@@ -17,6 +17,8 @@ def test_capture(request, snapshot):
         re.compile(r"^hs_time_in_"),
         re.compile(r"^hs_date_entered_"),
         re.compile(r"^hs_date_exited_"),
+        re.compile(r"^lastmodifieddate$"),
+        re.compile(r"^hs_lastmodifieddate$"),
     ]
 
     result = subprocess.run(

@@ -7,6 +7,32 @@ import pytest
 from estuary_cdk.utils import compare_capture_records
 
 
+FIELDS_TO_REDACT = [
+    "updated_at",
+    "last_login_at",
+    "assignee_updated_at",
+    "generated_timestamp",
+]
+
+
+def redact_nested_fields(value: list | dict) -> None:
+    """
+    Recursively redact volatile timestamp/cursor fields wherever they appear so
+    snapshots stay stable across captures. Zendesk surfaces `updated_at` on
+    nested objects (not just the record root), and incremental exports stamp a
+    fresh `generated_timestamp` on every run.
+    """
+    if isinstance(value, list):
+        for element in value:
+            redact_nested_fields(element)
+    elif isinstance(value, dict):
+        for key, nested in value.items():
+            if key in FIELDS_TO_REDACT:
+                value[key] = "redacted"
+            else:
+                redact_nested_fields(nested)
+
+
 def test_capture(request, snapshot):
     OMITTED_STREAMS = [
         "acmeCo/tags",
@@ -41,11 +67,8 @@ def test_capture(request, snapshot):
     for l in unique_stream_lines:
         stream, rec = l[0], l[1]
 
-        rec['_meta']['row_id'] = 0
-        if "updated_at" in rec:
-            rec["updated_at"] = "redacted"
-        if "last_login_at" in rec:
-            rec["last_login_at"] = "redacted"
+        rec["_meta"]["row_id"] = 0
+        redact_nested_fields(rec)
 
         if stream == "acmeCo/ticket_audits":
             rec["id"] = "redacted"
@@ -53,7 +76,11 @@ def test_capture(request, snapshot):
             rec["events"] = "redacted"
             rec["ticket_id"] = "redacted"
 
-    snapshot_path = Path(request.fspath.dirname) / "snapshots" / "snapshots__capture__capture.stdout.json"
+    snapshot_path = (
+        Path(request.fspath.dirname)
+        / "snapshots"
+        / "snapshots__capture__capture.stdout.json"
+    )
     insta_mode = request.config.getoption("--insta", default=None)
 
     if insta_mode == "update" or not snapshot_path.exists():

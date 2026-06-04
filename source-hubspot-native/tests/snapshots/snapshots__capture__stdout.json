@@ -122,7 +122,7 @@
         "hs_last_sales_activity_date": null,
         "hs_last_sales_activity_timestamp": null,
         "hs_last_sales_activity_type": null,
-        "hs_lastmodifieddate": "2025-01-18T21:49:41.259Z",
+        "hs_lastmodifieddate": "redacted",
         "hs_latest_createdate_of_active_subscriptions": null,
         "hs_latest_intent_signal_occurred_at": null,
         "hs_latest_intent_signal_timestamp": null,
@@ -387,50 +387,7 @@
           }
         ],
         "hs_date_entered_lead": "redacted",
-        "hs_lastmodifieddate": [
-          {
-            "sourceType": "DATA_ENRICHMENT",
-            "timestamp": "2025-01-18T21:49:41.259000Z",
-            "value": "2025-01-18T21:49:41.259Z"
-          },
-          {
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-10-28T16:39:23.486000Z",
-            "value": "2024-10-28T16:39:23.486Z"
-          },
-          {
-            "sourceType": "INTERNAL_PROCESSING",
-            "timestamp": "2024-10-28T16:39:21.729000Z",
-            "value": "2024-10-28T16:39:21.729Z"
-          },
-          {
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-10-28T16:39:18.872000Z",
-            "value": "2024-10-28T16:39:18.872Z"
-          },
-          {
-            "sourceType": "INTERNAL_PROCESSING",
-            "timestamp": "2024-10-28T16:39:06.146000Z",
-            "value": "2024-10-28T16:39:06.146Z"
-          },
-          {
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-10-28T16:39:02.248000Z",
-            "value": "2024-10-28T16:39:02.248Z"
-          },
-          {
-            "sourceId": "RecordSourceDetailsWriterWorker",
-            "sourceType": "INTERNAL_PROCESSING",
-            "timestamp": "2024-10-28T16:39:01.568000Z",
-            "value": "2024-10-28T16:39:01.568Z"
-          },
-          {
-            "sourceId": "FetchAssociatedCompanyIdStep",
-            "sourceType": "COMPANIES",
-            "timestamp": "2024-10-28T16:39:01.173000Z",
-            "value": "2024-10-28T16:39:01.173Z"
-          }
-        ],
+        "hs_lastmodifieddate": "redacted",
         "hs_logo_url": [
           {
             "sourceType": "DATA_ENRICHMENT",
@@ -817,7 +774,7 @@
         "hs_last_sales_activity_type": null,
         "hs_last_sms_send_date": null,
         "hs_last_sms_send_name": null,
-        "hs_lastmodifieddate": null,
+        "hs_lastmodifieddate": "redacted",
         "hs_latest_disqualified_lead_date": null,
         "hs_latest_meeting_activity": null,
         "hs_latest_open_lead_date": null,
@@ -872,6 +829,7 @@
         "hs_predictivecontactscore_v2": null,
         "hs_predictivecontactscorebucket": null,
         "hs_predictivescoringtier": null,
+        "hs_prospecting_agent_activation_email_id": null,
         "hs_prospecting_agent_activation_status": null,
         "hs_prospecting_agent_actively_enrolled_count": "0",
         "hs_prospecting_agent_enrollment_status": null,
@@ -882,6 +840,8 @@
         "hs_quarantined_emails": null,
         "hs_read_only": null,
         "hs_recent_closed_order_date": null,
+        "hs_reddit_ad_clicked": null,
+        "hs_reddit_click_id": null,
         "hs_registered_member": "0",
         "hs_registration_method": null,
         "hs_returning_to_office_detected_date": null,
@@ -986,7 +946,7 @@
         "job_function": null,
         "jobtitle": "Salesperson",
         "kloutscoregeneral": null,
-        "lastmodifieddate": "2024-10-28T16:40:17.996Z",
+        "lastmodifieddate": "redacted",
         "lastname": "Johnson (Sample Contact)",
         "lifecyclestage": "lead",
         "linkedinbio": null,
@@ -1411,35 +1371,7 @@
             "value": "Salesperson"
           }
         ],
-        "lastmodifieddate": [
-          {
-            "sourceType": "API",
-            "timestamp": "2024-10-28T16:40:17.996000Z",
-            "value": "2024-10-28T16:40:17.996Z"
-          },
-          {
-            "sourceType": "API",
-            "timestamp": "2024-10-28T16:39:10.630000Z",
-            "value": "2024-10-28T16:39:10.630Z"
-          },
-          {
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-10-28T16:39:01.522000Z",
-            "value": "2024-10-28T16:39:01.522Z"
-          },
-          {
-            "sourceId": "sample-contact",
-            "sourceType": "API",
-            "timestamp": "2024-10-28T16:39:01.010000Z",
-            "value": "2024-10-28T16:39:01.010Z"
-          },
-          {
-            "sourceId": "sample-contact",
-            "sourceType": "API",
-            "timestamp": "2024-10-28T16:39:00.846000Z",
-            "value": "2024-10-28T16:39:00.846Z"
-          }
-        ],
+        "lastmodifieddate": "redacted",
         "lastname": [
           {
             "sourceId": "sample-contact",
@@ -1679,7 +1611,7 @@
         "hs_last_sales_activity_type": null,
         "hs_last_sms_send_date": null,
         "hs_last_sms_send_name": null,
-        "hs_lastmodifieddate": null,
+        "hs_lastmodifieddate": "redacted",
         "hs_latest_disqualified_lead_date": null,
         "hs_latest_meeting_activity": null,
         "hs_latest_open_lead_date": null,
@@ -1734,6 +1666,7 @@
         "hs_predictivecontactscore_v2": null,
         "hs_predictivecontactscorebucket": null,
         "hs_predictivescoringtier": null,
+        "hs_prospecting_agent_activation_email_id": null,
         "hs_prospecting_agent_activation_status": null,
         "hs_prospecting_agent_actively_enrolled_count": "0",
         "hs_prospecting_agent_enrollment_status": null,
@@ -1744,6 +1677,8 @@
         "hs_quarantined_emails": null,
         "hs_read_only": null,
         "hs_recent_closed_order_date": null,
+        "hs_reddit_ad_clicked": null,
+        "hs_reddit_click_id": null,
         "hs_registered_member": "0",
         "hs_registration_method": null,
         "hs_returning_to_office_detected_date": null,
@@ -1848,7 +1783,7 @@
         "job_function": null,
         "jobtitle": "Executive Chairperson",
         "kloutscoregeneral": null,
-        "lastmodifieddate": "2024-10-28T16:40:20.553Z",
+        "lastmodifieddate": "redacted",
         "lastname": "Halligan (Sample Contact)",
         "lifecyclestage": "lead",
         "linkedinbio": null,
@@ -2257,35 +2192,7 @@
             "value": "Executive Chairperson"
           }
         ],
-        "lastmodifieddate": [
-          {
-            "sourceType": "API",
-            "timestamp": "2024-10-28T16:40:20.553000Z",
-            "value": "2024-10-28T16:40:20.553Z"
-          },
-          {
-            "sourceType": "API",
-            "timestamp": "2024-10-28T16:39:14.522000Z",
-            "value": "2024-10-28T16:39:14.522Z"
-          },
-          {
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-10-28T16:39:02.286000Z",
-            "value": "2024-10-28T16:39:02.286Z"
-          },
-          {
-            "sourceId": "sample-contact",
-            "sourceType": "API",
-            "timestamp": "2024-10-28T16:39:01.442000Z",
-            "value": "2024-10-28T16:39:01.442Z"
-          },
-          {
-            "sourceId": "sample-contact",
-            "sourceType": "API",
-            "timestamp": "2024-10-28T16:39:01.326000Z",
-            "value": "2024-10-28T16:39:01.326Z"
-          }
-        ],
+        "lastmodifieddate": "redacted",
         "lastname": [
           {
             "sourceId": "sample-contact",
@@ -2537,7 +2444,7 @@
         "hs_last_sales_activity_type": null,
         "hs_last_sms_send_date": null,
         "hs_last_sms_send_name": null,
-        "hs_lastmodifieddate": null,
+        "hs_lastmodifieddate": "redacted",
         "hs_latest_disqualified_lead_date": null,
         "hs_latest_meeting_activity": null,
         "hs_latest_open_lead_date": null,
@@ -2570,7 +2477,7 @@
         "hs_membership_has_accessed_private_content": "0",
         "hs_membership_last_private_content_access_date": null,
         "hs_merged_object_ids": null,
-        "hs_messaging_engagement_score": null,
+        "hs_messaging_engagement_score": "0.474357",
         "hs_mobile_sdk_push_tokens": null,
         "hs_notes_last_activity": null,
         "hs_notes_next_activity": null,
@@ -2592,6 +2499,7 @@
         "hs_predictivecontactscore_v2": null,
         "hs_predictivecontactscorebucket": null,
         "hs_predictivescoringtier": null,
+        "hs_prospecting_agent_activation_email_id": null,
         "hs_prospecting_agent_activation_status": null,
         "hs_prospecting_agent_actively_enrolled_count": "0",
         "hs_prospecting_agent_enrollment_status": null,
@@ -2602,6 +2510,8 @@
         "hs_quarantined_emails": null,
         "hs_read_only": null,
         "hs_recent_closed_order_date": null,
+        "hs_reddit_ad_clicked": null,
+        "hs_reddit_click_id": null,
         "hs_registered_member": "0",
         "hs_registration_method": null,
         "hs_returning_to_office_detected_date": null,
@@ -2706,7 +2616,7 @@
         "job_function": null,
         "jobtitle": null,
         "kloutscoregeneral": null,
-        "lastmodifieddate": "2026-06-02T17:19:18.431Z",
+        "lastmodifieddate": "redacted",
         "lastname": "Doe",
         "lifecyclestage": "lead",
         "linkedinbio": null,
@@ -2958,6 +2868,14 @@
             "value": "0"
           }
         ],
+        "hs_messaging_engagement_score": [
+          {
+            "sourceId": "MessagingContactEngagementScoreEvaluator",
+            "sourceType": "EMAIL",
+            "timestamp": "2026-06-03T01:33:01.277000Z",
+            "value": "0.474357"
+          }
+        ],
         "hs_num_associated_open_deals": [
           {
             "sourceId": "InitialRollupProperties",
@@ -3149,26 +3067,7 @@
             "value": "true"
           }
         ],
-        "lastmodifieddate": [
-          {
-            "sourceType": "API",
-            "timestamp": "2026-06-02T17:19:18.431000Z",
-            "value": "2026-06-02T17:19:18.431Z"
-          },
-          {
-            "sourceId": "RecordSourceDetailsWriterWorker",
-            "sourceType": "INTERNAL_PROCESSING",
-            "timestamp": "2026-06-02T17:19:08.187000Z",
-            "value": "2026-06-02T17:19:08.187Z"
-          },
-          {
-            "sourceId": "76185710",
-            "sourceType": "IMPORT",
-            "timestamp": "2026-06-02T17:19:07.527000Z",
-            "updatedByUserId": 73074756,
-            "value": "2026-06-02T17:19:07.527Z"
-          }
-        ],
+        "lastmodifieddate": "redacted",
         "lastname": [
           {
             "sourceId": "76185710",
@@ -3311,7 +3210,7 @@
         "hs_last_meeting_id_with_followups": null,
         "hs_last_partner_shared_message_date": null,
         "hs_last_shared_message_create_date": null,
-        "hs_lastmodifieddate": "2025-04-03T12:59:43.469Z",
+        "hs_lastmodifieddate": "redacted",
         "hs_latest_approval_status": null,
         "hs_latest_approval_status_approval_id": null,
         "hs_latest_marketing_email_click_date": null,
@@ -3656,32 +3555,7 @@
             "value": "1"
           }
         ],
-        "hs_lastmodifieddate": [
-          {
-            "sourceId": "DealStageProbabilityHandler",
-            "sourceType": "CALCULATED",
-            "timestamp": "2025-04-03T12:59:43.469000Z",
-            "value": "2025-04-03T12:59:43.469Z"
-          },
-          {
-            "sourceType": "API",
-            "timestamp": "2025-04-03T12:59:19.747000Z",
-            "value": "2025-04-03T12:59:19.747Z"
-          },
-          {
-            "sourceId": "DealStageProcessor:userId:Optional.empty",
-            "sourceType": "INTERNAL_PROCESSING",
-            "timestamp": "2025-04-03T12:59:11.666000Z",
-            "value": "2025-04-03T12:59:11.666Z"
-          },
-          {
-            "sourceId": "userId:73074756",
-            "sourceType": "CRM_UI",
-            "timestamp": "2025-04-03T12:59:10.726000Z",
-            "updatedByUserId": 73074756,
-            "value": "2025-04-03T12:59:10.726Z"
-          }
-        ],
+        "hs_lastmodifieddate": "redacted",
         "hs_num_associated_active_deal_registrations": [
           {
             "sourceId": "InitialRollupProperties",
@@ -4210,7 +4084,7 @@
         "hs_is_canceled": "false",
         "hs_is_closed": "true",
         "hs_landing_site": null,
-        "hs_lastmodifieddate": "2026-01-14T19:18:04.972Z",
+        "hs_lastmodifieddate": "redacted",
         "hs_merged_object_ids": null,
         "hs_object_id": "520214166401",
         "hs_object_source": "CRM_UI",
@@ -4339,15 +4213,7 @@
             "value": "true"
           }
         ],
-        "hs_lastmodifieddate": [
-          {
-            "sourceId": "userId:73074756",
-            "sourceType": "CRM_UI",
-            "timestamp": "2026-01-14T19:18:04.972000Z",
-            "updatedByUserId": 73074756,
-            "value": "2026-01-14T19:18:04.972Z"
-          }
-        ],
+        "hs_lastmodifieddate": "redacted",
         "hs_object_id": [
           {
             "sourceId": "userId:73074756",

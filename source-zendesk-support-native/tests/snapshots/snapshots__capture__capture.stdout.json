@@ -197,6 +197,7 @@
       "phone_number_id": 28835744176276,
       "post_call_summary": null,
       "post_call_summary_created": null,
+      "post_call_transcription": null,
       "post_call_transcription_created": null,
       "quality_issues": [
         "none"
@@ -250,6 +251,7 @@
         "custom_objects": {},
         "end_user_list_access": "full",
         "end_user_profile_access": "readonly",
+        "execute_it_asset_management_actions": false,
         "explore_access": "readonly",
         "explore_reports": {
           "brands_ticket_access": "all",
@@ -265,6 +267,7 @@
         "it_asset_management_access": "view",
         "light_agent": true,
         "macro_access": "readonly",
+        "manage_api_credentials": false,
         "manage_approval_requests": false,
         "manage_automations": false,
         "manage_business_rules": false,
@@ -284,6 +287,7 @@
         "manage_roles": "none",
         "manage_skills": false,
         "manage_slas": false,
+        "manage_support_apps": false,
         "manage_suspended_tickets": false,
         "manage_team_members": "readonly",
         "manage_ticket_fields": false,
@@ -309,6 +313,7 @@
         "ticket_redaction": false,
         "ticket_tag_editing": false,
         "twitter_search_access": false,
+        "update_api_settings": false,
         "update_user_own_alias": false,
         "update_user_own_name": false,
         "update_user_own_signature": false,
@@ -1046,6 +1051,14 @@
           {
             "id": 48494958189844,
             "value": null
+          },
+          {
+            "id": 49220324710292,
+            "value": null
+          },
+          {
+            "id": 49220324714132,
+            "value": null
           }
         ],
         "custom_status_id": 28835714727188,
@@ -1070,6 +1083,14 @@
           },
           {
             "id": 48494958189844,
+            "value": null
+          },
+          {
+            "id": 49220324710292,
+            "value": null
+          },
+          {
+            "id": 49220324714132,
             "value": null
           }
         ],
@@ -1148,6 +1169,14 @@
         {
           "id": 48494958189844,
           "value": null
+        },
+        {
+          "id": 49220324710292,
+          "value": null
+        },
+        {
+          "id": 49220324714132,
+          "value": null
         }
       ],
       "custom_status_id": 28835714727188,
@@ -1171,6 +1200,14 @@
         },
         {
           "id": 48494958189844,
+          "value": null
+        },
+        {
+          "id": 49220324710292,
+          "value": null
+        },
+        {
+          "id": 49220324714132,
           "value": null
         }
       ],

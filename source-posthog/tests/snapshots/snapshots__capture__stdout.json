@@ -125,6 +125,7 @@
       "allow_publicly_shared_resources": true,
       "available_product_features": [
         {
+          "category": null,
           "description": "Ingest, search, and analyze logs from your applications.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -135,6 +136,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Create as many surveys as you want.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -145,6 +147,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Rating scale (for NPS and the like), multiple choice, single choice, emoji rating, link, free text.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -155,6 +158,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Ask multiple questions in a single survey.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -165,6 +169,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Target by URL, user property, or feature flag when used with Feature flags.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -175,6 +180,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Sample users to only survey a portion of the users who match the criteria.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -185,6 +191,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Add custom HTML to your survey text.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -195,6 +202,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Using Popover or Feedback button surveys? No more code required. But if want to create your own UI, we have a full API.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -205,6 +213,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "See feedback summarized and broken down per response, plus completion rates and drop offs.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -215,6 +224,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Use our templates to get started quickly with NPS, customer satisfaction surveys, user interviews, and more.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -225,6 +235,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Track user sentiment in distinct iterations of a survey.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -235,6 +246,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Activate surveys based on user events.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -245,6 +257,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Keep a historical record of your data.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -255,6 +268,7 @@
           "unit": "year"
         },
         {
+          "category": null,
           "description": "PostHog AI builds insights, automates manual tasks, and routes more complex tasks to other AI agents for specialized work.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -265,6 +279,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Zapier lets you connect PostHog with thousands of the most popular apps, so you can automate your work and have more time for what matters most\u2014no code required.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -275,6 +290,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Get notified about new actions in Slack.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -285,6 +301,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Get notified about new actions in Microsoft Teams.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -295,6 +312,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Get notified about new actions in Discord.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -305,6 +323,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Use transformations to filter or modify your incoming data (destinations not included, see the data pipelines addon for product analytics).",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -315,6 +334,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Schedule regular data exports to your warehouse or other tools like BigQuery, Redshift, and more.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -325,6 +345,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Create as many feature flags as you need.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -335,6 +356,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Turn features on and off for specific users.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -345,6 +367,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Create three or more variants of a feature flag to test or release different versions of a feature.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -355,6 +378,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Persist feature flags across authentication events so that flag values don't change when an anonymous user logs in and becomes identified.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -365,6 +389,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Use JSON payloads to change text, visuals, or entire blocks of code without subsequent deployments.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -375,6 +400,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Customize your rollout strategy by user or group properties, cohort, or trafic percentage.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -385,6 +411,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "For any release condition, specify which flag value the users or groups in that condition should receive.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -395,6 +422,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Target feature flag release conditions by group properties, not just user properties.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -405,6 +433,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Bootstrap flags on initialization so all flags are available immediately, without having to make extra network requests.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -415,6 +444,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "See how many times a flag has been evaluated, how many times each variant has been returned, and what values users received.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -425,6 +455,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Test changes to your product and evaluate the impacts those changes make.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -435,6 +466,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Measure the impact of a change on a aggregate values or a series of events, like a signup flow.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -445,6 +477,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Track additional metrics to see how your experiment affects other parts of your app or different flows.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -455,6 +488,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Get a statistical analysis of your experiment results to see if the results are significant, or if they're likely just due to chance.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -465,6 +499,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Keep a historical record of your data.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -475,6 +510,7 @@
           "unit": "year"
         },
         {
+          "category": null,
           "description": "Keep a historical record of your data.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -485,17 +521,19 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Overview dashboard with usage metrics, costs, and performance.",
           "entitlement_only": false,
           "is_plan_default": true,
           "key": "llm_analytics_dashboard",
           "limit": null,
-          "name": "LLM analytics dashboard",
+          "name": "AI observability dashboard",
           "note": null,
           "unit": null
         },
         {
-          "description": "Full interaction timelines grouping related LLM calls.",
+          "category": null,
+          "description": "Full interaction timelines grouping related AI calls.",
           "entitlement_only": false,
           "is_plan_default": true,
           "key": "llm_analytics_traces",
@@ -505,7 +543,8 @@
           "unit": null
         },
         {
-          "description": "Track individual LLM requests with conversation history.",
+          "category": null,
+          "description": "Track individual AI requests with conversation history.",
           "entitlement_only": false,
           "is_plan_default": true,
           "key": "llm_analytics_generations",
@@ -515,6 +554,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Capture atomic operations like vector searches and tool calls.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -525,16 +565,18 @@
           "unit": null
         },
         {
-          "description": "Test and debug LLM interactions.",
+          "category": null,
+          "description": "Test and debug AI interactions.",
           "entitlement_only": false,
           "is_plan_default": true,
           "key": "llm_analytics_playground",
           "limit": null,
-          "name": "LLM playground",
+          "name": "AI playground",
           "note": null,
           "unit": null
         },
         {
+          "category": null,
           "description": "Python SDK support for OpenAI, Anthropic, Google Gemini, LangChain, and more.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -545,6 +587,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Node.js SDK support for OpenAI, Anthropic, Google Gemini, Vercel AI SDK, LangChain, and more.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -555,6 +598,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Automatic cost calculation per request.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -565,6 +609,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Track input, output, and cached token usage.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -575,6 +620,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Monitor response times and performance.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -585,7 +631,8 @@
           "unit": null
         },
         {
-          "description": "Analyze LLM usage with dashboards, funnels, retention, and custom SQL queries.",
+          "category": null,
+          "description": "Analyze AI usage with dashboards, funnels, retention, and custom SQL queries.",
           "entitlement_only": false,
           "is_plan_default": true,
           "key": "llm_analytics_product_analytics",
@@ -595,7 +642,8 @@
           "unit": null
         },
         {
-          "description": "Monitor, debug, and resolve LLM-generated errors automatically.",
+          "category": null,
+          "description": "Monitor, debug, and resolve AI-generated errors automatically.",
           "entitlement_only": false,
           "is_plan_default": true,
           "key": "llm_analytics_error_tracking",
@@ -605,7 +653,8 @@
           "unit": null
         },
         {
-          "description": "Watch session recordings to see exactly how users interact with your LLM features.",
+          "category": null,
+          "description": "Watch session recordings to see exactly how users interact with your AI features.",
           "entitlement_only": false,
           "is_plan_default": true,
           "key": "llm_analytics_session_replay",
@@ -615,6 +664,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Exclude sensitive data from tracking.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -625,6 +675,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Add metadata and custom properties.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -635,6 +686,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Record and replay mobile app sessions.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -645,6 +697,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Sync data from Stripe, Hubspot, Zendesk, Snowflake, Postgres, and more.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -655,6 +708,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Create views to model your data and streamline queries.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -665,6 +719,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Link directly to your data sources such as S3, Google Cloud Storage, and Cloudflare R2. Data stays on your servers.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -675,6 +730,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Join data from any source, including your PostHog analytics data, to easily get the answers you need.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -685,6 +741,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Query all your business and product data directly inside PostHog.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -695,6 +752,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Create insights from the data you import and add them to your PostHog dashboards.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -705,6 +763,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Sync only the data that has changed since the last sync.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -715,6 +774,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Choose how often you want to sync your data - daily, weekly, or monthly.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -725,6 +785,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Automatically capture unhandled exceptions in your code.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -735,6 +796,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Upload source maps to get code context.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -745,6 +807,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Watch a users session when they encounter an error.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -755,6 +818,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Get notified of new issues by email, Slack, or webhook.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -765,6 +829,7 @@
           "unit": "alerts"
         },
         {
+          "category": null,
           "description": "Debug issues faster by browsing the user's console.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -775,6 +840,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "See your end-user's network performance and information alongside session recordings.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -785,6 +851,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Analyze performance and network calls.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -795,16 +862,18 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Create playlists of certain session recordings to easily find and watch them again in the future.",
           "entitlement_only": false,
           "is_plan_default": true,
           "key": "recordings_playlists",
           "limit": null,
           "name": "Recording playlists",
-          "note": "unlimited",
+          "note": null,
           "unit": null
         },
         {
+          "category": null,
           "description": "Keep a historical record of your data. Up to 5 years of retention available with add-on packages.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -815,6 +884,7 @@
           "unit": "month"
         },
         {
+          "category": null,
           "description": "Disable capturing data from any DOM element with HTML attributes or a customizable config.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -825,6 +895,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Share replays directly via URL or embed via iframe.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -835,6 +906,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "See a history of everything that happened in a user's session.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -845,6 +917,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Filter by person properties to quickly find relevant recordings.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -855,6 +928,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Filter by events to quickly find relevant recordings.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -865,6 +939,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Freeze snapshots of recordings and explore the DOM with your browser dev tools.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -875,6 +950,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Restrict the percentage of sessions that will be recorded.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -885,6 +961,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Only record sessions longer than the minimum duration.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -895,6 +972,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Only record sessions for users that have the flag enabled.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -905,6 +983,7 @@
           "unit": null
         },
         {
+          "category": "Platforms",
           "description": "Record sessions on your web app.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -915,6 +994,7 @@
           "unit": null
         },
         {
+          "category": "Platforms",
           "description": "Record sessions on your Android app.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -925,6 +1005,7 @@
           "unit": null
         },
         {
+          "category": "Platforms",
           "description": "Record sessions on your iOS app.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -935,6 +1016,7 @@
           "unit": null
         },
         {
+          "category": "Platforms",
           "description": "Record sessions on your React Native app.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -945,6 +1027,7 @@
           "unit": null
         },
         {
+          "category": "Platforms",
           "description": "Record sessions on your Flutter app.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -955,6 +1038,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Enhance your user data with properties and attribution data. Great for tracking user behavior across devices and sessions and tracking person changes over time.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -965,6 +1049,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Send emails to your users with workflows.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -975,6 +1060,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Save trends, funnels, and other insights for easy reference by your whole team.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -985,6 +1071,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Visualize user dropoff between a sequence of events. See conversion rate over time, use flexible step ordering, set exclusion steps, and more.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -995,6 +1082,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Plot any number of events or actions over time.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -1005,6 +1093,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Customize columns across the app.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -1015,6 +1104,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Limited paths excludes: customizing path insights by setting the maximum number of paths, number of people on each path, how path names appear",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -1025,6 +1115,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Keep a historical record of your data.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -1035,16 +1126,29 @@
           "unit": "year"
         },
         {
+          "category": null,
           "description": "Set up alerts to notify you when certain events happen.",
           "entitlement_only": false,
           "is_plan_default": true,
           "key": "alerts",
-          "limit": 2,
+          "limit": 5,
           "name": "Alerts",
           "note": null,
           "unit": "alert"
         },
         {
+          "category": null,
+          "description": "Create a subscription for any insight or dashboard in PostHog to receive regular reports with their updates.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "subscriptions",
+          "limit": 5,
+          "name": "Insight & dashboard subscriptions",
+          "note": null,
+          "unit": "subscription"
+        },
+        {
+          "category": null,
           "description": "Track users across devices and sessions.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -1055,6 +1159,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "PostHog doesn't charge per seat add your entire team!",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -1065,6 +1170,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Organize environments within a project. Share dashboards, insights and more across environments without duplicating work.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -1075,6 +1181,7 @@
           "unit": "project"
         },
         {
+          "category": null,
           "description": "Access your data via our developer-friendly API.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -1085,6 +1192,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Log in to PostHog with your Google, Github, or Gitlab account.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -1095,6 +1203,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Get help from other users and PostHog team members in our Community forums.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -1105,6 +1214,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Secure your PostHog account with two-factor authentication.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -1115,6 +1225,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Get help from our team!",
           "entitlement_only": true,
           "is_plan_default": true,
@@ -1125,6 +1236,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Configure settings for publicly shared resources like insights and dashboards.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -1135,6 +1247,7 @@
           "unit": "configuration"
         },
         {
+          "category": "Features",
           "description": "Use our managed proxy service to send events through your own domain. Capture more usage data that might otherwise be intercepted by ad blockers without needing to set up and maintain the proxy yourself.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -1145,6 +1258,7 @@
           "unit": "proxies"
         },
         {
+          "category": null,
           "description": "Instantly send data to hundreds of third-party tools to trigger automations, send emails, enhance ads, and more.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -1155,6 +1269,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Send data to internal tools like Slack so you get notified whenever important events happen.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -1165,6 +1280,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Transform, enrich, sample, or drop events as they arrive \u2014 before ingestion, at no extra cost.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -1175,6 +1291,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Get a massive free allowance every month to try the integrations you need, and only pay for usage at scale.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -1185,6 +1302,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Send your data to 100+ destinations with workflows.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -1195,6 +1313,7 @@
           "unit": null
         },
         {
+          "category": null,
           "description": "Sync free historical rows in the first 7 days for each new source.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -1214,11 +1333,16 @@
       "id": "019c2351-c712-0000-8470-cf277880e65a",
       "is_active": true,
       "is_ai_data_processing_approved": false,
+      "is_ai_training_cta_shown": true,
+      "is_ai_training_locked": true,
+      "is_ai_training_opted_in": false,
+      "is_hipaa": false,
       "is_member_join_email_enabled": true,
       "is_not_active_reason": null,
       "is_pending_deletion": false,
       "logo_media_id": null,
       "member_count": 1,
+      "members_can_create_projects": false,
       "members_can_invite": true,
       "members_can_use_personal_api_keys": true,
       "membership_level": 15,
