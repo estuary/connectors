@@ -24,15 +24,18 @@ from .api import (
     API,
     fetch_backfill,
     fetch_backfill_substreams,
+    fetch_backfill_list_items,
     fetch_backfill_usage_records,
     fetch_incremental,
     fetch_incremental_no_events,
     fetch_incremental_substreams,
+    fetch_incremental_list_items,
     fetch_incremental_usage_records,
 )
 from .models import (
     CONNECTED_ACCOUNT_EXEMPT_STREAMS,
     DISABLED_BY_DEFAULT_STREAMS,
+    LIST_ITEM_STREAM_NAMES,
     REGIONAL_STREAMS,
     SCHEDULED_BACKFILL_STREAMS,
     SPLIT_CHILD_STREAM_NAMES,
@@ -252,6 +255,19 @@ async def all_resources(
                                     http,
                                     config.start_date,
                                     config.advanced.incremental_window_size,
+                                    platform_account_id,
+                                    connected_account_ids,
+                                    all_account_ids,
+                                    initial_state,
+                                )
+                            )
+                        case _ if child_stream.NAME in LIST_ITEM_STREAM_NAMES:
+                            all_streams.append(
+                                list_item_object(
+                                    base_stream,
+                                    child_stream,
+                                    http,
+                                    config.start_date,
                                     platform_account_id,
                                     connected_account_ids,
                                     all_account_ids,
@@ -556,6 +572,53 @@ def child_object(
         ),
         fetch_page_factory=lambda account_id: functools.partial(
             fetch_backfill_substreams,
+            cls,
+            child_cls,
+            start_date,
+            platform_account_id,
+            account_id,
+            http,
+        ),
+        platform_account_id=platform_account_id,
+        connected_account_ids=connected_account_ids,
+        all_account_ids=all_account_ids,
+        initial_state=initial_state,
+    )
+
+
+def list_item_object(
+    cls: type[BaseStripeObjectNoEvents],
+    child_cls: type[BaseStripeObjectNoEvents],
+    http: HTTPSession,
+    start_date: datetime,
+    platform_account_id: str,
+    connected_account_ids: list[str],
+    all_account_ids: list[str],
+    initial_state: ResourceState,
+) -> Resource[BaseDocument, ResourceConfig, ResourceState]:
+    """list_item_object handles a list item stream — a child stream of items listed
+    under a parent that has no events at the /events endpoint (e.g. ValueListItems under
+    ValueLists). Like child_object it lists the parent and fetches each parent's items,
+    but it has no incremental window since there's no Events API to page through —
+    incremental re-lists parents and filters items by `created`. When the items are
+    immutable (as ValueListItems are) this fully captures the stream, so it is not a
+    member of SCHEDULED_BACKFILL_STREAMS; a periodic re-backfill would only re-emit
+    identical docs (it surfaces neither updates nor deletes).
+    """
+    return _build_resource(
+        name=child_cls.NAME,
+        model=child_cls,
+        key=["/id"],
+        fetch_changes_factory=lambda account_id: functools.partial(
+            fetch_incremental_list_items,
+            cls,
+            child_cls,
+            platform_account_id,
+            account_id,
+            http,
+        ),
+        fetch_page_factory=lambda account_id: functools.partial(
+            fetch_backfill_list_items,
             cls,
             child_cls,
             start_date,

@@ -1,4 +1,27 @@
 $defs:
+  ListItemsPreview:
+    additionalProperties: true
+    description: |-
+      Preview of a value list's items embedded in each object of the
+      /v1/radar/value_lists response. Modeled as a required field (rather than
+      read defensively via getattr) so the ValueListItems stream's reliance on
+      it fails loudly at validation if Stripe ever stops embedding it, instead of
+      silently capturing nothing. When has_more is False, `data` holds the
+      complete set of items for the list.
+    properties:
+      has_more:
+        title: Has More
+        type: boolean
+      data:
+        items:
+          $ref: '#/$defs/ValueListItems'
+        title: Data
+        type: array
+    required:
+    - has_more
+    - data
+    title: ListItemsPreview
+    type: object
   Meta:
     properties:
       op:
@@ -16,6 +39,34 @@ $defs:
         title: Row Id
         type: integer
     title: Meta
+    type: object
+  ValueListItems:
+    additionalProperties: true
+    description: 'Parent Stream: ValueLists'
+    properties:
+      _meta:
+        $ref: '#/$defs/Meta'
+        description: Document metadata
+      id:
+        title: Id
+        type: string
+      object:
+        title: Object
+        type: string
+      account_id:
+        anyOf:
+        - type: string
+        - type: 'null'
+        description: The account ID associated with the resource.
+        title: Account Id
+      created:
+        title: Created
+        type: integer
+    required:
+    - id
+    - object
+    - created
+    title: ValueListItems
     type: object
 additionalProperties: true
 properties:
@@ -37,10 +88,13 @@ properties:
   created:
     title: Created
     type: integer
+  list_items:
+    $ref: '#/$defs/ListItemsPreview'
 required:
 - id
 - object
 - created
+- list_items
 title: ValueLists
 type: object
 x-infer-schema: true

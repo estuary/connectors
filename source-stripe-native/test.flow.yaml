@@ -230,3 +230,8 @@ captures:
         interval: PT5M
         schedule: 0 0 * * *
       target: acmeCo/ValueLists
+    - resource:
+        name: ValueListItems
+        interval: PT5M
+        schedule: ''
+      target: acmeCo/ValueListItems

@@ -456,15 +456,40 @@ class EarlyFraudWarning(BaseStripeObjectWithEvents):
     }
 
 
+# Stripe documents no value_list_item* event types (verified 2026-06-03).
+# value_list_items are immutable, so incremental on `created` captures every item.
+class ValueListItems(BaseStripeObjectNoEvents):
+    """
+    Parent Stream: ValueLists
+    """
+
+    NAME: ClassVar[str] = "ValueListItems"
+    SEARCH_NAME: ClassVar[str] = "radar/value_list_items"
+
+
 # Stripe documents no value_list* event types and no `updated` field
-# on the resource (verified 2026-06-01).
-# Value lists are mutable (rename, item add/remove, delete), so the
-# scheduled backfill in SCHEDULED_BACKFILL_STREAMS is required to
-# eventually observe updates and deletes — incremental on `created`
-# alone only catches new lists.
+# on the resource (verified 2026-06-03).
+# Value lists are mutable, so the scheduled backfill in
+# SCHEDULED_BACKFILL_STREAMS re-snapshots each list and those field updates are
+# picked up via reduction.
 class ValueLists(BaseStripeObjectNoEvents):
     NAME: ClassVar[str] = "ValueLists"
     SEARCH_NAME: ClassVar[str] = "radar/value_lists"
+
+    class ListItemsPreview(BaseModel, extra="allow"):
+        """
+        Preview of a value list's items embedded in each object of the
+        /v1/radar/value_lists response. Modeled as a required field (rather than
+        read defensively via getattr) so the ValueListItems stream's reliance on
+        it fails loudly at validation if Stripe ever stops embedding it, instead of
+        silently capturing nothing. When has_more is False, `data` holds the
+        complete set of items for the list.
+        """
+
+        has_more: bool
+        data: list[ValueListItems]
+
+    list_items: ListItemsPreview
 
 
 class InvoiceItems(BaseStripeObjectWithEvents):
@@ -839,7 +864,12 @@ STREAMS = [
     {"stream": Files},
     {"stream": FilesLink},
     {"stream": BalanceTransactions},
-    {"stream": ValueLists},
+    {
+        "stream": ValueLists,
+        "children": [
+            {"stream": ValueListItems},
+        ],
+    },
 ]
 
 # Regional streams are streams that don't have any children and are only accessible in certain regions.
@@ -860,6 +890,14 @@ SPLIT_CHILD_STREAM_NAMES = [
     Persons.NAME,
     ExternalAccountCards.NAME,
     ExternalBankAccount.NAME,
+]
+
+# List item streams: child streams of items listed under a parent that has no events at
+# the /events endpoint. They're captured by listing the parent stream and fetching each
+# parent's items directly (see list_item_object in resources.py), relying on scheduled
+# backfills to observe updates and deletes.
+LIST_ITEM_STREAM_NAMES = [
+    ValueListItems.NAME,
 ]
 
 # Streams that should not create per-account subtasks when capture_connected_accounts=true.
@@ -885,6 +923,4 @@ SCHEDULED_BACKFILL_STREAMS = [
 # Streams whose discovered binding is recommended disabled, so a capture only
 # replicates them if the user explicitly enables the binding. Existing captures
 # that already enabled the binding are unaffected.
-DISABLED_BY_DEFAULT_STREAMS = [
-    "ValueLists",
-]
+DISABLED_BY_DEFAULT_STREAMS = [ValueLists.NAME, ValueListItems.NAME]
