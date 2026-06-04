@@ -2,6 +2,7 @@
 
 import unittest
 from delayed_tag import (
+    ConnectorImage,
     PullRequest,
     PlanEntry,
     LaterEntry,
@@ -11,6 +12,7 @@ from delayed_tag import (
     find_boundary,
     parse_claude_verdict,
     pr_touches_dir,
+    resolve_family,
 )
 
 
@@ -296,6 +298,42 @@ class TestBuildClaudePrompt(unittest.TestCase):
     def test_no_later_prs(self):
         prompt = build_claude_prompt('img', 'dir', 5, 'chosen body', [])
         self.assertIn('PR #5', prompt)
+
+
+# ---------------------------------------------------------------------------
+# resolve_family
+# ---------------------------------------------------------------------------
+
+class TestResolveFamily(unittest.TestCase):
+    # source-postgres with two variants, plus an unrelated connector.
+    IMAGES = [
+        ConnectorImage('source-postgres', 'source-postgres'),
+        ConnectorImage('source-alloydb', 'source-postgres'),
+        ConnectorImage('source-amazon-rds-postgres', 'source-postgres'),
+        ConnectorImage('source-mysql', 'source-mysql'),
+    ]
+
+    def test_parent_returns_whole_family(self):
+        family = resolve_family(self.IMAGES, 'source-postgres')
+        self.assertEqual(
+            {c.image_name for c in family},
+            {'source-postgres', 'source-alloydb', 'source-amazon-rds-postgres'},
+        )
+
+    def test_variant_returns_whole_family(self):
+        # Selecting a variant still fast-forwards the entire family.
+        family = resolve_family(self.IMAGES, 'source-alloydb')
+        self.assertEqual(
+            {c.image_name for c in family},
+            {'source-postgres', 'source-alloydb', 'source-amazon-rds-postgres'},
+        )
+
+    def test_standalone_connector(self):
+        family = resolve_family(self.IMAGES, 'source-mysql')
+        self.assertEqual([c.image_name for c in family], ['source-mysql'])
+
+    def test_unknown_connector_is_empty(self):
+        self.assertEqual(resolve_family(self.IMAGES, 'source-nope'), [])
 
 
 if __name__ == '__main__':

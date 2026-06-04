@@ -204,6 +204,50 @@ def load_connector_images(ci_yaml: str, python_yaml: str) -> list:
     return images
 
 
+def resolve_family(connector_images: list, selected: str) -> list:
+    """
+    Return every ConnectorImage that shares the source_dir of `selected`
+    (matched by image_name) — i.e. the connector plus all of its variants,
+    regardless of whether the user named the parent or a variant.
+
+    Returns [] when `selected` is not a known image name.
+    """
+    match = next((c for c in connector_images if c.image_name == selected), None)
+    if match is None:
+        return []
+    return [c for c in connector_images if c.source_dir == match.source_dir]
+
+
+def resolve_version(source_dir: str, python_yaml: str) -> str:
+    """
+    Return the version tag (e.g. 'v3') CI publishes for a connector.
+
+    Python connectors carry their version in the python.yaml matrix; Go
+    connectors carry it in a VERSION file in the connector directory. We check
+    the matrix first because some Python connectors have no VERSION file.
+    Returns '' when neither source yields a version.
+    """
+    try:
+        out = subprocess.check_output(
+            ['yq',
+             f'.jobs.py_connector.strategy.matrix.connector[] '
+             f'| select(.name == "{source_dir}") | .version',
+             python_yaml],
+            text=True, stderr=subprocess.DEVNULL,
+        )
+        for line in out.splitlines():
+            v = line.strip()
+            if v and v != 'null':
+                return v
+    except subprocess.CalledProcessError:
+        pass
+
+    version_file = Path(source_dir) / 'VERSION'
+    if version_file.exists():
+        return version_file.read_text().strip()
+    return ''
+
+
 # ---------------------------------------------------------------------------
 # GitHub API
 # ---------------------------------------------------------------------------
@@ -714,6 +758,44 @@ def cmd_check(args: argparse.Namespace) -> None:
     print(f'Tagging {len(safe)}/{len(plan)} connector(s) after hold filter')
 
 
+def cmd_forward(args: argparse.Namespace) -> None:
+    """
+    Resolve a user-selected connector to the (image, version) pairs whose
+    ':delayed' tag should be fast-forwarded to match the latest published
+    version tag. Writes a two-column 'image TAB version' file consumed by the
+    workflow's tagging step. Includes all variants of the selected connector.
+    """
+    selected = args.connector.strip()
+    images = load_connector_images(args.ci_yaml, args.python_yaml)
+    family = resolve_family(images, selected)
+    if not family:
+        print(
+            f'::error::unknown connector {selected!r}: not found in the '
+            f'ci.yaml / python.yaml connector matrices',
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    source_dir = family[0].source_dir
+    version = resolve_version(source_dir, args.python_yaml)
+    if not version:
+        print(
+            f'::error::could not determine the version tag for {selected!r} '
+            f'(source dir {source_dir!r}/)',
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    with open(args.output, 'w') as f:
+        for ci in family:
+            f.write(f'{ci.image_name}\t{version}\n')
+
+    print(f'{selected}: version {version}, {len(family)} image(s) to fast-forward:')
+    for ci in family:
+        suffix = '' if ci.image_name == source_dir else ' (variant)'
+        print(f'  {ci.image_name}:{version} -> :delayed{suffix}')
+
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
@@ -740,8 +822,18 @@ def main(argv: Optional[list] = None) -> None:
     p.add_argument('--output-safe',     default='/tmp/safe_plan.tsv')
     p.add_argument('--output-verdicts', default='/tmp/claude_verdicts.tsv')
 
+    p = sub.add_parser(
+        'forward',
+        help="fast-forward a connector's ':delayed' tag to its latest version",
+    )
+    p.add_argument('--connector',   required=True,
+                   help='connector image name, e.g. source-postgres')
+    p.add_argument('--ci-yaml',     default='.github/workflows/ci.yaml')
+    p.add_argument('--python-yaml', default='.github/workflows/python.yaml')
+    p.add_argument('--output',      default='/tmp/forward_plan.tsv')
+
     args = parser.parse_args(argv)
-    {'plan': cmd_plan, 'check': cmd_check}[args.command](args)
+    {'plan': cmd_plan, 'check': cmd_check, 'forward': cmd_forward}[args.command](args)
 
 
 if __name__ == '__main__':

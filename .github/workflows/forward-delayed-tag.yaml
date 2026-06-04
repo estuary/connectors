@@ -1,0 +1,140 @@
+name: Forward delayed tag
+
+# Manually fast-forward a single connector's ':delayed' tag to match its
+# latest published version tag (':vN'). This is the deliberate counterpart to
+# the nightly `delayed-tag.yaml` workflow, which holds ':delayed' two weeks
+# behind main.
+#
+# Use it to:
+#   - Ship a critical hotfix that already landed on the latest version to
+#     ':delayed' customers immediately, without waiting out the 2-week delay.
+#   - Re-sync ':delayed' with the current version tag so that a customer can be
+#     switched from ':vN' to ':delayed' without regressing onto an older image.
+#
+# The selected connector is resolved (via delayed_tag.py forward) to its image
+# name plus every variant in its VARIANTS file. For each, ':delayed' is pointed
+# at the same registry digest as ':<version>' — a manifest-only re-tag, no
+# layers are moved. The connector_tags DB row for ':delayed' is then re-queued.
+
+on:
+  workflow_dispatch:
+    inputs:
+      connector:
+        description: 'Connector image name (e.g. source-postgres). Variants are included automatically.'
+        required: true
+        type: string
+
+concurrency:
+  # Serialise with the nightly delayed-tag workflow so the two never race on
+  # the same ':delayed' tag / DB rows.
+  group: delayed-tag
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  forward_delayed:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to GitHub package docker registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Run unit tests
+        run: cd .github/scripts && python3 -m unittest test_delayed_tag -v
+
+      - name: Resolve connector to image + version
+        # Validates the selected connector against the ci.yaml / python.yaml
+        # matrices and expands variants. Reads the version from the connector's
+        # VERSION file (Go) or the python.yaml matrix (Python).
+        # Writes: /tmp/forward_plan.tsv  (image, version)
+        run: |
+          python3 .github/scripts/delayed_tag.py forward \
+            --connector "${{ inputs.connector }}" \
+            --output /tmp/forward_plan.tsv
+
+      - name: Fast-forward ':delayed' to the version tag
+        run: |
+          set -uo pipefail
+          tagged=0; failed=0
+          : > /tmp/tagged.txt
+          : > /tmp/forwarded.tsv
+          while IFS=$'\t' read -r IMAGE VERSION; do
+            [ -z "${IMAGE}" ] && continue
+            SRC="ghcr.io/estuary/${IMAGE}:${VERSION}"
+            DST="ghcr.io/estuary/${IMAGE}:delayed"
+            # `docker buildx imagetools create --tag DST SRC` is a manifest-only
+            # operation that points DST at the same digest as SRC. No image
+            # layers are downloaded or re-uploaded.
+            if ! docker buildx imagetools inspect "${SRC}" >/dev/null 2>&1; then
+              echo "::error::no image at ${SRC} — was the latest version built and pushed to GHCR?"
+              failed=$((failed + 1))
+              continue
+            fi
+            if docker buildx imagetools create --tag "${DST}" "${SRC}" >/dev/null; then
+              echo "tagged ${DST} -> :${VERSION}"
+              echo "${IMAGE}" >> /tmp/tagged.txt
+              printf '%s\t%s\n' "${IMAGE}" "${VERSION}" >> /tmp/forwarded.tsv
+              tagged=$((tagged + 1))
+            else
+              echo "::warning::failed to tag ${IMAGE}"
+              failed=$((failed + 1))
+            fi
+          done < /tmp/forward_plan.tsv
+          echo "Summary: tagged=${tagged} failed=${failed}"
+          if [ "${failed}" -gt 0 ]; then
+            exit 1
+          fi
+
+      - name: Install psql
+        run: |
+          sudo apt update
+          sudo apt install -y postgresql-client
+
+      - name: Refresh connector_tags rows for ':delayed'
+        env:
+          PGHOST: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_HOST }}
+          PGUSER: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_USER }}
+          PGPASSWORD: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_PASSWORD }}
+          PGDATABASE: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_DATABASE }}
+        run: |
+          set -euo pipefail
+          while IFS= read -r IMAGE; do
+            [ -z "${IMAGE}" ] && continue
+            echo "UPDATE connector_tags SET job_status='{\"type\": \"queued\"}'
+                    WHERE connector_id IN (
+                      SELECT id FROM connectors WHERE image_name='ghcr.io/estuary/${IMAGE}'
+                    ) AND image_tag = ':delayed';" | psql
+          done < /tmp/tagged.txt
+
+      - name: Write job summary
+        if: always()
+        run: |
+          set -uo pipefail
+          {
+            echo "## Forward Delayed Tag — \`${{ inputs.connector }}\`"
+            echo ""
+            if [ -s /tmp/forwarded.tsv ]; then
+              echo "Fast-forwarded \`:delayed\` to the latest version tag:"
+              echo ""
+              echo "| Connector | Version |"
+              echo "|-----------|---------|"
+              while IFS=$'\t' read -r IMAGE VERSION; do
+                [ -z "${IMAGE}" ] && continue
+                echo "| \`${IMAGE}\` | \`${VERSION}\` |"
+              done < /tmp/forwarded.tsv
+            else
+              echo "No images were tagged."
+            fi
+            echo ""
+          } >> "${GITHUB_STEP_SUMMARY}"
