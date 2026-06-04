@@ -3,7 +3,7 @@ from typing import Generic, Literal, TypeVar
 from pydantic import BaseModel, Field
 
 
-class BaseDocument(BaseModel):
+class BaseDocument(BaseModel, extra="allow"):
     class Meta(BaseModel):
         op: Literal["c", "u", "d"] = Field(
             default="u",
