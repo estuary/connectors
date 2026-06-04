@@ -107,7 +107,19 @@ pub async fn do_pull(req: Open, mut stdout: std::io::Stdout) -> Result<()> {
         let mut doc = match msg.payload() {
             Some(bytes) => parse_datum(bytes, false, &mut schema_cache, schema_client.as_ref())
                 .await
-                .with_context(|| format!("parsing message payload for topic {}", msg.topic()))?,
+                .with_context(|| {
+                    // The first 64 bytes are enough to inspect the schema
+                    // registry framing (magic byte, schema ID, and protobuf
+                    // message indexes) of an unparseable message.
+                    format!(
+                        "parsing message payload for topic {} (partition {}, offset {}, payload length {}, first bytes {})",
+                        msg.topic(),
+                        msg.partition(),
+                        msg.offset(),
+                        bytes.len(),
+                        hex::encode(&bytes[..bytes.len().min(64)]),
+                    )
+                })?,
             None => {
                 // We interpret an absent message payload as a deletion
                 // tombstone. The captured document will otherwise be empty
