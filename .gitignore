@@ -1,6 +1,6 @@
 verify-affected-*
 venv
-.claude/scheduled_tasks.lock
+*/**/.claude/
 tests/benchmark/materialize/runs/*
 !tests/benchmark/materialize/runs/baselines
 tests/benchmark/materialize/runs/baselines/*/run.*
