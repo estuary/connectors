@@ -80,6 +80,12 @@ Annotate all function signatures and class attributes. The CDK relies heavily on
 - Keep defined fields to just primary keys, cursors and anything referenced in the codebase
 - Don't over-specify schemas—Estuary's schema inference handles additional fields automatically
 - Prefer type parameter syntax (`class Foo[T]`) over `TypeVar` + `Generic[T]`
+- When the connector's logic depends on a provider field, model it as a **required**
+  field rather than reading it defensively (e.g. `getattr(obj, "field", None)`). A
+  `getattr` default silently swallows a provider response-shape change—the dependent
+  logic just sees `None` and quietly does nothing. A required field fails loudly at
+  validation instead, surfacing the broken assumption immediately. (Accepting the
+  resulting breakage is the point: better a loud validation error than silent data loss.)
 
 ### Error handling
 
