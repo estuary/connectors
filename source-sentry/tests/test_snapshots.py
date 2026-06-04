@@ -30,6 +30,10 @@ def test_capture(request, snapshot):
             continue
         seen.add(stream)
         line[1]["stats"] = "redacted-object"
+        # Sentry toggles org/project feature flags server-side over time, so
+        # the `features` list drifts independently of connector behavior.
+        if "features" in line[1]:
+            line[1]["features"] = "redacted-list"
         unique_stream_lines.append(line)
 
     unique_stream_lines.sort(key=lambda l: l[0])
