@@ -198,6 +198,7 @@
           "type": "object"
         }
       },
+      "additionalProperties": true,
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
@@ -368,6 +369,7 @@
           "type": "object"
         }
       },
+      "additionalProperties": true,
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
@@ -538,6 +540,7 @@
           "type": "object"
         }
       },
+      "additionalProperties": true,
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
@@ -708,6 +711,7 @@
           "type": "object"
         }
       },
+      "additionalProperties": true,
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
@@ -878,6 +882,7 @@
           "type": "object"
         }
       },
+      "additionalProperties": true,
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
@@ -1048,6 +1053,7 @@
           "type": "object"
         }
       },
+      "additionalProperties": true,
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
@@ -1218,6 +1224,7 @@
           "type": "object"
         }
       },
+      "additionalProperties": true,
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
@@ -1388,6 +1395,7 @@
           "type": "object"
         }
       },
+      "additionalProperties": true,
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
@@ -1558,6 +1566,7 @@
           "type": "object"
         }
       },
+      "additionalProperties": true,
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
@@ -1728,6 +1737,7 @@
           "type": "object"
         }
       },
+      "additionalProperties": true,
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
@@ -1898,6 +1908,7 @@
           "type": "object"
         }
       },
+      "additionalProperties": true,
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
@@ -2068,6 +2079,7 @@
           "type": "object"
         }
       },
+      "additionalProperties": true,
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
@@ -2238,6 +2250,7 @@
           "type": "object"
         }
       },
+      "additionalProperties": true,
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
@@ -2408,6 +2421,7 @@
           "type": "object"
         }
       },
+      "additionalProperties": true,
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",

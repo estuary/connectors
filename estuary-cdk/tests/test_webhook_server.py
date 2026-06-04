@@ -203,7 +203,7 @@ class TestWebhookHandler:
 
     @pytest.mark.asyncio
     async def test_subclassed_document_model_respected(self):
-        class CustomDoc(WebhookDocument, extra="allow"):
+        class CustomDoc(WebhookDocument):
             @model_validator(mode="before")
             @classmethod
             def uppercase_name(cls, data: Any) -> Any:

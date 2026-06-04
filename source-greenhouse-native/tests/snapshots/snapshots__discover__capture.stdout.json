@@ -1544,6 +1544,7 @@
           "type": "object"
         }
       },
+      "additionalProperties": true,
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
