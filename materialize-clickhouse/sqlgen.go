@@ -587,9 +587,10 @@ INSERT INTO {{ template "storeTableNameIdentifier" . }} (
 {{ end }}
 
 {{ define "queryStoreParts" }}
-SELECT DISTINCT partition_id FROM system.parts
+SELECT partition_id, sum(rows) FROM system.parts
 WHERE table = {{ template "storeTableNameString" . }}
   AND database = ? AND active
+GROUP BY partition_id
 SETTINGS select_sequential_consistency = 1;
 {{ end }}
 
