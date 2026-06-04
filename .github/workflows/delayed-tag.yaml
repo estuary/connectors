@@ -28,7 +28,9 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}
+  # Shared with the manual forward-delayed-tag workflow so the two never race
+  # on the same ':delayed' tag / DB rows.
+  group: delayed-tag
   cancel-in-progress: false
 
 permissions:
