@@ -339,12 +339,16 @@ func storeRows(t *testing.T, ctx context.Context, conn chdriver.Conn, b *binding
 
 	partRows, err := conn.Query(ctx, b.store.queryPartsSQL, database)
 	require.NoError(t, err)
+	var totalRows int64
 	for partRows.Next() {
 		var partitionID string
-		require.NoError(t, partRows.Scan(&partitionID))
+		var partitionRows uint64
+		require.NoError(t, partRows.Scan(&partitionID, &partitionRows))
+		totalRows += int64(partitionRows)
 		require.NoError(t, conn.Exec(ctx, b.store.movePartitionSQL, partitionID))
 	}
 	require.NoError(t, partRows.Err())
+	require.Equal(t, int64(len(rows)), totalRows, "system.parts must account for every staged row")
 }
 
 // loadDocuments inserts keys into the binding's temp table, runs the load query
@@ -1039,7 +1043,8 @@ func TestMovePartitionMissingTarget(t *testing.T) {
 	var moveErr error
 	for rows.Next() {
 		var partitionID string
-		require.NoError(t, rows.Scan(&partitionID))
+		var partitionRows uint64
+		require.NoError(t, rows.Scan(&partitionID, &partitionRows))
 		if err = storeConn.Exec(ctx, b.store.movePartitionSQL, partitionID); err != nil {
 			moveErr = err
 			break
@@ -1051,4 +1056,89 @@ func TestMovePartitionMissingTarget(t *testing.T) {
 	var exc *clickhouseproto.Exception
 	require.ErrorAs(t, moveErr, &exc)
 	require.EqualValues(t, chproto.ErrUnknownTable, exc.Code)
+}
+
+// TestMoveRefusesOnStoredRowsMismatch exercises the row-accounting guard in
+// moveStorePartitionsToTarget: when system.parts does not account for every
+// row recorded in stateItem.StoredRows, the commit must fail without moving
+// partitions or dropping the stage table, preserving the staged rows for a
+// retry. With a matching count the move proceeds, and a recovery of state
+// whose stage table is already gone is treated as previously committed.
+func TestMoveRefusesOnStoredRowsMismatch(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	ensureDockerUp(t)
+
+	var cfg = testConfig()
+	var ctx = t.Context()
+	var dialect = clickHouseDialect(cfg.Database)
+	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tableName = "test_move_refuses_on_mismatch"
+	var table = buildTestTable(t, dialect, tableName)
+
+	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
+	defer db.Close()
+
+	_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
+	createSQL, err := sql.RenderTableTemplate(table, tpls.createTargetTable)
+	require.NoError(t, err)
+	_, err = db.ExecContext(ctx, createSQL)
+	require.NoError(t, err)
+
+	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}}
+	storeConn, err := clickhouse.Open(cfg.newClickhouseOptions())
+	require.NoError(t, err)
+	tr.store.conn = storeConn
+	defer storeConn.Close()
+	require.NoError(t, tr.addBinding(ctx, table))
+	var b = tr.bindings[0]
+
+	// Stage two rows.
+	require.NoError(t, storeConn.Exec(ctx, b.store.createTableSQL))
+	batch, err := storeConn.PrepareBatch(ctx, b.store.insertSQL)
+	require.NoError(t, err)
+	require.NoError(t, batch.Append("k1", "v1", "c", testTime, `{"id":"k1"}`))
+	require.NoError(t, batch.Append("k2", "v2", "c", testTime, `{"id":"k2"}`))
+	require.NoError(t, batch.Send())
+
+	si := &stateItem{
+		QueryPartsSQL:    b.store.queryPartsSQL,
+		MovePartitionSQL: b.store.movePartitionSQL,
+		ExistsSQL:        b.store.existsSQL,
+		DropTableSQL:     b.store.dropTableSQL,
+		StoredRows:       3, // deliberately wrong: only 2 rows were staged
+	}
+
+	// Mismatch: the commit must fail, naming the counts, ...
+	err = tr.moveStorePartitionsToTarget(ctx, si)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "refusing to commit store table")
+	require.Contains(t, err.Error(), "2 staged rows")
+	require.Contains(t, err.Error(), "3 rows were stored")
+
+	// ... the stage table must survive with its rows intact, ...
+	var stagedCount uint64
+	require.NoError(t, storeConn.QueryRow(ctx,
+		fmt.Sprintf("SELECT count() FROM %s", dialect.Identifier("flow_temp_store_0_"+tableName))).Scan(&stagedCount))
+	require.EqualValues(t, 2, stagedCount)
+
+	// ... and nothing may have reached the target table.
+	var targetCount uint64
+	require.NoError(t, storeConn.QueryRow(ctx,
+		fmt.Sprintf("SELECT count() FROM %s", dialect.Identifier(tableName))).Scan(&targetCount))
+	require.EqualValues(t, 0, targetCount)
+
+	// With the correct count the commit proceeds: rows land in the target and
+	// the stage table is dropped.
+	si.StoredRows = 2
+	require.NoError(t, tr.moveStorePartitionsToTarget(ctx, si))
+	require.NoError(t, storeConn.QueryRow(ctx,
+		fmt.Sprintf("SELECT count() FROM %s", dialect.Identifier(tableName))).Scan(&targetCount))
+	require.EqualValues(t, 2, targetCount)
+
+	// Recovery with the stage table already gone is a previously-completed
+	// commit, not data loss: it must succeed without error.
+	tr.recovery = true
+	require.NoError(t, tr.moveStorePartitionsToTarget(ctx, si))
 }

@@ -229,7 +229,17 @@ func (t *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSp
 type stateItem struct {
 	QueryPartsSQL    string
 	MovePartitionSQL string
+	ExistsSQL        string
 	DropTableSQL     string
+	// StoredRows is the number of rows inserted into the stage table during
+	// the transaction. Before moving partitions to the target table, it is
+	// checked against the row counts reported by system.parts: a mismatch
+	// means the staged rows are not (yet) visible to the connection servicing
+	// the move, and moving + dropping the stage table would silently lose
+	// them. A value of 0 means the count is unknown (state recovered from a
+	// checkpoint written by a prior version of the connector) and disables
+	// the check.
+	StoredRows int64
 }
 
 type connectorState map[string]*stateItem
@@ -520,6 +530,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 				t.state[stateKey] = &stateItem{
 					QueryPartsSQL:    t.bindings[it.Binding].store.queryPartsSQL,
 					MovePartitionSQL: t.bindings[it.Binding].store.movePartitionSQL,
+					ExistsSQL:        t.bindings[it.Binding].store.existsSQL,
 					DropTableSQL:     t.bindings[it.Binding].store.dropTableSQL,
 				}
 			}
@@ -539,6 +550,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		}
 		batch = append(batch, converted)
 		batchBytes += len(it.PackedKey) + len(it.PackedValues) + len(it.RawJSON)
+		t.state[b.target.StateKey].StoredRows++
 
 		if len(batch) >= maxBatchSize || batchBytes >= batchBytesLimit {
 			if err = flushLastBinding(); err != nil {
@@ -609,17 +621,62 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 }
 
 func (t *transactor) moveStorePartitionsToTarget(ctx context.Context, si *stateItem) error {
-	rows, err := t.store.conn.Query(ctx, si.QueryPartsSQL, t.cfg.Database)
-	if err != nil {
-		return fmt.Errorf("querying store table partitions: %w", err)
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var partitionID string
-		if err = rows.Scan(&partitionID); err != nil {
-			return fmt.Errorf("scanning store table partition: %w", err)
+	queryParts := func() (partitionIDs []string, totalRows int64, err error) {
+		rows, err := t.store.conn.Query(ctx, si.QueryPartsSQL, t.cfg.Database)
+		if err != nil {
+			return nil, 0, fmt.Errorf("querying store table partitions: %w", err)
 		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var partitionID string
+			var partitionRows uint64
+			if err = rows.Scan(&partitionID, &partitionRows); err != nil {
+				return nil, 0, fmt.Errorf("scanning store table partition: %w", err)
+			}
+			partitionIDs = append(partitionIDs, partitionID)
+			totalRows += int64(partitionRows)
+		}
+		if err = rows.Err(); err != nil {
+			return nil, 0, fmt.Errorf("iterating store table partitions: %w", err)
+		}
+		return partitionIDs, totalRows, nil
+	}
+
+	partitionIDs, totalRows, err := queryParts()
+	if err != nil {
+		return err
+	}
+
+	// Hard check: system.parts must account for every row inserted into the
+	// stage table during the transaction. A shortfall means the parts query
+	// was serviced by a connection that does not (yet) see the staged data --
+	// for example a replica with stale metadata for the stage table, which is
+	// re-created with a new UUID every transaction. Proceeding would move
+	// only the visible parts and then DROP the stage table, silently losing
+	// the rest. Fail instead, leaving the stage table intact for a retry.
+	if si.StoredRows > 0 && totalRows != si.StoredRows {
+		if t.recovery {
+			// During recovery the previous process may have already moved the
+			// partitions and dropped the stage table before exiting; the
+			// stage table no longer existing distinguishes that from loss.
+			if si.ExistsSQL != "" {
+				var exists uint64
+				if err := t.store.conn.QueryRow(ctx, si.ExistsSQL).Scan(&exists); err != nil {
+					return fmt.Errorf("querying store table existence: %w", err)
+				}
+				if exists == 0 {
+					return nil
+				}
+			}
+		}
+		return fmt.Errorf(
+			"refusing to commit store table: system.parts reports %d staged rows but %d rows were stored; "+
+				"not moving partitions or dropping the store table so staged rows are preserved for retry",
+			totalRows, si.StoredRows)
+	}
+
+	for _, partitionID := range partitionIDs {
 		if err = t.store.conn.Exec(ctx, si.MovePartitionSQL, partitionID); err != nil {
 			if t.recovery {
 				var typedErr *clickhouseproto.Exception
@@ -630,8 +687,17 @@ func (t *transactor) moveStorePartitionsToTarget(ctx context.Context, si *stateI
 			return fmt.Errorf("moving store table partition: %w", err)
 		}
 	}
-	if err = rows.Err(); err != nil {
-		return fmt.Errorf("iterating store table partitions: %w", err)
+
+	// Hard check: after moving every partition the stage table must have no
+	// active parts remaining. Rows left behind here would be destroyed by the
+	// DROP below.
+	if _, remainingRows, err := queryParts(); err != nil {
+		return err
+	} else if remainingRows > 0 {
+		return fmt.Errorf(
+			"refusing to drop store table: %d rows remain after moving %d partition(s); "+
+				"dropping the store table now would lose them",
+			remainingRows, len(partitionIDs))
 	}
 
 	if err = t.store.conn.Exec(ctx, si.DropTableSQL); err != nil {
