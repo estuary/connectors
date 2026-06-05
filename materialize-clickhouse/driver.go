@@ -4,15 +4,11 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
-	"time"
 
-	chproto "github.com/ClickHouse/ch-go/proto"
 	"github.com/ClickHouse/clickhouse-go/v2"
 	chdriver "github.com/ClickHouse/clickhouse-go/v2/lib/driver"
-	clickhouseproto "github.com/ClickHouse/clickhouse-go/v2/lib/proto"
 	m "github.com/estuary/connectors/go/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -217,7 +213,21 @@ type transactor struct {
 	be       *m.BindingEvents
 	_range   *pf.RangeSpec
 
-	recovery          bool
+	// recovery is set when the Open request carried prior connector state,
+	// meaning this session may be re-applying commits begun by a previous
+	// process. Pending commits recovered under this flag skip the pre-move
+	// row accounting: a crash mid-move legitimately leaves fewer staged rows
+	// than were stored, and an empty stage table means the commit had fully
+	// completed. It is cleared after the first Acknowledge.
+	recovery bool
+	// ensured is set once the first Acknowledge of the session has run the
+	// ensure pass: recovering any pending commits and creating / truncating /
+	// re-creating the persistent temp tables for every binding. It is
+	// deliberately independent of the recovery flag, which is only set when
+	// the Open request carried prior connector state -- a brand-new task has
+	// no state but still needs its temp tables ensured before the first
+	// transaction.
+	ensured           bool
 	state             connectorState
 	runtimeCheckpoint m.RuntimeCheckpoint
 }
@@ -226,19 +236,20 @@ func (t *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSp
 	return t.runtimeCheckpoint, nil
 }
 
+// stateItem records that a binding has a committed-but-not-yet-acknowledged
+// transaction whose rows are staged in its store table. The SQL needed to
+// commit those rows is always rendered freshly from the live binding -- never
+// persisted -- so that state written by one version of the connector is safe
+// to recover with another.
 type stateItem struct {
-	QueryPartsSQL    string
-	MovePartitionSQL string
-	ExistsSQL        string
-	DropTableSQL     string
 	// StoredRows is the number of rows inserted into the stage table during
 	// the transaction. Before moving partitions to the target table, it is
-	// checked against the row counts reported by system.parts: a mismatch
-	// means the staged rows are not (yet) visible to the connection servicing
-	// the move, and moving + dropping the stage table would silently lose
-	// them. A value of 0 means the count is unknown (state recovered from a
-	// checkpoint written by a prior version of the connector) and disables
-	// the check.
+	// checked against an authoritative (select_sequential_consistency) row
+	// count of the stage table: a mismatch means the staged rows are not
+	// visible to the connection servicing the move, and moving would silently
+	// lose them. A value of 0 means the count is unknown (state recovered
+	// from a checkpoint written by a prior version of the connector) and
+	// disables the check.
 	StoredRows int64
 }
 
@@ -299,16 +310,18 @@ type binding struct {
 	nullFieldsToStrip []string
 	load              struct {
 		createTableSQL string
+		truncateSQL    string
+		countKeysSQL   string
 		insertSQL      string
 		querySQL       string
 		dropTableSQL   string
 	}
 	store struct {
 		createTableSQL   string
+		truncateSQL      string
 		insertSQL        string
 		queryPartsSQL    string
 		movePartitionSQL string
-		existsSQL        string
 		dropTableSQL     string
 	}
 }
@@ -326,6 +339,12 @@ func (t *transactor) addBinding(_ context.Context, target sql.Table) error {
 	if b.load.createTableSQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.createLoadTable); err != nil {
 		return fmt.Errorf("rendering createLoadTable template: %w", err)
 	}
+	if b.load.truncateSQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.truncateLoadTable); err != nil {
+		return fmt.Errorf("rendering truncateLoadTable template: %w", err)
+	}
+	if b.load.countKeysSQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.countLoadKeys); err != nil {
+		return fmt.Errorf("rendering countLoadKeys template: %w", err)
+	}
 	if b.load.insertSQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.insertLoadTable); err != nil {
 		return fmt.Errorf("rendering insertLoadTable template: %w", err)
 	}
@@ -339,6 +358,9 @@ func (t *transactor) addBinding(_ context.Context, target sql.Table) error {
 	if b.store.createTableSQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.createStoreTable); err != nil {
 		return fmt.Errorf("rendering createStoreTable template: %w", err)
 	}
+	if b.store.truncateSQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.truncateStoreTable); err != nil {
+		return fmt.Errorf("rendering truncateStoreTable template: %w", err)
+	}
 	if b.store.insertSQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.insertStoreTable); err != nil {
 		return fmt.Errorf("rendering insertStoreTable template: %w", err)
 	}
@@ -347,9 +369,6 @@ func (t *transactor) addBinding(_ context.Context, target sql.Table) error {
 	}
 	if b.store.movePartitionSQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.moveStorePartition); err != nil {
 		return fmt.Errorf("rendering moveStorePartition template: %w", err)
-	}
-	if b.store.existsSQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.existsStoreTable); err != nil {
-		return fmt.Errorf("rendering existsStoreTable template: %w", err)
 	}
 	if b.store.dropTableSQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.dropStoreTable); err != nil {
 		return fmt.Errorf("rendering dropStoreTable template: %w", err)
@@ -376,7 +395,10 @@ const (
 func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) (err error) {
 	var ctx = it.Context()
 
-	activeBindings := make(map[int]struct{}, len(t.bindings))
+	// activeBindings tracks the number of keys inserted into each binding's
+	// load table this round, for verification against an authoritative count
+	// before the join.
+	activeBindings := make(map[int]int64, len(t.bindings))
 	lastBinding := -1
 	batch := make([][]any, 0, maxBatchSize)
 	batchBytes := 0
@@ -406,8 +428,11 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	defer func() {
 		for i := range activeBindings {
 			b := t.bindings[i]
-			// Free resources on the ClickHouse server
-			_ = t.load.conn.Exec(ctx, b.load.dropTableSQL)
+			// Free resources on the ClickHouse server. Truncate rather than
+			// drop: the load table's identity must stay stable so that key
+			// inserts and the join query resolve the same table from any
+			// replica of a clustered deployment.
+			_ = t.load.conn.Exec(ctx, b.load.truncateSQL)
 		}
 	}()
 
@@ -420,10 +445,12 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 			if _, found := activeBindings[it.Binding]; !found {
 				b := t.bindings[it.Binding]
-				if err = t.load.conn.Exec(ctx, b.load.createTableSQL); err != nil {
-					return fmt.Errorf("creating load stage table: %w", err)
+				// The load table exists (ensured at session start); truncate
+				// clears any keys left over from a previous round.
+				if err = t.load.conn.Exec(ctx, b.load.truncateSQL); err != nil {
+					return fmt.Errorf("truncating load stage table: %w", err)
 				}
-				activeBindings[it.Binding] = struct{}{}
+				activeBindings[it.Binding] = 0
 			}
 		}
 
@@ -434,6 +461,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		}
 		batch = append(batch, converted)
 		batchBytes += len(it.PackedKey)
+		activeBindings[it.Binding]++
 
 		if len(batch) >= maxBatchSize || batchBytes >= batchBytesLimit {
 			if err = flushLastBinding(); err != nil {
@@ -451,13 +479,34 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		return err
 	}
 
+	// Hard check: an authoritative count of each load table must account for
+	// every key inserted this round. A shortfall means the keys are not
+	// visible to the replica that will serve the join -- running it anyway
+	// would silently treat existing documents as absent, storing unreduced
+	// documents over them.
+	for i, inserted := range activeBindings {
+		b := t.bindings[i]
+		var counted uint64
+		if err = t.load.conn.QueryRow(ctx, b.load.countKeysSQL).Scan(&counted); err != nil {
+			return fmt.Errorf("counting load table keys: %w", err)
+		}
+		if int64(counted) != inserted {
+			return fmt.Errorf(
+				"refusing to load %s: load table contains %d keys but %d were inserted",
+				b.target.Identifier, counted, inserted)
+		}
+	}
+
 	// Keys are now ready to be JOIN'd between the temporary and target tables.
+	// The union query runs with select_sequential_consistency so that it
+	// observes both the just-inserted keys and target-table rows committed by
+	// prior transactions' partition moves, from any replica.
 
 	loadQueries := make([]string, 0, len(activeBindings))
 	for i := range activeBindings {
 		loadQueries = append(loadQueries, t.bindings[i].load.querySQL)
 	}
-	loadQueryUnionSQL := strings.Join(loadQueries, "\nUNION ALL\n") + ";"
+	loadQueryUnionSQL := strings.Join(loadQueries, "\nUNION ALL\n") + "\nSETTINGS select_sequential_consistency = 1;"
 	rows, err := t.load.conn.Query(ctx, loadQueryUnionSQL)
 	if err != nil {
 		return fmt.Errorf("querying Load documents: %w", err)
@@ -522,17 +571,12 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			}
 			lastBinding = it.Binding
 
+			// The stage table itself exists and is empty: it was ensured at
+			// session start and emptied by the previous transaction's
+			// partition moves.
 			stateKey := t.bindings[it.Binding].target.StateKey
 			if _, found := t.state[stateKey]; !found {
-				if err = t.store.conn.Exec(ctx, t.bindings[it.Binding].store.createTableSQL); err != nil {
-					return nil, fmt.Errorf("creating store stage table: %w", err)
-				}
-				t.state[stateKey] = &stateItem{
-					QueryPartsSQL:    t.bindings[it.Binding].store.queryPartsSQL,
-					MovePartitionSQL: t.bindings[it.Binding].store.movePartitionSQL,
-					ExistsSQL:        t.bindings[it.Binding].store.existsSQL,
-					DropTableSQL:     t.bindings[it.Binding].store.dropTableSQL,
-				}
+				t.state[stateKey] = &stateItem{}
 			}
 		}
 
@@ -585,15 +629,38 @@ func (t *transactor) bindingForStateKey(stateKey string) (*binding, bool) {
 }
 
 func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
-	for stateKey, si := range t.state {
-		// Skip targets tables which do not have a binding anymore
-		// since these tables might be deleted already
-		b, found := t.bindingForStateKey(stateKey)
-		if !found {
-			continue
+	if !t.ensured {
+		// First Acknowledge of the session: recover pending commits and
+		// ensure every binding's persistent temp tables. This always runs
+		// before the first Store (the runtime serializes Acknowledge ahead
+		// of the next transaction's store phase).
+		for _, b := range t.bindings {
+			if si, pending := t.state[b.target.StateKey]; pending {
+				// A committed-but-unacknowledged transaction has rows staged
+				// in this binding's store table. Move them; never truncate or
+				// re-create a stage table holding pending rows.
+				if err := t.moveStorePartitionsToTarget(ctx, b, si, true); err != nil {
+					return nil, fmt.Errorf("recovering stage to target %s: %w", b.target.Identifier, err)
+				}
+			} else if err := t.ensureTempTables(ctx, b); err != nil {
+				return nil, fmt.Errorf("ensuring temp tables of %s: %w", b.target.Identifier, err)
+			}
 		}
-		if err := t.moveStorePartitionsToTarget(ctx, si); err != nil {
-			return nil, fmt.Errorf("moving stage to target %s: %w", b.target.Identifier, err)
+		t.ensured = true
+	} else {
+		for stateKey, si := range t.state {
+			// Skip target tables which do not have a binding anymore since
+			// these tables might be deleted already. Note that the persistent
+			// stage table of a removed binding with pending state is stranded
+			// (never moved, never dropped) -- a known limitation requiring
+			// manual cleanup.
+			b, found := t.bindingForStateKey(stateKey)
+			if !found {
+				continue
+			}
+			if err := t.moveStorePartitionsToTarget(ctx, b, si, false); err != nil {
+				return nil, fmt.Errorf("moving stage to target %s: %w", b.target.Identifier, err)
+			}
 		}
 	}
 	t.recovery = false
@@ -620,9 +687,18 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	return &pf.ConnectorState{UpdatedJson: checkpointJSON, MergePatch: true}, nil
 }
 
-func (t *transactor) moveStorePartitionsToTarget(ctx context.Context, si *stateItem) error {
+// moveStorePartitionsToTarget commits a transaction's staged rows by moving
+// every partition of the binding's store table into its target table. All SQL
+// is rendered from the live binding -- never from persisted state -- so that
+// state written by older connector versions recovers cleanly.
+//
+// recovery is true when re-applying a commit from a previous process. In that
+// case the staged rows may have been partially (or fully) moved already, so
+// the pre-move row accounting is skipped: the consistent read is
+// authoritative, and re-applying the remainder is idempotent.
+func (t *transactor) moveStorePartitionsToTarget(ctx context.Context, b *binding, si *stateItem, recovery bool) error {
 	queryParts := func() (partitionIDs []string, totalRows int64, err error) {
-		rows, err := t.store.conn.Query(ctx, si.QueryPartsSQL, t.cfg.Database)
+		rows, err := t.store.conn.Query(ctx, b.store.queryPartsSQL)
 		if err != nil {
 			return nil, 0, fmt.Errorf("querying store table partitions: %w", err)
 		}
@@ -648,71 +724,156 @@ func (t *transactor) moveStorePartitionsToTarget(ctx context.Context, si *stateI
 		return err
 	}
 
-	// Hard check: system.parts must account for every row inserted into the
-	// stage table during the transaction. A shortfall means the parts query
-	// was serviced by a connection that does not (yet) see the staged data --
-	// for example a replica with stale metadata for the stage table, which is
-	// re-created with a new UUID every transaction. Proceeding would move
-	// only the visible parts and then DROP the stage table, silently losing
-	// the rest. Fail instead, leaving the stage table intact for a retry.
-	if si.StoredRows > 0 && totalRows != si.StoredRows {
-		if t.recovery {
-			// During recovery the previous process may have already moved the
-			// partitions and dropped the stage table before exiting; the
-			// stage table no longer existing distinguishes that from loss.
-			if si.ExistsSQL != "" {
-				var exists uint64
-				if err := t.store.conn.QueryRow(ctx, si.ExistsSQL).Scan(&exists); err != nil {
-					return fmt.Errorf("querying store table existence: %w", err)
-				}
-				if exists == 0 {
-					return nil
-				}
-			}
-		}
+	// Hard check: the authoritative count must account for every row inserted
+	// into the stage table during the transaction. A mismatch means the rows
+	// are not visible to the connection servicing the move; proceeding would
+	// silently lose them. Fail instead, leaving the stage table intact for a
+	// retry. The check is skipped during recovery, where a prior partial move
+	// legitimately leaves fewer rows (zero rows meaning the commit had fully
+	// completed before the previous process exited).
+	if !recovery && si.StoredRows > 0 && totalRows != si.StoredRows {
 		return fmt.Errorf(
-			"refusing to commit store table: system.parts reports %d staged rows but %d rows were stored; "+
-				"not moving partitions or dropping the store table so staged rows are preserved for retry",
+			"refusing to commit store table: it contains %d staged rows but %d rows were stored; "+
+				"not moving partitions so staged rows are preserved for retry",
 			totalRows, si.StoredRows)
 	}
 
 	for _, partitionID := range partitionIDs {
-		if err = t.store.conn.Exec(ctx, si.MovePartitionSQL, partitionID); err != nil {
-			if t.recovery {
-				var typedErr *clickhouseproto.Exception
-				if errors.As(err, &typedErr) && int(typedErr.Code) == int(chproto.ErrUnknownTable) {
-					continue
-				}
-			}
+		if err = t.store.conn.Exec(ctx, b.store.movePartitionSQL, partitionID); err != nil {
+			// Never truncate or drop here: unmoved staged rows must survive
+			// for a retry (or operator intervention, e.g. if the stage table
+			// schema has drifted from a target migrated while this commit was
+			// pending).
 			return fmt.Errorf("moving store table partition: %w", err)
 		}
 	}
 
-	// Hard check: after moving every partition the stage table must have no
-	// active parts remaining. Rows left behind here would be destroyed by the
-	// DROP below.
+	// Hard check: after moving every partition the stage table must be empty.
+	// Rows appearing here would be re-moved by a later transaction's commit,
+	// or destroyed if the table were ever cleaned up.
 	if _, remainingRows, err := queryParts(); err != nil {
 		return err
 	} else if remainingRows > 0 {
 		return fmt.Errorf(
-			"refusing to drop store table: %d rows remain after moving %d partition(s); "+
-				"dropping the store table now would lose them",
+			"store table still contains %d rows after moving %d partition(s)",
 			remainingRows, len(partitionIDs))
 	}
 
-	if err = t.store.conn.Exec(ctx, si.DropTableSQL); err != nil {
-		return fmt.Errorf("dropping stage table: %w", err)
+	return nil
+}
+
+// ensureTempTables establishes the binding's persistent temp tables at
+// session start: the store stage table for every binding, and the load table
+// for standard-updates bindings. Tables are created if missing, re-created if
+// their schema has drifted from the target's (a migration ran in a prior
+// session -- migrations only happen in the Apply RPC, never while a session
+// is running), and truncated otherwise to discard rows staged by a
+// transaction that never committed. It must never be called for a binding
+// with a pending commit recorded in the connector state.
+func (t *transactor) ensureTempTables(ctx context.Context, b *binding) error {
+	ensure := func(createSQL, truncateSQL, dropSQL string, tableName string) error {
+		if err := t.store.conn.Exec(ctx, createSQL); err != nil {
+			return fmt.Errorf("creating temp table: %w", err)
+		}
+		matches, err := t.tempTableMatchesTarget(ctx, tableName, b)
+		if err != nil {
+			return err
+		}
+		if !matches {
+			if err := t.store.conn.Exec(ctx, dropSQL); err != nil {
+				return fmt.Errorf("dropping schema-drifted temp table: %w", err)
+			}
+			if err := t.store.conn.Exec(ctx, createSQL); err != nil {
+				return fmt.Errorf("re-creating temp table: %w", err)
+			}
+			return nil
+		}
+		if err := t.store.conn.Exec(ctx, truncateSQL); err != nil {
+			return fmt.Errorf("truncating temp table: %w", err)
+		}
+		return nil
+	}
+
+	if err := ensure(b.store.createTableSQL, b.store.truncateSQL, b.store.dropTableSQL, storeTableName(b.target, t._range.KeyBegin)); err != nil {
+		return fmt.Errorf("store stage table: %w", err)
+	}
+	if !b.target.DeltaUpdates {
+		// Load tables hold only the current round's lookup keys, so schema
+		// drift (changed key columns) is handled the same way; a stray drop
+		// loses nothing durable.
+		if err := ensure(b.load.createTableSQL, b.load.truncateSQL, b.load.dropTableSQL, loadTableName(b.target, t._range.KeyBegin)); err != nil {
+			return fmt.Errorf("load table: %w", err)
+		}
 	}
 	return nil
 }
 
-func (t *transactor) Destroy() {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	for _, b := range t.bindings {
-		_ = t.load.conn.Exec(ctx, b.load.dropTableSQL)
+// tempTableMatchesTarget reports whether the temp table's columns are a
+// (positional, typed) prefix-compatible match for what the connector will
+// insert into it. The temp table is compared against its own expected shape:
+// for store tables that is the target table's full column set (the stage is
+// created AS the target); for load tables it is the key columns. Rather than
+// re-deriving expectations, both the temp table and the target are read from
+// system.columns and compared by (name, type) in position order; for load
+// tables only the leading key columns of the target are considered.
+func (t *transactor) tempTableMatchesTarget(ctx context.Context, tempTable string, b *binding) (bool, error) {
+	type column struct {
+		name, typ string
 	}
+	readColumns := func(table string) ([]column, error) {
+		rows, err := t.store.conn.Query(ctx,
+			"SELECT name, type FROM system.columns WHERE database = currentDatabase() AND table = ? ORDER BY position", table)
+		if err != nil {
+			return nil, fmt.Errorf("querying system.columns of %q: %w", table, err)
+		}
+		defer rows.Close()
+		var out []column
+		for rows.Next() {
+			var c column
+			if err := rows.Scan(&c.name, &c.typ); err != nil {
+				return nil, fmt.Errorf("scanning system.columns of %q: %w", table, err)
+			}
+			out = append(out, c)
+		}
+		return out, rows.Err()
+	}
+
+	tempCols, err := readColumns(tempTable)
+	if err != nil {
+		return false, err
+	}
+	targetCols, err := readColumns(b.target.Path[0])
+	if err != nil {
+		return false, err
+	}
+
+	want := targetCols
+	if tempTable == loadTableName(b.target, t._range.KeyBegin) {
+		// Load tables contain only the key columns.
+		if len(targetCols) < len(b.target.Keys) {
+			return false, nil
+		}
+		want = targetCols[:len(b.target.Keys)]
+	}
+
+	if len(tempCols) != len(want) {
+		return false, nil
+	}
+	for i := range want {
+		if tempCols[i] != want[i] {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func (t *transactor) Destroy() {
+	// Temp tables are deliberately NOT dropped here. Store stage tables may
+	// hold a committed-but-unacknowledged transaction's rows, which the next
+	// session recovers and moves to the target -- dropping them would lose
+	// data. Load tables are dropped the same way for symmetry: both kinds are
+	// persistent, and are dropped + re-created only by the ensure pass when
+	// their schema has drifted from the target's.
 	_ = t.store.conn.Close()
 	_ = t.load.conn.Close()
 }

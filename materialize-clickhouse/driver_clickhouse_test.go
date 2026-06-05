@@ -324,11 +324,13 @@ func TestAddBinding(t *testing.T) {
 	require.Contains(t, tr.bindings[0].store.insertSQL, "INSERT INTO")
 }
 
-// storeRows creates the stage table, inserts rows via PrepareBatch, and moves
-// all partitions to the target table — the same sequence as Store + commit.
+// storeRows ensures the persistent stage table, inserts rows via PrepareBatch,
+// and moves all partitions to the target table — the same sequence as
+// ensure + Store + commit.
 func storeRows(t *testing.T, ctx context.Context, conn chdriver.Conn, b *binding, database string, rows ...[]any) {
 	t.Helper()
 	require.NoError(t, conn.Exec(ctx, b.store.createTableSQL))
+	require.NoError(t, conn.Exec(ctx, b.store.truncateSQL))
 
 	batch, err := conn.PrepareBatch(ctx, b.store.insertSQL)
 	require.NoError(t, err)
@@ -337,7 +339,7 @@ func storeRows(t *testing.T, ctx context.Context, conn chdriver.Conn, b *binding
 	}
 	require.NoError(t, batch.Send())
 
-	partRows, err := conn.Query(ctx, b.store.queryPartsSQL, database)
+	partRows, err := conn.Query(ctx, b.store.queryPartsSQL)
 	require.NoError(t, err)
 	var totalRows int64
 	for partRows.Next() {
@@ -348,16 +350,17 @@ func storeRows(t *testing.T, ctx context.Context, conn chdriver.Conn, b *binding
 		require.NoError(t, conn.Exec(ctx, b.store.movePartitionSQL, partitionID))
 	}
 	require.NoError(t, partRows.Err())
-	require.Equal(t, int64(len(rows)), totalRows, "system.parts must account for every staged row")
+	require.Equal(t, int64(len(rows)), totalRows, "the consistent read must account for every staged row")
 }
 
-// loadDocuments inserts keys into the binding's temp table, runs the load query
-// (which JOINs the temp table with the target table), collects documents, then
-// truncates the temp table for the next load cycle.
+// loadDocuments ensures the persistent load table, truncates any keys from a
+// previous round, inserts this round's keys, verifies the key count, and runs
+// the load query (which JOINs the temp table with the target table).
 func loadDocuments(t *testing.T, ctx context.Context, loadConn chdriver.Conn, b *binding, keys ...[]any) []string {
 	t.Helper()
 
 	require.NoError(t, loadConn.Exec(ctx, b.load.createTableSQL))
+	require.NoError(t, loadConn.Exec(ctx, b.load.truncateSQL))
 
 	batch, err := loadConn.PrepareBatch(ctx, b.load.insertSQL)
 	require.NoError(t, err)
@@ -365,6 +368,10 @@ func loadDocuments(t *testing.T, ctx context.Context, loadConn chdriver.Conn, b 
 		require.NoError(t, batch.Append(key...))
 	}
 	require.NoError(t, batch.Send())
+
+	var counted uint64
+	require.NoError(t, loadConn.QueryRow(ctx, b.load.countKeysSQL).Scan(&counted))
+	require.EqualValues(t, len(keys), counted, "the consistent read must account for every inserted key")
 
 	rows, err := loadConn.Query(ctx, b.load.querySQL)
 	require.NoError(t, err)
@@ -377,8 +384,6 @@ func loadDocuments(t *testing.T, ctx context.Context, loadConn chdriver.Conn, b 
 		docs = append(docs, doc)
 	}
 	_ = rows.Close()
-
-	require.NoError(t, loadConn.Exec(ctx, b.load.dropTableSQL))
 
 	return docs
 }
@@ -1025,8 +1030,9 @@ func TestMovePartitionMissingTarget(t *testing.T) {
 	require.NoError(t, tr.addBinding(ctx, table))
 	var b = tr.bindings[0]
 
-	// Create the store stage table and insert a row.
+	// Ensure the store stage table is empty and insert a row.
 	require.NoError(t, storeConn.Exec(ctx, b.store.createTableSQL))
+	require.NoError(t, storeConn.Exec(ctx, b.store.truncateSQL))
 	batch, err := storeConn.PrepareBatch(ctx, b.store.insertSQL)
 	require.NoError(t, err)
 	require.NoError(t, batch.Append("k1", "v1", "c", testTime, `{"id":"k1"}`))
@@ -1037,7 +1043,7 @@ func TestMovePartitionMissingTarget(t *testing.T) {
 	require.NoError(t, err)
 
 	// Attempt to move partitions to the now-missing target table.
-	rows, err := storeConn.Query(ctx, b.store.queryPartsSQL, cfg.Database)
+	rows, err := storeConn.Query(ctx, b.store.queryPartsSQL)
 	require.NoError(t, err)
 
 	var moveErr error
@@ -1058,23 +1064,16 @@ func TestMovePartitionMissingTarget(t *testing.T) {
 	require.EqualValues(t, chproto.ErrUnknownTable, exc.Code)
 }
 
-// TestMoveRefusesOnStoredRowsMismatch exercises the row-accounting guard in
-// moveStorePartitionsToTarget: when system.parts does not account for every
-// row recorded in stateItem.StoredRows, the commit must fail without moving
-// partitions or dropping the stage table, preserving the staged rows for a
-// retry. With a matching count the move proceeds, and a recovery of state
-// whose stage table is already gone is treated as previously committed.
-func TestMoveRefusesOnStoredRowsMismatch(t *testing.T) {
-	if testing.Short() {
-		t.Skip()
-	}
-	ensureDockerUp(t)
+// newTestTransactor creates a target table and a transactor with a single
+// binding for it, returning both. The target is dropped and re-created; the
+// binding's stage table is NOT touched (tests exercise the ensure/recovery
+// paths themselves).
+func newTestTransactor(t *testing.T, ctx context.Context, tableName string) (*transactor, *binding) {
+	t.Helper()
 
 	var cfg = testConfig()
-	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
 	var tpls = renderTemplates(dialect, cfg.HardDelete)
-	var tableName = "test_move_refuses_on_mismatch"
 	var table = buildTestTable(t, dialect, tableName)
 
 	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
@@ -1086,59 +1085,220 @@ func TestMoveRefusesOnStoredRowsMismatch(t *testing.T) {
 	_, err = db.ExecContext(ctx, createSQL)
 	require.NoError(t, err)
 
-	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}}
+	var tr = &transactor{
+		dialect:   dialect,
+		templates: tpls,
+		cfg:       cfg,
+		_range:    &pf.RangeSpec{},
+		state:     make(connectorState),
+	}
 	storeConn, err := clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
 	tr.store.conn = storeConn
-	defer storeConn.Close()
+	t.Cleanup(func() { _ = storeConn.Close() })
 	require.NoError(t, tr.addBinding(ctx, table))
-	var b = tr.bindings[0]
+	return tr, tr.bindings[0]
+}
 
-	// Stage two rows.
-	require.NoError(t, storeConn.Exec(ctx, b.store.createTableSQL))
-	batch, err := storeConn.PrepareBatch(ctx, b.store.insertSQL)
+func stageTestRows(t *testing.T, ctx context.Context, tr *transactor, b *binding, rows ...[]any) {
+	t.Helper()
+	batch, err := tr.store.conn.PrepareBatch(ctx, b.store.insertSQL)
 	require.NoError(t, err)
-	require.NoError(t, batch.Append("k1", "v1", "c", testTime, `{"id":"k1"}`))
-	require.NoError(t, batch.Append("k2", "v2", "c", testTime, `{"id":"k2"}`))
-	require.NoError(t, batch.Send())
-
-	si := &stateItem{
-		QueryPartsSQL:    b.store.queryPartsSQL,
-		MovePartitionSQL: b.store.movePartitionSQL,
-		ExistsSQL:        b.store.existsSQL,
-		DropTableSQL:     b.store.dropTableSQL,
-		StoredRows:       3, // deliberately wrong: only 2 rows were staged
+	for _, row := range rows {
+		require.NoError(t, batch.Append(row...))
 	}
+	require.NoError(t, batch.Send())
+}
+
+func countTable(t *testing.T, ctx context.Context, tr *transactor, identifier string) uint64 {
+	t.Helper()
+	var count uint64
+	require.NoError(t, tr.store.conn.QueryRow(ctx,
+		fmt.Sprintf("SELECT count() FROM %s SETTINGS select_sequential_consistency = 1", identifier)).Scan(&count))
+	return count
+}
+
+// TestMoveRefusesOnStoredRowsMismatch exercises the row-accounting guard in
+// moveStorePartitionsToTarget: when the authoritative count does not account
+// for every row recorded in stateItem.StoredRows, the commit must fail
+// without moving partitions, preserving the staged rows for a retry. With a
+// matching count the move proceeds and empties the stage table, and recovery
+// of an already-committed (empty) stage succeeds without error.
+func TestMoveRefusesOnStoredRowsMismatch(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	ensureDockerUp(t)
+
+	var ctx = t.Context()
+	var tableName = "test_move_refuses_on_mismatch"
+	tr, b := newTestTransactor(t, ctx, tableName)
+	stageName := tr.dialect.Identifier(storeTableName(b.target, 0))
+	targetName := tr.dialect.Identifier(tableName)
+
+	// Ensure + stage two rows.
+	require.NoError(t, tr.ensureTempTables(ctx, b))
+	stageTestRows(t, ctx, tr, b,
+		[]any{"k1", "v1", "c", testTime, `{"id":"k1"}`},
+		[]any{"k2", "v2", "c", testTime, `{"id":"k2"}`})
+
+	si := &stateItem{StoredRows: 3} // deliberately wrong: only 2 rows were staged
 
 	// Mismatch: the commit must fail, naming the counts, ...
-	err = tr.moveStorePartitionsToTarget(ctx, si)
+	err := tr.moveStorePartitionsToTarget(ctx, b, si, false)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "refusing to commit store table")
-	require.Contains(t, err.Error(), "2 staged rows")
+	require.Contains(t, err.Error(), "contains 2 staged rows")
 	require.Contains(t, err.Error(), "3 rows were stored")
 
-	// ... the stage table must survive with its rows intact, ...
-	var stagedCount uint64
-	require.NoError(t, storeConn.QueryRow(ctx,
-		fmt.Sprintf("SELECT count() FROM %s", dialect.Identifier("flow_temp_store_0_"+tableName))).Scan(&stagedCount))
-	require.EqualValues(t, 2, stagedCount)
-
-	// ... and nothing may have reached the target table.
-	var targetCount uint64
-	require.NoError(t, storeConn.QueryRow(ctx,
-		fmt.Sprintf("SELECT count() FROM %s", dialect.Identifier(tableName))).Scan(&targetCount))
-	require.EqualValues(t, 0, targetCount)
+	// ... the stage table must survive with its rows intact, and nothing may
+	// have reached the target table.
+	require.EqualValues(t, 2, countTable(t, ctx, tr, stageName))
+	require.EqualValues(t, 0, countTable(t, ctx, tr, targetName))
 
 	// With the correct count the commit proceeds: rows land in the target and
-	// the stage table is dropped.
+	// the stage table is left empty by the moves.
 	si.StoredRows = 2
-	require.NoError(t, tr.moveStorePartitionsToTarget(ctx, si))
-	require.NoError(t, storeConn.QueryRow(ctx,
-		fmt.Sprintf("SELECT count() FROM %s", dialect.Identifier(tableName))).Scan(&targetCount))
-	require.EqualValues(t, 2, targetCount)
+	require.NoError(t, tr.moveStorePartitionsToTarget(ctx, b, si, false))
+	require.EqualValues(t, 2, countTable(t, ctx, tr, targetName))
+	require.EqualValues(t, 0, countTable(t, ctx, tr, stageName))
 
-	// Recovery with the stage table already gone is a previously-completed
-	// commit, not data loss: it must succeed without error.
-	tr.recovery = true
-	require.NoError(t, tr.moveStorePartitionsToTarget(ctx, si))
+	// Recovery of an already-committed (empty) stage is not data loss: it
+	// must succeed without error even though StoredRows > 0.
+	require.NoError(t, tr.moveStorePartitionsToTarget(ctx, b, si, true))
+}
+
+// TestAcknowledgeRecoveryMatrix exercises the first-Acknowledge ensure pass
+// across the recovery matrix: pending commits are recovered (fully or
+// partially applied), leftover rows of uncommitted transactions are
+// truncated, missing temp tables are created, and schema-drifted temp tables
+// are re-created.
+func TestAcknowledgeRecoveryMatrix(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	ensureDockerUp(t)
+	var ctx = t.Context()
+
+	t.Run("pending state with all rows staged is recovered", func(t *testing.T) {
+		tr, b := newTestTransactor(t, ctx, "test_recovery_full")
+		require.NoError(t, tr.ensureTempTables(ctx, b))
+		stageTestRows(t, ctx, tr, b, []any{"k1", "v1", "c", testTime, `{"id":"k1"}`})
+
+		tr.ensured = false
+		tr.recovery = true
+		tr.state[b.target.StateKey] = &stateItem{StoredRows: 1}
+		_, err := tr.Acknowledge(ctx)
+		require.NoError(t, err)
+		require.EqualValues(t, 1, countTable(t, ctx, tr, tr.dialect.Identifier("test_recovery_full")))
+		require.Empty(t, tr.state)
+	})
+
+	t.Run("pending state with partial rows is recovered without the equality guard", func(t *testing.T) {
+		tr, b := newTestTransactor(t, ctx, "test_recovery_partial")
+		require.NoError(t, tr.ensureTempTables(ctx, b))
+		stageTestRows(t, ctx, tr, b, []any{"k1", "v1", "c", testTime, `{"id":"k1"}`})
+
+		// StoredRows says 3, but only 1 row remains staged -- as if a prior
+		// process had moved part of the commit before crashing. Recovery must
+		// move the remainder rather than failing the equality check forever.
+		tr.ensured = false
+		tr.recovery = true
+		tr.state[b.target.StateKey] = &stateItem{StoredRows: 3}
+		_, err := tr.Acknowledge(ctx)
+		require.NoError(t, err)
+		require.EqualValues(t, 1, countTable(t, ctx, tr, tr.dialect.Identifier("test_recovery_partial")))
+	})
+
+	t.Run("leftover rows of an uncommitted transaction are truncated", func(t *testing.T) {
+		tr, b := newTestTransactor(t, ctx, "test_recovery_leftovers")
+		require.NoError(t, tr.ensureTempTables(ctx, b))
+		stageTestRows(t, ctx, tr, b, []any{"k1", "v1", "c", testTime, `{"id":"k1"}`})
+
+		// No pending state for the binding: the staged row was never
+		// committed and must be discarded, not moved.
+		tr.ensured = false
+		_, err := tr.Acknowledge(ctx)
+		require.NoError(t, err)
+		require.EqualValues(t, 0, countTable(t, ctx, tr, tr.dialect.Identifier(storeTableName(b.target, 0))))
+		require.EqualValues(t, 0, countTable(t, ctx, tr, tr.dialect.Identifier("test_recovery_leftovers")))
+	})
+
+	t.Run("missing temp tables are created", func(t *testing.T) {
+		tr, b := newTestTransactor(t, ctx, "test_recovery_fresh")
+		_ = tr.store.conn.Exec(ctx, b.store.dropTableSQL)
+
+		tr.ensured = false
+		_, err := tr.Acknowledge(ctx)
+		require.NoError(t, err)
+		require.EqualValues(t, 0, countTable(t, ctx, tr, tr.dialect.Identifier(storeTableName(b.target, 0))))
+	})
+
+	t.Run("schema-drifted stage table is re-created", func(t *testing.T) {
+		tr, b := newTestTransactor(t, ctx, "test_recovery_drift")
+		require.NoError(t, tr.ensureTempTables(ctx, b))
+		// Simulate a migration that ran in a prior session: the target gained
+		// a column the stage table doesn't have.
+		stageName := tr.dialect.Identifier(storeTableName(b.target, 0))
+		require.NoError(t, tr.store.conn.Exec(ctx,
+			fmt.Sprintf("ALTER TABLE %s DROP COLUMN %s", stageName, tr.dialect.Identifier("value"))))
+
+		tr.ensured = false
+		_, err := tr.Acknowledge(ctx)
+		require.NoError(t, err)
+
+		// The stage table must once again match the target (and so accept
+		// inserts of the full column set).
+		stageTestRows(t, ctx, tr, b, []any{"k1", "v1", "c", testTime, `{"id":"k1"}`})
+		require.EqualValues(t, 1, countTable(t, ctx, tr, stageName))
+	})
+
+	t.Run("pre-StoredRows checkpoint state recovers without executing persisted SQL", func(t *testing.T) {
+		tr, b := newTestTransactor(t, ctx, "test_recovery_upgrade")
+		require.NoError(t, tr.ensureTempTables(ctx, b))
+		stageTestRows(t, ctx, tr, b, []any{"k1", "v1", "c", testTime, `{"id":"k1"}`})
+
+		// A checkpoint written by a pre-#4623 connector: it persists rendered
+		// SQL (including a single-column parts query) and has no StoredRows.
+		// Recovery must ignore the persisted SQL entirely and use freshly
+		// rendered statements.
+		oldState := fmt.Sprintf(`{%q: {
+			"QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'obsolete' AND database = ? AND active\nSETTINGS select_sequential_consistency = 1;\n",
+			"MovePartitionSQL": "\nALTER TABLE obsolete MOVE PARTITION ID ? TO TABLE also_obsolete;\n",
+			"DropTableSQL": "\nDROP TABLE IF EXISTS obsolete;\n"
+		}}`, b.target.StateKey)
+		require.NoError(t, tr.UnmarshalState([]byte(oldState)))
+		require.True(t, tr.recovery)
+
+		tr.ensured = false
+		_, err := tr.Acknowledge(ctx)
+		require.NoError(t, err)
+		require.EqualValues(t, 1, countTable(t, ctx, tr, tr.dialect.Identifier("test_recovery_upgrade")))
+	})
+
+	t.Run("load table is truncated between rounds", func(t *testing.T) {
+		// Covered end-to-end by loadDocuments-based tests; this asserts the
+		// truncate-between-rounds behavior directly.
+		tr, b := newTestTransactor(t, ctx, "test_load_truncate_rounds")
+		require.NoError(t, tr.store.conn.Exec(ctx, b.load.createTableSQL))
+		require.NoError(t, tr.store.conn.Exec(ctx, b.load.truncateSQL))
+
+		batch, err := tr.store.conn.PrepareBatch(ctx, b.load.insertSQL)
+		require.NoError(t, err)
+		require.NoError(t, batch.Append("k1"))
+		require.NoError(t, batch.Send())
+		var counted uint64
+		require.NoError(t, tr.store.conn.QueryRow(ctx, b.load.countKeysSQL).Scan(&counted))
+		require.EqualValues(t, 1, counted)
+
+		// Next round: truncate, insert a different key; the count must not
+		// include the previous round's key.
+		require.NoError(t, tr.store.conn.Exec(ctx, b.load.truncateSQL))
+		batch, err = tr.store.conn.PrepareBatch(ctx, b.load.insertSQL)
+		require.NoError(t, err)
+		require.NoError(t, batch.Append("k2"))
+		require.NoError(t, batch.Send())
+		require.NoError(t, tr.store.conn.QueryRow(ctx, b.load.countKeysSQL).Scan(&counted))
+		require.EqualValues(t, 1, counted)
+	})
 }
