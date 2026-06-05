@@ -84,6 +84,22 @@ async def check_accessibility(
         )
         is_accessible = not is_permission_blocked and not is_disabled
 
+        if is_permission_blocked:
+            warning_msg = (
+                f"Removing inaccessible resource for {url} due to missing API key permissions. "
+                "Update your restricted API key to grant read access if this resource should be captured."
+            )
+        elif is_disabled:
+            warning_msg = (
+                f"Removing resource the account is not configured to use: {url}."
+            )
+        else:
+            warning_msg = (
+                f"Encountered HTTP error while checking accessibility for {url}"
+            )
+
+        log.warning(warning_msg, {"err.code": err.code, "err.message": err.message})
+
     return is_accessible
 
 
