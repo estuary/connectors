@@ -22,8 +22,8 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
-	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
 
@@ -360,22 +360,22 @@ func prepareNewTransactor(
 }
 
 type binding struct {
-	target                  sql.Table
-	nullFieldsToStrip       []string
-	varcharColumnMetas      []varcharColumnMeta
-	loadFile                *stagedFile
-	storeFile               *stagedFile
-	deleteFile              *stagedFile
-	createLoadTableTemplate *template.Template
-	createStoreTableSQL     string
-	createDeleteTableSQL    string
-	mergeIntoSQL            string
-	deleteQuerySQL          string
-	loadQuerySQL            string
-	copyIntoLoadTableSQL    string
-	copyIntoMergeTableSQL   string
-	copyIntoDeleteTableSQL  string
-	copyIntoTargetTableSQL  string
+	target                    sql.Table
+	nullFieldsToStrip         []string
+	varcharColumnMetas        []VarcharColumnMeta
+	loadFile                  *stagedFile
+	storeFile                 *stagedFile
+	deleteFile                *stagedFile
+	createLoadTableTemplate   *template.Template
+	createStoreTableTemplate  *template.Template
+	createDeleteTableTemplate *template.Template
+	mergeIntoSQL              string
+	deleteQuerySQL            string
+	loadQuerySQL              string
+	copyIntoLoadTableSQL      string
+	copyIntoMergeTableSQL     string
+	copyIntoDeleteTableSQL    string
+	copyIntoTargetTableSQL    string
 
 	// A reference of all staged file cleanup operations that should be run once
 	// the commit has completed. Will be empty if not data was processed for
@@ -390,12 +390,12 @@ type binding struct {
 	mustMerge bool
 }
 
-// varcharColumnMeta contains metadata about Redshift varchar columns. Currently this is just the
+// VarcharColumnMeta contains metadata about Redshift varchar columns. Currently this is just the
 // maximum length of the field as reported from the database, populated upon connector startup.
-type varcharColumnMeta struct {
-	identifier string
-	maxLength  int
-	isVarchar  bool
+type VarcharColumnMeta struct {
+	Identifier string
+	MaxLength  int
+	IsVarchar  bool
 }
 
 func (t *transactor) addBinding(
@@ -454,8 +454,6 @@ func (t *transactor) addBinding(
 		sql *string
 		tpl *template.Template
 	}{
-		{&b.createStoreTableSQL, t.templates.createStoreTable},
-		{&b.createDeleteTableSQL, t.templates.createDeleteTable},
 		{&b.mergeIntoSQL, t.templates.mergeInto},
 		{&b.deleteQuerySQL, t.templates.deleteQuery},
 		{&b.loadQuerySQL, loadQueryTemplate},
@@ -466,23 +464,25 @@ func (t *transactor) addBinding(
 		}
 	}
 
-	// The load table template is re-evaluated every transaction to account for the specific string
-	// lengths observed for string keys in the load key set.
+	// The load/store/delete tables template are re-evaluated every transaction
+	// to account for the specific string lengths observed for string keys.
 	b.createLoadTableTemplate = t.templates.createLoadTable
+	b.createStoreTableTemplate = t.templates.createStoreTable
+	b.createDeleteTableTemplate = t.templates.createDeleteTable
 
 	// Retain column metadata information for this binding as a snapshot of the target table
 	// configuration when the connector started, indexed in the same order as values will be
 	// received from the runtime for Store requests. Only VARCHAR columns will have non-zero-valued
 	// varcharColumnMeta.
 	allColumns := target.Columns()
-	columnMetas := make([]varcharColumnMeta, len(allColumns))
+	columnMetas := make([]VarcharColumnMeta, len(allColumns))
 	for idx, col := range allColumns {
 		existing := is.GetResource(target.Path).GetField(col.Field)
 		if existing.Type == "character varying" {
-			columnMetas[idx] = varcharColumnMeta{
-				identifier: col.Identifier,
-				maxLength:  existing.CharacterMaxLength,
-				isVarchar:  true,
+			columnMetas[idx] = VarcharColumnMeta{
+				Identifier: col.Identifier,
+				MaxLength:  existing.CharacterMaxLength,
+				IsVarchar:  true,
 			}
 
 			log.WithFields(log.Fields{
@@ -718,21 +718,21 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		// See if we need to increase any VARCHAR column lengths.
 		for idx, c := range converted {
 			varcharMeta := b.varcharColumnMetas[idx]
-			if varcharMeta.isVarchar {
+			if varcharMeta.IsVarchar {
 				switch v := c.(type) {
 				case string:
 					// If the column is already at its maximum length, it can't be enlarged any
 					// more. The string values will be truncated by Redshift when loading them into
 					// the table.
-					if len(v) > varcharMeta.maxLength && varcharMeta.maxLength != redshiftVarcharMaxLength {
+					if len(v) > varcharMeta.MaxLength && varcharMeta.MaxLength != redshiftVarcharMaxLength {
 						log.WithFields(log.Fields{
 							"table":               b.target.Identifier,
-							"column":              varcharMeta.identifier,
-							"currentColumnLength": varcharMeta.maxLength,
+							"column":              varcharMeta.Identifier,
+							"currentColumnLength": varcharMeta.MaxLength,
 							"stringValueLength":   len(v),
 						}).Info("column will be altered to VARCHAR(MAX) to accommodate large string value")
-						varcharColumnUpdates[b.target.Identifier] = append(varcharColumnUpdates[b.target.Identifier], varcharMeta.identifier)
-						b.varcharColumnMetas[idx].maxLength = redshiftVarcharMaxLength // Do not need to alter this column again.
+						varcharColumnUpdates[b.target.Identifier] = append(varcharColumnUpdates[b.target.Identifier], varcharMeta.Identifier)
+						b.varcharColumnMetas[idx].MaxLength = redshiftVarcharMaxLength // Do not need to alter this column again.
 					}
 				case nil:
 					// Values for string fields may be null, in which case there is nothing to do.
@@ -740,7 +740,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 				default:
 					// Invariant: This value must either be a string or nil, since the column it is
 					// going into is a VARCHAR.
-					return nil, fmt.Errorf("expected type string or nil for column %s of table %s, got %T", varcharMeta.identifier, b.target.Identifier, c)
+					return nil, fmt.Errorf("expected type string or nil for column %s of table %s, got %T", varcharMeta.Identifier, b.target.Identifier, c)
 				}
 			}
 		}
@@ -860,7 +860,13 @@ func (d *transactor) commit(ctx context.Context, varcharColumnUpdates map[string
 			// Create the temporary table for staging values to delete from the target table.
 			// Redshift actually supports transactional DDL for creating tables, so this can be
 			// executed within the transaction.
-			if _, err := txn.Exec(ctx, b.createDeleteTableSQL); err != nil {
+			var createDeleteTableSQL strings.Builder
+			if err := b.createDeleteTableTemplate.Execute(&createDeleteTableSQL, deleteTableParams{
+				Target:            &b.target,
+				VarcharColumnMeta: b.varcharColumnMetas,
+			}); err != nil {
+				return fmt.Errorf("evaluating create delete table template: %w", err)
+			} else if _, err := txn.Exec(ctx, createDeleteTableSQL.String()); err != nil {
 				return fmt.Errorf("creating delete table: %w", err)
 			}
 
@@ -877,7 +883,13 @@ func (d *transactor) commit(ctx context.Context, varcharColumnUpdates map[string
 			// Create the temporary table for staging values to merge into the target table.
 			// Redshift actually supports transactional DDL for creating tables, so this can be
 			// executed within the transaction.
-			if _, err := txn.Exec(ctx, b.createStoreTableSQL); err != nil {
+			var createStoreTableSQL strings.Builder
+			if err := b.createStoreTableTemplate.Execute(&createStoreTableSQL, storeTableParams{
+				Target:            &b.target,
+				VarcharColumnMeta: b.varcharColumnMetas,
+			}); err != nil {
+				return fmt.Errorf("evaluating create store table template: %w", err)
+			} else if _, err := txn.Exec(ctx, createStoreTableSQL.String()); err != nil {
 				return fmt.Errorf("creating store table: %w", err)
 			}
 
