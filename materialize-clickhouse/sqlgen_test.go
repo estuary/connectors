@@ -20,15 +20,17 @@ func TestSQLGeneration(t *testing.T) {
 	// The load/store templates are rendered separately with renderTableAndRangeKey.
 	rangeKeyTemplates := []*template.Template{
 		testTemplates.createLoadTable,
+		testTemplates.truncateLoadTable,
+		testTemplates.countLoadKeys,
 		testTemplates.queryLoadTable,
 		testTemplates.queryLoadTableNoFlowDocument,
 		testTemplates.insertLoadTable,
 		testTemplates.dropLoadTable,
 		testTemplates.createStoreTable,
+		testTemplates.truncateStoreTable,
 		testTemplates.insertStoreTable,
 		testTemplates.queryStoreParts,
 		testTemplates.moveStorePartition,
-		testTemplates.existsStoreTable,
 		testTemplates.dropStoreTable,
 	}
 
@@ -110,15 +112,17 @@ func TestSQLGenerationQuotedTableNames(t *testing.T) {
 
 	rangeKeyTemplates := []*template.Template{
 		testTemplates.createLoadTable,
+		testTemplates.truncateLoadTable,
+		testTemplates.countLoadKeys,
 		testTemplates.queryLoadTable,
 		testTemplates.queryLoadTableNoFlowDocument,
 		testTemplates.insertLoadTable,
 		testTemplates.dropLoadTable,
 		testTemplates.createStoreTable,
+		testTemplates.truncateStoreTable,
 		testTemplates.insertStoreTable,
 		testTemplates.queryStoreParts,
 		testTemplates.moveStorePartition,
-		testTemplates.existsStoreTable,
 		testTemplates.dropStoreTable,
 	}
 
