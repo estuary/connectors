@@ -1,0 +1,10 @@
+captures:
+  acmeCo/source-zuora:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_zuora
+        config: config.yaml
+    bindings: []

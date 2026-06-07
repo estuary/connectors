@@ -1,0 +1,6 @@
+credentials:
+  credentials_title: OAuth Credentials
+  client_id: your-zuora-client-id
+  client_secret: "your-zuora-client-secret"
+base_url: https://rest.sandbox.eu.zuora.com
+start_date: "2025-01-01T00:00:00Z"
