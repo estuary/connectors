@@ -1,0 +1,54 @@
+# syntax=docker/dockerfile:1
+FROM python:3.12-slim AS base
+FROM base AS builder
+
+ARG CONNECTOR_NAME
+
+RUN apt-get update && \
+  apt install -y --no-install-recommends \
+  python3-poetry
+
+RUN python -m venv /opt/venv
+ENV VIRTUAL_ENV=/opt/venv
+
+WORKDIR /opt/${CONNECTOR_NAME}
+COPY ${CONNECTOR_NAME}/pyproject.toml ${CONNECTOR_NAME}/poetry.lock /opt/${CONNECTOR_NAME}
+COPY estuary-cdk /opt/estuary-cdk
+
+RUN poetry install --no-root
+
+COPY ${CONNECTOR_NAME} /opt/${CONNECTOR_NAME}
+
+RUN poetry install
+
+FROM base AS runner
+
+ARG CONNECTOR_NAME
+ARG CONNECTOR_TYPE
+ARG DOCS_URL
+ARG ENCRYPTION_URL="https://config-encryption.estuary.dev/v1/encrypt-config"
+ARG USAGE_RATE
+
+RUN apt-get update && \
+  apt install -y --no-install-recommends \
+  openssh-client \
+  tzdata \
+  tzdata-legacy
+
+LABEL FLOW_RUNTIME_PROTOCOL=${CONNECTOR_TYPE}
+LABEL FLOW_RUNTIME_CODEC=json
+LABEL dev.estuary.usage-rate=${USAGE_RATE}
+
+COPY --from=builder /opt/$CONNECTOR_NAME /opt/$CONNECTOR_NAME
+COPY --from=builder /opt/estuary-cdk /opt/estuary-cdk
+COPY --from=builder /opt/venv /opt/venv
+COPY --from=ghcr.io/estuary/network-tunnel:dev /flow-network-tunnel /usr/bin/flow-network-tunnel
+
+ENV DOCS_URL=${DOCS_URL}
+ENV ENCRYPTION_URL=${ENCRYPTION_URL}
+ENV CONNECTOR_NAME=${CONNECTOR_NAME}
+
+EXPOSE 8080
+LABEL dev.estuary.port-public.8080=true
+
+CMD ["/bin/sh", "-c", "/opt/venv/bin/python -m $(echo \"$CONNECTOR_NAME\" | tr '-' '_')"]

@@ -1,0 +1,6 @@
+credentials:
+  credentials_title: "OAuth Credentials"
+  client_id: "${ZUORA_CLIENT_ID}"
+  client_secret: "${ZUORA_CLIENT_SECRET}"
+tenant_endpoint: "${ZUORA_TENANT_ENDPOINT}"
+start_date: "2020-01-01T00:00:00Z"
