@@ -1,0 +1,158 @@
+---
+collections:
+  acmeCo/Account:
+    schema: Account.schema.yaml
+    key:
+      - /Id
+  acmeCo/AccountingCode:
+    schema: AccountingCode.schema.yaml
+    key:
+      - /Id
+  acmeCo/AccountingPeriod:
+    schema: AccountingPeriod.schema.yaml
+    key:
+      - /Id
+  acmeCo/Amendment:
+    schema: Amendment.schema.yaml
+    key:
+      - /Id
+  acmeCo/BillingRun:
+    schema: BillingRun.schema.yaml
+    key:
+      - /Id
+  acmeCo/CommunicationProfile:
+    schema: CommunicationProfile.schema.yaml
+    key:
+      - /Id
+  acmeCo/Contact:
+    schema: Contact.schema.yaml
+    key:
+      - /Id
+  acmeCo/ContactSnapshot:
+    schema: ContactSnapshot.schema.yaml
+    key:
+      - /Id
+  acmeCo/CreditBalanceAdjustment:
+    schema: CreditBalanceAdjustment.schema.yaml
+    key:
+      - /Id
+  acmeCo/DiscountAppliedMetrics:
+    schema: DiscountAppliedMetrics.schema.yaml
+    key:
+      - /Id
+  acmeCo/Export:
+    schema: Export.schema.yaml
+    key:
+      - /Id
+  acmeCo/Import:
+    schema: Import.schema.yaml
+    key:
+      - /Id
+  acmeCo/Invoice:
+    schema: Invoice.schema.yaml
+    key:
+      - /Id
+  acmeCo/InvoiceItem:
+    schema: InvoiceItem.schema.yaml
+    key:
+      - /Id
+  acmeCo/InvoiceItemAdjustment:
+    schema: InvoiceItemAdjustment.schema.yaml
+    key:
+      - /Id
+  acmeCo/JournalEntry:
+    schema: JournalEntry.schema.yaml
+    key:
+      - /Id
+  acmeCo/JournalEntryItem:
+    schema: JournalEntryItem.schema.yaml
+    key:
+      - /Id
+  acmeCo/JournalRun:
+    schema: JournalRun.schema.yaml
+    key:
+      - /Id
+  acmeCo/Payment:
+    schema: Payment.schema.yaml
+    key:
+      - /Id
+  acmeCo/PaymentMethod:
+    schema: PaymentMethod.schema.yaml
+    key:
+      - /Id
+  acmeCo/PaymentMethodSnapshot:
+    schema: PaymentMethodSnapshot.schema.yaml
+    key:
+      - /Id
+  acmeCo/PaymentRun:
+    schema: PaymentRun.schema.yaml
+    key:
+      - /Id
+  acmeCo/ProcessedUsage:
+    schema: ProcessedUsage.schema.yaml
+    key:
+      - /Id
+  acmeCo/Product:
+    schema: Product.schema.yaml
+    key:
+      - /Id
+  acmeCo/ProductRatePlan:
+    schema: ProductRatePlan.schema.yaml
+    key:
+      - /Id
+  acmeCo/ProductRatePlanCharge:
+    schema: ProductRatePlanCharge.schema.yaml
+    key:
+      - /Id
+  acmeCo/ProductRatePlanChargeTier:
+    schema: ProductRatePlanChargeTier.schema.yaml
+    key:
+      - /Id
+  acmeCo/RatePlan:
+    schema: RatePlan.schema.yaml
+    key:
+      - /Id
+  acmeCo/RatePlanCharge:
+    schema: RatePlanCharge.schema.yaml
+    key:
+      - /Id
+  acmeCo/RatePlanChargeTier:
+    schema: RatePlanChargeTier.schema.yaml
+    key:
+      - /Id
+  acmeCo/Refund:
+    schema: Refund.schema.yaml
+    key:
+      - /Id
+  acmeCo/RevenueChargeSummaryItem:
+    schema: RevenueChargeSummaryItem.schema.yaml
+    key:
+      - /Id
+  acmeCo/RevenueEventItem:
+    schema: RevenueEventItem.schema.yaml
+    key:
+      - /Id
+  acmeCo/RevenueEventItemInvoiceItem:
+    schema: RevenueEventItemInvoiceItem.schema.yaml
+    key:
+      - /Id
+  acmeCo/RevenueEventItemInvoiceItemAdjustment:
+    schema: RevenueEventItemInvoiceItemAdjustment.schema.yaml
+    key:
+      - /Id
+  acmeCo/RevenueScheduleItem:
+    schema: RevenueScheduleItem.schema.yaml
+    key:
+      - /Id
+  acmeCo/RevenueScheduleItemInvoiceItem:
+    schema: RevenueScheduleItemInvoiceItem.schema.yaml
+    key:
+      - /Id
+  acmeCo/RevenueScheduleItemInvoiceItemAdjustment:
+    schema: RevenueScheduleItemInvoiceItemAdjustment.schema.yaml
+    key:
+      - /Id
+  acmeCo/Subscription:
+    schema: Subscription.schema.yaml
+    key:
+      - /Id
