@@ -1,0 +1,103 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$defs": {
+        "ClientCredentialsOAuth2Credentials": {
+          "properties": {
+            "credentials_title": {
+              "const": "OAuth Credentials",
+              "default": "OAuth Credentials",
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "client_id": {
+              "secret": true,
+              "title": "Client Id",
+              "type": "string"
+            },
+            "client_secret": {
+              "secret": true,
+              "title": "Client Secret",
+              "type": "string"
+            }
+          },
+          "required": [
+            "client_id",
+            "client_secret"
+          ],
+          "title": "OAuth",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "credentials": {
+          "$ref": "#/$defs/ClientCredentialsOAuth2Credentials",
+          "description": "OAuth2 Client ID and Client Secret for Zuora API access.",
+          "title": "Authentication"
+        },
+        "tenant_endpoint": {
+          "default": "https://rest.zuora.com",
+          "description": "Your Zuora REST API base URL. Use https://rest.zuora.com for production, https://rest.apisandbox.zuora.com for sandbox, or https://rest.eu.zuora.com for EU production.",
+          "examples": [
+            "https://rest.zuora.com",
+            "https://rest.apisandbox.zuora.com"
+          ],
+          "title": "Tenant Endpoint",
+          "type": "string"
+        },
+        "start_date": {
+          "description": "UTC date and time from which to start replicating data. Defaults to January 1, 2000, which will capture all available history.",
+          "format": "date-time",
+          "title": "Start Date",
+          "type": "string"
+        }
+      },
+      "required": [
+        "credentials"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "description": "ResourceConfig is a common resource configuration shape.",
+      "properties": {
+        "_meta": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Meta"
+        },
+        "name": {
+          "description": "Name of this resource",
+          "title": "Name",
+          "type": "string"
+        },
+        "interval": {
+          "default": "PT0S",
+          "description": "Interval between updates for this resource",
+          "format": "duration",
+          "title": "Interval",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ResourceConfig",
+      "type": "object"
+    },
+    "documentationUrl": "https://go.estuary.dev/source-zuora",
+    "resourcePathPointers": [
+      "/name"
+    ]
+  }
+]
