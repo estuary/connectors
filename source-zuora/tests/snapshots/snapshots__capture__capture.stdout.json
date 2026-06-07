@@ -1,0 +1,407 @@
+[
+  [
+    "acmeCo/Account",
+    {
+      "AccountNumber": "A00000888",
+      "AllowInvoiceEdit": false,
+      "AutoPay": true,
+      "Balance": "0",
+      "Batch": "Batch1",
+      "BcdSettingOption": "ManualSet",
+      "BillCycleDay": 10,
+      "BillToId": "8adc80f997f364ca0197f69b4a1644c2",
+      "CreatedById": "8e244967d640470397cb2b2202ddec61",
+      "CreatedDate": "2025-07-11T09:11:01+10:00",
+      "Currency": "USD",
+      "DefaultPaymentMethodId": "8adcac4197f364df0197f69b37174e51",
+      "Environment__c": "dev-b",
+      "GatewayRoutingEligible": false,
+      "Id": "8adc80f997f364ca0197f69b4a0244c1",
+      "InvoiceDeliveryPrefsEmail": true,
+      "InvoiceDeliveryPrefsPrint": false,
+      "InvoiceTemplateId": "8adc808c8b84cf23018b85adde221d0e",
+      "LastInvoiceDate": "2025-07-11T00:00:00Z",
+      "Name": "Dylan Gordon",
+      "PaymentTerm": "Due Upon Receipt",
+      "PersonalBillingAccount__c": true,
+      "Reseller__c": false,
+      "SoldToId": "8adc80f997f364ca0197f69b4a1644c2",
+      "Status": "Active",
+      "TaxExemptStatus": "No",
+      "UpdatedById": "8e244967d640470397cb2b2202ddec61",
+      "UpdatedDate": "2025-07-11T09:11:04+10:00",
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/AccountingCode",
+    {
+      "Category": "Assets",
+      "CreatedById": "061d20e3fed64f8e8450666fae14bf38",
+      "CreatedDate": "2023-10-31T22:20:42+10:00",
+      "GLAccountName": "Accounts Receivable - Zuora",
+      "GLAccountNumber": "12007000",
+      "Id": "8adc808c8b84cf23018b85adce5b1be6",
+      "Name": "Accounts Receivable",
+      "Status": "Active",
+      "Type": "AccountsReceivable",
+      "UpdatedById": "061d20e3fed64f8e8450666fae14bf38",
+      "UpdatedDate": "2024-07-26T08:38:12+10:00",
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/BillingRun",
+    {
+      "Id": "8adc802c964ba7d301964bc63b5e1335",
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/CommunicationProfile",
+    {
+      "CreatedById": "061d20e3fed64f8e8450666fae14bf38",
+      "CreatedDate": "2023-10-31T22:20:44+10:00",
+      "Id": "8adc808c8b84cf23018b85add61b1c42",
+      "IsDefault": true,
+      "Muted": false,
+      "ProfileName": "Default Profile",
+      "ProfileNumber": "CP-00000001",
+      "UpdatedById": "061d20e3fed64f8e8450666fae14bf38",
+      "UpdatedDate": "2024-06-07T11:28:45+10:00",
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/Contact",
+    {
+      "AccountId": "8adc80f997f364ca0197f69b4a0244c1",
+      "Address1": "100 Cuba Street",
+      "City": "Wellington",
+      "Country": "New Zealand",
+      "CreatedById": "8e244967d640470397cb2b2202ddec61",
+      "CreatedDate": "2025-07-11T09:11:01+10:00",
+      "FirstName": "Dylan",
+      "Id": "8adc80f997f364ca0197f69b4a1644c2",
+      "LastName": "Gordon",
+      "PostalCode": "6011",
+      "State": "North Island",
+      "UpdatedById": "8e244967d640470397cb2b2202ddec61",
+      "UpdatedDate": "2025-07-11T09:11:01+10:00",
+      "WorkEmail": "dylan.gordon@octopus.com",
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/Export",
+    {
+      "CreatedById": "c1d979c705244cf08939d6147e0f4146",
+      "CreatedDate": "2024-02-27T10:43:40+10:00",
+      "Encrypted": false,
+      "FileId": "8adcb19c8dd037a2018de8046fdd6d51",
+      "Format": "csv",
+      "Id": "8adca5a18dd02cd7018de8046c696cd4",
+      "Query": "select BookingTransaction.SubscriptionNumber from BookingTransaction",
+      "Size": 86,
+      "Status": "Completed",
+      "UpdatedById": "c1d979c705244cf08939d6147e0f4146",
+      "UpdatedDate": "2024-02-27T10:43:41+10:00",
+      "Zip": false,
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/Import",
+    {
+      "CreatedById": "8e244967d640470397cb2b2202ddec61",
+      "CreatedDate": "2025-04-19T00:01:04+10:00",
+      "Id": "8adc87679644913701964933f7805934",
+      "ImportType": "ImportFXRate",
+      "ImportedCount": 1,
+      "Name": "2025-04-18.j-ART4esJR-Pz3JQK.csv",
+      "OriginalResourceUrl": "https://sandbox.eu.zuora.com/apps/v1/files/8adc87679644913701964933f7775933",
+      "ResultResourceUrl": "https://sandbox.eu.zuora.com/apps/v1/files/8adc8fd89644a65e01964933ffa553cf",
+      "Status": "Completed",
+      "TotalCount": 1,
+      "UpdatedById": "8e244967d640470397cb2b2202ddec61",
+      "UpdatedDate": "2025-04-19T00:01:06+10:00",
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/Payment",
+    {
+      "AccountId": "8adca5a18e6587f6018e66ae81154c5d",
+      "AccountingCode": "Stripe USD",
+      "Amount": "580",
+      "AppliedAmount": "580",
+      "BankIdentificationNumber": "424242",
+      "CreatedById": "3",
+      "CreatedDate": "2024-05-22T12:52:25+10:00",
+      "Currency": "USD",
+      "EffectiveDate": "2024-05-22T00:00:00Z",
+      "Gateway": "Stripe - Dev A (Test Mode)",
+      "GatewayResponse": "Approved",
+      "GatewayResponseCode": "200",
+      "GatewayState": "Submitted",
+      "Id": "8adc808c8f99e576018f9e36d92548eb",
+      "PaymentMethodId": "8adc808c8f99e576018f9e36d6a748e6",
+      "PaymentMethodSnapshotId": "8adc808c8f99e576018f9e36d91b48ea",
+      "PaymentNumber": "P-00000022",
+      "ReferenceId": "ch_3PJ5HuLRozVk5RV21mi3WjgN",
+      "RefundAmount": "0",
+      "SecondPaymentReferenceId": "pi_3PJ5HuLRozVk5RV21jP9KMh3",
+      "Source": "PaymentLink",
+      "SourceName": "077cfd9b9f1841f3a6c4d9530f46d789",
+      "Status": "Processed",
+      "SubmittedOn": "2024-05-22T12:52:27+10:00",
+      "Type": "Electronic",
+      "UnappliedAmount": "0",
+      "UpdatedById": "3",
+      "UpdatedDate": "2024-05-22T12:52:27+10:00",
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/PaymentMethod",
+    {
+      "Active": false,
+      "CreatedById": "061d20e3fed64f8e8450666fae14bf38",
+      "CreatedDate": "2023-10-31T22:20:42+10:00",
+      "Id": "8adc808c8b84cf23018b85adcf0f1bea",
+      "IsCompany": false,
+      "Name": "ACH",
+      "NumConsecutiveFailures": 0,
+      "TotalNumberOfErrorPayments": 0,
+      "TotalNumberOfProcessedPayments": 0,
+      "Type": "ACH",
+      "UpdatedById": "061d20e3fed64f8e8450666fae14bf38",
+      "UpdatedDate": "2024-06-28T08:51:25+10:00",
+      "UseDefaultRetryRule": true,
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/PaymentMethodSnapshot",
+    {
+      "AccountId": "8adca5a18e6587f6018e66ae81154c5d",
+      "BankIdentificationNumber": "424242",
+      "CreditCardExpirationMonth": 12,
+      "CreditCardExpirationYear": 2034,
+      "CreditCardHolderName": "Jarrad",
+      "CreditCardMaskNumber": "************4242",
+      "CreditCardType": "Visa",
+      "Id": "8adc808c8f99e576018f9e36d91b48ea",
+      "IsCompany": false,
+      "NumConsecutiveFailures": 0,
+      "PaymentMethodId": "8adc808c8f99e576018f9e36d6a748e6",
+      "PaymentMethodStatus": "Active",
+      "TotalNumberOfErrorPayments": 0,
+      "TotalNumberOfProcessedPayments": 0,
+      "Type": "CreditCard",
+      "UseDefaultRetryRule": true,
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/Product",
+    {
+      "Category": "Base Products",
+      "CreatedById": "2f2f4c2ecf1d448e8c00ee419875441f",
+      "CreatedDate": "2025-09-30T03:32:05+10:00",
+      "EffectiveEndDate": "9999-12-31T00:00:00Z",
+      "EffectiveStartDate": "2024-01-01T00:00:00Z",
+      "Id": "30a97aa0591a49778fd32df538117b2c",
+      "Name": "Codefresh Hybrid Professional, Heritage",
+      "PlanTier__c": "Professional",
+      "Platform__c": "Codefresh Hybrid",
+      "Product_Family__c": "Hybrid",
+      "SKU": "CFH-PROHER",
+      "UpdatedById": "3",
+      "UpdatedDate": "2025-10-30T02:24:37+10:00",
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/ProductRatePlan",
+    {
+      "CreatedById": "2f2f4c2ecf1d448e8c00ee419875441f",
+      "CreatedDate": "2025-05-13T03:05:06+10:00",
+      "DisplayName__c": "GitOps Cloud Additional Clusters, Annually",
+      "EffectiveEndDate": "9999-12-31T00:00:00Z",
+      "EffectiveStartDate": "2025-04-25T00:00:00Z",
+      "Id": "15fd7b91ccc84a26a30042cf761e48f4",
+      "Name": "GitOps Cloud Additional Clusters (Annually) - List Price",
+      "ProductId": "bac2fe0706dc41ffba620e85fa3e47e7",
+      "UpdatedById": "2f2f4c2ecf1d448e8c00ee419875441f",
+      "UpdatedDate": "2025-05-13T03:05:06+10:00",
+      "ZuoraProductRatePlanCode__c": "CFC-GOCLUS-2505",
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/ProductRatePlanCharge",
+    {
+      "AccountingCode": "Subscription Revenue",
+      "BillCycleType": "DefaultFromCustomer",
+      "ChargeModel": "Flat Fee Pricing",
+      "ChargeType": "OneTime",
+      "CreatedById": "b5a9c3cce64445bc8b14787b116d801b",
+      "CreatedDate": "2025-06-17T13:14:24+10:00",
+      "DefaultQuantity": "1",
+      "DeferredRevenueAccount": "Subscription Revenue",
+      "EndDateCondition": "OneTime",
+      "Id": "0b85648a9ad04ecf8b113fa19a05808c",
+      "IncludedUnits": "0",
+      "LegacyRevenueReporting": false,
+      "ListPriceBase": "Per Billing Period",
+      "Name": "Free of charge",
+      "NumberOfPeriod": 1,
+      "OverageCalculationOption": "EndOfSmoothingPeriod",
+      "OverageUnusedUnitsCreditOption": "NoCredit",
+      "PriceChangeOption": "NoChange",
+      "PriceIncreasePercentage": "0",
+      "ProductRatePlanId": "848929bdc3644c51b30f267ac92a21f5",
+      "RecognizedRevenueAccount": "Subscription Revenue",
+      "RevenueRecognitionRuleName": "Recognize upon invoicing",
+      "Taxable": false,
+      "TriggerEvent": "ContractEffective",
+      "UpToPeriodsType": "Billing Periods",
+      "UpdatedById": "b5a9c3cce64445bc8b14787b116d801b",
+      "UpdatedDate": "2025-06-17T13:14:24+10:00",
+      "UsageRecordRatingOption": "EndOfBillingPeriod",
+      "UseTenantDefaultForPriceChange": true,
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/RatePlan",
+    {
+      "CreatedById": "3",
+      "CreatedDate": "2025-07-16T11:07:23+10:00",
+      "Id": "2075076f018980d8873810c59d2012b5",
+      "InvoiceOwnerId": "8adccd3397ee90af0197f153f98c63c8",
+      "Name": "Starter (Annually) - PTM - List Price",
+      "ProductRatePlanId": "8adca8878e2d4622018e318d24163708",
+      "SubscriptionId": "2075076f018980d8873810c59d0012b4",
+      "SubscriptionOwnerId": "8adccd3397ee90af0197f153f98c63c8",
+      "UpdatedById": "3",
+      "UpdatedDate": "2025-07-16T11:07:23+10:00",
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/RatePlanChargeTier",
+    {
+      "CreatedById": "3c8eba103c9343b9b83130f1f93764d6",
+      "CreatedDate": "2024-05-28T10:10:32+10:00",
+      "EndingUnit": "0",
+      "Id": "8adc96428fb8cf04018fbc88c98e55ec",
+      "IsOveragePrice": false,
+      "Price": "8.4",
+      "PriceFormat": "Per Unit",
+      "RatePlanChargeId": "8adc96428fb8cf04018fbc88c98755e9",
+      "StartingUnit": "0",
+      "Tier": 1,
+      "UpdatedById": "3c8eba103c9343b9b83130f1f93764d6",
+      "UpdatedDate": "2024-05-28T10:10:32+10:00",
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/Refund",
+    {
+      "AccountId": "8adcffb3975e39b60197676d5c6d7ff1",
+      "AccountingCode": "Stripe USD",
+      "Amount": "206.8",
+      "CreatedById": "b5a9c3cce64445bc8b14787b116d801b",
+      "CreatedDate": "2025-06-23T10:14:50+10:00",
+      "Currency": "USD",
+      "GatewayState": "NotSubmitted",
+      "Id": "8adcad47978731a901979a2340a139cc",
+      "MethodType": "CreditCard",
+      "PaymentMethodId": "8adc808c8b84cf23018b85add21f1bf6",
+      "ReasonCode": "Standard Refund",
+      "RefundDate": "2025-06-23T00:00:00Z",
+      "RefundNumber": "R-00000088",
+      "SourceType": "CreditMemo",
+      "Status": "Processed",
+      "Type": "External",
+      "UpdatedById": "b5a9c3cce64445bc8b14787b116d801b",
+      "UpdatedDate": "2025-06-23T10:14:50+10:00",
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/Subscription",
+    {
+      "AccountId": "8adc9ed88dd02cec018dee00485d117a",
+      "AutoRenew": true,
+      "ContractAcceptanceDate": "2023-08-25T00:00:00Z",
+      "ContractEffectiveDate": "2023-08-25T00:00:00Z",
+      "CreatedById": "3",
+      "CreatedDate": "2025-08-25T11:06:41+10:00",
+      "CreatorAccountId": "8adc9ed88dd02cec018dee00485d117a",
+      "CreatorInvoiceOwnerId": "8adc9ed88dd02cec018dee00485d117a",
+      "CurrentTerm": 12,
+      "CurrentTermPeriodType": "Month",
+      "Id": "2075076f09798c6ca8d8dec35c0a2444",
+      "InitialTerm": 12,
+      "InitialTermPeriodType": "Month",
+      "InvoiceOwnerId": "8adc9ed88dd02cec018dee00485d117a",
+      "IsInvoiceSeparate": false,
+      "Name": "A-S00000033",
+      "OriginalCreatedDate": "2024-02-28T14:56:01+10:00",
+      "OriginalId": "8adcd6538dd03d9c018dee11d1417951",
+      "PreviousSubscriptionId": "8adcea93917ece2d0191871bdbf90db2",
+      "RenewalSetting": "RENEW_WITH_SPECIFIC_TERM",
+      "RenewalTerm": 12,
+      "RenewalTermPeriodType": "Month",
+      "ServiceActivationDate": "2023-08-25T00:00:00Z",
+      "Status": "Active",
+      "SubscriptionEndDate": "2026-08-25T00:00:00Z",
+      "SubscriptionStartDate": "2023-08-25T00:00:00Z",
+      "TermEndDate": "2026-08-25T00:00:00Z",
+      "TermStartDate": "2025-08-25T00:00:00Z",
+      "TermType": "TERMED",
+      "UpdatedById": "3",
+      "UpdatedDate": "2025-08-25T11:06:41+10:00",
+      "Version": 3,
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ]
+]

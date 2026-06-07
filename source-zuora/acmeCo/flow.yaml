@@ -32,14 +32,6 @@ collections:
     schema: ContactSnapshot.schema.yaml
     key:
       - /Id
-  acmeCo/CreditBalanceAdjustment:
-    schema: CreditBalanceAdjustment.schema.yaml
-    key:
-      - /Id
-  acmeCo/DiscountAppliedMetrics:
-    schema: DiscountAppliedMetrics.schema.yaml
-    key:
-      - /Id
   acmeCo/Export:
     schema: Export.schema.yaml
     key:

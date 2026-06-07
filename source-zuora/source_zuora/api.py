@@ -1,10 +1,11 @@
-from datetime import datetime, UTC
+import re as _re
+from datetime import datetime, timedelta, UTC
 from logging import Logger
 from typing import Any, AsyncGenerator
 import xml.etree.ElementTree as ET
 
 from estuary_cdk.capture.common import LogCursor, PageCursor
-from estuary_cdk.http import HTTPSession
+from estuary_cdk.http import HTTPError, HTTPSession
 from pydantic import BaseModel
 
 from .models import ZuoraDocument, OBJECT_MODELS
@@ -14,6 +15,9 @@ QUERY_BATCH_SIZE = 2000
 
 # Number of documents to emit before issuing a checkpoint.
 CHECKPOINT_INTERVAL = 500
+
+# Pattern to extract the invalid field name from Zuora's INVALID_FIELD fault message.
+_INVALID_FIELD_RE = _re.compile(r'invalid field for query: \w+\.(\w+)', _re.IGNORECASE)
 
 
 class QueryResult(BaseModel, extra="forbid"):
@@ -56,6 +60,57 @@ async def describe_object(
 def _format_cursor(dt: datetime) -> str:
     """Format a datetime for use in a ZOQL WHERE clause."""
     return dt.strftime("%Y-%m-%dT%H:%M:%S")
+
+
+async def validate_fields(
+    object_name: str,
+    fields: list[str],
+    tenant_endpoint: str,
+    http: HTTPSession,
+    log: Logger,
+) -> list[str]:
+    """
+    Validate fields against ZOQL by running a zero-row test query.
+    Removes fields that cause INVALID_FIELD or INVALID_VALUE errors (e.g. ActiveCurrencies),
+    retrying until the query succeeds or no more removable fields remain.
+    """
+    url = f"{tenant_endpoint}/v1/action/query"
+    current = list(fields)
+
+    for _ in range(len(fields)):
+        if not current:
+            break
+        fields_str = ", ".join(current)
+        # Far-future date ensures zero rows; still validates field names.
+        test_query = f"SELECT {fields_str} FROM {object_name} WHERE UpdatedDate > '2099-12-31T00:00:00'"
+        try:
+            await http.request(log, url, method="POST", json={"queryString": test_query})
+            return current
+        except HTTPError as e:
+            if e.code != 400:
+                raise
+            msg = e.message
+
+            m = _INVALID_FIELD_RE.search(msg)
+            if m:
+                bad = m.group(1)
+                log.warning(f"Field '{bad}' is not valid in ZOQL for {object_name}, removing it.")
+                current = [f for f in current if f.lower() != bad.lower()]
+                continue
+
+            if 'active currencies' in msg.lower() or 'activecurrencies' in msg.lower():
+                log.warning(
+                    f"Removing 'ActiveCurrencies' from {object_name} "
+                    "(Zuora requires it be queried alone)."
+                )
+                current = [f for f in current if f != 'ActiveCurrencies']
+                continue
+
+            # Unknown 400 — skip validation and use fields as-is.
+            log.warning(f"ZOQL field validation for {object_name} got unexpected 400: {msg}")
+            return current
+
+    return current
 
 
 async def fetch_changes(
@@ -111,8 +166,14 @@ async def fetch_changes(
         url = f"{tenant_endpoint}/v1/action/queryMore"
         body = {"queryLocator": result.queryLocator}
 
-    if max_updated > log_cursor:
-        yield max_updated
+    # The CDK requires a LogCursor to be emitted if any documents were yielded.
+    # If UpdatedDate was null or unchanged for all records, advance by 1 second
+    # to guarantee forward progress and avoid re-processing the same window.
+    if emitted > 0:
+        if max_updated > log_cursor:
+            yield max_updated
+        else:
+            yield log_cursor + timedelta(seconds=1)
 
 
 async def fetch_page(

@@ -83,6 +83,12 @@ async def all_resources(
             log.warning(f"Skipping {object_name}: no selectable fields found.")
             continue
 
+        # Validate field list against ZOQL, removing fields that cause errors
+        # (e.g. system fields marked selectable in describe but rejected by ZOQL).
+        fields = await api.validate_fields(
+            object_name, fields, config.tenant_endpoint, http, log
+        )
+
         # Ensure UpdatedDate is always in the field list for cursor tracking.
         if "UpdatedDate" not in fields:
             log.warning(

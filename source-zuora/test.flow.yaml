@@ -44,14 +44,6 @@ captures:
           interval: PT5M
         target: acmeCo/ContactSnapshot
       - resource:
-          name: CreditBalanceAdjustment
-          interval: PT5M
-        target: acmeCo/CreditBalanceAdjustment
-      - resource:
-          name: DiscountAppliedMetrics
-          interval: PT5M
-        target: acmeCo/DiscountAppliedMetrics
-      - resource:
           name: Export
           interval: PT5M
         target: acmeCo/Export

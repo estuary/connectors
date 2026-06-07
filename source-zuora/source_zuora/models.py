@@ -1,6 +1,9 @@
+import re
 from datetime import UTC, datetime
 from decimal import Decimal
-from pydantic import AwareDatetime, BaseModel, Field
+from typing import Any
+
+from pydantic import AwareDatetime, BaseModel, Field, model_validator
 
 from estuary_cdk.capture.common import (
     BaseDocument,
@@ -9,6 +12,9 @@ from estuary_cdk.capture.common import (
     ConnectorState as GenericConnectorState,
 )
 from estuary_cdk.flow import ClientCredentialsOAuth2Credentials
+
+# Matches date-only strings like '2025-06-23'.
+_DATE_ONLY_RE = re.compile(r'^\d{4}-\d{2}-\d{2}$')
 
 
 def _default_start_date():
@@ -48,6 +54,19 @@ class ZuoraDocument(BaseDocument, extra="allow"):
     """Base class for all Zuora objects. All Zuora objects have Id and UpdatedDate."""
     Id: str = ""
     UpdatedDate: AwareDatetime | None = None
+
+    @model_validator(mode='before')
+    @classmethod
+    def _normalize_dates(cls, data: Any) -> Any:
+        # Zuora returns some date fields as date-only strings ('YYYY-MM-DD') without
+        # time or timezone. Pydantic's AwareDatetime requires timezone info, so we
+        # append 'T00:00:00+00:00' to convert them to valid RFC3339 datetimes.
+        if not isinstance(data, dict):
+            return data
+        return {
+            k: (v + 'T00:00:00+00:00' if isinstance(v, str) and _DATE_ONLY_RE.match(v) else v)
+            for k, v in data.items()
+        }
 
 
 # --- Account ---
