@@ -31,3 +31,9 @@ captures:
       - resource:
           topic: protobuf-ref-topic
         target: acmeCo/protobuf-ref-topic
+      - resource:
+          topic: protobuf-wkt-topic
+        target: acmeCo/protobuf-wkt-topic
+      - resource:
+          topic: avro-ref-topic
+        target: acmeCo/avro-ref-topic
