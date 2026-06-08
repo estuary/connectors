@@ -187,6 +187,13 @@ func (v Validator) validateMatchesExistingResource(
 	constraints := make(map[string]*pm.Response_Validated_Constraint)
 
 	docFields := []string{}
+	// For a new binding adopted via `allow_existing_tables_for_new_bindings`,
+	// tracks the first root document projection whose existing destination column
+	// (if any) is type-compatible. That projection gets LOCATION_REQUIRED; any
+	// later root projections become FIELD_FORBIDDEN with a "already materialized
+	// as the document" reason. If no root projection is compatible by the end of
+	// the loop, the post-loop check below returns an error.
+	var selectedRootField string
 	for _, p := range boundCollection.Projections {
 		// Base constraint used for all new projections of the binding. This may be re-evaluated
 		// below, depending on the details of the projection and any pre-existing materialization of
@@ -204,8 +211,48 @@ func (v Validator) validateMatchesExistingResource(
 			docFields = append(docFields, p.Field)
 			// Only the originally selected root document projection is allowed to be selected for
 			// changes to a standard updates materialization. If there is no previously persisted
-			// spec, the first root document projection is selected as the root document.
-			if (lastBinding != nil && p.Field == lastBinding.FieldSelection.Document) || (lastBinding == nil && len(docFields) == 1) {
+			// spec, the first compatible root document projection is selected as the root document.
+			if lastBinding == nil {
+				// New binding adopted via `allow_existing_tables_for_new_bindings`. A
+				// connector storing the document as a single column must emit
+				// LOCATION_REQUIRED on the root JSON pointer so the control plane keeps
+				// the slot filled; bare INCOMPATIBLE is silently dropped without a live
+				// spec, which would let the publish proceed with no document column and
+				// degenerate to INSERT-only corruption.
+				//
+				// Pick the first root projection whose existing destination column
+				// (if any) is type-compatible. Incompatible roots return the
+				// connector's existing-field constraint as-is — the post-loop check
+				// turns "no compatible root found" into an explicit error so the
+				// user sees a publish-time failure rather than a runtime load
+				// failure.
+				var fromExisting *pm.Response_Validated_Constraint
+				if existingField := existingResource.GetField(p.Field); existingField != nil {
+					fromExisting, err = v.constraintForExistingField(boundCollection, p, *existingField, fieldConfigJsonMap)
+					if err != nil {
+						return nil, err
+					}
+				}
+
+				if fromExisting != nil && fromExisting.Type.IsForbidden() {
+					c = fromExisting
+				} else if selectedRootField == "" {
+					c = &pm.Response_Validated_Constraint{
+						Type:   pm.Response_Validated_Constraint_LOCATION_REQUIRED,
+						Reason: "The root document is required for a standard updates materialization",
+					}
+					selectedRootField = p.Field
+				} else {
+					c = &pm.Response_Validated_Constraint{
+						Type: pm.Response_Validated_Constraint_FIELD_FORBIDDEN,
+						Reason: fmt.Sprintf(
+							"Cannot materialize root document projection '%s' because field '%s' is already being materialized as the document",
+							p.Field,
+							selectedRootField,
+						),
+					}
+				}
+			} else if p.Field == lastBinding.FieldSelection.Document {
 				c = &pm.Response_Validated_Constraint{
 					Type:   pm.Response_Validated_Constraint_FIELD_REQUIRED,
 					Reason: "This field is the document in the current materialization",
@@ -220,7 +267,7 @@ func (v Validator) validateMatchesExistingResource(
 						c = constraintFromExisting
 					}
 				}
-			} else if lastBinding != nil && lastBinding.FieldSelection.Document == "" {
+			} else if lastBinding.FieldSelection.Document == "" {
 				c = &pm.Response_Validated_Constraint{
 					Type:   pm.Response_Validated_Constraint_INCOMPATIBLE,
 					Reason: "Cannot add a new root document projection to materialization without backfilling",
@@ -231,13 +278,7 @@ func (v Validator) validateMatchesExistingResource(
 					Reason: fmt.Sprintf(
 						"Cannot materialize root document projection '%s' because field '%s' is already being materialized as the document",
 						p.Field,
-						func() string {
-							if lastBinding != nil {
-								return lastBinding.FieldSelection.Document
-							} else {
-								return docFields[0]
-							}
-						}(),
+						lastBinding.FieldSelection.Document,
 					),
 				}
 			}
@@ -281,6 +322,17 @@ func (v Validator) validateMatchesExistingResource(
 		}
 
 		constraints[p.Field] = c
+	}
+
+	if lastBinding == nil && !deltaUpdates && len(docFields) > 0 && selectedRootField == "" {
+		// New binding over an existing table, but every root document projection's
+		// existing destination column is type-incompatible with the materialization.
+		// Fail at publish time with a clear error rather than letting the publish
+		// silently succeed and break at load time.
+		return nil, fmt.Errorf(
+			"no compatible root document projection: the existing destination column(s) for %v are incompatible with the materialization's required types. Backfill the binding to drop and recreate the column",
+			docFields,
+		)
 	}
 
 	if lastBinding != nil && !deltaUpdates && lastBinding.FieldSelection.Document != "" && !slices.Contains(docFields, lastBinding.FieldSelection.Document) {

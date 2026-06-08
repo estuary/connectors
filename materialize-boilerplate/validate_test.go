@@ -265,6 +265,140 @@ func TestValidate(t *testing.T) {
 		require.NotNil(t, cs)
 	})
 
+	t.Run("new binding with existing table - single root projection with incompatible column", func(t *testing.T) {
+		// Regression test for the customer's collection shape: only flow_document is
+		// declared as a root projection. A connector storing the document as a single
+		// column must emit LOCATION_REQUIRED on the root JSON pointer so the control
+		// plane keeps the slot filled.
+		//
+		// The selected-root branch historically emitted FIELD_REQUIRED, then overrode
+		// to INCOMPATIBLE when the existing column was the wrong type. Without a live
+		// spec the control plane silently drops INCOMPATIBLE, so the publish proceeded
+		// with FieldSelection.Document = "" — INSERT-only data corruption. The
+		// override was originally a defensive measure against unsafe string->JSON
+		// migrations; the excludable-by-user side effect was unintended.
+		proposed := loadValidateSpec(t, "base.flow.proto")
+		binding := proposed.Bindings[0]
+
+		// Drop second_root so flow_document is the only root projection.
+		filtered := make([]pf.Projection, 0, len(binding.Collection.Projections))
+		for _, p := range binding.Collection.Projections {
+			if p.IsRootDocumentProjection() && p.Field != "flow_document" {
+				continue
+			}
+			filtered = append(filtered, p)
+		}
+		binding.Collection.Projections = filtered
+
+		transformPath := func(in []string) []string {
+			out := make([]string, 0, len(in))
+			for _, p := range in {
+				out = append(out, simpleTestTransform(p))
+			}
+			return out
+		}
+		is := NewInfoSchema(transformPath, simpleTestTransform, simpleTestTransform, false, false)
+		res := is.PushResource(transformPath([]string{"key_value"})...)
+		for _, f := range binding.FieldSelection.AllFields() {
+			proj := *binding.Collection.GetProjection(f)
+			fieldType := strings.Join(proj.Inference.Types, ",")
+			if f == binding.FieldSelection.Document {
+				fieldType = "string"
+			}
+			res.PushField(ExistingField{
+				Name:     simpleTestTransform(f),
+				Nullable: proj.Inference.Exists != pf.Inference_MUST || slices.Contains(proj.Inference.Types, "null"),
+				Type:     fieldType,
+			})
+		}
+
+		featureFlags := map[string]bool{
+			"allow_existing_tables_for_new_bindings": true,
+			"flow_document":                          true,
+		}
+		validator := NewValidator(testConstrainter{featureFlags: featureFlags}, is, 0, true, featureFlags)
+
+		_, err := validator.ValidateBinding(
+			[]string{"key_value"},
+			false,
+			binding.Backfill, binding.Collection, binding.FieldSelection.FieldConfigJsonMap,
+			nil, // lastBinding == nil
+		)
+		require.Error(t, err, "publish must fail when the only root projection's existing column is incompatible")
+		require.Contains(t, err.Error(), "no compatible root document projection")
+		require.Contains(t, err.Error(), "flow_document")
+	})
+
+	t.Run("new binding with existing table - multiple roots, first incompatible alternate compatible", func(t *testing.T) {
+		// Multi-root case: flow_document's existing column is the wrong type
+		// (STRING where the materialization wants something else), but an alternate
+		// root projection second_root's existing column is compatible. The validator
+		// should select second_root as the root document (LOCATION_REQUIRED) and
+		// reject flow_document via the connector's existing-field INCOMPATIBLE
+		// constraint, rather than failing the whole publish.
+		proposed := loadValidateSpec(t, "base.flow.proto")
+		binding := proposed.Bindings[0]
+
+		transformPath := func(in []string) []string {
+			out := make([]string, 0, len(in))
+			for _, p := range in {
+				out = append(out, simpleTestTransform(p))
+			}
+			return out
+		}
+		is := NewInfoSchema(transformPath, simpleTestTransform, simpleTestTransform, false, false)
+		res := is.PushResource(transformPath([]string{"key_value"})...)
+		// Push every field from the binding's selection plus second_root, so the
+		// destination table mirrors a real "alternate root already exists" shape.
+		fieldsToPush := append([]string{}, binding.FieldSelection.AllFields()...)
+		fieldsToPush = append(fieldsToPush, "second_root")
+		for _, f := range fieldsToPush {
+			proj := binding.Collection.GetProjection(f)
+			if proj == nil {
+				continue
+			}
+			fieldType := strings.Join(proj.Inference.Types, ",")
+			if f == "flow_document" {
+				// Mismatch the expected type so flow_document is rejected.
+				fieldType = "string"
+			}
+			res.PushField(ExistingField{
+				Name:     simpleTestTransform(f),
+				Nullable: proj.Inference.Exists != pf.Inference_MUST || slices.Contains(proj.Inference.Types, "null"),
+				Type:     fieldType,
+			})
+		}
+
+		featureFlags := map[string]bool{
+			"allow_existing_tables_for_new_bindings": true,
+			"flow_document":                          true,
+		}
+		validator := NewValidator(testConstrainter{featureFlags: featureFlags}, is, 0, true, featureFlags)
+
+		cs, err := validator.ValidateBinding(
+			[]string{"key_value"},
+			false,
+			binding.Backfill, binding.Collection, binding.FieldSelection.FieldConfigJsonMap,
+			nil, // lastBinding == nil
+		)
+		require.NoError(t, err)
+
+		flowDoc, ok := cs["flow_document"]
+		require.True(t, ok, "no constraint emitted for flow_document")
+		require.Truef(t, flowDoc.Type.IsForbidden(),
+			"flow_document must be forbidden because its existing column is incompatible; got %v: %s",
+			flowDoc.Type, flowDoc.Reason,
+		)
+
+		secondRoot, ok := cs["second_root"]
+		require.True(t, ok, "no constraint emitted for second_root")
+		require.Equalf(t,
+			pm.Response_Validated_Constraint_LOCATION_REQUIRED, secondRoot.Type,
+			"second_root must carry LOCATION_REQUIRED so the control plane selects it as the document; got %v: %s",
+			secondRoot.Type, secondRoot.Reason,
+		)
+	})
+
 	t.Run("folded fields are set when field names are transformed", func(t *testing.T) {
 		proposed := loadValidateSpec(t, "base.flow.proto")
 
