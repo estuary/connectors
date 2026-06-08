@@ -79,48 +79,6 @@ Flow publication date-time of this document
 auto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';
 --- End "a-schema".delta_updates createTargetTable ---
 
---- Begin "a-schema".key_value createStoreTable ---
-
-CREATE TEMPORARY TABLE flow_temp_table_0 (
-	key1 BIGINT,
-	key2 BOOLEAN,
-	"key!binary" VARBYTE(1024000),
-	"array" SUPER,
-	"binary" VARBYTE(1024000),
-	boolean BOOLEAN,
-	field_with_projection TEXT,
-	flow_published_at TIMESTAMPTZ,
-	integer BIGINT,
-	"integerGt128Bit" NUMERIC(38,0),
-	"integerGt256Bit" NUMERIC(38,0),
-	"integerGt64Bit" NUMERIC(38,0),
-	"integerWithUserDDL" DECIMAL(20),
-	multiple SUPER,
-	"nonAsciiκόσμε" TEXT,
-	number DOUBLE PRECISION,
-	"numberCastToString" TEXT,
-	object SUPER,
-	string TEXT,
-	"stringInteger" NUMERIC(38,0),
-	"stringInteger18Chars" NUMERIC(38,0),
-	"stringInteger38Chars" NUMERIC(38,0),
-	"stringInteger39Chars" TEXT,
-	"stringInteger66Chars" TEXT,
-	"stringInteger77Chars" TEXT,
-	"stringNumber" DOUBLE PRECISION,
-	flow_document SUPER
-);
---- End "a-schema".key_value createStoreTable ---
-
---- Begin "a-schema".delta_updates createStoreTable ---
-
-CREATE TEMPORARY TABLE flow_temp_table_1 (
-	"theKey" TEXT,
-	"aValue" BIGINT,
-	flow_published_at TIMESTAMPTZ
-);
---- End "a-schema".delta_updates createStoreTable ---
-
 --- Begin "a-schema".key_value mergeInto ---
 
 MERGE INTO "a-schema".key_value
@@ -204,22 +162,6 @@ SELECT * FROM (SELECT -1, CAST(NULL AS SUPER) LIMIT 0) as nodoc
 
 --- End "a-schema".delta_updates loadQueryNoFlowDocument ---
 
---- Begin "a-schema".key_value createDeleteTable ---
-
-CREATE TEMPORARY TABLE flow_temp_table_0_deleted (
-  key1 BIGINT,
-  key2 BOOLEAN,
-  "key!binary" VARBYTE(1024000)
-);
---- End "a-schema".key_value createDeleteTable ---
-
---- Begin "a-schema".delta_updates createDeleteTable ---
-
-CREATE TEMPORARY TABLE flow_temp_table_1_deleted (
-  "theKey" TEXT
-);
---- End "a-schema".delta_updates createDeleteTable ---
-
 --- Begin "a-schema".key_value deleteQuery ---
 
 DELETE FROM "a-schema".key_value
@@ -259,6 +201,114 @@ CREATE TEMPORARY TABLE flow_temp_table_1 (
 	"theKey" VARCHAR(400)
 );
 --- End "a-schema".delta_updates createLoadTable (with varchar length) ---
+
+--- Begin "a-schema".key_value createStoreTable (no varchar length) ---
+CREATE TEMPORARY TABLE flow_temp_table_0 (
+	key1 BIGINT,
+	key2 BOOLEAN,
+	"key!binary" VARBYTE(1024000),
+	"array" SUPER,
+	"binary" VARBYTE(1024000),
+	boolean BOOLEAN,
+	field_with_projection TEXT,
+	flow_published_at TIMESTAMPTZ,
+	integer BIGINT,
+	"integerGt128Bit" NUMERIC(38,0),
+	"integerGt256Bit" NUMERIC(38,0),
+	"integerGt64Bit" NUMERIC(38,0),
+	"integerWithUserDDL" DECIMAL(20),
+	multiple SUPER,
+	"nonAsciiκόσμε" TEXT,
+	number DOUBLE PRECISION,
+	"numberCastToString" TEXT,
+	object SUPER,
+	string TEXT,
+	"stringInteger" NUMERIC(38,0),
+	"stringInteger18Chars" NUMERIC(38,0),
+	"stringInteger38Chars" NUMERIC(38,0),
+	"stringInteger39Chars" TEXT,
+	"stringInteger66Chars" TEXT,
+	"stringInteger77Chars" TEXT,
+	"stringNumber" DOUBLE PRECISION,
+	flow_document SUPER
+);
+--- End "a-schema".key_value createStoreTable (no varchar length) ---
+
+--- Begin "a-schema".key_value createStoreTable (with varchar length) ---
+CREATE TEMPORARY TABLE flow_temp_table_0 (
+	key1 BIGINT,
+	key2 BOOLEAN,
+	"key!binary" VARBYTE(1024000),
+	"array" SUPER,
+	"binary" VARBYTE(1024000),
+	boolean BOOLEAN,
+	field_with_projection VARCHAR(48),
+	flow_published_at TIMESTAMPTZ,
+	integer BIGINT,
+	"integerGt128Bit" NUMERIC(38,0),
+	"integerGt256Bit" NUMERIC(38,0),
+	"integerGt64Bit" NUMERIC(38,0),
+	"integerWithUserDDL" DECIMAL(20),
+	multiple SUPER,
+	"nonAsciiκόσμε" VARCHAR(56),
+	number DOUBLE PRECISION,
+	"numberCastToString" VARCHAR(58),
+	object SUPER,
+	string VARCHAR(60),
+	"stringInteger" NUMERIC(38,0),
+	"stringInteger18Chars" NUMERIC(38,0),
+	"stringInteger38Chars" NUMERIC(38,0),
+	"stringInteger39Chars" VARCHAR(64),
+	"stringInteger66Chars" VARCHAR(65),
+	"stringInteger77Chars" VARCHAR(66),
+	"stringNumber" DOUBLE PRECISION,
+	flow_document SUPER
+);
+--- End "a-schema".key_value createStoreTable (with varchar length) ---
+
+--- Begin "a-schema".delta_updates createStoreTable (no varchar length) ---
+CREATE TEMPORARY TABLE flow_temp_table_1 (
+	"theKey" TEXT,
+	"aValue" BIGINT,
+	flow_published_at TIMESTAMPTZ
+);
+--- End "a-schema".delta_updates createStoreTable (no varchar length) ---
+
+--- Begin "a-schema".delta_updates createStoreTable (with varchar length) ---
+CREATE TEMPORARY TABLE flow_temp_table_1 (
+	"theKey" VARCHAR(42),
+	"aValue" BIGINT,
+	flow_published_at TIMESTAMPTZ
+);
+--- End "a-schema".delta_updates createStoreTable (with varchar length) ---
+
+--- Begin "a-schema".key_value createDeleteTable (no varchar length) ---
+CREATE TEMPORARY TABLE flow_temp_table_0_deleted (
+	key1 BIGINT,
+	key2 BOOLEAN,
+	"key!binary" VARBYTE(1024000)
+);
+--- End "a-schema".key_value createDeleteTable (no varchar length) ---
+
+--- Begin "a-schema".key_value createDeleteTable (with varchar length) ---
+CREATE TEMPORARY TABLE flow_temp_table_0_deleted (
+	key1 BIGINT,
+	key2 BOOLEAN,
+	"key!binary" VARBYTE(1024000)
+);
+--- End "a-schema".key_value createDeleteTable (with varchar length) ---
+
+--- Begin "a-schema".delta_updates createDeleteTable (no varchar length) ---
+CREATE TEMPORARY TABLE flow_temp_table_1_deleted (
+	"theKey" TEXT
+);
+--- End "a-schema".delta_updates createDeleteTable (no varchar length) ---
+
+--- Begin "a-schema".delta_updates createDeleteTable (with varchar length) ---
+CREATE TEMPORARY TABLE flow_temp_table_1_deleted (
+	"theKey" VARCHAR(42)
+);
+--- End "a-schema".delta_updates createDeleteTable (with varchar length) ---
 
 --- Begin Copy From S3 Without Case Sensitive Identifiers or Truncation ---
 COPY my_temp_table
