@@ -20,6 +20,27 @@ START = datetime(2024, 1, 1, tzinfo=UTC)
 END = datetime(2024, 2, 1, tzinfo=UTC)
 
 
+def test_orders_retail_location_included_only_with_read_locations():
+    with_scope = Orders.build_query(
+        START, END, capabilities=StoreCapabilities(scopes=frozenset({"read_locations"}))
+    )
+    without_scope = Orders.build_query(
+        START, END, capabilities=StoreCapabilities(scopes=frozenset({"read_orders"}))
+    )
+
+    assert "retailLocation" in with_scope
+    assert "retailLocation" not in without_scope
+
+
+def test_orders_missing_capabilities_omits_conditional_fields():
+    """A query built without capabilities must not request scope-gated fields."""
+    query = Orders.build_query(START, END)
+
+    assert "retailLocation" not in query
+    # The placeholder itself must not leak into the emitted query.
+    assert "{{ retailLocation }}" not in query
+
+
 def test_placeholder_substituted_at_any_depth():
     """The mechanism splices at the placeholder's position, not only the query root."""
 

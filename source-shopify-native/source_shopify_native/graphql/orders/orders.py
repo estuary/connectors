@@ -4,7 +4,13 @@ import json
 from typing import Any, AsyncGenerator, Dict
 
 from ..common import money_bag_fragment
-from ...models import ShopifyGraphQLResource, SortKey, StoreCapabilities
+from ...models import (
+    ConditionalField,
+    ShopifyGraphQLResource,
+    SortKey,
+    StoreCapabilities,
+    requires_any_scope,
+)
 
 
 class Orders(ShopifyGraphQLResource):
@@ -352,8 +358,20 @@ class Orders(ShopifyGraphQLResource):
         ..._MoneyBagFields
     }
     totalWeight
+    # {{ retailLocation }}
     """
     FRAGMENTS = [money_bag_fragment]
+    CONDITIONAL_FIELDS = [
+        # retailLocation requires the read_locations scope, which
+        # the orders stream does not otherwise need.
+        ConditionalField(
+            placeholder="# {{ retailLocation }}",
+            fields="""retailLocation {
+        id
+    }""",
+            is_available=requires_any_scope("read_locations"),
+        ),
+    ]
 
     @staticmethod
     def build_query(
