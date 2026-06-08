@@ -1,4 +1,4 @@
-# source-claude-api
+# source-claude-admin-api
 
 Estuary Flow capture connector for the **Anthropic Claude Admin API**.
 

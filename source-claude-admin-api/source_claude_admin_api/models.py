@@ -1,9 +1,14 @@
-"""Pydantic models for the source-claude-api (Claude Admin API) connector."""
+"""Pydantic models for the source-claude-admin-api (Claude Admin API) connector.
+
+Each document model is aware of its own API endpoint via the `api_path` ClassVar
+on `BaseClaudeEntity`; the fetch functions in api.py read that instead of
+hardcoding URLs, and delegate to the fetch shape that fits the resource.
+"""
 
 import hashlib
 import json
 from datetime import UTC, datetime, timedelta
-from typing import Annotated, Any
+from typing import Annotated, Any, ClassVar, Generic, TypeVar
 
 from estuary_cdk.capture.common import (
     BaseDocument,
@@ -17,9 +22,9 @@ from pydantic import AwareDatetime, BaseModel, Field, computed_field
 
 ConnectorState = GenericConnectorState[ResourceState]
 
-# The Claude Admin API requires this static version header on every request.
-# It is not part of the x-api-key auth handled by TokenSource, so it must be
-# passed explicitly via headers= on every http.request* call.
+# The Claude Admin API requires this static version header on every request. It is
+# not part of the x-api-key auth handled by TokenSource, so it must be passed
+# explicitly via headers= on every http.request* call.
 ANTHROPIC_VERSION_HEADERS = {"anthropic-version": "2023-06-01"}
 
 DEFAULT_BASE_URL = "https://api.anthropic.com"
@@ -70,30 +75,41 @@ class EndpointConfig(BaseModel):
     ]
 
 
-class Organization(BaseDocument, extra="allow"):
+# --- Endpoint-aware base + document models ---
+# api_path encapsulates the endpoint on the model; fetchers read it. Keep models
+# minimal (extra="allow" passes everything else through to schema inference).
+
+
+class BaseClaudeEntity(BaseDocument, extra="allow"):
+    resource_name: ClassVar[str]
+    api_path: ClassVar[str]
+    page_limit: ClassVar[int] = 1000
+
+
+class Organization(BaseClaudeEntity):
+    resource_name: ClassVar[str] = "Organization"
+    api_path: ClassVar[str] = "v1/organizations/me"
+
     id: str
 
 
-class User(BaseDocument, extra="allow"):
+class User(BaseClaudeEntity):
+    resource_name: ClassVar[str] = "Users"
+    api_path: ClassVar[str] = "v1/organizations/users"
+
     id: str
-    # The docs mark added_at as always-present, but that's [INFERRED] (no published
-    # JSON Schema). Keep it optional so a single member missing it can't fail the
-    # whole snapshot page; it isn't a key field.
     added_at: AwareDatetime | None = None
 
 
-class UserList(BaseModel, extra="allow"):
-    data: list[User]
-    has_more: bool
-    last_id: str | None = None
+class ClaudeCodeUsageRecord(BaseClaudeEntity):
+    resource_name: ClassVar[str] = "ClaudeCodeUsageReport"
+    api_path: ClassVar[str] = "v1/organizations/usage_report/claude_code"
 
-
-class ClaudeCodeUsageRecord(BaseDocument, extra="allow"):
     date: AwareDatetime
     organization_id: str
-    # The API nests the actor identity under `actor`, a discriminated union of
-    # user_actor (email_address) / api_actor (api_key_name). The composite key
-    # needs a single non-null scalar, so derive a flat actor_id here.
+    # actor is a discriminated union (user_actor: email_address / api_actor:
+    # api_key_name). The composite key needs a single non-null scalar, so derive
+    # a flat actor_id here.
     actor: dict[str, Any]
 
     @computed_field  # type: ignore[prop-decorator]
@@ -104,9 +120,7 @@ class ClaudeCodeUsageRecord(BaseDocument, extra="allow"):
         if identity:
             return identity
         # Unknown/empty actor shape (this stream is live-unvalidated). Derive a stable
-        # id from the raw actor so distinct actors never collapse onto a shared key and
-        # silently overwrite each other; a new actor shape surfaces as a new key, not
-        # as lost rows.
+        # id from the raw actor so distinct actors never collapse onto a shared key.
         if actor:
             digest = hashlib.sha1(
                 json.dumps(actor, sort_keys=True, default=str).encode()
@@ -115,9 +129,23 @@ class ClaudeCodeUsageRecord(BaseDocument, extra="allow"):
         return "unknown"
 
 
-class ClaudeCodeUsageReport(BaseModel, extra="allow"):
-    # Defaults make a missing/short final page terminate the day-drain loop cleanly
-    # instead of raising mid-stream (this envelope is live-unvalidated).
-    data: list[ClaudeCodeUsageRecord] = []
+# --- Generic paginated response envelopes ---
+# One generic per pagination contract, so no per-resource envelope class is needed.
+
+T = TypeVar("T")
+
+
+class CursorPage(BaseModel, Generic[T], extra="allow"):
+    """ID-cursor list envelope: page forward with after_id = last_id while has_more."""
+
+    data: list[T] = []
+    has_more: bool = False
+    last_id: str | None = None
+
+
+class OpaquePage(BaseModel, Generic[T], extra="allow"):
+    """Opaque-cursor report envelope: page forward with page = next_page while has_more."""
+
+    data: list[T] = []
     has_more: bool = False
     next_page: str | None = None

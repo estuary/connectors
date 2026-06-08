@@ -26,7 +26,7 @@ class Connector(
     async def spec(self, log: Logger, _: request.Spec) -> ConnectorSpec:
         return ConnectorSpec(
             configSchema=EndpointConfig.model_json_schema(),
-            documentationUrl="https://go.estuary.dev/source-claude-api",
+            documentationUrl="https://go.estuary.dev/source-claude-admin-api",
             resourceConfigSchema=ResourceConfig.model_json_schema(),
             resourcePathPointers=ResourceConfig.PATH_POINTERS,
         )

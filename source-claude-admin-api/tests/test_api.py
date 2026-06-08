@@ -11,8 +11,9 @@ from datetime import UTC, datetime
 
 import pytest
 
-from source_claude_api import api
-from source_claude_api.models import ClaudeCodeUsageRecord
+from source_claude_admin_api import api
+from source_claude_admin_api.api import fetch_cursor_list, fetch_singleton
+from source_claude_admin_api.models import ClaudeCodeUsageRecord, Organization, User
 
 log = logging.getLogger()
 
@@ -123,7 +124,7 @@ async def test_day_iteration_advances_and_stops_at_freshness_floor(frozen_now):
     # Never requested the incomplete day 06-10.
     assert all(p["starting_at"] != "2026-06-10" for p in http.requests)
     # The two-page day issued a second request carrying the opaque page cursor.
-    assert {"starting_at": "2026-06-06", "limit": api.USAGE_PAGE_LIMIT, "page": "1"} in http.requests
+    assert {"starting_at": "2026-06-06", "limit": ClaudeCodeUsageRecord.page_limit, "page": "1"} in http.requests
 
 
 async def test_no_ready_days_yields_nothing(frozen_now):

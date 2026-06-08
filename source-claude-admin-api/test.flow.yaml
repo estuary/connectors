@@ -1,13 +1,15 @@
 import:
 - acmeCo/flow.yaml
 captures:
-  acmeCo/source-claude-api:
+  acmeCo/source-claude-admin-api:
     endpoint:
       local:
         command:
+        - poetry
+        - run
         - python
         - -m
-        - source_claude_api
+        - source_claude_admin_api
         config: config.yaml
     bindings:
     - resource:

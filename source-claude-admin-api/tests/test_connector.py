@@ -1,11 +1,11 @@
-"""Tests for the source-claude-api connector."""
+"""Tests for the source-claude-admin-api connector."""
 
 import logging
 
 import pytest
 
-from source_claude_api import Connector
-from source_claude_api.models import EndpointConfig, ResourceConfig
+from source_claude_admin_api import Connector
+from source_claude_admin_api.models import EndpointConfig, ResourceConfig
 
 EXPECTED_RESOURCES = ["Organization", "Users", "ClaudeCodeUsageReport"]
 

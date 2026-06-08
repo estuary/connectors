@@ -1,11 +1,11 @@
-"""Pytest fixtures for source-claude-api tests."""
+"""Pytest fixtures for source-claude-admin-api tests."""
 
 from pathlib import Path
 
 import pytest
 import yaml
 
-from source_claude_api.models import EndpointConfig
+from source_claude_admin_api.models import EndpointConfig
 
 CONFIG_PATH = Path(__file__).parent.parent / "config.yaml"
 

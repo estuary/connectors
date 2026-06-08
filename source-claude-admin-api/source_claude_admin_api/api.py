@@ -1,33 +1,33 @@
 """Claude Admin API client functions.
 
-Three distinct fetch shapes — deliberately NOT unified behind one helper:
+Fetch shapes are generic over the model type and read each model's `api_path`
+ClassVar — no hardcoded URLs:
 
-1. Organization      — single GET, no pagination (snapshot singleton).
-2. Users             — ID-cursor pagination (limit / after_id -> has_more / last_id),
-                       full re-list each poll (snapshot).
-3. ClaudeCodeUsageReport — opaque page cursor WITHIN a single UTC day
-                       (page -> next_page / has_more) plus an outer day loop with a
-                       freshness gate (mirrors source-front::fetch_conversations).
+1. fetch_singleton      — single GET, no pagination (Organization).
+2. fetch_cursor_list    — ID-cursor pagination (limit / after_id -> has_more / last_id), Users.
+3. fetch_claude_code_usage — opaque page cursor WITHIN a single UTC day
+                          (page -> next_page / has_more) plus an outer day loop with a
+                          freshness gate. Bespoke: the freshness gate isn't generalizable,
+                          but it still reads ClaudeCodeUsageRecord.api_path.
 """
 
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime, timedelta
 from logging import Logger
+from typing import TypeVar
 
 from estuary_cdk.capture.common import BaseDocument, LogCursor
 from estuary_cdk.http import HTTPSession
 
 from .models import (
     ANTHROPIC_VERSION_HEADERS,
+    BaseClaudeEntity,
     ClaudeCodeUsageRecord,
-    ClaudeCodeUsageReport,
-    Organization,
-    User,
-    UserList,
+    CursorPage,
+    OpaquePage,
 )
 
-USERS_PAGE_LIMIT = 1000
-USAGE_PAGE_LIMIT = 1000
+EntityT = TypeVar("EntityT", bound=BaseClaudeEntity)
 
 # The usage report API only returns data older than ~1 hour. We wait this long past
 # midnight of the *next* day before processing a day, so a day is never advanced past
@@ -44,35 +44,38 @@ def _midnight(dt: datetime) -> datetime:
     return dt.astimezone(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
 
 
-async def fetch_organization(
+def _entity_url(base_url: str, model: type[BaseClaudeEntity]) -> str:
+    return f"{base_url.rstrip('/')}/{model.api_path}"
+
+
+async def fetch_singleton(
+    model: type[EntityT],
     http: HTTPSession,
     base_url: str,
     log: Logger,
-) -> AsyncGenerator[Organization, None]:
-    url = f"{base_url}/v1/organizations/me"
-    org = Organization.model_validate_json(
-        await http.request(log, url, headers=ANTHROPIC_VERSION_HEADERS)
+) -> AsyncGenerator[EntityT, None]:
+    doc = model.model_validate_json(
+        await http.request(log, _entity_url(base_url, model), headers=ANTHROPIC_VERSION_HEADERS)
     )
-    yield org
+    yield doc
 
 
-async def fetch_users(
+async def fetch_cursor_list(
+    model: type[EntityT],
     http: HTTPSession,
     base_url: str,
     log: Logger,
-) -> AsyncGenerator[User, None]:
-    url = f"{base_url}/v1/organizations/users"
-    params: dict[str, str | int] = {"limit": USERS_PAGE_LIMIT}
+) -> AsyncGenerator[EntityT, None]:
+    url = _entity_url(base_url, model)
+    params: dict[str, str | int] = {"limit": model.page_limit}
 
     while True:
-        page = UserList.model_validate_json(
-            await http.request(
-                log, url, params=params, headers=ANTHROPIC_VERSION_HEADERS
-            )
+        page = CursorPage[model].model_validate_json(
+            await http.request(log, url, params=params, headers=ANTHROPIC_VERSION_HEADERS)
         )
 
-        for user in page.data:
-            yield user
+        for item in page.data:
+            yield item
 
         if not page.has_more or page.last_id is None:
             break
@@ -86,18 +89,15 @@ async def _fetch_usage_day(
     log: Logger,
     day: datetime,
 ) -> AsyncGenerator[ClaudeCodeUsageRecord, None]:
-    url = f"{base_url}/v1/organizations/usage_report/claude_code"
-    starting_at = _midnight(day).strftime("%Y-%m-%d")
+    url = _entity_url(base_url, ClaudeCodeUsageRecord)
     params: dict[str, str | int] = {
-        "starting_at": starting_at,
-        "limit": USAGE_PAGE_LIMIT,
+        "starting_at": _midnight(day).strftime("%Y-%m-%d"),
+        "limit": ClaudeCodeUsageRecord.page_limit,
     }
 
     while True:
-        report = ClaudeCodeUsageReport.model_validate_json(
-            await http.request(
-                log, url, params=params, headers=ANTHROPIC_VERSION_HEADERS
-            )
+        report = OpaquePage[ClaudeCodeUsageRecord].model_validate_json(
+            await http.request(log, url, params=params, headers=ANTHROPIC_VERSION_HEADERS)
         )
 
         for record in report.data:
@@ -122,9 +122,9 @@ async def fetch_claude_code_usage(
 
     day = _midnight(log_cursor)
 
-    # Freshness gate: only process day D once we are safely past the point where
-    # its data is complete. Day D's data is "done" at midnight(D+1); add a safety
-    # lag because the API only returns data older than ~1 hour.
+    # Freshness gate: only process day D once we are safely past the point where its
+    # data is complete. Day D's data is "done" at midnight(D+1); add a safety lag
+    # because the API only returns data older than ~1 hour.
     def _is_ready(d: datetime) -> bool:
         return now_utc() >= _midnight(d) + timedelta(days=1) + USAGE_FRESHNESS_LAG
 

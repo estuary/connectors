@@ -26,12 +26,14 @@ properties:
     title: Id
     type: string
   added_at:
-    format: date-time
+    anyOf:
+    - format: date-time
+      type: string
+    - type: 'null'
+    default: null
     title: Added At
-    type: string
 required:
 - id
-- added_at
 title: User
 type: object
 x-infer-schema: true

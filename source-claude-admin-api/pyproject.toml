@@ -1,6 +1,6 @@
 [tool.poetry]
 version = "0.1.0"
-name = "source-claude-api"
+name = "source-claude-admin-api"
 description = "Estuary Flow source connector for the Anthropic Claude Admin API"
 authors = ["CorrDyn"]
 
