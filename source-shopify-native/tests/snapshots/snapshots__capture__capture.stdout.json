@@ -782,6 +782,9 @@
       },
       "referrerUrl": null,
       "registeredSourceUrl": null,
+      "retailLocation": {
+        "id": "gid://shopify/Location/73871392813"
+      },
       "shippingAddress": null,
       "sourceIdentifier": null,
       "sourceName": "shopify_draft_order",
@@ -1317,7 +1320,7 @@
       "sortOrder": "BEST_SELLING",
       "templateSuffix": null,
       "title": "Automated Collection",
-      "updatedAt": "2025-04-24T20:25:42Z"
+      "updatedAt": "2026-06-06T09:39:22Z"
     }
   ],
   [
@@ -1343,7 +1346,7 @@
       "id": "gid://shopify/Collection/295442612269",
       "legacyResourceId": "295442612269",
       "metafields": [],
-      "updatedAt": "2025-04-24T20:25:42Z"
+      "updatedAt": "2026-06-06T09:39:22Z"
     }
   ],
   [
