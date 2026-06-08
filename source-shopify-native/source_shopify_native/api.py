@@ -13,6 +13,7 @@ from source_shopify_native.graphql.bulk_job_manager import BulkJobManager
 from source_shopify_native.models import (
     BaseResponseData,
     ShopifyGraphQLResource,
+    StoreCapabilities,
     StoreValidationContext,
     TShopifyGraphQLResource,
 )
@@ -31,13 +32,14 @@ async def bulk_fetch_incremental(
     bulk_job_manager: BulkJobManager,
     model: type[ShopifyGraphQLResource],
     store: str,
+    capabilities: StoreCapabilities,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[ShopifyGraphQLResource | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
     max_end = log_cursor + window_size
     end = min(max_end, datetime.now(tz=UTC))
-    query = model.build_query(log_cursor, end)
+    query = model.build_query(log_cursor, end, capabilities=capabilities)
 
     url = await bulk_job_manager.execute(model, query)
 
@@ -63,10 +65,11 @@ async def bulk_fetch_full_refresh(
     bulk_job_manager: BulkJobManager,
     model: type[ShopifyGraphQLResource],
     store: str,
+    capabilities: StoreCapabilities,
     log: Logger,
 ) -> AsyncGenerator[ShopifyGraphQLResource, None]:
     end = datetime.now(tz=UTC)
-    query = model.build_query(start_date, end)
+    query = model.build_query(start_date, end, capabilities=capabilities)
 
     url = await bulk_job_manager.execute(model, query)
 
@@ -90,6 +93,7 @@ async def _paginate_through_resources(
     start: datetime,
     end: datetime,
     store: str,
+    capabilities: StoreCapabilities,
     log: Logger,
 ) -> AsyncGenerator[TShopifyGraphQLResource, None]:
     after: str | None = None
@@ -101,6 +105,7 @@ async def _paginate_through_resources(
             end=end,
             first=PAGE_SIZE,
             after=after,
+            capabilities=capabilities,
         )
 
         data = await client.request(query, data_model, log, context=ctx)
@@ -120,6 +125,7 @@ async def fetch_incremental_unsorted(
     model: type[TShopifyGraphQLResource],
     data_model: type[BaseResponseData[TShopifyGraphQLResource]],
     store: str,
+    capabilities: StoreCapabilities,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[TShopifyGraphQLResource | LogCursor, None]:
@@ -135,6 +141,7 @@ async def fetch_incremental_unsorted(
         start=log_cursor,
         end=end,
         store=store,
+        capabilities=capabilities,
         log=log,
     ):
         cursor_value = doc.get_cursor_value()
@@ -153,6 +160,7 @@ async def fetch_incremental(
     model: type[TShopifyGraphQLResource],
     data_model: type[BaseResponseData[TShopifyGraphQLResource]],
     store: str,
+    capabilities: StoreCapabilities,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[TShopifyGraphQLResource | LogCursor, None]:
@@ -169,6 +177,7 @@ async def fetch_incremental(
         start=log_cursor,
         end=end,
         store=store,
+        capabilities=capabilities,
         log=log,
     ):
         cursor_value = doc.get_cursor_value()
@@ -193,6 +202,7 @@ async def backfill_incremental(
     model: type[TShopifyGraphQLResource],
     data_model: type[BaseResponseData[TShopifyGraphQLResource]],
     store: str,
+    capabilities: StoreCapabilities,
     log: Logger,
     page: PageCursor | None,
     cutoff: LogCursor,
@@ -213,6 +223,7 @@ async def backfill_incremental(
         start=start,
         end=cutoff,
         store=store,
+        capabilities=capabilities,
         log=log,
     ):
         cursor_value = doc.get_cursor_value()

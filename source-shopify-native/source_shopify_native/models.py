@@ -8,6 +8,7 @@ from typing import (
     Annotated,
     Any,
     AsyncGenerator,
+    Callable,
     ClassVar,
     Generic,
     Literal,
@@ -410,7 +411,7 @@ class StoreValidationContext:
 
 @dataclass(frozen=True, slots=True)
 class StoreCapabilities:
-    """Per-store capabilities derived from granted scopes and the store's Shopify plan.
+    """Per-store capabilities used to decide which conditional query fields are available.
 
     Carries everything a ConditionalField predicate might need to gate a field.
     """
@@ -421,6 +422,45 @@ class StoreCapabilities:
     is_plus_or_advanced: bool = False
 
 
+@dataclass(slots=True)
+class ConditionalField:
+    """A GraphQL fragment spliced into a query only when available for the store.
+
+    `placeholder` must appear verbatim in the resource's QUERY at the position where
+    `fields` belongs. When `is_available` returns False, the placeholder is replaced
+    with an empty string. Because substitution is positional, this works at any nesting
+    depth, not just the query root.
+
+    Placeholders are written as GraphQL comments (`# ...`) so that a marker which is
+    never substituted degrades to a harmless comment rather than producing an invalid
+    query. ShopifyGraphQLResource validates at class-definition time that each placeholder
+    is actually present in QUERY.
+    """
+
+    placeholder: str
+    fields: str
+    is_available: Callable[["StoreCapabilities"], bool]
+
+    def __post_init__(self) -> None:
+        # The degrade-to-no-op guarantee only holds if the placeholder is a comment, so
+        # that an unsubstituted marker is ignored by GraphQL rather than parsed as a field.
+        if not self.placeholder.lstrip().startswith("#"):
+            raise ValueError(
+                f"ConditionalField placeholder must be a GraphQL comment (start with "
+                f"'#'), got {self.placeholder!r}."
+            )
+
+
+def requires_any_scope(*scopes: str) -> Callable[["StoreCapabilities"], bool]:
+    """Build an `is_available` predicate that holds when any of `scopes` is granted.
+
+    Mirrors the any-of semantics of QUALIFYING_SCOPES. A field reachable via any one of
+    several scopes is available if at least one is present.
+    """
+    required = frozenset(scopes)
+    return lambda capabilities: not required.isdisjoint(capabilities.scopes)
+
+
 class ShopifyGraphQLResource(BaseDocument):
     QUERY: ClassVar[str] = ""
     QUERY_ROOT: ClassVar[str] = ""
@@ -429,8 +469,24 @@ class ShopifyGraphQLResource(BaseDocument):
     SORT_KEY: ClassVar[SortKey | None] = None
     SHOULD_USE_BULK_QUERIES: ClassVar[bool] = True
     QUALIFYING_SCOPES: ClassVar[set[str]] = set()
+    # Fields included in the query only when the store's capabilities allow it. See
+    # ConditionalField for placeholder/substitution semantics.
+    CONDITIONAL_FIELDS: ClassVar[list[ConditionalField]] = []
 
     model_config = ConfigDict(extra="allow", validate_assignment=True)
+
+    @classmethod
+    def __pydantic_init_subclass__(cls, **kwargs: Any) -> None:
+        super().__pydantic_init_subclass__(**kwargs)
+        # A placeholder absent from QUERY would be silently dropped during substitution,
+        # so reject it at class-definition time instead.
+        for field in cls.CONDITIONAL_FIELDS:
+            if cls.QUERY and field.placeholder not in cls.QUERY:
+                raise ValueError(
+                    f"{cls.__name__} declares a ConditionalField with placeholder "
+                    f"{field.placeholder!r}, but that marker is not present in its QUERY. "
+                    f"Embed the placeholder verbatim where the field belongs."
+                )
 
     class Meta(BaseDocument.Meta):
         model_config = ConfigDict(validate_assignment=True)
@@ -486,6 +542,7 @@ class ShopifyGraphQLResource(BaseDocument):
         end: datetime,
         first: int | None = None,
         after: str | None = None,
+        capabilities: "StoreCapabilities | None" = None,
     ) -> str:
         raise NotImplementedError("build_query method must be implemented")
 
@@ -519,6 +576,23 @@ class ShopifyGraphQLResource(BaseDocument):
             yield current_record
 
     @classmethod
+    def _resolve_conditional_fields(
+        cls, capabilities: "StoreCapabilities | None"
+    ) -> str:
+        """Splice the resource's CONDITIONAL_FIELDS into QUERY based on capabilities.
+
+        Each placeholder is replaced by its fragment when available, else by "".
+        """
+        caps = capabilities or StoreCapabilities(scopes=frozenset())
+        body = cls.QUERY
+        for field in cls.CONDITIONAL_FIELDS:
+            body = body.replace(
+                field.placeholder,
+                field.fields if field.is_available(caps) else "",
+            )
+        return body
+
+    @classmethod
     def build_query_with_fragment(
         cls,
         start: datetime,
@@ -529,9 +603,11 @@ class ShopifyGraphQLResource(BaseDocument):
         includeLegacyId: bool = True,
         includeCreatedAt: bool = True,
         includeUpdatedAt: bool = True,
+        capabilities: "StoreCapabilities | None" = None,
     ) -> str:
         lower_bound = dt_to_str(start)
         upper_bound = dt_to_str(end)
+        query_body = cls._resolve_conditional_fields(capabilities)
 
         query = f"""
         {{
@@ -549,7 +625,7 @@ class ShopifyGraphQLResource(BaseDocument):
                         {"legacyResourceId" if includeLegacyId else ""}
                         {"createdAt" if includeCreatedAt else ""}
                         {"updatedAt" if includeUpdatedAt else ""}
-                        {cls.QUERY}
+                        {query_body}
                     }}
                 }}
                 {

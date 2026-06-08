@@ -3,6 +3,8 @@ from logging import Logger
 from typing import AsyncGenerator
 from ..metafields import MetafieldsResource
 
+from ...models import StoreCapabilities
+
 
 class LocationMetafields(MetafieldsResource):
     NAME = "location_metafields"
@@ -16,12 +18,14 @@ class LocationMetafields(MetafieldsResource):
         end: datetime,
         first: int | None = None,
         after: str | None = None,
+        capabilities: StoreCapabilities | None = None,
     ) -> str:
         return LocationMetafields.build_query_with_fragment(
             start,
             end,
             first=first,
             after=after,
+            capabilities=capabilities,
         )
 
     @staticmethod

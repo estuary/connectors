@@ -593,6 +593,7 @@ async def all_resources(
                             ctx.bulk_job_manager,
                             model,
                             store_id,
+                            ctx.capabilities,
                         )
                     elif model.SORT_KEY is None:
                         fetch_changes[store_id] = functools.partial(
@@ -601,6 +602,7 @@ async def all_resources(
                             model,
                             data_model,
                             store_id,
+                            ctx.capabilities,
                         )
                     else:
                         fetch_changes[store_id] = functools.partial(
@@ -609,6 +611,7 @@ async def all_resources(
                             model,
                             data_model,
                             store_id,
+                            ctx.capabilities,
                         )
                         fetch_page[store_id] = functools.partial(
                             backfill_incremental,
@@ -616,6 +619,7 @@ async def all_resources(
                             model,
                             data_model,
                             store_id,
+                            ctx.capabilities,
                         )
 
                 open_binding(

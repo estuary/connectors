@@ -3,7 +3,7 @@ from logging import Logger
 from typing import AsyncGenerator
 from ..metafields import MetafieldsResource
 
-from source_shopify_native.models import SortKey
+from source_shopify_native.models import SortKey, StoreCapabilities
 
 
 class CustomCollectionMetafields(MetafieldsResource):
@@ -19,6 +19,7 @@ class CustomCollectionMetafields(MetafieldsResource):
         end: datetime,
         first: int | None = None,
         after: str | None = None,
+        capabilities: StoreCapabilities | None = None,
     ) -> str:
         return CustomCollectionMetafields.build_query_with_fragment(
             start,
@@ -27,6 +28,7 @@ class CustomCollectionMetafields(MetafieldsResource):
             first=first,
             after=after,
             includeCreatedAt=False,
+            capabilities=capabilities,
         )
 
     @staticmethod
@@ -51,6 +53,7 @@ class SmartCollectionMetafields(MetafieldsResource):
         end: datetime,
         first: int | None = None,
         after: str | None = None,
+        capabilities: StoreCapabilities | None = None,
     ) -> str:
         return SmartCollectionMetafields.build_query_with_fragment(
             start,
@@ -59,6 +62,7 @@ class SmartCollectionMetafields(MetafieldsResource):
             first=first,
             after=after,
             includeCreatedAt=False,
+            capabilities=capabilities,
         )
 
     @staticmethod

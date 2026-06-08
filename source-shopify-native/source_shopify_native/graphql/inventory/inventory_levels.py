@@ -3,7 +3,7 @@ from logging import Logger
 import json
 from typing import Any, AsyncGenerator
 
-from ...models import ShopifyGraphQLResource
+from ...models import ShopifyGraphQLResource, StoreCapabilities
 
 
 class InventoryLevels(ShopifyGraphQLResource):
@@ -55,12 +55,14 @@ class InventoryLevels(ShopifyGraphQLResource):
         end: datetime,
         first: int | None = None,
         after: str | None = None,
+        capabilities: StoreCapabilities | None = None,
     ) -> str:
         return InventoryLevels.build_query_with_fragment(
             start,
             end,
             first=first,
             after=after,
+            capabilities=capabilities,
         )
 
     @staticmethod

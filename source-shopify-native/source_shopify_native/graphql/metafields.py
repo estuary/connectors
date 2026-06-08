@@ -3,7 +3,7 @@ import json
 from datetime import datetime
 from typing import Any, AsyncGenerator, ClassVar
 
-from ..models import ShopifyGraphQLResource
+from ..models import ShopifyGraphQLResource, StoreCapabilities
 
 
 class MetafieldsResource(ShopifyGraphQLResource):
@@ -47,6 +47,7 @@ class MetafieldsResource(ShopifyGraphQLResource):
         end: datetime,
         first: int | None = None,
         after: str | None = None,
+        capabilities: StoreCapabilities | None = None,
     ) -> str:
         # This method should be implemented by subclasses
         # pylint: disable=unused-argument
