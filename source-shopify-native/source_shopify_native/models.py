@@ -408,6 +408,19 @@ class StoreValidationContext:
     store: str
 
 
+@dataclass(frozen=True, slots=True)
+class StoreCapabilities:
+    """Per-store capabilities derived from granted scopes and the store's Shopify plan.
+
+    Carries everything a ConditionalField predicate might need to gate a field.
+    """
+
+    scopes: frozenset[str]
+    # Whether the store is on a Shopify Plus or Advanced plan or a partner dev store.
+    # Some fields are only queryable on these tiers regardless of granted scopes.
+    is_plus_or_advanced: bool = False
+
+
 class ShopifyGraphQLResource(BaseDocument):
     QUERY: ClassVar[str] = ""
     QUERY_ROOT: ClassVar[str] = ""

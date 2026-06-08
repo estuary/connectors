@@ -39,6 +39,7 @@ from .models import (
     ShopDetails,
     ShopifyClientCredentials,
     ShopifyGraphQLResource,
+    StoreCapabilities,
     StoreConfig,
     create_response_data_model,
 )
@@ -94,7 +95,7 @@ class StoreContext:
     http: StoreHTTP
     client: gql.ShopifyGraphQLClient
     bulk_job_manager: BulkJobManager
-    scopes: set[str]
+    capabilities: StoreCapabilities
     available_resources: set[type[ShopifyGraphQLResource]]
 
 
@@ -187,18 +188,26 @@ async def _create_store_context(
         store_config.credentials, (AccessToken, ShopifyClientCredentials)
     )
     can_access_pii = True
+    is_plus_or_advanced = False
     if uses_custom_app_token:
-        can_access_pii = await _check_plan_allows_pii(store_http, client.url, log)
+        plan = await _get_shop_plan(store_http, client.url, log)
+        can_access_pii = _plan_allows_pii(plan, log)
+        is_plus_or_advanced = _plan_is_plus_or_advanced(plan)
 
     available_resources = _get_available_resources(
         granted_scopes, uses_custom_app_token, can_access_pii
+    )
+
+    capabilities = StoreCapabilities(
+        scopes=frozenset(granted_scopes),
+        is_plus_or_advanced=is_plus_or_advanced,
     )
 
     store_context = StoreContext(
         http=store_http,
         client=client,
         bulk_job_manager=bulk_job_manager,
-        scopes=granted_scopes,
+        capabilities=capabilities,
         available_resources=available_resources,
     )
 
@@ -351,13 +360,18 @@ async def _reconcile_connector_state(
         await task.checkpoint(ConnectorState(bindingStateV1={binding.stateKey: state}))
 
 
-async def _check_plan_allows_pii(http: HTTPMixin, url: str, log: Logger) -> bool:
-    """Check if the Shopify plan allows access to PII data."""
+async def _get_shop_plan(
+    http: HTTPMixin, url: str, log: Logger
+) -> ShopDetails.Data.Shop.Plan:
+    """Fetch the store's Shopify plan details."""
     response = ShopDetails.model_validate_json(
         await http.request(log, url, method="POST", json={"query": ShopDetails.query()})
     )
-    plan = response.data.shop.plan
+    return response.data.shop.plan
 
+
+def _plan_allows_pii(plan: ShopDetails.Data.Shop.Plan, log: Logger) -> bool:
+    """Check if the Shopify plan allows access to PII data."""
     if plan.partnerDevelopment or plan.shopifyPlus:
         return True
 
@@ -372,6 +386,18 @@ async def _check_plan_allows_pii(http: HTTPMixin, url: str, log: Logger) -> bool
         f"Assuming PII access is supported."
     )
     return True
+
+
+def _plan_is_plus_or_advanced(plan: ShopDetails.Data.Shop.Plan) -> bool:
+    """Whether the plan can query fields restricted to Plus/Advanced tiers.
+
+    Partner development stores have the same access as Plus for testing purposes.
+    """
+    return (
+        plan.shopifyPlus
+        or plan.partnerDevelopment
+        or plan.displayName == PlanName.ADVANCED
+    )
 
 
 async def _get_granted_scopes(http: HTTPMixin, url: str, log: Logger) -> set[str]:
@@ -535,7 +561,7 @@ async def all_resources(
                 if model == gql.FulfillmentOrders:
                     fo_scopes = gql.FulfillmentOrders.QUALIFYING_SCOPES
                     for store_id in stores_with_access:
-                        granted = store_contexts[store_id].scopes
+                        granted = store_contexts[store_id].capabilities.scopes
                         if fo_scopes & granted and not fo_scopes <= granted:
                             missing = fo_scopes - granted
                             task.log.warning(
