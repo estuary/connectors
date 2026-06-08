@@ -3,7 +3,7 @@ from logging import Logger
 import json
 from typing import Any, AsyncGenerator, ClassVar, Literal
 
-from ...models import ShopifyGraphQLResource, SortKey
+from ...models import ShopifyGraphQLResource, SortKey, StoreCapabilities
 
 
 class _Collections(ShopifyGraphQLResource):
@@ -56,6 +56,7 @@ class _Collections(ShopifyGraphQLResource):
         end: datetime,
         first: int | None = None,
         after: str | None = None,
+        capabilities: StoreCapabilities | None = None,
     ) -> str:
         return _Collections.build_query_with_fragment(
             start,
@@ -64,6 +65,7 @@ class _Collections(ShopifyGraphQLResource):
             first=first,
             after=after,
             includeCreatedAt=False,
+            capabilities=capabilities,
         )
 
     @staticmethod
@@ -72,6 +74,7 @@ class _Collections(ShopifyGraphQLResource):
         end: datetime,
         first: int | None = None,
         after: str | None = None,
+        capabilities: StoreCapabilities | None = None,
     ) -> str:
         raise NotImplementedError("build_query method must be implemented")
 
@@ -149,8 +152,9 @@ class CustomCollections(_Collections):
         end: datetime,
         first: int | None = None,
         after: str | None = None,
+        capabilities: StoreCapabilities | None = None,
     ) -> str:
-        return _Collections.build_query_with_type("custom", start, end, first=first, after=after)
+        return _Collections.build_query_with_type("custom", start, end, first=first, after=after, capabilities=capabilities)
 
     @staticmethod
     def process_result(
@@ -169,8 +173,9 @@ class SmartCollections(_Collections):
         end: datetime,
         first: int | None = None,
         after: str | None = None,
+        capabilities: StoreCapabilities | None = None,
     ) -> str:
-        return _Collections.build_query_with_type("smart", start, end, first=first, after=after)
+        return _Collections.build_query_with_type("smart", start, end, first=first, after=after, capabilities=capabilities)
 
     @staticmethod
     def process_result(
