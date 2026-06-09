@@ -536,7 +536,7 @@ def build_claude_prompt(
         f"to the pull-request causing the regression being fixed, however you cannot\n"
         f"take this explicit statement of regression as granted. It is possible that\n"
         f"no such explicit mention of a regression is there, but the pull-request is still\n"
-        f"a roll-forward fix of a previous PR. Use the explicit statement as additional\n",
+        f"a roll-forward fix of a previous PR. Use the explicit statement as additional\n"
         f"information and not as the sole source of truth.\n\n"
         f"Note: this repo uses rebase-and-merge, so each PR's commits land on main\n"
         f"as a linear sequence — judge PRs as units, not individual commits.\n\n"
