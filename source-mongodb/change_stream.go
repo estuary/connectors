@@ -434,14 +434,31 @@ func (c *capture) processBatch(
 
 		if resp.IsSkip && resp.FullDocumentMissing {
 			rid := resourceId(resp.Database, resp.Collection)
-			if _, tracked := c.trackedChangeStreamBindings[rid]; tracked && c.fullDocRequired[resp.Database] {
+			_, tracked := c.trackedChangeStreamBindings[rid]
+			if tracked && c.fullDocRequired[resp.Database] {
 				return primitive.Timestamp{}, fmt.Errorf(
 					"fullDocument was missing for a change event on %s.%s: the collection must have changeStreamPreAndPostImages enabled",
 					resp.Database, resp.Collection,
 				)
 			}
-			// Untracked binding or UpdateLookup database: null fullDocument is a
-			// known race condition (doc deleted between update and lookup).
+			// UpdateLookup database: a null fullDocument means the document was not
+			// in the majority-committed snapshot at lookup time, so this non-delete
+			// event is dropped and the cursor advances past it. This is normally a
+			// delete/lookup race, but we have not confirmed whether these
+			// nulls are always real deletes or whether some other condition
+			// causes a null fullDocument. Log identifying details so a skipped
+			// event can be correlated against a reported missing document. Limited
+			// to tracked bindings to avoid noise from collections that are not being captured.
+			if tracked {
+				opType, _ := ev.raw.Lookup("operationType").StringValueOK()
+				log.WithFields(log.Fields{
+					"database":      resp.Database,
+					"collection":    resp.Collection,
+					"operationType": opType,
+					"documentID":    ev.raw.Lookup("documentKey", "_id").String(),
+					"clusterTime":   ev.raw.Lookup("clusterTime").String(),
+				}).Debug("skipping change event with null fullDocument (document absent at lookup time)")
+			}
 			continue
 		}
 
