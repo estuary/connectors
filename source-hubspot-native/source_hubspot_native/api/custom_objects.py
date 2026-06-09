@@ -12,6 +12,8 @@ from ..models import (
     CustomObject,
     CustomObjectSchema,
     PageResult,
+    TimestampedId,
+    TimestampedObject,
 )
 from .object_with_associations import (
     fetch_changes_with_associations,
@@ -28,11 +30,11 @@ def fetch_recent_custom_objects(
     with_history: bool,
     since: datetime,
     until: datetime | None,
-) -> AsyncGenerator[tuple[datetime, str, CustomObject], None]:
+) -> AsyncGenerator[TimestampedObject[CustomObject], None]:
 
     async def do_fetch(
         page: PageCursor, count: int
-    ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+    ) -> tuple[Iterable[TimestampedId], PageCursor]:
         return await fetch_search_objects(
             object_name, log, http, since, until, page,
             should_crash_on_unordered_results=False,
@@ -50,11 +52,11 @@ def fetch_delayed_custom_objects(
     with_history: bool,
     since: datetime,
     until: datetime,
-) -> AsyncGenerator[tuple[datetime, str, CustomObject] | datetime, None]:
+) -> AsyncGenerator[TimestampedObject[CustomObject] | datetime, None]:
 
     async def do_fetch(
         page: PageCursor, count: int
-    ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+    ) -> tuple[Iterable[TimestampedId], PageCursor]:
         return await fetch_search_objects(object_name, log, http, since, until, page)
 
     return fetch_chunked_changes_with_associations(

@@ -13,6 +13,8 @@ from ..models import (
     Names,
     OldRecentTicket,
     Ticket,
+    TimestampedId,
+    TimestampedObject,
 )
 from .object_with_associations import (
     fetch_changes_with_associations,
@@ -31,11 +33,11 @@ def fetch_recent_tickets(
     with_history: bool,
     since: datetime,
     until: datetime | None,
-) -> AsyncGenerator[tuple[datetime, str, Ticket], None]:
+) -> AsyncGenerator[TimestampedObject[Ticket], None]:
 
     async def do_fetch(
         page: PageCursor, count: int
-    ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+    ) -> tuple[Iterable[TimestampedId], PageCursor]:
         # This API will return a maximum of 1000 tickets, and does not appear to
         # ever return an error. It just ends at the 1000 most recently modified
         # tickets.
@@ -45,7 +47,9 @@ def fetch_recent_tickets(
         result = TypeAdapter(list[OldRecentTicket]).validate_json(
             await http.request(log, url, params=params)
         )
-        return ((ms_to_dt(r.timestamp), str(r.objectId)) for r in result), None
+        return (
+            TimestampedId(ms_to_dt(r.timestamp), str(r.objectId)) for r in result
+        ), None
 
     return fetch_changes_with_associations(
         Names.tickets, Ticket, do_fetch, log, http, with_history, since, until
@@ -54,11 +58,11 @@ def fetch_recent_tickets(
 
 def fetch_delayed_tickets(
     log: Logger, http: HTTPSession, with_history: bool, since: datetime, until: datetime
-) -> AsyncGenerator[tuple[datetime, str, Ticket] | datetime, None]:
+) -> AsyncGenerator[TimestampedObject[Ticket] | datetime, None]:
 
     async def do_fetch(
         page: PageCursor, count: int
-    ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+    ) -> tuple[Iterable[TimestampedId], PageCursor]:
         return await fetch_search_objects(Names.tickets, log, http, since, until, page)
 
     return fetch_chunked_changes_with_associations(

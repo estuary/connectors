@@ -11,6 +11,8 @@ from estuary_cdk.http import HTTPSession
 from ..models import (
     FeedbackSubmission,
     Names,
+    TimestampedId,
+    TimestampedObject,
 )
 from .object_with_associations import (
     fetch_changes_with_associations,
@@ -25,11 +27,11 @@ def fetch_recent_feedback_submissions(
     with_history: bool,
     since: datetime,
     until: datetime | None,
-) -> AsyncGenerator[tuple[datetime, str, FeedbackSubmission], None]:
+) -> AsyncGenerator[TimestampedObject[FeedbackSubmission], None]:
 
     async def do_fetch(
         page: PageCursor, count: int
-    ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+    ) -> tuple[Iterable[TimestampedId], PageCursor]:
         return await fetch_search_objects(
             Names.feedback_submissions, log, http, since, until, page,
             should_crash_on_unordered_results=False,
@@ -49,11 +51,11 @@ def fetch_recent_feedback_submissions(
 
 def fetch_delayed_feedback_submissions(
     log: Logger, http: HTTPSession, with_history: bool, since: datetime, until: datetime
-) -> AsyncGenerator[tuple[datetime, str, FeedbackSubmission] | datetime, None]:
+) -> AsyncGenerator[TimestampedObject[FeedbackSubmission] | datetime, None]:
 
     async def do_fetch(
         page: PageCursor, count: int
-    ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+    ) -> tuple[Iterable[TimestampedId], PageCursor]:
         return await fetch_search_objects(
             Names.feedback_submissions, log, http, since, until, page
         )

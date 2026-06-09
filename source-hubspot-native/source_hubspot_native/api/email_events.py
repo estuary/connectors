@@ -15,6 +15,7 @@ from estuary_cdk.http import HTTPSession
 from ..models import (
     EmailEvent,
     EmailEventsResponse,
+    TimestampedObject,
 )
 from .shared import (
     dt_to_ms,
@@ -51,7 +52,7 @@ async def fetch_email_events_page(
 
 async def _fetch_email_events(
     log: Logger, http: HTTPSession, since: datetime, until: datetime | None
-) -> AsyncGenerator[tuple[datetime, str, EmailEvent], None]:
+) -> AsyncGenerator[TimestampedObject[EmailEvent], None]:
     url = f"{HUB}/email/public/v1/events"
 
     input: Dict[str, Any] = {
@@ -67,7 +68,7 @@ async def _fetch_email_events(
         )
 
         for event in result.events:
-            yield event.created, event.id, event
+            yield TimestampedObject(event.created, event.id, event)
 
         if not result.hasMore:
             break
@@ -77,13 +78,13 @@ async def _fetch_email_events(
 
 def fetch_recent_email_events(
     log: Logger, http: HTTPSession, _: bool, since: datetime, until: datetime | None
-) -> AsyncGenerator[tuple[datetime, str, EmailEvent], None]:
+) -> AsyncGenerator[TimestampedObject[EmailEvent], None]:
 
     return _fetch_email_events(log, http, since + timedelta(milliseconds=1), until)
 
 
 def fetch_delayed_email_events(
     log: Logger, http: HTTPSession, _: bool, since: datetime, until: datetime
-) -> AsyncGenerator[tuple[datetime, str, EmailEvent], None]:
+) -> AsyncGenerator[TimestampedObject[EmailEvent], None]:
 
     return _fetch_email_events(log, http, since, until)

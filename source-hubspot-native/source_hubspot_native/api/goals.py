@@ -11,6 +11,8 @@ from estuary_cdk.http import HTTPSession
 from ..models import (
     Goals,
     Names,
+    TimestampedId,
+    TimestampedObject,
 )
 from .object_with_associations import (
     fetch_changes_with_associations,
@@ -25,11 +27,11 @@ def fetch_recent_goals(
     with_history: bool,
     since: datetime,
     until: datetime | None,
-) -> AsyncGenerator[tuple[datetime, str, Goals], None]:
+) -> AsyncGenerator[TimestampedObject[Goals], None]:
 
     async def do_fetch(
         page: PageCursor, count: int
-    ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+    ) -> tuple[Iterable[TimestampedId], PageCursor]:
         return await fetch_search_objects(
             Names.goals, log, http, since, until, page,
             should_crash_on_unordered_results=False,
@@ -42,11 +44,11 @@ def fetch_recent_goals(
 
 def fetch_delayed_goals(
     log: Logger, http: HTTPSession, with_history: bool, since: datetime, until: datetime
-) -> AsyncGenerator[tuple[datetime, str, Goals] | datetime, None]:
+) -> AsyncGenerator[TimestampedObject[Goals] | datetime, None]:
 
     async def do_fetch(
         page: PageCursor, count: int
-    ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+    ) -> tuple[Iterable[TimestampedId], PageCursor]:
         return await fetch_search_objects(Names.goals, log, http, since, until, page)
 
     return fetch_chunked_changes_with_associations(

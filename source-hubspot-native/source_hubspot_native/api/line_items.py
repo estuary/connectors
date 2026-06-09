@@ -11,6 +11,8 @@ from estuary_cdk.http import HTTPSession
 from ..models import (
     LineItem,
     Names,
+    TimestampedId,
+    TimestampedObject,
 )
 from .object_with_associations import (
     fetch_changes_with_associations,
@@ -25,11 +27,11 @@ def fetch_recent_line_items(
     with_history: bool,
     since: datetime,
     until: datetime | None,
-) -> AsyncGenerator[tuple[datetime, str, LineItem], None]:
+) -> AsyncGenerator[TimestampedObject[LineItem], None]:
 
     async def do_fetch(
         page: PageCursor, count: int
-    ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+    ) -> tuple[Iterable[TimestampedId], PageCursor]:
         return await fetch_search_objects(
             Names.line_items, log, http, since, until, page,
             should_crash_on_unordered_results=False,
@@ -42,11 +44,11 @@ def fetch_recent_line_items(
 
 def fetch_delayed_line_items(
     log: Logger, http: HTTPSession, with_history: bool, since: datetime, until: datetime
-) -> AsyncGenerator[tuple[datetime, str, LineItem] | datetime, None]:
+) -> AsyncGenerator[TimestampedObject[LineItem] | datetime, None]:
 
     async def do_fetch(
         page: PageCursor, count: int
-    ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+    ) -> tuple[Iterable[TimestampedId], PageCursor]:
         return await fetch_search_objects(
             Names.line_items, log, http, since, until, page
         )

@@ -11,6 +11,8 @@ import estuary_cdk.emitted_changes_cache as cache
 from estuary_cdk.capture.common import LogCursor, Triggers
 from estuary_cdk.http import HTTPSession
 
+from ..models import TimestampedObject
+
 # Hubspot returns a 500 internal server error if querying for data at the EPOCH.
 EPOCH_PLUS_ONE_SECOND = datetime(1970, 1, 1, tzinfo=UTC) + timedelta(seconds=1)
 HUB = "https://api.hubapi.com"
@@ -36,7 +38,7 @@ class MustBackfillBinding(Exception):
 
 FetchRecentFn = Callable[
     [Logger, HTTPSession, bool, datetime, datetime | None],
-    AsyncGenerator[tuple[datetime, str, Any], None],
+    AsyncGenerator[TimestampedObject[Any], None],
 ]
 """
 Returns a stream of (timestamp, key, document) tuples that represent a
@@ -54,7 +56,7 @@ which if not None is a hint that more recent documents are not needed.
 
 FetchDelayedFn = Callable[
     [Logger, HTTPSession, bool, datetime, datetime],
-    AsyncGenerator[tuple[datetime, str, Any] | datetime, None],
+    AsyncGenerator[TimestampedObject[Any] | datetime, None],
 ]
 """
 Returns a stream of (timestamp, key, document) tuples that represent a complete
