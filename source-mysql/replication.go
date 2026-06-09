@@ -1082,7 +1082,7 @@ func (rs *mysqlReplicationStream) handleAlterTable(ctx context.Context, stmt *sq
 			meta.Schema.Columns = slices.Delete(meta.Schema.Columns, oldIndex, oldIndex+1)
 
 			var newName = alter.NewColDefinition.Name.String()
-			var newType = translateDataType(meta, alter.NewColDefinition.Type, rs.db.featureFlags)
+			var newType = translateDataType(meta, alter.NewColDefinition.Type, rs.db.featureFlags, rs.db.versionProduct == "MariaDB")
 			var newIndex = oldIndex
 			if alter.First {
 				newIndex = 0
@@ -1107,7 +1107,7 @@ func (rs *mysqlReplicationStream) handleAlterTable(ctx context.Context, stmt *sq
 			colName = meta.Schema.Columns[oldIndex] // Use the actual column name from the metadata
 			meta.Schema.Columns = slices.Delete(meta.Schema.Columns, oldIndex, oldIndex+1)
 
-			var newType = translateDataType(meta, alter.NewColDefinition.Type, rs.db.featureFlags)
+			var newType = translateDataType(meta, alter.NewColDefinition.Type, rs.db.featureFlags, rs.db.versionProduct == "MariaDB")
 			var newIndex = oldIndex
 			if alter.First {
 				newIndex = 0
@@ -1138,7 +1138,7 @@ func (rs *mysqlReplicationStream) handleAlterTable(ctx context.Context, stmt *sq
 			var newCols []string
 			for _, col := range alter.Columns {
 				newCols = append(newCols, col.Name.String())
-				var dataType = translateDataType(meta, col.Type, rs.db.featureFlags)
+				var dataType = translateDataType(meta, col.Type, rs.db.featureFlags, rs.db.versionProduct == "MariaDB")
 				meta.Schema.ColumnTypes[col.Name.String()] = dataType
 			}
 
@@ -1187,7 +1187,7 @@ func findColumnIndex(columns []string, name string) int {
 	return -1
 }
 
-func translateDataType(meta *mysqlTableMetadata, t *sqlparser.ColumnType, featureFlags map[string]bool) any {
+func translateDataType(meta *mysqlTableMetadata, t *sqlparser.ColumnType, featureFlags map[string]bool, isMariaDB bool) any {
 	switch typeName := strings.ToLower(t.Type); typeName {
 	case "enum":
 		return &mysqlColumnType{Type: typeName, EnumValues: append([]string{""}, unquoteEnumValues(t.EnumValues)...)}
@@ -1204,17 +1204,17 @@ func translateDataType(meta *mysqlTableMetadata, t *sqlparser.ColumnType, featur
 	case "tinyint", "smallint", "mediumint", "int", "bigint":
 		return &mysqlColumnType{Type: typeName, Unsigned: t.Unsigned}
 	case "char", "varchar", "tinytext", "text", "mediumtext", "longtext":
-		var charset string
-		if t.Charset.Name != "" {
-			charset = t.Charset.Name // If explicitly specified, the declared charset wins
-		} else if t.Options.Collate != "" {
-			charset = charsetFromCollation(t.Options.Collate) // If only a collation is declared, figure out what charset that implies
-		} else if meta.DefaultCharset != "" {
-			charset = meta.DefaultCharset // In the absence of a column-specific declaration, use the default table charset
-		} else {
-			charset = mysqlDefaultCharset // Finally fall back to UTF-8 if nothing else supersedes that
+		return &mysqlColumnType{Type: typeName, Charset: columnCharset(meta, t)}
+	case "json":
+		// MySQL has a real JSON type, but in MariaDB the JSON type is an alias for
+		// `LONGTEXT COLLATE utf8mb4_bin`, and discovery (which reads information_schema)
+		// reports it as a longtext with charset utf8mb4. Thus we have to mirror that here
+		// so a JSON column added via live DDL is captured as a string, consistent with the
+		// discovered schema.
+		if isMariaDB {
+			return &mysqlColumnType{Type: "longtext", Charset: "utf8mb4"}
 		}
-		return &mysqlColumnType{Type: typeName, Charset: charset}
+		return typeName
 	case "binary":
 		var columnLength int
 		if t.Length == nil {
@@ -1226,6 +1226,20 @@ func translateDataType(meta *mysqlTableMetadata, t *sqlparser.ColumnType, featur
 	default:
 		return typeName
 	}
+}
+
+// columnCharset resolves the character set of a text column declared in a DDL statement,
+// preferring an explicit column charset, then the charset implied by an explicit collation,
+// then the table default, and finally falling back to UTF-8.
+func columnCharset(meta *mysqlTableMetadata, t *sqlparser.ColumnType) string {
+	if t.Charset.Name != "" {
+		return t.Charset.Name
+	} else if t.Options.Collate != "" {
+		return charsetFromCollation(t.Options.Collate)
+	} else if meta.DefaultCharset != "" {
+		return meta.DefaultCharset
+	}
+	return mysqlDefaultCharset
 }
 
 func resolveTableName(defaultSchema string, name sqlparser.TableName) sqlcapture.StreamID {
