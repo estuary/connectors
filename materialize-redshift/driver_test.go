@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"testing"
 
+	"github.com/estuary/connectors/go/common"
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -55,7 +56,7 @@ func TestIntegration(t *testing.T) {
 
 	t.Run("fence", func(t *testing.T) {
 		cfg := mustGetCfg(t)
-		var testDialect = createRsDialect(false, featureFlagDefaults)
+		var testDialect = createRsDialect(false, common.ResolveFlagDefaults(featureFlagDefaults, false))
 		var testTemplates = renderTemplates(testDialect)
 
 		sql.RunFencingTest(

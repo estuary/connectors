@@ -7,6 +7,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/estuary/connectors/go/common"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/sirupsen/logrus"
@@ -160,7 +161,14 @@ func RunTransactions(
 	}
 
 	if open.StateJson != nil {
-		if err := transactor.UnmarshalState(open.StateJson); err != nil {
+		// The boilerplate records runtime-resolved feature flag values under a
+		// reserved connector-state key; strip it so the transactor only sees
+		// its own state (some transactors decode state strictly).
+		state, err := common.StripFeatureFlagState(open.StateJson)
+		if err != nil {
+			return fmt.Errorf("stripping runtime feature flag state: %w", err)
+		}
+		if err := transactor.UnmarshalState(state); err != nil {
 			return fmt.Errorf("transactor.UnmarshalState: %w", err)
 		}
 	}

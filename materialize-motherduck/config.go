@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/estuary/connectors/go/blob"
+	"github.com/estuary/connectors/go/common"
 	m "github.com/estuary/connectors/go/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	"github.com/invopop/jsonschema"
@@ -20,10 +21,10 @@ import (
 	"google.golang.org/api/option"
 )
 
-var featureFlagDefaults = map[string]bool{
-	"datetime_keys_as_string":          true,
-	"retain_existing_data_on_backfill": false,
-	"native_binary_column_type":        true,
+var featureFlagDefaults = map[string]common.FlagDefault{
+	"datetime_keys_as_string":          common.FlagEnabled,
+	"retain_existing_data_on_backfill": common.FlagDisabled,
+	"native_binary_column_type":        common.FlagEnabled,
 }
 
 type config struct {
@@ -160,7 +161,7 @@ func (c config) DefaultNamespace() string {
 	return c.Schema
 }
 
-func (c config) FeatureFlags() (string, map[string]bool) {
+func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
 	return c.Advanced.FeatureFlags, featureFlagDefaults
 }
 

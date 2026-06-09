@@ -19,6 +19,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	awsHttp "github.com/aws/smithy-go/transport/http"
 	"github.com/estuary/connectors/filesink"
+	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	m "github.com/estuary/connectors/go/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
@@ -29,15 +30,15 @@ import (
 	iso8601 "github.com/senseyeio/duration"
 )
 
-var featureFlagDefaults = map[string]bool{
-	"retain_existing_data_on_backfill": false,
+var featureFlagDefaults = map[string]common.FlagDefault{
+	"retain_existing_data_on_backfill": common.FlagDisabled,
 
 	// An alternate naming style for the Iceberg table data.  By default (when
 	// false), the naming is:
 	//   <base_location>/<namespace>/<table>_<hash>
 	// When this flag is enabled:
 	//   <base_location>/<namespace>/<table>.<hash>
-	"nested_dot_hash_location_style": false,
+	"nested_dot_hash_location_style": common.FlagDisabled,
 }
 
 type catalogType string
@@ -164,7 +165,7 @@ func (c config) DefaultNamespace() string {
 	return ""
 }
 
-func (c config) FeatureFlags() (string, map[string]bool) {
+func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
 	return c.Advanced.FeatureFlags, featureFlagDefaults
 }
 

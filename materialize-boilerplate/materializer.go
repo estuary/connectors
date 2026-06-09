@@ -191,7 +191,7 @@ type EndpointConfiger interface {
 
 	// FeatureFlags returns the raw string of comma-separated feature flags, and
 	// the default feature flag values that should be applied.
-	FeatureFlags() (raw string, defaults map[string]bool)
+	FeatureFlags() (raw string, defaults map[string]common.FlagDefault)
 }
 
 // Resourcer represents a parsed resource config.
@@ -356,7 +356,7 @@ func RunValidate[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT
 		return nil, err
 	}
 
-	parsedFlags := ParseFlags(cfg)
+	parsedFlags := resolveFlags(cfg, req.LastMaterialization == nil, nil)
 	materializer, err := newMaterializer(ctx, req.Name.String(), cfg, parsedFlags)
 	if err != nil {
 		return nil, err
@@ -413,14 +413,52 @@ func RunValidate[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT
 	return &pm.Response_Validated{Bindings: out}, nil
 }
 
+type applyOptions struct {
+	configSchema     json.RawMessage
+	featureFlagsPath []string
+}
+
+// ApplyOption customizes the behavior of RunApply.
+type ApplyOption func(*applyOptions)
+
+// WithConfigUpdates enables pinning the resolved value of new-task-gated
+// feature flags into the task's persisted endpoint config via a configUpdate
+// event: tasks that were already running when such a flag was released get the
+// disabled form pinned, while brand-new tasks get the enabled form, and the
+// pinned values then apply for the rest of the task's life. featureFlagsPath
+// locates the feature flags property within the config document, e.g.
+// ["advanced", "feature_flags"].
+//
+// The configUpdate is published asynchronously by the control plane and is
+// only eventually consistent, so it cannot by itself decide a brand-new task's
+// flags: a restart between the first Apply and the publication landing would
+// re-classify the task as already-running. The decision is therefore made once
+// on the first Apply and recorded in connector state (which commits atomically
+// with the apply checkpoint and is observed by every later Apply and Open);
+// the configUpdate merely makes that recorded value visible in the config, and
+// is retried each session until it lands. This requires a runtime that
+// delivers connector state to the Apply RPC (runtime-v2).
+func WithConfigUpdates(configSchema json.RawMessage, featureFlagsPath []string) ApplyOption {
+	return func(o *applyOptions) {
+		o.configSchema = configSchema
+		o.featureFlagsPath = featureFlagsPath
+	}
+}
+
 // RunApply produces an Applied response for an Apply request.
 func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
 	ctx context.Context,
 	req *pm.Request_Apply,
 	newMaterializer NewMaterializerFn[EC, FC, RC, MT],
+	opts ...ApplyOption,
 ) (*pm.Response_Applied, error) {
 	if err := req.Validate(); err != nil {
 		return nil, fmt.Errorf("validating request: %w", err)
+	}
+
+	var applyOpts applyOptions
+	for _, opt := range opts {
+		opt(&applyOpts)
 	}
 
 	var endpointCfg EC
@@ -428,7 +466,8 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 		return nil, err
 	}
 
-	parsedFlags := ParseFlags(endpointCfg)
+	isNewTask := req.LastMaterialization == nil
+	parsedFlags := resolveFlags(endpointCfg, isNewTask, req.StateJson)
 	materializer, err := newMaterializer(ctx, req.Materialization.Name.String(), endpointCfg, parsedFlags)
 	if err != nil {
 		return nil, err
@@ -516,12 +555,12 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 		setupActionDescriptions = append(setupActionDescriptions, desc)
 	}
 
-	common, err := computeCommonUpdates(req.LastMaterialization, req.Materialization, is)
+	updates, err := computeCommonUpdates(req.LastMaterialization, req.Materialization, is)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, bindingIdx := range common.newBindings {
+	for _, bindingIdx := range updates.newBindings {
 		if mapped, err := buildMappedBinding(endpointCfg, materializer, *req.Materialization, bindingIdx); err != nil {
 			return nil, err
 		} else if desc, action, err := materializer.CreateResource(ctx, *mapped); err != nil {
@@ -532,7 +571,7 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 	}
 
 	validator := NewValidator(&constrainterAdapter[EC, FC, RC, MT]{m: materializer}, is, mCfg.MaxFieldLength, mCfg.CaseInsensitiveFields, parsedFlags)
-	for _, bindingIdx := range common.backfillBindings {
+	for _, bindingIdx := range updates.backfillBindings {
 		mapped, err := buildMappedBinding(endpointCfg, materializer, *req.Materialization, bindingIdx)
 		if err != nil {
 			return nil, err
@@ -593,7 +632,7 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 			if err != nil {
 				return nil, err
 			}
-			common.updatedBindings[bindingIdx] = *upd
+			updates.updatedBindings[bindingIdx] = *upd
 		} else {
 			// Check if retain_existing_data_on_backfill is enabled, and if so, return an error
 			if parsedFlags["retain_existing_data_on_backfill"] {
@@ -630,7 +669,7 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 		}
 	}
 
-	for bindingIdx, commonUpdates := range common.updatedBindings {
+	for bindingIdx, commonUpdates := range updates.updatedBindings {
 		mb, err := buildMappedBinding(endpointCfg, materializer, *req.Materialization, bindingIdx)
 		if err != nil {
 			return nil, err
@@ -699,11 +738,55 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 		}
 	}
 
+	// Durably fix the values of any new-task-gated flags not yet pinned into
+	// the config. The decision is made once, here on the task's first Apply,
+	// and recorded in connector state so that it is the same on every later
+	// Apply and Open regardless of whether the eventually-consistent
+	// configUpdate has landed: connector state commits atomically with the
+	// apply checkpoint, so a restart between this Apply and the configUpdate
+	// publication observes the recorded decision rather than re-deriving it
+	// from task newness (which would have flipped, since the spec is now
+	// applied).
+	var appliedState *pf.ConnectorState
+	if applyOpts.featureFlagsPath != nil {
+		rawFlags, defaultFlags := endpointCfg.FeatureFlags()
+		stateRecord := common.FeatureFlagStateRecord(req.StateJson)
+		toPin, recordNew := common.PendingFeatureFlags(rawFlags, defaultFlags, isNewTask, stateRecord)
+
+		// Record newly-decided values in connector state. This is the
+		// authoritative, strongly-consistent record; it is set even when the
+		// configUpdate below cannot be emitted.
+		if patch := common.FeatureFlagStatePatch(recordNew); patch != nil {
+			appliedState = &pf.ConnectorState{UpdatedJson: patch, MergePatch: true}
+		}
+
+		// Pin the values into the user-visible config via a configUpdate. This
+		// is retried on every Apply until the config catches up; the pinned
+		// value comes from connector state once recorded, so it is stable and
+		// can never contradict the runtime behavior. Connector events are only
+		// consumed from the runtime's JSON-formatted task logs, so any other
+		// log format means this is a test or ad-hoc CLI invocation where
+		// emitting would only produce a pointless call to the encryption
+		// service.
+		_, isJSONLogs := log.StandardLogger().Formatter.(*log.JSONFormatter)
+		if len(toPin) > 0 && applyOpts.configSchema != nil && isJSONLogs {
+			pinnedFlags := common.PinnedFlagsString(rawFlags, toPin)
+			if pinned, err := common.SetJSONProperty(req.Materialization.ConfigJson, applyOpts.featureFlagsPath, pinnedFlags); err != nil {
+				log.WithError(err).Warn("failed to pin feature flags into endpoint config")
+			} else if err := common.EmitConfigUpdate(ctx, "Recording default values for newly introduced settings in the endpoint config.", pinned, applyOpts.configSchema); err != nil {
+				log.WithError(err).Warn("failed to emit config update pinning feature flags")
+			}
+		}
+	}
+
 	allActions := append(namespaceActionDesciptions, setupActionDescriptions...)
 	allActions = append(allActions, truncationActionDescriptions...)
 	allActions = append(allActions, resourceActionDescriptions...)
 
-	return &pm.Response_Applied{ActionDescription: strings.Join(allActions, "\n")}, nil
+	return &pm.Response_Applied{
+		ActionDescription: strings.Join(allActions, "\n"),
+		State:             appliedState,
+	}, nil
 }
 
 // RunNewTransactor builds a transactor and Opened response from an Open
@@ -723,7 +806,12 @@ func RunNewTransactor[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC
 		return nil, nil, nil, err
 	}
 
-	featureFlags := ParseFlags(epCfg)
+	// Open carries no last-materialization, so newness is unknown here; for a
+	// brand-new task the decision was recorded in connector state by the
+	// preceding Apply (atomically, and folded into this Open's state by the
+	// runtime), so resolution reads it from there. Absent both a config pin and
+	// a state record, a new-task-gated flag resolves to false.
+	featureFlags := resolveFlags(epCfg, false, req.StateJson)
 	materializer, err := newMaterializer(ctx, req.Materialization.Name.String(), epCfg, featureFlags)
 	if err != nil {
 		return nil, nil, nil, err
@@ -933,9 +1021,24 @@ func (c *constrainterAdapter[EC, FC, RC, MT]) DescriptionForType(p *pf.Projectio
 	return mt.String(), nil
 }
 
+// ParseFlags resolves feature flags without any task-newness or connector
+// state context, treating the task as pre-existing. It is intended for call
+// sites outside the Validate/Apply/Open RPCs (for example prerequisite
+// checks). New-task-gated flags resolve to their pinned config value if
+// present, and otherwise to false.
 func ParseFlags(cfg EndpointConfiger) map[string]bool {
+	return resolveFlags(cfg, false, nil)
+}
+
+// resolveFlags resolves feature flags for a single RPC. New-task-gated flag
+// defaults are resolved from (in precedence order) an explicit config entry, a
+// value recorded in connector state on a prior Apply, or task newness.
+// stateJson is the connector state delivered with the Apply or Open request,
+// or nil for Validate which carries no state.
+func resolveFlags(cfg EndpointConfiger, isNewTask bool, stateJson json.RawMessage) map[string]bool {
 	rawFlags, defaultFlags := cfg.FeatureFlags()
-	parsedFlags := common.ParseFeatureFlags(rawFlags, defaultFlags)
+	stateRecord := common.FeatureFlagStateRecord(stateJson)
+	parsedFlags := common.ResolveFlags(rawFlags, defaultFlags, isNewTask, stateRecord)
 	if rawFlags != "" {
 		log.WithField("flags", parsedFlags).Info("parsed feature flags")
 	}

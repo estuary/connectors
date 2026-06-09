@@ -18,7 +18,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	awsHttp "github.com/aws/smithy-go/transport/http"
-	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
@@ -191,7 +190,7 @@ func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
 		errs.Err(err)
 	}
 
-	parsedFlags := common.ParseFeatureFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults)
+	parsedFlags := boilerplate.ParseFlags(cfg)
 
 	s3client, err := cfg.toS3Client(ctx, parsedFlags)
 	if err != nil {

@@ -5,11 +5,12 @@ import (
 	"text/template"
 
 	"github.com/bradleyjkemp/cupaloy"
+	"github.com/estuary/connectors/go/common"
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/stretchr/testify/require"
 )
 
-var testDialect = bqDialect(featureFlagDefaults)
+var testDialect = bqDialect(common.ResolveFlagDefaults(featureFlagDefaults, false))
 var testTemplates = renderTemplates(testDialect)
 
 func TestSQLGeneration(t *testing.T) {
