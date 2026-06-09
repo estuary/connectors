@@ -24,7 +24,7 @@ from source_hubspot_native.api.object_with_associations import (
 from source_hubspot_native.api.properties import properties_cache
 from source_hubspot_native.api.search_objects import fetch_search_objects
 from source_hubspot_native.api.shared import dt_to_str, fetch_delayed_changes
-from source_hubspot_native.models import Product
+from source_hubspot_native.models import Product, TimestampedId
 
 log = getLogger("test_search_objects")
 
@@ -147,9 +147,9 @@ async def test_fetch_chunked_changes_yields_max_ts_as_checkpoint():
     # (more pages remain) matters. IDs are deliberately out of order within the
     # chunk since the chunked layer is order-agnostic.
     pages = [
-        ([(t2, "2"), (t1, "1")], "opaque-resume-cursor-1"),
+        ([TimestampedId(t2, "2"), TimestampedId(t1, "1")], "opaque-resume-cursor-1"),
         ([], "opaque-resume-cursor-2"),  # empty non-final chunk
-        ([(t3, "3")], None),  # final page
+        ([TimestampedId(t3, "3")], None),  # final page
     ]
 
     async def fake_fetcher(page: Any, count: int) -> Any:

@@ -11,6 +11,7 @@ from estuary_cdk.http import HTTPSession
 from ..models import (
     CustomObjectSearchResult,
     SearchPageResult,
+    TimestampedId,
 )
 from .shared import (
     dt_to_str,
@@ -28,7 +29,7 @@ async def fetch_search_objects(
     page: PageCursor,
     last_modified_property_name: str = "hs_lastmodifieddate",
     should_crash_on_unordered_results: bool = True,
-) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+) -> tuple[Iterable[TimestampedId], PageCursor]:
     """
     Retrieve a single chunk of records modified at or after 'since' and at or
     before 'until' if provided, in ascending order of last-modified time.
@@ -59,7 +60,7 @@ async def fetch_search_objects(
 
     url = f"{HUB}/crm/v3/objects/{object_name}/search"
     limit = 200
-    output_items: set[tuple[datetime, str]] = set()
+    output_items: set[TimestampedId] = set()
     cursor: int | None = None
     max_updated: datetime = since
     original_total: int | None = None
@@ -137,7 +138,7 @@ async def fetch_search_objects(
                 continue
 
             max_updated = this_mod_time
-            output_items.add((this_mod_time, str(r.id)))
+            output_items.add(TimestampedId(this_mod_time, str(r.id)))
 
         if not result.paging:
             # The whole window has been read and no more chunks remain.
@@ -179,7 +180,7 @@ async def fetch_search_objects(
             # Withhold the in-progress `max_updated` millisecond from the chunk;
             # the offset cap may have cut it off partway, so the next call
             # re-reads it.
-            chunk = sorted(item for item in output_items if item[0] < max_updated)
+            chunk = sorted(item for item in output_items if item.ts < max_updated)
 
         log.info(
             "search window chunk complete; resuming with a new search",
@@ -202,7 +203,7 @@ async def fetch_search_objects_modified_at(
     http: HTTPSession,
     modified: datetime,
     last_modified_property_name: str = "hs_lastmodifieddate",
-) -> set[tuple[datetime, str]]:
+) -> set[TimestampedId]:
     """
     Fetch all of the ids of the given object that were modified at the given
     time. Used exclusively for breaking out of cycles in the search API
@@ -216,7 +217,7 @@ async def fetch_search_objects_modified_at(
 
     url = f"{HUB}/crm/v3/objects/{object_name}/search"
     limit = 200
-    output_items: set[tuple[datetime, str]] = set()
+    output_items: set[TimestampedId] = set()
     id_cursor: int | None = None
     round = 0
 
@@ -255,7 +256,9 @@ async def fetch_search_objects_modified_at(
                 # figure it out.
                 raise Exception(f"unexpected id order: {r.id} <= {id_cursor}")
             id_cursor = r.id
-            output_items.add((r.properties.hs_lastmodifieddate, str(r.id)))
+            output_items.add(
+                TimestampedId(r.properties.hs_lastmodifieddate, str(r.id))
+            )
 
         # Log every 10,000 returned records, since there are 200 per page.
         if round % 50 == 0:
