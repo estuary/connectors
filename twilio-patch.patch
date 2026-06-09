@@ -1,0 +1,441 @@
+diff --git a/source-twilio/VERSION b/source-twilio/VERSION
+index 8c1384d..29ef827 100644
+--- a/source-twilio/VERSION
++++ b/source-twilio/VERSION
+@@ -1 +1 @@
+-v2
++v3
+diff --git a/source-twilio/source_twilio/source.py b/source-twilio/source_twilio/source.py
+index 6b1e852..0912d9b 100644
+--- a/source-twilio/source_twilio/source.py
++++ b/source-twilio/source_twilio/source.py
+@@ -60,9 +60,19 @@ class SourceTwilio(AbstractSource):
+                     config["auth_token"],
+                 ),
+             )
+-            accounts_gen = Accounts(authenticator=auth).read_records(sync_mode=SyncMode.full_refresh)
++            accounts_gen = Accounts(
++                authenticator=auth,
++                sync_subaccounts=config.get("sync_subaccounts", True),
++                config_account_sid=config["account_sid"],
++            ).read_records(sync_mode=SyncMode.full_refresh)
+             next(accounts_gen)
+             return True, None
++        except StopIteration:
++            return (
++                False,
++                "Connected to the Twilio API, but no account matched. If 'Capture Subaccount Data' is disabled, "
++                "the connector only captures the main account or the account matching the configured Account SID.",
++            )
+         except Exception as error:
+             return False, f"Unable to connect to Twilio API with the provided credentials - {repr(error)}"
+ 
+@@ -76,12 +86,18 @@ class SourceTwilio(AbstractSource):
+                 config["auth_token"],
+             ),
+         )
+-        full_refresh_stream_kwargs = {"authenticator": auth}
++        full_refresh_stream_kwargs = {
++            "authenticator": auth,
++            "sync_subaccounts": config.get("sync_subaccounts", True),
++            "config_account_sid": config["account_sid"],
++        }
+         incremental_stream_kwargs = {
+             "authenticator": auth,
+             "start_date": config["start_date"],
+             "lookback_window": config.get("lookback_window", 0),
+             "slice_step_map": config.get("slice_step_map", {}),
++            "sync_subaccounts": config.get("sync_subaccounts", True),
++            "config_account_sid": config["account_sid"],
+         }
+ 
+         # Fix for `Date range specified in query is partially or entirely outside of retention window of 400 days`
+diff --git a/source-twilio/source_twilio/spec.json b/source-twilio/source_twilio/spec.json
+index ea691b8..bd1a6a7 100644
+--- a/source-twilio/source_twilio/spec.json
++++ b/source-twilio/source_twilio/spec.json
+@@ -39,6 +39,13 @@
+         "maximum": 576000,
+         "type": "integer",
+         "order": 4
++      },
++      "sync_subaccounts": {
++        "title": "Capture Subaccount Data",
++        "description": "Whether to capture data belonging to subaccounts in addition to the authenticated account. Disable this if you authenticate with an API Key (SID and Secret) instead of an Auth Token, since Twilio denies API Key access to subaccount resources. Requires a Main API Key or an Auth Token; Standard API Keys cannot list accounts.",
++        "default": true,
++        "type": "boolean",
++        "order": 5
+       }
+     }
+   },
+diff --git a/source-twilio/source_twilio/streams.py b/source-twilio/source_twilio/streams.py
+index c865696..bec802c 100644
+--- a/source-twilio/source_twilio/streams.py
++++ b/source-twilio/source_twilio/streams.py
+@@ -38,6 +38,24 @@ class TwilioStream(HttpStream, ABC):
+     page_size = 1000
+     transformer: TypeTransformer = TypeTransformer(TransformConfig.DefaultSchemaNormalization | TransformConfig.CustomSchemaNormalization)
+ 
++    def __init__(
++        self,
++        authenticator: Union[AuthBase, HttpAuthenticator],
++        sync_subaccounts: bool = True,
++        config_account_sid: Optional[str] = None,
++    ):
++        super().__init__(authenticator=authenticator)
++        # When False, the Accounts stream (which acts as the parent for most other
++        # streams) only emits the main account and/or the account whose SID is
++        # provided in the config. This prevents fanning out to subaccount resources,
++        # which Twilio denies when authenticating with an API Key instead of an
++        # account's Auth Token (error 20003).
++        self.sync_subaccounts = sync_subaccounts
++        # The Account SID field from the endpoint config. Note: when the user
++        # authenticates with an API Key, this holds an "SK..." key SID rather than
++        # an "AC..." account SID, so it cannot be assumed to identify an account.
++        self.config_account_sid = config_account_sid
++
+     @property
+     def data_field(self):
+         return self.name
+@@ -130,8 +148,10 @@ class IncrementalTwilioStream(TwilioStream, IncrementalMixin):
+         start_date: str = None,
+         lookback_window: int = 0,
+         slice_step_map: Mapping[str, int] = None,
++        sync_subaccounts: bool = True,
++        config_account_sid: Optional[str] = None,
+     ):
+-        super().__init__(authenticator)
++        super().__init__(authenticator, sync_subaccounts=sync_subaccounts, config_account_sid=config_account_sid)
+         slice_step = (slice_step_map or {}).get(self.name)
+         self._slice_step = slice_step and pendulum.duration(days=slice_step)
+         self._start_date = start_date if start_date is not None else "1970-01-01T00:00:00Z"
+@@ -299,7 +319,11 @@ class TwilioNestedStream(TwilioStream):
+ 
+     @cached_property
+     def parent_stream_instance(self):
+-        return self.parent_stream(authenticator=self.authenticator)
++        return self.parent_stream(
++            authenticator=self.authenticator,
++            sync_subaccounts=self.sync_subaccounts,
++            config_account_sid=self.config_account_sid,
++        )
+ 
+     def parent_record_to_stream_slice(self, record: Mapping[str, Any]) -> Mapping[str, Any]:
+         return {"subresource_uri": record["subresource_uris"][self.subresource_uri_key]}
+@@ -328,6 +352,16 @@ class Accounts(TwilioStream):
+ 
+     url_base = TWILIO_API_URL_BASE_VERSIONED
+ 
++    def parse_response(self, response: requests.Response, **kwargs) -> Iterable[Mapping]:
++        for record in super().parse_response(response, **kwargs):
++            if self.sync_subaccounts:
++                yield record
++            # The main account is the account that owns itself. Also retain a record
++            # matching the configured Account SID so that captures authenticated with
++            # a subaccount's own credentials keep working when this option is disabled.
++            elif record.get("sid") == record.get("owner_account_sid") or record.get("sid") == self.config_account_sid:
++                yield record
++
+ 
+ class Addresses(TwilioNestedStream):
+     """https://www.twilio.com/docs/usage/api/address#read-multiple-address-resources"""
+@@ -621,7 +655,12 @@ class MessageMedia(IncrementalTwilioStream, TwilioNestedStream):
+     @cached_property
+     def parent_stream_instance(self):
+         most_recent_cursor = self.state.get(self.cursor_field, self._start_date)
+-        return self.parent_stream(authenticator=self.authenticator, start_date=most_recent_cursor)
++        return self.parent_stream(
++            authenticator=self.authenticator,
++            start_date=most_recent_cursor,
++            sync_subaccounts=self.sync_subaccounts,
++            config_account_sid=self.config_account_sid,
++        )
+ 
+ 
+ class UsageNestedStream(TwilioNestedStream):
+diff --git a/source-twilio/tests/snapshots/snapshots__spec__capture.stdout.json b/source-twilio/tests/snapshots/snapshots__spec__capture.stdout.json
+index 0cf8df5..57ade16 100644
+--- a/source-twilio/tests/snapshots/snapshots__spec__capture.stdout.json
++++ b/source-twilio/tests/snapshots/snapshots__spec__capture.stdout.json
+@@ -1,102 +1,109 @@
+ [
+-  {
+-    "configSchema": {
+-      "$schema": "http://json-schema.org/draft-07/schema#",
+-      "additionalProperties": true,
+-      "properties": {
+-        "account_sid": {
+-          "airbyte_secret": true,
+-          "description": "Twilio account SID",
+-          "order": 1,
+-          "title": "Account ID",
+-          "type": "string"
+-        },
+-        "auth_token": {
+-          "airbyte_secret": true,
+-          "description": "Twilio Auth Token.",
+-          "order": 2,
+-          "title": "Auth Token",
+-          "type": "string"
+-        },
+-        "lookback_window": {
+-          "default": 0,
+-          "description": "How far into the past to look for records. (in minutes)",
+-          "examples": [
+-            60
+-          ],
+-          "maximum": 576000,
+-          "minimum": 0,
+-          "order": 4,
+-          "title": "Lookback window",
+-          "type": "integer"
+-        },
+-        "start_date": {
+-          "description": "UTC date and time in the format 2020-10-01T00:00:00Z. Any data before this date will not be replicated.",
+-          "examples": [
+-            "2020-10-01T00:00:00Z"
+-          ],
+-          "format": "date-time",
+-          "order": 3,
+-          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$",
+-          "title": "Replication Start Date",
+-          "type": "string"
+-        }
+-      },
+-      "required": [
+-        "account_sid",
+-        "auth_token",
+-        "start_date"
+-      ],
+-      "title": "Twilio Spec",
+-      "type": "object"
++ {
++  "configSchema": {
++   "$schema": "http://json-schema.org/draft-07/schema#",
++   "additionalProperties": true,
++   "properties": {
++    "account_sid": {
++     "airbyte_secret": true,
++     "description": "Twilio account SID",
++     "order": 1,
++     "title": "Account ID",
++     "type": "string"
+     },
+-    "documentationUrl": "https://go.estuary.dev/F3BerQ",
+-    "protocol": 3032023,
+-    "resourceConfigSchema": {
+-      "additionalProperties": false,
+-      "description": "ResourceConfig encodes a configured resource stream",
+-      "properties": {
+-        "_meta": {
+-          "title": "Meta",
+-          "type": "object"
+-        },
+-        "cursorField": {
+-          "items": {
+-            "type": "string"
+-          },
+-          "title": "Cursor Field",
+-          "type": "array"
+-        },
+-        "namespace": {
+-          "description": "Enclosing schema namespace of this resource",
+-          "title": "Namespace",
+-          "type": "string"
+-        },
+-        "stream": {
+-          "description": "Name of this stream",
+-          "title": "Stream",
+-          "type": "string"
+-        },
+-        "syncMode": {
+-          "description": "Sync this resource incrementally, or fully refresh it every run",
+-          "enum": [
+-            "full_refresh",
+-            "incremental"
+-          ],
+-          "title": "Sync Mode",
+-          "type": "string"
+-        }
+-      },
+-      "required": [
+-        "stream",
+-        "syncMode"
+-      ],
+-      "title": "ResourceConfig",
+-      "type": "object"
++    "auth_token": {
++     "airbyte_secret": true,
++     "description": "Twilio Auth Token.",
++     "order": 2,
++     "title": "Auth Token",
++     "type": "string"
+     },
+-    "resourcePathPointers": [
+-      "/namespace",
+-      "/stream"
+-    ]
+-  }
++    "lookback_window": {
++     "default": 0,
++     "description": "How far into the past to look for records. (in minutes)",
++     "examples": [
++      60
++     ],
++     "maximum": 576000,
++     "minimum": 0,
++     "order": 4,
++     "title": "Lookback window",
++     "type": "integer"
++    },
++    "start_date": {
++     "description": "UTC date and time in the format 2020-10-01T00:00:00Z. Any data before this date will not be replicated.",
++     "examples": [
++      "2020-10-01T00:00:00Z"
++     ],
++     "format": "date-time",
++     "order": 3,
++     "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$",
++     "title": "Replication Start Date",
++     "type": "string"
++    },
++    "sync_subaccounts": {
++     "title": "Capture Subaccount Data",
++     "description": "Whether to capture data belonging to subaccounts in addition to the authenticated account. Disable this if you authenticate with an API Key (SID and Secret) instead of an Auth Token, since Twilio denies API Key access to subaccount resources. Requires a Main API Key or an Auth Token; Standard API Keys cannot list accounts.",
++     "default": true,
++     "type": "boolean",
++     "order": 5
++    }
++   },
++   "required": [
++    "account_sid",
++    "auth_token",
++    "start_date"
++   ],
++   "title": "Twilio Spec",
++   "type": "object"
++  },
++  "documentationUrl": "https://go.estuary.dev/F3BerQ",
++  "protocol": 3032023,
++  "resourceConfigSchema": {
++   "additionalProperties": false,
++   "description": "ResourceConfig encodes a configured resource stream",
++   "properties": {
++    "_meta": {
++     "title": "Meta",
++     "type": "object"
++    },
++    "cursorField": {
++     "items": {
++      "type": "string"
++     },
++     "title": "Cursor Field",
++     "type": "array"
++    },
++    "namespace": {
++     "description": "Enclosing schema namespace of this resource",
++     "title": "Namespace",
++     "type": "string"
++    },
++    "stream": {
++     "description": "Name of this stream",
++     "title": "Stream",
++     "type": "string"
++    },
++    "syncMode": {
++     "description": "Sync this resource incrementally, or fully refresh it every run",
++     "enum": [
++      "full_refresh",
++      "incremental"
++     ],
++     "title": "Sync Mode",
++     "type": "string"
++    }
++   },
++   "required": [
++    "stream",
++    "syncMode"
++   ],
++   "title": "ResourceConfig",
++   "type": "object"
++  },
++  "resourcePathPointers": [
++   "/namespace",
++   "/stream"
++  ]
++ }
+ ]
+diff --git a/source-twilio/tests/test_streams.py b/source-twilio/tests/test_streams.py
+index 3093552..2f3f599 100644
+--- a/source-twilio/tests/test_streams.py
++++ b/source-twilio/tests/test_streams.py
+@@ -13,6 +13,7 @@ from freezegun import freeze_time
+ from source_twilio.auth import HttpBasicAuthenticator
+ from source_twilio.source import SourceTwilio
+ from source_twilio.streams import (
++    TWILIO_API_URL_BASE_VERSIONED,
+     Accounts,
+     Addresses,
+     Alerts,
+@@ -331,3 +332,61 @@ class TestUsageNestedStream:
+                 with patch.object(parent_stream, "read_records", return_value=record):
+                     result = stream.stream_slices()
+                     assert list(result) == expected
++
++
++class TestAccountsSubaccountFiltering:
++    """Tests for the `sync_subaccounts` option on the Accounts stream."""
++
++    MAIN = {"sid": "AC_main", "owner_account_sid": "AC_main", "friendly_name": "main"}
++    SUB_1 = {"sid": "AC_sub1", "owner_account_sid": "AC_main", "friendly_name": "sub1"}
++    SUB_2 = {"sid": "AC_sub2", "owner_account_sid": "AC_main", "friendly_name": "sub2"}
++
++    def _parse(self, stream, records, requests_mock):
++        requests_mock.get(
++            f"{TWILIO_API_URL_BASE_VERSIONED}Accounts.json",
++            json={"accounts": records},
++        )
++        response = requests.get(f"{TWILIO_API_URL_BASE_VERSIONED}Accounts.json")
++        return list(stream.parse_response(response))
++
++    def test_sync_subaccounts_enabled_returns_all_accounts(self, requests_mock):
++        stream = Accounts(authenticator=TEST_CONFIG.get("authenticator"), sync_subaccounts=True)
++        result = self._parse(stream, [self.MAIN, self.SUB_1, self.SUB_2], requests_mock)
++        assert result == [self.MAIN, self.SUB_1, self.SUB_2]
++
++    def test_sync_subaccounts_default_is_enabled(self, requests_mock):
++        stream = Accounts(authenticator=TEST_CONFIG.get("authenticator"))
++        result = self._parse(stream, [self.MAIN, self.SUB_1], requests_mock)
++        assert result == [self.MAIN, self.SUB_1]
++
++    def test_sync_subaccounts_disabled_returns_only_main_account(self, requests_mock):
++        stream = Accounts(
++            authenticator=TEST_CONFIG.get("authenticator"),
++            sync_subaccounts=False,
++            config_account_sid="SK_some_api_key_sid",
++        )
++        result = self._parse(stream, [self.MAIN, self.SUB_1, self.SUB_2], requests_mock)
++        assert result == [self.MAIN]
++
++    def test_sync_subaccounts_disabled_retains_configured_subaccount(self, requests_mock):
++        # A capture authenticated with a subaccount's own credentials only sees that
++        # subaccount, whose owner_account_sid differs from its sid. It must still be
++        # captured when subaccount sync is disabled.
++        stream = Accounts(
++            authenticator=TEST_CONFIG.get("authenticator"),
++            sync_subaccounts=False,
++            config_account_sid="AC_sub1",
++        )
++        result = self._parse(stream, [self.SUB_1], requests_mock)
++        assert result == [self.SUB_1]
++
++    def test_nested_stream_parent_inherits_flags(self):
++        stream = Calls(
++            authenticator=TEST_CONFIG.get("authenticator"),
++            start_date=TEST_CONFIG["start_date"],
++            sync_subaccounts=False,
++            config_account_sid="AC_main",
++        )
++        parent = stream.parent_stream_instance
++        assert parent.sync_subaccounts is False
++        assert parent.config_account_sid == "AC_main"
