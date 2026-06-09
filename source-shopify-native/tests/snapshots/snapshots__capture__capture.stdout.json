@@ -94,7 +94,7 @@
       "title": "Gift Card",
       "totalInventory": 0,
       "tracksInventory": false,
-      "updatedAt": "2025-08-29T12:12:00Z",
+      "updatedAt": "redacted",
       "variantsCount": {
         "count": 4,
         "precision": "EXACT"
@@ -124,7 +124,7 @@
           }
         }
       ],
-      "updatedAt": "2025-08-29T12:12:00Z"
+      "updatedAt": "redacted"
     }
   ],
   [
@@ -138,7 +138,7 @@
       "id": "gid://shopify/Product/8086707830829",
       "legacyResourceId": "8086707830829",
       "metafields": [],
-      "updatedAt": "2025-08-29T12:12:00Z"
+      "updatedAt": "redacted"
     }
   ],
   [
@@ -151,7 +151,7 @@
       "createdAt": "2025-01-14T15:10:14Z",
       "id": "gid://shopify/Product/8086707830829",
       "legacyResourceId": "8086707830829",
-      "updatedAt": "2025-08-29T12:12:00Z",
+      "updatedAt": "redacted",
       "variants": [
         {
           "__parentId": "gid://shopify/Product/8086707830829",
@@ -314,7 +314,7 @@
           "value": "true"
         }
       ],
-      "updatedAt": "2025-08-29T12:12:00Z"
+      "updatedAt": "redacted"
     }
   ],
   [
@@ -419,7 +419,7 @@
       ],
       "id": "gid://shopify/Order/5714619858989",
       "legacyResourceId": "5714619858989",
-      "updatedAt": "2025-04-10T17:54:23Z"
+      "updatedAt": "redacted"
     }
   ],
   [
@@ -433,7 +433,7 @@
       "fulfillments": [],
       "id": "gid://shopify/Order/5714619858989",
       "legacyResourceId": "5714619858989",
-      "updatedAt": "2025-04-10T17:54:23Z"
+      "updatedAt": "redacted"
     }
   ],
   [
@@ -866,7 +866,7 @@
         }
       },
       "totalWeight": "0",
-      "updatedAt": "2025-04-10T17:54:23Z"
+      "updatedAt": "redacted"
     }
   ],
   [
@@ -983,7 +983,7 @@
       "createdAt": "2025-04-10T17:42:58Z",
       "id": "gid://shopify/Order/5714619858989",
       "legacyResourceId": "5714619858989",
-      "updatedAt": "2025-04-10T17:54:23Z"
+      "updatedAt": "redacted"
     }
   ],
   [
@@ -997,7 +997,7 @@
       "id": "gid://shopify/Order/5714619858989",
       "legacyResourceId": "5714619858989",
       "metafields": [],
-      "updatedAt": "2025-04-10T17:54:23Z"
+      "updatedAt": "redacted"
     }
   ],
   [
@@ -1011,7 +1011,7 @@
       "id": "gid://shopify/Order/5714619858989",
       "legacyResourceId": "5714619858989",
       "transactions": [],
-      "updatedAt": "2025-04-10T17:54:23Z"
+      "updatedAt": "redacted"
     }
   ],
   [
@@ -1027,7 +1027,7 @@
       "id": "gid://shopify/Order/5714619858989",
       "legacyResourceId": "5714619858989",
       "refunds": [],
-      "updatedAt": "2025-04-10T17:54:23Z"
+      "updatedAt": "redacted"
     }
   ],
   [
@@ -1087,7 +1087,7 @@
         ],
         "recommendation": "NONE"
       },
-      "updatedAt": "2025-04-10T17:54:23Z"
+      "updatedAt": "redacted"
     }
   ],
   [
@@ -1108,7 +1108,7 @@
       "sku": null,
       "tracked": false,
       "unitCost": null,
-      "updatedAt": "2025-08-29T12:12:00Z",
+      "updatedAt": "redacted",
       "variant": {
         "id": "gid://shopify/ProductVariant/43217823334445",
         "legacyResourceId": "43217823334445",
@@ -1191,7 +1191,7 @@
         }
       ],
       "scheduledChanges": [],
-      "updatedAt": "2025-01-14T15:10:14Z"
+      "updatedAt": "redacted"
     }
   ],
   [
@@ -1246,7 +1246,7 @@
       "sortOrder": "BEST_SELLING",
       "templateSuffix": null,
       "title": "Home page",
-      "updatedAt": "2025-04-10T17:45:43Z"
+      "updatedAt": "redacted"
     }
   ],
   [
@@ -1320,7 +1320,7 @@
       "sortOrder": "BEST_SELLING",
       "templateSuffix": null,
       "title": "Automated Collection",
-      "updatedAt": "2026-06-06T09:39:22Z"
+      "updatedAt": "redacted"
     }
   ],
   [
@@ -1333,7 +1333,7 @@
       "id": "gid://shopify/Collection/295442513965",
       "legacyResourceId": "295442513965",
       "metafields": [],
-      "updatedAt": "2025-04-10T17:45:43Z"
+      "updatedAt": "redacted"
     }
   ],
   [
@@ -1346,7 +1346,7 @@
       "id": "gid://shopify/Collection/295442612269",
       "legacyResourceId": "295442612269",
       "metafields": [],
-      "updatedAt": "2026-06-06T09:39:22Z"
+      "updatedAt": "redacted"
     }
   ],
   [
@@ -1382,7 +1382,7 @@
       "legacyResourceId": "73871392813",
       "name": "Shop location",
       "shipsInventory": true,
-      "updatedAt": "2025-01-14T15:09:43Z"
+      "updatedAt": "redacted"
     }
   ],
   [
@@ -1396,7 +1396,7 @@
       "id": "gid://shopify/Location/73871392813",
       "legacyResourceId": "73871392813",
       "metafields": [],
-      "updatedAt": "2025-01-14T15:09:43Z"
+      "updatedAt": "redacted"
     }
   ]
 ]
