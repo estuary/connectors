@@ -4,17 +4,11 @@ inputs:
   connector:
     description: Image name of this connector.
     required: true
-  pg_database:
-    description: Postgres database to use.
+  rt_id:
+    description: Control-plane refresh token id for the github_action_connector_refresh role.
     required: true
-  pg_host:
-    description: Postgres host to use.
-    required: true
-  pg_password:
-    description: Postgres password to use.
-    required: true
-  pg_user:
-    description: Postgres user to use.
+  rt_secret:
+    description: Control-plane refresh token secret for the github_action_connector_refresh role.
     required: true
   tag_sha:
     description: Short tag of the commit SHA1, such as 'f32dc1a'.
@@ -55,11 +49,6 @@ runs:
           docker image push ghcr.io/estuary/${VARIANT}:${{ inputs.tag_version }};
         done
 
-    - name: Install psql
-      if: ${{ github.event_name == 'push' }}
-      shell: bash
-      run: sudo apt install postgresql
-
     - uses: dorny/paths-filter@v2
       id: filter
       with:
@@ -67,19 +56,35 @@ runs:
           connector:
             - "${{ inputs.connector }}/**"
 
-    - name: Refresh connector tags for ${{ inputs.connector }}
+    # Re-queue connector tag publishing over PostgREST (HTTPS) instead of a direct
+    # psql connection from CI.
+    # A revocable refresh token is exchanged for a short-lived access token whose
+    # role claim is github_action_connector_refresh; PostgREST runs requeue_connector_tag
+    # under that role.
+    - name: Re-queue connector tags for ${{ inputs.connector }}
       if: github.event_name == 'push' && steps.filter.outputs.connector == 'true'
       shell: bash
       env:
-        PGDATABASE: ${{ inputs.pg_database }}
-        PGHOST: ${{ inputs.pg_host }}
-        PGPASSWORD: ${{ inputs.pg_password }}
-        PGUSER: ${{ inputs.pg_user }}
+        RT_ID: ${{ inputs.rt_id }}
+        RT_SECRET: ${{ inputs.rt_secret }}
       run: |
+        set -euo pipefail
+        SUPABASE_URL="https://eyrcnmuzzyriypdajwdk.supabase.co"
+        # Public anon key, used only as the PostgREST apikey header.
+        ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5cmNubXV6enlyaXlwZGFqd2RrIiwicm9sZSI6ImFub24iLCJpYXQiOjE2NDg3NTA1NzksImV4cCI6MTk2NDMyNjU3OX0.y1OyXD3-DYMz10eGxzo1eeamVMMUwIIeOoMryTRAoco"
+
+        access_token=$(curl -sS -X POST "$SUPABASE_URL/rest/v1/rpc/generate_access_token" \
+          -H "apikey: $ANON_KEY" -H "Content-Type: application/json" \
+          -d "{\"refresh_token_id\": \"$RT_ID\", \"secret\": \"$RT_SECRET\"}" | jq -r '.access_token')
+        if [ -z "$access_token" ] || [ "$access_token" = "null" ]; then
+          echo "failed to obtain control-plane access token"; exit 1
+        fi
+
         for VARIANT in ${{ inputs.connector }} ${{ inputs.variants }}; do
-          echo "UPDATE connector_tags SET job_status='{\"type\": \"queued\"}'
-                  WHERE connector_id IN (
-                    SELECT id FROM connectors WHERE image_name='ghcr.io/estuary/${VARIANT}'
-                  ) AND image_tag IN (':${{ inputs.tag_version }}', ':dev');" | psql;
+          echo "Re-queuing tags for ghcr.io/estuary/${VARIANT}";
+          curl -sS --fail-with-body -X POST "$SUPABASE_URL/rest/v1/rpc/requeue_connector_tag" \
+            -H "apikey: $ANON_KEY" -H "Authorization: Bearer $access_token" \
+            -H "Content-Type: application/json" \
+            -d "{\"image_name\": \"ghcr.io/estuary/${VARIANT}\", \"image_tags\": [\":${{ inputs.tag_version }}\", \":dev\"]}";
         done
 
