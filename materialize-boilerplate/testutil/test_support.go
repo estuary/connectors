@@ -3,6 +3,7 @@ package testutil
 import (
 	"bufio"
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -563,7 +564,7 @@ func runBigSchemaApplyTests[EC boilerplate.EndpointConfiger, FC boilerplate.Fiel
 	require.NoError(t, err)
 
 	snap.WriteString("Big Schema Initial Constraints:\n")
-	snap.WriteString(snapshotConstraints(t, validateRes.Bindings[0].Constraints))
+	snap.WriteString(snapshotConstraints(t, validateRes.Bindings[0].ProjectionConstraints))
 
 	// Initial apply with no previously existing table.
 	_, err = driver.Apply(ctx, applyReq(fixture, nil, configJson, resourceConfigJson, validateRes, true))
@@ -576,7 +577,7 @@ func runBigSchemaApplyTests[EC boilerplate.EndpointConfiger, FC boilerplate.Fiel
 	require.NoError(t, err)
 
 	snap.WriteString("\nBig Schema Re-validated Constraints:\n")
-	snap.WriteString(snapshotConstraints(t, validateRes.Bindings[0].Constraints))
+	snap.WriteString(snapshotConstraints(t, validateRes.Bindings[0].ProjectionConstraints))
 
 	// Apply again - this should be a no-op.
 	_, err = driver.Apply(ctx, applyReq(fixture, fixture, configJson, resourceConfigJson, validateRes, true))
@@ -589,7 +590,7 @@ func runBigSchemaApplyTests[EC boilerplate.EndpointConfiger, FC boilerplate.Fiel
 	require.NoError(t, err)
 
 	snap.WriteString("\nBig Schema Changed Types Constraints:\n")
-	snap.WriteString(snapshotConstraints(t, validateRes.Bindings[0].Constraints))
+	snap.WriteString(snapshotConstraints(t, validateRes.Bindings[0].ProjectionConstraints))
 
 	snap.WriteString("\nBig Schema Materialized Resource Schema With All Fields Required:\n")
 	snap.WriteString(sch)
@@ -618,7 +619,7 @@ func runBigSchemaApplyTests[EC boilerplate.EndpointConfiger, FC boilerplate.Fiel
 	require.NoError(t, err)
 
 	snap.WriteString("\nBig Schema Changed Types With Backfill Constraints:\n")
-	snap.WriteString(snapshotConstraints(t, validateRes.Bindings[0].Constraints))
+	snap.WriteString(snapshotConstraints(t, validateRes.Bindings[0].ProjectionConstraints))
 
 	_, err = driver.Apply(ctx, applyReq(changed, nullable, configJson, resourceConfigJson, validateRes, true))
 	require.NoError(t, err)
@@ -840,19 +841,53 @@ func applyReq(spec *pf.MaterializationSpec, lastSpec *pf.MaterializationSpec, co
 }
 
 // selectedFields creates a field selection that includes all possible fields.
+// A field may carry multiple projection_constraints; a field is selected when
+// some constraint wants it (required, recommended, or optional when optionals
+// are included) and none forbids it. An INCOMPATIBLE constraint does not by
+// itself exclude a wanted field: the control plane selects it presuming a
+// backfill (see build_selection in flow's field_selection.rs).
 func selectedFields(binding *pm.Response_Validated_Binding, collection pf.CollectionSpec, includeOptional bool) pf.FieldSelection {
 	out := pf.FieldSelection{}
 
+	// Group the binding's projection_constraints by field, preserving order so
+	// the folded field is taken from the first constraint, as the control plane
+	// does.
+	byField := make(map[string][]*pm.Response_Validated_Constraint)
+	var fieldOrder []string
+	for _, pc := range binding.ProjectionConstraints {
+		if _, ok := byField[pc.Field]; !ok {
+			fieldOrder = append(fieldOrder, pc.Field)
+		}
+		byField[pc.Field] = append(byField[pc.Field], pc.Constraint)
+	}
+
 	var foldedFieldMap = make(map[string]struct{})
 
-	for field, constraint := range binding.Constraints {
-		if constraint.Type.IsForbidden() || !includeOptional && constraint.Type == pm.Response_Validated_Constraint_FIELD_OPTIONAL {
+	for _, field := range fieldOrder {
+		constraints := byField[field]
+
+		var wanted, forbidden bool
+		for _, c := range constraints {
+			switch c.Type {
+			case pm.Response_Validated_Constraint_FIELD_FORBIDDEN:
+				forbidden = true
+			case pm.Response_Validated_Constraint_FIELD_REQUIRED,
+				pm.Response_Validated_Constraint_LOCATION_REQUIRED,
+				pm.Response_Validated_Constraint_LOCATION_RECOMMENDED:
+				wanted = true
+			case pm.Response_Validated_Constraint_FIELD_OPTIONAL:
+				if includeOptional {
+					wanted = true
+				}
+			}
+		}
+		if !wanted || forbidden {
 			continue
 		}
 
 		var foldedField = field
-		if constraint.FoldedField != "" {
-			foldedField = constraint.FoldedField
+		if constraints[0].FoldedField != "" {
+			foldedField = constraints[0].FoldedField
 		}
 
 		// The runtime only keeps one of the fields which have equal FoldedFields. We replicate
@@ -884,9 +919,10 @@ func selectedFields(binding *pm.Response_Validated_Binding, collection pf.Collec
 	return out
 }
 
-// snapshotConstraints makes a compact string representation of a set of constraints, with one
-// constraint printed per line.
-func snapshotConstraints(t *testing.T, cs map[string]*pm.Response_Validated_Constraint) string {
+// snapshotConstraints makes a compact string representation of a binding's
+// projection_constraints, with one constraint printed per line. A field may
+// carry multiple constraints, each of which is printed.
+func snapshotConstraints(t *testing.T, pcs []*pm.Response_Validated_ProjectionConstraint) string {
 	t.Helper()
 
 	type constraintRow struct {
@@ -896,18 +932,18 @@ func snapshotConstraints(t *testing.T, cs map[string]*pm.Response_Validated_Cons
 		Reason     string
 	}
 
-	rows := make([]constraintRow, 0, len(cs))
-	for f, c := range cs {
+	rows := make([]constraintRow, 0, len(pcs))
+	for _, pc := range pcs {
 		rows = append(rows, constraintRow{
-			Field:      f,
-			Type:       int(c.Type),
-			TypeString: c.Type.String(),
-			Reason:     c.Reason,
+			Field:      pc.Field,
+			Type:       int(pc.Constraint.Type),
+			TypeString: pc.Constraint.Type.String(),
+			Reason:     pc.Constraint.Reason,
 		})
 	}
 
 	slices.SortFunc(rows, func(i, j constraintRow) int {
-		return strings.Compare(i.Field, j.Field)
+		return cmp.Or(strings.Compare(i.Field, j.Field), cmp.Compare(i.Type, j.Type))
 	})
 
 	var out strings.Builder

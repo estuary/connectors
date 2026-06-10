@@ -203,17 +203,17 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 			reqBinding := req.Bindings[idx]
 			for _, p := range reqBinding.Collection.Projections {
 				if p.IsPrimaryKey {
-					if binding.Constraints == nil {
-						binding.Constraints = make(map[string]*pm.Response_Validated_Constraint)
-					}
 					log.WithFields(log.Fields{
 						"binding": idx,
 						"field":   p.Field,
 					}).Info("adding INCOMPATIBLE constraint for key field due to key distribution optimization change")
-					binding.Constraints[p.Field] = &pm.Response_Validated_Constraint{
-						Type:   pm.Response_Validated_Constraint_INCOMPATIBLE,
-						Reason: "The 'disable_key_distribution_optimization' setting has changed. This changes the table's primary key structure (flow_key_hash column is added or removed) and requires re-creating all tables. Backfill all bindings to proceed.",
-					}
+					binding.ProjectionConstraints = append(binding.ProjectionConstraints, &pm.Response_Validated_ProjectionConstraint{
+						Field: p.Field,
+						Constraint: &pm.Response_Validated_Constraint{
+							Type:   pm.Response_Validated_Constraint_INCOMPATIBLE,
+							Reason: "The 'disable_key_distribution_optimization' setting has changed. This changes the table's primary key structure (flow_key_hash column is added or removed) and requires re-creating all tables. Backfill all bindings to proceed.",
+						},
+					})
 				}
 			}
 		}
