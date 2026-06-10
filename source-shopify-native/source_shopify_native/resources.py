@@ -167,7 +167,9 @@ PII_RESOURCES: set[type[ShopifyGraphQLResource]] = {
     gql.FulfillmentOrders,
 }
 
-FULL_REFRESH_RESOURCES: list[type[ShopifyGraphQLResource]] = []
+FULL_REFRESH_RESOURCES: list[type[ShopifyGraphQLResource]] = [
+    gql.StaffMembers,
+]
 
 
 async def _create_store_context(
