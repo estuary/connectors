@@ -25,6 +25,20 @@ This is mostly an issue for small-scale testing, as these overheads are more or
 less fixed and unrelated to the actual volume of changes. But this makes our
 automated test suite runs take 10-20x longer than they do on other databases.
 
+### Transaction commit timestamps (`_meta/source/ts_ms`)
+
+By default the connector does not populate `_meta/source/ts_ms` on CDC events,
+because SQL Server CDC change tables do not contain commit timestamps inline.
+Setting the advanced option `populate_source_ts_ms` causes the connector to
+range-prefetch commit times from `cdc.lsn_time_mapping` over each polling
+cycle's LSN range and apply them as `_meta/source/ts_ms` on emitted change
+events. The lookup is one indexed range query per polling cycle, paginated
+when the range is wide enough to cross the prefetch page size. Backfill rows
+do not have a meaningful commit time and will not have `ts_ms` set, matching
+the behavior of the Postgres and MySQL connectors. The standard
+`GRANT SELECT ON SCHEMA :: cdc TO flow_capture` already grants the necessary
+permissions on `cdc.lsn_time_mapping`, so no additional setup is required.
+
 ### Developing
 
 Some useful commands for working with a test instance of SQL Server:
