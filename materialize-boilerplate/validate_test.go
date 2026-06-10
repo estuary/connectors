@@ -3,6 +3,7 @@ package boilerplate
 import (
 	"embed"
 	"encoding/json"
+	"maps"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -174,6 +175,16 @@ func TestValidate(t *testing.T) {
 			featureFlags:       map[string]bool{"allow_existing_tables_for_new_bindings": true, "flow_document": true, "retain_existing_data_on_backfill": false},
 		},
 		{
+			name:               "table already exists with incompatible root document column",
+			deltaUpdates:       false,
+			specForInfoSchema:  specWithDocColumnType(loadValidateSpec(t, "base.flow.proto"), "string"),
+			existingSpec:       nil,
+			proposedSpec:       loadValidateSpec(t, "base.flow.proto"),
+			fieldNameTransform: simpleTestTransform,
+			maxFieldLength:     0,
+			featureFlags:       map[string]bool{"allow_existing_tables_for_new_bindings": true, "flow_document": true, "retain_existing_data_on_backfill": false},
+		},
+		{
 			name:               "field names over the length limit are forbidden",
 			deltaUpdates:       false,
 			specForInfoSchema:  nil,
@@ -284,11 +295,13 @@ func TestValidate(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify that folded fields are set for all constraints
-		for field, constraint := range cs {
-			// simpleTestTransform adds "_transformed" to all field names
-			expectedFolded := field + "_transformed"
-			require.Equal(t, expectedFolded, constraint.FoldedField,
-				"FoldedField should be set to the transformed field name for field %q", field)
+		for field, constraints := range cs {
+			for _, constraint := range constraints {
+				// simpleTestTransform adds "_transformed" to all field names
+				expectedFolded := field + "_transformed"
+				require.Equal(t, expectedFolded, constraint.FoldedField,
+					"FoldedField should be set to the transformed field name for field %q", field)
+			}
 		}
 	})
 
@@ -312,9 +325,11 @@ func TestValidate(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify that folded fields are empty when no transformation occurs
-		for field, constraint := range cs {
-			require.Empty(t, constraint.FoldedField,
-				"FoldedField should be empty when field name is unchanged for field %q", field)
+		for field, constraints := range cs {
+			for _, constraint := range constraints {
+				require.Empty(t, constraint.FoldedField,
+					"FoldedField should be empty when field name is unchanged for field %q", field)
+			}
 		}
 	})
 
@@ -485,15 +500,94 @@ func TestValidate(t *testing.T) {
 		)
 		require.NoError(t, err)
 
+		// The INCOMPATIBLE constraint is paired with the connector's own LOCATION_REQUIRED
+		// constraint, so the control plane fails the build with a clear error.
 		for _, documentField := range []string{"flow_document", "second_root"} {
 			require.Equal(t, constraints[documentField],
-				&pm.Response_Validated_Constraint{
-					Type:   pm.Response_Validated_Constraint_INCOMPATIBLE,
-					Reason: "Cannot add a new root document projection to materialization without backfilling",
+				[]*pm.Response_Validated_Constraint{
+					{
+						Type:   pm.Response_Validated_Constraint_LOCATION_REQUIRED,
+						Reason: "The root document is required for a standard updates materialization",
+					},
+					{
+						Type:   pm.Response_Validated_Constraint_INCOMPATIBLE,
+						Reason: "Cannot add a new root document projection to materialization without backfilling",
+					},
 				},
 			)
 		}
 	})
+
+	t.Run("new binding to existing table with incompatible document column", func(t *testing.T) {
+		// A new binding attached to an existing table whose document column has an
+		// incompatible type reports both LOCATION_REQUIRED and INCOMPATIBLE for the
+		// document field, so the control plane fails the build with a clear error.
+		identityTransform := func(s string) string { return s }
+		is := testInfoSchemaFromSpec(t, specWithDocColumnType(loadValidateSpec(t, "base.flow.proto"), "string"), identityTransform)
+		featureFlags := map[string]bool{"allow_existing_tables_for_new_bindings": true, "flow_document": true, "retain_existing_data_on_backfill": false}
+		validator := NewValidator(testConstrainter{featureFlags: featureFlags}, is, 0, true, featureFlags)
+
+		proposed := loadValidateSpec(t, "base.flow.proto")
+		cs, err := validator.ValidateBinding(
+			[]string{"key_value"},
+			false,
+			proposed.Bindings[0].Backfill,
+			proposed.Bindings[0].Collection,
+			proposed.Bindings[0].FieldSelection.FieldConfigJsonMap,
+			nil, // No existing spec (new binding)
+		)
+		require.NoError(t, err)
+
+		require.Len(t, cs["flow_document"], 2)
+		require.Equal(t, pm.Response_Validated_Constraint_LOCATION_REQUIRED, cs["flow_document"][0].Type)
+		require.Equal(t, pm.Response_Validated_Constraint_INCOMPATIBLE, cs["flow_document"][1].Type)
+		require.Contains(t, cs["flow_document"][1].Reason, "already being materialized as endpoint type 'STRING'")
+
+		// projection_constraints carries both entries for the field.
+		list := ValidatedConstraints(cs)
+
+		var docConstraints []*pm.Response_Validated_Constraint
+		for _, pc := range list {
+			require.NotEmpty(t, pc.Field)
+			require.NotNil(t, pc.Constraint)
+			if pc.Field == "flow_document" {
+				docConstraints = append(docConstraints, pc.Constraint)
+			}
+		}
+		require.Equal(t, cs["flow_document"], docConstraints)
+	})
+
+	t.Run("new binding to existing table with incompatible document column in document-less mode", func(t *testing.T) {
+		// When the connector reports the root document projection as optional (e.g. the
+		// no_flow_document mode), an incompatible document column remains a lone INCOMPATIBLE
+		// constraint: the materialization legitimately proceeds without the document field.
+		identityTransform := func(s string) string { return s }
+		is := testInfoSchemaFromSpec(t, specWithDocColumnType(loadValidateSpec(t, "base.flow.proto"), "string"), identityTransform)
+		featureFlags := map[string]bool{"allow_existing_tables_for_new_bindings": true, "flow_document": false, "retain_existing_data_on_backfill": false}
+		validator := NewValidator(testConstrainter{featureFlags: featureFlags}, is, 0, true, featureFlags)
+
+		proposed := loadValidateSpec(t, "base.flow.proto")
+		cs, err := validator.ValidateBinding(
+			[]string{"key_value"},
+			false,
+			proposed.Bindings[0].Backfill,
+			proposed.Bindings[0].Collection,
+			proposed.Bindings[0].FieldSelection.FieldConfigJsonMap,
+			nil, // No existing spec (new binding)
+		)
+		require.NoError(t, err)
+
+		require.Len(t, cs["flow_document"], 1)
+		require.Equal(t, pm.Response_Validated_Constraint_INCOMPATIBLE, cs["flow_document"][0].Type)
+	})
+}
+
+// specWithDocColumnType simulates an existing table whose root document column has the given
+// type, by mutating the inference types of the flow_document projection used to build the
+// InfoSchema fixture.
+func specWithDocColumnType(spec *pf.MaterializationSpec, typ string) *pf.MaterializationSpec {
+	spec.Bindings[0].Collection.GetProjection("flow_document").Inference.Types = []string{typ}
+	return spec
 }
 
 type testConstrainter struct {
@@ -622,7 +716,7 @@ func TestFlowDocumentFeatureFlag(t *testing.T) {
 	})
 }
 
-func snapshotConstraints(t *testing.T, cs map[string]*pm.Response_Validated_Constraint) string {
+func snapshotConstraints(t *testing.T, cs map[string][]*pm.Response_Validated_Constraint) string {
 	t.Helper()
 
 	type constraintRow struct {
@@ -632,24 +726,17 @@ func snapshotConstraints(t *testing.T, cs map[string]*pm.Response_Validated_Cons
 		Reason     string
 	}
 
-	rows := make([]constraintRow, 0, len(cs))
-	for f, c := range cs {
-		rows = append(rows, constraintRow{
-			Field:      f,
-			Type:       int(c.Type),
-			TypeString: c.Type.String(),
-			Reason:     c.Reason,
-		})
-	}
-
-	slices.SortFunc(rows, func(i, j constraintRow) int {
-		return strings.Compare(i.Field, j.Field)
-	})
-
 	var out strings.Builder
 	enc := json.NewEncoder(&out)
-	for _, r := range rows {
-		require.NoError(t, enc.Encode(r))
+	for _, f := range slices.Sorted(maps.Keys(cs)) {
+		for _, c := range cs[f] {
+			require.NoError(t, enc.Encode(constraintRow{
+				Field:      f,
+				Type:       int(c.Type),
+				TypeString: c.Type.String(),
+				Reason:     c.Reason,
+			}))
+		}
 	}
 
 	return out.String()
