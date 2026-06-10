@@ -2,7 +2,28 @@ from datetime import datetime
 from logging import Logger
 from typing import AsyncGenerator
 
-from ...models import ShopifyGraphQLResource, SortKey, StoreCapabilities
+from ..common import money_bag_fragment
+from ...models import (
+    NestedConnection,
+    ShopifyGraphQLResource,
+    SortKey,
+    StoreCapabilities,
+)
+
+
+_FULFILLMENT_LINE_ITEM_SELECTION = """
+id
+quantity
+discountedTotalSet {
+    ..._MoneyBagFields
+}
+originalTotalSet {
+    ..._MoneyBagFields
+}
+lineItem {
+    id
+}
+"""
 
 
 class Fulfillments(ShopifyGraphQLResource):
@@ -65,8 +86,21 @@ class Fulfillments(ShopifyGraphQLResource):
             number
             url
         }
+        # {{ fulfillmentLineItems }}
     }
     """
+    NESTED_CONNECTIONS = [
+        NestedConnection(
+            parent_path=["fulfillments"],
+            parent_typename="Fulfillment",
+            field_name="fulfillmentLineItems",
+            node_selection=_FULFILLMENT_LINE_ITEM_SELECTION,
+            page_size=100,
+            overflow_page_size=250,
+            fragments=[money_bag_fragment],
+        ),
+    ]
+    OUTER_PAGE_SIZE = 100
 
     @staticmethod
     def build_query(
