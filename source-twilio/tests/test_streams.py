@@ -13,6 +13,7 @@ from freezegun import freeze_time
 from source_twilio.auth import HttpBasicAuthenticator
 from source_twilio.source import SourceTwilio
 from source_twilio.streams import (
+    TWILIO_API_URL_BASE_VERSIONED,
     Accounts,
     Addresses,
     Alerts,
@@ -331,3 +332,61 @@ class TestUsageNestedStream:
                 with patch.object(parent_stream, "read_records", return_value=record):
                     result = stream.stream_slices()
                     assert list(result) == expected
+
+
+class TestAccountsSubaccountFiltering:
+    """Tests for the `sync_subaccounts` option on the Accounts stream."""
+
+    MAIN = {"sid": "AC_main", "owner_account_sid": "AC_main", "friendly_name": "main"}
+    SUB_1 = {"sid": "AC_sub1", "owner_account_sid": "AC_main", "friendly_name": "sub1"}
+    SUB_2 = {"sid": "AC_sub2", "owner_account_sid": "AC_main", "friendly_name": "sub2"}
+
+    def _parse(self, stream, records, requests_mock):
+        requests_mock.get(
+            f"{TWILIO_API_URL_BASE_VERSIONED}Accounts.json",
+            json={"accounts": records},
+        )
+        response = requests.get(f"{TWILIO_API_URL_BASE_VERSIONED}Accounts.json")
+        return list(stream.parse_response(response))
+
+    def test_sync_subaccounts_enabled_returns_all_accounts(self, requests_mock):
+        stream = Accounts(authenticator=TEST_CONFIG.get("authenticator"), sync_subaccounts=True)
+        result = self._parse(stream, [self.MAIN, self.SUB_1, self.SUB_2], requests_mock)
+        assert result == [self.MAIN, self.SUB_1, self.SUB_2]
+
+    def test_sync_subaccounts_default_is_enabled(self, requests_mock):
+        stream = Accounts(authenticator=TEST_CONFIG.get("authenticator"))
+        result = self._parse(stream, [self.MAIN, self.SUB_1], requests_mock)
+        assert result == [self.MAIN, self.SUB_1]
+
+    def test_sync_subaccounts_disabled_returns_only_main_account(self, requests_mock):
+        stream = Accounts(
+            authenticator=TEST_CONFIG.get("authenticator"),
+            sync_subaccounts=False,
+            config_account_sid="SK_some_api_key_sid",
+        )
+        result = self._parse(stream, [self.MAIN, self.SUB_1, self.SUB_2], requests_mock)
+        assert result == [self.MAIN]
+
+    def test_sync_subaccounts_disabled_retains_configured_subaccount(self, requests_mock):
+        # A capture authenticated with a subaccount's own credentials only sees that
+        # subaccount, whose owner_account_sid differs from its sid. It must still be
+        # captured when subaccount sync is disabled.
+        stream = Accounts(
+            authenticator=TEST_CONFIG.get("authenticator"),
+            sync_subaccounts=False,
+            config_account_sid="AC_sub1",
+        )
+        result = self._parse(stream, [self.SUB_1], requests_mock)
+        assert result == [self.SUB_1]
+
+    def test_nested_stream_parent_inherits_flags(self):
+        stream = Calls(
+            authenticator=TEST_CONFIG.get("authenticator"),
+            start_date=TEST_CONFIG["start_date"],
+            sync_subaccounts=False,
+            config_account_sid="AC_main",
+        )
+        parent = stream.parent_stream_instance
+        assert parent.sync_subaccounts is False
+        assert parent.config_account_sid == "AC_main"
