@@ -3987,6 +3987,428 @@
             "id": "gid://shopify/Order/18697849798701",
             "legacyResourceId": "18697849798701"
           },
+          "refundLineItems": [
+            {
+              "id": "gid://shopify/RefundLineItem/743490748461",
+              "lineItem": {
+                "id": "gid://shopify/LineItem/50297223512109"
+              },
+              "location": {
+                "id": "gid://shopify/Location/73871392813"
+              },
+              "priceSet": {
+                "presentmentMoney": {
+                  "amount": "43.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "43.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "quantity": 100,
+              "restockType": "RETURN",
+              "restocked": true,
+              "subtotalSet": {
+                "presentmentMoney": {
+                  "amount": "4300.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "4300.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "totalTaxSet": {
+                "presentmentMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                }
+              }
+            },
+            {
+              "id": "gid://shopify/RefundLineItem/743490781229",
+              "lineItem": {
+                "id": "gid://shopify/LineItem/50297223544877"
+              },
+              "location": {
+                "id": "gid://shopify/Location/73871392813"
+              },
+              "priceSet": {
+                "presentmentMoney": {
+                  "amount": "600.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "600.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "quantity": 100,
+              "restockType": "RETURN",
+              "restocked": true,
+              "subtotalSet": {
+                "presentmentMoney": {
+                  "amount": "60000.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "60000.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "totalTaxSet": {
+                "presentmentMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                }
+              }
+            },
+            {
+              "id": "gid://shopify/RefundLineItem/743490813997",
+              "lineItem": {
+                "id": "gid://shopify/LineItem/50297223577645"
+              },
+              "location": {
+                "id": "gid://shopify/Location/73871392813"
+              },
+              "priceSet": {
+                "presentmentMoney": {
+                  "amount": "749.95",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "749.95",
+                  "currencyCode": "USD"
+                }
+              },
+              "quantity": 100,
+              "restockType": "RETURN",
+              "restocked": true,
+              "subtotalSet": {
+                "presentmentMoney": {
+                  "amount": "74995.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "74995.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "totalTaxSet": {
+                "presentmentMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                }
+              }
+            },
+            {
+              "id": "gid://shopify/RefundLineItem/743490846765",
+              "lineItem": {
+                "id": "gid://shopify/LineItem/50297223610413"
+              },
+              "location": {
+                "id": "gid://shopify/Location/73871392813"
+              },
+              "priceSet": {
+                "presentmentMoney": {
+                  "amount": "1025.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "1025.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "quantity": 100,
+              "restockType": "RETURN",
+              "restocked": true,
+              "subtotalSet": {
+                "presentmentMoney": {
+                  "amount": "102500.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "102500.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "totalTaxSet": {
+                "presentmentMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                }
+              }
+            },
+            {
+              "id": "gid://shopify/RefundLineItem/743490879533",
+              "lineItem": {
+                "id": "gid://shopify/LineItem/50297223643181"
+              },
+              "location": {
+                "id": "gid://shopify/Location/73871392813"
+              },
+              "priceSet": {
+                "presentmentMoney": {
+                  "amount": "785.95",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "785.95",
+                  "currencyCode": "USD"
+                }
+              },
+              "quantity": 100,
+              "restockType": "RETURN",
+              "restocked": true,
+              "subtotalSet": {
+                "presentmentMoney": {
+                  "amount": "78595.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "78595.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "totalTaxSet": {
+                "presentmentMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                }
+              }
+            },
+            {
+              "id": "gid://shopify/RefundLineItem/743490912301",
+              "lineItem": {
+                "id": "gid://shopify/LineItem/50297223675949"
+              },
+              "location": {
+                "id": "gid://shopify/Location/73871392813"
+              },
+              "priceSet": {
+                "presentmentMoney": {
+                  "amount": "699.95",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "699.95",
+                  "currencyCode": "USD"
+                }
+              },
+              "quantity": 100,
+              "restockType": "RETURN",
+              "restocked": true,
+              "subtotalSet": {
+                "presentmentMoney": {
+                  "amount": "69995.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "69995.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "totalTaxSet": {
+                "presentmentMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                }
+              }
+            },
+            {
+              "id": "gid://shopify/RefundLineItem/743490945069",
+              "lineItem": {
+                "id": "gid://shopify/LineItem/50297223708717"
+              },
+              "location": {
+                "id": "gid://shopify/Location/73871392813"
+              },
+              "priceSet": {
+                "presentmentMoney": {
+                  "amount": "699.95",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "699.95",
+                  "currencyCode": "USD"
+                }
+              },
+              "quantity": 100,
+              "restockType": "RETURN",
+              "restocked": true,
+              "subtotalSet": {
+                "presentmentMoney": {
+                  "amount": "69995.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "69995.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "totalTaxSet": {
+                "presentmentMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                }
+              }
+            },
+            {
+              "id": "gid://shopify/RefundLineItem/743490977837",
+              "lineItem": {
+                "id": "gid://shopify/LineItem/50297223741485"
+              },
+              "location": {
+                "id": "gid://shopify/Location/73871392813"
+              },
+              "priceSet": {
+                "presentmentMoney": {
+                  "amount": "699.95",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "699.95",
+                  "currencyCode": "USD"
+                }
+              },
+              "quantity": 100,
+              "restockType": "RETURN",
+              "restocked": true,
+              "subtotalSet": {
+                "presentmentMoney": {
+                  "amount": "69995.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "69995.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "totalTaxSet": {
+                "presentmentMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                }
+              }
+            },
+            {
+              "id": "gid://shopify/RefundLineItem/743491010605",
+              "lineItem": {
+                "id": "gid://shopify/LineItem/50297223774253"
+              },
+              "location": {
+                "id": "gid://shopify/Location/73871392813"
+              },
+              "priceSet": {
+                "presentmentMoney": {
+                  "amount": "699.95",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "699.95",
+                  "currencyCode": "USD"
+                }
+              },
+              "quantity": 100,
+              "restockType": "RETURN",
+              "restocked": true,
+              "subtotalSet": {
+                "presentmentMoney": {
+                  "amount": "69995.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "69995.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "totalTaxSet": {
+                "presentmentMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                }
+              }
+            },
+            {
+              "id": "gid://shopify/RefundLineItem/743491043373",
+              "lineItem": {
+                "id": "gid://shopify/LineItem/50297223807021"
+              },
+              "location": {
+                "id": "gid://shopify/Location/73871392813"
+              },
+              "priceSet": {
+                "presentmentMoney": {
+                  "amount": "699.95",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "699.95",
+                  "currencyCode": "USD"
+                }
+              },
+              "quantity": 100,
+              "restockType": "RETURN",
+              "restocked": true,
+              "subtotalSet": {
+                "presentmentMoney": {
+                  "amount": "69995.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "69995.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "totalTaxSet": {
+                "presentmentMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                }
+              }
+            }
+          ],
           "totalRefundedSet": {
             "presentmentMoney": {
               "amount": "670365.0",
@@ -4009,6 +4431,428 @@
             "id": "gid://shopify/Order/18697849798701",
             "legacyResourceId": "18697849798701"
           },
+          "refundLineItems": [
+            {
+              "id": "gid://shopify/RefundLineItem/743491305517",
+              "lineItem": {
+                "id": "gid://shopify/LineItem/50297223512109"
+              },
+              "location": {
+                "id": "gid://shopify/Location/73871392813"
+              },
+              "priceSet": {
+                "presentmentMoney": {
+                  "amount": "43.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "43.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "quantity": 5,
+              "restockType": "RETURN",
+              "restocked": true,
+              "subtotalSet": {
+                "presentmentMoney": {
+                  "amount": "215.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "215.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "totalTaxSet": {
+                "presentmentMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                }
+              }
+            },
+            {
+              "id": "gid://shopify/RefundLineItem/743491338285",
+              "lineItem": {
+                "id": "gid://shopify/LineItem/50297223544877"
+              },
+              "location": {
+                "id": "gid://shopify/Location/73871392813"
+              },
+              "priceSet": {
+                "presentmentMoney": {
+                  "amount": "600.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "600.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "quantity": 5,
+              "restockType": "RETURN",
+              "restocked": true,
+              "subtotalSet": {
+                "presentmentMoney": {
+                  "amount": "3000.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "3000.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "totalTaxSet": {
+                "presentmentMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                }
+              }
+            },
+            {
+              "id": "gid://shopify/RefundLineItem/743491371053",
+              "lineItem": {
+                "id": "gid://shopify/LineItem/50297223577645"
+              },
+              "location": {
+                "id": "gid://shopify/Location/73871392813"
+              },
+              "priceSet": {
+                "presentmentMoney": {
+                  "amount": "749.95",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "749.95",
+                  "currencyCode": "USD"
+                }
+              },
+              "quantity": 5,
+              "restockType": "RETURN",
+              "restocked": true,
+              "subtotalSet": {
+                "presentmentMoney": {
+                  "amount": "3749.75",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "3749.75",
+                  "currencyCode": "USD"
+                }
+              },
+              "totalTaxSet": {
+                "presentmentMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                }
+              }
+            },
+            {
+              "id": "gid://shopify/RefundLineItem/743491403821",
+              "lineItem": {
+                "id": "gid://shopify/LineItem/50297223610413"
+              },
+              "location": {
+                "id": "gid://shopify/Location/73871392813"
+              },
+              "priceSet": {
+                "presentmentMoney": {
+                  "amount": "1025.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "1025.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "quantity": 5,
+              "restockType": "RETURN",
+              "restocked": true,
+              "subtotalSet": {
+                "presentmentMoney": {
+                  "amount": "5125.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "5125.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "totalTaxSet": {
+                "presentmentMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                }
+              }
+            },
+            {
+              "id": "gid://shopify/RefundLineItem/743491436589",
+              "lineItem": {
+                "id": "gid://shopify/LineItem/50297223643181"
+              },
+              "location": {
+                "id": "gid://shopify/Location/73871392813"
+              },
+              "priceSet": {
+                "presentmentMoney": {
+                  "amount": "785.95",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "785.95",
+                  "currencyCode": "USD"
+                }
+              },
+              "quantity": 5,
+              "restockType": "RETURN",
+              "restocked": true,
+              "subtotalSet": {
+                "presentmentMoney": {
+                  "amount": "3929.75",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "3929.75",
+                  "currencyCode": "USD"
+                }
+              },
+              "totalTaxSet": {
+                "presentmentMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                }
+              }
+            },
+            {
+              "id": "gid://shopify/RefundLineItem/743491469357",
+              "lineItem": {
+                "id": "gid://shopify/LineItem/50297223675949"
+              },
+              "location": {
+                "id": "gid://shopify/Location/73871392813"
+              },
+              "priceSet": {
+                "presentmentMoney": {
+                  "amount": "699.95",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "699.95",
+                  "currencyCode": "USD"
+                }
+              },
+              "quantity": 5,
+              "restockType": "RETURN",
+              "restocked": true,
+              "subtotalSet": {
+                "presentmentMoney": {
+                  "amount": "3499.75",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "3499.75",
+                  "currencyCode": "USD"
+                }
+              },
+              "totalTaxSet": {
+                "presentmentMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                }
+              }
+            },
+            {
+              "id": "gid://shopify/RefundLineItem/743491502125",
+              "lineItem": {
+                "id": "gid://shopify/LineItem/50297223708717"
+              },
+              "location": {
+                "id": "gid://shopify/Location/73871392813"
+              },
+              "priceSet": {
+                "presentmentMoney": {
+                  "amount": "699.95",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "699.95",
+                  "currencyCode": "USD"
+                }
+              },
+              "quantity": 5,
+              "restockType": "RETURN",
+              "restocked": true,
+              "subtotalSet": {
+                "presentmentMoney": {
+                  "amount": "3499.75",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "3499.75",
+                  "currencyCode": "USD"
+                }
+              },
+              "totalTaxSet": {
+                "presentmentMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                }
+              }
+            },
+            {
+              "id": "gid://shopify/RefundLineItem/743491534893",
+              "lineItem": {
+                "id": "gid://shopify/LineItem/50297223741485"
+              },
+              "location": {
+                "id": "gid://shopify/Location/73871392813"
+              },
+              "priceSet": {
+                "presentmentMoney": {
+                  "amount": "699.95",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "699.95",
+                  "currencyCode": "USD"
+                }
+              },
+              "quantity": 5,
+              "restockType": "RETURN",
+              "restocked": true,
+              "subtotalSet": {
+                "presentmentMoney": {
+                  "amount": "3499.75",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "3499.75",
+                  "currencyCode": "USD"
+                }
+              },
+              "totalTaxSet": {
+                "presentmentMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                }
+              }
+            },
+            {
+              "id": "gid://shopify/RefundLineItem/743491567661",
+              "lineItem": {
+                "id": "gid://shopify/LineItem/50297223774253"
+              },
+              "location": {
+                "id": "gid://shopify/Location/73871392813"
+              },
+              "priceSet": {
+                "presentmentMoney": {
+                  "amount": "699.95",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "699.95",
+                  "currencyCode": "USD"
+                }
+              },
+              "quantity": 5,
+              "restockType": "RETURN",
+              "restocked": true,
+              "subtotalSet": {
+                "presentmentMoney": {
+                  "amount": "3499.75",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "3499.75",
+                  "currencyCode": "USD"
+                }
+              },
+              "totalTaxSet": {
+                "presentmentMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                }
+              }
+            },
+            {
+              "id": "gid://shopify/RefundLineItem/743491600429",
+              "lineItem": {
+                "id": "gid://shopify/LineItem/50297223807021"
+              },
+              "location": {
+                "id": "gid://shopify/Location/73871392813"
+              },
+              "priceSet": {
+                "presentmentMoney": {
+                  "amount": "699.95",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "699.95",
+                  "currencyCode": "USD"
+                }
+              },
+              "quantity": 5,
+              "restockType": "RETURN",
+              "restocked": true,
+              "subtotalSet": {
+                "presentmentMoney": {
+                  "amount": "3499.75",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "3499.75",
+                  "currencyCode": "USD"
+                }
+              },
+              "totalTaxSet": {
+                "presentmentMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                }
+              }
+            }
+          ],
           "totalRefundedSet": {
             "presentmentMoney": {
               "amount": "33518.25",
