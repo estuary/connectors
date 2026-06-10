@@ -25,9 +25,11 @@ from .orders.refunds import OrderRefunds
 from .orders.risks import OrderRisks
 from .orders.transactions import OrderTransactions
 from .subscriptions.subscription_contracts import SubscriptionContracts
+from .staff_members import StaffMembers
 
 
 __all__ = [
+    "StaffMembers",
     "AbandonedCheckouts",
     "ShopifyGraphQLClient",
     "CustomCollections",
