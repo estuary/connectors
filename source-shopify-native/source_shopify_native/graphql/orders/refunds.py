@@ -3,7 +3,35 @@ from logging import Logger
 from typing import AsyncGenerator
 
 from ..common import money_bag_fragment
-from ...models import ShopifyGraphQLResource, SortKey, StoreCapabilities
+from ...models import (
+    NestedConnection,
+    ShopifyGraphQLResource,
+    SortKey,
+    StoreCapabilities,
+)
+
+
+_REFUND_LINE_ITEM_SELECTION = """
+id
+location {
+    id
+}
+priceSet {
+    ..._MoneyBagFields
+}
+quantity
+restocked
+restockType
+subtotalSet {
+    ..._MoneyBagFields
+}
+totalTaxSet {
+    ..._MoneyBagFields
+}
+lineItem {
+    id
+}
+"""
 
 
 class OrderRefunds(ShopifyGraphQLResource):
@@ -50,10 +78,23 @@ class OrderRefunds(ShopifyGraphQLResource):
         totalRefundedSet {
             ..._MoneyBagFields
         }
+        # {{ refundLineItems }}
     }
     """
 
     FRAGMENTS = [money_bag_fragment]
+    NESTED_CONNECTIONS = [
+        NestedConnection(
+            parent_path=["refunds"],
+            parent_typename="Refund",
+            field_name="refundLineItems",
+            node_selection=_REFUND_LINE_ITEM_SELECTION,
+            page_size=10,
+            overflow_page_size=250,
+            fragments=[money_bag_fragment],
+        ),
+    ]
+    OUTER_PAGE_SIZE = 100
 
     @staticmethod
     def build_query(
