@@ -59,23 +59,22 @@ async def bulk_fetch_incremental(
     yield end
 
 
-async def bulk_fetch_full_refresh(
+async def bulk_fetch_snapshot(
     http: HTTPMixin,
-    start_date: datetime,
     bulk_job_manager: BulkJobManager,
     model: type[ShopifyGraphQLResource],
     store: str,
     capabilities: StoreCapabilities,
     log: Logger,
 ) -> AsyncGenerator[ShopifyGraphQLResource, None]:
-    end = datetime.now(tz=UTC)
-    query = model.build_query(start_date, end, capabilities=capabilities)
+    now = datetime.now(tz=UTC)
+    query = model.build_query(now, now, capabilities=capabilities)
 
     url = await bulk_job_manager.execute(model, query)
 
     if url is None:
         log.info(
-            f"[{store}] Bulk query job found no results between {start_date} and {end} for {model.__name__}."
+            f"[{store}] Bulk query job found no results for {model.__name__}."
         )
         return
 
@@ -118,6 +117,28 @@ async def _paginate_through_resources(
             return
 
         after = page_info.endCursor
+
+
+async def fetch_snapshot(
+    client: ShopifyGraphQLClient,
+    model: type[TShopifyGraphQLResource],
+    data_model: type[BaseResponseData[TShopifyGraphQLResource]],
+    store: str,
+    capabilities: StoreCapabilities,
+    log: Logger,
+) -> AsyncGenerator[TShopifyGraphQLResource, None]:
+    now = datetime.now(tz=UTC)
+    async for doc in _paginate_through_resources(
+        client=client,
+        model=model,
+        data_model=data_model,
+        start=now,
+        end=now,
+        store=store,
+        capabilities=capabilities,
+        log=log,
+    ):
+        yield doc
 
 
 async def fetch_incremental_unsorted(

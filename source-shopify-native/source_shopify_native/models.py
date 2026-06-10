@@ -469,6 +469,9 @@ class ShopifyGraphQLResource(BaseDocument):
     SORT_KEY: ClassVar[SortKey | None] = None
     SHOULD_USE_BULK_QUERIES: ClassVar[bool] = True
     QUALIFYING_SCOPES: ClassVar[set[str]] = set()
+    # Some resources are only queryable on Shopify Plus / Advanced plans or
+    # partner dev stores regardless of granted scopes.
+    REQUIRES_PLUS_OR_ADVANCED_PLAN: ClassVar[bool] = False
     # Fields included in the query only when the store's capabilities allow it. See
     # ConditionalField for placeholder/substitution semantics.
     CONDITIONAL_FIELDS: ClassVar[list[ConditionalField]] = []
