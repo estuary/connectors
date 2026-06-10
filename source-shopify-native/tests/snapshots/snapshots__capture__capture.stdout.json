@@ -659,6 +659,35 @@
           "deliveredAt": null,
           "displayStatus": "FULFILLED",
           "estimatedDeliveryAt": null,
+          "fulfillmentLineItems": [
+            {
+              "discountedTotalSet": {
+                "presentmentMoney": {
+                  "amount": "885.95",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "885.95",
+                  "currencyCode": "USD"
+                }
+              },
+              "id": "gid://shopify/FulfillmentLineItem/18219383717933",
+              "lineItem": {
+                "id": "gid://shopify/LineItem/50353178017837"
+              },
+              "originalTotalSet": {
+                "presentmentMoney": {
+                  "amount": "885.95",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "885.95",
+                  "currencyCode": "USD"
+                }
+              },
+              "quantity": 1
+            }
+          ],
           "id": "gid://shopify/Fulfillment/7089298964525",
           "inTransitAt": null,
           "legacyResourceId": "7089298964525",
@@ -695,6 +724,278 @@
           "deliveredAt": "2026-06-15T13:19:16Z",
           "displayStatus": "DELIVERED",
           "estimatedDeliveryAt": null,
+          "fulfillmentLineItems": [
+            {
+              "discountedTotalSet": {
+                "presentmentMoney": {
+                  "amount": "8600.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "8600.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "id": "gid://shopify/FulfillmentLineItem/18166932996141",
+              "lineItem": {
+                "id": "gid://shopify/LineItem/50297223512109"
+              },
+              "originalTotalSet": {
+                "presentmentMoney": {
+                  "amount": "8600.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "8600.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "quantity": 200
+            },
+            {
+              "discountedTotalSet": {
+                "presentmentMoney": {
+                  "amount": "120000.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "120000.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "id": "gid://shopify/FulfillmentLineItem/18166933028909",
+              "lineItem": {
+                "id": "gid://shopify/LineItem/50297223544877"
+              },
+              "originalTotalSet": {
+                "presentmentMoney": {
+                  "amount": "120000.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "120000.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "quantity": 200
+            },
+            {
+              "discountedTotalSet": {
+                "presentmentMoney": {
+                  "amount": "149990.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "149990.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "id": "gid://shopify/FulfillmentLineItem/18166933061677",
+              "lineItem": {
+                "id": "gid://shopify/LineItem/50297223577645"
+              },
+              "originalTotalSet": {
+                "presentmentMoney": {
+                  "amount": "149990.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "149990.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "quantity": 200
+            },
+            {
+              "discountedTotalSet": {
+                "presentmentMoney": {
+                  "amount": "205000.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "205000.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "id": "gid://shopify/FulfillmentLineItem/18166933094445",
+              "lineItem": {
+                "id": "gid://shopify/LineItem/50297223610413"
+              },
+              "originalTotalSet": {
+                "presentmentMoney": {
+                  "amount": "205000.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "205000.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "quantity": 200
+            },
+            {
+              "discountedTotalSet": {
+                "presentmentMoney": {
+                  "amount": "157190.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "157190.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "id": "gid://shopify/FulfillmentLineItem/18166933127213",
+              "lineItem": {
+                "id": "gid://shopify/LineItem/50297223643181"
+              },
+              "originalTotalSet": {
+                "presentmentMoney": {
+                  "amount": "157190.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "157190.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "quantity": 200
+            },
+            {
+              "discountedTotalSet": {
+                "presentmentMoney": {
+                  "amount": "139990.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "139990.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "id": "gid://shopify/FulfillmentLineItem/18166933159981",
+              "lineItem": {
+                "id": "gid://shopify/LineItem/50297223675949"
+              },
+              "originalTotalSet": {
+                "presentmentMoney": {
+                  "amount": "139990.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "139990.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "quantity": 200
+            },
+            {
+              "discountedTotalSet": {
+                "presentmentMoney": {
+                  "amount": "139990.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "139990.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "id": "gid://shopify/FulfillmentLineItem/18166933192749",
+              "lineItem": {
+                "id": "gid://shopify/LineItem/50297223708717"
+              },
+              "originalTotalSet": {
+                "presentmentMoney": {
+                  "amount": "139990.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "139990.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "quantity": 200
+            },
+            {
+              "discountedTotalSet": {
+                "presentmentMoney": {
+                  "amount": "139990.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "139990.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "id": "gid://shopify/FulfillmentLineItem/18166933225517",
+              "lineItem": {
+                "id": "gid://shopify/LineItem/50297223741485"
+              },
+              "originalTotalSet": {
+                "presentmentMoney": {
+                  "amount": "139990.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "139990.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "quantity": 200
+            },
+            {
+              "discountedTotalSet": {
+                "presentmentMoney": {
+                  "amount": "139990.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "139990.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "id": "gid://shopify/FulfillmentLineItem/18166933258285",
+              "lineItem": {
+                "id": "gid://shopify/LineItem/50297223774253"
+              },
+              "originalTotalSet": {
+                "presentmentMoney": {
+                  "amount": "139990.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "139990.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "quantity": 200
+            },
+            {
+              "discountedTotalSet": {
+                "presentmentMoney": {
+                  "amount": "139990.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "139990.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "id": "gid://shopify/FulfillmentLineItem/18166933291053",
+              "lineItem": {
+                "id": "gid://shopify/LineItem/50297223807021"
+              },
+              "originalTotalSet": {
+                "presentmentMoney": {
+                  "amount": "139990.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "139990.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "quantity": 200
+            }
+          ],
           "id": "gid://shopify/Fulfillment/7059371851821",
           "inTransitAt": null,
           "legacyResourceId": "7059371851821",
