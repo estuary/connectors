@@ -37,8 +37,10 @@ def test_orders_missing_capabilities_omits_conditional_fields():
     query = Orders.build_query(START, END)
 
     assert "retailLocation" not in query
+    assert "staffMember" not in query
     # The placeholder itself must not leak into the emitted query.
     assert "{{ retailLocation }}" not in query
+    assert "{{ staffMember }}" not in query
 
 
 def test_placeholder_substituted_at_any_depth():
