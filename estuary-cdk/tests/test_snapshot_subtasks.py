@@ -294,3 +294,18 @@ class TestOpenBindingSnapshotDict:
                 fetch_snapshot={"A": self._noop, "B": self._noop},
                 tombstone={"A": _doc("A", "")},  # missing "B"
             )
+
+    def test_requires_distinct_discriminators(self):
+        output = io.BytesIO()
+        task = _task(output, Task.Stopping())
+        with pytest.raises(AssertionError, match="distinct key discriminator"):
+            open_binding(
+                _binding(COMPOUND_KEY),
+                0,
+                self._state(),
+                task,
+                fetch_snapshot={"A": self._noop, "B": self._noop},
+                # Both tombstones carry store "A": their (store, row_id)
+                # keyspaces would overlap and clobber each other.
+                tombstone={"A": _doc("A", ""), "B": _doc("A", "")},
+            )

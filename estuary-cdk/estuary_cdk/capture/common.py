@@ -747,6 +747,28 @@ def open(
     return (response.Opened(explicitAcknowledgements=requires_explicit_acks), _run)
 
 
+def _tombstone_discriminator_values(
+    tombstone: BaseDocument, key: list[str]
+) -> tuple[object, ...]:
+    """Return a tombstone's collection-key values other than the CDK-managed
+    /_meta/row_id, in key order. These are what must differ between snapshot
+    subtasks: two subtasks sharing them would emit tombstones into the same
+    (discriminator, row_id) keyspace."""
+    dump = tombstone.model_dump(by_alias=True)
+    values: list[object] = []
+    for key_pointer in key:
+        # row_id is assigned per-pass by the CDK and is identical across
+        # subtasks, so it can't distinguish them.
+        if key_pointer == "/_meta/row_id":
+            continue
+        node: Any = dump
+        for field in key_pointer.strip("/").split("/"):
+            # A KeyError here means the tombstone is missing a key field.
+            node = node[field]
+        values.append(node)
+    return tuple(values)
+
+
 def open_binding(
     binding: CaptureBinding[_ResourceConfig],
     binding_index: int,
@@ -907,6 +929,19 @@ def open_binding(
             ), (
                 "fetch_snapshot subtasks requires a tombstone dict with "
                 "the same keys, each carrying the subtask discriminator. "
+            )
+
+            # Each subtask numbers row_id independently from zero, so the
+            # non-row_id key field(s) are all that distinguish one subtask's
+            # tombstones from another's. If two subtasks shared a discriminator,
+            # a deletion from one would land on the other's keyspace.
+            discriminators = [
+                _tombstone_discriminator_values(subtask_tombstone, key)
+                for subtask_tombstone in tombstone.values()
+            ]
+            assert len(set(discriminators)) == len(discriminators), (
+                f"fetch_snapshot subtask tombstones must carry distinct key "
+                f"discriminator values, one per subtask. Got: {discriminators}"
             )
 
             snapshot_state = resource_state.snapshot
