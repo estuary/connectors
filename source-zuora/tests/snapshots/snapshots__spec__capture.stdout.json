@@ -1,0 +1,155 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$defs": {
+        "BasicCredentials": {
+          "properties": {
+            "credentials_title": {
+              "const": "Username & Password",
+              "default": "Username & Password",
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "username": {
+              "title": "Username",
+              "type": "string"
+            },
+            "password": {
+              "secret": true,
+              "title": "Password",
+              "type": "string"
+            },
+            "auth_type": {
+              "const": "basic",
+              "default": "basic",
+              "title": "Auth Type",
+              "type": "string"
+            }
+          },
+          "required": [
+            "username",
+            "password"
+          ],
+          "title": "BasicCredentials",
+          "type": "object"
+        },
+        "OAuthCredentials": {
+          "properties": {
+            "credentials_title": {
+              "const": "OAuth Credentials",
+              "default": "OAuth Credentials",
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "client_id": {
+              "secret": true,
+              "title": "Client Id",
+              "type": "string"
+            },
+            "client_secret": {
+              "secret": true,
+              "title": "Client Secret",
+              "type": "string"
+            },
+            "auth_type": {
+              "const": "client_credentials",
+              "default": "client_credentials",
+              "title": "Auth Type",
+              "type": "string"
+            }
+          },
+          "required": [
+            "client_id",
+            "client_secret"
+          ],
+          "title": "OAuth",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "credentials": {
+          "discriminator": {
+            "mapping": {
+              "basic": "#/$defs/BasicCredentials",
+              "client_credentials": "#/$defs/OAuthCredentials"
+            },
+            "propertyName": "auth_type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/BasicCredentials"
+            },
+            {
+              "$ref": "#/$defs/OAuthCredentials"
+            }
+          ],
+          "title": "Authentication"
+        },
+        "base_url": {
+          "default": "https://rest.zuora.com",
+          "description": "Zuora REST API base URL. Use https://rest.zuora.com for US production, https://rest.apisandbox.zuora.com for US sandbox, or https://rest.eu.zuora.com for EU production.",
+          "examples": [
+            "https://rest.zuora.com",
+            "https://rest.apisandbox.zuora.com",
+            "https://rest.eu.zuora.com",
+            "https://rest.sandbox.eu.zuora.com"
+          ],
+          "title": "API Base URL",
+          "type": "string"
+        },
+        "start_date": {
+          "description": "UTC date and time from which to start replicating data. Defaults to January 1, 2000, which captures all available history.",
+          "format": "date-time",
+          "title": "Start Date",
+          "type": "string"
+        }
+      },
+      "required": [
+        "credentials"
+      ],
+      "title": "Source Zuora Configuration",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "description": "ResourceConfig is a common resource configuration shape.",
+      "properties": {
+        "_meta": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Meta"
+        },
+        "name": {
+          "description": "Name of this resource",
+          "title": "Name",
+          "type": "string"
+        },
+        "interval": {
+          "default": "PT0S",
+          "description": "Interval between updates for this resource",
+          "format": "duration",
+          "title": "Interval",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ResourceConfig",
+      "type": "object"
+    },
+    "documentationUrl": "https://go.estuary.dev/source-zuora",
+    "resourcePathPointers": [
+      "/name"
+    ]
+  }
+]

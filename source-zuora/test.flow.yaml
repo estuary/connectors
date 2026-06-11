@@ -1,0 +1,59 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-zuora:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_zuora
+        config: config.yaml
+    bindings:
+      - resource: {name: Account, interval: PT5M}
+        target: acmeCo/Account
+      - resource: {name: AccountingCode, interval: PT5M}
+        target: acmeCo/AccountingCode
+      - resource: {name: AccountingPeriod, interval: PT5M}
+        target: acmeCo/AccountingPeriod
+      - resource: {name: BillingRun, interval: PT5M}
+        target: acmeCo/BillingRun
+      - resource: {name: CommunicationProfile, interval: PT5M}
+        target: acmeCo/CommunicationProfile
+      - resource: {name: Contact, interval: PT5M}
+        target: acmeCo/Contact
+      - resource: {name: Invoice, interval: PT5M}
+        target: acmeCo/Invoice
+      - resource: {name: InvoiceItem, interval: PT5M}
+        target: acmeCo/InvoiceItem
+      - resource: {name: Order, interval: PT5M}
+        target: acmeCo/Order
+      - resource: {name: OrderAction, interval: PT5M}
+        target: acmeCo/OrderAction
+      - resource: {name: Payment, interval: PT5M}
+        target: acmeCo/Payment
+      - resource: {name: PaymentPart, interval: PT5M}
+        target: acmeCo/PaymentPart
+      - resource: {name: Product, interval: PT5M}
+        target: acmeCo/Product
+      - resource: {name: ProductRatePlan, interval: PT5M}
+        target: acmeCo/ProductRatePlan
+      - resource: {name: ProductRatePlanCharge, interval: PT5M}
+        target: acmeCo/ProductRatePlanCharge
+      - resource: {name: ProductRatePlanChargeTier, interval: PT5M}
+        target: acmeCo/ProductRatePlanChargeTier
+      - resource: {name: RatePlan, interval: PT5M}
+        target: acmeCo/RatePlan
+      - resource: {name: RatePlanCharge, interval: PT5M}
+        target: acmeCo/RatePlanCharge
+      - resource: {name: RatePlanChargeTier, interval: PT5M}
+        target: acmeCo/RatePlanChargeTier
+      - resource: {name: Refund, interval: PT5M}
+        target: acmeCo/Refund
+      - resource: {name: RefundPart, interval: PT5M}
+        target: acmeCo/RefundPart
+      - resource: {name: Subscription, interval: PT5M}
+        target: acmeCo/Subscription
+      - resource: {name: SubscriptionStatusHistory, interval: PT5M}
+        target: acmeCo/SubscriptionStatusHistory

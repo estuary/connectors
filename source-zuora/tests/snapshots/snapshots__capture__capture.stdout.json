@@ -1,0 +1,643 @@
+[
+  [
+    "acmeCo/Account",
+    {
+      "AccountNumber": "A00000888",
+      "AdditionalEmailAddresses": "",
+      "AllowInvoiceEdit": "false",
+      "AutoPay": "true",
+      "Balance": "0",
+      "Batch": "Batch1",
+      "BcdSettingOption": "ManualSet",
+      "BillCycleDay": "10",
+      "CodefreshAccount__c": "",
+      "CommunicationProfileId": "",
+      "CreatedById": "00000000000000000000000000000001",
+      "CreatedDate": "2025-07-11T09:11:01+1000",
+      "CreditBalance": "0",
+      "CrmId": "",
+      "Currency": "USD",
+      "CustomerServiceRepName": "",
+      "Environment__c": "dev-b",
+      "GatewayRoutingEligible": "false",
+      "Id": "8adc80f997f364ca0197f69b4a0244c1",
+      "InvoiceDeliveryPrefsEmail": "true",
+      "InvoiceDeliveryPrefsPrint": "false",
+      "InvoiceTemplateId": "8adc808c8b84cf23018b85adde221d0e",
+      "LastInvoiceDate": "2025-07-11T00:00:00+00:00",
+      "Mrr": "30",
+      "Name": "Acme Corp",
+      "Notes": "",
+      "ParentId": "",
+      "PaymentGateway": "",
+      "PaymentTerm": "Due Upon Receipt",
+      "PersonalBillingAccount__c": "true",
+      "PurchaseOrderNumber": "",
+      "Reseller__c": "false",
+      "SalesRepName": "",
+      "Status": "Active",
+      "TaxCompanyCode": "",
+      "TaxExemptCertificateID": "",
+      "TaxExemptCertificateType": "",
+      "TaxExemptDescription": "",
+      "TaxExemptEffectiveDate": "",
+      "TaxExemptExpirationDate": "",
+      "TaxExemptIssuingJurisdiction": "",
+      "TaxExemptStatus": "No",
+      "TotalInvoiceBalance": "0",
+      "UnappliedBalance": "0",
+      "UpdatedById": "00000000000000000000000000000001",
+      "UpdatedDate": "2025-07-11T09:11:04+10:00",
+      "VATId": "",
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/AccountingCode",
+    {
+      "Category": "Revenue",
+      "CreatedById": "00000000000000000000000000000002",
+      "CreatedDate": "2025-05-12T07:32:20+1000",
+      "GLAccountName": "Recognized Revenue - Acme",
+      "GLAccountNumber": "41004001",
+      "Id": "8adc8d5b96aaff380196c143613a2030",
+      "Name": "Subscription Revenue - Acme",
+      "Notes": "",
+      "Status": "Active",
+      "Type": "SalesRevenue",
+      "UpdatedById": "00000000000000000000000000000002",
+      "UpdatedDate": "2025-05-12T11:54:08+10:00",
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/AccountingPeriod",
+    {
+      "CreatedById": "00000000000000000000000000000003",
+      "CreatedDate": "2024-10-09T14:42:10+1000",
+      "EndDate": "2024-10-31T00:00:00+00:00",
+      "FiscalYear": "2024",
+      "Id": "8adca46d926c5d7101926f95a3180f6b",
+      "Name": "October 2024",
+      "Notes": "",
+      "StartDate": "2024-10-01T00:00:00+00:00",
+      "Status": "Open",
+      "UpdatedById": "00000000000000000000000000000006",
+      "UpdatedDate": "2025-04-22T11:43:50+10:00",
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/BillingRun",
+    {
+      "BillingRunNumber": "BR-00001542",
+      "CreatedById": "00000000000000000000000000000004",
+      "CreatedDate": "2025-04-19T12:00:04+1000",
+      "EndDate": "2025-04-19T12:00:09+1000",
+      "ErrorMessage": "There are subscriptions that failed to generate invoice.",
+      "ExecutedDate": "2025-04-19T12:00:06+1000",
+      "Id": "8adc802c964ba7d301964bc63b5e1335",
+      "InvoiceDate": "2025-04-19T00:00:00+00:00",
+      "NumberOfAccounts": "1",
+      "NumberOfInvoices": "0",
+      "StartDate": "2025-04-19T12:00:06+1000",
+      "Status": "Error",
+      "TargetDate": "2025-04-19T00:00:00+00:00",
+      "TargetType": "AllAccount",
+      "TotalTime": "3015",
+      "UpdatedById": "00000000000000000000000000000004",
+      "UpdatedDate": "2025-04-19T12:00:09+10:00",
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/CommunicationProfile",
+    {
+      "CreatedById": "00000000000000000000000000000005",
+      "CreatedDate": "2025-11-15T04:25:08+1000",
+      "Description": "Acme - No comms sent to customers",
+      "Id": "8adcd29e9a77c61f019a839d335c6588",
+      "IsDefault": "false",
+      "Muted": "false",
+      "ProfileName": "Acme",
+      "ProfileNumber": "CP-00000004",
+      "UpdatedById": "00000000000000000000000000000005",
+      "UpdatedDate": "2025-11-15T04:25:08+10:00",
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/Contact",
+    {
+      "AccountId": "8adc80f997f364ca0197f69b4a0244c1",
+      "Address1": "123 Main Street",
+      "Address2": "",
+      "City": "Springfield",
+      "Country": "United States",
+      "County": "",
+      "CreatedById": "00000000000000000000000000000001",
+      "CreatedDate": "2025-07-11T09:11:01+1000",
+      "Description": "",
+      "Fax": "",
+      "FirstName": "Jane",
+      "HomePhone": "",
+      "Id": "8adc80f997f364ca0197f69b4a1644c2",
+      "LastName": "Doe",
+      "MobilePhone": "",
+      "NickName": "",
+      "OtherPhone": "",
+      "OtherPhoneType": "",
+      "PersonalEmail": "",
+      "PostalCode": "10001",
+      "State": "New York",
+      "TaxRegion": "",
+      "UpdatedById": "00000000000000000000000000000001",
+      "UpdatedDate": "2025-07-11T09:11:01+10:00",
+      "WorkEmail": "jane.doe@acmecorp.com",
+      "WorkPhone": "",
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/Invoice",
+    {
+      "AdjustmentAmount": "0",
+      "Amount": "144",
+      "AmountWithoutTax": "144",
+      "Balance": "0",
+      "Comments": "",
+      "CreatedById": "00000000000000000000000000000006",
+      "CreatedDate": "2025-01-24T16:22:13+1000",
+      "CreditBalanceAdjustmentAmount": "0",
+      "DueDate": "2025-02-23T00:00:00+00:00",
+      "Id": "8adc8f1e946ce01c019496f9b0467c2a",
+      "IncludesOneTime": "true",
+      "IncludesRecurring": "true",
+      "IncludesUsage": "true",
+      "InvoiceDate": "2025-01-24T00:00:00+00:00",
+      "InvoiceNumber": "INV00013224",
+      "LastEmailSentDate": "",
+      "PaymentAmount": "144",
+      "PostedBy": "00000000000000000000000000000006",
+      "PostedDate": "2025-01-24T16:30:27+1000",
+      "PurchaseOrderOverride__c": "",
+      "RefundAmount": "0",
+      "Reversed": "false",
+      "Source": "API",
+      "SourceId": "",
+      "Status": "Posted",
+      "TargetDate": "",
+      "TaxAmount": "0",
+      "TaxExemptAmount": "0",
+      "TransferredToAccounting": "",
+      "UpdatedById": "00000000000000000000000000000006",
+      "UpdatedDate": "2025-01-24T16:31:02+10:00",
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/InvoiceItem",
+    {
+      "AccountingCode": "Deferred Revenue - Acme Cloud",
+      "AppliedToInvoiceItemId": "",
+      "BookingReference": "",
+      "ChargeAmount": "0",
+      "ChargeDate": "2025-03-18T17:00:05+1000",
+      "ChargeName": "Tenants",
+      "CommitmentChargeNumber": "",
+      "CommitmentChargeSegmentNumber": "",
+      "CommitmentId": "",
+      "CommitmentPeriodId": "",
+      "CreatedById": "00000000000000000000000000000003",
+      "CreatedDate": "2025-03-18T17:00:05+1000",
+      "Id": "8adc80df95a79ae60195a80d666b127a",
+      "ProcessingType": "0",
+      "Quantity": "0",
+      "RevRecStartDate": "",
+      "SKU": "ACM-PROPTA",
+      "ServiceEndDate": "2026-02-22T00:00:00+00:00",
+      "ServiceStartDate": "2025-02-23T00:00:00+00:00",
+      "SourceItemType": "SubscriptionComponent",
+      "SubscriptionId": "20756b709639521835e53057fc5a0935",
+      "TaxAmount": "0",
+      "TaxCode": "SFT-B-CLOUD",
+      "TaxExemptAmount": "0",
+      "TaxMode": "TaxExclusive",
+      "UOM": "Tenant",
+      "UnitPrice": "4",
+      "UpdatedById": "00000000000000000000000000000003",
+      "UpdatedDate": "2025-03-18T17:00:05+10:00",
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/Order",
+    {
+      "CancelReason": "",
+      "Category": "",
+      "Channel__c": "Self-Service",
+      "CreatedById": "00000000000000000000000000000007",
+      "CreatedByMigration": "false",
+      "CreatedDate": "2025-06-06T10:54:34+1000",
+      "Description": "",
+      "ErrorCode": "",
+      "ErrorMessage": "",
+      "Id": "20750985d07973a0e2b742bb84941a38",
+      "IsScheduled": "",
+      "License_Key_text__c": "",
+      "Migrated_Data__c": "false",
+      "OrderDate": "2025-06-06T00:00:00+00:00",
+      "OrderNumber": "O-00056554",
+      "Purchase_Order_Number__c": "",
+      "Response": "",
+      "ReversionOrder": "false",
+      "RevertedByOrderId": "",
+      "RevertedDate": "",
+      "RevertedOrderId": "",
+      "RevertedOrderNumber": "",
+      "ScheduledDate": "",
+      "ScheduledDatePolicy": "",
+      "State": "Complete",
+      "Status": "Completed",
+      "UpdatedById": "00000000000000000000000000000007",
+      "UpdatedDate": "2025-06-06T10:54:35+10:00",
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/OrderAction",
+    {
+      "AutoGenerated": "false",
+      "AutoRenew": "true",
+      "CancellationEffectiveDate": "",
+      "CancellationPolicy": "",
+      "ChangeReason": "",
+      "ClearingExistingBillToContact": "",
+      "ClearingExistingInvoiceGroupNumber": "",
+      "ClearingExistingInvoiceTemplate": "",
+      "ClearingExistingPaymentTerm": "",
+      "ClearingExistingSequenceSet": "",
+      "ClearingExistingSoldToContact": "",
+      "ContractEffectiveDate": "2025-06-06T00:00:00+00:00",
+      "CreatedById": "00000000000000000000000000000007",
+      "CreatedDate": "2025-06-06T10:54:34+1000",
+      "CurrentTerm": "12",
+      "CurrentTermPeriodType": "Month",
+      "CustomerAcceptanceDate": "2025-06-06T00:00:00+00:00",
+      "EffectivePolicy": "",
+      "Id": "20750985d07973a0e2b742bb84941a3a",
+      "InvoiceGroupNumber": "",
+      "InvoiceTemplateId": "",
+      "PaymentTerm": "",
+      "RenewSetting": "RENEW_WITH_SPECIFIC_TERM",
+      "RenewalTerm": "12",
+      "RenewalTermPeriodType": "Month",
+      "ResumeDate": "",
+      "Sequence": "0",
+      "SequenceSetId": "",
+      "ServiceActivationDate": "2025-06-06T00:00:00+00:00",
+      "Status": "Completed",
+      "SubType": "",
+      "SubscriptionNumber": "SUB00054617",
+      "SuspendDate": "",
+      "TermStartDate": "",
+      "TermType": "TERMED",
+      "Type": "CreateSubscription",
+      "UpdatedById": "00000000000000000000000000000007",
+      "UpdatedDate": "2025-06-06T10:54:34+10:00",
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/Payment",
+    {
+      "AccountingCode": "Deferred Revenue - Acme Unify",
+      "Amount": "38360",
+      "AppliedAmount": "38360",
+      "AppliedCreditBalanceAmount": "0",
+      "AuthTransactionId": "",
+      "BankFeesUSD_Numeric__c": "",
+      "BankIdentificationNumber": "",
+      "CancelledOn": "",
+      "Comment": "",
+      "CreatedById": "00000000000000000000000000000003",
+      "CreatedDate": "2025-11-15T08:48:47+1000",
+      "Currency": "USD",
+      "EffectiveDate": "2025-11-15T00:00:00+00:00",
+      "Gateway": "",
+      "GatewayOrderId": "",
+      "GatewayReconciliationReason": "",
+      "GatewayReconciliationStatus": "",
+      "GatewayResponse": "",
+      "GatewayResponseCode": "",
+      "GatewayState": "NotSubmitted",
+      "Id": "8adc80e59a77a3d2019a848e91b24b91",
+      "IsStandalone": "false",
+      "MarkedForSubmissionOn": "",
+      "OtherPaymentType__c": "",
+      "PaymentNumber": "P-00001423",
+      "PayoutId": "",
+      "Prepayment": "false",
+      "ReferenceId": "",
+      "ReferencedPaymentID": "",
+      "RefundAmount": "0",
+      "SecondPaymentReferenceId": "",
+      "SettledOn": "",
+      "SoftDescriptor": "",
+      "SoftDescriptorPhone": "",
+      "Source": "API",
+      "SourceName": "",
+      "Status": "Processed",
+      "SubmittedOn": "",
+      "TransferredToAccounting": "",
+      "Type": "External",
+      "UnappliedAmount": "0",
+      "UpdatedById": "00000000000000000000000000000003",
+      "UpdatedDate": "2025-11-15T08:48:47+10:00",
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/PaymentPart",
+    {
+      "Amount": "38360",
+      "CreatedById": "00000000000000000000000000000003",
+      "CreatedDate": "2025-11-15T08:48:47+1000",
+      "Id": "8adc80e59a77a3d2019a848e91d24b99",
+      "InvoiceId": "8adcf0e89a77c6a9019a848bc60d1b6c",
+      "UpdatedById": "00000000000000000000000000000003",
+      "UpdatedDate": "2025-11-15T08:48:47+10:00",
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/Product",
+    {
+      "AllowFeatureChanges": "false",
+      "Category": "Base Products",
+      "CreatedById": "00000000000000000000000000000005",
+      "CreatedDate": "2025-09-30T03:32:05+1000",
+      "Description": "",
+      "EffectiveEndDate": "9999-12-31T00:00:00+00:00",
+      "EffectiveStartDate": "2024-01-01T00:00:00+00:00",
+      "Id": "30a97aa0591a49778fd32df538117b2c",
+      "Name": "Acme Professional, Heritage",
+      "PlanTier__c": "Professional",
+      "Platform__c": "Acme Hybrid",
+      "Product_Family__c": "Hybrid",
+      "SKU": "ACM-PROHER",
+      "UpdatedById": "3",
+      "UpdatedDate": "2025-10-30T02:24:37+10:00",
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/ProductRatePlan",
+    {
+      "CreatedById": "00000000000000000000000000000005",
+      "CreatedDate": "2025-05-13T03:05:06+1000",
+      "Description": "",
+      "DisplayName__c": "Acme Cloud Additional Units, Annually",
+      "EffectiveEndDate": "9999-12-31T00:00:00+00:00",
+      "EffectiveStartDate": "2025-04-25T00:00:00+00:00",
+      "ExternalIdSourceSystem": "",
+      "Id": "15fd7b91ccc84a26a30042cf761e48f4",
+      "LegacyOctofrontProductCode__c": "",
+      "LegacySalesforceProductCode__c": "",
+      "Name": "Acme Cloud Additional Units (Annually) - List Price",
+      "ProductRatePlanNumber": "PRP-00000036",
+      "UpdatedById": "00000000000000000000000000000005",
+      "UpdatedDate": "2025-05-13T03:05:06+10:00",
+      "ZuoraProductRatePlanCode__c": "ACM-UNITS-2505",
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/ProductRatePlanChargeTier",
+    {
+      "Active": "false",
+      "CreatedById": "00000000000000000000000000000008",
+      "CreatedDate": "2025-10-30T07:31:32+1000",
+      "Currency": "AUD",
+      "DiscountAmount": "",
+      "DiscountPercentage": "",
+      "EndingUnit": "",
+      "Id": "02ca26d216b34466943c38cd17c4bd84",
+      "IncludedUnits": "",
+      "MaximumAmount": "",
+      "MinimumAmount": "",
+      "OveragePrice": "",
+      "Price": "0",
+      "PriceFormat": "",
+      "StartingUnit": "",
+      "Tier": "1",
+      "UpdatedById": "00000000000000000000000000000008",
+      "UpdatedDate": "2025-10-30T07:31:32+10:00",
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/RatePlan",
+    {
+      "AmendmentType": "",
+      "CreatedById": "3",
+      "CreatedDate": "2025-07-16T11:07:23+1000",
+      "ExternallyManagedPlanId": "",
+      "Id": "2075076f018980d8873810c59d2012b5",
+      "InvoiceOwnerId": "8adccd3397ee90af0197f153f98c63c8",
+      "IsFromExternalCatalog": "false",
+      "Name": "Base Plan (Annually) - List Price",
+      "OriginalRatePlanId": "207525e30bf97ee908c7f153fa7008ce",
+      "ProductRatePlanNumber": "",
+      "SubscriptionOwnerId": "8adccd3397ee90af0197f153f98c63c8",
+      "SubscriptionRatePlanNumber": "SRP-00074344",
+      "UpdatedById": "3",
+      "UpdatedDate": "2025-07-16T11:07:23+10:00",
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/RatePlanChargeTier",
+    {
+      "CreatedById": "3",
+      "CreatedDate": "2025-07-16T11:07:23+1000",
+      "Currency": "USD",
+      "DiscountAmount": "",
+      "DiscountPercentage": "",
+      "EndingUnit": "",
+      "Id": "2075076f018980d8873810c59d4812bb",
+      "IncludedUnits": "",
+      "OveragePrice": "",
+      "Price": "360",
+      "PriceFormat": "",
+      "StartingUnit": "",
+      "Tier": "1",
+      "UpdatedById": "3",
+      "UpdatedDate": "2025-07-16T11:07:23+10:00",
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/Refund",
+    {
+      "AccountingCode": "Acme USD",
+      "Amount": "206.8",
+      "CancelledOn": "",
+      "Comment": "",
+      "CreatedById": "00000000000000000000000000000009",
+      "CreatedDate": "2025-06-23T10:14:50+1000",
+      "Currency": "USD",
+      "Gateway": "",
+      "GatewayReconciliationReason": "",
+      "GatewayReconciliationStatus": "",
+      "GatewayResponse": "",
+      "GatewayResponseCode": "",
+      "GatewayState": "NotSubmitted",
+      "Id": "8adcad47978731a901979a2340a139cc",
+      "MarkedForSubmissionOn": "",
+      "MethodType": "CreditCard",
+      "PaymentMethodId": "8adc808c8b84cf23018b85add21f1bf6",
+      "PayoutId": "",
+      "ReasonCode": "Standard Refund",
+      "ReferenceID": "",
+      "RefundDate": "2025-06-23T00:00:00+00:00",
+      "RefundNumber": "R-00000088",
+      "RefundTransactionTime": "",
+      "SecondRefundReferenceId": "",
+      "SettledOn": "",
+      "SoftDescriptor": "",
+      "SoftDescriptorPhone": "",
+      "SourceType": "CreditMemo",
+      "Status": "Processed",
+      "SubmittedOn": "",
+      "TransferredToAccounting": "",
+      "Type": "External",
+      "UpdatedById": "00000000000000000000000000000009",
+      "UpdatedDate": "2025-06-23T10:14:50+10:00",
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/RefundPart",
+    {
+      "CreatedById": "00000000000000000000000000000009",
+      "CreatedDate": "2025-06-23T10:14:51+1000",
+      "Id": "8adcad47978731a901979a2340ed39d7",
+      "RefundAmount": "206.8",
+      "UpdatedById": "00000000000000000000000000000009",
+      "UpdatedDate": "2025-06-23T10:14:51+10:00",
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/Subscription",
+    {
+      "AutoRenew": "true",
+      "CancelReason": "",
+      "CancelledDate": "",
+      "Channel__c": "Self-Service",
+      "ContractAcceptanceDate": "2025-03-12T00:00:00+00:00",
+      "ContractEffectiveDate": "2025-03-12T00:00:00+00:00",
+      "CpqBundleJsonId__QT": "",
+      "CreatedById": "00000000000000000000000000000001",
+      "CreatedDate": "2025-03-12T10:20:17+1000",
+      "CreatorAccountId": "8adcff3f958448b2019587b938464cda",
+      "CreatorInvoiceOwnerId": "8adcff3f958448b2019587b938464cda",
+      "CurrentTerm": "12",
+      "CurrentTermPeriodType": "Month",
+      "ExternallyManagedBy": "",
+      "Id": "20751ba11eb95844891587b939521a95",
+      "InitialTerm": "12",
+      "InitialTermPeriodType": "Month",
+      "InvoiceOwnerId": "8adcff3f958448b2019587b938464cda",
+      "IsInvoiceSeparate": "false",
+      "License_Key_text__c": "11111-22222-33333-44444",
+      "Name": "SUB00054581",
+      "Notes": "",
+      "OpportunityCloseDate__QT": "",
+      "OpportunityName__QT": "",
+      "OriginalCreatedDate": "2025-03-12T10:20:17+1000",
+      "OriginalId": "20751ba11eb95844891587b939521a95",
+      "PaymentGatewayId": "",
+      "PaymentMethodId": "",
+      "PreviousSubscriptionId": "",
+      "Purchase_Order_Number__c": "",
+      "QuoteBusinessType__QT": "",
+      "QuoteNumber__QT": "",
+      "QuoteType__QT": "",
+      "RampId": "",
+      "RenewalSetting": "RENEW_WITH_SPECIFIC_TERM",
+      "RenewalTerm": "12",
+      "RenewalTermPeriodType": "Month",
+      "ServiceActivationDate": "2025-03-12T00:00:00+00:00",
+      "Status": "Expired",
+      "SubscriptionEndDate": "2026-03-12T00:00:00+00:00",
+      "SubscriptionStartDate": "2025-03-12T00:00:00+00:00",
+      "TermEndDate": "2026-03-12T00:00:00+00:00",
+      "TermStartDate": "2025-03-12T00:00:00+00:00",
+      "TermType": "TERMED",
+      "UpdatedById": "00000000000000000000000000000001",
+      "UpdatedDate": "2025-03-27T13:56:24+10:00",
+      "Version": "1",
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/SubscriptionStatusHistory",
+    {
+      "CreatedById": "00000000000000000000000000000001",
+      "CreatedDate": "2025-07-11T09:11:01+1000",
+      "EndDate": "2026-07-10T00:00:00+00:00",
+      "Id": "8adc80f997f364ca0197f69b4afc44d2",
+      "SortOrder": "0",
+      "StartDate": "2025-07-10T00:00:00+00:00",
+      "Status": "Active",
+      "SubscriptionNumber": "SUB00054978",
+      "UpdatedById": "00000000000000000000000000000001",
+      "UpdatedDate": "2025-07-11T09:11:01+10:00",
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ]
+]
