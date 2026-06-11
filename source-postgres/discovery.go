@@ -290,10 +290,11 @@ func (db *postgresDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo, 
 }
 
 type columnSchema struct {
-	contentEncoding string
-	format          string
-	nullable        bool
-	jsonTypes       []string
+	contentEncoding  string
+	contentMediaType string
+	format           string
+	nullable         bool
+	jsonTypes        []string
 }
 
 func (s columnSchema) toType() *jsonschema.Schema {
@@ -304,6 +305,10 @@ func (s columnSchema) toType() *jsonschema.Schema {
 
 	if s.contentEncoding != "" {
 		out.Extras["contentEncoding"] = s.contentEncoding // New in 2019-09.
+	}
+
+	if s.contentMediaType != "" {
+		out.Extras["contentMediaType"] = s.contentMediaType // New in 2019-09.
 	}
 
 	if s.jsonTypes != nil {
@@ -361,8 +366,12 @@ var postgresTypeToJSON = map[string]columnSchema{
 	"bit":     {jsonTypes: []string{"string"}},
 	"varbit":  {jsonTypes: []string{"string"}},
 
-	"json":     {},
-	"jsonb":    {},
+	// json and jsonb columns capture arbitrary JSON values, so we don't constrain
+	// the JSON Schema type. The contentMediaType annotation distinguishes the two
+	// at the wire so downstream connectors (e.g. materialize-postgres) can
+	// recreate the original column type instead of collapsing both onto json.
+	"json":     {contentMediaType: "application/json"},
+	"jsonb":    {contentMediaType: "application/vnd.estuary.postgresql.jsonb+json"},
 	"jsonpath": {jsonTypes: []string{"string"}},
 
 	// Domain-Specific Types
