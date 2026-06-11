@@ -2,34 +2,21 @@ import json
 import subprocess
 
 
-def test_capture(request, snapshot):
+def test_spec(request, snapshot):
     result = subprocess.run(
         [
             "flowctl",
-            "preview",
+            "raw",
+            "spec",
             "--source",
             request.fspath.dirname + "/../test.flow.yaml",
-            "--sessions",
-            "1",
-            "--delay",
-            "10s",
         ],
         stdout=subprocess.PIPE,
         text=True,
     )
     assert result.returncode == 0
     lines = [json.loads(l) for l in result.stdout.splitlines()]
-
-    unique_stream_lines = []
-    seen = set()
-
-    for line in lines:
-        stream = line[0]
-        if stream not in seen:
-            unique_stream_lines.append(line)
-            seen.add(stream)
-
-    assert snapshot("capture.stdout.json") == unique_stream_lines
+    assert snapshot("capture.stdout.json") == lines
 
 
 def test_discover(request, snapshot):
@@ -49,18 +36,20 @@ def test_discover(request, snapshot):
     )
     assert result.returncode == 0
     lines = [json.loads(l) for l in result.stdout.splitlines()]
-
     assert snapshot("capture.stdout.json") == lines
 
 
-def test_spec(request, snapshot):
+def test_capture(request, snapshot):
     result = subprocess.run(
         [
             "flowctl",
-            "raw",
-            "spec",
+            "preview",
             "--source",
             request.fspath.dirname + "/../test.flow.yaml",
+            "--sessions",
+            "1",
+            "--delay",
+            "900s",
         ],
         stdout=subprocess.PIPE,
         text=True,
@@ -68,4 +57,13 @@ def test_spec(request, snapshot):
     assert result.returncode == 0
     lines = [json.loads(l) for l in result.stdout.splitlines()]
 
-    assert snapshot("capture.stdout.json") == lines
+    # Deduplicate to one line per stream so snapshots stay stable.
+    seen: set[str] = set()
+    unique_stream_lines = []
+    for line in lines:
+        stream = line[0]
+        if stream not in seen:
+            unique_stream_lines.append(line)
+            seen.add(stream)
+
+    assert snapshot("capture.stdout.json") == unique_stream_lines

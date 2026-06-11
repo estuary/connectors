@@ -1,48 +1,92 @@
-import re as _re
-from datetime import datetime, timedelta, UTC
-from logging import Logger
-from typing import Any, AsyncGenerator
+import asyncio
+import json
+import re
 import xml.etree.ElementTree as ET
+from datetime import UTC, datetime, timedelta
+from logging import Logger
+from typing import AsyncGenerator
 
 from estuary_cdk.capture.common import LogCursor, PageCursor
 from estuary_cdk.http import HTTPError, HTTPSession
-from pydantic import BaseModel
+from estuary_cdk.incremental_csv_processor import IncrementalCSVProcessor
 
-from .models import ZuoraDocument, OBJECT_MODELS
+from .models import BasicCredentials, EndpointConfig, ZuoraDocument
 
-# Default maximum page size for ZOQL queries.
-QUERY_BATCH_SIZE = 2000
+# Matches Zuora's "There is no field named Foo." error message.
+_INVALID_FIELD_RE = re.compile(r"There is no field named (\w+)\.")
 
-# Number of documents to emit before issuing a checkpoint.
-CHECKPOINT_INTERVAL = 500
+# Per-process cache of fields confirmed unavailable for each object.
+# Populated on first 400 per field; prevents re-trying bad fields on every sync cycle.
+_unavailable_fields: dict[str, set[str]] = {}
 
-# Pattern to extract the invalid field name from Zuora's INVALID_FIELD fault message.
-_INVALID_FIELD_RE = _re.compile(r'invalid field for query: \w+\.(\w+)', _re.IGNORECASE)
+# Maximum date range for a single REST export job (Zuora enforces 30 days
+# for incremental queries via the export API).
+MAX_EXPORT_DAYS = 30
+
+# Seconds between export job status polls.
+POLL_INTERVAL = 10
+
+# Maximum number of polling attempts before giving up (~1 hour).
+MAX_POLL_ATTEMPTS = 360
+
+# Retries for transient Zuora export job failures (Failed/Cancelled status).
+MAX_RETRIES = 3
+
+# Zuora limits concurrent export jobs per tenant (typically 5).
+# This semaphore keeps us well under that limit across all concurrent bindings.
+_EXPORT_SEMAPHORE = asyncio.Semaphore(4)
 
 
-class QueryResult(BaseModel, extra="forbid"):
-    done: bool
-    queryLocator: str | None = None
-    records: list[dict[str, Any]] = []
-    size: int = 0
+def auth_headers(config: EndpointConfig) -> dict[str, str]:
+    """Return extra HTTP headers for BASIC auth.
+    OAuth2 tokens are injected automatically by the CDK's token_source.
+    """
+    if isinstance(config.credentials, BasicCredentials):
+        return {
+            "apiAccessKeyId": config.credentials.username,
+            "apiSecretAccessKey": config.credentials.password,
+        }
+    return {}
+
+
+def _fmt_dt(dt: datetime) -> str:
+    return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+async def discover_object_names(
+    base_url: str,
+    http: HTTPSession,
+    log: Logger,
+    auth: dict[str, str],
+) -> list[str]:
+    """Return all object names available in this Zuora tenant via GET /v1/describe."""
+    url = f"{base_url}/v1/describe"
+    response_bytes = await http.request(log, url, headers=auth or None)
+    root = ET.fromstring(response_bytes)
+    return [el.text for el in root.findall("./object/name") if el.text]
 
 
 async def describe_object(
-    tenant_endpoint: str,
+    base_url: str,
     http: HTTPSession,
     log: Logger,
     object_name: str,
-) -> list[str]:
-    """
-    Fetch all selectable field names for a Zuora object via the describe endpoint.
-    Returns a list of field names suitable for use in a ZOQL SELECT statement.
-    """
-    url = f"{tenant_endpoint}/v1/describe/{object_name}"
-    response_bytes = await http.request(log, url)
+    auth: dict[str, str],
+) -> tuple[list[str], bool]:
+    """Return (selectable_fields, is_queryable) for a Zuora object.
 
+    is_queryable reflects the <queryable> flag in the describe XML; objects
+    with queryable=false cannot be used in ZOQL and cannot be exported.
+    Defaults to True when the flag is absent.
+    """
+    url = f"{base_url}/v1/describe/{object_name}"
+    response_bytes = await http.request(log, url, headers=auth or None)
     root = ET.fromstring(response_bytes)
-    fields: list[str] = []
 
+    queryable_el = root.find("./queryable")
+    is_queryable = queryable_el is None or queryable_el.text == "true"
+
+    fields: list[str] = []
     for field_el in root.findall(".//field"):
         name_el = field_el.find("name")
         selectable_el = field_el.find("selectable")
@@ -53,163 +97,218 @@ async def describe_object(
             and selectable_el.text == "true"
         ):
             fields.append(name_el.text)
-
-    return fields
-
-
-def _format_cursor(dt: datetime) -> str:
-    """Format a datetime for use in a ZOQL WHERE clause."""
-    return dt.strftime("%Y-%m-%dT%H:%M:%S")
+    return fields, is_queryable
 
 
-async def validate_fields(
-    object_name: str,
-    fields: list[str],
-    tenant_endpoint: str,
+async def _run_export_job(
+    base_url: str,
     http: HTTPSession,
     log: Logger,
-) -> list[str]:
-    """
-    Validate fields against ZOQL by running a zero-row test query.
-    Removes fields that cause INVALID_FIELD or INVALID_VALUE errors (e.g. ActiveCurrencies),
-    retrying until the query succeeds or no more removable fields remain.
-    """
-    url = f"{tenant_endpoint}/v1/action/query"
-    current = list(fields)
+    auth: dict[str, str],
+    query: str,
+) -> str:
+    """Submit an export job, poll until complete, and return the file ID.
 
-    for _ in range(len(fields)):
-        if not current:
-            break
-        fields_str = ", ".join(current)
-        # Far-future date ensures zero rows; still validates field names.
-        test_query = f"SELECT {fields_str} FROM {object_name} WHERE UpdatedDate > '2099-12-31T00:00:00'"
+    Holds _EXPORT_SEMAPHORE for the full duration so at most 4 jobs run
+    concurrently across all bindings, staying within Zuora's per-tenant limit.
+    Retries up to MAX_RETRIES times on transient failures with exponential backoff.
+    """
+    for attempt in range(MAX_RETRIES):
         try:
-            await http.request(log, url, method="POST", json={"queryString": test_query})
-            return current
-        except HTTPError as e:
-            if e.code != 400:
-                raise
-            msg = e.message
-
-            m = _INVALID_FIELD_RE.search(msg)
-            if m:
-                bad = m.group(1)
-                log.warning(f"Field '{bad}' is not valid in ZOQL for {object_name}, removing it.")
-                current = [f for f in current if f.lower() != bad.lower()]
-                continue
-
-            if 'active currencies' in msg.lower() or 'activecurrencies' in msg.lower():
-                log.warning(
-                    f"Removing 'ActiveCurrencies' from {object_name} "
-                    "(Zuora requires it be queried alone)."
+            async with _EXPORT_SEMAPHORE:
+                url = f"{base_url}/v1/object/export"
+                payload = {"Format": "csv", "Query": query}
+                submit_bytes = await http.request(
+                    log, url, method="POST", json=payload, headers=auth or None
                 )
-                current = [f for f in current if f != 'ActiveCurrencies']
-                continue
+                submit_resp = json.loads(submit_bytes)
+                if not submit_resp.get("Success", False):
+                    raise RuntimeError(
+                        f"Export job submission failed for query: {query!r} — {submit_resp}"
+                    )
+                job_id = submit_resp["Id"]
+                log.debug("created export job", {"job_id": job_id})
 
-            # Unknown 400 — skip validation and use fields as-is.
-            log.warning(f"ZOQL field validation for {object_name} got unexpected 400: {msg}")
-            return current
+                poll_url = f"{base_url}/v1/object/export/{job_id}"
+                for _ in range(MAX_POLL_ATTEMPTS):
+                    response_bytes = await http.request(log, poll_url, headers=auth or None)
+                    resp = json.loads(response_bytes)
+                    status = resp.get("Status", "")
+                    if status == "Completed":
+                        return resp["FileId"]
+                    if status in ("Cancelled", "Failed"):
+                        raise RuntimeError(
+                            f"Export job {job_id} {status}: "
+                            f"{resp.get('StatusReason', 'no reason given')}"
+                        )
+                    await asyncio.sleep(POLL_INTERVAL)
+                raise RuntimeError(
+                    f"Export job {job_id} timed out after {MAX_POLL_ATTEMPTS * POLL_INTERVAL}s"
+                )
+        except Exception as exc:
+            # 4xx errors are not transient — retrying won't help.
+            if isinstance(exc, HTTPError) and 400 <= exc.code < 500:
+                raise
+            if attempt == MAX_RETRIES - 1:
+                raise
+            wait = 30 * (2**attempt)
+            log.warning(
+                "Export job failed, retrying",
+                {"attempt": attempt + 1, "max": MAX_RETRIES, "wait_s": wait, "error": str(exc)},
+            )
+            await asyncio.sleep(wait)
+    raise RuntimeError("unreachable")
 
-    return current
+
+def _active_fields_for(object_name: str, fields: list[str]) -> list[str]:
+    """Return fields with any previously-cached unavailable fields removed."""
+    known_bad = _unavailable_fields.get(object_name)
+    if not known_bad:
+        return list(fields)
+    return [f for f in fields if f not in known_bad]
+
+
+async def _run_job_filtering_fields(
+    base_url: str,
+    http: HTTPSession,
+    log: Logger,
+    auth: dict[str, str],
+    object_name: str,
+    active_fields: list[str],
+    where_clause: str,
+) -> str:
+    """Build a ZOQL SELECT, run the export, and return the file ID.
+
+    If Zuora rejects a field as unavailable, it is removed from active_fields
+    (mutated in-place), added to the per-process cache so subsequent sync cycles
+    skip it immediately, and the query is retried.
+    """
+    while True:
+        query = f"SELECT {', '.join(active_fields)} FROM {object_name}"
+        if where_clause:
+            query = f"{query} {where_clause}"
+        try:
+            return await _run_export_job(base_url, http, log, auth, query)
+        except Exception as exc:
+            m = _INVALID_FIELD_RE.search(str(exc))
+            if m and m.group(1) in active_fields:
+                bad = m.group(1)
+                log.warning("Removing unavailable field", {"object": object_name, "field": bad})
+                active_fields.remove(bad)
+                _unavailable_fields.setdefault(object_name, set()).add(bad)
+                if not active_fields:
+                    raise RuntimeError(f"No selectable fields remain for {object_name}") from exc
+            else:
+                raise
+
+
+async def _stream_export_rows(
+    base_url: str,
+    http: HTTPSession,
+    log: Logger,
+    auth: dict[str, str],
+    file_id: str,
+) -> AsyncGenerator[dict, None]:
+    url = f"{base_url}/v1/files/{file_id}"
+    _resp_headers, body_factory = await http.request_stream(
+        log, url, headers=auth or None
+    )
+    async for row in IncrementalCSVProcessor(body_factory()):
+        # Zuora prefixes every CSV column with "ObjectName." — strip it so
+        # downstream fields match the describe names (e.g. "Id", not "Account.Id").
+        yield {k.split(".", 1)[-1]: v for k, v in row.items()}
 
 
 async def fetch_changes(
     object_name: str,
     fields: list[str],
-    tenant_endpoint: str,
+    base_url: str,
     http: HTTPSession,
+    config: EndpointConfig,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[ZuoraDocument | LogCursor, None]:
+    """Incrementally fetch records updated since log_cursor using time-windowed exports.
+
+    Processes up to MAX_EXPORT_DAYS per iteration so the CDK can checkpoint
+    progress without holding a single export job open for too long.
     """
-    Incrementally fetch records updated since log_cursor using ZOQL.
-    Yields documents and an updated LogCursor.
-    """
-    assert isinstance(log_cursor, datetime)
+    if not isinstance(log_cursor, datetime):
+        raise TypeError(f"expected datetime log_cursor, got {type(log_cursor)}")
+    auth = auth_headers(config)
+    active_fields = _active_fields_for(object_name, fields)
+    window_start = log_cursor
+    now = datetime.now(UTC)
 
-    model_cls = OBJECT_MODELS.get(object_name, ZuoraDocument)
-    fields_str = ", ".join(fields)
-    cursor_str = _format_cursor(log_cursor)
-    query = (
-        f"SELECT {fields_str} FROM {object_name} "
-        f"WHERE UpdatedDate >= '{cursor_str}'"
-    )
-
-    url = f"{tenant_endpoint}/v1/action/query"
-    body: dict[str, Any] = {
-        "queryString": query,
-        "conf": {"queryBatchSize": QUERY_BATCH_SIZE},
-    }
-
-    max_updated = log_cursor
-    emitted = 0
-
-    while True:
-        response_bytes = await http.request(log, url, method="POST", json=body)
-        result = QueryResult.model_validate_json(response_bytes)
-
-        for record in result.records:
-            doc = model_cls.model_validate(record)
-
-            if doc.UpdatedDate and doc.UpdatedDate > max_updated:
-                max_updated = doc.UpdatedDate
-
-            yield doc
-            emitted += 1
-
-            if emitted % CHECKPOINT_INTERVAL == 0 and max_updated > log_cursor:
-                yield max_updated
-
-        if result.done or not result.queryLocator:
-            break
-
-        url = f"{tenant_endpoint}/v1/action/queryMore"
-        body = {"queryLocator": result.queryLocator}
-
-    # The CDK requires a LogCursor to be emitted if any documents were yielded.
-    # If UpdatedDate was null or unchanged for all records, advance by 1 second
-    # to guarantee forward progress and avoid re-processing the same window.
-    if emitted > 0:
-        if max_updated > log_cursor:
-            yield max_updated
-        else:
-            yield log_cursor + timedelta(seconds=1)
+    while window_start < now:
+        window_end = min(window_start + timedelta(days=MAX_EXPORT_DAYS), now)
+        where = (
+            f"WHERE UpdatedDate >= '{_fmt_dt(window_start)}' "
+            f"AND UpdatedDate < '{_fmt_dt(window_end)}'"
+        )
+        file_id = await _run_job_filtering_fields(
+            base_url, http, log, auth, object_name, active_fields, where
+        )
+        async for row in _stream_export_rows(base_url, http, log, auth, file_id):
+            yield ZuoraDocument.model_validate(row)
+        yield window_end
+        window_start = window_end
 
 
 async def fetch_page(
     object_name: str,
     fields: list[str],
-    tenant_endpoint: str,
+    base_url: str,
     http: HTTPSession,
+    config: EndpointConfig,
+    start_date: datetime,
     log: Logger,
     page: PageCursor,
+    cutoff: LogCursor,
 ) -> AsyncGenerator[ZuoraDocument | PageCursor, None]:
+    """Backfill records from start_date up to cutoff, processing one window per call.
+
+    The PageCursor is the start datetime of the next window; None means start fresh.
+    Yields documents for the current window, then the next window's start as PageCursor.
+    Returns without yielding a PageCursor when the backfill is complete.
     """
-    Fetch a page of records for full backfill using ZOQL.
-    page=None starts a fresh query; page=queryLocator continues pagination.
-    Yields documents and a PageCursor for the next page (or nothing if done).
-    """
-    model_cls = OBJECT_MODELS.get(object_name, ZuoraDocument)
+    if not isinstance(cutoff, datetime):
+        raise TypeError(f"expected datetime cutoff, got {type(cutoff)}")
+    auth = auth_headers(config)
+    active_fields = _active_fields_for(object_name, fields)
 
-    if page is None:
-        fields_str = ", ".join(fields)
-        query = f"SELECT {fields_str} FROM {object_name}"
-        url = f"{tenant_endpoint}/v1/action/query"
-        body: dict[str, Any] = {
-            "queryString": query,
-            "conf": {"queryBatchSize": QUERY_BATCH_SIZE},
-        }
-    else:
-        assert isinstance(page, str)
-        url = f"{tenant_endpoint}/v1/action/queryMore"
-        body = {"queryLocator": page}
+    window_start: datetime = page if isinstance(page, datetime) else start_date
+    if window_start >= cutoff:
+        return
 
-    response_bytes = await http.request(log, url, method="POST", json=body)
-    result = QueryResult.model_validate_json(response_bytes)
+    window_end = min(window_start + timedelta(days=MAX_EXPORT_DAYS), cutoff)
+    where = (
+        f"WHERE UpdatedDate >= '{_fmt_dt(window_start)}' "
+        f"AND UpdatedDate < '{_fmt_dt(window_end)}'"
+    )
+    file_id = await _run_job_filtering_fields(
+        base_url, http, log, auth, object_name, active_fields, where
+    )
+    async for row in _stream_export_rows(base_url, http, log, auth, file_id):
+        yield ZuoraDocument.model_validate(row)
 
-    for record in result.records:
-        doc = model_cls.model_validate(record)
-        yield doc
+    if window_end < cutoff:
+        yield window_end  # more windows remain
 
-    if not result.done and result.queryLocator:
-        yield result.queryLocator
+
+async def fetch_snapshot(
+    object_name: str,
+    fields: list[str],
+    base_url: str,
+    http: HTTPSession,
+    config: EndpointConfig,
+    log: Logger,
+) -> AsyncGenerator[ZuoraDocument, None]:
+    """Full table export for objects that do not have an UpdatedDate field."""
+    auth = auth_headers(config)
+    active_fields = _active_fields_for(object_name, fields)
+    file_id = await _run_job_filtering_fields(
+        base_url, http, log, auth, object_name, active_fields, ""
+    )
+    async for row in _stream_export_rows(base_url, http, log, auth, file_id):
+        yield ZuoraDocument.model_validate(row)

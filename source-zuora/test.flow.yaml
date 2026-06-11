@@ -11,151 +11,49 @@ captures:
           - source_zuora
         config: config.yaml
     bindings:
-      - resource:
-          name: Account
-          interval: PT5M
+      - resource: {name: Account, interval: PT5M}
         target: acmeCo/Account
-      - resource:
-          name: AccountingCode
-          interval: PT5M
+      - resource: {name: AccountingCode, interval: PT5M}
         target: acmeCo/AccountingCode
-      - resource:
-          name: AccountingPeriod
-          interval: PT5M
+      - resource: {name: AccountingPeriod, interval: PT5M}
         target: acmeCo/AccountingPeriod
-      - resource:
-          name: Amendment
-          interval: PT5M
-        target: acmeCo/Amendment
-      - resource:
-          name: BillingRun
-          interval: PT5M
+      - resource: {name: BillingRun, interval: PT5M}
         target: acmeCo/BillingRun
-      - resource:
-          name: CommunicationProfile
-          interval: PT5M
+      - resource: {name: CommunicationProfile, interval: PT5M}
         target: acmeCo/CommunicationProfile
-      - resource:
-          name: Contact
-          interval: PT5M
+      - resource: {name: Contact, interval: PT5M}
         target: acmeCo/Contact
-      - resource:
-          name: ContactSnapshot
-          interval: PT5M
-        target: acmeCo/ContactSnapshot
-      - resource:
-          name: Export
-          interval: PT5M
-        target: acmeCo/Export
-      - resource:
-          name: Import
-          interval: PT5M
-        target: acmeCo/Import
-      - resource:
-          name: Invoice
-          interval: PT5M
+      - resource: {name: Invoice, interval: PT5M}
         target: acmeCo/Invoice
-      - resource:
-          name: InvoiceItem
-          interval: PT5M
+      - resource: {name: InvoiceItem, interval: PT5M}
         target: acmeCo/InvoiceItem
-      - resource:
-          name: InvoiceItemAdjustment
-          interval: PT5M
-        target: acmeCo/InvoiceItemAdjustment
-      - resource:
-          name: JournalEntry
-          interval: PT5M
-        target: acmeCo/JournalEntry
-      - resource:
-          name: JournalEntryItem
-          interval: PT5M
-        target: acmeCo/JournalEntryItem
-      - resource:
-          name: JournalRun
-          interval: PT5M
-        target: acmeCo/JournalRun
-      - resource:
-          name: Payment
-          interval: PT5M
+      - resource: {name: Order, interval: PT5M}
+        target: acmeCo/Order
+      - resource: {name: OrderAction, interval: PT5M}
+        target: acmeCo/OrderAction
+      - resource: {name: Payment, interval: PT5M}
         target: acmeCo/Payment
-      - resource:
-          name: PaymentMethod
-          interval: PT5M
-        target: acmeCo/PaymentMethod
-      - resource:
-          name: PaymentMethodSnapshot
-          interval: PT5M
-        target: acmeCo/PaymentMethodSnapshot
-      - resource:
-          name: PaymentRun
-          interval: PT5M
-        target: acmeCo/PaymentRun
-      - resource:
-          name: ProcessedUsage
-          interval: PT5M
-        target: acmeCo/ProcessedUsage
-      - resource:
-          name: Product
-          interval: PT5M
+      - resource: {name: PaymentPart, interval: PT5M}
+        target: acmeCo/PaymentPart
+      - resource: {name: Product, interval: PT5M}
         target: acmeCo/Product
-      - resource:
-          name: ProductRatePlan
-          interval: PT5M
+      - resource: {name: ProductRatePlan, interval: PT5M}
         target: acmeCo/ProductRatePlan
-      - resource:
-          name: ProductRatePlanCharge
-          interval: PT5M
+      - resource: {name: ProductRatePlanCharge, interval: PT5M}
         target: acmeCo/ProductRatePlanCharge
-      - resource:
-          name: ProductRatePlanChargeTier
-          interval: PT5M
+      - resource: {name: ProductRatePlanChargeTier, interval: PT5M}
         target: acmeCo/ProductRatePlanChargeTier
-      - resource:
-          name: RatePlan
-          interval: PT5M
+      - resource: {name: RatePlan, interval: PT5M}
         target: acmeCo/RatePlan
-      - resource:
-          name: RatePlanCharge
-          interval: PT5M
+      - resource: {name: RatePlanCharge, interval: PT5M}
         target: acmeCo/RatePlanCharge
-      - resource:
-          name: RatePlanChargeTier
-          interval: PT5M
+      - resource: {name: RatePlanChargeTier, interval: PT5M}
         target: acmeCo/RatePlanChargeTier
-      - resource:
-          name: Refund
-          interval: PT5M
+      - resource: {name: Refund, interval: PT5M}
         target: acmeCo/Refund
-      - resource:
-          name: RevenueChargeSummaryItem
-          interval: PT5M
-        target: acmeCo/RevenueChargeSummaryItem
-      - resource:
-          name: RevenueEventItem
-          interval: PT5M
-        target: acmeCo/RevenueEventItem
-      - resource:
-          name: RevenueEventItemInvoiceItem
-          interval: PT5M
-        target: acmeCo/RevenueEventItemInvoiceItem
-      - resource:
-          name: RevenueEventItemInvoiceItemAdjustment
-          interval: PT5M
-        target: acmeCo/RevenueEventItemInvoiceItemAdjustment
-      - resource:
-          name: RevenueScheduleItem
-          interval: PT5M
-        target: acmeCo/RevenueScheduleItem
-      - resource:
-          name: RevenueScheduleItemInvoiceItem
-          interval: PT5M
-        target: acmeCo/RevenueScheduleItemInvoiceItem
-      - resource:
-          name: RevenueScheduleItemInvoiceItemAdjustment
-          interval: PT5M
-        target: acmeCo/RevenueScheduleItemInvoiceItemAdjustment
-      - resource:
-          name: Subscription
-          interval: PT5M
+      - resource: {name: RefundPart, interval: PT5M}
+        target: acmeCo/RefundPart
+      - resource: {name: Subscription, interval: PT5M}
         target: acmeCo/Subscription
+      - resource: {name: SubscriptionStatusHistory, interval: PT5M}
+        target: acmeCo/SubscriptionStatusHistory

@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "source-zuora"
+name = "source_zuora"
 version = "0.1.0"
 description = "Estuary source connector for Zuora"
 authors = ["Estuary Contributors"]

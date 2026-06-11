@@ -3,7 +3,38 @@
     "protocol": 3032023,
     "configSchema": {
       "$defs": {
-        "ClientCredentialsOAuth2Credentials": {
+        "BasicCredentials": {
+          "properties": {
+            "credentials_title": {
+              "const": "Username & Password",
+              "default": "Username & Password",
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "username": {
+              "title": "Username",
+              "type": "string"
+            },
+            "password": {
+              "secret": true,
+              "title": "Password",
+              "type": "string"
+            },
+            "auth_type": {
+              "const": "basic",
+              "default": "basic",
+              "title": "Auth Type",
+              "type": "string"
+            }
+          },
+          "required": [
+            "username",
+            "password"
+          ],
+          "title": "BasicCredentials",
+          "type": "object"
+        },
+        "OAuthCredentials": {
           "properties": {
             "credentials_title": {
               "const": "OAuth Credentials",
@@ -20,6 +51,12 @@
               "secret": true,
               "title": "Client Secret",
               "type": "string"
+            },
+            "auth_type": {
+              "const": "client_credentials",
+              "default": "client_credentials",
+              "title": "Auth Type",
+              "type": "string"
             }
           },
           "required": [
@@ -32,22 +69,37 @@
       },
       "properties": {
         "credentials": {
-          "$ref": "#/$defs/ClientCredentialsOAuth2Credentials",
-          "description": "OAuth2 Client ID and Client Secret for Zuora API access.",
+          "discriminator": {
+            "mapping": {
+              "basic": "#/$defs/BasicCredentials",
+              "client_credentials": "#/$defs/OAuthCredentials"
+            },
+            "propertyName": "auth_type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/BasicCredentials"
+            },
+            {
+              "$ref": "#/$defs/OAuthCredentials"
+            }
+          ],
           "title": "Authentication"
         },
-        "tenant_endpoint": {
+        "base_url": {
           "default": "https://rest.zuora.com",
-          "description": "Your Zuora REST API base URL. Use https://rest.zuora.com for production, https://rest.apisandbox.zuora.com for sandbox, or https://rest.eu.zuora.com for EU production.",
+          "description": "Zuora REST API base URL. Use https://rest.zuora.com for US production, https://rest.apisandbox.zuora.com for US sandbox, or https://rest.eu.zuora.com for EU production.",
           "examples": [
             "https://rest.zuora.com",
-            "https://rest.apisandbox.zuora.com"
+            "https://rest.apisandbox.zuora.com",
+            "https://rest.eu.zuora.com",
+            "https://rest.sandbox.eu.zuora.com"
           ],
-          "title": "Tenant Endpoint",
+          "title": "API Base URL",
           "type": "string"
         },
         "start_date": {
-          "description": "UTC date and time from which to start replicating data. Defaults to January 1, 2000, which will capture all available history.",
+          "description": "UTC date and time from which to start replicating data. Defaults to January 1, 2000, which captures all available history.",
           "format": "date-time",
           "title": "Start Date",
           "type": "string"
@@ -56,7 +108,7 @@
       "required": [
         "credentials"
       ],
-      "title": "EndpointConfig",
+      "title": "Source Zuora Configuration",
       "type": "object"
     },
     "resourceConfigSchema": {

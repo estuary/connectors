@@ -1,28 +1,35 @@
+import asyncio
 import functools
 from datetime import timedelta
 from logging import Logger
 
 from estuary_cdk.capture import Task, common
 from estuary_cdk.capture.common import CaptureBinding, ResourceConfig, ResourceState
-from estuary_cdk.flow import ValidationError
+from estuary_cdk.flow import OAuth2TokenFlowSpec, ValidationError
 from estuary_cdk.http import HTTPError, HTTPMixin, TokenSource
-from estuary_cdk.flow import OAuth2TokenFlowSpec
 
 from . import api
-from .models import EndpointConfig, OBJECT_MODELS, ZuoraDocument
+from .models import EndpointConfig, OAuthCredentials, ZuoraDocument
+
+# Max concurrent describe calls during discovery.
+_DISCOVER_CONCURRENCY = 10
 
 
-def _make_token_source(config: EndpointConfig) -> TokenSource:
-    return TokenSource(
-        oauth_spec=OAuth2TokenFlowSpec(
-            accessTokenUrlTemplate=f"{config.tenant_endpoint}/oauth/token",
-            accessTokenResponseMap={"access_token": "/access_token"},
-        ),
-        credentials=config.credentials,
-    )
+def _setup_http_auth(http: HTTPMixin, config: EndpointConfig) -> None:
+    if isinstance(config.credentials, OAuthCredentials):
+        http.token_source = TokenSource(
+            oauth_spec=OAuth2TokenFlowSpec(
+                accessTokenUrlTemplate=f"{config.base_url}/oauth/token",
+                accessTokenResponseMap={"access_token": "/access_token"},
+            ),
+            credentials=config.credentials,
+        )
+    else:
+        # BASIC auth: headers are injected per-request in api.py via auth_headers().
+        http.token_source = None
 
 
-def _open_binding(
+def _open_incremental(
     object_name: str,
     fields: list[str],
     config: EndpointConfig,
@@ -31,8 +38,8 @@ def _open_binding(
     binding_index: int,
     state: ResourceState,
     task: Task,
-    all_bindings,
-):
+    all_bindings: list[CaptureBinding[ResourceConfig]],
+) -> None:
     common.open_binding(
         binding,
         binding_index,
@@ -42,17 +49,77 @@ def _open_binding(
             api.fetch_changes,
             object_name,
             fields,
-            config.tenant_endpoint,
+            config.base_url,
             http,
+            config,
         ),
         fetch_page=functools.partial(
             api.fetch_page,
             object_name,
             fields,
-            config.tenant_endpoint,
+            config.base_url,
             http,
+            config,
+            config.start_date,
         ),
     )
+
+
+def _open_snapshot(
+    object_name: str,
+    fields: list[str],
+    config: EndpointConfig,
+    http: HTTPMixin,
+    binding: CaptureBinding[ResourceConfig],
+    binding_index: int,
+    state: ResourceState,
+    task: Task,
+    all_bindings: list[CaptureBinding[ResourceConfig]],
+) -> None:
+    common.open_binding(
+        binding,
+        binding_index,
+        state,
+        task,
+        fetch_snapshot=functools.partial(
+            api.fetch_snapshot,
+            object_name,
+            fields,
+            config.base_url,
+            http,
+            config,
+        ),
+        tombstone=ZuoraDocument(_meta=ZuoraDocument.Meta(op="d")),
+    )
+
+
+async def _describe_one(
+    object_name: str,
+    base_url: str,
+    http: HTTPMixin,
+    log: Logger,
+    auth: dict[str, str],
+    sem: asyncio.Semaphore,
+) -> tuple[str, list[str]] | None:
+    async with sem:
+        try:
+            fields, is_queryable = await api.describe_object(
+                base_url, http, log, object_name, auth
+            )
+        except HTTPError as err:
+            log.warning("Skipping object: describe failed", {"object": object_name, "http_code": err.code})
+            return None
+        except Exception as err:
+            log.warning("Skipping object: describe failed", {"object": object_name, "error": str(err)})
+            return None
+
+    if not is_queryable:
+        log.debug("Skipping object: not queryable via ZOQL", {"object": object_name})
+        return None
+    if not fields:
+        log.warning("Skipping object: no selectable fields", {"object": object_name})
+        return None
+    return object_name, fields
 
 
 async def all_resources(
@@ -60,91 +127,74 @@ async def all_resources(
     http: HTTPMixin,
     config: EndpointConfig,
 ) -> list[common.Resource]:
-    http.token_source = _make_token_source(config)
+    _setup_http_auth(http, config)
+    auth = api.auth_headers(config)
+
+    object_names = await api.discover_object_names(config.base_url, http, log, auth)
+    log.info("Describing Zuora objects", {"count": len(object_names), "concurrency": _DISCOVER_CONCURRENCY})
+
+    sem = asyncio.Semaphore(_DISCOVER_CONCURRENCY)
+    describe_results = await asyncio.gather(*[
+        _describe_one(name, config.base_url, http, log, auth, sem)
+        for name in object_names
+    ])
 
     resources: list[common.Resource] = []
-
-    for object_name, model_cls in OBJECT_MODELS.items():
-        try:
-            fields = await api.describe_object(
-                config.tenant_endpoint, http, log, object_name
-            )
-        except HTTPError as err:
-            log.warning(
-                f"Skipping {object_name}: describe endpoint returned HTTP {err.code}. "
-                "This object may not be available in your Zuora subscription."
-            )
+    for result in describe_results:
+        if result is None:
             continue
-        except Exception as err:
-            log.warning(f"Skipping {object_name}: failed to describe object: {err}")
-            continue
+        object_name, fields = result
+        has_updated_date = "UpdatedDate" in fields
 
-        if not fields:
-            log.warning(f"Skipping {object_name}: no selectable fields found.")
-            continue
-
-        # Validate field list against ZOQL, removing fields that cause errors
-        # (e.g. system fields marked selectable in describe but rejected by ZOQL).
-        fields = await api.validate_fields(
-            object_name, fields, config.tenant_endpoint, http, log
-        )
-
-        # Ensure UpdatedDate is always in the field list for cursor tracking.
-        if "UpdatedDate" not in fields:
-            log.warning(
-                f"Skipping {object_name}: UpdatedDate field not available. "
-                "Incremental sync requires this field."
-            )
-            continue
-
-        resource = common.Resource(
-            name=object_name,
-            key=["/Id"],
-            model=model_cls,
-            open=functools.partial(
-                _open_binding,
-                object_name,
-                fields,
-                config,
-                http,
-            ),
-            initial_state=ResourceState(
-                inc=ResourceState.Incremental(cursor=config.start_date),
-            ),
-            initial_config=ResourceConfig(
+        if has_updated_date:
+            resource = common.Resource(
                 name=object_name,
-                interval=timedelta(minutes=5),
-            ),
-            schema_inference=True,
-        )
+                key=["/Id"],
+                model=ZuoraDocument,
+                open=functools.partial(
+                    _open_incremental, object_name, fields, config, http
+                ),
+                initial_state=ResourceState(
+                    inc=ResourceState.Incremental(cursor=config.start_date),
+                ),
+                initial_config=ResourceConfig(
+                    name=object_name, interval=timedelta(minutes=5)
+                ),
+                schema_inference=True,
+            )
+        else:
+            resource = common.Resource(
+                name=object_name,
+                key=["/_meta/row_id"],
+                model=ZuoraDocument,
+                open=functools.partial(
+                    _open_snapshot, object_name, fields, config, http
+                ),
+                initial_state=ResourceState(),
+                initial_config=ResourceConfig(
+                    name=object_name, interval=timedelta(hours=1)
+                ),
+                schema_inference=True,
+            )
+
         resources.append(resource)
 
     return resources
 
 
 async def validate_credentials(
-    log: Logger,
-    http: HTTPMixin,
-    config: EndpointConfig,
+    log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> None:
-    """Validate that the provided credentials can authenticate with Zuora."""
-    http.token_source = _make_token_source(config)
-
+    """Validate connectivity by describing the Account object."""
+    _setup_http_auth(http, config)
+    auth = api.auth_headers(config)
     try:
-        # A lightweight call to verify authentication and endpoint reachability.
-        url = f"{config.tenant_endpoint}/v1/describe/Account"
-        await http.request(log, url)
+        await api.describe_object(config.base_url, http, log, "Account", auth)  # result unused
     except HTTPError as err:
         if err.code == 401:
             raise ValidationError(
-                [
-                    "Authentication failed. Please verify your Client ID and Client Secret "
-                    f"are correct for the endpoint {config.tenant_endpoint}."
-                ]
+                ["Authentication failed. Please check your credentials."]
             )
-        raise ValidationError(
-            [
-                f"Failed to connect to Zuora at {config.tenant_endpoint}. "
-                f"HTTP {err.code}: {err.message}"
-            ]
-        )
+        raise ValidationError([f"Failed to connect to Zuora: {err.message}."])
+    except Exception as err:
+        raise ValidationError([f"Failed to connect to Zuora: {err}."])
