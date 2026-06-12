@@ -1,6 +1,6 @@
 import json
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from logging import Logger
@@ -462,6 +462,57 @@ def requires_any_scope(*scopes: str) -> Callable[["StoreCapabilities"], bool]:
     return lambda capabilities: not required.isdisjoint(capabilities.scopes)
 
 
+@dataclass(frozen=True, slots=True)
+class NestedConnection:
+    """Describes a connection nested somewhere in a document.
+
+    Its first page is spliced inline into the outer query at `placeholder`; after that query, the
+    resolver descends `parent_path` to the parents, flattens each inline page into a plain list, and
+    drains any overflow with `node(id:)` re-queries.
+
+    Every parent must be a Node with an `id`, and connections resolve in declaration order -
+    resolving one flattens it to a list, so a connection nested inside another must be declared
+    after it.
+    """
+
+    # Path from the document root to the parent object(s) containing the connection. [] means the document
+    # node itself; ["refunds"] means each object in document["refunds"]; a multi-step path descends
+    # fields, fanning out to the elements of any list a step lands on.
+    parent_path: list[str]
+    # The parent object's GraphQL type, used in the `... on <typename>` inline fragment.
+    parent_typename: str
+    # The connection field name. Also the key the resolved list is written back under.
+    field_name: str
+    # GraphQL fields selected for each node. It should contain no edges/pageInfo wrapping.
+    node_selection: str
+    # The inline `first:` argument, spliced into the outer query. Sized to keep that outer query
+    # under Shopify's per-query cost ceiling.
+    page_size: int
+    # `first:` for the overflow queries. Defaults to `page_size`. The overflow query is 
+    # cheaper than the outer query, so this can be raised to drain large parents in
+    # fewer round trips.
+    overflow_page_size: int | None = None
+    # Fragment definitions referenced by node_selection, appended to the query.
+    fragments: list[str] = field(default_factory=list)
+
+    @property
+    def placeholder(self) -> str:
+        """The marker in the resource's QUERY where the inline connection block is spliced.
+
+        Written as a GraphQL comment so an unsubstituted marker degrades to a no-op.
+        """
+        return f"# {{{{ {self.field_name} }}}}"
+
+    def inline_block(self) -> str:
+        """The connection selection spliced into the outer query to fetch the first page inline."""
+        return (
+            f"{self.field_name}(first: {self.page_size}) {{\n"
+            f"    edges {{ node {{ {self.node_selection} }} }}\n"
+            f"    pageInfo {{ hasNextPage endCursor }}\n"
+            f"}}"
+        )
+
+
 class ShopifyGraphQLResource(BaseDocument):
     QUERY: ClassVar[str] = ""
     QUERY_ROOT: ClassVar[str] = ""
@@ -476,6 +527,13 @@ class ShopifyGraphQLResource(BaseDocument):
     # Fields included in the query only when the store's capabilities allow it. See
     # ConditionalField for placeholder/substitution semantics.
     CONDITIONAL_FIELDS: ClassVar[list[ConditionalField]] = []
+    # Connections nested under a list field. Their first page is spliced inline into the outer query
+    # at each connection's placeholder; overflow is paged separately. See graphql/nested_resolver.py.
+    # Only used on the non-bulk fetch path.
+    NESTED_CONNECTIONS: ClassVar[list[NestedConnection]] = []
+    # Outer-connection page size override. Streams that inline nested connections lower this to keep
+    # the per-query cost comfortably under Shopify's ceiling (with headroom for more connections).
+    OUTER_PAGE_SIZE: ClassVar[int | None] = None
 
     model_config = ConfigDict(extra="allow", validate_assignment=True)
 
@@ -490,6 +548,18 @@ class ShopifyGraphQLResource(BaseDocument):
                     f"{cls.__name__} declares a ConditionalField with placeholder "
                     f"{field.placeholder!r}, but that marker is not present in its QUERY. "
                     f"Embed the placeholder verbatim where the field belongs."
+                )
+        # A nested connection's placeholder lives in the QUERY, or — for a connection nested inside
+        # another — in that other connection's node_selection. Check both, so a missing marker
+        # (silently dropped during substitution) is rejected at class-definition time.
+        templates = [cls.QUERY, *(c.node_selection for c in cls.NESTED_CONNECTIONS)]
+        for connection in cls.NESTED_CONNECTIONS:
+            if cls.QUERY and not any(connection.placeholder in t for t in templates):
+                raise ValueError(
+                    f"{cls.__name__} declares a NestedConnection {connection.field_name!r}, but its "
+                    f"placeholder {connection.placeholder!r} is not present in its QUERY (or in "
+                    f"another connection's node_selection). Embed the placeholder verbatim where the "
+                    f"connection belongs."
                 )
 
     class Meta(BaseDocument.Meta):
@@ -597,6 +667,17 @@ class ShopifyGraphQLResource(BaseDocument):
         return body
 
     @classmethod
+    def _resolve_nested_connections(cls, body: str) -> str:
+        """Splice each NESTED_CONNECTIONS inline block into `body` at its placeholder.
+
+        Splicing happens in declaration order, so a connection whose inline block embeds another
+        connection's placeholder (a connection nested inside another) must be declared first.
+        """
+        for connection in cls.NESTED_CONNECTIONS:
+            body = body.replace(connection.placeholder, connection.inline_block())
+        return body
+
+    @classmethod
     def build_query_with_fragment(
         cls,
         start: datetime,
@@ -611,7 +692,9 @@ class ShopifyGraphQLResource(BaseDocument):
     ) -> str:
         lower_bound = dt_to_str(start)
         upper_bound = dt_to_str(end)
-        query_body = cls._resolve_conditional_fields(capabilities)
+        query_body = cls._resolve_nested_connections(
+            cls._resolve_conditional_fields(capabilities)
+        )
 
         query = f"""
         {{
@@ -644,7 +727,15 @@ class ShopifyGraphQLResource(BaseDocument):
         }}
         """
 
-        for fragment in cls.FRAGMENTS:
+        # Inline nested connections reuse fragments. We dedupe so each fragment
+        # is defined exactly once in the query.
+        fragments = list(
+            dict.fromkeys(
+                cls.FRAGMENTS
+                + [f for connection in cls.NESTED_CONNECTIONS for f in connection.fragments]
+            )
+        )
+        for fragment in fragments:
             query += fragment
 
         return query
