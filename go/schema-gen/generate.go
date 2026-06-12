@@ -31,7 +31,8 @@ func GenerateSchema(title string, configObject interface{}) *jsonschema.Schema {
 
 // walkSchema invokes visit on every property of the root schema, and then traverses each of these
 // sub-schemas recursively. The visit function should modify the provided schema in-place to
-// accomplish the desired transformation.
+// accomplish the desired transformation. OneOf and AnyOf branches are also traversed, so that
+// fixups apply to nullable-wrapped fields (where invopop emits oneOf: [original, {type:null}]).
 func walkSchema(root *jsonschema.Schema, visits ...func(t *jsonschema.Schema)) {
 	if root.Properties != nil {
 		for pair := root.Properties.Oldest(); pair != nil; pair = pair.Next() {
@@ -41,6 +42,18 @@ func walkSchema(root *jsonschema.Schema, visits ...func(t *jsonschema.Schema)) {
 
 			walkSchema(pair.Value, visits...)
 		}
+	}
+	for _, branch := range root.OneOf {
+		for _, visit := range visits {
+			visit(branch)
+		}
+		walkSchema(branch, visits...)
+	}
+	for _, branch := range root.AnyOf {
+		for _, visit := range visits {
+			visit(branch)
+		}
+		walkSchema(branch, visits...)
 	}
 }
 

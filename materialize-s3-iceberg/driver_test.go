@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/url"
@@ -15,6 +16,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/apache/iceberg-go"
+	icebergcatalog "github.com/apache/iceberg-go/catalog"
+	icebergtable "github.com/apache/iceberg-go/table"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -34,23 +38,6 @@ const (
 	polarisClientID      = "root"
 	polarisClientSecret  = "s3cr3t"
 )
-
-// TestMain resolves PYTHON_PATH from the iceberg-ctl Poetry venv if it isn't
-// already set, so `go test` works without extra env wrangling. The Docker
-// image sets PYTHON_PATH explicitly; this is just for local runs.
-func TestMain(m *testing.M) {
-	if _, ok := os.LookupEnv("PYTHON_PATH"); !ok {
-		cmd := exec.Command("poetry", "env", "info", "--path")
-		cmd.Dir = "iceberg-ctl"
-		if out, err := cmd.Output(); err == nil {
-			venv := strings.TrimSpace(string(out))
-			if venv != "" {
-				os.Setenv("PYTHON_PATH", venv+"/bin/python")
-			}
-		}
-	}
-	os.Exit(m.Run())
-}
 
 func TestSpec(t *testing.T) {
 	if testing.Short() {
@@ -72,7 +59,6 @@ func TestIntegration(t *testing.T) {
 		t.Skip()
 	}
 
-	// Start the Iceberg REST catalog (+ PostgreSQL).
 	require.NoError(t, exec.Command("docker", "compose", "-f", "docker-compose.yaml", "up", "--wait").Run())
 	t.Cleanup(func() {
 		exec.Command("docker", "compose", "-f", "docker-compose.yaml", "down", "-v").Run()
@@ -120,58 +106,62 @@ func TestIntegration(t *testing.T) {
 	})
 
 	// Migration test is skipped because Iceberg does not support the type
-	// migrations exercised by the test (e.g. long→string). pyiceberg rejects
-	// schema mismatches when appending files with migrated types.
+	// migrations exercised by the test (e.g. long→string).
 	//t.Run("migrate", func(t *testing.T) {
 	//	boilerplate.RunMigrationTest(t, newMaterialization, "testdata/migrate.flow.yaml", makeResourceFn, nil)
 	//})
 }
 
-// runTimestampOverflowRegression reproduces the deel/prod/.../profile failure
-// where iceberg_ctl `append_files` aborts with `OverflowError: date value out
-// of range`: pyiceberg reads the parquet column's min/max stats through
-// pyarrow, which materializes a Python `datetime` capped at MAXYEAR=9999.
-// Iceberg's INT64-micros encoding admits much wider years; the input value
-// here normalizes to UTC year 10000.
+// runTimestampOverflowRegression reproduces a production failure observed at
+// deel/prod/.../profile where appending a parquet file containing a timestamp
+// with UTC year 10000 failed. Iceberg's int64-micros encoding can represent
+// ~±292,277 years from epoch; "9999-12-31T23:59:59-14:00" normalizes to UTC
+// year 10000 and must round-trip without error.
 func runTimestampOverflowRegression(t *testing.T, cfg config) {
 	ctx := context.Background()
+
+	cat, err := newCatalog(ctx, cfg, NestedLocationStyle)
+	require.NoError(t, err)
 
 	const (
 		namespace = "tests"
 		table     = "ts_overflow_regression"
 	)
-	fqn := namespace + "." + table
+	tableIdent := icebergtable.Identifier{namespace, table}
 
-	// Tolerate leftovers from a prior run.
-	_, _ = runIcebergctl(ctx, &cfg, "drop-table", fqn)
-	if _, err := runIcebergctl(ctx, &cfg, "create-namespace", namespace); err != nil &&
-		!strings.Contains(err.Error(), "already exists") &&
-		!strings.Contains(err.Error(), "AlreadyExists") {
+	// Tolerate leftovers from a prior run of this test.
+	_ = cat.cat.DropTable(ctx, tableIdent)
+	if err := cat.createNamespace(ctx, namespace); err != nil &&
+		!errors.Is(err, icebergcatalog.ErrNamespaceAlreadyExists) {
 		t.Fatalf("create-namespace: %v", err)
 	}
 
-	tblLocation := tablePath(cfg.Bucket, cfg.Prefix, namespace, table, NestedLocationStyle)
-
-	tcJson, err := json.Marshal(tableCreate{
-		Location: tblLocation,
-		Fields: []existingIcebergColumn{
-			{Name: "ts", Nullable: true, Type: icebergTypeTimestamptz},
-		},
+	schema := iceberg.NewSchema(0, iceberg.NestedField{
+		ID:       1,
+		Name:     "ts",
+		Type:     iceberg.PrimitiveTypes.TimestampTz,
+		Required: false,
 	})
-	require.NoError(t, err)
-	_, err = runIcebergctl(ctx, &cfg, "create-table", fqn, string(tcJson))
+
+	nameMappingJSON, err := json.Marshal(schema.NameMapping())
 	require.NoError(t, err)
 
-	// "9999-12-31T23:59:59-14:00" normalizes to UTC year 10000.
+	tblLocation := tablePath(cfg.Bucket, cfg.Prefix, namespace, table, NestedLocationStyle)
+	_, err = cat.cat.CreateTable(ctx, tableIdent, schema,
+		icebergcatalog.WithLocation(tblLocation),
+		icebergcatalog.WithProperties(iceberg.Properties{
+			icebergtable.DefaultNameMappingKey: string(nameMappingJSON),
+		}),
+	)
+	require.NoError(t, err)
+
 	parquetPath := filepath.Join(t.TempDir(), "data.parquet")
 	parquetFile, err := os.Create(parquetPath)
 	require.NoError(t, err)
 	pqw := writer.NewParquetWriter(parquetFile, writer.ParquetSchema{
 		{Name: "ts", DataType: writer.LogicalTypeTimestamp, Required: false},
 	}, writer.WithParquetCompression(writer.Snappy))
-	clamped, err := clampTimestamp("9999-12-31T23:59:59-14:00")
-	require.NoError(t, err)
-	require.NoError(t, pqw.Write([]any{clamped}))
+	require.NoError(t, pqw.Write([]any{"9999-12-31T23:59:59-14:00"}))
 	require.NoError(t, pqw.Close())
 
 	s3Path := strings.TrimSuffix(tblLocation, "/") + "/data/" + uuid.New().String() + ".parquet"
@@ -194,47 +184,54 @@ func runTimestampOverflowRegression(t *testing.T, cfg config) {
 	})
 	require.NoError(t, err)
 
-	_, err = runIcebergctl(ctx, &cfg, "append-files",
+	require.NoError(t, cat.appendFiles(ctx,
 		"acmeCo/tests/regression",
-		fqn,
+		tableIdent,
+		[]string{s3Path},
 		"",
 		"deadbeefdeadbeef",
-		s3Path,
-	)
-	require.NoError(t, err, "append-files should accept a timestamp within Iceberg's range")
+	))
 }
 
-// runDateOverflowRegression is the date analog of
-// runTimestampOverflowRegression. Parquet DATE is INT32 days-since-epoch;
-// year > 9999 fits the spec but overflows pyarrow's Date32Scalar.as_py.
-// getDateVal rejects > 4-digit years at parse time today, so the failure
-// surfaces earlier than the pyiceberg call.
+// runDateOverflowRegression is the date analog of runTimestampOverflowRegression.
+// Parquet DATE is INT32 days-since-epoch; year > 9999 fits the Iceberg spec and
+// is now handled correctly by the writer's date parser.
 func runDateOverflowRegression(t *testing.T, cfg config) {
 	ctx := context.Background()
+
+	cat, err := newCatalog(ctx, cfg, NestedLocationStyle)
+	require.NoError(t, err)
 
 	const (
 		namespace = "tests"
 		table     = "date_overflow_regression"
 	)
-	fqn := namespace + "." + table
+	tableIdent := icebergtable.Identifier{namespace, table}
 
-	_, _ = runIcebergctl(ctx, &cfg, "drop-table", fqn)
-	if _, err := runIcebergctl(ctx, &cfg, "create-namespace", namespace); err != nil &&
-		!strings.Contains(err.Error(), "already exists") &&
-		!strings.Contains(err.Error(), "AlreadyExists") {
+	// Tolerate leftovers from a prior run of this test.
+	_ = cat.cat.DropTable(ctx, tableIdent)
+	if err := cat.createNamespace(ctx, namespace); err != nil &&
+		!errors.Is(err, icebergcatalog.ErrNamespaceAlreadyExists) {
 		t.Fatalf("create-namespace: %v", err)
 	}
 
-	tblLocation := tablePath(cfg.Bucket, cfg.Prefix, namespace, table, NestedLocationStyle)
-
-	tcJson, err := json.Marshal(tableCreate{
-		Location: tblLocation,
-		Fields: []existingIcebergColumn{
-			{Name: "d", Nullable: true, Type: icebergTypeDate},
-		},
+	schema := iceberg.NewSchema(0, iceberg.NestedField{
+		ID:       1,
+		Name:     "d",
+		Type:     iceberg.PrimitiveTypes.Date,
+		Required: false,
 	})
+
+	nameMappingJSON, err := json.Marshal(schema.NameMapping())
 	require.NoError(t, err)
-	_, err = runIcebergctl(ctx, &cfg, "create-table", fqn, string(tcJson))
+
+	tblLocation := tablePath(cfg.Bucket, cfg.Prefix, namespace, table, NestedLocationStyle)
+	_, err = cat.cat.CreateTable(ctx, tableIdent, schema,
+		icebergcatalog.WithLocation(tblLocation),
+		icebergcatalog.WithProperties(iceberg.Properties{
+			icebergtable.DefaultNameMappingKey: string(nameMappingJSON),
+		}),
+	)
 	require.NoError(t, err)
 
 	parquetPath := filepath.Join(t.TempDir(), "data.parquet")
@@ -243,9 +240,7 @@ func runDateOverflowRegression(t *testing.T, cfg config) {
 	pqw := writer.NewParquetWriter(parquetFile, writer.ParquetSchema{
 		{Name: "d", DataType: writer.LogicalTypeDate, Required: false},
 	}, writer.WithParquetCompression(writer.Snappy))
-	clamped, err := clampDate("10000-01-01")
-	require.NoError(t, err)
-	require.NoError(t, pqw.Write([]any{clamped}))
+	require.NoError(t, pqw.Write([]any{"10000-01-01"}))
 	require.NoError(t, pqw.Close())
 
 	s3Path := strings.TrimSuffix(tblLocation, "/") + "/data/" + uuid.New().String() + ".parquet"
@@ -268,15 +263,15 @@ func runDateOverflowRegression(t *testing.T, cfg config) {
 	})
 	require.NoError(t, err)
 
-	_, err = runIcebergctl(ctx, &cfg, "append-files",
+	require.NoError(t, cat.appendFiles(ctx,
 		"acmeCo/tests/regression",
-		fqn,
+		tableIdent,
+		[]string{s3Path},
 		"",
 		"deadbeefdeadbeef",
-		s3Path,
-	)
-	require.NoError(t, err, "append-files should accept a date within Iceberg's range")
+	))
 }
+
 
 func loadTestConfig(t *testing.T) config {
 	t.Helper()
