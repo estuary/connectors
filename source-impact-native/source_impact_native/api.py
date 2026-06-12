@@ -26,6 +26,7 @@ async def fetch_incremental(
     This method has the basic behaviour of querying data after the logcursor, comparing and yielding
     records accorrding.
     """
+    assert isinstance(log_cursor, datetime)
     _cls: Any = cls  # Silence mypy false-positive
     
     iterating = True
@@ -42,12 +43,13 @@ async def fetch_incremental(
         result = json.loads(await http.request(log, url, method="GET", params=parameters, headers=headers))
 
         for results in result[f"{_cls.NAME}"]:
-            if _s_to_dt(results[f"{_cls.REP_KEY}"]) >= log_cursor:
-                max_ts = max(max_ts, _s_to_dt(results[f"{_cls.REP_KEY}"]))
+            ts = _s_to_dt(results[f"{_cls.REP_KEY}"])
+            if ts >= log_cursor:
+                max_ts = max(max_ts, ts)
                 doc = _cls.model_validate_json(json.dumps(results))
                 yield doc
 
-            elif _s_to_dt(results[f"{_cls.REP_KEY}"]) < log_cursor:
+            elif ts < log_cursor:
                 iterating = False
                 break
         if result.get("@nextpageuri"):
@@ -61,22 +63,23 @@ async def fetch_incremental(
 async def fetch_backfill(
     cls,
     config_start_date: datetime,
-    account_sid,
+    account_sid: str,
     http: HTTPSession,
     log: Logger,
-    page: str | None,
-    cutoff: datetime,
+    page: PageCursor,
+    cutoff: LogCursor,
 )-> AsyncGenerator:
     """Fetch backfill is the default FetchPagesFn handler for source-impact-native
     This method has the basic behaviour of backfilling data and (when possible) query data from
     specific ranges. Its page_cursor is already the full URI for the next page
     """
-
+    assert isinstance(cutoff, datetime)
     _cls: Any = cls
     headers = {'Accept': 'application/json'}
     parameters = None
 
     if page:
+        assert isinstance(page, str)
         url = API + page
     
     else:
@@ -87,12 +90,13 @@ async def fetch_backfill(
     result = json.loads(await http.request(log, url, method="GET", params=parameters, headers=headers))
 
     for results in result[f"{_cls.NAME}"]:
-        if _s_to_dt(results[f"{_cls.REP_KEY}"]) == config_start_date:
+        ts = _s_to_dt(results[f"{_cls.REP_KEY}"])
+        if ts == config_start_date:
             doc = _cls.model_validate_json(json.dumps(results))
             yield doc
-        elif _s_to_dt(results[f"{_cls.REP_KEY}"]) < config_start_date:
+        elif ts < config_start_date:
             return
-        elif _s_to_dt(results[f"{_cls.REP_KEY}"]) < cutoff:
+        elif ts < cutoff:
             doc = _cls.model_validate_json(json.dumps(results))
             yield doc
 
@@ -160,11 +164,11 @@ async def fetch_backfill_actions(
     cls_parent,
     cls,
     config_start_date: datetime,
-    account_sid,
+    account_sid: str,
     http: HTTPSession,
     log: Logger,
-    page: str | None,
-    cutoff: datetime,
+    page: PageCursor,
+    cutoff: LogCursor,
 )-> AsyncGenerator:
     """Fetch backfill actions is the default FetchPageFn handler for Actions Streams
     This method requires CampaignIds to query for actions data.
@@ -175,6 +179,7 @@ async def fetch_backfill_actions(
     start_date and end_date cant be set more than 45 days apart.
     
     """
+    assert isinstance(cutoff, datetime)
     headers = {'Accept': 'application/json'}
     parameters = {}
 
@@ -232,7 +237,7 @@ async def fetch_backfill_actions(
 
 async def fetch_snapshot(
     cls,
-    account_sid,
+    account_sid: str,
     http: HTTPSession,
     log: Logger,
 ) -> AsyncGenerator:
@@ -272,7 +277,7 @@ async def fetch_incremental_child(
     
     This method requires CampaignId values from the Campaigns stream.
     """
-
+    assert isinstance(log_cursor, datetime)
     _cls: Any = cls  # Silence mypy false-positive
 
     campaign_list = set()
@@ -318,11 +323,11 @@ async def fetch_backfill_child(
     cls_parent,
     cls,
     config_start_date: datetime,
-    account_sid,
+    account_sid: str,
     http: HTTPSession,
     log: Logger,
-    page: str | None,
-    cutoff: datetime,
+    page: PageCursor,
+    cutoff: LogCursor,
 )-> AsyncGenerator:
     """_Fetch backfill child is the default FetchPagesFn handler for source-impact-native child streams.
     This method has the basic behaviour of backfilling data and (when possible) query data from
@@ -331,7 +336,7 @@ async def fetch_backfill_child(
     
     This method requires CampaignId values from the Campaigns stream.
     """
-
+    assert isinstance(cutoff, datetime)
     _cls: Any = cls
     headers = {'Accept': 'application/json'}
     parameters = None
@@ -356,14 +361,14 @@ async def fetch_backfill_child(
             result = json.loads(await http.request(log, url, method="GET", params=parameters, headers=headers))
 
             for results in result[f"{_cls.NAME}"]:
-                if _s_to_dt(results[f"{_cls.REP_KEY}"]) == config_start_date:
+                ts = _s_to_dt(results[f"{_cls.REP_KEY}"])
+                if ts == config_start_date:
                     doc = _cls.model_validate_json(json.dumps(results))
                     yield doc
-
-                elif _s_to_dt(results[f"{_cls.REP_KEY}"]) < config_start_date:
+                elif ts < config_start_date:
                     iterating = False
                     break
-                elif _s_to_dt(results[f"{_cls.REP_KEY}"]) < cutoff:
+                elif ts < cutoff:
                     doc = _cls.model_validate_json(json.dumps(results))
                     yield doc
             if result.get("@nextpageuri"):
@@ -376,7 +381,7 @@ async def fetch_backfill_child(
 async def fetch_snapshot_child(
     cls_parent,
     cls,
-    account_sid,
+    account_sid: str,
     http: HTTPSession,
     log: Logger,
 ) -> AsyncGenerator:
@@ -389,10 +394,7 @@ async def fetch_snapshot_child(
     async for campaign in campaigns:
         campaign_list.add(campaign.Id)
 
-    
-
     for campaign in campaign_list:
-    
         iterating = True
 
         url = f"{API}/{API_CATALOG}/{account_sid}/Campaigns/{campaign}/{cls.NAME}"
@@ -416,15 +418,15 @@ async def fetch_snapshot_child(
 def _s_to_dt(date: str) -> datetime:
     return datetime.fromisoformat(date)
 
-def _cursor_dt(name, logcursor):
+def _cursor_dt(name: str, logcursor: datetime) -> str:
     new_logcursor = logcursor.strftime("%Y-%m-%dT%H:%M:%S%z")
     if name == "PhoneNumbers" or name == "Jobs":
         new_logcursor = logcursor.strftime("%Y-%m-%d")
     return new_logcursor
 
-def get_date_ranges(start_date, end_date, step=40):
+def get_date_ranges(start_date: datetime, end_date: datetime, step: int = 40) -> list[tuple[datetime, datetime]]:
     current_start = start_date
-    date_ranges = []
+    date_ranges: list[tuple[datetime, datetime]] = []
 
     while current_start < end_date:
         current_end = min(current_start + timedelta(days=step), end_date)
