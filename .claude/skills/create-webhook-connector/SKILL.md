@@ -131,4 +131,4 @@ If the provider also has pull API endpoints, classify and add them as ordinary s
 
 ## Smoke test
 
-`flowctl raw spec` / `flowctl raw discover` (free, no API) should emit the config schema and the webhook resource(s). Don't run a live capture — webhook delivery is exercised by the provider POSTing to a deployed receiver, out of scope here.
+`flowctl raw spec` / `flowctl raw discover` should emit the config schema and the webhook resource(s). `flowctl raw spec` never touches the provider; `flowctl raw discover` is gated by `API-DISCOVER-STATIC-IS-FREE` — free for **Pattern 2** (`known_values`, hardcoded/config-driven, no provider call), budget-gated like `flowctl preview` for **Pattern 1: API-discovered** event types (`source-appsflyer`'s `all_resources` fetches them live on every discover). Don't run a live capture — webhook delivery is exercised by the provider POSTing to a deployed receiver, out of scope here.

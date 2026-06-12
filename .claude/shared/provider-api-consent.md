@@ -46,16 +46,21 @@ Don't read the encrypted credentials file directly, even just to check its struc
 
 Survey the provider's rate limits before running anything repeatedly, and set the session budget from the result:
 
-- **All required endpoints > 20 req/hr:** run `flowctl preview`, `pytest` (including snapshot tests that drive `flowctl preview` underneath), and capture-running commands as often as needed, without further consent.
-- **Any required endpoint ≤ 20 req/hr:** ask before each run, and apply `API-COST-SAVER-DISABLE`.
+- **All required endpoints > 20 req/hr:** run `flowctl preview`, `flowctl raw discover` (whenever it hits the API — see `API-DISCOVER-STATIC-IS-FREE`), `pytest` (including snapshot tests that drive `flowctl preview` underneath), and capture-running commands as often as needed, without further consent.
+- **Any required endpoint ≤ 20 req/hr:** ask before each run — `flowctl raw discover` included, whenever it hits the API — and apply `API-COST-SAVER-DISABLE`.
 
 Verified limits live in `<connector>/bruno/opencollection.yml`'s `docs:` block under `## API constraints (account-wide)`. Check there before re-deriving anything; record newly-established limits there so the next session doesn't repeat the work.
 
 ---
 
-### `API-DISCOVER-FREE` · checkable-from-diff
+### `API-DISCOVER-STATIC-IS-FREE` · checkable-from-diff
 
-`flowctl raw discover` is always free. It exercises only the connector's discovery path and burns no provider API budget. No consent needed, regardless of the `API-BUDGET-20RPH` verdict.
+`flowctl raw discover` follows `API-BUDGET-20RPH` **unless** this connector's discovery makes zero provider calls, in which case it's unconditionally free.
+
+Which case you're in is a property of the connector, not a blanket exemption — read its discovery path before assuming either way:
+
+- **Static (the common case):** the resource list is fixed in code. Zero provider calls. Discover is free, full stop.
+- **Dynamic:** discovery asks the provider what resources exist. `source-salesforce-native`'s `all_resources` fetches the instance URL and the queryable-object list; `source-zuora`'s fetches its object names. For these, discover is just another API-hitting command.
 
 ---
 

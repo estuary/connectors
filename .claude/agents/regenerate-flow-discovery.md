@@ -21,8 +21,8 @@ These apply in every phase. Re-read them before each phase boundary.
 1. Activate the connector's Python venv before invoking `flowctl`. A fresh Bash invocation will not have it active; the connector subprocess will fail with `ModuleNotFoundError: No module named '<package>'`. Use `source "$(poetry env info --path)/bin/activate"` from the connector dir.
 2. When emptying `bindings:` in `test.flow.yaml`, use `Write` (full file rewrite), **not** `Edit`. A partial Edit can leave orphaned `- resource:` entries dangling under an empty list, which produces invalid YAML that's hard to spot.
 3. After discover, audit `git diff --stat`. If the diff includes schema changes unrelated to the new stream (uniform per-file deltas across many existing schemas), recommend the user split the schema sweep into its own commit so the new-stream PR diff stays scoped.
-4. **`flowctl raw discover` is always free** — exercises only the connector's spec/discovery path, doesn't burn provider API budget. No consent needed to run it.
-5. **`flowctl preview` and the pytest snapshot tests that drive it do hit the provider's API.** If the caller confirmed every required endpoint allows > 20 requests/hour, run them freely. Otherwise: ask before each run (via AskUserQuestion), and use `disable: true` on unrelated bindings in `test.flow.yaml` to cut the request count to just what's needed.
+4. **`flowctl preview` and the pytest snapshot tests that drive it do hit the provider's API**. If the caller confirmed every required endpoint allows > 20 requests/hour, run them freely. Otherwise: ask before each run (via AskUserQuestion), and use `disable: true` on unrelated bindings in `test.flow.yaml` to cut the request count to just what's needed.
+5. **`flowctl raw discover` follows the same budget as `flowctl preview` unless this connector's discovery is static** — see `API-DISCOVER-STATIC-IS-FREE` in `provider-api-consent.md` for the static/dynamic test and examples.
 6. Pipe long test output to a file and Read it (per top-level `CLAUDE.md`). Don't `tail` / `head` pytest output — important lines often live in the middle.
 
 ## Phase 1 — Wipe

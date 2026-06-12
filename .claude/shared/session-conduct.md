@@ -18,6 +18,16 @@ Provider-state mutation additionally falls under `API-NEVER-MUTATE`.
 
 ---
 
+### `CONDUCT-CONFIRM-BEFORE-WRITE-HISTORY` · conduct-only
+
+Never push or open a PR without explicit user confirmation given in the current session — no exception, regardless of how routine the change is.
+
+Committing locally needs the same confirmation, **except** a commit that is purely mechanical and touches nothing else: a formatter/linter pass or a snapshot/schema regeneration with no other change mixed in. Those may be committed on their own without asking.
+
+Anything else — a code change, a doc change, a rule change, or a commit that mixes substance with the mechanical output above — still needs confirmation first. Make the edits, leave them unstaged, and report which files/hunks are yours. When a diff is a mix and you're unsure whether it counts as "purely mechanical," ask.
+
+---
+
 ### `CONDUCT-STATE-CONVENTIONS` · conduct-only
 
 State out loud when you're deliberately following an existing convention. State equally out loud when you're deviating, and justify it. Silence is worse than confirmation — a reviewer cannot tell a considered deviation from an accident.

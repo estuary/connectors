@@ -66,7 +66,7 @@ Invoke before writing or changing any `fetch_*` / `backfill_*` function.
 | `API-TOKEN-EPHEMERAL` | diff | Token on `req` only; never `setVar` / `setEnvVar` / committed |
 | `API-DONT-READ-CREDS` | conduct | Don't read the encrypted credentials file directly |
 | `API-BUDGET-20RPH` | runtime | Rate-limit survey sets the run budget |
-| `API-DISCOVER-FREE` | diff | `flowctl raw discover` needs no consent |
+| `API-DISCOVER-STATIC-IS-FREE` | diff | `flowctl raw discover` follows the same budget gate as `preview` — free only if this connector's discovery makes zero provider calls |
 | `API-COST-SAVER-DISABLE` | diff | `disable: true` is a test-time tool — **never commit it** |
 
 ### Session conduct — [`session-conduct.md`](session-conduct.md)
@@ -75,6 +75,7 @@ Invoke before writing or changing any `fetch_*` / `backfill_*` function.
 | ---- | ----- | --------- |
 | `CONDUCT-TODO-LIST` | conduct | Open with a TODO list, one task per phase |
 | `CONDUCT-CONSENT-DESTRUCTIVE` | conduct | Consent before destructive ops |
+| `CONDUCT-CONFIRM-BEFORE-WRITE-HISTORY` | conduct | Push/PR always need confirmation; a purely formatting- or snapshot-only commit doesn't |
 | `CONDUCT-STATE-CONVENTIONS` | conduct | Say when you follow a convention, and when you deviate |
 | `CONDUCT-CITE-SOURCE` | diff | Copied patterns cite `file:line` |
 | `CONDUCT-GREP-BEFORE-CITE` | conduct | Grep for remembered symbols before recommending them |
