@@ -80,6 +80,12 @@ Annotate all function signatures and class attributes. The CDK relies heavily on
 - Keep defined fields to just primary keys, cursors and anything referenced in the codebase
 - Don't over-specify schemas—Estuary's schema inference handles additional fields automatically
 - Prefer type parameter syntax (`class Foo[T]`) over `TypeVar` + `Generic[T]`
+- Carry per-stream identity (stream name, endpoint path, response items key)
+  as `ClassVar`s on the entity model — not as parallel tuple registries or
+  threaded parameters. Define resources the `source-posthog` style: a plain
+  list of model classes for snapshot streams consumed by a builder with a
+  name→fetcher mapping, one named builder function per non-snapshot stream,
+  and an `all_resources` that composes the builders.
 - When the connector's logic depends on a provider field, model it as a **required**
   field rather than reading it defensively (e.g. `getattr(obj, "field", None)`). A
   `getattr` default silently swallows a provider response-shape change—the dependent
@@ -96,6 +102,7 @@ Annotate all function signatures and class attributes. The CDK relies heavily on
 ### API response processing
 
 - Always prefer using `IncrementalJsonProcessor` and `IncrementalCsvProcessor` over manually parsing responses.
+- **Never use `json.loads` on an API response.** Define a Pydantic model with typed attributes and parse with `Model.model_validate_json(...)` — even for one-off responses like auth/metadata endpoints. Untyped dict access hides schema drift until runtime; a typed model validates the response shape at the parse boundary and documents the contract.
 
 #### Basic usage
 
@@ -123,6 +130,24 @@ next_url = meta.next  # e.g., pagination URL
 - **Pagination metadata**: Extract `next`/`previous` URLs from response envelope
 - **Query metadata**: Extract column names, totals, cursor tokens
 - **Any structure outside the array path**: Remainder captures everything not at the prefix
+
+### Parameter ordering
+
+When a function takes any of `log`, `http`, and `config`, they appear in that
+relative order — e.g. `validate_credentials(log, http, config)`,
+`all_resources(log, http, config)`. Exception: the CDK's fetch contracts
+append `log` (and the cursor) after the partial-bound parameters, so fetch
+functions are necessarily `fetch_x(http, ..., log, cursor)` — external
+contracts and typing constraints like this take precedence over the ordering.
+
+### Fetch function naming
+
+The three public per-stream fetch functions follow a fixed scheme (campaigns as
+the example): snapshot → `snapshot_campaigns`; backfill (`fetch_page`) →
+`backfill_campaigns`; incremental (`fetch_changes`) → `fetch_campaigns`.
+Helper functions have no naming restrictions — a shared polymorphic engine
+should be a private helper behind per-stream public functions named per the
+scheme.
 
 ### Incremental cursor behavior
 

@@ -12,6 +12,8 @@ Check whether the parent ID is already in the child's response body. If it is, y
 
 Before iterating to fetch children, drain the parent stream into a list of **only** the fields you actually need downstream — typically just `id`, plus any filter fields like `updated_at`. Do **not** interleave streaming a parent response with per-parent child requests. Holding a parent HTTP response open while fetching children for each parent leaves the parent connection idle long enough to trigger timeout errors. Don't buffer the full parent records — define a small dataclass or extract just `parent.id` (and the filter fields you need) to save on memory.
 
+**Reject empty parent IDs at the drain step.** An empty parent ID templates a malformed child path (e.g. `parents//children`) that typically returns nothing, silently orphaning every child instead of failing. Reject only the empty string, not every falsy value: integer IDs can legitimately be `0`.
+
 ## Pattern
 
 ### 1. Validation-context dataclass (`models.py`)

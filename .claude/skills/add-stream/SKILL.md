@@ -12,13 +12,16 @@ Add a `stream-name` stream to the `source-$1` connector. Read a few neighboring 
 These apply in every phase. Re-read them before each phase boundary.
 
 1. Open the session with a TODO list. One task per phase below, plus any provider-specific work that comes up.
-2. **Budget rule for captures and previews:** Phase 1 (Rate Limit Survey) sets the budget. If every endpoint this stream and its siblings will touch allows **more than 20 requests/hour**, you may run `flowctl preview`, `pytest` (including the snapshot tests that drive `flowctl preview` under the hood), and capture-running commands as often as needed without further consent. If any required endpoint is tighter than that, ask before each run, and consider Law #6.
-3. **Cost-saver:** `disable: true` on a binding in `test.flow.yaml` skips that stream during preview/capture. When the budget is tight or you only care about the new stream's behavior, disable unrelated bindings before running tests. Restore them before committing.
-4. **`flowctl raw discover` is always free.** It exercises only the connector's discovery path and doesn't burn provider API budget. No consent needed.
-5. Prefer snapshot tests over fine-grained assertions when checking outputs.
-6. State out loud when you're deliberately following an existing convention. State equally out loud when you're deviating, and justify it. Silence is worse than confirmation.
-7. When you copy a pattern from another stream, cite the exact `file:line` you copied from so the user can sanity-check.
-8. If you propose a function/field/flag that you remember seeing in the connector, grep for it before recommending — the codebase may have changed since memory was formed.
+2. Ask the user for consent before any destructive op (deleting generated files/dirs, rewriting bindings, mutating provider state).
+3. Never mutate provider state yourself. If verification needs a mutation, write the request and hand it to the user.
+4. **Provider API-call rule:** read-only calls allowed without per-call consent **iff** `<connector>/config.yaml` is unmodified and tracked — check via `git status --porcelain <connector>/config.yaml` before _every_ read call. Ask every time the file shows any uncommitted modification. Effectful (mutating) calls always require explicit consent and are run by the user, not by you.
+5. **Budget rule for captures and previews:** Phase 1 (Rate Limit Survey) sets the budget. If every endpoint this stream and its siblings will touch allows **more than 20 requests/hour**, you may run `flowctl preview`, `pytest` (including the snapshot tests that drive `flowctl preview` under the hood), and capture-running commands as often as needed without further consent. If any required endpoint is tighter than that, ask before each run, and consider Law #6.
+6. **Cost-saver:** `disable: true` on a binding in `test.flow.yaml` skips that stream during preview/capture. When the budget is tight or you only care about the new stream's behavior, disable unrelated bindings before running tests. Restore them before committing.
+7. **`flowctl raw discover` is always free.** It exercises only the connector's discovery path and doesn't burn provider API budget. No consent needed.
+8. Prefer snapshot tests over fine-grained assertions when checking outputs.
+9. State out loud when you're deliberately following an existing convention. State equally out loud when you're deviating, and justify it. Silence is worse than confirmation.
+10. When you copy a pattern from another stream, cite the exact `file:line` you copied from so the user can sanity-check.
+11. If you propose a function/field/flag that you remember seeing in the connector, grep for it before recommending — the codebase may have changed since memory was formed.
 
 ## Phase 0 — Reconnoiter
 
@@ -36,27 +39,31 @@ If the suite fails:
 
 Before researching the requested stream, figure out the provider's API rate limits.
 
-**First, check for cached notes.** Read `<connector>/CLAUDE.md` (create the file if it doesn't exist). If it has an "API Rate Limits" section, use those values — don't re-derive. They're authoritative until proven stale (and you'll only spot staleness if a run starts 429-ing).
+**The Bruno collection is the home for API knowledge, not `CLAUDE.md`.** Verified rate limits and throttling behavior live in `<connector>/bruno/collection.bru`'s `docs` block under an `## API constraints (account-wide)` heading, next to the requests that prove them.
 
-**If the section is absent**, look up the limits:
+**First, check for cached notes.** If the connector has a `bruno/` collection, read `bruno/collection.bru`'s `docs` block. If it has an `## API constraints` section, use those values — don't re-derive.
+
+**If the section (or the collection) is absent**, look up the limits:
 
 - The published limit for the endpoint family (typically requests/second or requests/hour, sometimes per-key, sometimes per-account).
 - Any _tighter_ limits that apply to the specific endpoints this stream will touch — search endpoints, expensive list endpoints, and event firehoses often have lower budgets than the general bucket.
 - Any soft-quota / overage / 429 backoff behavior the provider documents.
 
-Then **write the findings to `<connector>/CLAUDE.md`** under an `## API Rate Limits` section so the next stream addition doesn't repeat the work.
+Then **record the findings in `bruno/collection.bru`'s `docs` block** under `## API constraints (account-wide)` so the next stream addition doesn't repeat the work. The collection is stood up during verification (`bruno-probe-endpoint`); if it doesn't exist yet at this point, carry the findings forward and write them there once it's created.
 
 ```markdown
-## API Rate Limits
+## API constraints (account-wide)
 
-- General: <N> req/sec per key (per provider docs, link).
+- Concurrency / general: <N> req/sec per key (per provider docs, link).
 - Tighter buckets:
   - `/v1/<endpoint>`: <M> req/min
   - `/v1/<events-firehose>`: <K> req/hr
-- 429 behavior: <retry-after / exponential backoff / hard-cut>.
+- Throttling (429/403): <retry-after / exponential backoff / hard-cut>.
 ```
 
-**Set the budget for the rest of the skill**:
+**Per-endpoint limitations** discovered while surveying a specific endpoint go on the request that proves them, in that request's `docs` block under a `**Limitation:**` marker (mirroring the `**Finding (verified live):**` convention) — not in this account-wide block, and not in `CLAUDE.md`. `collection.bru` keeps a short index of them.
+
+**Set the budget for the rest of the skill** (see Laws #5–#7):
 
 - **All required endpoints > 20 req/hr:** run `flowctl preview` / `pytest` / captures freely.
 - **Any required endpoint ≤ 20 req/hr:** ask before each run; plan to disable unrelated bindings in `test.flow.yaml` (`disable: true`) before testing.
@@ -124,6 +131,19 @@ Documentation:
 Add the new stream wherever the connector enumerates streams. That's often a top-level list, a discovery function, or both — grep the connector for how other streams declare themselves and match the form.
 
 Check whether any per-connector "special lists" apply (split-child, regional, scheduled-backfill, exempt-from-X). The way to know: grep for sibling streams that share traits with the new one, and see which lists they appear in.
+
+## Phase 5.5 — Static checks & formatting
+
+After the implementation compiles and before regenerating flow discovery, run over the connector package:
+
+1. **Type-check** with `pyright` (or `basedpyright`), inside the connector's poetry env so imports resolve: `poetry run basedpyright source_<pkg>/`.
+   - Fix every error in code this session wrote.
+   - **Read the warnings individually too — never dismiss the warning list wholesale.** Actionable classes hide there at warning severity: `reportDeprecated` (e.g. `typing.AsyncGenerator` → `collections.abc`) and `reportPrivateImportUsage` (importing a symbol from a module that re-imports but doesn't re-export it — follow the "Import from X instead" hint). Fix these in session-written code; only generics-inference noise from CDK internals may be left.
+   - House-pattern errors (e.g. `request_class`/`spec`/`credentials_title` override complaints inherited from the scaffold/reference idioms) may be pre-existing noise: **verify parity by running the same check on a sibling connector** before ignoring them, and say so out loud.
+2. **Organize imports**: `ruff check --select I --fix source_<pkg>/ tests/`.
+3. **Format**: `black source_<pkg>/ tests/`.
+
+Re-run the test suite if any of these changed code. If a tool isn't on PATH, find it (editor tooling dirs count) or ask — don't skip the step silently.
 
 ## Phase 6 — Flow Regeneration
 
