@@ -80,6 +80,20 @@ When debugging CI test failures, always ask the user for complete CI logs before
 - [capture.proto](https://github.com/estuary/flow/blob/master/go/protocols/capture/capture.proto) — Capture protocol
 - [materialize.proto](https://github.com/estuary/flow/blob/master/go/protocols/materialize/materialize.proto) — Materialization protocol
 
-## PR Reviews
+## Agent skills
+
+### Issue tracker
+
+Issues live as GitHub issues in `estuary/connectors`, driven by the `gh` CLI (the org enforces SAML SSO — `gh auth refresh` if a call is rejected). See [docs/agents/issue-tracker.md](docs/agents/issue-tracker.md).
+
+### Domain docs
+
+Multi-context: [CONTEXT-MAP.md](CONTEXT-MAP.md) splits captures from materializations, with per-context glossaries and ADRs under `docs/contexts/`. See [docs/agents/domain.md](docs/agents/domain.md).
+
+### Connector work
+
+Skills under `.claude/skills/` cover the connector lifecycle — `create-capture-connector`, `scaffold-connector`, `configure-auth`, `add-stream`, `child-entities`, `bruno-probe-endpoint`, `regenerate-flow-discovery`, `changelog`. The rules they enforce are indexed in [.claude/shared/rules-index.md](.claude/shared/rules-index.md); always-on Python rules load from [.claude/rules/connector-python.md](.claude/rules/connector-python.md).
+
+### PR reviews
 
 When running the `pr-review-toolkit:review-pr` skill, after the standard review: for every commit that fixes a bug in a specific stream's fetch/parse/cursor logic, check whether the same bug pattern exists in other streams in the same connector. Streams within a connector typically share polling, pagination, and cursor patterns, so single-stream fixes frequently apply to siblings. Report any affected-looking siblings as part of the review output.

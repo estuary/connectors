@@ -29,7 +29,7 @@ Confirm the connector exists. Locate its `models.py`, `resources.py`, `api.py` (
 
 If the suite fails:
 
-- **Simple schema drift** (the connector spec/discover output has shifted but the code is unchanged): you may dispatch the `regenerate-flow-discovery` agent to refresh the snapshots, then commit the result on its own with the message `<connector-name>: update tests`. Keep this commit separate from the new-stream work so the PR diff stays scoped.
+- **Simple schema drift** (the connector spec/discover output has shifted but the code is unchanged): you may dispatch the `regenerate-flow-discovery` agent to refresh the snapshots, then commit the result on its own with the message `<connector-name>: update tests` — a pure snapshot regeneration, so `CONDUCT-CONFIRM-BEFORE-WRITE-HISTORY`'s mechanical-change exception covers it. Keep this commit separate from the new-stream work so the PR diff stays scoped.
 - **Flakey fields in the diff** (timestamps like `updated_at`, ETags, anything that changes between runs): surface them to the user and ask whether to add them to the connector's `FIELDS_TO_REDACT` list in `tests/test_snapshots.py` (name varies between connectors — grep for `FIELDS_TO_REDACT` to find the convention).
 - **Anything else:** stop and surface the failure to the user before entering Phase 4.
 
@@ -47,11 +47,10 @@ Before researching the requested stream, figure out the provider's API rate limi
 
 Then **record the findings in the collection** so the next stream addition doesn't repeat the work. The block format — and where endpoint-specific limitations go instead (a `**LIMITATION**` finding on the proving request) — is defined in `bruno-probe-endpoint`, which also stands the collection up during verification; if it doesn't exist yet at this point, carry the findings forward and write them there once it's created.
 
-**Set the budget for the rest of the skill** (`API-BUDGET-20RPH`, `API-DISCOVER-FREE`, `API-COST-SAVER-DISABLE` in [`.claude/shared/provider-api-consent.md`](../../shared/provider-api-consent.md)):
+**Set the budget for the rest of the skill** (`API-BUDGET-20RPH`, `API-DISCOVER-STATIC-IS-FREE`, `API-COST-SAVER-DISABLE` in [`.claude/shared/provider-api-consent.md`](../../shared/provider-api-consent.md)):
 
-- **All required endpoints > 20 req/hr:** run `flowctl preview` / `pytest` / captures freely.
-- **Any required endpoint ≤ 20 req/hr:** ask before each run; plan to disable unrelated bindings in `test.flow.yaml` (`disable: true`) before testing.
-- **`flowctl raw discover` is always allowed**, regardless of budget.
+- **All required endpoints > 20 req/hr:** run `flowctl preview` / `flowctl raw discover` / `pytest` / captures freely.
+- **Any required endpoint ≤ 20 req/hr:** ask before each run — `flowctl raw discover` included, unless this connector's discovery is static (see `API-DISCOVER-STATIC-IS-FREE` above); plan to disable unrelated bindings in `test.flow.yaml` (`disable: true`) before testing.
 
 ## Phase 2 — Endpoint Survey
 
