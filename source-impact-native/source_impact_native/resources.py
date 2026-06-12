@@ -82,7 +82,7 @@ async def all_resources(
 
 
 def base_object(
-    cls, http: HTTPSession, stop_date: datetime, account_sid
+    cls, http: HTTPSession, stop_date: datetime, account_sid: str
 ) -> Resource:
     """Base Object is the standard object for source-impact-native
     """
@@ -120,7 +120,7 @@ def base_object(
 
 
 def action_object(
-    cls_parent, cls, http: HTTPSession, stop_date: datetime, account_sid
+    cls_parent, cls, http: HTTPSession, stop_date: datetime, account_sid: str
 ) -> Resource:
     """Action Object is the standard method for Actions and ActionsInquires streams.
     Actions endpoints require a really specific set of parameters to work, and also requires
@@ -159,7 +159,7 @@ def action_object(
     )
 
 def snapshot_object(
-    cls, http: HTTPSession, stop_date: datetime, account_sid
+    cls, http: HTTPSession, stop_date: datetime, account_sid: str
 ) -> Resource:
     """Snapshot Object handles the stream cases were we dont have any valid replication keys
     to use. Some streams have valid Ids being returned by the API, others depend on flow's _meta/id
@@ -192,7 +192,7 @@ def snapshot_object(
     )
 
 def child_object(
-    cls_parent, cls, http: HTTPSession, stop_date: datetime, account_sid
+    cls_parent, cls, http: HTTPSession, stop_date: datetime, account_sid: str
 ) -> Resource:
     """Child Object handles the default parent/child streams. As of now, the only possible parent stream to exist is the
     Campaigns stream.
