@@ -1,0 +1,13 @@
+collections:
+  acmeCo/automations:
+    schema: automations.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/campaigns:
+    schema: campaigns.schema.yaml
+    key:
+    - /id
+  acmeCo/lists:
+    schema: lists.schema.yaml
+    key:
+    - /_meta/row_id
