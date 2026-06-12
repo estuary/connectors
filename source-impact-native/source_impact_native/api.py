@@ -15,6 +15,15 @@ from source_impact_native.models import ActionInquiries, Actions
 API = "https://api.impact.com"
 API_CATALOG = "Advertisers"
 
+# Impact's endpoints are eventually consistent.A record can become
+# queryable minutes after its timestamp, after the connector has
+# already seen records with later timestamps. Since the incremental
+# cursor is a high-water mark, anything that surfaces below it would
+# be filtered out and lost forever. To avoid that, we never advance
+# the cursor over records younger than INCREMENTAL_LAG, giving late
+# arrivals time to appear before the cursor moves past their timestamp.
+INCREMENTAL_LAG = timedelta(hours=1)
+
 async def fetch_incremental(
     cls,
     account_sid,
@@ -38,13 +47,14 @@ async def fetch_incremental(
     if _cls.START_DATE_INCREMENTAL:
         parameters = {f"{_cls.START_DATE_INCREMENTAL}": _cursor_dt(_cls.NAME, log_cursor)}
     max_ts = log_cursor
+    horizon = datetime.now(tz=UTC) - INCREMENTAL_LAG
 
     while iterating:
         result = json.loads(await http.request(log, url, method="GET", params=parameters, headers=headers))
 
         for results in result[f"{_cls.NAME}"]:
             ts = _s_to_dt(results[f"{_cls.REP_KEY}"])
-            if ts >= log_cursor:
+            if log_cursor <= ts < horizon:
                 max_ts = max(max_ts, ts)
                 doc = _cls.model_validate_json(json.dumps(results))
                 yield doc
@@ -132,6 +142,7 @@ async def fetch_incremental_actions(
         campaign_list.add(campaign.Id)
 
     max_ts = log_cursor
+    horizon = datetime.now(tz=UTC) - INCREMENTAL_LAG
 
     for campaign in campaign_list:
 
@@ -146,7 +157,8 @@ async def fetch_incremental_actions(
             result = json.loads(await http.request(log, url, method="GET", params=parameters, headers=headers))
 
             for results in result[f"{cls.NAME}"]:
-                if _s_to_dt(results["CreationDate"]) >= log_cursor:
+                ts = _s_to_dt(results["CreationDate"])
+                if log_cursor <= ts < horizon:
                     doc = _cls.model_validate_json(json.dumps(results))
                     max_ts = max(max_ts, doc.CreationDate)
                     yield doc
@@ -287,6 +299,7 @@ async def fetch_incremental_child(
         campaign_list.add(campaign.Id)
 
     max_ts = log_cursor
+    horizon = datetime.now(tz=UTC) - INCREMENTAL_LAG
 
     for campaign in campaign_list:
         iterating = True
@@ -303,12 +316,13 @@ async def fetch_incremental_child(
             result = json.loads(await http.request(log, url, method="GET", params=parameters, headers=headers))
 
             for results in result[f"{_cls.NAME}"]:
-                if _s_to_dt(results[f"{_cls.REP_KEY}"]) >= log_cursor:
-                    max_ts = max(max_ts, _s_to_dt(results[f"{_cls.REP_KEY}"]))
+                ts = _s_to_dt(results[f"{_cls.REP_KEY}"])
+                if log_cursor <= ts < horizon:
+                    max_ts = max(max_ts, ts)
                     doc = _cls.model_validate_json(json.dumps(results))
                     yield doc
 
-                elif _s_to_dt(results[f"{_cls.REP_KEY}"]) < log_cursor:
+                elif ts < log_cursor:
                     iterating = False
                     break
             if result.get("@nextpageuri"):
