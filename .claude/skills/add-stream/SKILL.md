@@ -11,14 +11,15 @@ Add a `stream-name` stream to the `source-$1` connector. Read a few neighboring 
 
 These apply in every phase. Re-read them before each phase boundary.
 
-1. Open the session with a TODO list. One task per phase below, plus any provider-specific work that comes up.
-2. **Budget rule for captures and previews:** Phase 1 (Rate Limit Survey) sets the budget. If every endpoint this stream and its siblings will touch allows **more than 20 requests/hour**, you may run `flowctl preview`, `pytest` (including the snapshot tests that drive `flowctl preview` under the hood), and capture-running commands as often as needed without further consent. If any required endpoint is tighter than that, ask before each run, and consider Law #6.
-3. **Cost-saver:** `disable: true` on a binding in `test.flow.yaml` skips that stream during preview/capture. When the budget is tight or you only care about the new stream's behavior, disable unrelated bindings before running tests. Restore them before committing.
-4. **`flowctl raw discover` is always free.** It exercises only the connector's discovery path and doesn't burn provider API budget. No consent needed.
-5. Prefer snapshot tests over fine-grained assertions when checking outputs.
-6. State out loud when you're deliberately following an existing convention. State equally out loud when you're deviating, and justify it. Silence is worse than confirmation.
-7. When you copy a pattern from another stream, cite the exact `file:line` you copied from so the user can sanity-check.
-8. If you propose a function/field/flag that you remember seeing in the connector, grep for it before recommending — the codebase may have changed since memory was formed.
+**Shared laws** — read both before Phase 0; they are the single authority:
+
+- [`.claude/shared/session-conduct.md`](../../shared/session-conduct.md)
+- [`.claude/shared/provider-api-consent.md`](../../shared/provider-api-consent.md)
+
+**Skill-specific laws:**
+
+1. Phase 1 (Rate Limit Survey) is what sets the budget referenced by `API-BUDGET-20RPH`. Don't enter Phase 4 without it.
+2. Prefer snapshot tests over fine-grained assertions when checking outputs.
 
 ## Phase 0 — Reconnoiter
 
@@ -36,27 +37,17 @@ If the suite fails:
 
 Before researching the requested stream, figure out the provider's API rate limits.
 
-**First, check for cached notes.** Read `<connector>/CLAUDE.md` (create the file if it doesn't exist). If it has an "API Rate Limits" section, use those values — don't re-derive. They're authoritative until proven stale (and you'll only spot staleness if a run starts 429-ing).
+**Check for cached notes first.** The Bruno collection is the home for API knowledge: verified limits and throttling behavior live in `<connector>/bruno/opencollection.yml`'s `docs:` block under `## API constraints (account-wide)`. If the section exists, use those values — don't re-derive.
 
-**If the section is absent**, look up the limits:
+**If the section (or the collection) is absent**, look up the limits:
 
 - The published limit for the endpoint family (typically requests/second or requests/hour, sometimes per-key, sometimes per-account).
 - Any _tighter_ limits that apply to the specific endpoints this stream will touch — search endpoints, expensive list endpoints, and event firehoses often have lower budgets than the general bucket.
 - Any soft-quota / overage / 429 backoff behavior the provider documents.
 
-Then **write the findings to `<connector>/CLAUDE.md`** under an `## API Rate Limits` section so the next stream addition doesn't repeat the work.
+Then **record the findings in the collection** so the next stream addition doesn't repeat the work. The block format — and where endpoint-specific limitations go instead (a `**LIMITATION**` finding on the proving request) — is defined in `bruno-probe-endpoint`, which also stands the collection up during verification; if it doesn't exist yet at this point, carry the findings forward and write them there once it's created.
 
-```markdown
-## API Rate Limits
-
-- General: <N> req/sec per key (per provider docs, link).
-- Tighter buckets:
-  - `/v1/<endpoint>`: <M> req/min
-  - `/v1/<events-firehose>`: <K> req/hr
-- 429 behavior: <retry-after / exponential backoff / hard-cut>.
-```
-
-**Set the budget for the rest of the skill**:
+**Set the budget for the rest of the skill** (`API-BUDGET-20RPH`, `API-DISCOVER-FREE`, `API-COST-SAVER-DISABLE` in [`.claude/shared/provider-api-consent.md`](../../shared/provider-api-consent.md)):
 
 - **All required endpoints > 20 req/hr:** run `flowctl preview` / `pytest` / captures freely.
 - **Any required endpoint ≤ 20 req/hr:** ask before each run; plan to disable unrelated bindings in `test.flow.yaml` (`disable: true`) before testing.
@@ -70,60 +61,46 @@ Pick one and explain why it fits the connector's constraints. **Call out when yo
 
 Surface rejected alternatives with a one-line "why not" each. This becomes useful context for reviewers later.
 
+**Document grain.** Decide here — with the endpoint, before classification — what one document _is_. The document is the atomic fact, not the API's transport grouping: list endpoints often shape their repeated element as a container (a member row wrapping an `activity[]` of independently-identified events, a report wrapping a `timeseries[]`). When the repeated element contains its own array of items carrying their own identity (action, timestamp, id), yield the **inner item**, with the wrapper's identifying fields denormalized into it (or into `_meta`) — never the wrapper with the array still nested. Tells that you've picked the container:
+
+- The collection key can't be unique without reaching _inside_ a nested array (`[campaign_id, email_id]` doesn't identify an event; `[campaign_id, email_id, action, timestamp]` does — so the event is the document).
+- Re-capturing the entity would _mutate a growing array_ instead of appending new documents. Under last-write-wins reduction, a later partial fetch (e.g. one filtered by `since`) silently **erases** previously captured history from the nested array.
+- The wrapper is a _view over_ facts (an aggregate/rollup), while the inner items are the facts themselves — immutable once they happen.
+
+The decision test: "what is the thing that, once true, never changes?" That's the document. Aggregates change; events don't.
+
 ## Phase 3 — Classification
 
 Defer to the `classify-stream-types` skill. Don't re-derive its flowchart here. Bring back: the chosen replication strategy (webhook, incremental+backfill, incremental-only, or snapshot) and the rationale.
 
-**Checkpoint:** present the chosen endpoint (from Phase 2), the classification, and the rationale to the user, and ask whether they want to proceed to Phase 4 (Model Implementation). Stop here until they say yes. This is the natural break for the user to course-correct before any connector code gets written.
+**Checkpoint:** present the chosen endpoint (from Phase 2), the document grain, the classification, and the rationale to the user, and ask whether they want to proceed to Phase 4 (Model Implementation). Stop here until they say yes. This is the natural break for the user to course-correct before any connector code gets written.
 
 ## Phase 4 — Model Implementation
 
 Find the closest existing stream in _the same connector_ whose replication strategy matches the one chosen in Phase 3. Replicate its pattern verbatim and cite the exact `file:line` you copied from. Do not introduce a new pattern when the connector already has one — if the existing pattern doesn't fit, that's a Phase 2 conversation, not a Phase 4 one.
 
-For incremental and backfill streams, the fetch functions must additionally follow the **House rules for incremental & backfill fetch functions** below.
+For incremental and backfill streams, **invoke the `fetch-function-rules` skill before writing the fetch functions.** It holds the window semantics, resume-key, and checkpointing rules — four of them are data-loss-class and none are inferable from the sibling stream you're copying. Cite rule IDs (`FETCH-SEAM-PRECISION`, …) when you apply or deviate from them. Do not mention rule IDs in code.
 
-## House rules — incremental & backfill fetch functions
-
-Naming and shape:
-
-1. **Names:** incremental functions are `fetch_<stream>`, backfill functions are `backfill_<stream>` (cf. `fetch_campaigns`/`backfill_campaigns`).
-2. **The model owns its endpoint contract.** Path templates, items keys, and cursor-filter parameter names (`SINCE_PARAM`/`BEFORE_PARAM`-style) are ClassVars on the document model; the cursor value comes from an abstract `get_cursor()` method on the model base — never a `cursor_of` callable threaded through signatures.
-3. **Name request-param dicts by distance from the request:** plain `params` only where the dict is immediately handed to the HTTP call; `request_params` / `extra_request_params` when it crosses a signature, struct, or partial. No anonymous tuples in wiring maps — use a small frozen dataclass.
-
-Window semantics (updated-style cursors). "Tick" below means one unit of the provider's cursor resolution — determine it first; providers variously use seconds, milliseconds, or whole minutes:
-
-4. **Fetch complete ticks only.** Cap every incremental window at the last fully-elapsed tick (e.g. at second resolution, `horizon = now() floored to the second − 1s`); early-return when `horizon <= cursor`. Updates always stamp their own "now", so an elapsed tick is final the moment it is read — no boundary re-fetch or re-emission tricks are ever needed.
-5. **Boundaries live in the request, not in client-side filters.** First pin each boundary param's inclusivity with a cheap probe (query with the bound set to a doc's exact cursor timestamp; check membership), then choose the queried timestamps so the server returns exactly the intended window. Client filtering is a second boundary-logic layer plus wasted bandwidth/memory — it is only the fallback while semantics are still unverified.
-6. **Exact precision at the seams only.** The seams — backfill→incremental at the cutoff, poll→poll at the cursor — must be gapless: floor the cutoff to a whole tick, end backfill at `cutoff − 1 tick` (inclusive), seed the first incremental cursor at `cutoff − 1 tick` so its first emitted tick is exactly `cutoff`. The START of a backfill window is not load-bearing: query `since = start_date` as-is and let the boundary instant fall out; don't add `− 1 tick` machinery for it.
-
-Documentation:
-
-7. **State facts plainly; flag only the unverified.** No "(verified live)" stamps in code comments or docstrings — verification is the default. Annotate only claims that could NOT be verified. Evidence pointers (a named Bruno probe) are fine; status stamps are not. (The Bruno collection keeps its `**Finding (verified live, date):**` markers — that's the evidence record.)
-8. **Document each window as a rail timeline** in the fetch function's docstring: one tick per named instant, one rail per query param with its bracket semantics at the queried timestamp (`(` exclusive, `]` inclusive), a bottom effect rail (`emitted`/`window`) using closed brackets on the first and last ticks actually collected, and `└─` notes anchored to the tick they explain. Boundary-semantics prose goes in one line below the graph. Keep it hand-editable: ≤ 79 columns, no cross-rail alignment beyond the shared ticks. Copy the shape of this exemplar (from `source-mailchimp-native`'s `fetch_list_children`; adapt ticks, params, and notes to the stream — the glyph conventions are the normative part):
-
-   ```
-                 cursor   cursor + 1s  horizon = last elapsed second
-   ─────────────────┼──────────┼──────────────┼─────▶ time (1s ticks)
-                    │          │              │
-   SINCE_PARAM ─────(══════════╪══════════════╪═════▶
-   BEFORE_PARAM ════╪══════════╪══════════════]
-   emitted ─────────┼──────────[══════════════]
-                    │          │              └─ the present second is still
-                    │          │                 in progress; its docs wait
-                    │          │                 for the next poll's window
-                    │          └─ first emitted second
-                    └─ nothing new can appear here or earlier: this second
-                       had fully elapsed when it was walked, and updates
-                       always stamp "now"
-   ```
-
-   Glyph key: `═` covered by that rail, `─` not covered; `(`/`[`/`]` sit exactly on a tick column; `╪` where a covered rail crosses a tick it doesn't bracket, `┼` where an uncovered one does; tick guideline pipes (`│`) continue through rows whose rail stops short of them; a note's continuation lines align three columns in from its `└─`; rails run top-to-bottom in request-param order with the effect rail last.
+If the stream is a child entity requiring a parent ID to list, use the `child-entities` skill for the per-parent cursor and context-injection pattern.
 
 ## Phase 5 — Registration
 
 Add the new stream wherever the connector enumerates streams. That's often a top-level list, a discovery function, or both — grep the connector for how other streams declare themselves and match the form.
 
 Check whether any per-connector "special lists" apply (split-child, regional, scheduled-backfill, exempt-from-X). The way to know: grep for sibling streams that share traits with the new one, and see which lists they appear in.
+
+## Phase 5.5 — Static checks & formatting
+
+After the implementation compiles and before regenerating flow discovery, run over the connector package:
+
+1. **Type-check** with `pyright` (or `basedpyright`), inside the connector's poetry env so imports resolve: `poetry run basedpyright source_<pkg>/`.
+   - Fix every error in code this session wrote.
+   - **Read the warnings individually too — never dismiss the warning list wholesale.** Actionable classes hide there at warning severity: `reportDeprecated` (e.g. `typing.AsyncGenerator` → `collections.abc`) and `reportPrivateImportUsage` (importing a symbol from a module that re-imports but doesn't re-export it — follow the "Import from X instead" hint). Fix these in session-written code; only generics-inference noise from CDK internals may be left.
+   - House-pattern errors (e.g. `request_class`/`spec`/`credentials_title` override complaints inherited from the scaffold/reference idioms) may be pre-existing noise: **verify parity by running the same check on a sibling connector** before ignoring them, and say so out loud.
+2. **Organize imports**: `ruff check --select I --fix source_<pkg>/ tests/`.
+3. **Format**: `black source_<pkg>/ tests/`.
+
+Re-run the test suite if any of these changed code. If a tool isn't on PATH, find it (editor tooling dirs count) or ask — don't skip the step silently.
 
 ## Phase 6 — Flow Regeneration
 
@@ -142,9 +119,11 @@ This happens inside the `regenerate-flow-discovery` agent. Verify when it return
 For canonical examples of stream patterns at different replication strategies, look at:
 
 - `source-sentry/` — incremental + backfill via cursor filtering on the list endpoint.
-- `source-front/` — incremental only.
+- `source-front/` — incremental only. Also the simplest overall REST skeleton.
 - `source-ashby/` — snapshot.
 - `source-posthog/` — incremental child entities under a parent (see also the `child-entities` skill).
+- `source-airtable-native/` — pagination and nested resources.
+- `source-appsflyer/` — webhook + pull hybrid in one connector (see `create-webhook-connector`).
 
 ## Out of scope
 

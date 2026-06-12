@@ -1,11 +1,13 @@
 ---
+name: changelog
 description: Draft CHANGELOG.md entries for connectors changed in the current branch. Use when the user says "update the changelog", "write a changelog entry", "/changelog", or before submitting a PR that touches a connector.
+allowed-tools: Bash Read Write Edit Glob Grep
 ---
 
 # Changelog Skill
 
 Drafts user-visible entries for each connector's `CHANGELOG.md` based on
-the diff between the current branch and `main`. See [CONTRIBUTING.md](../../CONTRIBUTING.md#changelog-entries)
+the diff between the current branch and `main`. See [CONTRIBUTING.md](../../../CONTRIBUTING.md#changelog-entries)
 for the convention.
 
 ## When to invoke
