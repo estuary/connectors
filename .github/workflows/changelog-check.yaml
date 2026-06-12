@@ -1,0 +1,115 @@
+name: CHANGELOG check
+
+# Advisory PR check: when a connector's code changes (any file under a
+# top-level connector directory like source-*/, materialize-*/), warns
+# in a PR comment if that directory's CHANGELOG.md was not also updated.
+#
+# Opt-in: a directory is only checked if it already has a CHANGELOG.md.
+# Non-blocking: this workflow never fails the build. It exists to remind
+# authors, not to gate merges.
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  check:
+    name: Check CHANGELOG entries
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Identify connectors missing a CHANGELOG entry
+        id: scan
+        run: |
+          set -euo pipefail
+
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+
+          CHANGED=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+          echo "Changed files:"
+          echo "$CHANGED" | sed 's/^/  /'
+
+          # Group by top-level directory.
+          TOP_DIRS=$(echo "$CHANGED" | awk -F/ '/\// {print $1}' | sort -u)
+
+          MISSING=()
+          for dir in $TOP_DIRS; do
+            # Only check connector-like directories.
+            case "$dir" in
+              source-*|materialize-*|capture-*|filesource|filesink) ;;
+              *) continue ;;
+            esac
+
+            # Opt-in: only enforce if the directory already has a CHANGELOG.md.
+            if [ ! -f "$dir/CHANGELOG.md" ]; then
+              continue
+            fi
+
+            # Did this PR change anything in $dir besides CHANGELOG.md?
+            CONTENT_CHANGED=$(echo "$CHANGED" | grep "^$dir/" | grep -v "^$dir/CHANGELOG.md" || true)
+            CHANGELOG_CHANGED=$(echo "$CHANGED" | grep "^$dir/CHANGELOG.md" || true)
+
+            if [ -n "$CONTENT_CHANGED" ] && [ -z "$CHANGELOG_CHANGED" ]; then
+              MISSING+=("$dir")
+            fi
+          done
+
+          if [ ${#MISSING[@]} -eq 0 ]; then
+            echo "missing=" >> "$GITHUB_OUTPUT"
+            echo "All touched connectors with a CHANGELOG.md updated it."
+          else
+            printf 'missing=%s\n' "$(IFS=,; echo "${MISSING[*]}")" >> "$GITHUB_OUTPUT"
+            echo "Connectors missing CHANGELOG entries:"
+            printf '  - %s\n' "${MISSING[@]}"
+          fi
+
+      - name: Post or update PR comment
+        if: steps.scan.outputs.missing != ''
+        uses: actions/github-script@v8
+        env:
+          MISSING: ${{ steps.scan.outputs.missing }}
+        with:
+          script: |
+            const missing = process.env.MISSING.split(',').filter(Boolean);
+            const list = missing.map(d => `- \`${d}/CHANGELOG.md\``).join('\n');
+            const marker = '<!-- changelog-check -->';
+            const body = `${marker}
+            ### CHANGELOG reminder
+
+            This PR changes the following connector(s) but doesn't update their CHANGELOG:
+
+            ${list}
+
+            CHANGELOG entries help customers track what's changed in connectors they use. If your change is user-visible, please add an entry. If it isn't (refactor, internal test, etc.), feel free to ignore this warning.
+
+            See [contributing notes](https://github.com/${{ github.repository }}/blob/main/docs/CONTRIBUTING-changelog.md) or run \`/changelog\` in Claude Code for a draft.`;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
