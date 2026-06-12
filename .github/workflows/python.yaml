@@ -67,6 +67,7 @@ on:
       - "source-appsflyer/**"
       - "source-zuora/**"
       - "source-smartsheet/**"
+      - "source-mailchimp-native/**"
 
   pull_request:
     branches: [main]
@@ -135,6 +136,7 @@ on:
       - "source-appsflyer/**"
       - "source-zuora/**"
       - "source-smartsheet/**"
+      - "source-mailchimp-native/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -395,6 +397,10 @@ jobs:
             version: v1
             usage_rate: "1.0"
           - name: source-smartsheet
+            type: capture
+            version: v1
+            usage_rate: "1.0"
+          - name: source-mailchimp-native
             type: capture
             version: v1
             usage_rate: "1.0"

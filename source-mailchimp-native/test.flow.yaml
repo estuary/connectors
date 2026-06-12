@@ -1,0 +1,27 @@
+import:
+- acmeCo/flow.yaml
+captures:
+  acmeCo/source-mailchimp-native:
+    endpoint:
+      local:
+        command:
+        - python
+        - -m
+        - source_mailchimp_native
+        config: config.yaml
+    bindings:
+    - resource:
+        name: lists
+        interval: PT1H
+        schedule: ''
+      target: acmeCo/lists
+    - resource:
+        name: automations
+        interval: PT1H
+        schedule: ''
+      target: acmeCo/automations
+    - resource:
+        name: campaigns
+        interval: PT5M
+        schedule: 0 0 * * *
+      target: acmeCo/campaigns
