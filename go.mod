@@ -15,6 +15,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.8.0
 	github.com/ClickHouse/ch-go v0.71.0
 	github.com/ClickHouse/clickhouse-go/v2 v2.43.0
+	github.com/alexflint/go-arg v1.6.1
 	github.com/alpacahq/alpaca-trade-api-go/v2 v2.8.0
 	github.com/apache/arrow-go/v18 v18.6.1-0.20260702190817-7c0238a91375
 	github.com/apache/iceberg-go v0.6.1-0.20260714155824-ee3687ced24d
@@ -132,6 +133,7 @@ require (
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.57.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.57.0 // indirect
 	github.com/RoaringBitmap/roaring/v2 v2.19.0 // indirect
+	github.com/alexflint/go-scalar v1.2.0 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/apache/arrow/go/v12 v12.0.1 // indirect
 	github.com/apache/arrow/go/v15 v15.0.2 // indirect
