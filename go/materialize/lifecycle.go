@@ -114,6 +114,11 @@ type StoreIterator struct {
 	ctx     context.Context
 }
 
+// NewStoreIterator creates a new StoreIterator.
+func NewStoreIterator(ctx context.Context, stream Stream, request *pm.Request) *StoreIterator {
+	return &StoreIterator{stream: stream, request: request, ctx: ctx}
+}
+
 // Context returns the Context of this StoreIterator.
 func (it *StoreIterator) Context() context.Context { return it.ctx }
 

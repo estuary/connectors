@@ -21,6 +21,14 @@ func OneOfSchema(title, description, discriminator, default_ string, inputs ...O
 			Extras:  map[string]any{"order": 0},
 		})
 		config.Properties.MoveToFront(discriminator)
+
+		if input.oauth2Provider != nil {
+			if config.Extras == nil {
+				config.Extras = make(map[string]any, 1)
+			}
+			config.Extras["x-oauth2-provider"] = *input.oauth2Provider
+		}
+
 		oneOfs = append(oneOfs, config)
 	}
 
@@ -42,7 +50,13 @@ func OneOfSubSchema(title string, configObj any, default_ string) OneOfSubSchema
 }
 
 type OneOfSubSchemaT struct {
-	title     string
-	configObj any
-	default_  string
+	title          string
+	configObj      any
+	default_       string
+	oauth2Provider *string
+}
+
+func (s OneOfSubSchemaT) WithOAuth2Provider(provider string) OneOfSubSchemaT {
+	s.oauth2Provider = &provider
+	return s
 }
