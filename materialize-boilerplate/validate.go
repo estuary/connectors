@@ -3,6 +3,7 @@ package boilerplate
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -62,6 +63,10 @@ func NewValidator(
 }
 
 // ValidateBinding calculates the constraints for a new binding or a change to an existing binding.
+// Each field may have more than one constraint: notably, a required field whose existing
+// materialized column is incompatible with the proposed projection carries both the requiredness
+// constraint and the INCOMPATIBLE constraint, so that the control plane fails the build with a
+// clear error instead of silently omitting the field from the selection.
 func (v Validator) ValidateBinding(
 	path []string,
 	deltaUpdates bool,
@@ -69,7 +74,7 @@ func (v Validator) ValidateBinding(
 	boundCollection pf.CollectionSpec,
 	fieldConfigJsonMap map[string]json.RawMessage,
 	lastSpec *pf.MaterializationSpec,
-) (map[string]*pm.Response_Validated_Constraint, error) {
+) (map[string][]*pm.Response_Validated_Constraint, error) {
 	lastBinding := findLastBinding(path, lastSpec)
 	existingResource := v.is.GetResource(path)
 
@@ -105,13 +110,18 @@ func (v Validator) ValidateBinding(
 	}
 
 	var err error
-	var constraints map[string]*pm.Response_Validated_Constraint
+	var constraints map[string][]*pm.Response_Validated_Constraint
 	if existingResource == nil || (lastBinding != nil && backfill != lastBinding.Backfill) {
 		// Always validate as a new table if the existing table doesn't exist, since there is no
 		// existing table to be incompatible with. Also validate as a new table if we are going to
 		// be replacing the table.
-		if constraints, err = v.validateNewBinding(boundCollection, deltaUpdates, fieldConfigJsonMap); err != nil {
+		newConstraints, err := v.validateNewBinding(boundCollection, deltaUpdates, fieldConfigJsonMap)
+		if err != nil {
 			return nil, err
+		}
+		constraints = make(map[string][]*pm.Response_Validated_Constraint, len(newConstraints))
+		for field, c := range newConstraints {
+			constraints[field] = []*pm.Response_Validated_Constraint{c}
 		}
 	} else {
 		if lastBinding != nil && lastBinding.DeltaUpdates && !deltaUpdates {
@@ -125,14 +135,34 @@ func (v Validator) ValidateBinding(
 	}
 
 	// Set folded field for each constraint where field translation changes the field name.
-	// This applies to both new and existing fields, ensuring complete coverage.
-	for field, constraint := range constraints {
+	// This applies to both new and existing fields, ensuring complete coverage. All
+	// constraints of a field must agree on the folded field, per the protocol.
+	for field, cs := range constraints {
 		if t := v.is.translateField(field); t != field {
-			constraint.FoldedField = t
+			for _, constraint := range cs {
+				constraint.FoldedField = t
+			}
 		}
 	}
 
 	return forbidLongFields(v.maxFieldLength, boundCollection, constraints)
+}
+
+// ValidatedConstraints flattens per-field constraint lists into the Validated
+// response's projection_constraints representation, which can express multiple
+// constraints per field.
+func ValidatedConstraints(
+	constraints map[string][]*pm.Response_Validated_Constraint,
+) []*pm.Response_Validated_ProjectionConstraint {
+	list := make([]*pm.Response_Validated_ProjectionConstraint, 0, len(constraints))
+
+	for _, field := range slices.Sorted(maps.Keys(constraints)) {
+		for _, c := range constraints[field] {
+			list = append(list, &pm.Response_Validated_ProjectionConstraint{Field: field, Constraint: c})
+		}
+	}
+
+	return list
 }
 
 func (v Validator) validateNewBinding(
@@ -183,8 +213,8 @@ func (v Validator) validateMatchesExistingResource(
 	boundCollection pf.CollectionSpec,
 	deltaUpdates bool,
 	fieldConfigJsonMap map[string]json.RawMessage,
-) (map[string]*pm.Response_Validated_Constraint, error) {
-	constraints := make(map[string]*pm.Response_Validated_Constraint)
+) (map[string][]*pm.Response_Validated_Constraint, error) {
+	constraints := make(map[string][]*pm.Response_Validated_Constraint)
 
 	docFields := []string{}
 	for _, p := range boundCollection.Projections {
@@ -195,6 +225,22 @@ func (v Validator) validateMatchesExistingResource(
 		if err != nil {
 			return nil, err
 		}
+
+		// Whether the connector itself requires this projection to be materialized, per its base
+		// constraint. Root document projections are required for standard updates unless the
+		// connector is operating in a document-less mode (e.g. a no_flow_document feature flag),
+		// in which case the base constraint is not a "required" type. When a required document
+		// projection cannot be materialized as-is, both the requiredness and the INCOMPATIBLE
+		// constraint are reported so the control plane fails the build with a clear error, rather
+		// than dropping the lone INCOMPATIBLE constraint and silently materializing without a
+		// document column.
+		baseRequired := c
+		docRequired := c.Type == pm.Response_Validated_Constraint_LOCATION_REQUIRED ||
+			c.Type == pm.Response_Validated_Constraint_FIELD_REQUIRED
+
+		// cs is the full constraint list for this field. It remains nil for the common
+		// single-constraint cases and is assembled from c at the bottom of the loop.
+		var cs []*pm.Response_Validated_Constraint
 
 		if c.Type == pm.Response_Validated_Constraint_FIELD_FORBIDDEN {
 			// Is the proposed type completely disallowed by the materialization? This differs from
@@ -217,13 +263,20 @@ func (v Validator) validateMatchesExistingResource(
 					if constraintFromExisting, err := v.constraintForExistingField(boundCollection, p, *existingField, fieldConfigJsonMap); err != nil {
 						return nil, err
 					} else if constraintFromExisting.Type.IsForbidden() {
-						c = constraintFromExisting
+						if docRequired {
+							cs = []*pm.Response_Validated_Constraint{baseRequired, constraintFromExisting}
+						} else {
+							c = constraintFromExisting
+						}
 					}
 				}
 			} else if lastBinding != nil && lastBinding.FieldSelection.Document == "" {
 				c = &pm.Response_Validated_Constraint{
 					Type:   pm.Response_Validated_Constraint_INCOMPATIBLE,
 					Reason: "Cannot add a new root document projection to materialization without backfilling",
+				}
+				if docRequired {
+					cs = []*pm.Response_Validated_Constraint{baseRequired, c}
 				}
 			} else {
 				c = &pm.Response_Validated_Constraint{
@@ -272,6 +325,7 @@ func (v Validator) validateMatchesExistingResource(
 		// not have "columns" that can be inspected, but still support field selection (ex:
 		// materialize-dynamodb), so that selected fields can continue to be recommended.
 		if lastBinding != nil &&
+			cs == nil &&
 			c.Type == pm.Response_Validated_Constraint_FIELD_OPTIONAL &&
 			slices.Contains(lastBinding.FieldSelection.AllFields(), p.Field) {
 			c = &pm.Response_Validated_Constraint{
@@ -280,19 +334,29 @@ func (v Validator) validateMatchesExistingResource(
 			}
 		}
 
-		constraints[p.Field] = c
+		if cs == nil {
+			cs = []*pm.Response_Validated_Constraint{c}
+		}
+		constraints[p.Field] = cs
 	}
 
 	if lastBinding != nil && !deltaUpdates && lastBinding.FieldSelection.Document != "" && !slices.Contains(docFields, lastBinding.FieldSelection.Document) {
 		// For standard updates, the proposed binding must still have the original document field
 		// from a prior specification, if that's known. If it doesn't, make sure to fail the build
-		// with a constraint on a root document projection that it does have.
-		constraints[docFields[0]] = &pm.Response_Validated_Constraint{
-			Type: pm.Response_Validated_Constraint_INCOMPATIBLE,
-			Reason: fmt.Sprintf(
-				"The root document must be materialized as field '%s'",
-				lastBinding.FieldSelection.Document,
-			),
+		// with a constraint on a root document projection that it does have. The paired
+		// LOCATION_REQUIRED constraint guarantees the conflict is surfaced as a clean error.
+		constraints[docFields[0]] = []*pm.Response_Validated_Constraint{
+			{
+				Type:   pm.Response_Validated_Constraint_LOCATION_REQUIRED,
+				Reason: "The root document must be materialized for standard updates",
+			},
+			{
+				Type: pm.Response_Validated_Constraint_INCOMPATIBLE,
+				Reason: fmt.Sprintf(
+					"The root document must be materialized as field '%s'",
+					lastBinding.FieldSelection.Document,
+				),
+			},
 		}
 	}
 
@@ -381,18 +445,24 @@ func findLastBinding(resourcePath []string, lastSpec *pf.MaterializationSpec) *p
 // if all of the projections of a location that is required have names that are too long - at least
 // one of the projections of a required location must be able to be materialized. If maxLength is 0
 // no restrictions are enforced.
-func forbidLongFields(maxLength int, collection pf.CollectionSpec, constraints map[string]*pm.Response_Validated_Constraint) (map[string]*pm.Response_Validated_Constraint, error) {
+func forbidLongFields(maxLength int, collection pf.CollectionSpec, constraints map[string][]*pm.Response_Validated_Constraint) (map[string][]*pm.Response_Validated_Constraint, error) {
 	if maxLength == 0 {
 		return constraints, nil
 	}
 
+	hasType := func(cs []*pm.Response_Validated_Constraint, t pm.Response_Validated_Constraint_Type) bool {
+		return slices.ContainsFunc(cs, func(c *pm.Response_Validated_Constraint) bool {
+			return c.Type == t
+		})
+	}
+
 	requiredLocations := make(map[string]bool)
-	for field, constraint := range constraints {
+	for field, cs := range constraints {
 		tooLong := len([]rune(field)) > maxLength
 
 		p := collection.GetProjection(field)
 
-		if constraint.Type == pm.Response_Validated_Constraint_LOCATION_REQUIRED {
+		if hasType(cs, pm.Response_Validated_Constraint_LOCATION_REQUIRED) {
 			if _, ok := requiredLocations[p.Ptr]; !ok {
 				requiredLocations[p.Ptr] = false
 			}
@@ -406,7 +476,7 @@ func forbidLongFields(maxLength int, collection pf.CollectionSpec, constraints m
 			continue
 		}
 
-		if constraint.Type == pm.Response_Validated_Constraint_FIELD_REQUIRED {
+		if hasType(cs, pm.Response_Validated_Constraint_FIELD_REQUIRED) {
 			return nil, fmt.Errorf(
 				"field '%s' is required to be materialized but has a length of %d which exceeds the maximum length allowable by the destination of %d",
 				field,
@@ -415,13 +485,16 @@ func forbidLongFields(maxLength int, collection pf.CollectionSpec, constraints m
 			)
 		}
 
-		constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
-		constraint.Reason = fmt.Sprintf(
-			"Field '%s' has a length of %d which exceeds the maximum length allowable by the destination of %d. Use an alternate projection with a shorter name to materialize this location",
-			field,
-			len(field),
-			maxLength,
-		)
+		constraints[field] = []*pm.Response_Validated_Constraint{{
+			Type: pm.Response_Validated_Constraint_FIELD_FORBIDDEN,
+			Reason: fmt.Sprintf(
+				"Field '%s' has a length of %d which exceeds the maximum length allowable by the destination of %d. Use an alternate projection with a shorter name to materialize this location",
+				field,
+				len(field),
+				maxLength,
+			),
+			FoldedField: cs[0].FoldedField,
+		}}
 	}
 
 	for location, hasAllowable := range requiredLocations {

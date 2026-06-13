@@ -419,6 +419,8 @@ github.com/envoyproxy/protoc-gen-validate v1.3.0 h1:TvGH1wof4H33rezVKWSpqKz5NXWg
 github.com/envoyproxy/protoc-gen-validate v1.3.0/go.mod h1:HvYl7zwPa5mffgyeTUHA9zHIH36nmrm7oCbo4YKoSWA=
 github.com/estuary/flow v0.6.4 h1:MpermXN5h1U85zJspZftGSC7XbdTUWv22/FM/tvofSc=
 github.com/estuary/flow v0.6.4/go.mod h1:xihzOEpeEzcLTsgU2LFvjLs0f5UvbTeAQGnwno6ondk=
+github.com/estuary/flow v0.6.10-0.20260605161557-1013f9821954 h1:lXUHH6uyXGX/l3ph+yfoZ8Rv3tHs3rInVUoH23w6nX4=
+github.com/estuary/flow v0.6.10-0.20260605161557-1013f9821954/go.mod h1:jdQeVWS9sw520EU2u9UPYryE5iEo1Gu9Ju99LXJ8r7Y=
 github.com/estuary/go-mysql v0.0.0-20250918155720-90d473fd1a3e h1:stJOXFppEkEksGtqpJjIIfufID+RUkrkMCFKgu4Vfaw=
 github.com/estuary/go-mysql v0.0.0-20250918155720-90d473fd1a3e/go.mod h1:FQxw17uRbFvMZFK+dPtIPufbU46nBdrGaxOw0ac9MFs=
 github.com/estuary/vitess v0.15.10 h1:oXJgcG0HGZWuwjdvSp4pIFIAXtKLaR9Fl9VBynSszFA=
@@ -1119,6 +1121,8 @@ go.etcd.io/etcd/client/v3 v3.6.5 h1:yRwZNFBx/35VKHTcLDeO7XVLbCBFbPi+XV4OC3QJf2U=
 go.etcd.io/etcd/client/v3 v3.6.5/go.mod h1:ZqwG/7TAFZ0BJ0jXRPoJjKQJtbFo/9NIY8uoFFKcCyo=
 go.gazette.dev/core v0.102.0 h1:S1FFQn4Ws4qThrnwQhZ75jghg++Tfev++fPdq6PVlGw=
 go.gazette.dev/core v0.102.0/go.mod h1:4qMw9JDecqIx6EijHy6ndbueTYeglm6LW4qKxEUOZ8M=
+go.gazette.dev/core v0.103.1-0.20260505142537-ce718ada37ee h1:yceN2m1184/i4YSN4tlfMSdpnV+xnePgnUf4KFa00oE=
+go.gazette.dev/core v0.103.1-0.20260505142537-ce718ada37ee/go.mod h1:4qMw9JDecqIx6EijHy6ndbueTYeglm6LW4qKxEUOZ8M=
 go.mongodb.org/mongo-driver v1.11.4/go.mod h1:PTSz5yu21bkT/wXpkS7WR5f0ddqw5quethTUn9WM+2g=
 go.mongodb.org/mongo-driver v1.17.4 h1:jUorfmVzljjr0FLzYQsGP8cgN/qzzxlY9Vh0C9KFXVw=
 go.mongodb.org/mongo-driver v1.17.4/go.mod h1:Hy04i7O2kC4RS06ZrhPRqj/u4DTYkFDAAccj+rVKqgQ=

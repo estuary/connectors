@@ -563,7 +563,7 @@ func runBigSchemaApplyTests[EC boilerplate.EndpointConfiger, FC boilerplate.Fiel
 	require.NoError(t, err)
 
 	snap.WriteString("Big Schema Initial Constraints:\n")
-	snap.WriteString(snapshotConstraints(t, validateRes.Bindings[0].Constraints))
+	snap.WriteString(snapshotConstraints(t, legacyConstraints(validateRes.Bindings[0])))
 
 	// Initial apply with no previously existing table.
 	_, err = driver.Apply(ctx, applyReq(fixture, nil, configJson, resourceConfigJson, validateRes, true))
@@ -576,7 +576,7 @@ func runBigSchemaApplyTests[EC boilerplate.EndpointConfiger, FC boilerplate.Fiel
 	require.NoError(t, err)
 
 	snap.WriteString("\nBig Schema Re-validated Constraints:\n")
-	snap.WriteString(snapshotConstraints(t, validateRes.Bindings[0].Constraints))
+	snap.WriteString(snapshotConstraints(t, legacyConstraints(validateRes.Bindings[0])))
 
 	// Apply again - this should be a no-op.
 	_, err = driver.Apply(ctx, applyReq(fixture, fixture, configJson, resourceConfigJson, validateRes, true))
@@ -589,7 +589,7 @@ func runBigSchemaApplyTests[EC boilerplate.EndpointConfiger, FC boilerplate.Fiel
 	require.NoError(t, err)
 
 	snap.WriteString("\nBig Schema Changed Types Constraints:\n")
-	snap.WriteString(snapshotConstraints(t, validateRes.Bindings[0].Constraints))
+	snap.WriteString(snapshotConstraints(t, legacyConstraints(validateRes.Bindings[0])))
 
 	snap.WriteString("\nBig Schema Materialized Resource Schema With All Fields Required:\n")
 	snap.WriteString(sch)
@@ -618,7 +618,7 @@ func runBigSchemaApplyTests[EC boilerplate.EndpointConfiger, FC boilerplate.Fiel
 	require.NoError(t, err)
 
 	snap.WriteString("\nBig Schema Changed Types With Backfill Constraints:\n")
-	snap.WriteString(snapshotConstraints(t, validateRes.Bindings[0].Constraints))
+	snap.WriteString(snapshotConstraints(t, legacyConstraints(validateRes.Bindings[0])))
 
 	_, err = driver.Apply(ctx, applyReq(changed, nullable, configJson, resourceConfigJson, validateRes, true))
 	require.NoError(t, err)
@@ -845,7 +845,7 @@ func selectedFields(binding *pm.Response_Validated_Binding, collection pf.Collec
 
 	var foldedFieldMap = make(map[string]struct{})
 
-	for field, constraint := range binding.Constraints {
+	for field, constraint := range legacyConstraints(binding) {
 		if constraint.Type.IsForbidden() || !includeOptional && constraint.Type == pm.Response_Validated_Constraint_FIELD_OPTIONAL {
 			continue
 		}
@@ -881,6 +881,21 @@ func selectedFields(binding *pm.Response_Validated_Binding, collection pf.Collec
 	slices.Sort(out.Keys)
 	slices.Sort(out.Values)
 
+	return out
+}
+
+// legacyConstraints collapses a binding's projection_constraints into one
+// constraint per field - the forbidden member if any, otherwise the first -
+// matching how a control plane that predates projection_constraints would
+// interpret them. The test harness uses this to emulate field selection and to
+// render constraint snapshots.
+func legacyConstraints(binding *pm.Response_Validated_Binding) map[string]*pm.Response_Validated_Constraint {
+	out := make(map[string]*pm.Response_Validated_Constraint, len(binding.ProjectionConstraints))
+	for _, pc := range binding.ProjectionConstraints {
+		if existing, ok := out[pc.Field]; !ok || (!existing.Type.IsForbidden() && pc.Constraint.Type.IsForbidden()) {
+			out[pc.Field] = pc.Constraint
+		}
+	}
 	return out
 }
 
