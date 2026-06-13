@@ -6,13 +6,14 @@ import (
 	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
+	"github.com/estuary/connectors/go/common"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/stretchr/testify/require"
 )
 
-var testDialect = createSqlServerDialect("Latin1_General_100_BIN2_UTF8", "dbo", featureFlagDefaults)
+var testDialect = createSqlServerDialect("Latin1_General_100_BIN2_UTF8", "dbo", common.ResolveFlagDefaults(featureFlagDefaults, false))
 var testTemplates = renderTemplates(testDialect)
 
 func TestSQLGeneration(t *testing.T) {

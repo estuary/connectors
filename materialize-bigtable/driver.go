@@ -15,6 +15,7 @@ import (
 
 	"cloud.google.com/go/bigtable"
 	"github.com/estuary/connectors/go/auth/iam"
+	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	m "github.com/estuary/connectors/go/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
@@ -30,7 +31,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-var featureFlagDefaults = map[string]bool{}
+var featureFlagDefaults = map[string]common.FlagDefault{}
 
 type AuthType string
 
@@ -110,7 +111,7 @@ func (c config) Validate() error {
 
 func (c config) DefaultNamespace() string { return "" }
 
-func (c config) FeatureFlags() (string, map[string]bool) {
+func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
 	return c.Advanced.FeatureFlags, featureFlagDefaults
 }
 

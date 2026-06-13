@@ -14,6 +14,7 @@ import (
 	"time"
 
 	elasticsearch "github.com/elastic/go-elasticsearch/v8"
+	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	m "github.com/estuary/connectors/go/materialize"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
@@ -24,13 +25,13 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var featureFlagDefaults = map[string]bool{
-	"retain_existing_data_on_backfill": false,
+var featureFlagDefaults = map[string]common.FlagDefault{
+	"retain_existing_data_on_backfill": common.FlagDisabled,
 
 	// Enable this flag to avoid a one time backfill due to change in date
 	// format in the mapping (a581ab1b761816b2b93b525c63153aac3493d49a).  This
 	// flag should not be used on tasks created after this commit.
-	"ignore_mapping_format_changes": false,
+	"ignore_mapping_format_changes": common.FlagDisabled,
 }
 
 type sshForwarding struct {
@@ -238,7 +239,7 @@ func (c config) DefaultNamespace() string {
 	return ""
 }
 
-func (c config) FeatureFlags() (string, map[string]bool) {
+func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
 	return c.Advanced.FeatureFlags, featureFlagDefaults
 }
 

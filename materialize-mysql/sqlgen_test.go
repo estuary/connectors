@@ -6,13 +6,14 @@ import (
 	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
+	"github.com/estuary/connectors/go/common"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/stretchr/testify/require"
 )
 
-var testDialect = mysqlDialect(time.UTC, "flow", "mysql", featureFlagDefaults)
+var testDialect = mysqlDialect(time.UTC, "flow", "mysql", common.ResolveFlagDefaults(featureFlagDefaults, false))
 var testTemplates = renderTemplates(testDialect, "mysql")
 
 func TestSQLGeneration(t *testing.T) {
@@ -20,7 +21,7 @@ func TestSQLGeneration(t *testing.T) {
 }
 
 func TestSQLGeneration_Singlestore(t *testing.T) {
-	dialect := mysqlDialect(time.UTC, "flow", "singlestore", featureFlagDefaults)
+	dialect := mysqlDialect(time.UTC, "flow", "singlestore", common.ResolveFlagDefaults(featureFlagDefaults, false))
 	tpls := renderTemplates(dialect, "singlestore")
 	runSQLGen(t, dialect, tpls)
 }

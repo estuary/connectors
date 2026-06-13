@@ -16,6 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/estuary/connectors/go/auth/iam"
 	"github.com/estuary/connectors/go/blob"
+	"github.com/estuary/connectors/go/common"
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
@@ -24,13 +25,13 @@ import (
 	"github.com/segmentio/encoding/json"
 )
 
-var featureFlagDefaults = map[string]bool{
+var featureFlagDefaults = map[string]common.FlagDefault{
 	// An alternate naming style for the Iceberg table data.  By default (when
 	// false), the naming is:
 	//   <base_location>/<namespace>_<table>_<hash>
 	// When this flag is enabled:
 	//   <base_location>/<namespace>/<table>.<hash>
-	"nested_dot_hash_location_style": false,
+	"nested_dot_hash_location_style": common.FlagDisabled,
 }
 
 // TODO(whb): It would be nice to have a configuration for making the table use
@@ -143,7 +144,7 @@ func (c config) DefaultNamespace() string {
 	return c.Namespace
 }
 
-func (c config) FeatureFlags() (raw string, defaults map[string]bool) {
+func (c config) FeatureFlags() (raw string, defaults map[string]common.FlagDefault) {
 	return c.Advanced.FeatureFlags, featureFlagDefaults
 }
 

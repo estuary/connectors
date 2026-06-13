@@ -99,7 +99,7 @@ func TestCompatibleFallback(t *testing.T) {
 // TestCompatibleRoundTrip asserts that every name the generator produces is
 // recognized as compatible by Compatible, across the truncation/hash regimes.
 func TestCompatibleRoundTrip(t *testing.T) {
-	dialect := createPgDialect(featureFlagDefaults)
+	dialect := createPgDialect(newTaskFlagDefaults())
 
 	cases := []struct {
 		name  string
@@ -128,7 +128,7 @@ func TestCompatibleRoundTrip(t *testing.T) {
 }
 
 func TestEnumTypeNamePartsNormal(t *testing.T) {
-	dialect := createPgDialect(featureFlagDefaults)
+	dialect := createPgDialect(newTaskFlagDefaults())
 
 	// Short names: no hash, base <= 63 bytes
 	schema, base, typeName, err := enumTypeNameParts(dialect, []string{"public", "orders"}, "status")
@@ -140,7 +140,7 @@ func TestEnumTypeNamePartsNormal(t *testing.T) {
 }
 
 func TestEnumTypeNamePartsHashed(t *testing.T) {
-	dialect := createPgDialect(featureFlagDefaults)
+	dialect := createPgDialect(newTaskFlagDefaults())
 
 	// Long field name triggers hash mode
 	longField := strings.Repeat("x", 50)
@@ -153,7 +153,7 @@ func TestEnumTypeNamePartsHashed(t *testing.T) {
 }
 
 func TestEnumTypeNamePartsLongTableName(t *testing.T) {
-	dialect := createPgDialect(featureFlagDefaults)
+	dialect := createPgDialect(newTaskFlagDefaults())
 
 	// tableName at max length (63 bytes) — previously caused base to exceed 63 bytes
 	longTable := strings.Repeat("a", 63)
@@ -165,7 +165,7 @@ func TestEnumTypeNamePartsLongTableName(t *testing.T) {
 }
 
 func TestEnumTypeNamePartsSinglePathElement(t *testing.T) {
-	dialect := createPgDialect(featureFlagDefaults)
+	dialect := createPgDialect(newTaskFlagDefaults())
 
 	schema, base, _, err := enumTypeNameParts(dialect, []string{"mytable"}, "col")
 	require.NoError(t, err)

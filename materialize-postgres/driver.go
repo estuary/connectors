@@ -14,6 +14,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/feature/rds/auth"
 	iam "github.com/estuary/connectors/go/auth/iam"
+	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
@@ -49,12 +50,17 @@ const (
 	queryTimeout = 1 * time.Hour
 )
 
-var featureFlagDefaults = map[string]bool{
-	"datetime_keys_as_string":          true,
-	"retain_existing_data_on_backfill": false,
-	"native_binary_column_type":        true,
-	"enum":                             true,
-	"jsonb":                            true,
+var featureFlagDefaults = map[string]common.FlagDefault{
+	"datetime_keys_as_string":          common.FlagEnabled,
+	"retain_existing_data_on_backfill": common.FlagDisabled,
+	"native_binary_column_type":        common.FlagEnabled,
+	"enum":                             common.FlagEnabled,
+	// JSONB mapping of fields annotated with the postgres jsonb
+	// contentMediaType applies only to tasks created after this flag was
+	// released (June 2026), so that existing tasks don't unexpectedly have
+	// their JSON columns migrated to JSONB. The resolved value is pinned into
+	// each task's advanced.feature_flags via a configUpdate event on Apply.
+	"jsonb": common.FlagEnabledForNewTasks,
 }
 
 func ctxWithQueryTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
@@ -129,7 +135,7 @@ func (c config) DefaultNamespace() string {
 	return c.Schema
 }
 
-func (c config) FeatureFlags() (string, map[string]bool) {
+func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
 	return c.Advanced.FeatureFlags, featureFlagDefaults
 }
 

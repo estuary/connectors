@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
-	"github.com/estuary/connectors/go/common"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	testutil "github.com/estuary/connectors/materialize-boilerplate/testutil"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -101,8 +100,7 @@ func RunFencingTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC
 
 		checkpointsTable := "temp_test_fencing_checkpoints" + rngSuffix
 
-		rawFlags, defaultFlags := cfg.FeatureFlags()
-		parsedFlags := common.ParseFeatureFlags(rawFlags, defaultFlags)
+		parsedFlags := boilerplate.ParseFlags(cfg)
 
 		ep, err := driver.NewEndpoint(ctx, cfg, parsedFlags)
 		require.NoError(t, err)

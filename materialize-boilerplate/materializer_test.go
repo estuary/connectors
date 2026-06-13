@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	m "github.com/estuary/connectors/go/materialize"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -247,6 +248,39 @@ type testMaterializer struct {
 	is    *InfoSchema
 }
 
+// TestRunApplyRecordsFeatureFlagState verifies that a new-task-gated flag is
+// decided once on a brand-new task's first Apply and recorded in connector
+// state, and that a subsequent Apply carrying that state converges without
+// re-deciding (so an eventually-consistent configUpdate can never contradict
+// the recorded value).
+func TestRunApplyRecordsFeatureFlagState(t *testing.T) {
+	ctx := context.Background()
+	spec := loadMaterializerSpec(t, "base.flow.proto")
+	withConfigUpdates := WithConfigUpdates(json.RawMessage(`{}`), []string{"config", "advanced", "feature_flags"})
+
+	// Brand-new task (no last materialization, no prior state): the gated flag
+	// resolves enabled and is recorded as a connector state merge patch.
+	newIS := testInfoSchemaFromSpec(t, nil, func(in string) string { return in })
+	applied, err := RunApply(ctx, &pm.Request_Apply{Materialization: spec},
+		makeTestMaterializerFn(&testCalls{}, newIS), withConfigUpdates)
+	require.NoError(t, err)
+	require.NotNil(t, applied.State)
+	require.True(t, applied.State.MergePatch)
+	require.Equal(t, map[string]bool{"test_gated": true}, common.FeatureFlagStateRecord(applied.State.UpdatedJson))
+
+	// A later Apply that is re-classified as already-running (last
+	// materialization present) but carries the recorded state must not record
+	// anything new: the decision stands.
+	existingIS := testInfoSchemaFromSpec(t, spec, func(in string) string { return in })
+	applied, err = RunApply(ctx, &pm.Request_Apply{
+		Materialization:     spec,
+		LastMaterialization: spec,
+		StateJson:           applied.State.UpdatedJson,
+	}, makeTestMaterializerFn(&testCalls{}, existingIS), withConfigUpdates)
+	require.NoError(t, err)
+	require.Nil(t, applied.State)
+}
+
 func makeTestMaterializerFn(got *testCalls, is *InfoSchema) NewMaterializerFn[testEndpointConfiger, testFieldConfiger, testResourcer, testMappedTyper] {
 	return func(
 		ctx context.Context,
@@ -338,7 +372,7 @@ func (c testEndpointConfiger) DefaultNamespace() string {
 	return ""
 }
 
-func (c testEndpointConfiger) FeatureFlags() (string, map[string]bool) {
+func (c testEndpointConfiger) FeatureFlags() (string, map[string]common.FlagDefault) {
 	featureFlags := ""
 	if advanced, ok := c.Config["advanced"].(map[string]any); ok {
 		if ff, ok := advanced["feature_flags"].(string); ok {
@@ -346,8 +380,9 @@ func (c testEndpointConfiger) FeatureFlags() (string, map[string]bool) {
 		}
 	}
 
-	return featureFlags, map[string]bool{
-		"retain_existing_data_on_backfill": false,
+	return featureFlags, map[string]common.FlagDefault{
+		"retain_existing_data_on_backfill": common.FlagDisabled,
+		"test_gated":                       common.FlagEnabledForNewTasks,
 	}
 }
 
