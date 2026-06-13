@@ -543,7 +543,7 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 		// truncated rather than fully dropping and re-creating the table.
 		var doTruncate bool
 		thisBinding := req.Materialization.Bindings[bindingIdx]
-		lastBinding := findLastBinding(thisBinding.ResourcePath, req.LastMaterialization)
+		lastBinding := FindLastBinding(thisBinding.ResourcePath, req.LastMaterialization)
 		existing := is.GetResource(thisBinding.ResourcePath)
 		if _, err := validator.ValidateBinding(
 			thisBinding.ResourcePath,

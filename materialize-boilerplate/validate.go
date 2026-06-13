@@ -70,7 +70,7 @@ func (v Validator) ValidateBinding(
 	fieldConfigJsonMap map[string]json.RawMessage,
 	lastSpec *pf.MaterializationSpec,
 ) (map[string]*pm.Response_Validated_Constraint, error) {
-	lastBinding := findLastBinding(path, lastSpec)
+	lastBinding := FindLastBinding(path, lastSpec)
 	existingResource := v.is.GetResource(path)
 
 	for _, p := range boundCollection.Projections {
@@ -351,8 +351,8 @@ func (v Validator) constraintForExistingField(
 	return out, nil
 }
 
-// findLastBinding locates a binding within a previously applied or validated specification.
-func findLastBinding(resourcePath []string, lastSpec *pf.MaterializationSpec) *pf.MaterializationSpec_Binding {
+// FindLastBinding locates a binding within a previously applied or validated specification.
+func FindLastBinding(resourcePath []string, lastSpec *pf.MaterializationSpec) *pf.MaterializationSpec_Binding {
 	if lastSpec == nil {
 		return nil // Binding is trivially not found
 	}
