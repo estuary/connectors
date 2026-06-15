@@ -40,6 +40,14 @@ class LogFormatter(logging.Formatter):
         return OpsLog(level=record.levelname, msg=record.msg, fields=fields).model_dump_json()
 
 
+# Boolean log field set to True on log lines we aggregate across the whole
+# connector fleet as health indicators (e.g. backfills triggered). An observable
+# log line is an otherwise-normal log line that additionally carries this field,
+# so that downstream aggregation can select observable logs without matching on
+# free-form messages. Go connectors set the same "observable" field directly.
+OBSERVABLE_FIELD = "observable"
+
+
 class EventLogger:
     def __init__(self, logger: logging.Logger):
         self._logger = logger
