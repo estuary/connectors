@@ -113,7 +113,7 @@ async def _paginate_through_resources(
             yield doc
 
         page_info = data.page_info
-        if not page_info.hasNextPage or not page_info.endCursor:
+        if not page_info.hasNextPage:
             return
 
         after = page_info.endCursor
