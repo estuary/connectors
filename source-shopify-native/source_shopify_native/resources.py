@@ -28,6 +28,7 @@ from .graphql.bulk_job_manager import BulkJobManager
 
 from .api import (
     backfill_incremental,
+    backfill_incremental_unsorted,
     bulk_fetch_incremental,
     bulk_fetch_snapshot,
     fetch_incremental,
@@ -251,6 +252,7 @@ def _create_initial_state(
     store_ids: list[str],
     start_date: AwareDatetime,
     use_backfill: bool,
+    is_unsorted: bool = False,
 ) -> ResourceState:
     """Create initial state for a resource.
 
@@ -262,17 +264,17 @@ def _create_initial_state(
     Args:
         store_ids: List of store IDs to create state for.
         start_date: The start date for data replication.
-        use_backfill: Whether to create backfill state (for non-bulk queries with SORT_KEY).
+        use_backfill: Whether to create backfill state (for non-bulk queries).
+        is_unsorted: Whether this is an unsorted (no sortKey) stream.
     """
     cutoff = datetime.now(tz=UTC)
 
     if use_backfill:
+        next_page = None if is_unsorted else dt_to_str(start_date)
         return ResourceState(
             inc={sid: ResourceState.Incremental(cursor=cutoff) for sid in store_ids},
             backfill={
-                sid: ResourceState.Backfill(
-                    next_page=dt_to_str(start_date), cutoff=cutoff
-                )
+                sid: ResourceState.Backfill(next_page=next_page, cutoff=cutoff)
                 for sid in store_ids
             },
         )
@@ -542,9 +544,10 @@ async def all_resources(
         if not stores_with_access:
             continue
 
-        use_backfill = not model.SHOULD_USE_BULK_QUERIES and model.SORT_KEY is not None
+        use_backfill = not model.SHOULD_USE_BULK_QUERIES
+        is_unsorted = model.SORT_KEY is None
         initial_state = _create_initial_state(
-            stores_with_access, config.start_date, use_backfill
+            stores_with_access, config.start_date, use_backfill, is_unsorted
         )
         legacy_store_id = config._legacy_store or config.stores[0].store
 
@@ -616,6 +619,15 @@ async def all_resources(
                             data_model,
                             store_id,
                             ctx.capabilities,
+                        )
+                        fetch_page[store_id] = functools.partial(
+                            backfill_incremental_unsorted,
+                            ctx.client,
+                            model,
+                            data_model,
+                            store_id,
+                            ctx.capabilities,
+                            config.start_date,
                         )
                     else:
                         fetch_changes[store_id] = functools.partial(

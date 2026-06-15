@@ -265,3 +265,38 @@ async def backfill_incremental(
         yield doc
         count += 1
         last_seen_dt = cursor_value
+
+
+async def backfill_incremental_unsorted(
+    client: ShopifyGraphQLClient,
+    model: type[TShopifyGraphQLResource],
+    data_model: type[BaseResponseData[TShopifyGraphQLResource]],
+    store: str,
+    capabilities: StoreCapabilities,
+    start_date: datetime,
+    log: Logger,
+    page: PageCursor | None,
+    cutoff: LogCursor,
+) -> AsyncGenerator[TShopifyGraphQLResource | PageCursor, None]:
+    assert isinstance(cutoff, datetime)
+
+    if page is not None:
+        assert isinstance(page, str)
+
+    query = model.build_query(
+        start_date,
+        cutoff,
+        first=PAGE_SIZE,
+        after=page,
+        capabilities=capabilities,
+    )
+    data = await client.request(
+        query, data_model, log, context=StoreValidationContext(store=store)
+    )
+
+    for doc in data.nodes:
+        yield doc
+
+    page_info = data.page_info
+    if page_info.hasNextPage:
+        yield page_info.endCursor
