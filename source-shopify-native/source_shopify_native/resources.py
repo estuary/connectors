@@ -161,6 +161,7 @@ INCREMENTAL_RESOURCES: list[type[ShopifyGraphQLResource]] = [
     gql.Locations,
     gql.LocationMetafields,
     gql.SubscriptionContracts,
+    gql.Disputes,
 ]
 
 PII_RESOURCES: set[type[ShopifyGraphQLResource]] = {

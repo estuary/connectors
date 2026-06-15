@@ -48,6 +48,7 @@ scopes = [
     "read_customers",  # Customers
     "read_own_subscription_contracts",  # SubscriptionContracts
     "read_users", # StaffMembers
+    "read_shopify_payments_disputes",  # Disputes
     # FulfillmentOrder requires one of the following 4 scopes (not read_fulfillments).
     # See: https://shopify.dev/docs/api/admin-graphql/latest/objects/FulfillmentOrder
     "read_assigned_fulfillment_orders",
