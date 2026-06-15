@@ -138,7 +138,7 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 		}
 		if res := is.GetResource([]string{ts, tn}); res != nil {
 			if field := res.GetField(cn); field != nil {
-				field.Meta = pgFieldMeta{UDTName: udt}
+				field.Meta = pgFieldMeta{UDTName: udt, Path: []string{ts, tn}}
 			}
 		}
 	}

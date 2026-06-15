@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"regexp"
 	"slices"
 	"strings"
 	"unicode/utf8"
@@ -13,10 +12,6 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 	log "github.com/sirupsen/logrus"
 )
-
-// hashedEnumSuffix matches the "_<fieldPart>_<8hexchars>_flow_enum" tail of a hashed enum type
-// name, capturing the (possibly truncated) field portion in group 1.
-var hashedEnumSuffix = regexp.MustCompile(`_([^_]+)_[0-9a-f]{8}_flow_enum$`)
 
 // PgEnum represents a PostgreSQL ENUM type for a specific column.
 // TypeName is empty until resolved via resolveEnumTypes at apply time.
@@ -31,39 +26,30 @@ func (e *PgEnum) DDL() string {
 }
 
 // pgFieldMeta is attached to ExistingField.Meta by PopulateInfoSchema to carry
-// the udt_name for USER-DEFINED columns, needed for compatibility checks.
+// the udt_name and resource path for USER-DEFINED columns, needed for
+// compatibility checks.
 type pgFieldMeta struct {
 	UDTName string
+	Path    []string
 }
 
 // Compatible returns true when an existing column is a USER-DEFINED type whose
-// udt_name matches the expected enum type name for this field. Two naming
-// patterns are recognized:
-//
-//   - Normal: ends with "_<field>_flow_enum"
-//   - Hashed: ends with "_<truncatedField>_<8hexchars>_flow_enum" (for long names)
+// udt_name matches the enum type name this field would generate. It recomputes
+// the expected base name with the same generator used to create the type, so
+// the round-trip is exactly the same as when creating the type
 func (e *PgEnum) Compatible(existing boilerplate.ExistingField) bool {
 	if !strings.EqualFold(existing.Type, "USER-DEFINED") {
 		return false
 	}
-	var udtName string
-	if m, ok := existing.Meta.(pgFieldMeta); ok {
-		udtName = m.UDTName
+	m, ok := existing.Meta.(pgFieldMeta)
+	if !ok {
+		return false
 	}
-	udtLower := strings.ToLower(udtName)
-	fieldLower := strings.ToLower(e.Field)
-
-	// Normal case: tablename_field_flow_enum
-	if strings.HasSuffix(udtLower, "_"+fieldLower+"_flow_enum") {
-		return true
+	expected, err := enumBaseName(m.Path, e.Field)
+	if err != nil {
+		return false
 	}
-	// Hashed case: tablename_truncatedfield_<8hexchars>_flow_enum.
-	// The field component may be truncated, so check that fieldLower starts with
-	// whatever field portion was retained before the hash.
-	if m := hashedEnumSuffix.FindStringSubmatch(udtLower); m != nil && strings.HasPrefix(fieldLower, m[1]) {
-		return true
-	}
-	return false
+	return strings.EqualFold(m.UDTName, expected)
 }
 
 var _ sql.DDLer = (*PgEnum)(nil)
@@ -145,8 +131,24 @@ func enumTypeNameParts(dialect sql.Dialect, path []string, field string) (schema
 	default:
 		return "", "", "", fmt.Errorf("unexpected resource path length %d for enum type naming: %v", len(path), path)
 	}
+	if base, err = enumBaseName(path, field); err != nil {
+		return "", "", "", err
+	}
+	typeName = dialect.Identifier(schema, base)
+	return
+}
+
+// enumBaseName computes the unqualified base name (the "_flow_enum"-suffixed
+// identifier, before schema-qualification and quoting) for a column's enum
+// type. Generation (enumTypeNameParts) and the compatibility check (Compatible)
+// share this single source of truth so that recognizing the connector's own
+// type names is exact regardless of truncation or hashing.
+func enumBaseName(path []string, field string) (string, error) {
+	if len(path) == 0 {
+		return "", fmt.Errorf("unexpected empty resource path for enum type naming")
+	}
 	tableName := truncatedIdentifier(path[len(path)-1])
-	base = tableName + "_" + field + "_flow_enum"
+	base := tableName + "_" + field + "_flow_enum"
 
 	if len([]byte(base)) > 63 {
 		// Hash mode: <tableName>_<truncatedField>_<8hexHash>_flow_enum
@@ -161,8 +163,7 @@ func enumTypeNameParts(dialect sql.Dialect, path []string, field string) (schema
 		base = tableName + "_" + fieldPart + "_" + hash + "_flow_enum"
 	}
 
-	typeName = dialect.Identifier(schema, base)
-	return
+	return base, nil
 }
 
 // truncateToBytes truncates s to at most maxBytes bytes while retaining valid UTF-8.

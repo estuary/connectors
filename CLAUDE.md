@@ -102,3 +102,7 @@ When debugging CI test failures, always ask the user for complete CI logs before
 # Insights
 
 When making changes that affect function signatures or shared interfaces, immediately grep for all callers and update them before running tests. Use `grep -rn 'FunctionName' --include='*.go'` to find all references.
+
+# PR review
+
+When running the `pr-review-toolkit:review-pr` skill, after the standard review: for every commit that fixes a bug in a specific stream's fetch/parse/cursor logic, check whether the same bug pattern exists in other streams in the same connector. Streams within a connector typically share polling, pagination, and cursor patterns, so single-stream fixes frequently apply to siblings. Report any affected-looking siblings as part of the review output.

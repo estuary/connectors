@@ -22,6 +22,10 @@ def sanitize_tokens(data):
 
 
 def test_capture(request, snapshot):
+    FIELDS_TO_REDACT = [
+        "updatedAt"
+    ]
+
     result = subprocess.run(
         [
             "flowctl",
@@ -43,9 +47,14 @@ def test_capture(request, snapshot):
     seen = set()
 
     for line in lines:
-        stream = line[0]
+        stream, record = line[0], line[1]
         if stream not in seen:
-            sanitize_tokens(line[1])
+            sanitize_tokens(record)
+
+            for field in FIELDS_TO_REDACT:
+                if field in record:
+                    record[field] = "redacted"
+
             unique_stream_lines.append(line)
             seen.add(stream)
 

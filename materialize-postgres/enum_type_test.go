@@ -12,62 +12,71 @@ func TestCompatibleFallback(t *testing.T) {
 	tests := []struct {
 		name         string
 		field        string
+		path         []string
 		existingType string
 		udtName      string
+		noMeta       bool
 		wantOk       bool
 	}{
 		{
 			name:    "normal match",
 			field:   "status",
+			path:    []string{"public", "orders"},
 			udtName: "orders_status_flow_enum",
 			wantOk:  true,
 		},
 		{
+			// udt_name as reported by Postgres may differ in case; the
+			// comparison is case-insensitive.
 			name:    "normal match case-insensitive",
-			field:   "Status",
+			field:   "status",
+			path:    []string{"public", "orders"},
 			udtName: "orders_STATUS_flow_enum",
 			wantOk:  true,
 		},
 		{
 			name:    "normal no match wrong field",
 			field:   "state",
+			path:    []string{"public", "orders"},
 			udtName: "orders_status_flow_enum",
 			wantOk:  false,
 		},
 		{
 			name:         "not user-defined type",
 			field:        "status",
+			path:         []string{"public", "orders"},
 			existingType: "text",
 			udtName:      "orders_status_flow_enum",
 			wantOk:       false,
 		},
 		{
-			// Hashed case: field exactly matches the truncated segment
-			name:    "hashed match exact field truncation",
-			field:   "some_very_long_field_name_for_testing",
-			udtName: "table_some_abcd1234_flow_enum",
-			wantOk:  true,
-		},
-		{
-			// Hashed case: field prefix is 1 byte
-			name:    "hashed match single byte field prefix",
+			// A pre-existing user-defined type not managed by the connector.
+			name:    "foreign user-defined type",
 			field:   "status",
-			udtName: "table_s_abcd1234_flow_enum",
-			wantOk:  true,
-		},
-		{
-			// Hashed suffix with wrong field prefix should not match
-			name:    "hashed no match wrong field prefix",
-			field:   "color",
-			udtName: "table_s_abcd1234_flow_enum",
+			path:    []string{"public", "orders"},
+			udtName: "my_custom_enum",
 			wantOk:  false,
 		},
 		{
-			// 8-char suffix is not hex — should not match hashed pattern
-			name:    "hashed suffix not hex",
-			field:   "status",
-			udtName: "table_status_ZZZZZZZZ_flow_enum",
-			wantOk:  false,
+			// No metadata attached (e.g. udt_name was never populated) cannot
+			// be confirmed compatible.
+			name:   "missing meta",
+			field:  "status",
+			path:   []string{"public", "orders"},
+			noMeta: true,
+			wantOk: false,
+		},
+		{
+			// Regression: a field starting with "_" on a long table truncates
+			// its retained field portion down to a single underscore, producing
+			// a "..._<hash>_flow_enum" name the old reverse-parsing regex could
+			// not recognize — causing an endless backfill. The recompute path
+			// recognizes it.
+			name:    "underscore field on long table (meta/op)",
+			field:   "_meta/op",
+			path:    []string{"somelongtenant", "somelongtenant_baaaaaaaaaaaaaaaaaaaaaaaaaaaadocuments"},
+			udtName: "somelongtenant_baaaaaaaaaaaaaaaaaaaaaaaaaa___33e4d166_flow_enum",
+			wantOk:  true,
 		},
 	}
 
@@ -78,15 +87,45 @@ func TestCompatibleFallback(t *testing.T) {
 			if existingType == "" {
 				existingType = "USER-DEFINED"
 			}
-			existing := boilerplate.ExistingField{
-				Type: existingType,
-				Meta: pgFieldMeta{UDTName: tt.udtName},
+			existing := boilerplate.ExistingField{Type: existingType}
+			if !tt.noMeta {
+				existing.Meta = pgFieldMeta{UDTName: tt.udtName, Path: tt.path}
 			}
 			require.Equal(t, tt.wantOk, e.Compatible(existing))
 		})
 	}
 }
 
+// TestCompatibleRoundTrip asserts that every name the generator produces is
+// recognized as compatible by Compatible, across the truncation/hash regimes.
+func TestCompatibleRoundTrip(t *testing.T) {
+	dialect := createPgDialect(featureFlagDefaults)
+
+	cases := []struct {
+		name  string
+		path  []string
+		field string
+	}{
+		{"short", []string{"public", "orders"}, "status"},
+		{"long field hashes", []string{"public", "orders"}, strings.Repeat("x", 60)},
+		{"long table hashes", []string{"public", strings.Repeat("a", 60)}, "status"},
+		{"underscore field long table", []string{"somelongtenant", "somelongtenant_baaaaaaaaaaaaaaaaaaaaaaaaaaaadocuments"}, "_meta/op"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, base, _, err := enumTypeNameParts(dialect, tc.path, tc.field)
+			require.NoError(t, err)
+
+			e := &PgEnum{Field: tc.field}
+			existing := boilerplate.ExistingField{
+				Type: "USER-DEFINED",
+				Meta: pgFieldMeta{UDTName: base, Path: tc.path},
+			}
+			require.True(t, e.Compatible(existing), "generated base %q must be compatible", base)
+		})
+	}
+}
 
 func TestEnumTypeNamePartsNormal(t *testing.T) {
 	dialect := createPgDialect(featureFlagDefaults)

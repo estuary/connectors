@@ -9,6 +9,7 @@ from typing import (
     ClassVar,
     Generic,
     Literal,
+    NamedTuple,
     Self,
     TypeVar,
 )
@@ -432,6 +433,37 @@ class BaseCRMObject(BaseDocument, extra="allow"):
 
 # CRMObject is a generic, concrete subclass of BaseCRMObject.
 CRMObject = TypeVar("CRMObject", bound=BaseCRMObject)
+
+
+class TimestampedId(NamedTuple):
+    """An object's id paired with its last-modified timestamp. The unit that the
+    ID fetchers return and that flows through the batch-read chunking layer."""
+
+    ts: datetime
+    id: str
+
+
+class IdChunk(NamedTuple):
+    """One page of TimestampedIds yielded by _fetch_id_chunks, plus whether the
+    underlying fetcher reports more pages remain."""
+
+    ids: list[TimestampedId]
+    has_more: bool
+
+
+# The document type carried by a TimestampedObject. Its bound is intentionally
+# open: object_with_associations specializes it to CRMObject, while the
+# FetchRecentFn/FetchDelayedFn aliases in api/shared.py use TimestampedObject[Any].
+Doc = TypeVar("Doc")
+
+
+class TimestampedObject(NamedTuple, Generic[Doc]):
+    """A fetched document with its last-modified timestamp and id. The id doubles
+    as the emitted-changes cache key."""
+
+    ts: datetime
+    id: str
+    doc: Doc
 
 
 class Company(BaseCRMObject):

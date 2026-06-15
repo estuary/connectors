@@ -12,6 +12,7 @@ from estuary_cdk.capture.common import (
 
 from estuary_cdk.http import HTTPError
 from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
+from pydantic import JsonValue
 
 from .models import (
     Events,
@@ -491,6 +492,188 @@ async def fetch_backfill_substreams(
         return
 
 
+async def _value_list_items_for_parent(
+    cls_child: type[StripeObjectNoEvents],
+    search_name: str,
+    parent,
+    account_id: str | None,
+    http: HTTPSession,
+    log: Logger,
+    extra_params: dict[str, JsonValue] | None = None,
+):
+    """
+    Yields a value list's items for a single parent value list.
+    /v1/radar/value_lists embeds the first page of each list's items as
+    `list_items`; when that preview reports has_more=False it already holds
+    every item (already validated as part of the parent), so we read straight
+    from it and skip the per-list request. Only when the preview is partial
+    (has_more=True) do we page the items endpoint via _capture_substreams.
+    """
+    if not parent.list_items.has_more:
+        for doc in parent.list_items.data:
+            yield doc
+        return
+
+    async for doc in _capture_substreams(
+        cls_child, search_name, parent.id, parent, account_id, http, log, extra_params
+    ):
+        yield doc
+
+
+async def fetch_backfill_list_items(
+    cls: type[StripeObjectNoEvents],
+    cls_child: type[StripeObjectNoEvents],
+    start_date: datetime,
+    platform_account_id: str | None,
+    connected_account_id: str | None,
+    http: HTTPSession,
+    log: Logger,
+    page: PageCursor | None,
+    cutoff: LogCursor,
+) -> AsyncGenerator[StripeObjectNoEvents | str, None]:
+    """
+    Backfills a list item stream — a child stream of items listed under a
+    parent that itself has no events at the /events endpoint (e.g.
+    ValueListItems under ValueLists). Works like fetch_backfill_substreams, but
+    lists the parent endpoint directly instead of iterating the Events API.
+
+    Crucially, it does not gate child capture on the parent's `created`
+    timestamp: a value list created long before the backfill window can still
+    own items that must be captured, so every visited parent's items are
+    fetched. The page cursor paginates over parents; each item is emitted when
+    its own `created` falls within the [start_date, cutoff) window.
+    """
+    assert isinstance(cutoff, datetime)
+
+    search_name = cls.SEARCH_NAME
+    url = f"{API}/{search_name}"
+    parameters: dict[str, JsonValue] = {"limit": MAX_PAGE_LIMIT}
+    headers = {}
+    account_id = (
+        connected_account_id
+        if connected_account_id and cls.NAME not in CONNECTED_ACCOUNT_EXEMPT_STREAMS
+        else platform_account_id
+    )
+    if account_id:
+        headers["Stripe-Account"] = account_id
+
+    if page:
+        parameters["starting_after"] = page
+
+    result = BackfillResult[cls].model_validate_json(
+        await http.request(log, url, method="GET", params=parameters, headers=headers)
+    )
+
+    # Stripe only supports whole second timestamps, so we use gte/lte
+    # (over-inclusive at the boundaries) rather than gte/lt: the client-side
+    # [start_date, cutoff) check below restores exact precision
+    item_created_filter: dict[str, JsonValue] = {
+        "created[gte]": int(start_date.timestamp()),
+        "created[lte]": int(cutoff.timestamp()),
+    }
+
+    for parent in result.data:
+        child_data = _value_list_items_for_parent(
+            cls_child, search_name, parent, account_id, http, log, item_created_filter
+        )
+        async for doc in child_data:
+            doc_ts = _s_to_dt(doc.created)
+            if doc_ts < start_date or doc_ts >= cutoff:
+                continue
+            if account_id:
+                doc.account_id = account_id
+            yield doc
+
+    if result.has_more:
+        yield result.data[-1].id
+    else:
+        return
+
+
+async def fetch_incremental_list_items(
+    cls: type[StripeObjectNoEvents],
+    cls_child: type[StripeObjectNoEvents],
+    platform_account_id: str | None,
+    connected_account_id: str | None,
+    http: HTTPSession,
+    log: Logger,
+    log_cursor: LogCursor,
+) -> AsyncGenerator[StripeObjectNoEvents | LogCursor, None]:
+    """
+    Incrementally captures a list item stream — a child stream of items listed
+    under a parent that has no events at the /events endpoint (e.g.
+    ValueListItems under ValueLists). Since Stripe emits no events for these
+    resources, "incremental" re-lists every parent and its items each sweep and
+    emits items whose `created` is at or after the cursor — the same
+    list-and-filter approach fetch_incremental_no_events uses for its base
+    streams, applied per parent.
+
+    Items are filtered client-side so the cursor keeps millisecond precision
+    and boundary items aren't re-emitted, matching fetch_incremental_no_events.
+    """
+    assert isinstance(log_cursor, datetime)
+
+    max_ts = log_cursor
+
+    search_name = cls.SEARCH_NAME
+    url = f"{API}/{search_name}"
+    parameters: dict[str, str | int] = {"limit": MAX_PAGE_LIMIT}
+    headers = {}
+    account_id = (
+        connected_account_id
+        if connected_account_id and cls.NAME not in CONNECTED_ACCOUNT_EXEMPT_STREAMS
+        else platform_account_id
+    )
+    if account_id:
+        headers["Stripe-Account"] = account_id
+
+    end = datetime.now(tz=UTC) - LAG
+
+    parents = []
+    while True:
+        result = BackfillResult[cls].model_validate_json(
+            await http.request(
+                log, url, method="GET", params=parameters, headers=headers
+            )
+        )
+        parents.extend(result.data)
+
+        if result.has_more is True:
+            parameters["starting_after"] = result.data[-1].id
+        else:
+            break
+
+    # Floored to whole seconds, the client-side `doc_ts >= log_cursor` check
+    # below keeps the cursor's millisecond precision and prevents re-emitting
+    # boundary items.
+    item_created_filter: dict[str, JsonValue] = {
+        "created[gte]": int(log_cursor.timestamp()),
+    }
+
+    for parent in parents:
+        child_data = _value_list_items_for_parent(
+            cls_child, search_name, parent, account_id, http, log, item_created_filter
+        )
+        async for doc in child_data:
+            doc_ts = _s_to_dt(doc.created)
+
+            if doc_ts > max_ts:
+                max_ts = doc_ts
+
+            if doc_ts >= log_cursor:
+                if account_id:
+                    doc.account_id = account_id
+                yield doc
+
+    if max_ts != log_cursor:
+        yield max_ts + timedelta(milliseconds=1)  # startTimestamp is inclusive.
+    elif end > log_cursor:
+        # No new items were found. Advance the cursor to `end` (now - LAG) to avoid
+        # re-processing the same time window. Only yield if `end` is actually ahead
+        # of the current cursor; otherwise let the task sleep and try again later.
+        yield end
+
+
 async def _capture_substreams(
     cls_child: type[StripeChildObject],
     search_name: str,
@@ -499,6 +682,7 @@ async def _capture_substreams(
     connected_account_id: str | None,
     http: HTTPSession,
     log: Logger,
+    extra_params: dict[str, JsonValue] | None = None,
 ):
     """
     _capture_substreams works by handling the child_stream query and pagination.
@@ -506,7 +690,7 @@ async def _capture_substreams(
     """
 
     child_url = f"{API}/{search_name}/{id}/{cls_child.SEARCH_NAME}"
-    parameters: dict[str, str | int] = {"limit": MAX_PAGE_LIMIT}
+    parameters: dict[str, JsonValue] = {"limit": MAX_PAGE_LIMIT}
     headers = {}
     account_id = (
         connected_account_id
@@ -528,6 +712,14 @@ async def _capture_substreams(
             parameters.update({"object": "card"})
         case "ExternalBankAccount":
             parameters.update({"object": "bank_account"})
+        case "ValueListItems":
+            # Items are not nested under the parent's path; they're queried at a
+            # top-level endpoint filtered by the parent value list's id.
+            parameters.update({"value_list": id})
+            child_url = f"{API}/{cls_child.SEARCH_NAME}"
+
+    if extra_params:
+        parameters.update(extra_params)
 
     # Fetch child records
     while True:

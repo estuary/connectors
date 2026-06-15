@@ -38,6 +38,24 @@ class TwilioStream(HttpStream, ABC):
     page_size = 1000
     transformer: TypeTransformer = TypeTransformer(TransformConfig.DefaultSchemaNormalization | TransformConfig.CustomSchemaNormalization)
 
+    def __init__(
+        self,
+        authenticator: Union[AuthBase, HttpAuthenticator],
+        sync_subaccounts: bool = True,
+        config_account_sid: Optional[str] = None,
+    ):
+        super().__init__(authenticator=authenticator)
+        # When False, the Accounts stream (which acts as the parent for most other
+        # streams) only emits the main account and/or the account whose SID is
+        # provided in the config. This prevents fanning out to subaccount resources,
+        # which Twilio denies when authenticating with an API Key instead of an
+        # account's Auth Token (error 20003).
+        self.sync_subaccounts = sync_subaccounts
+        # The Account SID field from the endpoint config. Note: when the user
+        # authenticates with an API Key, this holds an "SK..." key SID rather than
+        # an "AC..." account SID, so it cannot be assumed to identify an account.
+        self.config_account_sid = config_account_sid
+
     @property
     def data_field(self):
         return self.name
@@ -130,8 +148,10 @@ class IncrementalTwilioStream(TwilioStream, IncrementalMixin):
         start_date: str = None,
         lookback_window: int = 0,
         slice_step_map: Mapping[str, int] = None,
+        sync_subaccounts: bool = True,
+        config_account_sid: Optional[str] = None,
     ):
-        super().__init__(authenticator)
+        super().__init__(authenticator, sync_subaccounts=sync_subaccounts, config_account_sid=config_account_sid)
         slice_step = (slice_step_map or {}).get(self.name)
         self._slice_step = slice_step and pendulum.duration(days=slice_step)
         self._start_date = start_date if start_date is not None else "1970-01-01T00:00:00Z"
@@ -299,7 +319,11 @@ class TwilioNestedStream(TwilioStream):
 
     @cached_property
     def parent_stream_instance(self):
-        return self.parent_stream(authenticator=self.authenticator)
+        return self.parent_stream(
+            authenticator=self.authenticator,
+            sync_subaccounts=self.sync_subaccounts,
+            config_account_sid=self.config_account_sid,
+        )
 
     def parent_record_to_stream_slice(self, record: Mapping[str, Any]) -> Mapping[str, Any]:
         return {"subresource_uri": record["subresource_uris"][self.subresource_uri_key]}
@@ -327,6 +351,16 @@ class Accounts(TwilioStream):
     """https://www.twilio.com/docs/usage/api/account#read-multiple-account-resources"""
 
     url_base = TWILIO_API_URL_BASE_VERSIONED
+
+    def parse_response(self, response: requests.Response, **kwargs) -> Iterable[Mapping]:
+        for record in super().parse_response(response, **kwargs):
+            if self.sync_subaccounts:
+                yield record
+            # The main account is the account that owns itself. Also retain a record
+            # matching the configured Account SID so that captures authenticated with
+            # a subaccount's own credentials keep working when this option is disabled.
+            elif record.get("sid") == record.get("owner_account_sid") or record.get("sid") == self.config_account_sid:
+                yield record
 
 
 class Addresses(TwilioNestedStream):
@@ -621,7 +655,12 @@ class MessageMedia(IncrementalTwilioStream, TwilioNestedStream):
     @cached_property
     def parent_stream_instance(self):
         most_recent_cursor = self.state.get(self.cursor_field, self._start_date)
-        return self.parent_stream(authenticator=self.authenticator, start_date=most_recent_cursor)
+        return self.parent_stream(
+            authenticator=self.authenticator,
+            start_date=most_recent_cursor,
+            sync_subaccounts=self.sync_subaccounts,
+            config_account_sid=self.config_account_sid,
+        )
 
 
 class UsageNestedStream(TwilioNestedStream):

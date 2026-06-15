@@ -231,6 +231,16 @@ type loadTableParams struct {
 	VarCharLength int
 }
 
+type deleteTableParams struct {
+	Target            *sql.Table
+	VarcharColumnMeta []VarcharColumnMeta
+}
+
+type storeTableParams struct {
+	Target            *sql.Table
+	VarcharColumnMeta []VarcharColumnMeta
+}
+
 type templates struct {
 	createTargetTable         *template.Template
 	createLoadTable           *template.Template
@@ -290,19 +300,27 @@ CREATE TEMPORARY TABLE {{ template "temp_name" $.Target }} (
 -- Idempotent creation of the store table for staging new records.
 
 {{ define "createStoreTable" }}
-CREATE TEMPORARY TABLE {{ template "temp_name" . }} (
-{{- range $ind, $col := $.Columns }}
+CREATE TEMPORARY TABLE {{ template "temp_name" $.Target }} (
+{{- range $ind, $col := $.Target.Columns }}
 	{{- if $ind }},{{ end }}
-	{{ $col.Identifier }} {{ $col.DDL }}
+	{{ $col.Identifier }} {{ if and (eq $col.DDL "TEXT") (ne (index $.VarcharColumnMeta $ind).MaxLength 0) -}}
+		VARCHAR({{ (index $.VarcharColumnMeta $ind).MaxLength }})
+	{{- else }}
+		{{- $col.DDL }}
+	{{- end }}
 {{- end }}
 );
 {{ end }}
 
 {{ define "createDeleteTable" }}
-CREATE TEMPORARY TABLE {{ template "temp_name_deleted" . }} (
-{{- range $ind, $key := $.Keys }}
+CREATE TEMPORARY TABLE {{ template "temp_name_deleted" $.Target }} (
+{{- range $ind, $key := $.Target.Keys }}
 	{{- if $ind }},{{ end }}
-  {{ $key.Identifier }} {{ $key.DDL }}
+	{{ $key.Identifier }} {{ if and (eq $key.DDL "TEXT") (ne (index $.VarcharColumnMeta $ind).MaxLength 0) -}}
+		VARCHAR({{ (index $.VarcharColumnMeta $ind).MaxLength }})
+	{{- else }}
+		{{- $key.DDL }}
+	{{- end }}
 {{- end }}
 );
 {{ end }}

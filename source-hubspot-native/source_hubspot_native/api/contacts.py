@@ -12,8 +12,13 @@ from ..models import (
     Contact,
     Names,
     OldRecentContacts,
+    TimestampedId,
+    TimestampedObject,
 )
-from .object_with_associations import fetch_changes_with_associations
+from .object_with_associations import (
+    fetch_changes_with_associations,
+    fetch_chunked_changes_with_associations,
+)
 from .search_objects import fetch_search_objects
 from .shared import (
     ms_to_dt,
@@ -26,10 +31,10 @@ def fetch_recent_contacts(
     with_history: bool,
     since: datetime,
     until: datetime | None,
-) -> AsyncGenerator[tuple[datetime, str, Contact], None]:
+) -> AsyncGenerator[TimestampedObject[Contact], None]:
     async def do_fetch(
         page: PageCursor, count: int
-    ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+    ) -> tuple[Iterable[TimestampedId], PageCursor]:
         if count >= 9_900:
             # There is actually no documented limit on the number of contacts
             # that can be returned by this API, other than that it goes back a
@@ -47,10 +52,18 @@ def fetch_recent_contacts(
         result = OldRecentContacts.model_validate_json(
             await http.request(log, url, params=params)
         )
-        return (
-            (ms_to_dt(int(r.properties.lastmodifieddate.value)), str(r.vid))
-            for r in result.contacts
-        ), result.has_more and result.time_offset
+        next_page: PageCursor = result.has_more and result.time_offset
+        records: list[TimestampedId] = []
+        for r in result.contacts:
+            ts = ms_to_dt(int(r.properties.lastmodifieddate.value))
+            records.append(TimestampedId(ts, str(r.vid)))
+            if ts <= since:
+                # This endpoint returns records newest-first, so once a page
+                # reaches one as old as `since` there's nothing older worth
+                # paging for.
+                next_page = None
+
+        return records, next_page
 
     return fetch_changes_with_associations(
         Names.contacts, Contact, do_fetch, log, http, with_history, since, until
@@ -59,15 +72,15 @@ def fetch_recent_contacts(
 
 def fetch_delayed_contacts(
     log: Logger, http: HTTPSession, with_history: bool, since: datetime, until: datetime
-) -> AsyncGenerator[tuple[datetime, str, Contact], None]:
+) -> AsyncGenerator[TimestampedObject[Contact] | datetime, None]:
 
     async def do_fetch(
         page: PageCursor, count: int
-    ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+    ) -> tuple[Iterable[TimestampedId], PageCursor]:
         return await fetch_search_objects(
             Names.contacts, log, http, since, until, page, "lastmodifieddate"
         )
 
-    return fetch_changes_with_associations(
+    return fetch_chunked_changes_with_associations(
         Names.contacts, Contact, do_fetch, log, http, with_history, since, until
     )

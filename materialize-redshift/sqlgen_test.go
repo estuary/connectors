@@ -41,11 +41,9 @@ func runSQLGen(t *testing.T, testDialect sql.Dialect, testTemplates templates) {
 		sql.TestTemplates{
 			TableTemplates: []*template.Template{
 				testTemplates.createTargetTable,
-				testTemplates.createStoreTable,
 				testTemplates.mergeInto,
 				testTemplates.loadQuery,
 				testTemplates.loadQueryNoFlowDocument,
-				testTemplates.createDeleteTable,
 				testTemplates.deleteQuery,
 			},
 		},
@@ -76,6 +74,80 @@ func runSQLGen(t *testing.T, testDialect sql.Dialect, testTemplates templates) {
 		snap.WriteString("--- Begin " + testcase + " (with varchar length) ---")
 		require.NoError(t, tpl.Execute(snap, data))
 		snap.WriteString("--- End " + testcase + " (with varchar length) ---\n\n")
+	}
+
+	for _, tbl := range tables {
+		t.Run("createStoreTable/"+tbl.Identifier, func(t *testing.T) {
+			tpl := testTemplates.createStoreTable
+			var testcase = tbl.Identifier + " " + tpl.Name()
+
+			meta := make([]VarcharColumnMeta, len(tbl.Columns()))
+			data := storeTableParams{
+				Target:            &tbl,
+				VarcharColumnMeta: meta,
+			}
+
+			snap.WriteString("--- Begin " + testcase + " (no varchar length) ---")
+			require.NoError(t, tpl.Execute(snap, data))
+			snap.WriteString("--- End " + testcase + " (no varchar length) ---\n\n")
+		})
+
+		t.Run("createStoreTable/"+tbl.Identifier+"/varchar", func(t *testing.T) {
+			tpl := testTemplates.createStoreTable
+			var testcase = tbl.Identifier + " " + tpl.Name()
+
+			meta := make([]VarcharColumnMeta, len(tbl.Columns()))
+			for idx, col := range tbl.Columns() {
+				if col.DDL == "TEXT" {
+					meta[idx] = VarcharColumnMeta{MaxLength: idx + 42}
+				}
+			}
+			data := storeTableParams{
+				Target:            &tbl,
+				VarcharColumnMeta: meta,
+			}
+
+			snap.WriteString("--- Begin " + testcase + " (with varchar length) ---")
+			require.NoError(t, tpl.Execute(snap, data))
+			snap.WriteString("--- End " + testcase + " (with varchar length) ---\n\n")
+		})
+	}
+
+	for _, tbl := range tables {
+		t.Run("createDeleteTable/"+tbl.Identifier, func(t *testing.T) {
+			tpl := testTemplates.createDeleteTable
+			var testcase = tbl.Identifier + " " + tpl.Name()
+
+			meta := make([]VarcharColumnMeta, len(tbl.Columns()))
+			data := deleteTableParams{
+				Target:            &tbl,
+				VarcharColumnMeta: meta,
+			}
+
+			snap.WriteString("--- Begin " + testcase + " (no varchar length) ---")
+			require.NoError(t, tpl.Execute(snap, data))
+			snap.WriteString("--- End " + testcase + " (no varchar length) ---\n\n")
+		})
+
+		t.Run("createDeleteTable/"+tbl.Identifier+"/varchar", func(t *testing.T) {
+			tpl := testTemplates.createDeleteTable
+			var testcase = tbl.Identifier + " " + tpl.Name()
+
+			meta := make([]VarcharColumnMeta, len(tbl.Columns()))
+			for idx, col := range tbl.Columns() {
+				if col.DDL == "TEXT" {
+					meta[idx] = VarcharColumnMeta{MaxLength: idx + 42}
+				}
+			}
+			data := deleteTableParams{
+				Target:            &tbl,
+				VarcharColumnMeta: meta,
+			}
+
+			snap.WriteString("--- Begin " + testcase + " (with varchar length) ---")
+			require.NoError(t, tpl.Execute(snap, data))
+			snap.WriteString("--- End " + testcase + " (with varchar length) ---\n\n")
+		})
 	}
 
 	var copyParams = copyFromS3Params{

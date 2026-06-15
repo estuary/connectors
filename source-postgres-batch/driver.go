@@ -626,10 +626,16 @@ func (c *capture) pollCustomQuery(ctx context.Context, binding *bindingInfo) err
 		return fmt.Errorf("error processing query result: %w", err)
 	}
 	for i, columnType := range columnTypes {
+		// ScanType() returns a nil reflect.Type for column types the driver has
+		// no Go mapping for, so guard against it to avoid a nil dereference.
+		var scanTypeName string
+		if scanType := columnType.ScanType(); scanType != nil {
+			scanTypeName = scanType.Name()
+		}
 		log.WithFields(log.Fields{
 			"idx":          i,
 			"name":         columnType.DatabaseTypeName(),
-			"scanTypeName": columnType.ScanType().Name(),
+			"scanTypeName": scanTypeName,
 		}).Debug("column type")
 	}
 
@@ -965,10 +971,16 @@ func (c *capture) pollIncrementalChunk(ctx context.Context, chunk *incrementalCh
 		return 0, fmt.Errorf("error processing query result: %w", err)
 	}
 	for i, columnType := range columnTypes {
+		// ScanType() returns a nil reflect.Type for column types the driver has
+		// no Go mapping for, so guard against it to avoid a nil dereference.
+		var scanTypeName string
+		if scanType := columnType.ScanType(); scanType != nil {
+			scanTypeName = scanType.Name()
+		}
 		log.WithFields(log.Fields{
 			"idx":          i,
 			"name":         columnType.DatabaseTypeName(),
-			"scanTypeName": columnType.ScanType().Name(),
+			"scanTypeName": scanTypeName,
 		}).Debug("column type")
 	}
 	var columnIndices = make(map[string]int)

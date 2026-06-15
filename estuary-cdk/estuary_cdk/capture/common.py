@@ -268,7 +268,9 @@ class ResourceState(BaseResourceState, BaseModel, extra="forbid"):
         description="Backfill progress, or None if no backfill is occurring",
     )
 
-    snapshot: Snapshot | None = Field(default=None, description="Snapshot progress")
+    snapshot: Snapshot | dict[str, Snapshot | None] | None = Field(
+        default=None, description="Snapshot progress"
+    )
 
     last_initialized: datetime | None = Field(
         default=None, description="The last time this state was initialized."
@@ -745,6 +747,28 @@ def open(
     return (response.Opened(explicitAcknowledgements=requires_explicit_acks), _run)
 
 
+def _tombstone_discriminator_values(
+    tombstone: BaseDocument, key: list[str]
+) -> tuple[object, ...]:
+    """Return a tombstone's collection-key values other than the CDK-managed
+    /_meta/row_id, in key order. These are what must differ between snapshot
+    subtasks: two subtasks sharing them would emit tombstones into the same
+    (discriminator, row_id) keyspace."""
+    dump = tombstone.model_dump(by_alias=True)
+    values: list[object] = []
+    for key_pointer in key:
+        # row_id is assigned per-pass by the CDK and is identical across
+        # subtasks, so it can't distinguish them.
+        if key_pointer == "/_meta/row_id":
+            continue
+        node: Any = dump
+        for field in key_pointer.strip("/").split("/"):
+            # A KeyError here means the tombstone is missing a key field.
+            node = node[field]
+        values.append(node)
+    return tuple(values)
+
+
 def open_binding(
     binding: CaptureBinding[_ResourceConfig],
     binding_index: int,
@@ -757,8 +781,10 @@ def open_binding(
     | RecurringFetchPageFn[_BaseDocument]
     | dict[str, FetchPageFn[_BaseDocument]]
     | None = None,
-    fetch_snapshot: FetchSnapshotFn[_BaseDocument] | None = None,
-    tombstone: _BaseDocument | None = None,
+    fetch_snapshot: FetchSnapshotFn[_BaseDocument]
+    | dict[str, FetchSnapshotFn[_BaseDocument]]
+    | None = None,
+    tombstone: _BaseDocument | dict[str, _BaseDocument] | None = None,
 ):
     """
     open_binding() is intended to be called by closures set as Resource.open Callables.
@@ -870,24 +896,91 @@ def open_binding(
             )
 
     if fetch_snapshot:
-        if tombstone is None:
-            # Default tombstone for snapshot bindings so callers don't need to
-            # provide one. The cast satisfies the _BaseDocument TypeVar since
-            # BaseDocument is its bound.
-            tombstone = cast(_BaseDocument, BaseDocument(_meta=BaseDocument.Meta(op="d")))
 
-        async def closure(task: Task):
-            assert tombstone is not None
+        async def snapshot_closure(
+            task: Task,
+            fetch_snapshot: FetchSnapshotFn[_BaseDocument],
+            state: ResourceState.Snapshot | None,
+            tombstone: _BaseDocument,
+            subtask_id: str | None = None,
+        ):
             await _binding_snapshot_task(
                 binding,
                 binding_index,
                 fetch_snapshot,
-                resource_state.snapshot,
+                state,
                 task,
                 tombstone,
+                subtask_id,
             )
 
-        task.spawn_child(f"{prefix}.snapshot", closure)
+        if isinstance(fetch_snapshot, dict):
+            key = binding.collection.key
+            assert "/_meta/row_id" in key and len(key) > 1, (
+                f"A fetch_snapshot subtask requires a compound collection "
+                f"key containing /_meta/row_id plus a subtask discriminator. "
+                f"Got: {key}"
+            )
+            # The CDK can set _meta/row_id but not the connector-specific discriminator, so
+            # each subtask must supply its own tombstone with that field pre-set.
+            assert (
+                isinstance(tombstone, dict)
+                and tombstone.keys() == fetch_snapshot.keys()
+            ), (
+                "fetch_snapshot subtasks requires a tombstone dict with "
+                "the same keys, each carrying the subtask discriminator. "
+            )
+
+            # Each subtask numbers row_id independently from zero, so the
+            # non-row_id key field(s) are all that distinguish one subtask's
+            # tombstones from another's. If two subtasks shared a discriminator,
+            # a deletion from one would land on the other's keyspace.
+            discriminators = [
+                _tombstone_discriminator_values(subtask_tombstone, key)
+                for subtask_tombstone in tombstone.values()
+            ]
+            assert len(set(discriminators)) == len(discriminators), (
+                f"fetch_snapshot subtask tombstones must carry distinct key "
+                f"discriminator values, one per subtask. Got: {discriminators}"
+            )
+
+            snapshot_state = resource_state.snapshot
+            assert snapshot_state is None or isinstance(snapshot_state, dict)
+
+            for subtask_id, subtask_fetch_snapshot in fetch_snapshot.items():
+                subtask_state = (
+                    snapshot_state.get(subtask_id) if snapshot_state else None
+                )
+                task.spawn_child(
+                    f"{prefix}.snapshot.{subtask_id}",
+                    functools.partial(
+                        snapshot_closure,
+                        fetch_snapshot=subtask_fetch_snapshot,
+                        state=subtask_state,
+                        tombstone=tombstone[subtask_id],
+                        subtask_id=subtask_id,
+                    ),
+                )
+        else:
+            if tombstone is None:
+                # Default tombstone for snapshot bindings so callers don't need to
+                # provide one. The cast satisfies the _BaseDocument TypeVar since
+                # BaseDocument is its bound.
+                tombstone = cast(
+                    _BaseDocument, BaseDocument(_meta=BaseDocument.Meta(op="d"))
+                )
+            assert not isinstance(tombstone, dict)
+            assert not isinstance(resource_state.snapshot, dict)
+
+            task.spawn_child(
+                f"{prefix}.snapshot",
+                functools.partial(
+                    snapshot_closure,
+                    fetch_snapshot=fetch_snapshot,
+                    state=resource_state.snapshot,
+                    tombstone=tombstone,
+                ),
+            )
 
 
 async def _binding_snapshot_task(
@@ -897,6 +990,7 @@ async def _binding_snapshot_task(
     state: ResourceState.Snapshot | None,
     task: Task,
     tombstone: _BaseDocument,
+    subtask_id: str | None = None,
 ):
     """Snapshot the content of a resource at a regular interval."""
 
@@ -907,9 +1001,14 @@ async def _binding_snapshot_task(
             last_digest="",
         )
 
-    connector_state = ConnectorState(
-        bindingStateV1={binding.stateKey: ResourceState(snapshot=state)}
-    )
+    if subtask_id is not None:
+        connector_state = ConnectorState(
+            bindingStateV1={binding.stateKey: ResourceState(snapshot={subtask_id: state})}
+        )
+    else:
+        connector_state = ConnectorState(
+            bindingStateV1={binding.stateKey: ResourceState(snapshot=state)}
+        )
 
     while True:
         # Yield to the event loop to prevent starvation.
@@ -938,15 +1037,22 @@ async def _binding_snapshot_task(
 
         count = 0
         async for doc in fetch_snapshot(task.log):
+            # Set only op/row_id, preserving any other _meta fields (e.g. a
+            # connector-injected subtask discriminator that is part of a
+            # compound key) rather than replacing _meta wholesale.
+            op = "u" if count < state.last_count else "c"
             if isinstance(doc, dict):
-                doc["meta_"] = {
-                    "op": "u" if count < state.last_count else "c",
-                    "row_id": count,
-                }
+                meta = doc.get("meta_")
+                if not isinstance(meta, dict):
+                    meta = {}
+                    doc["meta_"] = meta
+                meta["op"] = op
+                meta["row_id"] = count
             else:
-                doc.meta_ = BaseDocument.Meta(
-                    op="u" if count < state.last_count else "c", row_id=count
-                )
+                # Reassign so meta_ is marked as explicitly set on
+                # the parent document and included when serializing
+                # with model_dump(exclude_unset=True).
+                doc.meta_ = doc.meta_.model_copy(update={"op": op, "row_id": count})
             task.captured(binding_index, doc)
             count += 1
 
@@ -963,7 +1069,10 @@ async def _binding_snapshot_task(
 
         if digest != state.last_digest:
             for del_id in range(count, state.last_count):
-                tombstone.meta_ = BaseDocument.Meta(op="d", row_id=del_id)
+                # Mutate only op/row_id so the tombstone
+                # keeps any fields the caller pre-set.
+                tombstone.meta_.op = "d"
+                tombstone.meta_.row_id = del_id
                 task.captured(binding_index, tombstone)
 
             state.last_count = count

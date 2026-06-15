@@ -12,8 +12,13 @@ from ..models import (
     Company,
     Names,
     OldRecentCompanies,
+    TimestampedId,
+    TimestampedObject,
 )
-from .object_with_associations import fetch_changes_with_associations
+from .object_with_associations import (
+    fetch_changes_with_associations,
+    fetch_chunked_changes_with_associations,
+)
 from .search_objects import fetch_search_objects
 from .shared import (
     ms_to_dt,
@@ -27,11 +32,11 @@ def fetch_recent_companies(
     with_history: bool,
     since: datetime,
     until: datetime | None,
-) -> AsyncGenerator[tuple[datetime, str, Company], None]:
+) -> AsyncGenerator[TimestampedObject[Company], None]:
 
     async def do_fetch(
         page: PageCursor, count: int
-    ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+    ) -> tuple[Iterable[TimestampedId], PageCursor]:
         if count >= 9_900:
             log.warn("limit of 9,900 recent companies reached")
             return [], None
@@ -42,10 +47,18 @@ def fetch_recent_companies(
         result = OldRecentCompanies.model_validate_json(
             await http.request(log, url, params=params)
         )
-        return (
-            (ms_to_dt(r.properties.hs_lastmodifieddate.timestamp), str(r.companyId))
-            for r in result.results
-        ), result.hasMore and result.offset
+        next_page: PageCursor = result.hasMore and result.offset
+        records: list[TimestampedId] = []
+        for r in result.results:
+            ts = ms_to_dt(r.properties.hs_lastmodifieddate.timestamp)
+            records.append(TimestampedId(ts, str(r.companyId)))
+            if ts <= since:
+                # This endpoint returns records newest-first, so once a page
+                # reaches one as old as `since` there's nothing older worth
+                # paging for.
+                next_page = None
+
+        return records, next_page
 
     return fetch_changes_with_associations(
         Names.companies, Company, do_fetch, log, http, with_history, since, until
@@ -54,15 +67,15 @@ def fetch_recent_companies(
 
 def fetch_delayed_companies(
     log: Logger, http: HTTPSession, with_history: bool, since: datetime, until: datetime
-) -> AsyncGenerator[tuple[datetime, str, Company], None]:
+) -> AsyncGenerator[TimestampedObject[Company] | datetime, None]:
 
     async def do_fetch(
         page: PageCursor, count: int
-    ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+    ) -> tuple[Iterable[TimestampedId], PageCursor]:
         return await fetch_search_objects(
             Names.companies, log, http, since, until, page
         )
 
-    return fetch_changes_with_associations(
+    return fetch_chunked_changes_with_associations(
         Names.companies, Company, do_fetch, log, http, with_history, since, until
     )

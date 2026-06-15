@@ -4,7 +4,13 @@ import json
 from typing import Any, AsyncGenerator, Dict
 
 from ..common import money_bag_fragment
-from ...models import ShopifyGraphQLResource, SortKey
+from ...models import (
+    ConditionalField,
+    ShopifyGraphQLResource,
+    SortKey,
+    StoreCapabilities,
+    requires_any_scope,
+)
 
 
 class Orders(ShopifyGraphQLResource):
@@ -17,6 +23,7 @@ class Orders(ShopifyGraphQLResource):
         id
         name
     }
+    # {{ staffMember }}
     billingAddress {
         id
         address1
@@ -352,8 +359,31 @@ class Orders(ShopifyGraphQLResource):
         ..._MoneyBagFields
     }
     totalWeight
+    # {{ retailLocation }}
     """
     FRAGMENTS = [money_bag_fragment]
+    CONDITIONAL_FIELDS = [
+        # retailLocation requires the read_locations scope, which
+        # the orders stream does not otherwise need.
+        ConditionalField(
+            placeholder="# {{ retailLocation }}",
+            fields="""retailLocation {
+        id
+    }""",
+            is_available=requires_any_scope("read_locations"),
+        ),
+        # staffMember requires the read_users scope, which is only grantable on
+        # Shopify Plus / Advanced stores or finance embedded apps. Both the
+        # scope and the plan tier must be present.
+        ConditionalField(
+            placeholder="# {{ staffMember }}",
+            fields="""staffMember {
+        id
+    }""",
+            is_available=lambda caps: "read_users" in caps.scopes
+            and caps.is_plus_or_advanced,
+        ),
+    ]
 
     @staticmethod
     def build_query(
@@ -361,12 +391,14 @@ class Orders(ShopifyGraphQLResource):
         end: datetime,
         first: int | None = None,
         after: str | None = None,
+        capabilities: StoreCapabilities | None = None,
     ) -> str:
         return Orders.build_query_with_fragment(
             start,
             end,
             first=first,
             after=after,
+            capabilities=capabilities,
         )
 
     @staticmethod

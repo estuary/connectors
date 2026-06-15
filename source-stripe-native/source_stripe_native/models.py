@@ -456,6 +456,42 @@ class EarlyFraudWarning(BaseStripeObjectWithEvents):
     }
 
 
+# Stripe documents no value_list_item* event types (verified 2026-06-03).
+# value_list_items are immutable, so incremental on `created` captures every item.
+class ValueListItems(BaseStripeObjectNoEvents):
+    """
+    Parent Stream: ValueLists
+    """
+
+    NAME: ClassVar[str] = "ValueListItems"
+    SEARCH_NAME: ClassVar[str] = "radar/value_list_items"
+
+
+# Stripe documents no value_list* event types and no `updated` field
+# on the resource (verified 2026-06-03).
+# Value lists are mutable, so the scheduled backfill in
+# SCHEDULED_BACKFILL_STREAMS re-snapshots each list and those field updates are
+# picked up via reduction.
+class ValueLists(BaseStripeObjectNoEvents):
+    NAME: ClassVar[str] = "ValueLists"
+    SEARCH_NAME: ClassVar[str] = "radar/value_lists"
+
+    class ListItemsPreview(BaseModel, extra="allow"):
+        """
+        Preview of a value list's items embedded in each object of the
+        /v1/radar/value_lists response. Modeled as a required field (rather than
+        read defensively via getattr) so the ValueListItems stream's reliance on
+        it fails loudly at validation if Stripe ever stops embedding it, instead of
+        silently capturing nothing. When has_more is False, `data` holds the
+        complete set of items for the list.
+        """
+
+        has_more: bool
+        data: list[ValueListItems]
+
+    list_items: ListItemsPreview
+
+
 class InvoiceItems(BaseStripeObjectWithEvents):
     NAME: ClassVar[str] = "InvoiceItems"
     SEARCH_NAME: ClassVar[str] = "invoiceitems"
@@ -530,6 +566,21 @@ class Payouts(BaseStripeObjectWithEvents):
         "payout.paid": "u",
         "payout.reconciliation_completed": "u",
         "payout.updated": "u",
+    }
+
+
+# Stripe's docs for GET /v1/prices claim it "returns a list of your active
+# prices," but the bare list endpoint actually returns both active and
+# inactive prices. The `active` query param only filters when explicitly set;
+# omitting it captures everything — verified empirically on 2026-06-01 against
+# an account with an archived price.
+class Prices(BaseStripeObjectWithEvents):
+    NAME: ClassVar[str] = "Prices"
+    SEARCH_NAME: ClassVar[str] = "prices"
+    EVENT_TYPES: ClassVar[dict[str, Literal["c", "u", "d"]]] = {
+        "price.created": "c",
+        "price.updated": "u",
+        "price.deleted": "d",
     }
 
 
@@ -780,6 +831,7 @@ STREAMS = [
     },
     {"stream": PaymentIntent},
     {"stream": Payouts},
+    {"stream": Prices},
     {"stream": Plans},
     {"stream": Products},
     {"stream": PromotionCode},
@@ -812,6 +864,12 @@ STREAMS = [
     {"stream": Files},
     {"stream": FilesLink},
     {"stream": BalanceTransactions},
+    {
+        "stream": ValueLists,
+        "children": [
+            {"stream": ValueListItems},
+        ],
+    },
 ]
 
 # Regional streams are streams that don't have any children and are only accessible in certain regions.
@@ -834,6 +892,14 @@ SPLIT_CHILD_STREAM_NAMES = [
     ExternalBankAccount.NAME,
 ]
 
+# List item streams: child streams of items listed under a parent that has no events at
+# the /events endpoint. They're captured by listing the parent stream and fetching each
+# parent's items directly (see list_item_object in resources.py), relying on scheduled
+# backfills to observe updates and deletes.
+LIST_ITEM_STREAM_NAMES = [
+    ValueListItems.NAME,
+]
+
 # Streams that should not create per-account subtasks when capture_connected_accounts=true.
 # Only Accounts needs this because /v1/accounts lists all connected accounts from the platform.
 # Other streams need per-account subtasks to query each connected account's events.
@@ -851,4 +917,10 @@ SCHEDULED_BACKFILL_STREAMS = [
     "ExternalAccountCards",
     "ExternalBankAccount",
     "Persons",
+    "ValueLists",
 ]
+
+# Streams whose discovered binding is recommended disabled, so a capture only
+# replicates them if the user explicitly enables the binding. Existing captures
+# that already enabled the binding are unaffected.
+DISABLED_BY_DEFAULT_STREAMS = [ValueLists.NAME, ValueListItems.NAME]

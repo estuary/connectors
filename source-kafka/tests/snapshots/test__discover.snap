@@ -46,6 +46,76 @@ expression: snap
           "topic"
         ],
         "type": "object"
+      }
+    },
+    "required": [
+      "_meta"
+    ],
+    "then": {
+      "reduce": {
+        "delete": true,
+        "strategy": "merge"
+      }
+    },
+    "type": "object",
+    "x-infer-schema": true
+  },
+  "key": [
+    "/_meta/partition",
+    "/_meta/offset"
+  ],
+  "recommendedName": "avro-ref-topic",
+  "resourceConfig": {
+    "topic": "avro-ref-topic"
+  },
+  "resourcePath": [
+    "avro-ref-topic"
+  ]
+}
+{
+  "documentSchema": {
+    "if": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "op": {
+              "const": "d"
+            }
+          }
+        }
+      }
+    },
+    "properties": {
+      "_meta": {
+        "properties": {
+          "offset": {
+            "description": "The offset of the message within the partition",
+            "type": "integer"
+          },
+          "op": {
+            "description": "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete.",
+            "enum": [
+              "c",
+              "u",
+              "d"
+            ]
+          },
+          "partition": {
+            "description": "The partition the message was read from",
+            "type": "integer"
+          },
+          "topic": {
+            "description": "The topic the message was read from",
+            "type": "string"
+          }
+        },
+        "required": [
+          "offset",
+          "op",
+          "partition",
+          "topic"
+        ],
+        "type": "object"
       },
       "idx": {
         "type": "integer"
@@ -402,5 +472,78 @@ expression: snap
   },
   "resourcePath": [
     "protobuf-topic"
+  ]
+}
+{
+  "documentSchema": {
+    "if": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "op": {
+              "const": "d"
+            }
+          }
+        }
+      }
+    },
+    "properties": {
+      "_meta": {
+        "properties": {
+          "offset": {
+            "description": "The offset of the message within the partition",
+            "type": "integer"
+          },
+          "op": {
+            "description": "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete.",
+            "enum": [
+              "c",
+              "u",
+              "d"
+            ]
+          },
+          "partition": {
+            "description": "The partition the message was read from",
+            "type": "integer"
+          },
+          "topic": {
+            "description": "The topic the message was read from",
+            "type": "string"
+          }
+        },
+        "required": [
+          "offset",
+          "op",
+          "partition",
+          "topic"
+        ],
+        "type": "object"
+      },
+      "idx": {
+        "type": "integer"
+      }
+    },
+    "required": [
+      "_meta",
+      "idx"
+    ],
+    "then": {
+      "reduce": {
+        "delete": true,
+        "strategy": "merge"
+      }
+    },
+    "type": "object",
+    "x-infer-schema": true
+  },
+  "key": [
+    "/idx"
+  ],
+  "recommendedName": "protobuf-wkt-topic",
+  "resourceConfig": {
+    "topic": "protobuf-wkt-topic"
+  },
+  "resourcePath": [
+    "protobuf-wkt-topic"
   ]
 }

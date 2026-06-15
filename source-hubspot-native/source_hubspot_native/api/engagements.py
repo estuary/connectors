@@ -14,6 +14,8 @@ from ..models import (
     EngagementsModifiedAfter,
     Names,
     OldRecentEngagements,
+    TimestampedId,
+    TimestampedObject,
 )
 from .object_with_associations import fetch_changes_with_associations
 from .shared import (
@@ -31,13 +33,13 @@ async def _fetch_engagements_modified_after(
     until: datetime,
     page: PageCursor,
     count: int,
-) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+) -> tuple[Iterable[TimestampedId], PageCursor]:
     # Unlike the "recent/modified" endpoint used by the realtime stream,
     # "modified/after" is cursor-paginated with no 10k offset cap and reads
     # forward from a timestamp. The results aren't ordered, so we fully
     # enumerate the result set here and return everything at once.
     url = f"{HUB}/engagements/v1/engagements/modified/after"
-    output: list[tuple[datetime, str]] = []
+    output: list[TimestampedId] = []
     after: int | str = dt_to_ms(since)
 
     while True:
@@ -46,7 +48,7 @@ async def _fetch_engagements_modified_after(
             await http.request(log, url, params=params)
         )
         output.extend(
-            (ts, str(r.engagement.id))
+            TimestampedId(ts, str(r.engagement.id))
             for r in result.results
             if (ts := ms_to_dt(r.engagement.lastUpdated)) <= until
         )
@@ -58,8 +60,8 @@ async def _fetch_engagements_modified_after(
 
 
 async def _fetch_recently_modified_engagements(
-    log: Logger, http: HTTPSession, page: PageCursor, count: int
-) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+    log: Logger, http: HTTPSession, since: datetime, page: PageCursor, count: int
+) -> tuple[Iterable[TimestampedId], PageCursor]:
     if count >= 9_900:
         # "Engagements" as we are capturing them has a 10k limit on how many
         # items the API can return, and there is no other API that can be used
@@ -74,10 +76,17 @@ async def _fetch_recently_modified_engagements(
     result = OldRecentEngagements.model_validate_json(
         await http.request(log, url, params=params)
     )
-    return (
-        (ms_to_dt(r.engagement.lastUpdated), str(r.engagement.id))
-        for r in result.results
-    ), result.hasMore and result.offset
+    next_page: PageCursor = result.hasMore and result.offset
+    records: list[TimestampedId] = []
+    for r in result.results:
+        ts = ms_to_dt(r.engagement.lastUpdated)
+        records.append(TimestampedId(ts, str(r.engagement.id)))
+        if ts <= since:
+            # This endpoint returns records newest-first, so once a page reaches
+            # one as old as `since` there's nothing older worth paging for.
+            next_page = None
+
+    return records, next_page
 
 
 def fetch_recent_engagements(
@@ -86,11 +95,11 @@ def fetch_recent_engagements(
     with_history: bool,
     since: datetime,
     until: datetime | None,
-) -> AsyncGenerator[tuple[datetime, str, Engagement], None]:
+) -> AsyncGenerator[TimestampedObject[Engagement], None]:
     return fetch_changes_with_associations(
         Names.engagements,
         Engagement,
-        functools.partial(_fetch_recently_modified_engagements, log, http),
+        functools.partial(_fetch_recently_modified_engagements, log, http, since),
         log,
         http,
         with_history,
@@ -101,7 +110,7 @@ def fetch_recent_engagements(
 
 def fetch_delayed_engagements(
     log: Logger, http: HTTPSession, with_history: bool, since: datetime, until: datetime
-) -> AsyncGenerator[tuple[datetime, str, Engagement], None]:
+) -> AsyncGenerator[TimestampedObject[Engagement], None]:
     return fetch_changes_with_associations(
         Names.engagements,
         Engagement,

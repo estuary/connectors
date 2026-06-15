@@ -136,6 +136,11 @@ captures:
         schedule: ''
       target: acmeCo/Payouts
     - resource:
+        name: Prices
+        interval: PT5M
+        schedule: ''
+      target: acmeCo/Prices
+    - resource:
         name: Plans
         interval: PT5M
         schedule: ''
@@ -220,3 +225,13 @@ captures:
         interval: PT5M
         schedule: ''
       target: acmeCo/BalanceTransactions
+    - resource:
+        name: ValueLists
+        interval: PT5M
+        schedule: 0 0 * * *
+      target: acmeCo/ValueLists
+    - resource:
+        name: ValueListItems
+        interval: PT5M
+        schedule: ''
+      target: acmeCo/ValueListItems

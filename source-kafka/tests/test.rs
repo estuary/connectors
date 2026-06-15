@@ -126,6 +126,12 @@ async fn test_capture_resume() {
             "1": 1,
             "2": 1
           }
+        },
+        "protobuf-wkt-topic": {
+          "partitions": {
+            "1": 1,
+            "2": 1
+          }
         }
       }
     });
@@ -304,6 +310,24 @@ async fn setup_test() {
         &producer,
     )
     .await;
+
+    // Protobuf schema importing a google well-known type (timestamp.proto).
+    // Regression test for the DescriptorPool well-known types fix.
+    setup_protobuf_wkt_test(
+        &admin,
+        &opts,
+        &http,
+        schema_registry_endpoint,
+        num_messages,
+        num_partitions,
+        topic_replication,
+        &producer,
+    )
+    .await;
+
+    // Avro schema with references (unsupported). Regression test for discovery
+    // resilience: one unsupported schema must not fail discovery of the others.
+    setup_avro_ref_test(&admin, &opts, &http, schema_registry_endpoint, num_partitions, topic_replication).await;
 }
 
 async fn setup_protobuf_test(
@@ -693,6 +717,252 @@ async fn setup_protobuf_ref_test(
         )
         .await;
     }
+}
+
+async fn setup_protobuf_wkt_test(
+    admin: &AdminClient<rdkafka::client::DefaultClientContext>,
+    opts: &AdminOptions,
+    http: &reqwest::Client,
+    schema_registry_endpoint: &str,
+    num_messages: usize,
+    num_partitions: i32,
+    topic_replication: i32,
+    producer: &FutureProducer,
+) {
+    let topic = "protobuf-wkt-topic";
+
+    // Delete and recreate the topic.
+    admin.delete_topics(&[topic], opts).await.unwrap();
+    admin
+        .create_topics(
+            &[NewTopic::new(
+                topic,
+                num_partitions,
+                TopicReplication::Fixed(topic_replication),
+            )],
+            opts,
+        )
+        .await
+        .unwrap()
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+
+    // Delete existing schemas for the topic.
+    for suffix in ["key", "value"] {
+        http.delete(format!(
+            "{}/subjects/{}-{}",
+            schema_registry_endpoint, topic, suffix
+        ))
+        .send()
+        .await
+        .unwrap();
+
+        http.delete(format!(
+            "{}/subjects/{}-{}?permanent=true",
+            schema_registry_endpoint, topic, suffix
+        ))
+        .send()
+        .await
+        .unwrap();
+    }
+
+    // Register a simple key schema (no references).
+    let key_schema = r#"syntax = "proto3"; message WktKey { int32 idx = 1; }"#;
+    let resp = http
+        .post(format!(
+            "{}/subjects/{}-key/versions",
+            schema_registry_endpoint, topic
+        ))
+        .json(&json!({"schema": key_schema, "schemaType": "PROTOBUF"}))
+        .send()
+        .await
+        .unwrap();
+    assert!(
+        resp.status().is_success(),
+        "Failed to register wkt key schema: {:?}",
+        resp.text().await
+    );
+
+    // Value schema imports the google well-known Timestamp type, resolved
+    // natively rather than via a Schema Registry reference.
+    let value_schema = r#"syntax = "proto3"; import "google/protobuf/timestamp.proto"; message WktValue { string value = 1; google.protobuf.Timestamp ts = 2; }"#;
+    let resp = http
+        .post(format!(
+            "{}/subjects/{}-value/versions",
+            schema_registry_endpoint, topic
+        ))
+        .json(&json!({"schema": value_schema, "schemaType": "PROTOBUF"}))
+        .send()
+        .await
+        .unwrap();
+    assert!(
+        resp.status().is_success(),
+        "Failed to register wkt value schema: {:?}",
+        resp.text().await
+    );
+
+    // Get the assigned schema IDs.
+    let key_info: serde_json::Value = http
+        .get(format!(
+            "{}/subjects/{}-key/versions/latest",
+            schema_registry_endpoint, topic
+        ))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let key_schema_id = key_info["id"].as_u64().unwrap() as u32;
+
+    let value_info: serde_json::Value = http
+        .get(format!(
+            "{}/subjects/{}-value/versions/latest",
+            schema_registry_endpoint, topic
+        ))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let value_schema_id = value_info["id"].as_u64().unwrap() as u32;
+
+    // Produce messages with manually constructed Confluent wire-format bytes.
+    for idx in 0..num_messages {
+        let key = encode_confluent_protobuf(key_schema_id, &encode_ref_key(idx as i32));
+        let value = encode_confluent_protobuf(value_schema_id, &encode_wkt_value(idx));
+        send_message(topic, &key, Some(&value), idx, num_partitions, producer).await;
+    }
+
+    // Produce tombstone (deletion) records.
+    for idx in 0..num_partitions {
+        let key = encode_confluent_protobuf(key_schema_id, &encode_ref_key(idx));
+        send_message(
+            topic,
+            &key,
+            None::<&[u8]>,
+            idx as usize,
+            num_partitions,
+            producer,
+        )
+        .await;
+    }
+}
+
+async fn setup_avro_ref_test(
+    admin: &AdminClient<rdkafka::client::DefaultClientContext>,
+    opts: &AdminOptions,
+    http: &reqwest::Client,
+    schema_registry_endpoint: &str,
+    num_partitions: i32,
+    topic_replication: i32,
+) {
+    let topic = "avro-ref-topic";
+
+    // Delete and recreate the topic.
+    admin.delete_topics(&[topic], opts).await.unwrap();
+    admin
+        .create_topics(
+            &[NewTopic::new(
+                topic,
+                num_partitions,
+                TopicReplication::Fixed(topic_replication),
+            )],
+            opts,
+        )
+        .await
+        .unwrap()
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+
+    // Delete existing schemas for the topic value and the shared subject.
+    for subject in [format!("{}-value", topic), "avro-ref-common".to_string()] {
+        http.delete(format!("{}/subjects/{}", schema_registry_endpoint, subject))
+            .send()
+            .await
+            .unwrap();
+        http.delete(format!(
+            "{}/subjects/{}?permanent=true",
+            schema_registry_endpoint, subject
+        ))
+        .send()
+        .await
+        .unwrap();
+    }
+
+    // Register a shared/common Avro record as its own subject.
+    let common_schema = r#"{"type":"record","name":"Common","namespace":"acme","fields":[{"name":"common_field","type":"string"}]}"#;
+    let resp = http
+        .post(format!(
+            "{}/subjects/avro-ref-common/versions",
+            schema_registry_endpoint
+        ))
+        .json(&json!({"schema": common_schema, "schemaType": "AVRO"}))
+        .send()
+        .await
+        .unwrap();
+    assert!(
+        resp.status().is_success(),
+        "Failed to register common avro schema: {:?}",
+        resp.text().await
+    );
+
+    // Register the topic value schema WITH an Avro reference to the common schema.
+    // The connector does not support Avro references and will error fetching this
+    // schema; discovery must remain resilient and still surface the topic.
+    let value_schema = r#"{"type":"record","name":"AvroRefValue","namespace":"acme","fields":[{"name":"common","type":"acme.Common"},{"name":"value","type":"string"}]}"#;
+    let resp = http
+        .post(format!(
+            "{}/subjects/{}-value/versions",
+            schema_registry_endpoint, topic
+        ))
+        .json(&json!({
+            "schema": value_schema,
+            "schemaType": "AVRO",
+            "references": [{
+                "name": "acme.Common",
+                "subject": "avro-ref-common",
+                "version": 1
+            }]
+        }))
+        .send()
+        .await
+        .unwrap();
+    assert!(
+        resp.status().is_success(),
+        "Failed to register avro value schema with references: {:?}",
+        resp.text().await
+    );
+
+    // Intentionally produce no messages: this case exercises discovery resilience only.
+}
+
+/// Encode WktValue { value: "value-N", ts: google.protobuf.Timestamp { seconds } }
+/// as raw protobuf bytes.
+fn encode_wkt_value(idx: usize) -> Vec<u8> {
+    let value_str = format!("value-{}", idx);
+    // Deterministic, non-zero seconds so the Timestamp serializes to a stable RFC3339.
+    let seconds = ((idx + 1) * 86_400) as u64;
+
+    // Inner google.protobuf.Timestamp { seconds = <n> } (field 1, varint).
+    let mut inner = Vec::new();
+    inner.push(0x08);
+    encode_unsigned_varint(seconds, &mut inner);
+
+    let mut buf = Vec::new();
+    // Field 1: string value (length-delimited).
+    buf.push(0x0A);
+    encode_unsigned_varint(value_str.len() as u64, &mut buf);
+    buf.extend_from_slice(value_str.as_bytes());
+    // Field 2: Timestamp message (length-delimited).
+    buf.push(0x12);
+    encode_unsigned_varint(inner.len() as u64, &mut buf);
+    buf.extend_from_slice(&inner);
+
+    buf
 }
 
 /// Wrap protobuf bytes in Confluent wire format:

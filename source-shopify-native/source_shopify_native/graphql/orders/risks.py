@@ -2,7 +2,7 @@ from datetime import datetime
 from logging import Logger
 from typing import AsyncGenerator
 
-from ...models import ShopifyGraphQLResource, SortKey
+from ...models import ShopifyGraphQLResource, SortKey, StoreCapabilities
 
 
 class OrderRisks(ShopifyGraphQLResource):
@@ -71,12 +71,14 @@ class OrderRisks(ShopifyGraphQLResource):
         end: datetime,
         first: int | None = None,
         after: str | None = None,
+        capabilities: StoreCapabilities | None = None,
     ) -> str:
         return OrderRisks.build_query_with_fragment(
             start,
             end,
             first=first,
             after=after,
+            capabilities=capabilities,
         )
 
     @staticmethod

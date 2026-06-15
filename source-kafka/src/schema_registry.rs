@@ -137,24 +137,43 @@ impl SchemaRegistryClient {
                         value: None,
                     };
 
+                    // Don't let one unsupported schema (e.g. Avro/JSON
+                    // references) fail discovery for the whole registry: skip it
+                    // with a warning and fall back to schema inference.
                     if need_key {
-                        schema.key = Some(self.fetch_latest_schema(topic, true).await?)
+                        match self.fetch_latest_schema(topic, true).await {
+                            Ok(s) => schema.key = Some(s),
+                            Err(e) => tracing::warn!(
+                                topic = topic.as_str(),
+                                error = format!("{:#}", e),
+                                "skipping unsupported message key schema; topic will be discovered with the default collection key",
+                            ),
+                        }
                     }
                     if need_value {
-                        schema.value = Some(self.fetch_latest_schema(topic, false).await?)
+                        match self.fetch_latest_schema(topic, false).await {
+                            Ok(s) => schema.value = Some(s),
+                            Err(e) => tracing::warn!(
+                                topic = topic.as_str(),
+                                error = format!("{:#}", e),
+                                "skipping unsupported message value schema; topic will be discovered with schema inference",
+                            ),
+                        }
                     }
 
-                    Ok::<(String, TopicSchema), anyhow::Error>((topic.to_owned(), schema))
+                    (topic.to_owned(), schema)
                 })
             })
             .collect();
 
-        stream::iter(schema_futures)
+        let schemas = stream::iter(schema_futures)
             .buffer_unordered(CONCURRENT_SCHEMA_REQUESTS)
             .collect::<Vec<_>>()
             .await
             .into_iter()
-            .collect::<Result<HashMap<String, TopicSchema>>>()
+            .collect::<HashMap<String, TopicSchema>>();
+
+        Ok(schemas)
     }
 
     pub async fn fetch_schema(&self, id: u32) -> Result<RegisteredSchema> {
@@ -229,8 +248,13 @@ impl SchemaRegistryClient {
 
         let file_descriptor_set = prost_types::FileDescriptorSet { file: files };
 
-        let descriptor_pool = DescriptorPool::from_file_descriptor_set(file_descriptor_set)
-            .context("failed to create DescriptorPool from FileDescriptorSet")?;
+        // Start from the global pool so google well-known type imports (which
+        // we don't fetch from the registry) resolve. It's copy-on-write, so
+        // additions stay local to this schema.
+        let mut descriptor_pool = DescriptorPool::global();
+        descriptor_pool
+            .add_file_descriptor_set(file_descriptor_set)
+            .context("failed to add FileDescriptorSet to DescriptorPool")?;
 
         Ok(RegisteredSchema::Protobuf(ProtobufSchema {
             descriptor_pool,

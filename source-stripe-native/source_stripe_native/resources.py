@@ -13,37 +13,47 @@ from estuary_cdk.capture.common import (
     ResourceState,
     open_binding,
 )
+from estuary_cdk.capture.document import BaseDocument
 from estuary_cdk.flow import CaptureBinding
-
-# Default backfill schedule for exempt streams - runs daily at midnight UTC
-DEFAULT_SCHEDULE = "0 0 * * *"
-
 from estuary_cdk.http import HTTPError, HTTPMixin, HTTPSession, TokenSource
+
+from .protocols import FetchChangesFnFactory, FetchPageFnFactory
 
 from .account_fetcher import fetch_connected_account_ids
 from .api import (
     API,
     fetch_backfill,
     fetch_backfill_substreams,
+    fetch_backfill_list_items,
     fetch_backfill_usage_records,
     fetch_incremental,
     fetch_incremental_no_events,
     fetch_incremental_substreams,
+    fetch_incremental_list_items,
     fetch_incremental_usage_records,
 )
 from .models import (
     CONNECTED_ACCOUNT_EXEMPT_STREAMS,
+    DISABLED_BY_DEFAULT_STREAMS,
+    LIST_ITEM_STREAM_NAMES,
     REGIONAL_STREAMS,
     SCHEDULED_BACKFILL_STREAMS,
     SPLIT_CHILD_STREAM_NAMES,
     STREAMS,
     Accounts,
+    BaseStripeChildObject,
+    BaseStripeObjectNoEvents,
+    BaseStripeObjectWithEvents,
     ConnectorState,
     EndpointConfig,
+    SubscriptionItems,
 )
 from .priority_capture import (
     open_binding_with_priority_queue,
 )
+
+# Default backfill schedule for exempt streams - runs daily at midnight UTC
+DEFAULT_SCHEDULE = "0 0 * * *"
 
 DISABLED_MESSAGE_REGEX = r"Your account is not set up to use"
 
@@ -73,6 +83,22 @@ async def check_accessibility(
             re.search(DISABLED_MESSAGE_REGEX, err.message)
         )
         is_accessible = not is_permission_blocked and not is_disabled
+
+        if is_permission_blocked:
+            warning_msg = (
+                f"Removing inaccessible resource for {url} due to missing API key permissions. "
+                "Update your restricted API key to grant read access if this resource should be captured."
+            )
+        elif is_disabled:
+            warning_msg = (
+                f"Removing resource the account is not configured to use: {url}."
+            )
+        else:
+            warning_msg = (
+                f"Encountered HTTP error while checking accessibility for {url}"
+            )
+
+        log.warning(warning_msg, {"err.code": err.code, "err.message": err.message})
 
     return is_accessible
 
@@ -251,6 +277,19 @@ async def all_resources(
                                     initial_state,
                                 )
                             )
+                        case _ if child_stream.NAME in LIST_ITEM_STREAM_NAMES:
+                            all_streams.append(
+                                list_item_object(
+                                    base_stream,
+                                    child_stream,
+                                    http,
+                                    config.start_date,
+                                    platform_account_id,
+                                    connected_account_ids,
+                                    all_account_ids,
+                                    initial_state,
+                                )
+                            )
                         case _:
                             all_streams.append(
                                 child_object(
@@ -399,21 +438,25 @@ async def _maybe_migrate_exempt_state(
     )
 
 
-def base_object(
-    cls,
-    http: HTTPSession,
-    start_date: datetime,
-    incremental_window_size: timedelta,
+def _build_resource(
+    *,
+    name: str,
+    model: type[BaseDocument],
+    key: list[str],
+    fetch_changes_factory: FetchChangesFnFactory,
+    fetch_page_factory: FetchPageFnFactory,
     platform_account_id: str,
     connected_account_ids: list[str],
     all_account_ids: list[str],
     initial_state: ResourceState,
-) -> Resource:
-    """Base Object handles the default case from source-stripe-native
-    It requires a single, parent stream with a valid Event API Type
+) -> Resource[BaseDocument, ResourceConfig, ResourceState]:
+    """Shared skeleton for every resource builder.
+
+    The two factories each map a connected account id (or None for the platform
+    account) to a fetch partial.
     """
-    is_exempt = cls.NAME in CONNECTED_ACCOUNT_EXEMPT_STREAMS
-    needs_schedule = cls.NAME in SCHEDULED_BACKFILL_STREAMS
+    is_exempt = name in CONNECTED_ACCOUNT_EXEMPT_STREAMS
+    needs_schedule = name in SCHEDULED_BACKFILL_STREAMS
 
     # Exempt streams should use non-dict state since they always query
     # the platform account regardless of connected accounts
@@ -435,58 +478,20 @@ def base_object(
         if not connected_account_ids or is_exempt:
             # Migrate state if needed (for existing captures with dict state).
             state = await _maybe_migrate_exempt_state(
-                cls.NAME, binding, state, platform_account_id, task
-            )
-
-            fetch_changes_fns = functools.partial(
-                fetch_incremental,
-                cls,
-                platform_account_id,
-                None,
-                http,
-                incremental_window_size,
-            )
-            fetch_page_fns = functools.partial(
-                fetch_backfill,
-                cls,
-                start_date,
-                platform_account_id,
-                None,
-                http,
+                name, binding, state, platform_account_id, task
             )
             open_binding(
                 binding,
                 binding_index,
                 state,
                 task,
-                fetch_changes=fetch_changes_fns,
-                fetch_page=fetch_page_fns,
+                fetch_changes=fetch_changes_factory(None),
+                fetch_page=fetch_page_factory(None),
             )
         else:
             await _reconcile_connector_state(
                 all_account_ids, binding, state, initial_state, task
             )
-
-            def fetch_changes_factory(account_id: str):
-                return functools.partial(
-                    fetch_incremental,
-                    cls,
-                    platform_account_id,
-                    account_id,
-                    http,
-                    incremental_window_size,
-                )
-
-            def fetch_page_factory(account_id: str):
-                return functools.partial(
-                    fetch_backfill,
-                    cls,
-                    start_date,
-                    platform_account_id,
-                    account_id,
-                    http,
-                )
-
             open_binding_with_priority_queue(
                 binding,
                 binding_index,
@@ -498,23 +503,64 @@ def base_object(
             )
 
     return Resource(
-        name=cls.NAME,
-        key=["/id"],
-        model=cls,
+        name=name,
+        key=key,
+        model=model,
         open=open,
         initial_state=effective_initial_state,
         initial_config=ResourceConfigWithSchedule(
-            name=cls.NAME,
+            name=name,
             interval=timedelta(minutes=5),
             schedule=DEFAULT_SCHEDULE if needs_schedule else "",
         ),
         schema_inference=True,
+        disable=name in DISABLED_BY_DEFAULT_STREAMS,
+    )
+
+
+def base_object(
+    cls: type[BaseStripeObjectWithEvents],
+    http: HTTPSession,
+    start_date: datetime,
+    incremental_window_size: timedelta,
+    platform_account_id: str,
+    connected_account_ids: list[str],
+    all_account_ids: list[str],
+    initial_state: ResourceState,
+) -> Resource[BaseDocument, ResourceConfig, ResourceState]:
+    """Base Object handles the default case from source-stripe-native
+    It requires a single, parent stream with a valid Event API Type
+    """
+    return _build_resource(
+        name=cls.NAME,
+        model=cls,
+        key=["/id"],
+        fetch_changes_factory=lambda account_id: functools.partial(
+            fetch_incremental,
+            cls,
+            platform_account_id,
+            account_id,
+            http,
+            incremental_window_size,
+        ),
+        fetch_page_factory=lambda account_id: functools.partial(
+            fetch_backfill,
+            cls,
+            start_date,
+            platform_account_id,
+            account_id,
+            http,
+        ),
+        platform_account_id=platform_account_id,
+        connected_account_ids=connected_account_ids,
+        all_account_ids=all_account_ids,
+        initial_state=initial_state,
     )
 
 
 def child_object(
-    cls,
-    child_cls,
+    cls: type[BaseStripeObjectWithEvents],
+    child_cls: type[BaseStripeChildObject],
     http: HTTPSession,
     start_date: datetime,
     incremental_window_size: timedelta,
@@ -522,115 +568,90 @@ def child_object(
     connected_account_ids: list[str],
     all_account_ids: list[str],
     initial_state: ResourceState,
-) -> Resource:
+) -> Resource[BaseDocument, ResourceConfig, ResourceState]:
     """Child Object handles the default child case from source-stripe-native
     It requires both the parent and child stream, with the parent stream having
     a valid Event API Type
     """
-    is_exempt = child_cls.NAME in CONNECTED_ACCOUNT_EXEMPT_STREAMS
-    needs_schedule = child_cls.NAME in SCHEDULED_BACKFILL_STREAMS
-
-    # Exempt streams should use non-dict state since they always query
-    # the platform account regardless of connected accounts
-    effective_initial_state = (
-        _create_initial_state_for_exempt_stream()
-        if is_exempt and connected_account_ids
-        else initial_state
+    return _build_resource(
+        name=child_cls.NAME,
+        model=child_cls,
+        key=["/id"],
+        fetch_changes_factory=lambda account_id: functools.partial(
+            fetch_incremental_substreams,
+            cls,
+            child_cls,
+            platform_account_id,
+            account_id,
+            http,
+            incremental_window_size,
+        ),
+        fetch_page_factory=lambda account_id: functools.partial(
+            fetch_backfill_substreams,
+            cls,
+            child_cls,
+            start_date,
+            platform_account_id,
+            account_id,
+            http,
+        ),
+        platform_account_id=platform_account_id,
+        connected_account_ids=connected_account_ids,
+        all_account_ids=all_account_ids,
+        initial_state=initial_state,
     )
 
-    async def open(
-        binding: CaptureBinding[ResourceConfig],
-        binding_index: int,
-        state: ResourceState,
-        task: Task,
-        all_bindings,
-    ):
-        if not connected_account_ids or is_exempt:
-            # Migrate state if needed (for existing captures with dict state).
-            state = await _maybe_migrate_exempt_state(
-                child_cls.NAME, binding, state, platform_account_id, task
-            )
-            fetch_changes_fns = functools.partial(
-                fetch_incremental_substreams,
-                cls,
-                child_cls,
-                platform_account_id,
-                None,
-                http,
-                incremental_window_size,
-            )
-            fetch_page_fns = functools.partial(
-                fetch_backfill_substreams,
-                cls,
-                child_cls,
-                start_date,
-                platform_account_id,
-                None,
-                http,
-            )
-            open_binding(
-                binding,
-                binding_index,
-                state,
-                task,
-                fetch_changes=fetch_changes_fns,
-                fetch_page=fetch_page_fns,
-            )
-        else:
-            await _reconcile_connector_state(
-                all_account_ids, binding, state, initial_state, task
-            )
 
-            def fetch_changes_factory(account_id: str):
-                return functools.partial(
-                    fetch_incremental_substreams,
-                    cls,
-                    child_cls,
-                    platform_account_id,
-                    account_id,
-                    http,
-                    incremental_window_size,
-                )
-
-            def fetch_page_factory(account_id: str):
-                return functools.partial(
-                    fetch_backfill_substreams,
-                    cls,
-                    child_cls,
-                    start_date,
-                    platform_account_id,
-                    account_id,
-                    http,
-                )
-
-            open_binding_with_priority_queue(
-                binding,
-                binding_index,
-                state,
-                task,
-                all_account_ids,
-                fetch_changes_factory=fetch_changes_factory,
-                fetch_page_factory=fetch_page_factory,
-            )
-
-    return Resource(
+def list_item_object(
+    cls: type[BaseStripeObjectNoEvents],
+    child_cls: type[BaseStripeObjectNoEvents],
+    http: HTTPSession,
+    start_date: datetime,
+    platform_account_id: str,
+    connected_account_ids: list[str],
+    all_account_ids: list[str],
+    initial_state: ResourceState,
+) -> Resource[BaseDocument, ResourceConfig, ResourceState]:
+    """list_item_object handles a list item stream — a child stream of items listed
+    under a parent that has no events at the /events endpoint (e.g. ValueListItems under
+    ValueLists). Like child_object it lists the parent and fetches each parent's items,
+    but it has no incremental window since there's no Events API to page through —
+    incremental re-lists parents and filters items by `created`. When the items are
+    immutable (as ValueListItems are) this fully captures the stream, so it is not a
+    member of SCHEDULED_BACKFILL_STREAMS; a periodic re-backfill would only re-emit
+    identical docs (it surfaces neither updates nor deletes).
+    """
+    return _build_resource(
         name=child_cls.NAME,
-        key=["/id"],
         model=child_cls,
-        open=open,
-        initial_state=effective_initial_state,
-        initial_config=ResourceConfigWithSchedule(
-            name=child_cls.NAME,
-            interval=timedelta(minutes=5),
-            schedule=DEFAULT_SCHEDULE if needs_schedule else "",
+        key=["/id"],
+        fetch_changes_factory=lambda account_id: functools.partial(
+            fetch_incremental_list_items,
+            cls,
+            child_cls,
+            platform_account_id,
+            account_id,
+            http,
         ),
-        schema_inference=True,
+        fetch_page_factory=lambda account_id: functools.partial(
+            fetch_backfill_list_items,
+            cls,
+            child_cls,
+            start_date,
+            platform_account_id,
+            account_id,
+            http,
+        ),
+        platform_account_id=platform_account_id,
+        connected_account_ids=connected_account_ids,
+        all_account_ids=all_account_ids,
+        initial_state=initial_state,
     )
 
 
 def split_child_object(
-    cls,
-    child_cls,
+    cls: type[BaseStripeObjectWithEvents],
+    child_cls: type[BaseStripeChildObject],
     http: HTTPSession,
     start_date: datetime,
     incremental_window_size: timedelta,
@@ -638,114 +659,43 @@ def split_child_object(
     connected_account_ids: list[str],
     all_account_ids: list[str],
     initial_state: ResourceState,
-) -> Resource:
+) -> Resource[BaseDocument, ResourceConfig, ResourceState]:
     """
     split_child_object handles the case where a stream is a child stream when backfilling
     but incrementally replicates based off events that contain the child stream resource directly
     in the API response. Meaning, the stream behaves like a non-chid stream incrementally.
     """
-    is_exempt = child_cls.NAME in CONNECTED_ACCOUNT_EXEMPT_STREAMS
-    needs_schedule = child_cls.NAME in SCHEDULED_BACKFILL_STREAMS
-
-    # Exempt streams should use non-dict state since they always query
-    # the platform account regardless of connected accounts
-    effective_initial_state = (
-        _create_initial_state_for_exempt_stream()
-        if is_exempt and connected_account_ids
-        else initial_state
-    )
-
-    async def open(
-        binding: CaptureBinding[ResourceConfig],
-        binding_index: int,
-        state: ResourceState,
-        task: Task,
-        all_bindings,
-    ):
-        if not connected_account_ids or is_exempt:
-            # Migrate state if needed (for existing captures with dict state).
-            state = await _maybe_migrate_exempt_state(
-                child_cls.NAME, binding, state, platform_account_id, task
-            )
-            fetch_changes_fns = functools.partial(
-                fetch_incremental,
-                child_cls,
-                platform_account_id,
-                None,
-                http,
-                incremental_window_size,
-            )
-            fetch_page_fns = functools.partial(
-                fetch_backfill_substreams,
-                cls,
-                child_cls,
-                start_date,
-                platform_account_id,
-                None,
-                http,
-            )
-            open_binding(
-                binding,
-                binding_index,
-                state,
-                task,
-                fetch_changes=fetch_changes_fns,
-                fetch_page=fetch_page_fns,
-            )
-        else:
-            await _reconcile_connector_state(
-                all_account_ids, binding, state, initial_state, task
-            )
-
-            def fetch_changes_factory(account_id: str):
-                return functools.partial(
-                    fetch_incremental,
-                    child_cls,
-                    platform_account_id,
-                    account_id,
-                    http,
-                    incremental_window_size,
-                )
-
-            def fetch_page_factory(account_id: str):
-                return functools.partial(
-                    fetch_backfill_substreams,
-                    cls,
-                    child_cls,
-                    start_date,
-                    platform_account_id,
-                    account_id,
-                    http,
-                )
-
-            open_binding_with_priority_queue(
-                binding,
-                binding_index,
-                state,
-                task,
-                all_account_ids,
-                fetch_changes_factory=fetch_changes_factory,
-                fetch_page_factory=fetch_page_factory,
-            )
-
-    return Resource(
+    return _build_resource(
         name=child_cls.NAME,
-        key=["/id"],
         model=child_cls,
-        open=open,
-        initial_state=effective_initial_state,
-        initial_config=ResourceConfigWithSchedule(
-            name=child_cls.NAME,
-            interval=timedelta(minutes=5),
-            schedule=DEFAULT_SCHEDULE if needs_schedule else "",
+        key=["/id"],
+        fetch_changes_factory=lambda account_id: functools.partial(
+            fetch_incremental,
+            child_cls,
+            platform_account_id,
+            account_id,
+            http,
+            incremental_window_size,
         ),
-        schema_inference=True,
+        fetch_page_factory=lambda account_id: functools.partial(
+            fetch_backfill_substreams,
+            cls,
+            child_cls,
+            start_date,
+            platform_account_id,
+            account_id,
+            http,
+        ),
+        platform_account_id=platform_account_id,
+        connected_account_ids=connected_account_ids,
+        all_account_ids=all_account_ids,
+        initial_state=initial_state,
     )
 
 
 def usage_records(
-    cls,
-    child_cls,
+    cls: type[SubscriptionItems],
+    child_cls: type[BaseStripeChildObject],
     http: HTTPSession,
     start_date: datetime,
     incremental_window_size: timedelta,
@@ -753,219 +703,75 @@ def usage_records(
     connected_account_ids: list[str],
     all_account_ids: list[str],
     initial_state: ResourceState,
-) -> Resource:
+) -> Resource[BaseDocument, ResourceConfig, ResourceState]:
     """Usage Records handles a specific stream (UsageRecords).
     This is required since Usage Records is a child stream from SubscriptionItem
     and requires special processing.
     """
-    is_exempt = child_cls.NAME in CONNECTED_ACCOUNT_EXEMPT_STREAMS
-    needs_schedule = child_cls.NAME in SCHEDULED_BACKFILL_STREAMS
-
-    # Exempt streams should use non-dict state since they always query
-    # the platform account regardless of connected accounts
-    effective_initial_state = (
-        _create_initial_state_for_exempt_stream()
-        if is_exempt and connected_account_ids
-        else initial_state
-    )
-
-    async def open(
-        binding: CaptureBinding[ResourceConfig],
-        binding_index: int,
-        state: ResourceState,
-        task: Task,
-        all_bindings,
-    ):
-        if not connected_account_ids or is_exempt:
-            # Migrate state if needed (for existing captures with dict state).
-            state = await _maybe_migrate_exempt_state(
-                child_cls.NAME, binding, state, platform_account_id, task
-            )
-            fetch_changes_fns = functools.partial(
-                fetch_incremental_usage_records,
-                cls,
-                child_cls,
-                platform_account_id,
-                None,
-                http,
-                incremental_window_size,
-            )
-            fetch_page_fns = functools.partial(
-                fetch_backfill_usage_records,
-                cls,
-                child_cls,
-                start_date,
-                platform_account_id,
-                None,
-                http,
-            )
-            open_binding(
-                binding,
-                binding_index,
-                state,
-                task,
-                fetch_changes=fetch_changes_fns,
-                fetch_page=fetch_page_fns,
-            )
-        else:
-            await _reconcile_connector_state(
-                all_account_ids, binding, state, initial_state, task
-            )
-
-            def fetch_changes_factory(account_id: str):
-                return functools.partial(
-                    fetch_incremental_usage_records,
-                    cls,
-                    child_cls,
-                    platform_account_id,
-                    account_id,
-                    http,
-                    incremental_window_size,
-                )
-
-            def fetch_page_factory(account_id: str):
-                return functools.partial(
-                    fetch_backfill_usage_records,
-                    cls,
-                    child_cls,
-                    start_date,
-                    platform_account_id,
-                    account_id,
-                    http,
-                )
-
-            open_binding_with_priority_queue(
-                binding,
-                binding_index,
-                state,
-                task,
-                all_account_ids,
-                fetch_changes_factory=fetch_changes_factory,
-                fetch_page_factory=fetch_page_factory,
-            )
-
-    return Resource(
+    return _build_resource(
         name=child_cls.NAME,
-        key=["/subscription_item"],  # Note: This is different from other resources
         model=child_cls,
-        open=open,
-        initial_state=effective_initial_state,
-        initial_config=ResourceConfigWithSchedule(
-            name=child_cls.NAME,
-            interval=timedelta(minutes=5),
-            schedule=DEFAULT_SCHEDULE if needs_schedule else "",
+        key=["/subscription_item"],  # Note: This is different from other resources
+        fetch_changes_factory=lambda account_id: functools.partial(
+            fetch_incremental_usage_records,
+            cls,
+            child_cls,
+            platform_account_id,
+            account_id,
+            http,
+            incremental_window_size,
         ),
-        schema_inference=True,
+        fetch_page_factory=lambda account_id: functools.partial(
+            fetch_backfill_usage_records,
+            cls,
+            child_cls,
+            start_date,
+            platform_account_id,
+            account_id,
+            http,
+        ),
+        platform_account_id=platform_account_id,
+        connected_account_ids=connected_account_ids,
+        all_account_ids=all_account_ids,
+        initial_state=initial_state,
     )
 
 
 def no_events_object(
-    cls,
+    cls: type[BaseStripeObjectNoEvents],
     http: HTTPSession,
     start_date: datetime,
     platform_account_id: str,
     connected_account_ids: list[str],
     all_account_ids: list[str],
     initial_state: ResourceState,
-) -> Resource:
+) -> Resource[BaseDocument, ResourceConfig, ResourceState]:
     """No Events Object handles a edge-case from source-stripe-native,
     where the given parent stream does not contain a valid Events API type.
     It requires a single, parent stream with a valid list all API endpoint.
     It works very similar to the base object, but without the use of the Events APi.
     """
-    is_exempt = cls.NAME in CONNECTED_ACCOUNT_EXEMPT_STREAMS
-    needs_schedule = cls.NAME in SCHEDULED_BACKFILL_STREAMS
-
-    # Exempt streams should use non-dict state since they always query
-    # the platform account regardless of connected accounts
-    effective_initial_state = (
-        _create_initial_state_for_exempt_stream()
-        if is_exempt and connected_account_ids
-        else initial_state
-    )
-
-    async def open(
-        binding: CaptureBinding[ResourceConfig],
-        binding_index: int,
-        state: ResourceState,
-        task: Task,
-        all_bindings,
-    ):
-        # Exempt streams should not use per-account subtasks even when
-        # connected accounts exist. They always query the platform account.
-        if not connected_account_ids or is_exempt:
-            # Migrate state if needed (for existing captures with dict state).
-            state = await _maybe_migrate_exempt_state(
-                cls.NAME, binding, state, platform_account_id, task
-            )
-
-            fetch_changes_fns = functools.partial(
-                fetch_incremental_no_events,
-                cls,
-                platform_account_id,
-                None,
-                http,
-            )
-            fetch_page_fns = functools.partial(
-                fetch_backfill,
-                cls,
-                start_date,
-                platform_account_id,
-                None,
-                http,
-            )
-            open_binding(
-                binding,
-                binding_index,
-                state,
-                task,
-                fetch_changes=fetch_changes_fns,
-                fetch_page=fetch_page_fns,
-            )
-        else:
-            await _reconcile_connector_state(
-                all_account_ids, binding, state, initial_state, task
-            )
-
-            def fetch_changes_factory(account_id: str):
-                return functools.partial(
-                    fetch_incremental_no_events,
-                    cls,
-                    platform_account_id,
-                    account_id,
-                    http,
-                )
-
-            def fetch_page_factory(account_id: str):
-                return functools.partial(
-                    fetch_backfill,
-                    cls,
-                    start_date,
-                    platform_account_id,
-                    account_id,
-                    http,
-                )
-
-            open_binding_with_priority_queue(
-                binding,
-                binding_index,
-                state,
-                task,
-                all_account_ids,
-                fetch_changes_factory=fetch_changes_factory,
-                fetch_page_factory=fetch_page_factory,
-            )
-
-    return Resource(
+    return _build_resource(
         name=cls.NAME,
-        key=["/id"],
         model=cls,
-        open=open,
-        initial_state=effective_initial_state,
-        initial_config=ResourceConfigWithSchedule(
-            name=cls.NAME,
-            interval=timedelta(minutes=5),
-            schedule=DEFAULT_SCHEDULE if needs_schedule else "",
+        key=["/id"],
+        fetch_changes_factory=lambda account_id: functools.partial(
+            fetch_incremental_no_events,
+            cls,
+            platform_account_id,
+            account_id,
+            http,
         ),
-        schema_inference=True,
+        fetch_page_factory=lambda account_id: functools.partial(
+            fetch_backfill,
+            cls,
+            start_date,
+            platform_account_id,
+            account_id,
+            http,
+        ),
+        platform_account_id=platform_account_id,
+        connected_account_ids=connected_account_ids,
+        all_account_ids=all_account_ids,
+        initial_state=initial_state,
     )

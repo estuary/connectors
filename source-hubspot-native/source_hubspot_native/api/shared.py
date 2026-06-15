@@ -11,6 +11,8 @@ import estuary_cdk.emitted_changes_cache as cache
 from estuary_cdk.capture.common import LogCursor, Triggers
 from estuary_cdk.http import HTTPSession
 
+from ..models import TimestampedObject
+
 # Hubspot returns a 500 internal server error if querying for data at the EPOCH.
 EPOCH_PLUS_ONE_SECOND = datetime(1970, 1, 1, tzinfo=UTC) + timedelta(seconds=1)
 HUB = "https://api.hubapi.com"
@@ -36,7 +38,7 @@ class MustBackfillBinding(Exception):
 
 FetchRecentFn = Callable[
     [Logger, HTTPSession, bool, datetime, datetime | None],
-    AsyncGenerator[tuple[datetime, str, Any], None],
+    AsyncGenerator[TimestampedObject[Any], None],
 ]
 """
 Returns a stream of (timestamp, key, document) tuples that represent a
@@ -54,12 +56,17 @@ which if not None is a hint that more recent documents are not needed.
 
 FetchDelayedFn = Callable[
     [Logger, HTTPSession, bool, datetime, datetime],
-    AsyncGenerator[tuple[datetime, str, Any], None],
+    AsyncGenerator[TimestampedObject[Any] | datetime, None],
 ]
 """
 Returns a stream of (timestamp, key, document) tuples that represent a complete
 stream of not-so-recent documents. The key is used for seeing if a more recent
 change event document has already been emitted by the FetchRecentFn.
+
+A bare datetime may be interleaved between tuples to mark an intermediate
+checkpoint boundary: every document at or before that timestamp has already
+been yielded, so fetch_delayed_changes can safely checkpoint there. Chunked
+delayed fetchers use this to checkpoint progress within a large window.
 
 Similar to FetchRecentFn, documents may be returned in any order and iteration
 stops when seeing an entry that's as-old or older than the "since" datetime
@@ -197,17 +204,44 @@ async def fetch_delayed_changes(
         return
 
     max_ts = lower_bound
+    last_checkpoint = lower_bound
     cache_hits = 0
     emitted = 0
 
+    def _log_progress(cursor: datetime) -> None:
+        evicted = cache.cleanup(object_name, cursor)
+        log.info(
+            "fetched delayed events for stream",
+            {
+                "object_name": object_name,
+                "since": lower_bound,
+                "until": cursor,
+                "emitted": emitted,
+                "cache_hits": cache_hits,
+                "evicted": evicted,
+                "new_size": cache.count_for(object_name),
+            },
+        )
+
     try:
-        async for ts, key, obj in fetch_delayed(
+        async for item in fetch_delayed(
             log,
             http,
             with_history,
             lower_bound,
             upper_bound,
         ):
+            if isinstance(item, datetime):
+                # An intermediate checkpoint boundary yielded by a chunked
+                # fetcher. Every document at or before this timestamp has
+                # already been yielded.
+                if item > last_checkpoint:
+                    _log_progress(item)
+                    last_checkpoint = item
+                    yield item
+                continue
+
+            ts, key, obj = item
             if ts > upper_bound:
                 # In case the FetchDelayedFn is unable to filter based on upper_bound.
                 continue
@@ -228,18 +262,6 @@ async def fetch_delayed_changes(
     if upper_bound < horizon:
         max_ts = upper_bound
 
-    if max_ts != lower_bound:
-        evicted = cache.cleanup(object_name, max_ts)
-        log.info(
-            "fetched delayed events for stream",
-            {
-                "object_name": object_name,
-                "since": lower_bound,
-                "until": upper_bound,
-                "emitted": emitted,
-                "cache_hits": cache_hits,
-                "evicted": evicted,
-                "new_size": cache.count_for(object_name),
-            },
-        )
+    if max_ts > last_checkpoint:
+        _log_progress(max_ts)
         yield max_ts

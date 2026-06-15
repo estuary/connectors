@@ -10,6 +10,7 @@ from estuary_cdk.capture.common import (
     Resource,
     ResourceConfig,
     ResourceState,
+    SnapshotResource,
     open_binding,
 )
 from estuary_cdk.flow import (
@@ -27,8 +28,10 @@ from .graphql.bulk_job_manager import BulkJobManager
 from .api import (
     backfill_incremental,
     bulk_fetch_incremental,
+    bulk_fetch_snapshot,
     fetch_incremental,
     fetch_incremental_unsorted,
+    fetch_snapshot,
 )
 from .utils import dt_to_str
 from .models import (
@@ -39,6 +42,7 @@ from .models import (
     ShopDetails,
     ShopifyClientCredentials,
     ShopifyGraphQLResource,
+    StoreCapabilities,
     StoreConfig,
     create_response_data_model,
 )
@@ -94,7 +98,7 @@ class StoreContext:
     http: StoreHTTP
     client: gql.ShopifyGraphQLClient
     bulk_job_manager: BulkJobManager
-    scopes: set[str]
+    capabilities: StoreCapabilities
     available_resources: set[type[ShopifyGraphQLResource]]
 
 
@@ -163,6 +167,10 @@ PII_RESOURCES: set[type[ShopifyGraphQLResource]] = {
     gql.FulfillmentOrders,
 }
 
+FULL_REFRESH_RESOURCES: list[type[ShopifyGraphQLResource]] = [
+    gql.StaffMembers,
+]
+
 
 async def _create_store_context(
     log: Logger,
@@ -187,18 +195,26 @@ async def _create_store_context(
         store_config.credentials, (AccessToken, ShopifyClientCredentials)
     )
     can_access_pii = True
+    is_plus_or_advanced = False
     if uses_custom_app_token:
-        can_access_pii = await _check_plan_allows_pii(store_http, client.url, log)
+        plan = await _get_shop_plan(store_http, client.url, log)
+        can_access_pii = _plan_allows_pii(plan, log)
+        is_plus_or_advanced = _plan_is_plus_or_advanced(plan)
 
     available_resources = _get_available_resources(
-        granted_scopes, uses_custom_app_token, can_access_pii
+        granted_scopes, uses_custom_app_token, can_access_pii, is_plus_or_advanced
+    )
+
+    capabilities = StoreCapabilities(
+        scopes=frozenset(granted_scopes),
+        is_plus_or_advanced=is_plus_or_advanced,
     )
 
     store_context = StoreContext(
         http=store_http,
         client=client,
         bulk_job_manager=bulk_job_manager,
-        scopes=granted_scopes,
+        capabilities=capabilities,
         available_resources=available_resources,
     )
 
@@ -209,16 +225,21 @@ def _get_available_resources(
     granted_scopes: set[str],
     uses_custom_app_token: bool,
     can_access_pii: bool,
+    is_plus_or_advanced: bool,
 ) -> set[type[ShopifyGraphQLResource]]:
     """Determine which resources are available based on scopes and plan."""
     available: set[type[ShopifyGraphQLResource]] = set()
 
-    for resource in INCREMENTAL_RESOURCES:
+    for resource in INCREMENTAL_RESOURCES + FULL_REFRESH_RESOURCES:
         # Skip if none of the qualifying scopes are granted
         if resource.QUALIFYING_SCOPES.isdisjoint(granted_scopes):
             continue
         # Skip PII resources for custom app tokens when plan doesn't allow PII
         if uses_custom_app_token and resource in PII_RESOURCES and not can_access_pii:
+            continue
+        # Skip resources only queryable on Plus/Advanced plans when the store
+        # isn't on one.
+        if resource.REQUIRES_PLUS_OR_ADVANCED_PLAN and not is_plus_or_advanced:
             continue
         available.add(resource)
 
@@ -351,13 +372,18 @@ async def _reconcile_connector_state(
         await task.checkpoint(ConnectorState(bindingStateV1={binding.stateKey: state}))
 
 
-async def _check_plan_allows_pii(http: HTTPMixin, url: str, log: Logger) -> bool:
-    """Check if the Shopify plan allows access to PII data."""
+async def _get_shop_plan(
+    http: HTTPMixin, url: str, log: Logger
+) -> ShopDetails.Data.Shop.Plan:
+    """Fetch the store's Shopify plan details."""
     response = ShopDetails.model_validate_json(
         await http.request(log, url, method="POST", json={"query": ShopDetails.query()})
     )
-    plan = response.data.shop.plan
+    return response.data.shop.plan
 
+
+def _plan_allows_pii(plan: ShopDetails.Data.Shop.Plan, log: Logger) -> bool:
+    """Check if the Shopify plan allows access to PII data."""
     if plan.partnerDevelopment or plan.shopifyPlus:
         return True
 
@@ -372,6 +398,18 @@ async def _check_plan_allows_pii(http: HTTPMixin, url: str, log: Logger) -> bool
         f"Assuming PII access is supported."
     )
     return True
+
+
+def _plan_is_plus_or_advanced(plan: ShopDetails.Data.Shop.Plan) -> bool:
+    """Whether the plan can query fields restricted to Plus/Advanced tiers.
+
+    Partner development stores have the same access as Plus for testing purposes.
+    """
+    return (
+        plan.shopifyPlus
+        or plan.partnerDevelopment
+        or plan.displayName == PlanName.ADVANCED
+    )
 
 
 async def _get_granted_scopes(http: HTTPMixin, url: str, log: Logger) -> set[str]:
@@ -461,7 +499,7 @@ async def all_resources(
         else:
             excluded = [
                 m.NAME
-                for m in INCREMENTAL_RESOURCES
+                for m in INCREMENTAL_RESOURCES + FULL_REFRESH_RESOURCES
                 if m not in result.available_resources
             ]
             if excluded:
@@ -535,7 +573,7 @@ async def all_resources(
                 if model == gql.FulfillmentOrders:
                     fo_scopes = gql.FulfillmentOrders.QUALIFYING_SCOPES
                     for store_id in stores_with_access:
-                        granted = store_contexts[store_id].scopes
+                        granted = store_contexts[store_id].capabilities.scopes
                         if fo_scopes & granted and not fo_scopes <= granted:
                             missing = fo_scopes - granted
                             task.log.warning(
@@ -567,6 +605,7 @@ async def all_resources(
                             ctx.bulk_job_manager,
                             model,
                             store_id,
+                            ctx.capabilities,
                         )
                     elif model.SORT_KEY is None:
                         fetch_changes[store_id] = functools.partial(
@@ -575,6 +614,7 @@ async def all_resources(
                             model,
                             data_model,
                             store_id,
+                            ctx.capabilities,
                         )
                     else:
                         fetch_changes[store_id] = functools.partial(
@@ -583,6 +623,7 @@ async def all_resources(
                             model,
                             data_model,
                             store_id,
+                            ctx.capabilities,
                         )
                         fetch_page[store_id] = functools.partial(
                             backfill_incremental,
@@ -590,6 +631,7 @@ async def all_resources(
                             model,
                             data_model,
                             store_id,
+                            ctx.capabilities,
                         )
 
                 open_binding(
@@ -615,6 +657,85 @@ async def all_resources(
                 schema_inference=True,
                 initial_config=ResourceConfig(
                     name=model.NAME, interval=timedelta(minutes=5)
+                ),
+            )
+        )
+
+    # Build snapshot resources. Each is a single binding keyed on
+    # [/_meta/store, /_meta/row_id] whose snapshot fans out into one per-store
+    # subtask
+    snapshot_key = ["/_meta/store", "/_meta/row_id"]
+    for model in FULL_REFRESH_RESOURCES:
+        stores_with_access = [
+            store_id
+            for store_id, ctx in store_contexts.items()
+            if model in ctx.available_resources
+        ]
+
+        if not stores_with_access:
+            continue
+
+        def create_snapshot_open_fn(
+            model: type[ShopifyGraphQLResource],
+            stores_with_access: list[str],
+        ):
+            async def open(
+                binding: CaptureBinding[ResourceConfig],
+                binding_index: int,
+                state: ResourceState,
+                task: Task,
+                _all_bindings,
+            ):
+                data_model = create_response_data_model(model)
+
+                fetch_snapshot_fns: dict[str, functools.partial] = {}
+                tombstones: dict[str, ShopifyGraphQLResource] = {}
+                for store_id in stores_with_access:
+                    ctx = store_contexts[store_id]
+                    if model.SHOULD_USE_BULK_QUERIES:
+                        fetch_snapshot_fns[store_id] = functools.partial(
+                            bulk_fetch_snapshot,
+                            ctx.http,
+                            ctx.bulk_job_manager,
+                            model,
+                            store_id,
+                            ctx.capabilities,
+                        )
+                    else:
+                        fetch_snapshot_fns[store_id] = functools.partial(
+                            fetch_snapshot,
+                            ctx.client,
+                            model,
+                            data_model,
+                            store_id,
+                            ctx.capabilities,
+                        )
+                    # The tombstone must carry the /_meta/store discriminator so
+                    # deletes target the correct [store, row_id] key. The CDK only
+                    # fills in op/row_id.
+                    tombstones[store_id] = ShopifyGraphQLResource(
+                        id="",
+                        _meta=ShopifyGraphQLResource.Meta(op="d", store=store_id),
+                    )
+
+                open_binding(
+                    binding,
+                    binding_index,
+                    state,
+                    task,
+                    fetch_snapshot=fetch_snapshot_fns,
+                    tombstone=tombstones,
+                )
+
+            return open
+
+        resources.append(
+            SnapshotResource(
+                name=model.NAME,
+                key=snapshot_key,
+                open=create_snapshot_open_fn(model, stores_with_access),
+                initial_config=ResourceConfig(
+                    name=model.NAME, interval=timedelta(minutes=15)
                 ),
             )
         )
