@@ -281,83 +281,81 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil, m.FinishedOperation(fmt.Errorf("evaluating fence template: %w", err))
 		}
 
-		return nil, m.RunAsyncOperation(func() error {
-			defer t.storeFiles.CleanupCurrentTransaction(ctx)
+		defer t.storeFiles.CleanupCurrentTransaction(ctx)
 
-			db, err := t.cfg.db()
+		db, err := t.cfg.db()
+		if err != nil {
+			return nil, m.FinishedOperation(fmt.Errorf("creating db: %w", err))
+		}
+		defer db.Close()
+
+		txn, err := db.BeginTx(ctx, nil)
+		if err != nil {
+			return nil, m.FinishedOperation(fmt.Errorf("store BeginTx: %w", err))
+		}
+		defer txn.Rollback()
+
+		for idx, b := range t.bindings {
+			if !t.storeFiles.Started(idx) {
+				continue
+			}
+
+			uris, err := t.storeFiles.Flush(idx)
 			if err != nil {
-				return fmt.Errorf("creating db: %w", err)
-			}
-			defer db.Close()
-
-			txn, err := db.BeginTx(ctx, nil)
-			if err != nil {
-				return fmt.Errorf("store BeginTx: %w", err)
-			}
-			defer txn.Rollback()
-
-			for idx, b := range t.bindings {
-				if !t.storeFiles.Started(idx) {
-					continue
-				}
-
-				uris, err := t.storeFiles.Flush(idx)
-				if err != nil {
-					return fmt.Errorf("flushing store file for binding[%d]: %w", idx, err)
-				}
-
-				params := &queryParams{
-					Table:             b.target,
-					URIs:              uris,
-					StorageAccountKey: t.cfg.StorageAccountKey,
-					Bounds:            b.store.mergeBounds.Build(),
-				}
-
-				t.be.StartedResourceCommit(b.target.Path)
-				if b.store.mustMerge {
-					var mergeQuery strings.Builder
-					if err := t.templates.storeMergeQuery.Execute(&mergeQuery, params); err != nil {
-						return err
-					} else if _, err := txn.ExecContext(ctx, mergeQuery.String()); err != nil {
-						log.WithField(
-							"query", redactedQuery(mergeQuery, t.cfg.StorageAccountKey),
-						).Error("merge query failed")
-						return fmt.Errorf("executing store merge query for binding[%d]: %w", idx, err)
-					}
-				} else {
-					var copyIntoQuery strings.Builder
-					tpl := t.templates.storeCopyIntoDirectQuery
-					if b.hasBinaryColumns {
-						tpl = t.templates.storeCopyIntoFromStagedQuery
-					}
-
-					if err := tpl.Execute(&copyIntoQuery, params); err != nil {
-						return err
-					} else if _, err := txn.ExecContext(ctx, copyIntoQuery.String()); err != nil {
-						log.WithField(
-							"query", redactedQuery(copyIntoQuery, t.cfg.StorageAccountKey),
-						).Error("copy into query failed")
-						return fmt.Errorf("executing store copy into query for binding[%d]: %w", idx, err)
-					}
-				}
-				t.be.FinishedResourceCommit(b.target.Path)
-				b.store.mustMerge = false
+				return nil, m.FinishedOperation(fmt.Errorf("flushing store file for binding[%d]: %w", idx, err))
 			}
 
-			if res, err := txn.ExecContext(ctx, fenceUpdate.String()); err != nil {
-				return fmt.Errorf("updating checkpoints: %w", err)
-			} else if rows, err := res.RowsAffected(); err != nil {
-				return fmt.Errorf("getting fence update rows affected: %w", err)
-			} else if rows != 1 {
-				return fmt.Errorf("this instance was fenced off by another")
-			} else if err := txn.Commit(); err != nil {
-				return fmt.Errorf("committing store transaction: %w", err)
-			} else if err := t.storeFiles.CleanupCurrentTransaction(ctx); err != nil {
-				return fmt.Errorf("cleaning up temporary object files: %w", err)
+			params := &queryParams{
+				Table:             b.target,
+				URIs:              uris,
+				StorageAccountKey: t.cfg.StorageAccountKey,
+				Bounds:            b.store.mergeBounds.Build(),
 			}
 
-			return nil
-		})
+			t.be.StartedResourceCommit(b.target.Path)
+			if b.store.mustMerge {
+				var mergeQuery strings.Builder
+				if err := t.templates.storeMergeQuery.Execute(&mergeQuery, params); err != nil {
+					return nil, m.FinishedOperation(err)
+				} else if _, err := txn.ExecContext(ctx, mergeQuery.String()); err != nil {
+					log.WithField(
+						"query", redactedQuery(mergeQuery, t.cfg.StorageAccountKey),
+					).Error("merge query failed")
+					return nil, m.FinishedOperation(fmt.Errorf("executing store merge query for binding[%d]: %w", idx, err))
+				}
+			} else {
+				var copyIntoQuery strings.Builder
+				tpl := t.templates.storeCopyIntoDirectQuery
+				if b.hasBinaryColumns {
+					tpl = t.templates.storeCopyIntoFromStagedQuery
+				}
+
+				if err := tpl.Execute(&copyIntoQuery, params); err != nil {
+					return nil, m.FinishedOperation(err)
+				} else if _, err := txn.ExecContext(ctx, copyIntoQuery.String()); err != nil {
+					log.WithField(
+						"query", redactedQuery(copyIntoQuery, t.cfg.StorageAccountKey),
+					).Error("copy into query failed")
+					return nil, m.FinishedOperation(fmt.Errorf("executing store copy into query for binding[%d]: %w", idx, err))
+				}
+			}
+			t.be.FinishedResourceCommit(b.target.Path)
+			b.store.mustMerge = false
+		}
+
+		if res, err := txn.ExecContext(ctx, fenceUpdate.String()); err != nil {
+			return nil, m.FinishedOperation(fmt.Errorf("updating checkpoints: %w", err))
+		} else if rows, err := res.RowsAffected(); err != nil {
+			return nil, m.FinishedOperation(fmt.Errorf("getting fence update rows affected: %w", err))
+		} else if rows != 1 {
+			return nil, m.FinishedOperation(fmt.Errorf("this instance was fenced off by another"))
+		} else if err := txn.Commit(); err != nil {
+			return nil, m.FinishedOperation(fmt.Errorf("committing store transaction: %w", err))
+		} else if err := t.storeFiles.CleanupCurrentTransaction(ctx); err != nil {
+			return nil, m.FinishedOperation(fmt.Errorf("cleaning up temporary object files: %w", err))
+		}
+
+		return nil, nil
 	}, nil
 }
 
