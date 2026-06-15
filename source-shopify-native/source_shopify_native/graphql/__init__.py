@@ -22,6 +22,7 @@ from .orders.fulfillments import Fulfillments
 from .orders.metafields import OrderMetafields
 from .orders.orders import Orders
 from .orders.refunds import OrderRefunds
+from .orders.returns import OrderReturns
 from .orders.risks import OrderRisks
 from .orders.transactions import OrderTransactions
 from .subscriptions.subscription_contracts import SubscriptionContracts
@@ -54,6 +55,7 @@ __all__ = [
     "Orders",
     "OrderMetafields",
     "OrderRefunds",
+    "OrderReturns",
     "OrderRisks",
     "OrderTransactions",
     "Disputes",

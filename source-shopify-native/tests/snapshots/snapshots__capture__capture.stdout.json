@@ -4603,6 +4603,189 @@
     }
   ],
   [
+    "acmeCo/order_returns",
+    {
+      "_meta": {
+        "store": "estuary-alex-testing",
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "createdAt": "2026-06-11T17:33:51Z",
+      "id": "gid://shopify/Order/18697849798701",
+      "legacyResourceId": "18697849798701",
+      "returns": [
+        {
+          "__parentId": "gid://shopify/Order/18697849798701",
+          "closedAt": "2026-06-15T13:21:46Z",
+          "createdAt": "2026-06-15T13:20:39Z",
+          "decline": null,
+          "exchangeLineItems": [
+            {
+              "__parentId": "gid://shopify/Return/18804736045",
+              "id": "gid://shopify/ExchangeLineItem/964526125",
+              "processableQuantity": 0,
+              "processedQuantity": 1,
+              "quantity": 1,
+              "variantId": "gid://shopify/ProductVariant/43217823891501"
+            }
+          ],
+          "id": "gid://shopify/Return/18804736045",
+          "name": "#1007-R1",
+          "refunds": [
+            {
+              "__parentId": "gid://shopify/Return/18804736045",
+              "id": "gid://shopify/Refund/1100817530925"
+            }
+          ],
+          "returnLineItems": [
+            {
+              "__parentId": "gid://shopify/Return/18804736045",
+              "customerNote": null,
+              "id": "gid://shopify/ReturnLineItem/27743977517",
+              "quantity": 5,
+              "refundedQuantity": 5,
+              "returnReasonDefinition": {
+                "deleted": false,
+                "handle": "too-long",
+                "id": "gid://shopify/ReturnReasonDefinition/254",
+                "name": "Too long"
+              },
+              "returnReasonNote": ""
+            },
+            {
+              "__parentId": "gid://shopify/Return/18804736045",
+              "customerNote": null,
+              "id": "gid://shopify/ReturnLineItem/27744010285",
+              "quantity": 5,
+              "refundedQuantity": 5,
+              "returnReasonDefinition": {
+                "deleted": false,
+                "handle": "too-short",
+                "id": "gid://shopify/ReturnReasonDefinition/261",
+                "name": "Too short"
+              },
+              "returnReasonNote": ""
+            },
+            {
+              "__parentId": "gid://shopify/Return/18804736045",
+              "customerNote": null,
+              "id": "gid://shopify/ReturnLineItem/27744043053",
+              "quantity": 5,
+              "refundedQuantity": 5,
+              "returnReasonDefinition": {
+                "deleted": false,
+                "handle": "color",
+                "id": "gid://shopify/ReturnReasonDefinition/10",
+                "name": "Color"
+              },
+              "returnReasonNote": ""
+            },
+            {
+              "__parentId": "gid://shopify/Return/18804736045",
+              "customerNote": null,
+              "id": "gid://shopify/ReturnLineItem/27744075821",
+              "quantity": 5,
+              "refundedQuantity": 5,
+              "returnReasonDefinition": {
+                "deleted": false,
+                "handle": "flex",
+                "id": "gid://shopify/ReturnReasonDefinition/106",
+                "name": "Flex"
+              },
+              "returnReasonNote": ""
+            },
+            {
+              "__parentId": "gid://shopify/Return/18804736045",
+              "customerNote": null,
+              "id": "gid://shopify/ReturnLineItem/27744108589",
+              "quantity": 5,
+              "refundedQuantity": 5,
+              "returnReasonDefinition": {
+                "deleted": false,
+                "handle": "changed-my-mind",
+                "id": "gid://shopify/ReturnReasonDefinition/2",
+                "name": "Changed my mind"
+              },
+              "returnReasonNote": ""
+            },
+            {
+              "__parentId": "gid://shopify/Return/18804736045",
+              "customerNote": null,
+              "id": "gid://shopify/ReturnLineItem/27744141357",
+              "quantity": 5,
+              "refundedQuantity": 5,
+              "returnReasonDefinition": {
+                "deleted": false,
+                "handle": "item-not-as-described",
+                "id": "gid://shopify/ReturnReasonDefinition/3",
+                "name": "Item not as described"
+              },
+              "returnReasonNote": ""
+            },
+            {
+              "__parentId": "gid://shopify/Return/18804736045",
+              "customerNote": null,
+              "id": "gid://shopify/ReturnLineItem/27744174125",
+              "quantity": 5,
+              "refundedQuantity": 5,
+              "returnReasonDefinition": {
+                "deleted": false,
+                "handle": "received-the-wrong-item",
+                "id": "gid://shopify/ReturnReasonDefinition/4",
+                "name": "Received the wrong item"
+              },
+              "returnReasonNote": ""
+            },
+            {
+              "__parentId": "gid://shopify/Return/18804736045",
+              "customerNote": null,
+              "id": "gid://shopify/ReturnLineItem/27744206893",
+              "quantity": 5,
+              "refundedQuantity": 5,
+              "returnReasonDefinition": {
+                "deleted": false,
+                "handle": "damaged-or-defective",
+                "id": "gid://shopify/ReturnReasonDefinition/6",
+                "name": "Damaged or defective"
+              },
+              "returnReasonNote": ""
+            },
+            {
+              "__parentId": "gid://shopify/Return/18804736045",
+              "customerNote": null,
+              "id": "gid://shopify/ReturnLineItem/27744239661",
+              "quantity": 5,
+              "refundedQuantity": 5,
+              "returnReasonDefinition": {
+                "deleted": false,
+                "handle": "unknown",
+                "id": "gid://shopify/ReturnReasonDefinition/1",
+                "name": "Unknown"
+              },
+              "returnReasonNote": ""
+            },
+            {
+              "__parentId": "gid://shopify/Return/18804736045",
+              "customerNote": null,
+              "id": "gid://shopify/ReturnLineItem/27744272429",
+              "quantity": 5,
+              "refundedQuantity": 5,
+              "returnReasonDefinition": {
+                "deleted": false,
+                "handle": "other-reason",
+                "id": "gid://shopify/ReturnReasonDefinition/5",
+                "name": "Other"
+              },
+              "returnReasonNote": "test reason"
+            }
+          ],
+          "status": "CLOSED",
+          "totalQuantity": 50
+        }
+      ],
+      "updatedAt": "redacted"
+    }
+  ],
+  [
     "acmeCo/order_risks",
     {
       "_meta": {
