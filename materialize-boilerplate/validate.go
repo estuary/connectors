@@ -214,135 +214,36 @@ func (v Validator) validateMatchesExistingResource(
 	deltaUpdates bool,
 	fieldConfigJsonMap map[string]json.RawMessage,
 ) (map[string][]*pm.Response_Validated_Constraint, error) {
-	constraints := make(map[string][]*pm.Response_Validated_Constraint)
-
-	docFields := []string{}
+	// Root document projections, in projection order. The first one is the
+	// document when there is no prior selection to defer to.
+	var docFields []string
 	for _, p := range boundCollection.Projections {
-		// Base constraint used for all new projections of the binding. This may be re-evaluated
-		// below, depending on the details of the projection and any pre-existing materialization of
-		// it.
-		c, err := v.c.NewConstraints(&p, deltaUpdates, fieldConfigJsonMap[p.Field])
+		if p.IsRootDocumentProjection() {
+			docFields = append(docFields, p.Field)
+		}
+	}
+
+	constraints := make(map[string][]*pm.Response_Validated_Constraint)
+	for _, p := range boundCollection.Projections {
+		cs, err := v.projectionConstraints(p, existingResource, lastBinding, boundCollection, deltaUpdates, docFields, fieldConfigJsonMap)
 		if err != nil {
 			return nil, err
 		}
 
-		// baseRequired reports whether the connector's base constraint requires
-		// the projection (LOCATION_REQUIRED or FIELD_REQUIRED). When a required
-		// projection turns out to be incompatible, c is left as this base
-		// constraint and paired with the incompatibility below, so the control
-		// plane surfaces a clear error rather than dropping a lone INCOMPATIBLE.
-		baseRequired := c.Type == pm.Response_Validated_Constraint_LOCATION_REQUIRED ||
-			c.Type == pm.Response_Validated_Constraint_FIELD_REQUIRED
-
-		// incompatible is an optional INCOMPATIBLE constraint paired with c; it is
-		// set only when a required projection's existing column is incompatible.
-		// Otherwise the field gets the single constraint c.
-		var incompatible *pm.Response_Validated_Constraint
-
-		if c.Type == pm.Response_Validated_Constraint_FIELD_FORBIDDEN {
-			// Is the proposed type completely disallowed by the materialization? This differs from
-			// being INCOMPATIBLE, which implies that re-creating the materialization could resolve
-			// the difference.
-		} else if !deltaUpdates && p.IsRootDocumentProjection() {
-			docFields = append(docFields, p.Field)
-			// Only the originally selected root document projection is allowed to be selected for
-			// changes to a standard updates materialization. If there is no previously persisted
-			// spec, the first root document projection is selected as the root document.
-			if (lastBinding != nil && p.Field == lastBinding.FieldSelection.Document) || (lastBinding == nil && len(docFields) == 1) {
-				docConstraint := &pm.Response_Validated_Constraint{
-					Type:   pm.Response_Validated_Constraint_FIELD_REQUIRED,
-					Reason: "This field is the document in the current materialization",
-				}
-
-				// Mark this field as the document, unless it is already materialized
-				// with an incompatible type. In that case keep the base constraint c
-				// when it's required and pair it with the incompatibility; otherwise
-				// report only the incompatibility.
-				if existingField := existingResource.GetField(p.Field); existingField == nil {
-					c = docConstraint
-				} else if constraintFromExisting, err := v.constraintForExistingField(boundCollection, p, *existingField, fieldConfigJsonMap); err != nil {
-					return nil, err
-				} else if !constraintFromExisting.Type.IsForbidden() {
-					c = docConstraint
-				} else if baseRequired {
-					incompatible = constraintFromExisting
-				} else {
-					c = constraintFromExisting
-				}
-			} else if lastBinding != nil && lastBinding.FieldSelection.Document == "" {
-				addDocIncompatible := &pm.Response_Validated_Constraint{
-					Type:   pm.Response_Validated_Constraint_INCOMPATIBLE,
-					Reason: "Cannot add a new root document projection to materialization without backfilling",
-				}
-				if baseRequired {
-					// Keep the base (required) constraint in c and pair it with the incompatibility.
-					incompatible = addDocIncompatible
-				} else {
-					c = addDocIncompatible
-				}
-			} else {
-				c = &pm.Response_Validated_Constraint{
-					Type: pm.Response_Validated_Constraint_FIELD_FORBIDDEN,
-					Reason: fmt.Sprintf(
-						"Cannot materialize root document projection '%s' because field '%s' is already being materialized as the document",
-						p.Field,
-						func() string {
-							if lastBinding != nil {
-								return lastBinding.FieldSelection.Document
-							} else {
-								return docFields[0]
-							}
-						}(),
-					),
-				}
-			}
-		} else if !deltaUpdates && p.IsPrimaryKey && lastBinding != nil && !slices.Contains(lastBinding.FieldSelection.Keys, p.Field) {
-			// Locations that are part of the primary key may not be added without backfilling the binding
-			c = &pm.Response_Validated_Constraint{
-				Type:   pm.Response_Validated_Constraint_FIELD_FORBIDDEN,
-				Reason: "Cannot add a new key location to the field selection of an existing non-delta-updates materialization without backfilling",
-			}
-			if lastBinding != nil && slices.Contains(lastBinding.FieldSelection.AllFields(), p.Field) {
-				if existingField := existingResource.GetField(p.Field); existingField != nil {
-					if c, err = v.constraintForExistingField(boundCollection, p, *existingField, fieldConfigJsonMap); err != nil {
-						return nil, fmt.Errorf("evaluating constraint for existing field: %w", err)
-					}
-				} else {
-					c = &pm.Response_Validated_Constraint{
-						Type:   pm.Response_Validated_Constraint_LOCATION_RECOMMENDED,
-						Reason: "This location is part of the current materialization",
-					}
-				}
-			}
-		} else if existingField := existingResource.GetField(p.Field); existingField != nil {
-			// All other fields that are already being materialized.
-			if c, err = v.constraintForExistingField(boundCollection, p, *existingField, fieldConfigJsonMap); err != nil {
-				return nil, err
-			}
-		}
-
-		// Continue to recommended any optional fields that were included in a prior spec's
-		// field selection, even if the materialized field is not reported to exist in the
-		// destination. This is primarily to produce more useful constraints for systems that do
-		// not have "columns" that can be inspected, but still support field selection (ex:
-		// materialize-dynamodb), so that selected fields can continue to be recommended.
+		// Continue to recommend an optional field that was part of a prior
+		// selection, even when the destination doesn't report it as an existing
+		// column (e.g. materialize-dynamodb), so that it stays selected.
 		if lastBinding != nil &&
-			incompatible == nil &&
-			c.Type == pm.Response_Validated_Constraint_FIELD_OPTIONAL &&
+			len(cs) == 1 &&
+			cs[0].Type == pm.Response_Validated_Constraint_FIELD_OPTIONAL &&
 			slices.Contains(lastBinding.FieldSelection.AllFields(), p.Field) {
-			c = &pm.Response_Validated_Constraint{
+			cs = []*pm.Response_Validated_Constraint{{
 				Type:   pm.Response_Validated_Constraint_LOCATION_RECOMMENDED,
 				Reason: "This location is part of the current materialization",
-			}
+			}}
 		}
 
-		// A required projection with an incompatible existing column carries both
-		// constraints; every other field carries the single constraint c.
-		if incompatible != nil {
-			constraints[p.Field] = []*pm.Response_Validated_Constraint{c, incompatible}
-		} else {
-			constraints[p.Field] = []*pm.Response_Validated_Constraint{c}
-		}
+		constraints[p.Field] = cs
 	}
 
 	if lastBinding != nil && !deltaUpdates && lastBinding.FieldSelection.Document != "" && !slices.Contains(docFields, lastBinding.FieldSelection.Document) {
@@ -366,6 +267,160 @@ func (v Validator) validateMatchesExistingResource(
 	}
 
 	return constraints, nil
+}
+
+// projectionConstraints computes the validation constraint(s) for a single
+// projection of a binding that updates an existing resource. A field carries a
+// single constraint in the common case; a required projection whose existing
+// column is incompatible carries both the requiredness and an INCOMPATIBLE
+// constraint, so the control plane surfaces a clear conflict.
+func (v Validator) projectionConstraints(
+	p pf.Projection,
+	existingResource ExistingResource,
+	lastBinding *pf.MaterializationSpec_Binding,
+	boundCollection pf.CollectionSpec,
+	deltaUpdates bool,
+	docFields []string,
+	fieldConfigJsonMap map[string]json.RawMessage,
+) ([]*pm.Response_Validated_Constraint, error) {
+	// Base constraint, the connector's opinion of the projection on its own.
+	base, err := v.c.NewConstraints(&p, deltaUpdates, fieldConfigJsonMap[p.Field])
+	if err != nil {
+		return nil, err
+	}
+
+	// withIncompatibility pairs an INCOMPATIBLE constraint with the base
+	// requiredness when the base requires the projection, so the control plane
+	// surfaces a clear conflict; for a non-required projection it returns only
+	// the incompatibility, which the control plane drops.
+	withIncompatibility := func(incompatible *pm.Response_Validated_Constraint) []*pm.Response_Validated_Constraint {
+		if base.Type == pm.Response_Validated_Constraint_LOCATION_REQUIRED ||
+			base.Type == pm.Response_Validated_Constraint_FIELD_REQUIRED {
+			return []*pm.Response_Validated_Constraint{base, incompatible}
+		}
+		return []*pm.Response_Validated_Constraint{incompatible}
+	}
+
+	switch {
+	case base.Type == pm.Response_Validated_Constraint_FIELD_FORBIDDEN:
+		// The proposed type is completely disallowed by the materialization. This
+		// differs from INCOMPATIBLE, which re-creating the materialization could
+		// resolve.
+		return []*pm.Response_Validated_Constraint{base}, nil
+
+	case !deltaUpdates && p.IsRootDocumentProjection():
+		return v.rootDocumentConstraints(p, withIncompatibility, existingResource, lastBinding, boundCollection, docFields, fieldConfigJsonMap)
+
+	case !deltaUpdates && p.IsPrimaryKey && lastBinding != nil && !slices.Contains(lastBinding.FieldSelection.Keys, p.Field):
+		return v.addedKeyConstraints(p, existingResource, lastBinding, boundCollection, fieldConfigJsonMap)
+
+	case existingResource.GetField(p.Field) != nil:
+		// An already-materialized field: validate against its existing column.
+		c, err := v.constraintForExistingField(boundCollection, p, *existingResource.GetField(p.Field), fieldConfigJsonMap)
+		if err != nil {
+			return nil, err
+		}
+		return []*pm.Response_Validated_Constraint{c}, nil
+
+	default:
+		return []*pm.Response_Validated_Constraint{base}, nil
+	}
+}
+
+// rootDocumentConstraints computes the constraint(s) for a root document
+// projection of a standard-updates binding.
+func (v Validator) rootDocumentConstraints(
+	p pf.Projection,
+	withIncompatibility func(*pm.Response_Validated_Constraint) []*pm.Response_Validated_Constraint,
+	existingResource ExistingResource,
+	lastBinding *pf.MaterializationSpec_Binding,
+	boundCollection pf.CollectionSpec,
+	docFields []string,
+	fieldConfigJsonMap map[string]json.RawMessage,
+) ([]*pm.Response_Validated_Constraint, error) {
+	// Only the originally selected root document projection is allowed to be
+	// selected. If there is no prior spec, the first root document projection is
+	// the document.
+	selectedDoc := (lastBinding != nil && p.Field == lastBinding.FieldSelection.Document) ||
+		(lastBinding == nil && p.Field == docFields[0])
+
+	switch {
+	case selectedDoc:
+		docConstraint := &pm.Response_Validated_Constraint{
+			Type:   pm.Response_Validated_Constraint_FIELD_REQUIRED,
+			Reason: "This field is the document in the current materialization",
+		}
+
+		// Mark this field as the document, unless it is already materialized with
+		// an incompatible type, in which case surface the incompatibility.
+		existingField := existingResource.GetField(p.Field)
+		if existingField == nil {
+			return []*pm.Response_Validated_Constraint{docConstraint}, nil
+		}
+		c, err := v.constraintForExistingField(boundCollection, p, *existingField, fieldConfigJsonMap)
+		if err != nil {
+			return nil, err
+		}
+		if !c.Type.IsForbidden() {
+			return []*pm.Response_Validated_Constraint{docConstraint}, nil
+		}
+		return withIncompatibility(c), nil
+
+	case lastBinding != nil && lastBinding.FieldSelection.Document == "":
+		return withIncompatibility(&pm.Response_Validated_Constraint{
+			Type:   pm.Response_Validated_Constraint_INCOMPATIBLE,
+			Reason: "Cannot add a new root document projection to materialization without backfilling",
+		}), nil
+
+	default:
+		// Another root document projection when one is already materialized.
+		materializedAs := docFields[0]
+		if lastBinding != nil {
+			materializedAs = lastBinding.FieldSelection.Document
+		}
+		return []*pm.Response_Validated_Constraint{{
+			Type: pm.Response_Validated_Constraint_FIELD_FORBIDDEN,
+			Reason: fmt.Sprintf(
+				"Cannot materialize root document projection '%s' because field '%s' is already being materialized as the document",
+				p.Field,
+				materializedAs,
+			),
+		}}, nil
+	}
+}
+
+// addedKeyConstraints computes the constraint(s) for a primary key projection
+// that is not part of the existing binding's key, which cannot be added to a
+// standard-updates materialization without backfilling.
+func (v Validator) addedKeyConstraints(
+	p pf.Projection,
+	existingResource ExistingResource,
+	lastBinding *pf.MaterializationSpec_Binding,
+	boundCollection pf.CollectionSpec,
+	fieldConfigJsonMap map[string]json.RawMessage,
+) ([]*pm.Response_Validated_Constraint, error) {
+	if !slices.Contains(lastBinding.FieldSelection.AllFields(), p.Field) {
+		return []*pm.Response_Validated_Constraint{{
+			Type:   pm.Response_Validated_Constraint_FIELD_FORBIDDEN,
+			Reason: "Cannot add a new key location to the field selection of an existing non-delta-updates materialization without backfilling",
+		}}, nil
+	}
+
+	// The key location was already part of the selection: validate it against
+	// its existing column, or recommend it if the destination doesn't report
+	// columns.
+	existingField := existingResource.GetField(p.Field)
+	if existingField == nil {
+		return []*pm.Response_Validated_Constraint{{
+			Type:   pm.Response_Validated_Constraint_LOCATION_RECOMMENDED,
+			Reason: "This location is part of the current materialization",
+		}}, nil
+	}
+	c, err := v.constraintForExistingField(boundCollection, p, *existingField, fieldConfigJsonMap)
+	if err != nil {
+		return nil, fmt.Errorf("evaluating constraint for existing field: %w", err)
+	}
+	return []*pm.Response_Validated_Constraint{c}, nil
 }
 
 func (v Validator) constraintForExistingField(
