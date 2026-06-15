@@ -656,6 +656,17 @@ class PageInfo(BaseModel):
     endCursor: str | None = None
     hasNextPage: bool = False
 
+    @model_validator(mode="after")
+    def _require_end_cursor_when_more_pages(self) -> "PageInfo":
+        # A Relay connection that reports another page must also return the cursor to
+        # fetch it. hasNextPage without an endCursor would otherwise silently truncate
+        # pagination, so reject it at validation time and fail loudly.
+        if self.hasNextPage and not self.endCursor:
+            raise ValueError(
+                "PageInfo reported hasNextPage but no endCursor to fetch the next page."
+            )
+        return self
+
 
 class Edge(BaseModel, Generic[TShopifyGraphQLResource]):
     node: TShopifyGraphQLResource
