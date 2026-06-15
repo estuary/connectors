@@ -73,6 +73,10 @@ captures:
         interval: PT5M
       target: acmeCo/order_refunds
     - resource:
+        name: order_returns
+        interval: PT5M
+      target: acmeCo/order_returns
+    - resource:
         name: order_risks
         interval: PT5M
       target: acmeCo/order_risks

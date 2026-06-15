@@ -43,20 +43,35 @@ def test_capture(request, snapshot):
     assert result.returncode == 0
     lines = [json.loads(line) for line in result.stdout.splitlines()]
 
-    unique_stream_lines = []
-    seen = set()
+    # Keep one representative document per stream, preserving first-appearance order.
+    RETURNS_STREAM = "acmeCo/order_returns"
+    chosen: dict[str, list] = {}
+    order: list[str] = []
 
     for line in lines:
         stream, record = line[0], line[1]
-        if stream not in seen:
-            sanitize_tokens(record)
+        if stream not in chosen:
+            chosen[stream] = line
+            order.append(stream)
+        elif (
+            stream == RETURNS_STREAM
+            and not chosen[stream][1].get("returns")
+            and record.get("returns")
+        ):
+            # Prefer the first order that actually has returns so the snapshot
+            # covers the nested return reassembly.
+            chosen[stream] = line
 
-            for field in FIELDS_TO_REDACT:
-                if field in record:
-                    record[field] = "redacted"
+    unique_stream_lines = []
+    for stream in order:
+        record = chosen[stream][1]
+        sanitize_tokens(record)
 
-            unique_stream_lines.append(line)
-            seen.add(stream)
+        for field in FIELDS_TO_REDACT:
+            if field in record:
+                record[field] = "redacted"
+
+        unique_stream_lines.append(chosen[stream])
 
     assert snapshot("capture.stdout.json") == unique_stream_lines
 

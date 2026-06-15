@@ -59,6 +59,10 @@ collections:
     schema: order_refunds.schema.yaml
     key:
     - /id
+  acmeCo/order_returns:
+    schema: order_returns.schema.yaml
+    key:
+    - /id
   acmeCo/order_risks:
     schema: order_risks.schema.yaml
     key:
