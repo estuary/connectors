@@ -767,7 +767,11 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil, m.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
 		}
 
-		return nil, pf.RunAsyncOperation(func() error { return d.commit(ctx, varcharColumnUpdates) })
+		if err := d.commit(ctx, varcharColumnUpdates); err != nil {
+			return nil, pf.FinishedOperation(err)
+		}
+
+		return nil, nil
 	}, nil
 }
 
