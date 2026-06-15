@@ -19,6 +19,10 @@ collections:
     schema: customers.schema.yaml
     key:
     - /id
+  acmeCo/disputes:
+    schema: disputes.schema.yaml
+    key:
+    - /id
   acmeCo/fulfillment_orders:
     schema: fulfillment_orders.schema.yaml
     key:
