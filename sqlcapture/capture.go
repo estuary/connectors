@@ -484,6 +484,21 @@ func (c *Capture) activatePendingStreams(ctx context.Context, discovery map[Stre
 			return fmt.Errorf("invalid backfill mode %q for stream %q", binding.Resource.Mode, streamID)
 		}
 
+		// Emit an observable log whenever a stream enters a backfilling state.
+		// This only runs for streams currently in the Pending state, so it fires
+		// once when a backfill begins — both for newly-added streams and for
+		// streams whose state was reset to re-trigger a backfill. Observable logs
+		// are otherwise-normal log lines carrying "observable": true, used for
+		// fleet-wide aggregation of backfill activity.
+		switch state.Mode {
+		case TableStatePreciseBackfill, TableStateUnfilteredBackfill, TableStateKeylessBackfill:
+			log.WithFields(log.Fields{
+				"observable": true,
+				"stream":     streamID.String(),
+				"mode":       string(binding.Resource.Mode),
+			}).Info("backfill triggered")
+		}
+
 		// Log an informational notice if the key we'll be using for a backfill differs from
 		// the discovered primary key of a table.
 		if state.Mode == TableStatePreciseBackfill || state.Mode == TableStateUnfilteredBackfill {

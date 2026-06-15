@@ -21,6 +21,7 @@ from typing_extensions import override
 from pydantic import AwareDatetime, BaseModel, Field, NonNegativeInt
 
 from ..cron import next_fire
+from ..logger import OBSERVABLE_FIELD
 from ..flow import (
     AccessToken,
     AuthorizationCodeFlowOAuth2Credentials,
@@ -1113,7 +1114,12 @@ async def _binding_backfill_task(
     if state.next_page is not None:
         task.log.info("resuming backfill", {"state": state, "subtask_id": subtask_id})
     else:
-        task.log.info("beginning backfill", {"state": state, "subtask_id": subtask_id})
+        # Marked observable so backfill activity can be aggregated fleet-wide.
+        task.log.info(
+            "beginning backfill",
+            {"state": state, "subtask_id": subtask_id},
+            extra={OBSERVABLE_FIELD: True},
+        )
 
     while True:
         # Yield to the event loop to prevent starvation.
