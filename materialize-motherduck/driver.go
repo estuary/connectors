@@ -342,7 +342,11 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil, m.FinishedOperation(fmt.Errorf("evaluating fence template: %w", err))
 		}
 
-		return nil, m.RunAsyncOperation(func() error { return d.commit(ctx, fenceUpdate.String()) })
+		if err := d.commit(ctx, fenceUpdate.String()); err != nil {
+			return nil, m.FinishedOperation(err)
+		}
+
+		return nil, nil
 	}, nil
 }
 
