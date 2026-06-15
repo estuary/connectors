@@ -384,14 +384,12 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 	}
 
-	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
-		return nil, m.RunAsyncOperation(func() error {
-			if err = txn.Commit(); err != nil {
-				return fmt.Errorf("commit transaction: %w", err)
-			}
+	if err := txn.Commit(); err != nil {
+		return nil, fmt.Errorf("commit transaction: %w", err)
+	}
 
-			return nil
-		})
+	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
+		return nil, nil
 	}, nil
 }
 

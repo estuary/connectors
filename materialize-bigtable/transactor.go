@@ -289,14 +289,12 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		return nil, fmt.Errorf("marshalling state: %w", err)
 	}
 
-	return func(_ context.Context, _ *pc.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
-		return &pf.ConnectorState{UpdatedJson: newState}, m.RunAsyncOperation(func() error {
-			if err := group.Wait(); err != nil {
-				return fmt.Errorf("draining store workers: %w", err)
-			}
+	if err := group.Wait(); err != nil {
+		return nil, fmt.Errorf("draining store workers: %w", err)
+	}
 
-			return nil
-		})
+	return func(_ context.Context, _ *pc.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
+		return &pf.ConnectorState{UpdatedJson: newState}, nil
 	}, nil
 }
 

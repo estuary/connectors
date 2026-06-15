@@ -855,61 +855,59 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 	defuser.Defuse()
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
-		return nil, m.RunAsyncOperation(func() error {
-			defer txn.Rollback()
+		defer txn.Rollback()
 
-			for _, b := range d.bindings {
-				d.be.StartedResourceCommit(b.target.Path)
-				if b.mustDelete {
-					// Apply any deletions
-					if _, err := txn.ExecContext(ctx, b.deleteQuerySQL); err != nil {
-						return fmt.Errorf("running DELETE USING for %q: %w", b.target.Identifier, err)
-					} else if _, err := txn.ExecContext(ctx, b.deleteTruncateSQL); err != nil {
-						return fmt.Errorf("truncating delete table for %q: %w", b.target.Identifier, err)
-					}
-
-					b.mustDelete = false
+		for _, b := range d.bindings {
+			d.be.StartedResourceCommit(b.target.Path)
+			if b.mustDelete {
+				// Apply any deletions
+				if _, err := txn.ExecContext(ctx, b.deleteQuerySQL); err != nil {
+					return nil, m.FinishedOperation(fmt.Errorf("running DELETE USING for %q: %w", b.target.Identifier, err))
+				} else if _, err := txn.ExecContext(ctx, b.deleteTruncateSQL); err != nil {
+					return nil, m.FinishedOperation(fmt.Errorf("truncating delete table for %q: %w", b.target.Identifier, err))
 				}
 
-				if b.mustMerge {
-					// Merge data from the temporary staging table into the target table, replacing keys
-					// that already exist.
-					if _, err := txn.ExecContext(ctx, b.updateReplaceSQL); err != nil {
-						return fmt.Errorf("running REPLACE INTO for %q: %w", b.target.Identifier, err)
-					} else if _, err := txn.ExecContext(ctx, b.updateTruncateSQL); err != nil {
-						return fmt.Errorf("truncating update table for %q: %w", b.target.Identifier, err)
-					}
+				b.mustDelete = false
+			}
 
-					// Reset for the next round.
-					b.mustMerge = false
+			if b.mustMerge {
+				// Merge data from the temporary staging table into the target table, replacing keys
+				// that already exist.
+				if _, err := txn.ExecContext(ctx, b.updateReplaceSQL); err != nil {
+					return nil, m.FinishedOperation(fmt.Errorf("running REPLACE INTO for %q: %w", b.target.Identifier, err))
+				} else if _, err := txn.ExecContext(ctx, b.updateTruncateSQL); err != nil {
+					return nil, m.FinishedOperation(fmt.Errorf("truncating update table for %q: %w", b.target.Identifier, err))
 				}
-				d.be.FinishedResourceCommit(b.target.Path)
-			}
 
-			var err error
-			if d.store.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
-				return fmt.Errorf("marshalling checkpoint: %w", err)
+				// Reset for the next round.
+				b.mustMerge = false
 			}
+			d.be.FinishedResourceCommit(b.target.Path)
+		}
 
-			var fenceUpdate strings.Builder
-			if err := d.templates.updateFence.Execute(&fenceUpdate, d.store.fence); err != nil {
-				return fmt.Errorf("evaluating fence template: %w", err)
-			}
+		var err error
+		if d.store.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
+			return nil, m.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
+		}
 
-			if results, err := txn.ExecContext(ctx, fenceUpdate.String()); err != nil {
-				return fmt.Errorf("updating flow checkpoint: %w", err)
-			} else if rowsAffected, err := results.RowsAffected(); err != nil {
-				return fmt.Errorf("updating flow checkpoint (rows affected): %w", err)
-			} else if rowsAffected < 1 {
-				return fmt.Errorf("This instance was fenced off by another")
-			}
+		var fenceUpdate strings.Builder
+		if err := d.templates.updateFence.Execute(&fenceUpdate, d.store.fence); err != nil {
+			return nil, m.FinishedOperation(fmt.Errorf("evaluating fence template: %w", err))
+		}
 
-			if err := txn.Commit(); err != nil {
-				return fmt.Errorf("committing Store transaction: %w", err)
-			}
+		if results, err := txn.ExecContext(ctx, fenceUpdate.String()); err != nil {
+			return nil, m.FinishedOperation(fmt.Errorf("updating flow checkpoint: %w", err))
+		} else if rowsAffected, err := results.RowsAffected(); err != nil {
+			return nil, m.FinishedOperation(fmt.Errorf("updating flow checkpoint (rows affected): %w", err))
+		} else if rowsAffected < 1 {
+			return nil, m.FinishedOperation(fmt.Errorf("This instance was fenced off by another"))
+		}
 
-			return nil
-		})
+		if err := txn.Commit(); err != nil {
+			return nil, m.FinishedOperation(fmt.Errorf("committing Store transaction: %w", err))
+		}
+
+		return nil, nil
 	}, nil
 }
 

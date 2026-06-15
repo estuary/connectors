@@ -984,69 +984,67 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 	// Return the StartCommit function
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
-		return nil, m.RunAsyncOperation(func() error {
-			commitStart := time.Now()
-			var commitDuration time.Duration
+		commitStart := time.Now()
+		var commitDuration time.Duration
 
-			defer func() {
-				storeDuration := time.Since(storeStart)
-				commitDuration = time.Since(commitStart)
+		defer func() {
+			storeDuration := time.Since(storeStart)
+			commitDuration = time.Since(commitStart)
 
-				log.WithFields(log.Fields{
-					"totalDuration":       storeDuration.Seconds(),
-					"storePhaseDuration":  (storeDuration - commitDuration).Seconds(),
-					"commitPhaseDuration": commitDuration.Seconds(),
-					"storeCount":          storeCount,
-					"storeBytes":          storeBytes,
-					"numBatches":          flusher.getBatchCount(),
-				}).Info("store: phase complete")
-			}()
+			log.WithFields(log.Fields{
+				"totalDuration":       storeDuration.Seconds(),
+				"storePhaseDuration":  (storeDuration - commitDuration).Seconds(),
+				"commitPhaseDuration": commitDuration.Seconds(),
+				"storeCount":          storeCount,
+				"storeBytes":          storeBytes,
+				"numBatches":          flusher.getBatchCount(),
+			}).Info("store: phase complete")
+		}()
 
-			// Marshal the checkpoint
-			checkpointBytes, err := runtimeCheckpoint.Marshal()
-			if err != nil {
-				return fmt.Errorf("marshalling checkpoint: %w", err)
-			}
+		// Marshal the checkpoint
+		checkpointBytes, err := runtimeCheckpoint.Marshal()
+		if err != nil {
+			return nil, m.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
+		}
 
-			// Update the fence checkpoint
-			t.fence.Checkpoint = checkpointBytes
+		// Update the fence checkpoint
+		t.fence.Checkpoint = checkpointBytes
 
-			// Add fence update mutation to the current batch
-			// Use the standard checkpoint table name
-			fenceValues := []interface{}{
-				t.fence.Materialization.String(),
-				int64(t.fence.KeyBegin), // Convert uint32 to int64
-				int64(t.fence.KeyEnd),   // Convert uint32 to int64
-				int64(t.fence.Fence),    // Convert uint64 to int64
-				base64.StdEncoding.EncodeToString(checkpointBytes),
-			}
-			fenceMutation := spanner.InsertOrUpdate(
-				sql.DefaultFlowCheckpoints,
-				[]string{"materialization", "key_begin", "key_end", "fence", "checkpoint"},
-				fenceValues,
-			)
+		// Add fence update mutation to the current batch
+		// Use the standard checkpoint table name
+		fenceValues := []interface{}{
+			t.fence.Materialization.String(),
+			int64(t.fence.KeyBegin), // Convert uint32 to int64
+			int64(t.fence.KeyEnd),   // Convert uint32 to int64
+			int64(t.fence.Fence),    // Convert uint64 to int64
+			base64.StdEncoding.EncodeToString(checkpointBytes),
+		}
+		fenceMutation := spanner.InsertOrUpdate(
+			sql.DefaultFlowCheckpoints,
+			[]string{"materialization", "key_begin", "key_end", "fence", "checkpoint"},
+			fenceValues,
+		)
 
-			// Flush all data partitions first (before fence)
-			nonEmptyPartitions := flusher.partitionedBatch.getNonEmptyPartitions()
-			if err := flusher.flushPartitionsAsync(nonEmptyPartitions); err != nil {
-				return fmt.Errorf("flushing remaining partitions during commit: %w", err)
-			}
+		// Flush all data partitions first (before fence)
+		nonEmptyPartitions := flusher.partitionedBatch.getNonEmptyPartitions()
+		if err := flusher.flushPartitionsAsync(nonEmptyPartitions); err != nil {
+			return nil, m.FinishedOperation(fmt.Errorf("flushing remaining partitions during commit: %w", err))
+		}
 
-			// Wait for all data flushes to complete
-			if err := flusher.wait(); err != nil {
-				return fmt.Errorf("flushing data mutations: %w", err)
-			}
+		// Wait for all data flushes to complete
+		if err := flusher.wait(); err != nil {
+			return nil, m.FinishedOperation(fmt.Errorf("flushing data mutations: %w", err))
+		}
 
-			// Apply fence mutation separately after all data succeeds
-			// This ensures data is never committed without the checkpoint update
-			if _, _, err := t.timedSpannerApply(ctx, []*spanner.Mutation{fenceMutation}, "store-fence"); err != nil {
-				return fmt.Errorf("applying fence checkpoint: %w", err)
-			}
+		// Apply fence mutation separately after all data succeeds
+		// This ensures data is never committed without the checkpoint update
+		if _, _, err := t.timedSpannerApply(ctx, []*spanner.Mutation{fenceMutation}, "store-fence"); err != nil {
+			return nil, m.FinishedOperation(fmt.Errorf("applying fence checkpoint: %w", err))
+		}
 
-			log.WithField("batches", flusher.getBatchCount()).Info("store: completed all mutation batches")
+		log.WithField("batches", flusher.getBatchCount()).Info("store: completed all mutation batches")
 
-			return nil
-		})
+		return nil, nil
 	}, nil
 }
 
