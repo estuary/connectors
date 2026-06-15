@@ -3,7 +3,8 @@
     "recommendedName": "abandoned_checkouts",
     "resourceConfig": {
       "name": "abandoned_checkouts",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -87,7 +88,8 @@
     "recommendedName": "customers",
     "resourceConfig": {
       "name": "customers",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -171,7 +173,8 @@
     "recommendedName": "customer_metafields",
     "resourceConfig": {
       "name": "customer_metafields",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -255,7 +258,8 @@
     "recommendedName": "products",
     "resourceConfig": {
       "name": "products",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -339,7 +343,8 @@
     "recommendedName": "product_media",
     "resourceConfig": {
       "name": "product_media",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -423,7 +428,8 @@
     "recommendedName": "product_metafields",
     "resourceConfig": {
       "name": "product_metafields",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -507,7 +513,8 @@
     "recommendedName": "product_variants",
     "resourceConfig": {
       "name": "product_variants",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -591,7 +598,8 @@
     "recommendedName": "product_variant_metafields",
     "resourceConfig": {
       "name": "product_variant_metafields",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -675,7 +683,8 @@
     "recommendedName": "fulfillment_orders",
     "resourceConfig": {
       "name": "fulfillment_orders",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -759,7 +768,8 @@
     "recommendedName": "fulfillments",
     "resourceConfig": {
       "name": "fulfillments",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -843,7 +853,8 @@
     "recommendedName": "orders",
     "resourceConfig": {
       "name": "orders",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -927,7 +938,8 @@
     "recommendedName": "order_agreements",
     "resourceConfig": {
       "name": "order_agreements",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -1011,7 +1023,8 @@
     "recommendedName": "order_metafields",
     "resourceConfig": {
       "name": "order_metafields",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -1095,7 +1108,8 @@
     "recommendedName": "order_transactions",
     "resourceConfig": {
       "name": "order_transactions",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -1179,7 +1193,8 @@
     "recommendedName": "order_refunds",
     "resourceConfig": {
       "name": "order_refunds",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -1263,7 +1278,8 @@
     "recommendedName": "order_risks",
     "resourceConfig": {
       "name": "order_risks",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -1347,7 +1363,8 @@
     "recommendedName": "inventory_items",
     "resourceConfig": {
       "name": "inventory_items",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -1431,7 +1448,8 @@
     "recommendedName": "inventory_levels",
     "resourceConfig": {
       "name": "inventory_levels",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -1515,7 +1533,8 @@
     "recommendedName": "custom_collections",
     "resourceConfig": {
       "name": "custom_collections",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -1599,7 +1618,8 @@
     "recommendedName": "smart_collections",
     "resourceConfig": {
       "name": "smart_collections",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -1683,7 +1703,8 @@
     "recommendedName": "custom_collection_metafields",
     "resourceConfig": {
       "name": "custom_collection_metafields",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -1767,7 +1788,8 @@
     "recommendedName": "smart_collection_metafields",
     "resourceConfig": {
       "name": "smart_collection_metafields",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -1851,7 +1873,8 @@
     "recommendedName": "locations",
     "resourceConfig": {
       "name": "locations",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -1935,7 +1958,8 @@
     "recommendedName": "location_metafields",
     "resourceConfig": {
       "name": "location_metafields",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
