@@ -78,7 +78,7 @@ ALTER TABLE `key_value-@你好-``-"especiál` MODIFY COLUMN second_required_colu
 
 --- Begin `key_value-@你好-``-"especiál` createLoadTable ---
 
-CREATE OR REPLACE TABLE `flow_temp_load_0_key_value-@你好-``-"especiál` (
+CREATE TABLE IF NOT EXISTS `flow_temp_load_0_key_value-@你好-``-"especiál` (
 		key1 Int64,
 		key2 Bool,
 		`key!binary` String
@@ -89,12 +89,34 @@ ORDER BY (key1, key2, `key!binary`);
 
 --- Begin `delta_updates-@你好-``-"especiál` createLoadTable ---
 
-CREATE OR REPLACE TABLE `flow_temp_load_0_delta_updates-@你好-``-"especiál` (
+CREATE TABLE IF NOT EXISTS `flow_temp_load_0_delta_updates-@你好-``-"especiál` (
 		theKey String
 )
 ENGINE = MergeTree
 ORDER BY (theKey);
 --- End `delta_updates-@你好-``-"especiál` createLoadTable ---
+
+--- Begin `key_value-@你好-``-"especiál` truncateLoadTable ---
+
+TRUNCATE TABLE IF EXISTS `flow_temp_load_0_key_value-@你好-``-"especiál`;
+--- End `key_value-@你好-``-"especiál` truncateLoadTable ---
+
+--- Begin `delta_updates-@你好-``-"especiál` truncateLoadTable ---
+
+TRUNCATE TABLE IF EXISTS `flow_temp_load_0_delta_updates-@你好-``-"especiál`;
+--- End `delta_updates-@你好-``-"especiál` truncateLoadTable ---
+
+--- Begin `key_value-@你好-``-"especiál` countLoadKeys ---
+
+SELECT count() FROM `flow_temp_load_0_key_value-@你好-``-"especiál`
+SETTINGS select_sequential_consistency = 1;
+--- End `key_value-@你好-``-"especiál` countLoadKeys ---
+
+--- Begin `delta_updates-@你好-``-"especiál` countLoadKeys ---
+
+SELECT count() FROM `flow_temp_load_0_delta_updates-@你好-``-"especiál`
+SETTINGS select_sequential_consistency = 1;
+--- End `delta_updates-@你好-``-"especiál` countLoadKeys ---
 
 --- Begin `key_value-@你好-``-"especiál` queryLoadTable ---
 
@@ -174,15 +196,25 @@ DROP TABLE IF EXISTS `flow_temp_load_0_delta_updates-@你好-``-"especiál`;
 
 --- Begin `key_value-@你好-``-"especiál` createStoreTable ---
 
-CREATE OR REPLACE TABLE `flow_temp_store_0_key_value-@你好-``-"especiál`
+CREATE TABLE IF NOT EXISTS `flow_temp_store_0_key_value-@你好-``-"especiál`
 AS `key_value-@你好-``-"especiál`;
 --- End `key_value-@你好-``-"especiál` createStoreTable ---
 
 --- Begin `delta_updates-@你好-``-"especiál` createStoreTable ---
 
-CREATE OR REPLACE TABLE `flow_temp_store_0_delta_updates-@你好-``-"especiál`
+CREATE TABLE IF NOT EXISTS `flow_temp_store_0_delta_updates-@你好-``-"especiál`
 AS `delta_updates-@你好-``-"especiál`;
 --- End `delta_updates-@你好-``-"especiál` createStoreTable ---
+
+--- Begin `key_value-@你好-``-"especiál` truncateStoreTable ---
+
+TRUNCATE TABLE IF EXISTS `flow_temp_store_0_key_value-@你好-``-"especiál`;
+--- End `key_value-@你好-``-"especiál` truncateStoreTable ---
+
+--- Begin `delta_updates-@你好-``-"especiál` truncateStoreTable ---
+
+TRUNCATE TABLE IF EXISTS `flow_temp_store_0_delta_updates-@你好-``-"especiál`;
+--- End `delta_updates-@你好-``-"especiál` truncateStoreTable ---
 
 --- Begin `key_value-@你好-``-"especiál` insertStoreTable ---
 
@@ -196,19 +228,15 @@ INSERT INTO `flow_temp_store_0_delta_updates-@你好-``-"especiál` (theKey, aVa
 
 --- Begin `key_value-@你好-``-"especiál` queryStoreParts ---
 
-SELECT partition_id, sum(rows) FROM system.parts
-WHERE table = 'flow_temp_store_0_key_value-@你好-`-"especiál'
-  AND database = ? AND active
-GROUP BY partition_id
+SELECT _partition_id, count() FROM `flow_temp_store_0_key_value-@你好-``-"especiál`
+GROUP BY _partition_id
 SETTINGS select_sequential_consistency = 1;
 --- End `key_value-@你好-``-"especiál` queryStoreParts ---
 
 --- Begin `delta_updates-@你好-``-"especiál` queryStoreParts ---
 
-SELECT partition_id, sum(rows) FROM system.parts
-WHERE table = 'flow_temp_store_0_delta_updates-@你好-`-"especiál'
-  AND database = ? AND active
-GROUP BY partition_id
+SELECT _partition_id, count() FROM `flow_temp_store_0_delta_updates-@你好-``-"especiál`
+GROUP BY _partition_id
 SETTINGS select_sequential_consistency = 1;
 --- End `delta_updates-@你好-``-"especiál` queryStoreParts ---
 
@@ -225,20 +253,6 @@ ALTER TABLE `flow_temp_store_0_delta_updates-@你好-``-"especiál`
 MOVE PARTITION ID ?
 TO TABLE `delta_updates-@你好-``-"especiál`;
 --- End `delta_updates-@你好-``-"especiál` moveStorePartition ---
-
---- Begin `key_value-@你好-``-"especiál` existsStoreTable ---
-
-SELECT count() FROM system.tables
-WHERE database = currentDatabase()
-  AND name = 'flow_temp_store_0_key_value-@你好-`-"especiál';
---- End `key_value-@你好-``-"especiál` existsStoreTable ---
-
---- Begin `delta_updates-@你好-``-"especiál` existsStoreTable ---
-
-SELECT count() FROM system.tables
-WHERE database = currentDatabase()
-  AND name = 'flow_temp_store_0_delta_updates-@你好-`-"especiál';
---- End `delta_updates-@你好-``-"especiál` existsStoreTable ---
 
 --- Begin `key_value-@你好-``-"especiál` dropStoreTable ---
 

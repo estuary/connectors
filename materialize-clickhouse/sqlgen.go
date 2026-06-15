@@ -293,15 +293,17 @@ type templates struct {
 	alterTargetMigrateDropColumn     *template.Template
 	alterTargetMigrateRenameColumn   *template.Template
 	createLoadTable                  *template.Template
+	truncateLoadTable                *template.Template
+	countLoadKeys                    *template.Template
 	insertLoadTable                  *template.Template
 	queryLoadTable                   *template.Template
 	queryLoadTableNoFlowDocument     *template.Template
 	dropLoadTable                    *template.Template
 	createStoreTable                 *template.Template
+	truncateStoreTable               *template.Template
 	insertStoreTable                 *template.Template
 	queryStoreParts                  *template.Template
 	moveStorePartition               *template.Template
-	existsStoreTable                 *template.Template
 	dropStoreTable                   *template.Template
 }
 
@@ -445,16 +447,23 @@ SETTINGS mutations_sync = 1;
 -- Load tables use the MergeTree engine so that large key sets are spilled to disk
 -- rather than held entirely in memory, avoiding server memory limit issues.
 --
--- CREATE OR REPLACE TABLE is used so that the table is reset on connector restart,
--- discarding any stale state from a previous run. The table is dropped when the
--- connector shuts down.
+-- Like store tables, load tables are PERSISTENT: created once (IF NOT EXISTS) at
+-- session start and truncated -- never re-created -- between load rounds, keeping
+-- the name->UUID mapping stable so that key inserts and the join query resolve the
+-- same object from any replica of a clustered deployment. The join query and the
+-- pre-join key-count check run with select_sequential_consistency = 1 so they
+-- observe both the keys just inserted and target-table rows committed by prior
+-- transactions' partition moves. Load tables hold nothing durable (only the current
+-- round's lookup keys), so they are safe to truncate at any time. Like store
+-- tables, they are dropped + re-created only when their schema has drifted from
+-- the target's.
 
 {{ define "loadTableName" -}}
 {{ printf "flow_temp_load_%s_%s" $.RangeKey (index $.Path 0) | ColumnIdentifier }}
 {{- end }}
 
 {{ define "createLoadTable" }}
-CREATE OR REPLACE TABLE {{ template "loadTableName" . }} (
+CREATE TABLE IF NOT EXISTS {{ template "loadTableName" . }} (
 	{{- range $ind, $key := $.Keys }}
 		{{- if $ind }},{{ end }}
 		{{ $key.Identifier }} {{ $key.DDL }}
@@ -467,6 +476,15 @@ ORDER BY (
 		{{ $key.Identifier }}
 	{{- end -}}
 );
+{{ end }}
+
+{{ define "truncateLoadTable" }}
+TRUNCATE TABLE IF EXISTS {{ template "loadTableName" . }};
+{{ end }}
+
+{{ define "countLoadKeys" }}
+SELECT count() FROM {{ template "loadTableName" . }}
+SETTINGS select_sequential_consistency = 1;
 {{ end }}
 
 {{ define "insertLoadTable" }}
@@ -547,21 +565,35 @@ DROP TABLE IF EXISTS {{ template "loadTableName" . }};
 -- (ReplacingMergeTree), so that their on-disk parts are partition-compatible with the
 -- target table.
 --
+-- Store tables are PERSISTENT: created once (IF NOT EXISTS) at the start of a
+-- session and never dropped or re-created between transactions. This keeps the
+-- table's name->UUID mapping stable, which matters on clustered deployments
+-- (e.g. ClickHouse Cloud): every pooled connection, regardless of which replica
+-- serves it, resolves the table name to the same object. Re-creating the table
+-- per transaction gives it a new UUID each time, and a replica with stale DDL
+-- metadata resolves the name to the previous incarnation -- reporting zero rows
+-- for freshly staged data and silently losing it at commit.
+--
 -- Documents are inserted into the store table during the store phase. On commit, the
--- connector enumerates the store table's parts via system.parts and moves each
--- partition to the target table using ALTER TABLE ... MOVE PARTITION. Moving a
--- partition is a metadata-only operation (it relinks existing parts rather than
--- copying data), so the commit phase is very low latency regardless of transaction
--- size. This is significantly faster than INSERT ... SELECT or other bulk-copy
--- methods that would rewrite data.
+-- connector enumerates the store table's partitions by reading the table itself
+-- (the _partition_id virtual column) with select_sequential_consistency = 1, which
+-- on SharedMergeTree forces a fetch of the latest committed metadata from Keeper --
+-- an authoritative read from any replica. It then moves each partition to the
+-- target table using ALTER TABLE ... MOVE PARTITION. Moving a partition is a
+-- metadata-only operation (it relinks existing parts rather than copying data), so
+-- the commit phase is very low latency regardless of transaction size. Moving every
+-- partition leaves the store table empty; nothing is dropped or truncated on the
+-- happy path.
 --
 -- The commit is not atomic across bindings: partitions are moved one at a time and a
 -- failure mid-commit will leave some partitions moved and others not. This is safe
 -- because the target table uses ReplacingMergeTree, which deduplicates by ORDER BY
 -- key and flow_published_at version — re-applying a partial commit is idempotent.
 --
--- CREATE OR REPLACE TABLE resets the store table on connector restart. The table is
--- truncated between transactions and dropped when the connector shuts down.
+-- At session start the store table is truncated when there is no pending commit
+-- recorded in the connector state, discarding rows staged by a transaction that
+-- never committed. It is dropped and re-created only when its schema has drifted
+-- from the target's (a migration ran in a prior session).
 
 {{ define "storeTableNameIdentifier" -}}
 {{ printf "flow_temp_store_%s_%s" $.RangeKey (index $.Path 0) | ColumnIdentifier }}
@@ -572,7 +604,7 @@ DROP TABLE IF EXISTS {{ template "loadTableName" . }};
 {{- end }}
 
 {{ define "createStoreTable" }}
-CREATE OR REPLACE TABLE {{ template "storeTableNameIdentifier" . }}
+CREATE TABLE IF NOT EXISTS {{ template "storeTableNameIdentifier" . }}
 AS {{$.Identifier}};
 {{ end }}
 
@@ -587,10 +619,8 @@ INSERT INTO {{ template "storeTableNameIdentifier" . }} (
 {{ end }}
 
 {{ define "queryStoreParts" }}
-SELECT partition_id, sum(rows) FROM system.parts
-WHERE table = {{ template "storeTableNameString" . }}
-  AND database = ? AND active
-GROUP BY partition_id
+SELECT _partition_id, count() FROM {{ template "storeTableNameIdentifier" . }}
+GROUP BY _partition_id
 SETTINGS select_sequential_consistency = 1;
 {{ end }}
 
@@ -600,10 +630,8 @@ MOVE PARTITION ID ?
 TO TABLE {{ $.Identifier }};
 {{ end }}
 
-{{ define "existsStoreTable" }}
-SELECT count() FROM system.tables
-WHERE database = currentDatabase()
-  AND name = {{ template "storeTableNameString" . }};
+{{ define "truncateStoreTable" }}
+TRUNCATE TABLE IF EXISTS {{ template "storeTableNameIdentifier" . }};
 {{ end }}
 
 {{ define "dropStoreTable" }}
@@ -619,17 +647,30 @@ DROP TABLE IF EXISTS {{ template "storeTableNameIdentifier" . }};
 		alterTargetMigrateDropColumn:     tplAll.Lookup("alterTargetMigrateDropColumn"),
 		alterTargetMigrateRenameColumn:   tplAll.Lookup("alterTargetMigrateRenameColumn"),
 		createLoadTable:                  tplAll.Lookup("createLoadTable"),
+		truncateLoadTable:                tplAll.Lookup("truncateLoadTable"),
+		countLoadKeys:                    tplAll.Lookup("countLoadKeys"),
 		insertLoadTable:                  tplAll.Lookup("insertLoadTable"),
 		queryLoadTable:                   tplAll.Lookup("queryLoadTable"),
 		queryLoadTableNoFlowDocument:     tplAll.Lookup("queryLoadTableNoFlowDocument"),
 		dropLoadTable:                    tplAll.Lookup("dropLoadTable"),
 		createStoreTable:                 tplAll.Lookup("createStoreTable"),
+		truncateStoreTable:               tplAll.Lookup("truncateStoreTable"),
 		insertStoreTable:                 tplAll.Lookup("insertStoreTable"),
 		queryStoreParts:                  tplAll.Lookup("queryStoreParts"),
 		moveStorePartition:               tplAll.Lookup("moveStorePartition"),
-		existsStoreTable:                 tplAll.Lookup("existsStoreTable"),
 		dropStoreTable:                   tplAll.Lookup("dropStoreTable"),
 	}
+}
+
+// loadTableName and storeTableName produce the unquoted names of a binding's
+// persistent temp tables. They must agree with the loadTableName /
+// storeTableNameIdentifier template definitions above.
+func loadTableName(table sql.Table, rangeKey uint32) string {
+	return fmt.Sprintf("flow_temp_load_%s_%s", strconv.FormatInt(int64(rangeKey), 16), table.Path[0])
+}
+
+func storeTableName(table sql.Table, rangeKey uint32) string {
+	return fmt.Sprintf("flow_temp_store_%s_%s", strconv.FormatInt(int64(rangeKey), 16), table.Path[0])
 }
 
 func renderTableAndRangeKey(table sql.Table, rangeKey uint32, tpl *template.Template) (rendered string, err error) {
