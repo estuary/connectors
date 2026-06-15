@@ -44,7 +44,7 @@ require (
 	github.com/dropbox/dropbox-sdk-go-unofficial/v6 v6.0.5
 	github.com/duckdb/duckdb-go/v2 v2.10502.0
 	github.com/elastic/go-elasticsearch/v8 v8.9.0
-	github.com/estuary/flow v0.6.10-0.20260605161557-1013f9821954
+	github.com/estuary/flow v0.6.10
 	github.com/estuary/vitess v0.15.10
 	github.com/evanphx/json-patch/v5 v5.9.11
 	github.com/go-mysql-org/go-mysql v0.0.0-20250907131429-558ed11751bc
