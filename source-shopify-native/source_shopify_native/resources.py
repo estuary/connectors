@@ -9,6 +9,7 @@ from estuary_cdk.capture import Task
 from estuary_cdk.capture.common import (
     Resource,
     ResourceConfig,
+    ResourceConfigWithSchedule,
     ResourceState,
     SnapshotResource,
     open_binding,
@@ -655,8 +656,10 @@ async def all_resources(
                 ),
                 initial_state=initial_state,
                 schema_inference=True,
-                initial_config=ResourceConfig(
-                    name=model.NAME, interval=timedelta(minutes=5)
+                initial_config=ResourceConfigWithSchedule(
+                    name=model.NAME,
+                    interval=timedelta(minutes=5),
+                    schedule=model.BACKFILL_SCHEDULE,
                 ),
             )
         )
@@ -734,8 +737,9 @@ async def all_resources(
                 name=model.NAME,
                 key=snapshot_key,
                 open=create_snapshot_open_fn(model, stores_with_access),
-                initial_config=ResourceConfig(
-                    name=model.NAME, interval=timedelta(minutes=15)
+                initial_config=ResourceConfigWithSchedule(
+                    name=model.NAME,
+                    interval=timedelta(minutes=15)
                 ),
             )
         )
