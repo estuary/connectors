@@ -1,0 +1,49 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "description": "HackerNews API endpoint configuration.\nHackerNews API requires no authentication - it's completely public.",
+      "properties": {},
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "description": "Configuration for HackerNews resources.",
+      "properties": {
+        "_meta": {
+          "anyOf": [
+            {
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Meta"
+        },
+        "name": {
+          "description": "Resource name",
+          "title": "Name",
+          "type": "string"
+        },
+        "interval": {
+          "description": "Polling interval for incremental updates",
+          "format": "duration",
+          "title": "Interval",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ResourceConfig",
+      "type": "object"
+    },
+    "documentationUrl": "https://go.estuary.dev/source-hackernews",
+    "resourcePathPointers": [
+      "/name"
+    ]
+  }
+]

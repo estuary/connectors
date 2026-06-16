@@ -1,0 +1,823 @@
+[
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "pg",
+      "descendants": 3,
+      "id": 1,
+      "kids": [
+        15,
+        487171,
+        234509,
+        82729
+      ],
+      "score": 57,
+      "time": "2006-10-09T18:21:51Z",
+      "title": "Y Combinator",
+      "type": "story",
+      "url": "http://ycombinator.com/"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "phyllis",
+      "descendants": 0,
+      "id": 2,
+      "score": 16,
+      "time": "2006-10-09T18:30:28Z",
+      "title": "A Student's Guide to Startups",
+      "type": "story",
+      "url": "http://www.paulgraham.com/mit.html"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "phyllis",
+      "descendants": 0,
+      "id": 3,
+      "kids": [
+        531602
+      ],
+      "score": 7,
+      "time": "2006-10-09T18:40:33Z",
+      "title": "Woz Interview: the early days of Apple",
+      "type": "story",
+      "url": "http://www.foundersatwork.com/stevewozniak.html"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "onebeerdave",
+      "descendants": 0,
+      "id": 4,
+      "score": 5,
+      "time": "2006-10-09T18:47:42Z",
+      "title": "NYC Developer Dilemma",
+      "type": "story",
+      "url": "http://avc.blogs.com/a_vc/2006/10/the_nyc_develop.html"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "perler",
+      "descendants": 0,
+      "id": 5,
+      "score": 7,
+      "time": "2006-10-09T18:51:04Z",
+      "title": "Google, YouTube acquisition announcement could come tonight",
+      "type": "story",
+      "url": "http://www.techcrunch.com/2006/10/09/google-youtube-sign-more-separate-deals/"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "perler",
+      "descendants": 0,
+      "id": 6,
+      "score": 4,
+      "time": "2006-10-09T18:56:40Z",
+      "title": "Business Intelligence the Inkling Way: cool prediction markets software",
+      "type": "story",
+      "url": "http://360techblog.com/2006/10/02/business-intelligence-the-inkling-way/"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "phyllis",
+      "descendants": 0,
+      "id": 7,
+      "score": 5,
+      "time": "2006-10-09T19:00:55Z",
+      "title": "Sevin Rosen Unfunds - why?",
+      "type": "story",
+      "url": "http://featured.gigaom.com/2006/10/09/sevin-rosen-unfunds-why/"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "frobnicate",
+      "descendants": 0,
+      "id": 8,
+      "score": 10,
+      "time": "2006-10-09T19:17:39Z",
+      "title": "LikeBetter featured by BBC",
+      "type": "story",
+      "url": "http://news.bbc.co.uk/2/hi/programmes/click_online/5412216.stm"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "askjigga",
+      "descendants": 0,
+      "id": 9,
+      "score": 4,
+      "time": "2006-10-09T19:19:02Z",
+      "title": "weekendr: social network for the weekend",
+      "type": "story",
+      "url": "http://www.weekendr.com/"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "frobnicate",
+      "descendants": 0,
+      "id": 10,
+      "score": 3,
+      "time": "2006-10-09T19:21:14Z",
+      "title": "PhotoShow: Broadcast Photos to Cable TV",
+      "type": "story",
+      "url": "http://www.techcrunch.com/2006/10/09/broadcast-photos-to-cable-tv/"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "frobnicate",
+      "descendants": 0,
+      "id": 11,
+      "score": 5,
+      "time": "2006-10-09T19:24:44Z",
+      "title": "Participation Inequality: Encouraging More Users to Contribute",
+      "type": "story",
+      "url": "http://www.useit.com/alertbox/participation_inequality.html"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "farmer",
+      "descendants": 0,
+      "id": 12,
+      "score": 5,
+      "time": "2006-10-09T19:28:32Z",
+      "title": "Wired: The Desktop is Dead",
+      "type": "story",
+      "url": "http://wired.com/wired/archive/14.10/cloudware.html"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "phyllis",
+      "descendants": 0,
+      "id": 13,
+      "score": 5,
+      "time": "2006-10-09T19:36:12Z",
+      "title": "The Hardest Lessons for Startups to Learn",
+      "type": "story",
+      "url": "http://www.paulgraham.com/startuplessons.html"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "pg",
+      "descendants": 0,
+      "id": 14,
+      "score": 4,
+      "time": "2006-10-09T19:50:20Z",
+      "title": "Small is Beautiful: Building a Successful Company with Less Capital",
+      "type": "story",
+      "url": "http://blogs.zdnet.com/BTL/?p=3738"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "sama",
+      "id": 15,
+      "kids": [
+        17
+      ],
+      "parent": 1,
+      "text": "&#34;the rising star of venture capital&#34; -unknown VC eating lunch on SHR",
+      "time": "2006-10-09T19:51:01Z",
+      "type": "comment"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "pg",
+      "descendants": 0,
+      "id": 16,
+      "score": 11,
+      "time": "2006-10-09T19:51:43Z",
+      "title": "Feld: Question Regarding NDAs",
+      "type": "story",
+      "url": "http://www.feld.com/blog/archives/001979.html"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "pg",
+      "id": 17,
+      "kids": [
+        1079
+      ],
+      "parent": 15,
+      "text": "Is there anywhere to eat on Sandhill Road?",
+      "time": "2006-10-09T19:52:45Z",
+      "type": "comment"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "farmer",
+      "descendants": 0,
+      "id": 18,
+      "score": 3,
+      "time": "2006-10-09T19:55:46Z",
+      "title": "Voddler Raises $2.2M For Virtual Cable TV",
+      "type": "story",
+      "url": "http://www.thealarmclock.com/euro/archives/2006/10/stockholmnfounded_vo.html"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "pg",
+      "descendants": 0,
+      "id": 19,
+      "score": 2,
+      "time": "2006-10-09T19:59:03Z",
+      "title": "Will Silicon Light Illuminate the Future?",
+      "type": "story",
+      "url": "http://www.technologyreview.com/read_article.aspx?id=17588&ch=energy"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "pg",
+      "descendants": 1,
+      "id": 20,
+      "kids": [
+        23
+      ],
+      "score": 8,
+      "time": "2006-10-09T20:00:38Z",
+      "title": "Salaries at VC-backed companies",
+      "type": "story",
+      "url": "http://avc.blogs.com/a_vc/2006/10/search_by_salar.html"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "sama",
+      "descendants": 1,
+      "id": 21,
+      "kids": [
+        22
+      ],
+      "score": 6,
+      "time": "2006-10-10T01:21:11Z",
+      "title": "Best IRR ever?  YouTube 1.65B...",
+      "type": "story",
+      "url": "http://www.techcrunch.com/2006/10/09/google-has-acquired-youtube/"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "pg",
+      "id": 22,
+      "parent": 21,
+      "text": "It's kind of funny that Sevin Rosen is giving up at the same time Sequoia is scoring on this scale.",
+      "time": "2006-10-10T02:18:22Z",
+      "type": "comment"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "starklysnarky",
+      "id": 23,
+      "parent": 20,
+      "text": "This is interesting, but the limitations become apparent with one of their example searches: http://tinyurl.com/qqnum\r\n\r\nThis comparison shows \"early stage\" companies offering a higher salary than fortune XXX companies. However, these numbers don't seem to indicate total compensation, such as benefits and stock or options.\r\n\r\nStill, a cool use of search technology.",
+      "time": "2006-10-10T02:30:53Z",
+      "type": "comment"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "starklysnarky",
+      "descendants": 0,
+      "id": 24,
+      "score": 9,
+      "time": "2006-10-10T03:54:25Z",
+      "title": "MySpace: Not a purely viral start",
+      "type": "story",
+      "url": "http://www.startup-review.com/blog/myspace-case-study-not-a-purely-viral-start.php"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "starklysnarky",
+      "descendants": 0,
+      "id": 25,
+      "score": 5,
+      "time": "2006-10-10T05:33:32Z",
+      "title": "A Story About Not Going IPO During The Bubble",
+      "type": "story",
+      "url": "http://www.usatoday.com/money/industries/technology/2004-04-21-sas-culture_x.htm"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "zak",
+      "descendants": 1,
+      "id": 26,
+      "score": 1,
+      "time": "2006-10-10T06:12:13Z",
+      "title": "Spam stock tips work - for spammers",
+      "type": "story",
+      "url": "http://www.nytimes.com/2006/09/10/business/yourmoney/10stra.html?ex=1315540800&en=6889d6d8b8f28c5a&ei=5090&partner=rssuserland&emc=rss"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "spez",
+      "descendants": 0,
+      "id": 27,
+      "score": 12,
+      "time": "2006-10-10T14:04:03Z",
+      "title": "Google Acquires YouTube For $1.6B",
+      "type": "story",
+      "url": "http://www.google.com/press/pressrel/google_youtube.html"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "spez",
+      "dead": true,
+      "descendants": -1,
+      "id": 28,
+      "score": 1,
+      "time": "2006-10-10T14:35:10Z",
+      "title": "google!",
+      "type": "story",
+      "url": "http://www.google.com/press/pressrel/google_youtube.html"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "spez",
+      "dead": true,
+      "id": 29,
+      "kids": [
+        30
+      ],
+      "score": 2,
+      "time": "2006-10-10T15:34:50Z",
+      "type": "story"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "spez",
+      "id": 30,
+      "kids": [
+        31
+      ],
+      "parent": 29,
+      "text": "Stay tuned...",
+      "time": "2006-10-10T15:34:59Z",
+      "type": "comment"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "pg",
+      "id": 31,
+      "kids": [
+        33
+      ],
+      "parent": 30,
+      "text": "I'm tuned...",
+      "time": "2006-10-10T15:40:05Z",
+      "type": "comment"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "eshear",
+      "descendants": 0,
+      "id": 32,
+      "score": 5,
+      "time": "2006-10-10T15:43:00Z",
+      "title": "Scratchtop - notepad for the web",
+      "type": "story",
+      "url": "http://scratchtop.com/"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "spez",
+      "id": 33,
+      "kids": [
+        34
+      ],
+      "parent": 31,
+      "text": "winnar winnar chicken dinnar!",
+      "time": "2006-10-10T15:50:40Z",
+      "type": "comment"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "pg",
+      "id": 34,
+      "kids": [
+        36,
+        35,
+        531706
+      ],
+      "parent": 33,
+      "text": "what do you mean?  this story's still not #1",
+      "time": "2006-10-10T15:53:53Z",
+      "type": "comment"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "spez",
+      "id": 35,
+      "parent": 34,
+      "text": "perhaps if i hadn't told you it was coming\r\n\r\nhttp://lipstick.com/static/onlyforamoment.png",
+      "time": "2006-10-10T15:57:42Z",
+      "type": "comment"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "pg",
+      "id": 36,
+      "parent": 34,
+      "text": "Can you do it again?",
+      "time": "2006-10-10T16:01:01Z",
+      "type": "comment"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "gaborcselle",
+      "descendants": 1,
+      "id": 37,
+      "kids": [
+        41
+      ],
+      "score": 4,
+      "time": "2006-10-10T20:13:54Z",
+      "title": "Woah, Scrybe! - A new kind of online organiser.",
+      "type": "story",
+      "url": "http://marcusfoster.com/blog/2006/10/09/woah-scrybe/"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "farmer",
+      "descendants": 0,
+      "id": 38,
+      "score": 3,
+      "time": "2006-10-10T20:44:53Z",
+      "title": "Dot-Com Boom Echoed in Deal to Buy YouTube - New York Times",
+      "type": "story",
+      "url": "http://www.nytimes.com/2006/10/10/technology/10deal.html?ex=1318132800&en=d8a82aacfcbbe1ee&ei=5090&partner=rssuserland&emc=rss"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "frobnicate",
+      "descendants": 0,
+      "id": 39,
+      "score": 3,
+      "time": "2006-10-10T20:55:50Z",
+      "title": "Competitio.us: track your competitors online",
+      "type": "story",
+      "url": "http://www.techcrunch.com/2006/10/04/competitous-track-your-competition-online/"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "pg",
+      "descendants": 0,
+      "id": 40,
+      "score": 3,
+      "time": "2006-10-10T20:59:01Z",
+      "title": "Scoble: Google web apps &#34;will sneak in the back door&#34;",
+      "type": "story",
+      "url": "http://www.cioinsight.com/print_article2/0,1217,a=190067,00.asp"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "starklysnarky",
+      "id": 41,
+      "parent": 37,
+      "text": "it's interesting how a simple set of features can make the product seem wholly different, new, and interesting. that, and the use of 'revolutionary' and 'incredible' everywhere. =)",
+      "time": "2006-10-10T22:46:08Z",
+      "type": "comment"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "sergei",
+      "descendants": 0,
+      "id": 42,
+      "kids": [
+        28355,
+        28717
+      ],
+      "score": 5,
+      "time": "2006-10-11T02:10:01Z",
+      "title": "An alternative to VC: &#34;Selling In&#34;",
+      "type": "story",
+      "url": "http://www.venturebeat.com/contributors/2006/10/10/an-alternative-to-vc-selling-in/"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "farmer",
+      "descendants": 1,
+      "id": 43,
+      "kids": [
+        44
+      ],
+      "score": 3,
+      "time": "2006-10-11T14:45:01Z",
+      "title": "Yahoo's Growth Being Eroded by New Rivals - New York Times",
+      "type": "story",
+      "url": "http://www.nytimes.com/2006/10/11/technology/11yahoo.html?ex=1318219200&en=538f73d9faa9d263&ei=5090&partner=rssuserland&emc=rss"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "spez",
+      "id": 44,
+      "parent": 43,
+      "text": "Welcome back, Randall",
+      "time": "2006-10-11T15:00:48Z",
+      "type": "comment"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "perler",
+      "descendants": 0,
+      "id": 45,
+      "score": 5,
+      "time": "2006-10-11T15:04:38Z",
+      "title": "Coghead Goes Live: Build Applications Visually",
+      "type": "story",
+      "url": "http://www.techcrunch.com/2006/10/11/coghead-goes-live-build-applications-visually/"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "goldfish",
+      "descendants": 0,
+      "id": 46,
+      "score": 4,
+      "time": "2006-10-11T15:39:28Z",
+      "title": "Rentometer: Check How Your Rent Compares to Others in Your Area",
+      "type": "story",
+      "url": "http://www.rentometer.com/"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "onebeerdave",
+      "descendants": 0,
+      "id": 47,
+      "score": 2,
+      "time": "2006-10-11T21:47:48Z",
+      "title": "Another audience-driven news site that thinks it will win by paying users ",
+      "type": "story",
+      "url": "http://business2.blogs.com/business2blog/2006/10/startup_watch_c.html"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "zak",
+      "dead": true,
+      "id": 48,
+      "score": 9,
+      "time": "2006-10-12T03:52:03Z",
+      "type": "story"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "pg",
+      "descendants": 0,
+      "id": 49,
+      "score": 4,
+      "time": "2006-10-12T13:30:14Z",
+      "title": "Preezo Enters Online Office Race",
+      "type": "story",
+      "url": "http://www.techcrunch.com/2006/10/11/preezo-enters-online-office-race/"
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "by": "pg",
+      "descendants": 0,
+      "id": 50,
+      "score": 4,
+      "time": "2006-10-12T13:59:30Z",
+      "title": "Boston VCs invest in fewer consumer Internet startups than Silicon Valley firms",
+      "type": "story",
+      "url": "http://masshightech.bizjournals.com/masshightech/stories/2006/09/25/story8.html"
+    }
+  ]
+]
