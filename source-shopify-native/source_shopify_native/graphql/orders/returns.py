@@ -129,7 +129,10 @@ class OrderReturns(ShopifyGraphQLResource):
                 current_order = record
                 current_order[RETURNS_KEY] = []
 
-            elif "gid://shopify/ReturnLineItem/" in id:
+            elif (
+                "gid://shopify/ReturnLineItem/" in id
+                or "gid://shopify/UnverifiedReturnLineItem/" in id
+            ):
                 parent_id = record.get("__parentId", "")
                 parent_return = find_parent_return(parent_id)
                 if not parent_return:
