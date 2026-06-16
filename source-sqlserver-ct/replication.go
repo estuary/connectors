@@ -251,10 +251,21 @@ func (rs *sqlserverCTReplicationStream) pollChanges(ctx context.Context, toVersi
 	var tablesToPoll []*ctTablePollInfo
 	for streamID, info := range rs.tables {
 		fromVersion := rs.tableVersions[streamID]
+		minValid, ctEnabled := minValidVersions[streamID]
+
+		// Sanity check that the table's minValid < toVersion. This should always hold on a
+		// healthy primary since changes cannot be cleaned up before they exist and toVersion
+		// is just a recent `CHANGE_TRACKING_CURRENT_VERSION()`.
+		//
+		// A violation means we're trying to capture from some sort of incoherent replica
+		// setup which our prerequisites failed to catch.
+		if ctEnabled && toVersion < minValid {
+			return fmt.Errorf("inconsistent change tracking metadata for table %q: current version %d is below min valid version %d, which should be impossible on the primary database", streamID, toVersion, minValid)
+		}
 
 		// Check that the table still has change tracking enabled and data hasn't expired
 		var invalidCause error
-		if minValid, ok := minValidVersions[streamID]; !ok {
+		if !ctEnabled {
 			invalidCause = fmt.Errorf("change tracking no longer enabled for table %q", streamID)
 		} else if fromVersion < minValid {
 			invalidCause = fmt.Errorf("change tracking data expired for table %q (version %d < min valid %d)", streamID, fromVersion, minValid)

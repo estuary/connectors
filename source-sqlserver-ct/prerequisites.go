@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"github.com/estuary/connectors/go/capture/sqlserver/backfill"
 	"github.com/estuary/connectors/go/capture/sqlserver/version"
@@ -19,6 +20,7 @@ func (db *sqlserverDatabase) SetupPrerequisites(ctx context.Context) []error {
 	}
 
 	var checks = []func(ctx context.Context) error{
+		db.prerequisiteWritableDatabase,
 		db.prerequisiteCTEnabled,
 		db.prerequisiteConnectionEncryption,
 	}
@@ -82,6 +84,22 @@ func isCTEnabled(ctx context.Context, conn *sql.DB) (bool, error) {
 		return false, fmt.Errorf("unable to query Change Tracking status: %w", err)
 	}
 	return version.Valid, nil
+}
+
+// prerequisiteWritableDatabase verifies that the connector is not connected to a read-only
+// database. Change Tracking data must always be captured from the primary replica, and the
+// Change Tracking metadata can be incoherent on a secondary.
+func (db *sqlserverDatabase) prerequisiteWritableDatabase(ctx context.Context) error {
+	var updateability sql.NullString
+	const query = `SELECT CAST(DATABASEPROPERTYEX(DB_NAME(), 'Updateability') AS NVARCHAR(128));`
+	if err := db.conn.QueryRowContext(ctx, query).Scan(&updateability); err != nil {
+		log.WithField("err", err).Warn("unable to query database updateability")
+		return nil
+	}
+	if updateability.Valid && strings.EqualFold(strings.TrimSpace(updateability.String), "READ_ONLY") {
+		return fmt.Errorf("Change Tracking captures must target the primary writable database instance, but database %q is read-only", db.config.Database)
+	}
+	return nil
 }
 
 func (db *sqlserverDatabase) prerequisiteConnectionEncryption(ctx context.Context) error {
