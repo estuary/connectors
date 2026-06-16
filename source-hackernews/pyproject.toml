@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "source_hackernews"
 version = "0.2.0"
-description = "Estuary Flow capture connector for Hacker News"
+description = "Estuary capture connector for Hacker News"
 authors = ["Dani Palma <dani@estuary.dev>"]
 
 [tool.poetry.scripts]
