@@ -641,7 +641,7 @@ func (c config) toGlueClient(ctx context.Context) (*glue.Client, error) {
 		if err != nil {
 			return nil, err
 		}
-		region = catalogAuth.AWSRegion
+		region = catalogAuth.IAMConfig.AWSRegion
 	default:
 		return nil, fmt.Errorf("Glue optimizers require AWS credentials (SigV4 or IAM), not %q", catalogAuth.AuthType)
 	}
