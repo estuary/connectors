@@ -56,6 +56,7 @@ from .priority_capture import (
 DEFAULT_SCHEDULE = "0 0 * * *"
 
 DISABLED_MESSAGE_REGEX = r"Your account is not set up to use"
+ENABLED_RESOURCE_EXPECTED_ERROR_REGEX = r"No such .*: 'invalid_id'"
 
 
 async def check_accessibility(
@@ -82,8 +83,15 @@ async def check_accessibility(
         is_disabled = err.code == 400 and bool(
             re.search(DISABLED_MESSAGE_REGEX, err.message)
         )
+        # A "No such ...: 'invalid_id'" response means the resource is reachable —
+        # we probed it with a placeholder ID on purpose. We deliberately do not let
+        # this affect `is_accessible` to preserve the existing behavior
+        can_search_for_ids = re.search(
+            ENABLED_RESOURCE_EXPECTED_ERROR_REGEX, err.message
+        )
         is_accessible = not is_permission_blocked and not is_disabled
 
+        warning_msg = None
         if is_permission_blocked:
             warning_msg = (
                 f"Removing inaccessible resource for {url} due to missing API key permissions. "
@@ -93,12 +101,13 @@ async def check_accessibility(
             warning_msg = (
                 f"Removing resource the account is not configured to use: {url}."
             )
-        else:
+        elif not can_search_for_ids:
             warning_msg = (
                 f"Encountered HTTP error while checking accessibility for {url}"
             )
 
-        log.warning(warning_msg, {"err.code": err.code, "err.message": err.message})
+        if warning_msg:
+            log.warning(warning_msg, {"err.code": err.code, "err.message": err.message})
 
     return is_accessible
 
