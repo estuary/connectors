@@ -1,6 +1,6 @@
 # source-hackernews
 
-Estuary Flow capture connector for the [HackerNews API](https://github.com/HackerNews/API), built on the Python `estuary-cdk`.
+Estuary capture connector for the [HackerNews API](https://github.com/HackerNews/API), built on the Python `estuary-cdk`.
 
 The HackerNews API is a public, unauthenticated Firebase REST API at
 `https://hacker-news.firebaseio.com/v0/`. There is no rate limit and no
