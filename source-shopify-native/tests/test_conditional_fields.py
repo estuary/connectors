@@ -7,6 +7,7 @@ from datetime import datetime, UTC
 
 import pytest
 
+from source_shopify_native.graphql.disputes import Disputes
 from source_shopify_native.graphql.orders.orders import Orders
 from source_shopify_native.models import (
     ConditionalField,
@@ -114,6 +115,33 @@ def test_non_comment_placeholder_is_rejected():
             fields="retailLocation { id }",
             is_available=requires_any_scope("read_locations"),
         )
+
+
+def test_disputes_evidence_included_only_with_evidence_scope():
+    with_evidence = Disputes.build_query(
+        START,
+        END,
+        capabilities=StoreCapabilities(
+            scopes=frozenset(
+                {
+                    "read_shopify_payments_disputes",
+                    "read_shopify_payments_dispute_evidences",
+                }
+            )
+        ),
+    )
+    without_evidence = Disputes.build_query(
+        START,
+        END,
+        capabilities=StoreCapabilities(
+            scopes=frozenset({"read_shopify_payments_disputes"})
+        ),
+    )
+
+    assert "disputeEvidence" in with_evidence
+    assert "disputeEvidence" not in without_evidence
+    # The placeholder itself must not leak into the emitted query.
+    assert "{{ disputeEvidence }}" not in without_evidence
 
 
 def test_predicate_can_gate_on_plan_tier():

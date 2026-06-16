@@ -2,7 +2,12 @@ from datetime import datetime
 
 from pydantic import AwareDatetime
 
-from ..models import ShopifyGraphQLResource, StoreCapabilities
+from ..models import (
+    ConditionalField,
+    ShopifyGraphQLResource,
+    StoreCapabilities,
+    requires_any_scope,
+)
 from ..utils import dt_to_str, str_to_dt
 
 
@@ -39,7 +44,16 @@ class Disputes(ShopifyGraphQLResource):
         id
         legacyResourceId
     }
-    disputeEvidence {
+    # {{ disputeEvidence }}
+    """
+    # disputeEvidence requires the read_shopify_payments_dispute_evidences scope, which is
+    # distinct from the read_shopify_payments_disputes scope that gates the stream itself. A
+    # store can grant disputes access without granting evidence access, so query this block
+    # only when the evidence scope is present.
+    CONDITIONAL_FIELDS = [
+        ConditionalField(
+            placeholder="# {{ disputeEvidence }}",
+            fields="""disputeEvidence {
         id
         accessActivityLog
         cancellationPolicyDisclosure
@@ -149,8 +163,12 @@ class Disputes(ShopifyGraphQLResource):
             shippingDate
             shippingTrackingNumber
         }
-    }
-    """
+    }""",
+            is_available=requires_any_scope(
+                "read_shopify_payments_dispute_evidences"
+            ),
+        ),
+    ]
 
     def get_cursor_value(self) -> AwareDatetime:
         raw_value = getattr(self, "initiatedAt")
@@ -175,6 +193,7 @@ class Disputes(ShopifyGraphQLResource):
     ) -> str:
         lower_bound = dt_to_str(start)
         upper_bound = dt_to_str(end)
+        query_body = Disputes._resolve_conditional_fields(capabilities)
         return f"""
         {{
             disputes(
@@ -184,7 +203,7 @@ class Disputes(ShopifyGraphQLResource):
             ) {{
                 edges {{
                     node {{
-                        {Disputes.QUERY}
+                        {query_body}
                     }}
                 }}
                 pageInfo {{
