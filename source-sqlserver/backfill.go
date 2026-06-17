@@ -79,6 +79,9 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 
 	log.WithFields(log.Fields{"query": query, "args": args}).Debug("executing query")
 
+	// If this is the first chunk being backfilled from this table, log the query for debugging.
+	db.logBackfillQuery(streamID, query, args)
+
 	// Set up watchdog timer and run the query
 	var watchdogCtx, cancelWatchdog = context.WithCancel(ctx)
 	defer cancelWatchdog()

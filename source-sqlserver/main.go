@@ -301,6 +301,7 @@ type sqlserverDatabase struct {
 	datatypesConfig *datatypes.Config // Configuration for datatype handling
 
 	tableStatistics map[sqlcapture.StreamID]*sqlserverTableStatistics // Cached table statistics for backfill progress tracking
+	loggedBackfill  map[sqlcapture.StreamID]struct{}                  // Tracks tables whose backfill query has been logged during this connector invocation
 }
 
 func (db *sqlserverDatabase) HistoryMode() bool {
