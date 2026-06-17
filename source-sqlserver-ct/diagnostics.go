@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 
+	"github.com/estuary/connectors/sqlcapture"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -61,4 +62,25 @@ func (db *sqlserverDatabase) PeriodicChecks(ctx context.Context) error {
 	// and is called periodically during capture, but Change Tracking does not require
 	// any periodic maintenance or status checks.
 	return nil
+}
+
+// logBackfillQuery logs the backfill query for a table the first time it is scanned during a
+// connector invocation.
+//
+// In other connectors the analogous logic runs an EXPLAIN, and we were going to do the same
+// thing here with `SET SHOWPLAN`, but this was such an absolute pain that we gave up. Turns
+// out that query parameters via go-mssqldb don't play nicely with SHOWPLAN. Also SHOWPLAN
+// requires a special permission which we likely wouldn't have anyway, so it just wasn't
+// worth implementing a workaround at this time.
+func (db *sqlserverDatabase) logBackfillQuery(streamID sqlcapture.StreamID, query string, args []any) {
+	// Only log the backfill query once per table per connector invocation.
+	if db.loggedBackfill == nil {
+		db.loggedBackfill = make(map[sqlcapture.StreamID]struct{})
+	}
+	if _, ok := db.loggedBackfill[streamID]; ok {
+		return
+	}
+	db.loggedBackfill[streamID] = struct{}{}
+
+	log.WithFields(log.Fields{"id": streamID, "query": query, "args": args}).Info("backfill query")
 }
