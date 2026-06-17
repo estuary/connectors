@@ -1,3 +1,4 @@
+import re
 from datetime import datetime, timedelta, timezone
 from typing import (
     Annotated,
@@ -15,7 +16,18 @@ from estuary_cdk.capture.common import (
 )
 from estuary_cdk.capture.common import ConnectorState as GenericConnectorState
 from estuary_cdk.flow import AccessToken
-from pydantic import AliasChoices, AwareDatetime, BaseModel, Field
+from pydantic import (
+    AliasChoices,
+    AwareDatetime,
+    BaseModel,
+    Field,
+    field_validator,
+)
+
+
+# Stripe API versions are zero-padded dates, optionally with a release codename
+# suffix (e.g. "2024-06-20" or "2026-05-27.dahlia").
+API_VERSION_REGEX = re.compile(r"^\d{4}-\d{2}-\d{2}(\.\w+)?$")
 
 
 def default_start_date():
@@ -35,13 +47,35 @@ class EndpointConfig(BaseModel):
     )
 
     class Advanced(BaseModel):
-        incremental_window_size: Annotated[timedelta, Field(
-            description="Maximum time window to process in a single incremental sweep. This bounds how much catch-up work is done at once and helps prevent the connector from falling behind when there are a large number of changes in a short time frame. Uses ISO 8601 duration format (e.g. PT1H for 1 hour, PT30M for 30 minutes).",
-            title="Max Incremental Window Size",
-            default_factory=lambda: timedelta(days=1),
-            ge=timedelta(minutes=1),
-            le=timedelta(days=30),
-        )]
+        api_version: str | None = Field(
+            description='The Stripe API version to use for all requests, e.g. "2024-06-20". If left blank, the account\'s default API version is used. Streams that require a newer API version than the one in effect are disabled.',
+            title="API Version",
+            default=None,
+        )
+
+        @field_validator("api_version")
+        @classmethod
+        def _validate_api_version(cls, value: str) -> str:
+            if value and not API_VERSION_REGEX.match(value):
+                raise ValueError(
+                    (
+                        f"Invalid API Version {value!r}. Expected a Stripe dated "
+                        'version like "2024-06-20", optionally with a release '
+                        'codename suffix like "2024-06-20.acacia".'
+                    )
+                )
+            return value
+
+        incremental_window_size: Annotated[
+            timedelta,
+            Field(
+                description="Maximum time window to process in a single incremental sweep. This bounds how much catch-up work is done at once and helps prevent the connector from falling behind when there are a large number of changes in a short time frame. Uses ISO 8601 duration format (e.g. PT1H for 1 hour, PT30M for 30 minutes).",
+                title="Max Incremental Window Size",
+                default_factory=lambda: timedelta(days=1),
+                ge=timedelta(minutes=1),
+                le=timedelta(days=30),
+            ),
+        ]
 
     advanced: Advanced = Field(
         default_factory=Advanced,  # type: ignore
@@ -98,6 +132,8 @@ class BaseStripeObject(BaseDocument, extra="allow"):
 
     NAME: ClassVar[str]
     SEARCH_NAME: ClassVar[str]
+    # Oldest Stripe API version this stream can be captured against.
+    MINIMUM_API_VERSION: ClassVar[str | None] = None
 
     id: str
     object: str
@@ -661,9 +697,14 @@ class SetupAttempts(BaseStripeChildObject):
     }
 
 
+# First API version that accepts `status=all` when listing subscriptions.
+SUBSCRIPTIONS_MIN_API_VERSION = "2016-07-06"
+
+
 class Subscriptions(BaseStripeObjectWithEvents):
     NAME: ClassVar[str] = "Subscriptions"
     SEARCH_NAME: ClassVar[str] = "subscriptions"
+    MINIMUM_API_VERSION: ClassVar[str] = SUBSCRIPTIONS_MIN_API_VERSION
     EVENT_TYPES: ClassVar[dict[str, Literal["c", "u", "d"]]] = {
         "customer.subscription.created": "c",
         "customer.subscription.updated": "u",
@@ -678,6 +719,7 @@ class Subscriptions(BaseStripeObjectWithEvents):
 class SubscriptionItems(BaseStripeObjectWithEvents):
     NAME: ClassVar[str] = "SubscriptionItems"
     SEARCH_NAME: ClassVar[str] = "subscriptions"
+    MINIMUM_API_VERSION: ClassVar[str] = SUBSCRIPTIONS_MIN_API_VERSION
     EVENT_TYPES: ClassVar[dict[str, Literal["c", "u", "d"]]] = {
         "customer.subscription.created": "c",
         "customer.subscription.updated": "u",
