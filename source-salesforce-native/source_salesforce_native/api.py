@@ -17,6 +17,7 @@ from .bulk_job_manager import (
 from .rest_query_manager import RestQueryManager
 from .shared import dt_to_str, str_to_dt, now, should_retry, VERSION
 from .models import (
+    MIN_INCREMENTAL_WINDOW_SIZE,
     FieldDetails,
     FieldDetailsDict,
     SalesforceRecord,
@@ -35,7 +36,6 @@ BULK_CHECKPOINT_INTERVAL = MAX_BULK_QUERY_SET_SIZE
 # but it's a simple fix that easily rolled back if we come up with a better solution. The default
 # interval is already 5 minutes, so the connector is not really "real-time" anyway.
 LAG = timedelta(minutes=5)
-MIN_INCREMENTAL_WINDOW_SIZE = timedelta(minutes=1)
 
 
 def _determine_cursor_field(
@@ -162,7 +162,7 @@ async def backfill_incremental_resources(
     name: str,
     fields: FieldDetailsDict,
     model_cls: type[SalesforceRecord],
-    window_size: int,
+    window_size: timedelta,
     start_date: datetime,
     log: Logger,
     page: PageCursor | None,
@@ -184,7 +184,7 @@ async def backfill_incremental_resources(
         })
         return
 
-    max_window_size = min(timedelta(days=window_size), cutoff - start)
+    max_window_size = min(window_size, cutoff - start)
     end = min(cutoff, start + max_window_size)
 
     cursor_field = _determine_cursor_field(fields)
@@ -257,15 +257,14 @@ async def fetch_incremental_resources(
     rest_query_manager: RestQueryManager,
     instance_url: str,
     name: str,
-    window_size: int,
+    window_size: timedelta,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[SalesforceRecord | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
 
-    max_window_size = timedelta(days=window_size)
     max_end = now() - LAG
-    end = min(max_end, log_cursor + max_window_size)
+    end = min(max_end, log_cursor + window_size)
 
     # Return early and sleep if the end date is before the start date or if the date window is too small.
     # This is done to prevent repeatedly sending API requests for tiny date windows.
@@ -297,7 +296,7 @@ async def fetch_incremental_resources(
         end,
     )
 
-    async for record_or_dt in _execution_wrapper(gen, cursor_field, log_cursor, end, max_window_size, REST_CHECKPOINT_INTERVAL):
+    async for record_or_dt in _execution_wrapper(gen, cursor_field, log_cursor, end, window_size, REST_CHECKPOINT_INTERVAL):
         yield record_or_dt
 
     log.debug("Finished fetching incremental changes.", {

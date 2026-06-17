@@ -171,7 +171,7 @@ def incremental_resource(
                 name,
                 fields,
                 model_cls,
-                config.advanced.window_size,
+                config.advanced.window_size.as_timedelta,
                 config.start_date,
             ),
             fetch_changes=functools.partial(
@@ -182,7 +182,7 @@ def incremental_resource(
                 rest_query_manager,
                 instance_url,
                 name,
-                config.advanced.window_size,
+                config.advanced.window_size.as_timedelta,
             ),
         )
 

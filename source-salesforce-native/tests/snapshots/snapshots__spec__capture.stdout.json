@@ -6,11 +6,23 @@
         "Advanced": {
           "properties": {
             "window_size": {
-              "default": 18250,
-              "description": "Date window size for Bulk API 2.0 queries (in days). Typically left as the default unless Estuary Support or the connector logs indicate otherwise.",
-              "exclusiveMinimum": 0,
-              "title": "Window size",
-              "type": "integer"
+              "description": "Date window size for Bulk API 2.0 queries. Typically left as the default unless Estuary Support or the connector logs indicate otherwise.",
+              "discriminator": {
+                "mapping": {
+                  "days": "#/$defs/WindowSizeInDays",
+                  "interval": "#/$defs/WindowSizeAsInterval"
+                },
+                "propertyName": "window_type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/WindowSizeAsInterval"
+                },
+                {
+                  "$ref": "#/$defs/WindowSizeInDays"
+                }
+              ],
+              "title": "Window size"
             }
           },
           "title": "Advanced",
@@ -80,6 +92,52 @@
             "security_token"
           ],
           "title": "UserPass",
+          "type": "object"
+        },
+        "WindowSizeAsInterval": {
+          "properties": {
+            "window_type": {
+              "const": "interval",
+              "default": "interval",
+              "order": 0,
+              "title": "Window Type",
+              "type": "string"
+            },
+            "interval": {
+              "description": "Window size as an ISO 8601 duration, e.g. PT1H for one hour.",
+              "format": "duration",
+              "order": 1,
+              "title": "Interval",
+              "type": "string"
+            }
+          },
+          "required": [
+            "interval"
+          ],
+          "title": "Interval",
+          "type": "object"
+        },
+        "WindowSizeInDays": {
+          "properties": {
+            "window_type": {
+              "const": "days",
+              "default": "days",
+              "order": 0,
+              "title": "Window Type",
+              "type": "string"
+            },
+            "days": {
+              "description": "Window size as a whole number of days.",
+              "exclusiveMinimum": 0,
+              "order": 1,
+              "title": "Days",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "days"
+          ],
+          "title": "Days",
           "type": "object"
         },
         "_OAuth2Credentials": {
