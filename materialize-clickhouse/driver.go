@@ -4,11 +4,14 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
+	chproto "github.com/ClickHouse/ch-go/proto"
 	"github.com/ClickHouse/clickhouse-go/v2"
 	chdriver "github.com/ClickHouse/clickhouse-go/v2/lib/driver"
+	clickhouseproto "github.com/ClickHouse/clickhouse-go/v2/lib/proto"
 	m "github.com/estuary/connectors/go/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -639,10 +642,26 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 				// A committed-but-unacknowledged transaction has rows staged
 				// in this binding's store table. Move them; never truncate or
 				// re-create a stage table holding pending rows.
-				if err := t.moveStorePartitionsToTarget(ctx, b, si, true); err != nil {
+				err := t.moveStorePartitionsToTarget(ctx, b, si, true)
+				if err == nil {
+					continue
+				}
+				if !isUnknownTableErr(err) {
 					return nil, fmt.Errorf("recovering stage to target %s: %w", b.target.Identifier, err)
 				}
-			} else if err := t.ensureTempTables(ctx, b); err != nil {
+				// The store table was lost out-of-band (e.g. dropped) while the
+				// connector state still recorded a pending commit referencing
+				// it. No staged rows remain to recover -- the same situation as
+				// a commit that fully completed before the previous process
+				// exited -- so fall through to (re-)create the temp tables for
+				// the next transaction instead of crash-looping forever on the
+				// missing table. The pending transaction's rows are
+				// unrecoverable regardless; ReplacingMergeTree lets later
+				// transactions refresh them.
+				log.WithField("target", b.target.Identifier).Warn(
+					"store table missing during recovery; nothing to recover, re-creating temp tables")
+			}
+			if err := t.ensureTempTables(ctx, b); err != nil {
 				return nil, fmt.Errorf("ensuring temp tables of %s: %w", b.target.Identifier, err)
 			}
 		}
@@ -685,6 +704,14 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	}
 
 	return &pf.ConnectorState{UpdatedJson: checkpointJSON, MergePatch: true}, nil
+}
+
+// isUnknownTableErr reports whether err (anywhere in its chain) is a ClickHouse
+// "unknown table" exception (code 60), raised when a query references a table
+// that does not exist.
+func isUnknownTableErr(err error) bool {
+	var exc *clickhouseproto.Exception
+	return errors.As(err, &exc) && exc.Code == int32(chproto.ErrUnknownTable)
 }
 
 // moveStorePartitionsToTarget commits a transaction's staged rows by moving

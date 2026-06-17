@@ -1210,6 +1210,30 @@ func TestAcknowledgeRecoveryMatrix(t *testing.T) {
 		require.EqualValues(t, 1, countTable(t, ctx, tr, tr.dialect.Identifier("test_recovery_partial")))
 	})
 
+	t.Run("pending state with a missing store table recovers as a no-op", func(t *testing.T) {
+		tr, b := newTestTransactor(t, ctx, "test_recovery_missing_store")
+		// The store table was lost out-of-band (e.g. dropped) while the
+		// connector state still records a pending commit referencing it. There
+		// are no staged rows left to recover, so Acknowledge must not crash on
+		// the missing table -- it must treat it as nothing to recover, clear
+		// the pending state, and (re-)create the temp table so the next
+		// transaction can stage into it.
+		require.NoError(t, tr.store.conn.Exec(ctx, b.store.dropTableSQL))
+
+		tr.ensured = false
+		tr.recovery = true
+		tr.state[b.target.StateKey] = &stateItem{StoredRows: 1}
+		_, err := tr.Acknowledge(ctx)
+		require.NoError(t, err)
+		require.Empty(t, tr.state)
+
+		// The store table is back, empty, and ready for the next round's store.
+		stageName := tr.dialect.Identifier(storeTableName(b.target, 0))
+		require.EqualValues(t, 0, countTable(t, ctx, tr, stageName))
+		stageTestRows(t, ctx, tr, b, []any{"k1", "v1", "c", testTime, `{"id":"k1"}`})
+		require.EqualValues(t, 1, countTable(t, ctx, tr, stageName))
+	})
+
 	t.Run("leftover rows of an uncommitted transaction are truncated", func(t *testing.T) {
 		tr, b := newTestTransactor(t, ctx, "test_recovery_leftovers")
 		require.NoError(t, tr.ensureTempTables(ctx, b))
