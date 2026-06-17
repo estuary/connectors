@@ -1,10 +1,11 @@
-from datetime import datetime, UTC
+from datetime import datetime, timedelta, UTC
 from enum import StrEnum
-from typing import Any, Iterator, Annotated, ClassVar
+from typing import Any, Iterator, ClassVar, Literal
 
 from pydantic import (
     AwareDatetime,
     BaseModel,
+    ConfigDict,
     Field,
     ValidationInfo,
     create_model,
@@ -28,6 +29,7 @@ EARLIEST_VALID_DATE_IN_SALESFORCE = datetime(1700, 1, 1, tzinfo=UTC)
 # Salesforce was founded on 03FEB1999. As long as cursor values aren't backdated before this date (which only seems possible
 # for a select few of them), Salesforce's founding date should be a good start date for most users.
 SALESFORCE_FOUNDING_DATE = datetime(1999, 2, 3, tzinfo=UTC)
+MIN_INCREMENTAL_WINDOW_SIZE = timedelta(minutes=1)
 
 
 class SalesforceResourceConfigWithSchedule(ResourceConfigWithSchedule):
@@ -41,6 +43,44 @@ class SalesforceResourceConfigWithSchedule(ResourceConfigWithSchedule):
 
 def default_start_date():
     return SALESFORCE_FOUNDING_DATE
+
+
+class WindowSizeInDays(BaseModel):
+    model_config = ConfigDict(title="Days")
+
+    window_type: Literal["days"] = Field(
+        default="days",
+        json_schema_extra={"type": "string", "order": 0},
+    )
+    days: int = Field(
+        title="Days",
+        description="Window size as a whole number of days.",
+        gt=0,
+        json_schema_extra={"order": 1},
+    )
+
+    @property
+    def as_timedelta(self) -> timedelta:
+        return timedelta(days=self.days)
+
+
+class WindowSizeAsInterval(BaseModel):
+    model_config = ConfigDict(title="Interval")
+
+    window_type: Literal["interval"] = Field(
+        default="interval",
+        json_schema_extra={"type": "string", "order": 0},
+    )
+    interval: timedelta = Field(
+        title="Interval",
+        description="Window size as an ISO 8601 duration, e.g. PT1H for one hour.",
+        gt=MIN_INCREMENTAL_WINDOW_SIZE,
+        json_schema_extra={"order": 1},
+    )
+
+    @property
+    def as_timedelta(self) -> timedelta:
+        return self.interval
 
 
 class EndpointConfig(BaseModel):
@@ -86,19 +126,30 @@ class EndpointConfig(BaseModel):
         return self
 
     class Advanced(BaseModel):
-        window_size: Annotated[int, Field(
-            description="Date window size for Bulk API 2.0 queries (in days). Typically left as the default unless Estuary Support or the connector logs indicate otherwise.",
+        window_size: WindowSizeAsInterval | WindowSizeInDays = Field(
+            description="Date window size for Bulk API 2.0 queries. Typically left as the default unless Estuary Support or the connector logs indicate otherwise.",
             title="Window size",
-            default=18250,
-            gt=0,
-        )]
+            default_factory=lambda: WindowSizeInDays(days=18250),
+            discriminator="window_type",
+        )
+
+        @model_validator(mode="before")
+        @classmethod
+        def _coerce_legacy_window_size(cls, data: Any) -> Any:
+            # Older configs stored window_size as a bare integer count of days, before it became a
+            # discriminated union. Wrap that legacy form so running captures keep working without the
+            # user re-saving their config.
+            if isinstance(data, dict) and isinstance(data.get("window_size"), int):
+                return {**data, "window_size": {"window_type": "days", "days": data["window_size"]}}
+            return data
 
     advanced: Advanced = Field(
-        default_factory=Advanced, #type: ignore
+        default_factory=Advanced,  # type: ignore
         title="Advanced Config",
         description="Advanced settings for the connector.",
         json_schema_extra={"advanced": True},
     )
+
 
 ConnectorState = GenericConnectorState[ResourceState]
 
