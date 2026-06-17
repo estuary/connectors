@@ -35,6 +35,11 @@ class EndpointConfig(BaseModel):
     )
 
     class Advanced(BaseModel):
+        api_version: str = Field(
+            description='The Stripe API version to use for all requests, e.g. "2024-06-20". If left blank, the account\'s default API version is used. Streams that require a newer API version than the one in effect are disabled.',
+            title="API Version",
+            default="",
+        )
         incremental_window_size: Annotated[timedelta, Field(
             description="Maximum time window to process in a single incremental sweep. This bounds how much catch-up work is done at once and helps prevent the connector from falling behind when there are a large number of changes in a short time frame. Uses ISO 8601 duration format (e.g. PT1H for 1 hour, PT30M for 30 minutes).",
             title="Max Incremental Window Size",
@@ -98,6 +103,8 @@ class BaseStripeObject(BaseDocument, extra="allow"):
 
     NAME: ClassVar[str]
     SEARCH_NAME: ClassVar[str]
+    # Oldest Stripe API version this stream can be captured against.
+    MINIMUM_API_VERSION: ClassVar[str | None] = None
 
     id: str
     object: str
@@ -661,9 +668,14 @@ class SetupAttempts(BaseStripeChildObject):
     }
 
 
+# First API version that accepts `status=all` when listing subscriptions.
+SUBSCRIPTIONS_MIN_API_VERSION = "2016-07-06"
+
+
 class Subscriptions(BaseStripeObjectWithEvents):
     NAME: ClassVar[str] = "Subscriptions"
     SEARCH_NAME: ClassVar[str] = "subscriptions"
+    MINIMUM_API_VERSION: ClassVar[str] = SUBSCRIPTIONS_MIN_API_VERSION
     EVENT_TYPES: ClassVar[dict[str, Literal["c", "u", "d"]]] = {
         "customer.subscription.created": "c",
         "customer.subscription.updated": "u",
@@ -678,6 +690,7 @@ class Subscriptions(BaseStripeObjectWithEvents):
 class SubscriptionItems(BaseStripeObjectWithEvents):
     NAME: ClassVar[str] = "SubscriptionItems"
     SEARCH_NAME: ClassVar[str] = "subscriptions"
+    MINIMUM_API_VERSION: ClassVar[str] = SUBSCRIPTIONS_MIN_API_VERSION
     EVENT_TYPES: ClassVar[dict[str, Literal["c", "u", "d"]]] = {
         "customer.subscription.created": "c",
         "customer.subscription.updated": "u",

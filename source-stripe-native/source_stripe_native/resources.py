@@ -17,11 +17,14 @@ from estuary_cdk.capture.document import BaseDocument
 from estuary_cdk.flow import CaptureBinding
 from estuary_cdk.http import HTTPError, HTTPMixin, HTTPSession, TokenSource
 
+from source_stripe_native.http import StripeHTTPMixin
+
 from .protocols import FetchChangesFnFactory, FetchPageFnFactory
 
 from .account_fetcher import fetch_connected_account_ids
 from .api import (
     API,
+    fetch_api_version,
     fetch_backfill,
     fetch_backfill_substreams,
     fetch_backfill_list_items,
@@ -42,6 +45,7 @@ from .models import (
     STREAMS,
     Accounts,
     BaseStripeChildObject,
+    BaseStripeObject,
     BaseStripeObjectNoEvents,
     BaseStripeObjectWithEvents,
     ConnectorState,
@@ -176,11 +180,16 @@ async def _reconcile_connector_state(
 
 async def all_resources(
     log: Logger,
-    http: HTTPMixin,
+    http: StripeHTTPMixin,
     config: EndpointConfig,
     should_fetch_connected_accounts: bool = True,
 ) -> list[Resource]:
     http.token_source = TokenSource(oauth_spec=None, credentials=config.credentials)
+
+    api_version_override = config.advanced.api_version
+    effective_api_version = api_version_override or await fetch_api_version(http, log)
+    http.pinned_api_version = effective_api_version
+
     is_restricted_api_key = config.credentials.access_token.startswith("rk_")
     all_streams: list[Resource] = []
 
@@ -331,7 +340,31 @@ async def all_resources(
             )
             all_streams.append(resource)
 
+    _disable_streams_below_min_api_version(all_streams, effective_api_version, log)
+
     return all_streams
+
+
+def _disable_streams_below_min_api_version(
+    resources: list[Resource],
+    effective_api_version: str,
+    log: Logger,
+) -> None:
+    # Disable streams whose MINIMUM_API_VERSION is newer than the version in
+    # effect; their requests would be rejected (e.g. status=all on subscriptions).
+    for resource in resources:
+        model = resource.model
+        assert isinstance(model, type) and issubclass(model, BaseStripeObject)
+
+        minimum = model.MINIMUM_API_VERSION
+        if minimum and effective_api_version < minimum:
+            resource.disable = True
+            log.warning(
+                (
+                    f"Disabling stream '{resource.name}': requires Stripe API version "
+                    f"{minimum}+, but the effective version is {effective_api_version}."
+                )
+            )
 
 
 def _create_initial_state(account_ids: str | list[str]) -> ResourceState:

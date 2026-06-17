@@ -14,6 +14,7 @@ from estuary_cdk.flow import ValidationError
 
 from estuary_cdk.capture.common import ResourceConfigWithSchedule
 
+from .http import StripeHTTPMixin
 from .resources import all_resources
 from .models import (
     ConnectorState,
@@ -22,6 +23,7 @@ from .models import (
 
 
 class Connector(
+    StripeHTTPMixin,
     BaseCaptureConnector[EndpointConfig, ResourceConfigWithSchedule, ConnectorState],
 ):
     def request_class(self):

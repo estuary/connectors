@@ -51,6 +51,25 @@ LAG = timedelta(minutes=1)
 MIN_INCREMENTAL_INTERVAL = timedelta(minutes=1)
 
 
+async def fetch_api_version(http: HTTPSession, log: Logger) -> str:
+    """Return the account's default API version from the `stripe-version` response
+    header. Raises if it's absent."""
+    headers, body = await http.request_stream(log, f"{API}/account")
+    # Drain the body to release the connection.
+    async for _ in body():
+        pass
+
+    api_version = headers.get("stripe-version")
+    if not api_version:
+        raise RuntimeError(
+            (
+                "Stripe did not return a `stripe-version` response header, so the "
+                "account's API version could not be determined."
+            )
+        )
+    return api_version
+
+
 def add_event_types(
     params: dict[str, str | int], event_types: dict[str, Literal["c", "u", "d"]]
 ):
