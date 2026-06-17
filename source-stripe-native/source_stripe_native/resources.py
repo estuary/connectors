@@ -17,11 +17,14 @@ from estuary_cdk.capture.document import BaseDocument
 from estuary_cdk.flow import CaptureBinding
 from estuary_cdk.http import HTTPError, HTTPMixin, HTTPSession, TokenSource
 
+from source_stripe_native.http import StripeHTTPMixin
+
 from .protocols import FetchChangesFnFactory, FetchPageFnFactory
 
 from .account_fetcher import fetch_connected_account_ids
 from .api import (
     API,
+    fetch_api_version,
     fetch_backfill,
     fetch_backfill_substreams,
     fetch_backfill_list_items,
@@ -42,6 +45,7 @@ from .models import (
     STREAMS,
     Accounts,
     BaseStripeChildObject,
+    BaseStripeObject,
     BaseStripeObjectNoEvents,
     BaseStripeObjectWithEvents,
     ConnectorState,
@@ -57,6 +61,8 @@ DEFAULT_SCHEDULE = "0 0 * * *"
 
 DISABLED_MESSAGE_REGEX = r"Your account is not set up to use"
 ENABLED_RESOURCE_EXPECTED_ERROR_REGEX = r"No such .*: 'invalid_id'"
+
+StripeResource = Resource[BaseDocument, ResourceConfig, ResourceState]
 
 
 async def check_accessibility(
@@ -176,13 +182,18 @@ async def _reconcile_connector_state(
 
 async def all_resources(
     log: Logger,
-    http: HTTPMixin,
+    http: StripeHTTPMixin,
     config: EndpointConfig,
     should_fetch_connected_accounts: bool = True,
-) -> list[Resource]:
+) -> list[StripeResource]:
     http.token_source = TokenSource(oauth_spec=None, credentials=config.credentials)
+
+    api_version_override = config.advanced.api_version
+    effective_api_version = api_version_override or await fetch_api_version(http, log)
+    http.pinned_api_version = effective_api_version
+
     is_restricted_api_key = config.credentials.access_token.startswith("rk_")
-    all_streams: list[Resource] = []
+    all_streams: list[StripeResource] = []
 
     # If a restricted API key was provided, we have to ensure the /events endpoint is accessible.
     # Almost all streams use this endpoint for incremental replication, so we must be able to access it.
@@ -331,7 +342,36 @@ async def all_resources(
             )
             all_streams.append(resource)
 
+    all_streams = _filter_out_streams_below_min_api_version(
+        all_streams, effective_api_version, log
+    )
+
     return all_streams
+
+
+def _filter_out_streams_below_min_api_version(
+    resources: list[StripeResource],
+    effective_api_version: str,
+    log: Logger,
+) -> list[StripeResource]:
+    kept = []
+
+    for resource in resources:
+        model = resource.model
+        assert isinstance(model, type) and issubclass(model, BaseStripeObject)
+
+        minimum = model.MINIMUM_API_VERSION
+        if minimum and effective_api_version < minimum:
+            log.warning(
+                (
+                    f"Removing stream '{resource.name}': requires Stripe API version "
+                    f"{minimum}+, but the effective version is {effective_api_version}."
+                )
+            )
+            continue
+
+        kept.append(resource)
+    return kept
 
 
 def _create_initial_state(account_ids: str | list[str]) -> ResourceState:
@@ -458,7 +498,7 @@ def _build_resource(
     connected_account_ids: list[str],
     all_account_ids: list[str],
     initial_state: ResourceState,
-) -> Resource[BaseDocument, ResourceConfig, ResourceState]:
+) -> StripeResource:
     """Shared skeleton for every resource builder.
 
     The two factories each map a connected account id (or None for the platform
@@ -754,7 +794,7 @@ def no_events_object(
     connected_account_ids: list[str],
     all_account_ids: list[str],
     initial_state: ResourceState,
-) -> Resource[BaseDocument, ResourceConfig, ResourceState]:
+) -> StripeResource:
     """No Events Object handles a edge-case from source-stripe-native,
     where the given parent stream does not contain a valid Events API type.
     It requires a single, parent stream with a valid list all API endpoint.
