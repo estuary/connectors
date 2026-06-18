@@ -79,14 +79,19 @@ async def backfill_entity(
     http: HTTPSession,
     base_url: str,
     realm_id: str,
+    start_date: datetime,
     log: Logger,
     page: PageCursor,
     cutoff: LogCursor,
 ) -> AsyncGenerator[T | PageCursor, None]:
-    assert isinstance(page, str)
     assert isinstance(cutoff, datetime)
 
-    page_ts = datetime.fromisoformat(page)
+    if page is None:
+        page_ts = start_date
+    else:
+        assert isinstance(page, str)
+        page_ts = datetime.fromisoformat(page)
+
     timeout = datetime.now(tz=UTC) + TARGET_FETCH_PAGE_INVOCATION_RUN_TIME
     timeout_checkpoint = None
 
