@@ -1071,14 +1071,19 @@ async def backfill_issues(
     domain: str,
     timezone: ZoneInfo,
     projects: str | None,
+    start_date: datetime,
     log: Logger,
     page: PageCursor | None,
     cutoff: LogCursor,
 ) -> AsyncGenerator[JiraResource | PageCursor, None]:
-    assert isinstance(page, str)
     assert isinstance(cutoff, datetime)
 
-    start = str_to_dt(page)
+    if page is None:
+        start = start_date
+    else:
+        assert isinstance(page, str)
+        start = str_to_dt(page)
+
     last_seen = start
 
     count = 0
@@ -1280,14 +1285,19 @@ async def backfill_issues_child_resources(
     timezone: ZoneInfo,
     projects: str | None,
     stream: type[IssueChildStream],
+    start_date: datetime,
     log: Logger,
     page: PageCursor | None,
     cutoff: LogCursor,
 ) -> AsyncGenerator[IssueChildResource | PageCursor, None]:
-    assert isinstance(page, str)
     assert isinstance(cutoff, datetime)
 
-    start = str_to_dt(page)
+    if page is None:
+        start = start_date
+    else:
+        assert isinstance(page, str)
+        start = str_to_dt(page)
+
     last_seen = start
 
     count = 0
