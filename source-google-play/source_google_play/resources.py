@@ -84,6 +84,7 @@ def resources(
                 backfill_resources,
                 gcs_client,
                 model,
+                start,
             )
         )
 
@@ -100,7 +101,7 @@ def resources(
             open=functools.partial(open, model),
             initial_state=ResourceState(
                 inc=ResourceState.Incremental(cursor=cutoff),
-                backfill=ResourceState.Backfill(cutoff=cutoff, next_page=start)
+                backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None)
             ),
             initial_config=ResourceConfig(
                 name=model.name, interval=timedelta(minutes=60)
