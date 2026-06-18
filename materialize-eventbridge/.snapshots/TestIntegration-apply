@@ -46,7 +46,7 @@ Big Schema Re-validated Constraints:
 {"Field":"flow_document","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"The root document must be materialized"}
 {"Field":"flow_published_at","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
 {"Field":"intField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
-{"Field":"key","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"key","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"EventBridge ignores keys; including them in the payload is optional"}
 {"Field":"multipleField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
 {"Field":"nullField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
 {"Field":"numField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
@@ -85,7 +85,7 @@ Big Schema Changed Types Constraints:
 {"Field":"flow_document","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"The root document must be materialized"}
 {"Field":"flow_published_at","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
 {"Field":"intField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
-{"Field":"key","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"key","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"EventBridge ignores keys; including them in the payload is optional"}
 {"Field":"multipleField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
 {"Field":"nullField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
 {"Field":"numField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
