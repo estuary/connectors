@@ -17,7 +17,7 @@ from .supported_standard_objects import (
 
 from .bulk_job_manager import BulkJobManager
 from .rest_query_manager import RestQueryManager
-from .shared import dt_to_str, now, VERSION
+from .shared import now, VERSION
 
 from .models import (
     EndpointConfig,
@@ -171,7 +171,8 @@ def incremental_resource(
                 name,
                 fields,
                 model_cls,
-                config.advanced.window_size
+                config.advanced.window_size,
+                config.start_date,
             ),
             fetch_changes=functools.partial(
                 fetch_incremental_resources,
@@ -194,7 +195,7 @@ def incremental_resource(
         open=open,
         initial_state=ResourceState(
             inc=ResourceState.Incremental(cursor=cutoff),
-            backfill=ResourceState.Backfill(next_page=dt_to_str(config.start_date), cutoff=cutoff)
+            backfill=ResourceState.Backfill(next_page=None, cutoff=cutoff)
         ),
         initial_config=SalesforceResourceConfigWithSchedule(
             name=name,
