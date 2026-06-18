@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"sync"
+	"time"
 
 	m "github.com/estuary/connectors/go/materialize"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -32,7 +34,31 @@ const (
 	// The default batchWriteLimit is 100,000 documents. Practically speaking we will be limited to
 	// less than that to keep connector memory usage reasonable.
 	storeBatchSize = 10_000
+
+	// maxStoreRetries bounds how many times a bulk write is attempted when items
+	// fail with a transient (retryable) write error.
+	maxStoreRetries = 5
 )
+
+// retryableWriteErrorCodes are MongoDB write error codes that are transient and
+// safe to retry by re-sending the affected models. Taken from the mongo-driver's
+// own retryableCodes set (x/mongo/driver/errors.go). Note that 11000 (E11000
+// duplicate key) is deliberately absent: a strict InsertOneModel on a !Exists
+// store is a tripwire, and a duplicate key must fail fast rather than retry.
+var retryableWriteErrorCodes = map[int]bool{
+	11600: true, // InterruptedAtShutdown
+	11602: true, // InterruptedDueToReplStateChange
+	10107: true, // NotWritablePrimary
+	13435: true, // NotPrimaryNoSecondaryOk
+	13436: true, // NotPrimaryOrSecondary
+	189:   true, // PrimarySteppedDown
+	91:    true, // ShutdownInProgress
+	7:     true, // HostNotFound
+	6:     true, // HostUnreachable
+	89:    true, // NetworkTimeout
+	9001:  true, // SocketException
+	262:   true, // ExceededTimeLimit
+}
 
 type transactor struct {
 	cfg      *config
@@ -293,7 +319,14 @@ func (t *transactor) storeWorker(
 
 			// Ordered operations are not needed since each key can only be seen a single time in a
 			// Flow transaction. Turning this off supposedly allows for optimizations by the server.
-			res, err := collection.BulkWrite(ctx, batch.models, options.BulkWrite().SetOrdered(false))
+			// Transient per-item write errors (e.g. a primary stepdown) are retried by re-sending
+			// only the failed models; a duplicate-key (E11000) is terminal and fails fast.
+			res, err := storeBulkWithRetry(ctx, batch.models, maxStoreRetries,
+				func(models []mongo.WriteModel) (*mongo.BulkWriteResult, error) {
+					return collection.BulkWrite(ctx, models, options.BulkWrite().SetOrdered(false))
+				},
+				storeRetryDelay,
+			)
 			if err != nil {
 				return fmt.Errorf("bulk write for collection %s: %w", collection.Name(), err)
 			}
@@ -328,6 +361,103 @@ func (t *transactor) storeWorker(
 				)
 			}
 		}
+	}
+}
+
+// classifyBulkErr inspects a BulkWrite error. It returns the first terminal
+// (non-retryable) error, if any, and the indices of models that failed with a
+// retryable write error. A terminal error takes precedence: when one is present
+// the caller should fail rather than retry. A non-BulkWriteException error
+// (transport/command level, which the driver has already retried per its own
+// retryable-write logic) and a write-concern error are both treated as terminal.
+func classifyBulkErr(err error) (terminal error, retryable []int) {
+	if err == nil {
+		return nil, nil
+	}
+
+	var bwe mongo.BulkWriteException
+	if !errors.As(err, &bwe) {
+		return err, nil
+	}
+	if bwe.WriteConcernError != nil {
+		return bwe, nil
+	}
+
+	for _, we := range bwe.WriteErrors {
+		if retryableWriteErrorCodes[we.Code] {
+			retryable = append(retryable, we.Index)
+		} else {
+			// First non-retryable item error (including E11000) wins.
+			return bwe, nil
+		}
+	}
+
+	return nil, retryable
+}
+
+// storeBulkWithRetry sends models via send and, if any models fail with a
+// retryable per-item write error, re-sends only those models after a delay, up
+// to maxAttempts times. Re-sending only the failed models is safe: a failed
+// model did not land, so it is never duplicated, and models that succeeded are
+// never re-sent. BulkWriteResult counts are accumulated across attempts so the
+// caller's sanity check sees the totals across the whole batch.
+func storeBulkWithRetry(
+	ctx context.Context,
+	models []mongo.WriteModel,
+	maxAttempts int,
+	send func(models []mongo.WriteModel) (*mongo.BulkWriteResult, error),
+	delay func(ctx context.Context, attempt int) error,
+) (*mongo.BulkWriteResult, error) {
+	pending := models
+	total := &mongo.BulkWriteResult{}
+
+	for attempt := 0; ; attempt++ {
+		res, err := send(pending)
+		if res != nil {
+			total.InsertedCount += res.InsertedCount
+			total.MatchedCount += res.MatchedCount
+			total.ModifiedCount += res.ModifiedCount
+			total.DeletedCount += res.DeletedCount
+			total.UpsertedCount += res.UpsertedCount
+		}
+
+		terminal, retryable := classifyBulkErr(err)
+		if terminal != nil {
+			return total, terminal
+		}
+		if len(retryable) == 0 {
+			return total, nil
+		}
+		if attempt+1 >= maxAttempts {
+			return total, fmt.Errorf("%d write models still failing after %d attempts: %w", len(retryable), attempt+1, err)
+		}
+
+		next := make([]mongo.WriteModel, len(retryable))
+		for i, idx := range retryable {
+			next[i] = pending[idx]
+		}
+		pending = next
+
+		if err := delay(ctx, attempt); err != nil {
+			return total, err
+		}
+	}
+}
+
+// storeRetryDelay waits before re-sending failed models, with exponential
+// backoff capped at 5s.
+func storeRetryDelay(ctx context.Context, attempt int) error {
+	d := time.Duration(1<<attempt) * time.Second
+	if d > 5*time.Second {
+		d = 5 * time.Second
+	}
+	logrus.WithFields(logrus.Fields{"attempt": attempt, "delay": d.String()}).
+		Info("waiting to retry transient bulk write error")
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(d):
+		return nil
 	}
 }
 
