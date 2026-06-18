@@ -100,6 +100,7 @@ async def all_resources(
                 http,
                 base_url,
                 config.realm_id,
+                start_date,
             ),
         )
 
@@ -111,7 +112,7 @@ async def all_resources(
             open=functools.partial(open_all_bindings, resource),
             initial_state=ResourceState(
                 backfill=ResourceState.Backfill(
-                    cutoff=cutoff, next_page=start_date.isoformat(timespec="seconds")
+                    cutoff=cutoff, next_page=None
                 ),
                 inc=ResourceState.Incremental(cursor=cutoff),
             ),
