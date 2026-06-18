@@ -266,14 +266,18 @@ async def backfill_incremental(
     data_model: type[BaseResponseData[TShopifyGraphQLResource]],
     store: str,
     capabilities: StoreCapabilities,
+    start_date: datetime,
     log: Logger,
     page: PageCursor | None,
     cutoff: LogCursor,
 ) -> AsyncGenerator[TShopifyGraphQLResource | PageCursor, None]:
-    assert isinstance(page, str)
     assert isinstance(cutoff, datetime)
 
-    start = str_to_dt(page)
+    if page is None:
+        start = start_date
+    else:
+        assert isinstance(page, str)
+        start = str_to_dt(page)
 
     last_seen_dt = start
     count = 0

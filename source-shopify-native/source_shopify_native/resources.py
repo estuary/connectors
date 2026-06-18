@@ -35,7 +35,6 @@ from .api import (
     fetch_incremental_unsorted,
     fetch_snapshot,
 )
-from .utils import dt_to_str
 from .models import (
     AccessScopes,
     ConnectorState,
@@ -254,7 +253,6 @@ def _create_initial_state(
     store_ids: list[str],
     start_date: AwareDatetime,
     use_backfill: bool,
-    is_unsorted: bool = False,
 ) -> ResourceState:
     """Create initial state for a resource.
 
@@ -267,16 +265,14 @@ def _create_initial_state(
         store_ids: List of store IDs to create state for.
         start_date: The start date for data replication.
         use_backfill: Whether to create backfill state (for non-bulk queries).
-        is_unsorted: Whether this is an unsorted (no sortKey) stream.
     """
     cutoff = datetime.now(tz=UTC)
 
     if use_backfill:
-        next_page = None if is_unsorted else dt_to_str(start_date)
         return ResourceState(
             inc={sid: ResourceState.Incremental(cursor=cutoff) for sid in store_ids},
             backfill={
-                sid: ResourceState.Backfill(next_page=next_page, cutoff=cutoff)
+                sid: ResourceState.Backfill(next_page=None, cutoff=cutoff)
                 for sid in store_ids
             },
         )
@@ -547,9 +543,8 @@ async def all_resources(
             continue
 
         use_backfill = not model.SHOULD_USE_BULK_QUERIES
-        is_unsorted = model.SORT_KEY is None
         initial_state = _create_initial_state(
-            stores_with_access, config.start_date, use_backfill, is_unsorted
+            stores_with_access, config.start_date, use_backfill
         )
         legacy_store_id = config._legacy_store or config.stores[0].store
 
@@ -647,6 +642,7 @@ async def all_resources(
                             data_model,
                             store_id,
                             ctx.capabilities,
+                            config.start_date,
                         )
 
                 open_binding(
