@@ -67,6 +67,7 @@ pub async fn do_validate(req: Validate) -> Result<Vec<Binding>> {
                     nested_obj_truncate_after: 1000,
                     array_truncate_after: 1000,
                 }),
+                projection_constraints: Vec::new(),
             })
         })
         .collect::<Result<Vec<Binding>>>()

@@ -1,6 +1,7 @@
 use crate::configuration::{MessageFormat, SchemaRegistryConfig};
 use anyhow::Result;
-use doc::{ptr::Token, shape::ObjProperty, Pointer, Shape};
+use doc::{shape::ObjProperty, Shape};
+use json::{ptr::Token, Pointer};
 use futures::stream::{self, StreamExt};
 use json::schema::{
     self,
@@ -191,7 +192,7 @@ fn binding_info(binding: &Binding) -> Result<ComputedBinding> {
 
     let json_schema = doc::validation::build_bundle(&collection_schema)?;
     let validator = doc::Validator::new(json_schema)?;
-    let collection_shape = Shape::infer(&validator.schemas()[0], validator.schema_index());
+    let collection_shape = Shape::infer(validator.schema(), validator.schema_index());
     let collection_locations = collection_shape.locations();
     let collection_projections = collection.projections;
 
@@ -212,6 +213,7 @@ fn binding_info(binding: &Binding) -> Result<ComputedBinding> {
 
             ObjProperty {
                 name: field.clone().into(),
+                is_property: true,
                 is_required,
                 shape,
             }
