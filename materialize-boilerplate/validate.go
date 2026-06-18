@@ -223,6 +223,13 @@ func (v Validator) validateMatchesExistingResource(
 		}
 	}
 
+	// Standard updates require a root document projection: docFields[0] is
+	// dereferenced below as the fallback document field, and the protocol does
+	// not guarantee its presence.
+	if !deltaUpdates && len(docFields) == 0 {
+		return nil, fmt.Errorf("collection %q has no root document projection, which is required for a standard-updates materialization", boundCollection.Name.String())
+	}
+
 	constraints := make(map[string][]*pm.Response_Validated_Constraint)
 	for _, p := range boundCollection.Projections {
 		cs, err := v.projectionConstraints(p, existingResource, lastBinding, boundCollection, deltaUpdates, docFields, fieldConfigJsonMap)
