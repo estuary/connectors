@@ -34,7 +34,6 @@ from .models import (
     SmsCampaigns,
     SmsCampaignsArchived,
 )
-from .shared import dt_to_str
 
 # Klaviyo doesn't use the standard "Bearer" token type in the Authorization
 # header. Instead, it uses "Klaviyo-API-Key" as the token type.
@@ -138,11 +137,12 @@ def incremental_resources(
                 backfill_incremental_resources,
                 http,
                 model,
+                start,
             )
         )
 
     cutoff = datetime.now(tz=UTC)
-    start = dt_to_str(config.start_date - timedelta(seconds=1))
+    start = config.start_date - timedelta(seconds=1)
 
     resources = [
             common.Resource(
@@ -152,7 +152,7 @@ def incremental_resources(
             open=functools.partial(open, model),
             initial_state=ResourceState(
                 inc=ResourceState.Incremental(cursor=cutoff),
-                backfill=ResourceState.Backfill(cutoff=cutoff, next_page=start)
+                backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None)
             ),
             initial_config=ResourceConfig(
                 name=model.name, interval=timedelta(minutes=5)
@@ -208,28 +208,28 @@ def campaigns(
             },
             fetch_page={
                 "email": functools.partial(
-                    backfill_incremental_resources, http, EmailCampaigns,
+                    backfill_incremental_resources, http, EmailCampaigns, start,
                 ),
                 "archived_email": functools.partial(
-                    backfill_incremental_resources, http, EmailCampaignsArchived,
+                    backfill_incremental_resources, http, EmailCampaignsArchived, start,
                 ),
                 "sms": functools.partial(
-                    backfill_incremental_resources, http, SmsCampaigns,
+                    backfill_incremental_resources, http, SmsCampaigns, start,
                 ),
                 "archived_sms": functools.partial(
-                    backfill_incremental_resources, http, SmsCampaignsArchived,
+                    backfill_incremental_resources, http, SmsCampaignsArchived, start,
                 ),
                 "mobile_push": functools.partial(
-                    backfill_incremental_resources, http, MobilePushCampaigns,
+                    backfill_incremental_resources, http, MobilePushCampaigns, start,
                 ),
                 "archived_mobile_push": functools.partial(
-                    backfill_incremental_resources, http, MobilePushCampaignsArchived,
+                    backfill_incremental_resources, http, MobilePushCampaignsArchived, start,
                 ),
             }
         )
 
     cutoff = datetime.now(tz=UTC)
-    start = dt_to_str(config.start_date - timedelta(seconds=1))
+    start = config.start_date - timedelta(seconds=1)
 
     return common.Resource(
         name=Campaigns.name,
@@ -246,12 +246,12 @@ def campaigns(
                 "archived_mobile_push": ResourceState.Incremental(cursor=cutoff),
             },
             backfill={
-                "email": ResourceState.Backfill(cutoff=cutoff, next_page=start),
-                "archived_email": ResourceState.Backfill(cutoff=cutoff, next_page=start),
-                "sms": ResourceState.Backfill(cutoff=cutoff, next_page=start),
-                "archived_sms": ResourceState.Backfill(cutoff=cutoff, next_page=start),
-                "mobile_push": ResourceState.Backfill(cutoff=cutoff, next_page=start),
-                "archived_mobile_push": ResourceState.Backfill(cutoff=cutoff, next_page=start),
+                "email": ResourceState.Backfill(cutoff=cutoff, next_page=None),
+                "archived_email": ResourceState.Backfill(cutoff=cutoff, next_page=None),
+                "sms": ResourceState.Backfill(cutoff=cutoff, next_page=None),
+                "archived_sms": ResourceState.Backfill(cutoff=cutoff, next_page=None),
+                "mobile_push": ResourceState.Backfill(cutoff=cutoff, next_page=None),
+                "archived_mobile_push": ResourceState.Backfill(cutoff=cutoff, next_page=None),
             }
         ),
         initial_config=ResourceConfig(
@@ -290,16 +290,16 @@ def flows(
             },
             fetch_page={
                 "active": functools.partial(
-                    backfill_incremental_resources, http, Flows,
+                    backfill_incremental_resources, http, Flows, start,
                 ),
                 "archived": functools.partial(
-                    backfill_incremental_resources, http, FlowsArchived,
+                    backfill_incremental_resources, http, FlowsArchived, start,
                 ),
             }
         )
 
     cutoff = datetime.now(tz=UTC)
-    start = dt_to_str(config.start_date - timedelta(seconds=1))
+    start = config.start_date - timedelta(seconds=1)
 
     return common.Resource(
         name=Flows.name,
@@ -312,8 +312,8 @@ def flows(
                 "archived": ResourceState.Incremental(cursor=cutoff),
             },
             backfill={
-                "active": ResourceState.Backfill(cutoff=cutoff, next_page=start),
-                "archived": ResourceState.Backfill(cutoff=cutoff, next_page=start),
+                "active": ResourceState.Backfill(cutoff=cutoff, next_page=None),
+                "archived": ResourceState.Backfill(cutoff=cutoff, next_page=None),
             }
         ),
         initial_config=ResourceConfig(
@@ -350,11 +350,11 @@ def events(
                     fetch_incremental_resources, http, Events, EVENTS_EVENTUAL_CONSISTENCY_HORIZON,
                 ),
             },
-            fetch_page=functools.partial(backfill_events, http, config.advanced.window_size)
+            fetch_page=functools.partial(backfill_events, http, config.advanced.window_size, start)
         )
 
     cutoff = datetime.now(tz=UTC)
-    start = dt_to_str(config.start_date - timedelta(seconds=1))
+    start = config.start_date - timedelta(seconds=1)
 
     return common.Resource(
         name=Events.name,
@@ -366,7 +366,7 @@ def events(
                 "realtime": ResourceState.Incremental(cursor=cutoff),
                 "lookback": ResourceState.Incremental(cursor=cutoff - EVENTS_EVENTUAL_CONSISTENCY_HORIZON),
             },
-            backfill=ResourceState.Backfill(cutoff=cutoff, next_page=start)
+            backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None)
         ),
         initial_config=ResourceConfig(
             name=Events.name, interval=timedelta(minutes=5)
