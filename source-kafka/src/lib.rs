@@ -72,6 +72,7 @@ pub async fn run_connector(
             let res = Response {
                 applied: Some(Applied {
                     action_description: String::new(),
+                    state: None,
                 }),
                 ..Default::default()
             };
