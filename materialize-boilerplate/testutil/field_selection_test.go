@@ -45,16 +45,29 @@ func TestSelectedFields(t *testing.T) {
 	}
 
 	t.Run("without optionals", func(t *testing.T) {
-		got := selectedFields(binding, collection, false)
+		// LOCATION_RECOMMENDED is equivalent to FIELD_OPTIONAL and carries no
+		// selection signal: without optionals only the key and document (hard
+		// wants) are selected.
+		got := selectedFields(binding, collection, pf.FieldSelection{}, false)
 		require.Equal(t, []string{"id"}, got.Keys)
 		require.Equal(t, "doc", got.Document)
-		require.Equal(t, []string{"recommended"}, got.Values)
+		require.Empty(t, got.Values)
 	})
 
 	t.Run("with optionals", func(t *testing.T) {
-		got := selectedFields(binding, collection, true)
+		got := selectedFields(binding, collection, pf.FieldSelection{}, true)
 		require.Equal(t, []string{"id"}, got.Keys)
 		require.Equal(t, "doc", got.Document)
 		require.Equal(t, []string{"opt", "recommended"}, got.Values)
+	})
+
+	t.Run("live selection keeps recommended without optionals", func(t *testing.T) {
+		// A field carried in the prior selection stays selected even without
+		// optionals, emulating the control plane's stability preference.
+		live := pf.FieldSelection{Keys: []string{"id"}, Document: "doc", Values: []string{"recommended"}}
+		got := selectedFields(binding, collection, live, false)
+		require.Equal(t, []string{"id"}, got.Keys)
+		require.Equal(t, "doc", got.Document)
+		require.Equal(t, []string{"recommended"}, got.Values)
 	})
 }

@@ -699,11 +699,12 @@ func runChallengingNamesApplyTests[EC boilerplate.EndpointConfiger, FC boilerpla
 
 	// Validate and apply twice to make sure that a re-application does not attempt to re-create
 	// any columns. This makes sure we are able to read back the schema we have created
-	// correctly.
+	// correctly. Optionals are included so the challenging-named fields are
+	// materialized: recommended/optional fields are not selected by name alone.
 	for range 2 {
 		validateRes, err := driver.Validate(ctx, validateReq(fixture, nil, configJson, resourceConfigJson))
 		require.NoError(t, err)
-		_, err = driver.Apply(ctx, applyReq(fixture, nil, configJson, resourceConfigJson, validateRes, false))
+		_, err = driver.Apply(ctx, applyReq(fixture, nil, configJson, resourceConfigJson, validateRes, true))
 		require.NoError(t, err)
 	}
 
@@ -829,7 +830,14 @@ func applyReq(spec *pf.MaterializationSpec, lastSpec *pf.MaterializationSpec, co
 	spec.Bindings[0].ResourceConfigJson = resourceConfig
 	spec.Bindings[0].ResourcePath = validateRes.Bindings[0].ResourcePath
 	spec.Bindings[0].DeltaUpdates = validateRes.Bindings[0].DeltaUpdates
-	spec.Bindings[0].FieldSelection = selectedFields(validateRes.Bindings[0], spec.Bindings[0].Collection, includeOptional)
+
+	// The live (prior) field selection keeps previously materialized fields
+	// selected, just as the control plane does.
+	var live pf.FieldSelection
+	if lastSpec != nil && len(lastSpec.Bindings) > 0 {
+		live = lastSpec.Bindings[0].FieldSelection
+	}
+	spec.Bindings[0].FieldSelection = selectedFields(validateRes.Bindings[0], spec.Bindings[0].Collection, live, includeOptional)
 
 	req := &pm.Request_Apply{
 		Materialization:     spec,
@@ -840,13 +848,23 @@ func applyReq(spec *pf.MaterializationSpec, lastSpec *pf.MaterializationSpec, co
 	return req
 }
 
-// selectedFields creates a field selection that includes all possible fields.
-// A field may carry multiple projection_constraints; a field is selected when
-// some constraint wants it (required, recommended, or optional when optionals
-// are included) and none forbids it. An INCOMPATIBLE constraint does not by
-// itself exclude a wanted field: the control plane selects it presuming a
-// backfill (see build_selection in flow's field_selection.rs).
-func selectedFields(binding *pm.Response_Validated_Binding, collection pf.CollectionSpec, includeOptional bool) pf.FieldSelection {
+// selectedFields emulates the control plane's field selection from a binding's
+// projection_constraints, mirroring extract_constraints and build_selection in
+// flow's field_selection.rs. A field is selected when something wants it and
+// nothing fatally rejects it.
+//
+// Wants that are independent of the connector's "optional" opinion ("hard"
+// wants) are: group-by keys and the root document (always selected); the live
+// (prior) field selection, which keeps previously materialized fields stable;
+// and a connector FIELD_REQUIRED or LOCATION_REQUIRED constraint. When
+// includeOptional is set, every other non-rejected field is wanted too,
+// emulating a `recommended` selection depth.
+//
+// Per flow, LOCATION_RECOMMENDED and FIELD_OPTIONAL are equivalent and carry no
+// selection signal on their own. FIELD_FORBIDDEN always rejects. INCOMPATIBLE
+// rejects a field unless it is independently (hard-)wanted, in which case the
+// field is selected presuming a backfill.
+func selectedFields(binding *pm.Response_Validated_Binding, collection pf.CollectionSpec, live pf.FieldSelection, includeOptional bool) pf.FieldSelection {
 	out := pf.FieldSelection{}
 
 	// Group the binding's projection_constraints by field, preserving order so
@@ -861,27 +879,51 @@ func selectedFields(binding *pm.Response_Validated_Binding, collection pf.Collec
 		byField[pc.Field] = append(byField[pc.Field], pc.Constraint)
 	}
 
+	liveFields := make(map[string]struct{})
+	for _, f := range live.AllFields() {
+		liveFields[f] = struct{}{}
+	}
+
 	var foldedFieldMap = make(map[string]struct{})
 
 	for _, field := range fieldOrder {
 		constraints := byField[field]
 
-		var wanted, forbidden bool
+		var forbidden, incompatible, required bool
 		for _, c := range constraints {
 			switch c.Type {
 			case pm.Response_Validated_Constraint_FIELD_FORBIDDEN:
 				forbidden = true
+			case pm.Response_Validated_Constraint_INCOMPATIBLE,
+				pm.Response_Validated_Constraint_UNSATISFIABLE:
+				incompatible = true
 			case pm.Response_Validated_Constraint_FIELD_REQUIRED,
-				pm.Response_Validated_Constraint_LOCATION_REQUIRED,
-				pm.Response_Validated_Constraint_LOCATION_RECOMMENDED:
-				wanted = true
-			case pm.Response_Validated_Constraint_FIELD_OPTIONAL:
-				if includeOptional {
-					wanted = true
-				}
+				pm.Response_Validated_Constraint_LOCATION_REQUIRED:
+				required = true
+			case pm.Response_Validated_Constraint_LOCATION_RECOMMENDED,
+				pm.Response_Validated_Constraint_FIELD_OPTIONAL:
+				// Neither selected nor rejected by the connector; selection
+				// depends on includeOptional below.
 			}
 		}
-		if !wanted || forbidden {
+
+		proj := collection.GetProjection(field)
+		_, inLive := liveFields[field]
+		isKey := proj != nil && proj.IsPrimaryKey
+		isDoc := proj != nil && proj.IsRootDocumentProjection()
+		hardWanted := required || isKey || isDoc || inLive
+
+		switch {
+		case forbidden:
+			continue
+		case hardWanted:
+			// Selected even if also INCOMPATIBLE: presumes a backfill.
+		case incompatible:
+			// A bare incompatible field with no independent want is dropped.
+			continue
+		case includeOptional:
+			// Recommended/optional field selected at this depth.
+		default:
 			continue
 		}
 
@@ -897,10 +939,10 @@ func selectedFields(binding *pm.Response_Validated_Binding, collection pf.Collec
 		}
 		foldedFieldMap[foldedField] = struct{}{}
 
-		proj := collection.GetProjection(field)
-		if proj.IsPrimaryKey {
+		switch {
+		case isKey:
 			out.Keys = append(out.Keys, field)
-		} else if proj.IsRootDocumentProjection() {
+		case isDoc:
 			if out.Document == "" {
 				out.Document = field
 			} else {
@@ -908,7 +950,7 @@ func selectedFields(binding *pm.Response_Validated_Binding, collection pf.Collec
 				// one is the document, and the rest are materialized as values.
 				out.Values = append(out.Values, field)
 			}
-		} else {
+		default:
 			out.Values = append(out.Values, field)
 		}
 	}
