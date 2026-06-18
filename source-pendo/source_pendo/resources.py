@@ -138,6 +138,7 @@ def incremental_resources(
                 updated_at_field,
                 identifying_field,
                 config.advanced.backfill_limit,
+                backfill_start_ts,
             )
         )
 
@@ -152,7 +153,7 @@ def incremental_resources(
             open=functools.partial(open, stream.entity_name, stream, stream.cursor_field, stream.identifying_field),
             initial_state=ResourceState(
                 inc=ResourceState.Incremental(cursor=cutoff),
-                backfill=ResourceState.Backfill(next_page=backfill_start_ts, cutoff=cutoff)
+                backfill=ResourceState.Backfill(next_page=None, cutoff=cutoff)
             ),
             initial_config=ResourceConfig(
                 name=stream.resource_name, interval=timedelta(minutes=5)
@@ -244,6 +245,7 @@ def events(
                 model,
                 identifying_field,
                 config.advanced.backfill_limit,
+                backfill_start_ts,
             )
         )
 
@@ -268,7 +270,7 @@ def events(
             open=functools.partial(open, stream.entity_name, stream, stream.identifying_field),
             initial_state=ResourceState(
                 inc=ResourceState.Incremental(cursor=cutoff),
-                backfill=ResourceState.Backfill(next_page=backfill_start_ts, cutoff=cutoff)
+                backfill=ResourceState.Backfill(next_page=None, cutoff=cutoff)
             ),
             initial_config=ResourceConfig(
                 name=stream.resource_name, interval=timedelta(minutes=5)
@@ -316,11 +318,12 @@ def aggregated_events(
                 model,
                 identifying_field,
                 config.advanced.backfill_limit,
+                backfill_start_ts,
             )
         )
 
     backfill_start_ts = _dt_to_ms(datetime.fromisoformat(config.startDate))
-    cutoff = datetime.now(tz=UTC) - API_EVENT_LAG 
+    cutoff = datetime.now(tz=UTC) - API_EVENT_LAG
 
     shared_keys = [
         "/accountId",
@@ -341,7 +344,7 @@ def aggregated_events(
             open=functools.partial(open, stream.entity_name, stream, stream.identifying_field),
             initial_state=ResourceState(
                 inc=ResourceState.Incremental(cursor=cutoff),
-                backfill=ResourceState.Backfill(next_page=backfill_start_ts, cutoff=cutoff)
+                backfill=ResourceState.Backfill(next_page=None, cutoff=cutoff)
             ),
             initial_config=ResourceConfig(
                 name=stream.resource_name, interval=timedelta(minutes=5)
