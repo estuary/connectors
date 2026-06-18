@@ -135,14 +135,18 @@ async def backfill_transactions(
     base_url: str,
     braintree_gateway: BraintreeGateway,
     window_size: int,
+    start_date: datetime,
     log: Logger,
     page: PageCursor | None,
     cutoff: LogCursor,
 ) -> AsyncGenerator[IncrementalResource | PageCursor, None]:
-    assert isinstance(page, str)
     assert isinstance(cutoff, datetime)
 
-    start = _str_to_dt(page)
+    if page is None:
+        start = start_date
+    else:
+        assert isinstance(page, str)
+        start = _str_to_dt(page)
 
     initial_end = min(
         start + timedelta(hours=window_size),
@@ -238,14 +242,18 @@ async def backfill_incremental_resources(
     braintree_gateway: BraintreeGateway,
     braintree_class: IncrementalResourceBraintreeClass,
     window_size: int,
+    start_date: datetime,
     log: Logger,
     page: PageCursor | None,
     cutoff: LogCursor
 ) -> AsyncGenerator[IncrementalResource | PageCursor, None]:
-    assert isinstance(page, str)
     assert isinstance(cutoff, datetime)
 
-    start = _str_to_dt(page)
+    if page is None:
+        start = start_date
+    else:
+        assert isinstance(page, str)
+        start = _str_to_dt(page)
 
     initial_end = min(
         start + timedelta(hours=window_size),
@@ -317,14 +325,18 @@ async def backfill_disputes(
     http: HTTPSession,
     base_url: str,
     window_size: int,
+    start_date: datetime,
     log: Logger,
     page: PageCursor | None,
     cutoff: LogCursor,
 ) -> AsyncGenerator[IncrementalResource | PageCursor, None]:
-    assert isinstance(page, str)
     assert isinstance(cutoff, datetime)
 
-    start = _str_to_dt(page)
+    if page is None:
+        start = start_date
+    else:
+        assert isinstance(page, str)
+        start = _str_to_dt(page)
 
     window_end = start + timedelta(hours=max(window_size, MIN_DISPUTES_WINDOW_SIZE))
     end = min(window_end, cutoff).replace(microsecond=0)
