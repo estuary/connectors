@@ -20,6 +20,7 @@ import argparse
 import datetime
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -152,6 +153,57 @@ def build_safe_plan(
         else:
             safe.append(entry)
     return safe, held
+
+
+def select_commit_tag(tags: list) -> Optional[str]:
+    """
+    Return the first commit-SHA tag in `tags`, or None.
+
+    CI tags every published image with the 7-char commit SHA (`git rev-parse
+    HEAD | head -c7`), alongside non-commit tags like 'dev', 'delayed', 'local'
+    and ':vN' version tags. A commit tag is exactly 7 lowercase hex chars, which
+    none of the others match (':vN' starts with 'v', 'dev' contains 'v', etc.).
+    """
+    return next((t for t in tags if re.fullmatch(r'[0-9a-f]{7}', t)), None)
+
+
+def filter_backward_moves(
+    plan: list,
+    current_commit: Callable,
+    is_ancestor: Callable,
+) -> tuple:
+    """
+    Drop plan entries whose boundary commit would move ':delayed' BACKWARD onto
+    an older image than it currently points at. This protects deliberate
+    fast-forwards (forward-delayed-tag.yaml) from being silently undone by the
+    next nightly run, which otherwise re-pins ':delayed' to the 2-week boundary
+    with no regard for where the tag already sits.
+
+      current_commit(image_name) -> Optional[str]
+          the commit (sha7) ':delayed' currently points at, or None when there
+          is no ':delayed' tag yet or it cannot be resolved.
+      is_ancestor(a, b) -> bool
+          True when commit a is an ancestor of b (a is older-or-equal).
+
+    An entry is dropped iff its boundary is a STRICT ancestor of (older than)
+    the current ':delayed' commit.
+
+    Entries with an unresolvable current commit are kept: we cannot prove a
+    regression, so we preserve the pre-guard behaviour (tag the boundary).
+    Returns (kept, skipped) where skipped is [(entry, current_sha7), ...].
+    """
+    kept, skipped = [], []
+    for e in plan:
+        cur = current_commit(e.image_name)
+        if not cur or cur == e.chosen_sha7:
+            kept.append(e)
+            continue
+        # Strict-ancestor test: boundary older than current, and not equal.
+        if is_ancestor(e.chosen_sha7, cur) and not is_ancestor(cur, e.chosen_sha7):
+            skipped.append((e, cur))
+        else:
+            kept.append(e)
+    return kept, skipped
 
 
 # ---------------------------------------------------------------------------
@@ -464,6 +516,111 @@ def check_is_reverted(sha: str, head_sha: str) -> bool:
         return False
 
 
+def check_is_ancestor(ancestor: str, descendant: str) -> bool:
+    """
+    Return True if `ancestor` is an ancestor of (older than or equal to)
+    `descendant`. Returns False when either commit is unknown to git, so an
+    unresolvable revision can never be misread as a backward move.
+    """
+    try:
+        subprocess.check_call(
+            ['git', 'merge-base', '--is-ancestor', ancestor, descendant],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+
+# ---------------------------------------------------------------------------
+# Registry / package introspection for the backward-move guard
+# ---------------------------------------------------------------------------
+
+def image_digests(ref: str) -> frozenset:
+    """
+    Return the set of content digests for an image ref: the top-level manifest
+    digest plus every child (platform) manifest digest.
+
+    The nightly and forward workflows both publish ':delayed' via
+    `docker buildx imagetools create`, which wraps a connector's single-arch
+    image in a fresh manifest LIST. So ':delayed' carries a list digest that
+    matches no ':<sha7>' tag, while its child digest equals the single-arch
+    image that the ':<sha7>' tag points at. Returning both lets a caller match
+    ':delayed' back to its originating commit regardless of which layer the
+    ':<sha7>' tag sits on. Empty when the ref cannot be inspected.
+    """
+    try:
+        out = subprocess.check_output(
+            ['docker', 'buildx', 'imagetools', 'inspect', ref,
+             '--format', '{{json .Manifest}}'],
+            text=True, stderr=subprocess.DEVNULL,
+        )
+        manifest = json.loads(out)
+    except (subprocess.CalledProcessError, json.JSONDecodeError):
+        return frozenset()
+
+    digests = set()
+    top = manifest.get('digest')
+    if top:
+        digests.add(top)
+    for child in manifest.get('manifests') or []:
+        d = child.get('digest')
+        if d:
+            digests.add(d)
+    return frozenset(digests)
+
+
+def _list_package_versions(
+    image: str, owner: str, token: str, page: int,
+) -> list:
+    """One page (newest-first) of an org container package's versions."""
+    url = (
+        f'https://api.github.com/orgs/{owner}/packages/container/{image}'
+        f'/versions?per_page=100&page={page}'
+    )
+    req = urllib.request.Request(url, headers={
+        'Authorization': f'bearer {token}',
+        'Accept': 'application/vnd.github+json',
+    })
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        return json.loads(resp.read())
+
+
+def current_delayed_commit(
+    image: str, owner: str, token: str, max_pages: int = 3,
+) -> Optional[str]:
+    """
+    Return the commit (sha7) that ':delayed' currently points at, or None.
+
+    Inspects the live ':delayed' manifest to learn its content digests, then
+    scans the package's versions (newest-first, stopping at the first match) for
+    the version carrying one of those digests and reads its commit-SHA tag.
+    Stops after `max_pages`; ':delayed' always points at a recent image, so the
+    match is on the first page or two. Returns None on any failure so the guard
+    fails open (never blocks a legitimate forward move on a transient error).
+    """
+    digests = image_digests(f'ghcr.io/estuary/{image}:delayed')
+    if not digests:
+        return None
+    try:
+        for page in range(1, max_pages + 1):
+            versions = _list_package_versions(image, owner, token, page)
+            if not versions:
+                break
+            for v in versions:
+                if v.get('name') not in digests:
+                    continue
+                tags = (v.get('metadata') or {}).get('container', {}).get('tags', [])
+                sha = select_commit_tag(tags)
+                if sha:
+                    return sha
+    except (urllib.error.URLError, KeyError, json.JSONDecodeError) as exc:
+        print(f'::warning::{image}: could not resolve current :delayed commit ({exc})',
+              file=sys.stderr)
+        return None
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Claude / PR details
 # ---------------------------------------------------------------------------
@@ -625,10 +782,33 @@ def write_safe_plan(entries: list, path: str) -> None:
             f.write(f'{e.image_name}\t{e.chosen_sha7}\n')
 
 
+def read_safe_plan(path: str) -> list:
+    """Read the two-column 'image TAB sha7' file written by write_safe_plan."""
+    entries = []
+    with open(path) as f:
+        for line in f:
+            parts = line.rstrip('\n').split('\t')
+            if len(parts) == 2 and parts[0]:
+                entries.append(PlanEntry(
+                    image_name=parts[0],
+                    chosen_sha7=parts[1],
+                    chosen_pr=0,
+                    source_dir=parts[0],
+                ))
+    return entries
+
+
 def write_verdicts(verdicts: list, path: str) -> None:
     with open(path, 'w') as f:
         for v in verdicts:
             f.write(f'{v.image_name}\t{v.verdict}\t{v.reason}\n')
+
+
+def write_skips(skips: list, path: str) -> None:
+    """Write the (entry, current_sha7) backward-move skips: image, boundary, current."""
+    with open(path, 'w') as f:
+        for entry, current in skips:
+            f.write(f'{entry.image_name}\t{entry.chosen_sha7}\t{current}\n')
 
 
 # ---------------------------------------------------------------------------
@@ -763,6 +943,47 @@ def cmd_check(args: argparse.Namespace) -> None:
     print(f'Tagging {len(safe)}/{len(plan)} connector(s) after hold filter')
 
 
+def cmd_guard(args: argparse.Namespace) -> None:
+    """
+    Filter the safe plan so the nightly never moves ':delayed' backward.
+
+    For each connector about to be tagged, resolve the commit ':delayed' already
+    points at and drop the entry when re-tagging the 2-week boundary would
+    regress onto an older image (e.g. undoing a forward-delayed-tag run). Writes
+    the surviving entries to output_safe and the dropped ones to output_skips.
+    """
+    plan = read_safe_plan(args.plan)
+    gh_repo = os.environ.get('GITHUB_REPOSITORY', args.repo)
+    owner = gh_repo.split('/', 1)[0] if '/' in gh_repo else ''
+    token = os.environ.get('GH_TOKEN', '')
+
+    if not owner or not token:
+        print('::warning::GH_TOKEN/owner unavailable; skipping backward-move guard')
+        write_safe_plan(plan, args.output_safe)
+        write_skips([], args.output_skips)
+        return
+
+    # Resolve each connector's current ':delayed' commit at most once.
+    commit_cache: dict = {}
+
+    def current_commit(image: str) -> Optional[str]:
+        if image not in commit_cache:
+            commit_cache[image] = current_delayed_commit(image, owner, token)
+        return commit_cache[image]
+
+    kept, skipped = filter_backward_moves(plan, current_commit, check_is_ancestor)
+
+    write_safe_plan(kept, args.output_safe)
+    write_skips(skipped, args.output_skips)
+
+    for entry, current in skipped:
+        print(
+            f'::warning::{entry.image_name}: holding :delayed at {current} — boundary '
+            f'{entry.chosen_sha7} is older (would move backward)'
+        )
+    print(f'Guard: {len(kept)} to tag, {len(skipped)} held to avoid moving backward')
+
+
 def cmd_forward(args: argparse.Namespace) -> None:
     """
     Resolve a user-selected connector to the (image, version) pairs whose
@@ -828,6 +1049,15 @@ def main(argv: Optional[list] = None) -> None:
     p.add_argument('--output-verdicts', default='/tmp/claude_verdicts.tsv')
 
     p = sub.add_parser(
+        'guard',
+        help="drop plan entries that would move ':delayed' backward",
+    )
+    p.add_argument('--repo',         default=os.environ.get('GITHUB_REPOSITORY', ''))
+    p.add_argument('--plan',         default='/tmp/safe_plan.tsv')
+    p.add_argument('--output-safe',  default='/tmp/final_plan.tsv')
+    p.add_argument('--output-skips', default='/tmp/backward_skips.tsv')
+
+    p = sub.add_parser(
         'forward',
         help="fast-forward a connector's ':delayed' tag to its latest version",
     )
@@ -838,7 +1068,12 @@ def main(argv: Optional[list] = None) -> None:
     p.add_argument('--output',      default='/tmp/forward_plan.tsv')
 
     args = parser.parse_args(argv)
-    {'plan': cmd_plan, 'check': cmd_check, 'forward': cmd_forward}[args.command](args)
+    {
+        'plan': cmd_plan,
+        'check': cmd_check,
+        'guard': cmd_guard,
+        'forward': cmd_forward,
+    }[args.command](args)
 
 
 if __name__ == '__main__':
