@@ -121,7 +121,11 @@ async def all_resources(
             task,
             fetch_changes=functools.partial(fetch_issues, http, config.organization),
             fetch_page=functools.partial(
-                backfill_issues, http, config.organization, config.advanced.window_size
+                backfill_issues,
+                http,
+                config.organization,
+                config.advanced.window_size,
+                start_date,
             ),
         )
 
@@ -142,7 +146,7 @@ async def all_resources(
                 fetch_explore_query, http, config.organization, explore_query
             ),
             fetch_page=functools.partial(
-                backfill_explore_query, http, config.organization, explore_query
+                backfill_explore_query, http, config.organization, explore_query, start_date
             ),
         )
 
@@ -172,7 +176,7 @@ async def all_resources(
             initial_state=ResourceState(
                 backfill=ResourceState.Backfill(
                     cutoff=cutoff,
-                    next_page=start_date.isoformat(),
+                    next_page=None,
                 ),
                 inc=common.ResourceState.Incremental(
                     cursor=cutoff - timedelta(seconds=1)  # Time bounds are exclusive
@@ -190,7 +194,7 @@ async def all_resources(
             initial_state=ResourceState(
                 backfill=ResourceState.Backfill(
                     cutoff=explore_cutoff,
-                    next_page=start_date.isoformat(),
+                    next_page=None,
                 ),
                 inc=common.ResourceState.Incremental(
                     # Time bounds are exclusive; start incremental at the later of
