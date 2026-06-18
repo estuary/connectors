@@ -296,18 +296,6 @@ func (v Validator) projectionConstraints(
 		return nil, err
 	}
 
-	// withIncompatibility pairs an INCOMPATIBLE constraint with the base
-	// requiredness when the base requires the projection, so the control plane
-	// surfaces a clear conflict; for a non-required projection it returns only
-	// the incompatibility, which the control plane drops.
-	withIncompatibility := func(incompatible *pm.Response_Validated_Constraint) []*pm.Response_Validated_Constraint {
-		if base.Type == pm.Response_Validated_Constraint_LOCATION_REQUIRED ||
-			base.Type == pm.Response_Validated_Constraint_FIELD_REQUIRED {
-			return []*pm.Response_Validated_Constraint{base, incompatible}
-		}
-		return []*pm.Response_Validated_Constraint{incompatible}
-	}
-
 	switch {
 	case base.Type == pm.Response_Validated_Constraint_FIELD_FORBIDDEN:
 		// The proposed type is completely disallowed by the materialization. This
@@ -316,7 +304,7 @@ func (v Validator) projectionConstraints(
 		return []*pm.Response_Validated_Constraint{base}, nil
 
 	case !deltaUpdates && p.IsRootDocumentProjection():
-		return v.rootDocumentConstraints(p, withIncompatibility, existingResource, lastBinding, boundCollection, docFields, fieldConfigJsonMap)
+		return v.rootDocumentConstraints(p, base, existingResource, lastBinding, boundCollection, docFields, fieldConfigJsonMap)
 
 	case !deltaUpdates && p.IsPrimaryKey && lastBinding != nil && !slices.Contains(lastBinding.FieldSelection.Keys, p.Field):
 		return v.addedKeyConstraints(p, existingResource, lastBinding, boundCollection, fieldConfigJsonMap)
@@ -334,11 +322,23 @@ func (v Validator) projectionConstraints(
 	}
 }
 
+// withIncompatibility pairs an INCOMPATIBLE constraint with the base
+// requiredness when the base requires the projection, so the control plane
+// surfaces a clear conflict; for a non-required projection it returns only the
+// incompatibility, which the control plane drops.
+func withIncompatibility(base, incompatible *pm.Response_Validated_Constraint) []*pm.Response_Validated_Constraint {
+	if base.Type == pm.Response_Validated_Constraint_LOCATION_REQUIRED ||
+		base.Type == pm.Response_Validated_Constraint_FIELD_REQUIRED {
+		return []*pm.Response_Validated_Constraint{base, incompatible}
+	}
+	return []*pm.Response_Validated_Constraint{incompatible}
+}
+
 // rootDocumentConstraints computes the constraint(s) for a root document
 // projection of a standard-updates binding.
 func (v Validator) rootDocumentConstraints(
 	p pf.Projection,
-	withIncompatibility func(*pm.Response_Validated_Constraint) []*pm.Response_Validated_Constraint,
+	base *pm.Response_Validated_Constraint,
 	existingResource ExistingResource,
 	lastBinding *pf.MaterializationSpec_Binding,
 	boundCollection pf.CollectionSpec,
@@ -371,10 +371,10 @@ func (v Validator) rootDocumentConstraints(
 		if !c.Type.IsForbidden() {
 			return []*pm.Response_Validated_Constraint{docConstraint}, nil
 		}
-		return withIncompatibility(c), nil
+		return withIncompatibility(base, c), nil
 
 	case lastBinding != nil && lastBinding.FieldSelection.Document == "":
-		return withIncompatibility(&pm.Response_Validated_Constraint{
+		return withIncompatibility(base, &pm.Response_Validated_Constraint{
 			Type:   pm.Response_Validated_Constraint_INCOMPATIBLE,
 			Reason: "Cannot add a new root document projection to materialization without backfilling",
 		}), nil
