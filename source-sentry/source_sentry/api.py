@@ -101,14 +101,19 @@ async def backfill_issues(
     http: HTTPSession,
     organization: str,
     window_size: timedelta,
+    start_date: datetime,
     log: Logger,
     page: PageCursor,
     cutoff: LogCursor,
 ) -> AsyncGenerator[Issue | PageCursor, None]:
-    assert isinstance(page, str)
     assert isinstance(cutoff, datetime)
 
-    page_ts = datetime.fromisoformat(page)
+    if page is None:
+        page_ts = start_date
+    else:
+        assert isinstance(page, str)
+        page_ts = datetime.fromisoformat(page)
+
     max_date_to_fetch = min(page_ts + window_size, cutoff)
 
     log.info(
@@ -400,6 +405,7 @@ async def backfill_explore_query(
     http: HTTPSession,
     organization: str,
     explore_query: ExploreQuery,
+    start_date: datetime,
     log: Logger,
     page: PageCursor,
     cutoff: LogCursor,
@@ -407,10 +413,14 @@ async def backfill_explore_query(
     """Backfill the pre-30d tail (older than the rolling full-fidelity window)
     one explicit start/end window at a time. errors/transactions are full;
     spans are sampled (Sentry downsamples on explicit ranges)."""
-    assert isinstance(page, str)
     assert isinstance(cutoff, datetime)
 
-    page_ts = datetime.fromisoformat(page)
+    if page is None:
+        page_ts = start_date
+    else:
+        assert isinstance(page, str)
+        page_ts = datetime.fromisoformat(page)
+
     if page_ts >= cutoff:
         return
 
