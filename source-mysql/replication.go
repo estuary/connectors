@@ -106,9 +106,22 @@ func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursorJSON 
 		logrus.WithField("pos", pos).Debug("initialized binlog position")
 	}
 
+	// MySQL and MariaDB frame GTIDs and related metadata using different binlog
+	// event types, so the syncer must know which flavor it's talking to in order
+	// to request and parse the correct events. Connecting to MariaDB with the
+	// "mysql" flavor makes the server rewrite its native GTID events into
+	// backwards-compatible dummy events. That rewrite is lossy (we never observe
+	// the GTID or its commit timestamp) and occasionally fatal: a server-side
+	// failure to rewrite an event aborts replication with error 1236 ("Failed to
+	// replace GTID event with backwards-compatible event").
+	var flavor = mysql.MySQLFlavor
+	if db.versionProduct == "MariaDB" {
+		flavor = mysql.MariaDBFlavor
+	}
+
 	var syncConfig = replication.BinlogSyncerConfig{
 		ServerID: uint32(db.config.Advanced.NodeID),
-		Flavor:   "mysql", // TODO(wgd): See what happens if we change this and run against MariaDB?
+		Flavor:   flavor,
 		Host:     host,
 		Port:     uint16(port),
 		User:     db.config.User,
@@ -502,6 +515,23 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 		case *replication.IntVarEvent:
 			implicitFlush = true // Implicit FlushEvent conversion permitted
 			logrus.WithField("type", data.Type).WithField("value", data.Value).Debug("ignoring IntVar Event")
+		case *replication.MariadbGTIDEvent:
+			implicitFlush = true // Implicit FlushEvent conversion permitted
+			logrus.WithField("data", data).Trace("MariaDB GTID Event")
+			// MariaDB GTID events carry no dedicated commit timestamp the way MySQL
+			// GTID events do, so we fall back to the event header timestamp which
+			// holds the transaction's commit time (at second granularity).
+			rs.gtidTimestamp = time.Unix(int64(event.Header.Timestamp), 0)
+			rs.gtidString = data.GTID.String()
+		case *replication.MariadbGTIDListEvent:
+			implicitFlush = true // Implicit FlushEvent conversion permitted
+			logrus.WithField("gtids", data.GTIDs).Trace("MariaDB GTID List Event")
+		case *replication.MariadbBinlogCheckPointEvent:
+			implicitFlush = true // Implicit FlushEvent conversion permitted
+			logrus.WithField("info", string(data.Info)).Trace("MariaDB Binlog Checkpoint Event")
+		case *replication.MariadbAnnotateRowsEvent:
+			implicitFlush = true // Implicit FlushEvent conversion permitted
+			logrus.WithField("query", string(data.Query)).Trace("ignoring MariaDB Annotate Rows Event")
 		default:
 			return fmt.Errorf("unhandled event type: %q", event.Header.EventType)
 		}
