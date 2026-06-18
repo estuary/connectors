@@ -14,14 +14,14 @@ new materialization - standard updates:
 same binding again - standard updates:
 {"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"flow_document","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is the document in the current materialization"}
-{"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"flow_published_at","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
 {"Field":"key","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is a key in the current materialization"}
-{"Field":"multiple","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"nonScalarValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"multiple","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
+{"Field":"nonScalarValue","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
 {"Field":"nullValue","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize this field"}
-{"Field":"numericString","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"optional","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"scalarValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"numericString","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
+{"Field":"optional","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
+{"Field":"scalarValue","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
 {"Field":"second_root","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize root document projection 'second_root' because field 'flow_document' is already being materialized as the document"}
 
 new materialization - delta updates:
@@ -39,63 +39,63 @@ new materialization - delta updates:
 
 same binding again - delta updates:
 {"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
-{"Field":"flow_document","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"flow_document","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
+{"Field":"flow_published_at","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
 {"Field":"key","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is a key in the current materialization"}
-{"Field":"multiple","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"nonScalarValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"multiple","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
+{"Field":"nonScalarValue","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
 {"Field":"nullValue","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize this field"}
-{"Field":"numericString","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"optional","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"scalarValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"numericString","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
+{"Field":"optional","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
+{"Field":"scalarValue","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
 {"Field":"second_root","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The root document should usually be materialized"}
 
 binding update with incompatible changes:
 {"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"flow_document","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is the document in the current materialization"}
-{"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"flow_published_at","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
 {"Field":"key","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is a key in the current materialization"}
-{"Field":"multiple","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"multiple","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
 {"Field":"nonScalarValue","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'nonScalarValue' is already being materialized as endpoint type 'OBJECT' but endpoint type 'STRING' is required by its schema '{ type: [string] }'"}
 {"Field":"nullValue","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize this field"}
-{"Field":"numericString","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"optional","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"numericString","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
+{"Field":"optional","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
 {"Field":"scalarValue","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize this field"}
 {"Field":"second_root","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize root document projection 'second_root' because field 'flow_document' is already being materialized as the document"}
 
 fields exist in destination but not in collection:
 {"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"flow_document","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is the document in the current materialization"}
-{"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"flow_published_at","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
 {"Field":"key","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is a key in the current materialization"}
 {"Field":"nullValue","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize this field"}
-{"Field":"numericString","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"scalarValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"numericString","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
+{"Field":"scalarValue","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
 {"Field":"second_root","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize root document projection 'second_root' because field 'flow_document' is already being materialized as the document"}
 
 change root document projection for standard updates:
 {"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
-{"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"flow_published_at","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
 {"Field":"key","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is a key in the current materialization"}
-{"Field":"multiple","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"nonScalarValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"multiple","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
+{"Field":"nonScalarValue","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
 {"Field":"nullValue","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize this field"}
-{"Field":"numericString","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"optional","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"scalarValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"numericString","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
+{"Field":"optional","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
+{"Field":"scalarValue","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
 {"Field":"second_root","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"The root document must be materialized for standard updates"}
 {"Field":"second_root","Type":6,"TypeString":"INCOMPATIBLE","Reason":"The root document must be materialized as field 'flow_document'"}
 
 change root document projection for delta updates:
 {"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
-{"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"flow_published_at","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
 {"Field":"key","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is a key in the current materialization"}
-{"Field":"multiple","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"nonScalarValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"multiple","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
+{"Field":"nonScalarValue","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
 {"Field":"nullValue","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize this field"}
-{"Field":"numericString","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"optional","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"scalarValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"numericString","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
+{"Field":"optional","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
+{"Field":"scalarValue","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
 {"Field":"second_root","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The root document should usually be materialized"}
 
 increment backfill counter:
@@ -127,26 +127,26 @@ increment backfill counter for disabled -> enabled binding:
 table already exists with identical spec:
 {"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"flow_document","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is the document in the current materialization"}
-{"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"flow_published_at","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
 {"Field":"key","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is a key in the current materialization"}
-{"Field":"multiple","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"nonScalarValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"multiple","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
+{"Field":"nonScalarValue","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
 {"Field":"nullValue","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize this field"}
-{"Field":"numericString","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"optional","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"scalarValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"numericString","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
+{"Field":"optional","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
+{"Field":"scalarValue","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
 {"Field":"second_root","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize root document projection 'second_root' because field 'flow_document' is already being materialized as the document"}
 
 table already exists with incompatible proposed spec:
 {"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"flow_document","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is the document in the current materialization"}
-{"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"flow_published_at","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
 {"Field":"key","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is a key in the current materialization"}
-{"Field":"multiple","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"multiple","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
 {"Field":"nonScalarValue","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'nonScalarValue' is already being materialized as endpoint type 'OBJECT' but endpoint type 'STRING' is required by its schema '{ type: [string] }'"}
 {"Field":"nullValue","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize this field"}
-{"Field":"numericString","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"optional","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"numericString","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
+{"Field":"optional","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
 {"Field":"scalarValue","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize this field"}
 {"Field":"second_root","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize root document projection 'second_root' because field 'flow_document' is already being materialized as the document"}
 
@@ -154,14 +154,14 @@ table already exists with incompatible root document column:
 {"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"flow_document","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"The root document is required for a standard updates materialization"}
 {"Field":"flow_document","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'flow_document' is already being materialized as endpoint type 'STRING' but endpoint type 'OBJECT' is required by its schema '{ type: [object] }'"}
-{"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"flow_published_at","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
 {"Field":"key","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is a key in the current materialization"}
-{"Field":"multiple","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"nonScalarValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"multiple","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
+{"Field":"nonScalarValue","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
 {"Field":"nullValue","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize this field"}
-{"Field":"numericString","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"optional","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"scalarValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"numericString","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
+{"Field":"optional","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
+{"Field":"scalarValue","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
 {"Field":"second_root","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize root document projection 'second_root' because field 'flow_document' is already being materialized as the document"}
 
 field names over the length limit are forbidden:

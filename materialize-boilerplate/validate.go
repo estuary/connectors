@@ -401,12 +401,12 @@ func (v Validator) addedKeyConstraints(
 	}
 
 	// The key location was already part of the selection: validate it against
-	// its existing column, or recommend it if the destination doesn't report
+	// its existing column, or mark it optional if the destination doesn't report
 	// columns.
 	existingField := existingResource.GetField(p.Field)
 	if existingField == nil {
 		return []*pm.Response_Validated_Constraint{{
-			Type:   pm.Response_Validated_Constraint_LOCATION_RECOMMENDED,
+			Type:   pm.Response_Validated_Constraint_FIELD_OPTIONAL,
 			Reason: "This location is part of the current materialization",
 		}}, nil
 	}
@@ -435,11 +435,8 @@ func (v Validator) constraintForExistingField(
 				Reason: "This field is a key in the current materialization",
 			}
 		} else {
-			// TODO(whb): Really this should be "FIELD_RECOMMENDED", but that is not a
-			// constraint that has been implemented currently. This would be an issue if there
-			// are multiple projections of the same location.
 			out = &pm.Response_Validated_Constraint{
-				Type:   pm.Response_Validated_Constraint_LOCATION_RECOMMENDED,
+				Type:   pm.Response_Validated_Constraint_FIELD_OPTIONAL,
 				Reason: "This location is part of the current materialization",
 			}
 		}
