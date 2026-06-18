@@ -30,7 +30,6 @@ from .models import (
 )
 
 from .api import (
-    dt_to_str,
     fetch_transactions,
     backfill_transactions,
     fetch_incremental_resources,
@@ -236,6 +235,7 @@ def incremental_resources(
                 gateway,
                 braintree_class,
                 window_size,
+                config.start_date,
             )
         )
 
@@ -249,7 +249,7 @@ def incremental_resources(
             open=functools.partial(open, path, response_model, _create_gateway(config), braintree_class, config.advanced.window_size),
             initial_state=ResourceState(
                 inc=ResourceState.Incremental(cursor=cutoff),
-                backfill=ResourceState.Backfill(next_page=dt_to_str(config.start_date), cutoff=cutoff)
+                backfill=ResourceState.Backfill(next_page=None, cutoff=cutoff)
             ),
             initial_config=ResourceConfigWithSchedule(
                 name=name, interval=timedelta(minutes=5), schedule="0 20 * * 5",
@@ -291,6 +291,7 @@ def transactions(
                 base_url,
                 gateway,
                 window_size,
+                config.start_date,
             )
         )
 
@@ -303,7 +304,7 @@ def transactions(
         open=functools.partial(open, _create_gateway(config), config.advanced.window_size),
         initial_state=ResourceState(
             inc=ResourceState.Incremental(cursor=cutoff),
-            backfill=ResourceState.Backfill(next_page=dt_to_str(config.start_date), cutoff=cutoff)
+            backfill=ResourceState.Backfill(next_page=None, cutoff=cutoff)
         ),
         initial_config=ResourceConfigWithSchedule(
             name='transactions', interval=timedelta(minutes=5)
@@ -339,6 +340,7 @@ def disputes(
                 http,
                 base_url,
                 window_size,
+                config.start_date,
             )
         )
 
@@ -351,7 +353,7 @@ def disputes(
         open=functools.partial(open, config.advanced.window_size),
         initial_state=ResourceState(
             inc=ResourceState.Incremental(cursor=cutoff),
-            backfill=ResourceState.Backfill(next_page=dt_to_str(config.start_date), cutoff=cutoff)
+            backfill=ResourceState.Backfill(next_page=None, cutoff=cutoff)
         ),
         initial_config=ResourceConfigWithSchedule(
             name='disputes', interval=timedelta(minutes=5)
