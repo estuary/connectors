@@ -21,6 +21,7 @@ def test_capture(request, snapshot):
     lines = [json.loads(l) for l in result.stdout.splitlines()]
 
     FIELDS_TO_REDACT = [
+        "available_product_features",
         "created_at",
         "last_calculation",
         "last_seen_at",

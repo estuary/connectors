@@ -10,7 +10,7 @@
       "away_mode_enabled": false,
       "away_mode_reassign": false,
       "email": "alexb@estuary.dev",
-      "has_inbox_seat": true,
+      "has_inbox_seat": false,
       "id": "7939621",
       "name": "Alex Bair",
       "team_ids": [
