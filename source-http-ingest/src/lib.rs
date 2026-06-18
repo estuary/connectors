@@ -459,6 +459,7 @@ async fn do_apply(stdout: &mut io::Stdout) -> anyhow::Result<()> {
         Response {
             applied: Some(Applied {
                 action_description: String::new(),
+                state: None,
             }),
             ..Default::default()
         },
