@@ -9,10 +9,12 @@ from delayed_tag import (
     Verdict,
     build_safe_plan,
     build_claude_prompt,
+    filter_backward_moves,
     find_boundary,
     parse_claude_verdict,
     pr_touches_dir,
     resolve_family,
+    select_commit_tag,
 )
 
 
@@ -334,6 +336,88 @@ class TestResolveFamily(unittest.TestCase):
 
     def test_unknown_connector_is_empty(self):
         self.assertEqual(resolve_family(self.IMAGES, 'source-nope'), [])
+
+
+# ---------------------------------------------------------------------------
+# select_commit_tag
+# ---------------------------------------------------------------------------
+
+class TestSelectCommitTag(unittest.TestCase):
+
+    def test_picks_seven_hex_chars(self):
+        self.assertEqual(select_commit_tag(['dev', 'v4', 'e35f112', 'delayed']), 'e35f112')
+
+    def test_ignores_version_and_named_tags(self):
+        self.assertIsNone(select_commit_tag(['dev', 'delayed', 'v10', 'local']))
+
+    def test_rejects_wrong_length(self):
+        # 6 and 8 hex chars are not commit tags (CI uses exactly 7).
+        self.assertIsNone(select_commit_tag(['abc123', 'abcdef12']))
+
+    def test_rejects_non_hex(self):
+        self.assertIsNone(select_commit_tag(['ghijklm', 'v1']))
+
+    def test_empty(self):
+        self.assertIsNone(select_commit_tag([]))
+
+
+# ---------------------------------------------------------------------------
+# filter_backward_moves
+# ---------------------------------------------------------------------------
+
+class TestFilterBackwardMoves(unittest.TestCase):
+    # Linear history old -> ... -> new, expressed as an ordering so the fake
+    # is_ancestor can answer "a older-or-equal b" by index.
+    ORDER = ['old1234', 'mid1234', 'new1234', 'tip1234']
+
+    def is_ancestor(self, a, b):
+        return self.ORDER.index(a) <= self.ORDER.index(b)
+
+    def run_filter(self, plan, current):
+        return filter_backward_moves(
+            plan,
+            current_commit=lambda img: current.get(img),
+            is_ancestor=self.is_ancestor,
+        )
+
+    def test_keeps_forward_move(self):
+        # boundary newer than current :delayed -> normal progress, keep.
+        plan = [make_plan('a', sha7='new1234')]
+        kept, skipped = self.run_filter(plan, {'a': 'mid1234'})
+        self.assertEqual([e.image_name for e in kept], ['a'])
+        self.assertEqual(skipped, [])
+
+    def test_skips_backward_move(self):
+        # boundary older than current :delayed -> would regress, skip.
+        plan = [make_plan('a', sha7='mid1234')]
+        kept, skipped = self.run_filter(plan, {'a': 'new1234'})
+        self.assertEqual(kept, [])
+        self.assertEqual([(e.image_name, cur) for e, cur in skipped], [('a', 'new1234')])
+
+    def test_keeps_equal_commit(self):
+        plan = [make_plan('a', sha7='mid1234')]
+        kept, skipped = self.run_filter(plan, {'a': 'mid1234'})
+        self.assertEqual([e.image_name for e in kept], ['a'])
+        self.assertEqual(skipped, [])
+
+    def test_keeps_when_current_unknown(self):
+        # No resolvable :delayed commit -> fail open, tag the boundary.
+        plan = [make_plan('a', sha7='mid1234')]
+        kept, skipped = self.run_filter(plan, {})
+        self.assertEqual([e.image_name for e in kept], ['a'])
+        self.assertEqual(skipped, [])
+
+    def test_mixed_plan(self):
+        plan = [
+            make_plan('fwd', sha7='mid1234'),   # backward -> skip
+            make_plan('norm', sha7='tip1234'),  # forward  -> keep
+            make_plan('fresh', sha7='old1234'), # unknown  -> keep
+        ]
+        kept, skipped = self.run_filter(
+            plan, {'fwd': 'tip1234', 'norm': 'mid1234'},
+        )
+        self.assertEqual([e.image_name for e in kept], ['norm', 'fresh'])
+        self.assertEqual([e.image_name for e, _ in skipped], ['fwd'])
 
 
 if __name__ == '__main__':
