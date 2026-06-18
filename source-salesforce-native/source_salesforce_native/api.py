@@ -163,15 +163,19 @@ async def backfill_incremental_resources(
     fields: FieldDetailsDict,
     model_cls: type[SalesforceRecord],
     window_size: int,
+    start_date: datetime,
     log: Logger,
     page: PageCursor | None,
     cutoff: LogCursor,
     is_connector_initiated: bool,
 ) -> AsyncGenerator[SalesforceRecord | PageCursor, None]:
-    assert isinstance(page, str)
     assert isinstance(cutoff, datetime)
 
-    start = str_to_dt(page)
+    if page is None:
+        start = start_date
+    else:
+        assert isinstance(page, str)
+        start = str_to_dt(page)
 
     if start >= cutoff:
         log.debug("Page cursor is after cutoff, indicating backfill is complete.", {
