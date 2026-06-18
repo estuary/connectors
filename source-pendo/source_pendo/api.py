@@ -454,13 +454,19 @@ async def backfill_events(
         model: type[Event],
         identifying_field: str,
         limit: int,
+        start_ms: int,
         log: Logger,
         page_cursor: PageCursor | None,
         cutoff: LogCursor,
 ) -> AsyncGenerator[Event | PageCursor, None]:
-    assert isinstance(page_cursor, int)
     assert isinstance(cutoff, datetime)
-    last_dt = _ms_to_dt(page_cursor)
+    if page_cursor is None:
+        start = start_ms
+    else:
+        assert isinstance(page_cursor, int)
+        start = page_cursor
+
+    last_dt = _ms_to_dt(start)
     upper_bound_dt = last_dt + timedelta(days=EVENT_DATE_WINDOW_SIZE_IN_DAYS)
 
     # If we've reached or exceeded the cutoff date, stop backfilling.
@@ -486,7 +492,7 @@ async def backfill_events(
     if count == 0:
         # If there were no documents, we need to move the cursor forward to slide forward our date window.
         yield _dt_to_ms(last_dt + timedelta(days=EVENT_DATE_WINDOW_SIZE_IN_DAYS))
-    elif last_dt > _ms_to_dt(page_cursor):
+    elif last_dt > _ms_to_dt(start):
         # If there were documents and the last one has a later timestamp than our cursor,
         # then update the cursor to the later timestamp.
         yield _dt_to_ms(last_dt)
@@ -640,13 +646,19 @@ async def backfill_aggregated_events(
         model: type[EventAggregate],
         identifying_field: str,
         limit: int,
+        start_ms: int,
         log: Logger,
         page_cursor: PageCursor | None,
         cutoff: LogCursor,
 ) -> AsyncGenerator[EventAggregate | PageCursor, None]:
-    assert isinstance(page_cursor, int)
     assert isinstance(cutoff, datetime)
-    last_dt = _ms_to_dt(page_cursor)
+    if page_cursor is None:
+        start = start_ms
+    else:
+        assert isinstance(page_cursor, int)
+        start = page_cursor
+
+    last_dt = _ms_to_dt(start)
     upper_bound_dt = last_dt + timedelta(days=EVENT_DATE_WINDOW_SIZE_IN_DAYS)
 
     # If we've reached or exceeded the cutoff date, stop backfilling.
@@ -672,7 +684,7 @@ async def backfill_aggregated_events(
     if count == 0:
         # If there were no documents, we need to move the cursor forward to slide forward our date window.
         yield _dt_to_ms(last_dt + timedelta(days=EVENT_DATE_WINDOW_SIZE_IN_DAYS))
-    elif last_dt > _ms_to_dt(page_cursor):
+    elif last_dt > _ms_to_dt(start):
         # If there were documents and the last one has a later
         # timestamp than our cursor, update the cursor.
         yield _dt_to_ms(last_dt)
@@ -844,13 +856,19 @@ async def backfill_resources(
         updated_at_field: str,
         identifying_field: str,
         limit: int,
+        start_ms: int,
         log: Logger,
         page_cursor: PageCursor | None,
         cutoff: LogCursor,
 ) -> AsyncGenerator[IncrementalResource | PageCursor, None]:
-    assert isinstance(page_cursor, int)
     assert isinstance(cutoff, datetime)
-    last_dt = _ms_to_dt(page_cursor)
+    if page_cursor is None:
+        start = start_ms
+    else:
+        assert isinstance(page_cursor, int)
+        start = page_cursor
+
+    last_dt = _ms_to_dt(start)
     upper_bound_dt = last_dt + timedelta(days=RESOURCE_DATE_WINDOW_SIZE_IN_DAYS)
 
     # If we've reached or exceeded the cutoff date, stop backfilling.
@@ -877,7 +895,7 @@ async def backfill_resources(
     if count == 0:
         # If there were no documents, we need to move the cursor forward to slide forward our date window.
         yield _dt_to_ms(last_dt + timedelta(days=RESOURCE_DATE_WINDOW_SIZE_IN_DAYS))
-    elif last_dt > _ms_to_dt(page_cursor):
+    elif last_dt > _ms_to_dt(start):
         # If there were documents and the last one has a later
         # timestamp than our cursor, update the cursor.
         yield _dt_to_ms(last_dt)
