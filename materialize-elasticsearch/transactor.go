@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/elastic/go-elasticsearch/v8/esutil"
@@ -157,7 +158,11 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	ctx := it.Context()
 
 	type storeBatch struct {
-		buf   []byte
+		// items holds one complete bulk item per element (an action line, plus a
+		// document line for index/create actions, each terminated by '\n').
+		// Keeping items separate rather than as one flat buffer lets doStore
+		// re-send an exact subset of items when only some of them fail.
+		items [][]byte
 		index string
 	}
 
@@ -172,7 +177,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 				case batch, ok := <-batchCh:
 					if !ok {
 						return nil
-					} else if err := t.doStore(groupCtx, batch.buf, batch.index); err != nil {
+					} else if err := t.doStore(groupCtx, batch.items, batch.index); err != nil {
 						return err
 					}
 				}
@@ -180,26 +185,28 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		})
 	}
 
-	sendBatch := func(batch []byte, index string) error {
+	sendBatch := func(items [][]byte, index string) error {
 		select {
 		case <-groupCtx.Done():
 			return group.Wait()
-		case batchCh <- storeBatch{buf: batch, index: index}:
+		case batchCh <- storeBatch{items: items, index: index}:
 			return nil
 		}
 	}
 
-	var batch []byte
+	var batch [][]byte
+	var batchBytes int
 	var lastIndex string
 	// Skip deleted, non-existent documents iff HardDelete is enabled.
 	for it.Next(t.cfg.HardDelete) {
 		b := t.bindings[it.Binding]
 
-		if len(batch) > storeBatchSize || (lastIndex != b.index && lastIndex != "") {
+		if batchBytes > storeBatchSize || (lastIndex != b.index && lastIndex != "") {
 			if err := sendBatch(batch, lastIndex); err != nil {
 				return nil, err
 			}
 			batch = nil
+			batchBytes = 0
 		}
 		lastIndex = b.index
 
@@ -216,41 +223,21 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 
 		if it.Delete && t.cfg.HardDelete && it.Exists {
-			batch = append(batch, []byte(`{"delete":{"_id":"`+id+`"`)...)
+			var item []byte
+			item = append(item, []byte(`{"delete":{"_id":"`+id+`"`)...)
 			if routingVal != nil {
-				batch = append(batch, []byte(`,"routing":`+string(routingVal))...)
+				item = append(item, []byte(`,"routing":`+string(routingVal))...)
 			}
-			batch = append(batch, []byte(`}}`)...)
-			batch = append(batch, '\n')
+			item = append(item, []byte(`}}`)...)
+			item = append(item, '\n')
+			batch = append(batch, item)
+			batchBytes += len(item)
 			continue
 		}
 
-		// The "create" action will fail if an item by the provided ID already exists, and "index"
-		// is like a PUT where it will create or replace. We could just use "index" all the time,
-		// but using "create" when we believe the item does not already exist provides a bit of
-		// extra consistency checking.
-		if it.Exists {
-			batch = append(batch, []byte(`{"index":{"_id":"`+id+`"`)...)
-			if routingVal != nil {
-				batch = append(batch, []byte(`,"routing":`+string(routingVal))...)
-			}
-			batch = append(batch, []byte(`}}`)...)
-		} else if !b.deltaUpdates {
-			batch = append(batch, []byte(`{"create":{"_id":"`+id+`"`)...)
-			if routingVal != nil {
-				batch = append(batch, []byte(`,"routing":`+string(routingVal))...)
-			}
-			batch = append(batch, []byte(`}}`)...)
-		} else {
-			// Leaving the ID blank will cause Elasticsearch to generate one automatically for
-			// delta updates, where we otherwise could not insert multiple rows with the same ID.
-			batch = append(batch, []byte(`{"create":{`)...)
-			if routingVal != nil {
-				batch = append(batch, []byte(`"routing":`+string(routingVal))...)
-			}
-			batch = append(batch, []byte(`}}`)...)
-		}
-		batch = append(batch, '\n')
+		var item []byte
+		item = append(item, storeAction(it.Exists, b.deltaUpdates, id, routingVal)...)
+		item = append(item, '\n')
 
 		doc := make(map[string]any)
 		for idx, v := range append(it.Key, it.Values...) {
@@ -278,8 +265,10 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		if err != nil {
 			return nil, err
 		}
-		batch = append(batch, bodyData...)
-		batch = append(batch, '\n')
+		item = append(item, bodyData...)
+		item = append(item, '\n')
+		batch = append(batch, item)
+		batchBytes += len(item)
 	}
 	if err := it.Err(); err != nil {
 		return nil, err
@@ -296,6 +285,39 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 }
 
 func (t *transactor) Destroy() {}
+
+// storeAction returns the Elasticsearch _bulk action metadata line for storing
+// (not deleting) a single document.
+//
+// The "create" action will fail if an item by the provided ID already exists, and "index"
+// is like a PUT where it will create or replace. We could just use "index" all the time,
+// but using "create" when we believe the item does not already exist provides a bit of
+// extra consistency checking.
+func storeAction(exists, deltaUpdates bool, id string, routingVal []byte) []byte {
+	var line []byte
+	if exists {
+		line = append(line, []byte(`{"index":{"_id":"`+id+`"`)...)
+		if routingVal != nil {
+			line = append(line, []byte(`,"routing":`+string(routingVal))...)
+		}
+		line = append(line, []byte(`}}`)...)
+	} else if !deltaUpdates {
+		line = append(line, []byte(`{"create":{"_id":"`+id+`"`)...)
+		if routingVal != nil {
+			line = append(line, []byte(`,"routing":`+string(routingVal))...)
+		}
+		line = append(line, []byte(`}}`)...)
+	} else {
+		// Leaving the ID blank will cause Elasticsearch to generate one automatically for
+		// delta updates, where we otherwise could not insert multiple rows with the same ID.
+		line = append(line, []byte(`{"create":{`)...)
+		if routingVal != nil {
+			line = append(line, []byte(`"routing":`+string(routingVal))...)
+		}
+		line = append(line, []byte(`}}`)...)
+	}
+	return line
+}
 
 type getDoc struct {
 	Id      string `json:"_id"`
@@ -400,26 +422,67 @@ func (t *transactor) loadDocs(ctx context.Context, getDocs []getDoc, loaded func
 	return nil
 }
 
+const maxStoreRetries = 5
+
+// retryableBulkErrorTypes are Elasticsearch per-item error types that are
+// transient and safe to retry by re-sending only the affected items. They show
+// up inside an HTTP 200 bulk response (the request as a whole succeeded), most
+// commonly when an index's primary shard is briefly unavailable.
+var retryableBulkErrorTypes = map[string]bool{
+	"retry_on_primary_exception":      true,
+	"unavailable_shards_exception":    true,
+	"es_rejected_execution_exception": true,
+}
+
 type bulkResponse struct {
 	Items []map[string]struct {
-		Error struct {
+		Status int `json:"status"`
+		Error  struct {
 			Type   string `json:"type"`
 			Reason string `json:"reason"`
 		} `json:"error"`
 	} `json:"items"`
 }
 
-func (b bulkResponse) firstError() error {
-	for _, item := range b.Items {
-		for action, err := range item {
-			return fmt.Errorf("(%s) %s: %s", action, err.Error.Type, err.Error.Reason)
+// classify inspects the per-item results of a bulk response. Item i corresponds
+// to request item i. It returns the first terminal (non-retryable) item error,
+// if any, and the indices of items that failed with a retryable error. A
+// terminal error takes precedence: when one is present the caller should fail
+// rather than retry.
+func (b bulkResponse) classify() (terminal error, retryableIdx []int) {
+	for i, item := range b.Items {
+		for action, res := range item {
+			if res.Error.Type == "" {
+				continue
+			}
+			if retryableBulkErrorTypes[res.Error.Type] {
+				retryableIdx = append(retryableIdx, i)
+			} else if terminal == nil {
+				terminal = fmt.Errorf("(%s) %s: %s", action, res.Error.Type, res.Error.Reason)
+			}
 		}
 	}
+	return terminal, retryableIdx
+}
 
+// itemError returns the formatted error for the first errored item at one of
+// the given indices, for use when retries are exhausted.
+func (b bulkResponse) itemError(idx []int) error {
+	for _, i := range idx {
+		for action, res := range b.Items[i] {
+			if res.Error.Type != "" {
+				return fmt.Errorf("(%s) %s: %s", action, res.Error.Type, res.Error.Reason)
+			}
+		}
+	}
 	return nil
 }
 
-func (t *transactor) doStore(ctx context.Context, body []byte, index string) error {
+// sendBulk submits a single bulk request and returns the parsed per-item
+// response. A non-nil error indicates a transport- or HTTP-level failure (the
+// go-elasticsearch client has already retried those per its RetryOnStatus
+// config); per-item errors are carried in the returned bulkResponse.
+func (t *transactor) sendBulk(ctx context.Context, body []byte, index string) (*bulkResponse, error) {
 	opts := []func(*esapi.BulkRequest){
 		t.client.es.Bulk.WithContext(ctx),
 		// Request bodies are structured so that all documents belong to the
@@ -427,10 +490,11 @@ func (t *transactor) doStore(ctx context.Context, body []byte, index string) err
 		// rather than on each individual document.
 		t.client.es.Bulk.WithIndex(index),
 		// Without this filter, the response body will contain a bit of metadata
-		// for every single item in the bulk request. We only care if errors
-		// occurred, so this filter reduces the response size drastically in the
-		// most common case of no or few errors.
-		t.client.es.Bulk.WithFilterPath("items.*.error"),
+		// for every single item in the bulk request. We only care about each
+		// item's error and status, which keeps the response small in the common
+		// case of no or few errors while still returning one entry per item (so
+		// response item i aligns with request item i).
+		t.client.es.Bulk.WithFilterPath("items.*.error", "items.*.status"),
 	}
 
 	if !t.isServerless {
@@ -446,18 +510,84 @@ func (t *transactor) doStore(ctx context.Context, body []byte, index string) err
 
 	res, err := t.client.es.Bulk(bytes.NewReader(body), opts...)
 	if err != nil {
-		return fmt.Errorf("bulk request submission failed: %w", err)
+		return nil, fmt.Errorf("bulk request submission failed: %w", err)
 	}
 	defer res.Body.Close()
 
-	var parsed bulkResponse
 	if res.IsError() {
-		return fmt.Errorf("bulk request to index %q failed with status %d: %s", index, res.StatusCode, res.String())
-	} else if err := json.NewDecoder(res.Body).Decode(&parsed); err != nil {
-		return fmt.Errorf("failed to decode bulk response: %w", err)
-	} else if err := parsed.firstError(); err != nil {
-		return fmt.Errorf("bulk request to index %q failed: %w", index, err)
+		return nil, fmt.Errorf("bulk request to index %q failed with status %d: %s", index, res.StatusCode, res.String())
 	}
 
+	var parsed bulkResponse
+	if err := json.NewDecoder(res.Body).Decode(&parsed); err != nil {
+		return nil, fmt.Errorf("failed to decode bulk response: %w", err)
+	}
+	return &parsed, nil
+}
+
+func (t *transactor) doStore(ctx context.Context, items [][]byte, index string) error {
+	if err := retryBulkStore(ctx, items, maxStoreRetries,
+		func(body []byte) (*bulkResponse, error) { return t.sendBulk(ctx, body, index) },
+		storeRetryDelay,
+	); err != nil {
+		return fmt.Errorf("bulk request to index %q failed: %w", index, err)
+	}
 	return nil
+}
+
+// retryBulkStore sends items as a single bulk request and, if any items fail
+// with a retryable per-item error, re-sends only those items after a delay,
+// up to maxAttempts times. Re-sending only the failed items is safe for both
+// standard and delta-updates bindings: a failed item did not land, so it is
+// never duplicated, and items that succeeded are never re-sent.
+func retryBulkStore(
+	ctx context.Context,
+	items [][]byte,
+	maxAttempts int,
+	send func(body []byte) (*bulkResponse, error),
+	delay func(ctx context.Context, attempt int) error,
+) error {
+	pending := items
+	for attempt := 0; ; attempt++ {
+		resp, err := send(bytes.Join(pending, nil))
+		if err != nil {
+			return err
+		}
+
+		terminal, retryableIdx := resp.classify()
+		if terminal != nil {
+			return terminal
+		}
+		if len(retryableIdx) == 0 {
+			return nil
+		}
+		if attempt+1 >= maxAttempts {
+			return fmt.Errorf("%d items still failing after %d attempts: %w",
+				len(retryableIdx), attempt+1, resp.itemError(retryableIdx))
+		}
+
+		next := make([][]byte, len(retryableIdx))
+		for i, idx := range retryableIdx {
+			next[i] = pending[idx]
+		}
+		pending = next
+
+		if err := delay(ctx, attempt); err != nil {
+			return err
+		}
+	}
+}
+
+// storeRetryDelay waits before re-sending failed bulk items, with exponential
+// backoff capped at 5s, mirroring the go-elasticsearch client's RetryBackoff.
+func storeRetryDelay(ctx context.Context, attempt int) error {
+	d := min(time.Duration(1<<attempt)*time.Second, 5*time.Second)
+	log.WithFields(log.Fields{"attempt": attempt, "delay": d.String()}).
+		Info("waiting to retry bulk items on retryable error")
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(d):
+		return nil
+	}
 }
