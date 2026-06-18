@@ -20,6 +20,30 @@ def test_capture(request, snapshot):
     assert result.returncode == 0
     lines = [json.loads(l) for l in result.stdout.splitlines()]
 
+    # These fields drift independently of connector behavior: `stats` and
+    # `features` are server-side aggregates/flags Sentry toggles over time, and
+    # the event-aggregate timestamps move as seeded events age out of the
+    # retention window. Redact every occurrence at any nesting depth (e.g.
+    # `stats` also appears under `lifetime`).
+    FIELDS_TO_REDACT = {
+        "stats",
+        "features",
+        "firstEvent",
+        "lastEvent",
+        "firstSeen",
+        "lastSeen",
+    }
+
+    def redact(value):
+        if isinstance(value, dict):
+            return {
+                key: "redacted" if key in FIELDS_TO_REDACT else redact(val)
+                for key, val in value.items()
+            }
+        if isinstance(value, list):
+            return [redact(item) for item in value]
+        return value
+
     # Keep only the first captured document per stream so the snapshot stays
     # small and stable regardless of how many rows a stream returns.
     unique_stream_lines = []
@@ -29,11 +53,7 @@ def test_capture(request, snapshot):
         if stream in seen:
             continue
         seen.add(stream)
-        line[1]["stats"] = "redacted-object"
-        # Sentry toggles org/project feature flags server-side over time, so
-        # the `features` list drifts independently of connector behavior.
-        if "features" in line[1]:
-            line[1]["features"] = "redacted-list"
+        line[1] = redact(line[1])
         unique_stream_lines.append(line)
 
     unique_stream_lines.sort(key=lambda l: l[0])

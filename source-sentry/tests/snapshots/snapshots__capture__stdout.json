@@ -8,84 +8,7 @@
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "8972455",
-      "name": "estuary-dev-seed",
-      "stats": "redacted-object"
-    }
-  ],
-  [
-    "acmeCo/Issues",
-    {
-      "_meta": {
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "annotations": [],
-      "assignedTo": null,
-      "count": "6",
-      "culprit": "GET /healthz",
-      "filtered": null,
-      "firstSeen": "2026-05-18T18:26:31Z",
-      "hasSeen": false,
-      "id": "7490112871",
-      "inbox": null,
-      "integrationIssues": [],
-      "isBookmarked": false,
-      "isPublic": false,
-      "isSubscribed": false,
-      "isUnhandled": false,
-      "issueCategory": "error",
-      "issueType": "error",
-      "lastSeen": "2026-05-18T18:26:43Z",
-      "latestEventHasAttachments": false,
-      "level": "error",
-      "lifetime": {
-        "count": "6",
-        "firstSeen": "2026-05-18T18:26:31.494842Z",
-        "lastSeen": "2026-05-18T18:26:43Z",
-        "stats": null,
-        "userCount": 0
-      },
-      "logger": null,
-      "metadata": {
-        "filename": "seed_sentry.py",
-        "function": "run",
-        "in_app_frame_mix": "in-app-only",
-        "initial_priority": 75,
-        "sdk": {
-          "name": "sentry.python.aiohttp",
-          "name_normalized": "sentry.python"
-        },
-        "title": null,
-        "type": "RuntimeError",
-        "value": "seed error from GET /healthz"
-      },
-      "numComments": 0,
-      "owners": null,
-      "permalink": "https://estuary-94.sentry.io/issues/7490112871/",
-      "platform": "python",
-      "pluginActions": [],
-      "pluginIssues": [],
-      "priority": "high",
-      "priorityLockedAt": null,
-      "project": {
-        "id": "4509990551814144",
-        "name": "test-project",
-        "platform": "python",
-        "slug": "test-project"
-      },
-      "seerAutofixLastTriggered": null,
-      "seerExplorerAutofixLastTriggered": null,
-      "seerFixabilityScore": null,
-      "sentryAppIssues": [],
-      "shareId": null,
-      "shortId": "TEST-PROJECT-E",
-      "stats": "redacted-object",
-      "status": "unresolved",
-      "statusDetails": {},
-      "subscriptionDetails": null,
-      "substatus": "ongoing",
-      "title": "RuntimeError: seed error from GET /healthz",
-      "type": "error",
-      "userCount": 0
+      "name": "estuary-dev-seed"
     }
   ],
   [
@@ -117,8 +40,8 @@
       "environments": [
         "production"
       ],
-      "features": "redacted-list",
-      "firstEvent": "2025-09-18T14:12:28.557000Z",
+      "features": "redacted",
+      "firstEvent": "redacted",
       "firstTransactionEvent": true,
       "hasAccess": true,
       "hasFeedbacks": false,
@@ -162,8 +85,7 @@
           "name": "Estuary",
           "slug": "estuary"
         }
-      ],
-      "stats": "redacted-object"
+      ]
     }
   ],
   [
@@ -181,11 +103,11 @@
       "dateCreated": "2026-05-18T18:26:30.511703Z",
       "dateReleased": null,
       "deployCount": 0,
-      "firstEvent": "2026-05-18T18:26:31Z",
+      "firstEvent": "redacted",
       "id": 1788166050,
       "lastCommit": null,
       "lastDeploy": null,
-      "lastEvent": "2026-05-18T18:26:43Z",
+      "lastEvent": "redacted",
       "newGroups": 1,
       "owner": null,
       "projects": [
@@ -212,8 +134,7 @@
         "version": {
           "raw": "4207f22a318401f6721384d51acd662be89109ed"
         }
-      },
-      "stats": "redacted-object"
+      }
     }
   ],
   [
@@ -243,6 +164,7 @@
       ],
       "avatar": {
         "avatarType": "letter_avatar",
+        "avatarUrl": null,
         "avatarUuid": null
       },
       "dateCreated": "2025-09-09T15:45:53.671857Z",
@@ -256,26 +178,7 @@
       "memberCount": 1,
       "name": "Estuary",
       "slug": "estuary",
-      "teamRole": "admin",
-      "stats": "redacted-object"
-    }
-  ],
-  [
-    "acmeCo/custom_explore_my_spans",
-    {
-      "_meta": {
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "id": "96f0313edcdac5f3",
-      "project": "test-project",
-      "project.name": "test-project",
-      "span.description": "cache.get call #1160",
-      "span.duration": "39.958954",
-      "timestamp": "2026-05-18T18:26:30Z",
-      "trace": "00660d702dbe473fa10ab767af90ed2a",
-      "transaction": "cron.daily",
-      "transaction.span_id": "a574282a8f59aa9c",
-      "stats": "redacted-object"
+      "teamRole": "admin"
     }
   ]
 ]
