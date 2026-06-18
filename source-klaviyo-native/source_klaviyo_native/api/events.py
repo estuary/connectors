@@ -383,14 +383,19 @@ async def subdivision_worker(
 async def backfill_events(
     http: HTTPSession,
     window_size: timedelta,
+    start_date: datetime,
     log: Logger,
     page: PageCursor,
     cutoff: LogCursor,
 ) -> AsyncGenerator[IncrementalStream | PageCursor, None]:
     assert isinstance(cutoff, datetime)
-    assert isinstance(page, str)
 
-    start = str_to_dt(page)
+    if page is None:
+        start = start_date
+    else:
+        assert isinstance(page, str)
+        start = str_to_dt(page)
+
     if start >= cutoff:
         return
 
