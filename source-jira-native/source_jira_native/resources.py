@@ -47,7 +47,6 @@ from .models import (
 from .api import (
     backfill_issues,
     backfill_issues_child_resources,
-    dt_to_str,
     fetch_issues,
     fetch_issues_child_resources,
     fetch_timezone,
@@ -368,6 +367,7 @@ def issues(
                 config.domain,
                 timezone,
                 config.advanced.projects,
+                start,
             )
         )
 
@@ -386,7 +386,7 @@ def issues(
                 REALTIME: ResourceState.Incremental(cursor=cutoff),
                 LOOKBACK: ResourceState.Incremental(cursor=cutoff - ISSUE_SEARCH_EVENTUAL_CONSISTENCY_HORIZON),
             },
-            backfill=ResourceState.Backfill(cutoff=cutoff, next_page=dt_to_str(start))
+            backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None)
         ),
         initial_config=ResourceConfigWithSchedule(
             name="issues", interval=timedelta(minutes=5)
@@ -432,6 +432,7 @@ def issue_child_resources(
                 timezone,
                 config.advanced.projects,
                 stream,
+                start,
             )
         )
 
@@ -454,7 +455,7 @@ def issue_child_resources(
                         REALTIME: ResourceState.Incremental(cursor=cutoff),
                         LOOKBACK: ResourceState.Incremental(cursor=cutoff - ISSUE_SEARCH_EVENTUAL_CONSISTENCY_HORIZON),
                     },
-                    backfill=ResourceState.Backfill(cutoff=cutoff, next_page=dt_to_str(start))
+                    backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None)
                 ),
                 initial_config=ResourceConfigWithSchedule(
                     name=stream.name, interval=timedelta(minutes=5)
