@@ -308,7 +308,7 @@ jobs:
 
       - name: Install duckdb
         if: matrix.connector == 'materialize-motherduck' || matrix.connector == 'materialize-s3-iceberg'
-        uses: opt-nc/setup-duckdb-action@v1.0.8
+        uses: opt-nc/setup-duckdb-action@v1.2.9
         with:
           version: v1.3.1
 
