@@ -701,13 +701,23 @@ class ShopifyGraphQLResource(BaseDocument):
             cls._resolve_conditional_fields(capabilities)
         )
 
+        # Don't sort bulk queries. We observed that a bulk query pairing `sortKey: UPDATED_AT`
+        # with an `updated_at` filter omits some records that match the filter. Removing the sortKey
+        # returns those omitted records. To avoid silently omitting records, never use a sortKey
+        # for bulk queries.
+        sort_key_clause = (
+            f"sortKey: {cls.SORT_KEY}"
+            if cls.SORT_KEY and not cls.SHOULD_USE_BULK_QUERIES
+            else ""
+        )
+
         query = f"""
         {{
             {cls.QUERY_ROOT}(
                 query: "updated_at:>='{lower_bound}' AND updated_at:<='{upper_bound}' {
             "AND " + query.strip() if query else ""
         }"
-                {f"sortKey: {cls.SORT_KEY}" if cls.SORT_KEY else ""}
+                {sort_key_clause}
                 {f"first: {first}" if first else ""}
                 {f'after: "{after}"' if after else ""}
             ) {{
