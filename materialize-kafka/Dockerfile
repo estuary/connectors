@@ -8,7 +8,7 @@ RUN apt-get update \
     && apt-get install -y curl ca-certificates pkg-config cmake g++ libssl-dev libsasl2-dev libclang-dev \
     && rm -rf /var/lib/apt/lists/*
 
-RUN curl https://sh.rustup.rs -sSf | bash -s -- -y --default-toolchain 1.89
+RUN curl https://sh.rustup.rs -sSf | bash -s -- -y --default-toolchain 1.91
 ENV PATH="/root/.cargo/bin:${PATH}"
 RUN rustup component add clippy
 
