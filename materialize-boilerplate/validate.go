@@ -237,19 +237,6 @@ func (v Validator) validateMatchesExistingResource(
 			return nil, err
 		}
 
-		// Continue to recommend an optional field that was part of a prior
-		// selection, even when the destination doesn't report it as an existing
-		// column (e.g. materialize-dynamodb), so that it stays selected.
-		if lastBinding != nil &&
-			len(cs) == 1 &&
-			cs[0].Type == pm.Response_Validated_Constraint_FIELD_OPTIONAL &&
-			slices.Contains(lastBinding.FieldSelection.AllFields(), p.Field) {
-			cs = []*pm.Response_Validated_Constraint{{
-				Type:   pm.Response_Validated_Constraint_LOCATION_RECOMMENDED,
-				Reason: "This location is part of the current materialization",
-			}}
-		}
-
 		constraints[p.Field] = cs
 	}
 
