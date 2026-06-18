@@ -534,6 +534,7 @@ def satisfaction_ratings(
                 backfill_satisfaction_ratings,
                 http,
                 config.subdomain,
+                config.start_date,
             )
         )
 
@@ -546,7 +547,7 @@ def satisfaction_ratings(
         open=open,
         initial_state=ResourceState(
             inc=ResourceState.Incremental(cursor=cutoff),
-            backfill=ResourceState.Backfill(cutoff=cutoff, next_page=_dt_to_s(config.start_date))
+            backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None)
         ),
         initial_config=ResourceConfig(
             name="satisfaction_ratings", interval=timedelta(minutes=5)
@@ -653,6 +654,7 @@ def incremental_time_export_resources(
                 name,
                 path,
                 response_model,
+                config.start_date,
             )
         )
 
@@ -666,7 +668,7 @@ def incremental_time_export_resources(
             open=functools.partial(open, name, path, response_model),
             initial_state=ResourceState(
                 inc=ResourceState.Incremental(cursor=cutoff),
-                backfill=ResourceState.Backfill(cutoff=cutoff, next_page=_dt_to_s(config.start_date))
+                backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None)
             ),
             initial_config=ResourceConfig(
                 name=name, interval=timedelta(minutes=5)
@@ -713,6 +715,7 @@ def talk_incremental_export_resources(
                 name,
                 path,
                 response_model,
+                config.start_date,
             )
         )
 
@@ -726,7 +729,7 @@ def talk_incremental_export_resources(
             open=functools.partial(open, name, path, response_model),
             initial_state=ResourceState(
                 inc=ResourceState.Incremental(cursor=cutoff),
-                backfill=ResourceState.Backfill(cutoff=cutoff, next_page=_dt_to_s(config.start_date))
+                backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None)
             ),
             initial_config=ResourceConfig(
                 name=name, interval=timedelta(minutes=5)

@@ -411,23 +411,29 @@ async def fetch_satisfaction_ratings(
 async def backfill_satisfaction_ratings(
     http: HTTPSession,
     subdomain: str,
+    start_date: datetime,
     log: Logger,
-    page: PageCursor,
+    page: PageCursor | None,
     cutoff: LogCursor,
 ) -> AsyncGenerator[ZendeskResource | PageCursor, None]:
-    assert isinstance(page, int)
     assert isinstance(cutoff, datetime)
     cutoff_ts = _dt_to_s(cutoff)
 
-    if page >= cutoff_ts:
+    if page is None:
+        start = _dt_to_s(start_date)
+    else:
+        assert isinstance(page, int)
+        start = page
+
+    if start >= cutoff_ts:
         return
 
-    end = min(cutoff_ts, page + int(MAX_SATISFACTION_RATINGS_WINDOW_SIZE.total_seconds()))
+    end = min(cutoff_ts, start + int(MAX_SATISFACTION_RATINGS_WINDOW_SIZE.total_seconds()))
 
     generator = _fetch_satisfaction_ratings_between(
         http=http,
         subdomain=subdomain,
-        start=page,
+        start=start,
         end=end,
         log=log,
     )
@@ -538,14 +544,20 @@ async def backfill_incremental_time_export_resources(
     name: str,
     path: str,
     response_model: type[IncrementalTimeExportResponse],
+    start_date: datetime,
     log: Logger,
-    page: PageCursor,
+    page: PageCursor | None,
     cutoff: LogCursor,
 ) -> AsyncGenerator[TimestampedResource | PageCursor, None]:
-    assert isinstance(page, int)
     assert isinstance(cutoff, datetime)
 
-    generator = _fetch_incremental_time_export_resources(http, subdomain, name, path, response_model, _s_to_dt(page), log)
+    if page is None:
+        start = start_date
+    else:
+        assert isinstance(page, int)
+        start = _s_to_dt(page)
+
+    generator = _fetch_incremental_time_export_resources(http, subdomain, name, path, response_model, start, log)
 
     async for result in generator:
         if isinstance(result, datetime):
@@ -661,14 +673,20 @@ async def backfill_talk_incremental_export_resources(
     name: str,
     path: str,
     response_model: type[TalkIncrementalExportResponse],
+    start_date: datetime,
     log: Logger,
-    page: PageCursor,
+    page: PageCursor | None,
     cutoff: LogCursor,
 ) -> AsyncGenerator[TimestampedResource | PageCursor, None]:
-    assert isinstance(page, int)
     assert isinstance(cutoff, datetime)
 
-    generator = _fetch_talk_incremental_export_resources(http, subdomain, name, path, response_model, _s_to_dt(page), log)
+    if page is None:
+        start = start_date
+    else:
+        assert isinstance(page, int)
+        start = _s_to_dt(page)
+
+    generator = _fetch_talk_incremental_export_resources(http, subdomain, name, path, response_model, start, log)
 
     async for result in generator:
         if isinstance(result, datetime):
