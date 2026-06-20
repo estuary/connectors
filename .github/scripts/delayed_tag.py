@@ -671,34 +671,47 @@ def fetch_pr_details(
     return f'{meta.strip()}\n\n--- diff ---\n{diff}'
 
 
-def build_claude_prompt(
+# Static task framing. Deliberately free of any per-connector specifics (no
+# image name, PR numbers, or diffs) so it is byte-identical across every call
+# in a run and sits at the front of the cacheable prefix.
+_VERDICT_INSTRUCTIONS = (
+    "You are auditing a release pipeline for the Estuary connectors monorepo.\n"
+    "We promote one connector image to the ':delayed' tag, pinned to a CHOSEN\n"
+    "pull request. Determine whether any LATER PR is a roll-forward fix of the\n"
+    "CHOSEN PR — i.e. patches a bug or regression introduced BY the CHOSEN PR. A\n"
+    "feature addition, refactor, dependency bump, test addition, or unrelated\n"
+    "bugfix is NOT a roll-forward fix. Only flag PRs that exist because the\n"
+    "CHOSEN PR was buggy. Note that PR descriptions may explicitly include a link\n"
+    "to the pull-request causing the regression being fixed, however you cannot\n"
+    "take this explicit statement of regression as granted. It is possible that\n"
+    "no such explicit mention of a regression is there, but the pull-request is\n"
+    "still a roll-forward fix of a previous PR. Use the explicit statement as\n"
+    "additional information and not as the sole source of truth.\n\n"
+    "Note: this repo uses rebase-and-merge, so each PR's commits land on main as\n"
+    "a linear sequence — judge PRs as units, not individual commits."
+)
+
+
+def _later_section(later_pr_bodies: list) -> str:
+    """Render the LATER-PR block, sorted by PR number so that two connectors
+    sharing the same set of LATER PRs produce byte-identical text (and thus a
+    shared cache prefix)."""
+    return '\n\n'.join(
+        f'=== LATER: PR #{num} ===\n{body}' for num, body in sorted(later_pr_bodies)
+    )
+
+
+def _chosen_section(
     image_name: str,
     source_dir: str,
     chosen_pr_num: int,
     chosen_pr_body: str,
-    later_pr_bodies: list,  # [(pr_num, body_text), ...]
 ) -> str:
-    later_sections = '\n\n'.join(
-        f'=== LATER: PR #{num} ===\n{body}' for num, body in later_pr_bodies
-    )
+    """The per-connector tail: the CHOSEN PR plus the response instruction."""
     return (
-        f"You are auditing a release pipeline for the Estuary connectors monorepo.\n"
-        f"We are about to promote image '{image_name}' (source dir '{source_dir}/') to\n"
-        f"the ':delayed' tag, pinned to PR #{chosen_pr_num}.\n\n"
-        f"Determine whether any LATER PR is a roll-forward fix of the CHOSEN PR —\n"
-        f"i.e. patches a bug or regression introduced BY the CHOSEN PR. A feature\n"
-        f"addition, refactor, dependency bump, test addition, or unrelated bugfix\n"
-        f"is NOT a roll-forward fix. Only flag PRs that exist because the CHOSEN\n"
-        f"PR was buggy. Note that PR descriptions may explicitly include a link\n"
-        f"to the pull-request causing the regression being fixed, however you cannot\n"
-        f"take this explicit statement of regression as granted. It is possible that\n"
-        f"no such explicit mention of a regression is there, but the pull-request is still\n"
-        f"a roll-forward fix of a previous PR. Use the explicit statement as additional\n"
-        f"information and not as the sole source of truth.\n\n"
-        f"Note: this repo uses rebase-and-merge, so each PR's commits land on main\n"
-        f"as a linear sequence — judge PRs as units, not individual commits.\n\n"
+        f"We are about to promote image '{image_name}' (source dir "
+        f"'{source_dir}/') to the ':delayed' tag, pinned to PR #{chosen_pr_num}.\n\n"
         f"=== CHOSEN: PR #{chosen_pr_num} ===\n{chosen_pr_body}\n\n"
-        f"{later_sections}\n\n"
         f'Reply with ONLY a JSON object, no prose:\n'
         f'{{"verdict": "safe" | "hold", "reason": "<one short sentence>", '
         f'"fix_prs": [<pr numbers that are roll-forward fixes of CHOSEN>]}}\n'
@@ -707,12 +720,62 @@ def build_claude_prompt(
     )
 
 
-def call_claude(prompt: str, api_key: str, model: str = 'claude-sonnet-4-6') -> str:
-    """Call the Anthropic Messages API and return the assistant's text."""
+def build_claude_content(
+    image_name: str,
+    source_dir: str,
+    chosen_pr_num: int,
+    chosen_pr_body: str,
+    later_pr_bodies: list,  # [(pr_num, body_text), ...]
+) -> list:
+    """
+    Build the Messages API `content` blocks for one verdict request.
+
+    The static instructions + LATER-PR diffs form the first block and carry a
+    cache_control breakpoint. Connectors that share the same set of LATER PRs —
+    the common (and expensive) case after a monorepo-wide sweep PR, where one
+    large diff is a LATER PR for many connectors — produce a byte-identical
+    prefix, so every call after the first reads those diffs from cache (~0.1x
+    input price) instead of re-billing them in full at 1x. The per-connector
+    CHOSEN PR + question go in a trailing, uncached block.
+
+    cmd_check orders its calls so connectors sharing a LATER set run
+    back-to-back, keeping the cache entry warm within its TTL.
+    """
+    prefix = f'{_VERDICT_INSTRUCTIONS}\n\n{_later_section(later_pr_bodies)}'
+    suffix = _chosen_section(image_name, source_dir, chosen_pr_num, chosen_pr_body)
+    return [
+        {'type': 'text', 'text': prefix, 'cache_control': {'type': 'ephemeral'}},
+        {'type': 'text', 'text': suffix},
+    ]
+
+
+def build_claude_prompt(
+    image_name: str,
+    source_dir: str,
+    chosen_pr_num: int,
+    chosen_pr_body: str,
+    later_pr_bodies: list,  # [(pr_num, body_text), ...]
+) -> str:
+    """Full prompt text as a single string. build_claude_content holds the
+    cache-aware block split actually sent to the API; this mirrors it for
+    readability and tests."""
+    blocks = build_claude_content(
+        image_name, source_dir, chosen_pr_num, chosen_pr_body, later_pr_bodies
+    )
+    return '\n\n'.join(b['text'] for b in blocks)
+
+
+def call_claude(content, api_key: str, model: str = 'claude-sonnet-4-6') -> str:
+    """Call the Anthropic Messages API and return the assistant's text.
+
+    `content` is a Messages API content value — either a plain string or a list
+    of content blocks (the cache-aware form from build_claude_content). Token
+    usage (including cache reads/writes) is logged to stderr so the cache hit
+    rate is visible in CI logs."""
     payload = json.dumps({
         'model': model,
         'max_tokens': 1024,
-        'messages': [{'role': 'user', 'content': prompt}],
+        'messages': [{'role': 'user', 'content': content}],
     }).encode()
     req = urllib.request.Request(
         'https://api.anthropic.com/v1/messages',
@@ -725,7 +788,16 @@ def call_claude(prompt: str, api_key: str, model: str = 'claude-sonnet-4-6') -> 
     )
     try:
         with urllib.request.urlopen(req, timeout=90) as resp:
-            return json.loads(resp.read())['content'][0]['text']
+            obj = json.loads(resp.read())
+        u = obj.get('usage', {})
+        print(
+            f'    tokens: input={u.get("input_tokens", 0)} '
+            f'cache_write={u.get("cache_creation_input_tokens", 0)} '
+            f'cache_read={u.get("cache_read_input_tokens", 0)} '
+            f'output={u.get("output_tokens", 0)}',
+            file=sys.stderr,
+        )
+        return obj['content'][0]['text']
     except (urllib.error.URLError, KeyError, json.JSONDecodeError) as exc:
         raise RuntimeError(f'Claude API error: {exc}') from exc
 
@@ -888,7 +960,17 @@ def cmd_check(args: argparse.Namespace) -> None:
             )
         return pr_details_cache[pr_number]
 
-    for entry in plan:
+    # Process connectors grouped by their LATER-PR set. build_claude_content
+    # caches the (instructions + LATER diffs) prefix, which is identical for
+    # connectors sharing a LATER set; running them back-to-back keeps that
+    # cache entry warm so all but the first read it instead of re-billing the
+    # diffs. Iterate a sorted copy — `plan` stays in its original order for
+    # build_safe_plan below.
+    ordered = sorted(
+        plan,
+        key=lambda e: (sorted(later_map.get(e.image_name, [])), e.chosen_pr),
+    )
+    for entry in ordered:
         later_prs = later_map.get(entry.image_name, [])
         if not later_prs:
             continue
@@ -909,14 +991,14 @@ def cmd_check(args: argparse.Namespace) -> None:
             (pr, fetch_cached(pr))
             for pr in later_prs
         ]
-        prompt = build_claude_prompt(
+        content = build_claude_content(
             entry.image_name, entry.source_dir,
             entry.chosen_pr, chosen_body,
             later_bodies,
         )
 
         try:
-            raw = call_claude(prompt, api_key, model=args.model)
+            raw = call_claude(content, api_key, model=args.model)
         except RuntimeError as exc:
             print(f'::warning::{entry.image_name}: {exc}; treating as safe')
             verdict = Verdict(entry.image_name, 'safe', f'api error: {exc}')

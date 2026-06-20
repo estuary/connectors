@@ -8,6 +8,7 @@ from delayed_tag import (
     LaterEntry,
     Verdict,
     build_safe_plan,
+    build_claude_content,
     build_claude_prompt,
     filter_backward_moves,
     find_boundary,
@@ -300,6 +301,42 @@ class TestBuildClaudePrompt(unittest.TestCase):
     def test_no_later_prs(self):
         prompt = build_claude_prompt('img', 'dir', 5, 'chosen body', [])
         self.assertIn('PR #5', prompt)
+
+
+# ---------------------------------------------------------------------------
+# build_claude_content (prompt caching)
+# ---------------------------------------------------------------------------
+
+class TestBuildClaudeContent(unittest.TestCase):
+
+    def test_two_blocks_prefix_is_cached(self):
+        blocks = build_claude_content('img', 'dir', 5, 'chosen', [(9, 'fix')])
+        self.assertEqual(len(blocks), 2)
+        self.assertEqual(blocks[0]['cache_control'], {'type': 'ephemeral'})
+        self.assertNotIn('cache_control', blocks[1])
+
+    def test_chosen_pr_is_in_uncached_tail(self):
+        # The per-connector CHOSEN PR must live in the trailing block, not the
+        # cached prefix — otherwise the prefix would differ per connector.
+        blocks = build_claude_content('img', 'dir', 5, 'chosen', [(9, 'fix')])
+        self.assertNotIn('CHOSEN: PR #5', blocks[0]['text'])
+        self.assertIn('CHOSEN: PR #5', blocks[1]['text'])
+        self.assertIn('LATER: PR #9', blocks[0]['text'])
+
+    def test_shared_later_set_yields_identical_prefix(self):
+        # The whole point: two connectors with different CHOSEN PRs but the same
+        # LATER set produce a byte-identical cacheable prefix (a cache hit).
+        later = [(99, 'sweep diff')]
+        a = build_claude_content('conn-a', 'conn-a', 1, 'a body', later)
+        b = build_claude_content('conn-b', 'conn-b', 2, 'b body', later)
+        self.assertEqual(a[0]['text'], b[0]['text'])
+        self.assertNotEqual(a[1]['text'], b[1]['text'])
+
+    def test_later_section_sorted_for_byte_stability(self):
+        # Same LATER set in different order must still produce the same prefix.
+        forward = build_claude_content('i', 'd', 1, 'c', [(10, 'x'), (20, 'y')])
+        reverse = build_claude_content('i', 'd', 1, 'c', [(20, 'y'), (10, 'x')])
+        self.assertEqual(forward[0]['text'], reverse[0]['text'])
 
 
 # ---------------------------------------------------------------------------
