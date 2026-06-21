@@ -542,10 +542,10 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 		// binding in backfillBindings is having its backfill counter incremented,
 		// which triggers a backfill of that resource.
 		log.WithFields(log.Fields{
-			"observable":      true,
-			"materialization": req.Materialization.Name.String(),
-			"resource_path":   strings.Join(req.Materialization.Bindings[bindingIdx].ResourcePath, "."),
-			"backfill":        req.Materialization.Bindings[bindingIdx].Backfill,
+			"observable":        true,
+			"catalog_task_name": req.Materialization.Name.String(),
+			"resource_path":     strings.Join(req.Materialization.Bindings[bindingIdx].ResourcePath, "."),
+			"backfill":          req.Materialization.Bindings[bindingIdx].Backfill,
 		}).Info("backfill triggered")
 
 		// If the existing resource is compatible with the proposed binding spec
@@ -671,12 +671,12 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 				})
 				// Observable log for fleet-wide aggregation of column migrations by type.
 				log.WithFields(log.Fields{
-					"observable":      true,
-					"materialization": req.Materialization.Name.String(),
-					"resource_path":   strings.Join(mb.ResourcePath, "."),
-					"field":           p.Field,
-					"fromType":        existingField.Type,
-					"toType":          p.Mapped.String(),
+					"observable":        true,
+					"catalog_task_name": req.Materialization.Name.String(),
+					"resource_path":     strings.Join(mb.ResourcePath, "."),
+					"field":             p.Field,
+					"fromType":          existingField.Type,
+					"toType":            p.Mapped.String(),
 				}).Info("migrating column type")
 			} else if !p.Mapped.Compatible(*existingField) {
 				// This is mostly a sanity check that some other process (user

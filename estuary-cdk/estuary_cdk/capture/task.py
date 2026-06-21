@@ -115,6 +115,14 @@ class _BaseTask:
     _output: BinaryIO
     _tg: asyncio.TaskGroup
 
+    catalog_task_name: str
+    """The catalog task name of this capture (e.g. "acmeCo/my-capture"). Shared
+    by all Tasks of a capture and inherited by children via spawn_child. Used for
+    observability logging.
+
+    Distinct from the `_name` field, which is a connector-internal name for the
+    Python/asyncio task (e.g. "capture", "capture.webhook-server")."""
+
     MAX_BUFFER_MEM: int = 1_000_000
     """Maximum amount of memory to use for captured documents between checkpoints,
     before spilling to disk."""
@@ -128,6 +136,7 @@ class _BaseTask:
         stopping: Stopping,
         tg: asyncio.TaskGroup,
         transactor: Transactor,
+        catalog_task_name: str,
         requires_ack: bool = False,
     ):
         self._buffer = tempfile.SpooledTemporaryFile(max_size=self.MAX_BUFFER_MEM)
@@ -140,6 +149,7 @@ class _BaseTask:
         self.stopping = stopping
         self.transactor = transactor
         self.requires_ack = requires_ack
+        self.catalog_task_name = catalog_task_name
 
     def _captured(self, binding: int, document: Any):
         if isinstance(document, dict):
@@ -287,6 +297,7 @@ class Task(_BaseTask):
                         parent.stopping,
                         child_tg,
                         parent.transactor,
+                        parent.catalog_task_name,
                         parent.requires_ack,
                     )
                     await child(t)
@@ -328,6 +339,7 @@ class MultipleWritersTask(_BaseTask):
         stopping: _BaseTask.Stopping,
         tg: asyncio.TaskGroup,
         transactor: Transactor,
+        catalog_task_name: str,
         requires_ack: bool = False,
     ):
         super().__init__(
@@ -339,6 +351,7 @@ class MultipleWritersTask(_BaseTask):
             tg=tg,
             transactor=transactor,
             requires_ack=requires_ack,
+            catalog_task_name=catalog_task_name,
         )
         self._buffer_lock = asyncio.Lock()
 

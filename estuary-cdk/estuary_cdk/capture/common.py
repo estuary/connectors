@@ -1118,7 +1118,7 @@ async def _binding_backfill_task(
         task.log.info(
             "beginning backfill",
             {"state": state, "subtask_id": subtask_id},
-            extra={OBSERVABLE_FIELD: True},
+            extra={OBSERVABLE_FIELD: True, "catalog_task_name": task.catalog_task_name},
         )
 
     while True:

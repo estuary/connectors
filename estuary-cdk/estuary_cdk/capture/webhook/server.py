@@ -106,6 +106,7 @@ def build_webhook_app(
         tg=task._tg,  # pyright: ignore[reportPrivateUsage]
         transactor=task.transactor,
         requires_ack=task.requires_ack,
+        catalog_task_name=task.catalog_task_name,
     )
 
     async def webhook_handler(req: web.Request) -> web.Response:
@@ -171,6 +172,7 @@ def start_webhook_server(
                 webhook_tg,
                 task.transactor,
                 requires_ack=True,
+                catalog_task_name=task.catalog_task_name,
             )
 
             app = build_webhook_app(binding_index_mapping, webhook_task)

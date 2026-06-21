@@ -59,6 +59,7 @@ def _task(output: BinaryIO, stopping: Task.Stopping) -> Task:
         stopping=stopping,
         tg=MagicMock(),
         transactor=Transactor(output),
+        catalog_task_name="acmeCo/test-snapshot",
         requires_ack=False,
     )
 

@@ -150,6 +150,7 @@ const (
 // via replication, backfilling preexisting table contents, and emitting records/state
 // updates. It uses the `Database` interface to interact with a specific database.
 type Capture struct {
+	Name     string                  // The catalog task name of this capture, used for observability logging
 	Bindings map[StreamID]*Binding   // Map from fully-qualified stream IDs to the corresponding binding information
 	State    *PersistentState        // State read from `state.json` and emitted as updates
 	Output   *boilerplate.PullOutput // The encoder to which records and state updates are written
@@ -493,9 +494,10 @@ func (c *Capture) activatePendingStreams(ctx context.Context, discovery map[Stre
 		switch state.Mode {
 		case TableStatePreciseBackfill, TableStateUnfilteredBackfill, TableStateKeylessBackfill:
 			log.WithFields(log.Fields{
-				"observable": true,
-				"stream":     streamID.String(),
-				"mode":       string(binding.Resource.Mode),
+				"observable":        true,
+				"catalog_task_name": c.Name,
+				"stream":            streamID.String(),
+				"mode":              string(binding.Resource.Mode),
 			}).Info("backfill triggered")
 		}
 
