@@ -246,6 +246,7 @@ class BaseCaptureConnector(
                         stopping,
                         tg,
                         self._transactor,
+                        catalog_task_name=open.capture.name,
                     )
                     log.event.status("Capture started")
                     await capture(task)

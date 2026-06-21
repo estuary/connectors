@@ -60,6 +60,7 @@ async def run_server(
         stopping=stopping,
         tg=MagicMock(),
         transactor=transactor,
+        catalog_task_name="acmeCo/test-webhook",
         requires_ack=True,
     )
 
@@ -353,6 +354,7 @@ def _make_task() -> Task:
         stopping=Task.Stopping(),
         tg=MagicMock(),
         transactor=Transactor(output, requires_explicit_acks=True),
+        catalog_task_name="acmeCo/test-webhook",
         requires_ack=True,
     )
 
@@ -372,6 +374,7 @@ class TestWebhookAckBlocking:
             stopping=stopping,
             tg=MagicMock(),
             transactor=transactor,
+            catalog_task_name="acmeCo/test-webhook-ack",
             requires_ack=True,
         )
 
@@ -444,6 +447,7 @@ class TestSharedWebhookTask:
             stopping=stopping,
             tg=MagicMock(),
             transactor=transactor,
+            catalog_task_name="acmeCo/test-webhook-pipeline",
             requires_ack=True,
         )
 
