@@ -26,3 +26,9 @@ func (c *countingWriteCloser) Close() error {
 	}
 	return nil
 }
+
+// Tell satisfies the parquet/internal/utils.WriterTell interface that arrow-go's
+// file.NewPageWriter requires of its sink. We return the running byte count.
+func (c *countingWriteCloser) Tell() int64 {
+	return int64(c.written)
+}

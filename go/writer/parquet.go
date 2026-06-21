@@ -140,7 +140,7 @@ type ParquetWriter struct {
 
 	schema        ParquetSchema
 	schemaRoot    *schema.GroupNode
-	sinkWriter    *file.Writer
+	sinkWriter    *mergeWriter
 	cwc           *countingWriteCloser
 	rs            rowSize
 	rowGroupCount int
@@ -154,9 +154,14 @@ type ParquetWriter struct {
 		columnChunkCount int
 	}
 
-	// buffer contains rows of values that are pending to be written as a row group to the scratch
-	// file when bufferSizeBytes exceeds the threshold.
-	buffer          [][]any
+	// buffer holds column-oriented values pending to be written as a row group to the scratch file
+	// when bufferSizeBytes exceeds the threshold. Each entry is a strongly-typed slice (e.g.
+	// []int64, []parquet.ByteArray) matching the column's parquet physical type, and contains only
+	// non-null values for that column. defLevels[colIdx] runs parallel to the row order with 0 for
+	// null and 1 for present, so its length always equals bufferRowCount.
+	buffer          []any
+	defLevels       [][]int16
+	bufferRowCount  int
 	bufferSizeBytes int
 }
 
@@ -210,47 +215,119 @@ func NewParquetWriter(w io.WriteCloser, sch ParquetSchema, opts ...ParquetOption
 	schemaRoot := schema.MustGroup(schema.NewGroupNode("schema", parquet.Repetitions.Required, fields, -1))
 
 	cwc := &countingWriteCloser{w: w}
+	props, kvmeta := sinkWriterProperties(cfg)
+	// Matching arrow-go's *file.Writer constructor, we panic on the magic-bytes write failure
+	// rather than threading an error through NewParquetWriter — a sink that can't accept 4 bytes
+	// at construction time will fail again immediately on the first real write.
+	sinkWriter, err := newMergeWriter(cwc, schemaRoot, props, kvmeta)
+	if err != nil {
+		panic(fmt.Sprintf("creating sink writer: %s", err))
+	}
+
+	buffer := make([]any, len(sch))
+	defLevels := make([][]int16, len(sch))
+	const initialCap = 1000
+	for i, e := range sch {
+		buffer[i] = makeColumnBuffer(e.DataType, initialCap)
+		defLevels[i] = make([]int16, 0, initialCap)
+	}
 
 	return &ParquetWriter{
 		cfg:        cfg,
 		schema:     sch,
 		schemaRoot: schemaRoot,
-		sinkWriter: file.NewParquetWriter(cwc, schemaRoot, writerOpts(cfg)...),
+		sinkWriter: sinkWriter,
 		cwc:        cwc,
 		rs:         newRowSizing(sch),
+		buffer:     buffer,
+		defLevels:  defLevels,
 	}
 }
 
-func writerOpts(cfg parquetConfig) []file.WriteOption {
-	propOpts := []parquet.WriterProperty{}
-
-	switch cfg.compression {
-	case Uncompressed:
-		propOpts = append(propOpts, parquet.WithCompression(compress.Codecs.Uncompressed))
-	case Snappy:
-		propOpts = append(propOpts, parquet.WithCompression(compress.Codecs.Snappy))
-	case Gzip:
-		propOpts = append(propOpts, parquet.WithCompression(compress.Codecs.Gzip))
+// makeColumnBuffer returns a pointer to an empty strongly-typed slice for the given column type.
+// Storing a pointer (one word) in the []any buffer avoids a heap allocation on every append,
+// since the interface data word holds the pointer directly rather than boxing a 3-word slice header.
+func makeColumnBuffer(dt ParquetDataType, initialCap int) any {
+	switch dt {
+	case PrimitiveTypeInteger, LogicalTypeTime, LogicalTypeTimestamp, LogicalTypeTimestampNanos:
+		s := make([]int64, 0, initialCap)
+		return &s
+	case PrimitiveTypeNumber:
+		s := make([]float64, 0, initialCap)
+		return &s
+	case PrimitiveTypeBoolean:
+		s := make([]bool, 0, initialCap)
+		return &s
+	case PrimitiveTypeBinary, LogicalTypeJson, LogicalTypeString:
+		s := make([]parquet.ByteArray, 0, initialCap)
+		return &s
+	case LogicalTypeUuid, LogicalTypeDecimal, LogicalTypeInterval:
+		s := make([]parquet.FixedLenByteArray, 0, initialCap)
+		return &s
+	case LogicalTypeDate:
+		s := make([]int32, 0, initialCap)
+		return &s
 	default:
-		panic(fmt.Sprintf("unknown compression setting: %d", cfg.compression))
+		panic(fmt.Sprintf("makeColumnBuffer unknown type: %d", dt))
 	}
+}
 
-	if cfg.disableDictionaryEncoding {
-		propOpts = append(propOpts, parquet.WithDictionaryDefault(false))
+// resetColumnBuffer truncates the slice pointed to by s to length 0 while preserving its
+// underlying capacity so subsequent buffer cycles can reuse the allocation.
+func resetColumnBuffer(s any) {
+	switch sp := s.(type) {
+	case *[]int64:
+		*sp = (*sp)[:0]
+	case *[]int32:
+		*sp = (*sp)[:0]
+	case *[]float64:
+		*sp = (*sp)[:0]
+	case *[]bool:
+		*sp = (*sp)[:0]
+	case *[]parquet.ByteArray:
+		*sp = (*sp)[:0]
+	case *[]parquet.FixedLenByteArray:
+		*sp = (*sp)[:0]
+	default:
+		panic(fmt.Sprintf("resetColumnBuffer unknown type: %T", s))
 	}
+}
 
-	out := []file.WriteOption{file.WithWriterProps(parquet.NewWriterProperties(propOpts...))}
+func compressionCodec(c ParquetCompression) compress.Compression {
+	switch c {
+	case Uncompressed:
+		return compress.Codecs.Uncompressed
+	case Snappy:
+		return compress.Codecs.Snappy
+	case Gzip:
+		return compress.Codecs.Gzip
+	default:
+		panic(fmt.Sprintf("unknown compression setting: %d", c))
+	}
+}
+
+// sinkWriterProperties builds the WriterProperties used by the sink mergeWriter and the
+// KeyValueMetadata to embed in the file. Dictionary encoding is unconditionally disabled because
+// transferColumnValues copies pages verbatim from scratch into the sink, and the sink cannot
+// retroactively build a dictionary from already-encoded pages. The `disableDictionaryEncoding`
+// config field is therefore now a no-op kept only for API compatibility.
+func sinkWriterProperties(cfg parquetConfig) (*parquet.WriterProperties, metadata.KeyValueMetadata) {
+	propOpts := []parquet.WriterProperty{
+		parquet.WithCompression(compressionCodec(cfg.compression)),
+		parquet.WithDictionaryDefault(false),
+	}
+	props := parquet.NewWriterProperties(propOpts...)
+
+	var kv metadata.KeyValueMetadata
 	if len(cfg.metadata) > 0 {
-		meta := metadata.NewKeyValueMetadata()
+		kv = metadata.NewKeyValueMetadata()
 		for k, v := range cfg.metadata {
-			if err := meta.Append(k, v); err != nil {
+			if err := kv.Append(k, v); err != nil {
 				panic(fmt.Sprintf("invalid metadata: %s", err)) // only possible if the metadata keys/values contain invalid UTF-8
 			}
 		}
-		out = append(out, file.WithWriteMetadata(meta))
 	}
-
-	return out
+	return props, kv
 }
 
 // Write a row of data by buffering it in the writers's buffer, and if thresholds are
@@ -272,16 +349,100 @@ func (w *ParquetWriter) Write(row []any) error {
 		scratchOpts := []parquet.WriterProperty{
 			// Don't use dictionary encoding for the scratch file, since it is
 			// much slower to write than plain encoding with the small row
-			// groups of the scratch file.
+			// groups of the scratch file. Also avoids the dictionary-page
+			// splice problem when copying pages verbatim into the sink.
 			parquet.WithDictionaryDefault(false),
-			// Turning off stats calculations helps too, but just a tiny bit.
-			parquet.WithStats(false),
+			// Match the sink codec so transferColumnValues can copy page bytes
+			// without re-compressing. Stats default on so per-page min/max
+			// propagate via copied pages to the sink output.
+			parquet.WithCompression(compressionCodec(w.cfg.compression)),
 		}
 		w.scratch.writer = file.NewParquetWriter(w.scratch.file, w.schemaRoot, file.WithWriterProps(parquet.NewWriterProperties(scratchOpts...)))
 	}
 
-	w.buffer = append(w.buffer, row)
+	for colIdx, f := range w.schema {
+		v := row[colIdx]
+		if v == nil {
+			w.defLevels[colIdx] = append(w.defLevels[colIdx], 0)
+			continue
+		}
+		w.defLevels[colIdx] = append(w.defLevels[colIdx], 1)
+
+		switch f.DataType {
+		case PrimitiveTypeInteger:
+			var q int64
+			if q, err = getIntVal(v); err == nil {
+				appendVal(w, colIdx, q)
+			}
+		case PrimitiveTypeNumber:
+			var q float64
+			if q, err = getNumberVal(v); err == nil {
+				appendVal(w, colIdx, q)
+			}
+		case PrimitiveTypeBoolean:
+			var q bool
+			if q, err = getBooleanVal(v); err == nil {
+				appendVal(w, colIdx, q)
+			}
+		case PrimitiveTypeBinary:
+			var q parquet.ByteArray
+			if q, err = getBinaryVal(v); err == nil {
+				appendVal(w, colIdx, q)
+			}
+		case LogicalTypeJson:
+			var q parquet.ByteArray
+			if q, err = getJsonVal(v); err == nil {
+				appendVal(w, colIdx, q)
+			}
+		case LogicalTypeString:
+			var q parquet.ByteArray
+			if q, err = getStringVal(v); err == nil {
+				appendVal(w, colIdx, q)
+			}
+		case LogicalTypeUuid:
+			var q parquet.FixedLenByteArray
+			if q, err = getUuidVal(v); err == nil {
+				appendVal(w, colIdx, q)
+			}
+		case LogicalTypeDate:
+			var q int32
+			if q, err = getDateVal(v); err == nil {
+				appendVal(w, colIdx, q)
+			}
+		case LogicalTypeTime:
+			var q int64
+			if q, err = getTimeVal(v); err == nil {
+				appendVal(w, colIdx, q)
+			}
+		case LogicalTypeTimestamp:
+			var q int64
+			if q, err = getTimestampVal(v); err == nil {
+				appendVal(w, colIdx, q)
+			}
+		case LogicalTypeTimestampNanos:
+			var q int64
+			if q, err = getTimestampNanosVal(v); err == nil {
+				appendVal(w, colIdx, q)
+			}
+		case LogicalTypeDecimal:
+			var q parquet.FixedLenByteArray
+			if q, err = getDecimalVal(v); err == nil {
+				appendVal(w, colIdx, q)
+			}
+		case LogicalTypeInterval:
+			var q parquet.FixedLenByteArray
+			if q, err = getIntervalVal(v); err == nil {
+				appendVal(w, colIdx, q)
+			}
+		default:
+			panic(fmt.Sprintf("attempted to write unknown type of column '%s': %d", f.Name, f.DataType))
+		}
+		if err != nil {
+			return fmt.Errorf("converting value for column '%s': %w (type %T)", f.Name, err, v)
+		}
+	}
 	w.bufferSizeBytes += w.rs.estSize(row)
+	w.bufferRowCount += 1
 	w.scratch.rowCount += 1
 
 	if w.bufferSizeBytes >= maxBufferSize {
@@ -311,6 +472,13 @@ func (w *ParquetWriter) Write(row []any) error {
 	}
 
 	return nil
+}
+
+// appendVal appends v to the column's typed buffer slice. The caller is
+// responsible for handling nil values and maintaining defLevels.
+func appendVal[T parquetValue](w *ParquetWriter, colIdx int, v T) {
+	sp := w.buffer[colIdx].(*[]T)
+	*sp = append(*sp, v)
 }
 
 // Written returns the number of bytes written to the output writer. This value increases only as
@@ -378,70 +546,71 @@ func (w *ParquetWriter) flushScratchFile() error {
 
 // flushBuffer writes the current buffered rows as a single row group to the scratch file.
 func (w *ParquetWriter) flushBuffer() error {
-	if len(w.buffer) == 0 {
+	if w.bufferRowCount == 0 {
 		return nil
 	}
 
 	rgWriter := w.scratch.writer.AppendRowGroup()
 
-	// Transpose the buffered rows into the scratch file row group by writing them column-by-column.
 	for colIdx, f := range w.schema {
 		cw, err := rgWriter.NextColumn()
 		if err != nil {
 			return fmt.Errorf("getting next column: %w", err)
 		}
 
+		defLvls := w.defLevels[colIdx]
+
 		switch f.DataType {
 		case PrimitiveTypeInteger:
-			if err := writeColumn(colIdx, w.buffer, cw.(*file.Int64ColumnChunkWriter), getIntVal); err != nil {
+			if err := writeColumn(cw.(*file.Int64ColumnChunkWriter), *w.buffer[colIdx].(*[]int64), defLvls); err != nil {
 				return fmt.Errorf("writing integer column '%s': %w", f.Name, err)
 			}
 		case PrimitiveTypeNumber:
-			if err := writeColumn(colIdx, w.buffer, cw.(*file.Float64ColumnChunkWriter), getNumberVal); err != nil {
+			if err := writeColumn(cw.(*file.Float64ColumnChunkWriter), *w.buffer[colIdx].(*[]float64), defLvls); err != nil {
 				return fmt.Errorf("writing number column '%s': %w", f.Name, err)
 			}
 		case PrimitiveTypeBoolean:
-			if err := writeColumn(colIdx, w.buffer, cw.(*file.BooleanColumnChunkWriter), getBooleanVal); err != nil {
+			if err := writeColumn(cw.(*file.BooleanColumnChunkWriter), *w.buffer[colIdx].(*[]bool), defLvls); err != nil {
 				return fmt.Errorf("writing boolean column '%s': %w", f.Name, err)
 			}
 		case PrimitiveTypeBinary:
-			if err := writeColumn(colIdx, w.buffer, cw.(*file.ByteArrayColumnChunkWriter), getBinaryVal); err != nil {
+			if err := writeColumn(cw.(*file.ByteArrayColumnChunkWriter), *w.buffer[colIdx].(*[]parquet.ByteArray), defLvls); err != nil {
 				return fmt.Errorf("writing byte array column '%s': %w", f.Name, err)
 			}
 		case LogicalTypeJson:
-			if err := writeColumn(colIdx, w.buffer, cw.(*file.ByteArrayColumnChunkWriter), getJsonVal); err != nil {
+			if err := writeColumn(cw.(*file.ByteArrayColumnChunkWriter), *w.buffer[colIdx].(*[]parquet.ByteArray), defLvls); err != nil {
 				return fmt.Errorf("writing byte array (json) column '%s': %w", f.Name, err)
 			}
 		case LogicalTypeString:
-			if err := writeColumn(colIdx, w.buffer, cw.(*file.ByteArrayColumnChunkWriter), getStringVal); err != nil {
+			if err := writeColumn(cw.(*file.ByteArrayColumnChunkWriter), *w.buffer[colIdx].(*[]parquet.ByteArray), defLvls); err != nil {
 				return fmt.Errorf("writing byte array (string) column '%s': %w", f.Name, err)
 			}
 		case LogicalTypeUuid:
-			if err := writeColumn(colIdx, w.buffer, cw.(*file.FixedLenByteArrayColumnChunkWriter), getUuidVal); err != nil {
+			if err := writeColumn(cw.(*file.FixedLenByteArrayColumnChunkWriter), *w.buffer[colIdx].(*[]parquet.FixedLenByteArray), defLvls); err != nil {
 				return fmt.Errorf("writing uuid column '%s': %w", f.Name, err)
 			}
 		case LogicalTypeDate:
-			if err := writeColumn(colIdx, w.buffer, cw.(*file.Int32ColumnChunkWriter), getDateVal); err != nil {
+			if err := writeColumn(cw.(*file.Int32ColumnChunkWriter), *w.buffer[colIdx].(*[]int32), defLvls); err != nil {
 				return fmt.Errorf("writing date column '%s': %w", f.Name, err)
 			}
 		case LogicalTypeTime:
-			if err := writeColumn(colIdx, w.buffer, cw.(*file.Int64ColumnChunkWriter), getTimeVal); err != nil {
+			if err := writeColumn(cw.(*file.Int64ColumnChunkWriter), *w.buffer[colIdx].(*[]int64), defLvls); err != nil {
 				return fmt.Errorf("writing time column '%s': %w", f.Name, err)
 			}
 		case LogicalTypeTimestamp:
-			if err := writeColumn(colIdx, w.buffer, cw.(*file.Int64ColumnChunkWriter), getTimestampVal); err != nil {
+			if err := writeColumn(cw.(*file.Int64ColumnChunkWriter), *w.buffer[colIdx].(*[]int64), defLvls); err != nil {
 				return fmt.Errorf("writing timestamp column '%s': %w", f.Name, err)
 			}
 		case LogicalTypeTimestampNanos:
-			if err := writeColumn(colIdx, w.buffer, cw.(*file.Int64ColumnChunkWriter), getTimestampNanosVal); err != nil {
+			if err := writeColumn(cw.(*file.Int64ColumnChunkWriter), *w.buffer[colIdx].(*[]int64), defLvls); err != nil {
 				return fmt.Errorf("writing timestamp (nanos) column '%s': %w", f.Name, err)
 			}
 		case LogicalTypeDecimal:
-			if err := writeColumn(colIdx, w.buffer, cw.(*file.FixedLenByteArrayColumnChunkWriter), getDecimalVal); err != nil {
-				return fmt.Errorf("writing interval column '%s': %w", f.Name, err)
+			if err := writeColumn(cw.(*file.FixedLenByteArrayColumnChunkWriter), *w.buffer[colIdx].(*[]parquet.FixedLenByteArray), defLvls); err != nil {
+				return fmt.Errorf("writing decimal column '%s': %w", f.Name, err)
 			}
 		case LogicalTypeInterval:
-			if err := writeColumn(colIdx, w.buffer, cw.(*file.FixedLenByteArrayColumnChunkWriter), getIntervalVal); err != nil {
+			if err := writeColumn(cw.(*file.FixedLenByteArrayColumnChunkWriter), *w.buffer[colIdx].(*[]parquet.FixedLenByteArray), defLvls); err != nil {
 				return fmt.Errorf("writing interval column '%s': %w", f.Name, err)
 			}
 		default:
@@ -459,7 +628,11 @@ func (w *ParquetWriter) flushBuffer() error {
 
 	w.scratch.sizeBytes += int(rgWriter.TotalBytesWritten())
 	w.scratch.columnChunkCount += len(w.schema)
-	w.buffer = w.buffer[:0]
+	for i := range w.buffer {
+		resetColumnBuffer(w.buffer[i])
+		w.defLevels[i] = w.defLevels[i][:0]
+	}
+	w.bufferRowCount = 0
 	w.bufferSizeBytes = 0
 
 	return nil
@@ -467,17 +640,6 @@ func (w *ParquetWriter) flushBuffer() error {
 
 type parquetValue interface {
 	int64 | int32 | float64 | bool | parquet.FixedLenByteArray | parquet.ByteArray
-}
-
-// columnBatchReader is a generic wrapper for reading a batch of values having type T from a column.
-// This interface is satisfied by any of the typed column readers from the Apache parquet package.
-type columnBatchReader[T parquetValue] interface {
-	// ReadBatch reads batchSize values from the column. values must be large enough to hold the
-	// number of values that will be read. defLvls and repLvls will be populated if not nil; they
-	// are not inputs to the operation but their populated values are necessary for interpreting the
-	// data read into values. total is the number of rows that were read; valuesRead is the actual
-	// number of physical values that were read excluding nulls.
-	ReadBatch(batchSize int64, values []T, defLvls []int16, repLvls []int16) (total int64, valuesRead int, err error)
 }
 
 // columnBatchWriter is a generic wrapper for writing a batch of values having type T to a column.
@@ -495,33 +657,7 @@ type columnBatchWriter[T parquetValue] interface {
 	WriteBatch(vals []T, defLvls []int16, repLvls []int16) (valueOffset int64, err error)
 }
 
-type getValFn[T parquetValue] func(v any) (got T, err error)
-
-func writeColumn[T parquetValue](
-	colIdx int,
-	buf [][]any,
-	w columnBatchWriter[T],
-	getVal getValFn[T],
-) error {
-	var vals []T
-	var defLevels []int16
-
-	for _, row := range buf {
-		v := row[colIdx]
-		switch tv := v.(type) {
-		case nil:
-			defLevels = append(defLevels, 0)
-		default:
-			got, err := getVal(tv)
-			if err != nil {
-				return fmt.Errorf("getting typed value for value: %w (type %T)", err, tv)
-			}
-
-			vals = append(vals, got)
-			defLevels = append(defLevels, 1)
-		}
-	}
-
+func writeColumn[T parquetValue](w columnBatchWriter[T], vals []T, defLevels []int16) error {
 	if valuesWritten, err := w.WriteBatch(vals, defLevels, nil); err != nil {
 		return fmt.Errorf("writing batch of values: %w", err)
 	} else if int(valuesWritten) != len(vals) {
@@ -531,83 +667,59 @@ func writeColumn[T parquetValue](
 	return nil
 }
 
-// transferColumnValues reads columns from the scratch file r and writes the values to w. The
-// scratch file may contain many row groups, and the corresponding column from each row group is
-// read and written in order to combine all of the row groups from the scratch file into a single
-// row group written to w.
-func transferColumnValues(r *file.Reader, w *file.Writer) error {
+// transferColumnValues merges the row groups of scratch file r into a single row group written to
+// w by copying compressed page bytes verbatim. This avoids the per-value decode/re-encode that the
+// previous implementation performed, including codec re-compression. Preconditions, all enforced
+// at scratch-writer construction in (*ParquetWriter).Write:
+//
+//   - The scratch writer disables dictionary encoding so we never see a DictionaryPage to splice
+//     (arrow-go's column writer cannot import a foreign dictionary page).
+//   - The scratch writer's compression codec equals the sink's, so copied page bytes are valid in
+//     the sink's column chunks.
+//
+// w is our own *mergeWriter, which natively accepts pre-encoded data pages and tracks row counts
+// explicitly via SetNumRows — no need to bypass arrow-go's *file.Writer with reflect/unsafe.
+func transferColumnValues(r *file.Reader, w *mergeWriter) error {
 	sch := r.MetaData().Schema
-	rgWriter := w.AppendRowGroup()
+	rgWriter, err := w.AppendRowGroup()
+	if err != nil {
+		return fmt.Errorf("appending row group: %w", err)
+	}
 
-	for c := 0; c < sch.NumColumns(); c++ {
+	totalRows := 0
+	for rgIdx := 0; rgIdx < r.NumRowGroups(); rgIdx++ {
+		totalRows += int(r.RowGroup(rgIdx).NumRows())
+	}
+	rgWriter.SetNumRows(totalRows)
+
+	for i := 0; i < sch.NumColumns(); i++ {
 		cw, err := rgWriter.NextColumn()
 		if err != nil {
 			return fmt.Errorf("getting next column writer: %w", err)
 		}
 
 		for rgIdx := 0; rgIdx < r.NumRowGroups(); rgIdx++ {
-			rgReader := r.RowGroup(rgIdx)
-			n := int(rgReader.NumRows())
-
-			cr, err := rgReader.Column(c)
+			pr, err := r.RowGroup(rgIdx).GetColumnPageReader(i)
 			if err != nil {
-				return fmt.Errorf("getting next column reader: %w", err)
+				return fmt.Errorf("getting page reader for col %d rg %d: %w", i, rgIdx, err)
 			}
-
-			switch cw := cw.(type) {
-			case *file.FixedLenByteArrayColumnChunkWriter:
-				if err := doTransfer(n, cr.(*file.FixedLenByteArrayColumnChunkReader), cw); err != nil {
-					return fmt.Errorf("transferring fixed length byte array column: %w", err)
+			for pr.Next() {
+				dp, ok := pr.Page().(file.DataPage)
+				if !ok {
+					return fmt.Errorf("unexpected non-data page in scratch col %d rg %d (%T)", i, rgIdx, pr.Page())
 				}
-			case *file.Float64ColumnChunkWriter:
-				if err := doTransfer(n, cr.(*file.Float64ColumnChunkReader), cw); err != nil {
-					return fmt.Errorf("transferring float64 column: %w", err)
+				if err := cw.WriteDataPage(dp); err != nil {
+					return fmt.Errorf("writing data page: %w", err)
 				}
-			case *file.ByteArrayColumnChunkWriter:
-				if err := doTransfer(n, cr.(*file.ByteArrayColumnChunkReader), cw); err != nil {
-					return fmt.Errorf("transferring byte array column: %w", err)
-				}
-			case *file.Int32ColumnChunkWriter:
-				if err := doTransfer(n, cr.(*file.Int32ColumnChunkReader), cw); err != nil {
-					return fmt.Errorf("transferring int32 column: %w", err)
-				}
-			case *file.Int64ColumnChunkWriter:
-				if err := doTransfer(n, cr.(*file.Int64ColumnChunkReader), cw); err != nil {
-					return fmt.Errorf("transferring int64 column: %w", err)
-				}
-			case *file.BooleanColumnChunkWriter:
-				if err := doTransfer(n, cr.(*file.BooleanColumnChunkReader), cw); err != nil {
-					return fmt.Errorf("transferring boolean column: %w", err)
-				}
-			default:
-				return fmt.Errorf("unhandled physical type %q (writer type %T)", sch.Column(c).PhysicalType(), cw)
+			}
+			if err := pr.Err(); err != nil {
+				return fmt.Errorf("page reader error col %d rg %d: %w", i, rgIdx, err)
 			}
 		}
 	}
 
 	if err := rgWriter.Close(); err != nil {
 		return fmt.Errorf("closing row group writer: %w", err)
-	}
-
-	return nil
-}
-
-func doTransfer[T parquetValue](numRows int, r columnBatchReader[T], w columnBatchWriter[T]) error {
-	vals := make([]T, numRows)
-	defLvls := make([]int16, numRows)
-	rowsRead, valuesRead, err := r.ReadBatch(int64(numRows), vals, defLvls, nil)
-	if err != nil {
-		return fmt.Errorf("reading batch: %w", err)
-	}
-
-	vals = vals[:valuesRead]
-
-	if int(rowsRead) != numRows {
-		return fmt.Errorf("read %d rows vs. expected %d", rowsRead, numRows)
-	} else if valuesWritten, err := w.WriteBatch(vals, defLvls, nil); err != nil {
-		return fmt.Errorf("writing batch of values: %w", err)
-	} else if int(valuesWritten) != len(vals) {
-		return fmt.Errorf("written %d values vs. %d values in vals", valuesWritten, len(vals))
 	}
 
 	return nil
