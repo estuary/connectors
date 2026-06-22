@@ -1,6 +1,9 @@
 """Unit tests for delayed_tag.py."""
 
+import json
+import tempfile
 import unittest
+from pathlib import Path
 from delayed_tag import (
     ConnectorImage,
     PullRequest,
@@ -12,10 +15,13 @@ from delayed_tag import (
     build_claude_prompt,
     filter_backward_moves,
     find_boundary,
+    load_verdict_cache,
     parse_claude_verdict,
     pr_touches_dir,
     resolve_family,
     select_commit_tag,
+    verdict_cache_key,
+    write_verdict_cache,
 )
 
 
@@ -455,6 +461,93 @@ class TestFilterBackwardMoves(unittest.TestCase):
         )
         self.assertEqual([e.image_name for e in kept], ['norm', 'fresh'])
         self.assertEqual([e.image_name for e, _ in skipped], ['fwd'])
+
+
+# ---------------------------------------------------------------------------
+# verdict cache key
+# ---------------------------------------------------------------------------
+
+class TestVerdictCacheKey(unittest.TestCase):
+
+    def test_later_order_independent(self):
+        self.assertEqual(
+            verdict_cache_key(10, 'source-foo', [3, 1, 2]),
+            verdict_cache_key(10, 'source-foo', [2, 3, 1]),
+        )
+
+    def test_differs_on_chosen_pr(self):
+        self.assertNotEqual(
+            verdict_cache_key(10, 'source-foo', [1]),
+            verdict_cache_key(11, 'source-foo', [1]),
+        )
+
+    def test_differs_on_source_dir(self):
+        self.assertNotEqual(
+            verdict_cache_key(10, 'source-foo', [1]),
+            verdict_cache_key(10, 'source-bar', [1]),
+        )
+
+    def test_differs_on_later_set(self):
+        self.assertNotEqual(
+            verdict_cache_key(10, 'source-foo', [1]),
+            verdict_cache_key(10, 'source-foo', [1, 2]),
+        )
+
+    def test_variants_share_key_via_source_dir(self):
+        # A connector and its variant share source_dir, so they collapse to the
+        # same key and the verdict is computed once.
+        self.assertEqual(
+            verdict_cache_key(10, 'materialize-foo', [1]),
+            verdict_cache_key(10, 'materialize-foo', [1]),
+        )
+
+
+# ---------------------------------------------------------------------------
+# verdict cache round-trip
+# ---------------------------------------------------------------------------
+
+class TestVerdictCacheIO(unittest.TestCase):
+
+    def round_trip(self, cache: dict) -> dict:
+        with tempfile.TemporaryDirectory() as d:
+            path = str(Path(d) / 'sub' / 'verdict_cache.json')  # parent missing
+            write_verdict_cache(cache, path)
+            return load_verdict_cache(path)
+
+    def test_round_trip_preserves_entries(self):
+        cache = {
+            '10|source-foo|1,2': {'verdict': 'safe', 'reason': 'ok'},
+            '11|source-bar|': {'verdict': 'hold', 'reason': 'fix of 11'},
+        }
+        self.assertEqual(self.round_trip(cache), cache)
+
+    def test_write_creates_missing_parent_dir(self):
+        # round_trip points at a non-existent 'sub/' dir; success implies mkdir.
+        self.assertEqual(self.round_trip({'k': {'verdict': 'safe', 'reason': ''}}),
+                         {'k': {'verdict': 'safe', 'reason': ''}})
+
+    def test_missing_file_is_empty_cache(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.assertEqual(load_verdict_cache(str(Path(d) / 'nope.json')), {})
+
+    def test_corrupt_file_is_empty_cache(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / 'bad.json'
+            path.write_text('{not json')
+            self.assertEqual(load_verdict_cache(str(path)), {})
+
+    def test_drops_entries_with_invalid_verdict(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / 'c.json'
+            path.write_text(json.dumps({
+                'good': {'verdict': 'safe', 'reason': 'r'},
+                'bad-value': {'verdict': 'maybe', 'reason': 'r'},
+                'bad-shape': ['not', 'a', 'dict'],
+            }))
+            self.assertEqual(
+                load_verdict_cache(str(path)),
+                {'good': {'verdict': 'safe', 'reason': 'r'}},
+            )
 
 
 if __name__ == '__main__':
