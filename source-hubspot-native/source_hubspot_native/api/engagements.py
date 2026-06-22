@@ -22,7 +22,6 @@ from .shared import (
     dt_to_ms,
     ms_to_dt,
     HUB,
-    MustBackfillBinding,
 )
 
 
@@ -63,12 +62,12 @@ async def _fetch_recently_modified_engagements(
     log: Logger, http: HTTPSession, since: datetime, page: PageCursor, count: int
 ) -> tuple[Iterable[TimestampedId], PageCursor]:
     if count >= 9_900:
-        # "Engagements" as we are capturing them has a 10k limit on how many
-        # items the API can return, and there is no other API that can be used
-        # to get them within a certain time window. The only option here is to
-        # re-backfill.
-        log.warn("limit of 9,900 recent engagements reached")
-        raise MustBackfillBinding
+        # The /engagements/recent/modified endpoint has a 10k limit on how many
+        # items the API can return. We rely on the delayed stream that
+        # uses the /engagements/modified/after endpoint to capture
+        # any engagements the real-time stream missed due to this 10k limit.
+        log.warning("limit of 9,900 recent engagements reached")
+        return [], None
 
     url = f"{HUB}/engagements/v1/engagements/recent/modified"
     params = {"count": 100, "offset": page} if page else {"count": 1}
