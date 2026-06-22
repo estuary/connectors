@@ -765,13 +765,18 @@ def build_claude_prompt(
     return '\n\n'.join(b['text'] for b in blocks)
 
 
-def call_claude(content, api_key: str, model: str = 'claude-sonnet-4-6') -> str:
-    """Call the Anthropic Messages API and return the assistant's text.
+# HTTP statuses worth retrying: rate-limit (429), request timeout/conflict, and
+# server/gateway/overload errors. Any other 4xx (e.g. 401 auth, 400 bad request)
+# won't be fixed by retrying, so we fail fast and loudly on those.
+_RETRYABLE_STATUS = frozenset({408, 409, 429, 500, 502, 503, 504, 529})
 
-    `content` is a Messages API content value — either a plain string or a list
-    of content blocks (the cache-aware form from build_claude_content). Token
-    usage (including cache reads/writes) is logged to stderr so the cache hit
-    rate is visible in CI logs."""
+
+def _claude_request(content, api_key: str, model: str) -> str:
+    """One Anthropic Messages API call. Returns the assistant's text, or raises
+    urllib/JSONDecodeError on failure — call_claude decides what is retryable.
+    A 200 with an unexpected body shape raises KeyError, which call_claude does
+    NOT retry: an identical request would parse identically, so it propagates
+    immediately and fails the run."""
     payload = json.dumps({
         'model': model,
         'max_tokens': 1024,
@@ -786,20 +791,67 @@ def call_claude(content, api_key: str, model: str = 'claude-sonnet-4-6') -> str:
             'content-type': 'application/json',
         },
     )
-    try:
-        with urllib.request.urlopen(req, timeout=90) as resp:
-            obj = json.loads(resp.read())
-        u = obj.get('usage', {})
-        print(
-            f'    tokens: input={u.get("input_tokens", 0)} '
-            f'cache_write={u.get("cache_creation_input_tokens", 0)} '
-            f'cache_read={u.get("cache_read_input_tokens", 0)} '
-            f'output={u.get("output_tokens", 0)}',
-            file=sys.stderr,
-        )
-        return obj['content'][0]['text']
-    except (urllib.error.URLError, KeyError, json.JSONDecodeError) as exc:
-        raise RuntimeError(f'Claude API error: {exc}') from exc
+    with urllib.request.urlopen(req, timeout=90) as resp:
+        obj = json.loads(resp.read())
+    u = obj.get('usage', {})
+    print(
+        f'    tokens: input={u.get("input_tokens", 0)} '
+        f'cache_write={u.get("cache_creation_input_tokens", 0)} '
+        f'cache_read={u.get("cache_read_input_tokens", 0)} '
+        f'output={u.get("output_tokens", 0)}',
+        file=sys.stderr,
+    )
+    return obj['content'][0]['text']
+
+
+def call_claude(
+    content,
+    api_key: str,
+    model: str = 'claude-sonnet-4-6',
+    *,
+    attempts: int = 4,
+    base_delay: float = 2.0,
+    sleep: Callable = time.sleep,
+) -> str:
+    """Call the Anthropic Messages API and return the assistant's text.
+
+    `content` is a Messages API content value — either a plain string or a list
+    of content blocks (the cache-aware form from build_claude_content). Token
+    usage (including cache reads/writes) is logged to stderr so the cache hit
+    rate is visible in CI logs.
+
+    Transient failures (network errors, HTTP 429/5xx, malformed responses) are
+    retried up to `attempts` times with exponential backoff; non-retryable
+    failures (e.g. HTTP 401/400) raise immediately. When every attempt is
+    exhausted the final RuntimeError propagates. Callers MUST NOT downgrade this
+    to a 'safe' verdict: a roll-forward check we never ran is not a check that
+    passed, and treating it as safe could ship a known-buggy image to
+    ':delayed'."""
+    last_exc: Exception | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            return _claude_request(content, api_key, model)
+        except urllib.error.HTTPError as exc:
+            if exc.code not in _RETRYABLE_STATUS:
+                raise RuntimeError(
+                    f'Claude API error: HTTP {exc.code} {exc.reason}'
+                ) from exc
+            last_exc = exc
+        except (urllib.error.URLError, json.JSONDecodeError) as exc:
+            last_exc = exc
+
+        if attempt < attempts:
+            delay = base_delay * (2 ** (attempt - 1))
+            print(
+                f'    Claude API attempt {attempt}/{attempts} failed'
+                f' ({last_exc}); retrying in {delay:.0f}s',
+                file=sys.stderr,
+            )
+            sleep(delay)
+
+    raise RuntimeError(
+        f'Claude API failed after {attempts} attempts: {last_exc}'
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -995,11 +1047,10 @@ def cmd_check(args: argparse.Namespace) -> None:
     # Prior-run verdicts, restored across runs via actions/cache. Reused
     # whenever a connector's (chosen_pr, source_dir, later set) is unchanged.
     prior_cache = load_verdict_cache(args.verdict_cache)
-    # Verdicts to persist for the next run. Keyed by verdict_cache_key. We omit
-    # API-error verdicts (errored set) so a transient failure isn't cached as a
-    # sticky 'safe' that suppresses a real check next run.
+    # Verdicts to persist for the next run, keyed by verdict_cache_key. Written
+    # in a finally below so progress survives even if a later connector aborts
+    # the run on an unrecoverable API error.
     new_cache: dict = {}
-    errored: set = set()
     api_calls = 0
     prior_hits = 0
     # Cache PR details by PR number so large LATER PRs shared across multiple
@@ -1023,70 +1074,70 @@ def cmd_check(args: argparse.Namespace) -> None:
         plan,
         key=lambda e: (sorted(later_map.get(e.image_name, [])), e.chosen_pr),
     )
-    for entry in ordered:
-        later_prs = later_map.get(entry.image_name, [])
-        if not later_prs:
-            continue
+    try:
+        for entry in ordered:
+            later_prs = later_map.get(entry.image_name, [])
+            if not later_prs:
+                continue
 
-        xrun_key = verdict_cache_key(entry.chosen_pr, entry.source_dir, later_prs)
-        in_run_key = (entry.chosen_pr, entry.source_dir)
+            xrun_key = verdict_cache_key(entry.chosen_pr, entry.source_dir, later_prs)
+            in_run_key = (entry.chosen_pr, entry.source_dir)
 
-        if in_run_key in verdict_cache:
-            cached = verdict_cache[in_run_key]
-            verdict = Verdict(entry.image_name, cached.verdict, cached.reason)
-            print(f'  {entry.image_name}: reusing verdict from sibling connector')
-        elif xrun_key in prior_cache:
-            prev = prior_cache[xrun_key]
-            verdict = Verdict(entry.image_name, prev['verdict'], prev.get('reason', ''))
-            verdict_cache[in_run_key] = verdict
-            prior_hits += 1
-            print(
-                f'  {entry.image_name}: reusing prior-run verdict'
-                f' ({verdict.verdict}; PR #{entry.chosen_pr} + later set unchanged)'
-            )
-        else:
-            print(
-                f'Checking {entry.image_name}: PR #{entry.chosen_pr}'
-                f' ({len(later_prs)} later PR(s))'
-            )
-            chosen_body = fetch_cached(entry.chosen_pr)
-            later_bodies = [
-                (pr, fetch_cached(pr))
-                for pr in later_prs
-            ]
-            content = build_claude_content(
-                entry.image_name, entry.source_dir,
-                entry.chosen_pr, chosen_body,
-                later_bodies,
-            )
-
-            try:
-                raw = call_claude(content, api_key, model=args.model)
-            except RuntimeError as exc:
-                print(f'::warning::{entry.image_name}: {exc}; treating as safe')
-                verdict = Verdict(entry.image_name, 'safe', f'api error: {exc}')
-                errored.add(xrun_key)
+            if in_run_key in verdict_cache:
+                cached = verdict_cache[in_run_key]
+                verdict = Verdict(entry.image_name, cached.verdict, cached.reason)
+                print(f'  {entry.image_name}: reusing verdict from sibling connector')
+            elif xrun_key in prior_cache:
+                prev = prior_cache[xrun_key]
+                verdict = Verdict(entry.image_name, prev['verdict'], prev.get('reason', ''))
+                verdict_cache[in_run_key] = verdict
+                prior_hits += 1
+                print(
+                    f'  {entry.image_name}: reusing prior-run verdict'
+                    f' ({verdict.verdict}; PR #{entry.chosen_pr} + later set unchanged)'
+                )
             else:
+                print(
+                    f'Checking {entry.image_name}: PR #{entry.chosen_pr}'
+                    f' ({len(later_prs)} later PR(s))'
+                )
+                chosen_body = fetch_cached(entry.chosen_pr)
+                later_bodies = [
+                    (pr, fetch_cached(pr))
+                    for pr in later_prs
+                ]
+                content = build_claude_content(
+                    entry.image_name, entry.source_dir,
+                    entry.chosen_pr, chosen_body,
+                    later_bodies,
+                )
+
+                # No fallback to 'safe' on failure: call_claude already retries
+                # transient errors, so an exception here means the check could
+                # not be performed. Let it abort the run rather than risk
+                # promoting an unchecked, possibly-buggy image to ':delayed'.
+                raw = call_claude(content, api_key, model=args.model)
                 verdict = parse_claude_verdict(raw, entry.image_name)
                 api_calls += 1
+                verdict_cache[in_run_key] = verdict
 
-            verdict_cache[in_run_key] = verdict
+                if verdict.verdict == 'hold':
+                    print(f'::warning::{entry.image_name}: HOLD — {verdict.reason}')
+                else:
+                    print(f'  {entry.image_name}: safe — {verdict.reason or "no roll-forward fix"}')
 
-            if verdict.verdict == 'hold':
-                print(f'::warning::{entry.image_name}: HOLD — {verdict.reason}')
-            else:
-                print(f'  {entry.image_name}: safe — {verdict.reason or "no roll-forward fix"}')
-
-        verdicts.append(verdict)
-        if xrun_key not in errored:
+            verdicts.append(verdict)
             new_cache[xrun_key] = {'verdict': verdict.verdict, 'reason': verdict.reason}
+    finally:
+        # Persist verdicts computed so far so the next run reuses them even when
+        # this run aborts partway on an unrecoverable API error.
+        write_verdict_cache(new_cache, args.verdict_cache)
 
     verdict_map = {v.image_name: v for v in verdicts}
     safe, held = build_safe_plan(plan, verdict_map)
 
     write_safe_plan(safe, args.output_safe)
     write_verdicts(verdicts, args.output_verdicts)
-    write_verdict_cache(new_cache, args.verdict_cache)
 
     print(
         f'\nClaude checked {api_calls} connector(s) via API;'
