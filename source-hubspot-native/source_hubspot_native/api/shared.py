@@ -8,7 +8,7 @@ from typing import (
 )
 
 import estuary_cdk.emitted_changes_cache as cache
-from estuary_cdk.capture.common import LogCursor, Triggers
+from estuary_cdk.capture.common import LogCursor
 from estuary_cdk.http import HTTPSession
 
 from ..models import TimestampedObject
@@ -30,10 +30,6 @@ MAX_DELAYED_WINDOW = timedelta(hours=1)
 # Minimum time window required before polling the delayed stream.
 # Prevents excessive API calls when Resource.interval is small.
 MIN_DELAYED_WINDOW = timedelta(minutes=5)
-
-
-class MustBackfillBinding(Exception):
-    pass
 
 
 FetchRecentFn = Callable[
@@ -141,21 +137,17 @@ async def fetch_realtime_changes(
 
     max_ts = log_cursor
 
-    try:
-        async for ts, key, obj in fetch_recent(
-            log, http, with_history, lower_bound, upper_bound
-        ):
-            if upper_bound and ts > upper_bound:
-                continue
-            elif ts > lower_bound:
-                max_ts = max(max_ts, ts)
-                if cache.should_yield(object_name, key, ts):
-                    yield obj
-            else:
-                break
-    except MustBackfillBinding:
-        log.info("triggering automatic backfill for %s", object_name)
-        yield Triggers.BACKFILL
+    async for ts, key, obj in fetch_recent(
+        log, http, with_history, lower_bound, upper_bound
+    ):
+        if upper_bound and ts > upper_bound:
+            continue
+        elif ts > lower_bound:
+            max_ts = max(max_ts, ts)
+            if cache.should_yield(object_name, key, ts):
+                yield obj
+        else:
+            break
 
     # Assume all recent documents up until upper_bound were
     # returned by FetchRecentFn. It's fine if this is not strictly true
@@ -223,40 +215,36 @@ async def fetch_delayed_changes(
             },
         )
 
-    try:
-        async for item in fetch_delayed(
-            log,
-            http,
-            with_history,
-            lower_bound,
-            upper_bound,
-        ):
-            if isinstance(item, datetime):
-                # An intermediate checkpoint boundary yielded by a chunked
-                # fetcher. Every document at or before this timestamp has
-                # already been yielded.
-                if item > last_checkpoint:
-                    _log_progress(item)
-                    last_checkpoint = item
-                    yield item
-                continue
+    async for item in fetch_delayed(
+        log,
+        http,
+        with_history,
+        lower_bound,
+        upper_bound,
+    ):
+        if isinstance(item, datetime):
+            # An intermediate checkpoint boundary yielded by a chunked
+            # fetcher. Every document at or before this timestamp has
+            # already been yielded.
+            if item > last_checkpoint:
+                _log_progress(item)
+                last_checkpoint = item
+                yield item
+            continue
 
-            ts, key, obj = item
-            if ts > upper_bound:
-                # In case the FetchDelayedFn is unable to filter based on upper_bound.
-                continue
-            elif ts > lower_bound:
-                max_ts = max(max_ts, ts)
-                if cache.should_yield(object_name, key, ts):
-                    emitted += 1
-                    yield obj
-                else:
-                    cache_hits += 1
+        ts, key, obj = item
+        if ts > upper_bound:
+            # In case the FetchDelayedFn is unable to filter based on upper_bound.
+            continue
+        elif ts > lower_bound:
+            max_ts = max(max_ts, ts)
+            if cache.should_yield(object_name, key, ts):
+                emitted += 1
+                yield obj
             else:
-                break
-    except MustBackfillBinding:
-        log.info("triggering automatic backfill for %s", object_name)
-        yield Triggers.BACKFILL
+                cache_hits += 1
+        else:
+            break
 
     # If we limited the window, advance cursor to upper_bound.
     if upper_bound < horizon:
