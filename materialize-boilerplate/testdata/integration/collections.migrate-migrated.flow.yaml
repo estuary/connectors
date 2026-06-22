@@ -217,6 +217,8 @@ collections:
         numStrUnionToMulti: { type: [number, string] }
         objectToMulti: { type: [object, boolean] }
         stringToMulti: { type: [string, boolean] }
+        objectToString: *string
+        arrayToString: *string
         binaryToString: *string
         stringToBinary: *binary
         'binary"With"Quote': *binary

@@ -135,6 +135,7 @@ func bqDialect(featureFlags map[string]bool) sql.Dialect {
 			"timestamp":  {sql.NewMigrationSpec([]string{"string"}, sql.WithCastSQL(datetimeToStringCast))},
 			"string":     {sql.NewMigrationSpec([]string{"bytes"}, sql.WithCastSQL(stringToBytesCast))},
 			"bytes":      {sql.NewMigrationSpec([]string{"string"}, sql.WithCastSQL(bytesToStringCast))},
+			"json":       {sql.NewMigrationSpec([]string{"string"}, sql.WithCastSQL(jsonToStringCast))},
 			"*":          {sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(toJsonCast))},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
@@ -170,6 +171,14 @@ func datetimeToStringCast(migration sql.ColumnTypeMigration) string {
 
 func toJsonCast(migration sql.ColumnTypeMigration) string {
 	return fmt.Sprintf(`TO_JSON(%s)`, migration.Identifier)
+}
+
+// jsonToStringCast serializes a JSON column to its textual representation. Used
+// when reverting object/array fields from native JSON storage back to STRING,
+// e.g. when the objects_and_arrays_as_json feature flag is disabled or a
+// collection field that was an object/array becomes a plain string.
+func jsonToStringCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`TO_JSON_STRING(%s)`, migration.Identifier)
 }
 
 func toBigNumericCast(m sql.ColumnTypeMigration) string {

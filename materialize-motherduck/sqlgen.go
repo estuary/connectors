@@ -84,7 +84,10 @@ func createDuckDialect(featureFlags map[string]bool) sql.Dialect {
 			"uuid":                     {sql.NewMigrationSpec([]string{"varchar"}, sql.WithDirectCast())},
 			"varchar":                  {sql.NewMigrationSpec([]string{"blob"}, sql.WithDirectCast(), sql.WithCastSQL(stringToBlobCast))},
 			"blob":                     {sql.NewMigrationSpec([]string{"varchar"}, sql.WithDirectCast(), sql.WithCastSQL(blobToStringCast))},
-			"*":                        {sql.NewMigrationSpec([]string{"json"}, sql.WithDirectCast(), sql.WithCastSQL(toJsonCast))},
+			// DuckDB's CAST(JSON AS VARCHAR) yields the JSON text, used when
+			// reverting object/array fields from JSON storage back to varchar.
+			"json": {sql.NewMigrationSpec([]string{"varchar"}, sql.WithDirectCast())},
+			"*":    {sql.NewMigrationSpec([]string{"json"}, sql.WithDirectCast(), sql.WithCastSQL(toJsonCast))},
 		},
 		DirectCastSQL: func(table sql.Table, m sql.ColumnTypeMigration) string {
 			return fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s TYPE %s USING %s",

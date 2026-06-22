@@ -211,6 +211,8 @@ collections:
         numStrUnionToMulti: { type: [number, string], format: number }
         objectToMulti: *object
         stringToMulti: *string
+        objectToString: *object
+        arrayToString: *array
         binaryToString: *binary
         stringToBinary: *string
         # Quoted-name fields exercise identifier escaping in dialects that
