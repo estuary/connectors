@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"math/rand"
+	"slices"
 	"strings"
 	"time"
 
@@ -14,6 +16,8 @@ import (
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	log "github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/bsontype"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"golang.org/x/sync/errgroup"
@@ -172,6 +176,87 @@ func (c *capture) backfillWorker(
 	}
 }
 
+// bsonBracket is one entry in MongoDB's canonical BSON type comparison order.
+// min is the smallest possible value of the bracket.
+type bsonBracket struct {
+	types []bsontype.Type
+	min   any
+}
+
+// bsonOrder lists the BSON type brackets a cursor value may fall into, in ascending
+// canonical comparison order. The table is only consulted to enumerate the brackets that sort
+// after a resume value. Types that cannot be meaningfully range-scanned are omitted: Array and
+// the internal MinKey/MaxKey, plus Regex and the JavaScript/symbol/code types.
+// See https://www.mongodb.com/docs/manual/reference/bson-type-comparison-order
+var bsonOrder = []bsonBracket{
+	{types: []bsontype.Type{bson.TypeNull}, min: nil},
+	{types: []bsontype.Type{bson.TypeDouble, bson.TypeInt32, bson.TypeInt64, bson.TypeDecimal128}, min: math.Inf(-1)},
+	{types: []bsontype.Type{bson.TypeString}, min: ""},
+	{types: []bsontype.Type{bson.TypeEmbeddedDocument}, min: bson.D{}},
+	{types: []bsontype.Type{bson.TypeBinary}, min: primitive.Binary{Subtype: 0x00, Data: []byte{}}},
+	{types: []bsontype.Type{bson.TypeObjectID}, min: primitive.ObjectID{}},
+	{types: []bsontype.Type{bson.TypeBoolean}, min: false},
+	{types: []bsontype.Type{bson.TypeDateTime}, min: primitive.DateTime(math.MinInt64)},
+	{types: []bsontype.Type{bson.TypeTimestamp}, min: primitive.Timestamp{}},
+}
+
+// bracketIndex returns the index of t within bsonOrder, or -1 if t is not a type we can
+// resume across with value comparisons.
+func bracketIndex(t bsontype.Type) int {
+	for i, b := range bsonOrder {
+		if slices.Contains(b.types, t) {
+			return i
+		}
+	}
+	return -1
+}
+
+// buildResumeFilter constructs the query filter for a backfill scan ordered by cursorField.
+// With no prior cursor value it returns an empty filter that scans the whole collection.
+// Otherwise it must select every document that sorts after the last emitted value.
+//
+// A naive {cursorField: {$gt: last}} is insufficient when cursorField holds values of more
+// than one BSON type. MongoDB's comparison operators are type-bracketed, so $gt only matches
+// values of last's own type. A backfill interrupted partway through one type would resume,
+// drain the rest of that type, observe an empty result, and incorrectly conclude the backfill
+// is complete, silently skipping every document of a later-sorting type.
+// Instead we express "everything after last in full BSON sort order" as a union of per-bracket
+// intervals: the remainder of last's own bracket via $gt, plus the entirety of each bracket
+// that sorts after it via {$gte: bracketMin}.
+func buildResumeFilter(cursorField string, last *bson.RawValue) (bson.D, error) {
+	if last == nil {
+		return bson.D{}, nil
+	}
+
+	idx := bracketIndex(last.Type)
+	if idx < 0 {
+		// Regex, JavaScript/code/symbol, Array, and MinKey/MaxKey have no place in a value-range
+		// resume: a regex operand is rejected by comparison operators, arrays carry multikey
+		// semantics, and the rest are internal or deprecated. None of them can be an _id, so
+		// reaching here means there's a bug or an unsupported custom cursor field.
+		return nil, fmt.Errorf("cannot resume backfill on cursor field %q: unsupported BSON type %q for cursor value", cursorField, last.Type)
+	}
+
+	var v any
+	if err := last.Unmarshal(&v); err != nil {
+		return nil, fmt.Errorf("unmarshalling last_id: %w", err)
+	}
+
+	// The remainder of last's own bracket. This is the complete filter when last is already in
+	// the highest bracket and there are no later brackets to union.
+	gt := bson.D{{Key: cursorField, Value: bson.D{{Key: "$gt", Value: v}}}}
+	later := bsonOrder[idx+1:]
+	if len(later) == 0 {
+		return gt, nil
+	}
+
+	clauses := bson.A{gt}
+	for _, b := range later {
+		clauses = append(clauses, bson.D{{Key: cursorField, Value: bson.D{{Key: "$gte", Value: b.min}}}})
+	}
+	return bson.D{{Key: "$or", Value: clauses}}, nil
+}
+
 // doBackfill runs a backfill for a binding to completion, or until signalled to
 // stop by stopBackfill. The backfillDone channel will be closed when the
 // backfill is completely done (cursor returns no more documents) if it is not
@@ -233,28 +318,24 @@ func (c *capture) doBackfill(
 
 	var opts *options.FindOptions
 	if cursorField == idProperty && binding.resource.getMode() == captureModeChangeStream && !isSharded {
-		// By not specifying a sort parameter, MongoDB uses natural sort to order documents. Natural
-		// sort is approximately insertion order (but not guaranteed). We hint to MongoDB to use the _id
-		// index (an index that always exists) to speed up the process. Note that if we specify the sort
-		// explicitly by { $natural: 1 }, then the database will disregard any indices and do a full
-		// collection scan. See https://www.mongodb.com/docs/manual/reference/method/cursor.hint
-
-		// Note: This assumption is only true for "standard" MongoDB instances that support change
-		// streams. For other flavors of MongoDB that do not support change streams and/or we are using
-		// a batch capture mode, a sort will be required.
-		opts = options.Find().SetHint(bson.M{idProperty: 1})
+		// Sort by _id and hint the _id index (which should always exist) so the scan is served directly by
+		// that index in ascending _id order. The sort is required for correctness, not just speed:
+		// resuming with buildResumeFilter checkpoints a single monotonic high-water mark
+		// (LastCursorValue), which is only valid if documents arrive in ascending _id order. Although
+		// the hint pushes MongoDB to return results in _id BSON comparison order, MongoDB does not guarantee
+		// result order without an explicit sort, so we request it explicitly. A { _id: 1 } sort is
+		// satisfied by the _id index with no blocking in-memory sort (unlike { $natural: 1 }, which would
+		// disregard all indices and force a collection scan).
+		// See https://www.mongodb.com/docs/manual/reference/method/cursor.hint
+		opts = options.Find().SetHint(bson.M{idProperty: 1}).SetSort(bson.D{{Key: idProperty, Value: 1}})
 	} else {
 		// Other cursor fields require a sort.
 		opts = options.Find().SetSort(bson.D{{Key: cursorField, Value: 1}})
 	}
 
-	var v any
-	var filter = bson.D{}
-	if lastCursorValue != nil {
-		if err := lastCursorValue.Unmarshal(&v); err != nil {
-			return fmt.Errorf("unmarshalling last_id: %w", err)
-		}
-		filter = bson.D{{Key: cursorField, Value: bson.D{{Key: "$gt", Value: v}}}}
+	filter, err := buildResumeFilter(cursorField, lastCursorValue)
+	if err != nil {
+		return err
 	}
 
 	cursor, err := collection.Find(ctx, filter, opts)
@@ -263,7 +344,7 @@ func (c *capture) doBackfill(
 	}
 	defer cursor.Close(ctx)
 
-	logEntry.WithField("gt", v).Info("starting backfill for collection")
+	logEntry.WithField("resumeAfter", lastCursorValue).Info("starting backfill for collection")
 
 	for {
 		select {

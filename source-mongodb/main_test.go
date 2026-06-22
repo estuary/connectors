@@ -21,6 +21,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"golang.org/x/sync/errgroup"
 )
@@ -103,6 +104,75 @@ func TestCapture(t *testing.T) {
 	updateData(ctx, t, client, database2, col3, binaryPkVals(1), "forthColumn_new")
 	updateData(ctx, t, client, database1, batchCol1, stringPkVals(1), "batchColDb1_new")
 	updateData(ctx, t, client, database2, batchCol2, stringPkVals(1), "batchColDb2_new")
+
+	advanceCapture(ctx, t, cs)
+
+	cupaloy.SnapshotT(t, cs.Summary())
+}
+
+// An interrupted backfill of a collection whose _id values span multiple BSON types
+// must resume across the type boundaries rather than silently dropping every
+// document of a later-sorting type.
+func TestCaptureMixedIdTypeBackfillResumption(t *testing.T) {
+	database := "testDb"
+	collection := "mixedIdCollection"
+
+	ctx := context.Background()
+	client, cfg := testClient(t)
+
+	cleanup := func() {
+		require.NoError(t, client.Database(database).Drop(ctx))
+	}
+	cleanup()
+	t.Cleanup(cleanup)
+
+	// Seed a collection whose _id values span four BSON types. In canonical BSON sort order these
+	// sort number < string < binData < objectId, so the _id-ordered backfill scan emits them in that
+	// order. Resuming from a checkpoint partway through the numbers has to cross three
+	// type boundaries.
+	col := client.Database(database).Collection(collection)
+	const perType = 30
+	for idx := 0; idx < perType; idx++ {
+		uuid := make([]byte, 16)
+		uuid[15] = byte(idx)
+		oid, err := primitive.ObjectIDFromHex(fmt.Sprintf("%024x", idx))
+		require.NoError(t, err)
+		for _, id := range []any{
+			idx,                                         // number
+			fmt.Sprintf("str-%04d", idx),                // string
+			primitive.Binary{Subtype: 0x04, Data: uuid}, // binData (UUID)
+			oid,                                         // objectId
+		} {
+			_, err := col.InsertOne(ctx, bson.M{"_id": id, "value": idx})
+			require.NoError(t, err)
+		}
+	}
+
+	binding := makeBinding(t, database, collection, captureModeChangeStream, "")
+
+	// Start from a checkpoint representing a backfill interrupted partway through the numbers. The
+	// resume must capture the remaining numbers plus the entire string, binData, and objectId
+	// cohorts.
+	resumeState := captureState{
+		Resources: map[boilerplate.StateKey]resourceState{
+			boilerplate.StateKey(binding.StateKey): {Backfill: backfillState{
+				Done:            makePtr(false),
+				LastCursorValue: rawValue(t, int64(14)),
+				BackfilledDocs:  15,
+			}},
+		},
+	}
+	checkpoint, err := json.Marshal(resumeState)
+	require.NoError(t, err)
+
+	cs := &st.CaptureSpec{
+		Driver:       &driver{},
+		EndpointSpec: &cfg,
+		Checkpoint:   checkpoint,
+		Validator:    &st.SortedCaptureValidator{NormalizeJSON: true},
+		Sanitizers:   commonSanitizers(),
+		Bindings:     []*flow.CaptureSpec_Binding{binding},
+	}
 
 	advanceCapture(ctx, t, cs)
 
