@@ -495,7 +495,6 @@ AD_INSIGHTS_VALID_BREAKDOWNS: list[str] = [
     Breakdown.CREATIVE_RELAXATION_ASSET_TYPE,
     Breakdown.DESCRIPTION_ASSET,
     Breakdown.DEVICE_PLATFORM,
-    Breakdown.DMA,
     Breakdown.FIDELITY_TYPE,
     Breakdown.FLEXIBLE_FORMAT_ASSET_TYPE,
     Breakdown.FREQUENCY_VALUE,

@@ -188,7 +188,6 @@ FACEBOOK_INSIGHTS_TYPE_MAP: dict[str, type] = {
     F.GENDER: str,
     F.COUNTRY: str,
     F.REGION: str,
-    F.DMA: str,
     F.PUBLISHER_PLATFORM: str,
     F.PLATFORM_POSITION: str,
     F.DEVICE_PLATFORM: str,
@@ -1261,13 +1260,6 @@ class AdsInsightsRegion(AdsInsights):
     breakdowns: ClassVar[list[Breakdown]] = [Breakdown.REGION]
     primary_keys: ClassVar[list[str]] = sorted(AdsInsights.primary_keys + ["/region"])
     region: str
-
-
-class AdsInsightsDma(AdsInsights):
-    name: ClassVar[str] = ResourceName.ADS_INSIGHTS_DMA
-    breakdowns: ClassVar[list[Breakdown]] = [Breakdown.DMA]
-    primary_keys: ClassVar[list[str]] = sorted(AdsInsights.primary_keys + ["/dma"])
-    dma: str
 
 
 class AdsInsightsPlatformAndDevice(AdsInsights):
