@@ -78,17 +78,46 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: python3 .github/scripts/delayed_tag.py plan
 
+      - name: Restore roll-forward verdict cache
+        # A verdict is determined by (CHOSEN PR, source dir, LATER-PR set), all
+        # of which are stable for an idle connector from one night to the next.
+        # Restoring the prior run's verdicts lets the check step reuse them and
+        # only call Claude for connectors that actually moved. The key is unique
+        # per run (so each run saves a fresh entry); restore-keys falls back to
+        # the most recent prior save.
+        uses: actions/cache/restore@v4
+        with:
+          path: verdict-cache
+          key: delayed-verdict-${{ github.run_id }}
+          restore-keys: |
+            delayed-verdict-
+
       - name: Check for roll-forward fixes via Claude
         # For each connector that has LATER PRs, ask Claude Sonnet whether any
         # LATER PR is a roll-forward fix of the CHOSEN PR (i.e. it patches a
         # regression introduced by CHOSEN). Connectors flagged "hold" are
         # excluded from /tmp/safe_plan.tsv so they don't get tagged.
+        # Reuses any unchanged verdict from verdict-cache/verdict_cache.json
+        # (restored above) instead of re-calling Claude.
         # Writes: /tmp/safe_plan.tsv      (image, sha7) — connectors to tag
         #         /tmp/claude_verdicts.tsv (image, verdict, reason)
+        #         verdict-cache/verdict_cache.json — verdicts for the next run
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: python3 .github/scripts/delayed_tag.py check
+        run: >
+          python3 .github/scripts/delayed_tag.py check
+          --verdict-cache verdict-cache/verdict_cache.json
+
+      - name: Save roll-forward verdict cache
+        # Always save: the check step rewrites the cache with this run's
+        # verdicts (dropping connectors no longer in the plan), and on a crash
+        # the restored copy is preserved under the new key so it isn't lost.
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: verdict-cache
+          key: delayed-verdict-${{ github.run_id }}
 
       - name: Guard against moving ':delayed' backward
         # Drop any connector whose 2-week boundary is OLDER than the image

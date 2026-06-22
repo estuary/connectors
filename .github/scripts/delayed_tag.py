@@ -884,6 +884,49 @@ def write_skips(skips: list, path: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Cross-run verdict cache
+# ---------------------------------------------------------------------------
+#
+# A roll-forward verdict is fully determined by its inputs: the CHOSEN PR, the
+# connector's source dir, and the set of LATER PRs (PR diffs are immutable once
+# merged). The `check` step runs nightly, but most connectors are idle from one
+# night to the next — same boundary, same LATER set — so re-asking Claude the
+# identical question every night is pure waste. The workflow persists this
+# cache across runs via actions/cache; a later run reuses any verdict whose key
+# is unchanged and only calls Claude for connectors that actually moved.
+
+def verdict_cache_key(chosen_pr: int, source_dir: str, later_prs: list) -> str:
+    """Stable key identifying the inputs to a roll-forward verdict. Variants
+    share source_dir (and therefore boundary + LATER set), so they collapse to
+    the same key. Sorted LATER PRs keep the key order-independent."""
+    later = ','.join(str(n) for n in sorted(later_prs))
+    return f'{chosen_pr}|{source_dir}|{later}'
+
+
+def load_verdict_cache(path: str) -> dict:
+    """Load the prior run's verdict cache (key -> {'verdict', 'reason'}). A
+    missing or unparseable file yields an empty cache: a cold start re-checks
+    every connector, it never produces a wrong verdict."""
+    try:
+        with open(path) as f:
+            data = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    return {
+        k: v for k, v in data.items()
+        if isinstance(v, dict) and v.get('verdict') in ('safe', 'hold')
+    }
+
+
+def write_verdict_cache(cache: dict, path: str) -> None:
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    with open(path, 'w') as f:
+        json.dump(cache, f, indent=0, sort_keys=True)
+
+
+# ---------------------------------------------------------------------------
 # Subcommands
 # ---------------------------------------------------------------------------
 
@@ -946,9 +989,19 @@ def cmd_check(args: argparse.Namespace) -> None:
 
     later_map = read_later(args.later)
     verdicts: list = []
-    # Cache keyed by (chosen_pr, source_dir) so variants sharing the same
+    # In-run cache keyed by (chosen_pr, source_dir) so variants sharing the same
     # parent dir don't trigger duplicate Claude API calls.
     verdict_cache: dict = {}
+    # Prior-run verdicts, restored across runs via actions/cache. Reused
+    # whenever a connector's (chosen_pr, source_dir, later set) is unchanged.
+    prior_cache = load_verdict_cache(args.verdict_cache)
+    # Verdicts to persist for the next run. Keyed by verdict_cache_key. We omit
+    # API-error verdicts (errored set) so a transient failure isn't cached as a
+    # sticky 'safe' that suppresses a real check next run.
+    new_cache: dict = {}
+    errored: set = set()
+    api_calls = 0
+    prior_hits = 0
     # Cache PR details by PR number so large LATER PRs shared across multiple
     # connectors (e.g. a monorepo sweep) are only fetched once.
     pr_details_cache: dict = {}
@@ -975,51 +1028,70 @@ def cmd_check(args: argparse.Namespace) -> None:
         if not later_prs:
             continue
 
-        cache_key = (entry.chosen_pr, entry.source_dir)
-        if cache_key in verdict_cache:
-            cached = verdict_cache[cache_key]
-            verdicts.append(Verdict(entry.image_name, cached.verdict, cached.reason))
+        xrun_key = verdict_cache_key(entry.chosen_pr, entry.source_dir, later_prs)
+        in_run_key = (entry.chosen_pr, entry.source_dir)
+
+        if in_run_key in verdict_cache:
+            cached = verdict_cache[in_run_key]
+            verdict = Verdict(entry.image_name, cached.verdict, cached.reason)
             print(f'  {entry.image_name}: reusing verdict from sibling connector')
-            continue
-
-        print(
-            f'Checking {entry.image_name}: PR #{entry.chosen_pr}'
-            f' ({len(later_prs)} later PR(s))'
-        )
-        chosen_body = fetch_cached(entry.chosen_pr)
-        later_bodies = [
-            (pr, fetch_cached(pr))
-            for pr in later_prs
-        ]
-        content = build_claude_content(
-            entry.image_name, entry.source_dir,
-            entry.chosen_pr, chosen_body,
-            later_bodies,
-        )
-
-        try:
-            raw = call_claude(content, api_key, model=args.model)
-        except RuntimeError as exc:
-            print(f'::warning::{entry.image_name}: {exc}; treating as safe')
-            verdict = Verdict(entry.image_name, 'safe', f'api error: {exc}')
+        elif xrun_key in prior_cache:
+            prev = prior_cache[xrun_key]
+            verdict = Verdict(entry.image_name, prev['verdict'], prev.get('reason', ''))
+            verdict_cache[in_run_key] = verdict
+            prior_hits += 1
+            print(
+                f'  {entry.image_name}: reusing prior-run verdict'
+                f' ({verdict.verdict}; PR #{entry.chosen_pr} + later set unchanged)'
+            )
         else:
-            verdict = parse_claude_verdict(raw, entry.image_name)
+            print(
+                f'Checking {entry.image_name}: PR #{entry.chosen_pr}'
+                f' ({len(later_prs)} later PR(s))'
+            )
+            chosen_body = fetch_cached(entry.chosen_pr)
+            later_bodies = [
+                (pr, fetch_cached(pr))
+                for pr in later_prs
+            ]
+            content = build_claude_content(
+                entry.image_name, entry.source_dir,
+                entry.chosen_pr, chosen_body,
+                later_bodies,
+            )
 
-        verdict_cache[cache_key] = verdict
+            try:
+                raw = call_claude(content, api_key, model=args.model)
+            except RuntimeError as exc:
+                print(f'::warning::{entry.image_name}: {exc}; treating as safe')
+                verdict = Verdict(entry.image_name, 'safe', f'api error: {exc}')
+                errored.add(xrun_key)
+            else:
+                verdict = parse_claude_verdict(raw, entry.image_name)
+                api_calls += 1
+
+            verdict_cache[in_run_key] = verdict
+
+            if verdict.verdict == 'hold':
+                print(f'::warning::{entry.image_name}: HOLD — {verdict.reason}')
+            else:
+                print(f'  {entry.image_name}: safe — {verdict.reason or "no roll-forward fix"}')
+
         verdicts.append(verdict)
-
-        if verdict.verdict == 'hold':
-            print(f'::warning::{entry.image_name}: HOLD — {verdict.reason}')
-        else:
-            print(f'  {entry.image_name}: safe — {verdict.reason or "no roll-forward fix"}')
+        if xrun_key not in errored:
+            new_cache[xrun_key] = {'verdict': verdict.verdict, 'reason': verdict.reason}
 
     verdict_map = {v.image_name: v for v in verdicts}
     safe, held = build_safe_plan(plan, verdict_map)
 
     write_safe_plan(safe, args.output_safe)
     write_verdicts(verdicts, args.output_verdicts)
+    write_verdict_cache(new_cache, args.verdict_cache)
 
-    print(f'\nClaude checked {len(verdict_cache)} unique connector(s)')
+    print(
+        f'\nClaude checked {api_calls} connector(s) via API;'
+        f' {prior_hits} reused from prior-run cache'
+    )
     if held:
         print(f'Held ({len(held)}): {", ".join(e.image_name for e in held)}')
     print(f'Tagging {len(safe)}/{len(plan)} connector(s) after hold filter')
@@ -1129,6 +1201,8 @@ def main(argv: Optional[list] = None) -> None:
     p.add_argument('--diff-line-cap',   type=int, default=2000)
     p.add_argument('--output-safe',     default='/tmp/safe_plan.tsv')
     p.add_argument('--output-verdicts', default='/tmp/claude_verdicts.tsv')
+    p.add_argument('--verdict-cache',   default='/tmp/verdict_cache.json',
+                   help='cross-run verdict cache (restored/saved via actions/cache)')
 
     p = sub.add_parser(
         'guard',
