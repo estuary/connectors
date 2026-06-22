@@ -93,7 +93,10 @@ func createSpannerDialect(featureFlags map[string]bool) sql.Dialect {
 			"timestamp":   {sql.NewMigrationSpec([]string{"string(max)"}, sql.WithCastSQL(timestampToStringCast))},
 			"string(max)": {sql.NewMigrationSpec([]string{"bytes(max)"}, sql.WithCastSQL(stringToBytesCast))},
 			"bytes(max)":  {sql.NewMigrationSpec([]string{"string(max)"}, sql.WithCastSQL(bytesToStringCast))},
-			"*":           {sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(toJsonCast))},
+			// Spanner's CAST(JSON AS STRING) yields the canonical JSON text, used
+			// when reverting object/array fields from JSON storage back to STRING.
+			"json": {sql.NewMigrationSpec([]string{"string(max)"}, sql.WithCastSQL(toStringCast))},
+			"*":    {sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(toJsonCast))},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 2 {

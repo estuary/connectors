@@ -138,6 +138,7 @@ var snowflakeDialect = func(configSchema string, timestampType snowflakeTimestam
 			"timestamp_ltz": {sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(datetimeToStringCast))},
 			"binary":        {sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(binaryToStringCast))},
 			"text":          {sql.NewMigrationSpec([]string{"binary"}, sql.WithCastSQL(stringToBinaryCast))},
+			"variant":       {sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(variantToStringCast))},
 			"*":             {sql.NewMigrationSpec([]string{"variant"}, sql.WithCastSQL(toJsonCast))},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
@@ -184,6 +185,14 @@ func datetimeNoTzToStringCast(migration sql.ColumnTypeMigration) string {
 
 func toJsonCast(migration sql.ColumnTypeMigration) string {
 	return fmt.Sprintf(`TO_VARIANT(%s)`, migration.Identifier)
+}
+
+// variantToStringCast serializes a VARIANT column to its JSON text
+// representation. Used when reverting object/array fields from VARIANT storage
+// back to text, e.g. when a collection field that was an object/array becomes a
+// plain string.
+func variantToStringCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`TO_JSON(%s)`, migration.Identifier)
 }
 
 func binaryToStringCast(migration sql.ColumnTypeMigration) string {

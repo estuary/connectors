@@ -144,7 +144,8 @@ func createRsDialect(caseSensitiveIdentifierEnabled bool, featureFlags map[strin
 				sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(varbyteToStringCast)),
 				sql.NewMigrationSpec([]string{"super"}, sql.WithCastSQL(varbyteToSuperCast)),
 			},
-			"*": {sql.NewMigrationSpec([]string{"super"}, sql.WithCastSQL(toJsonCast))},
+			"super": {sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(superToStringCast))},
+			"*":     {sql.NewMigrationSpec([]string{"super"}, sql.WithCastSQL(toJsonCast))},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 1 {
@@ -198,6 +199,13 @@ func datetimeToSuperCast(migration sql.ColumnTypeMigration) string {
 
 func toJsonCast(migration sql.ColumnTypeMigration) string {
 	return fmt.Sprintf(`CAST(%s as SUPER)`, migration.Identifier)
+}
+
+// superToStringCast serializes a SUPER column to its JSON text representation.
+// Used when reverting object/array fields from SUPER storage back to text, e.g.
+// when a collection field that was an object/array becomes a plain string.
+func superToStringCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`JSON_SERIALIZE(%s)`, migration.Identifier)
 }
 
 // varbyteToStringCast decodes a VARBYTE column's raw bytes as a base64 string,

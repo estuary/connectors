@@ -127,8 +127,8 @@ func createPgDialect(featureFlags map[string]bool) sql.Dialect {
 				}),
 			)},
 			"bytea": {sql.NewMigrationSpec([]string{"text"}, sql.WithDirectCast(), sql.WithCastSQL(byteaToStringCast))},
-			"json":  {sql.NewMigrationSpec([]string{"jsonb"}, sql.WithDirectCast())},
-			"jsonb": {sql.NewMigrationSpec([]string{"json"}, sql.WithDirectCast())},
+			"json":  {sql.NewMigrationSpec([]string{"jsonb", "text"}, sql.WithDirectCast())},
+			"jsonb": {sql.NewMigrationSpec([]string{"json", "text"}, sql.WithDirectCast())},
 			"*":     {sql.NewMigrationSpec([]string{"json"}, sql.WithDirectCast(), sql.WithCastSQL(toJsonCast))},
 		},
 		DirectCastSQL: func(table sql.Table, m sql.ColumnTypeMigration) string {

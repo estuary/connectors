@@ -171,6 +171,10 @@ var mysqlDialect = func(tzLocation *time.Location, database string, product stri
 	if product != "mariadb" {
 		migrationSpecs["varchar"] = append(migrationSpecs["varchar"], sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(jsonQuoteCast(product))))
 		migrationSpecs["longtext"] = append(migrationSpecs["longtext"], sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(jsonQuoteCast(product))))
+		// Reverting object/array fields from JSON storage back to text: MySQL
+		// implicitly serializes a JSON column to its text form when assigning to
+		// a varchar/longtext column, so no explicit cast is needed.
+		migrationSpecs["json"] = []sql.MigrationSpec{sql.NewMigrationSpec([]string{"varchar", "longtext"}, nocast)}
 		migrationSpecs["*"] = []sql.MigrationSpec{sql.NewMigrationSpec([]string{"json"})}
 	}
 
