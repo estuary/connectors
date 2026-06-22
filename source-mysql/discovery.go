@@ -106,10 +106,21 @@ func (db *mysqlDatabase) ListTables(ctx context.Context) ([]sqlcapture.TableID, 
 // many tables at once.
 func (db *mysqlDatabase) DiscoverTableDetails(ctx context.Context, requested []sqlcapture.TableID) (map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, error) {
 	var tableMap = make(map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, len(requested))
-	for i := 0; i < len(requested); i += discoveryChunkSize {
-		var end = min(i+discoveryChunkSize, len(requested))
-		if err := db.extendTableDetails(ctx, tableMap, requested[i:end]); err != nil {
-			return nil, err
+
+	// Group the requested tables by schema so that each chunk's queries can use
+	// more efficient `table_schema = ? AND table_name IN (...)` predicates.
+	var bySchema = make(map[string][]string)
+	for _, t := range requested {
+		bySchema[t.Schema] = append(bySchema[t.Schema], t.Table)
+	}
+	for _, schema := range slices.Sorted(maps.Keys(bySchema)) {
+		var tables = bySchema[schema]
+		slices.Sort(tables)
+		for i := 0; i < len(tables); i += discoveryChunkSize {
+			var end = min(i+discoveryChunkSize, len(tables))
+			if err := db.extendTableDetails(ctx, tableMap, schema, tables[i:end]); err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -141,8 +152,8 @@ func (db *mysqlDatabase) DiscoverTableDetails(ctx context.Context, requested []s
 // primary keys, secondary indexes) for one batch of requested tables and
 // merges the results into dst. The collision check against dst spans chunks,
 // so duplicate-after-normalization StreamIDs are caught even across batches.
-func (db *mysqlDatabase) extendTableDetails(ctx context.Context, dst map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, requested []sqlcapture.TableID) error {
-	var tables, err = getTables(ctx, db.conn, requested)
+func (db *mysqlDatabase) extendTableDetails(ctx context.Context, dst map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, schema string, requested []string) error {
+	var tables, err = getTables(ctx, db.conn, schema, requested)
 	if err != nil {
 		return fmt.Errorf("error discovering tables: %w", err)
 	}
@@ -176,7 +187,7 @@ func (db *mysqlDatabase) extendTableDetails(ctx context.Context, dst map[sqlcapt
 		dst[streamID] = table
 	}
 
-	columns, err := db.getColumns(ctx, db.conn, requested)
+	columns, err := db.getColumns(ctx, db.conn, schema, requested)
 	if err != nil {
 		return fmt.Errorf("error discovering columns: %w", err)
 	}
@@ -194,7 +205,7 @@ func (db *mysqlDatabase) extendTableDetails(ctx context.Context, dst map[sqlcapt
 		dst[streamID] = info
 	}
 
-	primaryKeys, err := getPrimaryKeys(ctx, db.conn, requested)
+	primaryKeys, err := getPrimaryKeys(ctx, db.conn, schema, requested)
 	if err != nil {
 		return fmt.Errorf("unable to list database primary keys: %w", err)
 	}
@@ -208,7 +219,7 @@ func (db *mysqlDatabase) extendTableDetails(ctx context.Context, dst map[sqlcapt
 	}
 
 	// Use secondary indexes as a fallback key for tables whose primary key is unset.
-	secondaryIndexes, err := getSecondaryIndexes(ctx, db.conn, requested)
+	secondaryIndexes, err := getSecondaryIndexes(ctx, db.conn, schema, requested)
 	if err != nil {
 		return fmt.Errorf("unable to list database secondary indexes: %w", err)
 	}
@@ -409,28 +420,29 @@ func listTables(_ context.Context, conn mysqlClient, selectedSchemas []string) (
 	return tables, nil
 }
 
-// tableIDsInClause builds a parenthesized list of row-constructor placeholders
-// and the corresponding argument slice, suitable for use in a query predicate
-// of the form `WHERE (table_schema, table_name) IN (...)`.
-func tableIDsInClause(tables []sqlcapture.TableID) (string, []any) {
-	var placeholders = make([]string, len(tables))
-	var args = make([]any, 0, len(tables)*2)
-	for i, t := range tables {
-		placeholders[i] = "(?, ?)"
-		args = append(args, t.Schema, t.Table)
+// schemaTablesFilter builds a `table_schema = ? AND table_name IN (?, ...)`
+// predicate and the corresponding argument slice for a set of tables which all
+// share the same schema. This shape lets the MySQL optimizer push down schema
+// filtering for more efficient execution.
+func schemaTablesFilter(schema string, tables []string) (string, []any) {
+	var placeholders = strings.Join(slices.Repeat([]string{"?"}, len(tables)), ", ")
+	var args = make([]any, 0, len(tables)+1)
+	args = append(args, schema)
+	for _, table := range tables {
+		args = append(args, table)
 	}
-	return strings.Join(placeholders, ", "), args
+	return fmt.Sprintf("table_schema = ? AND table_name IN (%s)", placeholders), args
 }
 
-func getTables(_ context.Context, conn mysqlClient, requested []sqlcapture.TableID) ([]*sqlcapture.DiscoveryInfo, error) {
+func getTables(_ context.Context, conn mysqlClient, schema string, requested []string) ([]*sqlcapture.DiscoveryInfo, error) {
 	if len(requested) == 0 {
 		return nil, nil
 	}
-	var inClause, args = tableIDsInClause(requested)
+	var filter, args = schemaTablesFilter(schema, requested)
 	var query = fmt.Sprintf(
 		`SELECT table_schema, table_name, table_type, engine, table_collation`+
 			`  FROM information_schema.tables`+
-			`  WHERE (table_schema, table_name) IN (%s);`, inClause)
+			`  WHERE %s;`, filter)
 
 	var results, err = conn.Execute(query, args...)
 	if err != nil {
@@ -486,16 +498,16 @@ type mysqlTableDiscoveryDetails struct {
 	DefaultCharset string
 }
 
-func (db *mysqlDatabase) getColumns(_ context.Context, conn mysqlClient, requested []sqlcapture.TableID) ([]sqlcapture.ColumnInfo, error) {
+func (db *mysqlDatabase) getColumns(_ context.Context, conn mysqlClient, schema string, requested []string) ([]sqlcapture.ColumnInfo, error) {
 	if len(requested) == 0 {
 		return nil, nil
 	}
-	var inClause, args = tableIDsInClause(requested)
+	var filter, args = schemaTablesFilter(schema, requested)
 	var query = fmt.Sprintf(
 		`SELECT table_schema, table_name, ordinal_position, column_name, is_nullable, data_type, column_type, character_set_name, character_maximum_length`+
 			`  FROM information_schema.columns`+
-			`  WHERE (table_schema, table_name) IN (%s)`+
-			`  ORDER BY table_schema, table_name, ordinal_position;`, inClause)
+			`  WHERE %s`+
+			`  ORDER BY table_schema, table_name, ordinal_position;`, filter)
 
 	var results, err = conn.Execute(query, args...)
 	if err != nil {
@@ -755,17 +767,17 @@ var mysqlStringEscapeReplacements = map[string]string{
 // primary keys. Table names are fully qualified as "<schema>.<name>", and
 // primary keys are represented as a list of column names, in the order that
 // they form the table's primary key.
-func getPrimaryKeys(_ context.Context, conn mysqlClient, requested []sqlcapture.TableID) (map[sqlcapture.StreamID][]string, error) {
+func getPrimaryKeys(_ context.Context, conn mysqlClient, schema string, requested []string) (map[sqlcapture.StreamID][]string, error) {
 	if len(requested) == 0 {
 		return nil, nil
 	}
-	var inClause, args = tableIDsInClause(requested)
+	var filter, args = schemaTablesFilter(schema, requested)
 	var query = fmt.Sprintf(
 		`SELECT table_schema, table_name, column_name, seq_in_index`+
 			`  FROM information_schema.statistics`+
 			`  WHERE index_name = 'primary'`+
-			`    AND (table_schema, table_name) IN (%s)`+
-			`  ORDER BY table_schema, table_name, seq_in_index;`, inClause)
+			`    AND %s`+
+			`  ORDER BY table_schema, table_name, seq_in_index;`, filter)
 
 	var results, err = conn.Execute(query, args...)
 	if err != nil {
@@ -790,18 +802,18 @@ func getPrimaryKeys(_ context.Context, conn mysqlClient, requested []sqlcapture.
 	return keys, nil
 }
 
-func getSecondaryIndexes(_ context.Context, conn mysqlClient, requested []sqlcapture.TableID) (map[sqlcapture.StreamID]map[string][]string, error) {
+func getSecondaryIndexes(_ context.Context, conn mysqlClient, schema string, requested []string) (map[sqlcapture.StreamID]map[string][]string, error) {
 	if len(requested) == 0 {
 		return nil, nil
 	}
-	var inClause, args = tableIDsInClause(requested)
+	var filter, args = schemaTablesFilter(schema, requested)
 	var query = fmt.Sprintf(
-		`SELECT stat.table_schema, stat.table_name, stat.index_name, stat.column_name, stat.seq_in_index`+
-			`  FROM information_schema.statistics stat`+
-			`  WHERE stat.non_unique = 0`+
-			`    AND stat.index_name != 'PRIMARY'`+
-			`    AND (stat.table_schema, stat.table_name) IN (%s)`+
-			`  ORDER BY stat.table_schema, stat.table_name, stat.index_name, stat.seq_in_index`, inClause)
+		`SELECT table_schema, table_name, index_name, column_name, seq_in_index`+
+			`  FROM information_schema.statistics`+
+			`  WHERE non_unique = 0`+
+			`    AND index_name != 'PRIMARY'`+
+			`    AND %s`+
+			`  ORDER BY table_schema, table_name, index_name, seq_in_index`, filter)
 
 	var results, err = conn.Execute(query, args...)
 	if err != nil {
