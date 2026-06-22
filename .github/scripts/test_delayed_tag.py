@@ -3,7 +3,9 @@
 import json
 import tempfile
 import unittest
+import urllib.error
 from pathlib import Path
+from unittest import mock
 from delayed_tag import (
     ConnectorImage,
     PullRequest,
@@ -13,6 +15,7 @@ from delayed_tag import (
     build_safe_plan,
     build_claude_content,
     build_claude_prompt,
+    call_claude,
     filter_backward_moves,
     find_boundary,
     load_verdict_cache,
@@ -548,6 +551,76 @@ class TestVerdictCacheIO(unittest.TestCase):
                 load_verdict_cache(str(path)),
                 {'good': {'verdict': 'safe', 'reason': 'r'}},
             )
+
+
+# ---------------------------------------------------------------------------
+# call_claude retry / fail-loud behavior
+# ---------------------------------------------------------------------------
+
+def _http_error(code: int) -> urllib.error.HTTPError:
+    return urllib.error.HTTPError('https://api', code, f'status {code}', None, None)
+
+
+class TestCallClaudeRetry(unittest.TestCase):
+
+    def setUp(self):
+        self.slept = []
+        self.sleep = lambda d: self.slept.append(d)
+
+    def call(self, side_effect, attempts=4):
+        with mock.patch('delayed_tag._claude_request', side_effect=side_effect) as m:
+            result = call_claude(
+                'prompt', 'key', attempts=attempts,
+                base_delay=2.0, sleep=self.sleep,
+            )
+        return result, m
+
+    def test_returns_on_first_success(self):
+        result, m = self.call(['ok'])
+        self.assertEqual(result, 'ok')
+        self.assertEqual(m.call_count, 1)
+        self.assertEqual(self.slept, [])  # no retry, no sleep
+
+    def test_retries_transient_then_succeeds(self):
+        result, m = self.call([urllib.error.URLError('boom'), _http_error(503), 'ok'])
+        self.assertEqual(result, 'ok')
+        self.assertEqual(m.call_count, 3)
+        self.assertEqual(self.slept, [2.0, 4.0])  # exponential backoff
+
+    def test_retries_rate_limit(self):
+        result, m = self.call([_http_error(429), 'ok'])
+        self.assertEqual(result, 'ok')
+        self.assertEqual(m.call_count, 2)
+
+    def test_retries_truncated_json(self):
+        result, m = self.call([json.JSONDecodeError('x', 'doc', 0), 'ok'])
+        self.assertEqual(result, 'ok')
+        self.assertEqual(m.call_count, 2)
+
+    def test_unexpected_shape_not_retried(self):
+        # A 200 with a missing key surfaces as KeyError: an identical request
+        # would parse identically, so it propagates without retrying.
+        with self.assertRaises(KeyError):
+            self.call([KeyError('content'), 'ok'])
+        self.assertEqual(self.slept, [])
+
+    def test_exhausts_attempts_then_raises(self):
+        with self.assertRaises(RuntimeError) as ctx:
+            self.call([urllib.error.URLError('down')] * 4, attempts=4)
+        self.assertIn('after 4 attempts', str(ctx.exception))
+        self.assertEqual(self.slept, [2.0, 4.0, 8.0])  # 3 sleeps between 4 tries
+
+    def test_non_retryable_status_fails_fast(self):
+        # 401 won't be fixed by retrying: raise immediately, no sleeps.
+        with self.assertRaises(RuntimeError) as ctx:
+            self.call([_http_error(401), 'ok'])
+        self.assertIn('401', str(ctx.exception))
+        self.assertEqual(self.slept, [])
+
+    def test_bad_request_fails_fast(self):
+        with self.assertRaises(RuntimeError):
+            self.call([_http_error(400)] + ['ok'])
+        self.assertEqual(self.slept, [])
 
 
 if __name__ == '__main__':
