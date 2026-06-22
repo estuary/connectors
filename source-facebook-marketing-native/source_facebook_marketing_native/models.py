@@ -1262,6 +1262,15 @@ class AdsInsightsRegion(AdsInsights):
     region: str
 
 
+class AdsInsightsComscoreMarket(AdsInsights):
+    name: ClassVar[str] = ResourceName.ADS_INSIGHTS_COMSCORE_MARKET
+    breakdowns: ClassVar[list[Breakdown]] = [Breakdown.COMSCORE_MARKET]
+    primary_keys: ClassVar[list[str]] = sorted(
+        AdsInsights.primary_keys + ["/comscore_market"]
+    )
+    comscore_market: str
+
+
 class AdsInsightsPlatformAndDevice(AdsInsights):
     name: ClassVar[str] = ResourceName.ADS_INSIGHTS_PLATFORM_AND_DEVICE
     breakdowns: ClassVar[list[Breakdown]] = [

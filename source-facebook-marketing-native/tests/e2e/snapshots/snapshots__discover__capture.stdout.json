@@ -677,6 +677,101 @@
     ]
   },
   {
+    "recommendedName": "ads_insights_comscore_market",
+    "resourceConfig": {
+      "name": "ads_insights_comscore_market",
+      "interval": "PT1H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "account_id": {
+          "title": "Account Id",
+          "type": "string"
+        },
+        "date_start": {
+          "title": "Date Start",
+          "type": "string"
+        },
+        "ad_id": {
+          "title": "Ad Id",
+          "type": "string"
+        },
+        "comscore_market": {
+          "title": "Comscore Market",
+          "type": "string"
+        }
+      },
+      "required": [
+        "account_id",
+        "date_start",
+        "ad_id",
+        "comscore_market"
+      ],
+      "title": "AdsInsightsComscoreMarket",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/account_id",
+      "/ad_id",
+      "/comscore_market",
+      "/date_start"
+    ]
+  },
+  {
     "recommendedName": "ads_insights_country",
     "resourceConfig": {
       "name": "ads_insights_country",
