@@ -55,7 +55,6 @@ from .models import (
     AdsInsightsAgeAndGender,
     AdsInsightsCountry,
     AdsInsightsRegion,
-    AdsInsightsDma,
     AdsInsightsPlatformAndDevice,
     AdsInsightsActionType,
     InsightsConfig,
@@ -97,7 +96,6 @@ INSIGHTS_RESOURCES: set[type[FacebookInsightsResource]] = {
     AdsInsightsAgeAndGender,
     AdsInsightsCountry,
     AdsInsightsRegion,
-    AdsInsightsDma,
     AdsInsightsPlatformAndDevice,
     AdsInsightsActionType,
 }

@@ -34,7 +34,6 @@ class ResourceName(StrEnum):
     ADS_INSIGHTS_AGE_AND_GENDER = "ads_insights_age_and_gender"
     ADS_INSIGHTS_COUNTRY = "ads_insights_country"
     ADS_INSIGHTS_REGION = "ads_insights_region"
-    ADS_INSIGHTS_DMA = "ads_insights_dma"
     ADS_INSIGHTS_PLATFORM_AND_DEVICE = "ads_insights_platform_and_device"
     ADS_INSIGHTS_ACTION_TYPE = "ads_insights_action_type"
 
@@ -102,7 +101,6 @@ class Breakdown(StrEnum):
     CREATIVE_RELAXATION_ASSET_TYPE = "creative_relaxation_asset_type"
     DESCRIPTION_ASSET = "description_asset"
     DEVICE_PLATFORM = "device_platform"
-    DMA = "dma"
     FIDELITY_TYPE = "fidelity_type"
     FLEXIBLE_FORMAT_ASSET_TYPE = "flexible_format_asset_type"
     FREQUENCY_VALUE = "frequency_value"
@@ -548,5 +546,4 @@ class Field(StrEnum):
     WISH_BID = "wish_bid"
     COUNTRY = "country"
     REGION = "region"
-    DMA = "dma"
     DEVICE_PLATFORM = "device_platform"
