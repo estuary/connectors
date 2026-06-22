@@ -34,6 +34,7 @@ class ResourceName(StrEnum):
     ADS_INSIGHTS_AGE_AND_GENDER = "ads_insights_age_and_gender"
     ADS_INSIGHTS_COUNTRY = "ads_insights_country"
     ADS_INSIGHTS_REGION = "ads_insights_region"
+    ADS_INSIGHTS_COMSCORE_MARKET = "ads_insights_comscore_market"
     ADS_INSIGHTS_PLATFORM_AND_DEVICE = "ads_insights_platform_and_device"
     ADS_INSIGHTS_ACTION_TYPE = "ads_insights_action_type"
 
