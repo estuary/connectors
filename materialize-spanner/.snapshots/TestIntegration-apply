@@ -89,7 +89,7 @@ Big Schema Changed Types Constraints:
 {"Field":"multipleField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
 {"Field":"nullField","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"Required root-level properties must be present when flow_document is disabled"}
 {"Field":"numField","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'numField' is already being materialized as endpoint type 'FLOAT64' but endpoint type 'BOOL' is required by its schema '{ type: [boolean] }'"}
-{"Field":"objField","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'objField' is already being materialized as endpoint type 'JSON' but endpoint type 'STRING(MAX)' is required by its schema '{ type: [string] }'"}
+{"Field":"objField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
 {"Field":"stringDateField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
 {"Field":"stringDateTimeField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
 {"Field":"stringDurationField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
