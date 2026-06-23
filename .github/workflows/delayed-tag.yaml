@@ -32,12 +32,23 @@ on:
   schedule:
     - cron: '0 6 * * *'
   workflow_dispatch:
+  # Dry-run on PRs that change the delayed-tag logic, so the plan/check/guard
+  # steps can be exercised end-to-end before merge. The tag + DB-refresh steps
+  # are skipped on pull_request (see their `if:` guards), so a PR run never
+  # publishes a ':delayed' tag or mutates the connector_tags DB.
+  pull_request:
+    paths:
+      - '.github/workflows/delayed-tag.yaml'
+      - '.github/scripts/delayed_tag.py'
+      - '.github/scripts/test_delayed_tag.py'
 
 concurrency:
-  # Shared with the manual forward-delayed-tag workflow so the two never race
-  # on the same ':delayed' tag / DB rows.
-  group: delayed-tag
-  cancel-in-progress: false
+  # Production runs (nightly schedule + manual forward-delayed-tag) share one
+  # group so they never race on the same ':delayed' tag / DB rows. PR dry-runs
+  # touch neither, so they get their own per-ref group: they don't queue behind
+  # — or block — production, and a new push cancels the previous PR run.
+  group: ${{ github.event_name == 'pull_request' && format('delayed-tag-pr-{0}', github.ref) || 'delayed-tag' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -134,11 +145,17 @@ jobs:
         run: python3 .github/scripts/delayed_tag.py guard
 
       - name: Tag images as ':delayed'
+        # On pull_request this runs as a DRY RUN: it still resolves the plan and
+        # checks each boundary image exists in the registry (read-only), but
+        # skips the `imagetools create` re-tag. Nothing is published.
+        env:
+          DRY_RUN: ${{ github.event_name == 'pull_request' && '1' || '' }}
         run: |
           set -uo pipefail
           tagged=0; missing=0; failed=0
           : > /tmp/tagged.txt
           : > /tmp/missing.txt
+          [ -n "${DRY_RUN}" ] && echo "DRY RUN (pull_request): no images will actually be tagged"
           while IFS=$'\t' read -r IMAGE SHA; do
             [ -z "${IMAGE}" ] && continue
             SRC="ghcr.io/estuary/${IMAGE}:${SHA}"
@@ -151,6 +168,12 @@ jobs:
               echo "skip ${IMAGE}: no image at ${SHA} (may have been pruned from registry)"
               printf '%s\t%s\n' "${IMAGE}" "${SHA}" >> /tmp/missing.txt
               missing=$((missing + 1))
+              continue
+            fi
+            if [ -n "${DRY_RUN}" ]; then
+              echo "would tag ${DST} -> ${SHA}"
+              echo "${IMAGE}" >> /tmp/tagged.txt
+              tagged=$((tagged + 1))
               continue
             fi
             if docker buildx imagetools create --tag "${DST}" "${SRC}" >/dev/null; then
@@ -168,11 +191,14 @@ jobs:
           fi
 
       - name: Install psql
+        # Skipped on PR dry-runs: nothing was tagged, so there is no DB to refresh.
+        if: github.event_name != 'pull_request'
         run: |
           sudo apt update
           sudo apt install -y postgresql-client
 
       - name: Refresh connector_tags rows for ':delayed'
+        if: github.event_name != 'pull_request'
         env:
           PGHOST: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_HOST }}
           PGUSER: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_USER }}
@@ -192,11 +218,19 @@ jobs:
         if: always()
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
+          DRY_RUN: ${{ github.event_name == 'pull_request' && '1' || '' }}
         run: |
           set -uo pipefail
           {
             echo "## Delayed Tag Run — $(date -u '+%Y-%m-%d')"
             echo ""
+            if [ -n "${DRY_RUN}" ]; then
+              echo "> **DRY RUN (pull_request)** — the plan, Claude check, and"
+              echo "> backward-move guard ran for real, but nothing was tagged"
+              echo "> and the connector_tags DB was not touched. The \"Tagged\""
+              echo "> table below lists what a production run *would* tag."
+              echo ""
+            fi
 
             TAGGED_COUNT=$(wc -l < /tmp/tagged.txt 2>/dev/null | tr -d ' ') || TAGGED_COUNT=0
             HELD_COUNT=$(wc -l < /tmp/claude_verdicts.tsv 2>/dev/null \
