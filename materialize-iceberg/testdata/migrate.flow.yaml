@@ -14,6 +14,10 @@ materializations:
       source: key/value
       fields:
         recommended: true
+        include:
+          # Materialize the object field so it exercises the JSON->text migration
+          # (objects are FIELD_OPTIONAL and skipped by recommended selection).
+          objectToString: {}
 
   acmeCo/tests/materialize-iceberg/rest:
     endpoint:
@@ -27,6 +31,10 @@ materializations:
       source: key/value
       fields:
         recommended: true
+        include:
+          # Materialize the object field so it exercises the JSON->text migration
+          # (objects are FIELD_OPTIONAL and skipped by recommended selection).
+          objectToString: {}
 
   acmeCo/tests/materialize-iceberg/rest-deprecated:
     endpoint:
@@ -40,6 +48,10 @@ materializations:
       source: key/value
       fields:
         recommended: true
+        include:
+          # Materialize the object field so it exercises the JSON->text migration
+          # (objects are FIELD_OPTIONAL and skipped by recommended selection).
+          objectToString: {}
 
   acmeCo/tests/materialize-iceberg/glue:
     endpoint:
@@ -53,6 +65,10 @@ materializations:
       source: key/value
       fields:
         recommended: true
+        include:
+          # Materialize the object field so it exercises the JSON->text migration
+          # (objects are FIELD_OPTIONAL and skipped by recommended selection).
+          objectToString: {}
 
   acmeCo/tests/materialize-iceberg/glue-deprecated:
     endpoint:
@@ -66,6 +82,10 @@ materializations:
       source: key/value
       fields:
         recommended: true
+        include:
+          # Materialize the object field so it exercises the JSON->text migration
+          # (objects are FIELD_OPTIONAL and skipped by recommended selection).
+          objectToString: {}
 
   acmeCo/tests/materialize-iceberg/glue-optimized:
     endpoint:
@@ -79,6 +99,10 @@ materializations:
       source: key/value
       fields:
         recommended: true
+        include:
+          # Materialize the object field so it exercises the JSON->text migration
+          # (objects are FIELD_OPTIONAL and skipped by recommended selection).
+          objectToString: {}
 
   acmeCo/tests/materialize-iceberg/glue-catalog-auth:
     endpoint:
@@ -92,6 +116,10 @@ materializations:
       source: key/value
       fields:
         recommended: true
+        include:
+          # Materialize the object field so it exercises the JSON->text migration
+          # (objects are FIELD_OPTIONAL and skipped by recommended selection).
+          objectToString: {}
 
   acmeCo/tests/materialize-iceberg/s3tables:
     endpoint:
@@ -105,6 +133,10 @@ materializations:
       source: key/value
       fields:
         recommended: true
+        include:
+          # Materialize the object field so it exercises the JSON->text migration
+          # (objects are FIELD_OPTIONAL and skipped by recommended selection).
+          objectToString: {}
 
   acmeCo/tests/materialize-iceberg/s3tables-deprecated:
     endpoint:
@@ -118,6 +150,10 @@ materializations:
       source: key/value
       fields:
         recommended: true
+        include:
+          # Materialize the object field so it exercises the JSON->text migration
+          # (objects are FIELD_OPTIONAL and skipped by recommended selection).
+          objectToString: {}
 
   acmeCo/tests/materialize-iceberg/s3tables-catalog-auth:
     endpoint:
@@ -131,3 +167,7 @@ materializations:
       source: key/value
       fields:
         recommended: true
+        include:
+          # Materialize the object field so it exercises the JSON->text migration
+          # (objects are FIELD_OPTIONAL and skipped by recommended selection).
+          objectToString: {}
