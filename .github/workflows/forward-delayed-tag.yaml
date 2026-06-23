@@ -96,25 +96,31 @@ jobs:
             exit 1
           fi
 
-      - name: Install psql
-        run: |
-          sudo apt update
-          sudo apt install -y postgresql-client
-
-      - name: Refresh connector_tags rows for ':delayed'
+      # Re-queue the ':delayed' connector tags over PostgREST (HTTPS) instead of a
+      # direct psql connection from CI.
+      - name: Re-queue connector_tags rows for ':delayed'
         env:
-          PGHOST: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_HOST }}
-          PGUSER: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_USER }}
-          PGPASSWORD: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_PASSWORD }}
-          PGDATABASE: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_DATABASE }}
+          RT_ID: ${{ secrets.CONNECTOR_REFRESH_RT_ID }}
+          RT_SECRET: ${{ secrets.CONNECTOR_REFRESH_RT_SECRET }}
         run: |
           set -euo pipefail
+          SUPABASE_URL="https://eyrcnmuzzyriypdajwdk.supabase.co"
+          # Public anon key, used only as the PostgREST apikey header.
+          ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5cmNubXV6enlyaXlwZGFqd2RrIiwicm9sZSI6ImFub24iLCJpYXQiOjE2NDg3NTA1NzksImV4cCI6MTk2NDMyNjU3OX0.y1OyXD3-DYMz10eGxzo1eeamVMMUwIIeOoMryTRAoco"
+
+          access_token=$(curl -sS -X POST "$SUPABASE_URL/rest/v1/rpc/generate_access_token" \
+            -H "apikey: $ANON_KEY" -H "Content-Type: application/json" \
+            -d "{\"refresh_token_id\": \"$RT_ID\", \"secret\": \"$RT_SECRET\"}" | jq -r '.access_token')
+          if [ -z "$access_token" ] || [ "$access_token" = "null" ]; then
+            echo "failed to obtain control-plane access token"; exit 1
+          fi
+
           while IFS= read -r IMAGE; do
             [ -z "${IMAGE}" ] && continue
-            echo "UPDATE connector_tags SET job_status='{\"type\": \"queued\"}'
-                    WHERE connector_id IN (
-                      SELECT id FROM connectors WHERE image_name='ghcr.io/estuary/${IMAGE}'
-                    ) AND image_tag = ':delayed';" | psql
+            curl -sS --fail-with-body -X POST "$SUPABASE_URL/rest/v1/rpc/requeue_connector_tag" \
+              -H "apikey: $ANON_KEY" -H "Authorization: Bearer $access_token" \
+              -H "Content-Type: application/json" \
+              -d "{\"image_name\": \"ghcr.io/estuary/${IMAGE}\", \"image_tags\": [\":delayed\"]}"
           done < /tmp/tagged.txt
 
       - name: Write job summary

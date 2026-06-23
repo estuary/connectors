@@ -447,10 +447,8 @@ jobs:
         uses: ./.github/actions/deploy
         with:
           connector: ${{ matrix.connector.name }}
-          pg_database: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_DATABASE }}
-          pg_host: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_HOST }}
-          pg_password: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_PASSWORD }}
-          pg_user: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_USER }}
+          rt_id: ${{ secrets.CONNECTOR_REFRESH_RT_ID }}
+          rt_secret: ${{ secrets.CONNECTOR_REFRESH_RT_SECRET }}
           tag_sha: ${{ steps.setup.outputs.tag_sha }}
           tag_version: ${{ matrix.connector.version }}
           variants: ${{ matrix.connector.variants }}
