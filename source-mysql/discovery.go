@@ -10,12 +10,12 @@ import (
 	"strings"
 	"unsafe"
 
+	"github.com/estuary/connectors/go/mysql/sqlparser"
 	"github.com/estuary/connectors/go/tableglob"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/invopop/jsonschema"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/text/encoding/charmap"
-	"vitess.io/vitess/go/vt/sqlparser"
 )
 
 const (

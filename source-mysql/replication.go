@@ -19,6 +19,7 @@ import (
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	"github.com/estuary/connectors/go/encrow"
 	"github.com/estuary/connectors/go/mysql/jsonpath"
+	"github.com/estuary/connectors/go/mysql/sqlparser"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/go-mysql-org/go-mysql/client"
 	"github.com/go-mysql-org/go-mysql/mysql"
@@ -28,7 +29,6 @@ import (
 	"github.com/segmentio/encoding/json"
 	"github.com/sirupsen/logrus"
 	"github.com/tidwall/sjson"
-	"vitess.io/vitess/go/vt/sqlparser"
 )
 
 var (

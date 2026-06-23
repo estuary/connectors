@@ -1,0 +1,12 @@
+{
+  "name": "sqlparser",
+  "description": "MySQL-dialect SQL parser extracted and modified from Vitess.",
+  "upstream": {
+    "module": "vitess.io/vitess",
+    "version": "v0.21.3",
+    "path": "go/vt/sqlparser",
+    "repository": "https://github.com/vitessio/vitess",
+    "license": "Apache-2.0"
+  },
+  "vendoredOn": "2026-06-23"
+}

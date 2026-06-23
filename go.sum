@@ -1689,5 +1689,3 @@ sigs.k8s.io/yaml v1.6.0 h1:G8fkbMSAFqgEFgh4b1wmtzDnioxFCUgTZhlbj5P9QYs=
 sigs.k8s.io/yaml v1.6.0/go.mod h1:796bPqUfzR/0jLAl6XjHl3Ck7MiyVv8dbTdyT3/pMf4=
 tags.cncf.io/container-device-interface v1.0.1 h1:KqQDr4vIlxwfYh0Ed/uJGVgX+CHAkahrgabg6Q8GYxc=
 tags.cncf.io/container-device-interface v1.0.1/go.mod h1:JojJIOeW3hNbcnOH2q0NrWNha/JuHoDZcmYxAZwb2i0=
-vitess.io/vitess v0.21.3 h1:Bl5u+suA/IFQkPN5T6fPyKUK37DONdKQLxdde1tDZKw=
-vitess.io/vitess v0.21.3/go.mod h1:n37n5rmIBHYWnoPZod9umrtExlUR/9SbR3VGmanYNMU=
