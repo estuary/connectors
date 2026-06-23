@@ -185,6 +185,8 @@ _EXPLORE_INGESTION_LAG = timedelta(minutes=10)
 
 _EXPLORE_BACKFILL_WINDOW = timedelta(days=1)
 
+_MAX_INCREMENTAL_EXPLORE_WINDOW = timedelta(days=1)
+
 
 @dataclass(frozen=True)
 class _QuerySummary:
@@ -351,9 +353,16 @@ async def fetch_explore_query(
     now = datetime.now(tz=UTC).replace(microsecond=0)
     # Hold back from the live edge so Sentry's ingestion can settle; only query
     # timestamps that have aged past the lag (see _EXPLORE_INGESTION_LAG).
-    upper = now - _EXPLORE_INGESTION_LAG
-    if upper <= log_cursor:
+    max_upper_bound = now - _EXPLORE_INGESTION_LAG
+    if max_upper_bound <= log_cursor:
         return
+
+    # Bound the date window to be at max 1 day wide so it's easier to
+    # for the incremental task to catch up if it ever falls behind.
+    upper_bound = min(
+        max_upper_bound,
+        log_cursor + _MAX_INCREMENTAL_EXPLORE_WINDOW
+    )
 
     window_start = now - MAX_EXPLORE_FULL_FIDELITY_WINDOW
     if log_cursor < window_start:
@@ -378,7 +387,7 @@ async def fetch_explore_query(
         explore_query,
         log,
         lower_bound=log_cursor,
-        upper_bound=upper,
+        upper_bound=upper_bound,
         build_params=_incremental_explore_params,
         expect_full=True,
     ):
@@ -394,6 +403,11 @@ async def fetch_explore_query(
 
     if new_log_cursor != log_cursor:
         yield new_log_cursor
+    # If there were no results in the date window and we capped the window
+    # by _MAX_INCREMENTAL_EXPLORE_WINDOW, then move the cursor forward to avoid
+    # checking the same capped window on each invocation.
+    elif upper_bound < max_upper_bound:
+        yield upper_bound - (_MAX_INCREMENTAL_EXPLORE_WINDOW / 2)
 
 
 async def backfill_explore_query(
