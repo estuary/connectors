@@ -41,9 +41,9 @@ type binding struct {
 }
 
 type state struct {
-	// CommittedTimestamp is the last successfully committed cell timestamp;
-	// the timestamp stamped on writes for the in-progress transaction is
-	// always `CommittedTimestamp + 1`.
+	// CommittedTimestamp is the last committed cell timestamp, in microseconds.
+	// Bigtable truncates timestamps to millisecond granularity, so writes step by
+	// 1000µs per transaction to keep each transaction on a distinct cell version.
 	CommittedTimestamp int64 `json:"committed_timestamp"`
 }
 
@@ -87,7 +87,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 	batches := make(chan loadBatch)
 	group, groupCtx := errgroup.WithContext(ctx)
-	txTS := bigtable.Timestamp(t.state.CommittedTimestamp + 1)
+	txTS := bigtable.Timestamp(t.state.CommittedTimestamp + 1000)
 
 	for range concurrentWorkers {
 		group.Go(func() error {
@@ -222,7 +222,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var (
 		currentBatch storeBatch
 		currentBytes int
-		ts           = bigtable.Timestamp(t.state.CommittedTimestamp + 1)
+		ts           = bigtable.Timestamp(t.state.CommittedTimestamp + 1000)
 	)
 
 	sendBatch := func() error {

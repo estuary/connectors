@@ -482,7 +482,7 @@ func (d *materialization) SnapshotTestResource(ctx context.Context, path []strin
 		return "0x" + hex.EncodeToString(value)
 	}
 
-	colSet := map[string]struct{}{"_row_key": {}}
+	colSet := map[string]struct{}{"_row_key": {}, "_timestamp": {}}
 	for _, r := range rows {
 		for _, items := range r {
 			for _, it := range items {
@@ -502,6 +502,22 @@ func (d *materialization) SnapshotTestResource(ctx context.Context, path []strin
 		for i, c := range columns {
 			if c == "_row_key" {
 				row[i] = renderBytes([]byte(r.Key()))
+				continue
+			}
+			if c == "_timestamp" {
+				// Surface the read-back cell timestamp (microseconds) so snapshots
+				// reflect the millisecond-granular versions actually stored. All
+				// cells of a row are written in one transaction with a single
+				// timestamp, so the latest version of every cell shares it.
+				var ts bigtable.Timestamp
+				for _, items := range r {
+					for _, it := range items {
+						if it.Timestamp > ts {
+							ts = it.Timestamp
+						}
+					}
+				}
+				row[i] = int64(ts)
 				continue
 			}
 			for _, items := range r {
