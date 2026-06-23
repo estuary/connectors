@@ -976,6 +976,29 @@ func (rs *mysqlReplicationStream) handleQuery(ctx context.Context, parser *sqlpa
 		}
 	case *sqlparser.AlterTable:
 		if streamID := resolveTableName(schema, stmt.Table); rs.tableActive(streamID) {
+			// The Vitess SQL parser does not error on DDL it can't fully understand. Instead it
+			// silently degrades the result into a partially parsed statement with FullyParsed set
+			// to false, typically with empty or incomplete AlterOptions.
+			//
+			// If this happens we can't reliably apply the alteration to our cached table metadata,
+			// so rather than silently capturing against incorrect metadata we mark the table as
+			// dropped and rely on a subsequent backfill to reinitialize with correct metadata.
+			if !stmt.FullyParsed {
+				logrus.WithFields(logrus.Fields{
+					"query":  query,
+					"stream": streamID,
+				}).Warn("unable to fully parse ALTER TABLE on active table, will backfill")
+				if err := rs.emitEvent(ctx, &sqlcapture.TableDropEvent{
+					StreamID: streamID,
+					Cause:    fmt.Sprintf("unable to fully parse alteration of table %q by query %q", streamID, query),
+				}); err != nil {
+					return err
+				} else if err := rs.deactivateTable(streamID); err != nil {
+					return fmt.Errorf("error deactivating table %q after incomplete ALTER TABLE parse: %w", streamID, err)
+				}
+				return nil
+			}
+
 			logrus.WithFields(logrus.Fields{
 				"query":         query,
 				"partitionSpec": stmt.PartitionSpec,
