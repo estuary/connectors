@@ -85,17 +85,20 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 
-		var constraints = make(map[string]*pm.Response_Validated_Constraint)
+		var constraints []*pm.Response_Validated_ProjectionConstraint
+		var sawText, sawTs bool
 		for _, projection := range binding.Collection.Projections {
 			var constraint pm.Response_Validated_Constraint
 
 			switch {
 			case projection.Field == "ts":
+				sawTs = true
 				constraint = pm.Response_Validated_Constraint{
 					Type:   pm.Response_Validated_Constraint_FIELD_REQUIRED,
 					Reason: "The Slack materialization requires a message timestamp",
 				}
 			case projection.Field == "text":
+				sawText = true
 				constraint = pm.Response_Validated_Constraint{
 					Type:   pm.Response_Validated_Constraint_FIELD_REQUIRED,
 					Reason: "The Slack materialization requires 'text'",
@@ -116,19 +119,22 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 					Reason: "All fields other than 'ts', 'text', and 'blocks' will be ignored",
 				}
 			}
-			constraints[projection.Field] = &constraint
+			constraints = append(constraints, &pm.Response_Validated_ProjectionConstraint{
+				Field:      projection.Field,
+				Constraint: &constraint,
+			})
 		}
 
-		if constraints["text"] == nil {
+		if !sawText {
 			return nil, fmt.Errorf("'text' field required")
 		}
-		if constraints["ts"] == nil {
+		if !sawTs {
 			return nil, fmt.Errorf("'ts' field required")
 		}
 
 		out = append(out, &pm.Response_Validated_Binding{
 			CaseInsensitiveFields: false,
-			Constraints:           constraints,
+			ProjectionConstraints: constraints,
 			DeltaUpdates:          true,
 			ResourcePath:          []string{res.Channel},
 		})
