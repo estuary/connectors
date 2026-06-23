@@ -16,4 +16,5 @@ curl -L --proto '=https' --tlsv1.2 -sSf "https://github.com/estuary/flow/release
 curl -L -sSf "https://github.com/estuary/flow/releases/download/${FLOW_RELEASE}/flowctl-linux-x86_64" -o flowctl &&
 curl -L -sSf "https://github.com/estuary/flow/releases/download/${FLOW_RELEASE}/flowctl-go-linux-x86_64" -o flowctl-go &&
 curl -L -sSf "https://github.com/estuary/flow/releases/download/${FLOW_RELEASE}/flow-parser-linux-x86_64" -o flow-parser &&
-chmod +x flowctl flowctl-go flow-parser
+curl -L -sSf "https://github.com/estuary/flow/releases/download/${FLOW_RELEASE}/flow-connector-init-linux-x86_64" -o flow-connector-init &&
+chmod +x flowctl flowctl-go flow-parser flow-connector-init
