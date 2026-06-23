@@ -14,6 +14,10 @@ materializations:
       source: key/value
       fields:
         recommended: true
+        include:
+          # Materialize the object field so it exercises the JSON->text migration
+          # (objects are FIELD_OPTIONAL and skipped by recommended selection).
+          objectToString: {}
         exclude:
           # TODO: BigQuery maps wide integers to BIGNUMERIC(38,0) (~1e38 max).
           # Fixture values for int128/int129/int256/int257 (39+ digits) overflow

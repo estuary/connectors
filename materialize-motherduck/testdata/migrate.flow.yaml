@@ -14,6 +14,10 @@ materializations:
       source: key/value
       fields:
         recommended: true
+        include:
+          # Materialize the object field so it exercises the JSON->text migration
+          # (objects are FIELD_OPTIONAL and skipped by recommended selection).
+          objectToString: {}
         exclude:
           # TODO: MotherDuck maps wide integers to HUGEINT (~1.7e38 max).
           # Fixture values for int129/int256/int257 (3.4e38 to 1.16e77) overflow

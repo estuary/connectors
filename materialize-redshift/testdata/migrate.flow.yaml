@@ -14,6 +14,10 @@ materializations:
       source: key/value
       fields:
         recommended: true
+        include:
+          # Materialize the object field so it exercises the JSON->text migration
+          # (objects are FIELD_OPTIONAL and skipped by recommended selection).
+          objectToString: {}
         exclude:
           - intStr064ToInt064
           - intStr064ToInt128
