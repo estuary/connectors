@@ -367,12 +367,55 @@ def _rest_pr_files(pr_number: int, owner: str, repo: str, token: str) -> list:
     return paths
 
 
+# Diff size caps. The diff dominates the prompt we send Claude, and a single PR
+# can regenerate golden snapshot files (e.g. several connectors'
+# .snapshots/TestIntegration-migrate) whose diffs pack tens of thousands of
+# characters onto a SINGLE line. A line-count cap alone does not bound such a
+# diff: 2000 lines at 60k chars each is ~3 MB / ~800k tokens, which the
+# Anthropic API rejects with HTTP 400 "prompt is too long", aborting the run.
+# We therefore also truncate any individual over-long line (keeping the file
+# visible without its noise) and cap the diff's total character count.
+DEFAULT_DIFF_LINE_CAP = 2000
+DEFAULT_LINE_CHAR_CAP = 1000
+DEFAULT_DIFF_CHAR_CAP = 120_000
+
+
+def _truncate_diff(
+    lines: list,
+    line_cap: int,
+    line_char_cap: int,
+    char_cap: int,
+) -> str:
+    """
+    Bound a diff three ways so it can never blow the model's context window:
+    by line count, by per-line length (over-long generated/snapshot lines are
+    truncated in place, not dropped, so the file stays visible), and by total
+    character count. Returns the joined, truncated diff text.
+    """
+    out: list = []
+    chars = 0
+    for i, line in enumerate(lines):
+        if i >= line_cap:
+            out.append(f'... [truncated at {line_cap} lines]')
+            break
+        if len(line) > line_char_cap:
+            line = f'{line[:line_char_cap]} ... [line truncated, was {len(line)} chars]'
+        if chars + len(line) > char_cap:
+            out.append(f'... [truncated at {char_cap} chars]')
+            break
+        out.append(line)
+        chars += len(line) + 1  # +1 for the newline added by the final join
+    return '\n'.join(out)
+
+
 def _rest_pr_diff(
     pr_number: int,
     owner: str,
     repo: str,
     token: str,
-    diff_line_cap: int = 2000,
+    diff_line_cap: int = DEFAULT_DIFF_LINE_CAP,
+    line_char_cap: int = DEFAULT_LINE_CHAR_CAP,
+    diff_char_cap: int = DEFAULT_DIFF_CHAR_CAP,
 ) -> str:
     """
     Reconstruct a diff from the paginated 'list PR files' REST API.
@@ -383,10 +426,10 @@ def _rest_pr_diff(
     so large PRs can still be summarised file-by-file.
 
     Binary files and files whose individual diff is also too large have no
-    `patch` field; they are noted with a placeholder line.
+    `patch` field; they are noted with a placeholder line. The collected lines
+    are bounded by _truncate_diff before returning.
     """
-    lines_seen = 0
-    parts: list = []
+    lines: list = []
     page = 1
 
     while True:
@@ -404,27 +447,20 @@ def _rest_pr_diff(
         if not batch:
             break
 
-        truncated = False
         for f in batch:
-            header = f'--- a/{f["filename"]}\n+++ b/{f["filename"]}'
+            lines.append(f'--- a/{f["filename"]}\n+++ b/{f["filename"]}')
             patch = f.get('patch') or (
                 f'(binary or oversized file; {f.get("changes", "?")} changes)'
             )
-            file_lines = [header] + patch.splitlines()
+            lines.extend(patch.splitlines())
 
-            if lines_seen + len(file_lines) > diff_line_cap:
-                parts.append(f'... [truncated at {diff_line_cap} lines]')
-                truncated = True
-                break
-
-            parts.extend(file_lines)
-            lines_seen += len(file_lines)
-
-        if truncated or len(batch) < 100:
+        # Stop paginating once we already have more than enough lines to fill
+        # the cap; _truncate_diff makes the final cut below.
+        if len(lines) > diff_line_cap or len(batch) < 100:
             break
         page += 1
 
-    return '\n'.join(parts)
+    return _truncate_diff(lines, diff_line_cap, line_char_cap, diff_char_cap)
 
 
 def _iso_to_epoch(iso: str) -> int:
@@ -630,7 +666,9 @@ def fetch_pr_details(
     owner: str,
     repo: str,
     token: str,
-    diff_line_cap: int = 2000,
+    diff_line_cap: int = DEFAULT_DIFF_LINE_CAP,
+    line_char_cap: int = DEFAULT_LINE_CHAR_CAP,
+    diff_char_cap: int = DEFAULT_DIFF_CHAR_CAP,
 ) -> str:
     """
     Fetch PR title, body, and diff.
@@ -638,7 +676,9 @@ def fetch_pr_details(
     Tries gh pr diff first (fast, single request). If GitHub rejects it with
     HTTP 406 (PR exceeds the aggregate diff limit of 300 files / 20 000 lines),
     falls back to the paginated 'list PR files' REST API which returns per-file
-    patches without that aggregate limit.
+    patches without that aggregate limit. Either way the diff is bounded by
+    _truncate_diff so a PR that regenerates large golden files cannot push the
+    prompt past the model's context window.
     """
     try:
         meta = subprocess.check_output(
@@ -657,14 +697,15 @@ def fetch_pr_details(
             text=True,
             stderr=subprocess.DEVNULL,
         ).splitlines()
-        diff = '\n'.join(diff_lines[:diff_line_cap])
-        if len(diff_lines) > diff_line_cap:
-            diff += f'\n... [truncated at {diff_line_cap} lines]'
+        diff = _truncate_diff(diff_lines, diff_line_cap, line_char_cap, diff_char_cap)
     except subprocess.CalledProcessError:
         # HTTP 406: PR exceeds GitHub's aggregate diff size limit.
         # Fall back to the paginated files API which returns per-file patches.
         try:
-            diff = _rest_pr_diff(pr_number, owner, repo, token, diff_line_cap)
+            diff = _rest_pr_diff(
+                pr_number, owner, repo, token,
+                diff_line_cap, line_char_cap, diff_char_cap,
+            )
         except Exception as exc:
             diff = f'(diff not available: {exc})'
 
@@ -771,6 +812,26 @@ def build_claude_prompt(
 _RETRYABLE_STATUS = frozenset({408, 409, 429, 500, 502, 503, 504, 529})
 
 
+def _content_chars(content) -> int:
+    """Approximate prompt size in characters, for logging how close a request
+    sits to the model's context window."""
+    if isinstance(content, list):
+        return sum(len(b.get('text', '')) for b in content)
+    return len(content)
+
+
+def _http_error_body(exc: urllib.error.HTTPError) -> str:
+    """Read an HTTPError's response body. The Anthropic API returns a JSON error
+    whose message states the precise cause (e.g. 'prompt is too long: 812345
+    tokens > 200000 maximum'), which is exactly what we want in the CI log when
+    a request is rejected. Returns '' if the body can't be read, and truncates
+    so a large body can't flood the log."""
+    try:
+        return exc.read().decode('utf-8', 'replace')[:2000]
+    except Exception:
+        return ''
+
+
 def _claude_request(content, api_key: str, model: str) -> str:
     """One Anthropic Messages API call. Returns the assistant's text, or raises
     urllib/JSONDecodeError on failure — call_claude decides what is retryable.
@@ -791,6 +852,7 @@ def _claude_request(content, api_key: str, model: str) -> str:
             'content-type': 'application/json',
         },
     )
+    print(f'    request: ~{_content_chars(content)} chars', file=sys.stderr)
     with urllib.request.urlopen(req, timeout=90) as resp:
         obj = json.loads(resp.read())
     u = obj.get('usage', {})
@@ -832,10 +894,17 @@ def call_claude(
         try:
             return _claude_request(content, api_key, model)
         except urllib.error.HTTPError as exc:
+            body = _http_error_body(exc)
             if exc.code not in _RETRYABLE_STATUS:
+                # Include the API's error body so the CI log states exactly why
+                # the request was rejected (e.g. an over-long prompt), rather
+                # than a bare 'HTTP 400'.
                 raise RuntimeError(
                     f'Claude API error: HTTP {exc.code} {exc.reason}'
+                    + (f': {body}' if body else '')
                 ) from exc
+            if body:
+                print(f'    Claude API HTTP {exc.code} body: {body}', file=sys.stderr)
             last_exc = exc
         except (urllib.error.URLError, json.JSONDecodeError) as exc:
             last_exc = exc
@@ -933,6 +1002,15 @@ def write_skips(skips: list, path: str) -> None:
     with open(path, 'w') as f:
         for entry, current in skips:
             f.write(f'{entry.image_name}\t{entry.chosen_sha7}\t{current}\n')
+
+
+def write_check_failures(failures: list, path: str) -> None:
+    """Write the (image, error) connectors whose roll-forward check could not be
+    completed. Errors are flattened to a single line so the TSV stays one row
+    per connector."""
+    with open(path, 'w') as f:
+        for image, error in failures:
+            f.write(f'{image}\t{" ".join(error.split())}\n')
 
 
 # ---------------------------------------------------------------------------
@@ -1053,6 +1131,10 @@ def cmd_check(args: argparse.Namespace) -> None:
     new_cache: dict = {}
     api_calls = 0
     prior_hits = 0
+    # (image_name, error) for connectors whose check could not be completed.
+    # Surfaced loudly (::error:: + summary file) so a persistently-failing
+    # connector is visible even though it no longer aborts the whole run.
+    check_failures: list = []
     # Cache PR details by PR number so large LATER PRs shared across multiple
     # connectors (e.g. a monorepo sweep) are only fetched once.
     pr_details_cache: dict = {}
@@ -1060,7 +1142,10 @@ def cmd_check(args: argparse.Namespace) -> None:
     def fetch_cached(pr_number: int) -> str:
         if pr_number not in pr_details_cache:
             pr_details_cache[pr_number] = fetch_pr_details(
-                pr_number, owner, repo, gh_token, diff_line_cap=args.diff_line_cap
+                pr_number, owner, repo, gh_token,
+                diff_line_cap=args.diff_line_cap,
+                line_char_cap=args.line_char_cap,
+                diff_char_cap=args.diff_char_cap,
             )
         return pr_details_cache[pr_number]
 
@@ -1112,11 +1197,30 @@ def cmd_check(args: argparse.Namespace) -> None:
                     later_bodies,
                 )
 
-                # No fallback to 'safe' on failure: call_claude already retries
-                # transient errors, so an exception here means the check could
-                # not be performed. Let it abort the run rather than risk
-                # promoting an unchecked, possibly-buggy image to ':delayed'.
-                raw = call_claude(content, api_key, model=args.model)
+                # No fallback to 'safe' on failure. call_claude already retries
+                # transient errors, so a RuntimeError here means the check could
+                # not be performed for THIS connector. We HOLD it (exclude it
+                # from tagging) rather than promote an unchecked, possibly-buggy
+                # image to ':delayed' — but we isolate the failure to this one
+                # connector and keep going, so a single bad PR can't freeze the
+                # whole pipeline (the prior behaviour, where one failure aborted
+                # the run and no connector was ever tagged). The synthetic hold
+                # is deliberately NOT persisted to new_cache below, so the
+                # connector is re-checked next run instead of being stuck held.
+                try:
+                    raw = call_claude(content, api_key, model=args.model)
+                except RuntimeError as exc:
+                    print(
+                        f'::error::{entry.image_name}: roll-forward check could'
+                        f' not be completed; holding (not tagging) — {exc}'
+                    )
+                    verdict = Verdict(
+                        entry.image_name, 'hold', f'roll-forward check failed: {exc}'
+                    )
+                    verdict_cache[in_run_key] = verdict
+                    verdicts.append(verdict)
+                    check_failures.append((entry.image_name, str(exc)))
+                    continue
                 verdict = parse_claude_verdict(raw, entry.image_name)
                 api_calls += 1
                 verdict_cache[in_run_key] = verdict
@@ -1138,6 +1242,7 @@ def cmd_check(args: argparse.Namespace) -> None:
 
     write_safe_plan(safe, args.output_safe)
     write_verdicts(verdicts, args.output_verdicts)
+    write_check_failures(check_failures, args.output_failures)
 
     print(
         f'\nClaude checked {api_calls} connector(s) via API;'
@@ -1145,6 +1250,11 @@ def cmd_check(args: argparse.Namespace) -> None:
     )
     if held:
         print(f'Held ({len(held)}): {", ".join(e.image_name for e in held)}')
+    if check_failures:
+        print(
+            f'::warning::{len(check_failures)} connector(s) could not be checked'
+            f' and were held: {", ".join(img for img, _ in check_failures)}'
+        )
     print(f'Tagging {len(safe)}/{len(plan)} connector(s) after hold filter')
 
 
@@ -1249,9 +1359,15 @@ def main(argv: Optional[list] = None) -> None:
     p.add_argument('--plan',            default='/tmp/plan.tsv')
     p.add_argument('--later',           default='/tmp/later.tsv')
     p.add_argument('--model',           default='claude-sonnet-4-6')
-    p.add_argument('--diff-line-cap',   type=int, default=2000)
+    p.add_argument('--diff-line-cap',   type=int, default=DEFAULT_DIFF_LINE_CAP)
+    p.add_argument('--line-char-cap',   type=int, default=DEFAULT_LINE_CHAR_CAP,
+                   help='truncate any single diff line longer than this')
+    p.add_argument('--diff-char-cap',   type=int, default=DEFAULT_DIFF_CHAR_CAP,
+                   help="cap each PR's diff at this many characters")
     p.add_argument('--output-safe',     default='/tmp/safe_plan.tsv')
     p.add_argument('--output-verdicts', default='/tmp/claude_verdicts.tsv')
+    p.add_argument('--output-failures', default='/tmp/check_failures.tsv',
+                   help='connectors whose roll-forward check could not be completed')
     p.add_argument('--verdict-cache',   default='/tmp/verdict_cache.json',
                    help='cross-run verdict cache (restored/saved via actions/cache)')
 
