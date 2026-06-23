@@ -1,5 +1,6 @@
 """Unit tests for delayed_tag.py."""
 
+import io
 import json
 import tempfile
 import unittest
@@ -12,6 +13,8 @@ from delayed_tag import (
     PlanEntry,
     LaterEntry,
     Verdict,
+    _http_error_body,
+    _truncate_diff,
     build_safe_plan,
     build_claude_content,
     build_claude_prompt,
@@ -621,6 +624,87 @@ class TestCallClaudeRetry(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             self.call([_http_error(400)] + ['ok'])
         self.assertEqual(self.slept, [])
+
+
+# ---------------------------------------------------------------------------
+# _truncate_diff — diff size caps
+# ---------------------------------------------------------------------------
+
+class TestTruncateDiff(unittest.TestCase):
+
+    def test_under_all_caps_is_unchanged(self):
+        lines = ['+a', '-b', ' c']
+        self.assertEqual(
+            _truncate_diff(lines, line_cap=10, line_char_cap=10, char_cap=1000),
+            '+a\n-b\n c',
+        )
+
+    def test_line_count_cap(self):
+        lines = [f'+line{i}' for i in range(100)]
+        out = _truncate_diff(lines, line_cap=5, line_char_cap=100, char_cap=10_000)
+        self.assertEqual(len(out.splitlines()), 6)  # 5 lines + the marker
+        self.assertIn('truncated at 5 lines', out)
+
+    def test_long_line_truncated_in_place_not_dropped(self):
+        # A single enormous line (a regenerated golden-snapshot line) is the bug
+        # that 400'd the run: it must be truncated, not silently dropped.
+        lines = ['+' + 'x' * 60_000, '+kept']
+        out = _truncate_diff(lines, line_cap=10, line_char_cap=100, char_cap=10_000)
+        self.assertIn('line truncated, was 60001 chars', out)
+        self.assertIn('+kept', out)
+        # No remaining line is anywhere near the original 60k chars.
+        self.assertTrue(all(len(l) < 200 for l in out.splitlines()))
+
+    def test_total_char_cap(self):
+        lines = ['+' + 'a' * 50 for _ in range(100)]  # ~5100 chars total
+        out = _truncate_diff(lines, line_cap=1000, line_char_cap=1000, char_cap=200)
+        self.assertIn('truncated at 200 chars', out)
+        self.assertLess(len(out), 400)
+
+    def test_caps_compose_keep_request_bounded(self):
+        # 2000 lines of 60k chars each — the EventBridge case — must collapse to
+        # a small, sendable diff under all three caps applied together.
+        lines = ['+' + 'x' * 60_000 for _ in range(2000)]
+        out = _truncate_diff(lines, line_cap=2000, line_char_cap=1000, char_cap=120_000)
+        self.assertLessEqual(len(out), 121_000)
+
+
+# ---------------------------------------------------------------------------
+# _http_error_body / call_claude error surfacing
+# ---------------------------------------------------------------------------
+
+class TestHttpErrorBody(unittest.TestCase):
+
+    def test_reads_body(self):
+        exc = urllib.error.HTTPError(
+            'https://api', 400, 'Bad Request', {},
+            io.BytesIO(b'{"error":{"message":"prompt is too long"}}'),
+        )
+        self.assertIn('prompt is too long', _http_error_body(exc))
+
+    def test_unreadable_body_is_empty(self):
+        exc = urllib.error.HTTPError('https://api', 400, 'Bad Request', {}, None)
+        self.assertEqual(_http_error_body(exc), '')
+
+    def test_body_truncated(self):
+        exc = urllib.error.HTTPError(
+            'https://api', 400, 'Bad Request', {}, io.BytesIO(b'x' * 5000),
+        )
+        self.assertEqual(len(_http_error_body(exc)), 2000)
+
+    def test_call_claude_includes_body_in_error(self):
+        # The fail-fast RuntimeError must carry the API's reason so CI logs say
+        # WHY, not just 'HTTP 400'.
+        def boom(*a, **k):
+            raise urllib.error.HTTPError(
+                'https://api', 400, 'Bad Request', {},
+                io.BytesIO(b'{"error":{"message":"prompt is too long: 9 > 8"}}'),
+            )
+        with mock.patch('delayed_tag._claude_request', side_effect=boom):
+            with self.assertRaises(RuntimeError) as ctx:
+                call_claude('prompt', 'key', attempts=1, sleep=lambda d: None)
+        self.assertIn('prompt is too long', str(ctx.exception))
+        self.assertIn('400', str(ctx.exception))
 
 
 if __name__ == '__main__':

@@ -236,6 +236,23 @@ jobs:
               fi
             fi
 
+            if [ -s /tmp/check_failures.tsv ]; then
+              echo "### ⚠️ Roll-forward check failed (held)"
+              echo ""
+              echo "Claude could not be consulted for these connectors (e.g. an"
+              echo "over-long prompt or a persistent API error), so they were held"
+              echo "rather than tagged. They are re-checked on the next run; a"
+              echo "connector that stays here needs investigation."
+              echo ""
+              echo "| Connector | Error |"
+              echo "|-----------|-------|"
+              while IFS=$'\t' read -r IMAGE ERROR; do
+                [ -z "${IMAGE}" ] && continue
+                echo "| \`${IMAGE}\` | ${ERROR} |"
+              done < /tmp/check_failures.tsv
+              echo ""
+            fi
+
             if [ -s /tmp/backward_skips.tsv ]; then
               echo "### ⏪ Held to avoid moving \`:delayed\` backward"
               echo ""
