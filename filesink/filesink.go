@@ -143,14 +143,17 @@ func (d FileDriver[T, R]) Validate(ctx context.Context, req *pm.Request_Validate
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 
-		constraints := make(map[string]*pm.Response_Validated_Constraint)
+		var constraints []*pm.Response_Validated_ProjectionConstraint
 		for _, p := range b.Collection.Projections {
-			constraints[p.Field] = d.NewConstraints(&p)
+			constraints = append(constraints, &pm.Response_Validated_ProjectionConstraint{
+				Field:      p.Field,
+				Constraint: d.NewConstraints(&p),
+			})
 		}
 
 		out = append(out, &pm.Response_Validated_Binding{
 			CaseInsensitiveFields: config.CommonConfig().CaseInsensitiveFields,
-			Constraints:           constraints,
+			ProjectionConstraints: constraints,
 			DeltaUpdates:          true,
 			ResourcePath:          []string{res.Path},
 		})

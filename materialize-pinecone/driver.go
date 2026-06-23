@@ -196,7 +196,7 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 			return nil, err
 		}
 
-		constraints := make(map[string]*pm.Response_Validated_Constraint)
+		var constraints []*pm.Response_Validated_ProjectionConstraint
 		for _, projection := range b.Collection.Projections {
 
 			var constraint = new(pm.Response_Validated_Constraint)
@@ -218,12 +218,15 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 				constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
 				constraint.Reason = "This field can be materializaed"
 			}
-			constraints[projection.Field] = constraint
+			constraints = append(constraints, &pm.Response_Validated_ProjectionConstraint{
+				Field:      projection.Field,
+				Constraint: constraint,
+			})
 		}
 
 		out = append(out, &pm.Response_Validated_Binding{
 			CaseInsensitiveFields: false,
-			Constraints:           constraints,
+			ProjectionConstraints: constraints,
 			DeltaUpdates:          true,
 			ResourcePath:          []string{cfg.Index, res.Namespace},
 		})

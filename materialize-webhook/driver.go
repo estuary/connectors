@@ -118,7 +118,7 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 			return nil, fmt.Errorf("resolved webhook address %s is not absolute", resolved)
 		}
 
-		var constraints = make(map[string]*pm.Response_Validated_Constraint)
+		var constraints []*pm.Response_Validated_ProjectionConstraint
 		for _, projection := range binding.Collection.Projections {
 			var constraint = new(pm.Response_Validated_Constraint)
 			switch {
@@ -132,12 +132,15 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 				constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
 				constraint.Reason = "Webhooks only materialize the full document"
 			}
-			constraints[projection.Field] = constraint
+			constraints = append(constraints, &pm.Response_Validated_ProjectionConstraint{
+				Field:      projection.Field,
+				Constraint: constraint,
+			})
 		}
 
 		out = append(out, &pm.Response_Validated_Binding{
 			CaseInsensitiveFields: false,
-			Constraints:           constraints,
+			ProjectionConstraints: constraints,
 			// Only delta updates are supported by webhooks.
 			DeltaUpdates: true,
 			ResourcePath: []string{resolved.String()},
