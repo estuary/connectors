@@ -174,7 +174,7 @@ type Capture struct {
 }
 
 const (
-	rediscoverInterval        = 5 * time.Minute  // The capture will re-run discovery and reinitialize missing/pending tables this frequently.
+	rediscoverInterval        = 15 * time.Minute // The capture will re-run discovery and reinitialize missing/pending tables this frequently.
 	periodicChecksInterval    = 10 * time.Minute // The capture may run some database-specific sanity checks periodically at this interval.
 	streamingProgressInterval = 5 * time.Minute  // How often to log progress and diagnostics during a long-running streaming cycle.
 )
