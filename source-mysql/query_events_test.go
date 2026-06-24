@@ -472,6 +472,44 @@ func TestAnalyzeQuery(t *testing.T) {
 			query: "CREATE INDEX idx_email ON users (email)",
 			want:  `UpdateMetadata("test.users", id=int, name=varchar(charset=utf8mb4), email=varchar(charset=utf8mb4))`,
 		},
+
+		// Sanitized equivalents of interesting queries observed in production. The
+		// table/column names and comment text are anonymized, but structural variation
+		// (identifier quoting, schema qualification, embedded newlines, IF [NOT] EXISTS
+		// clauses, inline options like ALGORITHM/LOCK, and so on) is preserved.
+
+		// DROP EVENT is dropped by the ignore-list regex.
+		{query: "DROP EVENT IF EXISTS row_tracking_event"},
+
+		// FLUSH parses to a benign statement; here with a backtick-quoted, schema-qualified name.
+		{query: "FLUSH TABLE `backup_2024_08_17`.`accounts`"},
+
+		// CREATE OR REPLACE DEFINER ... TRIGGER is dropped by the ignore-list regex before
+		// parsing, even though it targets an active table.
+		{query: "CREATE OR REPLACE DEFINER=`appuser`@`%` TRIGGER orders_deleted_trigger BEFORE DELETE ON orders FOR EACH ROW INSERT INTO orders_deleted ( id, total, created, modified, deleted ) VALUES ( OLD.id, OLD.total, OLD.created, OLD.modified, NOW() )"},
+
+		// XA transaction control statements fail to parse and are ignored.
+		{query: "XA COMMIT X'0123456789abcdef'"},
+		{query: "XA END X'0123456789abcdef'"},
+
+		// TODO(wgd): The ALTER COLUMN IF NOT EXISTS syntax is a MariaDB-ism which
+		// the Vitess SQL parser can't handle. The incomplete parse is an error and
+		// would result in inconsistent metadata, so we drop the table for subsequent
+		// backfilling.
+		{
+			query: "ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `foobar_id` VARCHAR(255) NULL DEFAULT NULL",
+			want:  `DropTable("test.users")`,
+		},
+
+		// An ADD COLUMN IF NOT EXISTS against an inactive table is ignored regardless of whether
+		// we could parse it, since the active-table check short-circuits first.
+		{query: "ALTER TABLE `subscriptions` ADD COLUMN IF NOT EXISTS `foobar_id` VARCHAR(255) NULL DEFAULT NULL"},
+
+		// Complicated ALTER TABLE with embedded newlines and a comment and some options.
+		{
+			query: "ALTER TABLE `users`\n ADD COLUMN `foobar_id` VARCHAR(255) NULL DEFAULT NULL COMMENT 'foobar id for this user',\n ALGORITHM=INSTANT, LOCK=NONE",
+			want:  `UpdateMetadata("test.users", id=int, name=varchar(charset=utf8mb4), email=varchar(charset=utf8mb4), foobar_id=varchar(charset=utf8mb4))`,
+		},
 	}
 
 	for index, tc := range cases {
