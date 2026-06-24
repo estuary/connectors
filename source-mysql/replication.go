@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"reflect"
 	"regexp"
 	"slices"
@@ -284,9 +285,23 @@ type mysqlTableMetadata struct {
 	DefaultCharset string           `json:"charset,omitempty"`
 }
 
+func (m mysqlTableMetadata) Clone() mysqlTableMetadata {
+	return mysqlTableMetadata{
+		Schema:         m.Schema.Clone(),
+		DefaultCharset: m.DefaultCharset,
+	}
+}
+
 type mysqlTableSchema struct {
-	Columns     []string               `json:"columns"`
-	ColumnTypes map[string]interface{} `json:"types"`
+	Columns     []string       `json:"columns"`
+	ColumnTypes map[string]any `json:"types"`
+}
+
+func (s mysqlTableSchema) Clone() mysqlTableSchema {
+	return mysqlTableSchema{
+		Columns:     slices.Clone(s.Columns),
+		ColumnTypes: maps.Clone(s.ColumnTypes),
+	}
 }
 
 func (rs *mysqlReplicationStream) StartReplication(ctx context.Context, _ map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo) error {
@@ -348,6 +363,11 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 	parser, err := sqlparser.New(sqlparser.Options{})
 	if err != nil {
 		return fmt.Errorf("creating SQL parser: %w", err)
+	}
+	var analyzer = &queryAnalyzer{
+		parser:       parser,
+		featureFlags: rs.db.featureFlags,
+		isMariaDB:    rs.db.versionProduct == "MariaDB",
 	}
 
 	for {
@@ -476,7 +496,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 				}
 			} else {
 				implicitFlush = true // Implicit FlushEvent conversion permitted
-				if err := rs.handleQuery(ctx, parser, string(data.Schema), string(data.Query)); err != nil {
+				if err := rs.handleQuery(ctx, analyzer, string(data.Schema), string(data.Query)); err != nil {
 					return fmt.Errorf("error processing query event: %w", err)
 				}
 			}
@@ -914,7 +934,78 @@ var silentIgnoreQueriesRe = regexp.MustCompile(`(?i)^(BEGIN|COMMIT|ROLLBACK|SAVE
 var createDefinerRegex = `CREATE\s*(OR REPLACE){0,1}\s*(ALGORITHM\s*=\s*[^ ]+)*\s*DEFINER`
 var ignoreQueriesRe = regexp.MustCompile(`(?i)^(BEGIN|COMMIT|GRANT|REVOKE|CREATE USER|` + createDefinerRegex + `|DROP USER|ALTER USER|DROP PROCEDURE|DROP FUNCTION|DROP TRIGGER|SET STATEMENT|CREATE EVENT|ALTER EVENT|DROP EVENT)`)
 
-func (rs *mysqlReplicationStream) handleQuery(ctx context.Context, parser *sqlparser.Parser, schema, query string) error {
+// queryAnalyzer bundles the effectively-constant state needed to interpret
+// binlog query events: the SQL parser plus the feature flags and database
+// flavor which influence how DDL is translated into metadata changes. It's
+// constructed once per replication stream and reused for every query event.
+type queryAnalyzer struct {
+	parser       *sqlparser.Parser
+	featureFlags map[string]bool
+	isMariaDB    bool
+}
+
+// queryEffect describes a single state change from applying a query event.
+type queryEffect interface {
+	isQueryEffect()
+}
+
+type dropTableEffect struct {
+	StreamID sqlcapture.StreamID
+	Cause    string
+}
+
+type updateMetadataEffect struct {
+	StreamID sqlcapture.StreamID
+	Metadata *mysqlTableMetadata
+}
+
+func (*dropTableEffect) isQueryEffect()      {}
+func (*updateMetadataEffect) isQueryEffect() {}
+
+func (rs *mysqlReplicationStream) handleQuery(ctx context.Context, qa *queryAnalyzer, schema, query string) error {
+	var snapshot = rs.activeTables()
+	var effects, err = qa.analyzeQuery(snapshot, schema, query)
+	if err != nil {
+		return err
+	}
+
+	for _, effect := range effects {
+		switch effect := effect.(type) {
+		case *dropTableEffect:
+			// Indicate that change streaming for this table has failed and deactivate it.
+			if err := rs.emitEvent(ctx, &sqlcapture.TableDropEvent{
+				StreamID: effect.StreamID,
+				Cause:    effect.Cause,
+			}); err != nil {
+				return err
+			} else if err := rs.deactivateTable(effect.StreamID); err != nil {
+				return err
+			}
+		case *updateMetadataEffect:
+			// Update local metadata
+			rs.tables.Lock()
+			rs.tables.metadata[effect.StreamID] = effect.Metadata
+			rs.tables.Unlock()
+
+			// Emit metadata update event
+			var bs, err = json.Marshal(effect.Metadata)
+			if err != nil {
+				return fmt.Errorf("error serializing metadata JSON for %q: %w", effect.StreamID, err)
+			}
+			if err := rs.emitEvent(ctx, &sqlcapture.MetadataEvent{
+				StreamID: effect.StreamID,
+				Metadata: json.RawMessage(bs),
+			}); err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("unhandled query effect: %#v", effect)
+		}
+	}
+	return nil
+}
+
+func (qa *queryAnalyzer) analyzeQuery(tables *activeTablesView, schema, query string) ([]queryEffect, error) {
 	// There are basically three types of query events we might receive:
 	//   * An INSERT/UPDATE/DELETE query is an error, we should never receive
 	//     these if the server's `binlog_format` is set to ROW as it should be
@@ -929,23 +1020,25 @@ func (rs *mysqlReplicationStream) handleQuery(ctx context.Context, parser *sqlpa
 	//     by some other means.
 	if silentIgnoreQueriesRe.MatchString(query) {
 		logrus.WithField("query", query).Trace("silently ignoring query event")
-		return nil
+		return nil, nil
 	}
 	if ignoreQueriesRe.MatchString(query) {
 		logrus.WithField("query", query).Info("ignoring query event")
-		return nil
+		return nil, nil
 	}
 	logrus.WithField("query", query).Info("handling query event")
 
-	var stmt, err = parser.Parse(query)
+	var stmt, err = qa.parser.Parse(query)
 	if err != nil {
 		logrus.WithFields(logrus.Fields{
 			"query": query,
 			"err":   err,
 		}).Warn("failed to parse query event, ignoring it")
-		return nil
+		return nil, nil
 	}
 	logrus.WithField("stmt", fmt.Sprintf("%#v", stmt)).Debug("parsed query")
+
+	var effects []queryEffect
 
 	switch stmt := stmt.(type) {
 	case *sqlparser.CreateDatabase, *sqlparser.AlterDatabase, *sqlparser.CreateTable, *sqlparser.Savepoint, *sqlparser.Flush:
@@ -955,27 +1048,23 @@ func (rs *mysqlReplicationStream) handleQuery(ctx context.Context, parser *sqlpa
 		logrus.WithField("query", query).Debug("ignoring benign query")
 	case *sqlparser.DropDatabase:
 		// Remember that In MySQL land "database" is a synonym for the usual SQL concept "schema"
-		if streamIDs := rs.tablesInSchema(stmt.GetDatabaseName()); len(streamIDs) > 0 {
+		if streamIDs := tables.inSchema(stmt.GetDatabaseName()); len(streamIDs) > 0 {
 			logrus.WithFields(logrus.Fields{
 				"query":     query,
 				"schema":    stmt.GetDatabaseName(),
 				"streamIDs": streamIDs,
 			}).Info("dropped all tables in schema")
 			for _, streamID := range streamIDs {
-				if err := rs.emitEvent(ctx, &sqlcapture.TableDropEvent{
+				effects = append(effects, &dropTableEffect{
 					StreamID: streamID,
 					Cause:    fmt.Sprintf("schema %q was dropped by query %q", streamID, query),
-				}); err != nil {
-					return err
-				} else if err := rs.deactivateTable(streamID); err != nil {
-					return fmt.Errorf("cannot deactivate table %q after DROP DATABASE: %w", streamID, err)
-				}
+				})
 			}
 		} else {
 			logrus.WithField("query", query).Debug("ignorable dropped schema (not being captured from)")
 		}
 	case *sqlparser.AlterTable:
-		if streamID := resolveTableName(schema, stmt.Table); rs.tableActive(streamID) {
+		if streamID := resolveTableName(schema, stmt.Table); tables.active(streamID) {
 			// The Vitess SQL parser does not error on DDL it can't fully understand. Instead it
 			// silently degrades the result into a partially parsed statement with FullyParsed set
 			// to false, typically with empty or incomplete AlterOptions.
@@ -988,45 +1077,38 @@ func (rs *mysqlReplicationStream) handleQuery(ctx context.Context, parser *sqlpa
 					"query":  query,
 					"stream": streamID,
 				}).Warn("unable to fully parse ALTER TABLE on active table, will backfill")
-				if err := rs.emitEvent(ctx, &sqlcapture.TableDropEvent{
+
+				effects = append(effects, &dropTableEffect{
 					StreamID: streamID,
 					Cause:    fmt.Sprintf("unable to fully parse alteration of table %q by query %q", streamID, query),
-				}); err != nil {
-					return err
-				} else if err := rs.deactivateTable(streamID); err != nil {
-					return fmt.Errorf("error deactivating table %q after incomplete ALTER TABLE parse: %w", streamID, err)
-				}
-				return nil
-			}
+				})
+			} else {
+				logrus.WithFields(logrus.Fields{
+					"query":         query,
+					"partitionSpec": stmt.PartitionSpec,
+					"alterOptions":  stmt.AlterOptions,
+				}).Info("parsed components of ALTER TABLE statement")
 
-			logrus.WithFields(logrus.Fields{
-				"query":         query,
-				"partitionSpec": stmt.PartitionSpec,
-				"alterOptions":  stmt.AlterOptions,
-			}).Info("parsed components of ALTER TABLE statement")
-
-			if stmt.PartitionSpec == nil || len(stmt.AlterOptions) != 0 {
-				if err := rs.handleAlterTable(ctx, stmt, query, streamID); err != nil {
-					return fmt.Errorf("cannot handle table alteration %q: %w", query, err)
+				if stmt.PartitionSpec == nil || len(stmt.AlterOptions) != 0 {
+					if effect, err := qa.analyzeAlterTable(tables, stmt, query, streamID); err != nil {
+						return nil, fmt.Errorf("cannot handle table alteration %q: %w", query, err)
+					} else {
+						effects = append(effects, effect)
+					}
 				}
 			}
 		}
 	case *sqlparser.DropTable:
 		for _, table := range stmt.FromTables {
-			if streamID := resolveTableName(schema, table); rs.tableActive(streamID) {
-				// Indicate that change streaming for this table has failed.
-				if err := rs.emitEvent(ctx, &sqlcapture.TableDropEvent{
+			if streamID := resolveTableName(schema, table); tables.active(streamID) {
+				effects = append(effects, &dropTableEffect{
 					StreamID: streamID,
 					Cause:    fmt.Sprintf("table %q was dropped by query %q", streamID, query),
-				}); err != nil {
-					return err
-				} else if err := rs.deactivateTable(streamID); err != nil {
-					return err
-				}
+				})
 			}
 		}
 	case *sqlparser.TruncateTable:
-		if streamID := resolveTableName(schema, stmt.Table); rs.tableActive(streamID) {
+		if streamID := resolveTableName(schema, stmt.Table); tables.active(streamID) {
 			// Once we have a concept of collection-level truncation we will probably
 			// want to either handle this like a dropped-and-recreated table or else
 			// use another mechanism to produce the appropriate "the collection is
@@ -1036,25 +1118,20 @@ func (rs *mysqlReplicationStream) handleQuery(ctx context.Context, parser *sqlpa
 		}
 	case *sqlparser.RenameTable:
 		for _, pair := range stmt.TablePairs {
-			if streamID := resolveTableName(schema, pair.FromTable); rs.tableActive(streamID) {
-				// Indicate that change streaming for this table has failed.
-				if err := rs.emitEvent(ctx, &sqlcapture.TableDropEvent{
+			if streamID := resolveTableName(schema, pair.FromTable); tables.active(streamID) {
+				effects = append(effects, &dropTableEffect{
 					StreamID: streamID,
 					Cause:    fmt.Sprintf("table %q was renamed by query %q", streamID, query),
-				}); err != nil {
-					return err
-				} else if err := rs.deactivateTable(streamID); err != nil {
-					return err
-				}
+				})
 			}
 		}
 	case *sqlparser.Insert:
 		table, err := stmt.Table.TableName()
 		if err != nil {
-			return fmt.Errorf("internal error: could no determine table name for Insert query %s: %w", query, err)
+			return nil, fmt.Errorf("internal error: could no determine table name for Insert query %s: %w", query, err)
 		}
-		if streamID := resolveTableName(schema, table); rs.tableActive(streamID) {
-			return fmt.Errorf("unsupported DML query (go.estuary.dev/IK5EVx): %s", query)
+		if streamID := resolveTableName(schema, table); tables.active(streamID) {
+			return nil, fmt.Errorf("unsupported DML query (go.estuary.dev/IK5EVx): %s", query)
 		}
 	case *sqlparser.Update:
 		// Determine whether any of the table expressions in the UPDATE statement refer
@@ -1068,7 +1145,7 @@ func (rs *mysqlReplicationStream) handleQuery(ctx context.Context, parser *sqlpa
 			} else if table, err := tableExpr.TableName(); err != nil {
 				logrus.WithField("query", query).WithError(err).Warn("failed to resolve table name from UPDATE statement")
 				possiblyActiveTables = true
-			} else if streamID := resolveTableName(schema, table); rs.tableActive(streamID) {
+			} else if streamID := resolveTableName(schema, table); tables.active(streamID) {
 				logrus.WithField("streamID", streamID).WithField("query", query).Warn("UPDATE on active table")
 				possiblyActiveTables = true
 			} else {
@@ -1078,31 +1155,28 @@ func (rs *mysqlReplicationStream) handleQuery(ctx context.Context, parser *sqlpa
 
 		// If any table(s) in the UPDATE statement are possibly active then it's a fatal error.
 		if possiblyActiveTables {
-			return fmt.Errorf("unsupported DML query (go.estuary.dev/IK5EVx): %s", query)
+			return nil, fmt.Errorf("unsupported DML query (go.estuary.dev/IK5EVx): %s", query)
 		}
 	case *sqlparser.Delete:
 		for _, target := range stmt.Targets {
-			if streamID := resolveTableName(schema, target); rs.tableActive(streamID) {
-				return fmt.Errorf("unsupported DML query (go.estuary.dev/IK5EVx): %s", query)
+			if streamID := resolveTableName(schema, target); tables.active(streamID) {
+				return nil, fmt.Errorf("unsupported DML query (go.estuary.dev/IK5EVx): %s", query)
 			}
 		}
 	case *sqlparser.OtherAdmin, *sqlparser.Analyze:
 		logrus.WithField("query", query).Debug("ignoring benign query")
 	default:
-		return fmt.Errorf("unhandled query (go.estuary.dev/ceqr74): unhandled type %q: %q", reflect.TypeOf(stmt).String(), query)
+		return nil, fmt.Errorf("unhandled query (go.estuary.dev/ceqr74): unhandled type %q: %q", reflect.TypeOf(stmt).String(), query)
 	}
 
-	return nil
+	return effects, nil
 }
 
-func (rs *mysqlReplicationStream) handleAlterTable(ctx context.Context, stmt *sqlparser.AlterTable, query string, streamID sqlcapture.StreamID) error {
-	// This lock and assignment to `meta` isn't actually needed unless we are able to handle the
-	// alteration. But if we can't handle the alteration the connector is probably going to crash,
-	// so any performance implication is negligible at that point and it makes things a little
-	// easier to get the lock here.
-	rs.tables.Lock()
-	defer rs.tables.Unlock()
-	meta := rs.tables.metadata[streamID]
+func (qa *queryAnalyzer) analyzeAlterTable(tables *activeTablesView, stmt *sqlparser.AlterTable, query string, streamID sqlcapture.StreamID) (queryEffect, error) {
+	var meta, ok = tables.metadata(streamID)
+	if !ok {
+		return nil, fmt.Errorf("missing metadata for table %q", streamID)
+	}
 
 	for _, alterOpt := range stmt.AlterOptions {
 		switch alter := alterOpt.(type) {
@@ -1114,7 +1188,7 @@ func (rs *mysqlReplicationStream) handleAlterTable(ctx context.Context, stmt *sq
 
 			var colIndex = findColumnIndex(meta.Schema.Columns, oldName)
 			if colIndex == -1 {
-				return fmt.Errorf("unknown column %q", oldName)
+				return nil, fmt.Errorf("unknown column %q", oldName)
 			}
 			oldName = meta.Schema.Columns[colIndex] // Use the actual column name from the metadata
 			meta.Schema.Columns[colIndex] = newName
@@ -1124,18 +1198,18 @@ func (rs *mysqlReplicationStream) handleAlterTable(ctx context.Context, stmt *sq
 			meta.Schema.ColumnTypes[newName] = colType
 			logrus.WithField("columns", meta.Schema.Columns).WithField("types", meta.Schema.ColumnTypes).Info("processed RENAME COLUMN alteration")
 		case *sqlparser.RenameTableName:
-			return fmt.Errorf("unsupported table alteration (go.estuary.dev/eVVwet): %s", query)
+			return nil, fmt.Errorf("unsupported table alteration (go.estuary.dev/eVVwet): %s", query)
 		case *sqlparser.ChangeColumn:
 			var oldName = alter.OldColumn.Name.String()
 			var oldIndex = findColumnIndex(meta.Schema.Columns, oldName)
 			if oldIndex == -1 {
-				return fmt.Errorf("unknown column %q", oldName)
+				return nil, fmt.Errorf("unknown column %q", oldName)
 			}
 			oldName = meta.Schema.Columns[oldIndex] // Use the actual column name from the metadata
 			meta.Schema.Columns = slices.Delete(meta.Schema.Columns, oldIndex, oldIndex+1)
 
 			var newName = alter.NewColDefinition.Name.String()
-			var newType = translateDataType(meta, alter.NewColDefinition.Type, rs.db.featureFlags, rs.db.versionProduct == "MariaDB")
+			var newType = qa.translateDataType(meta, alter.NewColDefinition.Type)
 			var newIndex = oldIndex
 			if alter.First {
 				newIndex = 0
@@ -1143,7 +1217,7 @@ func (rs *mysqlReplicationStream) handleAlterTable(ctx context.Context, stmt *sq
 				var afterName = alter.After.Name.String()
 				var afterIndex = findColumnIndex(meta.Schema.Columns, afterName)
 				if afterIndex == -1 {
-					return fmt.Errorf("unknown column %q", afterName)
+					return nil, fmt.Errorf("unknown column %q", afterName)
 				}
 				newIndex = afterIndex + 1
 			}
@@ -1155,12 +1229,12 @@ func (rs *mysqlReplicationStream) handleAlterTable(ctx context.Context, stmt *sq
 			var colName = alter.NewColDefinition.Name.String()
 			var oldIndex = findColumnIndex(meta.Schema.Columns, colName)
 			if oldIndex == -1 {
-				return fmt.Errorf("unknown column %q", colName)
+				return nil, fmt.Errorf("unknown column %q", colName)
 			}
 			colName = meta.Schema.Columns[oldIndex] // Use the actual column name from the metadata
 			meta.Schema.Columns = slices.Delete(meta.Schema.Columns, oldIndex, oldIndex+1)
 
-			var newType = translateDataType(meta, alter.NewColDefinition.Type, rs.db.featureFlags, rs.db.versionProduct == "MariaDB")
+			var newType = qa.translateDataType(meta, alter.NewColDefinition.Type)
 			var newIndex = oldIndex
 			if alter.First {
 				newIndex = 0
@@ -1168,7 +1242,7 @@ func (rs *mysqlReplicationStream) handleAlterTable(ctx context.Context, stmt *sq
 				var afterName = alter.After.Name.String()
 				var afterIndex = findColumnIndex(meta.Schema.Columns, afterName)
 				if afterIndex == -1 {
-					return fmt.Errorf("unknown column %q", afterName)
+					return nil, fmt.Errorf("unknown column %q", afterName)
 				}
 				newIndex = afterIndex + 1
 			}
@@ -1183,7 +1257,7 @@ func (rs *mysqlReplicationStream) handleAlterTable(ctx context.Context, stmt *sq
 			} else if after := alter.After; after != nil {
 				var afterIndex = findColumnIndex(meta.Schema.Columns, after.Name.String())
 				if afterIndex == -1 {
-					return fmt.Errorf("unknown column %q", after.Name.String())
+					return nil, fmt.Errorf("unknown column %q", after.Name.String())
 				}
 				insertAt = afterIndex + 1
 			}
@@ -1191,7 +1265,7 @@ func (rs *mysqlReplicationStream) handleAlterTable(ctx context.Context, stmt *sq
 			var newCols []string
 			for _, col := range alter.Columns {
 				newCols = append(newCols, col.Name.String())
-				var dataType = translateDataType(meta, col.Type, rs.db.featureFlags, rs.db.versionProduct == "MariaDB")
+				var dataType = qa.translateDataType(meta, col.Type)
 				meta.Schema.ColumnTypes[col.Name.String()] = dataType
 			}
 
@@ -1201,7 +1275,7 @@ func (rs *mysqlReplicationStream) handleAlterTable(ctx context.Context, stmt *sq
 			var colName = alter.Name.Name.String()
 			var oldIndex = findColumnIndex(meta.Schema.Columns, colName)
 			if oldIndex == -1 {
-				return fmt.Errorf("unknown column %q", colName)
+				return nil, fmt.Errorf("unknown column %q", colName)
 			}
 			colName = meta.Schema.Columns[oldIndex] // Use the actual column name from the metadata
 			meta.Schema.Columns = slices.Delete(meta.Schema.Columns, oldIndex, oldIndex+1)
@@ -1212,18 +1286,10 @@ func (rs *mysqlReplicationStream) handleAlterTable(ctx context.Context, stmt *sq
 		}
 	}
 
-	var bs, err = json.Marshal(meta)
-	if err != nil {
-		return fmt.Errorf("error serializing metadata JSON for %q: %w", streamID, err)
-	}
-	if err := rs.emitEvent(ctx, &sqlcapture.MetadataEvent{
+	return &updateMetadataEffect{
 		StreamID: streamID,
-		Metadata: json.RawMessage(bs),
-	}); err != nil {
-		return err
-	}
-
-	return nil
+		Metadata: meta,
+	}, nil
 }
 
 // findColumnIndex performs a case-insensitive search for a column name in a slice of column names.
@@ -1240,7 +1306,7 @@ func findColumnIndex(columns []string, name string) int {
 	return -1
 }
 
-func translateDataType(meta *mysqlTableMetadata, t *sqlparser.ColumnType, featureFlags map[string]bool, isMariaDB bool) any {
+func (qa *queryAnalyzer) translateDataType(meta *mysqlTableMetadata, t *sqlparser.ColumnType) any {
 	switch typeName := strings.ToLower(t.Type); typeName {
 	case "enum":
 		return &mysqlColumnType{Type: typeName, EnumValues: append([]string{""}, unquoteEnumValues(t.EnumValues)...)}
@@ -1250,7 +1316,7 @@ func translateDataType(meta *mysqlTableMetadata, t *sqlparser.ColumnType, featur
 		// MySQL's BOOLEAN/BOOL is an alias for TINYINT(1). Since we're parsing the actual
 		// DDL query here, we get the raw keyword, unlike in discovery where we receive the
 		// resolved `tinyint` type. So we need to handle that mapping ourselves.
-		if featureFlags["tinyint1_as_bool"] {
+		if qa.featureFlags["tinyint1_as_bool"] {
 			return &mysqlColumnType{Type: "boolean"}
 		}
 		return &mysqlColumnType{Type: "tinyint"}
@@ -1264,7 +1330,7 @@ func translateDataType(meta *mysqlTableMetadata, t *sqlparser.ColumnType, featur
 		// reports it as a longtext with charset utf8mb4. Thus we have to mirror that here
 		// so a JSON column added via live DDL is captured as a string, consistent with the
 		// discovered schema.
-		if isMariaDB {
+		if qa.isMariaDB {
 			return &mysqlColumnType{Type: "longtext", Charset: "utf8mb4"}
 		}
 		return typeName
@@ -1317,17 +1383,60 @@ func (rs *mysqlReplicationStream) tableActive(streamID sqlcapture.StreamID) bool
 	return ok
 }
 
-func (rs *mysqlReplicationStream) tablesInSchema(schema string) []sqlcapture.StreamID {
-	rs.tables.RLock()
-	defer rs.tables.RUnlock()
+// activeTablesView is a read-only view of the table metadata for
+// all active tables, used as an input to query event processing.
+type activeTablesView struct {
+	// Lazy loading closure so we can avoid constructing the tables map
+	// in cases where the active tables view is unnecessary.
+	load func() map[sqlcapture.StreamID]*mysqlTableMetadata
 
-	var tables []sqlcapture.StreamID
-	for streamID := range rs.tables.active {
+	// Cached tables map after the first load.
+	cache map[sqlcapture.StreamID]*mysqlTableMetadata
+}
+
+func (t *activeTablesView) tables() map[sqlcapture.StreamID]*mysqlTableMetadata {
+	if t.cache == nil {
+		t.cache = t.load()
+	}
+	return t.cache
+}
+
+func (t *activeTablesView) active(streamID sqlcapture.StreamID) bool {
+	_, ok := t.tables()[streamID]
+	return ok
+}
+
+func (t *activeTablesView) inSchema(schema string) []sqlcapture.StreamID {
+	var out []sqlcapture.StreamID
+	for streamID := range t.tables() {
 		if strings.EqualFold(streamID.Schema, schema) {
-			tables = append(tables, streamID)
+			out = append(out, streamID)
 		}
 	}
-	return tables
+	return out
+}
+
+func (t *activeTablesView) metadata(streamID sqlcapture.StreamID) (*mysqlTableMetadata, bool) {
+	var meta, ok = t.tables()[streamID]
+	if !ok || meta == nil {
+		return nil, false
+	}
+	var cloned = meta.Clone()
+	return &cloned, true
+}
+
+func (rs *mysqlReplicationStream) activeTables() *activeTablesView {
+	return &activeTablesView{
+		load: func() map[sqlcapture.StreamID]*mysqlTableMetadata {
+			rs.tables.RLock()
+			defer rs.tables.RUnlock()
+			var tables = make(map[sqlcapture.StreamID]*mysqlTableMetadata)
+			for streamID := range rs.tables.active {
+				tables[streamID] = rs.tables.metadata[streamID]
+			}
+			return tables
+		},
+	}
 }
 
 // isNonTransactional returns true if the stream ID refers to a table which
