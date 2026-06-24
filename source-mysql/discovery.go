@@ -13,9 +13,11 @@ import (
 	"github.com/estuary/connectors/go/tableglob"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/invopop/jsonschema"
+	"github.com/pingcap/tidb/pkg/parser"
+	"github.com/pingcap/tidb/pkg/parser/ast"
+	_ "github.com/pingcap/tidb/pkg/parser/test_driver" // Registers the parser driver which decodes literal values.
 	"github.com/sirupsen/logrus"
 	"golang.org/x/text/encoding/charmap"
-	"vitess.io/vitess/go/vt/sqlparser"
 )
 
 const (
@@ -698,69 +700,14 @@ func parseEnumValues(details string) ([]string, error) {
 	// Construct a simple dummy query containing the full enum column type.
 	var query = fmt.Sprintf(`CREATE TABLE dummy (x %s)`, details)
 
-	parser, err := sqlparser.New(sqlparser.Options{})
-	if err != nil {
-		return nil, fmt.Errorf("error constructing SQL parser: %w", err)
-	}
-	stmt, err := parser.Parse(query)
+	stmt, err := parser.New().ParseOneStmt(query, "", "")
 	if err != nil {
 		return nil, fmt.Errorf("parse error: %w", err)
 	}
 
 	// We're making several unchecked assumptions here, but since we know the exact
 	// structure of the input query we can safely assume these things.
-	var enumValues = stmt.(*sqlparser.CreateTable).TableSpec.Columns[0].Type.EnumValues
-	return unquoteEnumValues(enumValues), nil
-}
-
-// unquoteEnumValues applies MySQL single-quote-unescaping to a list of single-quoted
-// escaped string values such as the EnumValues list returned by the Vitess SQL Parser
-// package when parsing a DDL query involving enum/set values.
-//
-// The single-quote wrapping and escaping of these strings is clearly deliberate, as
-// under the hood the package actually tokenizes the strings to raw values and then
-// explicitly calls `encodeSQLString()` to re-wrap them when building the AST. The
-// actual reason for doing this is unknown however, and it makes very little sense.
-//
-// So whatever, here's a helper function to undo that escaping and get back down to
-// the raw strings again.
-func unquoteEnumValues(values []string) []string {
-	var unquoted []string
-	for _, qval := range values {
-		unquoted = append(unquoted, unquoteMySQLString(qval))
-	}
-	return unquoted
-}
-
-// unquoteStringMySQL unquotes a MySQL-format single-quoted string (and unescapes
-// any backslash escapes) and returns it in unquoted, unescaped form.
-func unquoteMySQLString(qstr string) string {
-	if strings.HasPrefix(qstr, "'") && strings.HasSuffix(qstr, "'") {
-		qstr = strings.TrimPrefix(qstr, "'")
-		qstr = strings.TrimSuffix(qstr, "'")
-		for old, new := range mysqlStringEscapeReplacements {
-			qstr = strings.ReplaceAll(qstr, old, new)
-		}
-	}
-	return qstr
-}
-
-// mysqlStringEscapeReplacements contains the complete list of MySQL string escapes from
-// https://dev.mysql.com/doc/refman/8.0/en/string-literals.html#character-escape-sequences
-// plus the `'​'` repeated-single-quote mechanism.
-var mysqlStringEscapeReplacements = map[string]string{
-	`''`: "'",
-	`\0`: "\x00",
-	`\'`: "'",
-	`\"`: `"`,
-	`\b`: "\b",
-	`\n`: "\n",
-	`\r`: "\r",
-	`\t`: "\t",
-	`\Z`: "\x1A",
-	`\\`: "\\",
-	`\%`: "%",
-	`\_`: "_",
+	return stmt.(*ast.CreateTableStmt).Cols[0].Tp.GetElems(), nil
 }
 
 // getPrimaryKeys queries the database to produce a map from table names to

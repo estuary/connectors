@@ -9,15 +9,19 @@ import (
 	"strings"
 
 	"github.com/estuary/connectors/sqlcapture"
+	"github.com/pingcap/tidb/pkg/parser"
+	"github.com/pingcap/tidb/pkg/parser/ast"
+	"github.com/pingcap/tidb/pkg/parser/mysql"
+	_ "github.com/pingcap/tidb/pkg/parser/test_driver" // Registers the parser driver which decodes literal values (DEFAULT expressions and the like).
+	"github.com/pingcap/tidb/pkg/parser/types"
 	"github.com/segmentio/encoding/json"
 	"github.com/sirupsen/logrus"
-	"vitess.io/vitess/go/vt/sqlparser"
 )
 
 // Query Events in the MySQL binlog are normalized enough that we can use
 // prefix matching to detect many types of query that we just completely
-// don't care about. This is good, because the Vitess SQL parser disagrees
-// with the binlog Query Events for some statements like GRANT and CREATE USER.
+// don't care about.
+//
 // TODO(johnny): SET STATEMENT is not safe in the general case, and we want to re-visit
 // by extracting and ignoring a SET STATEMENT stanza prior to parsing.
 var silentIgnoreQueriesRe = regexp.MustCompile(`(?i)^(BEGIN|COMMIT|ROLLBACK|SAVEPOINT .*|# [^\n]*)$`)
@@ -29,7 +33,7 @@ var ignoreQueriesRe = regexp.MustCompile(`(?i)^(BEGIN|COMMIT|GRANT|REVOKE|CREATE
 // flavor which influence how DDL is translated into metadata changes. It's
 // constructed once per replication stream and reused for every query event.
 type queryAnalyzer struct {
-	parser       *sqlparser.Parser
+	parser       *parser.Parser
 	featureFlags map[string]bool
 	isMariaDB    bool
 }
@@ -118,7 +122,7 @@ func (qa *queryAnalyzer) analyzeQuery(tables *activeTablesView, schema, query st
 	}
 	logrus.WithField("query", query).Info("handling query event")
 
-	var stmt, err = qa.parser.Parse(query)
+	var stmt, err = qa.parser.ParseOneStmt(query, "", "")
 	if err != nil {
 		logrus.WithFields(logrus.Fields{
 			"query": query,
@@ -131,17 +135,22 @@ func (qa *queryAnalyzer) analyzeQuery(tables *activeTablesView, schema, query st
 	var effects []queryEffect
 
 	switch stmt := stmt.(type) {
-	case *sqlparser.CreateDatabase, *sqlparser.AlterDatabase, *sqlparser.CreateTable, *sqlparser.Savepoint, *sqlparser.Flush:
+	case *ast.CreateDatabaseStmt, *ast.AlterDatabaseStmt, *ast.CreateTableStmt, *ast.SavepointStmt, *ast.FlushStmt:
 		logrus.WithField("query", query).Debug("ignoring benign query")
-	case *sqlparser.CreateView, *sqlparser.AlterView, *sqlparser.DropView:
+	case *ast.CreateIndexStmt, *ast.DropIndexStmt:
+		// Index changes don't affect the columns we track, so they're benign. The Vitess
+		// parser modeled CREATE INDEX as an ALTER TABLE, but TiDB has dedicated statement
+		// types for them which we ignore directly.
+		logrus.WithField("query", query).Debug("ignoring benign query")
+	case *ast.CreateViewStmt:
 		// All view creation/deletion/alterations should be fine to ignore since we don't capture from views.
 		logrus.WithField("query", query).Debug("ignoring benign query")
-	case *sqlparser.DropDatabase:
+	case *ast.DropDatabaseStmt:
 		// Remember that In MySQL land "database" is a synonym for the usual SQL concept "schema"
-		if streamIDs := tables.inSchema(stmt.GetDatabaseName()); len(streamIDs) > 0 {
+		if streamIDs := tables.inSchema(stmt.Name.O); len(streamIDs) > 0 {
 			logrus.WithFields(logrus.Fields{
 				"query":     query,
-				"schema":    stmt.GetDatabaseName(),
+				"schema":    stmt.Name.O,
 				"streamIDs": streamIDs,
 			}).Info("dropped all tables in schema")
 			for _, streamID := range streamIDs {
@@ -153,51 +162,32 @@ func (qa *queryAnalyzer) analyzeQuery(tables *activeTablesView, schema, query st
 		} else {
 			logrus.WithField("query", query).Debug("ignorable dropped schema (not being captured from)")
 		}
-	case *sqlparser.AlterTable:
+	case *ast.AlterTableStmt:
 		if streamID := resolveTableName(schema, stmt.Table); tables.active(streamID) {
-			// The Vitess SQL parser does not error on DDL it can't fully understand. Instead it
-			// silently degrades the result into a partially parsed statement with FullyParsed set
-			// to false, typically with empty or incomplete AlterOptions.
-			//
-			// If this happens we can't reliably apply the alteration to our cached table metadata,
-			// so rather than silently capturing against incorrect metadata we mark the table as
-			// dropped and rely on a subsequent backfill to reinitialize with correct metadata.
-			if !stmt.FullyParsed {
-				logrus.WithFields(logrus.Fields{
-					"query":  query,
-					"stream": streamID,
-				}).Warn("unable to fully parse ALTER TABLE on active table, will backfill")
+			logrus.WithFields(logrus.Fields{
+				"query": query,
+				"specs": len(stmt.Specs),
+			}).Info("parsed components of ALTER TABLE statement")
 
-				effects = append(effects, &dropTableEffect{
-					StreamID: streamID,
-					Cause:    fmt.Sprintf("unable to fully parse alteration of table %q by query %q", streamID, query),
-				})
-			} else {
-				logrus.WithFields(logrus.Fields{
-					"query":         query,
-					"partitionSpec": stmt.PartitionSpec,
-					"alterOptions":  stmt.AlterOptions,
-				}).Info("parsed components of ALTER TABLE statement")
-
-				if stmt.PartitionSpec == nil || len(stmt.AlterOptions) != 0 {
-					if effect, err := qa.analyzeAlterTable(tables, stmt, query, streamID); err != nil {
-						return nil, fmt.Errorf("cannot handle table alteration %q: %w", query, err)
-					} else {
-						effects = append(effects, effect)
-					}
+			if effect, err := qa.analyzeAlterTable(tables, stmt, query, streamID); err != nil {
+				return nil, fmt.Errorf("cannot handle table alteration %q: %w", query, err)
+			} else if effect != nil {
+				effects = append(effects, effect)
+			}
+		}
+	case *ast.DropTableStmt:
+		// A `DROP VIEW` parses into a DropTableStmt with IsView set, and is benign since we don't capture views.
+		if !stmt.IsView {
+			for _, table := range stmt.Tables {
+				if streamID := resolveTableName(schema, table); tables.active(streamID) {
+					effects = append(effects, &dropTableEffect{
+						StreamID: streamID,
+						Cause:    fmt.Sprintf("table %q was dropped by query %q", streamID, query),
+					})
 				}
 			}
 		}
-	case *sqlparser.DropTable:
-		for _, table := range stmt.FromTables {
-			if streamID := resolveTableName(schema, table); tables.active(streamID) {
-				effects = append(effects, &dropTableEffect{
-					StreamID: streamID,
-					Cause:    fmt.Sprintf("table %q was dropped by query %q", streamID, query),
-				})
-			}
-		}
-	case *sqlparser.TruncateTable:
+	case *ast.TruncateTableStmt:
 		if streamID := resolveTableName(schema, stmt.Table); tables.active(streamID) {
 			// Once we have a concept of collection-level truncation we will probably
 			// want to either handle this like a dropped-and-recreated table or else
@@ -206,54 +196,26 @@ func (qa *queryAnalyzer) analyzeQuery(tables *activeTablesView, schema, query st
 			// we can do.
 			logrus.WithField("table", streamID).Warn("ignoring TRUNCATE on active table")
 		}
-	case *sqlparser.RenameTable:
-		for _, pair := range stmt.TablePairs {
-			if streamID := resolveTableName(schema, pair.FromTable); tables.active(streamID) {
+	case *ast.RenameTableStmt:
+		for _, pair := range stmt.TableToTables {
+			if streamID := resolveTableName(schema, pair.OldTable); tables.active(streamID) {
 				effects = append(effects, &dropTableEffect{
 					StreamID: streamID,
 					Cause:    fmt.Sprintf("table %q was renamed by query %q", streamID, query),
 				})
 			}
 		}
-	case *sqlparser.Insert:
-		table, err := stmt.Table.TableName()
-		if err != nil {
-			return nil, fmt.Errorf("internal error: could no determine table name for Insert query %s: %w", query, err)
-		}
-		if streamID := resolveTableName(schema, table); tables.active(streamID) {
-			return nil, fmt.Errorf("unsupported DML query (go.estuary.dev/IK5EVx): %s", query)
-		}
-	case *sqlparser.Update:
-		// Determine whether any of the table expressions in the UPDATE statement refer
-		// to an active table. The table expression grammar gets complicated, so if we
-		// can't tell then we'll assume that the table is active and return an error.
-		var possiblyActiveTables bool
-		for _, table := range stmt.TableExprs {
-			if tableExpr, ok := table.(*sqlparser.AliasedTableExpr); !ok {
-				logrus.WithField("query", query).Warnf("unsupported table expression type %T in UPDATE statement", table)
-				possiblyActiveTables = true
-			} else if table, err := tableExpr.TableName(); err != nil {
-				logrus.WithField("query", query).WithError(err).Warn("failed to resolve table name from UPDATE statement")
-				possiblyActiveTables = true
-			} else if streamID := resolveTableName(schema, table); tables.active(streamID) {
-				logrus.WithField("streamID", streamID).WithField("query", query).Warn("UPDATE on active table")
-				possiblyActiveTables = true
-			} else {
-				logrus.WithField("streamID", streamID).WithField("query", query).Debug("ignoring UPDATE on inactive table")
-			}
-		}
-
-		// If any table(s) in the UPDATE statement are possibly active then it's a fatal error.
-		if possiblyActiveTables {
-			return nil, fmt.Errorf("unsupported DML query (go.estuary.dev/IK5EVx): %s", query)
-		}
-	case *sqlparser.Delete:
-		for _, target := range stmt.Targets {
-			if streamID := resolveTableName(schema, target); tables.active(streamID) {
+	case *ast.InsertStmt, *ast.UpdateStmt, *ast.DeleteStmt:
+		// We should never observe DML in the binlog when `binlog_format` is set to ROW as
+		// required for CDC. If we do, and it touches a table we're capturing, that's a fatal
+		// error. We collect every table referenced anywhere in the statement (including joins
+		// and subqueries) and error if any of them is active.
+		for _, table := range referencedTables(stmt) {
+			if streamID := resolveTableName(schema, table); tables.active(streamID) {
 				return nil, fmt.Errorf("unsupported DML query (go.estuary.dev/IK5EVx): %s", query)
 			}
 		}
-	case *sqlparser.OtherAdmin, *sqlparser.Analyze:
+	case *ast.AnalyzeTableStmt, *ast.OptimizeTableStmt, *ast.SelectStmt, *ast.SetOprStmt, *ast.SetStmt:
 		logrus.WithField("query", query).Debug("ignoring benign query")
 	default:
 		return nil, fmt.Errorf("unhandled query (go.estuary.dev/ceqr74): unhandled type %q: %q", reflect.TypeOf(stmt).String(), query)
@@ -262,19 +224,44 @@ func (qa *queryAnalyzer) analyzeQuery(tables *activeTablesView, schema, query st
 	return effects, nil
 }
 
-func (qa *queryAnalyzer) analyzeAlterTable(tables *activeTablesView, stmt *sqlparser.AlterTable, query string, streamID sqlcapture.StreamID) (queryEffect, error) {
+// referencedTables returns every table name referenced anywhere within a statement,
+// by walking the AST and collecting all TableName nodes. It's used by the DML guard,
+// where we want to fail if a query touches any active table regardless of where in
+// the statement (target, join, or subquery) that reference appears.
+func referencedTables(stmt ast.Node) []*ast.TableName {
+	var c tableNameCollector
+	stmt.Accept(&c)
+	return c.names
+}
+
+type tableNameCollector struct {
+	names []*ast.TableName
+}
+
+func (c *tableNameCollector) Enter(n ast.Node) (ast.Node, bool) {
+	if tn, ok := n.(*ast.TableName); ok {
+		c.names = append(c.names, tn)
+	}
+	return n, false
+}
+
+func (c *tableNameCollector) Leave(n ast.Node) (ast.Node, bool) {
+	return n, true
+}
+
+func (qa *queryAnalyzer) analyzeAlterTable(tables *activeTablesView, stmt *ast.AlterTableStmt, query string, streamID sqlcapture.StreamID) (queryEffect, error) {
 	var meta, ok = tables.metadata(streamID)
 	if !ok {
 		return nil, fmt.Errorf("missing metadata for table %q", streamID)
 	}
 
-	for _, alterOpt := range stmt.AlterOptions {
-		switch alter := alterOpt.(type) {
+	for _, spec := range stmt.Specs {
+		switch spec.Tp {
 		// These should be all of the table alterations which might possibly impact our capture
 		// in ways we don't currently support, so the default behavior can be to log and ignore.
-		case *sqlparser.RenameColumn:
-			var oldName = alter.OldName.Name.String()
-			var newName = alter.NewName.Name.String()
+		case ast.AlterTableRenameColumn:
+			var oldName = spec.OldColumnName.Name.String()
+			var newName = spec.NewColumnName.Name.String()
 
 			var colIndex = findColumnIndex(meta.Schema.Columns, oldName)
 			if colIndex == -1 {
@@ -287,10 +274,10 @@ func (qa *queryAnalyzer) analyzeAlterTable(tables *activeTablesView, stmt *sqlpa
 			meta.Schema.ColumnTypes[oldName] = nil
 			meta.Schema.ColumnTypes[newName] = colType
 			logrus.WithField("columns", meta.Schema.Columns).WithField("types", meta.Schema.ColumnTypes).Info("processed RENAME COLUMN alteration")
-		case *sqlparser.RenameTableName:
+		case ast.AlterTableRenameTable:
 			return nil, fmt.Errorf("unsupported table alteration (go.estuary.dev/eVVwet): %s", query)
-		case *sqlparser.ChangeColumn:
-			var oldName = alter.OldColumn.Name.String()
+		case ast.AlterTableChangeColumn:
+			var oldName = spec.OldColumnName.Name.String()
 			var oldIndex = findColumnIndex(meta.Schema.Columns, oldName)
 			if oldIndex == -1 {
 				return nil, fmt.Errorf("unknown column %q", oldName)
@@ -298,25 +285,20 @@ func (qa *queryAnalyzer) analyzeAlterTable(tables *activeTablesView, stmt *sqlpa
 			oldName = meta.Schema.Columns[oldIndex] // Use the actual column name from the metadata
 			meta.Schema.Columns = slices.Delete(meta.Schema.Columns, oldIndex, oldIndex+1)
 
-			var newName = alter.NewColDefinition.Name.String()
-			var newType = qa.translateDataType(meta, alter.NewColDefinition.Type)
-			var newIndex = oldIndex
-			if alter.First {
-				newIndex = 0
-			} else if alter.After != nil {
-				var afterName = alter.After.Name.String()
-				var afterIndex = findColumnIndex(meta.Schema.Columns, afterName)
-				if afterIndex == -1 {
-					return nil, fmt.Errorf("unknown column %q", afterName)
-				}
-				newIndex = afterIndex + 1
+			var newCol = spec.NewColumns[0]
+			var newName = newCol.Name.Name.String()
+			var newType = qa.translateDataType(meta, newCol)
+			var newIndex, err = columnPositionIndex(meta.Schema.Columns, spec.Position, oldIndex)
+			if err != nil {
+				return nil, err
 			}
 			meta.Schema.Columns = slices.Insert(meta.Schema.Columns, newIndex, newName)
 			meta.Schema.ColumnTypes[oldName] = nil // Set to nil rather than delete so that JSON patch merging deletes it
 			meta.Schema.ColumnTypes[newName] = newType
 			logrus.WithField("columns", meta.Schema.Columns).WithField("types", meta.Schema.ColumnTypes).Info("processed CHANGE COLUMN alteration")
-		case *sqlparser.ModifyColumn:
-			var colName = alter.NewColDefinition.Name.String()
+		case ast.AlterTableModifyColumn:
+			var newCol = spec.NewColumns[0]
+			var colName = newCol.Name.Name.String()
 			var oldIndex = findColumnIndex(meta.Schema.Columns, colName)
 			if oldIndex == -1 {
 				return nil, fmt.Errorf("unknown column %q", colName)
@@ -324,45 +306,31 @@ func (qa *queryAnalyzer) analyzeAlterTable(tables *activeTablesView, stmt *sqlpa
 			colName = meta.Schema.Columns[oldIndex] // Use the actual column name from the metadata
 			meta.Schema.Columns = slices.Delete(meta.Schema.Columns, oldIndex, oldIndex+1)
 
-			var newType = qa.translateDataType(meta, alter.NewColDefinition.Type)
-			var newIndex = oldIndex
-			if alter.First {
-				newIndex = 0
-			} else if alter.After != nil {
-				var afterName = alter.After.Name.String()
-				var afterIndex = findColumnIndex(meta.Schema.Columns, afterName)
-				if afterIndex == -1 {
-					return nil, fmt.Errorf("unknown column %q", afterName)
-				}
-				newIndex = afterIndex + 1
+			var newType = qa.translateDataType(meta, newCol)
+			var newIndex, err = columnPositionIndex(meta.Schema.Columns, spec.Position, oldIndex)
+			if err != nil {
+				return nil, err
 			}
-
 			meta.Schema.Columns = slices.Insert(meta.Schema.Columns, newIndex, colName)
 			meta.Schema.ColumnTypes[colName] = newType
 			logrus.WithField("columns", meta.Schema.Columns).WithField("types", meta.Schema.ColumnTypes).Info("processed MODIFY COLUMN alteration")
-		case *sqlparser.AddColumns:
-			var insertAt = len(meta.Schema.Columns)
-			if alter.First {
-				insertAt = 0
-			} else if after := alter.After; after != nil {
-				var afterIndex = findColumnIndex(meta.Schema.Columns, after.Name.String())
-				if afterIndex == -1 {
-					return nil, fmt.Errorf("unknown column %q", after.Name.String())
-				}
-				insertAt = afterIndex + 1
+		case ast.AlterTableAddColumns:
+			var insertAt, err = columnPositionIndex(meta.Schema.Columns, spec.Position, len(meta.Schema.Columns))
+			if err != nil {
+				return nil, err
 			}
 
 			var newCols []string
-			for _, col := range alter.Columns {
-				newCols = append(newCols, col.Name.String())
-				var dataType = qa.translateDataType(meta, col.Type)
-				meta.Schema.ColumnTypes[col.Name.String()] = dataType
+			for _, col := range spec.NewColumns {
+				var colName = col.Name.Name.String()
+				newCols = append(newCols, colName)
+				meta.Schema.ColumnTypes[colName] = qa.translateDataType(meta, col)
 			}
 
 			meta.Schema.Columns = slices.Insert(meta.Schema.Columns, insertAt, newCols...)
-			logrus.WithField("columns", meta.Schema.Columns).WithField("types", meta.Schema.ColumnTypes).Info("processed CHANGE COLUMN alteration")
-		case *sqlparser.DropColumn:
-			var colName = alter.Name.Name.String()
+			logrus.WithField("columns", meta.Schema.Columns).WithField("types", meta.Schema.ColumnTypes).Info("processed ADD COLUMN alteration")
+		case ast.AlterTableDropColumn:
+			var colName = spec.OldColumnName.Name.String()
 			var oldIndex = findColumnIndex(meta.Schema.Columns, colName)
 			if oldIndex == -1 {
 				return nil, fmt.Errorf("unknown column %q", colName)
@@ -370,7 +338,7 @@ func (qa *queryAnalyzer) analyzeAlterTable(tables *activeTablesView, stmt *sqlpa
 			colName = meta.Schema.Columns[oldIndex] // Use the actual column name from the metadata
 			meta.Schema.Columns = slices.Delete(meta.Schema.Columns, oldIndex, oldIndex+1)
 			meta.Schema.ColumnTypes[colName] = nil // Set to nil rather than delete so that JSON patch merging deletes it
-			logrus.WithField("columns", meta.Schema.Columns).WithField("types", meta.Schema.ColumnTypes).Info("processed CHANGE COLUMN alteration")
+			logrus.WithField("columns", meta.Schema.Columns).WithField("types", meta.Schema.ColumnTypes).Info("processed DROP COLUMN alteration")
 		default:
 			logrus.WithField("query", query).Info("ignorable table alteration")
 		}
@@ -380,6 +348,29 @@ func (qa *queryAnalyzer) analyzeAlterTable(tables *activeTablesView, stmt *sqlpa
 		StreamID: streamID,
 		Metadata: meta,
 	}, nil
+}
+
+// columnPositionIndex translates an optional column position clause (FIRST or AFTER x)
+// into the index at which a column should be inserted. The defaultIndex is used when
+// the position is unspecified (or absent), which corresponds to "leave it where it is"
+// for CHANGE/MODIFY and "append to the end" for ADD.
+func columnPositionIndex(columns []string, pos *ast.ColumnPosition, defaultIndex int) (int, error) {
+	if pos == nil {
+		return defaultIndex, nil
+	}
+	switch pos.Tp {
+	case ast.ColumnPositionFirst:
+		return 0, nil
+	case ast.ColumnPositionAfter:
+		var afterName = pos.RelativeColumn.Name.String()
+		var afterIndex = findColumnIndex(columns, afterName)
+		if afterIndex == -1 {
+			return 0, fmt.Errorf("unknown column %q", afterName)
+		}
+		return afterIndex + 1, nil
+	default:
+		return defaultIndex, nil
+	}
 }
 
 // findColumnIndex performs a case-insensitive search for a column name in a slice of column names.
@@ -396,24 +387,30 @@ func findColumnIndex(columns []string, name string) int {
 	return -1
 }
 
-func (qa *queryAnalyzer) translateDataType(meta *mysqlTableMetadata, t *sqlparser.ColumnType) any {
-	switch typeName := strings.ToLower(t.Type); typeName {
+func (qa *queryAnalyzer) translateDataType(meta *mysqlTableMetadata, col *ast.ColumnDef) any {
+	var ft = col.Tp
+	// TypeToStr maps the parser's internal type code plus charset back to the canonical
+	// MySQL type name (for example "int", "varchar", "longtext", "binary"), matching the
+	// DATA_TYPE strings that discovery reads from information_schema.
+	var typeName = types.TypeToStr(ft.GetType(), ft.GetCharset())
+	switch typeName {
 	case "enum":
-		return &mysqlColumnType{Type: typeName, EnumValues: append([]string{""}, unquoteEnumValues(t.EnumValues)...)}
+		// Illegal values are represented internally by MySQL as the integer 0. Prepending
+		// an empty string as the zero-th element allows everything else to flow naturally,
+		// mirroring how enum columns are handled during discovery.
+		return &mysqlColumnType{Type: typeName, EnumValues: append([]string{""}, ft.GetElems()...)}
 	case "set":
-		return &mysqlColumnType{Type: typeName, EnumValues: unquoteEnumValues(t.EnumValues)}
-	case "boolean", "bool":
-		// MySQL's BOOLEAN/BOOL is an alias for TINYINT(1). Since we're parsing the actual
-		// DDL query here, we get the raw keyword, unlike in discovery where we receive the
-		// resolved `tinyint` type. So we need to handle that mapping ourselves.
-		if qa.featureFlags["tinyint1_as_bool"] {
+		return &mysqlColumnType{Type: typeName, EnumValues: ft.GetElems()}
+	case "tinyint", "smallint", "mediumint", "int", "bigint":
+		// MySQL's BOOLEAN/BOOL is an alias for TINYINT(1), which the parser normalizes to a
+		// tinyint with a display width of 1. As in discovery, we assume nobody uses TINYINT(1)
+		// for other purposes, so when the feature flag is set we treat it as a boolean.
+		if typeName == "tinyint" && ft.GetFlen() == 1 && qa.featureFlags["tinyint1_as_bool"] {
 			return &mysqlColumnType{Type: "boolean"}
 		}
-		return &mysqlColumnType{Type: "tinyint"}
-	case "tinyint", "smallint", "mediumint", "int", "bigint":
-		return &mysqlColumnType{Type: typeName, Unsigned: t.Unsigned}
+		return &mysqlColumnType{Type: typeName, Unsigned: mysql.HasUnsignedFlag(ft.GetFlag())}
 	case "char", "varchar", "tinytext", "text", "mediumtext", "longtext":
-		return &mysqlColumnType{Type: typeName, Charset: columnCharset(meta, t)}
+		return &mysqlColumnType{Type: typeName, Charset: columnCharset(meta, col)}
 	case "json":
 		// MySQL has a real JSON type, but in MariaDB the JSON type is an alias for
 		// `LONGTEXT COLLATE utf8mb4_bin`, and discovery (which reads information_schema)
@@ -425,11 +422,9 @@ func (qa *queryAnalyzer) translateDataType(meta *mysqlTableMetadata, t *sqlparse
 		}
 		return typeName
 	case "binary":
-		var columnLength int
-		if t.Length == nil {
+		var columnLength = ft.GetFlen()
+		if columnLength <= 0 {
 			columnLength = 1 // A type of just 'BINARY' is allowed and is a synonym for 'BINARY(1)'
-		} else {
-			columnLength = *t.Length
 		}
 		return &mysqlColumnType{Type: typeName, MaxLength: columnLength}
 	default:
@@ -440,19 +435,31 @@ func (qa *queryAnalyzer) translateDataType(meta *mysqlTableMetadata, t *sqlparse
 // columnCharset resolves the character set of a text column declared in a DDL statement,
 // preferring an explicit column charset, then the charset implied by an explicit collation,
 // then the table default, and finally falling back to UTF-8.
-func columnCharset(meta *mysqlTableMetadata, t *sqlparser.ColumnType) string {
-	if t.Charset.Name != "" {
-		return t.Charset.Name
-	} else if t.Options.Collate != "" {
-		return charsetFromCollation(t.Options.Collate)
+func columnCharset(meta *mysqlTableMetadata, col *ast.ColumnDef) string {
+	if charset := col.Tp.GetCharset(); charset != "" {
+		return charset
+	} else if collate := columnCollation(col); collate != "" {
+		return charsetFromCollation(collate)
 	} else if meta.DefaultCharset != "" {
 		return meta.DefaultCharset
 	}
 	return mysqlDefaultCharset
 }
 
-func resolveTableName(defaultSchema string, name sqlparser.TableName) sqlcapture.StreamID {
-	var schema, table = name.Qualifier.String(), name.Name.String()
+// columnCollation returns the collation named by an explicit COLLATE clause on a column
+// definition, or the empty string if none is present. The parser carries the collation
+// as a column option rather than folding it into the field type.
+func columnCollation(col *ast.ColumnDef) string {
+	for _, opt := range col.Options {
+		if opt.Tp == ast.ColumnOptionCollate {
+			return opt.StrValue
+		}
+	}
+	return ""
+}
+
+func resolveTableName(defaultSchema string, name *ast.TableName) sqlcapture.StreamID {
+	var schema, table = name.Schema.O, name.Name.O
 	if schema == "" {
 		schema = defaultSchema
 	}

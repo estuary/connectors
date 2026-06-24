@@ -24,10 +24,10 @@ import (
 	"github.com/go-mysql-org/go-mysql/replication"
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
+	"github.com/pingcap/tidb/pkg/parser"
 	"github.com/segmentio/encoding/json"
 	"github.com/sirupsen/logrus"
 	"github.com/tidwall/sjson"
-	"vitess.io/vitess/go/vt/sqlparser"
 )
 
 var (
@@ -350,20 +350,11 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 	var binlogOffsetOverflow bool
 	var binlogEstimatedOffset = uint64(cursor.Pos)
 
-	// The vitess SQL parser can be initialized with a few options that aren't relevant to
-	// us. Somewhat notably, the MySQLServerVersion is used when parsing version-specific
-	// MySQL comments in the form of /*!50708 sql here */. If the MySqlServerVersion is
-	// less than the version in that comment, the special comment is not parsed. If
-	// nothing is set for MySQLServerVersion, the default is 8.0.40. Also Note that in a
-	// previous version of the vitess SQL parser that we used the default was 5.07.09, but
-	// I don't think this should have any practical implications on our usage of the
-	// parser.
-	parser, err := sqlparser.New(sqlparser.Options{})
-	if err != nil {
-		return fmt.Errorf("creating SQL parser: %w", err)
-	}
+	// The TiDB SQL parser is not goroutine-safe and reuses internal state between calls,
+	// but it's only ever used from this single replication goroutine for one query event
+	// at a time, so a single instance reused across all query events is fine.
 	var analyzer = &queryAnalyzer{
-		parser:       parser,
+		parser:       parser.New(),
 		featureFlags: rs.db.featureFlags,
 		isMariaDB:    rs.db.versionProduct == "MariaDB",
 	}

@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/estuary/connectors/sqlcapture"
+	"github.com/pingcap/tidb/pkg/parser"
 	"github.com/stretchr/testify/require"
-	"vitess.io/vitess/go/vt/sqlparser"
 )
 
 func TestIgnoreQueries(t *testing.T) {
@@ -187,8 +187,7 @@ func subtestName(index int, query string) string {
 }
 
 func TestAnalyzeQuery(t *testing.T) {
-	parser, err := sqlparser.New(sqlparser.Options{})
-	require.NoError(t, err)
+	var sqlParser = parser.New()
 
 	var cases = []struct {
 		tables  map[sqlcapture.StreamID]*mysqlTableMetadata // Active tables fixture, defaults to testActiveTables() when nil.
@@ -278,9 +277,10 @@ func TestAnalyzeQuery(t *testing.T) {
 			wantErr: "unsupported DML query",
 		},
 		{query: "UPDATE nonexistent SET x = 1"},
-		// TODO(wgd): A single-table DELETE against an active table should be a fatal error
-		// like INSERT/UPDATE, but currently isn't.
-		{query: "DELETE FROM users WHERE id = 1"},
+		{
+			query:   "DELETE FROM users WHERE id = 1",
+			wantErr: "unsupported DML query",
+		},
 		{query: "DELETE FROM nonexistent WHERE id = 1"},
 		{
 			query:   "UPDATE users u JOIN orders o ON u.id = o.id SET u.name = 'x'",
@@ -447,31 +447,30 @@ func TestAnalyzeQuery(t *testing.T) {
 			want:  `UpdateMetadata("test.users", id=int, name=varchar(charset=utf8mb4), email=varchar(charset=utf8mb4))`,
 		},
 
-		// Partition-only operations parse into a PartitionSpec with no AlterOptions, which
-		// the analyzer skips entirely (no metadata update at all).
-		{query: "ALTER TABLE users DROP PARTITION p0"},
-
-		// Statements which reach the unhandled-statement branch and fail.
+		// Partition-only operations parse as an ordinary (unmodeled) alter spec, so like the
+		// other unmodeled alterations above they emit an unchanged metadata update.
 		{
-			query:   "SELECT * FROM users",
-			wantErr: `unhandled type "*sqlparser.Select"`,
+			query: "ALTER TABLE users DROP PARTITION p0",
+			want:  `UpdateMetadata("test.users", id=int, name=varchar(charset=utf8mb4), email=varchar(charset=utf8mb4))`,
 		},
-		// TODO(wgd): A bare SET reaches the unhandled-statement branch and produces a fatal
-		// error, which may be overly aggressive for harmless session-variable assignments.
+
+		// These probably can't show up in the binlog but should be ignored if they do
+		{query: "SELECT * FROM users"},
+		{query: "SELECT id FROM users UNION SELECT id FROM orders"},
+		{query: "SET autocommit = 1"},
+		{query: "SET @@session.time_zone = '+00:00'"},
+
+		// Statements we don't recognize still reach the unhandled-statement branch and fail,
+		// so that something capable of affecting a captured table can't slip by unnoticed.
 		{
-			query:   "SET autocommit = 1",
-			wantErr: `unhandled type "*sqlparser.Set"`,
+			query:   "CALL my_procedure(1, 2)",
+			wantErr: `unhandled type "*ast.CallStmt"`,
 		},
 
 		// Administrative statements which are ignored.
 		{query: "ANALYZE TABLE users"},
 		{query: "OPTIMIZE TABLE users"},
-		// CREATE INDEX parses into an AlterTable, so it lands in the unmodeled-alteration
-		// path and emits an unchanged metadata update.
-		{
-			query: "CREATE INDEX idx_email ON users (email)",
-			want:  `UpdateMetadata("test.users", id=int, name=varchar(charset=utf8mb4), email=varchar(charset=utf8mb4))`,
-		},
+		{query: "CREATE INDEX idx_email ON users (email)"},
 
 		// Sanitized equivalents of interesting queries observed in production. The
 		// table/column names and comment text are anonymized, but structural variation
@@ -492,13 +491,10 @@ func TestAnalyzeQuery(t *testing.T) {
 		{query: "XA COMMIT X'0123456789abcdef'"},
 		{query: "XA END X'0123456789abcdef'"},
 
-		// TODO(wgd): The ALTER COLUMN IF NOT EXISTS syntax is a MariaDB-ism which
-		// the Vitess SQL parser can't handle. The incomplete parse is an error and
-		// would result in inconsistent metadata, so we drop the table for subsequent
-		// backfilling.
+		// ADD COLUMN IF NOT EXISTS is a MariaDB-ism but fairly common in production.
 		{
 			query: "ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `foobar_id` VARCHAR(255) NULL DEFAULT NULL",
-			want:  `DropTable("test.users")`,
+			want:  `UpdateMetadata("test.users", id=int, name=varchar(charset=utf8mb4), email=varchar(charset=utf8mb4), foobar_id=varchar(charset=utf8mb4))`,
 		},
 
 		// An ADD COLUMN IF NOT EXISTS against an inactive table is ignored regardless of whether
@@ -523,7 +519,7 @@ func TestAnalyzeQuery(t *testing.T) {
 				schema = testDefaultSchema
 			}
 
-			var qa = &queryAnalyzer{parser: parser, featureFlags: tc.flags, isMariaDB: tc.mariadb}
+			var qa = &queryAnalyzer{parser: sqlParser, featureFlags: tc.flags, isMariaDB: tc.mariadb}
 			var view = &activeTablesView{cache: tables}
 
 			var got, err = qa.analyzeQuery(view, schema, tc.query)
