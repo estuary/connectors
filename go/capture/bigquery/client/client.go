@@ -11,15 +11,12 @@ import (
 
 // Connect builds a BigQuery client for the given project, applying the EstuaryFlow
 // user agent and verifying connectivity with a no-op query before returning.
-func Connect(ctx context.Context, projectID string, credOption option.ClientOption) (*bigquery.Client, error) {
+func Connect(ctx context.Context, projectID string, clientOpts ...option.ClientOption) (*bigquery.Client, error) {
 	log.WithFields(log.Fields{
 		"project_id": projectID,
 	}).Info("connecting to database")
 
-	var clientOpts = []option.ClientOption{
-		credOption,
-		option.WithUserAgent("EstuaryFlow (GPN:Estuary;)"),
-	}
+	clientOpts = append(clientOpts, option.WithUserAgent("EstuaryFlow (GPN:Estuary;)"))
 	bq, err := bigquery.NewClient(ctx, projectID, clientOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("creating bigquery client: %w", err)

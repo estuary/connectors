@@ -233,6 +233,11 @@
             "description": "When enabled the root document will not be required for standard updates.",
             "default": false
           },
+          "endpoint": {
+            "type": "string",
+            "title": "BigQuery Endpoint",
+            "description": "The BigQuery endpoint URI to connect to. Use if you're materializing to a compatible API that isn't provided by Google."
+          },
           "feature_flags": {
             "type": "string",
             "title": "Feature Flags",

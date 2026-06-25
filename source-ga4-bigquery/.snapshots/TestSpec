@@ -116,6 +116,11 @@
             "title": "Billing Project ID",
             "description": "Project that BigQuery jobs are billed to. Defaults to Project ID if not specified."
           },
+          "endpoint": {
+            "type": "string",
+            "title": "BigQuery Endpoint",
+            "description": "The BigQuery endpoint URI to connect to. Use if you're capturing from a compatible API that isn't provided by Google."
+          },
           "feature_flags": {
             "type": "string",
             "title": "Feature Flags",

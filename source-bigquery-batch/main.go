@@ -41,6 +41,7 @@ type advancedConfig struct {
 	DiscoverViews bool   `json:"discover_views,omitempty" jsonschema:"title=Discover Views,description=When set views will be automatically discovered as resources. If unset only tables will be discovered."`
 	PollSchedule  string `json:"poll,omitempty" jsonschema:"title=Default Polling Schedule,description=When and how often to execute fetch queries. Accepts a Go duration string like '5m' or '6h' for frequency-based polling or a string like 'daily at 12:34Z' to poll at a specific time (specified in UTC) every day. Defaults to '24h' if unset." jsonschema_extras:"pattern=^([-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+|daily at [0-9][0-9]?:[0-9]{2}Z)$"`
 	SourceTag     string `json:"source_tag,omitempty" jsonschema:"title=Source Tag,description=When set the capture will add this value as the property 'tag' in the source metadata of each document."`
+	Endpoint      string `json:"endpoint,omitempty" jsonschema:"title=BigQuery Endpoint,description=The BigQuery endpoint URI to connect to. Use if you're capturing from a compatible API that isn't provided by Google."`
 	FeatureFlags  string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 
 	parsedFeatureFlags map[string]bool // Parsed feature flags setting with defaults applied
@@ -58,7 +59,7 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	if c.Credentials == nil {
+	if c.Credentials == nil && c.Advanced.Endpoint == "" {
 		// Sanity check: Are the provided credentials valid JSON? A common error is to upload
 		// credentials that are not valid JSON, and the resulting error is fairly cryptic if fed
 		// directly to bigquery.NewClient.
@@ -91,11 +92,11 @@ func (c *Config) SetDefaults() {
 }
 
 func connectBigQuery(ctx context.Context, cfg *Config) (*bigquery.Client, error) {
-	credOption, err := cfg.credentialsClientOption()
+	clientOpts, err := cfg.bigQueryClientOptions()
 	if err != nil {
 		return nil, err
 	}
-	return bqclient.Connect(ctx, cfg.ProjectID, credOption)
+	return bqclient.Connect(ctx, cfg.ProjectID, clientOpts...)
 }
 
 func (c *Config) credentialsClientOption() (option.ClientOption, error) {
@@ -103,6 +104,21 @@ func (c *Config) credentialsClientOption() (option.ClientOption, error) {
 		return option.WithCredentialsJSON([]byte(c.CredentialsJSON)), nil
 	}
 	return c.Credentials.ClientOption()
+}
+
+func (c *Config) bigQueryClientOptions() ([]option.ClientOption, error) {
+	if c.Advanced.Endpoint != "" {
+		return []option.ClientOption{
+			option.WithEndpoint(c.Advanced.Endpoint),
+			option.WithoutAuthentication(),
+		}, nil
+	}
+
+	credOption, err := c.credentialsClientOption()
+	if err != nil {
+		return nil, err
+	}
+	return []option.ClientOption{credOption}, nil
 }
 
 func selectQueryTemplate(res *Resource) (string, error) {
