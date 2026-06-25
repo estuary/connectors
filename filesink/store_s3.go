@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -17,6 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/estuary/connectors/go/auth/iam"
+	"github.com/estuary/connectors/go/blob"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	"github.com/invopop/jsonschema"
 )
@@ -119,8 +119,8 @@ func (c S3StoreConfig) Validate() error {
 	if _, err := time.ParseDuration(c.UploadInterval); err != nil {
 		return fmt.Errorf("parsing upload interval %q: %w", c.UploadInterval, err)
 	} else if c.Prefix != "" {
-		if strings.HasPrefix(c.Prefix, "/") {
-			return fmt.Errorf("prefix %q cannot start with /", c.Prefix)
+		if err := blob.ValidateBucketPath("prefix", c.Prefix); err != nil {
+			return err
 		}
 	} else if c.FileSizeLimit < 0 {
 		return fmt.Errorf("fileSizeLimit '%d' cannot be negative", c.FileSizeLimit)

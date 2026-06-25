@@ -15,6 +15,7 @@ import (
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/estuary/connectors/go/blob"
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
@@ -113,6 +114,10 @@ func (c config) Validate() error {
 	}
 
 	if err := c.DBTJobTrigger.Validate(); err != nil {
+		return err
+	}
+
+	if err := blob.ValidateBucketPath("bucket path", c.effectiveBucketPath()); err != nil {
 		return err
 	}
 

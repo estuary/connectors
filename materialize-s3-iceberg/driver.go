@@ -19,6 +19,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	awsHttp "github.com/aws/smithy-go/transport/http"
 	"github.com/estuary/connectors/filesink"
+	"github.com/estuary/connectors/go/blob"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	m "github.com/estuary/connectors/go/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
@@ -151,10 +152,8 @@ func (c config) Validate() error {
 		return err
 	}
 
-	if c.Prefix != "" {
-		if strings.HasPrefix(c.Prefix, "/") {
-			return fmt.Errorf("prefix %q cannot start with /", c.Prefix)
-		}
+	if err := blob.ValidateBucketPath("prefix", c.Prefix); err != nil {
+		return err
 	}
 
 	return nil

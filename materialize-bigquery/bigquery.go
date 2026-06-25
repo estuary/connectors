@@ -9,6 +9,7 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	"github.com/estuary/connectors/go/auth/iam"
+	"github.com/estuary/connectors/go/blob"
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
@@ -133,6 +134,10 @@ func (c config) Validate() error {
 	}
 
 	if err := c.DBTJobTrigger.Validate(); err != nil {
+		return err
+	}
+
+	if err := blob.ValidateBucketPath("bucket path", c.effectiveBucketPath()); err != nil {
 		return err
 	}
 

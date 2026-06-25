@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"strings"
 	"time"
 
 	storage "cloud.google.com/go/storage"
@@ -59,8 +58,8 @@ func (c GCSStoreConfig) Validate() error {
 	} else if _, err := time.ParseDuration(c.UploadInterval); err != nil {
 		return fmt.Errorf("parsing upload interval %q: %w", c.UploadInterval, err)
 	} else if c.Prefix != "" {
-		if strings.HasPrefix(c.Prefix, "/") {
-			return fmt.Errorf("prefix %q cannot start with /", c.Prefix)
+		if err := blob.ValidateBucketPath("prefix", c.Prefix); err != nil {
+			return err
 		}
 	} else if c.FileSizeLimit < 0 {
 		return fmt.Errorf("fileSizeLimit '%d' cannot be negative", c.FileSizeLimit)
@@ -142,8 +141,8 @@ func (c AzureBlobConfig) Validate() error {
 	if _, err := time.ParseDuration(c.UploadInterval); err != nil {
 		return fmt.Errorf("parsing upload interval %q: %w", c.UploadInterval, err)
 	} else if c.Prefix != "" {
-		if strings.HasPrefix(c.Prefix, "/") {
-			return fmt.Errorf("prefix %q cannot start with /", c.Prefix)
+		if err := blob.ValidateBucketPath("prefix", c.Prefix); err != nil {
+			return err
 		}
 	} else if c.FileSizeLimit < 0 {
 		return fmt.Errorf("fileSizeLimit '%d' cannot be negative", c.FileSizeLimit)
