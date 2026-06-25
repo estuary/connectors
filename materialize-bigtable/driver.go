@@ -79,8 +79,9 @@ func (c *CredentialsConfig) Validate() error {
 type config struct {
 	ProjectID   string             `json:"project_id" jsonschema:"title=Project ID,description=Google Cloud Project ID that owns the Bigtable instance." jsonschema_extras:"order=0"`
 	InstanceID  string             `json:"instance_id" jsonschema:"title=Instance ID,description=Bigtable instance ID for the materialized tables." jsonschema_extras:"order=1"`
-	Credentials *CredentialsConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"x-iam-auth=true,order=2"`
-	HardDelete  bool               `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=3"`
+	AppProfile  string             `json:"app_profile,omitempty" jsonschema:"title=Application Profile,description=The Bigtable app profile ID to use for data operations. Leave blank to use the instance's default app profile." jsonschema_extras:"order=2"`
+	Credentials *CredentialsConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"x-iam-auth=true,order=3"`
+	HardDelete  bool               `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=4"`
 
 	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 }
@@ -153,7 +154,12 @@ func (c config) dataClient(ctx context.Context) (*bigtable.Client, error) {
 		return nil, err
 	}
 
-	cfg := bigtable.ClientConfig{MetricsProvider: bigtable.NoopMetricsProvider{}}
+	// AppProfile applies only to data operations; the admin client has no
+	// equivalent concept and routes through the instance directly.
+	cfg := bigtable.ClientConfig{
+		AppProfile:      c.AppProfile,
+		MetricsProvider: bigtable.NoopMetricsProvider{},
+	}
 	client, err := bigtable.NewClientWithConfig(ctx, c.ProjectID, c.InstanceID, cfg, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("creating bigtable data client: %w", err)
