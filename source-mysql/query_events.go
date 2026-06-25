@@ -280,6 +280,9 @@ func (qa *queryAnalyzer) analyzeAlterTable(tables *activeTablesView, stmt *ast.A
 			var oldName = spec.OldColumnName.Name.String()
 			var oldIndex = findColumnIndex(meta.Schema.Columns, oldName)
 			if oldIndex == -1 {
+				if spec.IfExists {
+					continue // CHANGE COLUMN IF EXISTS is a no-op for a column which doesn't exist.
+				}
 				return nil, fmt.Errorf("unknown column %q", oldName)
 			}
 			oldName = meta.Schema.Columns[oldIndex] // Use the actual column name from the metadata
@@ -301,6 +304,9 @@ func (qa *queryAnalyzer) analyzeAlterTable(tables *activeTablesView, stmt *ast.A
 			var colName = newCol.Name.Name.String()
 			var oldIndex = findColumnIndex(meta.Schema.Columns, colName)
 			if oldIndex == -1 {
+				if spec.IfExists {
+					continue // MODIFY COLUMN IF EXISTS is a no-op for a column which doesn't exist.
+				}
 				return nil, fmt.Errorf("unknown column %q", colName)
 			}
 			colName = meta.Schema.Columns[oldIndex] // Use the actual column name from the metadata
@@ -323,6 +329,12 @@ func (qa *queryAnalyzer) analyzeAlterTable(tables *activeTablesView, stmt *ast.A
 			var newCols []string
 			for _, col := range spec.NewColumns {
 				var colName = col.Name.Name.String()
+				// ADD COLUMN IF NOT EXISTS is a no-op for a column which already exists, so
+				// skip it rather than appending a duplicate to the metadata.
+				if spec.IfNotExists && findColumnIndex(meta.Schema.Columns, colName) != -1 {
+					logrus.WithField("column", colName).Debug("ignoring ADD COLUMN IF NOT EXISTS for existing column")
+					continue
+				}
 				newCols = append(newCols, colName)
 				meta.Schema.ColumnTypes[colName] = qa.translateDataType(meta, col)
 			}
@@ -333,6 +345,9 @@ func (qa *queryAnalyzer) analyzeAlterTable(tables *activeTablesView, stmt *ast.A
 			var colName = spec.OldColumnName.Name.String()
 			var oldIndex = findColumnIndex(meta.Schema.Columns, colName)
 			if oldIndex == -1 {
+				if spec.IfExists {
+					continue // DROP COLUMN IF EXISTS is a no-op for a column which doesn't exist.
+				}
 				return nil, fmt.Errorf("unknown column %q", colName)
 			}
 			colName = meta.Schema.Columns[oldIndex] // Use the actual column name from the metadata

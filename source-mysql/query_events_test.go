@@ -375,6 +375,11 @@ func TestAnalyzeQuery(t *testing.T) {
 			query:   "ALTER TABLE users DROP COLUMN nonexistent",
 			wantErr: `unknown column "nonexistent"`,
 		},
+		// DROP COLUMN IF EXISTS is a no-op when the column is already absent.
+		{
+			query: "ALTER TABLE users DROP COLUMN IF EXISTS nonexistent",
+			want:  `UpdateMetadata("test.users", id=int, name=varchar(charset=utf8mb4), email=varchar(charset=utf8mb4))`,
+		},
 
 		// RENAME COLUMN.
 		{
@@ -403,6 +408,11 @@ func TestAnalyzeQuery(t *testing.T) {
 			query:   "ALTER TABLE users CHANGE COLUMN nonexistent x INT",
 			wantErr: `unknown column "nonexistent"`,
 		},
+		// CHANGE COLUMN IF EXISTS is a no-op when the column is already absent.
+		{
+			query: "ALTER TABLE users CHANGE COLUMN IF EXISTS nonexistent x INT",
+			want:  `UpdateMetadata("test.users", id=int, name=varchar(charset=utf8mb4), email=varchar(charset=utf8mb4))`,
+		},
 
 		// MODIFY COLUMN (retype/reposition, keeping the same name). Note that a pure type
 		// change which our metadata doesn't track (such as a VARCHAR length) produces an
@@ -418,6 +428,11 @@ func TestAnalyzeQuery(t *testing.T) {
 		{
 			query:   "ALTER TABLE users MODIFY COLUMN nonexistent INT",
 			wantErr: `unknown column "nonexistent"`,
+		},
+		// MODIFY COLUMN IF EXISTS is a no-op when the column is already absent.
+		{
+			query: "ALTER TABLE users MODIFY COLUMN IF EXISTS nonexistent INT",
+			want:  `UpdateMetadata("test.users", id=int, name=varchar(charset=utf8mb4), email=varchar(charset=utf8mb4))`,
 		},
 
 		// ALTER TABLE ... RENAME TO is explicitly unsupported.
@@ -505,6 +520,12 @@ func TestAnalyzeQuery(t *testing.T) {
 		{
 			query: "ALTER TABLE `users`\n ADD COLUMN `foobar_id` VARCHAR(255) NULL DEFAULT NULL COMMENT 'foobar id for this user',\n ALGORITHM=INSTANT, LOCK=NONE",
 			want:  `UpdateMetadata("test.users", id=int, name=varchar(charset=utf8mb4), email=varchar(charset=utf8mb4), foobar_id=varchar(charset=utf8mb4))`,
+		},
+
+		// An ADD COLUMN IF NOT EXISTS when the column exists should be a no-op
+		{
+			query: "ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `email` VARCHAR(255)",
+			want:  `UpdateMetadata("test.users", id=int, name=varchar(charset=utf8mb4), email=varchar(charset=utf8mb4))`,
 		},
 	}
 
