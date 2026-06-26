@@ -34,9 +34,24 @@ type config struct {
 }
 
 type advancedConfig struct {
-	FlowSchema        string `json:"flowSchema,omitempty" jsonschema:"default=ESTUARY_STAGING,description=The schema in which Flow will create and manage its streams and staging tables."`
-	FlowDB            string `json:"flowDatabase,omitempty" jsonschema:"default=,description=The database in which Flow will create and manage its streams and staging tables. Defaults to the capture database if unset."`
-	FullCopySnapshots bool   `json:"fullCopySnapshots,omitempty" jsonschema:"default=false,description=If set the initial snapshot of a table will be a full copy rather than a zero-copy clone."`
+	FlowSchema              string `json:"flowSchema,omitempty" jsonschema:"default=ESTUARY_STAGING,description=The schema in which Flow will create and manage its streams and staging tables."`
+	FlowDB                  string `json:"flowDatabase,omitempty" jsonschema:"default=,description=The database in which Flow will create and manage its streams and staging tables. Defaults to the capture database if unset."`
+	FullCopySnapshots       bool   `json:"fullCopySnapshots,omitempty" jsonschema:"default=false,description=If set the initial snapshot of a table will be a full copy rather than a zero-copy clone."`
+	DiscoverTransientTables bool   `json:"discoverTransientTables,omitempty" jsonschema:"default=false,description=If set transient tables will be offered during discovery. Transient tables can be captured, but their limited Time Travel retention (at most one day) makes the underlying change stream prone to going stale if the capture falls behind, which forces a re-backfill."`
+}
+
+// isCapturableTableKind reports whether a table with the given SHOW TABLES "kind"
+// can be captured. Permanent tables (kind "TABLE") are always capturable. Transient
+// tables (kind "TRANSIENT") are only offered when explicitly enabled, because their
+// limited Time Travel retention makes the underlying change stream prone to staleness.
+func (c *config) isCapturableTableKind(kind string) bool {
+	if strings.EqualFold(kind, "TABLE") {
+		return true
+	}
+	if c.Advanced.DiscoverTransientTables && strings.EqualFold(kind, "TRANSIENT") {
+		return true
+	}
+	return false
 }
 
 var hostRe = regexp.MustCompile(`(?i)^.+.snowflakecomputing\.com$`)

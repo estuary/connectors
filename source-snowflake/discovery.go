@@ -163,7 +163,7 @@ func catalogFromDiscovery(cfg *config, info *snowflakeDiscoveryResults) ([]*pc.R
 			continue
 		}
 		var tableID = snowflakeObject{discoveredTable.Database, discoveredTable.Schema, discoveredTable.Name}
-		if !strings.EqualFold(discoveredTable.Kind, "TABLE") {
+		if !cfg.isCapturableTableKind(discoveredTable.Kind) {
 			log.WithFields(log.Fields{"table": tableID.String(), "kind": discoveredTable.Kind}).Trace("ignoring non-table entity")
 			continue
 		}

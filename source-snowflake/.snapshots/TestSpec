@@ -112,6 +112,11 @@
             "type": "boolean",
             "description": "If set the initial snapshot of a table will be a full copy rather than a zero-copy clone.",
             "default": false
+          },
+          "discoverTransientTables": {
+            "type": "boolean",
+            "description": "If set transient tables will be offered during discovery. Transient tables can be captured, but their limited Time Travel retention (at most one day) makes the underlying change stream prone to going stale if the capture falls behind, which forces a re-backfill.",
+            "default": false
           }
         },
         "additionalProperties": false,

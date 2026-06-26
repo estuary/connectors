@@ -244,6 +244,54 @@ func TestAddingAndRemovingBindings(t *testing.T) {
 	cupaloy.SnapshotT(t, summary.String())
 }
 
+func TestTransientTable(t *testing.T) {
+	var ctx, tb = context.Background(), snowflakeTestBackend(t)
+	var uniqueID = "51992037"
+
+	// Create a transient source table directly (the CreateTable helper only makes
+	// permanent tables) and seed it with a few rows.
+	var tableName = snowflakeObject{*dbName, *dbSchema, "test_" + strings.TrimPrefix(t.Name(), "Test") + "_" + uniqueID}.QuotedName()
+	tb.Query(ctx, t, fmt.Sprintf("CREATE OR REPLACE TRANSIENT TABLE %s (id INTEGER PRIMARY KEY, data TEXT);", tableName))
+	t.Cleanup(func() { tb.Query(ctx, t, fmt.Sprintf("DROP TABLE IF EXISTS %s;", tableName)) })
+
+	// Surface the kind value that SHOW TABLES reports for a transient table. The
+	// discovery filter keys off this string, so logging it makes failures easy to
+	// diagnose if Snowflake reports something other than the expected "TRANSIENT".
+	if rows, err := tb.control.QueryContext(ctx, fmt.Sprintf("SHOW TABLES LIKE 'test_%s_%s' IN SCHEMA %s.%s;",
+		strings.TrimPrefix(t.Name(), "Test"), uniqueID, *dbName, *dbSchema)); err != nil {
+		t.Logf("diagnostic SHOW TABLES failed: %v", err)
+	} else {
+		var cols, _ = rows.Columns()
+		for rows.Next() {
+			var vals = make([]any, len(cols))
+			var ptrs = make([]any, len(cols))
+			for i := range vals {
+				ptrs[i] = &vals[i]
+			}
+			require.NoError(t, rows.Scan(ptrs...))
+			for i, c := range cols {
+				if strings.EqualFold(c, "kind") {
+					t.Logf("SHOW TABLES reports kind=%v for the transient table", vals[i])
+				}
+			}
+		}
+		rows.Close()
+	}
+
+	// Transient tables are only offered during discovery when this advanced option is set.
+	tb.config.Advanced.DiscoverTransientTables = true
+
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+
+	t.Run("discover", func(t *testing.T) { cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID)) })
+
+	tb.Insert(ctx, t, tableName, [][]any{{0, "A"}, {1, "bbb"}, {2, "CDEFGHIJKLMNOP"}, {3, "Four"}, {4, "5"}})
+	t.Run("init", func(t *testing.T) { verifiedCapture(ctx, t, cs) })
+
+	tb.Insert(ctx, t, tableName, [][]any{{6, "F"}, {7, "ggg"}, {8, "QRSTUVWXYZ"}, {9, "Ten"}, {10, "11"}})
+	t.Run("main", func(t *testing.T) { verifiedCapture(ctx, t, cs) })
+}
+
 func TestDynamicTable(t *testing.T) {
 	var ctx, tb = context.Background(), snowflakeTestBackend(t)
 	var uniqueA, uniqueB = "81804963", "99720399"
