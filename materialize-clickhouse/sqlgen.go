@@ -496,15 +496,22 @@ INSERT INTO {{ template "loadTableName" . }} (
 )
 {{ end }}
 
+{{/*
+The load queries (queryLoadTable and queryLoadTableNoFlowDocument) each carry
+SETTINGS select_sequential_consistency = 1 so that a query observes both the
+just-inserted keys and target-table rows committed by prior transactions'
+partition moves, from any replica.
+*/}}
 {{ define "queryLoadTable" }}
 {{ if $.Document -}}
-SELECT {{ $.Binding }}::Int32, r.{{$.Document.Identifier}}
+SELECT r.{{$.Document.Identifier}}
 	FROM {{$.Identifier}} AS r FINAL
 	JOIN {{ template "loadTableName" . }} AS l
 	{{- range $ind, $key := $.Keys }}
 		{{ if $ind }} AND {{ else }} ON {{ end -}}
 		l.{{$key.Identifier}} = r.{{$key.Identifier}}
 	{{- end }}
+SETTINGS select_sequential_consistency = 1;
 {{ end -}}
 {{ end }}
 
@@ -536,7 +543,7 @@ SELECT {{ $.Binding }}::Int32, r.{{$.Document.Identifier}}
 
 {{ define "queryLoadTableNoFlowDocument" }}
 {{ if not $.DeltaUpdates -}}
-SELECT {{ $.Binding }}::Int32,
+SELECT
 concat('{',
 {{- range $i, $col := $.RootLevelColumns -}}
 	{{- if $i }}, ',',{{ end }}
@@ -549,8 +556,9 @@ concat('{',
 		{{ if $ind }} AND {{ else }} ON {{ end -}}
 		l.{{$key.Identifier}} = r.{{$key.Identifier}}
 	{{- end }}
+SETTINGS select_sequential_consistency = 1;
 {{ else -}}
-SELECT * FROM (SELECT -1::Int32, ''::String LIMIT 0) as nodoc
+SELECT ''::String LIMIT 0
 {{ end -}}
 {{ end }}
 
