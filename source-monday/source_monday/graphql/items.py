@@ -37,8 +37,8 @@ ItemsPageRemainder = GraphQLResponseRemainder[ItemsPageRemainderData]
 MAX_CONCURRENT_ITEM_FETCHES = 5
 # The max complexity budget per request is 5 million and 10 million total per minute.
 BOARDS_PER_PAGE = 1
-ITEMS_PER_BOARD = 5
-ITEMS_LIMIT_BY_ID = 100
+ITEMS_PER_BOARD = 1
+ITEMS_LIMIT_BY_ID = 1
 
 
 class CursorCollector:
