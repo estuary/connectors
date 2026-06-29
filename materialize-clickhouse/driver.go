@@ -501,37 +501,37 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}
 
 	// Keys are now ready to be JOIN'd between the temporary and target tables.
-	// The union query runs with select_sequential_consistency so that it
-	// observes both the just-inserted keys and target-table rows committed by
-	// prior transactions' partition moves, from any replica.
-
-	loadQueries := make([]string, 0, len(activeBindings))
-	for i := range activeBindings {
-		loadQueries = append(loadQueries, t.bindings[i].load.querySQL)
-	}
-	loadQueryUnionSQL := strings.Join(loadQueries, "\nUNION ALL\n") + "\nSETTINGS select_sequential_consistency = 1;"
-	rows, err := t.load.conn.Query(ctx, loadQueryUnionSQL)
-	if err != nil {
-		return fmt.Errorf("querying Load documents: %w", err)
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var bindingId int32
-		var doc json.RawMessage
-		if err = rows.Scan(&bindingId, &doc); err != nil {
-			return fmt.Errorf("scanning Load document: %w", err)
+	loadBinding := func(i int, b *binding) error {
+		rows, err := t.load.conn.Query(ctx, b.load.querySQL)
+		if err != nil {
+			return fmt.Errorf("querying Load documents for %s: %w", b.target.Identifier, err)
 		}
-		if b := t.bindings[bindingId]; len(b.nullFieldsToStrip) > 0 {
-			if doc, err = sql.StripNullFields(doc, b.nullFieldsToStrip); err != nil {
-				return fmt.Errorf("stripping null fields: %w", err)
+		defer rows.Close()
+
+		for rows.Next() {
+			var doc json.RawMessage
+			if err = rows.Scan(&doc); err != nil {
+				return fmt.Errorf("scanning Load document for %s: %w", b.target.Identifier, err)
+			}
+			if len(b.nullFieldsToStrip) > 0 {
+				if doc, err = sql.StripNullFields(doc, b.nullFieldsToStrip); err != nil {
+					return fmt.Errorf("stripping null fields: %w", err)
+				}
+			}
+			if err = loaded(i, doc); err != nil {
+				return err
 			}
 		}
-		if err = loaded(int(bindingId), doc); err != nil {
+		if err = rows.Err(); err != nil {
+			return fmt.Errorf("querying Load documents for %s: %w", b.target.Identifier, err)
+		}
+		return nil
+	}
+
+	for i := range activeBindings {
+		if err = loadBinding(i, t.bindings[i]); err != nil {
 			return err
 		}
-	}
-	if err = rows.Err(); err != nil {
-		return fmt.Errorf("querying Load documents: %w", err)
 	}
 
 	return nil

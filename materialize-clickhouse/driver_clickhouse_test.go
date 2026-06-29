@@ -378,9 +378,8 @@ func loadDocuments(t *testing.T, ctx context.Context, loadConn chdriver.Conn, b 
 
 	var docs []string
 	for rows.Next() {
-		var bindingIdx int32
 		var doc string
-		require.NoError(t, rows.Scan(&bindingIdx, &doc))
+		require.NoError(t, rows.Scan(&doc))
 		docs = append(docs, doc)
 	}
 	_ = rows.Close()
