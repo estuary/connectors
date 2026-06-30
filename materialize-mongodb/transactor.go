@@ -472,6 +472,25 @@ func storeDocument(rawJSON json.RawMessage, idValue string, deltaUpdates bool, k
 		return nil, fmt.Errorf("unmarshalling json doc: %w", err)
 	}
 
+	// Restoring exact integer keys only matters for standard updates, where the
+	// runtime re-derives a store's key from the loaded document body. Delta
+	// updates never load documents and let MongoDB mint a fresh _id, so it is
+	// skipped there to avoid needlessly flipping a key field's BSON type from
+	// double to long. Done before the _id rename below so a key located at /_id
+	// is corrected in place and then carried into _flow_id. Only int64 values are
+	// restored; strings and booleans already decode exactly, and keys beyond
+	// int64 (uint64) remain lossy, which BSON cannot represent faithfully anyway.
+	if !deltaUpdates {
+		if len(key) != len(keyTokens) {
+			panic(fmt.Sprintf("store key tuple has %d elements but binding declares %d key fields", len(key), len(keyTokens)))
+		}
+		for i, tokens := range keyTokens {
+			if v, ok := key[i].(int64); ok {
+				setAtPointer(doc, tokens, v)
+			}
+		}
+	}
+
 	if idVal, ok := doc[idField]; ok {
 		// Preserve the original value of a collection field with a name
 		// that collides with the MongoDB _id field by materializing it
