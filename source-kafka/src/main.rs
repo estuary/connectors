@@ -9,7 +9,10 @@ fn main() -> anyhow::Result<()> {
     let runtime = start_runtime()?;
 
     let stdin = io::BufReader::new(io::stdin());
-    let stdout = std::io::stdout();
+    // Wrap stdout in a BufWriter so captured documents are batched into a few
+    // large writes. Rust's `Stdout` is itself a LineWriter that would otherwise
+    // flush a syscall on every newline.
+    let stdout = std::io::BufWriter::with_capacity(256 * 1024, std::io::stdout());
 
     let result = runtime.block_on(run_connector(stdin, stdout));
 

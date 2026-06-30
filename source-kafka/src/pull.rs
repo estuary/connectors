@@ -28,6 +28,7 @@ use rdkafka::{
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map};
 use std::collections::{hash_map::Entry, HashMap};
+use std::io::{BufWriter, Stdout};
 use time::{format_description, OffsetDateTime};
 
 #[derive(Debug, Deserialize, Serialize, Default)]
@@ -73,7 +74,7 @@ enum MetaTimestamp {
     LogAppendTime(String),
 }
 
-pub async fn do_pull(req: Open, mut stdout: std::io::Stdout) -> Result<()> {
+pub async fn do_pull(req: Open, mut stdout: BufWriter<Stdout>) -> Result<()> {
     let spec = req.capture.expect("open must contain a capture spec");
 
     let state = if req.state_json == "{}" {
@@ -746,5 +747,62 @@ mod tests {
                 want
             )
         }
+    }
+
+    #[derive(Default)]
+    struct FlushCountingWriter {
+        buf: Vec<u8>,
+        flushes: usize,
+    }
+
+    impl std::io::Write for FlushCountingWriter {
+        fn write(&mut self, data: &[u8]) -> std::io::Result<usize> {
+            self.buf.extend_from_slice(data);
+            Ok(data.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            self.flushes += 1;
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn test_write_capture_response_buffering() {
+        let mut out = FlushCountingWriter::default();
+
+        // A captured document is buffered (not flushed) and written as exactly
+        // one newline-terminated line.
+        write_capture_response(
+            Response {
+                captured: Some(response::Captured {
+                    binding: 0,
+                    doc_json: r#"{"a":1}"#.to_string().into(),
+                }),
+                ..Default::default()
+            },
+            &mut out,
+        )
+        .unwrap();
+        assert_eq!(out.flushes, 0, "captured documents must not flush");
+        let text = String::from_utf8(out.buf.clone()).unwrap();
+        assert_eq!(text.matches('\n').count(), 1);
+        assert!(text.ends_with('\n'));
+
+        // A checkpoint flushes, pushing itself and all preceding buffered
+        // documents to the runtime.
+        write_capture_response(
+            Response {
+                checkpoint: Some(Checkpoint {
+                    state: Some(ConnectorState {
+                        updated_json: "{}".to_string().into(),
+                        merge_patch: true,
+                    }),
+                }),
+                ..Default::default()
+            },
+            &mut out,
+        )
+        .unwrap();
+        assert_eq!(out.flushes, 1, "a checkpoint must flush");
     }
 }

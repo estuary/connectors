@@ -1,4 +1,4 @@
-use std::io::Write;
+use std::io::{BufWriter, Stdout, Write};
 
 use anyhow::{Context, Result};
 use configuration::{schema_for, EndpointConfig, Resource, SchemaRegistryConfig};
@@ -26,7 +26,7 @@ const KAFKA_METADATA_TIMEOUT: std::time::Duration = std::time::Duration::from_se
 
 pub async fn run_connector(
     mut stdin: io::BufReader<io::Stdin>,
-    mut stdout: std::io::Stdout,
+    mut stdout: BufWriter<Stdout>,
 ) -> Result<(), anyhow::Error> {
     tracing::info!("running connector");
 
@@ -116,15 +116,18 @@ pub async fn run_connector(
     Ok(())
 }
 
-pub fn write_capture_response(
+pub fn write_capture_response<W: Write>(
     response: Response,
-    stdout: &mut std::io::Stdout,
+    out: &mut W,
 ) -> anyhow::Result<()> {
-    serde_json::to_writer(&mut *stdout, &response).context("serializing response")?;
-    writeln!(stdout).context("writing response newline")?;
+    serde_json::to_writer(&mut *out, &response).context("serializing response")?;
+    writeln!(out).context("writing response newline")?;
 
+    // Captured documents accumulate in the buffer and are flushed by the next
+    // Checkpoint. This batches many documents into a few large writes instead
+    // of one syscall per document.
     if response.captured.is_none() {
-        stdout.flush().context("flushing stdout")?;
+        out.flush().context("flushing output")?;
     }
     Ok(())
 }
