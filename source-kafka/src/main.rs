@@ -1,3 +1,6 @@
+// Links in the allocator crate, which sets the global allocator to jemalloc.
+extern crate allocator;
+
 use anyhow::Context;
 use source_kafka::run_connector;
 use tokio::io;
