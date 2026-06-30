@@ -1,16 +1,212 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
+
+// storeAndReload runs storeDocument and then simulates the MongoDB store + load
+// round-trip (BSON marshal/unmarshal followed by the connector's load
+// sanitization), returning both the stored BSON document and the JSON the
+// runtime would parse to re-derive the key.
+func storeAndReload(t *testing.T, raw json.RawMessage, idValue string, deltaUpdates bool, key tuple.Tuple, keyPtrs []string) (bson.M, []byte) {
+	t.Helper()
+	var keyTokens [][]string
+	for _, ptr := range keyPtrs {
+		keyTokens = append(keyTokens, parsePointerTokens(ptr))
+	}
+	doc, err := storeDocument(raw, idValue, deltaUpdates, key, keyTokens)
+	require.NoError(t, err)
+
+	encoded, err := bson.Marshal(doc)
+	require.NoError(t, err)
+	var reloaded bson.M
+	require.NoError(t, bson.Unmarshal(encoded, &reloaded))
+	loadedJSON, err := json.Marshal(sanitizedLoadedDocument(reloaded))
+	require.NoError(t, err)
+
+	return doc, loadedJSON
+}
+
+// numberAt decodes loadedJSON with UseNumber and returns the json.Number at the
+// given top-level field, so tests can assert exact (non-lossy) round-tripping.
+func numberAt(t *testing.T, loadedJSON []byte, field string) json.Number {
+	t.Helper()
+	dec := json.NewDecoder(bytes.NewReader(loadedJSON))
+	dec.UseNumber()
+	var m map[string]interface{}
+	require.NoError(t, dec.Decode(&m))
+	n, ok := m[field].(json.Number)
+	require.True(t, ok, "field %q is not a number: %v", field, m[field])
+	return n
+}
+
+// TestStoreDocumentPreservesLargeIntegerKey is the regression test for the
+// duplicate-key crash loop on large integer keys. A key beyond float64's exact
+// integer range (2^53) must round-trip through a store and a subsequent load
+// without losing precision: the runtime re-derives a store's key from the
+// document body returned by Load (a Loaded response carries no key), so a lossy
+// EVENT_ID makes the runtime fail to match the load, report Exists=false, and
+// the connector then issues a strict InsertOne for an _id that already exists →
+// E11000, permanently.
+func TestStoreDocumentPreservesLargeIntegerKey(t *testing.T) {
+	// A real colliding EVENT_ID from the field: ~-9.2e18, far beyond 2^53, and
+	// odd (so not representable as a float64, whose ULP at this magnitude is 2048).
+	const eventID int64 = -9223341701339290697
+	raw := json.RawMessage(fmt.Sprintf(`{"EVENT_ID":%d,"EVENT_TYPE":"u","NEW_VALUE":1.5}`, eventID))
+	// _id is the exact packed key; it is always faithful. The bug is in the body.
+	const packedKeyHex = "0c80001b97099fe3b6"
+
+	_, loadedJSON := storeAndReload(t, raw, packedKeyHex, false,
+		tuple.Tuple{eventID}, []string{"/EVENT_ID"})
+
+	// The runtime re-derives the key by parsing EVENT_ID out of the loaded doc.
+	require.Equal(t, fmt.Sprint(eventID), numberAt(t, loadedJSON, "EVENT_ID").String(),
+		"EVENT_ID must round-trip exactly; a lossy value re-derives a different key and breaks load matching")
+}
+
+// TestStoreDocumentLeavesNonKeyIntegersAsDouble verifies the key-scoped design:
+// only key fields get exact integer precision, while non-key numbers decode as
+// float64 exactly as before. This keeps BSON types stable across documents (a
+// non-key field never flips between int64 and double based on its value) and
+// avoids a fleet-wide type change on existing collections.
+func TestStoreDocumentLeavesNonKeyIntegersAsDouble(t *testing.T) {
+	const key int64 = 1
+	const nonKey int64 = 9223372036854775807 // MaxInt64, far beyond 2^53
+	raw := json.RawMessage(fmt.Sprintf(`{"id":%d,"COUNT":%d}`, key, nonKey))
+
+	doc, loadedJSON := storeAndReload(t, raw, "00", false,
+		tuple.Tuple{key}, []string{"/id"})
+
+	require.IsType(t, int64(0), doc["id"], "key field must be stored as int64")
+	require.IsType(t, float64(0), doc["COUNT"], "non-key integer must stay float64 (stable BSON type)")
+
+	require.Equal(t, fmt.Sprint(key), numberAt(t, loadedJSON, "id").String(),
+		"key round-trips exactly")
+	require.NotEqual(t, fmt.Sprint(nonKey), numberAt(t, loadedJSON, "COUNT").String(),
+		"non-key integer beyond 2^53 is expected to be lossy (unchanged pre-PR behavior)")
+}
+
+// TestStoreDocumentNestedKeyPointer exercises a key at a nested JSON pointer,
+// guarding setAtPointer's traversal of both the root bson.M and nested
+// map[string]interface{} produced by json.Unmarshal.
+func TestStoreDocumentNestedKeyPointer(t *testing.T) {
+	const id int64 = 9223372036854775807
+	raw := json.RawMessage(fmt.Sprintf(`{"a":{"b":{"id":%d}}}`, id))
+
+	_, loadedJSON := storeAndReload(t, raw, "00", false,
+		tuple.Tuple{id}, []string{"/a/b/id"})
+
+	var got struct {
+		A struct {
+			B struct {
+				ID json.Number `json:"id"`
+			} `json:"b"`
+		} `json:"a"`
+	}
+	dec := json.NewDecoder(bytes.NewReader(loadedJSON))
+	dec.UseNumber()
+	require.NoError(t, dec.Decode(&got))
+	require.Equal(t, fmt.Sprint(id), got.A.B.ID.String(), "nested key must round-trip exactly")
+}
+
+// TestStoreDocumentArrayNestedKey exercises a key located beneath a JSON array
+// element (a legal Flow key location). setAtPointer must traverse the
+// []interface{} that json.Unmarshal produces and restore the exact int64;
+// otherwise the lossy float64 re-derives a mismatched key and provokes the
+// duplicate-key crash loop.
+func TestStoreDocumentArrayNestedKey(t *testing.T) {
+	const id int64 = 9223372036854775807 // MaxInt64, far beyond 2^53
+	raw := json.RawMessage(fmt.Sprintf(`{"items":[{"id":%d}]}`, id))
+
+	_, loadedJSON := storeAndReload(t, raw, "00", false,
+		tuple.Tuple{id}, []string{"/items/0/id"})
+
+	var got struct {
+		Items []struct {
+			ID json.Number `json:"id"`
+		} `json:"items"`
+	}
+	dec := json.NewDecoder(bytes.NewReader(loadedJSON))
+	dec.UseNumber()
+	require.NoError(t, dec.Decode(&got))
+	require.Len(t, got.Items, 1)
+	require.Equal(t, fmt.Sprint(id), got.Items[0].ID.String(),
+		"array-nested key must round-trip exactly")
+}
+
+// TestStoreDocumentIdCollisionKey guards the ordering of key overwrite vs the
+// _id-collision rename: a key located at /_id must be corrected in place before
+// the rename moves it to _flow_id, so it round-trips exactly after the load path
+// reverses the rename.
+func TestStoreDocumentIdCollisionKey(t *testing.T) {
+	const id int64 = 9223372036854775807
+	raw := json.RawMessage(fmt.Sprintf(`{"_id":%d}`, id))
+
+	_, loadedJSON := storeAndReload(t, raw, "00", false,
+		tuple.Tuple{id}, []string{"/_id"})
+
+	require.Equal(t, fmt.Sprint(id), numberAt(t, loadedJSON, "_id").String(),
+		"a key at /_id must round-trip exactly through the _flow_id rename")
+}
+
+// TestStoreDocumentCompositeMixedKey verifies positional correspondence between
+// the key tuple and key pointers, and that only the int64 key element is
+// overwritten (the string key and non-key number are left as decoded).
+func TestStoreDocumentCompositeMixedKey(t *testing.T) {
+	const id int64 = 9223372036854775807
+	raw := json.RawMessage(fmt.Sprintf(`{"id":%d,"name":"abc","n":5}`, id))
+
+	doc, loadedJSON := storeAndReload(t, raw, "00", false,
+		tuple.Tuple{id, "abc"}, []string{"/id", "/name"})
+
+	require.IsType(t, int64(0), doc["id"], "int64 key element is overwritten exactly")
+	require.Equal(t, "abc", doc["name"], "string key element is left untouched")
+	require.IsType(t, float64(0), doc["n"], "non-key integer stays float64")
+
+	require.Equal(t, fmt.Sprint(id), numberAt(t, loadedJSON, "id").String(),
+		"int64 key round-trips exactly")
+}
+
+// TestStoreDocumentDeltaUpdatesLeavesKeyAsDouble verifies that delta-update
+// bindings skip int64 key restoration. They never load documents and let MongoDB
+// generate the _id, so restoring precision serves no purpose and would needlessly
+// flip an integer key field's BSON type from double to long on existing
+// collections.
+func TestStoreDocumentDeltaUpdatesLeavesKeyAsDouble(t *testing.T) {
+	const id int64 = 9223372036854775807
+	raw := json.RawMessage(fmt.Sprintf(`{"id":%d}`, id))
+
+	doc, _ := storeAndReload(t, raw, "00", true,
+		tuple.Tuple{id}, []string{"/id"})
+
+	require.IsType(t, float64(0), doc["id"],
+		"delta-update key field must stay float64 (BSON type unchanged)")
+	_, hasID := doc[idField]
+	require.False(t, hasID, "delta updates must not set _id")
+}
+
+// TestStoreDocumentKeyFieldCountMismatchPanics asserts that a key tuple whose
+// length disagrees with the binding's key field count — an impossible state,
+// since the runtime packs exactly one key element per declared key field — fails
+// loudly rather than silently storing a document with un-restored key precision.
+func TestStoreDocumentKeyFieldCountMismatchPanics(t *testing.T) {
+	raw := json.RawMessage(`{"id":1}`)
+	require.Panics(t, func() {
+		_, _ = storeDocument(raw, "00", false,
+			tuple.Tuple{int64(1), int64(2)}, [][]string{{"id"}})
+	})
+}
 
 // bulkErr builds a mongo.BulkWriteException with one per-item WriteError per
 // entry in codeByIndex (index -> MongoDB error code). It is returned by value,
