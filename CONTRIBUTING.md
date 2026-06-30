@@ -1,10 +1,16 @@
-# Connector CHANGELOGs
+# Contributing to estuary/connectors
+
+This file collects the conventions a contributor needs to know when
+submitting a PR. It's intentionally short; expand sections as patterns
+solidify.
+
+## Changelog entries
 
 Each connector has its own `CHANGELOG.md` at the root of its directory
 (e.g. `source-postgres/CHANGELOG.md`, `materialize-bigquery/CHANGELOG.md`).
 These document user-visible changes for customers using docs.estuary.dev.
 
-## When to add an entry
+### When to add an entry
 
 Add an entry when your change is **user-visible** — anything a customer
 might notice or care about:
@@ -23,7 +29,7 @@ You **don't** need an entry for:
 - Documentation-only changes (those go straight to `docs/`)
 - Dependency bumps with no behavioral effect
 
-## Format
+### Format
 
 Use date-headed sections with [Keep a Changelog](https://keepachangelog.com/)
 categories. Most recent on top.
@@ -49,15 +55,13 @@ effect, not the implementation. "Refactored to use new strategy interface"
 is a bad entry. "Field type detection now correctly handles NUMERIC(p,0)
 as integer" is a good one.
 
-## CI check
+### Opt-in convention
 
-A non-blocking GitHub Action (`.github/workflows/changelog-check.yaml`)
-posts a PR comment if a connector's code changed but `CHANGELOG.md`
-didn't. The check is opt-in — connectors without a `CHANGELOG.md` are
-ignored. To start tracking a new connector, just create the file with a
-single header (`# Changelog`).
+A connector is tracked once it has a `CHANGELOG.md`. To start tracking
+a new connector, just create the file with a single header (`# Changelog`).
+Connectors without a `CHANGELOG.md` are unchanged by this convention.
 
-## Claude Code skill
+### Claude Code skill
 
 If you use Claude Code, run `/changelog` in a session that has your PR
 branch checked out. It reads the diff, identifies which connector(s) are

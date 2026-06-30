@@ -5,8 +5,8 @@ description: Draft CHANGELOG.md entries for connectors changed in the current br
 # Changelog Skill
 
 Drafts user-visible entries for each connector's `CHANGELOG.md` based on
-the diff between the current branch and `main`. Designed for the
-[advisory CI check](../../docs/CONTRIBUTING-changelog.md) on this repo.
+the diff between the current branch and `main`. See [CONTRIBUTING.md](../../CONTRIBUTING.md#changelog-entries)
+for the convention.
 
 ## When to invoke
 

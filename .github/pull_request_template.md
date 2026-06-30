@@ -1,3 +1,7 @@
+**Regression?**
+
+(Is this pull-request fixing a regression introduced by an earlier pull-request? If so please link the earlier pull-request, otherwise remove this section)
+
 **Description:**
 
 (Describe the high level scope of new or changed features)
@@ -14,3 +18,6 @@
 
 (anything that might help someone review this PR)
 
+**Checklist:**
+
+- [ ] If this change is user-visible, the affected connector's `CHANGELOG.md` has been updated (see [CONTRIBUTING.md](../CONTRIBUTING.md#changelog-entries)). Connectors without a `CHANGELOG.md` are opt-in — skip or seed a new one.
