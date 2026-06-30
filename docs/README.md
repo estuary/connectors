@@ -27,3 +27,12 @@ The Docusaurus site that hosts these pages lives in
 [`estuary/docs`](https://github.com/estuary/docs), which sources this
 directory via git submodule.
 
+### Removing or renaming a connector page
+
+The docs site is rebuilt from this directory, so deleting a `.md` file here
+removes the page from the site. To avoid a broken URL, add a redirect in
+[`redirects.yaml`](redirects.yaml) in the **same PR** as the removal or
+rename. The site build reads that file and emits a redirect from the old
+URL to whatever you point it at (a replacement connector, or the connector
+category index).
+
