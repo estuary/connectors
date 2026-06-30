@@ -9,21 +9,30 @@ import (
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 )
 
-type stagedFileClient struct{}
+type stagedFileClient struct {
+	disableGzip bool
+}
 
-func (stagedFileClient) NewWriter(w io.WriteCloser, fields []string) boilerplate.Writer {
-	return writer.NewJsonWriter(w, fields, writer.WithJsonSkipNulls())
+func (c stagedFileClient) NewWriter(w io.WriteCloser, fields []string) boilerplate.Writer {
+	opts := []writer.JsonOption{writer.WithJsonSkipNulls()}
+	if c.disableGzip {
+		opts = append(opts, writer.WithJsonDisableCompression())
+	}
+	return writer.NewJsonWriter(w, fields, opts...)
 }
 
 func (stagedFileClient) NewKey(keyParts []string) string {
 	return path.Join(keyParts...)
 }
 
-func edc(uris []string, schema bigquery.Schema) *bigquery.ExternalDataConfig {
-	return &bigquery.ExternalDataConfig{
+func edc(uris []string, schema bigquery.Schema, isEmulator bool) *bigquery.ExternalDataConfig {
+	cfg := &bigquery.ExternalDataConfig{
 		SourceFormat: bigquery.JSON,
 		SourceURIs:   uris,
 		Schema:       schema,
-		Compression:  bigquery.Gzip,
 	}
+	if !isEmulator {
+		cfg.Compression = bigquery.Gzip
+	}
+	return cfg
 }

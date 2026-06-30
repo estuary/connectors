@@ -122,11 +122,13 @@ func (c config) Validate() error {
 		// Sanity check: Are the provided credentials valid JSON? A common error is to upload
 		// credentials that are not valid JSON, and the resulting error is fairly cryptic if fed
 		// directly to bigquery.NewClient.
-		if !json.Valid([]byte(c.CredentialsJSON)) {
+		if c.Advanced.Endpoint == "" && !json.Valid([]byte(c.CredentialsJSON)) {
 			return fmt.Errorf("service account credentials must be valid JSON, and the provided credentials were not")
 		}
-	} else if err := c.Credentials.Validate(); err != nil {
-		return err
+	} else if c.Advanced.Endpoint == "" {
+		if err := c.Credentials.Validate(); err != nil {
+			return err
+		}
 	}
 
 	if err := c.Schedule.Validate(); err != nil {
@@ -264,9 +266,10 @@ func newBigQueryDriver() *sql.Driver[config, tableConfig] {
 				"region":      cfg.Region,
 				"bucket":      cfg.Bucket,
 				"bucket_path": cfg.effectiveBucketPath(),
+				"endpoint":    cfg.Advanced.Endpoint,
 			}).Info("creating bigquery endpoint")
 
-			dialect := bqDialect(featureFlags)
+			dialect := bqDialect(featureFlags, cfg.Advanced.Endpoint != "")
 			templates := renderTemplates(dialect)
 
 			// BigQuery's default SerPolicy has historically had limits of 1500

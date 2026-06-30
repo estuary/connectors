@@ -13,6 +13,7 @@ var BQ_RESERVED_WORDS = []string{
 	"ASSERT_ROWS_MODIFIED",
 	"AT",
 	"BETWEEN",
+	"BINARY",
 	"BY",
 	"CASE",
 	"CAST",

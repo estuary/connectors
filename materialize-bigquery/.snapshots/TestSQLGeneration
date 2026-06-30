@@ -1,14 +1,14 @@
 --- Begin projectID.dataset.key_value createTargetTable ---
 CREATE TABLE IF NOT EXISTS projectID.dataset.key_value (
-		key1 INTEGER NOT NULL,
+		key1 INT64 NOT NULL,
 		key2 BOOLEAN NOT NULL,
 		key_binary BYTES NOT NULL,
 		`array` JSON,
-		binary BYTES,
+		`binary` BYTES,
 		boolean BOOLEAN,
 		field_with_projection STRING,
 		flow_published_at TIMESTAMP NOT NULL,
-		integer INTEGER,
+		integer INT64,
 		integerGt128Bit BIGNUMERIC(38,0),
 		integerGt256Bit BIGNUMERIC(38,0),
 		integerGt64Bit BIGNUMERIC(38,0),
@@ -34,14 +34,14 @@ CLUSTER BY key1, key2, key_binary;
 --- Begin projectID.dataset.delta_updates createTargetTable ---
 CREATE TABLE IF NOT EXISTS projectID.dataset.delta_updates (
 		theKey STRING NOT NULL,
-		aValue INTEGER,
+		aValue INT64,
 		flow_published_at TIMESTAMP NOT NULL
 )
 CLUSTER BY theKey;
 --- End projectID.dataset.delta_updates createTargetTable ---
 
 --- Begin projectID.dataset.key_value storeInsert ---
-INSERT INTO projectID.dataset.key_value (key1, key2, key_binary, `array`, binary, boolean, field_with_projection, flow_published_at, integer, integerGt128Bit, integerGt256Bit, integerGt64Bit, integerWithUserDDL, multiple, nonAscii_____, number, numberCastToString, object, string, stringInteger, stringInteger18Chars, stringInteger38Chars, stringInteger39Chars, stringInteger66Chars, stringInteger77Chars, stringNumber, flow_document)
+INSERT INTO projectID.dataset.key_value (key1, key2, key_binary, `array`, `binary`, boolean, field_with_projection, flow_published_at, integer, integerGt128Bit, integerGt256Bit, integerGt64Bit, integerWithUserDDL, multiple, nonAscii_____, number, numberCastToString, object, string, stringInteger, stringInteger18Chars, stringInteger38Chars, stringInteger39Chars, stringInteger66Chars, stringInteger77Chars, stringNumber, flow_document)
 SELECT c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15, c16, c17, c18, c19, c20, c21, c22, c23, c24, c25, c26 FROM flow_temp_table_0;
 --- End projectID.dataset.key_value storeInsert ---
 
@@ -51,25 +51,23 @@ SELECT c0, c1, c2 FROM flow_temp_table_1;
 --- End projectID.dataset.delta_updates storeInsert ---
 
 --- Begin alter table add columns and drop not nulls ---
-ALTER TABLE projectID.dataset.key_value
-	ADD COLUMN first_new_column STRING,
-	ADD COLUMN second_new_column BOOL;
 
-ALTER TABLE projectID.dataset.key_value
-	ALTER COLUMN first_required_column DROP NOT NULL,
-	ALTER COLUMN second_required_column DROP NOT NULL;
+ALTER TABLE projectID.dataset.key_value ADD COLUMN first_new_column STRING;
+ALTER TABLE projectID.dataset.key_value ADD COLUMN second_new_column BOOL;
+ALTER TABLE projectID.dataset.key_value ALTER COLUMN first_required_column DROP NOT NULL;
+ALTER TABLE projectID.dataset.key_value ALTER COLUMN second_required_column DROP NOT NULL;
 --- End alter table add columns and drop not nulls ---
 
 --- Begin alter table add columns ---
-ALTER TABLE projectID.dataset.key_value
-	ADD COLUMN first_new_column STRING,
-	ADD COLUMN second_new_column BOOL;
+
+ALTER TABLE projectID.dataset.key_value ADD COLUMN first_new_column STRING;
+ALTER TABLE projectID.dataset.key_value ADD COLUMN second_new_column BOOL;
 --- End alter table add columns ---
 
 --- Begin alter table drop not nulls ---
-ALTER TABLE projectID.dataset.key_value
-	ALTER COLUMN first_required_column DROP NOT NULL,
-	ALTER COLUMN second_required_column DROP NOT NULL;
+
+ALTER TABLE projectID.dataset.key_value ALTER COLUMN first_required_column DROP NOT NULL;
+ALTER TABLE projectID.dataset.key_value ALTER COLUMN second_required_column DROP NOT NULL;
 --- End alter table drop not nulls ---
 
 --- Begin Fence Install ---
@@ -153,9 +151,9 @@ ON
 WHEN MATCHED AND r._flow_delete THEN
 	DELETE
 WHEN MATCHED THEN
-	UPDATE SET l.`array` = r.c3, l.binary = r.c4, l.boolean = r.c5, l.field_with_projection = r.c6, l.flow_published_at = r.c7, l.integer = r.c8, l.integerGt128Bit = r.c9, l.integerGt256Bit = r.c10, l.integerGt64Bit = r.c11, l.integerWithUserDDL = r.c12, l.multiple = r.c13, l.nonAscii_____ = r.c14, l.number = r.c15, l.numberCastToString = r.c16, l.object = r.c17, l.string = r.c18, l.stringInteger = r.c19, l.stringInteger18Chars = r.c20, l.stringInteger38Chars = r.c21, l.stringInteger39Chars = r.c22, l.stringInteger66Chars = r.c23, l.stringInteger77Chars = r.c24, l.stringNumber = r.c25, l.flow_document = r.c26
+	UPDATE SET `array` = r.c3, `binary` = r.c4, boolean = r.c5, field_with_projection = r.c6, flow_published_at = r.c7, integer = r.c8, integerGt128Bit = r.c9, integerGt256Bit = r.c10, integerGt64Bit = r.c11, integerWithUserDDL = r.c12, multiple = r.c13, nonAscii_____ = r.c14, number = r.c15, numberCastToString = r.c16, object = r.c17, string = r.c18, stringInteger = r.c19, stringInteger18Chars = r.c20, stringInteger38Chars = r.c21, stringInteger39Chars = r.c22, stringInteger66Chars = r.c23, stringInteger77Chars = r.c24, stringNumber = r.c25, flow_document = r.c26
 WHEN NOT MATCHED AND NOT r._flow_delete THEN
-	INSERT (key1, key2, key_binary, `array`, binary, boolean, field_with_projection, flow_published_at, integer, integerGt128Bit, integerGt256Bit, integerGt64Bit, integerWithUserDDL, multiple, nonAscii_____, number, numberCastToString, object, string, stringInteger, stringInteger18Chars, stringInteger38Chars, stringInteger39Chars, stringInteger66Chars, stringInteger77Chars, stringNumber, flow_document)
+	INSERT (key1, key2, key_binary, `array`, `binary`, boolean, field_with_projection, flow_published_at, integer, integerGt128Bit, integerGt256Bit, integerGt64Bit, integerWithUserDDL, multiple, nonAscii_____, number, numberCastToString, object, string, stringInteger, stringInteger18Chars, stringInteger38Chars, stringInteger39Chars, stringInteger66Chars, stringInteger77Chars, stringNumber, flow_document)
 	VALUES (r.c0, r.c1, r.c2, r.c3, r.c4, r.c5, r.c6, r.c7, r.c8, r.c9, r.c10, r.c11, r.c12, r.c13, r.c14, r.c15, r.c16, r.c17, r.c18, r.c19, r.c20, r.c21, r.c22, r.c23, r.c24, r.c25, r.c26);
 --- End projectID.dataset.key_value storeUpdate ---
 
@@ -175,7 +173,7 @@ TO_JSON(STRUCT(
 	l.key2 AS key2, 
 	TO_BASE64(l.key_binary) AS key!binary, 
 	l.`array` AS array, 
-	TO_BASE64(l.binary) AS binary, 
+	TO_BASE64(l.`binary`) AS binary, 
 	l.boolean AS boolean, 
 	l.field_with_projection AS field_with_projection, 
 	l.integer AS integer, 

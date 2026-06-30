@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var testDialect = bqDialect(featureFlagDefaults)
+var testDialect = bqDialect(featureFlagDefaults, false)
 var testTemplates = renderTemplates(testDialect)
 
 func TestSQLGeneration(t *testing.T) {

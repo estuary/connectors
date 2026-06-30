@@ -25,6 +25,63 @@ func nextJobID(prefix string, attempt uint32) string {
 	return fmt.Sprintf("flow-%s-%010d", prefix, attempt)
 }
 
+func applyEmulatorLoadWorkaround(ctx context.Context, c *client, tableDefs map[string]bigquery.ExternalData) (func(), error) {
+	if c.cfg.Advanced.Endpoint == "" || len(tableDefs) == 0 {
+		return func() {}, nil
+	}
+
+	var createdTables []string
+
+	cleanup := func() {
+		bgCtx := context.Background()
+		for _, tableName := range createdTables {
+			_ = c.bigqueryClient.Dataset(c.cfg.Dataset).Table(tableName).Delete(bgCtx)
+		}
+	}
+
+	for tableName, def := range tableDefs {
+		edc, ok := def.(*bigquery.ExternalDataConfig)
+		if !ok {
+			cleanup()
+			return nil, fmt.Errorf("expected *bigquery.ExternalDataConfig, got %T", def)
+		}
+
+		table := c.bigqueryClient.Dataset(c.cfg.Dataset).Table(tableName)
+		_ = table.Delete(ctx)
+
+		err := table.Create(ctx, &bigquery.TableMetadata{
+			Schema: edc.Schema,
+		})
+		if err != nil {
+			cleanup()
+			return nil, fmt.Errorf("creating native table for emulator: %w", err)
+		}
+		createdTables = append(createdTables, tableName)
+
+		gcsRef := bigquery.NewGCSReference(edc.SourceURIs...)
+		gcsRef.SourceFormat = edc.SourceFormat
+		
+		loader := c.bigqueryClient.Dataset(c.cfg.Dataset).Table(tableName).LoaderFrom(gcsRef)
+		job, err := loader.Run(ctx)
+		if err != nil {
+			cleanup()
+			return nil, fmt.Errorf("running loader job for emulator: %w", err)
+		}
+
+		status, err := job.Wait(ctx)
+		if err != nil {
+			cleanup()
+			return nil, fmt.Errorf("waiting for loader job: %w", err)
+		}
+		if status.Err() != nil {
+			cleanup()
+			return nil, fmt.Errorf("loader job failed: %w", status.Err())
+		}
+	}
+
+	return cleanup, nil
+}
+
 // queryIdempotent runs the provided query with its associated files and ensures
 // that it is only run a single time. Job IDs are computed deterministically
 // from the prefix, and once one has succeeded it will not be run again.
@@ -38,8 +95,21 @@ func (c client) queryIdempotent(
 ) error {
 	q := c.bigqueryClient.Query(query)
 	q.Location = c.cfg.Region
-	q.TableDefinitions = map[string]bigquery.ExternalData{
-		tempTableName: edc(sourceURIs, schema),
+	q.DefaultProjectID = c.cfg.ProjectID
+	q.DefaultDatasetID = c.cfg.Dataset
+
+	tableDefs := map[string]bigquery.ExternalData{
+		tempTableName: edc(sourceURIs, schema, c.cfg.Advanced.Endpoint != ""),
+	}
+
+	if c.cfg.Advanced.Endpoint != "" {
+		cleanup, err := applyEmulatorLoadWorkaround(ctx, &c, tableDefs)
+		if err != nil {
+			return err
+		}
+		defer cleanup()
+	} else {
+		q.TableDefinitions = tableDefs
 	}
 
 	var attempt uint32 = 1
@@ -137,6 +207,8 @@ func (c client) newQuery(queryString string, parameters ...interface{}) *bigquer
 	// Create the query
 	query := c.bigqueryClient.Query(queryString)
 	query.Location = c.cfg.Region
+	query.DefaultProjectID = c.cfg.ProjectID
+	query.DefaultDatasetID = c.cfg.Dataset
 	// Add parameters
 	for _, p := range parameters {
 		query.Parameters = append(query.Parameters, bigquery.QueryParameter{Value: p})

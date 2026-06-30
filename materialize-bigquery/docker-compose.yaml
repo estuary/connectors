@@ -1,0 +1,23 @@
+services:
+  bigquery:
+    image: ghcr.io/goccy/bigquery-emulator:latest
+    command: ["--project=test-project", "--dataset=testing"]
+    networks: [flow-test]
+    ports:
+      - "9050:9050"   # REST
+      - "9060:9060"   # gRPC
+    environment:
+      STORAGE_EMULATOR_HOST: "http://gcs:4443"
+  gcs:
+    image: fsouza/fake-gcs-server:latest
+    command: ["-scheme", "http", "-host", "0.0.0.0", "-port", "4443", "-public-host", "localhost:4443", "-backend", "filesystem", "-data", "/storage"]
+    networks: [flow-test]
+    ports: ["4443:4443"]
+    volumes:
+      - gcs_data:/storage
+networks:
+  flow-test:
+    name: flow-test
+    external: true
+volumes:
+  gcs_data:

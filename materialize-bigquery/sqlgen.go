@@ -60,9 +60,15 @@ var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{
 	}
 }
 
-func bqDialect(featureFlags map[string]bool) sql.Dialect {
+func bqDialect(featureFlags map[string]bool, isEmulator bool) sql.Dialect {
 	objAndArrayAsJson := featureFlags["objects_and_arrays_as_json"]
-	objAndArrayCol := sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes))
+	converter := sql.ToJsonBytes
+	jsonType := "JSON"
+	if isEmulator {
+		converter = sql.ToJsonString
+		jsonType = "STRING"
+	}
+	objAndArrayCol := sql.MapStatic(jsonType, sql.UsingConverter(converter))
 	if !objAndArrayAsJson {
 		objAndArrayCol = sql.MapStatic("STRING", sql.UsingConverter(jsonConverter))
 	}
@@ -90,7 +96,7 @@ func bqDialect(featureFlags map[string]bool) sql.Dialect {
 			sql.BINARY:  binaryMapping,
 			sql.BOOLEAN: sql.MapStatic("BOOLEAN"),
 			sql.INTEGER: sql.MapSignedInt64(
-				sql.MapStatic("INTEGER"),
+				sql.MapStatic("INT64", sql.AlsoCompatibleWith("integer")),
 				sql.MapStatic("BIGNUMERIC(38,0)", sql.AlsoCompatibleWith("bignumeric")),
 			),
 			// We used to materialize these as "BIGNUMERIC(38,0)", so
@@ -100,7 +106,7 @@ func bqDialect(featureFlags map[string]bool) sql.Dialect {
 			sql.OBJECT: objAndArrayCol,
 			// Note that MULTIPLE fields have always been materialized into JSON
 			// columns, so there is no configurability for these.
-			sql.MULTIPLE: sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes)),
+			sql.MULTIPLE: sql.MapStatic(jsonType, sql.UsingConverter(converter)),
 			sql.STRING_INTEGER: sql.MapStringMaxLen(
 				// BigQuery's table metadata APIs include the precision and
 				// scale with BIGNUMERIC columns, and we strip that off when
@@ -234,21 +240,14 @@ CLUSTER BY {{ range $ind, $key := $.Keys }}
 
 {{ define "alterTableColumns" }}
 {{- if $.AddColumns -}}
-ALTER TABLE {{$.Identifier}}
 {{- range $ind, $col := $.AddColumns }}
-	{{- if $ind }},{{ end }}
-	ADD COLUMN {{$col.Identifier}} {{$col.NullableDDL}}
-{{- end }};
+ALTER TABLE {{$.Identifier}} ADD COLUMN {{$col.Identifier}} {{$col.NullableDDL}};
+{{- end }}
 {{- end -}}
 {{- if $.DropNotNulls -}}
-{{- if $.AddColumns }}
-
-{{ end -}}
-ALTER TABLE {{$.Identifier}}
 {{- range $ind, $col := $.DropNotNulls }}
-	{{- if $ind }},{{ end }}
-	ALTER COLUMN {{ ColumnIdentifier $col.Name }} DROP NOT NULL
-{{- end }};
+ALTER TABLE {{$.Identifier}} ALTER COLUMN {{ ColumnIdentifier $col.Name }} DROP NOT NULL;
+{{- end }}
 {{- end }}
 {{ end }}
 
@@ -337,10 +336,10 @@ WHEN MATCHED AND r._flow_delete THEN
 WHEN MATCHED THEN
 	UPDATE SET {{ range $ind, $val := $.Values }}
 	{{- if $ind }}, {{end -}}
-		l.{{$val.Identifier}} = r.c{{ Add (len $.Keys) $ind}}
+		{{$val.Identifier}} = r.c{{ Add (len $.Keys) $ind}}
 	{{- end}}
 	{{- if $.Document -}}
-		{{ if $.Values  }}, {{ end }}l.{{$.Document.Identifier}} = r.c{{ Add (len $.Columns) -1 }}
+		{{ if $.Values  }}, {{ end }}{{$.Document.Identifier}} = r.c{{ Add (len $.Columns) -1 }}
 	{{- end }}
 WHEN NOT MATCHED AND NOT r._flow_delete THEN
 	INSERT (
