@@ -6,10 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	m "github.com/estuary/connectors/go/materialize"
+	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -69,6 +72,10 @@ type transactor struct {
 type binding struct {
 	collection   *mongo.Collection
 	deltaUpdates bool
+	// keyTokens holds the parsed RFC6901 JSON pointer tokens of the binding's
+	// key fields, in the same order as a store's key tuple, used to restore
+	// exact integer key values in the stored document.
+	keyTokens [][]string
 }
 
 func (t *transactor) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, rangeSpec pf.RangeSpec) (m.RuntimeCheckpoint, error) {
@@ -183,22 +190,10 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			batch = append(batch, del)
 			batchSize += len(key)
 		} else {
-			var doc bson.M
-			if err := json.Unmarshal(it.RawJSON, &doc); err != nil {
-				return nil, fmt.Errorf("bson unmarshalling json doc: %w", err)
-			}
-			if idVal, ok := doc[idField]; ok {
-				// Preserve the original value of a collection field with a name
-				// that collides with the MongoDB _id field by materializing it
-				// with an alternate name.
-				doc[idFieldAlt] = idVal
-				delete(doc, idField)
-			}
-
-			// In case of delta updates, we don't want to set the _id. We want MongoDB to generate a new
-			// _id for each record we insert
-			if !t.bindings[it.Binding].deltaUpdates {
-				doc[idField] = key
+			b := t.bindings[it.Binding]
+			doc, err := storeDocument(it.RawJSON, key, b.deltaUpdates, it.Key, b.keyTokens)
+			if err != nil {
+				return nil, err
 			}
 
 			var m mongo.WriteModel
@@ -459,6 +454,117 @@ func storeRetryDelay(ctx context.Context, attempt int) error {
 	case <-time.After(d):
 		return nil
 	}
+}
+
+// storeDocument builds the MongoDB document for a store from the raw Flow
+// document JSON. It renames any field colliding with MongoDB's reserved _id
+// field and, for standard updates, sets _id to the packed key.
+//
+// Integer key fields are restored to their exact values from the store's key
+// tuple: json.Unmarshal decodes JSON numbers as float64, which rounds integers
+// beyond 2^53, and because the runtime re-derives a store's key from the loaded
+// document body a rounded key field would no longer match — provoking a
+// duplicate-key crash loop. Non-key numbers are intentionally left as float64 so
+// a field's BSON type stays stable regardless of its value.
+func storeDocument(rawJSON json.RawMessage, idValue string, deltaUpdates bool, key tuple.Tuple, keyTokens [][]string) (bson.M, error) {
+	var doc bson.M
+	if err := json.Unmarshal(rawJSON, &doc); err != nil {
+		return nil, fmt.Errorf("unmarshalling json doc: %w", err)
+	}
+
+	if idVal, ok := doc[idField]; ok {
+		// Preserve the original value of a collection field with a name
+		// that collides with the MongoDB _id field by materializing it
+		// with an alternate name.
+		doc[idFieldAlt] = idVal
+		delete(doc, idField)
+	}
+
+	// In case of delta updates, we don't want to set the _id. We want MongoDB to generate a new
+	// _id for each record we insert
+	if !deltaUpdates {
+		doc[idField] = idValue
+	}
+
+	return doc, nil
+}
+
+// parsePointerTokens splits an RFC6901 JSON pointer into its decoded reference
+// tokens. It is computed once per binding (see binding.keyTokens) so that
+// setAtPointer need not re-parse the pointer on every stored document.
+func parsePointerTokens(ptr string) []string {
+	if ptr == "" {
+		return nil
+	}
+
+	tokens := strings.Split(strings.TrimPrefix(ptr, "/"), "/")
+	for i, token := range tokens {
+		token = strings.ReplaceAll(token, "~1", "/")
+		tokens[i] = strings.ReplaceAll(token, "~0", "~")
+	}
+	return tokens
+}
+
+// setAtPointer writes val at the location addressed by the parsed JSON pointer
+// tokens within doc, traversing both JSON objects and arrays. It no-ops when the
+// location is absent or a token does not address its parent's type, degrading to
+// the value json.Unmarshal already decoded rather than altering the document's
+// shape.
+func setAtPointer(doc bson.M, tokens []string, val any) {
+	if len(tokens) == 0 {
+		return
+	}
+
+	// Walk to the parent of the leaf. Objects decoded by json.Unmarshal are
+	// map[string]interface{} (the root is the equivalent bson.M) and arrays are
+	// []interface{}; slices are reference types, so writing back through the
+	// parent below is visible in doc.
+	var current any = map[string]interface{}(doc)
+	for _, token := range tokens[:len(tokens)-1] {
+		current = childAtToken(current, token)
+		if current == nil {
+			return
+		}
+	}
+
+	leaf := tokens[len(tokens)-1]
+	switch parent := current.(type) {
+	case map[string]interface{}:
+		parent[leaf] = val
+	case bson.M:
+		parent[leaf] = val
+	case []interface{}:
+		if idx, ok := arrayIndex(leaf, len(parent)); ok {
+			parent[idx] = val
+		}
+	}
+}
+
+// childAtToken returns the child of node addressed by a single JSON pointer
+// token, or nil when node is neither an object nor an array or the token does
+// not address an existing element.
+func childAtToken(node any, token string) any {
+	switch n := node.(type) {
+	case map[string]interface{}:
+		return n[token]
+	case bson.M:
+		return n[token]
+	case []interface{}:
+		if idx, ok := arrayIndex(token, len(n)); ok {
+			return n[idx]
+		}
+	}
+	return nil
+}
+
+// arrayIndex parses an RFC6901 array-index token and reports whether it is a
+// valid in-bounds index into a slice of the given length.
+func arrayIndex(token string, length int) (int, bool) {
+	idx, err := strconv.Atoi(token)
+	if err != nil || idx < 0 || idx >= length {
+		return 0, false
+	}
+	return idx, true
 }
 
 func sanitizedLoadedDocument(doc map[string]interface{}) map[string]interface{} {

@@ -252,9 +252,15 @@ func (d *materialization) NewTransactor(
 ) (m.Transactor, error) {
 	var bindings []*binding
 	for _, b := range mappedBindings {
+		var keyTokens [][]string
+		for _, k := range b.Keys {
+			keyTokens = append(keyTokens, parsePointerTokens(k.Ptr))
+		}
+
 		bindings = append(bindings, &binding{
 			collection:   d.client.Database(d.cfg.Database).Collection(b.ResourcePath[1]),
 			deltaUpdates: b.DeltaUpdates,
+			keyTokens:    keyTokens,
 		})
 	}
 
