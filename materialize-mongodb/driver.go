@@ -252,15 +252,20 @@ func (d *materialization) NewTransactor(
 ) (m.Transactor, error) {
 	var bindings []*binding
 	for _, b := range mappedBindings {
-		var keyTokens [][]string
-		for _, k := range b.Keys {
-			keyTokens = append(keyTokens, parsePointerTokens(k.Ptr))
+		var keyRestorations []keyRestoration
+		for i, k := range b.Keys {
+			if isIntegerKeyType(k.Inference.Types) {
+				keyRestorations = append(keyRestorations, keyRestoration{
+					tupleIndex: i,
+					tokens:     parsePointerTokens(k.Ptr),
+				})
+			}
 		}
 
 		bindings = append(bindings, &binding{
-			collection:   d.client.Database(d.cfg.Database).Collection(b.ResourcePath[1]),
-			deltaUpdates: b.DeltaUpdates,
-			keyTokens:    keyTokens,
+			collection:      d.client.Database(d.cfg.Database).Collection(b.ResourcePath[1]),
+			deltaUpdates:    b.DeltaUpdates,
+			keyRestorations: keyRestorations,
 		})
 	}
 
@@ -269,6 +274,27 @@ func (d *materialization) NewTransactor(
 		client:   d.client,
 		bindings: bindings,
 	}, nil
+}
+
+// isIntegerKeyType reports whether a key field's declared JSON-schema types
+// (from its projection's Inference.Types) are exactly "integer", modulo
+// "null" — the only shape whose stored precision needs restoring (see
+// storeDocument). A polymorphic key (e.g. ["integer","string"]) is excluded:
+// its packed tuple element isn't guaranteed to be an integer, so restoring it
+// unconditionally could flip its stored BSON type inconsistently across
+// documents.
+func isIntegerKeyType(types []string) bool {
+	nonNull, isInteger := 0, false
+	for _, t := range types {
+		if t == "null" {
+			continue
+		}
+		nonNull++
+		if t == "integer" {
+			isInteger = true
+		}
+	}
+	return nonNull == 1 && isInteger
 }
 
 func (d *materialization) ListTestTasks(ctx context.Context) ([]string, error) {

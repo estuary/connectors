@@ -21,11 +21,11 @@ import (
 // runtime would parse to re-derive the key.
 func storeAndReload(t *testing.T, raw json.RawMessage, idValue string, deltaUpdates bool, key tuple.Tuple, keyPtrs []string) (bson.M, []byte) {
 	t.Helper()
-	var keyTokens [][]string
-	for _, ptr := range keyPtrs {
-		keyTokens = append(keyTokens, parsePointerTokens(ptr))
+	var restorations []keyRestoration
+	for i, ptr := range keyPtrs {
+		restorations = append(restorations, keyRestoration{tupleIndex: i, tokens: parsePointerTokens(ptr)})
 	}
-	doc, err := storeDocument(raw, idValue, deltaUpdates, key, keyTokens)
+	doc, err := storeDocument(raw, idValue, deltaUpdates, key, restorations)
 	require.NoError(t, err)
 
 	encoded, err := bson.Marshal(doc)
@@ -204,7 +204,7 @@ func TestStoreDocumentKeyFieldCountMismatchPanics(t *testing.T) {
 	raw := json.RawMessage(`{"id":1}`)
 	require.Panics(t, func() {
 		_, _ = storeDocument(raw, "00", false,
-			tuple.Tuple{int64(1), int64(2)}, [][]string{{"id"}})
+			tuple.Tuple{int64(1)}, []keyRestoration{{tupleIndex: 5, tokens: []string{"id"}}})
 	})
 }
 

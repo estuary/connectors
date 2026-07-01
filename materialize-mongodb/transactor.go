@@ -18,6 +18,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -72,10 +73,21 @@ type transactor struct {
 type binding struct {
 	collection   *mongo.Collection
 	deltaUpdates bool
-	// keyTokens holds the parsed RFC6901 JSON pointer tokens of the binding's
-	// key fields, in the same order as a store's key tuple, used to restore
-	// exact integer key values in the stored document.
-	keyTokens [][]string
+	// keyRestorations holds, for each of the binding's key fields declared as
+	// JSON-schema integer (the only type whose stored precision needs
+	// restoring — see storeDocument), its index into a store's key tuple and
+	// parsed RFC6901 JSON pointer tokens. Key fields of other declared types
+	// are omitted so the per-document restore loop never re-derives their
+	// (never-integer) type.
+	keyRestorations []keyRestoration
+}
+
+// keyRestoration is a single entry of binding.keyRestorations. tupleIndex
+// indexes into a store's key tuple; tokens is the pre-parsed JSON pointer to
+// that key field's location in the stored document.
+type keyRestoration struct {
+	tupleIndex int
+	tokens     []string
 }
 
 func (t *transactor) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, rangeSpec pf.RangeSpec) (m.RuntimeCheckpoint, error) {
@@ -191,7 +203,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			batchSize += len(key)
 		} else {
 			b := t.bindings[it.Binding]
-			doc, err := storeDocument(it.RawJSON, key, b.deltaUpdates, it.Key, b.keyTokens)
+			doc, err := storeDocument(it.RawJSON, key, b.deltaUpdates, it.Key, b.keyRestorations)
 			if err != nil {
 				return nil, err
 			}
@@ -466,7 +478,7 @@ func storeRetryDelay(ctx context.Context, attempt int) error {
 // document body a rounded key field would no longer match — provoking a
 // duplicate-key crash loop. Non-key numbers are intentionally left as float64 so
 // a field's BSON type stays stable regardless of its value.
-func storeDocument(rawJSON json.RawMessage, idValue string, deltaUpdates bool, key tuple.Tuple, keyTokens [][]string) (bson.M, error) {
+func storeDocument(rawJSON json.RawMessage, idValue string, deltaUpdates bool, key tuple.Tuple, keyRestorations []keyRestoration) (bson.M, error) {
 	var doc bson.M
 	if err := json.Unmarshal(rawJSON, &doc); err != nil {
 		return nil, fmt.Errorf("unmarshalling json doc: %w", err)
@@ -478,16 +490,27 @@ func storeDocument(rawJSON json.RawMessage, idValue string, deltaUpdates bool, k
 	// skipped there to avoid needlessly flipping a key field's BSON type from
 	// double to long. Done before the _id rename below so a key located at /_id
 	// is corrected in place and then carried into _flow_id. Only int64 values are
-	// restored; strings and booleans already decode exactly, and keys beyond
-	// int64 (uint64) remain lossy, which BSON cannot represent faithfully anyway.
+	// restored; strings and booleans already decode exactly. keyRestorations is
+	// pre-filtered (see driver.go) to only the key fields declared as
+	// JSON-schema integer, so non-integer key fields never enter this loop.
 	if !deltaUpdates {
-		if len(key) != len(keyTokens) {
-			panic(fmt.Sprintf("store key tuple has %d elements but binding declares %d key fields", len(key), len(keyTokens)))
-		}
-		for i, tokens := range keyTokens {
-			if v, ok := key[i].(int64); ok {
-				setAtPointer(doc, tokens, v)
+		for _, kr := range keyRestorations {
+			if kr.tupleIndex >= len(key) {
+				panic(fmt.Sprintf("store key tuple has %d elements but binding declares a key field at index %d", len(key), kr.tupleIndex))
 			}
+			v, ok := key[kr.tupleIndex].(int64)
+			if !ok {
+				continue
+			}
+			// Fast path for the overwhelmingly common case: a key at the
+			// document's root (a single pointer segment). This skips
+			// setAtPointer's generic tree walk, which is only needed when a
+			// key is nested under an object or array.
+			if len(kr.tokens) == 1 {
+				doc[kr.tokens[0]] = v
+				continue
+			}
+			setAtPointer(doc, kr.tokens, v)
 		}
 	}
 
@@ -509,8 +532,8 @@ func storeDocument(rawJSON json.RawMessage, idValue string, deltaUpdates bool, k
 }
 
 // parsePointerTokens splits an RFC6901 JSON pointer into its decoded reference
-// tokens. It is computed once per binding (see binding.keyTokens) so that
-// setAtPointer need not re-parse the pointer on every stored document.
+// tokens. It is computed once per binding (see binding.keyRestorations) so
+// that setAtPointer need not re-parse the pointer on every stored document.
 func parsePointerTokens(ptr string) []string {
 	if ptr == "" {
 		return nil
@@ -525,13 +548,13 @@ func parsePointerTokens(ptr string) []string {
 }
 
 // setAtPointer writes val at the location addressed by the parsed JSON pointer
-// tokens within doc, traversing both JSON objects and arrays. It no-ops when the
-// location is absent or a token does not address its parent's type, degrading to
-// the value json.Unmarshal already decoded rather than altering the document's
-// shape.
-func setAtPointer(doc bson.M, tokens []string, val any) {
+// tokens within doc, traversing both JSON objects and arrays. It reports
+// whether the write succeeded; it fails (returns false) without altering doc
+// when the location is absent or a token does not address its parent's type,
+// rather than guessing and altering the document's shape.
+func setAtPointer(doc bson.M, tokens []string, val any) bool {
 	if len(tokens) == 0 {
-		return
+		return false
 	}
 
 	// Walk to the parent of the leaf. Objects decoded by json.Unmarshal are
@@ -542,7 +565,7 @@ func setAtPointer(doc bson.M, tokens []string, val any) {
 	for _, token := range tokens[:len(tokens)-1] {
 		current = childAtToken(current, token)
 		if current == nil {
-			return
+			return false
 		}
 	}
 
@@ -550,13 +573,14 @@ func setAtPointer(doc bson.M, tokens []string, val any) {
 	switch parent := current.(type) {
 	case map[string]interface{}:
 		parent[leaf] = val
-	case bson.M:
-		parent[leaf] = val
+		return true
 	case []interface{}:
 		if idx, ok := arrayIndex(leaf, len(parent)); ok {
 			parent[idx] = val
+			return true
 		}
 	}
+	return false
 }
 
 // childAtToken returns the child of node addressed by a single JSON pointer
@@ -565,8 +589,6 @@ func setAtPointer(doc bson.M, tokens []string, val any) {
 func childAtToken(node any, token string) any {
 	switch n := node.(type) {
 	case map[string]interface{}:
-		return n[token]
-	case bson.M:
 		return n[token]
 	case []interface{}:
 		if idx, ok := arrayIndex(token, len(n)); ok {
@@ -616,4 +638,25 @@ func sanitizeDocumentInner(doc map[string]interface{}) map[string]interface{} {
 	}
 
 	return doc
+}
+
+// sanitizeArrayInner is sanitizeDocumentInner's counterpart for array elements.
+func sanitizeArrayInner(arr []interface{}) []interface{} {
+	for i, value := range arr {
+		switch v := value.(type) {
+		case float64:
+			if math.IsNaN(v) {
+				arr[i] = "NaN"
+			}
+		case map[string]interface{}:
+			arr[i] = sanitizeDocumentInner(v)
+		case primitive.M:
+			arr[i] = sanitizeDocumentInner(v)
+		case primitive.A:
+			arr[i] = sanitizeArrayInner(v)
+		case []interface{}:
+			arr[i] = sanitizeArrayInner(v)
+		}
+	}
+	return arr
 }
