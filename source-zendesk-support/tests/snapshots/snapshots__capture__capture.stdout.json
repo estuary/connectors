@@ -879,7 +879,6 @@
         "update_user_own_signature": false,
         "user_view_access": "none",
         "view_access": "readonly",
-        "view_access_logs": false,
         "view_audit_logs": false,
         "view_deleted_tickets": false,
         "view_filter_tickets": true,
