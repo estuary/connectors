@@ -661,7 +661,16 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 		}
 
 		existingResource := is.GetResource(mb.ResourcePath)
-		for _, p := range mb.Values {
+		// The root document column is migratable in the same way value columns
+		// are (see mustRecreateTypeChange): e.g. disabling
+		// objects_and_arrays_as_json converts its JSON column to text in place.
+		// Keys are intentionally excluded, since a key type change requires a
+		// backfill rather than an in-place migration.
+		migratable := mb.Values
+		if mb.Document != nil {
+			migratable = append(slices.Clone(mb.Values), *mb.Document)
+		}
+		for _, p := range migratable {
 			if existingField := existingResource.GetField(p.Field); existingField == nil {
 				continue
 			} else if !p.Mapped.Compatible(*existingField) && p.Mapped.CanMigrate(*existingField) {
