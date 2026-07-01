@@ -1,5 +1,6 @@
 use crate::{
     configuration::{EndpointConfig, FlowConsumerContext, Resource, SchemaRegistryConfig},
+    document::MergeSerializer,
     schema_registry::{RegisteredSchema, SchemaRegistryClient},
     write_capture_response,
 };
@@ -19,6 +20,7 @@ use proto_flow::{
     },
     flow::{capture_spec::Binding, ConnectorState, RangeSpec},
 };
+use prost_reflect::DynamicMessage;
 use rdkafka::{
     consumer::{BaseConsumer, Consumer},
     message::Headers,
@@ -74,6 +76,14 @@ enum MetaTimestamp {
     LogAppendTime(String),
 }
 
+/// The result of parsing a message payload or key. Protobuf payloads are kept
+/// as a `DynamicMessage` so they can be streamed straight to output without an
+/// intermediate `serde_json::Value` DOM; everything else is parsed to a `Value`.
+enum Parsed {
+    Message(DynamicMessage),
+    Value(serde_json::Value),
+}
+
 pub async fn do_pull(req: Open, mut stdout: BufWriter<Stdout>) -> Result<()> {
     let spec = req.capture.expect("open must contain a capture spec");
 
@@ -105,7 +115,7 @@ pub async fn do_pull(req: Open, mut stdout: BufWriter<Stdout>) -> Result<()> {
             .context("receiving next message")?;
 
         let mut op = "u";
-        let mut doc = match msg.payload() {
+        let payload = match msg.payload() {
             Some(bytes) => parse_datum(bytes, false, &mut schema_cache, schema_client.as_ref())
                 .await
                 .with_context(|| {
@@ -126,7 +136,7 @@ pub async fn do_pull(req: Open, mut stdout: BufWriter<Stdout>) -> Result<()> {
                 // tombstone. The captured document will otherwise be empty
                 // except for the _meta field and the message key (if present).
                 op = "d";
-                json!({})
+                Parsed::Value(json!({}))
             }
         };
 
@@ -169,20 +179,57 @@ pub async fn do_pull(req: Open, mut stdout: BufWriter<Stdout>) -> Result<()> {
             }
         };
 
-        let captured = doc.as_object_mut().unwrap();
-        captured.insert("_meta".to_string(), serde_json::to_value(meta).unwrap());
-
-        if let Some(key_bytes) = msg.key() {
-            let mut key_parsed =
-                parse_datum(key_bytes, true, &mut schema_cache, schema_client.as_ref())
+        // Parse the message key into a map so its fields can be merged
+        // over the payload.
+        let key_fields: Option<Map<String, serde_json::Value>> = match msg.key() {
+            Some(key_bytes) => {
+                let parsed = parse_datum(key_bytes, true, &mut schema_cache, schema_client.as_ref())
                     .await
                     .with_context(|| format!("parsing message key for topic {}", msg.topic()))?;
+                match parsed {
+                    Parsed::Value(serde_json::Value::Object(map)) => Some(map),
+                    Parsed::Value(other) => anyhow::bail!(
+                        "message key for topic {} did not parse to a JSON object: {}",
+                        msg.topic(),
+                        other
+                    ),
+                    Parsed::Message(_) => unreachable!("keys are parsed with is_key = true"),
+                }
+            }
+            None => None,
+        };
 
-            // Add key/val pairs from the "key" to root of the captured
-            // document, which will clobber any collisions with keys from
-            // the parsed payload.
-            captured.append(key_parsed.as_object_mut().unwrap());
-        }
+        // Build the captured document's JSON bytes. Protobuf payloads are
+        // streamed straight into the buffer with the key and _meta merged in.
+        // Other payloads are already a Value.
+        let doc_bytes: Vec<u8> = match payload {
+            Parsed::Message(message) => {
+                let mut buf = Vec::new();
+                {
+                    let mut ser = serde_json::Serializer::new(&mut buf);
+                    message
+                        .serialize_with_options(
+                            MergeSerializer::new(&mut ser, key_fields.as_ref(), &meta),
+                            &prost_reflect::SerializeOptions::new().use_proto_field_name(true),
+                        )
+                        .context("serializing protobuf message")?;
+                }
+                buf
+            }
+            Parsed::Value(mut doc) => {
+                let captured = doc
+                    .as_object_mut()
+                    .context("captured document must be a JSON object")?;
+                captured.insert("_meta".to_string(), serde_json::to_value(&meta)?);
+                if let Some(mut key_fields) = key_fields {
+                    // Add key/val pairs from the "key" to root of the captured
+                    // document, which will clobber any collisions with keys from
+                    // the parsed payload.
+                    captured.append(&mut key_fields);
+                }
+                serde_json::to_vec(&doc)?
+            }
+        };
 
         let binding_info = topics_to_bindings
             .get(msg.topic())
@@ -190,7 +237,7 @@ pub async fn do_pull(req: Open, mut stdout: BufWriter<Stdout>) -> Result<()> {
 
         let message = response::Captured {
             binding: binding_info.binding_index,
-            doc_json: serde_json::to_string(&captured)?.into(),
+            doc_json: doc_bytes.into(),
         };
 
         let checkpoint =
@@ -323,7 +370,7 @@ async fn parse_datum(
     is_key: bool,
     schema_cache: &mut HashMap<u32, RegisteredSchema>,
     schema_client: Option<&SchemaRegistryClient>,
-) -> Result<serde_json::Value> {
+) -> Result<Parsed> {
     match (schema_client, datum[0]) {
         (Some(schema_client), 0) => {
             // Schema registry is available, and this message was encoded with a
@@ -345,12 +392,14 @@ async fn parse_datum(
                         // Handle cases where there is an Avro schema, but it's
                         // not a record type. I'm not sure how common this is in
                         // practice but it's the first thing I tried to do.
-                        Ok(serde_json::Map::from_iter([("_key".to_string(), json_value)]).into())
+                        Ok(Parsed::Value(
+                            serde_json::Map::from_iter([("_key".to_string(), json_value)]).into(),
+                        ))
                     } else {
-                        Ok(json_value)
+                        Ok(Parsed::Value(json_value))
                     }
                 }
-                RegisteredSchema::Json(_) => Ok(serde_json::from_slice(&datum[5..])?),
+                RegisteredSchema::Json(_) => Ok(Parsed::Value(serde_json::from_slice(&datum[5..])?)),
                 RegisteredSchema::Protobuf(proto_schema) => {
                     // Parse message indexes (bytes after schema ID)
                     let (indexes, payload_offset) = crate::protobuf::parse_message_indexes(&datum[5..])?;
@@ -365,17 +414,26 @@ async fn parse_datum(
                     // Decode to DynamicMessage
                     let message = crate::protobuf::decode_protobuf_message(&descriptor, &datum[5 + payload_offset..])?;
 
-                    // Convert to JSON using proto field names (snake_case) to match discovered schemas
-                    let json_value: serde_json::Value = message.serialize_with_options(
-                        serde_json::value::Serializer,
-                        &prost_reflect::SerializeOptions::new().use_proto_field_name(true),
-                    )?;
+                    if is_key {
+                        // Convert to JSON using proto field names to match discovered schemas.
+                        let json_value: serde_json::Value = message.serialize_with_options(
+                            serde_json::value::Serializer,
+                            &prost_reflect::SerializeOptions::new().use_proto_field_name(true),
+                        )?;
 
-                    // For keys that are not objects, wrap in a synthetic _key field
-                    if is_key && !json_value.is_object() {
-                        Ok(serde_json::Map::from_iter([("_key".to_string(), json_value)]).into())
+                        // For keys that are not objects, wrap in a synthetic _key field
+                        if json_value.is_object() {
+                            Ok(Parsed::Value(json_value))
+                        } else {
+                            Ok(Parsed::Value(
+                                serde_json::Map::from_iter([("_key".to_string(), json_value)])
+                                    .into(),
+                            ))
+                        }
                     } else {
-                        Ok(json_value)
+                        // Payloads are streamed straight to output by do_pull,
+                        // so keep the decoded message rather than build a DOM.
+                        Ok(Parsed::Message(message))
                     }
                 }
             }
@@ -384,9 +442,9 @@ async fn parse_datum(
             // Schema registry is not available, but the data was encoded with a
             // schema. We might as well try to see if the data is a valid JSON
             // document.
-            Ok(serde_json::from_slice(&datum[5..]).context(
+            Ok(Parsed::Value(serde_json::from_slice(&datum[5..]).context(
                 "received a message with a schema magic byte, but schema registry is not configured and the message is not valid JSON"
-            )?)
+            )?))
         }
         (_, _) => {
             // If there is no schema information available for how to parse the
@@ -396,12 +454,12 @@ async fn parse_datum(
             // thing to do for a "payload" is to try to parse it as a JSON
             // document.
             if is_key {
-                Ok(
+                Ok(Parsed::Value(
                     serde_json::Map::from_iter([("_key".to_string(), base64.encode(datum).into())])
                         .into(),
-                )
+                ))
             } else {
-                Ok(serde_json::from_slice(datum)?)
+                Ok(Parsed::Value(serde_json::from_slice(datum)?))
             }
         }
     }
