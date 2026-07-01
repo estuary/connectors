@@ -1,9 +1,16 @@
 use anyhow::Result;
 use rdkafka::client::{ClientContext, OAuthToken};
 use rdkafka::consumer::{BaseConsumer, ConsumerContext};
+use rdkafka::statistics::Statistics;
 use rdkafka::ClientConfig;
 use schemars::{schema::RootSchema, JsonSchema};
 use serde::{de, Deserialize, Deserializer, Serialize};
+
+// How often in milliseconds librdkafka computes consumer statistics and
+// delivers them to the `stats` callback, which logs per-partition lag. This is
+// serviced on the same thread that polls for messages, so the interval is kept
+// coarse to keep the logging overhead negligible.
+const STATISTICS_INTERVAL_MS: &str = "300000"; // 5 minutes
 
 #[derive(Serialize, Deserialize)]
 pub struct EndpointConfig {
@@ -299,9 +306,79 @@ impl ClientContext for FlowConsumerContext {
             _ => Err(anyhow::anyhow!("generate_oauth_token called without AWS credentials").into()),
         }
     }
+
+    fn stats(&self, statistics: Statistics) {
+        log_partition_lag(&statistics);
+    }
 }
 
 impl ConsumerContext for FlowConsumerContext {}
+
+// Logs consumer lag, rolled up per topic. Because the connector emits
+// exactly one captured document per Kafka message, "messages behind"
+// is equivalently "documents behind", and a topic is exactly one
+// binding/collection.
+//
+// librdkafka delivers `statistics` on the `statistics.interval.ms` cadence via
+// the poll thread, so this only runs once per interval.
+fn log_partition_lag(statistics: &Statistics) {
+    for topic in statistics.topics.values() {
+        let mut partitions: u64 = 0;
+        let mut partitions_behind: u64 = 0;
+        let mut total_messages_behind: i64 = 0;
+        let mut max_messages_behind: i64 = 0;
+        // The partition owning `max_messages_behind`; a caught-up topic still
+        // names a real partition (the first one seen).
+        let mut max_lag_partition: i32 = -1;
+
+        for partition in topic.partitions.values() {
+            // librdkafka reports an internal aggregate entry under partition -1.
+            if partition.partition < 0 {
+                continue;
+            }
+
+            // `app_offset` is the offset of the last message handed to us, which
+            // is our true read position. It is unset until the first message of
+            // a session is consumed, so fall back to the fetch position and then
+            // the low watermark for a freshly-assigned partition. We avoid
+            // librdkafka's `consumer_lag` field, which is derived from the
+            // committed offset: this connector never commits offsets (it tracks
+            // them in Flow checkpoints), so that field is unreliable.
+            let read_offset = [partition.app_offset, partition.next_offset]
+                .into_iter()
+                .find(|&offset| offset >= 0)
+                .unwrap_or(partition.lo_offset.max(0));
+
+            let messages_behind = (partition.hi_offset - read_offset).max(0);
+
+            // The first real partition, or a new maximum, owns the worst-lag slot.
+            if partitions == 0 || messages_behind > max_messages_behind {
+                max_messages_behind = messages_behind;
+                max_lag_partition = partition.partition;
+            }
+            partitions += 1;
+            total_messages_behind += messages_behind;
+            if messages_behind > 0 {
+                partitions_behind += 1;
+            }
+        }
+
+        // Skip topics with no assigned partitions, which carry no useful signal.
+        if partitions == 0 {
+            continue;
+        }
+
+        tracing::info!(
+            topic = topic.topic.as_str(),
+            partitions,
+            partitions_behind,
+            total_messages_behind,
+            max_messages_behind,
+            max_lag_partition,
+            "consumer lag",
+        );
+    }
+}
 
 impl EndpointConfig {
     pub async fn to_consumer(&self) -> Result<BaseConsumer<FlowConsumerContext>> {
@@ -311,6 +388,7 @@ impl EndpointConfig {
         config.set("enable.auto.commit", "false");
         config.set("group.id", "source-kafka"); // librdkafka will throw an error if this is left blank
         config.set("security.protocol", self.security_protocol());
+        config.set("statistics.interval.ms", STATISTICS_INTERVAL_MS);
 
         match &self.credentials {
             Some(Credentials::UserPassword {
