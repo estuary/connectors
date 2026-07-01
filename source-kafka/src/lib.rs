@@ -17,6 +17,7 @@ use tokio::io::{self, AsyncBufReadExt};
 
 pub mod configuration;
 pub mod discover;
+pub mod document;
 pub mod msk_oauthbearer;
 pub mod protobuf;
 pub mod pull;
