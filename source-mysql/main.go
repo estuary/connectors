@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/feature/rds/auth"
+	iam "github.com/estuary/connectors/go/auth/iam"
 	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
@@ -147,16 +149,78 @@ func connectMySQL(ctx context.Context, name string, cfg json.RawMessage) (sqlcap
 // Config tells the connector how to connect to the source database and
 // capture changes from it.
 type Config struct {
-	Address     string         `json:"address" jsonschema:"title=Server Address,description=The host or host:port at which the database can be reached." jsonschema_extras:"order=0"`
-	User        string         `json:"user" jsonschema:"title=Login Username,default=flow_capture,description=The database user to authenticate as." jsonschema_extras:"order=1"`
-	Password    string         `json:"password" jsonschema:"title=Login Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
-	Timezone    string         `json:"timezone,omitempty" jsonschema:"title=Timezone,description=Timezone to use when capturing datetime columns. Should normally be left blank to use the database's 'time_zone' system variable. Only required if the 'time_zone' system variable cannot be read and columns with type datetime are being captured. Must be a valid IANA time zone name or +HH:MM offset. Takes precedence over the 'time_zone' system variable if both are set (go.estuary.dev/80J6rX)." jsonschema_extras:"order=3"`
-	HistoryMode bool           `json:"historyMode" jsonschema:"default=false,description=Capture change events without reducing them to a final state." jsonschema_extras:"order=4"`
+	Address string `json:"address" jsonschema:"title=Server Address,description=The host or host:port at which the database can be reached." jsonschema_extras:"order=0"`
+	User    string `json:"user" jsonschema:"title=Login Username,default=flow_capture,description=The database user to authenticate as." jsonschema_extras:"order=1"`
+	// Password is a deprecated top-level field, retained so
+	// that pre-credentials configs continue to deserialize and work.
+	// New configs carry the password under Credentials instead.
+	Password    string            `json:"password,omitempty" jsonschema:"title=Login Password,description=Password for the specified database user." jsonschema_extras:"secret=true,x-hidden-field=true"`
+	Credentials *credentialConfig `json:"credentials,omitempty" jsonschema:"title=Authentication" jsonschema_extras:"order=2,x-iam-auth=true"`
+	Timezone    string            `json:"timezone,omitempty" jsonschema:"title=Timezone,description=Timezone to use when capturing datetime columns. Should normally be left blank to use the database's 'time_zone' system variable. Only required if the 'time_zone' system variable cannot be read and columns with type datetime are being captured. Must be a valid IANA time zone name or +HH:MM offset. Takes precedence over the 'time_zone' system variable if both are set (go.estuary.dev/80J6rX)." jsonschema_extras:"order=3"`
+	HistoryMode bool              `json:"historyMode" jsonschema:"default=false,description=Capture change events without reducing them to a final state." jsonschema_extras:"order=4"`
 
 	DiscoveryFilters discoveryFilters `json:"discoveryFilters,omitempty" jsonschema:"title=Discovery Filters,description=Options that restrict which tables are visible to discovery."`
 	Advanced         advancedConfig   `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 
 	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
+}
+
+type authType string
+
+const (
+	UserPassword authType = "UserPassword"
+	AWSIAM       authType = "AWSIAM"
+)
+
+type userPassword struct {
+	Password string `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true"`
+}
+
+type credentialConfig struct {
+	AuthType authType `json:"auth_type"`
+
+	userPassword
+	iam.IAMConfig
+}
+
+func (credentialConfig) JSONSchema() *jsonschema.Schema {
+	subSchemas := []schemagen.OneOfSubSchemaT{
+		schemagen.OneOfSubSchema("Password", userPassword{}, string(UserPassword)),
+		schemagen.OneOfSubSchema("AWS IAM", iam.AWSConfig{}, string(AWSIAM)),
+	}
+	return schemagen.OneOfSchema("Authentication", "", "auth_type", string(UserPassword), subSchemas...)
+}
+
+// resolvePassword returns the value to authenticate with: either a static
+// password or an IAM token, depending on the configured auth
+// type. IAM tokens are short-lived, so this is called each time we open a
+// connection rather than cached on the config.
+func (c *Config) resolvePassword(ctx context.Context) (string, error) {
+	// A nil Credentials means a pre-credentials config, which carries its
+	// password in the deprecated top-level field.
+	if c.Credentials == nil {
+		return c.Password, nil
+	}
+	switch c.Credentials.AuthType {
+	case UserPassword:
+		return c.Credentials.Password, nil
+	case AWSIAM:
+		credProvider, err := c.Credentials.AWSCredentialsProvider()
+		if err != nil {
+			return "", err
+		}
+		token, err := auth.BuildAuthToken(ctx, c.Address, c.Credentials.AWSRegion, c.User, credProvider)
+		if err != nil {
+			return "", fmt.Errorf("building AWS auth token: %w", err)
+		}
+		return token, nil
+	default:
+		return "", fmt.Errorf("unsupported auth type %q", c.Credentials.AuthType)
+	}
+}
+
+func (c *Config) usesIAM() bool {
+	return c.Credentials != nil && c.Credentials.AuthType != UserPassword
 }
 
 type advancedConfig struct {
@@ -180,11 +244,27 @@ func (c *Config) Validate() error {
 	var requiredProperties = [][]string{
 		{"address", c.Address},
 		{"user", c.User},
-		{"password", c.Password},
 	}
 	for _, req := range requiredProperties {
 		if req[1] == "" {
 			return fmt.Errorf("missing '%s'", req[0])
+		}
+	}
+	if c.Credentials != nil {
+		switch c.Credentials.AuthType {
+		case UserPassword:
+			if c.Credentials.Password == "" {
+				return fmt.Errorf("missing 'password'")
+			}
+		case AWSIAM:
+			if c.Credentials.AWSRegion == "" {
+				return fmt.Errorf("missing 'aws_region'")
+			}
+			if c.Credentials.AWSRole == "" {
+				return fmt.Errorf("missing 'aws_role_arn'")
+			}
+		default:
+			return fmt.Errorf("unsupported auth type %q", c.Credentials.AuthType)
 		}
 	}
 	if len(c.Password) > 32 {
@@ -251,7 +331,7 @@ func configSchema() json.RawMessage {
 	return json.RawMessage(configSchema)
 }
 
-func (db *mysqlDatabase) connect(_ context.Context) error {
+func (db *mysqlDatabase) connect(ctx context.Context) error {
 	logrus.WithFields(logrus.Fields{
 		"addr":     db.config.Address,
 		"dbName":   db.config.Advanced.DBName,
@@ -287,19 +367,28 @@ func (db *mysqlDatabase) connect(_ context.Context) error {
 		return nil
 	}
 
+	pass, err := db.config.resolvePassword(ctx)
+	if err != nil {
+		return err
+	}
+
 	// The following if-else chain looks somewhat complicated but it's really very simple.
 	// * We'd prefer to use TLS, so we first try to connect with TLS, and then if that fails
 	//   we try again without.
 	// * If either error is an incorrect username/password then we just report that.
+	// * Cloud IAM auth sends the token to the server as a cleartext password, so it requires
+	//   TLS and must never fall back to a non-TLS connection.
 	// * Otherwise we report both errors because it's better to be clear what failed and how.
 	// * Except if the non-TLS connection specifically failed because TLS is required then
 	//   we don't need to mention that and just return the with-TLS error.
-	if connWithTLS, errWithTLS := client.Connect(address, db.config.User, db.config.Password, db.config.Advanced.DBName, withTLS, withAttrs); errWithTLS == nil {
+	if connWithTLS, errWithTLS := client.Connect(address, db.config.User, pass, db.config.Advanced.DBName, withTLS, withAttrs); errWithTLS == nil {
 		logrus.WithField("addr", address).Info("connected with TLS")
 		db.conn = &mysqlConnection{inner: connWithTLS, queryTimeout: DefaultQueryTimeout}
 	} else if errors.As(errWithTLS, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
 		return cerrors.NewUserError(mysqlErr, "incorrect username or password")
-	} else if connWithoutTLS, errWithoutTLS := client.Connect(address, db.config.User, db.config.Password, db.config.Advanced.DBName, withAttrs); errWithoutTLS == nil {
+	} else if db.config.usesIAM() {
+		return fmt.Errorf("unable to connect to database with TLS: %w", errWithTLS)
+	} else if connWithoutTLS, errWithoutTLS := client.Connect(address, db.config.User, pass, db.config.Advanced.DBName, withAttrs); errWithoutTLS == nil {
 		logrus.WithField("addr", address).Info("connected without TLS")
 		db.conn = &mysqlConnection{inner: connWithoutTLS, queryTimeout: DefaultQueryTimeout}
 	} else if errors.As(errWithoutTLS, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {

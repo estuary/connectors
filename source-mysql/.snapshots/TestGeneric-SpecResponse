@@ -21,8 +21,73 @@
         "type": "string",
         "title": "Login Password",
         "description": "Password for the specified database user.",
+        "secret": true,
+        "x-hidden-field": true
+      },
+      "credentials": {
+        "oneOf": [
+          {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/source-mysql/user-password",
+            "properties": {
+              "auth_type": {
+                "type": "string",
+                "const": "UserPassword",
+                "default": "UserPassword",
+                "order": 0
+              },
+              "password": {
+                "type": "string",
+                "title": "Password",
+                "description": "Password for the specified database user.",
+                "secret": true
+              }
+            },
+            "type": "object",
+            "required": [
+              "password"
+            ],
+            "title": "Password"
+          },
+          {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/go/auth/iam/aws-config",
+            "properties": {
+              "auth_type": {
+                "type": "string",
+                "const": "AWSIAM",
+                "default": "AWSIAM",
+                "order": 0
+              },
+              "aws_region": {
+                "type": "string",
+                "title": "AWS Region",
+                "description": "AWS Region of your resource"
+              },
+              "aws_role_arn": {
+                "type": "string",
+                "title": "AWS Role ARN",
+                "description": "AWS Role which has access to the resource which will be assumed by Flow"
+              }
+            },
+            "type": "object",
+            "required": [
+              "aws_region",
+              "aws_role_arn"
+            ],
+            "title": "AWS IAM"
+          }
+        ],
+        "type": "object",
+        "title": "Authentication",
+        "default": {
+          "auth_type": "UserPassword"
+        },
+        "discriminator": {
+          "propertyName": "auth_type"
+        },
         "order": 2,
-        "secret": true
+        "x-iam-auth": true
       },
       "timezone": {
         "type": "string",
@@ -186,7 +251,6 @@
     "required": [
       "address",
       "user",
-      "password",
       "historyMode"
     ],
     "title": "MySQL Connection"

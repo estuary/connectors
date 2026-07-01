@@ -119,13 +119,18 @@ func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursorJSON 
 		flavor = mysql.MariaDBFlavor
 	}
 
+	pass, err := db.config.resolvePassword(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	var syncConfig = replication.BinlogSyncerConfig{
 		ServerID: uint32(db.config.Advanced.NodeID),
 		Flavor:   flavor,
 		Host:     host,
 		Port:     uint16(port),
 		User:     db.config.User,
-		Password: db.config.Password,
+		Password: pass,
 		// TODO(wgd): Maybe add 'serverName' checking as described over in Connect()
 		TLSConfig: &tls.Config{InsecureSkipVerify: true},
 		// Request that timestamp values coming via replication be interpreted as UTC.
@@ -158,6 +163,14 @@ func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursorJSON 
 	var syncer = replication.NewBinlogSyncer(syncConfig)
 	if streamer, err = syncer.StartSync(pos); err == nil {
 		logrus.Debug("replication connected with TLS")
+	} else if db.config.usesIAM() {
+		// Cloud IAM auth sends the token to the server as a cleartext password, so
+		// it requires TLS and must not fall back to a non-TLS connection.
+		syncer.Close()
+		if userErr := wrapMySQLReplicationError(err); userErr != nil {
+			return nil, userErr
+		}
+		return nil, fmt.Errorf("error starting binlog sync with TLS: %w", err)
 	} else {
 		syncer.Close()
 		syncConfig.TLSConfig = nil
