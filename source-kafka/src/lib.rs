@@ -60,6 +60,8 @@ pub async fn run_connector(
 
             write_capture_response(res, &mut stdout)?;
         } else if let Some(req) = request.validate {
+            tracing::info!(eventType = "connectorStatus", "Validating capture configuration");
+
             let res = Response {
                 validated: Some(Validated {
                     bindings: do_validate(req).await?,
@@ -69,6 +71,8 @@ pub async fn run_connector(
 
             write_capture_response(res, &mut stdout)?;
         } else if request.apply.is_some() {
+            tracing::info!(eventType = "connectorStatus", "Applying capture configuration");
+
             let res = Response {
                 applied: Some(Applied {
                     action_description: String::new(),
@@ -88,6 +92,8 @@ pub async fn run_connector(
                 },
                 &mut stdout,
             )?;
+
+            tracing::info!(eventType = "connectorStatus", "Starting capture");
 
             let eof = tokio::spawn(async move {
                 let mut line_string = String::new();
