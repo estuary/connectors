@@ -1,0 +1,123 @@
+---
+source: src/document.rs
+expression: parsed
+---
+{
+  "_meta": {
+    "offset": 42,
+    "op": "u",
+    "partition": 3,
+    "topic": "t"
+  },
+  "f_any": {
+    "@type": "type.googleapis.com/differential.Nested",
+    "name": "wrapped",
+    "ratio": 0.5,
+    "samples": [
+      1.5
+    ]
+  },
+  "f_bool": true,
+  "f_bytes": "AP+fkpY=",
+  "f_double": 0.1,
+  "f_enum": "CORNER_B",
+  "f_fixed32": 7,
+  "f_fixed64": "8",
+  "f_float": 0.5,
+  "f_int32": -2147483648,
+  "f_int64": "9223372036854775807",
+  "f_message": {
+    "name": "inner",
+    "ratio": -1.25,
+    "samples": [
+      1.5,
+      -2.5
+    ]
+  },
+  "f_null": null,
+  "f_sfixed32": -7,
+  "f_sfixed64": "-8",
+  "f_sint32": -42,
+  "f_sint64": "-9223372036854775808",
+  "f_string": "héllo \"world\"\n☃",
+  "f_uint32": 4294967295,
+  "f_uint64": "18446744073709551615",
+  "m_bool": {
+    "false": "f",
+    "true": "t"
+  },
+  "m_int32": {
+    "-2": {
+      "name": "neg",
+      "ratio": 0.5
+    },
+    "1": {
+      "name": "one",
+      "ratio": 0.5
+    }
+  },
+  "m_int64": {
+    "-5": "neg",
+    "5": "pos"
+  },
+  "m_string": {
+    "k1": "v1",
+    "k2": "v2",
+    "k3": "v3"
+  },
+  "m_uint64": {
+    "18446744073709551615": "max"
+  },
+  "one_string": "chosen",
+  "opt_int32": 0,
+  "r_float": [
+    0.5,
+    -1.25,
+    16777216.0
+  ],
+  "r_message": [
+    {
+      "name": "a",
+      "ratio": 0.5
+    },
+    {
+      "name": "b",
+      "ratio": -1.25,
+      "samples": [
+        0.25
+      ]
+    }
+  ],
+  "r_string": [
+    "first",
+    "second"
+  ],
+  "wkt_duration": "3600.500s",
+  "wkt_list": [
+    null,
+    false
+  ],
+  "wkt_mask": "a.b,c",
+  "wkt_struct": {
+    "_meta": "from-payload",
+    "deep": {
+      "_meta": "kept"
+    },
+    "flag": true,
+    "n": 1.5,
+    "nil": null,
+    "s": "payload"
+  },
+  "wkt_timestamp": "2024-10-29T20:26:46.123Z",
+  "wkt_value": [
+    1.0,
+    "two"
+  ],
+  "wrap_bool": false,
+  "wrap_bytes": "aGk=",
+  "wrap_double": 2.5,
+  "wrap_float": -1.25,
+  "wrap_int64": "-9223372036854775808",
+  "wrap_string": "",
+  "wrap_uint64": "18446744073709551615"
+}
