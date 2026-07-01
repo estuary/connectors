@@ -929,11 +929,12 @@ func (c *constrainterAdapter[EC, FC, RC, MT]) Compatible(existing ExistingField,
 // Generally this is true if there is a type change that can't be migrated.
 func mustRecreateTypeChange[MT MappedTyper](p *pf.Projection, mt MT, existing ExistingField) bool {
 	canMigrate := mt.CanMigrate(existing)
-	if p.IsRootDocumentProjection() || p.IsPrimaryKey {
-		// There are currently no known cases where migrating the root document
-		// column's type would be useful. Somewhat similarly, it would
-		// theoretically be possible for a few systems to migrate collection key
-		// columns, but for the most part this is not practical.
+	if p.IsPrimaryKey {
+		// It would theoretically be possible for a few systems to migrate
+		// collection key columns, but for the most part this is not practical, so
+		// a key type change still requires a backfill. The root document column,
+		// by contrast, is migratable: e.g. disabling objects_and_arrays_as_json
+		// converts its JSON column to text in place via the dialect's migration.
 		canMigrate = false
 	}
 
