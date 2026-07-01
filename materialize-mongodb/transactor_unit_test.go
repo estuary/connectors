@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -160,6 +161,21 @@ func TestStoreDocumentIdCollisionKey(t *testing.T) {
 		"a key at /_id must round-trip exactly through the _flow_id rename")
 }
 
+// TestStoreDocumentIdFlowIdCollisionReturnsError is the regression test for the
+// _id/_flow_id collision clobbering a restored key: when a document has both a
+// literal _id field and a key field literally named _flow_id, the _id-collision
+// rename has nowhere safe to put the displaced _id value without destroying the
+// key. storeDocument must fail loudly rather than silently let the rename
+// overwrite the restored key with the unrelated _id value.
+func TestStoreDocumentIdFlowIdCollisionReturnsError(t *testing.T) {
+	const id int64 = 9223372036854775807
+	raw := json.RawMessage(fmt.Sprintf(`{"_id":"arbitrary","_flow_id":%d}`, id))
+
+	_, err := storeDocument(raw, "00", false,
+		tuple.Tuple{id}, []keyRestoration{{tupleIndex: 0, tokens: []string{"_flow_id"}}})
+	require.Error(t, err)
+}
+
 // TestStoreDocumentCompositeMixedKey verifies positional correspondence between
 // the key tuple and key pointers, and that only the int64 key element is
 // overwritten (the string key and non-key number are left as decoded).
@@ -196,16 +212,84 @@ func TestStoreDocumentDeltaUpdatesLeavesKeyAsDouble(t *testing.T) {
 	require.False(t, hasID, "delta updates must not set _id")
 }
 
-// TestStoreDocumentKeyFieldCountMismatchPanics asserts that a key tuple whose
-// length disagrees with the binding's key field count — an impossible state,
-// since the runtime packs exactly one key element per declared key field — fails
-// loudly rather than silently storing a document with un-restored key precision.
-func TestStoreDocumentKeyFieldCountMismatchPanics(t *testing.T) {
+// TestStoreDocumentKeyIndexOutOfBoundsReturnsError asserts that a
+// keyRestoration whose tupleIndex falls outside the store's key tuple — an
+// impossible state, since the runtime packs exactly one key element per
+// declared key field — fails loudly rather than silently storing a document
+// with un-restored key precision.
+func TestStoreDocumentKeyIndexOutOfBoundsReturnsError(t *testing.T) {
 	raw := json.RawMessage(`{"id":1}`)
-	require.Panics(t, func() {
-		_, _ = storeDocument(raw, "00", false,
-			tuple.Tuple{int64(1)}, []keyRestoration{{tupleIndex: 5, tokens: []string{"id"}}})
-	})
+	_, err := storeDocument(raw, "00", false,
+		tuple.Tuple{int64(1)}, []keyRestoration{{tupleIndex: 5, tokens: []string{"id"}}})
+	require.Error(t, err)
+}
+
+// TestStoreDocumentKeyPointerUnresolvedReturnsError asserts that storeDocument
+// fails loudly, rather than silently storing a document with un-restored key
+// precision, when a key field's declared JSON pointer doesn't resolve in the
+// document body (here, the intermediate object "a" is missing entirely).
+func TestStoreDocumentKeyPointerUnresolvedReturnsError(t *testing.T) {
+	raw := json.RawMessage(`{}`)
+	_, err := storeDocument(raw, "00", false,
+		tuple.Tuple{int64(1)}, []keyRestoration{{tupleIndex: 0, tokens: []string{"a", "id"}}})
+	require.Error(t, err)
+}
+
+// TestSanitizeDocumentInnerArrayNaN is the regression test for NaN nested
+// inside an array surviving load-side sanitization: the mongo-driver decodes a
+// loaded document's nested BSON arrays as primitive.A (bson.A), never
+// []interface{}, so a NaN nested inside an array element — e.g.
+// {"items": [{"val": NaN}]} — passed through sanitizeDocumentInner untouched
+// and broke the subsequent json.Marshal of the loaded document. The array is
+// round-tripped through bson.Marshal/Unmarshal so the test exercises the
+// driver-authentic primitive.A shape rather than a hand-built []interface{}.
+func TestSanitizeDocumentInnerArrayNaN(t *testing.T) {
+	encoded, err := bson.Marshal(bson.M{"items": bson.A{bson.M{"val": math.NaN()}}})
+	require.NoError(t, err)
+	var doc bson.M
+	require.NoError(t, bson.Unmarshal(encoded, &doc))
+
+	sanitized := sanitizeDocumentInner(doc)
+	_, err = json.Marshal(sanitized)
+	require.NoError(t, err, "NaN nested inside an array must be sanitized before marshaling")
+}
+
+// TestSanitizeDocumentInnerNestedObjectNaN is the regression test for the
+// sibling gap to TestSanitizeDocumentInnerArrayNaN: the mongo-driver decodes a
+// loaded document's nested sub-objects as primitive.M (bson.M), never plain
+// map[string]interface{}, so a NaN nested inside a sub-object — not even
+// inside an array — also passed through sanitizeDocumentInner untouched.
+func TestSanitizeDocumentInnerNestedObjectNaN(t *testing.T) {
+	encoded, err := bson.Marshal(bson.M{"obj": bson.M{"val": math.NaN()}})
+	require.NoError(t, err)
+	var doc bson.M
+	require.NoError(t, bson.Unmarshal(encoded, &doc))
+
+	sanitized := sanitizeDocumentInner(doc)
+	_, err = json.Marshal(sanitized)
+	require.NoError(t, err, "NaN nested inside a sub-object must be sanitized before marshaling")
+}
+
+// BenchmarkStoreDocumentCompositeKey measures storeDocument's restore loop for
+// a composite key with one integer field (eligible for restoration) and two
+// non-integer fields (string, boolean) that keyRestorations excludes
+// up front. It exists to confirm the eligibility filter and root-level fast
+// path keep this loop's cost close to the single-key case rather than scaling
+// with the binding's total key-field count.
+func BenchmarkStoreDocumentCompositeKey(b *testing.B) {
+	const id int64 = 9223372036854775807
+	raw := json.RawMessage(fmt.Sprintf(`{"id":%d,"code":"abc","active":true,"name":"n"}`, id))
+	key := tuple.Tuple{id, "abc", true}
+	// Only "id" is integer-typed; driver.go's isIntegerKeyType filter would
+	// exclude "code" and "active" from keyRestorations entirely.
+	restorations := []keyRestoration{{tupleIndex: 0, tokens: []string{"id"}}}
+
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		if _, err := storeDocument(raw, "00", false, key, restorations); err != nil {
+			b.Fatal(err)
+		}
+	}
 }
 
 // bulkErr builds a mongo.BulkWriteException with one per-item WriteError per
