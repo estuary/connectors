@@ -6,15 +6,19 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	m "github.com/estuary/connectors/go/materialize"
+	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -69,6 +73,21 @@ type transactor struct {
 type binding struct {
 	collection   *mongo.Collection
 	deltaUpdates bool
+	// keyRestorations holds, for each of the binding's key fields declared as
+	// JSON-schema integer (the only type whose stored precision needs
+	// restoring — see storeDocument), its index into a store's key tuple and
+	// parsed RFC6901 JSON pointer tokens. Key fields of other declared types
+	// are omitted so the per-document restore loop never re-derives their
+	// (never-integer) type.
+	keyRestorations []keyRestoration
+}
+
+// keyRestoration is a single entry of binding.keyRestorations. tupleIndex
+// indexes into a store's key tuple; tokens is the pre-parsed JSON pointer to
+// that key field's location in the stored document.
+type keyRestoration struct {
+	tupleIndex int
+	tokens     []string
 }
 
 func (t *transactor) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, rangeSpec pf.RangeSpec) (m.RuntimeCheckpoint, error) {
@@ -183,22 +202,10 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			batch = append(batch, del)
 			batchSize += len(key)
 		} else {
-			var doc bson.M
-			if err := json.Unmarshal(it.RawJSON, &doc); err != nil {
-				return nil, fmt.Errorf("bson unmarshalling json doc: %w", err)
-			}
-			if idVal, ok := doc[idField]; ok {
-				// Preserve the original value of a collection field with a name
-				// that collides with the MongoDB _id field by materializing it
-				// with an alternate name.
-				doc[idFieldAlt] = idVal
-				delete(doc, idField)
-			}
-
-			// In case of delta updates, we don't want to set the _id. We want MongoDB to generate a new
-			// _id for each record we insert
-			if !t.bindings[it.Binding].deltaUpdates {
-				doc[idField] = key
+			b := t.bindings[it.Binding]
+			doc, err := storeDocument(it.RawJSON, key, b.deltaUpdates, it.Key, b.keyRestorations)
+			if err != nil {
+				return nil, err
 			}
 
 			var m mongo.WriteModel
@@ -461,6 +468,170 @@ func storeRetryDelay(ctx context.Context, attempt int) error {
 	}
 }
 
+// storeDocument builds the MongoDB document for a store from the raw Flow
+// document JSON. It renames any field colliding with MongoDB's reserved _id
+// field and, for standard updates, sets _id to the packed key.
+//
+// Integer key fields are restored to their exact values from the store's key
+// tuple: json.Unmarshal decodes JSON numbers as float64, which rounds integers
+// beyond 2^53, and because the runtime re-derives a store's key from the loaded
+// document body a rounded key field would no longer match — provoking a
+// duplicate-key crash loop. Non-key numbers are intentionally left as float64 so
+// a field's BSON type stays stable regardless of its value.
+func storeDocument(rawJSON json.RawMessage, idValue string, deltaUpdates bool, key tuple.Tuple, keyRestorations []keyRestoration) (bson.M, error) {
+	var doc bson.M
+	if err := json.Unmarshal(rawJSON, &doc); err != nil {
+		return nil, fmt.Errorf("unmarshalling json doc: %w", err)
+	}
+
+	// Renaming runs before key restoration below so a key pointer can be
+	// redirected to wherever its value actually ends up living.
+	_, hadIDCollision := doc[idField]
+	if hadIDCollision {
+		// Preserve the original value of a collection field with a name
+		// that collides with the MongoDB _id field by materializing it
+		// with an alternate name.
+		doc[idFieldAlt] = doc[idField]
+		delete(doc, idField)
+	}
+
+	// Restoring exact integer keys only matters for standard updates, where the
+	// runtime re-derives a store's key from the loaded document body. Delta
+	// updates never load documents and let MongoDB mint a fresh _id, so it is
+	// skipped there to avoid needlessly flipping a key field's BSON type from
+	// double to long. Only int64 values are restored; strings and booleans
+	// already decode exactly. keyRestorations is pre-filtered (see driver.go)
+	// to only the key fields declared as JSON-schema integer, so non-integer
+	// key fields never enter this loop.
+	if !deltaUpdates {
+		for _, kr := range keyRestorations {
+			if kr.tupleIndex >= len(key) {
+				return nil, fmt.Errorf("store key tuple has %d elements but binding declares a key field at index %d", len(key), kr.tupleIndex)
+			}
+			v, ok := key[kr.tupleIndex].(int64)
+			if !ok {
+				continue
+			}
+
+			// A key pointer of exactly /_id addresses the field the rename above
+			// just relocated to _flow_id; redirect there so the value lands where
+			// it now actually lives. A key pointer of exactly /_flow_id colliding
+			// with a renamed _id is irreconcilable: the document has both a
+			// literal _flow_id (the key) and a literal _id (an unrelated value
+			// the rename just pushed onto _flow_id), so there's no single
+			// location left to hold both — fail rather than let the rename
+			// silently clobber the key.
+			target := kr.tokens
+			if hadIDCollision && len(target) == 1 {
+				switch target[0] {
+				case idField:
+					target = []string{idFieldAlt}
+				case idFieldAlt:
+					return nil, fmt.Errorf("document has a field named %q which collides with the reserved name used to materialize its key %q", idField, idFieldAlt)
+				}
+			}
+
+			// Fast path for the overwhelmingly common case: a key at the
+			// document's root (a single pointer segment). This skips
+			// setAtPointer's generic tree walk, which is only needed when a
+			// key is nested under an object or array.
+			if len(target) == 1 {
+				doc[target[0]] = v
+				continue
+			}
+
+			if !setAtPointer(doc, target, v) {
+				return nil, fmt.Errorf("key field at pointer %v could not be located in the document body", target)
+			}
+		}
+	}
+
+	// In case of delta updates, we don't want to set the _id. We want MongoDB to generate a new
+	// _id for each record we insert
+	if !deltaUpdates {
+		doc[idField] = idValue
+	}
+
+	return doc, nil
+}
+
+// parsePointerTokens splits an RFC6901 JSON pointer into its decoded reference
+// tokens. It is computed once per binding (see binding.keyRestorations) so
+// that setAtPointer need not re-parse the pointer on every stored document.
+func parsePointerTokens(ptr string) []string {
+	if ptr == "" {
+		return nil
+	}
+
+	tokens := strings.Split(strings.TrimPrefix(ptr, "/"), "/")
+	for i, token := range tokens {
+		token = strings.ReplaceAll(token, "~1", "/")
+		tokens[i] = strings.ReplaceAll(token, "~0", "~")
+	}
+	return tokens
+}
+
+// setAtPointer writes val at the location addressed by the parsed JSON pointer
+// tokens within doc, traversing both JSON objects and arrays. It reports
+// whether the write succeeded; it fails (returns false) without altering doc
+// when the location is absent or a token does not address its parent's type,
+// rather than guessing and altering the document's shape.
+func setAtPointer(doc bson.M, tokens []string, val any) bool {
+	if len(tokens) == 0 {
+		return false
+	}
+
+	// Walk to the parent of the leaf. Objects decoded by json.Unmarshal are
+	// map[string]interface{} (the root is the equivalent bson.M) and arrays are
+	// []interface{}; slices are reference types, so writing back through the
+	// parent below is visible in doc.
+	var current any = map[string]interface{}(doc)
+	for _, token := range tokens[:len(tokens)-1] {
+		current = childAtToken(current, token)
+		if current == nil {
+			return false
+		}
+	}
+
+	leaf := tokens[len(tokens)-1]
+	switch parent := current.(type) {
+	case map[string]interface{}:
+		parent[leaf] = val
+		return true
+	case []interface{}:
+		if idx, ok := arrayIndex(leaf, len(parent)); ok {
+			parent[idx] = val
+			return true
+		}
+	}
+	return false
+}
+
+// childAtToken returns the child of node addressed by a single JSON pointer
+// token, or nil when node is neither an object nor an array or the token does
+// not address an existing element.
+func childAtToken(node any, token string) any {
+	switch n := node.(type) {
+	case map[string]interface{}:
+		return n[token]
+	case []interface{}:
+		if idx, ok := arrayIndex(token, len(n)); ok {
+			return n[idx]
+		}
+	}
+	return nil
+}
+
+// arrayIndex parses an RFC6901 array-index token and reports whether it is a
+// valid in-bounds index into a slice of the given length.
+func arrayIndex(token string, length int) (int, bool) {
+	idx, err := strconv.Atoi(token)
+	if err != nil || idx < 0 || idx >= length {
+		return 0, false
+	}
+	return idx, true
+}
+
 func sanitizedLoadedDocument(doc map[string]interface{}) map[string]interface{} {
 	if idValAlt, ok := doc[idFieldAlt]; ok {
 		// Reverse the renaming of a collection's _id field to _flow_id by
@@ -478,6 +649,15 @@ func sanitizedLoadedDocument(doc map[string]interface{}) map[string]interface{} 
 	return sanitizeDocumentInner(doc)
 }
 
+// sanitizeDocumentInner recurses through a loaded document's values, converting
+// any BSON double NaN to the string "NaN" (json.Marshal rejects NaN outright).
+// The mongo-driver decodes nested BSON sub-documents and arrays into the named
+// types primitive.M and primitive.A respectively, never plain
+// map[string]interface{} or []interface{}, so both the named and plain forms
+// are matched here: a type switch only matches the exact dynamic type, and
+// named/unnamed forms of the same underlying type are distinct for that
+// purpose. The plain forms are kept so this is also callable with
+// hand-constructed maps/slices, e.g. from tests.
 func sanitizeDocumentInner(doc map[string]interface{}) map[string]interface{} {
 	for key, value := range doc {
 		switch v := value.(type) {
@@ -487,8 +667,35 @@ func sanitizeDocumentInner(doc map[string]interface{}) map[string]interface{} {
 			}
 		case map[string]interface{}:
 			doc[key] = sanitizeDocumentInner(v)
+		case primitive.M:
+			doc[key] = sanitizeDocumentInner(v)
+		case primitive.A:
+			doc[key] = sanitizeArrayInner(v)
+		case []interface{}:
+			doc[key] = sanitizeArrayInner(v)
 		}
 	}
 
 	return doc
+}
+
+// sanitizeArrayInner is sanitizeDocumentInner's counterpart for array elements.
+func sanitizeArrayInner(arr []interface{}) []interface{} {
+	for i, value := range arr {
+		switch v := value.(type) {
+		case float64:
+			if math.IsNaN(v) {
+				arr[i] = "NaN"
+			}
+		case map[string]interface{}:
+			arr[i] = sanitizeDocumentInner(v)
+		case primitive.M:
+			arr[i] = sanitizeDocumentInner(v)
+		case primitive.A:
+			arr[i] = sanitizeArrayInner(v)
+		case []interface{}:
+			arr[i] = sanitizeArrayInner(v)
+		}
+	}
+	return arr
 }
