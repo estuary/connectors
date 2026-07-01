@@ -2,23 +2,6 @@
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "if": {
-        "properties": {
-          "_meta": {
-            "properties": {
-              "op": {
-                "const": "d"
-              }
-            },
-            "required": [
-              "op"
-            ]
-          }
-        },
-        "required": [
-          "_meta"
-        ]
-      },
       "properties": {
         "_meta": {
           "properties": {
@@ -202,12 +185,6 @@
       "required": [
         "id"
       ],
-      "then": {
-        "reduce": {
-          "delete": true,
-          "strategy": "merge"
-        }
-      },
       "type": [
         "object"
       ]
@@ -227,23 +204,6 @@
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "if": {
-        "properties": {
-          "_meta": {
-            "properties": {
-              "op": {
-                "const": "d"
-              }
-            },
-            "required": [
-              "op"
-            ]
-          }
-        },
-        "required": [
-          "_meta"
-        ]
-      },
       "properties": {
         "_meta": {
           "properties": {
@@ -1583,12 +1543,6 @@
       "required": [
         "id"
       ],
-      "then": {
-        "reduce": {
-          "delete": true,
-          "strategy": "merge"
-        }
-      },
       "type": [
         "object"
       ]
@@ -1608,23 +1562,6 @@
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "if": {
-        "properties": {
-          "_meta": {
-            "properties": {
-              "op": {
-                "const": "d"
-              }
-            },
-            "required": [
-              "op"
-            ]
-          }
-        },
-        "required": [
-          "_meta"
-        ]
-      },
       "properties": {
         "_meta": {
           "properties": {
@@ -1810,12 +1747,6 @@
       "required": [
         "listId"
       ],
-      "then": {
-        "reduce": {
-          "delete": true,
-          "strategy": "merge"
-        }
-      },
       "type": "object"
     },
     "key": [
@@ -1833,23 +1764,6 @@
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "if": {
-        "properties": {
-          "_meta": {
-            "properties": {
-              "op": {
-                "const": "d"
-              }
-            },
-            "required": [
-              "op"
-            ]
-          }
-        },
-        "required": [
-          "_meta"
-        ]
-      },
       "properties": {
         "_meta": {
           "properties": {
@@ -3802,12 +3716,6 @@
       "required": [
         "id"
       ],
-      "then": {
-        "reduce": {
-          "delete": true,
-          "strategy": "merge"
-        }
-      },
       "type": [
         "object"
       ]
@@ -3827,23 +3735,6 @@
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "if": {
-        "properties": {
-          "_meta": {
-            "properties": {
-              "op": {
-                "const": "d"
-              }
-            },
-            "required": [
-              "op"
-            ]
-          }
-        },
-        "required": [
-          "_meta"
-        ]
-      },
       "properties": {
         "_meta": {
           "properties": {
@@ -3893,12 +3784,6 @@
       "required": [
         "canonical-vid"
       ],
-      "then": {
-        "reduce": {
-          "delete": true,
-          "strategy": "merge"
-        }
-      },
       "type": "object"
     },
     "key": [
@@ -3913,23 +3798,6 @@
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "if": {
-        "properties": {
-          "_meta": {
-            "properties": {
-              "op": {
-                "const": "d"
-              }
-            },
-            "required": [
-              "op"
-            ]
-          }
-        },
-        "required": [
-          "_meta"
-        ]
-      },
       "properties": {
         "_meta": {
           "properties": {
@@ -4067,12 +3935,6 @@
       "required": [
         "pipelineId"
       ],
-      "then": {
-        "reduce": {
-          "delete": true,
-          "strategy": "merge"
-        }
-      },
       "type": [
         "object"
       ]
@@ -4092,23 +3954,6 @@
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "if": {
-        "properties": {
-          "_meta": {
-            "properties": {
-              "op": {
-                "const": "d"
-              }
-            },
-            "required": [
-              "op"
-            ]
-          }
-        },
-        "required": [
-          "_meta"
-        ]
-      },
       "properties": {
         "_meta": {
           "properties": {
@@ -5104,12 +4949,6 @@
       "required": [
         "id"
       ],
-      "then": {
-        "reduce": {
-          "delete": true,
-          "strategy": "merge"
-        }
-      },
       "type": [
         "object"
       ]
@@ -5129,23 +4968,6 @@
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "if": {
-        "properties": {
-          "_meta": {
-            "properties": {
-              "op": {
-                "const": "d"
-              }
-            },
-            "required": [
-              "op"
-            ]
-          }
-        },
-        "required": [
-          "_meta"
-        ]
-      },
       "properties": {
         "_meta": {
           "properties": {
@@ -6142,12 +5964,6 @@
       "required": [
         "id"
       ],
-      "then": {
-        "reduce": {
-          "delete": true,
-          "strategy": "merge"
-        }
-      },
       "type": [
         "object"
       ]
@@ -6167,23 +5983,6 @@
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "if": {
-        "properties": {
-          "_meta": {
-            "properties": {
-              "op": {
-                "const": "d"
-              }
-            },
-            "required": [
-              "op"
-            ]
-          }
-        },
-        "required": [
-          "_meta"
-        ]
-      },
       "properties": {
         "_meta": {
           "properties": {
@@ -6562,12 +6361,6 @@
       "required": [
         "id"
       ],
-      "then": {
-        "reduce": {
-          "delete": true,
-          "strategy": "merge"
-        }
-      },
       "type": [
         "object"
       ]
@@ -6588,23 +6381,6 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": true,
-      "if": {
-        "properties": {
-          "_meta": {
-            "properties": {
-              "op": {
-                "const": "d"
-              }
-            },
-            "required": [
-              "op"
-            ]
-          }
-        },
-        "required": [
-          "_meta"
-        ]
-      },
       "properties": {
         "_meta": {
           "properties": {
@@ -6648,12 +6424,6 @@
       "required": [
         "id"
       ],
-      "then": {
-        "reduce": {
-          "delete": true,
-          "strategy": "merge"
-        }
-      },
       "type": [
         "object"
       ]
@@ -6670,23 +6440,6 @@
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "if": {
-        "properties": {
-          "_meta": {
-            "properties": {
-              "op": {
-                "const": "d"
-              }
-            },
-            "required": [
-              "op"
-            ]
-          }
-        },
-        "required": [
-          "_meta"
-        ]
-      },
       "properties": {
         "_meta": {
           "properties": {
@@ -7329,12 +7082,6 @@
       "required": [
         "id"
       ],
-      "then": {
-        "reduce": {
-          "delete": true,
-          "strategy": "merge"
-        }
-      },
       "type": [
         "object"
       ]
@@ -7354,23 +7101,6 @@
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "if": {
-        "properties": {
-          "_meta": {
-            "properties": {
-              "op": {
-                "const": "d"
-              }
-            },
-            "required": [
-              "op"
-            ]
-          }
-        },
-        "required": [
-          "_meta"
-        ]
-      },
       "properties": {
         "_meta": {
           "properties": {
@@ -8030,12 +7760,6 @@
       "required": [
         "id"
       ],
-      "then": {
-        "reduce": {
-          "delete": true,
-          "strategy": "merge"
-        }
-      },
       "type": [
         "object"
       ]
@@ -8055,23 +7779,6 @@
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "if": {
-        "properties": {
-          "_meta": {
-            "properties": {
-              "op": {
-                "const": "d"
-              }
-            },
-            "required": [
-              "op"
-            ]
-          }
-        },
-        "required": [
-          "_meta"
-        ]
-      },
       "properties": {
         "_meta": {
           "properties": {
@@ -8885,12 +8592,6 @@
       "required": [
         "id"
       ],
-      "then": {
-        "reduce": {
-          "delete": true,
-          "strategy": "merge"
-        }
-      },
       "type": [
         "object"
       ]
@@ -8910,23 +8611,6 @@
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "if": {
-        "properties": {
-          "_meta": {
-            "properties": {
-              "op": {
-                "const": "d"
-              }
-            },
-            "required": [
-              "op"
-            ]
-          }
-        },
-        "required": [
-          "_meta"
-        ]
-      },
       "properties": {
         "_meta": {
           "properties": {
@@ -9611,12 +9295,6 @@
       "required": [
         "id"
       ],
-      "then": {
-        "reduce": {
-          "delete": true,
-          "strategy": "merge"
-        }
-      },
       "type": [
         "object"
       ]
@@ -9636,23 +9314,6 @@
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "if": {
-        "properties": {
-          "_meta": {
-            "properties": {
-              "op": {
-                "const": "d"
-              }
-            },
-            "required": [
-              "op"
-            ]
-          }
-        },
-        "required": [
-          "_meta"
-        ]
-      },
       "properties": {
         "_meta": {
           "properties": {
@@ -10041,12 +9702,6 @@
       "required": [
         "id"
       ],
-      "then": {
-        "reduce": {
-          "delete": true,
-          "strategy": "merge"
-        }
-      },
       "type": [
         "object"
       ]
@@ -10066,23 +9721,6 @@
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "if": {
-        "properties": {
-          "_meta": {
-            "properties": {
-              "op": {
-                "const": "d"
-              }
-            },
-            "required": [
-              "op"
-            ]
-          }
-        },
-        "required": [
-          "_meta"
-        ]
-      },
       "properties": {
         "_meta": {
           "properties": {
@@ -10806,12 +10444,6 @@
       "required": [
         "id"
       ],
-      "then": {
-        "reduce": {
-          "delete": true,
-          "strategy": "merge"
-        }
-      },
       "type": [
         "object"
       ]
@@ -10831,23 +10463,6 @@
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "if": {
-        "properties": {
-          "_meta": {
-            "properties": {
-              "op": {
-                "const": "d"
-              }
-            },
-            "required": [
-              "op"
-            ]
-          }
-        },
-        "required": [
-          "_meta"
-        ]
-      },
       "properties": {
         "_meta": {
           "properties": {
@@ -11497,12 +11112,6 @@
       "required": [
         "id"
       ],
-      "then": {
-        "reduce": {
-          "delete": true,
-          "strategy": "merge"
-        }
-      },
       "type": [
         "object"
       ]
@@ -11522,23 +11131,6 @@
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema",
-      "if": {
-        "properties": {
-          "_meta": {
-            "properties": {
-              "op": {
-                "const": "d"
-              }
-            },
-            "required": [
-              "op"
-            ]
-          }
-        },
-        "required": [
-          "_meta"
-        ]
-      },
       "properties": {
         "_meta": {
           "properties": {
@@ -11603,12 +11195,6 @@
         "submittedAt",
         "formId"
       ],
-      "then": {
-        "reduce": {
-          "delete": true,
-          "strategy": "merge"
-        }
-      },
       "type": [
         "object"
       ]
@@ -11629,23 +11215,6 @@
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "if": {
-        "properties": {
-          "_meta": {
-            "properties": {
-              "op": {
-                "const": "d"
-              }
-            },
-            "required": [
-              "op"
-            ]
-          }
-        },
-        "required": [
-          "_meta"
-        ]
-      },
       "properties": {
         "_meta": {
           "properties": {
@@ -12268,12 +11837,6 @@
       "required": [
         "id"
       ],
-      "then": {
-        "reduce": {
-          "delete": true,
-          "strategy": "merge"
-        }
-      },
       "type": [
         "object"
       ]
@@ -12293,23 +11856,6 @@
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "if": {
-        "properties": {
-          "_meta": {
-            "properties": {
-              "op": {
-                "const": "d"
-              }
-            },
-            "required": [
-              "op"
-            ]
-          }
-        },
-        "required": [
-          "_meta"
-        ]
-      },
       "properties": {
         "_meta": {
           "properties": {
@@ -12402,12 +11948,6 @@
       "required": [
         "id"
       ],
-      "then": {
-        "reduce": {
-          "delete": true,
-          "strategy": "merge"
-        }
-      },
       "type": [
         "object"
       ]
@@ -12427,23 +11967,6 @@
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "if": {
-        "properties": {
-          "_meta": {
-            "properties": {
-              "op": {
-                "const": "d"
-              }
-            },
-            "required": [
-              "op"
-            ]
-          }
-        },
-        "required": [
-          "_meta"
-        ]
-      },
       "properties": {
         "_meta": {
           "properties": {
@@ -12817,12 +12340,6 @@
       "required": [
         "id"
       ],
-      "then": {
-        "reduce": {
-          "delete": true,
-          "strategy": "merge"
-        }
-      },
       "type": [
         "object"
       ]
@@ -12842,23 +12359,6 @@
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema",
-      "if": {
-        "properties": {
-          "_meta": {
-            "properties": {
-              "op": {
-                "const": "d"
-              }
-            },
-            "required": [
-              "op"
-            ]
-          }
-        },
-        "required": [
-          "_meta"
-        ]
-      },
       "properties": {
         "_meta": {
           "properties": {
@@ -14809,12 +14309,6 @@
         "property",
         "timestamp"
       ],
-      "then": {
-        "reduce": {
-          "delete": true,
-          "strategy": "merge"
-        }
-      },
       "type": [
         "object"
       ]
@@ -14832,23 +14326,6 @@
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "if": {
-        "properties": {
-          "_meta": {
-            "properties": {
-              "op": {
-                "const": "d"
-              }
-            },
-            "required": [
-              "op"
-            ]
-          }
-        },
-        "required": [
-          "_meta"
-        ]
-      },
       "properties": {
         "_meta": {
           "properties": {
@@ -14948,12 +14425,6 @@
         "timestamp",
         "recipient"
       ],
-      "then": {
-        "reduce": {
-          "delete": true,
-          "strategy": "merge"
-        }
-      },
       "type": [
         "object"
       ]
@@ -14974,23 +14445,6 @@
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "if": {
-        "properties": {
-          "_meta": {
-            "properties": {
-              "op": {
-                "const": "d"
-              }
-            },
-            "required": [
-              "op"
-            ]
-          }
-        },
-        "required": [
-          "_meta"
-        ]
-      },
       "properties": {
         "_meta": {
           "properties": {
@@ -15998,12 +15452,6 @@
       "required": [
         "id"
       ],
-      "then": {
-        "reduce": {
-          "delete": true,
-          "strategy": "merge"
-        }
-      },
       "type": [
         "object"
       ]
@@ -16023,23 +15471,6 @@
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "if": {
-        "properties": {
-          "_meta": {
-            "properties": {
-              "op": {
-                "const": "d"
-              }
-            },
-            "required": [
-              "op"
-            ]
-          }
-        },
-        "required": [
-          "_meta"
-        ]
-      },
       "properties": {
         "_meta": {
           "properties": {
@@ -16157,12 +15588,6 @@
       "required": [
         "id"
       ],
-      "then": {
-        "reduce": {
-          "delete": true,
-          "strategy": "merge"
-        }
-      },
       "type": [
         "object"
       ]
@@ -16182,23 +15607,6 @@
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "if": {
-        "properties": {
-          "_meta": {
-            "properties": {
-              "op": {
-                "const": "d"
-              }
-            },
-            "required": [
-              "op"
-            ]
-          }
-        },
-        "required": [
-          "_meta"
-        ]
-      },
       "properties": {
         "_meta": {
           "properties": {
@@ -16292,12 +15700,6 @@
       "required": [
         "id"
       ],
-      "then": {
-        "reduce": {
-          "delete": true,
-          "strategy": "merge"
-        }
-      },
       "type": [
         "object"
       ]
