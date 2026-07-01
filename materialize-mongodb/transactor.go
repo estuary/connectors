@@ -484,42 +484,66 @@ func storeDocument(rawJSON json.RawMessage, idValue string, deltaUpdates bool, k
 		return nil, fmt.Errorf("unmarshalling json doc: %w", err)
 	}
 
+	// Renaming runs before key restoration below so a key pointer can be
+	// redirected to wherever its value actually ends up living.
+	_, hadIDCollision := doc[idField]
+	if hadIDCollision {
+		// Preserve the original value of a collection field with a name
+		// that collides with the MongoDB _id field by materializing it
+		// with an alternate name.
+		doc[idFieldAlt] = doc[idField]
+		delete(doc, idField)
+	}
+
 	// Restoring exact integer keys only matters for standard updates, where the
 	// runtime re-derives a store's key from the loaded document body. Delta
 	// updates never load documents and let MongoDB mint a fresh _id, so it is
 	// skipped there to avoid needlessly flipping a key field's BSON type from
-	// double to long. Done before the _id rename below so a key located at /_id
-	// is corrected in place and then carried into _flow_id. Only int64 values are
-	// restored; strings and booleans already decode exactly. keyRestorations is
-	// pre-filtered (see driver.go) to only the key fields declared as
-	// JSON-schema integer, so non-integer key fields never enter this loop.
+	// double to long. Only int64 values are restored; strings and booleans
+	// already decode exactly. keyRestorations is pre-filtered (see driver.go)
+	// to only the key fields declared as JSON-schema integer, so non-integer
+	// key fields never enter this loop.
 	if !deltaUpdates {
 		for _, kr := range keyRestorations {
 			if kr.tupleIndex >= len(key) {
-				panic(fmt.Sprintf("store key tuple has %d elements but binding declares a key field at index %d", len(key), kr.tupleIndex))
+				return nil, fmt.Errorf("store key tuple has %d elements but binding declares a key field at index %d", len(key), kr.tupleIndex)
 			}
 			v, ok := key[kr.tupleIndex].(int64)
 			if !ok {
 				continue
 			}
+
+			// A key pointer of exactly /_id addresses the field the rename above
+			// just relocated to _flow_id; redirect there so the value lands where
+			// it now actually lives. A key pointer of exactly /_flow_id colliding
+			// with a renamed _id is irreconcilable: the document has both a
+			// literal _flow_id (the key) and a literal _id (an unrelated value
+			// the rename just pushed onto _flow_id), so there's no single
+			// location left to hold both — fail rather than let the rename
+			// silently clobber the key.
+			target := kr.tokens
+			if hadIDCollision && len(target) == 1 {
+				switch target[0] {
+				case idField:
+					target = []string{idFieldAlt}
+				case idFieldAlt:
+					return nil, fmt.Errorf("document has a field named %q which collides with the reserved name used to materialize its key %q", idField, idFieldAlt)
+				}
+			}
+
 			// Fast path for the overwhelmingly common case: a key at the
 			// document's root (a single pointer segment). This skips
 			// setAtPointer's generic tree walk, which is only needed when a
 			// key is nested under an object or array.
-			if len(kr.tokens) == 1 {
-				doc[kr.tokens[0]] = v
+			if len(target) == 1 {
+				doc[target[0]] = v
 				continue
 			}
-			setAtPointer(doc, kr.tokens, v)
-		}
-	}
 
-	if idVal, ok := doc[idField]; ok {
-		// Preserve the original value of a collection field with a name
-		// that collides with the MongoDB _id field by materializing it
-		// with an alternate name.
-		doc[idFieldAlt] = idVal
-		delete(doc, idField)
+			if !setAtPointer(doc, target, v) {
+				return nil, fmt.Errorf("key field at pointer %v could not be located in the document body", target)
+			}
+		}
 	}
 
 	// In case of delta updates, we don't want to set the _id. We want MongoDB to generate a new
@@ -625,6 +649,15 @@ func sanitizedLoadedDocument(doc map[string]interface{}) map[string]interface{} 
 	return sanitizeDocumentInner(doc)
 }
 
+// sanitizeDocumentInner recurses through a loaded document's values, converting
+// any BSON double NaN to the string "NaN" (json.Marshal rejects NaN outright).
+// The mongo-driver decodes nested BSON sub-documents and arrays into the named
+// types primitive.M and primitive.A respectively, never plain
+// map[string]interface{} or []interface{}, so both the named and plain forms
+// are matched here: a type switch only matches the exact dynamic type, and
+// named/unnamed forms of the same underlying type are distinct for that
+// purpose. The plain forms are kept so this is also callable with
+// hand-constructed maps/slices, e.g. from tests.
 func sanitizeDocumentInner(doc map[string]interface{}) map[string]interface{} {
 	for key, value := range doc {
 		switch v := value.(type) {
@@ -634,6 +667,12 @@ func sanitizeDocumentInner(doc map[string]interface{}) map[string]interface{} {
 			}
 		case map[string]interface{}:
 			doc[key] = sanitizeDocumentInner(v)
+		case primitive.M:
+			doc[key] = sanitizeDocumentInner(v)
+		case primitive.A:
+			doc[key] = sanitizeArrayInner(v)
+		case []interface{}:
+			doc[key] = sanitizeArrayInner(v)
 		}
 	}
 
