@@ -170,6 +170,17 @@ func datetimeToStringCast(migration sql.ColumnTypeMigration) string {
 }
 
 func toJsonCast(migration sql.ColumnTypeMigration) string {
+	// Object and array fields stored as text hold serialized JSON (e.g. after
+	// objects_and_arrays_as_json was disabled, or the historical string
+	// behavior), so PARSE_JSON restores their structure when migrating back to a
+	// JSON column. SAFE.PARSE_JSON maps the empty-string representation of a null
+	// object/array to NULL rather than erroring. Scalar values widened to JSON
+	// are wrapped as-is with TO_JSON.
+	if slices.ContainsFunc(migration.Inference.Types, func(t string) bool {
+		return t == "object" || t == "array"
+	}) {
+		return fmt.Sprintf(`SAFE.PARSE_JSON(%s)`, migration.Identifier)
+	}
 	return fmt.Sprintf(`TO_JSON(%s)`, migration.Identifier)
 }
 
