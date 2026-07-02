@@ -19,16 +19,22 @@ from .api import (
     fetch_campaigns,
     resolve_base_url,
     snapshot_automations,
+    snapshot_children,
+    snapshot_interests,
     snapshot_lists,
+    snapshot_segment_members,
 )
 from .models import (
     OAUTH2_SPEC,
     SCHEDULED_BACKFILL_STREAMS,
+    SNAPSHOT_CHILD_STREAMS,
     Automation,
     Campaign,
     EndpointConfig,
+    Interest,
     MailchimpEntity,
     MailchimpList,
+    SegmentMember,
 )
 
 DEFAULT_SCHEDULE = "0 0 * * *"
@@ -73,6 +79,16 @@ def snapshot_resources(http: HTTPMixin, base_url: str) -> list[MailchimpResource
     snapshot_fetchers = {
         MailchimpList.NAME: functools.partial(snapshot_lists, http, base_url),
         Automation.NAME: functools.partial(snapshot_automations, http, base_url),
+        Interest.NAME: functools.partial(snapshot_interests, http, base_url),
+        SegmentMember.NAME: functools.partial(
+            snapshot_segment_members, http, base_url
+        ),
+        **{
+            spec.model.NAME: functools.partial(
+                snapshot_children, spec, http, base_url
+            )
+            for spec in SNAPSHOT_CHILD_STREAMS
+        },
     }
 
     def open(
@@ -99,7 +115,12 @@ def snapshot_resources(http: HTTPMixin, base_url: str) -> list[MailchimpResource
                 name=model.NAME, interval=timedelta(hours=1)
             ),
         )
-        for model in SNAPSHOT_RESOURCES
+        for model in [
+            *SNAPSHOT_RESOURCES,
+            Interest,
+            SegmentMember,
+            *(spec.model for spec in SNAPSHOT_CHILD_STREAMS),
+        ]
     ]
 
 

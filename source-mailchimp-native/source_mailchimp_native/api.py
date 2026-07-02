@@ -5,15 +5,23 @@ from logging import Logger
 from estuary_cdk.capture.common import LogCursor, PageCursor
 from estuary_cdk.http import HTTPSession
 from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
+from pydantic import BaseModel
 
 from .models import (
     ApiKey,
     Automation,
     Campaign,
-    CollectionMeta,
-    MailchimpEntity,
+    ChildSpec,
+    IdOnly,
+    Interest,
+    InterestCategory,
+    MailchimpChildEntity,
     MailchimpList,
     OAuthMetadata,
+    ParentContext,
+    ParentId,
+    ParentIdValidationContext,
+    SegmentMember,
 )
 
 # Mailchimp's base URL is data-center-dependent. The `{dc}` placeholder (e.g. "us6")
@@ -52,58 +60,70 @@ async def resolve_base_url(log: Logger, http: HTTPSession, credentials: object) 
 MAX_PAGE_SIZE = 1000
 
 
-async def _fetch_collection_page[T: MailchimpEntity](
+async def _fetch_collection_page[T: BaseModel](
     http: HTTPSession,
     base_url: str,
+    path: str,
+    items_key: str,
     model: type[T],
     params: dict[str, str | int],
     log: Logger,
-) -> AsyncGenerator[T | CollectionMeta, None]:
-    """Stream one page of `model`'s collection endpoint, yielding each item
-    and then the envelope remainder (whose `total_items` drives pagination)."""
-    _, body = await http.request_stream(log, f"{base_url}/{model.PATH}", params=params)
+    validation_context: object | None = None,
+) -> AsyncGenerator[T, None]:
+    """Stream one page of the collection endpoint at `path`, yielding each
+    item. Iterating to completion drains the whole response — the envelope
+    tail past the items array is read and discarded — so callers detect the
+    last page by its item count, not by anything in the envelope."""
+    _, body = await http.request_stream(log, f"{base_url}/{path}", params=params)
     processor = IncrementalJsonProcessor(
         body(),
-        f"{model.ITEMS_KEY}.item",
+        f"{items_key}.item",
         model,
-        remainder_cls=CollectionMeta,
+        validation_context=validation_context,
     )
 
     async for item in processor:
         yield item
 
-    yield processor.get_remainder()
 
-
-async def _snapshot_collection[T: MailchimpEntity](
+async def _snapshot_collection[T: BaseModel](
     http: HTTPSession,
     base_url: str,
+    path: str,
+    items_key: str,
     model: type[T],
     log: Logger,
+    params: dict[str, str | int] | None = None,
+    validation_context: object | None = None,
 ) -> AsyncGenerator[T, None]:
-    """Page a top-level collection to exhaustion (snapshot streams)."""
+    """Page a collection to exhaustion (snapshot streams).
+
+    Completion is the short-page signal: a page smaller than the requested
+    `count` (including an empty one) is the last page. This holds regardless
+    of whether the endpoint caps `count` below our request or reports a
+    `total_items` that disagrees with the rows actually returned, so it's the
+    one rule that works across every Mailchimp collection."""
     offset = 0
 
     while True:
         count = 0
-        total_items = 0
         page = _fetch_collection_page(
             http,
             base_url,
+            path,
+            items_key,
             model,
-            {"count": MAX_PAGE_SIZE, "offset": offset},
+            {"count": MAX_PAGE_SIZE, "offset": offset, **(params or {})},
             log,
+            validation_context,
         )
 
         async for item in page:
-            if isinstance(item, CollectionMeta):
-                total_items = item.total_items
-                continue
             yield item
             count += 1
 
         offset += count
-        if count == 0 or offset >= total_items:
+        if count < MAX_PAGE_SIZE:
             return
 
 
@@ -112,7 +132,9 @@ async def snapshot_lists(
     base_url: str,
     log: Logger,
 ) -> AsyncGenerator[MailchimpList, None]:
-    async for doc in _snapshot_collection(http, base_url, MailchimpList, log):
+    async for doc in _snapshot_collection(
+        http, base_url, MailchimpList.PATH, MailchimpList.ITEMS_KEY, MailchimpList, log
+    ):
         yield doc
 
 
@@ -121,8 +143,148 @@ async def snapshot_automations(
     base_url: str,
     log: Logger,
 ) -> AsyncGenerator[Automation, None]:
-    async for doc in _snapshot_collection(http, base_url, Automation, log):
+    async for doc in _snapshot_collection(
+        http, base_url, Automation.PATH, Automation.ITEMS_KEY, Automation, log
+    ):
         yield doc
+
+
+async def snapshot_interests(
+    http: HTTPSession,
+    base_url: str,
+    log: Logger,
+) -> AsyncGenerator[Interest, None]:
+    """Snapshot interests, walking lists -> interest-categories -> interests.
+    Each interest carries its own list_id/category_id, so nothing is injected."""
+    for list_id in await _fetch_parent_ids(
+        http, base_url, MailchimpList.PATH, MailchimpList.ITEMS_KEY, log
+    ):
+        categories_path = InterestCategory.PATH_TEMPLATE.format(list_id=list_id)
+        for category_id in await _fetch_parent_ids(
+            http, base_url, categories_path, InterestCategory.ITEMS_KEY, log
+        ):
+            async for doc in _snapshot_collection(
+                http,
+                base_url,
+                Interest.PATH_TEMPLATE.format(
+                    list_id=list_id, category_id=category_id
+                ),
+                Interest.ITEMS_KEY,
+                Interest,
+                log,
+            ):
+                yield doc
+
+
+# Cleaned/transactional/unsubscribed members are excluded by default; capture
+# full membership and let `status` drive downstream filtering.
+_SEGMENT_MEMBER_PARAMS: dict[str, str | int] = {
+    "include_cleaned": "true",
+    "include_transactional": "true",
+    "include_unsubscribed": "true",
+}
+
+
+async def snapshot_segment_members(
+    http: HTTPSession,
+    base_url: str,
+    log: Logger,
+) -> AsyncGenerator[SegmentMember, None]:
+    """Snapshot segment members, walking lists -> segments -> members. The
+    member response omits segment_id, so it is stamped into _meta."""
+    for list_id in await _fetch_parent_ids(
+        http, base_url, MailchimpList.PATH, MailchimpList.ITEMS_KEY, log
+    ):
+        segments_path = f"lists/{list_id}/segments"
+        for segment_id in await _fetch_parent_ids(
+            http, base_url, segments_path, "segments", log
+        ):
+            async for doc in _snapshot_collection(
+                http,
+                base_url,
+                SegmentMember.PATH_TEMPLATE.format(
+                    list_id=list_id, segment_id=segment_id
+                ),
+                SegmentMember.ITEMS_KEY,
+                SegmentMember,
+                log,
+                params=_SEGMENT_MEMBER_PARAMS,
+                validation_context=ParentIdValidationContext({"segment_id": segment_id}),
+            ):
+                yield doc
+
+
+async def _fetch_parent_ids(
+    http: HTTPSession,
+    base_url: str,
+    path: str,
+    items_key: str,
+    log: Logger,
+) -> list[ParentId]:
+    """Drain a parent collection into bare IDs before any child request is
+    made, projecting the response down to `fields=<items_key>.id`
+    (live-verified honored on top-level and nested paths alike). `IdOnly`
+    rejects an empty ID, so a malformed child path can never be templated."""
+    return [
+        item.id
+        async for item in _snapshot_collection(
+            http,
+            base_url,
+            path,
+            items_key,
+            IdOnly,
+            log,
+            params={"fields": f"{items_key}.id"},
+        )
+    ]
+
+
+async def _resolve_leaf_contexts(
+    spec: ChildSpec,
+    http: HTTPSession,
+    base_url: str,
+    log: Logger,
+) -> list[ParentContext]:
+    """Drain the parent collection into one binding per parent ID — each a
+    context that fills the `{placeholder}` in the child's `PATH_TEMPLATE`.
+
+    `_fetch_parent_ids` fully materializes the parent list before any child is
+    fetched, so no response is held open across the child requests."""
+
+    parent = spec.parent
+    parent_ids = await _fetch_parent_ids(
+        http, base_url, parent.path_template, parent.items_key, log
+    )
+    return [{parent.id_field: parent_id} for parent_id in parent_ids]
+
+
+async def snapshot_children(
+    spec: ChildSpec,
+    http: HTTPSession,
+    base_url: str,
+    log: Logger,
+) -> AsyncGenerator[MailchimpChildEntity, None]:
+    """Snapshot one child stream: resolve the parent-ID fan-out into
+    fully-bound contexts, then page the leaf collection under each."""
+    for ctx_to_snapshot in await _resolve_leaf_contexts(spec, http, base_url, log):
+        # The context is exactly `{parent.id_field: parent_id}`, so injecting the
+        # parent ID means stamping that single binding into `_meta`.
+        validation_context = (
+            ParentIdValidationContext(ctx_to_snapshot)
+            if spec.inject_parent_id
+            else None
+        )
+
+        async for doc in _snapshot_collection(
+            http,
+            base_url,
+            spec.model.PATH_TEMPLATE.format(**ctx_to_snapshot),
+            spec.model.ITEMS_KEY,
+            spec.model,
+            log,
+            validation_context=validation_context,
+        ):
+            yield doc
 
 
 def _campaign_params(offset: int, since: datetime) -> dict[str, str | int]:
@@ -149,20 +311,17 @@ async def fetch_campaigns(
 
     while True:
         count = 0
-        total_items = 0
         page = _fetch_collection_page(
             http,
             base_url,
+            Campaign.PATH,
+            Campaign.ITEMS_KEY,
             Campaign,
             _campaign_params(offset, log_cursor),
             log,
         )
 
         async for item in page:
-            if isinstance(item, CollectionMeta):
-                total_items = item.total_items
-                continue
-
             count += 1
             # Suppressing docs at-or-before the cursor makes `since_*`
             # boundary inclusivity irrelevant.
@@ -175,7 +334,7 @@ async def fetch_campaigns(
                 last_seen = item.create_time
 
         offset += count
-        if count == 0 or offset >= total_items:
+        if count < MAX_PAGE_SIZE:
             break
 
     if emitted:
@@ -200,15 +359,14 @@ async def backfill_campaigns(
     params["before_create_time"] = cutoff.isoformat()
 
     count = 0
-    total_items = 0
-    page_gen = _fetch_collection_page(http, base_url, Campaign, params, log)
+    page_gen = _fetch_collection_page(
+        http, base_url, Campaign.PATH, Campaign.ITEMS_KEY, Campaign, params, log
+    )
 
     async for item in page_gen:
-        if isinstance(item, CollectionMeta):
-            total_items = item.total_items
-            continue
         yield item
         count += 1
 
-    if count > 0 and offset + count < total_items:
+    # A full page means there may be more; a short page is the last one.
+    if count == MAX_PAGE_SIZE:
         yield offset + count
