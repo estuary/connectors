@@ -38,5 +38,17 @@ func TestIntegration(t *testing.T) {
 	t.Run("migrate", func(t *testing.T) {
 		sql.RunMigrationTest(t, newBigQueryDriver(), "testdata/migrate.flow.yaml", makeResourceFn, nil)
 	})
+
+	// Toggling objects_and_arrays_as_json migrates the object column and the
+	// flow_document column between JSON and STRING in place. This exercises the
+	// root document JSON<->text migration end-to-end, the scenario that requires
+	// the root document to be migratable (rather than needing a backfill).
+	t.Run("flow_document-migration", func(t *testing.T) {
+		sql.RunFeatureFlagMigrationTest(t, newBigQueryDriver(), "testdata/migrate-doc.flow.yaml", makeResourceFn, []sql.FeatureFlagMigrationPhase{
+			{FeatureFlags: "objects_and_arrays_as_json", Fixture: "testdata/fixture.doc-migrate.json"},    // materialize as JSON
+			{FeatureFlags: "no_objects_and_arrays_as_json", Fixture: "testdata/fixture.doc-migrate.json"}, // migrate JSON -> STRING
+			{FeatureFlags: "objects_and_arrays_as_json", Fixture: "testdata/fixture.doc-migrate.json"},    // migrate STRING -> JSON
+		}, actionDescSanitizers)
+	})
 }
 

@@ -1,0 +1,34 @@
+# Fixture for the flow_document JSON<->TEXT migration test. A minimal collection
+# with an object field and the root document, materialized so that toggling
+# objects_and_arrays_as_json migrates both the `obj` column and flow_document
+# between JSON and STRING in place.
+collections:
+  key/value:
+    schema:
+      type: object
+      properties:
+        id: { type: integer }
+        obj:
+          type: object
+          properties:
+            nested: { type: string }
+      required: [id]
+    key: [/id]
+
+materializations:
+  acmeCo/tests/materialize-bigquery:
+    endpoint:
+      local:
+        command: ["go", "run", "."]
+        protobuf: true
+        config: config.yaml
+    bindings:
+    - resource:
+        table: doc_migrate
+      source: key/value
+      fields:
+        recommended: true
+        include:
+          # Force the object field to be materialized so the JSON<->TEXT
+          # migration is exercised on a value column as well as flow_document.
+          obj: {}
