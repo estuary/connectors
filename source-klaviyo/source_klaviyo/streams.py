@@ -23,6 +23,14 @@ from .exceptions import KlaviyoBackoffError
 # we only ask for data that older than LAG minutes in the `events` stream.
 LAG = 110
 
+
+def _normalize_rfc3339(value: Any) -> Any:
+    # Klaviyo emits consent timestamps space-separated (e.g. "2026-06-23 00:15:23+00:00"),
+    # but the `format: date-time` contract requires the RFC3339 "T" separator.
+    if isinstance(value, str) and " " in value:
+        return value.replace(" ", "T")
+    return value
+
 class KlaviyoStream(HttpStream, ABC):
     """Base stream for api version v2023-10-15"""
 
@@ -330,6 +338,31 @@ class Profiles(IncrementalKlaviyoStream):
         params = super().request_params(stream_state=stream_state, stream_slice=stream_slice, next_page_token=next_page_token)
         params.update({"additional-fields[profile]": "predictive_analytics,subscriptions"})
         return params
+
+    def map_record(self, record: MutableMapping[str, Any]) -> MutableMapping[str, Any]:
+        record = super().map_record(record)
+
+        # Klaviyo returns the documented consent timestamps space-separated rather than
+        # RFC3339. We only normalize these known fields: `attributes/properties` is a
+        # free-form custom-property object, so we can't generically tell which arbitrary
+        # props are timestamps.
+        attributes = record.get("attributes") or {}
+
+        properties = attributes.get("properties")
+        if isinstance(properties, dict) and "$consent_timestamp" in properties:
+            properties["$consent_timestamp"] = _normalize_rfc3339(properties["$consent_timestamp"])
+
+        subscriptions = attributes.get("subscriptions") or {}
+        for channel_path in (("email", "marketing"), ("sms", "marketing"), ("sms", "transactional")):
+            node = subscriptions
+            for key in channel_path:
+                node = node.get(key) if isinstance(node, dict) else None
+                if node is None:
+                    break
+            if isinstance(node, dict) and "consent_timestamp" in node:
+                node["consent_timestamp"] = _normalize_rfc3339(node["consent_timestamp"])
+
+        return record
 
 
 class Campaigns(ArchivedRecordsMixin, IncrementalKlaviyoStream):
