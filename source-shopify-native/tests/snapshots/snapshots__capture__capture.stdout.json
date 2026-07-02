@@ -82,6 +82,19 @@
             "id": "gid://shopify/Publication/148054310957",
             "name": "Online Store"
           }
+        },
+        {
+          "__parentId": "gid://shopify/Product/8086707830829",
+          "isPublished": true,
+          "publication": {
+            "catalog": {
+              "id": "gid://shopify/AppCatalog/105343287341",
+              "status": "ACTIVE",
+              "title": "Channel Catalog 204831391789 for Microsoft Copilot"
+            },
+            "id": "gid://shopify/Publication/204831391789",
+            "name": "Microsoft Copilot"
+          }
         }
       ],
       "seo": {
@@ -6563,6 +6576,14 @@
             "name": "Point of Sale"
           },
           "publishDate": "2025-01-14T15:09:43Z"
+        },
+        {
+          "__parentId": "gid://shopify/Collection/295442513965",
+          "publication": {
+            "id": "gid://shopify/Publication/204831391789",
+            "name": "Microsoft Copilot"
+          },
+          "publishDate": "2026-06-26T04:37:46Z"
         }
       ],
       "sortOrder": "BEST_SELLING",
@@ -6637,6 +6658,14 @@
             "name": "Online Store"
           },
           "publishDate": "2025-01-14T15:10:14Z"
+        },
+        {
+          "__parentId": "gid://shopify/Collection/295442612269",
+          "publication": {
+            "id": "gid://shopify/Publication/204831391789",
+            "name": "Microsoft Copilot"
+          },
+          "publishDate": "2026-06-26T04:37:46Z"
         }
       ],
       "sortOrder": "BEST_SELLING",
