@@ -410,8 +410,13 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		if len(batch) == 0 || lastBinding < 0 {
 			return nil
 		}
-		chBatch, err := t.load.conn.PrepareBatch(ctx, t.bindings[lastBinding].load.insertSQL)
-		if err != nil {
+		// PrepareBatch fails before any rows have been sent, so retrying a
+		// transient connection drop is a clean no-op on the ClickHouse side.
+		var chBatch chdriver.Batch
+		if err := transientRetryPolicy.retry(ctx, "preparing load batch", isTransientErr, func() (err error) {
+			chBatch, err = t.load.conn.PrepareBatch(ctx, t.bindings[lastBinding].load.insertSQL)
+			return err
+		}); err != nil {
 			return fmt.Errorf("preparing load batch: %w", err)
 		}
 		defer chBatch.Close()
@@ -502,30 +507,42 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 	// Keys are now ready to be JOIN'd between the temporary and target tables.
 	loadBinding := func(i int, b *binding) error {
-		rows, err := t.load.conn.Query(ctx, b.load.querySQL)
-		if err != nil {
-			return fmt.Errorf("querying Load documents for %s: %w", b.target.Identifier, err)
-		}
-		defer rows.Close()
-
-		for rows.Next() {
-			var doc json.RawMessage
-			if err = rows.Scan(&doc); err != nil {
-				return fmt.Errorf("scanning Load document for %s: %w", b.target.Identifier, err)
-			}
-			if len(b.nullFieldsToStrip) > 0 {
-				if doc, err = sql.StripNullFields(doc, b.nullFieldsToStrip); err != nil {
-					return fmt.Errorf("stripping null fields: %w", err)
+		// Documents already delivered via loaded() cannot be recalled, so the
+		// query may only be retried while nothing has been emitted: re-running
+		// it afterwards would deliver duplicates, which the runtime would
+		// reduce together (double-counting under sum-style reductions). The
+		// transient failures seen in practice ("failed to read first block
+		// packet") surface from Query itself, before any rows are delivered.
+		var emitted bool
+		return transientRetryPolicy.retry(ctx, "querying Load documents",
+			func(err error) bool { return !emitted && isTransientErr(err) },
+			func() error {
+				rows, err := t.load.conn.Query(ctx, b.load.querySQL)
+				if err != nil {
+					return fmt.Errorf("querying Load documents for %s: %w", b.target.Identifier, err)
 				}
-			}
-			if err = loaded(i, doc); err != nil {
-				return err
-			}
-		}
-		if err = rows.Err(); err != nil {
-			return fmt.Errorf("querying Load documents for %s: %w", b.target.Identifier, err)
-		}
-		return nil
+				defer rows.Close()
+
+				for rows.Next() {
+					var doc json.RawMessage
+					if err = rows.Scan(&doc); err != nil {
+						return fmt.Errorf("scanning Load document for %s: %w", b.target.Identifier, err)
+					}
+					if len(b.nullFieldsToStrip) > 0 {
+						if doc, err = sql.StripNullFields(doc, b.nullFieldsToStrip); err != nil {
+							return fmt.Errorf("stripping null fields: %w", err)
+						}
+					}
+					emitted = true
+					if err = loaded(i, doc); err != nil {
+						return err
+					}
+				}
+				if err = rows.Err(); err != nil {
+					return fmt.Errorf("querying Load documents for %s: %w", b.target.Identifier, err)
+				}
+				return nil
+			})
 	}
 
 	for i := range activeBindings {
@@ -548,8 +565,13 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		if len(batch) == 0 || lastBinding < 0 {
 			return nil
 		}
-		chBatch, err := t.store.conn.PrepareBatch(ctx, t.bindings[lastBinding].store.insertSQL)
-		if err != nil {
+		// As with the load batch, PrepareBatch fails before any rows have been
+		// sent and is safe to retry.
+		var chBatch chdriver.Batch
+		if err := transientRetryPolicy.retry(ctx, "preparing store batch", isTransientErr, func() (err error) {
+			chBatch, err = t.store.conn.PrepareBatch(ctx, t.bindings[lastBinding].store.insertSQL)
+			return err
+		}); err != nil {
 			return fmt.Errorf("preparing store batch: %w", err)
 		}
 		defer chBatch.Close()
@@ -766,7 +788,14 @@ func (t *transactor) moveStorePartitionsToTarget(ctx context.Context, b *binding
 	}
 
 	for _, partitionID := range partitionIDs {
-		if err = t.store.conn.Exec(ctx, b.store.movePartitionSQL, partitionID); err != nil {
+		// Retrying MOVE PARTITION after a transient connection drop is safe
+		// even if the server had already applied it: moving a partition with
+		// no remaining parts is a no-op, and the row accounting above plus the
+		// empty-stage check below still catch any genuinely stuck or partial
+		// move as a hard error.
+		if err = transientRetryPolicy.retry(ctx, "moving store table partition", isTransientErr, func() error {
+			return t.store.conn.Exec(ctx, b.store.movePartitionSQL, partitionID)
+		}); err != nil {
 			// Never truncate or drop here: unmoved staged rows must survive
 			// for a retry (or operator intervention, e.g. if the stage table
 			// schema has drifted from a target migrated while this commit was
