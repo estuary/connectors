@@ -48,13 +48,13 @@ const (
 )
 
 var SingleStoreClampDatetime sql.ElementConverter = sql.StringCastConverter(func(str string) (interface{}, error) {
-	str = strings.Replace(str, "z", "Z", 1)
-	if parsed, err := time.Parse(time.RFC3339Nano, str); err != nil {
+	parsed, canonical, err := sql.ParseRFC3339Nano(str)
+	if err != nil {
 		return nil, err
 	} else if parsed.Year() < 1000 {
 		return singleStoreMinimumTimestamp, nil
 	}
-	return str, nil
+	return canonical, nil
 })
 
 var SingleStoreClampDate sql.ElementConverter = sql.StringCastConverter(func(str string) (interface{}, error) {
@@ -264,7 +264,7 @@ func prepareDatetimeToStringCast(loc *time.Location) sql.CastSQLFunc {
 
 func rfc3339ToTZ(loc *time.Location, clamp bool) sql.ElementConverter {
 	return sql.StringCastConverter(func(str string) (interface{}, error) {
-		var date = strings.Replace(str, "z", "Z", 1)
+		var date = str
 		if clamp {
 			if clamped, err := SingleStoreClampDatetime(str); err != nil {
 				return nil, err
@@ -277,8 +277,8 @@ func rfc3339ToTZ(loc *time.Location, clamp bool) sql.ElementConverter {
 			return nil, fmt.Errorf("no timezone has been specified either in server or in connector configuration, cannot materialize date-time field. Consider setting a timezone in your database or in the connector configuration to continue")
 		}
 
-		if t, err := time.Parse(time.RFC3339Nano, date); err != nil {
-			return nil, fmt.Errorf("could not parse %q as RFC3339 date-time: %w", date, err)
+		if t, _, err := sql.ParseRFC3339Nano(date); err != nil {
+			return nil, err
 		} else {
 			return t.In(loc).Format("2006-01-02 15:04:05.999999"), nil
 		}

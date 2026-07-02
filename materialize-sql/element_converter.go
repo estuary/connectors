@@ -166,22 +166,53 @@ const (
 	minimumDate      = "0001-01-01"
 )
 
-// NormalizeDatetimeString replaces a lowercase trailing "z" with uppercase "Z" to ensure
-// RFC3339 compliance.
+// flexibleTimestampLayouts are the near-RFC3339 variants accepted in addition to RFC3339Nano.
+// Flow's schema inference can tag a field as `format: date-time` based on some values while
+// other values in the same field use these variants, so rejecting them crash-loops
+// otherwise-healthy shards. Only variants that fully specify the instant are accepted: a
+// timestamp without a timezone offset may be local time, and assuming a zone for it would
+// silently shift the data.
+var flexibleTimestampLayouts = []string{
+	"2006-01-02 15:04:05.999999999Z07:00",
+}
+
+// ParseRFC3339Nano parses str as RFC3339 or a near-RFC3339 variant, returning the parsed
+// time and its canonical RFC3339 rendering. Inputs that are already valid RFC3339 are returned
+// byte-identical (after repairing a lowercase "z"); only fallback layouts are reformatted.
+func ParseRFC3339Nano(str string) (time.Time, string, error) {
+	str = strings.Replace(str, "z", "Z", 1)
+	if parsed, err := time.Parse(time.RFC3339Nano, str); err == nil {
+		return parsed, str, nil
+	}
+	for _, layout := range flexibleTimestampLayouts {
+		if parsed, err := time.Parse(layout, str); err == nil {
+			return parsed, parsed.Format(time.RFC3339Nano), nil
+		}
+	}
+	return time.Time{}, "", fmt.Errorf("could not parse %q as RFC3339 date-time", str)
+}
+
+// NormalizeDatetimeString rewrites near-RFC3339 datetimes (lowercase "z", space separator)
+// to canonical RFC3339. Values it cannot parse are passed through unmodified,
+// since this converter has always been a pass-through and endpoints may accept formats it does
+// not recognize.
 var NormalizeDatetimeString ElementConverter = StringCastConverter(func(str string) (interface{}, error) {
+	if _, canonical, err := ParseRFC3339Nano(str); err == nil {
+		return canonical, nil
+	}
 	return strings.Replace(str, "z", "Z", 1), nil
 })
 
 // ClampDatetime provides handling for endpoints that do not accept "0000" as a year by replacing
 // these datetimes with minimumTimestamp.
 var ClampDatetime ElementConverter = StringCastConverter(func(str string) (interface{}, error) {
-	str = strings.Replace(str, "z", "Z", 1)
-	if parsed, err := time.Parse(time.RFC3339Nano, str); err != nil {
+	parsed, canonical, err := ParseRFC3339Nano(str)
+	if err != nil {
 		return nil, err
 	} else if parsed.Year() == 0 {
 		return minimumTimestamp, nil
 	}
-	return str, nil
+	return canonical, nil
 })
 
 // ClampDate is like ClampDatetime but just for dates.

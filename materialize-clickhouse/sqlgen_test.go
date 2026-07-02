@@ -5,9 +5,11 @@ import (
 	"strings"
 	"testing"
 	"text/template"
+	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
 	sql "github.com/estuary/connectors/materialize-sql"
+	"github.com/stretchr/testify/require"
 )
 
 var testDialect = clickHouseDialect("test_db")
@@ -156,4 +158,82 @@ func TestSQLGenerationQuotedTableNames(t *testing.T) {
 	}
 
 	cupaloy.SnapshotT(t, snap.String())
+}
+
+func TestClickHouseClampDatetime(t *testing.T) {
+	for _, tt := range []struct {
+		input   string
+		want    time.Time
+		wantErr bool
+	}{
+		{
+			input: "2023-08-29T16:17:18Z",
+			want:  time.Date(2023, 8, 29, 16, 17, 18, 0, time.UTC),
+		},
+		{
+			input: "2025-11-29 01:05:28+00:00",
+			want:  time.Date(2025, 11, 29, 1, 5, 28, 0, time.UTC),
+		},
+		{
+			input: "2026-06-23 00:15:23.918411+00:00",
+			want:  time.Date(2026, 6, 23, 0, 15, 23, 918411000, time.UTC),
+		},
+		{
+			input: "1900-01-01 00:00:00Z",
+			want:  time.Date(1925, 1, 1, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			input:   "not a timestamp",
+			wantErr: true,
+		},
+		{
+			input:   "2025-11-29 01:05:28",
+			wantErr: true,
+		},
+	} {
+		t.Run(tt.input, func(t *testing.T) {
+			got, err := clickHouseClampDatetime(tt.input)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.True(t, tt.want.Equal(got.(time.Time)))
+		})
+	}
+}
+
+func TestClickHouseClampDate(t *testing.T) {
+	for _, tt := range []struct {
+		input   string
+		want    time.Time
+		wantErr bool
+	}{
+		{
+			input: "2023-08-29",
+			want:  time.Date(2023, 8, 29, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			input: "1899-12-31",
+			want:  time.Date(1900, 1, 1, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			input:   "not a date",
+			wantErr: true,
+		},
+		{
+			input:   "2025-11-29 01:05:28+00:00",
+			wantErr: true,
+		},
+	} {
+		t.Run(tt.input, func(t *testing.T) {
+			got, err := clickHouseClampDate(tt.input)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.True(t, tt.want.Equal(got.(time.Time)))
+		})
+	}
 }

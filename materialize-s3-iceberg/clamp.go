@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
-	"strings"
 	"time"
 
+	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 )
 
@@ -32,9 +32,9 @@ func clampTimestamp(v tuple.TupleElement) (any, error) {
 		return v, nil
 	}
 
-	t, err := time.Parse(time.RFC3339Nano, strings.Replace(s, "z", "Z", 1))
+	t, canonical, err := sql.ParseRFC3339Nano(s)
 	if err != nil {
-		return nil, fmt.Errorf("could not parse %q as RFC3339 timestamp: %w", s, err)
+		return nil, err
 	}
 	// UTC year is what reaches pyarrow: "9999-12-31T23:59:59-14:00" looks
 	// like 9999 locally but materializes as 10000 in UTC.
@@ -44,7 +44,7 @@ func clampTimestamp(v tuple.TupleElement) (any, error) {
 	case year < pyMinYear:
 		return time.Date(pyMinYear, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339Nano), nil
 	}
-	return s, nil
+	return canonical, nil
 }
 
 // clampDate also rescues > 4-digit years, which time.Parse(time.DateOnly, ...)

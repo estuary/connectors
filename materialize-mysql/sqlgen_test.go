@@ -75,6 +75,89 @@ func TestDateTimeColumn(t *testing.T) {
 	parsed, err := mapped.Converter("2022-04-04T10:09:08.234567Z")
 	require.Equal(t, "2022-04-04 10:09:08.234567", parsed)
 	require.NoError(t, err)
+
+	// Near-RFC3339 variant: space separator instead of "T".
+	parsed, err = mapped.Converter("2022-04-04 10:09:08.234567+00:00")
+	require.Equal(t, "2022-04-04 10:09:08.234567", parsed)
+	require.NoError(t, err)
+
+	// A timestamp without a timezone offset may be local time and is rejected.
+	_, err = mapped.Converter("2022-04-04 10:09:08")
+	require.Error(t, err)
+}
+
+func TestSingleStoreClampDatetime(t *testing.T) {
+	for _, tt := range []struct {
+		input   string
+		want    string
+		wantErr bool
+	}{
+		{
+			input: "2023-08-29T16:17:18Z",
+			want:  "2023-08-29T16:17:18Z",
+		},
+		{
+			input: "2025-11-29 01:05:28+00:00",
+			want:  "2025-11-29T01:05:28Z",
+		},
+		{
+			input: "0999-12-31 23:59:59Z",
+			want:  singleStoreMinimumTimestamp,
+		},
+		{
+			input:   "not a timestamp",
+			wantErr: true,
+		},
+		{
+			input:   "2025-11-29 01:05:28",
+			wantErr: true,
+		},
+	} {
+		t.Run(tt.input, func(t *testing.T) {
+			got, err := SingleStoreClampDatetime(tt.input)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestSingleStoreClampDate(t *testing.T) {
+	for _, tt := range []struct {
+		input   string
+		want    string
+		wantErr bool
+	}{
+		{
+			input: "2023-08-29",
+			want:  "2023-08-29",
+		},
+		{
+			input: "0999-12-31",
+			want:  singleStoreMinimumDate,
+		},
+		{
+			input:   "not a date",
+			wantErr: true,
+		},
+		{
+			input:   "2025-11-29 01:05:28+00:00",
+			wantErr: true,
+		},
+	} {
+		t.Run(tt.input, func(t *testing.T) {
+			got, err := SingleStoreClampDate(tt.input)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
+		})
+	}
 }
 
 func TestDateTimePKColumn(t *testing.T) {
