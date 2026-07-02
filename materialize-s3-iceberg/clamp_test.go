@@ -38,6 +38,16 @@ func TestClampTimestamp(t *testing.T) {
 			input: "2025-06-15T12:00:00Z",
 			want:  "2025-06-15T12:00:00Z",
 		},
+		{
+			name:  "space separator normalizes to RFC3339",
+			input: "2025-11-29 01:05:28+00:00",
+			want:  "2025-11-29T01:05:28Z",
+		},
+		{
+			name:  "missing offset assumed UTC",
+			input: "2025-11-29 01:05:28",
+			want:  "2025-11-29T01:05:28Z",
+		},
 	}
 
 	for _, tt := range tests {
@@ -84,6 +94,11 @@ func TestClampDate(t *testing.T) {
 			name:  "in-range value passes through unchanged",
 			input: "2025-06-15",
 			want:  "2025-06-15",
+		},
+		{
+			name:    "timestamp in a date column returns error",
+			input:   "2025-11-29 01:05:28+00:00",
+			wantErr: true,
 		},
 	}
 

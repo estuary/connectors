@@ -98,8 +98,9 @@ func TestStdStrToInt(t *testing.T) {
 
 func TestClampDatetime(t *testing.T) {
 	for _, tt := range []struct {
-		input string
-		want  string
+		input   string
+		want    string
+		wantErr bool
 	}{
 		{
 			input: "0000-01-01T00:00:00Z",
@@ -121,9 +122,110 @@ func TestClampDatetime(t *testing.T) {
 			input: "2023-08-29T16:17:18Z",
 			want:  "2023-08-29T16:17:18Z",
 		},
+		// Already-valid RFC3339 values must pass through byte-identical.
+		{
+			input: "2023-08-29T16:17:18.123456789+05:00",
+			want:  "2023-08-29T16:17:18.123456789+05:00",
+		},
+		{
+			input: "2023-08-29T16:17:18z",
+			want:  "2023-08-29T16:17:18Z",
+		},
+		// Near-RFC3339 variants (see issue #4725): space separator instead of
+		// "T", and/or a missing offset (assumed UTC). All normalize to
+		// canonical RFC3339.
+		{
+			input: "2025-11-29 01:05:28+00:00",
+			want:  "2025-11-29T01:05:28Z",
+		},
+		{
+			input: "2026-06-23 00:15:23.918411+00:00",
+			want:  "2026-06-23T00:15:23.918411Z",
+		},
+		{
+			input: "2025-11-29 01:05:28+05:30",
+			want:  "2025-11-29T01:05:28+05:30",
+		},
+		{
+			input: "2025-11-29 01:05:28Z",
+			want:  "2025-11-29T01:05:28Z",
+		},
+		{
+			input: "2025-11-29 01:05:28z",
+			want:  "2025-11-29T01:05:28Z",
+		},
+		{
+			input: "2025-11-29 01:05:28",
+			want:  "2025-11-29T01:05:28Z",
+		},
+		{
+			input: "2025-11-29T01:05:28",
+			want:  "2025-11-29T01:05:28Z",
+		},
+		{
+			input: "0000-01-01 00:00:00Z",
+			want:  "0001-01-01T00:00:00Z",
+		},
+		{
+			input:   "not a timestamp",
+			wantErr: true,
+		},
+		{
+			input:   "2025-11-29",
+			wantErr: true,
+		},
 	} {
 		t.Run(tt.input, func(t *testing.T) {
 			got, err := ClampDatetime(tt.input)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestNormalizeDatetimeString(t *testing.T) {
+	for _, tt := range []struct {
+		input string
+		want  string
+	}{
+		{
+			input: "2023-08-29T16:17:18Z",
+			want:  "2023-08-29T16:17:18Z",
+		},
+		{
+			input: "2023-08-29T16:17:18.123456789+05:00",
+			want:  "2023-08-29T16:17:18.123456789+05:00",
+		},
+		{
+			input: "2023-08-29T16:17:18z",
+			want:  "2023-08-29T16:17:18Z",
+		},
+		{
+			input: "2025-11-29 01:05:28+00:00",
+			want:  "2025-11-29T01:05:28Z",
+		},
+		{
+			input: "2026-06-23 00:15:23.918411+00:00",
+			want:  "2026-06-23T00:15:23.918411Z",
+		},
+		{
+			input: "2025-11-29 01:05:28",
+			want:  "2025-11-29T01:05:28Z",
+		},
+		// Unparseable values pass through rather than erroring, since this
+		// converter has always been a pass-through and some endpoints accept
+		// formats we don't recognize.
+		{
+			input: "not a timestamp",
+			want:  "not a timestamp",
+		},
+	} {
+		t.Run(tt.input, func(t *testing.T) {
+			got, err := NormalizeDatetimeString(tt.input)
 			require.NoError(t, err)
 			require.Equal(t, tt.want, got)
 		})
@@ -132,8 +234,9 @@ func TestClampDatetime(t *testing.T) {
 
 func TestClampDate(t *testing.T) {
 	for _, tt := range []struct {
-		input string
-		want  string
+		input   string
+		want    string
+		wantErr bool
 	}{
 		{
 			input: "0000-01-01",
@@ -151,9 +254,21 @@ func TestClampDate(t *testing.T) {
 			input: "2023-08-29",
 			want:  "2023-08-29",
 		},
+		{
+			input:   "not a date",
+			wantErr: true,
+		},
+		{
+			input:   "2025-11-29 01:05:28+00:00",
+			wantErr: true,
+		},
 	} {
 		t.Run(tt.input, func(t *testing.T) {
 			got, err := ClampDate(tt.input)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
 			require.NoError(t, err)
 			require.Equal(t, tt.want, got)
 		})
