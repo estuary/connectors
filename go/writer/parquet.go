@@ -27,13 +27,15 @@ import (
 )
 
 const (
-	// Sets an approximate limit on the number of document "rows" to buffer in memory before writing
-	// them out as a row group to the scratch file. A larger buffer will use more connector memory,
-	// and perhaps afford slightly less overhead when seeking through the scratch file to read
-	// columns from its individual row groups. A smaller buffer here means more row groups written
-	// to the scratch file, and this interacts with the maxScratchColumnChunkCount value as well in
-	// terms of how much metadata is written to the scratch file.
-	maxBufferSize = 25 * 1024 * 1024
+	// The default approximate limit on the number of document "rows" to buffer in memory before
+	// writing them out as a row group to the scratch file. A larger buffer will use more connector
+	// memory, and perhaps afford slightly less overhead when seeking through the scratch file to
+	// read columns from its individual row groups. A smaller buffer here means more row groups
+	// written to the scratch file, and this interacts with the maxScratchColumnChunkCount value as
+	// well in terms of how much metadata is written to the scratch file. Configurable via
+	// WithParquetBufferSize, which is useful to lower for schemas with very large individual values,
+	// since this is the only buffering stage sized in bytes rather than rows.
+	defaultBufferSize = 25 * 1024 * 1024
 
 	// Each row group that is written to the scratch file has a column chunk for each column it
 	// contains. In extreme cases of very large numbers of columns (1000+) where the values in the
@@ -130,6 +132,7 @@ const (
 type parquetConfig struct {
 	compression               ParquetCompression
 	disableDictionaryEncoding bool
+	bufferSize                int
 	rowGroupRowLimit          int
 	rowGroupByteLimit         int
 	metadata                  map[string]string
@@ -174,6 +177,12 @@ func WithDisableDictionaryEncoding() ParquetOption {
 	}
 }
 
+func WithParquetBufferSize(n int) ParquetOption {
+	return func(cfg *parquetConfig) {
+		cfg.bufferSize = n
+	}
+}
+
 func WithParquetRowGroupRowLimit(n int) ParquetOption {
 	return func(cfg *parquetConfig) {
 		cfg.rowGroupRowLimit = n
@@ -195,6 +204,7 @@ func WithParquetMetadata(meta map[string]string) ParquetOption {
 func NewParquetWriter(w io.WriteCloser, sch ParquetSchema, opts ...ParquetOption) *ParquetWriter {
 	cfg := parquetConfig{
 		compression:       Uncompressed,
+		bufferSize:        defaultBufferSize,
 		rowGroupRowLimit:  defaultRowGroupRowLimit,
 		rowGroupByteLimit: defaultRowGroupByteLimit,
 	}
@@ -257,43 +267,24 @@ func writerOpts(cfg parquetConfig) []file.WriteOption {
 // exceed writing the buffer as a row group to the scratch file, and potentially flushing the row
 // groups from the scratch file collectively as a single row group to the output.
 func (w *ParquetWriter) Write(row []any) error {
-	var err error
-
 	if len(row) != len(w.schema) {
 		return fmt.Errorf("write: row length (%d) does not match schema length (%d)", len(row), len(w.schema))
 	}
 
-	if w.scratch.writer == nil {
-		// Either the very first row, or the first one after flushing the scratch file.
-		if w.scratch.file, err = os.CreateTemp("", "parquet-scratch-*"); err != nil {
-			return fmt.Errorf("write creating scratch file: %w", err)
-		}
-
-		scratchOpts := []parquet.WriterProperty{
-			// Don't use dictionary encoding for the scratch file, since it is
-			// much slower to write than plain encoding with the small row
-			// groups of the scratch file.
-			parquet.WithDictionaryDefault(false),
-			// Turning off stats calculations helps too, but just a tiny bit.
-			parquet.WithStats(false),
-		}
-		w.scratch.writer = file.NewParquetWriter(w.scratch.file, w.schemaRoot, file.WithWriterProps(parquet.NewWriterProperties(scratchOpts...)))
-	}
-
 	w.buffer = append(w.buffer, row)
 	w.bufferSizeBytes += w.rs.estSize(row)
-	w.scratch.rowCount += 1
 
-	if w.bufferSizeBytes >= maxBufferSize {
-		// Write out the buffer as a single row group to the scratch file.
+	if w.bufferSizeBytes >= w.cfg.bufferSize {
+		// Write out the buffer as a single row group, to the scratch file or directly to the
+		// output (see flushBuffer).
 		if err := w.flushBuffer(); err != nil {
 			return fmt.Errorf("write flushing buffer based on buffer size: %w", err)
 		}
 	}
 
-	if w.scratch.sizeBytes >= w.cfg.rowGroupByteLimit ||
+	if w.scratch.writer != nil && (w.scratch.sizeBytes >= w.cfg.rowGroupByteLimit ||
 		w.scratch.rowCount >= w.cfg.rowGroupRowLimit ||
-		w.scratch.columnChunkCount >= maxScratchColumnChunkCount {
+		w.scratch.columnChunkCount >= maxScratchColumnChunkCount) {
 		if w.scratch.columnChunkCount >= maxScratchColumnChunkCount {
 			log.WithFields(log.Fields{
 				"scratchSizeBytes":        w.scratch.sizeBytes,
@@ -354,13 +345,29 @@ func (w *ParquetWriter) flushScratchFile() error {
 
 	if err := w.scratch.writer.Close(); err != nil { // also closes the underlying io.WriteCloser
 		return fmt.Errorf("closing scratch writer: %w", err)
-	} else if sr, err := os.Open(w.scratch.file.Name()); err != nil {
+	}
+
+	sr, err := os.Open(w.scratch.file.Name())
+	if err != nil {
 		return fmt.Errorf("opening scratch file to transfer values: %w", err)
-	} else if scratchReader, err := file.NewParquetReader(sr); err != nil {
+	}
+
+	scratchReader, err := file.NewParquetReader(sr)
+	if err != nil {
 		return fmt.Errorf("creating scratch reader: %w", err)
-	} else if err := transferColumnValues(scratchReader, w.sinkWriter); err != nil {
+	}
+
+	if err := transferColumnValues(scratchReader, w.sinkWriter); err != nil {
 		return fmt.Errorf("transferring column values: %w", err)
-	} else if err := sr.Close(); err != nil {
+	}
+
+	// The scratch file's page cache is charged against the process's cgroup memory limit like
+	// heap memory is, and the kernel won't necessarily reclaim it before it's needed elsewhere.
+	// Drop it explicitly now that its contents have been transferred to the sink writer and the
+	// file is about to be removed.
+	dropPageCache(sr)
+
+	if err := sr.Close(); err != nil {
 		return fmt.Errorf("closing scratch file after reading: %w", err)
 	} else if err := os.Remove(w.scratch.file.Name()); err != nil {
 		return fmt.Errorf("removing scratch file: %w", err)
@@ -380,6 +387,26 @@ func (w *ParquetWriter) flushScratchFile() error {
 func (w *ParquetWriter) flushBuffer() error {
 	if len(w.buffer) == 0 {
 		return nil
+	}
+
+	if w.scratch.writer == nil {
+		// Either the very first buffered row group, or the first one after flushing the scratch
+		// file.
+		scratchFile, err := os.CreateTemp("", "parquet-scratch-*")
+		if err != nil {
+			return fmt.Errorf("flushing buffer creating scratch file: %w", err)
+		}
+
+		scratchOpts := []parquet.WriterProperty{
+			// Don't use dictionary encoding for the scratch file, since it is
+			// much slower to write than plain encoding with the small row
+			// groups of the scratch file.
+			parquet.WithDictionaryDefault(false),
+			// Turning off stats calculations helps too, but just a tiny bit.
+			parquet.WithStats(false),
+		}
+		w.scratch.file = scratchFile
+		w.scratch.writer = file.NewParquetWriter(scratchFile, w.schemaRoot, file.WithWriterProps(parquet.NewWriterProperties(scratchOpts...)))
 	}
 
 	rgWriter := w.scratch.writer.AppendRowGroup()
@@ -459,6 +486,7 @@ func (w *ParquetWriter) flushBuffer() error {
 
 	w.scratch.sizeBytes += int(rgWriter.TotalBytesWritten())
 	w.scratch.columnChunkCount += len(w.schema)
+	w.scratch.rowCount += len(w.buffer)
 	w.buffer = w.buffer[:0]
 	w.bufferSizeBytes = 0
 
