@@ -1,6 +1,23 @@
 import json
 import subprocess
 
+# Fields redacted from capture snapshots. Anything listed here must also be
+# redacted in the bruno collection's saved examples (see the redaction note in
+# bruno/opencollection.yml) so the two stay in sync.
+REDACTED = "REDACTED"
+REDACTED_FIELDS = {"_links", "stats"}
+
+
+def _redact(value):
+    if isinstance(value, dict):
+        return {
+            k: (REDACTED if k in REDACTED_FIELDS else _redact(v))
+            for k, v in value.items()
+        }
+    if isinstance(value, list):
+        return [_redact(v) for v in value]
+    return value
+
 
 def test_capture(request, snapshot):
     result = subprocess.run(
@@ -29,7 +46,7 @@ def test_capture(request, snapshot):
             unique_stream_lines.append(line)
             seen.add(stream)
 
-    assert snapshot("capture.stdout.json") == unique_stream_lines
+    assert snapshot("capture.stdout.json") == _redact(unique_stream_lines)
 
 
 def test_discover(request, snapshot):

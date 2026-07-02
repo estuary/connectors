@@ -2,115 +2,7 @@
   [
     "acmeCo/lists",
     {
-      "_links": [
-        {
-          "href": "https://us16.api.mailchimp.com/3.0/lists/f34247943d",
-          "method": "GET",
-          "rel": "self",
-          "targetSchema": "https://us16.api.mailchimp.com/schema/3.0/Definitions/Lists/Response.json"
-        },
-        {
-          "href": "https://us16.api.mailchimp.com/3.0/lists",
-          "method": "GET",
-          "rel": "parent",
-          "schema": "https://us16.api.mailchimp.com/schema/3.0/Paths/Lists/Collection.json",
-          "targetSchema": "https://us16.api.mailchimp.com/schema/3.0/Definitions/Lists/CollectionResponse.json"
-        },
-        {
-          "href": "https://us16.api.mailchimp.com/3.0/lists/f34247943d",
-          "method": "PATCH",
-          "rel": "update",
-          "schema": "https://us16.api.mailchimp.com/schema/3.0/Definitions/Lists/PATCH.json",
-          "targetSchema": "https://us16.api.mailchimp.com/schema/3.0/Definitions/Lists/Response.json"
-        },
-        {
-          "href": "https://us16.api.mailchimp.com/3.0/lists/f34247943d",
-          "method": "POST",
-          "rel": "batch-sub-unsub-members",
-          "schema": "https://us16.api.mailchimp.com/schema/3.0/Definitions/Lists/BatchPOST.json",
-          "targetSchema": "https://us16.api.mailchimp.com/schema/3.0/Definitions/Lists/BatchPOST-Response.json"
-        },
-        {
-          "href": "https://us16.api.mailchimp.com/3.0/lists/f34247943d",
-          "method": "DELETE",
-          "rel": "delete"
-        },
-        {
-          "href": "https://us16.api.mailchimp.com/3.0/lists/f34247943d/abuse-reports",
-          "method": "GET",
-          "rel": "abuse-reports",
-          "schema": "https://us16.api.mailchimp.com/schema/3.0/Paths/Lists/Abuse/Collection.json",
-          "targetSchema": "https://us16.api.mailchimp.com/schema/3.0/Definitions/Lists/Abuse/CollectionResponse.json"
-        },
-        {
-          "href": "https://us16.api.mailchimp.com/3.0/lists/f34247943d/activity",
-          "method": "GET",
-          "rel": "activity",
-          "targetSchema": "https://us16.api.mailchimp.com/schema/3.0/Definitions/Lists/Activity/Response.json"
-        },
-        {
-          "href": "https://us16.api.mailchimp.com/3.0/lists/f34247943d/clients",
-          "method": "GET",
-          "rel": "clients",
-          "targetSchema": "https://us16.api.mailchimp.com/schema/3.0/Definitions/Lists/Clients/Response.json"
-        },
-        {
-          "href": "https://us16.api.mailchimp.com/3.0/lists/f34247943d/growth-history",
-          "method": "GET",
-          "rel": "growth-history",
-          "schema": "https://us16.api.mailchimp.com/schema/3.0/Paths/Lists/Growth/Collection.json",
-          "targetSchema": "https://us16.api.mailchimp.com/schema/3.0/Definitions/Lists/Growth/CollectionResponse.json"
-        },
-        {
-          "href": "https://us16.api.mailchimp.com/3.0/lists/f34247943d/interest-categories",
-          "method": "GET",
-          "rel": "interest-categories",
-          "schema": "https://us16.api.mailchimp.com/schema/3.0/Paths/Lists/InterestCategories/Collection.json",
-          "targetSchema": "https://us16.api.mailchimp.com/schema/3.0/Definitions/Lists/InterestCategories/CollectionResponse.json"
-        },
-        {
-          "href": "https://us16.api.mailchimp.com/3.0/lists/f34247943d/members",
-          "method": "GET",
-          "rel": "members",
-          "schema": "https://us16.api.mailchimp.com/schema/3.0/Paths/Lists/Members/Collection.json",
-          "targetSchema": "https://us16.api.mailchimp.com/schema/3.0/Definitions/Lists/Members/CollectionResponse.json"
-        },
-        {
-          "href": "https://us16.api.mailchimp.com/3.0/lists/f34247943d/merge-fields",
-          "method": "GET",
-          "rel": "merge-fields",
-          "schema": "https://us16.api.mailchimp.com/schema/3.0/Paths/Lists/MergeFields/Collection.json",
-          "targetSchema": "https://us16.api.mailchimp.com/schema/3.0/Definitions/Lists/MergeFields/CollectionResponse.json"
-        },
-        {
-          "href": "https://us16.api.mailchimp.com/3.0/lists/f34247943d/segments",
-          "method": "GET",
-          "rel": "segments",
-          "schema": "https://us16.api.mailchimp.com/schema/3.0/Paths/Lists/Segments/Collection.json",
-          "targetSchema": "https://us16.api.mailchimp.com/schema/3.0/Definitions/Lists/Segments/CollectionResponse.json"
-        },
-        {
-          "href": "https://us16.api.mailchimp.com/3.0/lists/f34247943d/webhooks",
-          "method": "GET",
-          "rel": "webhooks",
-          "schema": "https://us16.api.mailchimp.com/schema/3.0/Paths/Lists/Webhooks/Collection.json",
-          "targetSchema": "https://us16.api.mailchimp.com/schema/3.0/Definitions/Lists/Webhooks/CollectionResponse.json"
-        },
-        {
-          "href": "https://us16.api.mailchimp.com/3.0/lists/f34247943d/signup-forms",
-          "method": "GET",
-          "rel": "signup-forms",
-          "schema": "https://us16.api.mailchimp.com/schema/3.0/Paths/Lists/SignupForms/Collection.json",
-          "targetSchema": "https://us16.api.mailchimp.com/schema/3.0/Definitions/Lists/SignupForms/CollectionResponse.json"
-        },
-        {
-          "href": "https://us16.api.mailchimp.com/3.0/lists/f34247943d/locations",
-          "method": "GET",
-          "rel": "locations",
-          "schema": "https://us16.api.mailchimp.com/schema/3.0/Paths/Lists/Locations/Collection.json",
-          "targetSchema": "https://us16.api.mailchimp.com/schema/3.0/Definitions/Lists/Locations/CollectionResponse.json"
-        }
-      ],
+      "_links": "REDACTED",
       "_meta": {
         "op": "c",
         "row_id": 0,
@@ -145,24 +37,7 @@
       "notify_on_subscribe": "",
       "notify_on_unsubscribe": "",
       "permission_reminder": "You are receiving this email because you opted in via our website.",
-      "stats": {
-        "avg_sub_rate": 0,
-        "avg_unsub_rate": 0,
-        "campaign_count": 3,
-        "campaign_last_sent": "",
-        "cleaned_count": 0,
-        "cleaned_count_since_send": 0,
-        "click_rate": 0,
-        "last_sub_date": "2026-06-09T15:12:24+00:00",
-        "last_unsub_date": "",
-        "member_count": 1,
-        "member_count_since_send": 0,
-        "merge_field_count": 6,
-        "open_rate": 0,
-        "target_sub_rate": 0,
-        "unsubscribe_count": 0,
-        "unsubscribe_count_since_send": 0
-      },
+      "stats": "REDACTED",
       "subscribe_url_long": "https://dev.us16.list-manage.com/subscribe?u=05c093afb0e356009f1c0f3af&id=f34247943d",
       "subscribe_url_short": "http://eepurl.com/MqKi2PfCnl",
       "use_archive_bar": true,
@@ -171,76 +46,103 @@
     }
   ],
   [
+    "acmeCo/interest_categories",
+    {
+      "_links": "REDACTED",
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "display_order": 0,
+      "id": "1d3affa9d2",
+      "list_id": "f34247943d",
+      "title": "Estuary Test Category A",
+      "type": "checkboxes"
+    }
+  ],
+  [
+    "acmeCo/interests",
+    {
+      "_links": "REDACTED",
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "category_id": "1d3affa9d2",
+      "display_order": 1,
+      "id": "6fbed1c079",
+      "list_id": "f34247943d",
+      "name": "Estuary Test Interest",
+      "subscriber_count": "0"
+    }
+  ],
+  [
+    "acmeCo/tags",
+    {
+      "_meta": {
+        "list_id": "f34247943d",
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": 2225592,
+      "name": "estuary-other-tag"
+    }
+  ],
+  [
+    "acmeCo/segment_members",
+    {
+      "_links": "REDACTED",
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "segment_id": 2225591,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "email_address": "nicolas+estuary-test-1@estuary.dev",
+      "email_client": "",
+      "email_type": "html",
+      "full_name": "Estuary Cursor Probe",
+      "id": "6409961b1c262a7e6fb62624ce95ddf5",
+      "interests": {
+        "6fbed1c079": false
+      },
+      "ip_opt": "201.235.239.178",
+      "ip_signup": "",
+      "language": "",
+      "last_changed": "2026-06-12T14:26:23+00:00",
+      "list_id": "f34247943d",
+      "location": {
+        "country_code": "",
+        "dstoff": 0,
+        "gmtoff": 0,
+        "latitude": 0,
+        "longitude": 0,
+        "timezone": ""
+      },
+      "member_rating": 2,
+      "merge_fields": {
+        "ADDRESS": "",
+        "BIRTHDAY": "",
+        "COMPANY": "",
+        "FNAME": "Estuary Cursor Probe",
+        "LNAME": "",
+        "PHONE": ""
+      },
+      "stats": "REDACTED",
+      "status": "subscribed",
+      "timestamp_opt": "2026-06-12T13:12:06+00:00",
+      "timestamp_signup": "",
+      "unique_email_id": "277db7ffd1",
+      "vip": false
+    }
+  ],
+  [
     "acmeCo/campaigns",
     {
-      "_links": [
-        {
-          "href": "https://us16.api.mailchimp.com/3.0/campaigns",
-          "method": "GET",
-          "rel": "parent",
-          "schema": "https://us16.api.mailchimp.com/schema/3.0/Paths/Campaigns/Collection.json",
-          "targetSchema": "https://us16.api.mailchimp.com/schema/3.0/Definitions/Campaigns/CollectionResponse.json"
-        },
-        {
-          "href": "https://us16.api.mailchimp.com/3.0/campaigns/524c905696",
-          "method": "GET",
-          "rel": "self",
-          "targetSchema": "https://us16.api.mailchimp.com/schema/3.0/Definitions/Campaigns/Response.json"
-        },
-        {
-          "href": "https://us16.api.mailchimp.com/3.0/campaigns/524c905696",
-          "method": "DELETE",
-          "rel": "delete"
-        },
-        {
-          "href": "https://us16.api.mailchimp.com/3.0/campaigns/524c905696/actions/send",
-          "method": "POST",
-          "rel": "send"
-        },
-        {
-          "href": "https://us16.api.mailchimp.com/3.0/campaigns/524c905696/actions/cancel-send",
-          "method": "POST",
-          "rel": "cancel_send"
-        },
-        {
-          "href": "https://us16.api.mailchimp.com/3.0/campaigns/524c905696/feedback",
-          "method": "GET",
-          "rel": "feedback",
-          "targetSchema": "https://us16.api.mailchimp.com/schema/3.0/Definitions/Campaigns/Feedback/CollectionResponse.json"
-        },
-        {
-          "href": "https://us16.api.mailchimp.com/3.0/campaigns/524c905696/content",
-          "method": "GET",
-          "rel": "content",
-          "targetSchema": "https://us16.api.mailchimp.com/schema/3.0/Definitions/Campaigns/Content/Response.json"
-        },
-        {
-          "href": "https://us16.api.mailchimp.com/3.0/campaigns/524c905696/send-checklist",
-          "method": "GET",
-          "rel": "send_checklist",
-          "targetSchema": "https://us16.api.mailchimp.com/schema/3.0/Definitions/Campaigns/Checklist/Response.json"
-        },
-        {
-          "href": "https://us16.api.mailchimp.com/3.0/campaigns/524c905696/actions/pause",
-          "method": "POST",
-          "rel": "pause"
-        },
-        {
-          "href": "https://us16.api.mailchimp.com/3.0/campaigns/524c905696/actions/resume",
-          "method": "POST",
-          "rel": "resume"
-        },
-        {
-          "href": "https://us16.api.mailchimp.com/3.0/campaigns/524c905696/actions/replicate",
-          "method": "POST",
-          "rel": "replicate"
-        },
-        {
-          "href": "https://us16.api.mailchimp.com/3.0/campaigns/524c905696/actions/create-resend",
-          "method": "POST",
-          "rel": "create_resend"
-        }
-      ],
+      "_links": "REDACTED",
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
@@ -258,7 +160,7 @@
         "list_id": "f34247943d",
         "list_is_active": true,
         "list_name": "Estuary",
-        "recipient_count": 1,
+        "recipient_count": 2,
         "segment_text": ""
       },
       "resendable": false,
