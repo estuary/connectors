@@ -82,6 +82,12 @@ All connector configurations use JSON Schema. See [config_schema_guidelines.md](
 - Date-time values with `format: date-time` must be RFC3339 compliant
 - Prefer schema inference over overly prescriptive schemas
 
+### GraphQL APIs
+
+Start by requesting the minimal field set and add fields only as users need them. Over-requesting invites API problems (a single problematic field or too many levels of nesting can fail the whole request) and locks the connector into a response-shaped data model that can be hard to reconstruct.
+
+When the connector captures related entities in separate streams, reference the other entity by id instead of embedding its full object. For example, in source-monday an item carries only its parent board's id, not the board's other fields, because boards are captured in their own stream. This avoids duplicating and re-fetching data, keeps each stream authoritative for its own entity, and reduces the field-set and nesting concerns above.
+
 ### Testing
 
 - Prefer snapshot tests over fine-grained assertions
