@@ -356,6 +356,147 @@ func RunMigrationTest[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfi
 	cupaloy.SnapshotT(t, snap.String())
 }
 
+// FeatureFlagMigrationPhase is a single apply within a
+// RunFeatureFlagMigrationTest. The binding is materialized with the given
+// feature flags and fixture data. Running consecutive phases against the same
+// resource exercises column type migrations that are driven by a feature flag
+// change rather than a collection schema change.
+type FeatureFlagMigrationPhase struct {
+	// FeatureFlags is the value of the endpoint's advanced.feature_flags for
+	// this phase, e.g. "objects_and_arrays_as_json=false".
+	FeatureFlags string
+	// Fixture is the path to the fixture document data applied in this phase.
+	Fixture string
+}
+
+// RunFeatureFlagMigrationTest applies a single binding repeatedly against the
+// same resource, changing the endpoint's feature flags between each phase. It
+// verifies column type migrations that are triggered by a feature flag change
+// rather than a collection schema change - notably that the flow_document column
+// migrates in place between JSON and text when objects_and_arrays_as_json is
+// toggled, without requiring a backfill.
+//
+// The source spec must have one or more materialization tasks with a single
+// binding. Each phase snapshots the apply action (migration DDL) and the
+// resulting table so that both the schema and data can be verified.
+func RunFeatureFlagMigrationTest[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
+	t *testing.T,
+	newMaterializer boilerplate.NewMaterializerFn[EC, FC, RC, MT],
+	sourcePath string,
+	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
+	phases []FeatureFlagMigrationPhase,
+	actionDescSanitizers []func(string) string,
+) {
+	ctx := context.Background()
+	var snap strings.Builder
+
+	bundled := RunFlowctl(t, "raw", "bundle", "--source", sourcePath)
+	suffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
+
+	for _, taskName := range taskNames(bundled) {
+		snap.WriteString(fmt.Sprintf("Task: %s\n\n", taskName))
+		snap.WriteString(runFeatureFlagMigrationForTask(t, ctx, newMaterializer, taskName, bundled, suffix, makeResourceFn, phases, actionDescSanitizers))
+	}
+
+	cupaloy.SnapshotT(t, snap.String())
+}
+
+func runFeatureFlagMigrationForTask[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
+	t *testing.T,
+	ctx context.Context,
+	newMaterializer boilerplate.NewMaterializerFn[EC, FC, RC, MT],
+	taskName string,
+	bundled []byte,
+	suffix string,
+	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
+	phases []FeatureFlagMigrationPhase,
+	actionDescSanitizers []func(string) string,
+) string {
+	var snap strings.Builder
+
+	rndSuffix := "_" + uuid.NewString()[:8] + suffix
+	workingTableName := "migration_test" + rndSuffix
+	workingTaskName := taskName + rndSuffix
+
+	cfg := decryptConfig[EC](t, bundled, taskName)
+	materializer, err := newMaterializer(ctx, taskName, cfg, boilerplate.ParseFlags(cfg))
+	require.NoError(t, err)
+
+	res := makeResourceFn(workingTableName, false).WithDefaults(cfg)
+	resCfgRaw, err := json.Marshal(res)
+	require.NoError(t, err)
+
+	bundled, err = sjson.SetBytes(
+		bundled,
+		fmt.Sprintf("materializations.%s.bindings.0.resource", taskName),
+		json.RawMessage(resCfgRaw),
+	)
+	require.NoError(t, err)
+
+	bundled, err = sjson.SetBytes(
+		bundled,
+		"materializations."+workingTaskName,
+		json.RawMessage(gjson.GetBytes(bundled, fmt.Sprintf("materializations.%s", taskName)).Raw),
+	)
+	require.NoError(t, err)
+
+	// The config is decrypted once so that each phase can override its feature
+	// flags. flowctl passes a plaintext (non-sops) config to the connector
+	// unchanged, so writing the decrypted config back inline is sufficient.
+	rawCfg := decryptConfigRaw(t, bundled, workingTaskName)
+
+	// The phase's flags are appended to whatever the source config already sets
+	// (later entries win in ParseFeatureFlags), so that flags the test relies on
+	// - notably allow_existing_tables_for_new_bindings, which lets each phase
+	// re-apply to the table created by the previous phase - are preserved.
+	baseFlags := gjson.GetBytes(rawCfg, "advanced.feature_flags").String()
+
+	path, _, err := res.Parameters()
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		CleanupTestResources(t, ctx, materializer, [][]string{path}, suffix)
+		cleanupTestTasks(t, ctx, materializer, suffix)
+	})
+
+	for _, phase := range phases {
+		phaseFlags := phase.FeatureFlags
+		if baseFlags != "" {
+			phaseFlags = baseFlags + "," + phaseFlags
+		}
+		phaseCfg, err := sjson.SetBytes(rawCfg, "advanced.feature_flags", phaseFlags)
+		require.NoError(t, err)
+
+		phaseBundled, err := sjson.SetRawBytes(
+			bundled,
+			"materializations."+workingTaskName+".endpoint.local.config",
+			phaseCfg,
+		)
+		require.NoError(t, err)
+
+		source := filepath.Join(t.TempDir(), "source.flow.yaml")
+		require.NoError(t, os.WriteFile(source, phaseBundled, 0o600))
+
+		actionDescription := RunFlowctl(
+			t,
+			"preview",
+			"--name", workingTaskName,
+			"--source", source,
+			"--fixture", phase.Fixture,
+			"--network", "flow-test",
+			"--output-apply",
+		)
+		for _, sanitize := range actionDescSanitizers {
+			actionDescription = []byte(sanitize(string(actionDescription)))
+		}
+
+		snap.WriteString(fmt.Sprintf("Feature flags: %q\n", phase.FeatureFlags))
+		snap.WriteString(snapshotTestTable(t, ctx, materializer, res, actionDescription, rndSuffix, true))
+	}
+
+	return snap.String()
+}
+
 // RunMigrationTestParallel is like RunMigrationTest but runs tasks concurrently
 // (up to maxParallelTasks at a time). Use this for connectors where parallel
 // task execution is safe and beneficial.
@@ -523,7 +664,12 @@ func renderTestTableData(t *testing.T, columnNames []string, rows [][]any) strin
 	return data.String()
 }
 
-func decryptConfig[EC boilerplate.EndpointConfiger](t *testing.T, bundled []byte, taskName string) EC {
+// decryptConfigRaw returns a task's endpoint config as raw JSON. If the config
+// is sops-encrypted it is decrypted and the _sops suffixes are stripped, so the
+// result is the plaintext config the connector expects. A plaintext (non-sops)
+// config is passed through to flowctl and the connector unchanged, which allows
+// callers to edit it (e.g. overriding feature flags) between applies.
+func decryptConfigRaw(t *testing.T, bundled []byte, taskName string) json.RawMessage {
 	t.Helper()
 
 	raw := json.RawMessage(gjson.GetBytes(bundled, fmt.Sprintf("materializations.%s.endpoint.local.config", taskName)).Raw)
@@ -541,8 +687,14 @@ func decryptConfig[EC boilerplate.EndpointConfiger](t *testing.T, bundled []byte
 		require.NoError(t, sopsCmd.Wait())
 	}
 
+	return raw
+}
+
+func decryptConfig[EC boilerplate.EndpointConfiger](t *testing.T, bundled []byte, taskName string) EC {
+	t.Helper()
+
 	var out EC
-	require.NoError(t, boilerplate.UnmarshalStrict(raw, &out))
+	require.NoError(t, boilerplate.UnmarshalStrict(decryptConfigRaw(t, bundled, taskName), &out))
 
 	return out
 }

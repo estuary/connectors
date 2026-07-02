@@ -59,6 +59,24 @@ func RunMigrationTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[
 	testutil.RunMigrationTest(t, driver.newMaterialization, sourcePath, makeResourceFn, actionDescSanitizers)
 }
 
+// FeatureFlagMigrationPhase is one apply of a RunFeatureFlagMigrationTest.
+type FeatureFlagMigrationPhase = testutil.FeatureFlagMigrationPhase
+
+// RunFeatureFlagMigrationTest applies a binding repeatedly against the same
+// resource, changing the endpoint's feature flags between phases, to verify
+// migrations driven by a feature flag change (e.g. flow_document migrating
+// between JSON and text as objects_and_arrays_as_json is toggled).
+func RunFeatureFlagMigrationTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](
+	t *testing.T,
+	driver *Driver[EC, RC],
+	sourcePath string,
+	makeResourceFn func(string, bool) RC,
+	phases []FeatureFlagMigrationPhase,
+	actionDescSanitizers []func(string) string,
+) {
+	testutil.RunFeatureFlagMigrationTest(t, driver.newMaterialization, sourcePath, makeResourceFn, phases, actionDescSanitizers)
+}
+
 // RunFencingTest is a generalized form of test cases over fencing behavior,
 // which ought to function with any Client implementation.
 func RunFencingTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](

@@ -1,0 +1,42 @@
+Task: acmeCo/tests/materialize-bigquery
+
+Feature flags: "objects_and_arrays_as_json"
+Resource: estuary-theatre.testing.migration_test
+["applied.actionDescription", "CREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.migration_test (\n\t\tid INTEGER NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tobj JSON,\n\t\tflow_document JSON NOT NULL\n)\nCLUSTER BY id;\n"]
+
+{"Name":"flow_document","Nullable":false,"Type":"JSON"}
+{"Name":"flow_published_at","Nullable":false,"Type":"TIMESTAMP"}
+{"Name":"id","Nullable":false,"Type":"INTEGER"}
+{"Name":"obj","Nullable":true,"Type":"JSON"}
+
+Table Data:
+{"flow_document":{"_meta":{"uuid":"13814000-1dd2-11b2-8000-071353030311"},"id":1,"obj":{"nested":"one"}},"flow_published_at":"1970-01-01T00:00:00Z","id":1,"obj":{"nested":"one"}}
+{"flow_document":{"_meta":{"uuid":"1419d680-1dd2-11b2-8000-071353030311"},"id":2,"obj":{"nested":"two"}},"flow_published_at":"1970-01-01T00:00:01Z","id":2,"obj":{"nested":"two"}}
+
+Feature flags: "no_objects_and_arrays_as_json"
+Resource: estuary-theatre.testing.migration_test
+["applied.actionDescription", "ALTER TABLE `estuary-theatre`.testing.migration_test ADD COLUMN obj_flowtmp1 STRING \nALTER TABLE `estuary-theatre`.testing.migration_test ADD COLUMN flow_document_flowtmp1 STRING \nUPDATE `estuary-theatre`.testing.migration_test SET obj_flowtmp1 = TO_JSON_STRING(obj), flow_document_flowtmp1 = TO_JSON_STRING(flow_document) WHERE true;\nALTER TABLE `estuary-theatre`.testing.migration_test DROP COLUMN obj\nALTER TABLE `estuary-theatre`.testing.migration_test DROP COLUMN flow_document\nALTER TABLE `estuary-theatre`.testing.migration_test RENAME COLUMN obj_flowtmp1 TO obj\nALTER TABLE `estuary-theatre`.testing.migration_test RENAME COLUMN flow_document_flowtmp1 TO flow_document"]
+
+{"Name":"flow_document","Nullable":true,"Type":"STRING"}
+{"Name":"flow_published_at","Nullable":false,"Type":"TIMESTAMP"}
+{"Name":"id","Nullable":false,"Type":"INTEGER"}
+{"Name":"obj","Nullable":true,"Type":"STRING"}
+
+Table Data:
+{"flow_document":{"_meta":{"uuid":"13814000-1dd2-11b2-8000-071353030311"},"id":1,"obj":{"nested":"one"}},"flow_published_at":"1970-01-01T00:00:00Z","id":1,"obj":{"nested":"one"}}
+{"flow_document":{"_meta":{"uuid":"1419d680-1dd2-11b2-8000-071353030311"},"id":2,"obj":{"nested":"two"}},"flow_published_at":"1970-01-01T00:00:01Z","id":2,"obj":{"nested":"two"}}
+
+Feature flags: "objects_and_arrays_as_json"
+Resource: estuary-theatre.testing.migration_test
+["applied.actionDescription", "ALTER TABLE `estuary-theatre`.testing.migration_test ADD COLUMN obj_flowtmp1 JSON \nALTER TABLE `estuary-theatre`.testing.migration_test ADD COLUMN flow_document_flowtmp1 JSON \nUPDATE `estuary-theatre`.testing.migration_test SET obj_flowtmp1 = SAFE.PARSE_JSON(obj), flow_document_flowtmp1 = SAFE.PARSE_JSON(flow_document) WHERE true;\nALTER TABLE `estuary-theatre`.testing.migration_test DROP COLUMN obj\nALTER TABLE `estuary-theatre`.testing.migration_test DROP COLUMN flow_document\nALTER TABLE `estuary-theatre`.testing.migration_test RENAME COLUMN obj_flowtmp1 TO obj\nALTER TABLE `estuary-theatre`.testing.migration_test RENAME COLUMN flow_document_flowtmp1 TO flow_document"]
+
+{"Name":"flow_document","Nullable":true,"Type":"JSON"}
+{"Name":"flow_published_at","Nullable":false,"Type":"TIMESTAMP"}
+{"Name":"id","Nullable":false,"Type":"INTEGER"}
+{"Name":"obj","Nullable":true,"Type":"JSON"}
+
+Table Data:
+{"flow_document":{"_meta":{"uuid":"13814000-1dd2-11b2-8000-071353030311"},"id":1,"obj":{"nested":"one"}},"flow_published_at":"1970-01-01T00:00:00Z","id":1,"obj":{"nested":"one"}}
+{"flow_document":{"_meta":{"uuid":"1419d680-1dd2-11b2-8000-071353030311"},"id":2,"obj":{"nested":"two"}},"flow_published_at":"1970-01-01T00:00:01Z","id":2,"obj":{"nested":"two"}}
+
+
