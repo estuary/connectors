@@ -27,6 +27,7 @@
       "date_marker": "2025-02-01T00:00:00Z",
       "deleted": false,
       "emoji": null,
+      "hidden_in_user_interface": null,
       "id": 317326,
       "insight_derived_name": null,
       "insight_name": null,
