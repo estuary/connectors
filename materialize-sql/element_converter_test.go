@@ -187,6 +187,72 @@ func TestClampDatetime(t *testing.T) {
 	}
 }
 
+func TestParseRFC3339Nano(t *testing.T) {
+	for _, tt := range []struct {
+		input         string
+		wantCanonical string
+		wantUnix      int64
+		wantErr       bool
+	}{
+		{
+			input:         "2025-11-29T01:05:28Z",
+			wantCanonical: "2025-11-29T01:05:28Z",
+			wantUnix:      1764378328,
+		},
+		// All variants of the same instant normalize to the same canonical
+		// string and parsed time.
+		{
+			input:         "2025-11-29 01:05:28+00:00",
+			wantCanonical: "2025-11-29T01:05:28Z",
+			wantUnix:      1764378328,
+		},
+		{
+			input:         "2025-11-29 01:05:28Z",
+			wantCanonical: "2025-11-29T01:05:28Z",
+			wantUnix:      1764378328,
+		},
+		{
+			input:         "2025-11-29 01:05:28",
+			wantCanonical: "2025-11-29T01:05:28Z",
+			wantUnix:      1764378328,
+		},
+		{
+			input:         "2025-11-29T01:05:28",
+			wantCanonical: "2025-11-29T01:05:28Z",
+			wantUnix:      1764378328,
+		},
+		{
+			input:         "2025-11-29 06:35:28+05:30",
+			wantCanonical: "2025-11-29T06:35:28+05:30",
+			wantUnix:      1764378328,
+		},
+		{
+			input:         "2026-06-23 00:15:23.918411+00:00",
+			wantCanonical: "2026-06-23T00:15:23.918411Z",
+			wantUnix:      1782173723,
+		},
+		{
+			input:   "not a timestamp",
+			wantErr: true,
+		},
+		{
+			input:   "2025-11-29",
+			wantErr: true,
+		},
+	} {
+		t.Run(tt.input, func(t *testing.T) {
+			parsed, canonical, err := ParseRFC3339Nano(tt.input)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tt.wantCanonical, canonical)
+			require.Equal(t, tt.wantUnix, parsed.Unix())
+		})
+	}
+}
+
 func TestNormalizeDatetimeString(t *testing.T) {
 	for _, tt := range []struct {
 		input string
