@@ -461,8 +461,9 @@ class RateLimiter:
 
     failed: int = 0
     total: int = 0
+    has_reached_max_delay: bool = False
 
-    def update(self, cur_delay: float, failed: bool):
+    def update(self, log: Logger, cur_delay: float, failed: bool) -> None:
         self.total += 1
         update: float
 
@@ -476,6 +477,17 @@ class RateLimiter:
 
         self.delay = (1 - self.gain) * self.delay + self.gain * update
         self.delay = min(self.delay, self.MAX_DELAY)
+
+        if self.delay >= self.MAX_DELAY and not self.has_reached_max_delay:
+            self.has_reached_max_delay = True
+            log.warning(
+                "rate limiter has reached its maximum delay",
+                {
+                    "delay": self.delay,
+                    "failed": self.failed,
+                    "total": self.total,
+                },
+            )
 
     @property
     def error_ratio(self) -> float:
@@ -615,7 +627,7 @@ class HTTPMixin(Mixin, HTTPSession):
 
             should_release_response = True
             try:
-                self.rate_limiter.update(cur_delay, resp.status == 429)
+                self.rate_limiter.update(log, cur_delay, resp.status == 429)
 
                 if resp.status == 429:
                     if self.rate_limiter.failed / self.rate_limiter.total > 0.05:
