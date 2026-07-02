@@ -44,9 +44,9 @@ func TestClampTimestamp(t *testing.T) {
 			want:  "2025-11-29T01:05:28Z",
 		},
 		{
-			name:  "missing offset assumed UTC",
-			input: "2025-11-29 01:05:28",
-			want:  "2025-11-29T01:05:28Z",
+			name:    "missing offset returns error",
+			input:   "2025-11-29 01:05:28",
+			wantErr: true,
 		},
 	}
 

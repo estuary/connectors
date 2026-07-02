@@ -179,15 +179,15 @@ func TestClickHouseClampDatetime(t *testing.T) {
 			want:  time.Date(2026, 6, 23, 0, 15, 23, 918411000, time.UTC),
 		},
 		{
-			input: "2025-11-29 01:05:28",
-			want:  time.Date(2025, 11, 29, 1, 5, 28, 0, time.UTC),
-		},
-		{
 			input: "1900-01-01 00:00:00Z",
 			want:  time.Date(1925, 1, 1, 0, 0, 0, 0, time.UTC),
 		},
 		{
 			input:   "not a timestamp",
+			wantErr: true,
+		},
+		{
+			input:   "2025-11-29 01:05:28",
 			wantErr: true,
 		},
 	} {

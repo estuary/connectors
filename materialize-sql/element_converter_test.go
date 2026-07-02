@@ -131,9 +131,8 @@ func TestClampDatetime(t *testing.T) {
 			input: "2023-08-29T16:17:18z",
 			want:  "2023-08-29T16:17:18Z",
 		},
-		// Near-RFC3339 variants (see issue #4725): space separator instead of
-		// "T", and/or a missing offset (assumed UTC). All normalize to
-		// canonical RFC3339.
+		// Near-RFC3339 variants (see issue #4725): a space separator instead
+		// of "T" normalizes to canonical RFC3339.
 		{
 			input: "2025-11-29 01:05:28+00:00",
 			want:  "2025-11-29T01:05:28Z",
@@ -155,16 +154,18 @@ func TestClampDatetime(t *testing.T) {
 			want:  "2025-11-29T01:05:28Z",
 		},
 		{
-			input: "2025-11-29 01:05:28",
-			want:  "2025-11-29T01:05:28Z",
-		},
-		{
-			input: "2025-11-29T01:05:28",
-			want:  "2025-11-29T01:05:28Z",
-		},
-		{
 			input: "0000-01-01 00:00:00Z",
 			want:  "0001-01-01T00:00:00Z",
+		},
+		// Timestamps without a timezone offset may be local time, so they are
+		// rejected rather than assumed to be UTC.
+		{
+			input:   "2025-11-29 01:05:28",
+			wantErr: true,
+		},
+		{
+			input:   "2025-11-29T01:05:28",
+			wantErr: true,
 		},
 		{
 			input:   "not a timestamp",
@@ -211,15 +212,15 @@ func TestParseRFC3339Nano(t *testing.T) {
 			wantCanonical: "2025-11-29T01:05:28Z",
 			wantUnix:      1764378328,
 		},
+		// Timestamps without a timezone offset may be local time, so they are
+		// rejected rather than assumed to be UTC.
 		{
-			input:         "2025-11-29 01:05:28",
-			wantCanonical: "2025-11-29T01:05:28Z",
-			wantUnix:      1764378328,
+			input:   "2025-11-29 01:05:28",
+			wantErr: true,
 		},
 		{
-			input:         "2025-11-29T01:05:28",
-			wantCanonical: "2025-11-29T01:05:28Z",
-			wantUnix:      1764378328,
+			input:   "2025-11-29T01:05:28",
+			wantErr: true,
 		},
 		{
 			input:         "2025-11-29 06:35:28+05:30",
@@ -278,13 +279,14 @@ func TestNormalizeDatetimeString(t *testing.T) {
 			input: "2026-06-23 00:15:23.918411+00:00",
 			want:  "2026-06-23T00:15:23.918411Z",
 		},
-		{
-			input: "2025-11-29 01:05:28",
-			want:  "2025-11-29T01:05:28Z",
-		},
 		// Unparseable values pass through rather than erroring, since this
 		// converter has always been a pass-through and some endpoints accept
-		// formats we don't recognize.
+		// formats we don't recognize. This includes timestamps without a
+		// timezone offset, which may be local time.
+		{
+			input: "2025-11-29 01:05:28",
+			want:  "2025-11-29 01:05:28",
+		},
 		{
 			input: "not a timestamp",
 			want:  "not a timestamp",

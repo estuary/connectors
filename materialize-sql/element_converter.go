@@ -166,16 +166,14 @@ const (
 	minimumDate      = "0001-01-01"
 )
 
-// flexibleTimestampLayouts are the near-RFC3339 variants accepted in addition to RFC3339Nano:
-// a space separator instead of "T", and/or a missing offset (assumed UTC). Flow's schema
-// inference can tag a field as `format: date-time` based on some values while other values in
-// the same field use these variants, so rejecting them crash-loops otherwise-healthy shards.
-// The set of layouts is aligned with flow's file-parser datetime sanitizer
-// (crates/parser/src/format/sanitize/datetime.rs), which normalizes the same variants.
+// flexibleTimestampLayouts are the near-RFC3339 variants accepted in addition to RFC3339Nano.
+// Flow's schema inference can tag a field as `format: date-time` based on some values while
+// other values in the same field use these variants, so rejecting them crash-loops
+// otherwise-healthy shards. Only variants that fully specify the instant are accepted: a
+// timestamp without a timezone offset may be local time, and assuming a zone for it would
+// silently shift the data.
 var flexibleTimestampLayouts = []string{
 	"2006-01-02 15:04:05.999999999Z07:00",
-	"2006-01-02T15:04:05.999999999",
-	"2006-01-02 15:04:05.999999999",
 }
 
 // ParseRFC3339Nano parses str as RFC3339 or a near-RFC3339 variant, returning the parsed
@@ -194,8 +192,8 @@ func ParseRFC3339Nano(str string) (time.Time, string, error) {
 	return time.Time{}, "", fmt.Errorf("could not parse %q as RFC3339 date-time", str)
 }
 
-// NormalizeDatetimeString rewrites near-RFC3339 datetimes (lowercase "z", space separator,
-// missing offset) to canonical RFC3339. Values it cannot parse are passed through unmodified,
+// NormalizeDatetimeString rewrites near-RFC3339 datetimes (lowercase "z", space separator)
+// to canonical RFC3339. Values it cannot parse are passed through unmodified,
 // since this converter has always been a pass-through and endpoints may accept formats it does
 // not recognize.
 var NormalizeDatetimeString ElementConverter = StringCastConverter(func(str string) (interface{}, error) {
