@@ -502,25 +502,6 @@ query GetNextItems($cursor: String!, $limit: Int = 200) {
     + _ITEM_FIELDS
 )
 
-ITEMS_BY_BOARD_PAGE = (
-    """
-query GetItemsByBoardPage($boardsLimit: Int = 25, $boardsPage: Int = 1, $itemsLimit: Int = 500, $state: State = all) {
-  boards(limit: $boardsLimit, page: $boardsPage, state: $state, order_by: created_at) {
-    id
-    state
-    updated_at
-    items_page(limit: $itemsLimit) {
-      cursor
-      items {
-        ...ItemFields
-      }
-    }
-  }
-}
-"""
-    + _ITEM_FIELDS
-)
-
 ITEMS_BY_IDS = (
     """
 query GetItemsByIds($ids: [ID!]!, $limit: Int = 10, $page: Int = 1) {
