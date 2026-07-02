@@ -29,6 +29,12 @@ class ItemsPageRemainderData(GraphQLResponseData, extra="allow"):
 
 ItemsPageRemainder = GraphQLResponseRemainder[ItemsPageRemainderData]
 
+
+class SubitemState(BaseModel, extra="allow"):
+    id: str
+    state: str
+
+
 # Fetching items by ID is restricted to 100 items per request when using the `items` query.
 # This is a limitation of the Monday API, so we need to batch requests accordingly.
 # This is only used in the incremental task, so we don't expect to have multiple concurrent fetches
@@ -39,6 +45,9 @@ MAX_CONCURRENT_ITEM_FETCHES = 5
 BOARDS_PER_PAGE = 1
 ITEMS_PER_BOARD = 5
 ITEMS_LIMIT_BY_ID = 100
+# Monday caps the `items(ids:)` query at 100 IDs per request, so subitem `state`
+# backfills are chunked into batches of this size (see `_enrich_subitem_states`).
+SUBITEM_STATE_BATCH_SIZE = 100
 
 
 class CursorCollector:
@@ -90,6 +99,76 @@ class CursorCollector:
         return self.cursors, self.null_board_count
 
 
+async def _enrich_subitem_states(
+    http: HTTPSession,
+    log: Logger,
+    items: list[Item],
+) -> None:
+    """
+    Populate `state` onto each item's nested subitems.
+
+    We don't request `state` inside the `subitems` selection of the items query.
+    Monday returns an INTERNAL_SERVER_ERROR when we request `state` for certain
+    subitems through that nested selection, which fails the whole request. The
+    top-level `items(ids:)` query returns subitem `state` fine, so we fetch it
+    there and write it back onto the subitems.
+    """
+    subitem_ids: list[str] = []
+    for item in items:
+        for subitem in getattr(item, "subitems", None) or []:
+            if isinstance(subitem, dict) and subitem.get("id"):
+                subitem_ids.append(subitem["id"])
+
+    subitem_ids = list(dict.fromkeys(subitem_ids))
+    if not subitem_ids:
+        return
+
+    subitem_state_by_id: dict[str, str] = {}
+    for batch in itertools.batched(subitem_ids, SUBITEM_STATE_BATCH_SIZE):
+        batch_list = list(batch)
+        async for subitem in execute_query(
+            SubitemState,
+            http,
+            log,
+            "data.items.item",
+            SUBITEM_STATES,
+            {"ids": batch_list, "limit": len(batch_list), "page": 1},
+        ):
+            subitem_state_by_id[subitem.id] = subitem.state
+
+    for item in items:
+        for subitem in getattr(item, "subitems", None) or []:
+            if isinstance(subitem, dict):
+                subitem_state = subitem_state_by_id.get(subitem.get("id", ""))
+                if subitem_state is not None:
+                    subitem["state"] = subitem_state
+
+
+async def _with_subitem_states(
+    http: HTTPSession,
+    log: Logger,
+    items: AsyncGenerator[Item, None],
+) -> AsyncGenerator[Item, None]:
+    """
+    Buffer items in batches, backfill subitem `state` for each batch via
+    `_enrich_subitem_states`, then yield the enriched items.
+    """
+    buffer: list[Item] = []
+
+    async for item in items:
+        buffer.append(item)
+        if len(buffer) >= SUBITEM_STATE_BATCH_SIZE:
+            await _enrich_subitem_states(http, log, buffer)
+            for enriched in buffer:
+                yield enriched
+            buffer = []
+
+    if buffer:
+        await _enrich_subitem_states(http, log, buffer)
+        for enriched in buffer:
+            yield enriched
+
+
 async def fetch_items_by_id(
     http: HTTPSession,
     log: Logger,
@@ -109,7 +188,7 @@ async def fetch_items_by_id(
     if batch_generators:
         for i in range(0, len(batch_generators), MAX_CONCURRENT_ITEM_FETCHES):
             concurrent_batch = batch_generators[i : i + MAX_CONCURRENT_ITEM_FETCHES]
-            async for item in merge(*concurrent_batch):
+            async for item in _with_subitem_states(http, log, merge(*concurrent_batch)):
                 yield item
 
 
@@ -177,13 +256,17 @@ async def get_items_from_boards(
 
         batch_cursor_collector = CursorCollector()
 
-        async for item in _stream_all_items_from_page(
+        async for item in _with_subitem_states(
             http,
             log,
-            ITEMS,
-            variables,
-            batch_cursor_collector,
-            batch_ids_list,
+            _stream_all_items_from_page(
+                http,
+                log,
+                ITEMS,
+                variables,
+                batch_cursor_collector,
+                batch_ids_list,
+            ),
         ):
             yield item
 
@@ -296,6 +379,11 @@ async def _stream_all_items_from_page(
     )
 
 
+# `state` lives only on the top-level `ItemFields` fragment, not on the shared
+# `_ItemFields` that subitems reuse. Monday returns an INTERNAL_SERVER_ERROR when
+# `state` is requested for certain subitems through the nested `subitems`
+# selection, so subitem `state` is populated separately by `_enrich_subitem_states`
+# via the top-level `items(ids:)` query.
 _ITEM_FIELDS = """
 fragment _ItemFields on Item {
   id
@@ -304,7 +392,6 @@ fragment _ItemFields on Item {
   created_at
   updated_at
   creator_id
-  state
   assets {
     id
     name
@@ -375,6 +462,7 @@ fragment _ItemFields on Item {
 }
 fragment ItemFields on Item {
   ..._ItemFields
+  state
   subitems {
     ..._ItemFields
   }
@@ -443,3 +531,15 @@ query GetItemsByIds($ids: [ID!]!, $limit: Int = 10, $page: Int = 1) {
 """
     + _ITEM_FIELDS
 )
+
+# Populate `state` onto subitems. Fetching subitem `state` inline through the
+# `subitems` selection triggers an INTERNAL_SERVER_ERROR for certain subitems,
+# but subitems are themselves items, so we can read their `state` here.
+SUBITEM_STATES = """
+query GetSubitemStates($ids: [ID!]!, $limit: Int = 100, $page: Int = 1) {
+    items(ids: $ids, limit: $limit, page: $page) {
+        id
+        state
+    }
+}
+"""
