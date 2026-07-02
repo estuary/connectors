@@ -155,6 +155,430 @@
     ]
   },
   {
+    "recommendedName": "interests",
+    "resourceConfig": {
+      "name": "interests",
+      "interval": "PT1H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "additionalProperties": true,
+          "description": "`extra=\"allow\"` lets context-stamped parent IDs ride in `_meta`;\n`BaseDocument.Meta` otherwise drops unknown keys.",
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "Items carry both parent IDs natively.",
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "list_id": {
+          "title": "List Id",
+          "type": "string"
+        },
+        "category_id": {
+          "title": "Category Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "list_id",
+        "category_id"
+      ],
+      "title": "Interest",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "segment_members",
+    "resourceConfig": {
+      "name": "segment_members",
+      "interval": "PT1H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "additionalProperties": true,
+          "description": "`extra=\"allow\"` lets context-stamped parent IDs ride in `_meta`;\n`BaseDocument.Meta` otherwise drops unknown keys.",
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "Items carry `list_id` natively, so it stays a body field; the parent\n`segment_id` is absent from the response and stamped into `_meta`.",
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "list_id": {
+          "title": "List Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "list_id"
+      ],
+      "title": "SegmentMember",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "interest_categories",
+    "resourceConfig": {
+      "name": "interest_categories",
+      "interval": "PT1H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "additionalProperties": true,
+          "description": "`extra=\"allow\"` lets context-stamped parent IDs ride in `_meta`;\n`BaseDocument.Meta` otherwise drops unknown keys.",
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "list_id": {
+          "title": "List Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "list_id"
+      ],
+      "title": "InterestCategory",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "tags",
+    "resourceConfig": {
+      "name": "tags",
+      "interval": "PT1H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "additionalProperties": true,
+          "description": "`extra=\"allow\"` lets context-stamped parent IDs ride in `_meta`;\n`BaseDocument.Meta` otherwise drops unknown keys.",
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "Tag-search items are bare `{id, name}`; the parent `list_id` is stamped\ninto `_meta` (the response omits it). Tags are Mailchimp static segments\nunder the hood \u2014 this stream is the `{id, name}` projection of the segments\nstream's `type: static` subset.\n\nPagination rides offset/count, which tag-search honors but does not\ndocument; if the provider ever drops it, the walker degrades to a single\npage of up to 1000 tags (fallback enumeration exists via\n`GET /lists/{list_id}/segments?type=static`).",
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "title": "Tag",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "automation_emails",
+    "resourceConfig": {
+      "name": "automation_emails",
+      "interval": "PT1H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "additionalProperties": true,
+          "description": "`extra=\"allow\"` lets context-stamped parent IDs ride in `_meta`;\n`BaseDocument.Meta` otherwise drops unknown keys.",
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "Email in a classic automation workflow. Like its `Automation` parent,\nthe endpoint is feature-gated and empty on the test account, so this shape\nis docs-based; the required `id` fails loudly if a real payload disagrees.\n\nThe parent `workflow_id` is stamped into `_meta` (we can't live-verify\nwhether the response carries it), and the parent fan-out rejects an empty\n`workflow_id` rather than build a malformed `automations//emails` path.",
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "AutomationEmail",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
     "recommendedName": "campaigns",
     "resourceConfig": {
       "name": "campaigns",

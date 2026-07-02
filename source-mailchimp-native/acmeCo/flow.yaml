@@ -1,4 +1,8 @@
 collections:
+  acmeCo/automation_emails:
+    schema: automation_emails.schema.yaml
+    key:
+    - /_meta/row_id
   acmeCo/automations:
     schema: automations.schema.yaml
     key:
@@ -7,7 +11,23 @@ collections:
     schema: campaigns.schema.yaml
     key:
     - /id
+  acmeCo/interest_categories:
+    schema: interest_categories.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/interests:
+    schema: interests.schema.yaml
+    key:
+    - /_meta/row_id
   acmeCo/lists:
     schema: lists.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/segment_members:
+    schema: segment_members.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/tags:
+    schema: tags.schema.yaml
     key:
     - /_meta/row_id
