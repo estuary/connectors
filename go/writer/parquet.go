@@ -275,8 +275,7 @@ func (w *ParquetWriter) Write(row []any) error {
 	w.bufferSizeBytes += w.rs.estSize(row)
 
 	if w.bufferSizeBytes >= w.cfg.bufferSize {
-		// Write out the buffer as a single row group, to the scratch file or directly to the
-		// output (see flushBuffer).
+		// Write out the buffer as a single row group to the scratch file (see flushBuffer).
 		if err := w.flushBuffer(); err != nil {
 			return fmt.Errorf("write flushing buffer based on buffer size: %w", err)
 		}
