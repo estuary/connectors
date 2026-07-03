@@ -357,7 +357,7 @@ func (w *ParquetWriter) flushScratchFile() error {
 		return fmt.Errorf("creating scratch reader: %w", err)
 	}
 
-	if err := transferColumnValues(scratchReader, w.sinkWriter); err != nil {
+	if err := transferColumnValues(scratchReader, w.sinkWriter, sr); err != nil {
 		return fmt.Errorf("transferring column values: %w", err)
 	}
 
@@ -490,6 +490,12 @@ func (w *ParquetWriter) flushBuffer() error {
 	w.buffer = w.buffer[:0]
 	w.bufferSizeBytes = 0
 
+	// Sync and drop the scratch file's page cache after each row group, so its resident (and
+	// cgroup-charged) page cache stays near one buffer's worth instead of growing to the full
+	// scratch file size. Nothing reads the scratch file until flushScratchFile, so dropping the
+	// whole file is safe.
+	flushAndDropPageCache(w.scratch.file)
+
 	return nil
 }
 
@@ -563,7 +569,7 @@ func writeColumn[T parquetValue](
 // scratch file may contain many row groups, and the corresponding column from each row group is
 // read and written in order to combine all of the row groups from the scratch file into a single
 // row group written to w.
-func transferColumnValues(r *file.Reader, w *file.Writer) error {
+func transferColumnValues(r *file.Reader, w *file.Writer, scratchFile *os.File) error {
 	sch := r.MetaData().Schema
 	rgWriter := w.AppendRowGroup()
 
@@ -609,6 +615,20 @@ func transferColumnValues(r *file.Reader, w *file.Writer) error {
 				}
 			default:
 				return fmt.Errorf("unhandled physical type %q (writer type %T)", sch.Column(c).PhysicalType(), cw)
+			}
+
+			// This chunk's byte range is never read again, and its pages are clean (the scratch
+			// file was synced as it was written), so drop it from the page cache immediately
+			// rather than letting the read-back re-accumulate the full scratch file size in
+			// cgroup-charged memory.
+			if scratchFile != nil {
+				if ccMeta, err := r.MetaData().RowGroup(rgIdx).ColumnChunk(c); err == nil {
+					off := ccMeta.DataPageOffset()
+					if dictOff := ccMeta.DictionaryPageOffset(); dictOff > 0 && dictOff < off {
+						off = dictOff
+					}
+					dropPageCacheRange(scratchFile, off, ccMeta.TotalCompressedSize())
+				}
 			}
 		}
 	}
