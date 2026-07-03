@@ -1,0 +1,17 @@
+# Connector documentation redirects.
+#
+# When a connector page is removed or renamed, its old URL would otherwise
+# 404 once the aggregation step drops the deleted file from the docs site.
+# Add an entry here in the SAME PR as the removal/rename so the old URL
+# redirects instead. estuary/docs reads this file via submodule and feeds it
+# to the Docusaurus client-redirects plugin.
+#
+# Each entry is a { from, to } pair of site-root-relative, trailing-slashed
+# paths. Uncomment the example below as a template:
+#
+#   - from: /reference/Connectors/capture-connectors/old-connector/
+#     to:   /reference/Connectors/capture-connectors/
+#
+# Point `to` at the best surviving destination: a replacement connector if
+# one exists, otherwise the connector category index. Avoid case-only renames
+# (e.g. foo -> Foo); they collide on case-insensitive filesystems.
