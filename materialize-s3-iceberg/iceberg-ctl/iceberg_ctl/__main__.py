@@ -202,6 +202,26 @@ class IcebergColumn(BaseModel):
     ]
 
 
+async def fetch_table_schemas(catalog: Catalog, tables: list[tuple[str, str]]) -> dict[str, list[IcebergColumn]]:
+    sem = asyncio.Semaphore(10)
+
+    async def fetch_table_schema(tbl: tuple[str, str]) -> tuple[str, list[IcebergColumn]]:
+        async with sem:
+            loaded = await asyncio.to_thread(catalog.load_table, tbl)
+            return (f"{tbl[0]}.{tbl[1]}", [
+                IcebergColumn(
+                    name=f.name,
+                    nullable=not f.required,
+                    type=f.field_type.__str__(),  # type: ignore
+                )
+                for f in loaded.schema().fields
+            ])
+
+    return dict(await asyncio.gather(
+        *(fetch_table_schema(tbl) for tbl in tables)
+    ))
+
+
 @run.command()
 @click.pass_context
 @click.argument("resource-paths", type=str)
@@ -225,7 +245,6 @@ def info_schema(
     catalog = ctx.obj["catalog"]
     assert isinstance(catalog, Catalog)
 
-    tables: dict[str, list[IcebergColumn]] = {}
     find_paths = TypeAdapter(list[tuple[str, str]]).validate_json(resource_paths)
     find_namespaces = set(path[0] for path in find_paths)
     find_tables: dict[str, list[str]] = {}
@@ -233,6 +252,7 @@ def info_schema(
         find_tables.setdefault(path[0], []).append(path[1])
 
     log(f"info_schema: scanning {len(find_paths)} tables")
+    relevant_tables: list[tuple[str, str]] = []
     for ns in catalog.list_namespaces():
         if ns[0] not in find_namespaces:
             # Namespace is not relevant for the list of tables and namespaces
@@ -245,16 +265,9 @@ def info_schema(
                 # are care about.
                 continue
 
-            loaded = catalog.load_table(tbl)
+            relevant_tables.append(tbl)
 
-            tables[f"{tbl[0]}.{tbl[1]}"] = [
-                IcebergColumn(
-                    name=f.name,
-                    nullable=not f.required,
-                    type=f.field_type.__str__(),  # type: ignore
-                )
-                for f in loaded.schema().fields
-            ]
+    tables = asyncio.run(fetch_table_schemas(catalog, relevant_tables))
 
     log(f"info_schema: found {len(tables)} tables")
     print(TypeAdapter(dict[str, list[IcebergColumn]]).dump_json(tables).decode())
@@ -265,7 +278,8 @@ async def fetch_table_paths(catalog: Catalog, tables: list[str]) -> dict[str, st
 
     async def fetch_table_path(table: str) -> tuple[str, str]:
         async with sem:
-            return (table, catalog.load_table(table).location())
+            loaded = await asyncio.to_thread(catalog.load_table, table)
+            return (table, loaded.location())
 
     return dict(await asyncio.gather(
         *(fetch_table_path(table) for table in tables)
