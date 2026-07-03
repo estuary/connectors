@@ -507,6 +507,8 @@ def append_files(
                 raise
             log(f"append_files: sleeping {attempt * 2} seconds before retry")
             time.sleep(attempt * 2)
+            log(f"append_files: reloading table before retry (attempt {attempt + 1})")
+            tbl = catalog.load_table(table)
             attempt += 1
 
     log(f"append_files: reloading table to verify update")
