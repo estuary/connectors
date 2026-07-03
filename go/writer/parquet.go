@@ -273,6 +273,7 @@ func (w *ParquetWriter) Write(row []any) error {
 
 	w.buffer = append(w.buffer, row)
 	w.bufferSizeBytes += w.rs.estSize(row)
+	w.scratch.rowCount += 1
 
 	if w.bufferSizeBytes >= w.cfg.bufferSize {
 		// Write out the buffer as a single row group to the scratch file (see flushBuffer).
@@ -485,7 +486,6 @@ func (w *ParquetWriter) flushBuffer() error {
 
 	w.scratch.sizeBytes += int(rgWriter.TotalBytesWritten())
 	w.scratch.columnChunkCount += len(w.schema)
-	w.scratch.rowCount += len(w.buffer)
 	w.buffer = w.buffer[:0]
 	w.bufferSizeBytes = 0
 
