@@ -55,6 +55,13 @@
             "title": "Row Group Byte Limit",
             "description": "Approximate maximum number of bytes in a row group. Defaults to 536870912 (512 MiB) if blank.",
             "order": 1
+          },
+          "bufferSize": {
+            "type": "integer",
+            "title": "Buffer Size",
+            "description": "Approximate size (in bytes) of the in-memory row buffer flushed to disk during writes. Defaults to 25 MiB if blank. Lowering this can reduce memory usage for schemas with very large individual field values. This may also reduce write throughput.",
+            "advanced": true,
+            "order": 2
           }
         },
         "additionalProperties": false,
