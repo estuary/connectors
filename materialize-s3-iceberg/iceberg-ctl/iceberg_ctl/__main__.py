@@ -457,37 +457,41 @@ def append_files(
     tbl = catalog.load_table(table)
     log(f"append_files: table loaded successfully")
 
-    log(f"append_files: parsing checkpoints from table properties")
-    checkpoints = TypeAdapter(dict[str, str]).validate_json(tbl.properties.get("flow_checkpoints_v1", "{}"))
-    cp = checkpoints.get(materialization, "")  # prev_checkpoint will be unset if this is the first commit to the table
-    log(f"append_files: current checkpoint from table is '{cp}'")
-
-    if cp == next_checkpoint:
-        log(f"append_files: checkpoint is already '{next_checkpoint}', skipping append")
-        print(f"checkpoint is already '{next_checkpoint}'")
-        return  # already appended these files
-    # TODO(whb): Re-enable this sanity check after any tasks effected by the
-    # disabled bindings state tracking bug have moved past it.
-    # elif cp != "" and cp != prev_checkpoint:
-    #     # An absent checkpoint table property is allowed to accommodate cases
-    #     # where the user may have manually dropped the table and the
-    #     # materialization automatically re-created it, outside the normal
-    #     # backfill counter increment process.
-    #     raise Exception(
-    #         f"checkpoint from snapshot ({cp}) did not match either previous ({prev_checkpoint}) or next ({next_checkpoint}) checkpoint"
-    #     )
-
-    # Files are only added if the table checkpoint property has the prior checkpoint. The checkpoint
-    # property is updated to the current checkpoint in an atomic operation with appending the files.
-    # Note that this is not 100% correct exactly-once semantics, since there is a potential race
-    # between retrieving the table properties and appending the files, where a zombie process could
-    # append the same files concurrently. In principal Iceberg catalogs support the atomic
-    # operations necessary for true exactly-once semantics, but we'd need to work with the catalog
-    # at a lower level than PyIceberg currently makes available.
-    checkpoints[materialization] = next_checkpoint
-
+    # The checkpoint is re-parsed from the table properties and re-validated on every attempt, not
+    # just the first, so that a retry after a reload always rebases its idempotency check against
+    # the latest table state. Without this, a retry could recommit over a checkpoint transition that
+    # a concurrent (e.g. zombie) process already completed, silently duplicating the appended files.
     attempt = 1
     while True:
+        log(f"append_files: parsing checkpoints from table properties (attempt {attempt})")
+        checkpoints = TypeAdapter(dict[str, str]).validate_json(tbl.properties.get("flow_checkpoints_v1", "{}"))
+        cp = checkpoints.get(materialization, "")  # prev_checkpoint will be unset if this is the first commit to the table
+        log(f"append_files: current checkpoint from table is '{cp}'")
+
+        if cp == next_checkpoint:
+            log(f"append_files: checkpoint is already '{next_checkpoint}', skipping append")
+            print(f"checkpoint is already '{next_checkpoint}'")
+            return  # already appended these files
+        # TODO(whb): Re-enable this sanity check after any tasks effected by the
+        # disabled bindings state tracking bug have moved past it.
+        # elif cp != "" and cp != prev_checkpoint:
+        #     # An absent checkpoint table property is allowed to accommodate cases
+        #     # where the user may have manually dropped the table and the
+        #     # materialization automatically re-created it, outside the normal
+        #     # backfill counter increment process.
+        #     raise Exception(
+        #         f"checkpoint from snapshot ({cp}) did not match either previous ({prev_checkpoint}) or next ({next_checkpoint}) checkpoint"
+        #     )
+
+        # Files are only added if the table checkpoint property has the prior checkpoint. The checkpoint
+        # property is updated to the current checkpoint in an atomic operation with appending the files.
+        # Note that this is not 100% correct exactly-once semantics, since there is a potential race
+        # between retrieving the table properties and appending the files, where a zombie process could
+        # append the same files concurrently. In principal Iceberg catalogs support the atomic
+        # operations necessary for true exactly-once semantics, but we'd need to work with the catalog
+        # at a lower level than PyIceberg currently makes available.
+        checkpoints[materialization] = next_checkpoint
+
         try:
             log(f"append_files: starting transaction (attempt {attempt})")
             txn = tbl.transaction()
