@@ -2,6 +2,8 @@
 sidebar_position: 6
 ---
 
+import ReactPlayer from "react-player";
+
 # PostgreSQL
 
 This connector uses change data capture (CDC) to continuously capture updates in a PostgreSQL database into one or more Estuary collections.
@@ -19,6 +21,8 @@ Setup instructions are provided for the following platforms:
 - [Amazon Aurora](#amazon-aurora)
 - [Google Cloud SQL](./google-cloud-sql-postgres/)
 - [Azure Database for PostgreSQL](#azure-database-for-postgresql)
+
+<ReactPlayer controls url="https://www.youtube.com/watch?v=10BLaiRc9uU?t=355" />
 
 ## Prerequisites
 
@@ -235,6 +239,8 @@ In this case, you may turn off backfilling on a per-table basis. See [properties
 ## Replication slot recovery
 
 If the replication slot is dropped or invalidated — for example after a major version upgrade, a failover, or a WAL size limit being exceeded — the capture will fail and require manual recovery. See [PostgreSQL replication slot recovery](/guides/troubleshooting/postgres-replication-slot-recovery) for step-by-step instructions.
+
+If the failover is planned and you can pause writes, you can re-establish the capture without a full backfill. See [Preventing backfills during database upgrades and failovers](/reference/backfilling-data/#preventing-backfills-during-database-upgrades-and-failovers).
 
 ## WAL Retention and Tuning Parameters
 

@@ -286,8 +286,8 @@ The `source-mysql` connector is designed to halt immediately if something wrong 
 
 The connector handles most DDL on actively-captured tables automatically:
 
-- `ALTER TABLE` to add, drop, rename, or change the type of a column is applied to the collection schema as the change appears in the binlog. No action is required.
-- `DROP TABLE`, `RENAME TABLE`, and `DROP DATABASE` deactivate the affected binding. To resume capturing afterwards, re-add the table to the binding list, which will trigger a fresh backfill.
+- `ALTER TABLE` to add, drop, rename, or change the type of a column is handled automatically as the change appears in the binlog. No action is required.
+- `DROP TABLE`, `RENAME TABLE`, and `DROP DATABASE` deactivate the affected binding. If the table is later recreated, the connector automatically re-backfills it and resumes capturing.
 - `TRUNCATE TABLE` on an active table is ignored — truncated rows are not propagated to the destination as deletes. If you need the destination to reflect the truncate, trigger a backfill of the binding.
 
 If a column type change results in captured documents that don't match the existing collection schema, autodiscovery will update the schema on its next run. To apply the new schema immediately, edit the capture, click **Refresh**, and republish.
@@ -302,7 +302,7 @@ Resolving this error requires fixing the `binlog_format` system variable, and th
 
 If your capture is failing with an `"unhandled query"` error, some SQL query is present in the binlog which the connector does not (currently) understand.
 
-In general, this error suggests that the connector should be modified to at least recognize this type of query, and most likely categorize it as either an unsupported [DML Query](#data-manipulation-queries), a [schema change](#handling-source-schema-changes), or something that can safely be ignored. Until such a fix is made the capture cannot proceed, and you will need to backfill all collections to allow the capture to jump ahead to a later point in the binlog.
+If you encounter this error, [contact Estuary support](mailto:support@estuary.dev) so we can help get your capture unstuck.
 
 ### Inconsistent Metadata
 
@@ -319,6 +319,12 @@ If your capture fails with a `"binlog retention period is too short"` error, it 
 The concern is that if a capture is disabled or the server becomes unreachable for longer than the binlog retention period, the database might delete a binlog segment which the capture isn't yet done with. If this happens then change events have been permanently lost, and the only way to get the capture running again is to skip ahead to a portion of the binlog which still exists. For correctness this requires backfilling the current contents of all tables from the source, and so we prefer to avoid it as much as possible. It's much easier to just set up your binlog retention with enough wiggle room to recover from temporary failures.
 
 The `"binlog retention period is too short"` error should normally be fixed by setting a longer retention period as described in these setup instructions. However, advanced users who understand the risks can use the `skip_binlog_retention_check` configuration option to disable this safety.
+
+### Failover and Host Changes
+
+MySQL binlog coordinates are specific to each server, so they do not carry over when you fail over to a new writer, for example by promoting a standby. After a failover, the capture's stored position is invalid on the new writer and replication fails with `ERROR 1236`. Always capture from the **writer** endpoint; reader endpoints report `log_bin = OFF` and fail the prerequisite check.
+
+If the failover is planned and you can pause writes, you can re-establish the capture on the new writer without a full backfill. See [Preventing backfills during database upgrades and failovers](/reference/backfilling-data/#preventing-backfills-during-database-upgrades-and-failovers).
 
 ### Empty Collection Key
 
