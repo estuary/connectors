@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/apache/arrow-go/v18/arrow/decimal128"
-	"github.com/apache/arrow-go/v18/parquet/metadata"
 	"github.com/estuary/connectors/go/writer"
 	sql "github.com/estuary/connectors/materialize-sql"
 )
@@ -237,21 +236,47 @@ func (bw *bdecWriter) writeRow(row []any) error {
 func (bw *bdecWriter) close() error {
 	if err := bw.pq.Close(); err != nil {
 		return fmt.Errorf("closing parquet writer: %w", err)
-	} else if bw.blobStats.parquetMetadata, err = bw.pq.FileMetadata(); err != nil {
+	}
+	fm, err := bw.pq.FileMetadata()
+	if err != nil {
 		return fmt.Errorf("getting parquet file metadata: %w", err)
 	}
 
 	// A couple of easy sanity checks to verify the recorded blob metadata vs.
 	// the written parquet file metadata. The uncompressed length is taken
 	// directly from the parquet metadata assuming everything else matches.
-	if bw.blobStats.parquetMetadata.NumRowGroups() != 1 {
-		return fmt.Errorf("internal appication error: expected exactly one row group in bdec file, got %d", bw.blobStats.parquetMetadata.NumRowGroups())
-	} else if bw.blobStats.rows != int(bw.blobStats.parquetMetadata.NumRows) {
-		return fmt.Errorf("internal appication error: row count mismatch: %d rows written, but parquet metadata has %d", bw.blobStats.rows, bw.blobStats.parquetMetadata.NumRows)
+	if fm.NumRowGroups() != 1 {
+		return fmt.Errorf("internal appication error: expected exactly one row group in bdec file, got %d", fm.NumRowGroups())
+	} else if bw.blobStats.rows != int(fm.NumRows) {
+		return fmt.Errorf("internal appication error: row count mismatch: %d rows written, but parquet metadata has %d", bw.blobStats.rows, fm.NumRows)
 	}
-	bw.blobStats.lengthUncompressed = int(bw.blobStats.parquetMetadata.RowGroups[0].TotalByteSize)
+	bw.blobStats.lengthUncompressed = int(fm.RowGroups[0].TotalByteSize)
+
+	// Only the scalars needed later are kept from the file metadata: retaining
+	// the *metadata.FileMetaData itself would pin the encoded column
+	// statistics, which can be several MiB per blob when column values are
+	// large, for as long as the tracker is retained.
+	bw.blobStats.parquetStats = parquetFileStats{
+		numRows:         fm.NumRows,
+		numRowGroups:    fm.NumRowGroups(),
+		rowGroupNumRows: fm.RowGroups[0].NumRows,
+		totalByteSize:   fm.RowGroups[0].TotalByteSize,
+	}
+	if s := fm.RowGroups[0].TotalCompressedSize; s != nil {
+		bw.blobStats.parquetStats.totalCompressedSize = *s
+	}
 
 	return nil
+}
+
+// parquetFileStats holds the scalars from the written parquet file's metadata
+// that are used after the blob is finished.
+type parquetFileStats struct {
+	numRows             int64
+	numRowGroups        int
+	rowGroupNumRows     int64
+	totalByteSize       int64
+	totalCompressedSize int64
 }
 
 type blobStatsTracker struct {
@@ -267,7 +292,7 @@ type blobStatsTracker struct {
 	length             int          // total number of bytes in the blob
 	lengthUncompressed int          // estimate of the uncompressed byte size of the blob's data
 
-	parquetMetadata *metadata.FileMetaData // As-written parquet file metadata
+	parquetStats parquetFileStats // As-written parquet file metadata scalars
 
 	columns []*columnStatsTracker
 
@@ -277,25 +302,37 @@ type blobStatsTracker struct {
 	buf    []byte
 }
 
+// encryptChunkSize bounds the scratch buffer used to encrypt bytes on their
+// way to the output. Encrypting in fixed-size chunks keeps the buffer small no
+// matter how large the writes from the parquet writer are (single compressed
+// pages can be tens of MB when values are large), which matters because each
+// blob's tracker is retained until the transaction commits.
+const encryptChunkSize = 64 * 1024
+
 func (bs *blobStatsTracker) Write(p []byte) (int, error) {
-	n := len(p)
-	if n > cap(bs.buf) {
-		bs.buf = slices.Grow(bs.buf, n-len(bs.buf))
+	if bs.buf == nil {
+		bs.buf = make([]byte, encryptChunkSize)
 	}
 
-	bs.stream.XORKeyStream(bs.buf[:n], p)
-	if written, err := bs.w.Write(bs.buf[:n]); err != nil {
-		return written, fmt.Errorf("blobStatsTracker error writing to output: %w", err)
-	} else if written != n {
-		return written, fmt.Errorf("written bytes %d != expected bytes %d", written, n)
-	} else if hashed, err := bs.md5.Write(bs.buf[:n]); err != nil {
-		return written, fmt.Errorf("failed to write md5 for blob: %w", err)
-	} else if hashed != n {
-		return written, fmt.Errorf("hashed bytes %d != expected bytes %d", hashed, n)
+	var total int
+	for len(p) > 0 {
+		n := min(len(p), encryptChunkSize)
+		bs.stream.XORKeyStream(bs.buf[:n], p[:n])
+		if written, err := bs.w.Write(bs.buf[:n]); err != nil {
+			return total + written, fmt.Errorf("blobStatsTracker error writing to output: %w", err)
+		} else if written != n {
+			return total + written, fmt.Errorf("written bytes %d != expected bytes %d", written, n)
+		} else if hashed, err := bs.md5.Write(bs.buf[:n]); err != nil {
+			return total + n, fmt.Errorf("failed to write md5 for blob: %w", err)
+		} else if hashed != n {
+			return total + n, fmt.Errorf("hashed bytes %d != expected bytes %d", hashed, n)
+		}
+		total += n
+		p = p[n:]
 	}
 
-	bs.length += n
-	return n, nil
+	bs.length += total
+	return total, nil
 }
 
 func (bs *blobStatsTracker) Close() error {
@@ -303,6 +340,7 @@ func (bs *blobStatsTracker) Close() error {
 		return fmt.Errorf("blobStatsTracker error closing output: %w", err)
 	}
 	bs.finish = time.Now()
+	bs.buf = nil // nothing more will be written; don't retain the buffer
 
 	return nil
 }
@@ -341,23 +379,32 @@ func (cs *columnStatsTracker) nextStr(v string) {
 		panic(fmt.Sprintf("internal error: nextStr called on non-string column %q", cs.name))
 	}
 
+	cs.strStats.maxLen = max(len(v), cs.strStats.maxLen)
+
+	if len(v) > MAX_LOB_LENGTH+1 {
+		// These ultimately get truncated to MAX_LOB_LENGTH per
+		// truncateBytesAsHex, so there is no reason to buffer more than that
+		// plus one byte, with the extra byte preserving the "value was longer"
+		// signal truncateBytesAsHex uses to round the maximum value up.
+		v = v[:MAX_LOB_LENGTH+1]
+	}
+
+	// Stored values must be cloned: a substring of v aliases v's backing
+	// array, and would otherwise pin the entire value in memory for as long as
+	// the tracker is retained, which is until the transaction commits.
 	if !cs.hasData {
-		cs.strStats.maxLen = len(v)
-		cs.strStats.maxVal = v
-		cs.strStats.minVal = v
+		cs.strStats.maxVal = strings.Clone(v)
+		cs.strStats.minVal = strings.Clone(v)
 		cs.hasData = true
 		return
 	}
 
-	cs.strStats.maxLen = max(len(v), cs.strStats.maxLen)
-
-	if len(v) > MAX_LOB_LENGTH {
-		// These ultimately get truncated per truncateBytesAsHex, so there is no
-		// reason to buffer more than this length.
-		v = v[:MAX_LOB_LENGTH]
+	if v > cs.strStats.maxVal {
+		cs.strStats.maxVal = strings.Clone(v)
 	}
-	cs.strStats.maxVal = max(cs.strStats.maxVal, v)
-	cs.strStats.minVal = min(cs.strStats.minVal, v)
+	if v < cs.strStats.minVal {
+		cs.strStats.minVal = strings.Clone(v)
+	}
 }
 
 func (cs *columnStatsTracker) nextInt(v decimal128.Num) {

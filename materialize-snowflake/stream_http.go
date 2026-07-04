@@ -587,11 +587,11 @@ func generateBlobMetadata(
 		"rows":                                 tracked.rows,
 		"length":                               tracked.length,
 		"lengthUncompressed":                   tracked.lengthUncompressed,
-		"parquetMetadata.NumRows":              tracked.parquetMetadata.FileMetaData.NumRows,
-		"parquetMetadata.NumRowGroups":         len(tracked.parquetMetadata.FileMetaData.RowGroups),
-		"parquetMetadata.RowGroups[0].NumRows": tracked.parquetMetadata.FileMetaData.RowGroups[0].NumRows,
-		"parquetMetadata.RowGroups[0].TotalCompressedSize": tracked.parquetMetadata.FileMetaData.RowGroups[0].TotalCompressedSize,
-		"parquetMetadata.RowGroups[0].TotalByteSize":       tracked.parquetMetadata.FileMetaData.RowGroups[0].TotalByteSize,
+		"parquetMetadata.NumRows":              tracked.parquetStats.numRows,
+		"parquetMetadata.NumRowGroups":         tracked.parquetStats.numRowGroups,
+		"parquetMetadata.RowGroups[0].NumRows": tracked.parquetStats.rowGroupNumRows,
+		"parquetMetadata.RowGroups[0].TotalCompressedSize": tracked.parquetStats.totalCompressedSize,
+		"parquetMetadata.RowGroups[0].TotalByteSize":       tracked.parquetStats.totalByteSize,
 	}).Info("generated bdec metadata")
 
 	return &out
