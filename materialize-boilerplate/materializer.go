@@ -796,8 +796,15 @@ func RunNewTransactor[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC
 	}
 
 	return transactor, &pm.Response_Opened{
-		RuntimeCheckpoint:       cp,
-		DisableLoadOptimization: featureFlags["allow_existing_tables_for_new_bindings"],
+		RuntimeCheckpoint: cp,
+		// retain_existing_data_on_backfill skips truncating a table on
+		// backfill, but the runtime's per-binding load-key optimization is
+		// reset by a backfill and would skip loads, causing backfills to
+		// insert duplicate rows alongside the retained data instead of
+		// merging with it. Disabling the load optimization forces loads so
+		// that retained data is merged correctly.
+		DisableLoadOptimization: featureFlags["allow_existing_tables_for_new_bindings"] ||
+			featureFlags["retain_existing_data_on_backfill"],
 	}, &mCfg.MaterializeOptions, nil
 }
 
