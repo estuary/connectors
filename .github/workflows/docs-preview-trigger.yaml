@@ -23,6 +23,10 @@ on:
 
 concurrency: connector-docs-preview-${{ github.event.pull_request.number }}
 
+# The job only ever uses the App-minted token (scoped to estuary/docs), never
+# the default GITHUB_TOKEN, so it needs none of the ambient token's scope.
+permissions: {}
+
 jobs:
   dispatch:
     if: ${{ vars.PREVIEW_APP_ID != '' }}
