@@ -89,6 +89,10 @@ func (c config) Validate() error {
 		if strings.Contains(c.StagingBucket.BucketS3, ".") {
 			return fmt.Errorf("bucket name must not contain '.'")
 		}
+
+		if err := blob.ValidateBucketPath(c.StagingBucket.BucketPathS3); err != nil {
+			return fmt.Errorf("bucketPathS3 %w", err)
+		}
 	case stagingBucketTypeGCS:
 		for _, req := range [][]string{
 			{"bucketGCS", c.StagingBucket.BucketGCS},
@@ -109,6 +113,10 @@ func (c config) Validate() error {
 			return fmt.Errorf("invalid gcsHMACSecret: must be 40 characters")
 		} else if _, err := base64.StdEncoding.DecodeString(c.StagingBucket.GCSHMACSecret); err != nil {
 			return fmt.Errorf("invalid gcsHMACSecret: must be base64 encoded")
+		}
+
+		if err := blob.ValidateBucketPath(c.StagingBucket.BucketPathGCS); err != nil {
+			return fmt.Errorf("bucketPathGCS %w", err)
 		}
 	case stagingBucketTypeAzure:
 		for _, req := range [][]string{
@@ -146,6 +154,10 @@ func (c config) Validate() error {
 		}
 		if strings.Contains(containerName, "--") {
 			return fmt.Errorf("invalid containerName: must not contain consecutive hyphens")
+		}
+
+		if err := blob.ValidateBucketPath(c.StagingBucket.BucketPathAzure); err != nil {
+			return fmt.Errorf("bucketPathAzure %w", err)
 		}
 	case "":
 		return fmt.Errorf("missing 'stagingBucketType'")
