@@ -20,7 +20,7 @@ func TestValidateBucketPath(t *testing.T) {
 		{"embedded scheme rejected", "estuary/s3://nested", true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateBucketPath("prefix", tt.prefix)
+			err := ValidateBucketPath(tt.prefix)
 			if tt.wantError && err == nil {
 				t.Fatalf("expected an error for %q, got nil", tt.prefix)
 			}

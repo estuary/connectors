@@ -152,8 +152,8 @@ func (c config) Validate() error {
 		return err
 	}
 
-	if err := blob.ValidateBucketPath("prefix", c.Prefix); err != nil {
-		return err
+	if err := blob.ValidateBucketPath(c.Prefix); err != nil {
+		return fmt.Errorf("prefix %w", err)
 	}
 
 	return nil

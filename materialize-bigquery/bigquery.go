@@ -137,8 +137,8 @@ func (c config) Validate() error {
 		return err
 	}
 
-	if err := blob.ValidateBucketPath("bucket path", c.effectiveBucketPath()); err != nil {
-		return err
+	if err := blob.ValidateBucketPath(c.effectiveBucketPath()); err != nil {
+		return fmt.Errorf("bucket_path %w", err)
 	}
 
 	return nil

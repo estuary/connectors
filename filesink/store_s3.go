@@ -119,8 +119,8 @@ func (c S3StoreConfig) Validate() error {
 	if _, err := time.ParseDuration(c.UploadInterval); err != nil {
 		return fmt.Errorf("parsing upload interval %q: %w", c.UploadInterval, err)
 	} else if c.Prefix != "" {
-		if err := blob.ValidateBucketPath("prefix", c.Prefix); err != nil {
-			return err
+		if err := blob.ValidateBucketPath(c.Prefix); err != nil {
+			return fmt.Errorf("prefix %w", err)
 		}
 	} else if c.FileSizeLimit < 0 {
 		return fmt.Errorf("fileSizeLimit '%d' cannot be negative", c.FileSizeLimit)
