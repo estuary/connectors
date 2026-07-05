@@ -384,8 +384,8 @@ func (c sparkConfig) Validate(emr emrConfig) error {
 	if emr.AWSSecretAccessKey == "" {
 		return errors.New("missing 'aws_secret_access_key'")
 	}
-	if emr.BucketPath != "" && strings.HasPrefix(emr.BucketPath, "/") {
-		return fmt.Errorf("bucket path %q cannot start with /", emr.BucketPath)
+	if err := blob.ValidateBucketPath(emr.BucketPath); err != nil {
+		return fmt.Errorf("bucket_path %w", err)
 	}
 	return nil
 }
@@ -480,10 +480,8 @@ func (c emrConfig) Validate() error {
 		}
 	}
 
-	if c.BucketPath != "" {
-		if strings.HasPrefix(c.BucketPath, "/") {
-			return fmt.Errorf("bucket path %q cannot start with /", c.BucketPath)
-		}
+	if err := blob.ValidateBucketPath(c.BucketPath); err != nil {
+		return fmt.Errorf("bucket_path %w", err)
 	}
 
 	if c.SystemsManagerPrefix != "" {
