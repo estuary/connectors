@@ -178,27 +178,41 @@ func (c config) CredentialsClientOption() (option.ClientOption, error) {
 	return nil, fmt.Errorf("unknown 'auth_type'")
 }
 
-func (c config) client(ctx context.Context, ep *sql.Endpoint[config]) (*client, error) {
-	var clientOpts []option.ClientOption
-
+// clientOptions returns the client options shared by every API client the
+// connector constructs, including the server-detection probe, so the probe
+// observes the server through exactly the same credentials and endpoint as
+// regular operation.
+func (c config) clientOptions() ([]option.ClientOption, error) {
 	credOption, err := c.CredentialsClientOption()
 	if err != nil {
 		return nil, err
 	}
-	clientOpts = append(clientOpts,
+	var clientOpts = []option.ClientOption{
 		credOption,
 		option.WithUserAgent("EstuaryFlow (GPN:Estuary;)"),
-	)
+	}
 	if c.Advanced.Endpoint != "" {
 		clientOpts = append(clientOpts, option.WithEndpoint(c.Advanced.Endpoint))
 	}
+	return clientOpts, nil
+}
 
-	// Allow overriding the main 'project_id' with 'billing_project_id' for client operation billing.
-	var billingProjectID = c.BillingProjectID
-	if billingProjectID == "" {
-		billingProjectID = c.ProjectID
+// effectiveBillingProjectID allows overriding the main 'project_id' with
+// 'billing_project_id' for client operation billing.
+func (c config) effectiveBillingProjectID() string {
+	if c.BillingProjectID != "" {
+		return c.BillingProjectID
 	}
-	bigqueryClient, err := bigquery.NewClient(ctx, billingProjectID, clientOpts...)
+	return c.ProjectID
+}
+
+func (c config) client(ctx context.Context, ep *sql.Endpoint[config], isEmulatorGoccy bool) (*client, error) {
+	clientOpts, err := c.clientOptions()
+	if err != nil {
+		return nil, err
+	}
+
+	bigqueryClient, err := bigquery.NewClient(ctx, c.effectiveBillingProjectID(), clientOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("creating bigquery client: %w", err)
 	}
@@ -212,9 +226,10 @@ func (c config) client(ctx context.Context, ep *sql.Endpoint[config]) (*client, 
 	}
 
 	return &client{
-		bigqueryClient: bigqueryClient,
-		cfg:            c,
-		ep:             ep,
+		bigqueryClient:  bigqueryClient,
+		cfg:             c,
+		ep:              ep,
+		isEmulatorGoccy: isEmulatorGoccy,
 	}, nil
 }
 
@@ -270,7 +285,16 @@ func newBigQueryDriver() *sql.Driver[config, tableConfig] {
 				"bucket_path": cfg.effectiveBucketPath(),
 			}).Info("creating bigquery endpoint")
 
-			dialect := bqDialect(featureFlags)
+			// Classify the server once per session; everything emulator-gated
+			// downstream keys off this single result (REQ-002). Spec never
+			// reaches NewEndpoint, so this probe never runs without a
+			// genuine need for a live server.
+			isEmulatorGoccy, err := detectEmulatorGoccy(ctx, cfg)
+			if err != nil {
+				return nil, err
+			}
+
+			dialect := bqDialect(featureFlags, isEmulatorGoccy)
 			templates := renderTemplates(dialect)
 
 			// BigQuery's default SerPolicy has historically had limits of 1500
@@ -289,9 +313,11 @@ func newBigQueryDriver() *sql.Driver[config, tableConfig] {
 				Dialect:             dialect,
 				SerPolicy:           serPolicy,
 				MetaCheckpoints:     nil,
-				NewClient:           newClient,
+				NewClient: func(ctx context.Context, _ string, ep *sql.Endpoint[config]) (sql.Client, error) {
+					return ep.Config.client(ctx, ep, isEmulatorGoccy)
+				},
 				CreateTableTemplate: templates.createTargetTable,
-				NewTransactor:       prepareNewTransactor(templates),
+				NewTransactor:       prepareNewTransactor(templates, isEmulatorGoccy),
 				ConcurrentApply:     true,
 				NoFlowDocument:      cfg.Advanced.NoFlowDocument,
 				Options: m.MaterializeOptions{

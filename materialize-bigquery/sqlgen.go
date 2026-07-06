@@ -60,7 +60,11 @@ var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{
 	}
 }
 
-func bqDialect(featureFlags map[string]bool) sql.Dialect {
+// bqDialect builds the SQL dialect. isEmulatorGoccy carries the one-time
+// server classification from endpoint setup (see detectEmulatorGoccy); the
+// goccy-emulator dialect variants key off it, while the production (SaaS)
+// dialect is byte-identical to its historical output when it is false.
+func bqDialect(featureFlags map[string]bool, isEmulatorGoccy bool) sql.Dialect {
 	objAndArrayAsJson := featureFlags["objects_and_arrays_as_json"]
 	objAndArrayCol := sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes))
 	if !objAndArrayAsJson {

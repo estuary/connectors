@@ -52,10 +52,15 @@ type transactor struct {
 	objAndArrayAsJson       bool
 	loggedStorageApiMessage bool
 	skipCleanup             bool
+	// isEmulatorGoccy is the server classification made once at endpoint setup
+	// (see detectEmulatorGoccy); it is threaded here so per-operation code
+	// never re-probes the server.
+	isEmulatorGoccy bool
 }
 
 func prepareNewTransactor(
 	templates templates,
+	isEmulatorGoccy bool,
 ) func(context.Context, string, map[string]bool, *sql.Endpoint[config], sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema, *m.BindingEvents) (m.Transactor, error) {
 	return func(
 		ctx context.Context,
@@ -70,7 +75,7 @@ func prepareNewTransactor(
 	) (m.Transactor, error) {
 		var cfg = ep.Config
 
-		client, err := cfg.client(ctx, ep)
+		client, err := cfg.client(ctx, ep, isEmulatorGoccy)
 		if err != nil {
 			return nil, err
 		}
@@ -92,6 +97,7 @@ func prepareNewTransactor(
 			templates:         templates,
 			objAndArrayAsJson: featureFlags["objects_and_arrays_as_json"],
 			skipCleanup:       featureFlags["skip_cleanup"],
+			isEmulatorGoccy:   isEmulatorGoccy,
 			client:            client,
 			be:                be,
 			loadFiles:         boilerplate.NewStagedFiles(stagedFileClient{}, bucket, writer.DefaultJsonFileSizeLimit, cfg.effectiveBucketPath(), false, false),

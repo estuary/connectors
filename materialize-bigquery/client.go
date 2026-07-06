@@ -29,10 +29,10 @@ type client struct {
 	bigqueryClient *bigquery.Client
 	cfg            config
 	ep             *sql.Endpoint[config]
-}
-
-func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint[config]) (sql.Client, error) {
-	return ep.Config.client(ctx, ep)
+	// isEmulatorGoccy is the server classification made once at endpoint setup
+	// (see detectEmulatorGoccy); it is threaded here so per-operation code
+	// never re-probes the server.
+	isEmulatorGoccy bool
 }
 
 func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
