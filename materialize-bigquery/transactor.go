@@ -95,7 +95,12 @@ func prepareNewTransactor(
 			cfg:               cfg,
 			dialect:           ep.Dialect,
 			templates:         templates,
-			objAndArrayAsJson: featureFlags["objects_and_arrays_as_json"],
+			// The goccy-emulator dialect stores documents and object/array
+			// fields as STRING rather than native JSON (see bqDialect), so
+			// query rendering must also pick STRING for the loadQuery
+			// no-document CAST or its UNION ALL branches would mix JSON and
+			// STRING types.
+			objAndArrayAsJson: featureFlags["objects_and_arrays_as_json"] && !isEmulatorGoccy,
 			skipCleanup:       featureFlags["skip_cleanup"],
 			isEmulatorGoccy:   isEmulatorGoccy,
 			client:            client,

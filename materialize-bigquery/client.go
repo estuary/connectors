@@ -185,7 +185,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	var stmts []string
 	if len(ta.DropNotNulls) > 0 || len(ta.AddColumns) > 0 {
 		var alterColumnStmtBuilder strings.Builder
-		if err := renderTemplates(c.ep.Dialect).alterTableColumns.Execute(&alterColumnStmtBuilder, ta); err != nil {
+		if err := renderTemplates(c.ep.Dialect, c.isEmulatorGoccy).alterTableColumns.Execute(&alterColumnStmtBuilder, ta); err != nil {
 			return "", nil, fmt.Errorf("rendering alter table columns statement: %w", err)
 		}
 		// The template can render both an ADD COLUMN and a DROP NOT NULL

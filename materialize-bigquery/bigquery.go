@@ -295,7 +295,7 @@ func newBigQueryDriver() *sql.Driver[config, tableConfig] {
 			}
 
 			dialect := bqDialect(featureFlags, isEmulatorGoccy)
-			templates := renderTemplates(dialect)
+			templates := renderTemplates(dialect, isEmulatorGoccy)
 
 			// BigQuery's default SerPolicy has historically had limits of 1500
 			// for truncation, rather than the more common 1000.

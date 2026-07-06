@@ -67,8 +67,32 @@ var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{
 func bqDialect(featureFlags map[string]bool, isEmulatorGoccy bool) sql.Dialect {
 	objAndArrayAsJson := featureFlags["objects_and_arrays_as_json"]
 	objAndArrayCol := sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes))
+	multipleCol := sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes))
+	if isEmulatorGoccy {
+		// goccy's SQLite-backed GCS load path parses JSON columns with
+		// googlesqlite_parse_json(), which rejects the connector's JSON byte
+		// encoding ("sqlite3: SQL logic error: invalid character 's' looking
+		// for beginning of value"), so the emulator stores these fields as
+		// stringified JSON instead of native JSON.
+		objAndArrayCol = sql.MapStatic("STRING", sql.UsingConverter(sql.ToJsonString))
+		multipleCol = objAndArrayCol
+	}
 	if !objAndArrayAsJson {
 		objAndArrayCol = sql.MapStatic("STRING", sql.UsingConverter(jsonConverter))
+	}
+
+	integerCol := sql.MapStatic("INTEGER")
+	if isEmulatorGoccy {
+		// goccy's zetasqlite analyzer — exercised whenever DDL uses
+		// fully-qualified `project`.dataset.table names, as the connector
+		// always does — accepts only canonical ZetaSQL type names: INTEGER
+		// fails with "googleapi: Error 400: failed to analyze: Type not
+		// found: INTEGER" while the INT64 alias works (verified hands-on
+		// against goccy/bigquery-emulator 0.8.1; unqualified 2-part names
+		// take a laxer path that accepts INTEGER, which is why simple
+		// experiments don't reproduce the failure). Table metadata still
+		// reports such columns as INTEGER, hence AlsoCompatibleWith.
+		integerCol = sql.MapStatic("INT64", sql.AlsoCompatibleWith("integer"))
 	}
 
 	primaryKeyTextType := sql.MapStatic("STRING")
@@ -94,7 +118,7 @@ func bqDialect(featureFlags map[string]bool, isEmulatorGoccy bool) sql.Dialect {
 			sql.BINARY:  binaryMapping,
 			sql.BOOLEAN: sql.MapStatic("BOOLEAN"),
 			sql.INTEGER: sql.MapSignedInt64(
-				sql.MapStatic("INTEGER"),
+				integerCol,
 				sql.MapStatic("BIGNUMERIC(38,0)", sql.AlsoCompatibleWith("bignumeric")),
 			),
 			// We used to materialize these as "BIGNUMERIC(38,0)", so
@@ -104,7 +128,7 @@ func bqDialect(featureFlags map[string]bool, isEmulatorGoccy bool) sql.Dialect {
 			sql.OBJECT: objAndArrayCol,
 			// Note that MULTIPLE fields have always been materialized into JSON
 			// columns, so there is no configurability for these.
-			sql.MULTIPLE: sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes)),
+			sql.MULTIPLE: multipleCol,
 			sql.STRING_INTEGER: sql.MapStringMaxLen(
 				// BigQuery's table metadata APIs include the precision and
 				// scale with BIGNUMERIC columns, and we strip that off when
@@ -226,7 +250,7 @@ type templates struct {
 	storeUpdate             *template.Template
 }
 
-func renderTemplates(dialect sql.Dialect) templates {
+func renderTemplates(dialect sql.Dialect, isEmulatorGoccy bool) templates {
 	var tplAll = sql.MustParseTemplate(dialect, "root", `
 {{ define "tempTableName" -}}
 flow_temp_table_{{ $.Binding }}
@@ -452,6 +476,33 @@ UPDATE {{ Identifier $.TablePath }}
 	AND fence={{ $.Fence }};
 {{ end }}
 `)
+
+	if isEmulatorGoccy {
+		// goccy handles only one ALTER command per statement, so the emulator
+		// variant renders each added column and dropped constraint as its own
+		// statement; client.go AlterTable splits the rendered output on ";"
+		// and submits each statement as a separate query. Note that on
+		// goccy/bigquery-emulator 0.8.1 every query-path ALTER TABLE is
+		// accepted but silently ignored (no error, no schema change) — the
+		// apply/migrate integration tasks address that separately.
+		//
+		// The storeUpdate MERGE template is deliberately NOT overridden:
+		// hands-on verification against goccy 0.8.1 (job path, fully
+		// qualified table names, the exact production template shape) shows
+		// the "l." alias prefix in UPDATE SET is accepted and the MERGE
+		// updates/inserts/deletes correctly, so PR #4721's unconditional
+		// alias removal was unnecessary.
+		tplAll = template.Must(tplAll.Parse(`
+{{ define "alterTableColumns" }}
+{{- range $col := $.AddColumns }}
+ALTER TABLE {{$.Identifier}} ADD COLUMN {{$col.Identifier}} {{$col.NullableDDL}};
+{{- end }}
+{{- range $col := $.DropNotNulls }}
+ALTER TABLE {{$.Identifier}} ALTER COLUMN {{ ColumnIdentifier $col.Name }} DROP NOT NULL;
+{{- end }}
+{{ end }}
+`))
+	}
 
 	return templates{
 		tempTableName:           tplAll.Lookup("tempTableName"),
