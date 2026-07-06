@@ -23,13 +23,11 @@ $defs:
     type: object
 additionalProperties: true
 description: |-
-  Email in a classic automation workflow. Like its `Automation` parent,
-  the endpoint is feature-gated and empty on the test account, so this shape
-  is docs-based; the required `id` fails loudly if a real payload disagrees.
-
-  The parent `workflow_id` is stamped into `_meta` (we can't live-verify
-  whether the response carries it), and the parent fan-out rejects an empty
-  `workflow_id` rather than build a malformed `automations//emails` path.
+  Member (contact) of a list. `id` is the MD5 of the lowercase email
+  address, so it is unique only within its list — the stream key is the
+  (`list_id`, `id`) composite. The unfiltered listing silently excludes
+  archived members, so the stream walks each list twice: once bare, once
+  with `status=archived` (see the per-sweep subtasks in `resources.py`).
 properties:
   _meta:
     $ref: '#/$defs/Meta'
@@ -37,9 +35,26 @@ properties:
   id:
     title: Id
     type: string
+  list_id:
+    title: List Id
+    type: string
+  email_address:
+    title: Email Address
+    type: string
+  last_changed:
+    format: date-time
+    title: Last Changed
+    type: string
+  status:
+    title: Status
+    type: string
 required:
 - id
-title: AutomationEmail
+- list_id
+- email_address
+- last_changed
+- status
+title: ListMember
 type: object
 x-infer-schema: true
 if:

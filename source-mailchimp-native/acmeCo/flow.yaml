@@ -19,6 +19,11 @@ collections:
     schema: interests.schema.yaml
     key:
     - /_meta/row_id
+  acmeCo/list_members:
+    schema: list_members.schema.yaml
+    key:
+    - /list_id
+    - /id
   acmeCo/lists:
     schema: lists.schema.yaml
     key:
@@ -27,6 +32,11 @@ collections:
     schema: segment_members.schema.yaml
     key:
     - /_meta/row_id
+  acmeCo/segments:
+    schema: segments.schema.yaml
+    key:
+    - /list_id
+    - /id
   acmeCo/tags:
     schema: tags.schema.yaml
     key:

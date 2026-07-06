@@ -46,22 +46,6 @@
     }
   ],
   [
-    "acmeCo/interest_categories",
-    {
-      "_links": "REDACTED",
-      "_meta": {
-        "op": "c",
-        "row_id": 0,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "display_order": 0,
-      "id": "1d3affa9d2",
-      "list_id": "f34247943d",
-      "title": "Estuary Test Category A",
-      "type": "checkboxes"
-    }
-  ],
-  [
     "acmeCo/interests",
     {
       "_links": "REDACTED",
@@ -76,19 +60,6 @@
       "list_id": "f34247943d",
       "name": "Estuary Test Interest",
       "subscriber_count": "0"
-    }
-  ],
-  [
-    "acmeCo/tags",
-    {
-      "_meta": {
-        "list_id": "f34247943d",
-        "op": "c",
-        "row_id": 0,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "id": 2225592,
-      "name": "estuary-other-tag"
     }
   ],
   [
@@ -140,6 +111,35 @@
     }
   ],
   [
+    "acmeCo/interest_categories",
+    {
+      "_links": "REDACTED",
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "display_order": 0,
+      "id": "1d3affa9d2",
+      "list_id": "f34247943d",
+      "title": "Estuary Test Category A",
+      "type": "checkboxes"
+    }
+  ],
+  [
+    "acmeCo/tags",
+    {
+      "_meta": {
+        "list_id": "f34247943d",
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": 2225592,
+      "name": "estuary-other-tag"
+    }
+  ],
+  [
     "acmeCo/campaigns",
     {
       "_links": "REDACTED",
@@ -160,7 +160,7 @@
         "list_id": "f34247943d",
         "list_is_active": true,
         "list_name": "Estuary",
-        "recipient_count": 2,
+        "recipient_count": 3,
         "segment_text": ""
       },
       "resendable": false,
@@ -194,6 +194,90 @@
       },
       "type": "regular",
       "web_id": 6783369
+    }
+  ],
+  [
+    "acmeCo/list_members",
+    {
+      "_links": "REDACTED",
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "consents_to_one_to_one_messaging": true,
+      "contact_id": "1bc3bc1c920d4a6cef2ee0d620f08bb0",
+      "email_address": "nicolas+estuary-test-2@estuary.dev",
+      "email_client": "",
+      "email_type": "html",
+      "full_name": "",
+      "id": "3abd9d34d7d6953d8a91a79904b6631d",
+      "interests": {
+        "6fbed1c079": false
+      },
+      "ip_opt": "201.235.239.178",
+      "ip_signup": "",
+      "language": "",
+      "last_changed": "2026-07-02T18:19:54Z",
+      "list_id": "f34247943d",
+      "location": {
+        "country_code": "",
+        "dstoff": 0,
+        "gmtoff": 0,
+        "latitude": 0,
+        "longitude": 0,
+        "region": "",
+        "timezone": ""
+      },
+      "member_rating": 2,
+      "merge_fields": {
+        "ADDRESS": "",
+        "BIRTHDAY": "",
+        "COMPANY": "",
+        "FNAME": "",
+        "LNAME": "",
+        "PHONE": ""
+      },
+      "sms_phone_number": "",
+      "sms_subscription_last_updated": "",
+      "sms_subscription_status": "",
+      "source": "API - Generic",
+      "stats": "REDACTED",
+      "status": "subscribed",
+      "tags": [
+        {
+          "id": 2225593,
+          "name": "estuary-test-segment (cursor probe)"
+        },
+        {
+          "id": 2225591,
+          "name": "estuary-test-tag"
+        },
+        {
+          "id": 2225592,
+          "name": "estuary-other-tag"
+        }
+      ],
+      "tags_count": 3,
+      "timestamp_opt": "2026-06-12T13:12:38+00:00",
+      "timestamp_signup": "",
+      "unique_email_id": "e8feaf0c3c",
+      "vip": false,
+      "web_id": 360308974
+    }
+  ],
+  [
+    "acmeCo/segments",
+    {
+      "_links": "REDACTED",
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "created_at": "2026-06-12T13:12:06+00:00",
+      "id": 2225591,
+      "list_id": "f34247943d",
+      "member_count": 2,
+      "name": "estuary-test-tag",
+      "type": "static",
+      "updated_at": "2026-06-12T13:12:06Z"
     }
   ]
 ]
