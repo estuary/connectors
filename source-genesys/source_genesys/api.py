@@ -246,7 +246,7 @@ async def _perform_conversation_job(
             case "CANCELLED" | "EXPIRED":
                 raise RuntimeError(f"Conversations job status is {state}. Job request body was: ", body)
 
-        rate_limiter.update(delay, True)
+        rate_limiter.update(log, delay, True)
 
     # Paginate through results.
     url = f"{COMMON_API}.{domain}/api/v2/analytics/conversations/details/jobs/{job_id}/results"
