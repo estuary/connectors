@@ -23,23 +23,30 @@ $defs:
     type: object
 additionalProperties: true
 description: |-
-  Email in a classic automation workflow. Like its `Automation` parent,
-  the endpoint is feature-gated and empty on the test account, so this shape
-  is docs-based; the required `id` fails loudly if a real payload disagrees.
-
-  The parent `workflow_id` is stamped into `_meta` (we can't live-verify
-  whether the response carries it), and the parent fan-out rejects an empty
-  `workflow_id` rather than build a malformed `automations//emails` path.
+  List segment. Every `type` partition (`saved`, `static`, `fuzzy`) flows
+  through the one endpoint, and the bare listing is the full population —
+  segments have no archived/hidden state (unlike members). Member tags
+  materialize as `type: static` segments, so this stream is a superset of
+  the `tags` stream's projection.
 properties:
   _meta:
     $ref: '#/$defs/Meta'
     description: Document metadata
   id:
     title: Id
+    type: integer
+  list_id:
+    title: List Id
+    type: string
+  updated_at:
+    format: date-time
+    title: Updated At
     type: string
 required:
 - id
-title: AutomationEmail
+- list_id
+- updated_at
+title: Segment
 type: object
 x-infer-schema: true
 if:
