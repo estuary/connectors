@@ -1,7 +1,7 @@
 import abc
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING, Any, ClassVar, Literal
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, override
 
 from estuary_cdk.capture.common import (
     ConnectorState as GenericConnectorState,
@@ -274,6 +274,70 @@ class AutomationEmail(MailchimpChildEntity):
     ITEMS_KEY: ClassVar[str] = "emails"
 
     id: str
+
+
+class MailchimpIncrementalChildEntity(MailchimpChildEntity, abc.ABC):
+    """List-child document with an updated-style cursor, captured
+    incrementally rather than by snapshot."""
+
+    # The endpoint's server-side cursor filters: `SINCE_PARAM` lower-bounds
+    # results by the cursor field (exclusive of the exact timestamp) and
+    # `BEFORE_PARAM` upper-bounds them
+    SINCE_PARAM: ClassVar[str]
+    BEFORE_PARAM: ClassVar[str]
+
+    @abc.abstractmethod
+    def get_cursor(self) -> AwareDatetime: ...
+
+
+class ListMember(MailchimpIncrementalChildEntity):
+    """Member (contact) of a list. `id` is the MD5 of the lowercase email
+    address, so it is unique only within its list — the stream key is the
+    (`list_id`, `id`) composite. The unfiltered listing silently excludes
+    archived members, so the stream walks each list twice: once bare, once
+    with `status=archived` (see the per-sweep subtasks in `resources.py`)."""
+
+    NAME: ClassVar[str] = "list_members"
+    PATH_TEMPLATE: ClassVar[str] = "lists/{list_id}/members"
+    ITEMS_KEY: ClassVar[str] = "members"
+    SINCE_PARAM: ClassVar[str] = "since_last_changed"
+    BEFORE_PARAM: ClassVar[str] = "before_last_changed"
+
+    id: str
+    list_id: str
+    email_address: str
+    # Cursor. Advances on update, archive, and unarchive, so both directions
+    # of the archive transition are observed.
+    last_changed: AwareDatetime
+    status: str
+
+    @override
+    def get_cursor(self) -> AwareDatetime:
+        return self.last_changed
+
+
+class Segment(MailchimpIncrementalChildEntity):
+    """List segment. Every `type` partition (`saved`, `static`, `fuzzy`) flows
+    through the one endpoint, and the bare listing is the full population —
+    segments have no archived/hidden state (unlike members). Member tags
+    materialize as `type: static` segments, so this stream is a superset of
+    the `tags` stream's projection."""
+
+    NAME: ClassVar[str] = "segments"
+    PATH_TEMPLATE: ClassVar[str] = "lists/{list_id}/segments"
+    ITEMS_KEY: ClassVar[str] = "segments"
+    SINCE_PARAM: ClassVar[str] = "since_updated_at"
+    BEFORE_PARAM: ClassVar[str] = "before_updated_at"
+
+    # Integer, unlike most Mailchimp IDs — and legitimately 0-able (see `IdOnly`).
+    id: int
+    list_id: str
+    # Cursor. Advances on rename/definition updates.
+    updated_at: AwareDatetime
+
+    @override
+    def get_cursor(self) -> AwareDatetime:
+        return self.updated_at
 
 
 @dataclass(frozen=True)

@@ -21,25 +21,25 @@ captures:
         schedule: ''
       target: acmeCo/automations
     - resource:
-        name: interest_categories
-        interval: PT1H
-        schedule: ''
-      target: acmeCo/interest_categories
-    - resource:
         name: interests
         interval: PT1H
         schedule: ''
       target: acmeCo/interests
     - resource:
-        name: tags
-        interval: PT1H
-        schedule: ''
-      target: acmeCo/tags
-    - resource:
         name: segment_members
         interval: PT1H
         schedule: ''
       target: acmeCo/segment_members
+    - resource:
+        name: interest_categories
+        interval: PT1H
+        schedule: ''
+      target: acmeCo/interest_categories
+    - resource:
+        name: tags
+        interval: PT1H
+        schedule: ''
+      target: acmeCo/tags
     - resource:
         name: automation_emails
         interval: PT1H
@@ -50,3 +50,13 @@ captures:
         interval: PT5M
         schedule: 0 0 * * *
       target: acmeCo/campaigns
+    - resource:
+        name: list_members
+        interval: PT5M
+        schedule: ''
+      target: acmeCo/list_members
+    - resource:
+        name: segments
+        interval: PT5M
+        schedule: ''
+      target: acmeCo/segments

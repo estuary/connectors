@@ -1,5 +1,5 @@
 from collections.abc import AsyncGenerator
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from logging import Logger
 
 from estuary_cdk.capture.common import LogCursor, PageCursor
@@ -16,11 +16,13 @@ from .models import (
     Interest,
     InterestCategory,
     MailchimpChildEntity,
+    MailchimpIncrementalChildEntity,
     MailchimpList,
     OAuthMetadata,
     ParentContext,
     ParentId,
     ParentIdValidationContext,
+    Segment,
     SegmentMember,
 )
 
@@ -55,8 +57,7 @@ async def resolve_base_url(log: Logger, http: HTTPSession, credentials: object) 
     return f"{metadata.api_endpoint}/3.0"
 
 
-# Documented maximum `count` across Mailchimp collection endpoints
-# (live-verified accepted on /lists and /campaigns).
+# Documented maximum `count` across Mailchimp collection endpoints.
 MAX_PAGE_SIZE = 1000
 
 
@@ -156,19 +157,17 @@ async def snapshot_interests(
 ) -> AsyncGenerator[Interest, None]:
     """Snapshot interests, walking lists -> interest-categories -> interests.
     Each interest carries its own list_id/category_id, so nothing is injected."""
-    for list_id in await _fetch_parent_ids(
+    for list_id in await fetch_parent_ids(
         http, base_url, MailchimpList.PATH, MailchimpList.ITEMS_KEY, log
     ):
         categories_path = InterestCategory.PATH_TEMPLATE.format(list_id=list_id)
-        for category_id in await _fetch_parent_ids(
+        for category_id in await fetch_parent_ids(
             http, base_url, categories_path, InterestCategory.ITEMS_KEY, log
         ):
             async for doc in _snapshot_collection(
                 http,
                 base_url,
-                Interest.PATH_TEMPLATE.format(
-                    list_id=list_id, category_id=category_id
-                ),
+                Interest.PATH_TEMPLATE.format(list_id=list_id, category_id=category_id),
                 Interest.ITEMS_KEY,
                 Interest,
                 log,
@@ -192,12 +191,12 @@ async def snapshot_segment_members(
 ) -> AsyncGenerator[SegmentMember, None]:
     """Snapshot segment members, walking lists -> segments -> members. The
     member response omits segment_id, so it is stamped into _meta."""
-    for list_id in await _fetch_parent_ids(
+    for list_id in await fetch_parent_ids(
         http, base_url, MailchimpList.PATH, MailchimpList.ITEMS_KEY, log
     ):
-        segments_path = f"lists/{list_id}/segments"
-        for segment_id in await _fetch_parent_ids(
-            http, base_url, segments_path, "segments", log
+        segments_path = Segment.PATH_TEMPLATE.format(list_id=list_id)
+        for segment_id in await fetch_parent_ids(
+            http, base_url, segments_path, Segment.ITEMS_KEY, log
         ):
             async for doc in _snapshot_collection(
                 http,
@@ -209,12 +208,14 @@ async def snapshot_segment_members(
                 SegmentMember,
                 log,
                 params=_SEGMENT_MEMBER_PARAMS,
-                validation_context=ParentIdValidationContext({"segment_id": segment_id}),
+                validation_context=ParentIdValidationContext(
+                    {"segment_id": segment_id}
+                ),
             ):
                 yield doc
 
 
-async def _fetch_parent_ids(
+async def fetch_parent_ids(
     http: HTTPSession,
     base_url: str,
     path: str,
@@ -222,8 +223,8 @@ async def _fetch_parent_ids(
     log: Logger,
 ) -> list[ParentId]:
     """Drain a parent collection into bare IDs before any child request is
-    made, projecting the response down to `fields=<items_key>.id`
-    (live-verified honored on top-level and nested paths alike). `IdOnly`
+    made, projecting the response down to `fields=<items_key>.id` — the
+    projection is honored on top-level and nested paths alike. `IdOnly`
     rejects an empty ID, so a malformed child path can never be templated."""
     return [
         item.id
@@ -248,11 +249,11 @@ async def _resolve_leaf_contexts(
     """Drain the parent collection into one binding per parent ID — each a
     context that fills the `{placeholder}` in the child's `PATH_TEMPLATE`.
 
-    `_fetch_parent_ids` fully materializes the parent list before any child is
+    `fetch_parent_ids` fully materializes the parent list before any child is
     fetched, so no response is held open across the child requests."""
 
     parent = spec.parent
-    parent_ids = await _fetch_parent_ids(
+    parent_ids = await fetch_parent_ids(
         http, base_url, parent.path_template, parent.items_key, log
     )
     return [{parent.id_field: parent_id} for parent_id in parent_ids]
@@ -361,6 +362,144 @@ async def backfill_campaigns(
     count = 0
     page_gen = _fetch_collection_page(
         http, base_url, Campaign.PATH, Campaign.ITEMS_KEY, Campaign, params, log
+    )
+
+    async for item in page_gen:
+        yield item
+        count += 1
+
+    # A full page means there may be more; a short page is the last one.
+    if count == MAX_PAGE_SIZE:
+        yield offset + count
+
+
+async def fetch_list_children[T: MailchimpIncrementalChildEntity](
+    http: HTTPSession,
+    base_url: str,
+    model: type[T],
+    list_id: ParentId,
+    extra_request_params: dict[str, str | int],
+    log: Logger,
+    log_cursor: LogCursor,
+) -> AsyncGenerator[T | LogCursor, None]:
+    """Incrementally fetch one (list, sweep) subtask of a list-child stream
+    (list_members, segments), parametrized by sweep params (e.g.
+    `status=archived`); the cursor filter and value come from the model
+    (`SINCE_PARAM`, `get_cursor()`).
+
+                  cursor   cursor + 1s  horizon = last elapsed second
+    ─────────────────┼──────────┼──────────────┼─────▶ time (1s ticks)
+                     │          │              │
+    SINCE_PARAM ─────(══════════╪══════════════╪═════▶
+    BEFORE_PARAM ════╪══════════╪══════════════]
+    emitted ─────────┼──────────[══════════════]
+                     │          │              └─ the present second is still
+                     │          │                 in progress; its docs wait
+                     │          │                 for the next poll's window
+                     │          └─ first emitted second
+                     └─ nothing new can appear here or earlier: this second
+                        had fully elapsed when it was walked, and updates
+                        always stamp "now"
+    """
+    assert isinstance(log_cursor, datetime)
+
+    # The last fully-elapsed second; docs stamped in the still-in-progress
+    # second wait for the next poll's window.
+    horizon = datetime.now(tz=UTC).replace(microsecond=0) - timedelta(seconds=1)
+    if horizon <= log_cursor:
+        return
+
+    last_seen = log_cursor
+    offset = 0
+    emitted = False
+    path = model.PATH_TEMPLATE.format(list_id=list_id)
+
+    while True:
+        count = 0
+        page = _fetch_collection_page(
+            http,
+            base_url,
+            path,
+            model.ITEMS_KEY,
+            model,
+            {
+                "count": MAX_PAGE_SIZE,
+                "offset": offset,
+                model.SINCE_PARAM: log_cursor.isoformat(),
+                model.BEFORE_PARAM: horizon.isoformat(),
+                **extra_request_params,
+            },
+            log,
+        )
+
+        async for item in page:
+            count += 1
+            yield item
+            emitted = True
+            if item.get_cursor() > last_seen:
+                last_seen = item.get_cursor()
+
+        offset += count
+        if count < MAX_PAGE_SIZE:
+            break
+
+    if emitted:
+        yield last_seen
+
+
+async def backfill_list_children[T: MailchimpIncrementalChildEntity](
+    http: HTTPSession,
+    base_url: str,
+    model: type[T],
+    list_id: ParentId,
+    extra_request_params: dict[str, str | int],
+    start_date: datetime,
+    log: Logger,
+    page: PageCursor,
+    cutoff: LogCursor,
+) -> AsyncGenerator[T | PageCursor, None]:
+    """Backfill one (list, sweep) subtask of a list-child stream over the
+    frozen `(start_date, cutoff − 1s]` window, checkpointing a plain int
+    offset per full page like `backfill_campaigns`. The window is frozen,
+    so nothing new ever enters it.
+
+              start_date            cutoff − 1s cutoff
+    ──────────────┼─────────────────────┼───────┼──▶ time (1s ticks)
+                  │                     │       │
+    SINCE_PARAM ──(═════════════════════╪═══════╪══▶
+    BEFORE_PARAM ═╪═════════════════════]       │
+    window ───────(═════════════════════]       │
+                  │                     │       └─ covered by the FIRST
+                  │                     │          incremental poll: its cursor
+                  │                     │          seeds at cutoff − 1s,
+                  │                     │          putting its first emitted
+                  │                     │          second exactly here
+                  │                     └─ last backfilled second
+                  └─ docs stamped exactly at start_date are skipped
+                     (since_* is exclusive) — start-of-window precision
+                     is not load-bearing, unlike the cutoff seam
+    """
+    assert page is None or isinstance(page, int)
+    assert isinstance(cutoff, datetime)
+
+    offset = page or 0
+    params: dict[str, str | int] = {
+        "count": MAX_PAGE_SIZE,
+        "offset": offset,
+        model.SINCE_PARAM: start_date.isoformat(),
+        model.BEFORE_PARAM: (cutoff - timedelta(seconds=1)).isoformat(),
+        **extra_request_params,
+    }
+
+    count = 0
+    page_gen = _fetch_collection_page(
+        http,
+        base_url,
+        model.PATH_TEMPLATE.format(list_id=list_id),
+        model.ITEMS_KEY,
+        model,
+        params,
+        log,
     )
 
     async for item in page_gen:
