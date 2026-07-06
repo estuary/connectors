@@ -1,0 +1,19 @@
+# Endpoint configuration for the opt-in local-emulator-goccy integration
+# suite, targeting the docker-compose stack in ../docker-compose.yaml:
+# goccy/bigquery-emulator on localhost:9050 and fake-gcs-server on
+# localhost:4443 (reached via STORAGE_EMULATOR_HOST, which the test sets).
+# No credentials: with advanced.endpoint set and credentials absent the
+# connector uses unauthenticated clients.
+project_id: test-project
+dataset: testing
+region: us-east1
+bucket: test-bucket
+bucket_path: /data
+hardDelete: true
+syncSchedule:
+    syncFrequency: 0s
+advanced:
+    feature_flags: allow_existing_tables_for_new_bindings
+    # The Go client treats the endpoint as the full API base path; goccy
+    # requires the /bigquery/v2/ suffix.
+    endpoint: http://localhost:9050/bigquery/v2/

@@ -1,0 +1,45 @@
+# Emulator stack for the opt-in local-emulator-goccy integration suite:
+# goccy/bigquery-emulator plus fake-gcs-server for staged-file storage.
+#
+# Both services join the external `flow-test` network. CI creates it
+# (.github/workflows/ci.yaml); for local runs create it once with:
+#   docker network create flow-test
+#
+# Image tags are pinned: the suite depends on version-specific emulator
+# behavior, and `latest` would make it non-reproducible.
+services:
+  bigquery:
+    image: "ghcr.io/goccy/bigquery-emulator:0.8.1"
+    command: >
+      --project=test-project
+      --dataset=testing
+    environment:
+      STORAGE_EMULATOR_HOST: "http://gcs:4443"
+    ports:
+      - "9050:9050"
+      - "9060:9060"
+    networks:
+      - flow-test
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/9050"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  gcs:
+    image: "fsouza/fake-gcs-server:1.54.0"
+    command: -scheme http
+    ports:
+      - "4443:4443"
+    networks:
+      - flow-test
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:4443/storage/v1/b"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+networks:
+  flow-test:
+    name: flow-test
+    external: true
