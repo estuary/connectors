@@ -34,9 +34,9 @@ LAG = 110
 # else untouched. The anchored regex is what keeps free-text values (e.g. "May 5, 2021")
 # safe from mangling.
 #
-# Matches "YYYY-MM-DD HH:MM:SS[.ffffff][ ](Z | +HH:MM | +HHMM)".
+# Matches the observed Klaviyo format "YYYY-MM-DD HH:MM:SS[.ffffff]+HH:MM".
 _SPACE_SEPARATED_DATETIME_RE = re.compile(
-    r"^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}(?:\.\d+)?) ?(Z|[+-]\d{2}:?\d{2})$"
+    r"^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}(?:\.\d+)?)([+-]\d{2}:\d{2})$"
 )
 
 
@@ -45,8 +45,6 @@ def _normalize_datetime(value: str) -> str:
     if not match:
         return value
     date, time, tz = match.groups()
-    if tz != "Z" and ":" not in tz:
-        tz = f"{tz[:3]}:{tz[3:]}"  # +0000 -> +00:00
     return f"{date}T{time}{tz}"
 
 

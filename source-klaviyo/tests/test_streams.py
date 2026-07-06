@@ -384,16 +384,16 @@ class TestProfilesStream:
                             # Documented consent field, and an arbitrary custom property that also
                             # happens to be a space-separated datetime: both should be normalized.
                             "$consent_timestamp": "2026-06-23 00:15:23.918411+00:00",
-                            "custom_signup_date": "2026-06-23 00:15:23+0000",
+                            "custom_signup_date": "2026-06-23 00:15:23+00:00",
                             # Free-text custom properties that merely contain spaces must be left alone.
                             "favorite_month": "May 5, 2021",
                             "status": "onboarding complete",
                         },
                         "subscriptions": {
-                            "email": {"marketing": {"consent": "SUBSCRIBED", "consent_timestamp": "2026-06-23 00:15:23 +00:00"}},
+                            "email": {"marketing": {"consent": "SUBSCRIBED", "consent_timestamp": "2026-06-23 00:15:23.918411+00:00"}},
                             "sms": {
                                 "marketing": {"consent": "SUBSCRIBED", "consent_timestamp": "2026-06-23 00:15:24.000000+00:00"},
-                                "transactional": {"consent": "SUBSCRIBED", "consent_timestamp": "2026-06-23 00:15:25.918411Z"}},
+                                "transactional": {"consent": "SUBSCRIBED", "consent_timestamp": "2026-06-23 00:15:25.000000+00:00"}},
                         },
                     },
                 },
@@ -421,10 +421,10 @@ class TestProfilesStream:
                         "status": "onboarding complete",
                     },
                     "subscriptions": {
-                        "email": {"marketing": {"consent": "SUBSCRIBED", "consent_timestamp": "2026-06-23T00:15:23+00:00"}},
+                        "email": {"marketing": {"consent": "SUBSCRIBED", "consent_timestamp": "2026-06-23T00:15:23.918411+00:00"}},
                         "sms": {
                             "marketing": {"consent": "SUBSCRIBED", "consent_timestamp": "2026-06-23T00:15:24.000000+00:00"},
-                            "transactional": {"consent": "SUBSCRIBED", "consent_timestamp": "2026-06-23T00:15:25.918411Z"}},
+                            "transactional": {"consent": "SUBSCRIBED", "consent_timestamp": "2026-06-23T00:15:25.000000+00:00"}},
                     },
                 },
             },
