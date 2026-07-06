@@ -370,7 +370,7 @@ class TestProfilesStream:
             },
         ]
 
-    def test_parse_response_normalizes_consent_timestamps(self, mocker):
+    def test_parse_response_normalizes_datetimes(self, mocker):
         stream = Profiles(api_key=API_KEY, start_date=START_DATE.isoformat())
         json = {
             "data": [
@@ -380,13 +380,20 @@ class TestProfilesStream:
                     "attributes": {
                         "email": "name@airbyte.io",
                         "updated": "2023-03-10T20:36:36+00:00",
-                        "properties": {"$consent_timestamp": "2026-06-23 00:15:23.918411+00:00"},
+                        "properties": {
+                            # Documented consent field, and an arbitrary custom property that also
+                            # happens to be a space-separated datetime: both should be normalized.
+                            "$consent_timestamp": "2026-06-23 00:15:23.918411+00:00",
+                            "custom_signup_date": "2026-06-23 00:15:23+0000",
+                            # Free-text custom properties that merely contain spaces must be left alone.
+                            "favorite_month": "May 5, 2021",
+                            "status": "onboarding complete",
+                        },
                         "subscriptions": {
-                            "email": {"marketing": {"consent": "SUBSCRIBED", "consent_timestamp": "2026-06-23 00:15:23.918411+00:00"}},
+                            "email": {"marketing": {"consent": "SUBSCRIBED", "consent_timestamp": "2026-06-23 00:15:23 +00:00"}},
                             "sms": {
                                 "marketing": {"consent": "SUBSCRIBED", "consent_timestamp": "2026-06-23 00:15:24.000000+00:00"},
-                                "transactional": {"consent": "SUBSCRIBED", "consent_timestamp": "2026-06-23 00:15:25.000000+00:00"},
-                            },
+                                "transactional": {"consent": "SUBSCRIBED", "consent_timestamp": "2026-06-23 00:15:25.918411Z"}},
                         },
                     },
                 },
@@ -407,13 +414,17 @@ class TestProfilesStream:
                 "attributes": {
                     "email": "name@airbyte.io",
                     "updated": "2023-03-10T20:36:36+00:00",
-                    "properties": {"$consent_timestamp": "2026-06-23T00:15:23.918411+00:00"},
+                    "properties": {
+                        "$consent_timestamp": "2026-06-23T00:15:23.918411+00:00",
+                        "custom_signup_date": "2026-06-23T00:15:23+00:00",
+                        "favorite_month": "May 5, 2021",
+                        "status": "onboarding complete",
+                    },
                     "subscriptions": {
-                        "email": {"marketing": {"consent": "SUBSCRIBED", "consent_timestamp": "2026-06-23T00:15:23.918411+00:00"}},
+                        "email": {"marketing": {"consent": "SUBSCRIBED", "consent_timestamp": "2026-06-23T00:15:23+00:00"}},
                         "sms": {
                             "marketing": {"consent": "SUBSCRIBED", "consent_timestamp": "2026-06-23T00:15:24.000000+00:00"},
-                            "transactional": {"consent": "SUBSCRIBED", "consent_timestamp": "2026-06-23T00:15:25.000000+00:00"},
-                        },
+                            "transactional": {"consent": "SUBSCRIBED", "consent_timestamp": "2026-06-23T00:15:25.918411Z"}},
                     },
                 },
             },
