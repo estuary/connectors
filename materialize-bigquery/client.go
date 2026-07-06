@@ -33,6 +33,11 @@ type client struct {
 	// (see detectEmulatorGoccy); it is threaded here so per-operation code
 	// never re-probes the server.
 	isEmulatorGoccy bool
+	// emulatorTempTableMu serializes the emulator-path sections of Load and
+	// Acknowledge, which materialize real native tables under the shared
+	// flow_temp_table_<binding> names (see emulator_load.go). A pointer so the
+	// value-receiver methods on client share the one lock.
+	emulatorTempTableMu *sync.Mutex
 }
 
 func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
@@ -250,8 +255,17 @@ func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, e
 	return fmt.Sprintf("CREATE DATASET %q.%q", c.cfg.ProjectID, schemaName), nil
 }
 
-func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
+func preReqs(ctx context.Context, cfg config, isEmulatorGoccy bool) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
+
+	// The GCS prerequisite check verifies bucket permissions against real
+	// Google Cloud Storage. A detected goccy emulator is paired with a GCS
+	// emulator (fake-gcs-server) that doesn't implement the permission
+	// self-checks, so the check is skipped only for the detected emulator — a
+	// SaaS server behind a custom endpoint still gets the full check.
+	if isEmulatorGoccy {
+		return errs
+	}
 
 	credOption, err := cfg.CredentialsClientOption()
 	if err != nil {

@@ -6,10 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 
 	"cloud.google.com/go/bigquery"
 	"github.com/estuary/connectors/go/auth/iam"
 	"github.com/estuary/connectors/go/blob"
+	cerrors "github.com/estuary/connectors/go/connector-errors"
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
@@ -220,16 +222,21 @@ func (c config) client(ctx context.Context, ep *sql.Endpoint[config], isEmulator
 	// authorization provides sufficient access, typically via the "BigQuery
 	// Read Session User" role. Result iterators will automatically fall back to
 	// the standard but much slower job/table read API if the storage API can't
-	// be accessed.
-	if err := bigqueryClient.EnableStorageReadClient(ctx, clientOpts...); err != nil {
-		return nil, fmt.Errorf("enabling storage read client: %w", err)
+	// be accessed. The goccy emulator does not implement the Storage Read API,
+	// so it is skipped only for the detected emulator — a SaaS server behind a
+	// custom endpoint still gets it.
+	if !isEmulatorGoccy {
+		if err := bigqueryClient.EnableStorageReadClient(ctx, clientOpts...); err != nil {
+			return nil, fmt.Errorf("enabling storage read client: %w", err)
+		}
 	}
 
 	return &client{
-		bigqueryClient:  bigqueryClient,
-		cfg:             c,
-		ep:              ep,
-		isEmulatorGoccy: isEmulatorGoccy,
+		bigqueryClient:      bigqueryClient,
+		cfg:                 c,
+		ep:                  ep,
+		isEmulatorGoccy:     isEmulatorGoccy,
+		emulatorTempTableMu: &sync.Mutex{},
 	}, nil
 }
 
@@ -273,6 +280,12 @@ func Driver() *sql.Driver[config, tableConfig] {
 }
 
 func newBigQueryDriver() *sql.Driver[config, tableConfig] {
+	// PreReqs receives only the config, but must skip the GCS bucket check for
+	// a detected goccy emulator (see preReqs). CheckPrerequisites is invoked on
+	// the materializer built from NewEndpoint's result, so NewEndpoint — and
+	// with it the detection probe — always runs first; its result is recorded
+	// here for PreReqs to consult rather than re-probing the server.
+	var detectedEmulatorGoccy bool
 	return &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-bigquery",
 		StartTunnel:      func(ctx context.Context, cfg config) error { return nil },
@@ -293,6 +306,7 @@ func newBigQueryDriver() *sql.Driver[config, tableConfig] {
 			if err != nil {
 				return nil, err
 			}
+			detectedEmulatorGoccy = isEmulatorGoccy
 
 			dialect := bqDialect(featureFlags, isEmulatorGoccy)
 			templates := renderTemplates(dialect, isEmulatorGoccy)
@@ -309,10 +323,10 @@ func newBigQueryDriver() *sql.Driver[config, tableConfig] {
 			}
 
 			return &sql.Endpoint[config]{
-				Config:              cfg,
-				Dialect:             dialect,
-				SerPolicy:           serPolicy,
-				MetaCheckpoints:     nil,
+				Config:          cfg,
+				Dialect:         dialect,
+				SerPolicy:       serPolicy,
+				MetaCheckpoints: nil,
 				NewClient: func(ctx context.Context, _ string, ep *sql.Endpoint[config]) (sql.Client, error) {
 					return ep.Config.client(ctx, ep, isEmulatorGoccy)
 				},
@@ -330,7 +344,9 @@ func newBigQueryDriver() *sql.Driver[config, tableConfig] {
 				},
 			}, nil
 		},
-		PreReqs: preReqs,
+		PreReqs: func(ctx context.Context, cfg config) *cerrors.PrereqErr {
+			return preReqs(ctx, cfg, detectedEmulatorGoccy)
+		},
 	}
 }
 

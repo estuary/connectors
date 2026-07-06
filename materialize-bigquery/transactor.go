@@ -105,8 +105,8 @@ func prepareNewTransactor(
 			isEmulatorGoccy:   isEmulatorGoccy,
 			client:            client,
 			be:                be,
-			loadFiles:         boilerplate.NewStagedFiles(stagedFileClient{}, bucket, writer.DefaultJsonFileSizeLimit, cfg.effectiveBucketPath(), false, false),
-			storeFiles:        boilerplate.NewStagedFiles(stagedFileClient{}, bucket, writer.DefaultJsonFileSizeLimit, cfg.effectiveBucketPath(), true, false),
+			loadFiles:         boilerplate.NewStagedFiles(stagedFileClient{disableGzip: isEmulatorGoccy}, bucket, writer.DefaultJsonFileSizeLimit, cfg.effectiveBucketPath(), false, false),
+			storeFiles:        boilerplate.NewStagedFiles(stagedFileClient{disableGzip: isEmulatorGoccy}, bucket, writer.DefaultJsonFileSizeLimit, cfg.effectiveBucketPath(), true, false),
 		}
 
 		for _, binding := range bindings {
@@ -257,6 +257,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	var subqueries []string
 	// This is the map of external table references we will populate.
 	var edcTableDefs = make(map[string]bigquery.ExternalData)
+	var emulatorTempTables []emulatorTempTable
 	var externalData = make(map[string][]string)
 
 	for idx, b := range t.bindings {
@@ -275,7 +276,11 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 				return fmt.Errorf("rendering load query template: %w", err)
 			} else {
 				subqueries = append(subqueries, loadQuery)
-				edcTableDefs[b.tempTableName] = edc(uris, b.loadSchema)
+				if t.isEmulatorGoccy {
+					emulatorTempTables = append(emulatorTempTables, emulatorTempTable{name: b.tempTableName, schema: b.loadSchema, uris: uris})
+				} else {
+					edcTableDefs[b.tempTableName] = edc(uris, b.loadSchema)
+				}
 				externalData[b.tempTableName] = uris
 			}
 		}
@@ -288,7 +293,24 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	// Build the query across all tables.
 	queryStr := strings.Join(subqueries, "\nUNION ALL\n") + ";"
 	query := t.client.newQuery(queryStr)
-	query.TableDefinitions = edcTableDefs // Tell bigquery where to get the external references in gcs.
+	if t.isEmulatorGoccy {
+		// The emulator does not implement external table definitions, so the
+		// temp tables are materialized as real native tables instead; see
+		// emulator_load.go for why this needs the lock and the query defaults.
+		// The lock is held until Load returns since the query's result
+		// iteration below still reads from the temp tables.
+		t.client.emulatorTempTableMu.Lock()
+		defer t.client.emulatorTempTableMu.Unlock()
+		cleanup, err := t.client.prepareEmulatorTempTables(ctx, emulatorTempTables)
+		if err != nil {
+			return fmt.Errorf("preparing emulator temp tables for load: %w", err)
+		}
+		defer cleanup()
+		query.DefaultProjectID = t.cfg.ProjectID
+		query.DefaultDatasetID = t.cfg.Dataset
+	} else {
+		query.TableDefinitions = edcTableDefs // Tell bigquery where to get the external references in gcs.
+	}
 	ll := log.WithFields(log.Fields{"query": queryStr, "external_data": externalData})
 
 	t.be.StartedEvaluatingLoads()
@@ -307,7 +329,9 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	ll.Debug("load query executed")
 	t.be.FinishedEvaluatingLoads()
 
-	if !bqit.IsAccelerated() && !t.loggedStorageApiMessage {
+	// The storage read API is deliberately not enabled for the emulator, so the
+	// performance advice would be noise there.
+	if !bqit.IsAccelerated() && !t.loggedStorageApiMessage && !t.isEmulatorGoccy {
 		log.Warn("not using the storage read API for load queries, performance may not be optimal. see https://go.estuary.dev/materialize-bigquery for more information")
 		t.loggedStorageApiMessage = true
 	}
