@@ -103,6 +103,7 @@ type advancedConfig struct {
 	DisableFieldTruncation bool   `json:"disableFieldTruncation,omitempty" jsonschema:"title=Disable Field Truncation,description=Disables truncation of materialized fields. May result in errors for documents with extremely large values or complex nested structures."`
 	NoFlowDocument         bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false"`
 	FeatureFlags           string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	Endpoint               string `json:"endpoint,omitempty" jsonschema:"title=BigQuery Endpoint,description=The BigQuery API endpoint to connect to. Use if you're materializing to a compatible API that isn't provided by Google. The client uses this as the full API base path — for example the goccy/bigquery-emulator requires http://host:9050/bigquery/v2/ rather than http://host:9050."`
 }
 
 func (c config) Validate() error {
@@ -118,15 +119,20 @@ func (c config) Validate() error {
 		}
 	}
 
-	if c.Credentials == nil {
+	// Credentials are required unless a custom endpoint is configured, in which case they are
+	// optional: an emulator behind the endpoint needs none, while a proxy in front of the real
+	// service may still require them. Credentials that are provided are always validated.
+	if c.Credentials != nil {
+		if err := c.Credentials.Validate(); err != nil {
+			return err
+		}
+	} else if c.CredentialsJSON != "" || c.Advanced.Endpoint == "" {
 		// Sanity check: Are the provided credentials valid JSON? A common error is to upload
 		// credentials that are not valid JSON, and the resulting error is fairly cryptic if fed
 		// directly to bigquery.NewClient.
 		if !json.Valid([]byte(c.CredentialsJSON)) {
 			return fmt.Errorf("service account credentials must be valid JSON, and the provided credentials were not")
 		}
-	} else if err := c.Credentials.Validate(); err != nil {
-		return err
 	}
 
 	if err := c.Schedule.Validate(); err != nil {
@@ -152,6 +158,12 @@ func (c config) effectiveBucketPath() string {
 
 func (c config) CredentialsClientOption() (option.ClientOption, error) {
 	if c.Credentials == nil {
+		// A custom endpoint with no credentials at all means an unauthenticated server, like an
+		// emulator. Credentials provided alongside an endpoint are still used, since the endpoint
+		// may be a proxy in front of the real authenticated service.
+		if c.CredentialsJSON == "" && c.Advanced.Endpoint != "" {
+			return option.WithoutAuthentication(), nil
+		}
 		return option.WithCredentialsJSON([]byte(c.CredentialsJSON)), nil
 	}
 
@@ -177,6 +189,9 @@ func (c config) client(ctx context.Context, ep *sql.Endpoint[config]) (*client, 
 		credOption,
 		option.WithUserAgent("EstuaryFlow (GPN:Estuary;)"),
 	)
+	if c.Advanced.Endpoint != "" {
+		clientOpts = append(clientOpts, option.WithEndpoint(c.Advanced.Endpoint))
+	}
 
 	// Allow overriding the main 'project_id' with 'billing_project_id' for client operation billing.
 	var billingProjectID = c.BillingProjectID
