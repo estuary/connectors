@@ -151,6 +151,24 @@ func bqDialect(featureFlags map[string]bool, isEmulatorGoccy bool) sql.Dialect {
 		sql.WithNotNullSuffix("NOT NULL"),
 	)
 
+	// The wildcard fallback migration below covers any source type migrating
+	// into a MULTIPLE field (e.g. boolToMulti) that has no more specific
+	// entry above — boolean is the only such type. On production it targets
+	// JSON, matching MULTIPLE's JSON column mapping. The emulator maps
+	// MULTIPLE (and OBJECT/ARRAY) to STRING instead (see objAndArrayCol
+	// above), so the wildcard must target STRING there too, or CanMigrate
+	// never matches and the migrate integration test fails loading a value
+	// into a column that was never migrated off its original type.
+	// TO_JSON_STRING accepts any BigQuery scalar type, so jsonToStringCast
+	// (normally used for the JSON->STRING entry below) doubles as the
+	// scalar->STRING cast here.
+	var wildcardTarget = "json"
+	var wildcardCastSQL = toJsonCast
+	if isEmulatorGoccy {
+		wildcardTarget = "string"
+		wildcardCastSQL = jsonToStringCast
+	}
+
 	return sql.Dialect{
 		MigratableTypes: sql.MigrationSpecs{
 			"integer": {
@@ -164,7 +182,7 @@ func bqDialect(featureFlags map[string]bool, isEmulatorGoccy bool) sql.Dialect {
 			"string":     {sql.NewMigrationSpec([]string{"bytes"}, sql.WithCastSQL(stringToBytesCast))},
 			"bytes":      {sql.NewMigrationSpec([]string{"string"}, sql.WithCastSQL(bytesToStringCast))},
 			"json":       {sql.NewMigrationSpec([]string{"string"}, sql.WithCastSQL(jsonToStringCast))},
-			"*":          {sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(toJsonCast))},
+			"*":          {sql.NewMigrationSpec([]string{wildcardTarget}, sql.WithCastSQL(wildcardCastSQL))},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			return sql.InfoTableLocation{
@@ -483,8 +501,9 @@ UPDATE {{ Identifier $.TablePath }}
 		// statement; client.go AlterTable splits the rendered output on ";"
 		// and submits each statement as a separate query. Note that on
 		// goccy/bigquery-emulator 0.8.1 every query-path ALTER TABLE is
-		// accepted but silently ignored (no error, no schema change) — the
-		// apply/migrate integration tasks address that separately.
+		// accepted but silently ignored (no error, no schema change), so
+		// AlterTable applies these statements' schema changes by recreating
+		// the table instead — see emulator_alter.go.
 		//
 		// The storeUpdate MERGE template is deliberately NOT overridden:
 		// hands-on verification against goccy 0.8.1 (job path, fully

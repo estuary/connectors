@@ -206,22 +206,42 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 		}
 	}
 
+	var migrationStmts []string
 	if len(ta.ColumnTypeChanges) > 0 {
 		if steps, err := sql.StdColumnTypeMigrations(ctx, c.ep.Dialect, ta.Table, ta.ColumnTypeChanges, columnMigrationSteps...); err != nil {
 			return "", nil, fmt.Errorf("rendering column migration steps: %w", err)
 		} else {
-			stmts = append(stmts, steps...)
+			migrationStmts = append(migrationStmts, steps...)
 		}
 	}
+	stmts = append(stmts, migrationStmts...)
 
-	return strings.Join(stmts, "\n"), func(ctx context.Context) error {
+	action := func(ctx context.Context) error {
 		for _, stmt := range stmts {
 			if _, err := c.query(ctx, stmt); err != nil {
 				return err
 			}
 		}
 		return nil
-	}, nil
+	}
+	if c.isEmulatorGoccy {
+		// The goccy emulator silently ignores ALTER TABLE, so the added
+		// columns, dropped constraints, and column type migrations are all
+		// applied by recreating the table instead (see emulatorAlterTable).
+		// The rendered ALTER/migration statements remain the action
+		// description: they describe the logical schema change being made,
+		// which is what the description is for.
+		action = func(ctx context.Context) error {
+			if len(ta.DropNotNulls) > 0 || len(ta.AddColumns) > 0 || len(ta.ColumnTypeChanges) > 0 {
+				if err := c.emulatorAlterTable(ctx, ta); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}
+
+	return strings.Join(stmts, "\n"), action, nil
 }
 
 func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
