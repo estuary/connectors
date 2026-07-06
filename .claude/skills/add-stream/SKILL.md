@@ -28,7 +28,7 @@ Confirm the connector exists. Locate its `models.py`, `resources.py`, `api.py` (
 
 If the suite fails:
 
-- **Simple schema drift** (the connector spec/discover output has shifted but the code is unchanged): you may run the `regenerate-flow-discovery` sub-skill to refresh the snapshots, then commit the result on its own with the message `<connector-name>: update tests`. Keep this commit separate from the new-stream work so the PR diff stays scoped.
+- **Simple schema drift** (the connector spec/discover output has shifted but the code is unchanged): you may dispatch the `regenerate-flow-discovery` agent to refresh the snapshots, then commit the result on its own with the message `<connector-name>: update tests`. Keep this commit separate from the new-stream work so the PR diff stays scoped.
 - **Flakey fields in the diff** (timestamps like `updated_at`, ETags, anything that changes between runs): surface them to the user and ask whether to add them to the connector's `FIELDS_TO_REDACT` list in `tests/test_snapshots.py` (name varies between connectors — grep for `FIELDS_TO_REDACT` to find the convention).
 - **Anything else:** stop and surface the failure to the user before entering Phase 4.
 
@@ -80,6 +80,45 @@ Defer to the `classify-stream-types` skill. Don't re-derive its flowchart here. 
 
 Find the closest existing stream in _the same connector_ whose replication strategy matches the one chosen in Phase 3. Replicate its pattern verbatim and cite the exact `file:line` you copied from. Do not introduce a new pattern when the connector already has one — if the existing pattern doesn't fit, that's a Phase 2 conversation, not a Phase 4 one.
 
+For incremental and backfill streams, the fetch functions must additionally follow the **House rules for incremental & backfill fetch functions** below.
+
+## House rules — incremental & backfill fetch functions
+
+Naming and shape:
+
+1. **Names:** incremental functions are `fetch_<stream>`, backfill functions are `backfill_<stream>` (cf. `fetch_campaigns`/`backfill_campaigns`).
+2. **The model owns its endpoint contract.** Path templates, items keys, and cursor-filter parameter names (`SINCE_PARAM`/`BEFORE_PARAM`-style) are ClassVars on the document model; the cursor value comes from an abstract `get_cursor()` method on the model base — never a `cursor_of` callable threaded through signatures.
+3. **Name request-param dicts by distance from the request:** plain `params` only where the dict is immediately handed to the HTTP call; `request_params` / `extra_request_params` when it crosses a signature, struct, or partial. No anonymous tuples in wiring maps — use a small frozen dataclass.
+
+Window semantics (updated-style cursors). "Tick" below means one unit of the provider's cursor resolution — determine it first; providers variously use seconds, milliseconds, or whole minutes:
+
+4. **Fetch complete ticks only.** Cap every incremental window at the last fully-elapsed tick (e.g. at second resolution, `horizon = now() floored to the second − 1s`); early-return when `horizon <= cursor`. Updates always stamp their own "now", so an elapsed tick is final the moment it is read — no boundary re-fetch or re-emission tricks are ever needed.
+5. **Boundaries live in the request, not in client-side filters.** First pin each boundary param's inclusivity with a cheap probe (query with the bound set to a doc's exact cursor timestamp; check membership), then choose the queried timestamps so the server returns exactly the intended window. Client filtering is a second boundary-logic layer plus wasted bandwidth/memory — it is only the fallback while semantics are still unverified.
+6. **Exact precision at the seams only.** The seams — backfill→incremental at the cutoff, poll→poll at the cursor — must be gapless: floor the cutoff to a whole tick, end backfill at `cutoff − 1 tick` (inclusive), seed the first incremental cursor at `cutoff − 1 tick` so its first emitted tick is exactly `cutoff`. The START of a backfill window is not load-bearing: query `since = start_date` as-is and let the boundary instant fall out; don't add `− 1 tick` machinery for it.
+
+Documentation:
+
+7. **State facts plainly; flag only the unverified.** No "(verified live)" stamps in code comments or docstrings — verification is the default. Annotate only claims that could NOT be verified. Evidence pointers (a named Bruno probe) are fine; status stamps are not. (The Bruno collection keeps its `**Finding (verified live, date):**` markers — that's the evidence record.)
+8. **Document each window as a rail timeline** in the fetch function's docstring: one tick per named instant, one rail per query param with its bracket semantics at the queried timestamp (`(` exclusive, `]` inclusive), a bottom effect rail (`emitted`/`window`) using closed brackets on the first and last ticks actually collected, and `└─` notes anchored to the tick they explain. Boundary-semantics prose goes in one line below the graph. Keep it hand-editable: ≤ 79 columns, no cross-rail alignment beyond the shared ticks. Copy the shape of this exemplar (from `source-mailchimp-native`'s `fetch_list_children`; adapt ticks, params, and notes to the stream — the glyph conventions are the normative part):
+
+   ```
+                 cursor   cursor + 1s  horizon = last elapsed second
+   ─────────────────┼──────────┼──────────────┼─────▶ time (1s ticks)
+                    │          │              │
+   SINCE_PARAM ─────(══════════╪══════════════╪═════▶
+   BEFORE_PARAM ════╪══════════╪══════════════]
+   emitted ─────────┼──────────[══════════════]
+                    │          │              └─ the present second is still
+                    │          │                 in progress; its docs wait
+                    │          │                 for the next poll's window
+                    │          └─ first emitted second
+                    └─ nothing new can appear here or earlier: this second
+                       had fully elapsed when it was walked, and updates
+                       always stamp "now"
+   ```
+
+   Glyph key: `═` covered by that rail, `─` not covered; `(`/`[`/`]` sit exactly on a tick column; `╪` where a covered rail crosses a tick it doesn't bracket, `┼` where an uncovered one does; tick guideline pipes (`│`) continue through rows whose rail stops short of them; a note's continuation lines align three columns in from its `└─`; rails run top-to-bottom in request-param order with the effect rail last.
+
 ## Phase 5 — Registration
 
 Add the new stream wherever the connector enumerates streams. That's often a top-level list, a discovery function, or both — grep the connector for how other streams declare themselves and match the form.
@@ -88,11 +127,11 @@ Check whether any per-connector "special lists" apply (split-child, regional, sc
 
 ## Phase 6 — Flow Regeneration
 
-Defer to the `regenerate-flow-discovery` sub-skill.
+Dispatch the `regenerate-flow-discovery` agent (runs on Haiku in its own context) via the Agent tool. Pass it the connector name and — since Phase 1 already surveyed the provider's rate limits — whether the budget is cleared (all required endpoints > 20 req/hr) so it can run the snapshot tests without re-asking for consent.
 
 ## Phase 7 — Snapshot Refresh
 
-This happens inside `regenerate-flow-discovery`. Verify when you come back:
+This happens inside the `regenerate-flow-discovery` agent. Verify when it returns:
 
 - The new stream appears in the discover snapshot.
 - The capture snapshot may or may not contain the new stream. That's expected and usually matches existing comments in the test file for similarly-quiet streams.
