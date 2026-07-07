@@ -1,6 +1,7 @@
 package hubspot
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -33,6 +34,15 @@ func (s Secret) String() string {
 
 func (s Secret) MarshalJSON() ([]byte, error) {
 	return []byte(`"***"`), nil
+}
+
+func (s *Secret) UnmarshalJSON(b []byte) error {
+	var str string
+	if err := json.Unmarshal(b, &str); err != nil {
+		return err
+	}
+	*s = Secret(str)
+	return nil
 }
 
 type OAuth2Credentials struct {
@@ -75,7 +85,7 @@ func (c *Credentials) Validate() error {
 
 func (Credentials) JSONSchema() *jsonschema.Schema {
 	subSchemas := []schemagen.OneOfSubSchemaT{
-		schemagen.OneOfSubSchema("OAuth2", OAuth2Credentials{}, string(OAuth2AuthType)).WithOAuth2Provider(oauth2Provider),
+		schemagen.OneOfSubSchema("OAuth2", OAuth2Credentials{}, string(OAuth2AuthType)).WithOAuth2Provider(Oauth2Provider),
 		schemagen.OneOfSubSchema("Service Key", ServiceKeyCredentials{}, string(ServiceKeyAuthType)),
 	}
 	return schemagen.OneOfSchema("Authentication", "", "auth_type", string(OAuth2AuthType), subSchemas...)

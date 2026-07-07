@@ -68,6 +68,34 @@ These issues can cause it to appear as if a record does not exist when in
 actuality it does, and trigger an insert instead of an update creating a
 duplicate record.
 
+## Tests
+
+```
+go test -short ./materialize-hubspot/...
+```
+
+### Integration Tests
+
+The integration tests work by creating a test account and authorizing a test
+app in it.  When the test completes the test account is deleted.
+
+Unfortunately, it is not completely non-interactive; you will need to manually
+authorize the app on the test account.
+
+Start the full test suite:
+```
+go test -v ./materialize-hubspot/... -interactive -count 1 -p 1
+```
+
+The `TestIntegration` test will print the newly created test-account and a
+authorization URL.  You will need to open the Authorization URL in a browser
+and authorize the app for the test-account before the test will continue.
+Sometimes the test account is unselectable, this can usually be fixed by
+refreshing the browser a few times.
+
+If any test accounts are orphaned, you may need to login to the HubSpot webapp
+and navigate to `Development > Testing > Test Accounts` to remove them.
+
 ## HubSpot Project
 
 To run this connector in a development environment you will need a HubSpot
