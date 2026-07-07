@@ -375,7 +375,7 @@ func (c *PipeClient) InsertReport(pipeName string) (*InsertReportResponse, error
 
 	log.WithFields(log.Fields{
 		"url":      url,
-		"headers":  req.Header,
+		"status":   resp.StatusCode,
 		"response": response,
 	}).Debug("insertReport")
 
