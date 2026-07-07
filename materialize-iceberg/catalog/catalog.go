@@ -409,19 +409,26 @@ var versionScopedMetadataFields = map[string]int{
 // dropFieldsBeyondFormatVersion removes metadata fields that are only valid
 // in format versions newer than the metadata's declared format-version,
 // reporting the dropped field names and the declared version so callers can
-// log which catalog provider is writing out-of-spec metadata. The raw
-// metadata is returned unchanged if nothing needs to be dropped, or if it
-// isn't shaped like table metadata at all - full validation of the metadata
-// is left to iceberg-go's parsing.
-func dropFieldsBeyondFormatVersion(raw json.RawMessage) (json.RawMessage, []string, int) {
+// log which catalog provider is writing out-of-spec metadata. Metadata
+// without a format-version field is returned unchanged: iceberg-go's parsing
+// produces the canonical error for that case, and full validation of the
+// metadata is left to it in general.
+func dropFieldsBeyondFormatVersion(raw json.RawMessage) (json.RawMessage, []string, int, error) {
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &fields); err != nil {
-		return raw, nil, 0
+		return nil, nil, 0, fmt.Errorf("parsing table metadata: %w", err)
 	}
 
+	versionRaw, ok := fields["format-version"]
+	if !ok {
+		return raw, nil, 0, nil
+	}
 	var version int
-	if err := json.Unmarshal(fields["format-version"], &version); err != nil || version < 1 {
-		return raw, nil, 0
+	if err := json.Unmarshal(versionRaw, &version); err != nil {
+		return nil, nil, 0, fmt.Errorf("parsing format-version: %w", err)
+	}
+	if version < 1 {
+		return nil, nil, 0, fmt.Errorf("invalid format-version %d", version)
 	}
 
 	var dropped []string
@@ -432,14 +439,15 @@ func dropFieldsBeyondFormatVersion(raw json.RawMessage) (json.RawMessage, []stri
 		}
 	}
 	if len(dropped) == 0 {
-		return raw, nil, version
+		return raw, nil, version, nil
 	}
 	slices.Sort(dropped)
 
-	if sanitized, err := json.Marshal(fields); err == nil {
-		return sanitized, dropped, version
+	sanitized, err := json.Marshal(fields)
+	if err != nil {
+		return nil, nil, 0, fmt.Errorf("re-encoding sanitized table metadata: %w", err)
 	}
-	return raw, nil, version
+	return sanitized, dropped, version, nil
 }
 
 func (c *Catalog) GetTable(ctx context.Context, ns string, name string) (*Table, error) {
@@ -454,7 +462,10 @@ func (c *Catalog) GetTable(ctx context.Context, ns string, name string) (*Table,
 		return nil, err
 	}
 
-	sanitized, dropped, version := dropFieldsBeyondFormatVersion(res.RawMeta)
+	sanitized, dropped, version, err := dropFieldsBeyondFormatVersion(res.RawMeta)
+	if err != nil {
+		return nil, fmt.Errorf("sanitizing table metadata: %w", err)
+	}
 	if len(dropped) > 0 {
 		// Identify catalog providers that write out-of-spec metadata so they
 		// can be notified upstream.

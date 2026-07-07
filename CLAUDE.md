@@ -88,6 +88,9 @@ All connector configurations use JSON Schema. See [config_schema_guidelines.md](
 - Include edge cases: data types, limits, error conditions
 - Integration tests capture to SQLite and verify against `expected.txt`
 
+### Error Handling
+- Do not swallow errors, we must propagate errors and should never silently drop errors
+
 ## Protocol References
 
 - [capture.proto](https://github.com/estuary/flow/blob/master/go/protocols/capture/capture.proto) — Capture protocol
