@@ -1,13 +1,16 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	stdsql "database/sql"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/databricks/databricks-sdk-go"
@@ -107,19 +110,28 @@ func newDatabricksDriver() *sql.Driver[config, tableConfig] {
 }
 
 var _ m.Transactor = (*transactor)(nil)
+var _ m.AcknowledgeStatePatcher = (*transactor)(nil)
 
 type transactor struct {
-	runtimeCheckpoint   m.RuntimeCheckpoint
-	cfg                 config
-	cp                  checkpoint
-	cpRecovery          bool // is this checkpoint a recovered checkpoint?
-	wsClient            *databricks.WorkspaceClient
-	localStagingPath    string
-	bindings            []*binding
-	be                  *m.BindingEvents
-	ep                  *sql.Endpoint[config]
-	templates           templates
-	materializationName string
+	runtimeCheckpoint m.RuntimeCheckpoint
+	cfg               config
+	cp                checkpoint
+	// Pending entries of other shards, of sessions predating the scale_out
+	// flag (legacyRangeKey), and of stale ranges from previous shard
+	// topologies. Only the primary shard tracks and executes these.
+	peerShardsCheckpoints rangeCheckpoints
+	cpRecovery            bool // is this checkpoint a recovered checkpoint?
+	scaleOut              bool // the "scale_out" feature flag
+	primary               bool // does this shard's range begin at key 0?
+	rangeKey              string
+	wsClient              *databricks.WorkspaceClient
+	localStagingPath      string
+	bindings              []*binding
+	be                    *m.BindingEvents
+	ep                    *sql.Endpoint[config]
+	templates             templates
+	materializationName   string
+	deleteFiles           func(ctx context.Context, files []string)
 }
 
 func (d *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSpec, _ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
@@ -127,10 +139,116 @@ func (d *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSp
 }
 
 func (d *transactor) UnmarshalState(state json.RawMessage) error {
-	if err := pf.UnmarshalStrict(state, &d.cp); err != nil {
+	if d.scaleOut && !d.primary {
+		// Non-primary shards recover nothing: the primary replays the entire
+		// consolidated state document. If a non-primary shard retained and
+		// later re-emitted recovered entries, the primary would re-execute
+		// them after their staged files were already deleted, outside of the
+		// recovery tolerance for missing files.
+		return nil
+	}
+
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(state, &raw); err != nil {
 		return err
 	}
+
+	for key, val := range raw {
+		if isJSONNull(val) {
+			continue
+		} else if bucket, ok := parseRangeBucket(key, val); ok {
+			if d.scaleOut && key == d.rangeKey {
+				d.cp = bucket
+			} else {
+				d.peerShardsCheckpoints[key] = bucket
+			}
+		} else if item, err := parseCheckpointItem(val); err != nil {
+			return fmt.Errorf("parsing checkpoint entry %q: %w", key, err)
+		} else if d.scaleOut {
+			d.legacyBucket()[key] = item
+		} else {
+			d.cp[key] = item
+		}
+	}
 	d.cpRecovery = true
+
+	return nil
+}
+
+func (d *transactor) legacyBucket() checkpoint {
+	if d.peerShardsCheckpoints[legacyRangeKey] == nil {
+		d.peerShardsCheckpoints[legacyRangeKey] = make(checkpoint)
+	}
+	return d.peerShardsCheckpoints[legacyRangeKey]
+}
+
+// OnAcknowledgeStatePatches folds the aggregated StartedCommit state patches
+// of all task shards into the primary's bookkeeping, so that its Acknowledge
+// executes the queries staged by every shard of the just-committed
+// transaction. Under the v1 runtime `patches` is always empty.
+func (d *transactor) OnAcknowledgeStatePatches(patches []json.RawMessage) error {
+	if !d.scaleOut || !d.primary {
+		return nil
+	}
+
+	for _, patch := range patches {
+		if isJSONNull(patch) {
+			// A state reset means some participant emitted a full-replace
+			// state update, which no shard does with scale_out enabled.
+			return fmt.Errorf("unexpected state reset patch under scale_out")
+		}
+
+		var raw map[string]json.RawMessage
+		if err := json.Unmarshal(patch, &raw); err != nil {
+			return fmt.Errorf("parsing aggregated state patch: %w", err)
+		}
+
+		for key, val := range raw {
+			if key == d.rangeKey {
+				// Our own contribution, echoed back by the runtime. It's
+				// already tracked in d.cp.
+				continue
+			}
+
+			if !rangeKeyRe.MatchString(key) {
+				// Top-level stateKeys are never emitted by scale_out peers,
+				// but route them as legacy entries rather than dropping them.
+				if isJSONNull(val) {
+					delete(d.peerShardsCheckpoints[legacyRangeKey], key)
+				} else if item, err := parseCheckpointItem(val); err != nil {
+					return fmt.Errorf("parsing aggregated state patch entry %q: %w", key, err)
+				} else {
+					d.legacyBucket()[key] = item
+				}
+				continue
+			}
+
+			if isJSONNull(val) {
+				delete(d.peerShardsCheckpoints, key)
+				continue
+			}
+
+			var bucket map[string]json.RawMessage
+			if err := json.Unmarshal(val, &bucket); err != nil {
+				return fmt.Errorf("parsing aggregated state patch bucket %q: %w", key, err)
+			}
+			for stateKey, itemRaw := range bucket {
+				if isJSONNull(itemRaw) {
+					delete(d.peerShardsCheckpoints[key], stateKey)
+				} else if item, err := parseCheckpointItem(itemRaw); err != nil {
+					return fmt.Errorf("parsing aggregated state patch entry %q of %q: %w", stateKey, key, err)
+				} else {
+					if d.peerShardsCheckpoints[key] == nil {
+						d.peerShardsCheckpoints[key] = make(checkpoint)
+					}
+					d.peerShardsCheckpoints[key][stateKey] = item
+				}
+			}
+			if len(d.peerShardsCheckpoints[key]) == 0 {
+				delete(d.peerShardsCheckpoints, key)
+			}
+		}
+	}
 
 	return nil
 }
@@ -158,7 +276,25 @@ func newTransactor(
 		return nil, fmt.Errorf("initialising workspace client: %w", err)
 	}
 
-	var d = &transactor{runtimeCheckpoint: fence.Checkpoint, cfg: cfg, wsClient: wsClient, be: be, ep: ep, templates: renderTemplates(ep.Dialect)}
+	var keyBegin, keyEnd uint32 = 0, math.MaxUint32
+	if open.Range != nil {
+		keyBegin, keyEnd = open.Range.KeyBegin, open.Range.KeyEnd
+	}
+
+	var d = &transactor{
+		runtimeCheckpoint:     fence.Checkpoint,
+		cfg:                   cfg,
+		cp:                    make(checkpoint),
+		peerShardsCheckpoints: make(rangeCheckpoints),
+		scaleOut:              featureFlags["scale_out"],
+		primary:               keyBegin == 0,
+		rangeKey:              fmt.Sprintf("%08x-%08x", keyBegin, keyEnd),
+		wsClient:              wsClient,
+		be:                    be,
+		ep:                    ep,
+		templates:             renderTemplates(ep.Dialect),
+	}
+	d.deleteFiles = d.deleteStagedFiles
 
 	db, err := d.openDB()
 	if err != nil {
@@ -182,7 +318,13 @@ func newTransactor(
 			"volumeName": volumeName,
 		}).Debug("creating volume for schema if it doesn't already exist")
 		if _, err := db.ExecContext(ctx, fmt.Sprintf("CREATE VOLUME IF NOT EXISTS `%s`.`%s`;", sch, volumeName)); err != nil {
-			return nil, fmt.Errorf("Exec(CREATE VOLUME IF NOT EXISTS `%s`.`%s`;): %w", sch, volumeName, err)
+			// Concurrent shards of a scaled-out task can race Unity Catalog's
+			// IF NOT EXISTS check.
+			if strings.Contains(strings.ToLower(err.Error()), "already exists") {
+				log.WithFields(log.Fields{"schema": sch}).Debug("volume was concurrently created")
+			} else {
+				return nil, fmt.Errorf("Exec(CREATE VOLUME IF NOT EXISTS `%s`.`%s`;): %w", sch, volumeName, err)
+			}
 		}
 	}
 
@@ -357,7 +499,59 @@ func (c *checkpoint) Validate() error {
 	return nil
 }
 
-func (d *transactor) deleteFiles(ctx context.Context, files []string) {
+// rangeCheckpoints maps shard range keys ("%08x-%08x" of key_begin-key_end)
+// to that shard's per-stateKey checkpoint. Range keys are disjoint across the
+// shards of a task, which is what lets each shard's StartedCommit merge patch
+// commute with its peers' when the runtime consolidates connector state.
+type rangeCheckpoints map[string]checkpoint
+
+// legacyRangeKey is the in-memory bucket holding top-level per-stateKey
+// entries written before the scale_out flag was enabled. Its entries clear
+// with top-level nulls rather than nested ones.
+const legacyRangeKey = ""
+
+var rangeKeyRe = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{8}$`)
+
+func unmarshalStrict(data json.RawMessage, v any) error {
+	var dec = json.NewDecoder(bytes.NewReader(data))
+	dec.DisallowUnknownFields()
+	return dec.Decode(v)
+}
+
+func isJSONNull(data json.RawMessage) bool {
+	return bytes.Equal(bytes.TrimSpace(data), []byte("null"))
+}
+
+func parseCheckpointItem(data json.RawMessage) (*checkpointItem, error) {
+	var item checkpointItem
+	if err := unmarshalStrict(data, &item); err != nil {
+		return nil, err
+	}
+	return &item, nil
+}
+
+// parseRangeBucket decodes val as a per-stateKey checkpoint when key names a
+// shard key-range. A key matching the range pattern whose value doesn't
+// decode as a bucket falls through to legacy entry parsing, which fails
+// loudly. StateKeys cannot collide with range keys: they are URL-encoded
+// resource paths carrying a ".vN" backfill counter suffix.
+func parseRangeBucket(key string, val json.RawMessage) (checkpoint, bool) {
+	if !rangeKeyRe.MatchString(key) {
+		return nil, false
+	}
+	var bucket checkpoint
+	if err := unmarshalStrict(val, &bucket); err != nil {
+		return nil, false
+	}
+	for stateKey, item := range bucket {
+		if item == nil {
+			delete(bucket, stateKey)
+		}
+	}
+	return bucket, true
+}
+
+func (d *transactor) deleteStagedFiles(ctx context.Context, files []string) {
 	for _, f := range files {
 		if err := d.wsClient.Files.DeleteByFilePath(ctx, f); err != nil {
 			log.WithFields(log.Fields{
@@ -461,29 +655,159 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
+		if state, err := d.startCommitState(); err != nil {
+			return nil, m.FinishedOperation(err)
+		} else {
+			return state, nil
+		}
+	}, nil
+}
+
+func (d *transactor) startCommitState() (*pf.ConnectorState, error) {
+	if !d.scaleOut {
 		var checkpointJSON, err = json.Marshal(d.cp)
 		if err != nil {
-			return nil, m.FinishedOperation(fmt.Errorf("creating checkpoint json: %w", err))
+			return nil, fmt.Errorf("creating checkpoint json: %w", err)
 		}
 
 		return &pf.ConnectorState{UpdatedJson: checkpointJSON}, nil
-	}, nil
+	}
+
+	// Emit only this shard's range bucket as a merge patch: range keys are
+	// disjoint across shards, so concurrent patches never clobber when the
+	// runtime consolidates connector state.
+	var patch, err = json.Marshal(rangeCheckpoints{d.rangeKey: d.cp})
+	if err != nil {
+		return nil, fmt.Errorf("creating checkpoint patch json: %w", err)
+	}
+
+	return &pf.ConnectorState{UpdatedJson: patch, MergePatch: true}, nil
 }
 
 // Acknowledge merges data from temporary table to main table
 // TODO: run these queries concurrently for improved performance
 func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
-	var db *stdsql.DB
-	if len(d.cp) > 0 {
-		var err error
-		db, err = d.openDB()
+	if d.scaleOut && !d.primary {
+		// Non-primary shards only stage files: their committed entries are
+		// executed by the primary, which observed them via the aggregated
+		// state patches. Drop them from local bookkeeping, mirroring the
+		// clearing the primary emits.
+		for _, b := range d.bindings {
+			delete(d.cp, b.target.StateKey)
+		}
+		d.cpRecovery = false
+		return nil, nil
+	}
+
+	var pending = len(d.cp)
+	for _, bucket := range d.peerShardsCheckpoints {
+		pending += len(bucket)
+	}
+
+	var exec func(context.Context, string) error
+	if pending > 0 {
+		db, err := d.openDB()
 		if err != nil {
 			return nil, err
 		}
 		defer db.Close()
+
+		exec = func(ctx context.Context, query string) error {
+			_, err := db.ExecContext(ctx, query)
+			return err
+		}
 	}
 
-	for stateKey, item := range d.cp {
+	return d.acknowledgeApply(ctx, exec)
+}
+
+// acknowledgeApply executes all pending checkpoint entries — this shard's
+// own, and (as the primary) those of peer shards and of prior sessions — and
+// builds the state update which clears the executed entries.
+func (d *transactor) acknowledgeApply(ctx context.Context, exec func(context.Context, string) error) (*pf.ConnectorState, error) {
+	if _, err := d.applyCheckpoint(ctx, exec, d.cp); err != nil {
+		return nil, err
+	}
+
+	var peerRangeKeys = make([]string, 0, len(d.peerShardsCheckpoints))
+	for rk := range d.peerShardsCheckpoints {
+		peerRangeKeys = append(peerRangeKeys, rk)
+	}
+	sort.Strings(peerRangeKeys)
+
+	var executedPeers = make(map[string][]string)
+	for _, rk := range peerRangeKeys {
+		executed, err := d.applyCheckpoint(ctx, exec, d.peerShardsCheckpoints[rk])
+		if err != nil {
+			return nil, err
+		}
+		executedPeers[rk] = executed
+	}
+
+	d.cpRecovery = false
+
+	// After having applied the checkpoint, we try to clean up the checkpoint in the ack response
+	// so that a restart of the connector does not need to run the same queries again
+	// Note that this is an best-effort "attempt" and there is no guarantee that this checkpoint update
+	// can actually be committed
+	// Important to note that in this case we do not reset the checkpoint for all bindings, but only the ones
+	// that have been committed in this transaction. The reason is that it may be the case that a binding
+	// which has been disabled right after a failed attempt to run its queries, must be able to recover by enabling
+	// the binding and running the queries that are pending for its last transaction.
+	var clear = make(map[string]interface{})
+
+	var ownClear = make(map[string]interface{})
+	for _, b := range d.bindings {
+		ownClear[b.target.StateKey] = nil
+		delete(d.cp, b.target.StateKey)
+	}
+	if d.scaleOut {
+		clear[d.rangeKey] = ownClear
+	} else {
+		for stateKey := range ownClear {
+			clear[stateKey] = nil
+		}
+	}
+
+	for rk, executed := range executedPeers {
+		var bucket = d.peerShardsCheckpoints[rk]
+		for _, stateKey := range executed {
+			if rk == legacyRangeKey {
+				clear[stateKey] = nil
+			} else {
+				if clear[rk] == nil {
+					clear[rk] = make(map[string]interface{})
+				}
+				clear[rk].(map[string]interface{})[stateKey] = nil
+			}
+			delete(bucket, stateKey)
+		}
+		if len(bucket) == 0 {
+			delete(d.peerShardsCheckpoints, rk)
+		}
+	}
+
+	var checkpointJSON, err = json.Marshal(clear)
+	if err != nil {
+		return nil, fmt.Errorf("creating checkpoint clearing json: %w", err)
+	}
+
+	return &pf.ConnectorState{UpdatedJson: json.RawMessage(checkpointJSON), MergePatch: true}, nil
+}
+
+// applyCheckpoint executes the staged queries of every entry in cp whose
+// stateKey still has an active binding, deleting the staged files afterwards.
+// It returns the stateKeys which were executed.
+func (d *transactor) applyCheckpoint(ctx context.Context, exec func(context.Context, string) error, cp checkpoint) ([]string, error) {
+	var stateKeys = make([]string, 0, len(cp))
+	for stateKey := range cp {
+		stateKeys = append(stateKeys, stateKey)
+	}
+	sort.Strings(stateKeys)
+
+	var executed []string
+	for _, stateKey := range stateKeys {
+		var item = cp[stateKey]
 		path := d.pathForStateKey(stateKey)
 		// we skip queries that belong to tables which do not have a binding anymore
 		// since these tables might be deleted already
@@ -500,7 +824,7 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 		}
 		d.be.StartedResourceCommit(path)
 		for _, query := range queries {
-			if _, err := db.ExecContext(ctx, query); err != nil {
+			if err := exec(ctx, query); err != nil {
 				// When doing a recovery apply, it may be the case that some tables & files have already been deleted after being applied
 				// it is okay to skip them in this case
 				if d.cpRecovery {
@@ -515,29 +839,10 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 
 		// Cleanup files.
 		d.deleteFiles(ctx, item.ToDelete)
+		executed = append(executed, stateKey)
 	}
 
-	d.cpRecovery = false
-
-	// After having applied the checkpoint, we try to clean up the checkpoint in the ack response
-	// so that a restart of the connector does not need to run the same queries again
-	// Note that this is an best-effort "attempt" and there is no guarantee that this checkpoint update
-	// can actually be committed
-	// Important to note that in this case we do not reset the checkpoint for all bindings, but only the ones
-	// that have been committed in this transaction. The reason is that it may be the case that a binding
-	// which has been disabled right after a failed attempt to run its queries, must be able to recover by enabling
-	// the binding and running the queries that are pending for its last transaction.
-	var checkpointClear = make(checkpoint)
-	for _, b := range d.bindings {
-		checkpointClear[b.target.StateKey] = nil
-		delete(d.cp, b.target.StateKey)
-	}
-	var checkpointJSON, err = json.Marshal(checkpointClear)
-	if err != nil {
-		return nil, fmt.Errorf("creating checkpoint clearing json: %w", err)
-	}
-
-	return &pf.ConnectorState{UpdatedJson: json.RawMessage(checkpointJSON), MergePatch: true}, nil
+	return executed, nil
 }
 
 func (d *transactor) pathForStateKey(stateKey string) []string {

@@ -74,6 +74,32 @@ type Transactor interface {
 	Destroy()
 }
 
+// AcknowledgeStatePatcher is an optional interface for Transactors that
+// participate in cooperative multi-shard ("scale-out") strategies under the
+// v2 runtime. When implemented, OnAcknowledgeStatePatches is invoked once per
+// transaction — after the Acknowledge request is read and before
+// Acknowledge() is called — with the aggregated StartedCommit state patches
+// of ALL task shards (including this shard's own contribution), in commit
+// order. Under the v1 runtime the slice is always empty.
+type AcknowledgeStatePatcher interface {
+	OnAcknowledgeStatePatches(patches []json.RawMessage) error
+}
+
+// SplitStatePatches decodes a state_patches_json payload into its individual
+// RFC 7396 merge patches. The wire format is a JSON array whose elements are
+// each followed by a tab; tabs are JSON whitespace, so a standard decode
+// suffices. An empty payload means no patches.
+func SplitStatePatches(payload json.RawMessage) ([]json.RawMessage, error) {
+	if len(payload) == 0 {
+		return nil, nil
+	}
+	var out []json.RawMessage
+	if err := json.Unmarshal(payload, &out); err != nil {
+		return nil, fmt.Errorf("decoding state_patches_json: %w", err)
+	}
+	return out, nil
+}
+
 // Stream is the basic interface used for sending and receiving
 // protocol messages.
 type Stream interface {
@@ -268,6 +294,19 @@ func RunTransactions(
 
 		if err = doReadAcknowledge(stream, &rxRequest); err != nil {
 			return err
+		}
+
+		// Surface the aggregated cross-shard state patches to cooperating
+		// transactors. This must happen synchronously, before the concurrent
+		// await() and load() phases begin: `rxRequest` is reused by load()'s
+		// recv, and the goroutine start below is the happens-before edge that
+		// publishes the transactor's updated view to Acknowledge().
+		if p, ok := transactor.(AcknowledgeStatePatcher); ok {
+			if patches, err := SplitStatePatches(rxRequest.Acknowledge.StatePatchesJson); err != nil {
+				return err
+			} else if err := p.OnAcknowledgeStatePatches(patches); err != nil {
+				return fmt.Errorf("transactor.OnAcknowledgeStatePatches: %w", err)
+			}
 		}
 
 		// Await the commit of the prior transaction, then notify the runtime.
