@@ -14,10 +14,16 @@ import (
 )
 
 type Config struct {
-	Greetings        int              `json:"greetings"`
-	SkipState        bool             `json:"skip_state"`
-	FailAfter        int              `json:"fail_after"`
-	ExitAfter        int              `json:"exit_after"`
+	Greetings int  `json:"greetings"`
+	SkipState bool `json:"skip_state"`
+	FailAfter int  `json:"fail_after"`
+	ExitAfter int  `json:"exit_after"`
+	// TruncateTest, when > 0, runs a backfill-truncation exercise instead of the
+	// normal greeting stream. It emits N "stale" documents, a BackfillBegin
+	// control signal, N "fresh" documents (reusing the same keys), a
+	// BackfillComplete signal, and then exits. Used to drive end-to-end tests of
+	// backfill truncation signals.
+	TruncateTest     int              `json:"truncate_test"`
 	OAuthCredentials oauthCredentials `json:"credentials"`
 }
 
@@ -45,7 +51,7 @@ type Greeting struct {
 }
 
 func (c *Config) Validate() error {
-	if c.Greetings == 0 {
+	if c.TruncateTest == 0 && c.Greetings == 0 {
 		return fmt.Errorf("missing greetings")
 	}
 	return nil
@@ -84,6 +90,11 @@ const configSchema = `{
       "type": ["integer", "null"],
       "title": "Exit after sending N number of greetings",
       "description": "Exit after sending N number of greetings"
+    },
+    "truncate_test": {
+      "type": ["integer", "null"],
+      "title": "Backfill-truncation test cycle",
+      "description": "When > 0, emit N stale docs, a BackfillBegin, N fresh docs, a BackfillComplete, then exit. Used to drive end-to-end backfill-truncation tests."
     },
     "credentials": {
       "type": "object",
@@ -205,6 +216,11 @@ func (connector) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	if err := stream.Ready(false); err != nil {
 		return err
 	}
+
+	if config.TruncateTest > 0 {
+		return runTruncateTest(config.TruncateTest, len(bindings), stream)
+	}
+
 	for {
 		if config.FailAfter != 0 && state.Cursor >= config.FailAfter {
 			return fmt.Errorf("a horrible, no good error!")
@@ -245,4 +261,73 @@ func (connector) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 			<-time.After(time.Millisecond * 500)
 		}
 	}
+}
+
+// runTruncateTest drives a backfill-truncation exercise across all bindings: it
+// emits `n` "stale" documents, signals BackfillBegin for each binding, emits `n`
+// "fresh" documents reusing the same keys, signals BackfillComplete, and exits.
+// Documents alternate `category` (alpha/beta) so a partitioned collection fans
+// the control signals across multiple journals. Stale documents carry value=100
+// and fresh documents carry value=1, so a destination that correctly skips the
+// truncated (pre-begin) prefix reflects only the fresh values.
+func runTruncateTest(n int, nBindings int, stream *boilerplate.PullOutput) error {
+	var categories = []string{"alpha", "beta"}
+
+	var emit = func(cursor int, phase string, value int) error {
+		for binding := 0; binding < nBindings; binding++ {
+			var doc, err = json.Marshal(struct {
+				Count    int    `json:"count"`
+				Message  string `json:"message"`
+				Category string `json:"category"`
+				Value    int    `json:"value"`
+			}{
+				Count:    cursor,
+				Message:  fmt.Sprintf("%s #%d", phase, cursor),
+				Category: categories[cursor%len(categories)],
+				Value:    value,
+			})
+			if err != nil {
+				return err
+			}
+			if err := stream.Documents(binding, doc); err != nil {
+				return err
+			}
+		}
+		var cp, err = json.Marshal(State{Cursor: cursor + 1})
+		if err != nil {
+			return err
+		}
+		return stream.Checkpoint(cp, false)
+	}
+
+	var controlCheckpoint, err = json.Marshal(State{Cursor: n})
+	if err != nil {
+		return err
+	}
+
+	// Stale generation, superseded once the backfill begins.
+	for i := 0; i < n; i++ {
+		if err := emit(i, "stale", 100); err != nil {
+			return err
+		}
+	}
+	// Signal backfill begin for every binding; each stands alone in its checkpoint.
+	for binding := 0; binding < nBindings; binding++ {
+		if err := stream.BackfillBegin(binding, controlCheckpoint, false); err != nil {
+			return err
+		}
+	}
+	// Fresh generation reuses the same keys with post-truncation values.
+	for i := 0; i < n; i++ {
+		if err := emit(i, "fresh", 1); err != nil {
+			return err
+		}
+	}
+	// Signal backfill complete for every binding.
+	for binding := 0; binding < nBindings; binding++ {
+		if err := stream.BackfillComplete(binding, controlCheckpoint, false); err != nil {
+			return err
+		}
+	}
+	return nil
 }

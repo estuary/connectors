@@ -248,6 +248,53 @@ func (out *PullOutput) Checkpoint(checkpoint json.RawMessage, merge bool) error 
 	return nil
 }
 
+// BackfillBegin signals that a backfill is starting for the given binding, then
+// emits a terminating checkpoint. A backfill control message must stand alone in
+// its connector checkpoint (no captured documents, sourced schemas, or other
+// control messages), so the signal and its checkpoint are sent atomically under
+// a single lock. The runtime uses this to stamp the collection's `truncated-at`
+// journal label at the signal's publication time, superseding earlier data.
+func (out *PullOutput) BackfillBegin(binding int, checkpoint json.RawMessage, merge bool) error {
+	out.Lock()
+	defer out.Unlock()
+	if err := out.Send(&pc.Response{
+		BackfillBegin: &pc.Response_BackfillBegin{Binding: uint32(binding)},
+	}); err != nil {
+		return fmt.Errorf("writing BackfillBegin: %w", err)
+	}
+	if err := out.Send(&pc.Response{
+		Checkpoint: &pc.Response_Checkpoint{
+			State: &pf.ConnectorState{UpdatedJson: checkpoint, MergePatch: merge},
+		},
+	}); err != nil {
+		return fmt.Errorf("writing BackfillBegin checkpoint: %w", err)
+	}
+	return nil
+}
+
+// BackfillComplete signals that a backfill has finished for the given binding,
+// then emits a terminating checkpoint. See BackfillBegin for the "stands alone
+// in its checkpoint" rule. The runtime resolves the completed backfill's
+// truncation boundary and notifies materializations, which may then delete
+// destination rows superseded by the backfill.
+func (out *PullOutput) BackfillComplete(binding int, checkpoint json.RawMessage, merge bool) error {
+	out.Lock()
+	defer out.Unlock()
+	if err := out.Send(&pc.Response{
+		BackfillComplete: &pc.Response_BackfillComplete{Binding: uint32(binding)},
+	}); err != nil {
+		return fmt.Errorf("writing BackfillComplete: %w", err)
+	}
+	if err := out.Send(&pc.Response{
+		Checkpoint: &pc.Response_Checkpoint{
+			State: &pf.ConnectorState{UpdatedJson: checkpoint, MergePatch: merge},
+		},
+	}); err != nil {
+		return fmt.Errorf("writing BackfillComplete checkpoint: %w", err)
+	}
+	return nil
+}
+
 // Emit documents and checkpoints with a common lock, this is useful if there
 // are multiple threads (goroutines) processing documents and emitting
 // checkpoints. In those instances using this method can allow each thread to

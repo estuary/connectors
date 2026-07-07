@@ -120,6 +120,30 @@ type StartCommitFunc = func(
 	runtimeCheckpoint *pc.Checkpoint,
 ) (*pf.ConnectorState, OpFuture)
 
+// logBackfillTruncationSignals surfaces backfill-begin/complete truncation
+// signals carried on a Flush request. These are populated only on shard zero: a
+// backfill supersedes the pre-begin prefix of a source collection, and a
+// BackfillComplete tells the connector it may delete destination rows whose
+// flow_published_at predates the truncation boundary. Connectors that don't yet
+// act on the signal at least record its receipt here.
+func logBackfillTruncationSignals(flush *pm.Request_Flush) {
+	if flush == nil {
+		return
+	}
+	for _, b := range flush.BackfillBegins {
+		log.WithFields(log.Fields{
+			"binding":     b.Binding,
+			"truncatedAt": b.Timestamp,
+		}).Info("received backfill-begin truncation signal")
+	}
+	for _, c := range flush.BackfillCompletes {
+		log.WithFields(log.Fields{
+			"binding":     c.Binding,
+			"truncatedAt": c.Timestamp,
+		}).Info("received backfill-complete truncation signal; destination rows older than truncatedAt were superseded by the backfill")
+	}
+}
+
 // RunTransactions processes materialization protocol transactions
 // over the established stream against a Connector.
 func RunTransactions(
@@ -306,7 +330,9 @@ func RunTransactions(
 
 		if err = validateIsFlush(&rxRequest); err != nil {
 			return err
-		} else if err = writeFlushed(stream, &txResponse); err != nil {
+		}
+		logBackfillTruncationSignals(rxRequest.Flush)
+		if err = writeFlushed(stream, &txResponse); err != nil {
 			return err
 		}
 
