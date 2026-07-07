@@ -202,9 +202,18 @@ def _build_session(c: dict) -> SparkSession:
         )
 
     if c.get("credential"):
-        builder = builder.config(
-            "spark.sql.catalog.estuary.credential", c["credential"]
-        )
+        if ":" in c["credential"]:
+            builder = builder.config(
+                "spark.sql.catalog.estuary.credential", c["credential"]
+            )
+        else:
+            # Iceberg treats `credential` as OAuth client-credentials material
+            # and POSTs it to the token endpoint. A credential without a colon
+            # is a static bearer token (mirroring the Go connector's
+            # dispatch), which must be set as `token` instead.
+            builder = builder.config(
+                "spark.sql.catalog.estuary.token", c["credential"]
+            )
     elif c.get("signing_name"):
         builder = (
             builder.config("spark.sql.catalog.estuary.rest.sigv4-enabled", "true")
