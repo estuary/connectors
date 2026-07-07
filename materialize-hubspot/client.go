@@ -5,8 +5,10 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -16,6 +18,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 	"golang.org/x/time/rate"
 )
 
@@ -83,7 +86,7 @@ const (
 )
 
 var (
-	baseURL         *url.URL      = MustParseURL("https://api.hubspot.com")
+	baseURL         *url.URL      = MustParseURL("https://api.hubapi.com")
 	tokenPath       string        = "/oauth/2026-03/token"
 	objectPath      string        = "/crm/objects/2026-03"
 	propertyPath    string        = "/crm/properties/2026-03"
@@ -638,7 +641,7 @@ func (c *Client) Search(
 		return nil, fmt.Errorf("unable to search more than %d filter groups", MaxSearchFilterGroups)
 	}
 
-	data, err := json.Marshal(&search)
+	data, err := json.Marshal(search)
 	if err != nil {
 		return nil, fmt.Errorf("unable to marshal search request: %w", err)
 	}
@@ -681,6 +684,76 @@ func (c *Client) Search(
 		return nil, err
 	}
 	return &searchResponse, nil
+}
+
+type GetRequest struct {
+	Properties []string `json:"properties,omitempty"`
+	Limit      int      `json:"limit,omitempty"`
+	After      string   `json:"after,omitempty"`
+}
+
+type GetResult struct {
+	ID         string         `json:"id"`
+	Properties map[string]any `json:"properties"`
+}
+
+type GetResponse struct {
+	Results []GetResult `json:"results"`
+	Paging  Paging      `json:"paging"`
+}
+
+func (c *Client) Get(
+	ctx context.Context,
+	object CRMObject,
+	get *GetRequest,
+) (*GetResponse, error) {
+	params := url.Values{}
+	if get.Limit != 0 {
+		params.Set("limit", fmt.Sprintf("%d", get.Limit))
+	}
+	if get.After != "" {
+		params.Set("after", get.After)
+	}
+	params.Set("properties", strings.Join(get.Properties, ","))
+	uri := baseURL.JoinPath(objectPath, object.String())
+	uri.RawQuery = params.Encode()
+
+	var getResponse GetResponse
+
+	err := Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
+		req, err := c.newRequest(ctx, "GET", uri, nil)
+		if err != nil {
+			return err
+		}
+
+		start := time.Now()
+		if err := c.limiter.Wait(ctx); err != nil {
+			return err
+		}
+		delay := time.Since(start)
+
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+		defer logExchange(resp, start, delay)
+
+		if resp.StatusCode != 200 {
+			apiError := parseAPIError(resp)
+			return fmt.Errorf("unexpected response: %w", apiError)
+		}
+
+		err = parseBody(resp, &getResponse, MaxResponseBytes)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &getResponse, nil
 }
 
 func (c *Client) ListPropertyGroups(ctx context.Context, object CRMObject) ([]*PropertyGroup, error) {
@@ -1103,6 +1176,160 @@ func (c *Client) RefreshTokens(ctx context.Context, now time.Time) (*TokenUpdate
 	}, nil
 }
 
+// AuthCode retrieves initial access and refresh tokens.
+//
+// This is used for debugging/development, during normal connector use this is
+// handled by the webapp during connector setup.
+func (c *Client) AuthCode(ctx context.Context, now time.Time, code string, redirectURI string) (*TokenUpdate, error) {
+	params := url.Values{}
+	params.Set("client_id", c.credentials.ClientID)
+	params.Set("client_secret", c.credentials.ClientSecret.Expose())
+	params.Set("code", code)
+	params.Set("grant_type", "authorization_code")
+	params.Set("redirect_uri", redirectURI)
+
+	uri := baseURL.JoinPath(tokenPath)
+
+	var tokens TokenResponse
+	err := Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
+		reqBody := strings.NewReader(params.Encode())
+		req, err := http.NewRequestWithContext(ctx, "POST", uri.String(), reqBody)
+		if err != nil {
+			return err
+		}
+		req.Header.Set("User-Agent", c.productToken)
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+		start := time.Now()
+		if err := c.limiter.Wait(ctx); err != nil {
+			return err
+		}
+		delay := time.Since(start)
+
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+		defer logExchange(resp, start, delay)
+
+		if resp.StatusCode != 200 {
+			apiError := parseAPIError(resp)
+			return fmt.Errorf("unexpected response: %w", apiError)
+		}
+
+		return parseBody(resp, &tokens, MaxResponseBytes)
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &TokenUpdate{
+		RefreshToken:         tokens.RefreshToken,
+		AccessToken:          tokens.AccessToken,
+		AccessTokenExpiresAt: now.Add(time.Duration(tokens.ExpiresIn) * time.Second),
+	}, nil
+}
+
+// OAuth2CallbackServer is a server to get the initial authentication tokens.
+//
+// Used for testing.
+type OAuth2CallbackServer struct {
+	server *http.Server
+	group  *errgroup.Group
+	tokens *TokenUpdate
+}
+
+// Addr returns the listening address in the form "host:port"
+func (s *OAuth2CallbackServer) Addr() string {
+	return s.server.Addr
+}
+
+// WaitTokens waits for the tokens to be received and returns them.
+//
+// Tokens are ready when the callback is received from the authentication page.
+func (s *OAuth2CallbackServer) WaitTokens() (*TokenUpdate, error) {
+	if err := s.group.Wait(); err != nil {
+		return nil, err
+	}
+
+	if s.tokens == nil {
+		return nil, errors.New("no tokens: cancelled")
+	}
+	return s.tokens, nil
+}
+
+// StartOAuth2CallbackServer starts a local server to get the initial OAuth2
+// refresh/access token for an App's client_id and client_secret.
+//
+// The appRedirectURL option must match the redirect_url for the App, and also
+// be a address that can be listened on.
+//
+// This is used for testing/development, during normal connector use this is
+// handled by the webapp during connector setup.
+func (c *Client) StartOAuth2CallbackServer(ctx context.Context, appRedirectURL *url.URL) (*OAuth2CallbackServer, error) {
+	ln, err := net.Listen("tcp", appRedirectURL.Host)
+	if err != nil {
+		return nil, fmt.Errorf("listen: %w", err)
+	}
+
+	group, groupCtx := errgroup.WithContext(ctx)
+
+	complete := make(chan struct{})
+
+	s := &OAuth2CallbackServer{}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/oauth", func(w http.ResponseWriter, r *http.Request) {
+		code := r.URL.Query().Get("code")
+
+		now := time.Now()
+		update, err := c.AuthCode(groupCtx, now, code, appRedirectURL.String())
+		if err != nil {
+			log.Errorf("refresh: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		s.tokens = update
+
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "<script>window.close()</script>Done, you can close this tab.")
+
+		complete <- struct{}{}
+	})
+	server := &http.Server{Handler: mux}
+
+	group.Go(func() error {
+		if err := server.Serve(ln); err != nil && err != http.ErrServerClosed {
+			return err
+		}
+		return nil
+	})
+
+	group.Go(func() error {
+		select {
+		case <-groupCtx.Done():
+			break
+		case <-complete:
+			break
+		}
+
+		ctx := context.Background()
+		if shutdownErr := server.Shutdown(ctx); shutdownErr != nil {
+			log.WithError(shutdownErr).Error("error during shutdown")
+		}
+		return nil
+	})
+
+	s.server = server
+	s.group = group
+	return s, nil
+}
+
+// InspectTokens displays information about a refresh token.
+//
+// This is used for testing/development.
 func (c *Client) InspectTokens(ctx context.Context) (map[string]any, error) {
 	params := url.Values{}
 	params.Set("refresh_token", c.credentials.RefreshToken.Expose())

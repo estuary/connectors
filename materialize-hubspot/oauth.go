@@ -9,10 +9,10 @@ import (
 )
 
 var (
-	authURL        = MustParseURL("https://app.hubspot.com/oauth/authorize")
-	oauth2Provider = "hubspot"
+	AuthURL        = MustParseURL("https://app.hubspot.com/oauth/authorize")
+	Oauth2Provider = "hubspot"
 
-	oauth2Scopes = []string{
+	Oauth2Scopes = []string{
 		"oauth",
 
 		"crm.objects.companies.read",
@@ -41,17 +41,17 @@ var (
 		"tickets",
 	}
 
-	oauth2OptionalScopes = []string{}
+	Oauth2OptionalScopes = []string{}
 )
 
 func OAuth2Spec() *pf.OAuth2 {
 	authParams := "" +
 		"client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}" +
-		"&scope=" + url.QueryEscape(strings.Join(oauth2Scopes, " ")) +
-		"&optional_scope=" + url.QueryEscape(strings.Join(oauth2OptionalScopes, " ")) +
+		"&scope=" + url.QueryEscape(strings.Join(Oauth2Scopes, " ")) +
+		"&optional_scope=" + url.QueryEscape(strings.Join(Oauth2OptionalScopes, " ")) +
 		"&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}" +
 		"&state={{#urlencode}}{{{ state }}}{{/urlencode}}"
-	authURLTemplate := *authURL
+	authURLTemplate := *AuthURL
 	authURLTemplate.RawQuery = authParams
 
 	accessParams := "" +
@@ -62,7 +62,7 @@ func OAuth2Spec() *pf.OAuth2 {
 		"&code={{#urlencode}}{{{ code }}}{{/urlencode}}"
 
 	return &pf.OAuth2{
-		Provider:        oauth2Provider,
+		Provider:        Oauth2Provider,
 		AccessTokenBody: accessParams,
 		AuthUrlTemplate: authURLTemplate.String(),
 		AccessTokenHeadersJsonMap: map[string]json.RawMessage{

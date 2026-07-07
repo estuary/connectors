@@ -10,35 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-/*
- *          domain         |        name         |      city      |    phone     |         closedate
- * ------------------------+---------------------+----------------+--------------+----------------------------
- *  vandelayindustries.com | Vandelay Industries | New York City  | +12125550192 | 2024-03-12 07:22:10.442-07
- *  lospolloshermanos.biz  | Los Pollos Hermanos | Albuquerque    | +15055550168 | 2024-01-19 08:05:54.217-08
- *  dundermifflin.com      | Dunder Mifflin      | Scranton       | +15705550121 | 2024-07-30 04:33:22.56-07
- *  aperturescience.com    | Aperture Science    | Upper Michigan | +19065550175 | 2024-02-25 00:14:47.334-08
- *  soylentcorp.com        | Soylent Corp        | New York City  | +12125550130 | 2024-06-11 13:58:01.775-07
- *  wayneent.com           | Wayne Enterprises   | Gotham City    | +13115550101 | 2024-04-03 06:41:29.108-07
- *  cyberdyne.io           | Cyberdyne Systems   | Sunnyvale      | +14085550182 | 2024-08-17 10:26:38.923-07
- *  sterlingcooper.com     | Sterling Cooper     | New York City  | +12125550156 | 2024-09-04 03:09:15.651-07
- *  bluthcompany.com       | Bluth Company       | Newport Beach  | +19495550199 | 2024-11-22 15:51:44.289-08
- *  initech.net            | Initech             | Austin         | +15125550144 | 2024-05-08 02:47:33.891-07
- *
- *
- *                email               | firstname | lastname |      city      |       company       | hs_lead_status
- * -----------------------------------+-----------+----------+----------------+---------------------+----------------
- *  pgibbons@initech.net              | Peter     | Gibbons  | Austin         | Initech             | OPEN
- *  g.fring@lospolloshermanos.biz     | Gustavo   | Fring    | Albuquerque    | Los Pollos Hermanos | OPEN
- *  m.scott@dundermifflin.com         | Michael   | Scott    | Scranton       | Dunder Mifflin      | OPEN
- *  c.johnson@aperturescience.com     | Cave      | Johnson  | Upper Michigan | Aperture Science    | OPEN
- *  r.neville@soylentcorp.com         | Robert    | Neville  | New York City  | Soylent Corp        | OPEN
- *  b.wayne@wayneent.com              | Bruce     | Wayne    | Gotham City    | Wayne Enterprises   | OPEN
- *  s.connor@cyberdyne.io             | Sarah     | Connor   | Sunnyvale      | Cyberdyne Systems   | OPEN
- *  d.draper@sterlingcooper.com       | Don       | Draper   | New York City  | Sterling Cooper     | OPEN
- *  m.bluth@bluthcompany.com          | Michael   | Bluth    | Newport Beach  | Bluth Company       | OPEN
- *  g.costanza@vandelayindustries.com | George    | Costanza | New York City  | Vandelay Industries | NEW
- */
-
 type FakeStream struct {
 	index int
 	items []StoreIteratorItem

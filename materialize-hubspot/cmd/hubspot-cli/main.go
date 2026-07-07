@@ -5,8 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
+	"os/exec"
 	"os/signal"
+	"runtime"
+	"strings"
 	"time"
 
 	arg "github.com/alexflint/go-arg"
@@ -45,22 +49,80 @@ func parseConfig(filename string) (*hubspot.Config, error) {
 	return &config, nil
 }
 
+type AuthCmd struct {
+	// RedirectHost must match the app's setting.
+	RedirectHost string `arg:"--redirect-host" default:"localhost:3000"`
+	// Attempt to open the authorize link in a browser automatically.
+	AutoOpen bool `arg:"--auto-open"`
+}
+
+func (c *AuthCmd) Run(ctx context.Context, client *hubspot.Client, creds hubspot.Credentials) error {
+	redirectBaseURL := &url.URL{
+		Scheme: "http",
+		Host:   c.RedirectHost,
+		Path:   "oauth",
+	}
+
+	server, err := client.StartOAuth2CallbackServer(ctx, redirectBaseURL)
+	if err != nil {
+		return fmt.Errorf("unable to start server: %w", err)
+	}
+
+	params := url.Values{}
+	params.Set("client_id", creds.ClientID)
+	params.Set("scope", strings.Join(hubspot.Oauth2Scopes, " "))
+	params.Set("redirect_uri", redirectBaseURL.String())
+	uri := *hubspot.AuthURL
+	uri.RawQuery = params.Encode()
+
+	fmt.Printf("Authorize URL: %s\n", uri.String())
+
+	if c.AutoOpen {
+		switch runtime.GOOS {
+		case "darwin":
+			err = exec.Command("open", uri.String()).Start()
+		default:
+			err = exec.Command("xdg-open", uri.String()).Start()
+		}
+		if err != nil {
+			log.WithError(err).Error("error opening link")
+		}
+	}
+
+	tokenUpdate, err := server.WaitTokens()
+	if err != nil {
+		return fmt.Errorf("server error: %w", err)
+	}
+
+	tokens := map[string]string{
+		"refresh_token":           tokenUpdate.RefreshToken.Expose(),
+		"access_token":            tokenUpdate.AccessToken.Expose(),
+		"access_token_expires_at": tokenUpdate.AccessTokenExpiresAt.Format(time.RFC3339),
+	}
+	data, err := json.MarshalIndent(tokens, "", "    ")
+	if err != nil {
+		return err
+	}
+	fmt.Printf("%s\n", data)
+
+	return nil
+}
+
 type RefreshTokensCmd struct{}
 
 func (*RefreshTokensCmd) Run(ctx context.Context, client *hubspot.Client) error {
 	now := time.Now()
-	tokens, err := client.RefreshTokens(ctx, now)
+	tokenUpdate, err := client.RefreshTokens(ctx, now)
 	if err != nil {
 		return err
 	}
 
-	update := map[string]string{
-		"refresh_token":           tokens.RefreshToken.Expose(),
-		"access_token":            tokens.AccessToken.Expose(),
-		"access_token_expires_at": tokens.AccessTokenExpiresAt.Format(time.RFC3339),
+	tokens := map[string]string{
+		"refresh_token":           tokenUpdate.RefreshToken.Expose(),
+		"access_token":            tokenUpdate.AccessToken.Expose(),
+		"access_token_expires_at": tokenUpdate.AccessTokenExpiresAt.Format(time.RFC3339),
 	}
-
-	data, err := json.MarshalIndent(update, "", "    ")
+	data, err := json.MarshalIndent(tokens, "", "    ")
 	if err != nil {
 		return err
 	}
@@ -340,6 +402,7 @@ func (c *SearchEqualCmd) Run(ctx context.Context, client *hubspot.Client) error 
 type Args struct {
 	Config string `arg:"-c,--config" default:"-"`
 
+	Auth                *AuthCmd                `arg:"subcommand:auth"`
 	RefreshTokens       *RefreshTokensCmd       `arg:"subcommand:refresh-tokens"`
 	InspectTokens       *InspectTokensCmd       `arg:"subcommand:inspect-tokens"`
 	CreateProperty      *CreatePropertyCmd      `arg:"subcommand:create-property"`
@@ -394,6 +457,8 @@ func main() {
 	}
 
 	switch {
+	case args.Auth != nil:
+		err = args.Auth.Run(ctx, client, config.Credentials)
 	case args.RefreshTokens != nil:
 		err = args.RefreshTokens.Run(ctx, client)
 	case args.InspectTokens != nil:
