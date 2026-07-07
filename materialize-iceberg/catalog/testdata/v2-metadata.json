@@ -1,0 +1,104 @@
+{
+  "format-version": 2,
+  "table-uuid": "cefe08fd-c720-4f53-8a07-e142d48a4d6d",
+  "location": "s3://warehouse/repro_ns/repro_table",
+  "last-sequence-number": 1,
+  "last-updated-ms": 1783445069235,
+  "last-column-id": 2,
+  "current-schema-id": 0,
+  "schemas": [
+    {
+      "type": "struct",
+      "schema-id": 0,
+      "identifier-field-ids": [
+        1
+      ],
+      "fields": [
+        {
+          "id": 1,
+          "name": "id",
+          "required": true,
+          "type": "long"
+        },
+        {
+          "id": 2,
+          "name": "val",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    }
+  ],
+  "default-spec-id": 0,
+  "partition-specs": [
+    {
+      "spec-id": 0,
+      "fields": []
+    }
+  ],
+  "last-partition-id": 999,
+  "default-sort-order-id": 0,
+  "sort-orders": [
+    {
+      "order-id": 0,
+      "fields": []
+    }
+  ],
+  "properties": {
+    "created-at": "2026-07-07T17:23:08.098523967Z",
+    "write.parquet.compression-codec": "zstd",
+    "flow_test": "1"
+  },
+  "current-snapshot-id": 7132070734803993372,
+  "refs": {
+    "main": {
+      "snapshot-id": 7132070734803993372,
+      "type": "branch"
+    }
+  },
+  "snapshots": [
+    {
+      "sequence-number": 1,
+      "snapshot-id": 7132070734803993372,
+      "timestamp-ms": 1783445069235,
+      "summary": {
+        "operation": "append",
+        "spark.app.id": "app-20260707172202-0000",
+        "added-data-files": "1",
+        "added-records": "1",
+        "added-files-size": "651",
+        "changed-partition-count": "1",
+        "total-records": "1",
+        "total-files-size": "651",
+        "total-data-files": "1",
+        "total-delete-files": "0",
+        "total-position-deletes": "0",
+        "total-equality-deletes": "0",
+        "engine-version": "3.5.5",
+        "app-id": "app-20260707172202-0000",
+        "engine-name": "spark",
+        "iceberg-version": "Apache Iceberg 1.6.1 (commit 8e9d59d299be42b0bca9461457cd1e95dbaad086)"
+      },
+      "manifest-list": "s3://warehouse/repro_ns/repro_table/metadata/snap-7132070734803993372-1-8cfcf776-d065-48b8-993f-fd48764f65de.avro",
+      "schema-id": 0
+    }
+  ],
+  "statistics": [],
+  "partition-statistics": [],
+  "snapshot-log": [
+    {
+      "timestamp-ms": 1783445069235,
+      "snapshot-id": 7132070734803993372
+    }
+  ],
+  "metadata-log": [
+    {
+      "timestamp-ms": 1783444988162,
+      "metadata-file": "s3://warehouse/repro_ns/repro_table/metadata/00000-f1b2ba12-2de1-4a0c-8534-2ec473235f56.metadata.json"
+    },
+    {
+      "timestamp-ms": 1783445018036,
+      "metadata-file": "s3://warehouse/repro_ns/repro_table/metadata/00001-f68f62ed-1bc9-4454-98bd-36be42ce4c22.metadata.json"
+    }
+  ]
+}
