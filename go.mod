@@ -56,7 +56,7 @@ require (
 	github.com/invopop/jsonschema v0.13.0
 	github.com/jackc/pgio v1.0.0
 	github.com/jackc/pglogrepl v0.0.0-20240307033717-828fbfe908e9
-	github.com/jackc/pgx/v5 v5.6.0
+	github.com/jackc/pgx/v5 v5.9.0
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/klauspost/compress v1.18.6
 	github.com/klauspost/pgzip v1.2.6
