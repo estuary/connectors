@@ -80,6 +80,9 @@ In the future, other open-source materialization connectors from third parties c
   * Package — ghcr.io/estuary/materialize-databricks:v3
 * Dekaf
   * [Configuration](./Dekaf/dekaf.md)
+* Dremio
+  * [Configuration](./apache-iceberg/dremio.md)
+  * Package - ghcr.io/estuary/materialize-dremio:v1
 * Elasticsearch
   * [Configuration](./Elasticsearch.md)
   * Package — ghcr.io/estuary/materialize-elasticsearch:v3
