@@ -324,6 +324,19 @@ jobs:
         run: |
           CONNECTOR=${{ matrix.connector }} VERSION=local tests/materialize/run.sh;
 
+      # Connectors implementing runtime-v2 scale-out must also pass a
+      # multi-shard end-to-end test, which drives the connector with two
+      # shards across two sessions via `flowctl raw preview-next` and
+      # verifies destination contents. See tests/scale-out/README.md.
+      - name: Runtime v2 scale-out tests for ${{ matrix.connector }}
+        if: |
+          contains(fromJson('[
+            "materialize-databricks"
+            ]'), matrix.connector)
+        env:
+          FLOW_AUTH_TOKEN: ${{ secrets.FLOW_SCALE_OUT_AUTH_TOKEN }}
+        run: CONNECTOR=${{ matrix.connector }} ./tests/scale-out/run.sh
+
       - name: Push ${{ matrix.connector }} image(s) with commit SHA tag
         run: |
           for VARIANT in ${{ steps.prep.outputs.variants }}; do
