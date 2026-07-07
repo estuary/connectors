@@ -14,6 +14,10 @@ import (
 var featureFlagDefaults = map[string]bool{
 	"datetime_keys_as_string":          true,
 	"retain_existing_data_on_backfill": false,
+	// scale_out enables multi-shard operation under the v2 runtime: checkpoint
+	// state is scoped by shard key-range, and only the primary shard (key_begin
+	// 0) executes the staged MERGE/COPY queries of all shards at Acknowledge.
+	"scale_out": false,
 }
 
 // config represents the endpoint configuration for sql server.
