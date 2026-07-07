@@ -97,7 +97,12 @@ func TestIntegrationLocalEmulatorGoccy(t *testing.T) {
 		t.Skip("local-emulator-goccy suite disabled by BIGQUERY_TEST_LOCAL_EMULATOR_GOCCY=0")
 	}
 
-	require.NoError(t, exec.Command("docker", "compose", "-f", "docker-compose.yaml", "up", "--wait").Run())
+	// Compose output is included on failure: the most common first-run error
+	// is the missing external `flow-test` network, which only compose's
+	// stderr explains (create it with `docker network create flow-test`).
+	if out, err := exec.Command("docker", "compose", "-f", "docker-compose.yaml", "up", "--wait").CombinedOutput(); err != nil {
+		t.Fatalf("docker compose up --wait: %v\n%s", err, out)
+	}
 	t.Cleanup(func() {
 		exec.Command("docker", "compose", "-f", "docker-compose.yaml", "down", "-v").Run()
 	})
