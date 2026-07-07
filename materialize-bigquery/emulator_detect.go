@@ -2,11 +2,14 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 	bqv2 "google.golang.org/api/bigquery/v2"
+	"google.golang.org/api/googleapi"
 	"google.golang.org/api/option"
 )
 
@@ -61,9 +64,12 @@ func detectEmulatorGoccy(ctx context.Context, cfg config) (bool, error) {
 
 // classifyServerWithRetry runs the classification probe with retries per
 // retrySchedule. A probe error is always inconclusive - never a classification
-// - so exhausting retries is a hard error naming the endpoint: silently
-// defaulting to either mode would run SaaS SQL against an emulator or
-// emulator workarounds against the real service.
+// - so failing is a hard error naming the endpoint: silently defaulting to
+// either mode would run SaaS SQL against an emulator or emulator workarounds
+// against the real service. Definitive request errors (bad credentials, an
+// unknown project) fail on the first attempt, so a plainly-misconfigured
+// connector surfaces its real error immediately instead of after the full
+// retry schedule.
 func classifyServerWithRetry(ctx context.Context, projectID, endpointDesc string, retrySchedule []time.Duration, opts ...option.ClientOption) (bool, error) {
 	svc, err := bqv2.NewService(ctx, opts...)
 	if err != nil {
@@ -71,6 +77,7 @@ func classifyServerWithRetry(ctx context.Context, projectID, endpointDesc string
 	}
 
 	var lastErr error
+	var attempts int
 	for attempt := 0; attempt <= len(retrySchedule); attempt++ {
 		if attempt > 0 {
 			select {
@@ -85,14 +92,32 @@ func classifyServerWithRetry(ctx context.Context, projectID, endpointDesc string
 			return isSaaS, nil
 		}
 		lastErr = err
+		attempts = attempt + 1
 
 		log.WithFields(log.Fields{
 			"endpoint": endpointDesc,
-			"attempt":  attempt + 1,
+			"attempt":  attempts,
 		}).WithError(err).Info("BigQuery server classification probe failed")
+
+		if !probeErrIsRetryable(err) {
+			break
+		}
 	}
 
-	return false, fmt.Errorf("classifying the BigQuery server at %s (%d attempts): %w", endpointDesc, len(retrySchedule)+1, lastErr)
+	return false, fmt.Errorf("classifying the BigQuery server at %s (%d attempts): %w", endpointDesc, attempts, lastErr)
+}
+
+// probeErrIsRetryable distinguishes transient probe failures from definitive
+// ones. An API response with a 4xx status - other than request timeout and
+// rate limiting - reflects the request itself and will not change on retry;
+// everything else (transport errors, 5xx, timeouts) may be a server still
+// starting up, which is exactly what the retry schedule exists for.
+func probeErrIsRetryable(err error) bool {
+	var gErr *googleapi.Error
+	if errors.As(err, &gErr) && gErr.Code >= 400 && gErr.Code < 500 {
+		return gErr.Code == http.StatusRequestTimeout || gErr.Code == http.StatusTooManyRequests
+	}
+	return true
 }
 
 // probeIsSaaSBigQuery classifies the connected server as either real SaaS

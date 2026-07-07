@@ -108,6 +108,27 @@ func TestClassifyServer(t *testing.T) {
 		require.ErrorAs(t, err, &gErr)
 		require.Equal(t, http.StatusServiceUnavailable, gErr.Code)
 	})
+
+	t.Run("definitive-4xx-fails-fast", func(t *testing.T) {
+		var attempts atomic.Int32
+		var server = serve(t, func(w http.ResponseWriter, r *http.Request) {
+			attempts.Add(1)
+			http.Error(w, `{"error": {"code": 403, "message": "permission denied"}}`, http.StatusForbidden)
+		})
+
+		var retrySchedule = []time.Duration{time.Millisecond, time.Millisecond}
+		_, err := classifyServerWithRetry(ctx, "test-project", server.URL, retrySchedule,
+			option.WithEndpoint(server.URL+"/"),
+			option.WithoutAuthentication(),
+		)
+		require.Error(t, err)
+		require.Equal(t, int32(1), attempts.Load(), "a definitive request error must not be retried")
+		require.Contains(t, err.Error(), server.URL, "error must name the probed endpoint")
+
+		var gErr *googleapi.Error
+		require.ErrorAs(t, err, &gErr)
+		require.Equal(t, http.StatusForbidden, gErr.Code)
+	})
 }
 
 const goccyProbeEndpoint = "http://localhost:9050/bigquery/v2/"
