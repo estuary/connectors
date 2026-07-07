@@ -95,11 +95,12 @@ func TestDropFieldsBeyondFormatVersion(t *testing.T) {
 		in          string
 		want        string
 		wantDropped []string
+		wantErr     string
 	}{
 		{
-			name: "not an object passes through",
-			in:   `"just a string"`,
-			want: `"just a string"`,
+			name:    "not an object errors",
+			in:      `"just a string"`,
+			wantErr: "parsing table metadata",
 		},
 		{
 			name: "missing format-version passes through",
@@ -107,9 +108,14 @@ func TestDropFieldsBeyondFormatVersion(t *testing.T) {
 			want: `{"next-row-id": 0}`,
 		},
 		{
-			name: "invalid format-version passes through",
-			in:   `{"format-version": "two", "next-row-id": 0}`,
-			want: `{"format-version": "two", "next-row-id": 0}`,
+			name:    "non-integer format-version errors",
+			in:      `{"format-version": "two", "next-row-id": 0}`,
+			wantErr: "parsing format-version",
+		},
+		{
+			name:    "nonsensical format-version errors",
+			in:      `{"format-version": 0, "next-row-id": 0}`,
+			wantErr: "invalid format-version 0",
 		},
 		{
 			name: "v3 keeps its own fields",
@@ -135,7 +141,12 @@ func TestDropFieldsBeyondFormatVersion(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			got, dropped, _ := dropFieldsBeyondFormatVersion(json.RawMessage(tt.in))
+			got, dropped, _, err := dropFieldsBeyondFormatVersion(json.RawMessage(tt.in))
+			if tt.wantErr != "" {
+				require.ErrorContains(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
 			require.JSONEq(t, tt.want, string(got))
 			require.Equal(t, tt.wantDropped, dropped)
 		})
