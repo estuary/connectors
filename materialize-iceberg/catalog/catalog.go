@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -18,6 +19,7 @@ import (
 	"github.com/apache/iceberg-go/table"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/oauth2/clientcredentials"
 	"resty.dev/v3"
 )
@@ -392,6 +394,54 @@ func (c *Catalog) ListTables(ctx context.Context, ns string) ([]string, error) {
 	return names, nil
 }
 
+// versionScopedMetadataFields are table metadata fields mapped to the format
+// version that introduced them. Some catalog services include fields from
+// newer format versions in metadata for older-version tables, most notably
+// the v3 row-lineage field 'next-row-id' appearing in v2 metadata. iceberg-go
+// v0.6.0+ rejects such metadata outright, where v0.5.0 ignored the extra
+// fields; dropping them before parsing retains the lenient reading behavior.
+var versionScopedMetadataFields = map[string]int{
+	"last-sequence-number": 2,
+	"next-row-id":          3,
+	"encryption-keys":      3,
+}
+
+// dropFieldsBeyondFormatVersion removes metadata fields that are only valid
+// in format versions newer than the metadata's declared format-version,
+// reporting the dropped field names and the declared version so callers can
+// log which catalog provider is writing out-of-spec metadata. The raw
+// metadata is returned unchanged if nothing needs to be dropped, or if it
+// isn't shaped like table metadata at all - full validation of the metadata
+// is left to iceberg-go's parsing.
+func dropFieldsBeyondFormatVersion(raw json.RawMessage) (json.RawMessage, []string, int) {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return raw, nil, 0
+	}
+
+	var version int
+	if err := json.Unmarshal(fields["format-version"], &version); err != nil || version < 1 {
+		return raw, nil, 0
+	}
+
+	var dropped []string
+	for f, introduced := range versionScopedMetadataFields {
+		if _, present := fields[f]; present && version < introduced {
+			delete(fields, f)
+			dropped = append(dropped, f)
+		}
+	}
+	if len(dropped) == 0 {
+		return raw, nil, version
+	}
+	slices.Sort(dropped)
+
+	if sanitized, err := json.Marshal(fields); err == nil {
+		return sanitized, dropped, version
+	}
+	return raw, nil, version
+}
+
 func (c *Catalog) GetTable(ctx context.Context, ns string, name string) (*Table, error) {
 	type resp struct {
 		Config           tableConfig     `json:"config"`
@@ -404,7 +454,20 @@ func (c *Catalog) GetTable(ctx context.Context, ns string, name string) (*Table,
 		return nil, err
 	}
 
-	meta, err := table.ParseMetadataBytes(res.RawMeta)
+	sanitized, dropped, version := dropFieldsBeyondFormatVersion(res.RawMeta)
+	if len(dropped) > 0 {
+		// Identify catalog providers that write out-of-spec metadata so they
+		// can be notified upstream.
+		log.WithFields(log.Fields{
+			"catalog":       c.rHttp.BaseURL(),
+			"namespace":     ns,
+			"table":         name,
+			"formatVersion": version,
+			"fields":        dropped,
+		}).Warn("dropped metadata fields not valid for the table's format version")
+	}
+
+	meta, err := table.ParseMetadataBytes(sanitized)
 	if err != nil {
 		return nil, err
 	}
