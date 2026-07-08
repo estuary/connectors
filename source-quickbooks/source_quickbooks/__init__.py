@@ -15,7 +15,6 @@ from estuary_cdk.flow import (
 )
 
 from .models import (
-    OAUTH2_SPEC,
     ConnectorState,
     EndpointConfig,
 )
@@ -31,7 +30,6 @@ class Connector(
     async def spec(self, _: request.Spec, logger: Logger) -> ConnectorSpec:
         return ConnectorSpec(
             configSchema=EndpointConfig.model_json_schema(),
-            oauth2=OAUTH2_SPEC,
             documentationUrl="https://go.estuary.dev/source-quickbooks",
             resourceConfigSchema=common.ResourceConfig.model_json_schema(),
             resourcePathPointers=common.ResourceConfig.PATH_POINTERS,
