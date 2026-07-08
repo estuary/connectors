@@ -90,7 +90,7 @@ func (c config) Validate() error {
 			return fmt.Errorf("bucket name must not contain '.'")
 		}
 
-		if err := blob.ValidateBucketPath(c.StagingBucket.BucketPathS3); err != nil {
+		if err := blob.ValidateBucketPath(c.effectiveBucketPath()); err != nil {
 			return fmt.Errorf("bucketPathS3 %w", err)
 		}
 	case stagingBucketTypeGCS:
@@ -115,7 +115,7 @@ func (c config) Validate() error {
 			return fmt.Errorf("invalid gcsHMACSecret: must be base64 encoded")
 		}
 
-		if err := blob.ValidateBucketPath(c.StagingBucket.BucketPathGCS); err != nil {
+		if err := blob.ValidateBucketPath(c.effectiveBucketPath()); err != nil {
 			return fmt.Errorf("bucketPathGCS %w", err)
 		}
 	case stagingBucketTypeAzure:
@@ -156,7 +156,7 @@ func (c config) Validate() error {
 			return fmt.Errorf("invalid containerName: must not contain consecutive hyphens")
 		}
 
-		if err := blob.ValidateBucketPath(c.StagingBucket.BucketPathAzure); err != nil {
+		if err := blob.ValidateBucketPath(c.effectiveBucketPath()); err != nil {
 			return fmt.Errorf("bucketPathAzure %w", err)
 		}
 	case "":
@@ -345,9 +345,24 @@ func (c *config) db(ctx context.Context) (*stdsql.DB, error) {
 	return db, err
 }
 
+func (c config) effectiveBucketPath() string {
+	var path string
+	switch c.StagingBucket.StagingBucketType {
+	case stagingBucketTypeS3:
+		path = c.StagingBucket.BucketPathS3
+	case stagingBucketTypeGCS:
+		path = c.StagingBucket.BucketPathGCS
+	case stagingBucketTypeAzure:
+		path = c.StagingBucket.BucketPathAzure
+	}
+
+	// If BucketPath starts with a /, trim it so we don't end up with repeated /
+	// chars in the URI and so the object key does not start with a /.
+	return strings.TrimPrefix(path, "/")
+}
+
 func (c *config) toBucketAndPath(ctx context.Context) (blob.Bucket, string, error) {
 	var bucket blob.Bucket
-	var path string
 	var err error
 
 	switch c.StagingBucket.StagingBucketType {
@@ -368,13 +383,11 @@ func (c *config) toBucketAndPath(ctx context.Context) (blob.Bucket, string, erro
 		if bucket, err = blob.NewS3Bucket(ctx, c.StagingBucket.BucketS3, creds, s3Opts...); err != nil {
 			return nil, "", fmt.Errorf("creating S3 bucket: %w", err)
 		}
-		path = c.StagingBucket.BucketPathS3
 	case stagingBucketTypeGCS:
 		auth := option.WithCredentialsJSON([]byte(c.StagingBucket.CredentialsJSON))
 		if bucket, err = blob.NewGCSBucket(ctx, c.StagingBucket.BucketGCS, auth); err != nil {
 			return nil, "", fmt.Errorf("creating GCS bucket: %w", err)
 		}
-		path = c.StagingBucket.BucketPathGCS
 	case stagingBucketTypeAzure:
 		azureBucket, err := blob.NewAzureBlobBucket(ctx,
 			c.StagingBucket.ContainerName,
@@ -388,14 +401,9 @@ func (c *config) toBucketAndPath(ctx context.Context) (blob.Bucket, string, erro
 			AzureBlobBucket: azureBucket,
 			container:       c.StagingBucket.ContainerName,
 		}
-		path = c.StagingBucket.BucketPathAzure
 	}
 
-	// If BucketPath starts with a /, trim it so we don't end up with repeated /
-	// chars in the URI and so the object key does not start with a /.
-	path = strings.TrimPrefix(path, "/")
-
-	return bucket, path, nil
+	return bucket, c.effectiveBucketPath(), nil
 }
 
 type tableConfig struct {
