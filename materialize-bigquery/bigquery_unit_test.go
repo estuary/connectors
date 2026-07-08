@@ -54,22 +54,15 @@ func TestConfigValidateCredentialsWithEndpoint(t *testing.T) {
 		require.Equal(t, option.WithoutAuthentication(), opt)
 	})
 
-	t.Run("endpoint set with credentials present uses them", func(t *testing.T) {
-		var cfg = base()
-		cfg.Advanced.Endpoint = "http://localhost:9050/bigquery/v2/"
-		cfg.CredentialsJSON = validCreds
-		require.NoError(t, cfg.Validate())
-
-		opt, err := cfg.CredentialsClientOption()
-		require.NoError(t, err)
-		require.Equal(t, option.WithCredentialsJSON([]byte(validCreds)), opt)
-	})
-
-	t.Run("endpoint set with invalid credentials still fails validation", func(t *testing.T) {
-		var cfg = base()
-		cfg.Advanced.Endpoint = "http://localhost:9050/bigquery/v2/"
-		cfg.CredentialsJSON = "not json"
-		require.ErrorContains(t, cfg.Validate(), "credentials must be valid JSON")
+	t.Run("endpoint set rejects the deprecated top-level credentials_json", func(t *testing.T) {
+		for name, creds := range map[string]string{"valid": validCreds, "invalid": "not json"} {
+			t.Run(name, func(t *testing.T) {
+				var cfg = base()
+				cfg.Advanced.Endpoint = "http://localhost:9050/bigquery/v2/"
+				cfg.CredentialsJSON = creds
+				require.ErrorContains(t, cfg.Validate(), "'credentials'")
+			})
+		}
 	})
 
 	t.Run("endpoint set with structured credentials still validates them", func(t *testing.T) {

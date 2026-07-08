@@ -123,18 +123,23 @@ func (c config) Validate() error {
 
 	// Credentials are required unless a custom endpoint is configured, in which case they are
 	// optional: an emulator behind the endpoint needs none, while a proxy in front of the real
-	// service may still require them. Credentials that are provided are always validated.
+	// service may still require them. Credentials accompanying an endpoint must arrive via the
+	// structured 'credentials' configuration: the deprecated top-level 'credentials_json' exists
+	// only so pre-existing configs keep working, and rejecting the combination here keeps such
+	// credentials from being silently ignored by CredentialsClientOption.
 	if c.Credentials != nil {
 		if err := c.Credentials.Validate(); err != nil {
 			return err
 		}
-	} else if c.CredentialsJSON != "" || c.Advanced.Endpoint == "" {
+	} else if c.Advanced.Endpoint == "" {
 		// Sanity check: Are the provided credentials valid JSON? A common error is to upload
 		// credentials that are not valid JSON, and the resulting error is fairly cryptic if fed
 		// directly to bigquery.NewClient.
 		if !json.Valid([]byte(c.CredentialsJSON)) {
 			return fmt.Errorf("service account credentials must be valid JSON, and the provided credentials were not")
 		}
+	} else if c.CredentialsJSON != "" {
+		return fmt.Errorf("credentials for a custom endpoint must be provided via 'credentials', not the deprecated 'credentials_json' field")
 	}
 
 	if err := c.Schedule.Validate(); err != nil {
@@ -160,10 +165,11 @@ func (c config) effectiveBucketPath() string {
 
 func (c config) CredentialsClientOption() (option.ClientOption, error) {
 	if c.Credentials == nil {
-		// A custom endpoint with no credentials at all means an unauthenticated server, like an
-		// emulator. Credentials provided alongside an endpoint are still used, since the endpoint
-		// may be a proxy in front of the real authenticated service.
-		if c.CredentialsJSON == "" && c.Advanced.Endpoint != "" {
+		// A custom endpoint without structured credentials means an unauthenticated server, like
+		// an emulator; a proxy in front of the real authenticated service takes its credentials
+		// through 'credentials'. Validate guarantees the deprecated top-level 'credentials_json'
+		// is empty whenever an endpoint is configured, so nothing is ignored here.
+		if c.Advanced.Endpoint != "" {
 			return option.WithoutAuthentication(), nil
 		}
 		return option.WithCredentialsJSON([]byte(c.CredentialsJSON)), nil
