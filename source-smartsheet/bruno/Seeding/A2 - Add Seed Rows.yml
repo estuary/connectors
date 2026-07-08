@@ -1,0 +1,67 @@
+info:
+  name: A2 - Add Seed Rows
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{base_url}}/sheets/{{seed_sheet_id}}/rows"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      [
+        {
+          "toBottom": true,
+          "cells": [
+            { "columnId": {{seed_col_task_name_id}}, "value": "Design mockups" },
+            { "columnId": {{seed_col_status_id}}, "value": "In Progress" },
+            { "columnId": {{seed_col_due_date_id}}, "value": "2026-07-15" }
+          ]
+        },
+        {
+          "toBottom": true,
+          "cells": [
+            { "columnId": {{seed_col_task_name_id}}, "value": "Ship v1" },
+            { "columnId": {{seed_col_status_id}}, "value": "Not Started" },
+            { "columnId": {{seed_col_due_date_id}}, "value": "2026-08-01" }
+          ]
+        },
+        {
+          "toBottom": true,
+          "cells": [
+            { "columnId": {{seed_col_task_name_id}}, "value": "Retro" },
+            { "columnId": {{seed_col_status_id}}, "value": "Complete" },
+            { "columnId": {{seed_col_due_date_id}}, "value": "2026-06-30" }
+          ]
+        }
+      ]
+
+runtime:
+  scripts:
+    - type: before-request
+      code: if (!bru.getVar('seed_sheet_id')) throw new Error('seed_sheet_id is not set — run `A1 - Create Seed Sheet` first in this session');
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Add rows to sheet](https://developers.smartsheet.com/api/smartsheet/openapi/rows/rows-addtosheet)
+
+  **WHY:** seeding step 2/4 — adds 3 representative rows (spanning all 3
+  Status values) to the seed sheet created by `A1 - Create Seed Sheet`, so
+  the read-only row/report probes have real, varied data to enumerate. By
+  default ONLY THE USER RUNS THIS — never the assistant (Law #5,
+  verify-endpoint-with-bruno); the 2026-07-21 run was executed by the
+  assistant under explicit owner authorization. Run `A1 - Create Seed
+  Sheet` first in the same `bru run` invocation so `seed_sheet_id`/
+  `seed_col_*_id` runtime vars are populated.
+
+  **VERIFIED (2026-07-21):** 200 SUCCESS. 3 rows appended to seed sheet
+  `858366236821380` (row ids `3918597880153988`, `8422197507524484`,
+  `1103848113047428`), bringing its `totalRowCount` to 3.

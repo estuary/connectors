@@ -1,0 +1,67 @@
+info:
+  name: List Reports (page+pageSize probe)
+  type: http
+  seq: 12
+
+http:
+  method: GET
+  url: "{{base_url}}/reports?page=1&pageSize=5"
+  params:
+    - name: page
+      value: "1"
+      type: query
+    - name: pageSize
+      value: "5"
+      type: query
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - totalCount=1, pageNumber=1, pageSize=5, totalPages=1 (data[] length 1)
+    request:
+      url: "{{base_url}}/reports?page=1&pageSize=5"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "pageNumber": 1,
+            "pageSize": 5,
+            "totalPages": 1,
+            "totalCount": 1,
+            "data": [
+              {
+                "id": 7840186690045828,
+                "name": "Report 1",
+                "accessLevel": "OWNER",
+                "permalink": "https://app.smartsheet.eu/reports/M4gHX49JmcwMmPq4fVrPVhCH5WPF7QM5WV7wmHr1",
+                "isSummaryReport": false
+              }
+            ]
+          }
+
+docs: |-
+  **REFERENCE:** [List reports](https://developers.smartsheet.com/api/smartsheet/openapi/reports/getreports) — also the [pagination guide](https://developers.smartsheet.com/api/smartsheet/guides/basics/pagination.md)
+
+  **WHY:** `getreports.md`'s own "Query parameters" section only documents
+  `modifiedSince`, but the general offset-pagination guide implies every
+  list endpoint accepts `page`/`pageSize`. This probe confirms those params
+  are honored on `/reports` despite being undocumented for this specific
+  endpoint.
+
+  **VERIFIED (2026-07-21):** with `page=1&pageSize=5`, 200 OK returns
+  `{pageNumber:1, pageSize:5, totalPages:1, totalCount:1,
+  data:[{id:7840186690045828, name:"Report 1", ...}]}`. `pageSize` is
+  honored (echoed back as 5, not clamped to the 100 default), confirming
+  `page`/`pageSize` are real, functioning params on this endpoint even
+  though getreports.md's params table omits them.

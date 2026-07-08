@@ -1,0 +1,51 @@
+info:
+  name: D1 - Edit a cell (provoke row+sheet change)
+  type: http
+  seq: 101
+
+http:
+  method: PUT
+  url: "{{base_url}}/sheets/{{PIN_SHEET_ID}}/rows"
+  body:
+    type: json
+    data: |-
+      [
+        {
+          "id": 3224513112835972,
+          "cells": [
+            { "columnId": 6988955096582020, "value": "verification-touch (safe to clear)" }
+          ]
+        }
+      ]
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Update rows](https://developers.smartsheet.com/api/smartsheet/openapi/rows/updaterows)
+
+  **WHY:** provokes a real row-content edit so `D2 - Recheck List Sheets
+  modifiedSince after edit`/`D3 - Recheck Sheet Version after edit` can
+  observe whether it bumps (a) the row's own `modifiedAt`, (b) the sheet
+  list's `modifiedAt`/`GET /sheets?modifiedSince=`, and (c) the dedicated
+  `GET /sheets/{id}/version` — the single open question the plan could not
+  resolve without a mutation. By default ONLY THE USER RUNS THIS — never
+  the assistant (Law #5, verify-endpoint-with-bruno); the 2026-07-21 run
+  was executed by the assistant under explicit owner authorization.
+
+  **VERIFIED (2026-07-21):** 200 SUCCESS. Target was row 1
+  (`id: 3224513112835972`), the "Description" column (`columnId
+  6988955096582020`), which the VERIFIED baseline on `Get Sheet (bare)` /
+  `Get Sheet (include objectValue+columnType+writerInfo)` shows empty on
+  every row — chosen so the edit is easy to identify and clear afterward
+  without disturbing real data. The edit landed at row
+  `modifiedAt: 2026-07-21T13:55:20Z` (pre-edit timestamp T_D =
+  `2026-07-21T13:55:14Z`); `D2`/`D3` ran immediately after in the same
+  `bru run` invocation — see their docs for the findings (list-level
+  `modifiedSince` lag; `version` increments on cell edits). The cell was
+  cleared back to empty afterward by `D4 - Clear the verification touch`,
+  restoring the saved baselines.

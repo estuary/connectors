@@ -1,0 +1,54 @@
+info:
+  name: E1 - Add a throwaway row
+  type: http
+  seq: 111
+
+http:
+  method: POST
+  url: "{{base_url}}/sheets/{{PIN_SHEET_ID}}/rows"
+  body:
+    type: json
+    data: |-
+      [
+        {
+          "toBottom": true,
+          "cells": [
+            { "columnId": 4737155282896772, "value": "THROWAWAY - deletion-gap test row, safe to delete" }
+          ]
+        }
+      ]
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        if (res.status === 200) {
+          const row = res.body?.result?.[0] ?? res.body?.result;
+          if (row?.id) bru.setVar('throwaway_row_id', row.id);
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Add rows](https://developers.smartsheet.com/api/smartsheet/openapi/rows/addrows)
+
+  **WHY:** creates a disposable row to delete in `E2 - Delete the throwaway
+  row`, so `E3 - Recheck sheet after delete (deletion-gap probe)` can
+  observe whether Smartsheet exposes ANY signal (tombstone, deleted-row
+  list, event) for a deleted row — the brief's "known gap" (row deletions
+  not observable via `rowsModifiedSince`) per community reports, confirmed
+  live on 2026-07-21 (see `E3`). The 2026-07-21 run was executed by the
+  assistant under explicit owner authorization.
+
+  **VERIFIED (2026-07-21):** 200 SUCCESS. Row `id 6596458449602436`
+  appended as `rowNumber: 9` to the pinned sheet, using `columnId
+  4737155282896772` (the "Task" column per `Get Sheet (bare)`); the
+  after-response script captured `throwaway_row_id` (re-injectable via
+  `--env-var throwaway_row_id=<id>` when E2 runs in a separate `bru run`
+  invocation) for `E2 - Delete the throwaway row`/`E3 - Recheck sheet
+  after delete (deletion-gap probe)`.

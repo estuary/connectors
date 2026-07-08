@@ -1,0 +1,177 @@
+[
+  [
+    "acmeCo/sheets",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "accessLevel": "OWNER",
+      "cellImageUploadEnabled": true,
+      "columns": [
+        {
+          "id": 4975488054986628,
+          "index": 0,
+          "primary": true,
+          "title": "Task Name",
+          "type": "TEXT_NUMBER",
+          "validation": false,
+          "version": 0,
+          "width": 150
+        },
+        {
+          "id": 2723688241301380,
+          "index": 1,
+          "options": [
+            "Not Started",
+            "In Progress",
+            "Complete"
+          ],
+          "title": "Status",
+          "type": "PICKLIST",
+          "validation": false,
+          "version": 0,
+          "width": 150
+        },
+        {
+          "id": 7227287868671876,
+          "index": 2,
+          "title": "Due Date",
+          "type": "DATE",
+          "validation": false,
+          "version": 0,
+          "width": 150
+        }
+      ],
+      "createdAt": "2026-07-21T13:51:38Z",
+      "dependenciesEnabled": false,
+      "effectiveAttachmentOptions": [
+        "BOX_COM",
+        "DROPBOX",
+        "EGNYTE",
+        "EVERNOTE",
+        "FILE",
+        "GOOGLE_DRIVE",
+        "LINK",
+        "ONEDRIVE"
+      ],
+      "ganttEnabled": false,
+      "hasSummaryFields": false,
+      "id": 858366236821380,
+      "isMultiPicklistEnabled": true,
+      "modifiedAt": "2026-07-21T13:51:41Z",
+      "name": "Estuary Connector Test Sheet",
+      "permalink": "https://app.smartsheet.eu/sheets/jQx998JX8G4jjW3WhCgvJgPfW48ghgQmxjVmVpJ1",
+      "resourceManagementEnabled": false,
+      "resourceManagementType": "NONE",
+      "totalRowCount": 3,
+      "userPermissions": {
+        "summaryPermissions": "ADMIN"
+      },
+      "userSettings": {
+        "criticalPathEnabled": false,
+        "displaySummaryTasks": true
+      },
+      "version": 2
+    }
+  ],
+  [
+    "acmeCo/sheet_rows",
+    {
+      "_meta": {
+        "sheet_id": 858366236821380,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "cells": [
+        {
+          "columnId": 4975488054986628,
+          "displayValue": "Retro",
+          "value": "Retro"
+        },
+        {
+          "columnId": 2723688241301380,
+          "displayValue": "Complete",
+          "value": "Complete"
+        },
+        {
+          "columnId": 7227287868671876,
+          "value": "2026-06-30"
+        }
+      ],
+      "createdAt": "2026-07-21T13:51:41Z",
+      "expanded": true,
+      "id": 1103848113047428,
+      "modifiedAt": "2026-07-21T13:51:41Z",
+      "rowNumber": 3,
+      "siblingId": 8422197507524484
+    }
+  ],
+  [
+    "acmeCo/reports",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "accessLevel": "OWNER",
+      "cellImageUploadEnabled": true,
+      "createdAt": "2026-07-21T13:54:39Z",
+      "effectiveAttachmentOptions": [
+        "BOX_COM",
+        "DROPBOX",
+        "EGNYTE",
+        "EVERNOTE",
+        "FILE",
+        "GOOGLE_DRIVE",
+        "LINK",
+        "ONEDRIVE"
+      ],
+      "ganttEnabled": false,
+      "id": 3852843205396356,
+      "isSummaryReport": false,
+      "modifiedAt": "2026-07-21T13:54:39Z",
+      "name": "Estuary Connector Test Report",
+      "permalink": "https://app.smartsheet.eu/reports/xqcjPxpg4pMJgvQJfQr94v9whM9HcFH3RHccr2w1",
+      "totalRowCount": 3
+    }
+  ],
+  [
+    "acmeCo/report_rows",
+    {
+      "_meta": {
+        "op": "c",
+        "report_id": 3852843205396356,
+        "row_id": 2,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "accessLevel": "OWNER",
+      "cells": [
+        {
+          "columnId": 4975488054986628,
+          "displayValue": "Retro",
+          "value": "Retro",
+          "virtualColumnId": 8811664796944260
+        },
+        {
+          "columnId": 2723688241301380,
+          "displayValue": "Complete",
+          "value": "Complete",
+          "virtualColumnId": 226678007269252
+        },
+        {
+          "columnId": 7227287868671876,
+          "value": "2026-06-30",
+          "virtualColumnId": 4730277634639748
+        }
+      ],
+      "createdAt": "2026-07-21T13:51:41Z",
+      "dataModifiedAt": "2026-07-21T13:51:41Z",
+      "expanded": true,
+      "id": 1103848113047428,
+      "modifiedAt": "2026-07-21T13:51:41Z",
+      "rowNumber": 3,
+      "sheetId": 858366236821380,
+      "siblingId": 8422197507524484
+    }
+  ]
+]

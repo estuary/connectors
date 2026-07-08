@@ -1,0 +1,39 @@
+info:
+  name: D3 - Recheck Sheet Version after edit
+  type: http
+  seq: 103
+
+http:
+  method: GET
+  url: "{{base_url}}/sheets/{{PIN_SHEET_ID}}/version"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Get sheet version](https://developers.smartsheet.com/api/smartsheet/openapi/sheets/getsheetversion)
+
+  **WHY:** recheck of `Get Sheet Version (dedicated endpoint)` after
+  `D1 - Edit a cell (provoke row+sheet change)` — determines whether the
+  dedicated version endpoint tracks ordinary cell edits or only
+  structural/definition changes (mirroring Reports' `modifiedAt`
+  semantics), deciding whether it's usable as a cheap incremental signal.
+
+  **VERIFIED (2026-07-21):** `{"version": 1}` — incremented from the
+  pre-edit baseline `{"version": 0}` on `Get Sheet Version (dedicated
+  endpoint)` immediately (~5s) after D1's ordinary cell edit, with no
+  observable lag (unlike the list-level `modifiedSince` index, see `D2`).
+  So `version` DOES track plain cell content changes, not just
+  structural/definition changes, and is a strong candidate for a cheap
+  per-sheet change signal in the two-tier optimization referenced on `D2 -
+  Recheck List Sheets modifiedSince after edit`. Caveats: it is a bare
+  counter (no timestamp, no row attribution — a bump still requires a full
+  `rowsModifiedSince` detail poll to find what changed), and it requires
+  one `GET /sheets/{id}/version` call per sheet per cycle, so it saves row
+  payload, not request count. Note `D4 - Clear the verification touch`
+  bumps it again (each edit increments it), so the live value drifts
+  upward; only the delta matters.
