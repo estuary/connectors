@@ -142,10 +142,10 @@ func computeSchemaForNewTable(res boilerplate.MappedBinding[config, resource, ma
 	var fields []iceberg.NestedField
 
 	// In Iceberg terms, identifier fields are the "keys" of a table.
-	identifierFields, lastId := appendProjectionsAsFields(&fields, res.Keys, 0)
-	_, lastId = appendProjectionsAsFields(&fields, res.Values, lastId)
+	identifierFields, lastId := appendProjectionsAsFields(&fields, res.Keys, 0, false)
+	_, lastId = appendProjectionsAsFields(&fields, res.Values, lastId, false)
 	if p := res.Document; p != nil {
-		appendProjectionsAsFields(&fields, []boilerplate.MappedProjection[mapped]{*p}, lastId)
+		appendProjectionsAsFields(&fields, []boilerplate.MappedProjection[mapped]{*p}, lastId, false)
 	}
 
 	if res.DeltaUpdates {
@@ -188,8 +188,15 @@ func computeSchemaForUpdatedTable(
 		tempMigrateProjections = append(tempMigrateProjections, temp)
 	}
 
-	_, lastId := appendProjectionsAsFields(&nextFields, update.NewProjections, currentHighestID)
-	appendProjectionsAsFields(&nextFields, tempMigrateProjections, lastId)
+	// S3 Tables' REST catalog rejects an add-schema update that introduces a
+	// brand-new required column, even with initial-default/write-default set.
+	// Columns newly appended to an existing table - ordinary new projections
+	// and migration temp columns alike - are therefore always created
+	// optional, matching how materialize-sql treats newly-added columns as
+	// nullable regardless of MustExist and only enforces required-ness at
+	// fresh table creation.
+	_, lastId := appendProjectionsAsFields(&nextFields, update.NewProjections, currentHighestID, true)
+	appendProjectionsAsFields(&nextFields, tempMigrateProjections, lastId, true)
 
 	return iceberg.NewSchemaWithIdentifiers(current.ID+1, current.IdentifierFieldIDs, nextFields...)
 }
@@ -230,7 +237,7 @@ func computeSchemaForCompletedMigrations(current *iceberg.Schema, fieldsToMigrat
 	return iceberg.NewSchemaWithIdentifiers(current.ID+1, current.IdentifierFieldIDs, nextFields...)
 }
 
-func appendProjectionsAsFields(dst *[]iceberg.NestedField, ps []boilerplate.MappedProjection[mapped], startID int) ([]int, int) {
+func appendProjectionsAsFields(dst *[]iceberg.NestedField, ps []boilerplate.MappedProjection[mapped], startID int, forceOptional bool) ([]int, int) {
 	id := startID
 	var ids []int
 
@@ -241,11 +248,13 @@ func appendProjectionsAsFields(dst *[]iceberg.NestedField, ps []boilerplate.Mapp
 			id += 1
 		}
 
+		required := !forceOptional && ((p.MustExist && !p.Mapped.Nullable) || p.IsPrimaryKey)
+
 		*dst = append(*dst, iceberg.NestedField{
 			ID:       id,
 			Name:     p.Mapped.Name,
 			Type:     p.Mapped.type_,
-			Required: (p.MustExist && !p.Mapped.Nullable) || p.IsPrimaryKey,
+			Required: required,
 			Doc:      strings.ReplaceAll(p.Comment, "\n", " - "), // Glue catalogs don't support newlines in field comments
 		})
 		ids = append(ids, id)
