@@ -121,16 +121,28 @@ func TestBucketPathValidation(t *testing.T) {
 			require.NoError(t, err)
 		})
 
-		t.Run(tc.name+" rejects leading slash", func(t *testing.T) {
+		t.Run(tc.name+" tolerates leading slash", func(t *testing.T) {
+			// A leading slash is trimmed by effectiveBucketPath() before it
+			// reaches ValidateBucketPath, so it validates successfully rather
+			// than being rejected. This preserves the connector's existing
+			// tolerance of a leading slash, matching effectiveBucketPath() on
+			// materialize-bigquery and materialize-redshift.
 			cfg := tc.baseConfig()
 			tc.setPath(&cfg, "/some/prefix")
 			err := cfg.Validate()
-			require.ErrorContains(t, err, "cannot start with /")
+			require.NoError(t, err)
 		})
 
 		t.Run(tc.name+" rejects full URI", func(t *testing.T) {
 			cfg := tc.baseConfig()
 			tc.setPath(&cfg, "s3://bucket/prefix")
+			err := cfg.Validate()
+			require.ErrorContains(t, err, "must be a bare key prefix within the bucket")
+		})
+
+		t.Run(tc.name+" rejects full URI with leading slash", func(t *testing.T) {
+			cfg := tc.baseConfig()
+			tc.setPath(&cfg, "/s3://bucket/prefix")
 			err := cfg.Validate()
 			require.ErrorContains(t, err, "must be a bare key prefix within the bucket")
 		})
