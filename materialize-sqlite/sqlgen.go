@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 
@@ -38,8 +39,8 @@ var sqliteDialect = func() sql.Dialect {
 				sql.QuoteTransform("\"", "\\\""),
 			))),
 		Literaler: sql.ToLiteralFn(sql.QuoteTransform("'", "''")),
-		Placeholderer: sql.PlaceholderFn(func(_ int) string {
-			return "?"
+		Placeholderer: sql.PlaceholderFn(func(index int) string {
+			return fmt.Sprintf("?%d", index+1)
 		}),
 		TypeMapper: mapper,
 	}
