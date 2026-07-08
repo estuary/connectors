@@ -1,0 +1,55 @@
+info:
+  name: List Reports (modifiedSince future narrowing check)
+  type: http
+  seq: 11.5
+
+http:
+  method: GET
+  url: "{{base_url}}/reports?modifiedSince=2026-07-08T00:00:00Z"
+  params:
+    - name: modifiedSince
+      value: 2026-07-08T00:00:00Z
+      type: query
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - totalCount=0, pageNumber=0, pageSize=100, totalPages=0 (data[] length 0)
+    request:
+      url: "{{base_url}}/reports?modifiedSince=2026-07-08T00:00:00Z"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "pageNumber": 0,
+            "pageSize": 100,
+            "totalPages": 0,
+            "totalCount": 0,
+            "data": []
+          }
+
+docs: |-
+  **REFERENCE:** [List reports](https://developers.smartsheet.com/api/smartsheet/openapi/reports/getreports)
+
+  **WHY:** companion to `List Reports (modifiedSince)` — uses a
+  `modifiedSince` timestamp AFTER Report 1's modifiedAt to confirm the
+  filter excludes rather than being a no-op, and doubles as the
+  zero-result envelope reference cited at the collection root.
+
+  **VERIFIED (2026-07-21):** with `modifiedSince=2026-07-08T00:00:00Z`
+  (after the report's modifiedAt of 2026-07-07T19:50:15Z), 200 OK returns
+  `{pageNumber:0, pageSize:100, totalPages:0, totalCount:0, data:[]}`.
+  Confirms the filter narrows the seeded report out once the timestamp is
+  past its modifiedAt, and confirms `pageNumber` is 0 (not 1) on a
+  zero-result page, matching the root docs' "Pagination (offset)" fact.

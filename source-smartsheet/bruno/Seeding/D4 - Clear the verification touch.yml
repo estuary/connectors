@@ -1,0 +1,41 @@
+info:
+  name: D4 - Clear the verification touch
+  type: http
+  seq: 104
+
+http:
+  method: PUT
+  url: "{{base_url}}/sheets/{{PIN_SHEET_ID}}/rows"
+  body:
+    type: json
+    data: |-
+      [
+        {
+          "id": 3224513112835972,
+          "cells": [
+            { "columnId": 6988955096582020, "value": "" }
+          ]
+        }
+      ]
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Update rows](https://developers.smartsheet.com/api/smartsheet/openapi/rows/updaterows)
+
+  **WHY:** cleanup companion to `D1 - Edit a cell (provoke row+sheet change)`
+  — clears the "verification-touch (safe to clear)" value back to empty so
+  the pinned sheet matches the saved VERIFIED baselines again (`Get Sheet
+  (bare)` shows the Description column empty on every row). Without this,
+  any future re-capture of the read probes would diff against the committed
+  examples. Run only AFTER `D2`/`D3` have captured their timestamps/version
+  — clearing is itself an edit and bumps the row's `modifiedAt` and the
+  sheet version again.
+
+  **VERIFIED (2026-07-21):** 200 SUCCESS; the Description cell of row
+  `3224513112835972` cleared back to empty after the D-series run.

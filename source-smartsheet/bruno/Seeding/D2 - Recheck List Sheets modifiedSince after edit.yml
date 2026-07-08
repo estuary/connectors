@@ -1,0 +1,50 @@
+info:
+  name: D2 - Recheck List Sheets modifiedSince after edit
+  type: http
+  seq: 102
+
+http:
+  method: GET
+  url: "{{base_url}}/sheets?modifiedSince={{PIN_TIMESTAMP_JUST_BEFORE_D1}}"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [List sheets](https://developers.smartsheet.com/api/smartsheet/openapi/sheets/listsheets)
+
+  **WHY:** recheck of `List Sheets (modifiedSince narrows)` after
+  `D1 - Edit a cell (provoke row+sheet change)` — determines whether `GET
+  /sheets?modifiedSince=` tracks row-content edits (not just structural
+  changes), which decides whether the plan's two-tier optimization (narrow
+  to changed sheets via list-level `modifiedSince`, then only detail-poll
+  those for `rowsModifiedSince`) is viable.
+
+  **VERIFIED (2026-07-21):** the answer is BOTH, separated by an
+  eventual-consistency lag. Run AFTER `D1 - Edit a cell (provoke row+sheet
+  change)`, injecting `--env-var PIN_TIMESTAMP_JUST_BEFORE_D1=<RFC3339
+  taken a few seconds before D1>`. Two runs against the same T_D =
+  `2026-07-21T13:55:14Z` (D1's edit landed at `13:55:20Z`):
+
+  - **T+~5s** (immediately after D1, same `bru run`): `totalCount: 0`,
+    `data: []` — the edited sheet is ABSENT.
+  - **T+~65s** (re-run 60s later): `totalCount: 1`, `data[]` contains the
+    pinned sheet with `modifiedAt: 2026-07-21T13:55:20Z` — exactly the
+    row-edit time.
+
+  So `GET /sheets?modifiedSince=` DOES track row-content edits, but the
+  list index lags the edit by somewhere in (5s, 65s] (single observation —
+  treat the bound as indicative, not guaranteed). The two-tier optimization
+  (narrow to changed sheets via list-level `modifiedSince`, then only
+  detail-poll those) is therefore viable ONLY with a lag allowance: the
+  list cursor must trail wall-clock by a safety window comfortably larger
+  than the observed lag, or slow edits will be skipped forever. This
+  applies to ANY cursor keyed on the list's `modifiedSince` — including the
+  `sheets` metadata stream's, not just the two-tier optimization — so the
+  connector clamps that cursor to trail poll start by a lag allowance
+  (2026-07-21). `sheet_rows` is unaffected: it polls the per-sheet detail
+  endpoint, which showed no lag (see `D3`).

@@ -1,0 +1,198 @@
+opencollection: 1.0.0
+
+info:
+  name: Smartsheet
+
+request:
+  scripts:
+    - type: before-request
+      code: |-
+        // Smartsheet auth via the connector's sops-encrypted config.yaml. The token is
+        // re-derived from sops on every request and lives only on `req` — it is never
+        // persisted to a var or env file (Law #3 of verify-endpoint-with-bruno).
+        // Requires the developer JS sandbox (the `child_process`/sops call throws in
+        // the safe QuickJS sandbox):
+        //   CLI: `bru run <request>.yml --env Smartsheet --sandbox developer`
+        //   GUI: jsSandboxMode "developer" in ~/.config/bruno/collection-security.json
+        const { execFileSync } = require('child_process');
+        const path = require('path');
+        const configured = bru.getEnvVar('config_path');
+        if (!configured) throw new Error('config_path env var is not set');
+        // Resolve relative to the collection root, not the process cwd — the GUI's
+        // cwd is wherever Bruno was launched from, only the CLI runs from bruno/.
+        const configPath = path.isAbsolute(configured)
+          ? configured
+          : path.resolve(bru.cwd(), configured);
+        const decrypted = execFileSync(
+          'sops', ['-d', '--output-type=json', configPath], { encoding: 'utf8' },
+        );
+        const creds = JSON.parse(decrypted)?.credentials;
+        const token = creds?.access_token_sops ?? creds?.access_token;
+        if (!token) throw new Error('credentials.{access_token_sops,access_token} missing from decrypted config');
+        req.setHeader('Authorization', `Bearer ${token}`);
+    - type: after-response
+      code: |-
+        // Mirror the connector's snapshot redactions once test.flow.yaml/REDACTED_FIELDS
+        // exist for this connector — none defined yet (zero streams registered as of
+        // this session). Revisit once `add-stream` lands the Sheets streams and their
+        // snapshot tests define a redaction set.
+
+docs:
+  content: |-
+    ## API constraints (account-wide)
+
+    Facts that hold for the whole Smartsheet account, not any single endpoint.
+    This block is the collection root — the canonical home for cross-cutting
+    limits. Every finding below was re-verified live against the EU trial
+    account on 2026-07-21 with the installed `bru`
+    (`bru run "<request>.yml" --env Smartsheet --sandbox developer`); the
+    evidence is the response example saved on the cited request.
+
+    - **Base URL (region-dependent):** `https://api.smartsheet.eu/2.0` for this
+      account. The host is chosen by region — `us` → api.smartsheet.com,
+      `eu` → api.smartsheet.eu, `gov` → api.smartsheetgov.com,
+      `au` → api.smartsheet.au (all under `/2.0`). The connector resolves it in
+      `base_url(region)` from the `region` config field (`REGION_BASE_URLS` in
+      `source_smartsheet/api.py`); the `{{base_url}}` env var here is the EU
+      host.
+    - **Auth:** a static, long-lived **API Access Token** (Account > Apps &
+      Integrations > API Access), sent as `Authorization: Bearer <token>`. The
+      pre-request script decrypts it from the connector's sops config on every
+      request and never caches it (Law #3 of verify-endpoint-with-bruno). There
+      is no refresh/expiry flow — see `Auth Sanity (GET users me)`.
+    - **Pagination (offset):** list endpoints take `page` (1-based) + `pageSize`
+      and return `{pageNumber, pageSize, totalPages, totalCount, data[]}`.
+      **VERIFIED (2026-07-21):** on an empty result `pageNumber` is **0** (not
+      1) — a zero-results special case, not an off-by-one (`List Reports
+      (bare)` vs `List Reports (modifiedSince future narrowing check)`). A
+      `page` past the last **clamps** to the last page (returns it, never
+      empty) on both list and detail endpoints (`List Sheets (page beyond last
+      clamps)`, `Get Sheet (page beyond last CLAMPS not empty)`). An over-limit
+      `pageSize` (10001) is accepted, not rejected (the over-limit probes). The
+      connector uses `LIST_PAGE_SIZE = 100` / `DETAIL_PAGE_SIZE = 10_000`
+      (`api.py`), the latter matching the Limitations guide's documented
+      10,000 rows/request cap.
+    - **Rate limits:** **Documented:** 300 requests/minute per Access Token
+      (https://developers.smartsheet.com/api/smartsheet/openapi — "Rate
+      Limiting"). **VERIFIED (2026-07-21):** the `x-ratelimit-limit` (=80000),
+      `-remaining`, `-reset` response headers are present **only on
+      `/sheets/{id}`** (and its 404) — absent on `/users/me`, `/reports`,
+      `/reports/{id}`, the `/sheets` list, and `/sheets/{id}/version`. Treat
+      them as endpoint-specific; never gate rate-limit handling on their
+      presence (`Get Sheet (bare)`).
+    - **Throttling (429):** **Documented:** exceeding the limit returns HTTP 429
+      with `errorCode` 4003 and a `Retry-After`; the CDK's standard backoff
+      handles it. **UNOBSERVABLE:** never triggered here — deliberately
+      hammering the API to find the ceiling is out of scope; trust the docs.
+    - **List-index eventual consistency:** **VERIFIED (2026-07-21):** the
+      `GET /sheets` list's `modifiedSince` index lags content edits. A cell
+      edit (row `modifiedAt` 13:55:20Z) was ABSENT from
+      `?modifiedSince=13:55:14Z` when queried ~5s after the edit, and PRESENT
+      (with `modifiedAt` = the edit time) when re-queried ~65s after — so the
+      lag is somewhere in (5s, 65s] (single observation; treat as indicative).
+      The detail endpoints showed no such lag: `GET /sheets/{id}/version`
+      reflected the same edit immediately (`Seeding/D2`/`Seeding/D3`). Any
+      incremental strategy keyed on a *list* endpoint's `modifiedSince` must
+      trail its cursor by a safety window larger than this lag.
+
+    ## Docs conventions: Why + classified findings
+
+    Every request's docs block opens with a `**WHY:**` line — why the request
+    exists and what it should teach — followed by findings, each dated and
+    classified:
+
+    - `**VERIFIED (YYYY-MM-DD):**` — observed in a live response on that date
+      (the run date). The evidence is the request's saved response example.
+    - `**PENDING:**` — an open question further probing/seeding can still close;
+      it must name the concrete path to close it. **No PENDING may remain at
+      hand-off** — resolve to VERIFIED or justify into UNOBSERVABLE.
+    - `**UNOBSERVABLE:**` — not practically verifiable here (state we can't seed,
+      or that only arises outside our control); states the reason and what we
+      rely on instead (usually the provider docs).
+
+    Enumerate markers with `grep -rl '\*\*PENDING' . | grep -v opencollection.yml`
+    (likewise UNOBSERVABLE / Limitation) — this root file matches only because
+    of the definitions above. The PENDING grep must be empty at hand-off.
+
+    ### Per-endpoint limitations
+
+    Endpoint-specific constraints with connector consequences carry a
+    `**Limitation**` marker on the request that proves them
+    (`grep -rl '\*\*Limitation' .`):
+
+    - `Get Sheet (bare)` — `x-ratelimit-*` headers are on `/sheets/{id}` only,
+      not account-wide.
+    - `List Sheets (page beyond last clamps)` — a `page` past the last clamps to
+      the last page (never empty); unlike the detail endpoint, the list envelope
+      still carries `pageNumber`/`totalPages` to page against.
+    - `Get Sheet (rowsModifiedSince narrows, blank-row gap)` — a row with every
+      cell empty silently drops from `rowsModifiedSince`-filtered responses even
+      though `totalRowCount` still counts it; a bare fetch includes it.
+    - `Get Sheet (page beyond last CLAMPS not empty)` — the detail row endpoint
+      carries no `pageNumber`/`totalPages` and clamps past-the-end pages, so the
+      connector must page by `totalRowCount`, never "stop when a page is empty".
+    - `Get Report (bare)` — reports have no `version` and no `rowsModifiedSince`,
+      and report rows carry no per-row modified timestamp, so reports can't be
+      incrementally row-synced (snapshot/backfill only). Confirmed from the
+      other direction by `List Reports (modifiedSince source-data-edit probe)`
+      (2026-07-21): report `modifiedAt`/`modifiedSince` tracks report-definition
+      edits ONLY — four data edits to a report's source sheet never surfaced
+      through it.
+    - `Get Sheet Version (dedicated endpoint)` — RESOLVED by seeding D1–D3
+      (2026-07-21): `version` DOES bump on an ordinary cell edit, immediately
+      and without the list-index lag above, so it is usable as a cheap
+      per-sheet change signal (a bare counter — a bump says *something*
+      changed, a `rowsModifiedSince` detail poll still finds what).
+    - `Seeding/E3 - Recheck sheet after delete (deletion-gap probe)` — row
+      deletions leave zero trace (no tombstone, no marker, `totalRowCount`
+      just decrements): confirmed live 2026-07-21, previously only community
+      reports. Deletions are only reconcilable by a full re-read diffing
+      against previously-captured row ids.
+
+    ## Format
+
+    Stored in Bruno's **OpenCollection YAML** format (`opencollection.yml` +
+    one `.yml` per request; environments in `environments/Smartsheet.yml`).
+    Requests are grouped into folders by document type, mirroring the
+    connector's stream clusters: `Sheets/` (the `sheets`/`sheet_rows`
+    streams), `Reports/` (`reports`/`report_rows`), and `Seeding/` (the
+    mutation runbook + its pre-/post checks); `Auth Sanity` stays at the
+    root. Run requests with the installed `bru` from the collection root:
+    `bru run "<Folder>/<request>.yml" --env Smartsheet --sandbox developer`
+    — the developer sandbox is required by the sops pre-request script above
+    (GUI equivalent: jsSandboxMode "developer" in
+    ~/.config/bruno/collection-security.json).
+
+    ## Redaction
+
+    No response redaction is configured: the connector's snapshot tests
+    (tests/test_snapshots.py) define no `REDACTED_FIELDS` set — the only
+    normalization is the CDK's `_meta.uuid` placeholder, which has no
+    request-example counterpart — so there is nothing to mirror and the
+    `after-response` script above stays a placeholder. The saved examples are
+    therefore raw live responses from the EU trial account. If the tests ever
+    grow a redaction set, mirror it here (same `"REDACTED"` marker) so
+    examples match what the tests assert.
+
+    ## Seeding
+
+    The `Seeding/` folder holds the mutations (create folder/sheet/rows/report,
+    edit a cell, add/delete a row) that bring the trial account into the state
+    the read-only probes assume, plus the pre-/post checks (D2/D3, E3) that
+    observe their effects. The full runbook was executed on **2026-07-21**
+    (with explicit owner authorization); every file carries a dated VERIFIED
+    finding, and the fixtures live in the account: seed sheet
+    `858366236821380`, seed folder `1442957044803459`, seed report
+    `3852843205396356`. The read probes still pin `PIN_SHEET_ID`/
+    `PIN_REPORT_ID` (the account's pre-existing "Project Sheet"/report) —
+    their saved examples were captured against those, and pins only move
+    together with re-captured evidence. Runtime `seed_*` vars survive one
+    `bru run` invocation only: chain steps as multiple files in a single run,
+    or inject with `--env-var`.
+  type: text/markdown
+bundled: false
+extensions:
+  bruno:
+    ignore:
+      - node_modules
+      - .git

@@ -1,0 +1,39 @@
+info:
+  name: E2 - Delete the throwaway row
+  type: http
+  seq: 112
+
+http:
+  method: DELETE
+  url: "{{base_url}}/sheets/{{PIN_SHEET_ID}}/rows/{{throwaway_row_id}}"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('throwaway_row_id') && !bru.getEnvVar('throwaway_row_id')) {
+          throw new Error('throwaway_row_id is not set — run `E1 - Add a throwaway row` first in this same session, or inject it with `--env-var throwaway_row_id=<id>`');
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Delete row](https://developers.smartsheet.com/api/smartsheet/openapi/rows/deleterow)
+
+  **WHY:** deletes the throwaway row created by `E1 - Add a throwaway row`
+  so `E3 - Recheck sheet after delete (deletion-gap probe)` can check for a
+  deletion signal on the sheet — completes the deletion-gap probe. By
+  default ONLY THE USER RUNS THIS — never the assistant (Law #5); the
+  2026-07-21 run was executed by the assistant under explicit owner
+  authorization. Run `E1 - Add a throwaway row` first (same `bru run`
+  invocation, or inject `--env-var throwaway_row_id=<id>`).
+
+  **VERIFIED (2026-07-21):** 200 SUCCESS deleting row `6596458449602436`;
+  `E3 - Recheck sheet after delete (deletion-gap probe)` ran immediately
+  after in the same invocation and found zero trace of the deletion — see
+  its docs for the full finding.

@@ -1,0 +1,19 @@
+collections:
+  acmeCo/report_rows:
+    schema: report_rows.schema.yaml
+    key:
+    - /_meta/report_id
+    - /id
+  acmeCo/reports:
+    schema: reports.schema.yaml
+    key:
+    - /id
+  acmeCo/sheet_rows:
+    schema: sheet_rows.schema.yaml
+    key:
+    - /_meta/sheet_id
+    - /id
+  acmeCo/sheets:
+    schema: sheets.schema.yaml
+    key:
+    - /id

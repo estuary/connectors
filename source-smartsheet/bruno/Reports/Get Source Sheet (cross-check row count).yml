@@ -1,0 +1,599 @@
+info:
+  name: Get Source Sheet (cross-check row count)
+  type: http
+  seq: 17
+
+http:
+  method: GET
+  url: "{{base_url}}/sheets/4312824539121540"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - totalRowCount=8, version=0, 8 rows returned x 9 columns
+    request:
+      url: "{{base_url}}/sheets/4312824539121540"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+        - name: x-ratelimit-limit
+          value: 80000
+        - name: x-ratelimit-remaining
+          value: 78000
+        - name: x-ratelimit-reset
+          value: 1784638464
+      body:
+        type: json
+        data: |-
+          {
+            "id": 4312824539121540,
+            "name": "Project Sheet",
+            "version": 0,
+            "totalRowCount": 8,
+            "accessLevel": "OWNER",
+            "effectiveAttachmentOptions": [
+              "DROPBOX",
+              "BOX_COM",
+              "FILE",
+              "EVERNOTE",
+              "LINK",
+              "GOOGLE_DRIVE",
+              "EGNYTE",
+              "ONEDRIVE"
+            ],
+            "ganttEnabled": true,
+            "dependenciesEnabled": false,
+            "resourceManagementEnabled": false,
+            "resourceManagementType": "NONE",
+            "cellImageUploadEnabled": true,
+            "userSettings": {
+              "criticalPathEnabled": false,
+              "displaySummaryTasks": true
+            },
+            "userPermissions": {
+              "summaryPermissions": "ADMIN"
+            },
+            "workspace": {
+              "id": 3258769762215811,
+              "name": "First Project"
+            },
+            "hasSummaryFields": false,
+            "permalink": "https://app.smartsheet.eu/sheets/M4wc8jH3r8C9wCRr7FMggMq9hCw6QmMVFRCf6RQ1",
+            "createdAt": "2026-07-07T13:40:44Z",
+            "modifiedAt": "2026-07-07T13:40:44Z",
+            "isMultiPicklistEnabled": true,
+            "columns": [
+              {
+                "id": 233555655526276,
+                "version": 0,
+                "index": 0,
+                "title": "At Risk",
+                "type": "CHECKBOX",
+                "symbol": "FLAG",
+                "validation": true,
+                "width": 72
+              },
+              {
+                "id": 4737155282896772,
+                "version": 0,
+                "index": 1,
+                "title": "Task",
+                "type": "TEXT_NUMBER",
+                "primary": true,
+                "validation": false,
+                "width": 337
+              },
+              {
+                "id": 2485355469211524,
+                "version": 0,
+                "index": 2,
+                "title": "Resource Allocation",
+                "type": "TEXT_NUMBER",
+                "validation": false,
+                "width": 318
+              },
+              {
+                "id": 6988955096582020,
+                "version": 0,
+                "index": 3,
+                "title": "Description",
+                "type": "TEXT_NUMBER",
+                "validation": false,
+                "width": 157
+              },
+              {
+                "id": 1359455562368900,
+                "version": 0,
+                "index": 4,
+                "title": "Assigned To",
+                "type": "CONTACT_LIST",
+                "contactOptions": [
+                  {
+                    "name": "Harley Sterling",
+                    "email": "harley@demo.mbfcorp.com"
+                  },
+                  {
+                    "name": "Jamal King",
+                    "email": "jamal@demo.mbfcorp.com"
+                  },
+                  {
+                    "name": "Guadalupe Garcia",
+                    "email": "guadalupe@demo.mbfcorp.com"
+                  },
+                  {
+                    "name": "Aviv Perez",
+                    "email": "aviv@demo.mbfcorp.com"
+                  },
+                  {
+                    "name": "Diana Kennedy",
+                    "email": "diana@demo.mbfcorp.com"
+                  }
+                ],
+                "validation": false,
+                "width": 150
+              },
+              {
+                "id": 5863055189739396,
+                "version": 0,
+                "index": 5,
+                "title": "Status",
+                "type": "PICKLIST",
+                "options": [
+                  "Not Started",
+                  "In Progress",
+                  "Blocked",
+                  "Complete"
+                ],
+                "validation": true,
+                "width": 135
+              },
+              {
+                "id": 3611255376054148,
+                "version": 0,
+                "index": 6,
+                "title": "Start Date",
+                "type": "DATE",
+                "tags": [
+                  "GANTT_START_DATE"
+                ],
+                "validation": true,
+                "width": 87
+              },
+              {
+                "id": 8114855003424644,
+                "version": 0,
+                "index": 7,
+                "title": "End Date",
+                "type": "DATE",
+                "tags": [
+                  "GANTT_END_DATE"
+                ],
+                "validation": true,
+                "width": 80
+              },
+              {
+                "id": 796505608947588,
+                "version": 0,
+                "index": 8,
+                "title": "Estimated Effort in Days",
+                "type": "TEXT_NUMBER",
+                "validation": false,
+                "width": 115
+              }
+            ],
+            "rows": [
+              {
+                "id": 3224513112835972,
+                "rowNumber": 1,
+                "locked": true,
+                "lockedForUser": false,
+                "expanded": true,
+                "createdAt": "2026-07-07T13:40:44Z",
+                "modifiedAt": "2026-07-07T13:40:44Z",
+                "cells": [
+                  {
+                    "columnId": 233555655526276,
+                    "value": true
+                  },
+                  {
+                    "columnId": 4737155282896772,
+                    "value": "Project Alpha",
+                    "displayValue": "Project Alpha"
+                  },
+                  {
+                    "columnId": 2485355469211524
+                  },
+                  {
+                    "columnId": 6988955096582020
+                  },
+                  {
+                    "columnId": 1359455562368900,
+                    "value": "Diana Kennedy",
+                    "displayValue": "Diana Kennedy"
+                  },
+                  {
+                    "columnId": 5863055189739396,
+                    "value": "In Progress",
+                    "displayValue": "In Progress"
+                  },
+                  {
+                    "columnId": 3611255376054148,
+                    "value": "2025-07-07"
+                  },
+                  {
+                    "columnId": 8114855003424644,
+                    "value": "2025-07-27"
+                  },
+                  {
+                    "columnId": 796505608947588
+                  }
+                ]
+              },
+              {
+                "id": 7728112740206468,
+                "rowNumber": 2,
+                "parentId": 3224513112835972,
+                "expanded": true,
+                "createdAt": "2026-07-07T13:40:44Z",
+                "modifiedAt": "2026-07-07T13:40:44Z",
+                "cells": [
+                  {
+                    "columnId": 233555655526276
+                  },
+                  {
+                    "columnId": 4737155282896772,
+                    "value": "Planning",
+                    "displayValue": "Planning"
+                  },
+                  {
+                    "columnId": 2485355469211524,
+                    "value": 0.421052631578947,
+                    "displayValue": "42%",
+                    "formula": "=[Estimated Effort in Days]@row / ([Estimated Effort in Days]@row + [Estimated Effort in Days]5)"
+                  },
+                  {
+                    "columnId": 6988955096582020
+                  },
+                  {
+                    "columnId": 1359455562368900
+                  },
+                  {
+                    "columnId": 5863055189739396
+                  },
+                  {
+                    "columnId": 3611255376054148
+                  },
+                  {
+                    "columnId": 8114855003424644
+                  },
+                  {
+                    "columnId": 796505608947588,
+                    "value": 8,
+                    "displayValue": "8",
+                    "formula": "=SUM(CHILDREN())"
+                  }
+                ]
+              },
+              {
+                "id": 2098613205993348,
+                "rowNumber": 3,
+                "parentId": 7728112740206468,
+                "expanded": true,
+                "createdAt": "2026-07-07T13:40:44Z",
+                "modifiedAt": "2026-07-07T13:40:44Z",
+                "cells": [
+                  {
+                    "columnId": 233555655526276,
+                    "value": false
+                  },
+                  {
+                    "columnId": 4737155282896772,
+                    "value": "Create project plan",
+                    "displayValue": "Create project plan"
+                  },
+                  {
+                    "columnId": 2485355469211524
+                  },
+                  {
+                    "columnId": 6988955096582020
+                  },
+                  {
+                    "columnId": 1359455562368900,
+                    "value": "Harley Sterling",
+                    "displayValue": "Harley Sterling"
+                  },
+                  {
+                    "columnId": 5863055189739396,
+                    "value": "Complete",
+                    "displayValue": "Complete"
+                  },
+                  {
+                    "columnId": 3611255376054148,
+                    "value": "2025-07-29",
+                    "formula": "=TODAY(-1)"
+                  },
+                  {
+                    "columnId": 8114855003424644,
+                    "value": "2025-08-01",
+                    "formula": "=TODAY(2)"
+                  },
+                  {
+                    "columnId": 796505608947588,
+                    "value": 3,
+                    "displayValue": "3",
+                    "formula": "=[End Date]@row - [Start Date]@row"
+                  }
+                ]
+              },
+              {
+                "id": 6602212833363844,
+                "rowNumber": 4,
+                "parentId": 7728112740206468,
+                "siblingId": 2098613205993348,
+                "expanded": true,
+                "createdAt": "2026-07-07T13:40:44Z",
+                "modifiedAt": "2026-07-07T13:40:44Z",
+                "cells": [
+                  {
+                    "columnId": 233555655526276,
+                    "value": false
+                  },
+                  {
+                    "columnId": 4737155282896772,
+                    "value": "Set up Automations",
+                    "displayValue": "Set up Automations"
+                  },
+                  {
+                    "columnId": 2485355469211524
+                  },
+                  {
+                    "columnId": 6988955096582020,
+                    "value": "Set up reminders and update requests on assigned tasks",
+                    "displayValue": "Set up reminders and update requests on assigned tasks"
+                  },
+                  {
+                    "columnId": 1359455562368900,
+                    "value": "Guadalupe Garcia",
+                    "displayValue": "Guadalupe Garcia"
+                  },
+                  {
+                    "columnId": 5863055189739396,
+                    "value": "Not Started",
+                    "displayValue": "Not Started"
+                  },
+                  {
+                    "columnId": 3611255376054148,
+                    "value": "2025-07-30",
+                    "formula": "=TODAY(0)"
+                  },
+                  {
+                    "columnId": 8114855003424644,
+                    "value": "2025-08-04",
+                    "formula": "=TODAY(5)"
+                  },
+                  {
+                    "columnId": 796505608947588,
+                    "value": 5,
+                    "displayValue": "5",
+                    "formula": "=[End Date]@row - [Start Date]@row"
+                  }
+                ]
+              },
+              {
+                "id": 4350413019678596,
+                "rowNumber": 5,
+                "parentId": 3224513112835972,
+                "siblingId": 7728112740206468,
+                "expanded": true,
+                "createdAt": "2026-07-07T13:40:44Z",
+                "modifiedAt": "2026-07-07T13:40:44Z",
+                "cells": [
+                  {
+                    "columnId": 233555655526276,
+                    "value": false
+                  },
+                  {
+                    "columnId": 4737155282896772,
+                    "value": "Launch",
+                    "displayValue": "Launch"
+                  },
+                  {
+                    "columnId": 2485355469211524,
+                    "value": 0.5,
+                    "displayValue": "50%",
+                    "formula": "=[Estimated Effort in Days]@row / ([Estimated Effort in Days]@row + [Estimated Effort in Days]5)"
+                  },
+                  {
+                    "columnId": 6988955096582020
+                  },
+                  {
+                    "columnId": 1359455562368900
+                  },
+                  {
+                    "columnId": 5863055189739396
+                  },
+                  {
+                    "columnId": 3611255376054148
+                  },
+                  {
+                    "columnId": 8114855003424644
+                  },
+                  {
+                    "columnId": 796505608947588,
+                    "value": 11,
+                    "displayValue": "11",
+                    "formula": "=SUM(CHILDREN())"
+                  }
+                ]
+              },
+              {
+                "id": 8854012647049092,
+                "rowNumber": 6,
+                "parentId": 4350413019678596,
+                "expanded": true,
+                "createdAt": "2026-07-07T13:40:44Z",
+                "modifiedAt": "2026-07-07T13:40:44Z",
+                "cells": [
+                  {
+                    "columnId": 233555655526276
+                  },
+                  {
+                    "columnId": 4737155282896772,
+                    "value": "Check progress in project dashboard",
+                    "displayValue": "Check progress in project dashboard"
+                  },
+                  {
+                    "columnId": 2485355469211524
+                  },
+                  {
+                    "columnId": 6988955096582020,
+                    "value": "Monitor and measure the success of your project",
+                    "displayValue": "Monitor and measure the success of your project"
+                  },
+                  {
+                    "columnId": 1359455562368900,
+                    "value": "Aviv Perez",
+                    "displayValue": "Aviv Perez"
+                  },
+                  {
+                    "columnId": 5863055189739396,
+                    "value": "Not Started",
+                    "displayValue": "Not Started"
+                  },
+                  {
+                    "columnId": 3611255376054148,
+                    "value": "2025-08-10",
+                    "formula": "=TODAY(11)"
+                  },
+                  {
+                    "columnId": 8114855003424644,
+                    "value": "2025-08-15",
+                    "formula": "=TODAY(16)"
+                  },
+                  {
+                    "columnId": 796505608947588,
+                    "value": 5,
+                    "displayValue": "5",
+                    "formula": "=[End Date]@row - [Start Date]@row"
+                  }
+                ]
+              },
+              {
+                "id": 269025857374084,
+                "rowNumber": 7,
+                "parentId": 4350413019678596,
+                "siblingId": 8854012647049092,
+                "expanded": true,
+                "createdAt": "2026-07-07T13:40:44Z",
+                "modifiedAt": "2026-07-07T13:40:44Z",
+                "cells": [
+                  {
+                    "columnId": 233555655526276,
+                    "value": false
+                  },
+                  {
+                    "columnId": 4737155282896772,
+                    "value": "Manage risks",
+                    "displayValue": "Manage risks"
+                  },
+                  {
+                    "columnId": 2485355469211524
+                  },
+                  {
+                    "columnId": 6988955096582020
+                  },
+                  {
+                    "columnId": 1359455562368900,
+                    "value": "Guadalupe Garcia",
+                    "displayValue": "Guadalupe Garcia"
+                  },
+                  {
+                    "columnId": 5863055189739396,
+                    "value": "Blocked",
+                    "displayValue": "Blocked"
+                  },
+                  {
+                    "columnId": 3611255376054148,
+                    "value": "2025-08-13",
+                    "formula": "=TODAY(14)"
+                  },
+                  {
+                    "columnId": 8114855003424644,
+                    "value": "2025-08-19",
+                    "formula": "=TODAY(20)"
+                  },
+                  {
+                    "columnId": 796505608947588,
+                    "value": 6,
+                    "displayValue": "6",
+                    "formula": "=[End Date]@row - [Start Date]@row"
+                  }
+                ]
+              },
+              {
+                "id": 4772625484744580,
+                "rowNumber": 8,
+                "siblingId": 3224513112835972,
+                "expanded": true,
+                "createdAt": "2026-07-07T13:40:44Z",
+                "modifiedAt": "2026-07-07T13:40:44Z",
+                "cells": [
+                  {
+                    "columnId": 233555655526276
+                  },
+                  {
+                    "columnId": 4737155282896772
+                  },
+                  {
+                    "columnId": 2485355469211524
+                  },
+                  {
+                    "columnId": 6988955096582020
+                  },
+                  {
+                    "columnId": 1359455562368900
+                  },
+                  {
+                    "columnId": 5863055189739396
+                  },
+                  {
+                    "columnId": 3611255376054148
+                  },
+                  {
+                    "columnId": 8114855003424644
+                  },
+                  {
+                    "columnId": 796505608947588
+                  }
+                ]
+              }
+            ]
+          }
+
+docs: |-
+  **REFERENCE:** [Get sheet](https://developers.smartsheet.com/api/smartsheet/openapi/sheets/getsheet)
+
+  **WHY:** one-off cross-check — the seed report (`Get Report (bare)`)
+  reports `totalRowCount:7` while the source sheet was seeded with 8 rows.
+  Confirms whether the sheet really has 8 rows and, if so, why the report
+  shows one fewer.
+
+  **VERIFIED (2026-07-21):** 200 OK, sheet id 4312824539121540 ("Project
+  Sheet"), `totalRowCount:8`, `version:0`, 9 columns, 8 rows returned. Row 8
+  (id 4772625484744580) has every cell empty (each cell carries only
+  `columnId`, no `value`) — this is the fully-blank trailing row the report
+  silently excludes (`totalRowCount:7` there).
+
+  **VERIFIED (2026-07-21):** `x-ratelimit-limit` (80000),
+  `x-ratelimit-remaining` (78000), and `x-ratelimit-reset` response headers
+  are present on this endpoint — contrast `Get Report (bare)`, `List
+  Reports (bare)`, and `Auth Sanity (GET users me)`, none of which emit
+  them.

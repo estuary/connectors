@@ -1,0 +1,11 @@
+info:
+  name: Reports
+  type: folder
+  seq: 3
+
+docs: |-
+  Read-only probes for the Reports cluster — the `reports` (catalog metadata)
+  and `report_rows` (row data) streams: `GET /reports` list semantics,
+  `GET /reports/{id}` detail/row pagination and include flags, plus the
+  source-sheet cross-check that validates report row counts against the
+  backing sheet (it hits `/sheets/{id}` but exists for the Reports cluster).

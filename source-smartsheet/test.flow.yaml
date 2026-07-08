@@ -1,0 +1,29 @@
+import:
+- acmeCo/flow.yaml
+captures:
+  acmeCo/source-smartsheet:
+    endpoint:
+      local:
+        command:
+        - python
+        - -m
+        - source_smartsheet
+        config: config.yaml
+    bindings:
+    - resource:
+        name: sheets
+        interval: PT10M
+      target: acmeCo/sheets
+    - resource:
+        name: sheet_rows
+        interval: PT10M
+        schedule: 0 0 * * *
+      target: acmeCo/sheet_rows
+    - resource:
+        name: reports
+        interval: PT30M
+      target: acmeCo/reports
+    - resource:
+        name: report_rows
+        interval: PT30M
+      target: acmeCo/report_rows

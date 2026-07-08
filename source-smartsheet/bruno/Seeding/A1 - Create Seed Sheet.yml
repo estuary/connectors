@@ -1,0 +1,66 @@
+info:
+  name: A1 - Create Seed Sheet
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{base_url}}/sheets"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "name": "Estuary Connector Test Sheet",
+        "columns": [
+          { "title": "Task Name", "primary": true, "type": "TEXT_NUMBER" },
+          { "title": "Status", "type": "PICKLIST", "options": ["Not Started", "In Progress", "Complete"] },
+          { "title": "Due Date", "type": "DATE" }
+        ]
+      }
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        const sheet = res.getBody()?.result;
+        if (sheet?.id) {
+          bru.setVar('seed_sheet_id', String(sheet.id));
+          const cols = {};
+          for (const c of sheet.columns || []) cols[c.title] = c.id;
+          bru.setVar('seed_col_task_name_id', String(cols['Task Name']));
+          bru.setVar('seed_col_status_id', String(cols['Status']));
+          bru.setVar('seed_col_due_date_id', String(cols['Due Date']));
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Create sheet in sheets folder](https://developers.smartsheet.com/api/smartsheet/openapi/sheets/create-sheet-in-sheets-folder)
+
+  **WHY:** seeding step 1/4 — creates a small sheet in the account's
+  Home/Sheets folder so the Reports stream has a source sheet to build a
+  report from. By default ONLY THE USER RUNS THIS — never the assistant
+  (Law #5, verify-endpoint-with-bruno); the 2026-07-21 run was executed by
+  the assistant under explicit owner authorization.
+
+  **VERIFIED (2026-07-21):** 200 SUCCESS. Created sheet
+  `id 858366236821380` ("Estuary Connector Test Sheet") with the 3 columns;
+  the after-response script captured `seed_sheet_id`/
+  `seed_col_task_name_id`/`seed_col_status_id`/`seed_col_due_date_id` and
+  `A2 - Add Seed Rows` consumed them in the same `bru run` invocation.
+  Note the sheet lands in Home/Sheets without any `destination` — unlike
+  `POST /reports`, which requires one (see `A3a - Create Seed Folder
+  (report destination)`).
+
+  Runtime vars (`bru.setVar`) survive only within one `bru run` invocation:
+  pass A1/A2/A3a/A3 as multiple files to a single `bru run` call, or inject
+  ids into later steps with `--env-var seed_sheet_id=...`. Durable pinning
+  into `environments/Smartsheet.yml` stays a deliberate manual edit so the
+  committed pins never drift from the saved evidence captured against them.
