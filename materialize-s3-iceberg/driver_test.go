@@ -141,19 +141,17 @@ func TestIntegrationGlue(t *testing.T) {
 		t.Skip("skipping AWS Glue integration test; enable with -s3iceberg.test-glue or S3_ICEBERG_TEST_GLUE")
 	}
 
-	cfg := loadTestConfigFrom(t, "testdata/materialize-glue.flow.yaml")
-	require.Equalf(t, catalogTypeGlue, cfg.Catalog.CatalogType,
-		"glue test config must set catalog_type to %q", catalogTypeGlue)
-
 	d := true
 	makeResourceFn := func(table string, delta bool) resource {
 		return resource{Table: table, Delta: &d}
 	}
 
-	// Sanitize the configured bucket plus the random UUIDs/hashes in S3 paths.
+	// Sanitize the S3 bucket host (kept out of the committed snapshot since the
+	// config is sops-encrypted) plus the random UUIDs/hashes in S3 paths.
 	sanitizers := []func(string) string{
 		func(s string) string {
-			return strings.ReplaceAll(s, cfg.Bucket, "<bucket>")
+			re := regexp.MustCompile(`s3://[^/"\s]+`)
+			return re.ReplaceAllString(s, "s3://<bucket>")
 		},
 		func(s string) string {
 			re := regexp.MustCompile(`[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.parquet`)
@@ -512,13 +510,9 @@ func TestPopulateInfoSchemaSkipsAbsentNamespace(t *testing.T) {
 }
 
 func loadTestConfig(t *testing.T) config {
-	return loadTestConfigFrom(t, "testdata/materialize.flow.yaml")
-}
-
-func loadTestConfigFrom(t *testing.T, source string) config {
 	t.Helper()
 
-	bundled := boilerplate.RunFlowctl(t, "raw", "bundle", "--source", source)
+	bundled := boilerplate.RunFlowctl(t, "raw", "bundle", "--source", "testdata/materialize.flow.yaml")
 	taskName := "acmeCo/tests/materialize-s3-iceberg"
 
 	raw := json.RawMessage(gjson.GetBytes(bundled, "materializations."+taskName+".endpoint.local.config").Raw)
