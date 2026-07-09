@@ -163,10 +163,14 @@ func s3PropsForDirectCreds(cfg *config) iceberg.Properties {
 		case filesink.AWSIAM:
 			// AWSAccessKeyID / AWSSecretAccessKey / AWSSessionToken under
 			// IAMTokens are runtime-injected session credentials produced by
-			// assuming the configured role — not user-provided keys.
-			props[icebergio.S3AccessKeyID] = cfg.Credentials.AWSAccessKeyID
-			props[icebergio.S3SecretAccessKey] = cfg.Credentials.AWSSecretAccessKey
-			props[icebergio.S3SessionToken] = cfg.Credentials.AWSSessionToken
+			// assuming the configured role — not user-provided keys. They must
+			// be read through .IAMTokens explicitly: CredentialsConfig also
+			// embeds AccessKeyCredentials, whose AWSAccessKeyID/
+			// AWSSecretAccessKey fields (empty under IAM auth) otherwise shadow
+			// these via shallower field promotion.
+			props[icebergio.S3AccessKeyID] = cfg.Credentials.IAMTokens.AWSAccessKeyID
+			props[icebergio.S3SecretAccessKey] = cfg.Credentials.IAMTokens.AWSSecretAccessKey
+			props[icebergio.S3SessionToken] = cfg.Credentials.IAMTokens.AWSSessionToken
 			props[icebergio.S3Region] = cfg.Region
 		default:
 			return iceberg.Properties{}

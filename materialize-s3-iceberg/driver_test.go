@@ -26,6 +26,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/bradleyjkemp/cupaloy"
 	"github.com/estuary/connectors/filesink"
+	"github.com/estuary/connectors/go/auth/iam"
 	"github.com/estuary/connectors/go/writer"
 	mboilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate/testutil"
@@ -345,6 +346,41 @@ func TestNormalizeLegacyCredentials(t *testing.T) {
 		cfg.normalizeCredentials()
 		require.Nil(t, cfg.Credentials)
 	})
+}
+
+// TestS3PropsForIAMCredentials is a regression guard for the S3 FileIO
+// credentials on the AWSIAM path (used by the Glue catalog). CredentialsConfig
+// embeds both AccessKeyCredentials and iam.IAMConfig, so a bare
+// cfg.Credentials.AWSAccessKeyID resolves to the shallower AccessKeyCredentials
+// field — empty under IAM auth — rather than the runtime-injected STS
+// credentials in IAMTokens. The direct-creds props must carry the IAMTokens
+// values.
+func TestS3PropsForIAMCredentials(t *testing.T) {
+	const (
+		akid    = "ASIAEXAMPLE"
+		secret  = "iamsecret"
+		session = "iamsessiontoken"
+	)
+	cfg := config{
+		Region: "us-east-1",
+		Credentials: &filesink.CredentialsConfig{
+			AuthType: filesink.AWSIAM,
+			IAMConfig: iam.IAMConfig{
+				IAMTokens: iam.IAMTokens{
+					AWSTokens: iam.AWSTokens{
+						AWSAccessKeyID:     akid,
+						AWSSecretAccessKey: secret,
+						AWSSessionToken:    session,
+					},
+				},
+			},
+		},
+	}
+
+	props := s3PropsForDirectCreds(&cfg)
+	require.Equal(t, akid, props[icebergio.S3AccessKeyID])
+	require.Equal(t, secret, props[icebergio.S3SecretAccessKey])
+	require.Equal(t, session, props[icebergio.S3SessionToken])
 }
 
 // fakeCatalog implements only the icebergcatalog.Catalog methods that
