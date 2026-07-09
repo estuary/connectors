@@ -168,10 +168,12 @@ func newTransactor(
 
 	schemas := map[string]struct{}{cfg.SchemaName: {}}
 	for _, binding := range bindings {
+		if err := overrideSkewedColumnCasts(ctx, wsClient, cfg.CatalogName, is, &binding); err != nil {
+			return nil, fmt.Errorf("resolving column type skew for %s: %w", binding.Path, err)
+		}
 		if err = d.addBinding(binding); err != nil {
 			return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 		}
-		d.bindings[len(d.bindings)-1].mustMerge = bindingHasColumnTypeSkew(is, binding)
 
 		schemas[binding.Path[0]] = struct{}{}
 	}
@@ -220,40 +222,74 @@ type binding struct {
 	// will always be false
 	needsMerge bool
 
-	// mustMerge forces MERGE INTO for all stores to this binding, even when no
-	// existing documents are updated. It is set when an existing column's type
-	// is incompatible with its mapped type, which can happen when Apply skips
-	// an unsupported column type migration ("existing field type mismatch
-	// without migration support"): MERGE INTO implicitly casts staged values
-	// into such columns, while COPY INTO's strict Delta schema merge rejects
-	// them with DELTA_FAILED_TO_MERGE_FIELDS.
-	mustMerge bool
-
 	loadMergeBounds  *sql.MergeBoundsBuilder
 	storeMergeBounds *sql.MergeBoundsBuilder
 }
 
-// bindingHasColumnTypeSkew reports whether any selected column exists in the
-// destination with a type that is incompatible with its mapped type. See the
-// comment on binding.mustMerge.
-func bindingHasColumnTypeSkew(is *boilerplate.InfoSchema, target sql.Table) bool {
+// overrideSkewedColumnCasts rewrites the DDL of columns whose existing
+// destination type is incompatible with their mapped type, so that staged
+// values are cast to the type the column actually has. This state arises when
+// Apply skips an unsupported column type migration ("existing field type
+// mismatch without migration support"): the staging queries would otherwise
+// cast to the spec's mapped type, which MERGE INTO tolerates via implicit
+// casting on write but COPY INTO's strict Delta schema merge rejects with
+// DELTA_FAILED_TO_MERGE_FIELDS. The full type text is fetched from the Tables
+// API because the InfoSchema records only the bare type name, and e.g. a bare
+// DECIMAL cast means DECIMAL(10,0), which would silently truncate.
+func overrideSkewedColumnCasts(
+	ctx context.Context,
+	wsClient *databricks.WorkspaceClient,
+	catalogName string,
+	is *boilerplate.InfoSchema,
+	target *sql.Table,
+) error {
 	existing := is.GetResource(target.Path)
 	if existing == nil {
-		return false
+		return nil
 	}
 
+	var skewed []*sql.Column
 	for _, col := range target.Columns() {
 		if ef := existing.GetField(col.Field); ef != nil && !col.MappedType.Compatible(*ef) {
-			log.WithFields(log.Fields{
-				"table":        target.Identifier,
-				"field":        col.Field,
-				"existingType": ef.Type,
-				"mappedType":   col.MappedType.String(),
-			}).Warn("forcing MERGE INTO for binding with incompatible existing column type")
-			return true
+			skewed = append(skewed, col)
 		}
 	}
-	return false
+	if len(skewed) == 0 {
+		return nil
+	}
+
+	fullName := fmt.Sprintf("%s.%s.%s", catalogName, target.InfoLocation.TableSchema, target.InfoLocation.TableName)
+	info, err := wsClient.Tables.GetByFullName(ctx, fullName)
+	if err != nil {
+		return fmt.Errorf("getting table info for %q: %w", fullName, err)
+	}
+
+	typeTexts := make(map[string]string, len(info.Columns))
+	for _, ci := range info.Columns {
+		typeTexts[ci.Name] = ci.TypeText
+	}
+
+	for _, col := range skewed {
+		ef := existing.GetField(col.Field)
+		typeText, ok := typeTexts[ef.Name]
+		if !ok || typeText == "" {
+			return fmt.Errorf("no type text for skewed column %q of table %q", ef.Name, fullName)
+		}
+		ddl := strings.ToUpper(typeText)
+
+		log.WithFields(log.Fields{
+			"table":        target.Identifier,
+			"field":        col.Field,
+			"existingType": ddl,
+			"mappedType":   col.MappedType.String(),
+		}).Warn("casting staged values to existing column type which is incompatible with the mapped type")
+
+		col.MappedType.DDL = ddl
+		col.MappedType.BareDDL = ddl
+		col.MappedType.NullableDDL = ddl
+	}
+
+	return nil
 }
 
 func (t *transactor) addBinding(target sql.Table) error {
@@ -458,7 +494,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		// not be loaded again
 		// see https://docs.databricks.com/en/sql/language-manual/delta-copy-into.html
 
-		if b.target.DeltaUpdates || (!b.needsMerge && !b.mustMerge) {
+		if b.target.DeltaUpdates || !b.needsMerge {
 			// TODO: switch to slices.Chunk once we switch to go1.23
 			for i := 0; i < len(toCopy); i += queryBatchSize {
 				end := i + queryBatchSize
