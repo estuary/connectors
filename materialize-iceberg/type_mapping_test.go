@@ -63,7 +63,10 @@ func TestComputeSchemas(t *testing.T) {
 	}
 
 	update := boilerplate.BindingUpdate[config, resource, mapped]{
-		NewProjections:      []boilerplate.MappedProjection[mapped]{mappedProjection("new", false, iceberg.StringType{})},
+		NewProjections: []boilerplate.MappedProjection[mapped]{
+			mappedProjection("new", false, iceberg.StringType{}),
+			mappedProjection("newRequired", true, iceberg.StringType{}),
+		},
 		NewlyNullableFields: []boilerplate.ExistingField{{Name: "dateToStr"}, {Name: "dateToStr" + migrateFieldSuffix}},
 		FieldsToMigrate: []boilerplate.MigrateField[mapped]{
 			{
