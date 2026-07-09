@@ -8,6 +8,7 @@ import (
 
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/microsoft/go-mssqldb/azuread"
 )
@@ -161,6 +162,7 @@ func newDriver() *sql.Driver[config, tableConfig] {
 			return &sql.Endpoint[config]{
 				Config:              cfg,
 				Dialect:             dialect,
+				SerPolicy:           boilerplate.SerPolicyStd,
 				MetaCheckpoints:     sql.FlowCheckpointsTable([]string{cfg.Warehouse, cfg.Schema}),
 				NewClient:           newClient,
 				CreateTableTemplate: templates.createTargetTable,
