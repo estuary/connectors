@@ -1,0 +1,9 @@
+collections:
+  acmeCo/events_data:
+    schema: events_data.schema.yaml
+    key:
+    - /event_id
+  acmeCo/profile_data:
+    schema: profile_data.schema.yaml
+    key:
+    - /clevertapId
