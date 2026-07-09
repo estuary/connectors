@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/apache/iceberg-go"
@@ -133,10 +134,44 @@ func buildGlueCatalog(ctx context.Context, cfg *config) (icebergcatalog.Catalog,
 		glueProps[k] = v
 	}
 
+	exportGlueFileIOEnv(cfg)
+
 	return icebergglue.NewCatalog(
 		icebergglue.WithAwsConfig(awsCfg),
 		icebergglue.WithAwsProperties(glueProps),
 	), nil
+}
+
+// exportGlueFileIOEnv publishes the resolved S3 region and credentials into the
+// process environment so iceberg-go's S3 FileIO can find them on the Glue path.
+//
+// iceberg-go v0.6.0's only S3 FileIO is the gocloud backend, which reads its
+// region and credentials solely from the FileIO properties it is handed. The
+// Glue catalog loads tables with an empty property set (LoadFSFunc(nil, ...))
+// and never forwards its AWS config, so those reads/writes would otherwise fall
+// back to the default AWS credential chain with no region and fail with a 301
+// redirect. (The REST catalog sidesteps this by passing WithAdditionalProps.)
+// The gocloud opener builds its client from config.LoadDefaultConfig, which does
+// consult the environment, so seeding these variables is the available hook.
+//
+// This is deliberately process-global but low-blast-radius: filesink's own S3
+// access uses explicit credential providers and ignores the environment, and
+// Flow restarts the connector when injected IAM session credentials rotate, so
+// the values captured here stay valid for the process lifetime.
+func exportGlueFileIOEnv(cfg *config) {
+	if cfg.Region != "" {
+		os.Setenv("AWS_REGION", cfg.Region)
+	}
+	props := s3PropsForDirectCreds(cfg)
+	for prop, env := range map[string]string{
+		icebergio.S3AccessKeyID:     "AWS_ACCESS_KEY_ID",
+		icebergio.S3SecretAccessKey: "AWS_SECRET_ACCESS_KEY",
+		icebergio.S3SessionToken:    "AWS_SESSION_TOKEN",
+	} {
+		if v := props[prop]; v != "" {
+			os.Setenv(env, v)
+		}
+	}
 }
 
 // s3PropsForDirectCreds builds iceberg-go S3 IO properties when the connector
