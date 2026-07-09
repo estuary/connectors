@@ -432,7 +432,10 @@ func (c *catalog) UpdateResource(_ context.Context, bindingUpdate boilerplate.Bi
 		}
 
 		tx := tbl.NewTransaction()
-		us := tx.UpdateSchema(false, false)
+		// caseSensitive=true matches pyiceberg's update_schema() default that
+		// the removed Python tool relied on; the connector's field names are
+		// case-sensitive, so column matches during add/relax must be too.
+		us := tx.UpdateSchema(true, false)
 		for _, a := range adds {
 			us = us.AddColumn([]string{a.name}, a.typ, "", false, nil)
 		}
