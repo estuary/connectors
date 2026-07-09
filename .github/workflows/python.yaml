@@ -8,6 +8,7 @@ on:
       - "source-airtable/**"
       - "source-asana/**"
       - "source-facebook-marketing/**"
+      - "source-azure-servicebus/**"
       - "source-gladly/**"
       - "source-google-ads/**"
       - "source-google-sheets-native/**"
@@ -73,6 +74,7 @@ on:
       - "source-airtable/**"
       - "source-asana/**"
       - "source-facebook-marketing/**"
+      - "source-azure-servicebus/**"
       - "source-gladly/**"
       - "source-google-ads/**"
       - "source-google-sheets-native/**"
@@ -157,6 +159,10 @@ jobs:
           - name: source-facebook-marketing
             type: capture
             version: v4
+            usage_rate: "1.0"
+          - name: source-azure-servicebus
+            type: capture
+            version: v1
             usage_rate: "1.0"
           - name: source-gladly
             type: capture
