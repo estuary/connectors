@@ -283,6 +283,7 @@ func newRedshiftDriver() *sql.Driver[config, tableConfig] {
 			return &sql.Endpoint[config]{
 				Config:              cfg,
 				Dialect:             dialect,
+				SerPolicy:           boilerplate.SerPolicyStd,
 				MetaCheckpoints:     sql.FlowCheckpointsTable(metaBase),
 				NewClient:           newClient,
 				CreateTableTemplate: templates.createTargetTable,

@@ -85,6 +85,7 @@ func NewSQLiteDriver() *sql.Driver[config, tableConfig] {
 			return &sql.Endpoint[config]{
 				Config:              config{path: path},
 				Dialect:             sqliteDialect,
+				SerPolicy:           boilerplate.SerPolicyStd,
 				MetaCheckpoints:     nil,
 				NewClient:           newClient,
 				CreateTableTemplate: tplCreateTargetTable,
