@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"flag"
 	"io"
 	"iter"
 	"net/http"
@@ -58,6 +59,11 @@ func TestSpec(t *testing.T) {
 
 	cupaloy.SnapshotT(t, formatted)
 }
+
+// testGlue opts into TestIntegrationGlue, which runs against a real AWS Glue
+// Data Catalog rather than the local rustfs+Polaris stack. Disabled by default
+// because it needs cloud credentials; also enablable via S3_ICEBERG_TEST_GLUE.
+var testGlue = flag.Bool("s3iceberg.test-glue", false, "run the integration test against a real AWS Glue catalog (requires cloud credentials in testdata/config-glue.yaml)")
 
 func TestIntegration(t *testing.T) {
 	if testing.Short() {
@@ -115,6 +121,57 @@ func TestIntegration(t *testing.T) {
 	//t.Run("migrate", func(t *testing.T) {
 	//	boilerplate.RunMigrationTest(t, newMaterialization, "testdata/migrate.flow.yaml", makeResourceFn, nil)
 	//})
+}
+
+// TestIntegrationGlue runs the standard materialize/apply integration tests
+// against a real AWS Glue Data Catalog. The connector advertises Glue support
+// but the default TestIntegration only exercises the Polaris REST catalog, so
+// this covers the otherwise-untested Glue code path (including the S3 FileIO
+// credential wiring). It is disabled by default: enable with -s3iceberg.test-glue
+// or S3_ICEBERG_TEST_GLUE, and supply real credentials in testdata/config-glue.yaml.
+//
+// Unlike TestIntegration there is no docker-compose stack; the Glue catalog and
+// the S3 bucket named in the config must already exist. The connector creates
+// the namespace (Glue database) and its tables.
+func TestIntegrationGlue(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode")
+	}
+	if !*testGlue && os.Getenv("S3_ICEBERG_TEST_GLUE") == "" {
+		t.Skip("skipping AWS Glue integration test; enable with -s3iceberg.test-glue or S3_ICEBERG_TEST_GLUE")
+	}
+
+	cfg := loadTestConfigFrom(t, "testdata/materialize-glue.flow.yaml")
+	require.Equalf(t, catalogTypeGlue, cfg.Catalog.CatalogType,
+		"glue test config must set catalog_type to %q", catalogTypeGlue)
+
+	d := true
+	makeResourceFn := func(table string, delta bool) resource {
+		return resource{Table: table, Delta: &d}
+	}
+
+	// Sanitize the configured bucket plus the random UUIDs/hashes in S3 paths.
+	sanitizers := []func(string) string{
+		func(s string) string {
+			return strings.ReplaceAll(s, cfg.Bucket, "<bucket>")
+		},
+		func(s string) string {
+			re := regexp.MustCompile(`[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.parquet`)
+			return re.ReplaceAllString(s, "<uuid>.parquet")
+		},
+		func(s string) string {
+			re := regexp.MustCompile(`_([\dA-F]{16})/data/`)
+			return re.ReplaceAllString(s, "_<hash>/data/")
+		},
+	}
+
+	t.Run("materialize", func(t *testing.T) {
+		boilerplate.RunMaterializationTest(t, newMaterialization, "testdata/materialize-glue.flow.yaml", makeResourceFn, sanitizers)
+	})
+
+	t.Run("apply", func(t *testing.T) {
+		boilerplate.RunApplyTest(t, &driver{}, newMaterialization, "testdata/apply-glue.flow.yaml", makeResourceFn)
+	})
 }
 
 // runTimestampOverflowRegression reproduces a production failure observed at
@@ -455,9 +512,13 @@ func TestPopulateInfoSchemaSkipsAbsentNamespace(t *testing.T) {
 }
 
 func loadTestConfig(t *testing.T) config {
+	return loadTestConfigFrom(t, "testdata/materialize.flow.yaml")
+}
+
+func loadTestConfigFrom(t *testing.T, source string) config {
 	t.Helper()
 
-	bundled := boilerplate.RunFlowctl(t, "raw", "bundle", "--source", "testdata/materialize.flow.yaml")
+	bundled := boilerplate.RunFlowctl(t, "raw", "bundle", "--source", source)
 	taskName := "acmeCo/tests/materialize-s3-iceberg"
 
 	raw := json.RawMessage(gjson.GetBytes(bundled, "materializations."+taskName+".endpoint.local.config").Raw)
