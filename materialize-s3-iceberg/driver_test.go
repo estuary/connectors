@@ -59,6 +59,58 @@ func TestSpec(t *testing.T) {
 	cupaloy.SnapshotT(t, formatted)
 }
 
+// regexpReplace returns a sanitizer that replaces every match of pattern with
+// repl.
+func regexpReplace(pattern, repl string) func(string) string {
+	re := regexp.MustCompile(pattern)
+	return func(s string) string { return re.ReplaceAllString(s, repl) }
+}
+
+// materializeSanitizers normalizes the parts of a materialize snapshot that
+// differ between the REST and Glue catalogs — the S3 bucket and prefix, plus
+// the random per-run parquet UUIDs and table-name hashes — to stable
+// placeholders. The namespace is deliberately NOT sanitized: both tests use the
+// same namespace (see the pre-creation in TestIntegration/TestIntegrationGlue),
+// and the "Resource:" snapshot header is written by the harness without passing
+// through these sanitizers, so the only way it can match is for the value to be
+// identical. Applied identically to both tests so their snapshots are
+// byte-identical; TestRestGlueSnapshotParity enforces that.
+func materializeSanitizers() []func(string) string {
+	return []func(string) string{
+		// s3://<bucket>/<prefix>/ — the bucket and prefix path segments. The
+		// namespace segment that follows is left intact (identical in both).
+		regexpReplace(`s3://[^/"]+/[^/"]+/`, `s3://<bucket>/<prefix>/`),
+		// Random UUIDs in parquet file names.
+		regexpReplace(`[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.parquet`, `<uuid>.parquet`),
+		// Per-run table-name hashes.
+		regexpReplace(`_([\dA-F]{16})/data/`, `_<hash>/data/`),
+	}
+}
+
+// ensureNamespace idempotently pre-creates cfg.Namespace so that the subsequent
+// materialization does not emit a "create namespace" apply action. Both the
+// REST and Glue tests call this: the REST stack is a fresh Polaris each run (the
+// namespace would otherwise be created during the test), while Glue is a shared,
+// persistent account where the namespace already exists. Pre-creating in both
+// makes the apply actions — and thus the snapshots — identical, and is safe
+// under concurrent runs because it neither drops the namespace nor fails when it
+// already exists.
+func ensureNamespace(t *testing.T, cfg config) {
+	t.Helper()
+
+	cat, err := newCatalog(context.Background(), cfg, NestedLocationStyle)
+	require.NoError(t, err)
+	// Glue's CreateDatabase returns a raw AWS AlreadyExistsException that
+	// iceberg-go does not map to ErrNamespaceAlreadyExists (mirroring the
+	// EntityNotFoundException quirk handled in populateInfoSchema), so tolerate
+	// both the mapped error and the raw string.
+	if err := cat.createNamespace(context.Background(), cfg.Namespace); err != nil &&
+		!errors.Is(err, icebergcatalog.ErrNamespaceAlreadyExists) &&
+		!strings.Contains(err.Error(), "AlreadyExists") {
+		t.Fatalf("pre-creating namespace %q: %v", cfg.Namespace, err)
+	}
+}
+
 func TestIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
@@ -74,28 +126,15 @@ func TestIntegration(t *testing.T) {
 	// Create the rustfs bucket and the Polaris catalog backed by it.
 	createTestBucket(t, cfg)
 	createTestWarehouse(t, cfg)
+	ensureNamespace(t, cfg)
 
 	d := true
 	makeResourceFn := func(table string, delta bool) resource {
 		return resource{Table: table, Delta: &d}
 	}
 
-	// Sanitize S3 file paths and table hashes that contain random UUIDs.
-	sanitizers := []func(string) string{
-		func(s string) string {
-			// Replace UUIDs in S3 parquet file paths.
-			re := regexp.MustCompile(`[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.parquet`)
-			return re.ReplaceAllString(s, "<uuid>.parquet")
-		},
-		func(s string) string {
-			// Replace table name hashes (16 hex chars).
-			re := regexp.MustCompile(`_([\dA-F]{16})/data/`)
-			return re.ReplaceAllString(s, "_<hash>/data/")
-		},
-	}
-
 	t.Run("materialize", func(t *testing.T) {
-		boilerplate.RunMaterializationTest(t, newMaterialization, "testdata/materialize.flow.yaml", makeResourceFn, sanitizers)
+		boilerplate.RunMaterializationTest(t, newMaterialization, "testdata/materialize.flow.yaml", makeResourceFn, materializeSanitizers())
 	})
 
 	t.Run("apply", func(t *testing.T) {
@@ -127,42 +166,42 @@ func TestIntegration(t *testing.T) {
 // need GCP KMS access).
 //
 // Unlike TestIntegration there is no docker-compose stack; the Glue catalog and
-// the S3 bucket named in the config must already exist. The connector creates
-// the namespace (Glue database) and its tables.
+// the S3 bucket named in the config must already exist. The namespace (Glue
+// database) is pre-created idempotently and its tables are created and cleaned
+// up by the test.
 func TestIntegrationGlue(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping test in short mode")
 	}
+
+	cfg := loadGlueTestConfig(t)
+	ensureNamespace(t, cfg)
 
 	d := true
 	makeResourceFn := func(table string, delta bool) resource {
 		return resource{Table: table, Delta: &d}
 	}
 
-	// Sanitize the S3 bucket host (kept out of the committed snapshot since the
-	// config is sops-encrypted) plus the random UUIDs/hashes in S3 paths.
-	sanitizers := []func(string) string{
-		func(s string) string {
-			re := regexp.MustCompile(`s3://[^/"\s]+`)
-			return re.ReplaceAllString(s, "s3://<bucket>")
-		},
-		func(s string) string {
-			re := regexp.MustCompile(`[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.parquet`)
-			return re.ReplaceAllString(s, "<uuid>.parquet")
-		},
-		func(s string) string {
-			re := regexp.MustCompile(`_([\dA-F]{16})/data/`)
-			return re.ReplaceAllString(s, "_<hash>/data/")
-		},
-	}
-
 	t.Run("materialize", func(t *testing.T) {
-		boilerplate.RunMaterializationTest(t, newMaterialization, "testdata/materialize-glue.flow.yaml", makeResourceFn, sanitizers)
+		boilerplate.RunMaterializationTest(t, newMaterialization, "testdata/materialize-glue.flow.yaml", makeResourceFn, materializeSanitizers())
 	})
 
 	t.Run("apply", func(t *testing.T) {
 		boilerplate.RunApplyTest(t, &driver{}, newMaterialization, "testdata/apply-glue.flow.yaml", makeResourceFn)
 	})
+}
+
+// TestRestGlueSnapshotParity enforces that the REST and Glue materialize
+// snapshots are byte-identical after sanitization. Any divergence means the two
+// catalog code paths produced different results — the drift this coverage
+// exists to catch.
+func TestRestGlueSnapshotParity(t *testing.T) {
+	rest, err := os.ReadFile(".snapshots/TestIntegration-materialize")
+	require.NoError(t, err)
+	glue, err := os.ReadFile(".snapshots/TestIntegrationGlue-materialize")
+	require.NoError(t, err)
+	require.Equal(t, string(rest), string(glue),
+		"REST and Glue materialize snapshots diverged; this indicates catalog-specific drift")
 }
 
 // runTimestampOverflowRegression reproduces a production failure observed at
@@ -514,6 +553,48 @@ func loadTestConfig(t *testing.T) config {
 	var cfg config
 	require.NoError(t, pf.UnmarshalStrict(raw, &cfg))
 	return cfg
+}
+
+// loadGlueTestConfig bundles the Glue task spec and returns its decrypted
+// endpoint config. testdata/config-glue.yaml is sops-encrypted, so unlike
+// loadTestConfig this decrypts the bundled config before unmarshaling.
+func loadGlueTestConfig(t *testing.T) config {
+	t.Helper()
+
+	bundled := boilerplate.RunFlowctl(t, "raw", "bundle", "--source", "testdata/materialize-glue.flow.yaml")
+	taskName := "acmeCo/tests/materialize-s3-iceberg"
+
+	raw := json.RawMessage(gjson.GetBytes(bundled, "materializations."+taskName+".endpoint.local.config").Raw)
+	require.NotEmpty(t, raw, "could not find config in bundled spec")
+
+	if gjson.GetBytes(raw, "sops").Exists() {
+		raw = sopsDecrypt(t, raw)
+	}
+
+	var cfg config
+	require.NoError(t, pf.UnmarshalStrict(raw, &cfg))
+	return cfg
+}
+
+// sopsDecrypt decrypts a sops-encrypted JSON config and strips the _sops key
+// suffixes, mirroring the boilerplate test harness's own decryption so the
+// result is the plaintext config the connector expects.
+func sopsDecrypt(t *testing.T, raw json.RawMessage) json.RawMessage {
+	t.Helper()
+
+	sopsCmd := exec.Command("sops", "--decrypt", "--input-type", "json", "--output-type", "json", "/dev/stdin")
+	jqCmd := exec.Command("jq", `walk( if type == "object" then with_entries(.key |= rtrimstr("_sops")) else . end)`)
+	sopsCmd.Stdin = bytes.NewReader(raw)
+
+	var err error
+	jqCmd.Stdin, err = sopsCmd.StdoutPipe()
+	require.NoError(t, err)
+	require.NoError(t, sopsCmd.Start())
+	out, err := jqCmd.Output()
+	require.NoError(t, err)
+	require.NoError(t, sopsCmd.Wait())
+
+	return out
 }
 
 func createTestBucket(t *testing.T, cfg config) {

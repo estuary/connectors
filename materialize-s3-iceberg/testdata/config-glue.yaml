@@ -12,7 +12,7 @@
 bucket: ENC[AES256_GCM,data:tdpk3crVRV0k91mifiLeWyMKtp5ScmCHogs6n1E=,iv:0L3+hX4zYdlfIioU+E8gqFNbqVLSZUhDRONXpV/HFx0=,tag:W6mypYGRzznu0BaWr5roQw==,type:str]
 region: ENC[AES256_GCM,data:IYUpswdHsPF5,iv:752CsHnevUSu/P9aG7AMxWxON3HqFHaZJh0IVH2oaOI=,tag:kkcZbYIQP4pQ7geBArcIOQ==,type:str]
 prefix: ENC[AES256_GCM,data:4393uC+kbbydAaWsK/Wm,iv:+/eSqaUeaP4CShGXu208kHAg+ItgBbM8zBjLz/E1Ln0=,tag:heYXx3pHQU3eRUsDZDUHMA==,type:str]
-namespace: ENC[AES256_GCM,data:KcYhA+9HZQazsd8Rx5O7pQ==,iv:cfp8cwH0JGdvX/TjGeadlGIrJR8UqyWqE5VdeXtYeVc=,tag:+mvfRzbOTHJlnFSPLO6sRw==,type:str]
+namespace: ENC[AES256_GCM,data:2RRguHw=,iv:rzEamsxwVXFn6Fk9sfKYKSnJN+y71Ps4Dt5guiq3dpE=,tag:pqOBdWzalyPkgW5qfoA8fg==,type:str]
 upload_interval: ENC[AES256_GCM,data:lcNFVA==,iv:7Ey+iKRiVOkf3aClDhvz65OUmdhmeVeJN+erhanMFAQ=,tag:XOjTbzjm6CNJ9HFYPXzYUg==,type:str]
 credentials:
     auth_type: ENC[AES256_GCM,data:XzFCSjSuHJvl83TL,iv:vFlt/iVV+txP3PNUjxw06DBYMqJ/o7y74pRxzAMXzyw=,tag:XimCed1knUmb3u0pHODmQg==,type:str]
@@ -29,7 +29,7 @@ sops:
         - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
           created_at: "2026-07-09T18:10:27Z"
           enc: CiUAdmEdwqpE/c68Belc5XFYoxQ0X4Eb0v8qzJqZ5K/C3ziiY5DBEkkApbezqj0fZZtkutTo9JzzNSJ86cs6eBv301GxKxc/ntY7oM+h/Ybl5Wi49wosnvTUFxBR8lXtFsYkfBP9teiAPjIzLdWNGlet
-    lastmodified: "2026-07-09T18:10:28Z"
-    mac: ENC[AES256_GCM,data:QMZXpndEibhwbnP6ySbeu7TB399kkN2negl1gltrlXvODPZbHu271f9po8c5L3zQX7Vyp9l35cx63xJpYde2NMiNen2ODv1HrvVwdqvU4361RdqbB+0S4/fSo2jlMizm7knyOhJRPNjM5qrj3JtSgBYPsERTAi7+J1Uxud6Rg70=,iv:Ua5gj0/8Fh76LQFfWJrhgJK7+iyz04z+dXd6KtGOud0=,tag:XLB7hDANS+kqouDgwLdl7A==,type:str]
+    lastmodified: "2026-07-10T19:17:47Z"
+    mac: ENC[AES256_GCM,data:merBQpZb72G7Lu9W3xVCleQ7+GECPVj6e2Ruo5x9hcTM/n6V06Omib7NZvLPp3IQL2zmWohul1SWi7d7nEcSKbVuwfla3fAdVd9znJBMLqN4i++6qR85l4ekVlb64GV0TVmV14CGu3t/ky15o1dSjdmR1gn4CDMIjSYybtopqOs=,iv:oqySi0+3NJe6uygLhOKvOF+CB9ECWzqCYALHTYrx9qA=,tag:s3KOfJqM/TinkuL5ACPcnA==,type:str]
     unencrypted_suffix: _unencrypted
     version: 3.12.1
