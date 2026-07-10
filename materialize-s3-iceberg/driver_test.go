@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"flag"
 	"io"
 	"iter"
 	"net/http"
@@ -59,11 +58,6 @@ func TestSpec(t *testing.T) {
 
 	cupaloy.SnapshotT(t, formatted)
 }
-
-// testGlue opts into TestIntegrationGlue, which runs against a real AWS Glue
-// Data Catalog rather than the local rustfs+Polaris stack. Disabled by default
-// because it needs cloud credentials; also enablable via S3_ICEBERG_TEST_GLUE.
-var testGlue = flag.Bool("s3iceberg.test-glue", false, "run the integration test against a real AWS Glue catalog (requires cloud credentials in testdata/config-glue.yaml)")
 
 func TestIntegration(t *testing.T) {
 	if testing.Short() {
@@ -125,10 +119,12 @@ func TestIntegration(t *testing.T) {
 
 // TestIntegrationGlue runs the standard materialize/apply integration tests
 // against a real AWS Glue Data Catalog. The connector advertises Glue support
-// but the default TestIntegration only exercises the Polaris REST catalog, so
-// this covers the otherwise-untested Glue code path (including the S3 FileIO
-// credential wiring). It is disabled by default: enable with -s3iceberg.test-glue
-// or S3_ICEBERG_TEST_GLUE, and supply real credentials in testdata/config-glue.yaml.
+// but TestIntegration only exercises the Polaris REST catalog, so this covers
+// the otherwise-untested Glue code path (including the S3 FileIO credential
+// wiring) and guards against drift between the two catalogs. It runs by default
+// alongside TestIntegration; the sops-encrypted testdata/config-glue.yaml
+// supplies credentials and is decrypted by the test harness (CI and local runs
+// need GCP KMS access).
 //
 // Unlike TestIntegration there is no docker-compose stack; the Glue catalog and
 // the S3 bucket named in the config must already exist. The connector creates
@@ -136,9 +132,6 @@ func TestIntegration(t *testing.T) {
 func TestIntegrationGlue(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping test in short mode")
-	}
-	if !*testGlue && os.Getenv("S3_ICEBERG_TEST_GLUE") == "" {
-		t.Skip("skipping AWS Glue integration test; enable with -s3iceberg.test-glue or S3_ICEBERG_TEST_GLUE")
 	}
 
 	d := true
