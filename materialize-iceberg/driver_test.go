@@ -176,7 +176,7 @@ func TestIntegration(t *testing.T) {
 	})
 
 	t.Run("migrate", func(t *testing.T) {
-		boilerplate.RunMigrationTestParallel(t, &Driver{}, newMaterialization, migrateSpec, makeResourceFn, nil)
+		boilerplate.RunMigrationTestParallel(t, newMaterialization, migrateSpec, makeResourceFn, nil)
 	})
 
 	t.Run("ts-overflow-regression", func(t *testing.T) {
