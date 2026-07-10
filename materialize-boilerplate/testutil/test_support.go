@@ -337,6 +337,7 @@ func RunApplyTestParallel[EC boilerplate.EndpointConfiger, FC boilerplate.FieldC
 // strive to support all of these migrations though.
 func RunMigrationTest[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
 	t *testing.T,
+	driver boilerplate.Connector,
 	newMaterializer boilerplate.NewMaterializerFn[EC, FC, RC, MT],
 	sourcePath string,
 	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
@@ -350,7 +351,7 @@ func RunMigrationTest[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfi
 
 	for _, taskName := range taskNames(bundled) {
 		snap.WriteString(fmt.Sprintf("Task: %s\n\n", taskName))
-		snap.WriteString(runMigrationTestForTask(t, ctx, newMaterializer, taskName, bundled, suffix, makeResourceFn, actionDescSanitizers))
+		snap.WriteString(runMigrationTestForTask(t, ctx, driver, newMaterializer, taskName, bundled, suffix, makeResourceFn, actionDescSanitizers))
 	}
 
 	cupaloy.SnapshotT(t, snap.String())
@@ -502,6 +503,7 @@ func runFeatureFlagMigrationForTask[EC boilerplate.EndpointConfiger, FC boilerpl
 // task execution is safe and beneficial.
 func RunMigrationTestParallel[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
 	t *testing.T,
+	driver boilerplate.Connector,
 	newMaterializer boilerplate.NewMaterializerFn[EC, FC, RC, MT],
 	sourcePath string,
 	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
@@ -511,7 +513,7 @@ func RunMigrationTestParallel[EC boilerplate.EndpointConfiger, FC boilerplate.Fi
 	suffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
 
 	names, results := RunTestAllTasksParallel(t, sourcePath, func(t *testing.T, bundled []byte, taskName string, cfg EC) string {
-		return runMigrationTestForTask(t, ctx, newMaterializer, taskName, bundled, suffix, makeResourceFn, actionDescSanitizers)
+		return runMigrationTestForTask(t, ctx, driver, newMaterializer, taskName, bundled, suffix, makeResourceFn, actionDescSanitizers)
 	})
 
 	var snap strings.Builder
@@ -867,6 +869,7 @@ func runChallengingNamesApplyTests[EC boilerplate.EndpointConfiger, FC boilerpla
 func runMigrationTestForTask[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
 	t *testing.T,
 	ctx context.Context,
+	driver boilerplate.Connector,
 	newMaterializer boilerplate.NewMaterializerFn[EC, FC, RC, MT],
 	taskName string,
 	bundled []byte,
@@ -917,9 +920,6 @@ func runMigrationTestForTask[EC boilerplate.EndpointConfiger, FC boilerplate.Fie
 		return false
 	})
 
-	migratedSource := filepath.Join(t.TempDir(), "test-migration-migrated.flow.yaml")
-	require.NoError(t, os.WriteFile(migratedSource, bundled, 0o600))
-
 	path, _, err := res.Parameters()
 	require.NoError(t, err)
 
@@ -933,17 +933,13 @@ func runMigrationTestForTask[EC boilerplate.EndpointConfiger, FC boilerplate.Fie
 	// state. The second one will both cause the columns to be migrated, as well
 	// as put some more data in the new form into the table to make sure it
 	// works.
-	for _, tc := range []struct{ source, fixture string }{
-		{source: initialSource, fixture: relativePath(t, "testdata/integration/fixture.migrate-base.json")},
-		{source: migratedSource, fixture: relativePath(t, "testdata/integration/fixture.migrate-migrated.json")},
-	} {
-
+	runPhase := func(source, fixture string) {
 		actionDescription := RunFlowctl(
 			t,
 			"preview",
 			"--name", workingTaskName,
-			"--source", tc.source,
-			"--fixture", tc.fixture,
+			"--source", source,
+			"--fixture", fixture,
 			"--network", "flow-test",
 			"--output-apply",
 		)
@@ -954,7 +950,69 @@ func runMigrationTestForTask[EC boilerplate.EndpointConfiger, FC boilerplate.Fie
 		snap.WriteString(snapshotTestTable(t, ctx, materializer, res, actionDescription, rndSuffix, true))
 	}
 
+	runPhase(initialSource, relativePath(t, "testdata/integration/fixture.migrate-base.json"))
+
+	// Only exercise migrations the connector actually supports: validate the
+	// migrated collection against the phase-1 table and exclude any field
+	// whose type change is INCOMPATIBLE. The control plane resolves such
+	// fields by incrementing the binding's backfill counter, but a backfill
+	// here would recreate the table and wipe out the migrations under test,
+	// so exclusion stands in for it and the skipped fields are recorded in
+	// the snapshot. Without this, Apply skips the unsupported migration with
+	// a warning and the task runs with a column type the spec doesn't expect
+	// — a state the control plane never produces.
+	migratedSpec := loadIntegrationSpec(t, "materialization.migrate-migrated.flow.proto")
+	baseSpec := loadIntegrationSpec(t, "materialization.migrate-base.flow.proto")
+	baseSpec.Bindings[0].ResourcePath = path
+
+	validateRes, err := driver.Validate(ctx, validateReq(migratedSpec, baseSpec, rawJson(t, cfg), resCfgRaw))
+	require.NoError(t, err)
+	require.Len(t, validateRes.Bindings, 1)
+
+	var excludedFields []string
+	for _, pc := range validateRes.Bindings[0].ProjectionConstraints {
+		switch pc.Constraint.Type {
+		case pm.Response_Validated_Constraint_INCOMPATIBLE,
+			pm.Response_Validated_Constraint_UNSATISFIABLE:
+			excludedFields = append(excludedFields, pc.Field)
+		}
+	}
+	slices.Sort(excludedFields)
+
+	if len(excludedFields) > 0 {
+		snap.WriteString("Fields excluded because their type change has no migration support:\n")
+		for _, f := range excludedFields {
+			snap.WriteString(f + "\n")
+			bundled, err = sjson.SetBytes(
+				bundled,
+				fmt.Sprintf("materializations.%s.bindings.0.fields.exclude.-1", workingTaskName),
+				f,
+			)
+			require.NoError(t, err)
+		}
+		snap.WriteString("\n")
+	}
+
+	migratedSource := filepath.Join(t.TempDir(), "test-migration-migrated.flow.yaml")
+	require.NoError(t, os.WriteFile(migratedSource, bundled, 0o600))
+
+	runPhase(migratedSource, relativePath(t, "testdata/integration/fixture.migrate-migrated.json"))
+
 	return snap.String()
+}
+
+// loadIntegrationSpec loads a pre-built materialization spec fixture for the
+// integration test collections. Regenerate these with generate-spec-proto.sh
+// when the corresponding collection fixtures change.
+func loadIntegrationSpec(t *testing.T, path string) *pf.MaterializationSpec {
+	t.Helper()
+
+	specBytes, err := os.ReadFile(testdataPath("integration", "generated_specs", path))
+	require.NoError(t, err)
+	var spec pf.MaterializationSpec
+	require.NoError(t, spec.Unmarshal(specBytes))
+
+	return &spec
 }
 
 // validateReq makes a mock Validate request object from a built spec fixture. It only works with a

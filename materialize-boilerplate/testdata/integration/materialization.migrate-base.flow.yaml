@@ -1,0 +1,18 @@
+import:
+  - collections.migrate-base.flow.yaml
+
+# Wrapper materialization used only to generate a built spec proto for the
+# migrate-base collection, so the migration test harness can issue Validate
+# requests with fully-built collection projections. Regenerate with:
+#   ../generate-spec-proto.sh materialization.migrate-base.flow.yaml
+materializations:
+  test/sqlite:
+    endpoint:
+      connector:
+        image: ghcr.io/estuary/materialize-sqlite:dev
+        config: {}
+    bindings:
+      - source: key/value
+        resource: { table: migrate }
+        fields:
+          recommended: true

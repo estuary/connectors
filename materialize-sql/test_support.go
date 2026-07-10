@@ -56,7 +56,7 @@ func RunMigrationTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[
 	makeResourceFn func(string, bool) RC,
 	actionDescSanitizers []func(string) string,
 ) {
-	testutil.RunMigrationTest(t, driver.newMaterialization, sourcePath, makeResourceFn, actionDescSanitizers)
+	testutil.RunMigrationTest(t, driver, driver.newMaterialization, sourcePath, makeResourceFn, actionDescSanitizers)
 }
 
 // FeatureFlagMigrationPhase is one apply of a RunFeatureFlagMigrationTest.
