@@ -968,6 +968,10 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	var retryDelay = 500 * time.Millisecond
 	var maxTryTime = time.Now().Add(10 * time.Minute)
 
+	// Try to get file status from the COPY_HISTORY for at least this long,
+	// even if no results are listed.
+	var minTryTime = time.Now().Add(30 * time.Minute)
+
 	for len(pipes) > 0 {
 		for pipeName, pipe := range pipes {
 			// if the pipe has no files to begin with, just skip it
@@ -1033,6 +1037,11 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 				}
 
 				if len(pipe.files) > 0 {
+					if time.Now().Before(minTryTime) {
+						maxTryTime = time.Now().Add(1 * time.Minute)
+						time.Sleep(retryDelay)
+						continue
+					}
 					return nil, fmt.Errorf("snowpipe: could not find reports of successful processing for all files of pipe %v", pipe)
 				}
 
