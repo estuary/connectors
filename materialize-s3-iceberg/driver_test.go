@@ -149,6 +149,10 @@ func TestIntegration(t *testing.T) {
 		runDateOverflowRegression(t, cfg)
 	})
 
+	t.Run("duplicate-append-regression", func(t *testing.T) {
+		runDuplicateAppendRegression(t, cfg)
+	})
+
 	// Migration test is skipped because Iceberg does not support the type
 	// migrations exercised by the test (e.g. long→string).
 	//t.Run("migrate", func(t *testing.T) {
@@ -366,6 +370,101 @@ func runDateOverflowRegression(t *testing.T, cfg config) {
 		"",
 		"deadbeefdeadbeef",
 	))
+}
+
+// runDuplicateAppendRegression locks in the duplicate-file semantics that
+// appendFiles preserves from pyiceberg's check_duplicate_files: a file that is
+// already live in the table fails a subsequent append under a new checkpoint,
+// while replaying an already-recorded checkpoint is skipped by the fence
+// rather than tripping the duplicate check.
+func runDuplicateAppendRegression(t *testing.T, cfg config) {
+	ctx := context.Background()
+
+	cat, err := newCatalog(ctx, cfg, NestedLocationStyle)
+	require.NoError(t, err)
+
+	const (
+		namespace       = "tests"
+		table           = "duplicate_append_regression"
+		materialization = "acmeCo/tests/regression"
+	)
+	tableIdent := icebergtable.Identifier{namespace, table}
+
+	// Tolerate leftovers from a prior run of this test.
+	_ = cat.cat.DropTable(ctx, tableIdent)
+	if err := cat.createNamespace(ctx, namespace); err != nil &&
+		!errors.Is(err, icebergcatalog.ErrNamespaceAlreadyExists) {
+		t.Fatalf("create-namespace: %v", err)
+	}
+
+	schema := iceberg.NewSchema(0, iceberg.NestedField{
+		ID:       1,
+		Name:     "v",
+		Type:     iceberg.PrimitiveTypes.String,
+		Required: false,
+	})
+
+	nameMappingJSON, err := json.Marshal(schema.NameMapping())
+	require.NoError(t, err)
+
+	tblLocation := tablePath(cfg.Bucket, cfg.Prefix, namespace, table, NestedLocationStyle)
+	_, err = cat.cat.CreateTable(ctx, tableIdent, schema,
+		icebergcatalog.WithLocation(tblLocation),
+		icebergcatalog.WithProperties(iceberg.Properties{
+			icebergtable.DefaultNameMappingKey: string(nameMappingJSON),
+		}),
+	)
+	require.NoError(t, err)
+
+	s3client := s3.New(s3.Options{
+		Region:       cfg.Region,
+		Credentials:  credentials.NewStaticCredentialsProvider(cfg.Credentials.AWSAccessKeyID, cfg.Credentials.AWSSecretAccessKey, ""),
+		BaseEndpoint: aws.String(cfg.S3Endpoint),
+		UsePathStyle: true,
+	})
+
+	uploadParquet := func(v string) string {
+		parquetPath := filepath.Join(t.TempDir(), "data.parquet")
+		parquetFile, err := os.Create(parquetPath)
+		require.NoError(t, err)
+		pqw := writer.NewParquetWriter(parquetFile, writer.ParquetSchema{
+			{Name: "v", DataType: writer.LogicalTypeString, Required: false},
+		}, writer.WithParquetCompression(writer.Snappy))
+		require.NoError(t, pqw.Write([]any{v}))
+		require.NoError(t, pqw.Close())
+
+		s3Path := strings.TrimSuffix(tblLocation, "/") + "/data/" + uuid.New().String() + ".parquet"
+		uploadFile, err := os.Open(parquetPath)
+		require.NoError(t, err)
+		defer uploadFile.Close()
+		_, err = s3client.PutObject(ctx, &s3.PutObjectInput{
+			Bucket: aws.String(cfg.Bucket),
+			Key:    aws.String(strings.TrimPrefix(s3Path, "s3://"+cfg.Bucket+"/")),
+			Body:   uploadFile,
+		})
+		require.NoError(t, err)
+
+		return s3Path
+	}
+
+	first := uploadParquet("one")
+	require.NoError(t, cat.appendFiles(ctx, materialization, tableIdent,
+		[]string{first}, "", "checkpoint-1"))
+
+	// The same path under a new checkpoint must be rejected as a duplicate.
+	err = cat.appendFiles(ctx, materialization, tableIdent,
+		[]string{first}, "checkpoint-1", "checkpoint-2")
+	require.ErrorContains(t, err, "already referenced")
+
+	// Replaying the already-committed checkpoint is skipped by the fence, so
+	// the duplicate path is not an error.
+	require.NoError(t, cat.appendFiles(ctx, materialization, tableIdent,
+		[]string{first}, "", "checkpoint-1"))
+
+	// A fresh file advances the checkpoint through the duplicate check.
+	second := uploadParquet("two")
+	require.NoError(t, cat.appendFiles(ctx, materialization, tableIdent,
+		[]string{second}, "checkpoint-1", "checkpoint-2"))
 }
 
 // TestNormalizeLegacyCredentials guards the parity with the removed Python
