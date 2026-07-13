@@ -74,3 +74,19 @@ materializations:
           - intStr065ToInt129
           - intStr128ToInt129
           - intStr129ToInt129
+          # These type changes have no migration support in motherduck
+          # (HUGEINT->BIGINT and VARCHAR->DOUBLE): Validate returns
+          # INCOMPATIBLE, which the control plane would resolve by backfilling
+          # the binding. The test harness doesn't emulate that resolution, so
+          # exclude them rather than let Apply skip the migration and leave a
+          # column type the spec doesn't expect.
+          - intStr000ToInt000
+          - intStr000ToInt032
+          - intStr000ToInt064
+          - intStr064ToInt064
+          - intStr129ToNum
+          - intStr129ToNumStr
+          - intStr256ToNum
+          - intStr256ToNumStr
+          - intStr257ToNum
+          - intStr257ToNumStr

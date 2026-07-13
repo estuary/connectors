@@ -18,6 +18,29 @@ materializations:
           # Materialize the object field so it exercises the JSON->text migration
           # (objects are FIELD_OPTIONAL and skipped by recommended selection).
           objectToString: {}
+        exclude:
+          # These type changes have no migration support in iceberg
+          # (DECIMAL->LONG, STRING->DECIMAL, and STRING->DOUBLE): Validate
+          # returns INCOMPATIBLE, which the control plane would resolve by
+          # backfilling the binding. The test harness doesn't emulate that
+          # resolution, so exclude them rather than let Apply skip the
+          # migration and leave a column type the spec doesn't expect.
+          - intStr000ToInt000
+          - intStr000ToInt032
+          - intStr000ToInt064
+          - intStr064ToInt064
+          - intStr129ToInt129
+          - intStr129ToInt256
+          - intStr129ToInt257
+          - intStr129ToNum
+          - intStr129ToNumStr
+          - intStr256ToInt256
+          - intStr256ToInt257
+          - intStr256ToNum
+          - intStr256ToNumStr
+          - intStr257ToInt257
+          - intStr257ToNum
+          - intStr257ToNumStr
 
   acmeCo/tests/materialize-iceberg/rest:
     endpoint:
@@ -35,6 +58,29 @@ materializations:
           # Materialize the object field so it exercises the JSON->text migration
           # (objects are FIELD_OPTIONAL and skipped by recommended selection).
           objectToString: {}
+        exclude:
+          # These type changes have no migration support in iceberg
+          # (DECIMAL->LONG, STRING->DECIMAL, and STRING->DOUBLE): Validate
+          # returns INCOMPATIBLE, which the control plane would resolve by
+          # backfilling the binding. The test harness doesn't emulate that
+          # resolution, so exclude them rather than let Apply skip the
+          # migration and leave a column type the spec doesn't expect.
+          - intStr000ToInt000
+          - intStr000ToInt032
+          - intStr000ToInt064
+          - intStr064ToInt064
+          - intStr129ToInt129
+          - intStr129ToInt256
+          - intStr129ToInt257
+          - intStr129ToNum
+          - intStr129ToNumStr
+          - intStr256ToInt256
+          - intStr256ToInt257
+          - intStr256ToNum
+          - intStr256ToNumStr
+          - intStr257ToInt257
+          - intStr257ToNum
+          - intStr257ToNumStr
 
   acmeCo/tests/materialize-iceberg/dremio:
     endpoint:
@@ -69,6 +115,29 @@ materializations:
           # Materialize the object field so it exercises the JSON->text migration
           # (objects are FIELD_OPTIONAL and skipped by recommended selection).
           objectToString: {}
+        exclude:
+          # These type changes have no migration support in iceberg
+          # (DECIMAL->LONG, STRING->DECIMAL, and STRING->DOUBLE): Validate
+          # returns INCOMPATIBLE, which the control plane would resolve by
+          # backfilling the binding. The test harness doesn't emulate that
+          # resolution, so exclude them rather than let Apply skip the
+          # migration and leave a column type the spec doesn't expect.
+          - intStr000ToInt000
+          - intStr000ToInt032
+          - intStr000ToInt064
+          - intStr064ToInt064
+          - intStr129ToInt129
+          - intStr129ToInt256
+          - intStr129ToInt257
+          - intStr129ToNum
+          - intStr129ToNumStr
+          - intStr256ToInt256
+          - intStr256ToInt257
+          - intStr256ToNum
+          - intStr256ToNumStr
+          - intStr257ToInt257
+          - intStr257ToNum
+          - intStr257ToNumStr
 
   acmeCo/tests/materialize-iceberg/glue:
     endpoint:
@@ -86,6 +155,29 @@ materializations:
           # Materialize the object field so it exercises the JSON->text migration
           # (objects are FIELD_OPTIONAL and skipped by recommended selection).
           objectToString: {}
+        exclude:
+          # These type changes have no migration support in iceberg
+          # (DECIMAL->LONG, STRING->DECIMAL, and STRING->DOUBLE): Validate
+          # returns INCOMPATIBLE, which the control plane would resolve by
+          # backfilling the binding. The test harness doesn't emulate that
+          # resolution, so exclude them rather than let Apply skip the
+          # migration and leave a column type the spec doesn't expect.
+          - intStr000ToInt000
+          - intStr000ToInt032
+          - intStr000ToInt064
+          - intStr064ToInt064
+          - intStr129ToInt129
+          - intStr129ToInt256
+          - intStr129ToInt257
+          - intStr129ToNum
+          - intStr129ToNumStr
+          - intStr256ToInt256
+          - intStr256ToInt257
+          - intStr256ToNum
+          - intStr256ToNumStr
+          - intStr257ToInt257
+          - intStr257ToNum
+          - intStr257ToNumStr
 
   acmeCo/tests/materialize-iceberg/glue-deprecated:
     endpoint:
@@ -103,6 +195,29 @@ materializations:
           # Materialize the object field so it exercises the JSON->text migration
           # (objects are FIELD_OPTIONAL and skipped by recommended selection).
           objectToString: {}
+        exclude:
+          # These type changes have no migration support in iceberg
+          # (DECIMAL->LONG, STRING->DECIMAL, and STRING->DOUBLE): Validate
+          # returns INCOMPATIBLE, which the control plane would resolve by
+          # backfilling the binding. The test harness doesn't emulate that
+          # resolution, so exclude them rather than let Apply skip the
+          # migration and leave a column type the spec doesn't expect.
+          - intStr000ToInt000
+          - intStr000ToInt032
+          - intStr000ToInt064
+          - intStr064ToInt064
+          - intStr129ToInt129
+          - intStr129ToInt256
+          - intStr129ToInt257
+          - intStr129ToNum
+          - intStr129ToNumStr
+          - intStr256ToInt256
+          - intStr256ToInt257
+          - intStr256ToNum
+          - intStr256ToNumStr
+          - intStr257ToInt257
+          - intStr257ToNum
+          - intStr257ToNumStr
 
   acmeCo/tests/materialize-iceberg/glue-optimized:
     endpoint:
@@ -120,6 +235,29 @@ materializations:
           # Materialize the object field so it exercises the JSON->text migration
           # (objects are FIELD_OPTIONAL and skipped by recommended selection).
           objectToString: {}
+        exclude:
+          # These type changes have no migration support in iceberg
+          # (DECIMAL->LONG, STRING->DECIMAL, and STRING->DOUBLE): Validate
+          # returns INCOMPATIBLE, which the control plane would resolve by
+          # backfilling the binding. The test harness doesn't emulate that
+          # resolution, so exclude them rather than let Apply skip the
+          # migration and leave a column type the spec doesn't expect.
+          - intStr000ToInt000
+          - intStr000ToInt032
+          - intStr000ToInt064
+          - intStr064ToInt064
+          - intStr129ToInt129
+          - intStr129ToInt256
+          - intStr129ToInt257
+          - intStr129ToNum
+          - intStr129ToNumStr
+          - intStr256ToInt256
+          - intStr256ToInt257
+          - intStr256ToNum
+          - intStr256ToNumStr
+          - intStr257ToInt257
+          - intStr257ToNum
+          - intStr257ToNumStr
 
   acmeCo/tests/materialize-iceberg/glue-catalog-auth:
     endpoint:
@@ -137,6 +275,29 @@ materializations:
           # Materialize the object field so it exercises the JSON->text migration
           # (objects are FIELD_OPTIONAL and skipped by recommended selection).
           objectToString: {}
+        exclude:
+          # These type changes have no migration support in iceberg
+          # (DECIMAL->LONG, STRING->DECIMAL, and STRING->DOUBLE): Validate
+          # returns INCOMPATIBLE, which the control plane would resolve by
+          # backfilling the binding. The test harness doesn't emulate that
+          # resolution, so exclude them rather than let Apply skip the
+          # migration and leave a column type the spec doesn't expect.
+          - intStr000ToInt000
+          - intStr000ToInt032
+          - intStr000ToInt064
+          - intStr064ToInt064
+          - intStr129ToInt129
+          - intStr129ToInt256
+          - intStr129ToInt257
+          - intStr129ToNum
+          - intStr129ToNumStr
+          - intStr256ToInt256
+          - intStr256ToInt257
+          - intStr256ToNum
+          - intStr256ToNumStr
+          - intStr257ToInt257
+          - intStr257ToNum
+          - intStr257ToNumStr
 
   acmeCo/tests/materialize-iceberg/s3tables:
     endpoint:
@@ -154,6 +315,29 @@ materializations:
           # Materialize the object field so it exercises the JSON->text migration
           # (objects are FIELD_OPTIONAL and skipped by recommended selection).
           objectToString: {}
+        exclude:
+          # These type changes have no migration support in iceberg
+          # (DECIMAL->LONG, STRING->DECIMAL, and STRING->DOUBLE): Validate
+          # returns INCOMPATIBLE, which the control plane would resolve by
+          # backfilling the binding. The test harness doesn't emulate that
+          # resolution, so exclude them rather than let Apply skip the
+          # migration and leave a column type the spec doesn't expect.
+          - intStr000ToInt000
+          - intStr000ToInt032
+          - intStr000ToInt064
+          - intStr064ToInt064
+          - intStr129ToInt129
+          - intStr129ToInt256
+          - intStr129ToInt257
+          - intStr129ToNum
+          - intStr129ToNumStr
+          - intStr256ToInt256
+          - intStr256ToInt257
+          - intStr256ToNum
+          - intStr256ToNumStr
+          - intStr257ToInt257
+          - intStr257ToNum
+          - intStr257ToNumStr
 
   acmeCo/tests/materialize-iceberg/s3tables-deprecated:
     endpoint:
@@ -171,6 +355,29 @@ materializations:
           # Materialize the object field so it exercises the JSON->text migration
           # (objects are FIELD_OPTIONAL and skipped by recommended selection).
           objectToString: {}
+        exclude:
+          # These type changes have no migration support in iceberg
+          # (DECIMAL->LONG, STRING->DECIMAL, and STRING->DOUBLE): Validate
+          # returns INCOMPATIBLE, which the control plane would resolve by
+          # backfilling the binding. The test harness doesn't emulate that
+          # resolution, so exclude them rather than let Apply skip the
+          # migration and leave a column type the spec doesn't expect.
+          - intStr000ToInt000
+          - intStr000ToInt032
+          - intStr000ToInt064
+          - intStr064ToInt064
+          - intStr129ToInt129
+          - intStr129ToInt256
+          - intStr129ToInt257
+          - intStr129ToNum
+          - intStr129ToNumStr
+          - intStr256ToInt256
+          - intStr256ToInt257
+          - intStr256ToNum
+          - intStr256ToNumStr
+          - intStr257ToInt257
+          - intStr257ToNum
+          - intStr257ToNumStr
 
   acmeCo/tests/materialize-iceberg/s3tables-catalog-auth:
     endpoint:
@@ -188,3 +395,26 @@ materializations:
           # Materialize the object field so it exercises the JSON->text migration
           # (objects are FIELD_OPTIONAL and skipped by recommended selection).
           objectToString: {}
+        exclude:
+          # These type changes have no migration support in iceberg
+          # (DECIMAL->LONG, STRING->DECIMAL, and STRING->DOUBLE): Validate
+          # returns INCOMPATIBLE, which the control plane would resolve by
+          # backfilling the binding. The test harness doesn't emulate that
+          # resolution, so exclude them rather than let Apply skip the
+          # migration and leave a column type the spec doesn't expect.
+          - intStr000ToInt000
+          - intStr000ToInt032
+          - intStr000ToInt064
+          - intStr064ToInt064
+          - intStr129ToInt129
+          - intStr129ToInt256
+          - intStr129ToInt257
+          - intStr129ToNum
+          - intStr129ToNumStr
+          - intStr256ToInt256
+          - intStr256ToInt257
+          - intStr256ToNum
+          - intStr256ToNumStr
+          - intStr257ToInt257
+          - intStr257ToNum
+          - intStr257ToNumStr

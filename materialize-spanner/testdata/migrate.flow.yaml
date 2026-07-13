@@ -20,6 +20,17 @@ materializations:
           objectToString: {}
         exclude:
           - intStr256ToString
+          # These type changes have no migration support in spanner
+          # (NUMERIC->INT64 and STRING(36)->STRING(MAX)): Validate returns
+          # INCOMPATIBLE, which the control plane would resolve by backfilling
+          # the binding. The test harness doesn't emulate that resolution, so
+          # exclude them rather than let Apply skip the migration and leave a
+          # column type the spec doesn't expect.
+          - intStr000ToInt000
+          - intStr000ToInt032
+          - intStr000ToInt064
+          - intStr064ToInt064
+          - uuidToString
           # TODO: `array` is a Spanner reserved keyword; the load-query SELECT
           # alias collides with it.
           - array
