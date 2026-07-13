@@ -351,6 +351,21 @@ URL** will be
 `https://ab12345.us-east-2.aws.snowflakecomputing.com/polaris/api/catalog`.
 :::
 
+#### Example: Dremio Cloud
+
+Dremio Cloud's catalog is an Apache Polaris-based Iceberg REST catalog. See
+the [Dremio connector page](./dremio.md) for setup details. In short:
+
+- The **Base URL** is `https://catalog.dremio.cloud/api/iceberg`
+- For **Warehouse**, use the name of your Dremio catalog (the default catalog
+  has the same name as your project)
+- For **Catalog Authentication**, select **OAuth 2.0 Client Credentials**:
+  - Set **OAuth 2.0 Server URI** to the full URL
+    `https://login.dremio.cloud/oauth/token`, since Dremio's token endpoint is
+    on a different host than the catalog
+  - Use a Dremio **Service User** credential as `<client id>:<client secret>`
+  - Set the **Scope** as `dremio.all`
+
 ## AWS EMR Serverless Application Configuration
 
 To use [AWS EMR

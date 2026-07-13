@@ -278,7 +278,7 @@ func (catalogAuthConfig) JSONSchema() *jsonschema.Schema {
 }
 
 type catalogAuthClientCredentialConfig struct {
-	Oauth2ServerURI string `json:"oauth2_server_uri" jsonschema:"title=OAuth 2.0 Server URI,default=v1/oauth/tokens,description=OAuth 2.0 server URI for requesting access tokens when using OAuth client credentials. Usually this should be 'v1/oauth/tokens'." jsonschema_extras:"order=0"`
+	Oauth2ServerURI string `json:"oauth2_server_uri" jsonschema:"title=OAuth 2.0 Server URI,default=v1/oauth/tokens,description=OAuth 2.0 server URI for requesting access tokens when using OAuth client credentials. Either a path relative to the catalog URL (usually 'v1/oauth/tokens') or a full URL if the token endpoint is on a different host (for example 'https://login.dremio.cloud/oauth/token' for Dremio Cloud)." jsonschema_extras:"order=0"`
 	Credential      string `json:"credential" jsonschema:"title=Catalog Credential,description=Credential for connecting to the REST catalog. Must be in the format of '<client_id>:<client_secret>' for OAuth client credentials. For Bearer authentication use '<token>'." jsonschema_extras:"order=1,secret=true"`
 	Scope           string `json:"scope,omitempty" jsonschema:"title=Scope,description=Authorization scope for connecting to the catalog when using OAuth client credentials. Example: 'PRINCIPAL_ROLE:your_principal'" jsonschema_extras:"order=2"`
 }
@@ -292,6 +292,17 @@ func (c catalogAuthClientCredentialConfig) Validate() error {
 		if req[1] == "" {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
+	}
+
+	// An absolute oauth2_server_uri (as with Dremio's token host) is used
+	// as-is by catalog.New; a relative one is joined onto the catalog URL.
+	// Mirror that url.IsAbs check here so an absolute value is a usable
+	// http(s) endpoint rather than something that would be silently treated
+	// as a relative path.
+	if u, err := url.Parse(c.Oauth2ServerURI); err != nil {
+		return fmt.Errorf("parsing oauth2_server_uri: %w", err)
+	} else if u.IsAbs() && ((u.Scheme != "http" && u.Scheme != "https") || u.Host == "") {
+		return fmt.Errorf("oauth2_server_uri %q must be an http(s) URL or a path relative to the catalog URL", c.Oauth2ServerURI)
 	}
 
 	return nil

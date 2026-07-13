@@ -49,7 +49,7 @@
               "oauth2_server_uri": {
                 "type": "string",
                 "title": "OAuth 2.0 Server URI",
-                "description": "OAuth 2.0 server URI for requesting access tokens when using OAuth client credentials. Usually this should be 'v1/oauth/tokens'.",
+                "description": "OAuth 2.0 server URI for requesting access tokens when using OAuth client credentials. Either a path relative to the catalog URL (usually 'v1/oauth/tokens') or a full URL if the token endpoint is on a different host (for example 'https://login.dremio.cloud/oauth/token' for Dremio Cloud).",
                 "default": "v1/oauth/tokens",
                 "order": 0
               },

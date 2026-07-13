@@ -63,6 +63,25 @@ materializations:
       fields:
         recommended: true
 
+  acmeCo/tests/materialize-iceberg/dremio:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.dremio.yaml
+    bindings:
+    - resource:
+        table: simple_standard
+      source: tests/simple
+      fields:
+        recommended: true
+    # See note on the rest task above for why tests/not-simple is omitted.
+    - resource:
+        table: data_types
+      source: tests/data-types
+      fields:
+        recommended: true
+
   acmeCo/tests/materialize-iceberg/glue:
     endpoint:
       local:

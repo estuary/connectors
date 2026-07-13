@@ -82,6 +82,23 @@ materializations:
           - intStr257ToNum
           - intStr257ToNumStr
 
+  acmeCo/tests/materialize-iceberg/dremio:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.dremio.yaml
+    bindings:
+    - resource:
+        table: migrate
+      source: key/value
+      fields:
+        recommended: true
+        include:
+          # Materialize the object field so it exercises the JSON->text migration
+          # (objects are FIELD_OPTIONAL and skipped by recommended selection).
+          objectToString: {}
+
   acmeCo/tests/materialize-iceberg/rest-deprecated:
     endpoint:
       local:

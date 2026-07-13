@@ -211,10 +211,19 @@ func New(ctx context.Context, catalogUrl string, warehouse string, opts ...Catal
 		}
 
 		if clientID, clientSecret, ok := strings.Cut(cfg.credential, ":"); ok {
+			// The token endpoint may be on a different host than the catalog,
+			// as with Dremio Cloud (catalog.dremio.cloud vs.
+			// login.dremio.cloud). An absolute oauth2ServerUri is used as-is;
+			// otherwise it is treated as a path relative to the catalog URL.
+			resolvedTokenURL := parsedCatalogUrl.JoinPath(cfg.oauth2ServerUri).String()
+			if u, err := url.Parse(cfg.oauth2ServerUri); err == nil && u.IsAbs() && u.Host != "" {
+				resolvedTokenURL = cfg.oauth2ServerUri
+			}
+
 			clientCredCfg := &clientcredentials.Config{
 				ClientID:     clientID,
 				ClientSecret: clientSecret,
-				TokenURL:     parsedCatalogUrl.JoinPath(cfg.oauth2ServerUri).String(),
+				TokenURL:     resolvedTokenURL,
 				Scopes:       scopes,
 			}
 
