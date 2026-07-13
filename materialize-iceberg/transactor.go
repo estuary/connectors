@@ -220,7 +220,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}, nil
 }
 
-func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage) (*pf.ConnectorState, error) {
 	outputPrefix := path.Join(t.cfg.Compute.BucketPath, uuid.NewString())
 	checkpointClear := make(map[string]*python.MergeBinding)
 	var mergeInput python.MergeInput

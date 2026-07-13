@@ -308,7 +308,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 func (transactor) Destroy() {
 }
 
-func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage) (*pf.ConnectorState, error) {
 	return nil, nil
 }
 

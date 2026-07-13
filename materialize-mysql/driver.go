@@ -436,7 +436,7 @@ func (t *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSp
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
-func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) { return nil, nil }
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage) (*pf.ConnectorState, error) { return nil, nil }
 
 func prepareNewTransactor(
 	templates templates,

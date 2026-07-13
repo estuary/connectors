@@ -413,7 +413,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}, nil
 }
 
-func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage) (*pf.ConnectorState, error) {
 	group, groupCtx := errgroup.WithContext(ctx)
 	// You can run up to 1,000 concurrent multi-statement queries, so we use a
 	// generous concurrency limit here, while not leaving it completely

@@ -115,7 +115,7 @@ func TestStartCommitState(t *testing.T) {
 	})
 }
 
-func TestOnAcknowledgeStatePatches(t *testing.T) {
+func TestMergePeerStatePatches(t *testing.T) {
 	var patches = func(ps ...string) []json.RawMessage {
 		var out []json.RawMessage
 		for _, p := range ps {
@@ -129,14 +129,14 @@ func TestOnAcknowledgeStatePatches(t *testing.T) {
 			testTransactor(false, fullRangeKey),
 			testTransactor(true, upperRangeKey),
 		} {
-			require.NoError(t, d.OnAcknowledgeStatePatches(patches(`{"80000000-ffffffff": {"a_table.v1": {"Queries": ["Q"], "ToDelete": []}}}`)))
+			require.NoError(t, d.mergePeerStatePatches(patches(`{"80000000-ffffffff": {"a_table.v1": {"Queries": ["Q"], "ToDelete": []}}}`)))
 			require.Empty(t, d.peerShardsCheckpoints)
 		}
 	})
 
 	t.Run("own contribution is skipped, peers merged", func(t *testing.T) {
 		var d = testTransactor(true, lowerRangeKey, "a_table.v1")
-		require.NoError(t, d.OnAcknowledgeStatePatches(patches(
+		require.NoError(t, d.mergePeerStatePatches(patches(
 			`{"00000000-7fffffff": {"a_table.v1": {"Queries": ["OWN"], "ToDelete": []}}}`,
 			`{"80000000-ffffffff": {"a_table.v1": {"Queries": ["PEER"], "ToDelete": ["pf1"]}}}`,
 		)))
@@ -152,21 +152,21 @@ func TestOnAcknowledgeStatePatches(t *testing.T) {
 			"b_table.v1": item("PEER-B"),
 		}
 
-		require.NoError(t, d.OnAcknowledgeStatePatches(patches(`{"80000000-ffffffff": {"a_table.v1": null}}`)))
+		require.NoError(t, d.mergePeerStatePatches(patches(`{"80000000-ffffffff": {"a_table.v1": null}}`)))
 		require.Len(t, d.peerShardsCheckpoints[upperRangeKey], 1)
 
-		require.NoError(t, d.OnAcknowledgeStatePatches(patches(`{"80000000-ffffffff": null}`)))
+		require.NoError(t, d.mergePeerStatePatches(patches(`{"80000000-ffffffff": null}`)))
 		require.Empty(t, d.peerShardsCheckpoints)
 	})
 
 	t.Run("state reset patch errors", func(t *testing.T) {
 		var d = testTransactor(true, lowerRangeKey, "a_table.v1")
-		require.Error(t, d.OnAcknowledgeStatePatches(patches(`null`, `{"a": 1}`)))
+		require.Error(t, d.mergePeerStatePatches(patches(`null`, `{"a": 1}`)))
 	})
 
 	t.Run("empty patches are a no-op", func(t *testing.T) {
 		var d = testTransactor(true, lowerRangeKey, "a_table.v1")
-		require.NoError(t, d.OnAcknowledgeStatePatches(nil))
+		require.NoError(t, d.mergePeerStatePatches(nil))
 	})
 }
 
@@ -239,7 +239,7 @@ func TestAcknowledge(t *testing.T) {
 
 		// Acknowledge itself is callable here since the non-primary path
 		// never opens a database connection.
-		state, err := d.Acknowledge(context.Background())
+		state, err := d.Acknowledge(context.Background(), nil)
 		require.NoError(t, err)
 		require.Nil(t, state)
 		require.Empty(t, d.cp)
