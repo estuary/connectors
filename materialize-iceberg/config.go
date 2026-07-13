@@ -294,13 +294,15 @@ func (c catalogAuthClientCredentialConfig) Validate() error {
 		}
 	}
 
-	if strings.Contains(c.Oauth2ServerURI, "://") {
-		u, err := url.Parse(c.Oauth2ServerURI)
-		if err != nil {
-			return fmt.Errorf("parsing oauth2_server_uri: %w", err)
-		} else if (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
-			return fmt.Errorf("oauth2_server_uri %q must be an http(s) URL or a path relative to the catalog URL", c.Oauth2ServerURI)
-		}
+	// An absolute oauth2_server_uri (as with Dremio's token host) is used
+	// as-is by catalog.New; a relative one is joined onto the catalog URL.
+	// Mirror that url.IsAbs check here so an absolute value is a usable
+	// http(s) endpoint rather than something that would be silently treated
+	// as a relative path.
+	if u, err := url.Parse(c.Oauth2ServerURI); err != nil {
+		return fmt.Errorf("parsing oauth2_server_uri: %w", err)
+	} else if u.IsAbs() && ((u.Scheme != "http" && u.Scheme != "https") || u.Host == "") {
+		return fmt.Errorf("oauth2_server_uri %q must be an http(s) URL or a path relative to the catalog URL", c.Oauth2ServerURI)
 	}
 
 	return nil
