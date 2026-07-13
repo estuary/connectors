@@ -1,292 +1,263 @@
 {
   "config_schema_json": {
-    "$defs": {
-      "AccessKeyCredentials": {
-        "properties": {
-          "auth_type": {
-            "const": "AWSAccessKey",
-            "default": "AWSAccessKey",
-            "order": 0,
-            "title": "Auth Type",
-            "type": "string"
-          },
-          "awsAccessKeyId": {
-            "description": "Access Key ID for accessing AWS services.",
-            "minLength": 1,
-            "order": 1,
-            "title": "AWS Access Key ID",
-            "type": "string"
-          },
-          "awsSecretAccessKey": {
-            "description": "Secret Access Key for accessing AWS services.",
-            "minLength": 1,
-            "order": 2,
-            "secret": true,
-            "title": "AWS Secret Access Key",
-            "type": "string"
-          }
-        },
-        "required": [
-          "awsAccessKeyId",
-          "awsSecretAccessKey"
-        ],
-        "title": "Access Key",
-        "type": "object"
-      },
-      "AdvancedConfig": {
-        "properties": {
-          "feature_flags": {
-            "default": null,
-            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.",
-            "title": "Feature Flags",
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "title": "AdvancedConfig",
-        "type": "object"
-      },
-      "GlueCatalogConfig": {
-        "properties": {
-          "catalog_type": {
-            "const": "AWS Glue",
-            "default": "AWS Glue",
-            "title": "Catalog Type",
-            "type": "string"
-          },
-          "glue_id": {
-            "default": null,
-            "description": "Glue Catalog ID to use. If not specified, defaults to the account ID of the configured credentials.",
-            "order": 1,
-            "title": "Glue Catalog ID",
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "title": "AWS Glue",
-        "type": "object"
-      },
-      "IAMCredentials": {
-        "properties": {
-          "auth_type": {
-            "const": "AWSIAM",
-            "default": "AWSIAM",
-            "order": 0,
-            "title": "Auth Type",
-            "type": "string"
-          },
-          "aws_region": {
-            "description": "AWS Region of your resource.",
-            "minLength": 1,
-            "order": 1,
-            "title": "AWS Region",
-            "type": "string"
-          },
-          "aws_role_arn": {
-            "description": "AWS Role which has access to the resource which will be assumed by Flow.",
-            "minLength": 1,
-            "order": 2,
-            "title": "AWS Role ARN",
-            "type": "string"
-          },
-          "aws_access_key_id": {
-            "default": "",
-            "description": "AWS Access Key ID for accessing AWS services. Automatically injected by Estuary",
-            "order": 3,
-            "title": "AWS Access Key ID",
-            "type": "string",
-            "x-hidden-field": true
-          },
-          "aws_secret_access_key": {
-            "default": "",
-            "description": "AWS Secret Access Key for accessing AWS services.Automatically injected by Estuary",
-            "order": 4,
-            "title": "AWS Secret Access Key",
-            "type": "string",
-            "x-hidden-field": true
-          },
-          "aws_session_token": {
-            "default": "",
-            "description": "AWS Session Token for accessing AWS services.Automatically injected by Estuary",
-            "order": 5,
-            "title": "AWS Session Token",
-            "type": "string",
-            "x-hidden-field": true
-          }
-        },
-        "required": [
-          "aws_region",
-          "aws_role_arn"
-        ],
-        "title": "AWS IAM",
-        "type": "object"
-      },
-      "RestCatalogConfig": {
-        "properties": {
-          "catalog_type": {
-            "const": "Iceberg REST Server",
-            "default": "Iceberg REST Server",
-            "order": 0,
-            "title": "Catalog Type",
-            "type": "string"
-          },
-          "uri": {
-            "description": "URI identifying the REST catalog, in the format of 'https://yourserver.com/catalog'.",
-            "order": 1,
-            "title": "URI",
-            "type": "string"
-          },
-          "credential": {
-            "default": null,
-            "description": "Credential for connecting to the catalog.",
-            "order": 2,
-            "secret": true,
-            "title": "Credential",
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "token": {
-            "default": null,
-            "description": "Token for connecting to the catalog.",
-            "order": 3,
-            "secret": true,
-            "title": "Token",
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "warehouse": {
-            "description": "Warehouse to connect to.",
-            "order": 4,
-            "title": "Warehouse",
-            "type": "string"
-          },
-          "scope": {
-            "default": null,
-            "description": "Desired scope of the requested security token.",
-            "order": 5,
-            "title": "Scope",
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "required": [
-          "uri",
-          "warehouse"
-        ],
-        "title": "REST",
-        "type": "object"
-      }
-    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-s3-iceberg/config",
     "properties": {
+      "aws_access_key_id": {
+        "title": "AWS Access Key ID",
+        "description": "Access Key ID for accessing AWS services (legacy).",
+        "order": 0,
+        "type": [
+          "string",
+          "null"
+        ],
+        "x-hidden-field": true
+      },
+      "aws_secret_access_key": {
+        "title": "AWS Secret Access Key",
+        "description": "Secret Access Key for accessing AWS services (legacy).",
+        "order": 1,
+        "secret": true,
+        "type": [
+          "string",
+          "null"
+        ],
+        "x-hidden-field": true
+      },
       "credentials": {
+        "oneOf": [
+          {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/filesink/access-key-credentials",
+            "properties": {
+              "auth_type": {
+                "type": "string",
+                "const": "AWSAccessKey",
+                "default": "AWSAccessKey",
+                "order": 0
+              },
+              "awsAccessKeyId": {
+                "type": "string",
+                "title": "AWS Access Key ID",
+                "description": "Access Key ID for writing data to the bucket.",
+                "order": 1
+              },
+              "awsSecretAccessKey": {
+                "type": "string",
+                "title": "AWS Secret Access key",
+                "description": "Secret Access Key for writing data to the bucket.",
+                "order": 2,
+                "secret": true
+              }
+            },
+            "type": "object",
+            "required": [
+              "awsAccessKeyId",
+              "awsSecretAccessKey"
+            ],
+            "title": "Access Key"
+          },
+          {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/go/auth/iam/aws-config",
+            "properties": {
+              "auth_type": {
+                "type": "string",
+                "const": "AWSIAM",
+                "default": "AWSIAM",
+                "order": 0
+              },
+              "aws_region": {
+                "type": "string",
+                "title": "AWS Region",
+                "description": "AWS Region of your resource"
+              },
+              "aws_role_arn": {
+                "type": "string",
+                "title": "AWS Role ARN",
+                "description": "AWS Role which has access to the resource which will be assumed by Flow"
+              }
+            },
+            "type": "object",
+            "required": [
+              "aws_region",
+              "aws_role_arn"
+            ],
+            "title": "AWS IAM"
+          }
+        ],
+        "type": "object",
+        "title": "Authentication",
         "default": {
           "auth_type": "AWSAccessKey"
         },
         "discriminator": {
-          "mapping": {
-            "AWSAccessKey": "#/$defs/AccessKeyCredentials",
-            "AWSIAM": "#/$defs/IAMCredentials"
-          },
           "propertyName": "auth_type"
         },
-        "oneOf": [
-          {
-            "$ref": "#/$defs/AccessKeyCredentials"
-          },
-          {
-            "$ref": "#/$defs/IAMCredentials"
-          }
-        ],
         "order": 2,
-        "title": "Authentication",
         "x-iam-auth": true
       },
       "bucket": {
-        "description": "The S3 bucket to write data files to.",
-        "order": 3,
+        "type": "string",
         "title": "Bucket",
-        "type": "string"
+        "description": "The S3 bucket to write data files to.",
+        "order": 3
       },
       "prefix": {
-        "default": "",
-        "description": "Optional prefix that will be used to store objects.",
-        "order": 4,
+        "type": "string",
         "title": "Prefix",
-        "type": "string"
+        "description": "Optional prefix that will be used to store objects.",
+        "order": 4
       },
       "region": {
-        "description": "AWS region.",
-        "order": 5,
+        "type": "string",
         "title": "Region",
-        "type": "string"
+        "description": "AWS region.",
+        "order": 5
       },
       "namespace": {
+        "type": "string",
+        "title": "Namespace",
         "description": "Namespace for bound collection tables (unless overridden within the binding resource configuration).",
         "order": 6,
-        "pattern": "^[^.]*$",
-        "title": "Namespace",
-        "type": "string"
+        "pattern": "^[^.]*$"
       },
       "upload_interval": {
-        "default": "PT5M",
-        "description": "Frequency at which files will be uploaded. Must be a valid ISO8601 duration string no greater than 4 hours.",
+        "type": "string",
         "format": "duration",
-        "order": 7,
         "title": "Upload Interval",
-        "type": "string"
+        "description": "Frequency at which files will be uploaded. Must be a valid ISO8601 duration string no greater than 4 hours.",
+        "default": "PT5M",
+        "order": 7
       },
       "s3_endpoint": {
-        "default": "",
-        "description": "Custom S3 endpoint URL. If not provided, the default AWS S3 endpoint for the specified region will be used.",
-        "order": 8,
+        "type": "string",
         "title": "S3 Endpoint",
-        "type": "string"
+        "description": "Custom S3 endpoint URL. The default AWS S3 endpoint for the specified region is used if not provided.",
+        "order": 8
       },
       "catalog": {
-        "discriminator": {
-          "mapping": {
-            "AWS Glue": "#/$defs/GlueCatalogConfig",
-            "Iceberg REST Server": "#/$defs/RestCatalogConfig"
-          },
-          "propertyName": "catalog_type"
-        },
         "oneOf": [
           {
-            "$ref": "#/$defs/RestCatalogConfig"
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/materialize-s3-iceberg/rest-catalog-props",
+            "properties": {
+              "catalog_type": {
+                "type": "string",
+                "const": "Iceberg REST Server",
+                "default": "Iceberg REST Server",
+                "order": 0
+              },
+              "uri": {
+                "type": "string",
+                "title": "URI",
+                "description": "URI identifying the REST catalog. Format: 'https://yourserver.com/catalog'.",
+                "order": 1
+              },
+              "credential": {
+                "title": "Credential",
+                "description": "Credential for connecting to the catalog.",
+                "order": 2,
+                "secret": true,
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "token": {
+                "title": "Token",
+                "description": "Token for connecting to the catalog.",
+                "order": 3,
+                "secret": true,
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "warehouse": {
+                "type": "string",
+                "title": "Warehouse",
+                "description": "Warehouse to connect to.",
+                "order": 4
+              },
+              "scope": {
+                "title": "Scope",
+                "description": "Desired scope of the requested security token.",
+                "order": 5,
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "type": "object",
+            "required": [
+              "uri",
+              "warehouse"
+            ],
+            "title": "REST"
           },
           {
-            "$ref": "#/$defs/GlueCatalogConfig"
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/materialize-s3-iceberg/glue-catalog-props",
+            "properties": {
+              "catalog_type": {
+                "type": "string",
+                "const": "AWS Glue",
+                "default": "AWS Glue",
+                "order": 0
+              },
+              "glue_id": {
+                "title": "Glue Catalog ID",
+                "description": "Glue Catalog ID to use. Defaults to the account ID of the configured credentials when not set.",
+                "order": 1,
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "type": "object",
+            "title": "AWS Glue"
           }
         ],
-        "order": 9,
-        "title": "Catalog"
+        "type": "object",
+        "title": "Catalog",
+        "default": {
+          "catalog_type": "Iceberg REST Server"
+        },
+        "discriminator": {
+          "propertyName": "catalog_type"
+        },
+        "order": 9
       },
       "advanced": {
-        "advanced": true,
-        "anyOf": [
+        "oneOf": [
           {
-            "$ref": "#/$defs/AdvancedConfig"
+            "properties": {
+              "feature_flags": {
+                "title": "Feature Flags",
+                "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "additionalProperties": false,
+            "type": "object",
+            "title": "Advanced Options",
+            "description": "Options for advanced users. You should not typically need to modify these.",
+            "advanced": true,
+            "order": 10
           },
           {
             "type": "null"
           }
-        ],
-        "default": null,
-        "description": "Options for advanced users. You should not typically need to modify these.",
-        "order": 10,
-        "title": "Advanced Options"
+        ]
       }
     },
+    "type": "object",
     "required": [
       "credentials",
       "bucket",
@@ -294,8 +265,7 @@
       "namespace",
       "catalog"
     ],
-    "title": "EndpointConfig",
-    "type": "object"
+    "title": "EndpointConfig"
   },
   "resource_config_schema_json": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",

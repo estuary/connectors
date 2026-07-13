@@ -1,0 +1,35 @@
+#ENC[AES256_GCM,data:Dm1l0D0i3zuvvKcYGrFtujfvFHDxniPR7D1PmetUmObNNQ==,iv:+zXGjxZWMeuCXrQlNb9/hIV5+hh6+L7ZgT1dynXg0sE=,tag:NHWs8sFgti/gl3qyOLo6SA==,type:comment]
+#
+#ENC[AES256_GCM,data:MgTFbNxStifwWdpC6dxyuAq7WBp5wBIlh8OO2nNg5Wa8MEIQ/ysRil9oyzN+KYtDmUhj5e0LqkfYJy1kDAUKklvcFQhmX7FuDTzzp94=,iv:PsawUdku+rmy0PIcgFSRmSNbc1YOG4Ce/Q4WdfLYs0w=,tag:Gi3ib8iRjffT5bmMNsgG3A==,type:comment]
+#ENC[AES256_GCM,data:u99k9XtsB+uY5xR52pu8mDWtiig3dkhBt8GDSbYJ6xpni4eNR5gQRDUriPjEhXU9b5L1kj2hvEnJbQfv5e8sAPzLE9GSLGe22LXZsA==,iv:JzNrPyramn8Dtq7m9necsBrLb07I+rFATS72DlWd5lM=,tag:g1kzVhfNf50qyePvbVI2Fw==,type:comment]
+#ENC[AES256_GCM,data:m2PGZtTmgwWi5XLEe//t1CQd0c//FITDO0lxjjqFHfJI/s0wobAxN0eHXiWcx4PKH0nxyXc3C2ydiW8eQ9ZOKAYSP4+ke/KiOdJC+2BXUEw=,iv:UKzI07YfwpCCOqNZj1EypNJTf7T8IsAFHRDR4wK0XqE=,tag:a09JVASa9w2rgAR013M9cw==,type:comment]
+#ENC[AES256_GCM,data:pxd5sS6/1V1T9WA9o2Uwsj8TthvYjZaj3Y9pBKdcNR9ktIOjpyCkEbSuO2/4kwSl1Evsy0Ek55KC1BJLU+WCJ4K8Gqx2b+IOHm8=,iv:Uv8UlYPIgvjkJKkA1ccKPrtRwwYgu8Wm6Ggj/YF0tRg=,tag:qHv0A63EJfEX4s8KSgsFJw==,type:comment]
+#ENC[AES256_GCM,data://L3Z9nGP/vCyUaiatkDvnXnaLCoOOlk+XnfHhd5h5G7CPr6JQda0uqI8CqlBERVtzaUVenySw/xoZVvpMeMrq2hp0hXgEHb+HmI,iv:m202PXu+Z+V6WzYeY8PcWuX4fVJpPsD9oNfG/nASzQw=,tag:OMdzm/im8U9aR05XwBBuTg==,type:comment]
+#ENC[AES256_GCM,data:PdvcV+YjlVZIUZnmeOWkPLOQNKaatDtXVHh5S6qJ8kxMyDoCGfvD,iv:8Gv5N9XFSF6/8RDniwqmCkc/UHhOUAZbZQvaw3iGZ/Q=,tag:vR++naj9fPQrJ4C2lmsH1w==,type:comment]
+#ENC[AES256_GCM,data:eW96lfGNpmDyvDcblQwRJ6dCsdMybORdzcBjEP5xE/ZwT14mn1Z5bz5SP7iHmV12JY4aHrvSTdlSi50M3t0voFUmxMWGQt34Y/CbZ4/2Pw==,iv:cqWzipUdCD7lH+wtFvve3eh8qDwTLAwNaU2HlxJmAjI=,tag:2/mb/Q7l607FEhgHPxTvNg==,type:comment]
+#ENC[AES256_GCM,data:5BaBzeocVZfoYUjMnpog9TZ1jiKOlC4dL6QS1QK3ycXCX9yjm8na7F9zMemEP5qWSiVDic/uCeZ3lg975uTPcOuBryYaGKfKKv2N5GM72Co=,iv:phti6mz+CLMkrnaVhyKDGnmgvxZzwV5RpNjrbWU6i5c=,tag:yXNEbAUmLFFZcFMFDZwWWg==,type:comment]
+#ENC[AES256_GCM,data:4385uqgBBsLOFMHTYQVcJd6XtFqMFSLEduTG7VfzI6HF4Tlm9gsvySC5Wvjx6fEDZXRRJDJ7QaI=,iv:a3xF9mh0YexSkQaR+z0zO0pgf4BUSTnkuge/c8F46M0=,tag:Jcvf6zXox00RiH7mwUobHw==,type:comment]
+bucket: ENC[AES256_GCM,data:tdpk3crVRV0k91mifiLeWyMKtp5ScmCHogs6n1E=,iv:0L3+hX4zYdlfIioU+E8gqFNbqVLSZUhDRONXpV/HFx0=,tag:W6mypYGRzznu0BaWr5roQw==,type:str]
+region: ENC[AES256_GCM,data:IYUpswdHsPF5,iv:752CsHnevUSu/P9aG7AMxWxON3HqFHaZJh0IVH2oaOI=,tag:kkcZbYIQP4pQ7geBArcIOQ==,type:str]
+prefix: ENC[AES256_GCM,data:4393uC+kbbydAaWsK/Wm,iv:+/eSqaUeaP4CShGXu208kHAg+ItgBbM8zBjLz/E1Ln0=,tag:heYXx3pHQU3eRUsDZDUHMA==,type:str]
+namespace: ENC[AES256_GCM,data:2RRguHw=,iv:rzEamsxwVXFn6Fk9sfKYKSnJN+y71Ps4Dt5guiq3dpE=,tag:pqOBdWzalyPkgW5qfoA8fg==,type:str]
+upload_interval: ENC[AES256_GCM,data:lcNFVA==,iv:7Ey+iKRiVOkf3aClDhvz65OUmdhmeVeJN+erhanMFAQ=,tag:XOjTbzjm6CNJ9HFYPXzYUg==,type:str]
+credentials:
+    auth_type: ENC[AES256_GCM,data:XzFCSjSuHJvl83TL,iv:vFlt/iVV+txP3PNUjxw06DBYMqJ/o7y74pRxzAMXzyw=,tag:XimCed1knUmb3u0pHODmQg==,type:str]
+    awsAccessKeyId: ENC[AES256_GCM,data:WbMdOau87WbDIvRHFy2jRJzMUxI=,iv:FBQmlwQs/tGPjXTrvfFb1I1gJDvsdNR9alIalf94CU8=,tag:ldJ1b4eTOINH6QKKCA9UvA==,type:str]
+    awsSecretAccessKey: ENC[AES256_GCM,data:tbhNu9BfFWgnuQaYrseFfzYIlVke0Dxo+ffxZKRDG28zFAy27Uv7Gg==,iv:KrAsS3qjgic2Gv6w9+0Tw4QKR9TYyEezms/2JsygnIY=,tag:vp5oxXKQvo6wAy4Z7+HsRw==,type:str]
+catalog:
+    catalog_type: ENC[AES256_GCM,data:vAuxicMBP0I=,iv:NGbR1oWdS2Un9PZf9ClhkUmcLmai7Fyu+uv++HsCSNw=,tag:gJ/aDUFxj3kpCNpWojzLxw==,type:str]
+    #ENC[AES256_GCM,data:/17VpaFAi4v2ANJEnrsJ+UyGEbJX62vVynZdno1xP0ooQQ2uIN9DtHnBMeMLRFekj4yKg8wS21BWyf2U6nUiYAcdXwG/abCrXkE=,iv:9WBVHcQLN2Dwk13eo3pig1MJ0bkTF0jKluQz+5UJM9k=,tag:0FR5SMT6HiuQWkvqHiDL6w==,type:comment]
+    #ENC[AES256_GCM,data:r6DPm/RHv3R0xMls91INnNmpDqf8bZQmL9V0TtuA+vKpBCk8h0WZn76wkpP7CA6fq+4qtqN/SAosvDeDAlymgthNMxflNA==,iv:f7NMbbfvfs8H0rriSlBr3JM8ZqQOl0RuSKh/VvurikY=,tag:g1XzPXvaA3zqwUaaW6GoCw==,type:comment]
+advanced:
+    feature_flags: ENC[AES256_GCM,data:UZp7joX/7GAKs/rjoo5OnAUulsoGqIYtDrKiUxUCZD/azzxSgtY=,iv:aOzPxEGu5nRj6PQX5akPriO/7emllowndnr2gCgX/t4=,tag:/7hn1TDGYz5UHClkPaKmrQ==,type:str]
+sops:
+    gcp_kms:
+        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+          created_at: "2026-07-09T18:10:27Z"
+          enc: CiUAdmEdwqpE/c68Belc5XFYoxQ0X4Eb0v8qzJqZ5K/C3ziiY5DBEkkApbezqj0fZZtkutTo9JzzNSJ86cs6eBv301GxKxc/ntY7oM+h/Ybl5Wi49wosnvTUFxBR8lXtFsYkfBP9teiAPjIzLdWNGlet
+    lastmodified: "2026-07-10T19:17:47Z"
+    mac: ENC[AES256_GCM,data:merBQpZb72G7Lu9W3xVCleQ7+GECPVj6e2Ruo5x9hcTM/n6V06Omib7NZvLPp3IQL2zmWohul1SWi7d7nEcSKbVuwfla3fAdVd9znJBMLqN4i++6qR85l4ekVlb64GV0TVmV14CGu3t/ky15o1dSjdmR1gn4CDMIjSYybtopqOs=,iv:oqySi0+3NJe6uygLhOKvOF+CB9ECWzqCYALHTYrx9qA=,tag:s3KOfJqM/TinkuL5ACPcnA==,type:str]
+    unencrypted_suffix: _unencrypted
+    version: 3.12.1

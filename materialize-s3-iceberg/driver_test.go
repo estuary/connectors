@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
+	"iter"
 	"net/http"
 	"net/url"
 	"os"
@@ -15,11 +17,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/apache/iceberg-go"
+	icebergcatalog "github.com/apache/iceberg-go/catalog"
+	icebergio "github.com/apache/iceberg-go/io"
+	icebergtable "github.com/apache/iceberg-go/table"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/bradleyjkemp/cupaloy"
+	"github.com/estuary/connectors/filesink"
+	"github.com/estuary/connectors/go/auth/iam"
 	"github.com/estuary/connectors/go/writer"
+	mboilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate/testutil"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
@@ -34,23 +43,6 @@ const (
 	polarisClientID      = "root"
 	polarisClientSecret  = "s3cr3t"
 )
-
-// TestMain resolves PYTHON_PATH from the iceberg-ctl Poetry venv if it isn't
-// already set, so `go test` works without extra env wrangling. The Docker
-// image sets PYTHON_PATH explicitly; this is just for local runs.
-func TestMain(m *testing.M) {
-	if _, ok := os.LookupEnv("PYTHON_PATH"); !ok {
-		cmd := exec.Command("poetry", "env", "info", "--path")
-		cmd.Dir = "iceberg-ctl"
-		if out, err := cmd.Output(); err == nil {
-			venv := strings.TrimSpace(string(out))
-			if venv != "" {
-				os.Setenv("PYTHON_PATH", venv+"/bin/python")
-			}
-		}
-	}
-	os.Exit(m.Run())
-}
 
 func TestSpec(t *testing.T) {
 	if testing.Short() {
@@ -67,12 +59,63 @@ func TestSpec(t *testing.T) {
 	cupaloy.SnapshotT(t, formatted)
 }
 
+// regexpReplace returns a sanitizer that replaces every match of pattern with
+// repl.
+func regexpReplace(pattern, repl string) func(string) string {
+	re := regexp.MustCompile(pattern)
+	return func(s string) string { return re.ReplaceAllString(s, repl) }
+}
+
+// materializeSanitizers normalizes the parts of a materialize snapshot that
+// differ between the REST and Glue catalogs — the S3 bucket and prefix, plus
+// the random per-run parquet UUIDs and table-name hashes — to stable
+// placeholders. The namespace is deliberately NOT sanitized: both tests use the
+// same namespace (see the pre-creation in TestIntegration/TestIntegrationGlue),
+// and the "Resource:" snapshot header is written by the harness without passing
+// through these sanitizers, so the only way it can match is for the value to be
+// identical. Applied identically to both tests so their snapshots are
+// byte-identical; TestRestGlueSnapshotParity enforces that.
+func materializeSanitizers() []func(string) string {
+	return []func(string) string{
+		// s3://<bucket>/<prefix>/ — the bucket and prefix path segments. The
+		// namespace segment that follows is left intact (identical in both).
+		regexpReplace(`s3://[^/"]+/[^/"]+/`, `s3://<bucket>/<prefix>/`),
+		// Random UUIDs in parquet file names.
+		regexpReplace(`[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.parquet`, `<uuid>.parquet`),
+		// Per-run table-name hashes.
+		regexpReplace(`_([\dA-F]{16})/data/`, `_<hash>/data/`),
+	}
+}
+
+// ensureNamespace idempotently pre-creates cfg.Namespace so that the subsequent
+// materialization does not emit a "create namespace" apply action. Both the
+// REST and Glue tests call this: the REST stack is a fresh Polaris each run (the
+// namespace would otherwise be created during the test), while Glue is a shared,
+// persistent account where the namespace already exists. Pre-creating in both
+// makes the apply actions — and thus the snapshots — identical, and is safe
+// under concurrent runs because it neither drops the namespace nor fails when it
+// already exists.
+func ensureNamespace(t *testing.T, cfg config) {
+	t.Helper()
+
+	cat, err := newCatalog(context.Background(), cfg, NestedLocationStyle)
+	require.NoError(t, err)
+	// Glue's CreateDatabase returns a raw AWS AlreadyExistsException that
+	// iceberg-go does not map to ErrNamespaceAlreadyExists (mirroring the
+	// EntityNotFoundException quirk handled in populateInfoSchema), so tolerate
+	// both the mapped error and the raw string.
+	if err := cat.createNamespace(context.Background(), cfg.Namespace); err != nil &&
+		!errors.Is(err, icebergcatalog.ErrNamespaceAlreadyExists) &&
+		!strings.Contains(err.Error(), "AlreadyExists") {
+		t.Fatalf("pre-creating namespace %q: %v", cfg.Namespace, err)
+	}
+}
+
 func TestIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
 
-	// Start the Iceberg REST catalog (+ PostgreSQL).
 	require.NoError(t, exec.Command("docker", "compose", "-f", "docker-compose.yaml", "up", "--wait").Run())
 	t.Cleanup(func() {
 		exec.Command("docker", "compose", "-f", "docker-compose.yaml", "down", "-v").Run()
@@ -83,28 +126,15 @@ func TestIntegration(t *testing.T) {
 	// Create the rustfs bucket and the Polaris catalog backed by it.
 	createTestBucket(t, cfg)
 	createTestWarehouse(t, cfg)
+	ensureNamespace(t, cfg)
 
 	d := true
 	makeResourceFn := func(table string, delta bool) resource {
 		return resource{Table: table, Delta: &d}
 	}
 
-	// Sanitize S3 file paths and table hashes that contain random UUIDs.
-	sanitizers := []func(string) string{
-		func(s string) string {
-			// Replace UUIDs in S3 parquet file paths.
-			re := regexp.MustCompile(`[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.parquet`)
-			return re.ReplaceAllString(s, "<uuid>.parquet")
-		},
-		func(s string) string {
-			// Replace table name hashes (16 hex chars).
-			re := regexp.MustCompile(`_([\dA-F]{16})/data/`)
-			return re.ReplaceAllString(s, "_<hash>/data/")
-		},
-	}
-
 	t.Run("materialize", func(t *testing.T) {
-		boilerplate.RunMaterializationTest(t, newMaterialization, "testdata/materialize.flow.yaml", makeResourceFn, sanitizers)
+		boilerplate.RunMaterializationTest(t, newMaterialization, "testdata/materialize.flow.yaml", makeResourceFn, materializeSanitizers())
 	})
 
 	t.Run("apply", func(t *testing.T) {
@@ -120,58 +150,112 @@ func TestIntegration(t *testing.T) {
 	})
 
 	// Migration test is skipped because Iceberg does not support the type
-	// migrations exercised by the test (e.g. long→string). pyiceberg rejects
-	// schema mismatches when appending files with migrated types.
+	// migrations exercised by the test (e.g. long→string).
 	//t.Run("migrate", func(t *testing.T) {
 	//	boilerplate.RunMigrationTest(t, newMaterialization, "testdata/migrate.flow.yaml", makeResourceFn, nil)
 	//})
 }
 
-// runTimestampOverflowRegression reproduces the deel/prod/.../profile failure
-// where iceberg_ctl `append_files` aborts with `OverflowError: date value out
-// of range`: pyiceberg reads the parquet column's min/max stats through
-// pyarrow, which materializes a Python `datetime` capped at MAXYEAR=9999.
-// Iceberg's INT64-micros encoding admits much wider years; the input value
-// here normalizes to UTC year 10000.
+// TestIntegrationGlue runs the standard materialize/apply integration tests
+// against a real AWS Glue Data Catalog. The connector advertises Glue support
+// but TestIntegration only exercises the Polaris REST catalog, so this covers
+// the otherwise-untested Glue code path (including the S3 FileIO credential
+// wiring) and guards against drift between the two catalogs. It runs by default
+// alongside TestIntegration; the sops-encrypted testdata/config-glue.yaml
+// supplies credentials and is decrypted by the test harness (CI and local runs
+// need GCP KMS access).
+//
+// Unlike TestIntegration there is no docker-compose stack; the Glue catalog and
+// the S3 bucket named in the config must already exist. The namespace (Glue
+// database) is pre-created idempotently and its tables are created and cleaned
+// up by the test.
+func TestIntegrationGlue(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode")
+	}
+
+	cfg := loadGlueTestConfig(t)
+	ensureNamespace(t, cfg)
+
+	d := true
+	makeResourceFn := func(table string, delta bool) resource {
+		return resource{Table: table, Delta: &d}
+	}
+
+	t.Run("materialize", func(t *testing.T) {
+		boilerplate.RunMaterializationTest(t, newMaterialization, "testdata/materialize-glue.flow.yaml", makeResourceFn, materializeSanitizers())
+	})
+
+	t.Run("apply", func(t *testing.T) {
+		boilerplate.RunApplyTest(t, &driver{}, newMaterialization, "testdata/apply-glue.flow.yaml", makeResourceFn)
+	})
+}
+
+// TestRestGlueSnapshotParity enforces that the REST and Glue materialize
+// snapshots are byte-identical after sanitization. Any divergence means the two
+// catalog code paths produced different results — the drift this coverage
+// exists to catch.
+func TestRestGlueSnapshotParity(t *testing.T) {
+	rest, err := os.ReadFile(".snapshots/TestIntegration-materialize")
+	require.NoError(t, err)
+	glue, err := os.ReadFile(".snapshots/TestIntegrationGlue-materialize")
+	require.NoError(t, err)
+	require.Equal(t, string(rest), string(glue),
+		"REST and Glue materialize snapshots diverged; this indicates catalog-specific drift")
+}
+
+// runTimestampOverflowRegression reproduces a production failure observed at
+// deel/prod/.../profile where appending a parquet file containing a timestamp
+// with UTC year 10000 failed. "9999-12-31T23:59:59-14:00" normalizes to UTC
+// year 10000; clampTimestamp rewrites it to the year-9999 boundary before the
+// writer sees it, so the append round-trips without error.
 func runTimestampOverflowRegression(t *testing.T, cfg config) {
 	ctx := context.Background()
+
+	cat, err := newCatalog(ctx, cfg, NestedLocationStyle)
+	require.NoError(t, err)
 
 	const (
 		namespace = "tests"
 		table     = "ts_overflow_regression"
 	)
-	fqn := namespace + "." + table
+	tableIdent := icebergtable.Identifier{namespace, table}
 
-	// Tolerate leftovers from a prior run.
-	_, _ = runIcebergctl(ctx, &cfg, "drop-table", fqn)
-	if _, err := runIcebergctl(ctx, &cfg, "create-namespace", namespace); err != nil &&
-		!strings.Contains(err.Error(), "already exists") &&
-		!strings.Contains(err.Error(), "AlreadyExists") {
+	// Tolerate leftovers from a prior run of this test.
+	_ = cat.cat.DropTable(ctx, tableIdent)
+	if err := cat.createNamespace(ctx, namespace); err != nil &&
+		!errors.Is(err, icebergcatalog.ErrNamespaceAlreadyExists) {
 		t.Fatalf("create-namespace: %v", err)
 	}
 
-	tblLocation := tablePath(cfg.Bucket, cfg.Prefix, namespace, table, NestedLocationStyle)
-
-	tcJson, err := json.Marshal(tableCreate{
-		Location: tblLocation,
-		Fields: []existingIcebergColumn{
-			{Name: "ts", Nullable: true, Type: icebergTypeTimestamptz},
-		},
+	schema := iceberg.NewSchema(0, iceberg.NestedField{
+		ID:       1,
+		Name:     "ts",
+		Type:     iceberg.PrimitiveTypes.TimestampTz,
+		Required: false,
 	})
-	require.NoError(t, err)
-	_, err = runIcebergctl(ctx, &cfg, "create-table", fqn, string(tcJson))
+
+	nameMappingJSON, err := json.Marshal(schema.NameMapping())
 	require.NoError(t, err)
 
-	// "9999-12-31T23:59:59-14:00" normalizes to UTC year 10000.
+	tblLocation := tablePath(cfg.Bucket, cfg.Prefix, namespace, table, NestedLocationStyle)
+	_, err = cat.cat.CreateTable(ctx, tableIdent, schema,
+		icebergcatalog.WithLocation(tblLocation),
+		icebergcatalog.WithProperties(iceberg.Properties{
+			icebergtable.DefaultNameMappingKey: string(nameMappingJSON),
+		}),
+	)
+	require.NoError(t, err)
+
 	parquetPath := filepath.Join(t.TempDir(), "data.parquet")
 	parquetFile, err := os.Create(parquetPath)
 	require.NoError(t, err)
 	pqw := writer.NewParquetWriter(parquetFile, writer.ParquetSchema{
 		{Name: "ts", DataType: writer.LogicalTypeTimestamp, Required: false},
 	}, writer.WithParquetCompression(writer.Snappy))
-	clamped, err := clampTimestamp("9999-12-31T23:59:59-14:00")
+	clampedTS, err := clampTimestamp("9999-12-31T23:59:59-14:00")
 	require.NoError(t, err)
-	require.NoError(t, pqw.Write([]any{clamped}))
+	require.NoError(t, pqw.Write([]any{clampedTS}))
 	require.NoError(t, pqw.Close())
 
 	s3Path := strings.TrimSuffix(tblLocation, "/") + "/data/" + uuid.New().String() + ".parquet"
@@ -194,47 +278,54 @@ func runTimestampOverflowRegression(t *testing.T, cfg config) {
 	})
 	require.NoError(t, err)
 
-	_, err = runIcebergctl(ctx, &cfg, "append-files",
+	require.NoError(t, cat.appendFiles(ctx,
 		"acmeCo/tests/regression",
-		fqn,
+		tableIdent,
+		[]string{s3Path},
 		"",
 		"deadbeefdeadbeef",
-		s3Path,
-	)
-	require.NoError(t, err, "append-files should accept a timestamp within Iceberg's range")
+	))
 }
 
-// runDateOverflowRegression is the date analog of
-// runTimestampOverflowRegression. Parquet DATE is INT32 days-since-epoch;
-// year > 9999 fits the spec but overflows pyarrow's Date32Scalar.as_py.
-// getDateVal rejects > 4-digit years at parse time today, so the failure
-// surfaces earlier than the pyiceberg call.
+// runDateOverflowRegression is the date analog of runTimestampOverflowRegression.
+// clampDate rewrites a year > 9999 (which time.Parse rejects outright) to the
+// year-9999 boundary before the writer sees it, so the append round-trips.
 func runDateOverflowRegression(t *testing.T, cfg config) {
 	ctx := context.Background()
+
+	cat, err := newCatalog(ctx, cfg, NestedLocationStyle)
+	require.NoError(t, err)
 
 	const (
 		namespace = "tests"
 		table     = "date_overflow_regression"
 	)
-	fqn := namespace + "." + table
+	tableIdent := icebergtable.Identifier{namespace, table}
 
-	_, _ = runIcebergctl(ctx, &cfg, "drop-table", fqn)
-	if _, err := runIcebergctl(ctx, &cfg, "create-namespace", namespace); err != nil &&
-		!strings.Contains(err.Error(), "already exists") &&
-		!strings.Contains(err.Error(), "AlreadyExists") {
+	// Tolerate leftovers from a prior run of this test.
+	_ = cat.cat.DropTable(ctx, tableIdent)
+	if err := cat.createNamespace(ctx, namespace); err != nil &&
+		!errors.Is(err, icebergcatalog.ErrNamespaceAlreadyExists) {
 		t.Fatalf("create-namespace: %v", err)
 	}
 
-	tblLocation := tablePath(cfg.Bucket, cfg.Prefix, namespace, table, NestedLocationStyle)
-
-	tcJson, err := json.Marshal(tableCreate{
-		Location: tblLocation,
-		Fields: []existingIcebergColumn{
-			{Name: "d", Nullable: true, Type: icebergTypeDate},
-		},
+	schema := iceberg.NewSchema(0, iceberg.NestedField{
+		ID:       1,
+		Name:     "d",
+		Type:     iceberg.PrimitiveTypes.Date,
+		Required: false,
 	})
+
+	nameMappingJSON, err := json.Marshal(schema.NameMapping())
 	require.NoError(t, err)
-	_, err = runIcebergctl(ctx, &cfg, "create-table", fqn, string(tcJson))
+
+	tblLocation := tablePath(cfg.Bucket, cfg.Prefix, namespace, table, NestedLocationStyle)
+	_, err = cat.cat.CreateTable(ctx, tableIdent, schema,
+		icebergcatalog.WithLocation(tblLocation),
+		icebergcatalog.WithProperties(iceberg.Properties{
+			icebergtable.DefaultNameMappingKey: string(nameMappingJSON),
+		}),
+	)
 	require.NoError(t, err)
 
 	parquetPath := filepath.Join(t.TempDir(), "data.parquet")
@@ -243,9 +334,9 @@ func runDateOverflowRegression(t *testing.T, cfg config) {
 	pqw := writer.NewParquetWriter(parquetFile, writer.ParquetSchema{
 		{Name: "d", DataType: writer.LogicalTypeDate, Required: false},
 	}, writer.WithParquetCompression(writer.Snappy))
-	clamped, err := clampDate("10000-01-01")
+	clampedDate, err := clampDate("10000-01-01")
 	require.NoError(t, err)
-	require.NoError(t, pqw.Write([]any{clamped}))
+	require.NoError(t, pqw.Write([]any{clampedDate}))
 	require.NoError(t, pqw.Close())
 
 	s3Path := strings.TrimSuffix(tblLocation, "/") + "/data/" + uuid.New().String() + ".parquet"
@@ -268,14 +359,186 @@ func runDateOverflowRegression(t *testing.T, cfg config) {
 	})
 	require.NoError(t, err)
 
-	_, err = runIcebergctl(ctx, &cfg, "append-files",
+	require.NoError(t, cat.appendFiles(ctx,
 		"acmeCo/tests/regression",
-		fqn,
+		tableIdent,
+		[]string{s3Path},
 		"",
 		"deadbeefdeadbeef",
-		s3Path,
+	))
+}
+
+// TestNormalizeLegacyCredentials guards the parity with the removed Python
+// `transform_legacy_credentials`: legacy top-level aws_access_key_id/
+// aws_secret_access_key must be promoted into cfg.Credentials so the REST
+// catalog path applies direct S3 FileIO creds (and strips the delegation
+// header). Without promotion, buildRestCatalog's directS3Creds gate is false
+// for legacy configs and non-vending catalogs fail with S3 credential errors.
+func TestNormalizeLegacyCredentials(t *testing.T) {
+	const (
+		akid   = "AKIAEXAMPLE"
+		secret = "s3cr3tkey"
 	)
-	require.NoError(t, err, "append-files should accept a date within Iceberg's range")
+
+	t.Run("legacy-only promotes to Credentials and enables direct S3 access", func(t *testing.T) {
+		legacyID, legacySecret := akid, secret
+		cfg := config{
+			Region:             "us-east-1",
+			AWSAccessKeyID:     &legacyID,
+			AWSSecretAccessKey: &legacySecret,
+		}
+		cfg.normalizeCredentials()
+
+		require.NotNil(t, cfg.Credentials)
+		require.Equal(t, filesink.AWSAccessKey, cfg.Credentials.AuthType)
+		require.Equal(t, akid, cfg.Credentials.AWSAccessKeyID)
+		require.Equal(t, secret, cfg.Credentials.AWSSecretAccessKey)
+		require.Nil(t, cfg.AWSAccessKeyID)
+		require.Nil(t, cfg.AWSSecretAccessKey)
+
+		// The REST catalog gates direct S3 FileIO creds and the delegation-header
+		// strip on exactly this predicate.
+		require.True(t, cfg.Credentials != nil &&
+			cfg.Credentials.AuthType == filesink.AWSAccessKey &&
+			cfg.Region != "")
+
+		props := s3PropsForDirectCreds(&cfg)
+		require.Equal(t, akid, props[icebergio.S3AccessKeyID])
+		require.Equal(t, secret, props[icebergio.S3SecretAccessKey])
+	})
+
+	t.Run("credentials take precedence over legacy keys when both set", func(t *testing.T) {
+		legacyID, legacySecret := akid, secret
+		cfg := config{
+			Region:             "us-east-1",
+			AWSAccessKeyID:     &legacyID,
+			AWSSecretAccessKey: &legacySecret,
+			Credentials: &filesink.CredentialsConfig{
+				AuthType: filesink.AWSAccessKey,
+				AccessKeyCredentials: filesink.AccessKeyCredentials{
+					AWSAccessKeyID:     "AKIANEW",
+					AWSSecretAccessKey: "newsecret",
+				},
+			},
+		}
+		cfg.normalizeCredentials()
+
+		require.Equal(t, "AKIANEW", cfg.Credentials.AWSAccessKeyID)
+		require.Nil(t, cfg.AWSAccessKeyID)
+		require.Nil(t, cfg.AWSSecretAccessKey)
+	})
+
+	t.Run("no credentials leaves config unchanged", func(t *testing.T) {
+		cfg := config{Region: "us-east-1"}
+		cfg.normalizeCredentials()
+		require.Nil(t, cfg.Credentials)
+	})
+}
+
+// TestS3PropsForIAMCredentials is a regression guard for the S3 FileIO
+// credentials on the AWSIAM path (used by the Glue catalog). CredentialsConfig
+// embeds both AccessKeyCredentials and iam.IAMConfig, so a bare
+// cfg.Credentials.AWSAccessKeyID resolves to the shallower AccessKeyCredentials
+// field — empty under IAM auth — rather than the runtime-injected STS
+// credentials in IAMTokens. The direct-creds props must carry the IAMTokens
+// values.
+func TestS3PropsForIAMCredentials(t *testing.T) {
+	const (
+		akid    = "ASIAEXAMPLE"
+		secret  = "iamsecret"
+		session = "iamsessiontoken"
+	)
+	cfg := config{
+		Region: "us-east-1",
+		Credentials: &filesink.CredentialsConfig{
+			AuthType: filesink.AWSIAM,
+			IAMConfig: iam.IAMConfig{
+				IAMTokens: iam.IAMTokens{
+					AWSTokens: iam.AWSTokens{
+						AWSAccessKeyID:     akid,
+						AWSSecretAccessKey: secret,
+						AWSSessionToken:    session,
+					},
+				},
+			},
+		},
+	}
+
+	props := s3PropsForDirectCreds(&cfg)
+	require.Equal(t, akid, props[icebergio.S3AccessKeyID])
+	require.Equal(t, secret, props[icebergio.S3SecretAccessKey])
+	require.Equal(t, session, props[icebergio.S3SessionToken])
+}
+
+// fakeCatalog implements only the icebergcatalog.Catalog methods that
+// populateInfoSchema exercises; the embedded interface panics if any other
+// method is called.
+type fakeCatalog struct {
+	icebergcatalog.Catalog
+	namespaces       []icebergtable.Identifier
+	tablesByNS       map[string][]string
+	listTablesCalled bool
+}
+
+func (f *fakeCatalog) ListNamespaces(ctx context.Context, parent icebergtable.Identifier) ([]icebergtable.Identifier, error) {
+	return f.namespaces, nil
+}
+
+func (f *fakeCatalog) ListTables(ctx context.Context, namespace icebergtable.Identifier) iter.Seq2[icebergtable.Identifier, error] {
+	f.listTablesCalled = true
+	return func(yield func(icebergtable.Identifier, error) bool) {
+		name := namespace[0]
+		tbls, ok := f.tablesByNS[name]
+		if !ok {
+			// Reproduce Glue's ListTables, which yields a raw AWS
+			// EntityNotFoundException for an absent database rather than
+			// catalog.ErrNoSuchNamespace.
+			yield(icebergtable.Identifier{}, errors.New("failed to list tables in namespace "+name+": EntityNotFoundException"))
+			return
+		}
+		for _, t := range tbls {
+			if !yield(icebergtable.Identifier{name, t}, nil) {
+				return
+			}
+		}
+	}
+}
+
+// TestPopulateInfoSchemaSkipsAbsentNamespace guards parity with the removed
+// Python info_schema, which listed tables only in namespaces returned by
+// list_namespaces(). A wanted namespace that does not yet exist must be skipped
+// silently — on Glue, ListTables surfaces a raw EntityNotFoundException that is
+// never catalog.ErrNoSuchNamespace, so error-matching alone fails to bootstrap.
+func TestPopulateInfoSchemaSkipsAbsentNamespace(t *testing.T) {
+	newIS := func() *mboilerplate.InfoSchema {
+		return mboilerplate.NewInfoSchema(
+			func(p []string) []string { return p },
+			func(ns string) string { return ns },
+			func(f string) string { return f },
+			false, false,
+		)
+	}
+
+	t.Run("absent namespace is skipped without error", func(t *testing.T) {
+		fake := &fakeCatalog{namespaces: nil}
+		c := &catalog{cfg: &config{}, locationStyle: NestedLocationStyle, cat: fake}
+
+		err := c.populateInfoSchema(context.Background(), newIS(), [][]string{{"tests", "mytable"}})
+		require.NoError(t, err)
+		require.False(t, fake.listTablesCalled, "must not scan a namespace that does not exist")
+	})
+
+	t.Run("existing namespace is scanned", func(t *testing.T) {
+		fake := &fakeCatalog{
+			namespaces: []icebergtable.Identifier{{"tests"}},
+			tablesByNS: map[string][]string{"tests": {"other"}},
+		}
+		c := &catalog{cfg: &config{}, locationStyle: NestedLocationStyle, cat: fake}
+
+		err := c.populateInfoSchema(context.Background(), newIS(), [][]string{{"tests", "mytable"}})
+		require.NoError(t, err)
+		require.True(t, fake.listTablesCalled)
+	})
 }
 
 func loadTestConfig(t *testing.T) config {
@@ -290,6 +553,48 @@ func loadTestConfig(t *testing.T) config {
 	var cfg config
 	require.NoError(t, pf.UnmarshalStrict(raw, &cfg))
 	return cfg
+}
+
+// loadGlueTestConfig bundles the Glue task spec and returns its decrypted
+// endpoint config. testdata/config-glue.yaml is sops-encrypted, so unlike
+// loadTestConfig this decrypts the bundled config before unmarshaling.
+func loadGlueTestConfig(t *testing.T) config {
+	t.Helper()
+
+	bundled := boilerplate.RunFlowctl(t, "raw", "bundle", "--source", "testdata/materialize-glue.flow.yaml")
+	taskName := "acmeCo/tests/materialize-s3-iceberg"
+
+	raw := json.RawMessage(gjson.GetBytes(bundled, "materializations."+taskName+".endpoint.local.config").Raw)
+	require.NotEmpty(t, raw, "could not find config in bundled spec")
+
+	if gjson.GetBytes(raw, "sops").Exists() {
+		raw = sopsDecrypt(t, raw)
+	}
+
+	var cfg config
+	require.NoError(t, pf.UnmarshalStrict(raw, &cfg))
+	return cfg
+}
+
+// sopsDecrypt decrypts a sops-encrypted JSON config and strips the _sops key
+// suffixes, mirroring the boilerplate test harness's own decryption so the
+// result is the plaintext config the connector expects.
+func sopsDecrypt(t *testing.T, raw json.RawMessage) json.RawMessage {
+	t.Helper()
+
+	sopsCmd := exec.Command("sops", "--decrypt", "--input-type", "json", "--output-type", "json", "/dev/stdin")
+	jqCmd := exec.Command("jq", `walk( if type == "object" then with_entries(.key |= rtrimstr("_sops")) else . end)`)
+	sopsCmd.Stdin = bytes.NewReader(raw)
+
+	var err error
+	jqCmd.Stdin, err = sopsCmd.StdoutPipe()
+	require.NoError(t, err)
+	require.NoError(t, sopsCmd.Start())
+	out, err := jqCmd.Output()
+	require.NoError(t, err)
+	require.NoError(t, sopsCmd.Wait())
+
+	return out
 }
 
 func createTestBucket(t *testing.T, cfg config) {
@@ -446,4 +751,27 @@ func grantPrincipalRole(t *testing.T, token, principalRole, catalog, catalogRole
 	respBody, _ := io.ReadAll(resp.Body)
 	require.Truef(t, resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusCreated || resp.StatusCode == http.StatusNoContent,
 		"granting principal role failed: status %d body %s", resp.StatusCode, respBody)
+}
+
+// TestMapTypeIgnoreStringFormatOnNonStringField guards against a regression
+// where MapType returned a zero mappedType (nil iceberg.Type) when
+// projectionToParquetSchemaElement errored, panicking in String/Compatible.
+// ignoreStringFormat is a no-op on a non-string field, so the field maps by
+// its native type instead.
+func TestMapTypeIgnoreStringFormatOnNonStringField(t *testing.T) {
+	proj := mboilerplate.Projection{
+		Projection: pf.Projection{
+			Field: "n",
+			Inference: pf.Inference{
+				Exists: pf.Inference_MUST,
+				Types:  []string{"integer"},
+			},
+		},
+	}
+
+	var d = &materialization{}
+	mt, conv := d.MapType(proj, fieldConfig{IgnoreStringFormat: true})
+
+	require.Equal(t, "long", mt.String())
+	require.Nil(t, conv)
 }
