@@ -1216,7 +1216,10 @@ func shouldCleanup(t *testing.T, now time.Time, item string, suffix string) bool
 		t.Log("malformed test item name", item)
 	} else if seconds, err := strconv.Atoi(parts[len(parts)-1]); err != nil {
 		t.Log("failed to parse timestamp from test item name", item, err)
-	} else if timestamp := time.Unix(int64(seconds), 0); now.Sub(timestamp) > 5*time.Minute {
+	} else if timestamp := time.Unix(int64(seconds), 0); now.Sub(timestamp) > 60*time.Minute {
+		// The threshold must comfortably exceed the longest single test run,
+		// since concurrent CI jobs sharing a database will otherwise drop each
+		// other's in-use tables mid-test.
 		t.Log("will cleanup old test item", item)
 		return true
 	}
