@@ -29,3 +29,14 @@ materializations:
           - int000ToNumStr
           - int064ToNumStr
           - int032ToNumStr
+          # These type changes have no migration support in postgres
+          # (NUMERIC->BIGINT and DOUBLE PRECISION->DECIMAL): Validate returns
+          # INCOMPATIBLE, which the control plane would resolve by backfilling
+          # the binding. The test harness doesn't emulate that resolution, so
+          # exclude them rather than let Apply skip the migration and leave a
+          # column type the spec doesn't expect.
+          - numToNumStr
+          - intStr000ToInt000
+          - intStr000ToInt032
+          - intStr000ToInt064
+          - intStr064ToInt064

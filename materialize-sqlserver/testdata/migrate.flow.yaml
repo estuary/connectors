@@ -18,3 +18,30 @@ materializations:
           # Materialize the object field so it exercises the JSON->text migration
           # (objects are FIELD_OPTIONAL and skipped by recommended selection).
           objectToString: {}
+        exclude:
+          # These type changes have no migration support in sqlserver
+          # (VARCHAR->FLOAT): Validate returns INCOMPATIBLE, which the control
+          # plane would resolve by backfilling the binding. The test harness
+          # doesn't emulate that resolution, so exclude them rather than let
+          # Apply skip the migration and leave a column type the spec doesn't
+          # expect.
+          - int065ToNum
+          - int065ToNumStr
+          - int128ToNum
+          - int128ToNumStr
+          - int129ToNum
+          - int129ToNumStr
+          - int256ToNum
+          - int256ToNumStr
+          - int257ToNum
+          - int257ToNumStr
+          - intStr065ToNum
+          - intStr065ToNumStr
+          - intStr128ToNum
+          - intStr128ToNumStr
+          - intStr129ToNum
+          - intStr129ToNumStr
+          - intStr256ToNum
+          - intStr256ToNumStr
+          - intStr257ToNum
+          - intStr257ToNumStr
