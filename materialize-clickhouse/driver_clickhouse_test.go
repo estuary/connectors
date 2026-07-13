@@ -1387,7 +1387,7 @@ func TestAcknowledgeRecoveryMatrix(t *testing.T) {
 		tr.ensured = false
 		tr.recovery = true
 		tr.state[b.target.StateKey] = &stateItem{StoredRows: 1}
-		_, err := tr.Acknowledge(ctx)
+		_, err := tr.Acknowledge(ctx, nil)
 		require.NoError(t, err)
 		require.EqualValues(t, 1, countTable(t, ctx, tr, tr.dialect.Identifier("test_recovery_full")))
 		require.Empty(t, tr.state)
@@ -1404,7 +1404,7 @@ func TestAcknowledgeRecoveryMatrix(t *testing.T) {
 		tr.ensured = false
 		tr.recovery = true
 		tr.state[b.target.StateKey] = &stateItem{StoredRows: 3}
-		_, err := tr.Acknowledge(ctx)
+		_, err := tr.Acknowledge(ctx, nil)
 		require.NoError(t, err)
 		require.EqualValues(t, 1, countTable(t, ctx, tr, tr.dialect.Identifier("test_recovery_partial")))
 	})
@@ -1422,7 +1422,7 @@ func TestAcknowledgeRecoveryMatrix(t *testing.T) {
 		tr.ensured = false
 		tr.recovery = true
 		tr.state[b.target.StateKey] = &stateItem{StoredRows: 1}
-		_, err := tr.Acknowledge(ctx)
+		_, err := tr.Acknowledge(ctx, nil)
 		require.NoError(t, err)
 		require.Empty(t, tr.state)
 
@@ -1441,7 +1441,7 @@ func TestAcknowledgeRecoveryMatrix(t *testing.T) {
 		// No pending state for the binding: the staged row was never
 		// committed and must be discarded, not moved.
 		tr.ensured = false
-		_, err := tr.Acknowledge(ctx)
+		_, err := tr.Acknowledge(ctx, nil)
 		require.NoError(t, err)
 		require.EqualValues(t, 0, countTable(t, ctx, tr, tr.dialect.Identifier(storeTableName(b.target, 0))))
 		require.EqualValues(t, 0, countTable(t, ctx, tr, tr.dialect.Identifier("test_recovery_leftovers")))
@@ -1452,7 +1452,7 @@ func TestAcknowledgeRecoveryMatrix(t *testing.T) {
 		_ = tr.store.conn.Exec(ctx, b.store.dropTableSQL)
 
 		tr.ensured = false
-		_, err := tr.Acknowledge(ctx)
+		_, err := tr.Acknowledge(ctx, nil)
 		require.NoError(t, err)
 		require.EqualValues(t, 0, countTable(t, ctx, tr, tr.dialect.Identifier(storeTableName(b.target, 0))))
 	})
@@ -1467,7 +1467,7 @@ func TestAcknowledgeRecoveryMatrix(t *testing.T) {
 			fmt.Sprintf("ALTER TABLE %s DROP COLUMN %s", stageName, tr.dialect.Identifier("value"))))
 
 		tr.ensured = false
-		_, err := tr.Acknowledge(ctx)
+		_, err := tr.Acknowledge(ctx, nil)
 		require.NoError(t, err)
 
 		// The stage table must once again match the target (and so accept
@@ -1502,7 +1502,7 @@ func TestAcknowledgeRecoveryMatrix(t *testing.T) {
 		tr.ensured = false
 		tr.recovery = true
 		tr.state[b.target.StateKey] = &stateItem{StoredRows: 1}
-		_, err := tr.Acknowledge(ctx)
+		_, err := tr.Acknowledge(ctx, nil)
 		require.NoError(t, err)
 
 		// The next transaction must stage and commit cleanly. On the unfixed
@@ -1532,7 +1532,7 @@ func TestAcknowledgeRecoveryMatrix(t *testing.T) {
 		require.True(t, tr.recovery)
 
 		tr.ensured = false
-		_, err := tr.Acknowledge(ctx)
+		_, err := tr.Acknowledge(ctx, nil)
 		require.NoError(t, err)
 		require.EqualValues(t, 1, countTable(t, ctx, tr, tr.dialect.Identifier("test_recovery_upgrade")))
 	})
