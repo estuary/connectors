@@ -587,7 +587,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
-func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) { return nil, nil }
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage) (*pf.ConnectorState, error) { return nil, nil }
 
 // timedSpannerApply wraps spanner.Client.Apply with timing instrumentation
 func (t *transactor) timedSpannerApply(ctx context.Context, mutations []*spanner.Mutation, operation string) (time.Time, time.Duration, error) {

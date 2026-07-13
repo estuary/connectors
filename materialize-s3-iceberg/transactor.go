@@ -230,7 +230,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}, nil
 }
 
-func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage) (*pf.ConnectorState, error) {
 	for _, b := range t.bindings {
 		bindingState := t.state.BindingStates[b.stateKey]
 

@@ -62,27 +62,24 @@ type Transactor interface {
 	// and also b) after an OpFuture returned by StartCommit has resolved.
 	// It may use the state populated by UnmarshalState, or the state updated as part of StartCommitFunc
 	//
+	// `statePatches` are the aggregated StartedCommit state patches of ALL of
+	// the task's shards for the just-committed transaction — including this
+	// shard's own contribution — in commit order. Under the v1 runtime it is
+	// always empty. Cooperative multi-shard ("scale-out") connectors use it to
+	// observe their peers' staged work, e.g. so that only the primary shard
+	// applies it; a task that isn't sharded is its own primary, so connectors
+	// without multi-shard support simply ignore it.
+	//
 	// It returns an optional ConnectorState update which will be applied in a best-effort fashion
 	// upon its successful completion.
 	//
 	// Acknowledge may perform long-running, idempotent operations such as merging staged
 	// updates into a base table. Upon its successful return, response.Acknowledged is sent to
 	// the runtime, allowing the next pipelined transaction to begin to close.
-	Acknowledge(context.Context) (*pf.ConnectorState, error)
+	Acknowledge(ctx context.Context, statePatches []json.RawMessage) (*pf.ConnectorState, error)
 
 	// Destroy the Transactor, releasing any held resources.
 	Destroy()
-}
-
-// AcknowledgeStatePatcher is an optional interface for Transactors that
-// participate in cooperative multi-shard ("scale-out") strategies under the
-// v2 runtime. When implemented, OnAcknowledgeStatePatches is invoked once per
-// transaction — after the Acknowledge request is read and before
-// Acknowledge() is called — with the aggregated StartedCommit state patches
-// of ALL task shards (including this shard's own contribution), in commit
-// order. Under the v1 runtime the slice is always empty.
-type AcknowledgeStatePatcher interface {
-	OnAcknowledgeStatePatches(patches []json.RawMessage) error
 }
 
 // SplitStatePatches decodes a state_patches_json payload into its individual
@@ -215,6 +212,7 @@ func RunTransactions(
 		lastCommitOp OpFuture, // Resolves when the prior commit completes.
 		awaitDoneCh chan<- struct{}, // To be closed upon return.
 		loadDoneCh <-chan struct{}, // Signaled when load() has completed.
+		statePatches []json.RawMessage, // This transaction's aggregated state patches.
 	) (__out error) {
 
 		defer func() {
@@ -234,7 +232,7 @@ func RunTransactions(
 			return nil
 		}
 
-		if ackState, err := transactor.Acknowledge(ctx); err != nil {
+		if ackState, err := transactor.Acknowledge(ctx, statePatches); err != nil {
 			return err
 		} else if err := writeAcknowledged(stream, ackState, &txResponse); err != nil {
 			return err
@@ -296,24 +294,19 @@ func RunTransactions(
 			return err
 		}
 
-		// Surface the aggregated cross-shard state patches to cooperating
-		// transactors. This must happen synchronously, before the concurrent
-		// await() and load() phases begin: `rxRequest` is reused by load()'s
-		// recv, and the goroutine start below is the happens-before edge that
-		// publishes the transactor's updated view to Acknowledge().
-		if p, ok := transactor.(AcknowledgeStatePatcher); ok {
-			if patches, err := SplitStatePatches(rxRequest.Acknowledge.StatePatchesJson); err != nil {
-				return err
-			} else if err := p.OnAcknowledgeStatePatches(patches); err != nil {
-				return fmt.Errorf("transactor.OnAcknowledgeStatePatches: %w", err)
-			}
+		// The aggregated cross-shard state patches must be decoded
+		// synchronously, before the concurrent await() and load() phases
+		// begin: `rxRequest` is reused by load()'s recv.
+		var statePatches []json.RawMessage
+		if statePatches, err = SplitStatePatches(rxRequest.Acknowledge.StatePatchesJson); err != nil {
+			return err
 		}
 
 		// Await the commit of the prior transaction, then notify the runtime.
 		// On completion, Acknowledged has been written to the stream,
 		// and a concurrent load() phase may now begin to close.
 		// At exit, `awaitDoneCh` is closed and `awaitErr` is its status.
-		go await(lastCommitOp, awaitDoneCh, loadDoneCh)
+		go await(lastCommitOp, awaitDoneCh, loadDoneCh, statePatches)
 
 		// Begin an async load of the current transaction.
 		// At exit, `loadDoneCh` is closed and `loadErr` is its status.

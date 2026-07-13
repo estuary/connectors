@@ -110,7 +110,6 @@ func newDatabricksDriver() *sql.Driver[config, tableConfig] {
 }
 
 var _ m.Transactor = (*transactor)(nil)
-var _ m.AcknowledgeStatePatcher = (*transactor)(nil)
 
 type transactor struct {
 	runtimeCheckpoint m.RuntimeCheckpoint
@@ -182,11 +181,11 @@ func (d *transactor) legacyBucket() checkpoint {
 	return d.peerShardsCheckpoints[legacyRangeKey]
 }
 
-// OnAcknowledgeStatePatches folds the aggregated StartedCommit state patches
-// of all task shards into the primary's bookkeeping, so that its Acknowledge
+// mergePeerStatePatches folds the aggregated StartedCommit state patches of
+// all task shards into the primary's bookkeeping, so that Acknowledge
 // executes the queries staged by every shard of the just-committed
 // transaction. Under the v1 runtime `patches` is always empty.
-func (d *transactor) OnAcknowledgeStatePatches(patches []json.RawMessage) error {
+func (d *transactor) mergePeerStatePatches(patches []json.RawMessage) error {
 	if !d.scaleOut || !d.primary {
 		return nil
 	}
@@ -686,7 +685,11 @@ func (d *transactor) startCommitState() (*pf.ConnectorState, error) {
 
 // Acknowledge merges data from temporary table to main table
 // TODO: run these queries concurrently for improved performance
-func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
+func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage) (*pf.ConnectorState, error) {
+	if err := d.mergePeerStatePatches(statePatches); err != nil {
+		return nil, err
+	}
+
 	if d.scaleOut && !d.primary {
 		// Non-primary shards only stage files: their committed entries are
 		// executed by the primary, which observed them via the aggregated

@@ -753,7 +753,7 @@ func (t *transactor) bindingForStateKey(stateKey string) (*binding, bool) {
 	return nil, false
 }
 
-func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage) (*pf.ConnectorState, error) {
 	if !t.ensured {
 		// First Acknowledge of the session: recover pending commits and
 		// ensure every binding's persistent temp tables. This always runs

@@ -432,7 +432,7 @@ func (t *transactor[T]) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 // Acknowledge completes all staged uploads and removes them from the
 // checkpoint, so that the checkpoint contains only the list of file counts.
-func (t *transactor[T]) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
+func (t *transactor[T]) Acknowledge(ctx context.Context, statePatches []json.RawMessage) (*pf.ConnectorState, error) {
 	for _, b := range t.bindings {
 		uploads, ok := t.state.Uploads[b.stateKey]
 		if !ok {

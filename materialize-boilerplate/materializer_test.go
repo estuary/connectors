@@ -433,7 +433,7 @@ func (t *testTransactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	panic("unimplemented")
 }
 
-func (t *testTransactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
+func (t *testTransactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage) (*pf.ConnectorState, error) {
 	panic("unimplemented")
 }
 

@@ -842,7 +842,7 @@ func (d *transactor) copyHistory(ctx context.Context, tableName string, fileName
 }
 
 // Acknowledge merges data from temporary table to main table
-func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
+func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage) (*pf.ConnectorState, error) {
 	defer func() {
 		d.didRecovery = true
 	}()

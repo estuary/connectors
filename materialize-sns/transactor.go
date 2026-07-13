@@ -35,7 +35,7 @@ type topicBinding struct {
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
-func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) { return nil, nil }
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage) (*pf.ConnectorState, error) { return nil, nil }
 
 // SNS is delta-update only.
 func (t *transactor) Load(it *materialize.LoadIterator, _ func(int, json.RawMessage) error) error {
