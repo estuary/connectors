@@ -147,14 +147,23 @@ func RunMaterializationTest[EC boilerplate.EndpointConfiger, FC boilerplate.Fiel
 	sourcePath string,
 	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
 	actionDescSanitizers []func(string) string,
+	v2 ...RuntimeV2Config,
 ) {
+	if len(v2) > 0 {
+		skipUnlessRuntimeV2Flowctl(t)
+	}
+
 	ctx := context.Background()
 	var snap strings.Builder
 	tsSuffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
 
 	RunTestAllTasks(t, sourcePath, func(t *testing.T, bundled []byte, taskName string, cfg EC) {
 		snap.WriteString(fmt.Sprintf("Task: %s\n\n", taskName))
-		snap.WriteString(runMaterializationTestForTask(t, ctx, newMaterializer, taskName, bundled, tsSuffix, makeResourceFn, actionDescSanitizers))
+		if len(v2) > 0 {
+			snap.WriteString(runMaterializationTestForTaskV2(t, ctx, newMaterializer, taskName, bundled, tsSuffix, makeResourceFn, actionDescSanitizers, v2[0]))
+		} else {
+			snap.WriteString(runMaterializationTestForTask(t, ctx, newMaterializer, taskName, bundled, tsSuffix, makeResourceFn, actionDescSanitizers))
+		}
 	})
 
 	cupaloy.SnapshotT(t, snap.String())
@@ -169,11 +178,19 @@ func RunMaterializationTestParallel[EC boilerplate.EndpointConfiger, FC boilerpl
 	sourcePath string,
 	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
 	actionDescSanitizers []func(string) string,
+	v2 ...RuntimeV2Config,
 ) {
+	if len(v2) > 0 {
+		skipUnlessRuntimeV2Flowctl(t)
+	}
+
 	ctx := context.Background()
 	tsSuffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
 
 	names, results := RunTestAllTasksParallel(t, sourcePath, func(t *testing.T, bundled []byte, taskName string, cfg EC) string {
+		if len(v2) > 0 {
+			return runMaterializationTestForTaskV2(t, ctx, newMaterializer, taskName, bundled, tsSuffix, makeResourceFn, actionDescSanitizers, v2[0])
+		}
 		return runMaterializationTestForTask(t, ctx, newMaterializer, taskName, bundled, tsSuffix, makeResourceFn, actionDescSanitizers)
 	})
 
@@ -535,58 +552,14 @@ func runMaterializationTestForTask[EC boilerplate.EndpointConfiger, FC boilerpla
 ) string {
 	var snap strings.Builder
 
-	rndSuffix := "_" + uuid.NewString()[:8] + tsSuffix
-	workingTaskName := taskName + rndSuffix
 	cfg := decryptConfig[EC](t, bundled, taskName)
+	rt := rewriteTaskForTest[EC, RC](t, bundled, taskName, tsSuffix, cfg, makeResourceFn)
 
 	materializer, err := newMaterializer(ctx, taskName, cfg, boilerplate.ParseFlags(cfg))
 	require.NoError(t, err)
 
-	var snapshotResources []RC
-	var testResourcePaths [][]string
-	gjson.GetBytes(bundled, fmt.Sprintf("materializations.%s.bindings", taskName)).ForEach(func(bindingIdx, binding gjson.Result) bool {
-		// Replace the final resource path part with a unique name for this test
-		// run, to prevent concurrent runs of the test from interfering with
-		// each other.
-		var res RC
-		require.NoError(t, boilerplate.UnmarshalStrict(json.RawMessage(gjson.Get(binding.Raw, "resource").Raw), &res))
-		path, deltaUpdates, err := res.WithDefaults(cfg).Parameters()
-		require.NoError(t, err)
-		lastPathPart := path[len(path)-1] + rndSuffix
-
-		res = makeResourceFn(lastPathPart, deltaUpdates).WithDefaults(cfg)
-		path, _, err = res.WithDefaults(cfg).Parameters()
-		require.NoError(t, err)
-		resCfgRaw, err := json.Marshal(res)
-		require.NoError(t, err)
-		snapshotResources = append(snapshotResources, res)
-		testResourcePaths = append(testResourcePaths, path)
-
-		bundled, err = sjson.SetBytes(
-			bundled,
-			fmt.Sprintf("materializations.%s.bindings.%d.resource", taskName, bindingIdx.Int()),
-			json.RawMessage(resCfgRaw),
-		)
-
-		return true
-	})
-
-	// Also replace the name of the materialization itself with a unique name,
-	// again to prevent concurrent tasks from clobbering each other. This is
-	// mostly relevant for materializations that use a "checkpoints" table keyed
-	// on the task name.
-	bundled, err = sjson.SetBytes(
-		bundled,
-		"materializations."+workingTaskName,
-		json.RawMessage(gjson.GetBytes(bundled, fmt.Sprintf("materializations.%s", taskName)).Raw),
-	)
-	require.NoError(t, err)
-
-	source := filepath.Join(t.TempDir(), "test.flow.yaml")
-	require.NoError(t, os.WriteFile(source, bundled, 0o600))
-
 	t.Cleanup(func() {
-		CleanupTestResources(t, ctx, materializer, testResourcePaths, tsSuffix)
+		CleanupTestResources(t, ctx, materializer, rt.resourcePaths, tsSuffix)
 		cleanupTestTasks(t, ctx, materializer, tsSuffix)
 	})
 
@@ -594,8 +567,8 @@ func runMaterializationTestForTask[EC boilerplate.EndpointConfiger, FC boilerpla
 	actionDescription := RunFlowctl(
 		t,
 		"preview",
-		"--name", workingTaskName,
-		"--source", source,
+		"--name", rt.workingTaskName,
+		"--source", rt.sourcePath,
 		"--fixture", relativePath(t, "testdata/integration/fixture.materialize.json"),
 		"--network", "flow-test",
 		"--output-apply",
@@ -605,8 +578,8 @@ func runMaterializationTestForTask[EC boilerplate.EndpointConfiger, FC boilerpla
 		actionDescription = []byte(sanitize(string(actionDescription)))
 	}
 
-	for _, res := range snapshotResources {
-		snap.WriteString(snapshotTestTable(t, ctx, materializer, res, actionDescription, rndSuffix, true))
+	for _, res := range rt.resources {
+		snap.WriteString(snapshotTestTable(t, ctx, materializer, res, actionDescription, rt.rndSuffix, true))
 	}
 
 	return snap.String()

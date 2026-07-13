@@ -26,8 +26,11 @@ func TestIntegration(t *testing.T) {
 		},
 	}
 
+	// Databricks supports runtime-v2 scale-out, so its integration test always
+	// runs with two shards, which requires its scale_out feature flag.
 	t.Run("materialize", func(t *testing.T) {
-		sql.RunMaterializationTest(t, newDatabricksDriver(), "testdata/materialize.flow.yaml", makeResourceFn, sanitizers)
+		sql.RunMaterializationTest(t, newDatabricksDriver(), "testdata/materialize.flow.yaml", makeResourceFn, sanitizers,
+			sql.RuntimeV2Config{Shards: 2, ExtraFeatureFlags: []string{"scale_out"}})
 	})
 	t.Run("apply", func(t *testing.T) {
 		sql.RunApplyTest(t, newDatabricksDriver(), "testdata/apply.flow.yaml", makeResourceFn)
