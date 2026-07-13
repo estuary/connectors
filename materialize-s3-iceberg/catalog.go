@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/apache/iceberg-go"
@@ -543,41 +542,12 @@ func (c *catalog) appendFiles(
 			return fmt.Errorf("marshaling checkpoints: %w", err)
 		}
 
-		// The duplicate-file check preserves the pyiceberg default
-		// (check_duplicate_files): a file already referenced by the table
-		// fails the append rather than being silently re-added, which guards
-		// against a zombie process double-appending the same paths in the
-		// window between the checkpoint-fence read and commit. It runs here
-		// instead of via AddFiles' ignoreDuplicates=false because iceberg-go
-		// scans the snapshot's manifests one S3 read at a time, and tables
-		// accumulate a manifest per transaction — a sequential scan cannot
-		// finish within the Acknowledge deadline on long-lived tables.
-		if referenced, err := referencedFilePaths(ctx, tbl, filePaths); err != nil {
-			err = fmt.Errorf("checking for referenced files in %q: %w", fqn, err)
-			if attempt >= maxAttempts {
-				return err
-			}
-			logger.WithError(err).WithField("attempt", attempt).Warn("append_files: retrying")
-			if err := sleepCtx(ctx, time.Duration(attempt*2)*time.Second); err != nil {
-				return err
-			}
-			continue
-		} else if len(referenced) > 0 {
-			// Retryable: when the files were appended by a zombie's completed
-			// commit, the next attempt's checkpoint-fence read observes that
-			// checkpoint and skips the append cleanly instead of failing.
-			err := fmt.Errorf("cannot add files that are already referenced by table %q: %v", fqn, referenced)
-			if attempt >= maxAttempts {
-				return err
-			}
-			logger.WithError(err).WithField("attempt", attempt).Warn("append_files: retrying")
-			if err := sleepCtx(ctx, time.Duration(attempt*2)*time.Second); err != nil {
-				return err
-			}
-			continue
-		}
-
 		tx := tbl.NewTransaction()
+		// ignoreDuplicates=true: checking for duplicates requires reading
+		// every manifest of the current snapshot, which cannot finish within
+		// the Acknowledge deadline on long-lived tables. The checkpoint fence
+		// above is the guard against replaying an already-recorded append,
+		// matching the pyiceberg 0.7.0 behavior this connector shipped with.
 		if err := tx.AddFiles(ctx, filePaths, nil, true); err != nil {
 			err = fmt.Errorf("staging files for %q: %w", fqn, err)
 			if attempt >= maxAttempts {
@@ -607,65 +577,6 @@ func (c *catalog) appendFiles(
 		logger.WithField("attempt", attempt).Info("append_files: committed")
 		return nil
 	}
-}
-
-// manifestReadConcurrency bounds concurrent manifest fetches during the
-// duplicate-file check. Manifest reads are small network-bound object-store
-// GETs, so the bound is a fixed fan-out rather than GOMAXPROCS.
-const manifestReadConcurrency = 16
-
-// referencedFilePaths returns the subset of filePaths that are live data files
-// of tbl's current snapshot. Deleted manifest entries are ignored, matching
-// pyiceberg's check_duplicate_files, so a path no longer referenced by the
-// table can be appended again.
-func referencedFilePaths(ctx context.Context, tbl *icebergtable.Table, filePaths []string) ([]string, error) {
-	snap := tbl.CurrentSnapshot()
-	if snap == nil {
-		return nil, nil
-	}
-
-	fs, err := tbl.FS(ctx)
-	if err != nil {
-		return nil, err
-	}
-	manifests, err := snap.Manifests(fs)
-	if err != nil {
-		return nil, err
-	}
-
-	want := make(map[string]struct{}, len(filePaths))
-	for _, p := range filePaths {
-		want[p] = struct{}{}
-	}
-
-	var mu sync.Mutex
-	var referenced []string
-
-	group, groupCtx := errgroup.WithContext(ctx)
-	group.SetLimit(manifestReadConcurrency)
-	for _, m := range manifests {
-		group.Go(func() error {
-			if err := groupCtx.Err(); err != nil {
-				return err
-			}
-			for entry, err := range m.Entries(fs, true) {
-				if err != nil {
-					return fmt.Errorf("reading manifest %q: %w", m.FilePath(), err)
-				}
-				if _, ok := want[entry.DataFile().FilePath()]; ok {
-					mu.Lock()
-					referenced = append(referenced, entry.DataFile().FilePath())
-					mu.Unlock()
-				}
-			}
-			return nil
-		})
-	}
-	if err := group.Wait(); err != nil {
-		return nil, err
-	}
-
-	return referenced, nil
 }
 
 func sleepCtx(ctx context.Context, d time.Duration) error {

@@ -149,8 +149,8 @@ func TestIntegration(t *testing.T) {
 		runDateOverflowRegression(t, cfg)
 	})
 
-	t.Run("duplicate-append-regression", func(t *testing.T) {
-		runDuplicateAppendRegression(t, cfg)
+	t.Run("checkpoint-fence-regression", func(t *testing.T) {
+		runCheckpointFenceRegression(t, cfg)
 	})
 
 	// Migration test is skipped because Iceberg does not support the type
@@ -372,12 +372,12 @@ func runDateOverflowRegression(t *testing.T, cfg config) {
 	))
 }
 
-// runDuplicateAppendRegression locks in the duplicate-file semantics that
-// appendFiles preserves from pyiceberg's check_duplicate_files: a file that is
-// already live in the table fails a subsequent append under a new checkpoint,
-// while replaying an already-recorded checkpoint is skipped by the fence
-// rather than tripping the duplicate check.
-func runDuplicateAppendRegression(t *testing.T, cfg config) {
+// runCheckpointFenceRegression locks in the checkpoint-fence semantics of
+// appendFiles: replaying an already-recorded checkpoint is skipped rather
+// than re-appending its files. The fence is the sole duplicate guard —
+// appendFiles does not scan existing manifests for duplicate paths, matching
+// the pyiceberg 0.7.0 behavior this connector originally shipped with.
+func runCheckpointFenceRegression(t *testing.T, cfg config) {
 	ctx := context.Background()
 
 	cat, err := newCatalog(ctx, cfg, NestedLocationStyle)
@@ -385,7 +385,7 @@ func runDuplicateAppendRegression(t *testing.T, cfg config) {
 
 	const (
 		namespace       = "tests"
-		table           = "duplicate_append_regression"
+		table           = "checkpoint_fence_regression"
 		materialization = "acmeCo/tests/regression"
 	)
 	tableIdent := icebergtable.Identifier{namespace, table}
@@ -451,20 +451,30 @@ func runDuplicateAppendRegression(t *testing.T, cfg config) {
 	require.NoError(t, cat.appendFiles(ctx, materialization, tableIdent,
 		[]string{first}, "", "checkpoint-1"))
 
-	// The same path under a new checkpoint must be rejected as a duplicate.
-	err = cat.appendFiles(ctx, materialization, tableIdent,
-		[]string{first}, "checkpoint-1", "checkpoint-2")
-	require.ErrorContains(t, err, "already referenced")
-
 	// Replaying the already-committed checkpoint is skipped by the fence, so
-	// the duplicate path is not an error.
+	// the same path is not re-appended.
 	require.NoError(t, cat.appendFiles(ctx, materialization, tableIdent,
 		[]string{first}, "", "checkpoint-1"))
 
-	// A fresh file advances the checkpoint through the duplicate check.
 	second := uploadParquet("two")
 	require.NoError(t, cat.appendFiles(ctx, materialization, tableIdent,
 		[]string{second}, "checkpoint-1", "checkpoint-2"))
+
+	// Two data files total: the replay added nothing.
+	tbl, err := cat.cat.LoadTable(ctx, tableIdent)
+	require.NoError(t, err)
+	fs, err := tbl.FS(ctx)
+	require.NoError(t, err)
+	manifests, err := tbl.CurrentSnapshot().Manifests(fs)
+	require.NoError(t, err)
+	var livePaths []string
+	for _, m := range manifests {
+		for entry, err := range m.Entries(fs, true) {
+			require.NoError(t, err)
+			livePaths = append(livePaths, entry.DataFile().FilePath())
+		}
+	}
+	require.ElementsMatch(t, []string{first, second}, livePaths)
 }
 
 // TestNormalizeLegacyCredentials guards the parity with the removed Python
