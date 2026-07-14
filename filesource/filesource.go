@@ -42,6 +42,16 @@ type Config interface {
 	PathRegex() string
 }
 
+// maxParquetSize is the size in bytes above which parquet files are skipped
+// rather than captured. Parquet requires random access and so must be staged
+// to local disk in its entirety before parsing, which makes very large files
+// a hazard to the shared scratch disk of the host. This skipping is a
+// temporary bandaid which should be removed once the parser is able to read
+// parquet files without staging them to disk, such as by fetching byte
+// ranges from the store on demand.
+// See https://github.com/estuary/connectors/issues/4814
+const maxParquetSize = 8 * 1000 * 1000 * 1000 // 8 GB
+
 // Source is implements a capture connector using provided callbacks.
 type Source struct {
 	// ConfigSchema returns the JSON schema of the source's configuration,
@@ -382,8 +392,48 @@ func (r *reader) shouldSkip(obj ObjectInfo) (_ bool, reason string) {
 	if !boilerplate.RangeIncludesHwHash(r.range_, []byte(obj.Path)) {
 		return true, "path not in range"
 	}
+	// Is it a parquet file too large to stage to local disk for parsing?
+	if obj.Size > maxParquetSize && isParquetFile(obj.Path, r.config.ParserConfig()) {
+		log.WithFields(log.Fields{
+			"path":  obj.Path,
+			"size":  obj.Size,
+			"limit": int64(maxParquetSize),
+		}).Warn("skipping parquet file which exceeds the maximum supported size")
+		return true, "parquet file exceeds size limit"
+	}
 
 	return false, ""
+}
+
+// isParquetFile reports whether the parser will treat the object as parquet,
+// mirroring its format resolution exactly: an explicitly configured format
+// wins, and is otherwise inferred from the path's dot-delimited extension
+// segments, evaluated last-first with the first recognized format deciding
+// (so "data.parquet.gz" is parquet, while "data.csv" under a forced parquet
+// format is also parquet). As in the parser, the full path is examined with
+// only its first character skipped: segments containing '/' never match, and
+// a hidden file such as ".parquet" still resolves. The recognized extensions
+// must be kept in sync with the parser's format_for_file_extension.
+func isParquetFile(path string, cfg *parser.Config) bool {
+	if cfg != nil {
+		if t, _ := cfg.Format["type"].(string); t != "" && t != "auto" {
+			return t == "parquet"
+		}
+	}
+
+	if len(path) < 2 {
+		return false
+	}
+	var segments = strings.Split(path[1:], ".")
+	for i := len(segments) - 1; i >= 0; i-- {
+		switch segments[i] {
+		case "parquet":
+			return true
+		case "json", "jsonl", "csv", "tsv", "avro", "xls", "xlsx", "xlsm", "xml", "ods":
+			return false
+		}
+	}
+	return false
 }
 
 func (r *reader) processObject(ctx context.Context, obj ObjectInfo) error {
