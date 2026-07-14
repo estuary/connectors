@@ -307,13 +307,21 @@ func newTransactor(
 			return nil, fmt.Errorf("NewPipeClient: %w", err)
 		}
 
-		if featureFlags["snowpipe_streaming_sdk"] {
-			// Only the v2 runtime populates the Open request's sealed config.
-			if len(open.SealedConfigJson) == 0 {
-				log.Info("snowpipe_streaming_sdk is enabled but this task is not running on the v2 runtime; using the original streaming protocol")
-			} else if sdkSM, err = newSdkStreamManager(&cfg, open.Materialization.TaskName(), accountName, open.Range.KeyBegin, db); err != nil {
-				return nil, fmt.Errorf("newSdkStreamManager: %w", err)
-			}
+		// The SDK stream manager is always constructed so that SDK streaming
+		// checkpoints can be replayed even after the feature flag is turned
+		// off or the task moves off the v2 runtime.
+		if sdkSM, err = newSdkStreamManager(&cfg, open.Materialization.TaskName(), accountName, open.Range.KeyBegin, db); err != nil {
+			return nil, fmt.Errorf("newSdkStreamManager: %w", err)
+		}
+	}
+
+	var sdkStreaming bool
+	if featureFlags["snowpipe_streaming_sdk"] && sdkSM != nil {
+		// Only the v2 runtime populates the Open request's sealed config.
+		if len(open.SealedConfigJson) == 0 {
+			log.Info("snowpipe_streaming_sdk is enabled but this task is not running on the v2 runtime; using the original streaming protocol")
+		} else {
+			sdkStreaming = true
 		}
 	}
 
@@ -325,7 +333,7 @@ func newTransactor(
 		db:                db,
 		streamManager:     sm,
 		sdkStreamManager:  sdkSM,
-		sdkStreaming:      sdkSM != nil,
+		sdkStreaming:      sdkStreaming,
 		pipeClient:        pipeClient,
 		_range:            open.Range,
 		version:           open.Version,
@@ -984,7 +992,7 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 			})
 		} else if len(item.SdkChunks) > 0 {
 			if d.sdkStreamManager == nil {
-				return nil, fmt.Errorf("checkpoint for %s contains chunks of the high-performance streaming API, but it is not active; is the snowpipe_streaming_sdk feature flag still enabled?", path)
+				return nil, fmt.Errorf("checkpoint for %s contains chunks of the high-performance streaming API, which requires Private Key (JWT) authentication to replay", path)
 			}
 			group.Go(func() error {
 				d.be.StartedResourceCommit(path)

@@ -7,13 +7,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/google/uuid"
 	"github.com/klauspost/pgzip"
-	log "github.com/sirupsen/logrus"
 	"github.com/segmentio/encoding/json"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/estuary/connectors/go/encrow"
 )
@@ -111,7 +112,11 @@ type sdkStreamManager struct {
 	db          *stdsql.DB
 	channelName string
 	tempdir     string
-	streams     map[int]*sdkTableStream
+
+	// mu guards streams, which commit replays of concurrent Acknowledge
+	// checkpoint items may add to via ensureStream.
+	mu      sync.Mutex
+	streams map[int]*sdkTableStream
 }
 
 func newSdkStreamManager(cfg *config, materialization string, account string, keyBegin uint32, db *stdsql.DB) (*sdkStreamManager, error) {
@@ -133,6 +138,45 @@ func newSdkStreamManager(cfg *config, materialization string, account string, ke
 // automatically creates for a table at first ingest.
 func defaultPipeName(tableName string) string {
 	return tableName + "-STREAMING"
+}
+
+// ensureStream returns the stream of the channel of the pipe, opening the
+// channel if needed. Checkpoint replay can reference a pipe with no stream
+// opened by addBinding, such as when the SDK streaming feature flag was
+// turned off with a transaction's chunks still pending.
+func (m *sdkStreamManager) ensureStream(ctx context.Context, schema string, pipe string) (*sdkTableStream, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for _, s := range m.streams {
+		if s.schema == schema && s.pipe == pipe {
+			return s, nil
+		}
+	}
+
+	res, err := m.c.openChannel(ctx, schema, pipe, m.channelName)
+	if err != nil {
+		return nil, fmt.Errorf("openChannel: %w", err)
+	}
+	stream := &sdkTableStream{
+		schema:            schema,
+		pipe:              pipe,
+		continuationToken: res.NextContinuationToken,
+		lastCommitted:     res.ChannelStatus.LastCommittedOffsetToken,
+		errorRows:         res.ChannelStatus.RowsErrorCount,
+	}
+	// Key by a binding number that no real binding uses, since this stream
+	// exists only to replay a checkpoint.
+	m.streams[-1-len(m.streams)] = stream
+
+	log.WithFields(log.Fields{
+		"schema":        schema,
+		"pipe":          pipe,
+		"channel":       m.channelName,
+		"lastCommitted": res.ChannelStatus.LastCommittedOffsetToken,
+	}).Info("opened streaming channel for checkpoint replay")
+
+	return stream, nil
 }
 
 func (m *sdkStreamManager) addBinding(ctx context.Context, schema string, tableName string, columnNames []string, target sql.Table) error {
@@ -291,15 +335,9 @@ func (m *sdkStreamManager) flush(ctx context.Context, baseToken string) (map[int
 // already committed, and returns once the channel reports the final chunk's
 // token as durably committed. All chunks must be for the same binding.
 func (m *sdkStreamManager) write(ctx context.Context, schema string, pipe string, chunks []sdkChunk) error {
-	var stream *sdkTableStream
-	for _, s := range m.streams {
-		if s.schema == schema && s.pipe == pipe {
-			stream = s
-			break
-		}
-	}
-	if stream == nil {
-		return fmt.Errorf("unknown stream for pipe %s.%s", schema, pipe)
+	stream, err := m.ensureStream(ctx, schema, pipe)
+	if err != nil {
+		return fmt.Errorf("ensuring stream for pipe %s.%s: %w", schema, pipe, err)
 	}
 
 	logger := log.WithFields(log.Fields{
