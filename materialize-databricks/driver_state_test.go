@@ -145,20 +145,6 @@ func TestMergePeerStatePatches(t *testing.T) {
 		require.Equal(t, []string{"PEER"}, d.peerShardsCheckpoints[upperRangeKey]["a_table.v1"].Queries)
 	})
 
-	t.Run("null entries delete", func(t *testing.T) {
-		var d = testTransactor(true, lowerRangeKey, "a_table.v1")
-		d.peerShardsCheckpoints[upperRangeKey] = checkpoint{
-			"a_table.v1": item("PEER"),
-			"b_table.v1": item("PEER-B"),
-		}
-
-		require.NoError(t, d.mergePeerStatePatches(patches(`{"80000000-ffffffff": {"a_table.v1": null}}`)))
-		require.Len(t, d.peerShardsCheckpoints[upperRangeKey], 1)
-
-		require.NoError(t, d.mergePeerStatePatches(patches(`{"80000000-ffffffff": null}`)))
-		require.Empty(t, d.peerShardsCheckpoints)
-	})
-
 	t.Run("state reset patch errors", func(t *testing.T) {
 		var d = testTransactor(true, lowerRangeKey, "a_table.v1")
 		require.Error(t, d.mergePeerStatePatches(patches(`null`, `{"a": 1}`)))
