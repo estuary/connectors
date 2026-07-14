@@ -231,6 +231,7 @@ type transactor struct {
 	ep                *sql.Endpoint[config]
 	db                *stdsql.DB
 	streamManager     *streamManager
+	sdkStreamManager  *sdkStreamManager
 	pipeClient        *PipeClient
 
 	// Variables exclusively used by Load.
@@ -291,6 +292,7 @@ func newTransactor(
 	}
 
 	var sm *streamManager
+	var sdkSM *sdkStreamManager
 	var pipeClient *PipeClient
 	if cfg.Credentials.AuthType == snowflake_auth.JWT {
 		var accountName string
@@ -302,6 +304,14 @@ func newTransactor(
 			return nil, fmt.Errorf("NewPipeClient: %w", err)
 		}
 
+		if featureFlags["snowpipe_streaming_sdk"] {
+			// Only the v2 runtime populates the Open request's sealed config.
+			if len(open.SealedConfigJson) == 0 {
+				log.Info("snowpipe_streaming_sdk is enabled but this task is not running on the v2 runtime; using the original streaming protocol")
+			} else if sdkSM, err = newSdkStreamManager(&cfg, open.Materialization.TaskName(), accountName, open.Range.KeyBegin, db); err != nil {
+				return nil, fmt.Errorf("newSdkStreamManager: %w", err)
+			}
+		}
 	}
 
 	var d = &transactor{
@@ -311,6 +321,7 @@ func newTransactor(
 		templates:         renderTemplates(ep.Dialect),
 		db:                db,
 		streamManager:     sm,
+		sdkStreamManager:  sdkSM,
 		pipeClient:        pipeClient,
 		_range:            open.Range,
 		version:           open.Version,
@@ -355,6 +366,11 @@ type binding struct {
 	target sql.Table
 
 	streaming bool
+	// sdk indicates the binding streams via the high-performance streaming
+	// API rather than the original streaming protocol.
+	sdk       bool
+	sdkSchema string
+	sdkPipe   string
 	pipeName  string
 	// clusteringExpr is the parenthesized CLUSTER BY expression for this
 	// binding, or empty if clustering is not configured.
@@ -382,6 +398,30 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, streaming
 	b.nullFieldsToStrip = target.NullableFieldsToStrip()
 	b.load.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
 	b.store.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
+
+	if b.target.DeltaUpdates && d.cfg.Credentials.AuthType == snowflake_auth.JWT && d.sdkStreamManager != nil {
+		loc := d.ep.Dialect.TableLocator(b.target.Path)
+		columnNames := make([]string, 0, len(target.Columns()))
+		for _, col := range target.Columns() {
+			columnNames = append(columnNames, d.ep.Dialect.ColumnLocator(col.Field))
+		}
+		if err := d.sdkStreamManager.addBinding(ctx, loc.TableSchema, loc.TableName, columnNames, target); err != nil {
+			if errors.Is(err, ErrPermanent) {
+				// The table cannot use the high-performance streaming API, so
+				// fall back to a non-SDK strategy for it.
+				log.WithError(err).WithField("table", b.target.Path).Info("not using Snowpipe Streaming SDK for table")
+			} else {
+				return fmt.Errorf("adding binding to SDK stream manager: %w", err)
+			}
+		} else {
+			b.streaming = true
+			b.sdk = true
+			b.sdkSchema = loc.TableSchema
+			b.sdkPipe = defaultPipeName(loc.TableName)
+			d.bindings = append(d.bindings, b)
+			return nil
+		}
+	}
 
 	if b.target.DeltaUpdates && d.cfg.Credentials.AuthType == snowflake_auth.JWT && streamingEnabled {
 		loc := d.ep.Dialect.TableLocator(b.target.Path)
@@ -614,6 +654,11 @@ type checkpointItem struct {
 	PipeFiles     []fileRecord
 	Version       string
 	EncryptionKey string
+
+	// Used by bindings streaming via the high-performance streaming API.
+	SdkSchema string     `json:",omitempty"`
+	SdkPipe   string     `json:",omitempty"`
+	SdkChunks []sdkChunk `json:",omitempty"`
 }
 
 type checkpoint = map[string]*checkpointItem
@@ -636,6 +681,10 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 		if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
 			return nil, fmt.Errorf("converting Store: %w", err)
+		} else if b.sdk {
+			if err := d.sdkStreamManager.writeRow(ctx, it.Binding, converted); err != nil {
+				return nil, fmt.Errorf("encoding Store to SDK stream for resource %s: %w", b.target.Path, err)
+			}
 		} else if b.streaming {
 			if err := d.streamManager.writeRow(ctx, it.Binding, converted); err != nil {
 				return nil, fmt.Errorf("encoding Store to stream for resource %s: %w", b.target.Path, err)
@@ -661,21 +710,48 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 }
 
 func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (json.RawMessage, error) {
+	// The "base token" only really needs to be sufficiently random that it
+	// doesn't collide with the prior or next transaction's value. Deriving
+	// it from the runtime checkpoint is not absolutely necessary, but it's
+	// convenient to make testing outputs consistent.
+	var baseToken string
+	if d.streamManager != nil || d.sdkStreamManager != nil {
+		if mcp, err := runtimeCheckpoint.Marshal(); err != nil {
+			return nil, fmt.Errorf("marshalling checkpoint: %w", err)
+		} else {
+			baseToken = fmt.Sprintf("%016x", xxhash.Sum64(mcp))
+		}
+	}
+
 	streamBlobs := make(map[int][]*blobMetadata)
 	keys := make(map[int]string)
 	if d.streamManager != nil {
-		// The "base token" only really needs to be sufficiently random that it
-		// doesn't collide with the prior or next transaction's value. Deriving
-		// it from the runtime checkpoint is not absolutely necessary, but it's
-		// convenient to make testing outputs consistent.
-		if mcp, err := runtimeCheckpoint.Marshal(); err != nil {
-			return nil, fmt.Errorf("marshalling checkpoint: %w", err)
-		} else if streamBlobs, keys, err = d.streamManager.flush(fmt.Sprintf("%016x", xxhash.Sum64(mcp))); err != nil {
+		var err error
+		if streamBlobs, keys, err = d.streamManager.flush(baseToken); err != nil {
 			return nil, fmt.Errorf("flushing stream manager: %w", err)
 		}
 	}
 
+	sdkChunks := make(map[int][]sdkChunk)
+	if d.sdkStreamManager != nil {
+		var err error
+		if sdkChunks, err = d.sdkStreamManager.flush(ctx, baseToken); err != nil {
+			return nil, fmt.Errorf("flushing SDK stream manager: %w", err)
+		}
+	}
+
 	for idx, b := range d.bindings {
+		if b.sdk {
+			if chunks, ok := sdkChunks[idx]; ok {
+				d.cp[b.target.StateKey] = &checkpointItem{
+					SdkSchema: b.sdkSchema,
+					SdkPipe:   b.sdkPipe,
+					SdkChunks: chunks,
+				}
+			}
+			continue
+		}
+
 		if b.streaming {
 			if blobs, ok := streamBlobs[idx]; ok {
 				d.cp[b.target.StateKey] = &checkpointItem{
@@ -906,6 +982,20 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 
 				return nil
 			})
+		} else if len(item.SdkChunks) > 0 {
+			if d.sdkStreamManager == nil {
+				return nil, fmt.Errorf("checkpoint for %s contains chunks of the high-performance streaming API, but it is not active; is the snowpipe_streaming_sdk feature flag still enabled?", path)
+			}
+			group.Go(func() error {
+				d.be.StartedResourceCommit(path)
+				if err := d.sdkStreamManager.write(groupCtx, item.SdkSchema, item.SdkPipe, item.SdkChunks); err != nil {
+					return fmt.Errorf("writing SDK streaming chunks for %s: %w", path, err)
+				}
+				d.be.FinishedResourceCommit(path)
+
+				return nil
+			})
+
 		} else if len(item.StreamBlobs) > 0 {
 			group.Go(func() error {
 				d.be.StartedResourceCommit(path)

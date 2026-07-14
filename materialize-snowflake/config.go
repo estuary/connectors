@@ -18,7 +18,12 @@ import (
 var featureFlagDefaults = map[string]bool{
 	// Use Snowpipe streaming for delta-updates bindings that use JWT
 	// authentication.
-	"snowpipe_streaming":               true,
+	"snowpipe_streaming": true,
+	// Use the Snowpipe Streaming high-performance architecture (the protocol
+	// of Snowflake's current streaming SDKs) instead of the original streaming
+	// protocol for delta-updates bindings that use JWT authentication.
+	// Requires running on the v2 runtime.
+	"snowpipe_streaming_sdk":           false,
 	"datetime_keys_as_string":          true,
 	"retain_existing_data_on_backfill": false,
 	"native_binary_column_type":        true,
