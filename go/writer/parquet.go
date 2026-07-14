@@ -201,7 +201,7 @@ func WithParquetMetadata(meta map[string]string) ParquetOption {
 	}
 }
 
-func NewParquetWriter(w io.WriteCloser, sch ParquetSchema, opts ...ParquetOption) *ParquetWriter {
+func NewParquetWriter(w io.WriteCloser, sch ParquetSchema, opts ...ParquetOption) (*ParquetWriter, error) {
 	cfg := parquetConfig{
 		compression:       Uncompressed,
 		bufferSize:        defaultBufferSize,
@@ -221,14 +221,23 @@ func NewParquetWriter(w io.WriteCloser, sch ParquetSchema, opts ...ParquetOption
 
 	cwc := &countingWriteCloser{w: w}
 
+	// Use the non-panicking constructor: the sink here is typically one end of an io.Pipe
+	// streaming to a cloud-storage upload, and its very first write (the parquet magic header)
+	// can fail transiently (e.g. a broken pipe). The legacy file.NewParquetWriter panics in that
+	// case; returning the error instead lets the caller surface it as a normal, retryable failure.
+	sinkWriter, err := file.NewParquetWriterWithError(cwc, schemaRoot, writerOpts(cfg)...)
+	if err != nil {
+		return nil, fmt.Errorf("initializing parquet sink writer: %w", err)
+	}
+
 	return &ParquetWriter{
 		cfg:        cfg,
 		schema:     sch,
 		schemaRoot: schemaRoot,
-		sinkWriter: file.NewParquetWriter(cwc, schemaRoot, writerOpts(cfg)...),
+		sinkWriter: sinkWriter,
 		cwc:        cwc,
 		rs:         newRowSizing(sch),
-	}
+	}, nil
 }
 
 func writerOpts(cfg parquetConfig) []file.WriteOption {
@@ -405,8 +414,12 @@ func (w *ParquetWriter) flushBuffer() error {
 			// Turning off stats calculations helps too, but just a tiny bit.
 			parquet.WithStats(false),
 		}
+		scratchWriter, err := file.NewParquetWriterWithError(scratchFile, w.schemaRoot, file.WithWriterProps(parquet.NewWriterProperties(scratchOpts...)))
+		if err != nil {
+			return fmt.Errorf("flushing buffer creating scratch writer: %w", err)
+		}
 		w.scratch.file = scratchFile
-		w.scratch.writer = file.NewParquetWriter(scratchFile, w.schemaRoot, file.WithWriterProps(parquet.NewWriterProperties(scratchOpts...)))
+		w.scratch.writer = scratchWriter
 	}
 
 	rgWriter := w.scratch.writer.AppendRowGroup()

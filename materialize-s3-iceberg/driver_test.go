@@ -254,9 +254,10 @@ func runTimestampOverflowRegression(t *testing.T, cfg config) {
 	parquetPath := filepath.Join(t.TempDir(), "data.parquet")
 	parquetFile, err := os.Create(parquetPath)
 	require.NoError(t, err)
-	pqw := writer.NewParquetWriter(parquetFile, writer.ParquetSchema{
+	pqw, err := writer.NewParquetWriter(parquetFile, writer.ParquetSchema{
 		{Name: "ts", DataType: writer.LogicalTypeTimestamp, Required: false},
 	}, writer.WithParquetCompression(writer.Snappy))
+	require.NoError(t, err)
 	clampedTS, err := clampTimestamp("9999-12-31T23:59:59-14:00")
 	require.NoError(t, err)
 	require.NoError(t, pqw.Write([]any{clampedTS}))
@@ -335,9 +336,10 @@ func runDateOverflowRegression(t *testing.T, cfg config) {
 	parquetPath := filepath.Join(t.TempDir(), "data.parquet")
 	parquetFile, err := os.Create(parquetPath)
 	require.NoError(t, err)
-	pqw := writer.NewParquetWriter(parquetFile, writer.ParquetSchema{
+	pqw, err := writer.NewParquetWriter(parquetFile, writer.ParquetSchema{
 		{Name: "d", DataType: writer.LogicalTypeDate, Required: false},
 	}, writer.WithParquetCompression(writer.Snappy))
+	require.NoError(t, err)
 	clampedDate, err := clampDate("10000-01-01")
 	require.NoError(t, err)
 	require.NoError(t, pqw.Write([]any{clampedDate}))
@@ -427,9 +429,10 @@ func runCheckpointFenceRegression(t *testing.T, cfg config) {
 		parquetPath := filepath.Join(t.TempDir(), "data.parquet")
 		parquetFile, err := os.Create(parquetPath)
 		require.NoError(t, err)
-		pqw := writer.NewParquetWriter(parquetFile, writer.ParquetSchema{
+		pqw, err := writer.NewParquetWriter(parquetFile, writer.ParquetSchema{
 			{Name: "v", DataType: writer.LogicalTypeString, Required: false},
 		}, writer.WithParquetCompression(writer.Snappy))
+		require.NoError(t, err)
 		require.NoError(t, pqw.Write([]any{v}))
 		require.NoError(t, pqw.Close())
 
