@@ -1,7 +1,8 @@
-# source-postgres
+# Changelog
 
-## v2, 2022-10-17
-- Use new network-tunnel
+## 2026-07-14
 
-## v1, 2022-07-27
-- Beginning of changelog.
+### Changed
+- Queries now use a default `statement_timeout` of 2 minutes when the
+  `statement_timeout` advanced option is left blank. Set to `0` for the
+  previous behavior of disabling timeouts.

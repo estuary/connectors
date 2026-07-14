@@ -171,7 +171,7 @@ type advancedConfig struct {
 	DiscoverUnpublishedTables bool     `json:"discover_unpublished_tables,omitempty" jsonschema:"title=Discover Unpublished Tables,description=When set the capture will discover all tables including those not currently in the publication. Unpublished tables will be added to the publication at capture time if possible. Use with caution as this requires appropriate database permissions."`
 	SourceTag                 string   `json:"source_tag,omitempty" jsonschema:"title=Source Tag,description=When set the capture will add this value as the property 'tag' in the source metadata of each document."`
 	FeatureFlags              string   `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
-	StatementTimeout          string   `json:"statement_timeout,omitempty" jsonschema:"title=Statement Timeout,description=Overrides the default statement timeout used by the connector. The default of zero disables statement timeouts entirely.,enum=,enum=30s,enum=1m,enum=5m,enum=30m,default="`
+	StatementTimeout          string   `json:"statement_timeout,omitempty" jsonschema:"title=Statement Timeout,description=Overrides the statement timeout used by the connector. Leave blank to use the default of 2 minutes. Set to '0' to disable statement timeouts entirely.,enum=,enum=0,enum=30s,enum=1m,enum=2m,enum=5m,enum=30m,default="`
 
 	DeprecatedDiscoverOnlyPublished bool `json:"discover_only_published,omitempty" jsonschema_extras:"x-hidden-field=true"` // Unused, only supported to avoid breaking existing captures
 }
@@ -426,6 +426,9 @@ func (db *postgresDatabase) HistoryMode() bool {
 	return db.config.HistoryMode
 }
 
+// The statement timeout applied to database connections when none is configured.
+const defaultStatementTimeout = 2 * time.Minute
+
 func (db *postgresDatabase) connect(ctx context.Context) error {
 	logrus.WithFields(logrus.Fields{
 		"address":  db.config.Address,
@@ -452,9 +455,9 @@ func (db *postgresDatabase) connect(ctx context.Context) error {
 		}
 
 		// Attempt (non-fatal) to set the statement_timeout parameter. If a timeout is
-		// configured in settings we use that, otherwise default to zero so that backfill
-		// queries never get interrupted.
-		var statementTimeout = "0"
+		// configured in settings we use that, otherwise fall back to a conservative
+		// default which bounds runaway queries.
+		var statementTimeout = fmt.Sprintf("%d", defaultStatementTimeout.Milliseconds())
 		if db.config.Advanced.StatementTimeout != "" {
 			if timeout, err := time.ParseDuration(db.config.Advanced.StatementTimeout); err == nil {
 				statementTimeout = fmt.Sprintf("%d", timeout.Milliseconds())
@@ -491,16 +494,12 @@ func (db *postgresDatabase) connect(ctx context.Context) error {
 		return fmt.Errorf("unable to connect to database: %w", err)
 	}
 
-	// Log a message about the statement_timeout setting. If we configured a specific timeout
-	// we just log the value for visibility. If we intended to disable the timeout (config empty
-	// or zero) but the database reports a nonzero value, we warn that backfills might be interrupted.
+	// Log the effective statement_timeout for visibility.
 	var actualTimeout string
 	if err := pool.QueryRow(ctx, "SHOW statement_timeout").Scan(&actualTimeout); err != nil {
 		logrus.WithField("err", err).Warn("failed to query statement_timeout")
-	} else if db.config.Advanced.StatementTimeout != "" {
+	} else {
 		logrus.WithField("timeout", actualTimeout).Info("queried statement_timeout")
-	} else if actualTimeout != "0" {
-		logrus.WithField("timeout", actualTimeout).Info("nonzero statement_timeout")
 	}
 
 	db.conn = pool
