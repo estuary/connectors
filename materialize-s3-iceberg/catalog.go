@@ -232,10 +232,13 @@ func (t *stripDelegationTransport) RoundTrip(req *http.Request) (*http.Response,
 	return t.base.RoundTrip(req)
 }
 
-// loadTables loads each table identifier in parallel (up to 10 concurrent),
-// preserving the input order in the returned slice.
-func (c *catalog) loadTables(ctx context.Context, idents []icebergtable.Identifier) ([]*icebergtable.Table, error) {
-	out := make([]*icebergtable.Table, len(idents))
+// forEachTable loads each table identifier in parallel (up to 10 concurrent)
+// and invokes fn with the loaded table and its input index. Each table is
+// released after fn returns instead of being accumulated: a loaded table
+// retains its full parsed metadata, including the entire snapshot history, so
+// holding one per binding exhausts the container's memory on materializations
+// with many long-lived tables. fn must be safe to call concurrently.
+func (c *catalog) forEachTable(ctx context.Context, idents []icebergtable.Identifier, fn func(idx int, tbl *icebergtable.Table) error) error {
 	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(10)
 	for i, ident := range idents {
@@ -244,14 +247,10 @@ func (c *catalog) loadTables(ctx context.Context, idents []icebergtable.Identifi
 			if err != nil {
 				return fmt.Errorf("loading table %s: %w", pathToFQN(ident), err)
 			}
-			out[i] = tbl
-			return nil
+			return fn(i, tbl)
 		})
 	}
-	if err := g.Wait(); err != nil {
-		return nil, err
-	}
-	return out, nil
+	return g.Wait()
 }
 
 func (c *catalog) populateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
@@ -305,24 +304,31 @@ func (c *catalog) populateInfoSchema(ctx context.Context, is *boilerplate.InfoSc
 		}
 	}
 
-	loaded, err := c.loadTables(ctx, matched)
-	if err != nil {
-		return err
-	}
-
-	for i, tbl := range loaded {
-		ident := matched[i]
-		ns, name := ident[0], ident[len(ident)-1]
-		res := is.PushResource(ns, name)
-		for _, f := range tbl.Schema().Fields() {
-			res.PushField(boilerplate.ExistingField{
+	fields := make([][]boilerplate.ExistingField, len(matched))
+	if err := c.forEachTable(ctx, matched, func(idx int, tbl *icebergtable.Table) error {
+		schemaFields := tbl.Schema().Fields()
+		out := make([]boilerplate.ExistingField, len(schemaFields))
+		for i, f := range schemaFields {
+			out[i] = boilerplate.ExistingField{
 				Name:     f.Name,
 				Nullable: !f.Required,
 				Type:     f.Type.Type(),
-			})
+			}
+		}
+		fields[idx] = out
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	for i, ident := range matched {
+		ns, name := ident[0], ident[len(ident)-1]
+		res := is.PushResource(ns, name)
+		for _, f := range fields[i] {
+			res.PushField(f)
 		}
 	}
-	log.WithField("count", len(loaded)).Info("info-schema: found tables")
+	log.WithField("count", len(matched)).Info("info-schema: found tables")
 	return nil
 }
 
@@ -333,13 +339,12 @@ func (c *catalog) tablePaths(ctx context.Context, resourcePaths [][]string) ([]s
 	for i, p := range resourcePaths {
 		idents[i] = p
 	}
-	loaded, err := c.loadTables(ctx, idents)
-	if err != nil {
+	out := make([]string, len(idents))
+	if err := c.forEachTable(ctx, idents, func(idx int, tbl *icebergtable.Table) error {
+		out[idx] = tbl.Location()
+		return nil
+	}); err != nil {
 		return nil, err
-	}
-	out := make([]string, len(loaded))
-	for i, tbl := range loaded {
-		out[i] = tbl.Location()
 	}
 	return out, nil
 }
