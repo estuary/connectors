@@ -72,6 +72,7 @@ func (e *sdkApiError) Unwrap() error {
 // account's discovered ingest host.
 type sdkStreamClient struct {
 	r        *resty.Client
+	scheme   string // "https", except in tests
 	host     string
 	key      *rsa.PrivateKey
 	user     string
@@ -92,6 +93,7 @@ func newSdkStreamClient(cfg *config, account string) (*sdkStreamClient, error) {
 
 	return &sdkStreamClient{
 		r:        resty.New(),
+		scheme:   "https",
 		host:     cfg.Host,
 		key:      key,
 		user:     cfg.Credentials.User,
@@ -122,7 +124,7 @@ func (c *sdkStreamClient) authorize(ctx context.Context) (string, string, error)
 			SetHeader("Authorization", "Bearer "+jwt).
 			SetHeader("X-Snowflake-Authorization-Token-Type", "KEYPAIR_JWT").
 			SetHeader("Accept", "application/json").
-			Get("https://" + c.host + "/v2/streaming/hostname")
+			Get(c.scheme + "://" + c.host + "/v2/streaming/hostname")
 		if err != nil {
 			return "", "", fmt.Errorf("discovering ingest hostname: %w", err)
 		} else if !res.IsSuccess() {
@@ -138,7 +140,7 @@ func (c *sdkStreamClient) authorize(ctx context.Context) (string, string, error)
 			"grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
 			"scope":      c.ingestHost,
 		}).
-		Post("https://" + c.host + "/oauth/token")
+		Post(c.scheme + "://" + c.host + "/oauth/token")
 	if err != nil {
 		return "", "", fmt.Errorf("exchanging scoped token: %w", err)
 	} else if !res.IsSuccess() {
@@ -152,8 +154,8 @@ func (c *sdkStreamClient) authorize(ctx context.Context) (string, string, error)
 }
 
 func (c *sdkStreamClient) pipeURL(ingestHost, schema, pipe string) string {
-	return fmt.Sprintf("https://%s/v2/streaming/databases/%s/schemas/%s/pipes/%s",
-		ingestHost, url.PathEscape(c.database), url.PathEscape(schema), url.PathEscape(pipe))
+	return fmt.Sprintf("%s://%s/v2/streaming/databases/%s/schemas/%s/pipes/%s",
+		c.scheme, ingestHost, url.PathEscape(c.database), url.PathEscape(schema), url.PathEscape(pipe))
 }
 
 // openChannel creates or re-opens a channel of the pipe, returning the
@@ -209,8 +211,8 @@ func (c *sdkStreamClient) appendRows(ctx context.Context, schema, pipe, channel,
 		SetBody(rows).
 		SetResult(&out).
 		SetError(apiErr).
-		Post(fmt.Sprintf("https://%s/v2/streaming/data/databases/%s/schemas/%s/pipes/%s/channels/%s/rows",
-			ingestHost, url.PathEscape(c.database), url.PathEscape(schema), url.PathEscape(pipe), url.PathEscape(channel)))
+		Post(fmt.Sprintf("%s://%s/v2/streaming/data/databases/%s/schemas/%s/pipes/%s/channels/%s/rows",
+			c.scheme, ingestHost, url.PathEscape(c.database), url.PathEscape(schema), url.PathEscape(pipe), url.PathEscape(channel)))
 	if err != nil {
 		return "", fmt.Errorf("appending rows to channel %q: %w", channel, err)
 	} else if !res.IsSuccess() {
