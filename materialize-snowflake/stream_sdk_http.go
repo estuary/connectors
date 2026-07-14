@@ -188,10 +188,10 @@ func (c *sdkStreamClient) openChannel(ctx context.Context, schema, pipe, channel
 	return &out, nil
 }
 
-// appendRows sends a batch of NDJSON-encoded rows. The batch is buffered
-// durably only once a subsequent channel status reports offsetToken (or a
-// later token) as committed.
-func (c *sdkStreamClient) appendRows(ctx context.Context, schema, pipe, channel, continuationToken, offsetToken string, rows []byte) (string, error) {
+// appendRows sends a batch of gzip-compressed NDJSON-encoded rows. The batch
+// is buffered durably only once a subsequent channel status reports
+// offsetToken (or a later token) as committed.
+func (c *sdkStreamClient) appendRows(ctx context.Context, schema, pipe, channel, continuationToken, offsetToken string, gzippedRows []byte) (string, error) {
 	ingestHost, token, err := c.authorize(ctx)
 	if err != nil {
 		return "", err
@@ -204,11 +204,12 @@ func (c *sdkStreamClient) appendRows(ctx context.Context, schema, pipe, channel,
 		SetHeader("Authorization", "Bearer "+token).
 		SetHeader("Accept", "application/json").
 		SetHeader("Content-Type", "application/x-ndjson").
+		SetHeader("Content-Encoding", "gzip").
 		SetQueryParams(map[string]string{
 			"continuationToken": continuationToken,
 			"offsetToken":       offsetToken,
 		}).
-		SetBody(rows).
+		SetBody(gzippedRows).
 		SetResult(&out).
 		SetError(apiErr).
 		Post(fmt.Sprintf("%s://%s/v2/streaming/data/databases/%s/schemas/%s/pipes/%s/channels/%s/rows",

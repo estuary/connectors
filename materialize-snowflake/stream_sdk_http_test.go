@@ -1,11 +1,14 @@
 package main
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -73,8 +76,11 @@ func TestSdkStreamClient(t *testing.T) {
 	})
 	mux.HandleFunc("POST /v2/streaming/data/databases/TEST_DB/schemas/TEST_SCHEMA/pipes/TBL-STREAMING/channels/CH/rows", func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, "application/x-ndjson", r.Header.Get("Content-Type"))
-		body := make([]byte, r.ContentLength)
-		r.Body.Read(body)
+		require.Equal(t, "gzip", r.Header.Get("Content-Encoding"))
+		gz, err := gzip.NewReader(r.Body)
+		require.NoError(t, err)
+		body, err := io.ReadAll(gz)
+		require.NoError(t, err)
 		appendedBodies = append(appendedBodies, body)
 		appendedTokens = append(appendedTokens, r.URL.Query().Get("offsetToken"))
 		w.Header().Set("Content-Type", "application/json")
@@ -120,11 +126,20 @@ func TestSdkStreamClient(t *testing.T) {
 	require.Equal(t, "0_1", open.NextContinuationToken)
 	require.Nil(t, open.ChannelStatus.LastCommittedOffsetToken)
 
-	next, err := c.appendRows(ctx, "TEST_SCHEMA", "TBL-STREAMING", "CH", open.NextContinuationToken, "base:0", []byte(`{"A": 1}`+"\n"))
+	gzipped := func(s string) []byte {
+		var buf bytes.Buffer
+		gz := gzip.NewWriter(&buf)
+		_, err := gz.Write([]byte(s))
+		require.NoError(t, err)
+		require.NoError(t, gz.Close())
+		return buf.Bytes()
+	}
+
+	next, err := c.appendRows(ctx, "TEST_SCHEMA", "TBL-STREAMING", "CH", open.NextContinuationToken, "base:0", gzipped(`{"A": 1}`+"\n"))
 	require.NoError(t, err)
 	require.Equal(t, "0_2", next)
 
-	next, err = c.appendRows(ctx, "TEST_SCHEMA", "TBL-STREAMING", "CH", next, "base:1", []byte(`{"A": 2}`+"\n"))
+	next, err = c.appendRows(ctx, "TEST_SCHEMA", "TBL-STREAMING", "CH", next, "base:1", gzipped(`{"A": 2}`+"\n"))
 	require.NoError(t, err)
 	require.Equal(t, "0_3", next)
 
