@@ -412,7 +412,7 @@ github.com/envoyproxy/go-control-plane/ratelimit v0.1.0/go.mod h1:Wk+tMFAFbCXaJP
 github.com/envoyproxy/protoc-gen-validate v0.1.0/go.mod h1:iSmxcyjqTsJpI2R4NaDN7+kN2VEUnK/pcBlmesArF7c=
 github.com/envoyproxy/protoc-gen-validate v1.3.3 h1:MVQghNeW+LZcmXe7SY1V36Z+WFMDjpqGAGacLe2T0ds=
 github.com/envoyproxy/protoc-gen-validate v1.3.3/go.mod h1:TsndJ/ngyIdQRhMcVVGDDHINPLWB7C82oDArY51KfB0=
-github.com/estuary/flow v0.6.11-0.20260713164751-17081a46f85c h1:/e2h6w0cEzETiKIRGFb0V9PT+YPhoRB1wHLa8l7V7h8=
+github.com/estuary/flow v0.6.11-0.20260713164751-17081a46f85c h1:1/dPnLqMMqQYCOw33C6quwEGJG0p3i74PzHV1OKKZGY=
 github.com/estuary/flow v0.6.11-0.20260713164751-17081a46f85c/go.mod h1:hJKr8VJaI0HB56EwcwxLRiOtivrKAIlHIn533NwH5UU=
 github.com/estuary/go-mysql v0.0.0-20250918155720-90d473fd1a3e h1:stJOXFppEkEksGtqpJjIIfufID+RUkrkMCFKgu4Vfaw=
 github.com/estuary/go-mysql v0.0.0-20250918155720-90d473fd1a3e/go.mod h1:FQxw17uRbFvMZFK+dPtIPufbU46nBdrGaxOw0ac9MFs=
