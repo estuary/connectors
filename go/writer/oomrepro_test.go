@@ -91,11 +91,14 @@ func TestOOMRepro(t *testing.T) {
 			stat["active_file"]/1024/1024, stat["inactive_file"]/1024/1024)
 	}
 
-	w := NewParquetWriter(oomReproDiscardCloser{}, sch,
+	w, err := NewParquetWriter(oomReproDiscardCloser{}, sch,
 		WithParquetRowGroupByteLimit(*oomReproRowGroupByteLimitMiB*1024*1024),
 		WithParquetRowGroupRowLimit(*oomReproRowGroupRowLimit),
 		WithParquetBufferSize(*oomReproBufferSizeMiB*1024*1024),
 	)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	var totalBytes, maxRowsSeen int64
 	start := time.Now()

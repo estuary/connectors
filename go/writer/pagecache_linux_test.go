@@ -130,7 +130,10 @@ func BenchmarkScratchPageCache(b *testing.B) {
 	b.ResetTimer()
 
 	for b.Loop() {
-		w := NewParquetWriter(discardCloser{}, sch)
+		w, err := NewParquetWriter(discardCloser{}, sch)
+		if err != nil {
+			b.Fatal(err)
+		}
 		inClose.Store(false)
 		for i := range numRows {
 			if err := w.Write([]any{int64(i), fmt.Sprintf("%08d-%s", i, payload)}); err != nil {

@@ -122,7 +122,7 @@ func newBdecWriter(
 		})
 	}
 
-	pq := writer.NewParquetWriter(
+	pq, err := writer.NewParquetWriter(
 		blobStats,
 		sch,
 		writer.WithParquetCompression(writer.Snappy),
@@ -131,6 +131,9 @@ func newBdecWriter(
 		writer.WithParquetRowGroupByteLimit(MAX_CHUNK_SIZE_IN_BYTES_DEFAULT),
 		writer.WithParquetRowGroupRowLimit(math.MaxInt64), // no specific limit on the number of rows in a bdec chunk
 	)
+	if err != nil {
+		return nil, fmt.Errorf("creating parquet writer: %w", err)
+	}
 
 	return &bdecWriter{
 		pq:        pq,

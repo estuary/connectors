@@ -2,6 +2,7 @@ package writer
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -47,7 +48,8 @@ func TestParquetWriter(t *testing.T) {
 			sink, err := os.CreateTemp(dir, "*.parquet")
 			require.NoError(t, err)
 
-			w := NewParquetWriter(sink, makeTestParquetSchema(!tt.nulls), tt.opts...)
+			w, err := NewParquetWriter(sink, makeTestParquetSchema(!tt.nulls), tt.opts...)
+			require.NoError(t, err)
 			for i := range 10 {
 				row := makeTestRow(t, i)
 				if tt.nulls {
@@ -62,6 +64,37 @@ func TestParquetWriter(t *testing.T) {
 	}
 }
 
+// errOnFirstWriteCloser fails its very first Write, simulating a transient
+// failure on the sink (e.g. a broken pipe to a cloud-storage upload) at the
+// point where the parquet magic header is written.
+type errOnFirstWriteCloser struct {
+	wrote bool
+}
+
+func (w *errOnFirstWriteCloser) Write(p []byte) (int, error) {
+	if !w.wrote {
+		w.wrote = true
+		return 0, fmt.Errorf("simulated transient write failure")
+	}
+	return len(p), nil
+}
+
+func (w *errOnFirstWriteCloser) Close() error { return nil }
+
+// A sink that fails its initial write (writing the parquet magic header) must
+// surface a returned error rather than panicking, so callers can handle it as
+// a normal, retryable failure. Regression test for the "failed to write magic
+// number" panic.
+func TestParquetWriterSinkWriteErrorReturnsError(t *testing.T) {
+	sch := ParquetSchema{
+		{Name: "field", DataType: LogicalTypeString, Required: false},
+	}
+
+	w, err := NewParquetWriter(&errOnFirstWriteCloser{}, sch)
+	require.Error(t, err)
+	require.Nil(t, w)
+}
+
 func TestParquetWriterTimestampNanos(t *testing.T) {
 	dir := t.TempDir()
 	sink, err := os.CreateTemp(dir, "*.parquet")
@@ -73,7 +106,8 @@ func TestParquetWriterTimestampNanos(t *testing.T) {
 
 	rows := []string{"2024-01-02T03:04:05.123456789Z", "1970-01-01T00:00:00.000000001Z", ""}
 
-	w := NewParquetWriter(sink, sch)
+	w, err := NewParquetWriter(sink, sch)
+	require.NoError(t, err)
 	for _, ts := range rows {
 		var val any
 		if ts != "" {

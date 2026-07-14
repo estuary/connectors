@@ -64,7 +64,7 @@ func NewParquetWriter(cfg ParquetConfig, b *pf.MaterializationSpec_Binding, w io
 	// compression.
 	opts = append(opts, writer.WithParquetCompression(writer.Snappy))
 
-	return writer.NewParquetWriter(w, sch, opts...), nil
+	return writer.NewParquetWriter(w, sch, opts...)
 }
 
 type CsvConfig struct {

@@ -120,7 +120,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var group errgroup.Group
 	var states = t.state.BindingStates
 
-	startFile := func(b binding) {
+	startFile := func(b binding) error {
 		// Start uploading a new file, either because the binding changed or because the prior file
 		// got sufficiently large.
 		r, w := io.Pipe()
@@ -137,7 +137,15 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil
 		})
 
-		pqw = writer.NewParquetWriter(w, b.pqSchema, writer.WithParquetCompression(writer.Snappy))
+		var err error
+		pqw, err = writer.NewParquetWriter(w, b.pqSchema, writer.WithParquetCompression(writer.Snappy))
+		if err != nil {
+			// Unblock and terminate the upload goroutine so it doesn't leak waiting on the pipe.
+			w.CloseWithError(err)
+			return fmt.Errorf("creating parquet writer: %w", err)
+		}
+
+		return nil
 	}
 
 	finishFile := func() error {
@@ -165,7 +173,9 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		lastBinding = it.Binding
 
 		if pqw == nil {
-			startFile(b)
+			if err := startFile(b); err != nil {
+				return nil, fmt.Errorf("starting file: %w", err)
+			}
 		}
 
 		row, err := b.mapped.ConvertAll(it.Key, it.Values, it.RawJSON)
