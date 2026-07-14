@@ -403,7 +403,7 @@ func (r *reader) processObject(ctx context.Context, obj ObjectInfo) error {
 		log.WithField("path", obj.Path).Debug("skipping path (after Read)")
 		return nil
 	}
-	log.Info(fmt.Sprintf("processing file %q modified at %s", obj.Path, obj.ModTime))
+	log.Info(fmt.Sprintf("processing file %q of %d bytes modified at %s", obj.Path, obj.Size, obj.ModTime))
 
 	tmp, err := os.CreateTemp("", "parser-config-*.json")
 	if err != nil {
