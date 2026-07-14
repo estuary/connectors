@@ -65,6 +65,7 @@ on:
       - "source-greenhouse-native/**"
       - "source-calendly/**"
       - "source-appsflyer/**"
+      - "source-zuora/**"
 
   pull_request:
     branches: [main]
@@ -131,6 +132,7 @@ on:
       - "source-greenhouse-native/**"
       - "source-calendly/**"
       - "source-appsflyer/**"
+      - "source-zuora/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -383,6 +385,10 @@ jobs:
             version: v1
             usage_rate: "1.0"
           - name: source-appsflyer
+            type: capture
+            version: v1
+            usage_rate: "1.0"
+          - name: source-zuora
             type: capture
             version: v1
             usage_rate: "1.0"
