@@ -153,9 +153,7 @@ func (d *transactor) UnmarshalState(state json.RawMessage) error {
 	}
 
 	for key, val := range raw {
-		if isJSONNull(val) {
-			continue
-		} else if bucket, ok := parseRangeBucket(key, val); ok {
+		if bucket, ok := parseRangeBucket(key, val); ok {
 			if d.scaleOut && key == d.rangeKey {
 				d.cp = bucket
 			} else {
@@ -192,8 +190,11 @@ func (d *transactor) mergePeerStatePatches(patches []json.RawMessage) error {
 
 	for _, patch := range patches {
 		if isJSONNull(patch) {
-			// A state reset means some participant emitted a full-replace
-			// state update, which no shard does with scale_out enabled.
+			// The runtime encodes a full-replace (non-merge-patch) state
+			// update as a literal null reset patch followed by the new state
+			// document. No shard emits full replacements with scale_out
+			// enabled, so a reset means a peer (e.g. one running an older
+			// connector image) just clobbered the consolidated state.
 			return fmt.Errorf("unexpected state reset patch under scale_out")
 		}
 
@@ -212,18 +213,11 @@ func (d *transactor) mergePeerStatePatches(patches []json.RawMessage) error {
 			if !rangeKeyRe.MatchString(key) {
 				// Top-level stateKeys are never emitted by scale_out peers,
 				// but route them as legacy entries rather than dropping them.
-				if isJSONNull(val) {
-					delete(d.peerShardsCheckpoints[legacyRangeKey], key)
-				} else if item, err := parseCheckpointItem(val); err != nil {
+				if item, err := parseCheckpointItem(val); err != nil {
 					return fmt.Errorf("parsing aggregated state patch entry %q: %w", key, err)
 				} else {
 					d.legacyBucket()[key] = item
 				}
-				continue
-			}
-
-			if isJSONNull(val) {
-				delete(d.peerShardsCheckpoints, key)
 				continue
 			}
 
@@ -232,9 +226,7 @@ func (d *transactor) mergePeerStatePatches(patches []json.RawMessage) error {
 				return fmt.Errorf("parsing aggregated state patch bucket %q: %w", key, err)
 			}
 			for stateKey, itemRaw := range bucket {
-				if isJSONNull(itemRaw) {
-					delete(d.peerShardsCheckpoints[key], stateKey)
-				} else if item, err := parseCheckpointItem(itemRaw); err != nil {
+				if item, err := parseCheckpointItem(itemRaw); err != nil {
 					return fmt.Errorf("parsing aggregated state patch entry %q of %q: %w", stateKey, key, err)
 				} else {
 					if d.peerShardsCheckpoints[key] == nil {
@@ -242,9 +234,6 @@ func (d *transactor) mergePeerStatePatches(patches []json.RawMessage) error {
 					}
 					d.peerShardsCheckpoints[key][stateKey] = item
 				}
-			}
-			if len(d.peerShardsCheckpoints[key]) == 0 {
-				delete(d.peerShardsCheckpoints, key)
 			}
 		}
 	}
@@ -541,11 +530,6 @@ func parseRangeBucket(key string, val json.RawMessage) (checkpoint, bool) {
 	var bucket checkpoint
 	if err := unmarshalStrict(val, &bucket); err != nil {
 		return nil, false
-	}
-	for stateKey, item := range bucket {
-		if item == nil {
-			delete(bucket, stateKey)
-		}
 	}
 	return bucket, true
 }
