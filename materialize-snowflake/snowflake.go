@@ -232,7 +232,10 @@ type transactor struct {
 	db                *stdsql.DB
 	streamManager     *streamManager
 	sdkStreamManager  *sdkStreamManager
-	pipeClient        *PipeClient
+	// sdkStreaming routes new delta-updates data through the SDK streaming
+	// path. The manager itself is available for checkpoint replay regardless.
+	sdkStreaming bool
+	pipeClient   *PipeClient
 
 	// Variables exclusively used by Load.
 	load struct {
@@ -322,6 +325,7 @@ func newTransactor(
 		db:                db,
 		streamManager:     sm,
 		sdkStreamManager:  sdkSM,
+		sdkStreaming:      sdkSM != nil,
 		pipeClient:        pipeClient,
 		_range:            open.Range,
 		version:           open.Version,
@@ -399,28 +403,24 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, streaming
 	b.load.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
 	b.store.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
 
-	if b.target.DeltaUpdates && d.cfg.Credentials.AuthType == snowflake_auth.JWT && d.sdkStreamManager != nil {
+	if b.target.DeltaUpdates && d.cfg.Credentials.AuthType == snowflake_auth.JWT && d.sdkStreaming {
+		// The SDK streaming path is explicitly opted into, so a table that
+		// cannot use it is an error rather than a reason to fall back to a
+		// strategy built on APIs that Snowflake is retiring.
 		loc := d.ep.Dialect.TableLocator(b.target.Path)
 		columnNames := make([]string, 0, len(target.Columns()))
 		for _, col := range target.Columns() {
 			columnNames = append(columnNames, d.ep.Dialect.ColumnLocator(col.Field))
 		}
 		if err := d.sdkStreamManager.addBinding(ctx, loc.TableSchema, loc.TableName, columnNames, target); err != nil {
-			if errors.Is(err, ErrPermanent) {
-				// The table cannot use the high-performance streaming API, so
-				// fall back to a non-SDK strategy for it.
-				log.WithError(err).WithField("table", b.target.Path).Info("not using Snowpipe Streaming SDK for table")
-			} else {
-				return fmt.Errorf("adding binding to SDK stream manager: %w", err)
-			}
-		} else {
-			b.streaming = true
-			b.sdk = true
-			b.sdkSchema = loc.TableSchema
-			b.sdkPipe = defaultPipeName(loc.TableName)
-			d.bindings = append(d.bindings, b)
-			return nil
+			return fmt.Errorf("adding binding to SDK stream manager: %w", err)
 		}
+		b.streaming = true
+		b.sdk = true
+		b.sdkSchema = loc.TableSchema
+		b.sdkPipe = defaultPipeName(loc.TableName)
+		d.bindings = append(d.bindings, b)
+		return nil
 	}
 
 	if b.target.DeltaUpdates && d.cfg.Credentials.AuthType == snowflake_auth.JWT && streamingEnabled {
