@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -153,9 +154,16 @@ func (c *sdkStreamClient) authorize(ctx context.Context) (string, string, error)
 	return c.ingestHost, c.scopedToken, nil
 }
 
+// quotedPathIdent renders an identifier for use as a URL path segment. The
+// endpoints parse path segments as SQL identifiers, uppercasing unquoted ones,
+// so identifiers are always double-quoted to preserve their exact stored form.
+func quotedPathIdent(ident string) string {
+	return url.PathEscape(`"` + strings.ReplaceAll(ident, `"`, `""`) + `"`)
+}
+
 func (c *sdkStreamClient) pipeURL(ingestHost, schema, pipe string) string {
 	return fmt.Sprintf("%s://%s/v2/streaming/databases/%s/schemas/%s/pipes/%s",
-		c.scheme, ingestHost, url.PathEscape(c.database), url.PathEscape(schema), url.PathEscape(pipe))
+		c.scheme, ingestHost, quotedPathIdent(c.database), quotedPathIdent(schema), quotedPathIdent(pipe))
 }
 
 // openChannel creates or re-opens a channel of the pipe, returning the
@@ -213,7 +221,7 @@ func (c *sdkStreamClient) appendRows(ctx context.Context, schema, pipe, channel,
 		SetResult(&out).
 		SetError(apiErr).
 		Post(fmt.Sprintf("%s://%s/v2/streaming/data/databases/%s/schemas/%s/pipes/%s/channels/%s/rows",
-			c.scheme, ingestHost, url.PathEscape(c.database), url.PathEscape(schema), url.PathEscape(pipe), url.PathEscape(channel)))
+			c.scheme, ingestHost, quotedPathIdent(c.database), quotedPathIdent(schema), quotedPathIdent(pipe), url.PathEscape(channel)))
 	if err != nil {
 		return "", fmt.Errorf("appending rows to channel %q: %w", channel, err)
 	} else if !res.IsSuccess() {

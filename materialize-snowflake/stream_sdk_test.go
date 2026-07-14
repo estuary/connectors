@@ -143,3 +143,58 @@ func TestSdkStreamManager(t *testing.T) {
 		{"key5", "hello5", "world5"},
 	})
 }
+
+// TestSdkStreamCaseSensitiveIdentifiers confirms the SDK streaming path works
+// with quoted, case-sensitive table and column names, whose stored identifiers
+// are not simply uppercased.
+func TestSdkStreamCaseSensitiveIdentifiers(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode")
+	}
+
+	ctx := context.Background()
+	cfg := mustGetCfg(t)
+
+	dsn, err := cfg.toURI(true, "")
+	require.NoError(t, err)
+	db, err := stdsql.Open("snowflake", dsn)
+	require.NoError(t, err)
+	defer db.Close()
+
+	var accountName string
+	require.NoError(t, db.QueryRowContext(ctx, "SELECT CURRENT_ACCOUNT()").Scan(&accountName))
+
+	const tableName = `Sdk Mixed-Case`
+	cleanup := func() {
+		db.ExecContext(ctx, `DROP TABLE IF EXISTS "Sdk Mixed-Case";`)
+	}
+	defer cleanup()
+	cleanup()
+
+	_, err = db.ExecContext(ctx, `CREATE TABLE "Sdk Mixed-Case" ("Key col" TEXT, "value:Col" TEXT);`)
+	require.NoError(t, err)
+
+	table := sql.Table{TableShape: sql.TableShape{Binding: 0}, Identifier: `"Sdk Mixed-Case"`}
+	columnNames := []string{"Key col", "value:Col"}
+
+	sm, err := newSdkStreamManager(&cfg, "testing-sdk-case", accountName, 0, db)
+	require.NoError(t, err)
+	require.NoError(t, sm.addBinding(ctx, cfg.Schema, tableName, columnNames, table))
+
+	require.NoError(t, sm.writeRow(ctx, 0, []any{"k1", "v1"}))
+	require.NoError(t, sm.writeRow(ctx, 0, []any{"k2", "v2"}))
+	chunks, err := sm.flush(ctx, "case-token")
+	require.NoError(t, err)
+	require.NoError(t, sm.write(ctx, cfg.Schema, defaultPipeName(tableName), chunks[0]))
+
+	rows, err := db.QueryContext(ctx, `SELECT "Key col", "value:Col" FROM "Sdk Mixed-Case" ORDER BY "Key col"`)
+	require.NoError(t, err)
+	defer rows.Close()
+	var got [][]string
+	for rows.Next() {
+		var k, v string
+		require.NoError(t, rows.Scan(&k, &v))
+		got = append(got, []string{k, v})
+	}
+	require.Equal(t, [][]string{{"k1", "v1"}, {"k2", "v2"}}, got)
+}

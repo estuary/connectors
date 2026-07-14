@@ -62,7 +62,7 @@ func TestSdkStreamClient(t *testing.T) {
 		require.Equal(t, serverHost, r.Form.Get("scope"))
 		w.Write([]byte("scoped-token"))
 	})
-	mux.HandleFunc("PUT /v2/streaming/databases/TEST_DB/schemas/TEST_SCHEMA/pipes/TBL-STREAMING/channels/CH", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("PUT /v2/streaming/databases/\"TEST_DB\"/schemas/\"TEST_SCHEMA\"/pipes/\"TBL-STREAMING\"/channels/CH", func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, "Bearer scoped-token", r.Header.Get("Authorization"))
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{
@@ -74,7 +74,7 @@ func TestSdkStreamClient(t *testing.T) {
 			},
 		})
 	})
-	mux.HandleFunc("POST /v2/streaming/data/databases/TEST_DB/schemas/TEST_SCHEMA/pipes/TBL-STREAMING/channels/CH/rows", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /v2/streaming/data/databases/\"TEST_DB\"/schemas/\"TEST_SCHEMA\"/pipes/\"TBL-STREAMING\"/channels/CH/rows", func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, "application/x-ndjson", r.Header.Get("Content-Type"))
 		require.Equal(t, "gzip", r.Header.Get("Content-Encoding"))
 		gz, err := gzip.NewReader(r.Body)
@@ -90,7 +90,7 @@ func TestSdkStreamClient(t *testing.T) {
 			"next_continuation_token": fmt.Sprintf("0_%d", len(appendedTokens)+1),
 		})
 	})
-	mux.HandleFunc("POST /v2/streaming/databases/TEST_DB/schemas/TEST_SCHEMA/pipes/TBL-STREAMING:bulk-channel-status", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /v2/streaming/databases/\"TEST_DB\"/schemas/\"TEST_SCHEMA\"/pipes/\"TBL-STREAMING\":bulk-channel-status", func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			ChannelNames []string `json:"channel_names"`
 		}
@@ -193,7 +193,7 @@ func TestSdkStreamClientErrors(t *testing.T) {
 			mux.HandleFunc("POST /oauth/token", func(w http.ResponseWriter, r *http.Request) {
 				w.Write([]byte("scoped-token"))
 			})
-			mux.HandleFunc("PUT /v2/streaming/databases/TEST_DB/schemas/TEST_SCHEMA/pipes/TBL-STREAMING/channels/CH", func(w http.ResponseWriter, r *http.Request) {
+			mux.HandleFunc("PUT /v2/streaming/databases/\"TEST_DB\"/schemas/\"TEST_SCHEMA\"/pipes/\"TBL-STREAMING\"/channels/CH", func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(tt.status)
 				json.NewEncoder(w).Encode(map[string]any{"code": "390404", "message": "no such pipe"})
@@ -272,7 +272,7 @@ func TestSdkWaitForTokenCommitted(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var call int
 			mux := http.NewServeMux()
-			mux.HandleFunc("POST /v2/streaming/databases/TEST_DB/schemas/TEST_SCHEMA/pipes/TBL-STREAMING:bulk-channel-status", func(w http.ResponseWriter, r *http.Request) {
+			mux.HandleFunc("POST /v2/streaming/databases/\"TEST_DB\"/schemas/\"TEST_SCHEMA\"/pipes/\"TBL-STREAMING\":bulk-channel-status", func(w http.ResponseWriter, r *http.Request) {
 				res := tt.responses[min(call, len(tt.responses)-1)]
 				call++
 				w.Header().Set("Content-Type", "application/json")
