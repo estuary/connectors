@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"iter"
 	"net/http"
@@ -160,11 +161,12 @@ func TestIntegration(t *testing.T) {
 	//})
 }
 
-// TestIntegrationGlue runs the standard materialize/apply integration tests
-// against a real AWS Glue Data Catalog. The connector advertises Glue support
-// but TestIntegration only exercises the Polaris REST catalog, so this covers
-// the otherwise-untested Glue code path (including the S3 FileIO credential
-// wiring) and guards against drift between the two catalogs. It runs by default
+// TestIntegrationGlue runs the same integration subtests as TestIntegration —
+// materialize/apply plus the catalog regression tests — against a real AWS
+// Glue Data Catalog. The connector advertises Glue support but TestIntegration
+// only exercises the Polaris REST catalog, so this covers the otherwise-
+// untested Glue code path (including the S3 FileIO credential wiring) and
+// guards against drift between the two catalogs. It runs by default
 // alongside TestIntegration; the sops-encrypted testdata/config-glue.yaml
 // supplies credentials and is decrypted by the test harness (CI and local runs
 // need GCP KMS access).
@@ -193,6 +195,18 @@ func TestIntegrationGlue(t *testing.T) {
 	t.Run("apply", func(t *testing.T) {
 		boilerplate.RunApplyTest(t, &driver{}, newMaterialization, "testdata/apply-glue.flow.yaml", makeResourceFn)
 	})
+
+	t.Run("ts-overflow-regression", func(t *testing.T) {
+		runTimestampOverflowRegression(t, cfg)
+	})
+
+	t.Run("date-overflow-regression", func(t *testing.T) {
+		runDateOverflowRegression(t, cfg)
+	})
+
+	t.Run("checkpoint-fence-regression", func(t *testing.T) {
+		runCheckpointFenceRegression(t, cfg)
+	})
 }
 
 // TestRestGlueSnapshotParity enforces that the REST and Glue materialize
@@ -216,80 +230,121 @@ func TestRestGlueSnapshotParity(t *testing.T) {
 func runTimestampOverflowRegression(t *testing.T, cfg config) {
 	ctx := context.Background()
 
-	cat, err := newCatalog(ctx, cfg, NestedLocationStyle)
-	require.NoError(t, err)
+	rt := newRegressionTable(t, ctx, cfg, "ts_overflow_regression",
+		iceberg.NestedField{ID: 1, Name: "ts", Type: iceberg.PrimitiveTypes.TimestampTz, Required: false}, nil)
 
-	const (
-		namespace = "tests"
-		table     = "ts_overflow_regression"
-	)
-	tableIdent := icebergtable.Identifier{namespace, table}
-
-	// Tolerate leftovers from a prior run of this test.
-	_ = cat.cat.DropTable(ctx, tableIdent)
-	if err := cat.createNamespace(ctx, namespace); err != nil &&
-		!errors.Is(err, icebergcatalog.ErrNamespaceAlreadyExists) {
-		t.Fatalf("create-namespace: %v", err)
-	}
-
-	schema := iceberg.NewSchema(0, iceberg.NestedField{
-		ID:       1,
-		Name:     "ts",
-		Type:     iceberg.PrimitiveTypes.TimestampTz,
-		Required: false,
-	})
-
-	nameMappingJSON, err := json.Marshal(schema.NameMapping())
-	require.NoError(t, err)
-
-	tblLocation := tablePath(cfg.Bucket, cfg.Prefix, namespace, table, NestedLocationStyle)
-	_, err = cat.cat.CreateTable(ctx, tableIdent, schema,
-		icebergcatalog.WithLocation(tblLocation),
-		icebergcatalog.WithProperties(iceberg.Properties{
-			icebergtable.DefaultNameMappingKey: string(nameMappingJSON),
-		}),
-	)
-	require.NoError(t, err)
-
-	parquetPath := filepath.Join(t.TempDir(), "data.parquet")
-	parquetFile, err := os.Create(parquetPath)
-	require.NoError(t, err)
-	pqw, err := writer.NewParquetWriter(parquetFile, writer.ParquetSchema{
-		{Name: "ts", DataType: writer.LogicalTypeTimestamp, Required: false},
-	}, writer.WithParquetCompression(writer.Snappy))
-	require.NoError(t, err)
 	clampedTS, err := clampTimestamp("9999-12-31T23:59:59-14:00")
 	require.NoError(t, err)
-	require.NoError(t, pqw.Write([]any{clampedTS}))
-	require.NoError(t, pqw.Close())
+	s3Path := rt.uploadParquet(t, ctx,
+		writer.ParquetSchemaElement{Name: "ts", DataType: writer.LogicalTypeTimestamp, Required: false}, clampedTS)
 
-	s3Path := strings.TrimSuffix(tblLocation, "/") + "/data/" + uuid.New().String() + ".parquet"
-	s3Key := strings.TrimPrefix(s3Path, "s3://"+cfg.Bucket+"/")
-
-	uploadFile, err := os.Open(parquetPath)
-	require.NoError(t, err)
-	defer uploadFile.Close()
-
-	s3client := s3.New(s3.Options{
-		Region:       cfg.Region,
-		Credentials:  credentials.NewStaticCredentialsProvider(cfg.Credentials.AWSAccessKeyID, cfg.Credentials.AWSSecretAccessKey, ""),
-		BaseEndpoint: aws.String(cfg.S3Endpoint),
-		UsePathStyle: true,
-	})
-	_, err = s3client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket: aws.String(cfg.Bucket),
-		Key:    aws.String(s3Key),
-		Body:   uploadFile,
-	})
-	require.NoError(t, err)
-
-	require.NoError(t, cat.appendFiles(ctx,
+	require.NoError(t, rt.cat.appendFiles(ctx,
 		"acmeCo/tests/regression",
-		tableIdent,
+		rt.ident,
 		[]string{s3Path},
 		"",
 		"deadbeefdeadbeef",
 	))
+}
+
+// regressionTable is the shared scaffolding of the append regression tests: a
+// freshly created single-column table plus the machinery to write, upload,
+// and append single-column parquet files to it.
+type regressionTable struct {
+	cfg      config
+	cat      *catalog
+	ident    icebergtable.Identifier
+	location string
+	s3client *s3.Client
+}
+
+func newRegressionTable(t *testing.T, ctx context.Context, cfg config, table string, field iceberg.NestedField, extraProps iceberg.Properties) *regressionTable {
+	t.Helper()
+
+	cat, err := newCatalog(ctx, cfg, NestedLocationStyle)
+	require.NoError(t, err)
+
+	ensureNamespace(t, cfg)
+
+	// The suffix follows testutil's testItemIdentifier convention: it keeps
+	// concurrent runs against the shared Glue account from dropping each
+	// other's tables, and lets the boilerplate subtests' stale-item sweep
+	// reclaim tables leaked by crashed runs.
+	table = fmt.Sprintf("%s_flow_test_%d", table, time.Now().Unix())
+	ident := icebergtable.Identifier{cfg.Namespace, table}
+
+	schema := iceberg.NewSchema(0, field)
+	nameMappingJSON, err := json.Marshal(schema.NameMapping())
+	require.NoError(t, err)
+
+	props := iceberg.Properties{
+		icebergtable.DefaultNameMappingKey: string(nameMappingJSON),
+	}
+	for k, v := range extraProps {
+		props[k] = v
+	}
+
+	location := tablePath(cfg.Bucket, cfg.Prefix, cfg.Namespace, table, NestedLocationStyle)
+	_, err = cat.cat.CreateTable(ctx, ident, schema,
+		icebergcatalog.WithLocation(location),
+		icebergcatalog.WithProperties(props),
+	)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		if err := cat.cat.DropTable(ctx, ident); err != nil {
+			t.Log("failed to drop regression table", ident, err)
+		}
+	})
+
+	s3opts := s3.Options{
+		Region:      cfg.Region,
+		Credentials: credentials.NewStaticCredentialsProvider(cfg.Credentials.AWSAccessKeyID, cfg.Credentials.AWSSecretAccessKey, ""),
+	}
+	// Path-style addressing only applies to S3-compatible stacks (rustfs in
+	// TestIntegration); real AWS (Glue) uses the default endpoint resolution.
+	if cfg.S3Endpoint != "" {
+		s3opts.BaseEndpoint = aws.String(cfg.S3Endpoint)
+		s3opts.UsePathStyle = true
+	}
+
+	return &regressionTable{
+		cfg:      cfg,
+		cat:      cat,
+		ident:    ident,
+		location: location,
+		s3client: s3.New(s3opts),
+	}
+}
+
+// uploadParquet writes rows into a single-column parquet file and uploads it to
+// the table's data prefix, returning its s3 path.
+func (rt *regressionTable) uploadParquet(t *testing.T, ctx context.Context, col writer.ParquetSchemaElement, rows ...any) string {
+	t.Helper()
+
+	parquetPath := filepath.Join(t.TempDir(), "data.parquet")
+	parquetFile, err := os.Create(parquetPath)
+	require.NoError(t, err)
+	pqw, err := writer.NewParquetWriter(parquetFile, writer.ParquetSchema{col},
+		writer.WithParquetCompression(writer.Snappy))
+	require.NoError(t, err)
+	for _, row := range rows {
+		require.NoError(t, pqw.Write([]any{row}))
+	}
+	require.NoError(t, pqw.Close())
+
+	s3Path := strings.TrimSuffix(rt.location, "/") + "/data/" + uuid.New().String() + ".parquet"
+
+	uploadFile, err := os.Open(parquetPath)
+	require.NoError(t, err)
+	defer uploadFile.Close()
+	_, err = rt.s3client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(rt.cfg.Bucket),
+		Key:    aws.String(strings.TrimPrefix(s3Path, "s3://"+rt.cfg.Bucket+"/")),
+		Body:   uploadFile,
+	})
+	require.NoError(t, err)
+
+	return s3Path
 }
 
 // runDateOverflowRegression is the date analog of runTimestampOverflowRegression.
@@ -298,76 +353,17 @@ func runTimestampOverflowRegression(t *testing.T, cfg config) {
 func runDateOverflowRegression(t *testing.T, cfg config) {
 	ctx := context.Background()
 
-	cat, err := newCatalog(ctx, cfg, NestedLocationStyle)
-	require.NoError(t, err)
+	rt := newRegressionTable(t, ctx, cfg, "date_overflow_regression",
+		iceberg.NestedField{ID: 1, Name: "d", Type: iceberg.PrimitiveTypes.Date, Required: false}, nil)
 
-	const (
-		namespace = "tests"
-		table     = "date_overflow_regression"
-	)
-	tableIdent := icebergtable.Identifier{namespace, table}
-
-	// Tolerate leftovers from a prior run of this test.
-	_ = cat.cat.DropTable(ctx, tableIdent)
-	if err := cat.createNamespace(ctx, namespace); err != nil &&
-		!errors.Is(err, icebergcatalog.ErrNamespaceAlreadyExists) {
-		t.Fatalf("create-namespace: %v", err)
-	}
-
-	schema := iceberg.NewSchema(0, iceberg.NestedField{
-		ID:       1,
-		Name:     "d",
-		Type:     iceberg.PrimitiveTypes.Date,
-		Required: false,
-	})
-
-	nameMappingJSON, err := json.Marshal(schema.NameMapping())
-	require.NoError(t, err)
-
-	tblLocation := tablePath(cfg.Bucket, cfg.Prefix, namespace, table, NestedLocationStyle)
-	_, err = cat.cat.CreateTable(ctx, tableIdent, schema,
-		icebergcatalog.WithLocation(tblLocation),
-		icebergcatalog.WithProperties(iceberg.Properties{
-			icebergtable.DefaultNameMappingKey: string(nameMappingJSON),
-		}),
-	)
-	require.NoError(t, err)
-
-	parquetPath := filepath.Join(t.TempDir(), "data.parquet")
-	parquetFile, err := os.Create(parquetPath)
-	require.NoError(t, err)
-	pqw, err := writer.NewParquetWriter(parquetFile, writer.ParquetSchema{
-		{Name: "d", DataType: writer.LogicalTypeDate, Required: false},
-	}, writer.WithParquetCompression(writer.Snappy))
-	require.NoError(t, err)
 	clampedDate, err := clampDate("10000-01-01")
 	require.NoError(t, err)
-	require.NoError(t, pqw.Write([]any{clampedDate}))
-	require.NoError(t, pqw.Close())
+	s3Path := rt.uploadParquet(t, ctx,
+		writer.ParquetSchemaElement{Name: "d", DataType: writer.LogicalTypeDate, Required: false}, clampedDate)
 
-	s3Path := strings.TrimSuffix(tblLocation, "/") + "/data/" + uuid.New().String() + ".parquet"
-	s3Key := strings.TrimPrefix(s3Path, "s3://"+cfg.Bucket+"/")
-
-	uploadFile, err := os.Open(parquetPath)
-	require.NoError(t, err)
-	defer uploadFile.Close()
-
-	s3client := s3.New(s3.Options{
-		Region:       cfg.Region,
-		Credentials:  credentials.NewStaticCredentialsProvider(cfg.Credentials.AWSAccessKeyID, cfg.Credentials.AWSSecretAccessKey, ""),
-		BaseEndpoint: aws.String(cfg.S3Endpoint),
-		UsePathStyle: true,
-	})
-	_, err = s3client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket: aws.String(cfg.Bucket),
-		Key:    aws.String(s3Key),
-		Body:   uploadFile,
-	})
-	require.NoError(t, err)
-
-	require.NoError(t, cat.appendFiles(ctx,
+	require.NoError(t, rt.cat.appendFiles(ctx,
 		"acmeCo/tests/regression",
-		tableIdent,
+		rt.ident,
 		[]string{s3Path},
 		"",
 		"deadbeefdeadbeef",
@@ -382,89 +378,27 @@ func runDateOverflowRegression(t *testing.T, cfg config) {
 func runCheckpointFenceRegression(t *testing.T, cfg config) {
 	ctx := context.Background()
 
-	cat, err := newCatalog(ctx, cfg, NestedLocationStyle)
-	require.NoError(t, err)
+	const materialization = "acmeCo/tests/regression"
 
-	const (
-		namespace       = "tests"
-		table           = "checkpoint_fence_regression"
-		materialization = "acmeCo/tests/regression"
-	)
-	tableIdent := icebergtable.Identifier{namespace, table}
+	rt := newRegressionTable(t, ctx, cfg, "checkpoint_fence_regression",
+		iceberg.NestedField{ID: 1, Name: "v", Type: iceberg.PrimitiveTypes.String, Required: false}, nil)
 
-	// Tolerate leftovers from a prior run of this test.
-	_ = cat.cat.DropTable(ctx, tableIdent)
-	if err := cat.createNamespace(ctx, namespace); err != nil &&
-		!errors.Is(err, icebergcatalog.ErrNamespaceAlreadyExists) {
-		t.Fatalf("create-namespace: %v", err)
-	}
-
-	schema := iceberg.NewSchema(0, iceberg.NestedField{
-		ID:       1,
-		Name:     "v",
-		Type:     iceberg.PrimitiveTypes.String,
-		Required: false,
-	})
-
-	nameMappingJSON, err := json.Marshal(schema.NameMapping())
-	require.NoError(t, err)
-
-	tblLocation := tablePath(cfg.Bucket, cfg.Prefix, namespace, table, NestedLocationStyle)
-	_, err = cat.cat.CreateTable(ctx, tableIdent, schema,
-		icebergcatalog.WithLocation(tblLocation),
-		icebergcatalog.WithProperties(iceberg.Properties{
-			icebergtable.DefaultNameMappingKey: string(nameMappingJSON),
-		}),
-	)
-	require.NoError(t, err)
-
-	s3client := s3.New(s3.Options{
-		Region:       cfg.Region,
-		Credentials:  credentials.NewStaticCredentialsProvider(cfg.Credentials.AWSAccessKeyID, cfg.Credentials.AWSSecretAccessKey, ""),
-		BaseEndpoint: aws.String(cfg.S3Endpoint),
-		UsePathStyle: true,
-	})
-
-	uploadParquet := func(v string) string {
-		parquetPath := filepath.Join(t.TempDir(), "data.parquet")
-		parquetFile, err := os.Create(parquetPath)
-		require.NoError(t, err)
-		pqw, err := writer.NewParquetWriter(parquetFile, writer.ParquetSchema{
-			{Name: "v", DataType: writer.LogicalTypeString, Required: false},
-		}, writer.WithParquetCompression(writer.Snappy))
-		require.NoError(t, err)
-		require.NoError(t, pqw.Write([]any{v}))
-		require.NoError(t, pqw.Close())
-
-		s3Path := strings.TrimSuffix(tblLocation, "/") + "/data/" + uuid.New().String() + ".parquet"
-		uploadFile, err := os.Open(parquetPath)
-		require.NoError(t, err)
-		defer uploadFile.Close()
-		_, err = s3client.PutObject(ctx, &s3.PutObjectInput{
-			Bucket: aws.String(cfg.Bucket),
-			Key:    aws.String(strings.TrimPrefix(s3Path, "s3://"+cfg.Bucket+"/")),
-			Body:   uploadFile,
-		})
-		require.NoError(t, err)
-
-		return s3Path
-	}
-
-	first := uploadParquet("one")
-	require.NoError(t, cat.appendFiles(ctx, materialization, tableIdent,
+	vCol := writer.ParquetSchemaElement{Name: "v", DataType: writer.LogicalTypeString, Required: false}
+	first := rt.uploadParquet(t, ctx, vCol, "one")
+	require.NoError(t, rt.cat.appendFiles(ctx, materialization, rt.ident,
 		[]string{first}, "", "checkpoint-1"))
 
 	// Replaying the already-committed checkpoint is skipped by the fence, so
 	// the same path is not re-appended.
-	require.NoError(t, cat.appendFiles(ctx, materialization, tableIdent,
+	require.NoError(t, rt.cat.appendFiles(ctx, materialization, rt.ident,
 		[]string{first}, "", "checkpoint-1"))
 
-	second := uploadParquet("two")
-	require.NoError(t, cat.appendFiles(ctx, materialization, tableIdent,
+	second := rt.uploadParquet(t, ctx, vCol, "two")
+	require.NoError(t, rt.cat.appendFiles(ctx, materialization, rt.ident,
 		[]string{second}, "checkpoint-1", "checkpoint-2"))
 
 	// Two data files total: the replay added nothing.
-	tbl, err := cat.cat.LoadTable(ctx, tableIdent)
+	tbl, err := rt.cat.cat.LoadTable(ctx, rt.ident)
 	require.NoError(t, err)
 	fs, err := tbl.FS(ctx)
 	require.NoError(t, err)
