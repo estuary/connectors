@@ -24,7 +24,12 @@ from ..flow import (
 )
 from ..http import HTTPMixin, TokenSource
 from ..logger import FlowLogger
-from ..utils import format_error_message, get_running_tasks_info, sort_dict
+from ..utils import (
+    format_error_message,
+    get_running_tasks_info,
+    sort_dict,
+    surface_slow,
+)
 from . import Request, Response, Task, request, response
 from ._emit import emit_bytes
 from .common import _ConnectorState
@@ -39,6 +44,8 @@ PERIODIC_RESTART_INTERVAL = 24 * 60 * 60  # 24 hours
 GRACEFUL_SHUTDOWN_TIMEOUT = 30 * 60  # 30 minutes
 TASK_CANCELLATION_TIMEOUT = 5 * 60  # 5 minutes
 WEBHOOK_SHUTDOWN_TIMEOUT = 60  # 1 minute
+
+OAUTH2_ROTATION_DEADLINE = 10 * 60  # 10 minutes
 
 
 class TerminateTaskGroup(Exception):
@@ -346,11 +353,16 @@ class BaseCaptureConnector(
         if access_token_expiration < now + timedelta(minutes=5):
             # Exchange for new access token & refresh token.
             log.info("Attempting to rotate OAuth2 tokens.")
-            token_exchange_response = await self.token_source.initialize_oauth2_tokens(
-                log, self
+            token_exchange_response = await surface_slow(
+                log,
+                "OAuth2 token exchange",
+                self.token_source.initialize_oauth2_tokens(log, self),
+                deadline=OAUTH2_ROTATION_DEADLINE,
             )
 
-            # Replace tokens in the config.
+            # Replace tokens in the config. From here until the control plane
+            # publishes the emitted config update, these in-memory tokens are
+            # the only valid copy.
             credentials = self.token_source.credentials
             credentials.access_token = token_exchange_response.access_token
             credentials.refresh_token = token_exchange_response.refresh_token
