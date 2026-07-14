@@ -25,6 +25,8 @@ API_CATALOG = "Advertisers"
 # arrivals time to appear before the cursor moves past their timestamp.
 INCREMENTAL_LAG = timedelta(hours=1)
 
+PAGE_SIZE = 20000
+
 async def fetch_incremental(
     cls,
     account_sid,
@@ -42,11 +44,12 @@ async def fetch_incremental(
     iterating = True
 
     url = f"{API}/{API_CATALOG}/{account_sid}/{_cls.NAME}"
-    parameters = None
+    first_page_params: dict[str, JsonValue] = {"PageSize": PAGE_SIZE}
     headers = {'Accept': 'application/json'} # required by the source, else results are XML
 
     if _cls.START_DATE_INCREMENTAL:
-        parameters = {f"{_cls.START_DATE_INCREMENTAL}": _cursor_dt(_cls.NAME, log_cursor)}
+        first_page_params[f"{_cls.START_DATE_INCREMENTAL}"] = _cursor_dt(_cls.NAME, log_cursor)
+    parameters: dict[str, JsonValue] | None = first_page_params
     max_ts = log_cursor
     horizon = datetime.now(tz=UTC) - INCREMENTAL_LAG
 
@@ -90,16 +93,18 @@ async def fetch_backfill(
     assert isinstance(cutoff, datetime)
     _cls: Any = cls
     headers = {'Accept': 'application/json'}
-    parameters = None
+    parameters: dict[str, JsonValue] | None = None
 
     if page:
         assert isinstance(page, str)
         url = API + page
-    
+
     else:
         url = f"{API}/{API_CATALOG}/{account_sid}/{cls.NAME}"
+        parameters = {"PageSize": PAGE_SIZE}
         if _cls.START_DATE:
-            parameters = {f"{_cls.START_DATE}": _cursor_dt(cls.NAME, config_start_date), f"{_cls.END_DATE}": _cursor_dt(cls.NAME, cutoff)}
+            parameters[f"{_cls.START_DATE}"] = _cursor_dt(cls.NAME, config_start_date)
+            parameters[f"{_cls.END_DATE}"] = _cursor_dt(cls.NAME, cutoff)
 
     result = json.loads(await http.request(log, url, method="GET", params=parameters, headers=headers))
 
@@ -153,7 +158,7 @@ async def fetch_incremental_actions(
         iterating = True
 
         url = f"{API}/{API_CATALOG}/{account_sid}/{cls.NAME}"
-        parameters: dict[str, JsonValue] | None = {"CampaignId": campaign}
+        parameters: dict[str, JsonValue] | None = {"CampaignId": campaign, "PageSize": PAGE_SIZE}
 
         _cls: Any = cls  # Silence mypy false-positive
 
@@ -200,7 +205,7 @@ async def fetch_backfill_actions(
     """
     assert isinstance(cutoff, datetime)
     headers = {'Accept': 'application/json'}
-    parameters = {}
+    parameters: dict[str, JsonValue] = {"PageSize": PAGE_SIZE}
 
 
     if cutoff - timedelta(days=1095) <= config_start_date <= cutoff:
@@ -277,7 +282,7 @@ async def fetch_snapshot(
     iterating = True
 
     url = f"{API}/{API_CATALOG}/{account_sid}/{cls.NAME}"
-    parameters = None
+    parameters: dict[str, JsonValue] | None = {"PageSize": PAGE_SIZE}
     headers = {'Accept': 'application/json'}
 
     while iterating:
@@ -288,7 +293,10 @@ async def fetch_snapshot(
             yield doc
 
         if result.get("@nextpageuri"):
+            # The next-page URI already carries every query parameter, so
+            # clear `parameters` to avoid sending them a second time
             url = API + result["@nextpageuri"]
+            parameters = None
         else:
             break
 
@@ -325,10 +333,11 @@ async def fetch_incremental_child(
         url = f"{API}/{API_CATALOG}/{account_sid}/Campaigns/{campaign}/{cls.NAME}"
         if cls.NAME == "Tasks":
             url = f"{API}/{API_CATALOG}/{account_sid}/Programs/{campaign}/{cls.NAME}"
-        parameters = None
+        first_page_params: dict[str, JsonValue] = {"PageSize": PAGE_SIZE}
         headers = {'Accept': 'application/json'}
         if _cls.START_DATE_INCREMENTAL:
-            parameters = {f"{_cls.START_DATE_INCREMENTAL}": _cursor_dt(cls.NAME, log_cursor)}
+            first_page_params[f"{_cls.START_DATE_INCREMENTAL}"] = _cursor_dt(cls.NAME, log_cursor)
+        parameters: dict[str, JsonValue] | None = first_page_params
 
         while iterating:
             result = json.loads(await http.request(log, url, method="GET", params=parameters, headers=headers))
@@ -374,7 +383,6 @@ async def fetch_backfill_child(
     assert isinstance(cutoff, datetime)
     _cls: Any = cls
     headers = {'Accept': 'application/json'}
-    parameters = None
 
     campaign_list = set()
 
@@ -388,7 +396,7 @@ async def fetch_backfill_child(
         url = f"{API}/{API_CATALOG}/{account_sid}/Campaigns/{campaign}/{cls.NAME}"
         if cls.NAME == "Tasks":
             url = f"{API}/{API_CATALOG}/{account_sid}/Programs/{campaign}/{cls.NAME}"
-        headers = {'Accept': 'application/json'}
+        parameters: dict[str, JsonValue] | None = {"PageSize": PAGE_SIZE}
         # if _cls.START_DATE:
         #     parameters = {f"{_cls.START_DATE}": _cursor_dt(cls.NAME, config_start_date), f"{_cls.END_DATE}": _cursor_dt(cls.NAME, cutoff)}
 
@@ -407,7 +415,10 @@ async def fetch_backfill_child(
                     doc = _cls.model_validate_json(json.dumps(results))
                     yield doc
             if result.get("@nextpageuri"):
+                # The next-page URI already carries every query parameter, so
+                # clear `parameters` to avoid sending them a second time
                 url = API + result["@nextpageuri"]
+                parameters = None
             else:
                 iterating = False
     return
@@ -433,7 +444,7 @@ async def fetch_snapshot_child(
         iterating = True
 
         url = f"{API}/{API_CATALOG}/{account_sid}/Campaigns/{campaign}/{cls.NAME}"
-        parameters = None
+        parameters: dict[str, JsonValue] | None = {"PageSize": PAGE_SIZE}
         headers = {'Accept': 'application/json'}
 
         while iterating:
@@ -444,7 +455,10 @@ async def fetch_snapshot_child(
                 yield doc
 
             if result.get("@nextpageuri"):
+                # The next-page URI already carries every query parameter, so
+                # clear `parameters` to avoid sending them a second time
                 url = API + result["@nextpageuri"]
+                parameters = None
             else:
                 break
 
