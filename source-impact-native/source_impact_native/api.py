@@ -9,6 +9,7 @@ from estuary_cdk.capture.common import (
     PageCursor,
 )
 from estuary_cdk.http import HTTPSession
+from pydantic import JsonValue
 
 from source_impact_native.models import ActionInquiries, Actions
 
@@ -63,7 +64,10 @@ async def fetch_incremental(
                 iterating = False
                 break
         if result.get("@nextpageuri"):
+            # The next-page URI already carries every query parameter, so
+            # clear `parameters` to avoid sending them a second time
             url = API + result["@nextpageuri"]
+            parameters = None
         else:
             break
     if max_ts != log_cursor:
@@ -149,7 +153,7 @@ async def fetch_incremental_actions(
         iterating = True
 
         url = f"{API}/{API_CATALOG}/{account_sid}/{cls.NAME}"
-        parameters = {"CampaignId": campaign}
+        parameters: dict[str, JsonValue] | None = {"CampaignId": campaign}
 
         _cls: Any = cls  # Silence mypy false-positive
 
@@ -164,7 +168,10 @@ async def fetch_incremental_actions(
                     yield doc
 
             if result.get("@nextpageuri"):
+                # The next-page URI already carries every query parameter, so
+                # clear `parameters` to avoid sending them a second time
                 url = API + result["@nextpageuri"]
+                parameters = None
             else:
                 iterating = False
     if max_ts != log_cursor:
@@ -212,11 +219,11 @@ async def fetch_backfill_actions(
     async for campaign in campaigns:
         campaign_list.add(campaign.Id)
 
+    base_url = f"{API}/{API_CATALOG}/{account_sid}/{cls.NAME}"
+
+    _cls: Any = cls
+
     for campaign in campaign_list:
-        url = f"{API}/{API_CATALOG}/{account_sid}/{cls.NAME}"
-
-        _cls: Any = cls
-
         parameters["CampaignId"] = campaign
 
         for start, end in dates:
@@ -225,10 +232,19 @@ async def fetch_backfill_actions(
             parameters["ActionDateStart"] = _cursor_dt(cls.NAME, start)
             parameters["ActionDateEnd"] = _cursor_dt(cls.NAME, end)
 
+            # The first page of each (campaign, date-range) window is requested
+            # from the base URL with the query parameters. Subsequent pages use
+            # the @nextpageuri, which already embeds every parameter
+            url = base_url
+            request_params: dict[str, JsonValue] | None = parameters
 
             while iterating:
 
-                result = json.loads(await http.request(log, url, method="GET", params=parameters, headers=headers))
+                result = json.loads(
+                    await http.request(
+                        log, url, method="GET", params=request_params, headers=headers
+                    )
+                )
 
                 for results in result[f"{_cls.NAME}"]:
                     if _s_to_dt(results[f"CreationDate"]) == config_start_date:
@@ -243,9 +259,11 @@ async def fetch_backfill_actions(
 
                 if result.get("@nextpageuri"):
                     url = API + result["@nextpageuri"]
+                    request_params = None
                 else:
                     iterating = False
     return
+
 
 async def fetch_snapshot(
     cls,
@@ -326,7 +344,10 @@ async def fetch_incremental_child(
                     iterating = False
                     break
             if result.get("@nextpageuri"):
+                # The next-page URI already carries every query parameter, so
+                # clear `parameters` to avoid sending them a second time
                 url = API + result["@nextpageuri"]
+                parameters = None
             else:
                 break
     if max_ts != log_cursor:
