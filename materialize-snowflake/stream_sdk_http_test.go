@@ -213,14 +213,15 @@ func TestSdkStreamClientErrors(t *testing.T) {
 func TestSdkWaitForTokenCommitted(t *testing.T) {
 	ctx := context.Background()
 
-	makeStatus := func(committed *string, errorRows int) map[string]any {
+	makeStatus := func(committed *string, errorRows int, errorOffset *string) map[string]any {
 		return map[string]any{
 			"channel_statuses": map[string]any{
 				"CH": map[string]any{
-					"channel_status_code":         "SUCCESS",
-					"last_committed_offset_token": committed,
-					"rows_error_count":            errorRows,
-					"last_error_message":          "row was rejected",
+					"channel_status_code":           "SUCCESS",
+					"last_committed_offset_token":   committed,
+					"rows_error_count":              errorRows,
+					"last_error_offset_upper_bound": errorOffset,
+					"last_error_message":            "row was rejected",
 				},
 			},
 		}
@@ -235,9 +236,9 @@ func TestSdkWaitForTokenCommitted(t *testing.T) {
 		{
 			name: "committed after polling",
 			responses: []map[string]any{
-				makeStatus(nil, 0),
-				makeStatus(strptr("base:0"), 0),
-				makeStatus(strptr("base:1"), 0),
+				makeStatus(nil, 0, nil),
+				makeStatus(strptr("base:0"), 0, nil),
+				makeStatus(strptr("base:1"), 0, nil),
 			},
 			check: func(t *testing.T, err error) {
 				require.NoError(t, err)
@@ -246,11 +247,23 @@ func TestSdkWaitForTokenCommitted(t *testing.T) {
 		{
 			name: "error rows fail loudly",
 			responses: []map[string]any{
-				makeStatus(nil, 2),
+				makeStatus(nil, 2, nil),
 			},
 			check: func(t *testing.T, err error) {
 				require.ErrorContains(t, err, "2 rows that could not be ingested")
 				require.ErrorContains(t, err, "row was rejected")
+			},
+		},
+		{
+			name: "error offset of this transaction fails even with reset baseline",
+			responses: []map[string]any{
+				// The committed token covers the transaction and the error-row
+				// count matches the (restart-reset) baseline, but the error
+				// offset names one of this transaction's tokens.
+				makeStatus(strptr("base:1"), 0, strptr("base:1")),
+			},
+			check: func(t *testing.T, err error) {
+				require.ErrorContains(t, err, "rows of this transaction (offset base:1) that could not be ingested")
 			},
 		},
 	}
@@ -273,7 +286,7 @@ func TestSdkWaitForTokenCommitted(t *testing.T) {
 
 			m := &sdkStreamManager{c: c, channelName: "CH"}
 			stream := &sdkTableStream{schema: "TEST_SCHEMA", pipe: "TBL-STREAMING"}
-			tt.check(t, m.waitForTokenCommitted(ctx, stream, "base:1"))
+			tt.check(t, m.waitForTokenCommitted(ctx, stream, "base:1", map[string]bool{"base:0": true, "base:1": true}))
 		})
 	}
 }

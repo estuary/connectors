@@ -347,7 +347,9 @@ func (m *sdkStreamManager) write(ctx context.Context, schema string, pipe string
 	ctx = WithLogger(ctx, logger)
 
 	var finalToken string
+	txnTokens := make(map[string]bool, len(chunks))
 	for _, chunk := range chunks {
+		txnTokens[chunk.Token] = true
 		finalToken = chunk.Token
 		if shouldWrite, err := shouldWriteNextToken(ctx, chunk.Token, stream.lastCommitted); err != nil {
 			return fmt.Errorf("shouldWriteNextToken: %w", err)
@@ -369,7 +371,7 @@ func (m *sdkStreamManager) write(ctx context.Context, schema string, pipe string
 		stream.lastCommitted = &token
 	}
 
-	if err := m.waitForTokenCommitted(ctx, stream, finalToken); err != nil {
+	if err := m.waitForTokenCommitted(ctx, stream, finalToken, txnTokens); err != nil {
 		return err
 	}
 
@@ -406,8 +408,11 @@ func (m *sdkStreamManager) chunkBytes(ctx context.Context, chunk sdkChunk) ([]by
 // waitForTokenCommitted polls the channel status until the given offset token
 // is reported as durably committed. It also fails loudly if the server reports
 // rows that could not be ingested, since those rows would otherwise be
-// silently dropped.
-func (m *sdkStreamManager) waitForTokenCommitted(ctx context.Context, stream *sdkTableStream, token string) error {
+// silently dropped: the channel's error-row count is compared against this
+// session's baseline, and the channel's last error offset is compared against
+// txnTokens, which detects rejected rows of this transaction even after a
+// restart has reset the session baseline.
+func (m *sdkStreamManager) waitForTokenCommitted(ctx context.Context, stream *sdkTableStream, token string, txnTokens map[string]bool) error {
 	logger := Logger(ctx)
 	maxBackoff := 2 * time.Second
 	backoff := 100 * time.Millisecond
@@ -425,6 +430,11 @@ func (m *sdkStreamManager) waitForTokenCommitted(ctx context.Context, stream *sd
 			return fmt.Errorf(
 				"channel %q reports %d rows that could not be ingested: %s",
 				m.channelName, status.RowsErrorCount-stream.errorRows, deref(status.LastErrorMessage),
+			)
+		} else if status.LastErrorOffsetUpperBound != nil && txnTokens[*status.LastErrorOffsetUpperBound] {
+			return fmt.Errorf(
+				"channel %q reports rows of this transaction (offset %s) that could not be ingested: %s",
+				m.channelName, *status.LastErrorOffsetUpperBound, deref(status.LastErrorMessage),
 			)
 		} else if status.LastCommittedOffsetToken != nil && *status.LastCommittedOffsetToken == token {
 			break
