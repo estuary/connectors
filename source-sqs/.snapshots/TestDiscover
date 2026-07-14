@@ -1,0 +1,112 @@
+Binding 0:
+{
+    "recommended_name": "test-discover-ordered.fifo",
+    "resource_config_json": {
+      "queueUrl": "https://sqs.test.example/123456789012/test-discover-ordered.fifo"
+    },
+    "document_schema_json": {
+      "type": "object",
+      "required": [
+        "_meta"
+      ],
+      "properties": {
+        "_meta": {
+          "type": "object",
+          "required": [
+            "messageId",
+            "messageGroupId",
+            "sequenceNumber"
+          ],
+          "properties": {
+            "approximateReceiveCount": {
+              "type": "integer",
+              "title": "Number of times the message has been received without being deleted"
+            },
+            "deduplicationId": {
+              "type": "string",
+              "title": "Producer-supplied or content-based deduplication ID"
+            },
+            "messageAttributes": {
+              "type": "object",
+              "title": "Message attributes attached by the producer"
+            },
+            "messageGroupId": {
+              "type": "string",
+              "title": "Message group this message belongs to"
+            },
+            "messageId": {
+              "type": "string",
+              "title": "SQS-assigned unique ID of the message"
+            },
+            "queueUrl": {
+              "type": "string",
+              "title": "URL of the queue the message was received from"
+            },
+            "sentTimestamp": {
+              "type": "string",
+              "format": "date-time",
+              "title": "Time the message was sent to the queue"
+            },
+            "sequenceNumber": {
+              "type": "string",
+              "title": "SQS-assigned sequence number, strictly increasing within the message group"
+            }
+          }
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/messageGroupId",
+      "/_meta/sequenceNumber"
+    ]
+  }
+Binding 1:
+{
+    "recommended_name": "test-discover-standard",
+    "resource_config_json": {
+      "queueUrl": "https://sqs.test.example/123456789012/test-discover-standard"
+    },
+    "document_schema_json": {
+      "type": "object",
+      "required": [
+        "_meta"
+      ],
+      "properties": {
+        "_meta": {
+          "type": "object",
+          "required": [
+            "messageId"
+          ],
+          "properties": {
+            "approximateReceiveCount": {
+              "type": "integer",
+              "title": "Number of times the message has been received without being deleted"
+            },
+            "messageAttributes": {
+              "type": "object",
+              "title": "Message attributes attached by the producer"
+            },
+            "messageId": {
+              "type": "string",
+              "title": "SQS-assigned unique ID of the message"
+            },
+            "queueUrl": {
+              "type": "string",
+              "title": "URL of the queue the message was received from"
+            },
+            "sentTimestamp": {
+              "type": "string",
+              "format": "date-time",
+              "title": "Time the message was sent to the queue"
+            }
+          }
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/messageId"
+    ]
+  }
+
