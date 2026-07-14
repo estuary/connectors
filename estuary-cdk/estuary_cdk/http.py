@@ -655,13 +655,13 @@ class HTTPMixin(Mixin, HTTPSession):
                         )
                     else:
                         raise HTTPError(
-                            f"Encountered HTTP error status {resp.status}.\nURL: {url}\nResponse:\n{body.decode('utf-8')}",
+                            f"Encountered HTTP error status {resp.status}.\nURL: {resp.request_info.url}\nResponse:\n{body.decode('utf-8')}",
                             resp.status,
                         )
                 elif resp.status >= 400 and resp.status < 500:
                     body = await resp.read()
                     raise HTTPError(
-                        f"Encountered HTTP error status {resp.status} which cannot be retried.\nURL: {url}\nResponse:\n{body.decode('utf-8')}",
+                        f"Encountered HTTP error status {resp.status} which cannot be retried.\nURL: {resp.request_info.url}\nResponse:\n{body.decode('utf-8')}",
                         resp.status,
                     )
                 else:
