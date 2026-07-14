@@ -234,13 +234,15 @@
             "type": "string",
             "enum": [
               "",
+              "0",
               "30s",
               "1m",
+              "2m",
               "5m",
               "30m"
             ],
             "title": "Statement Timeout",
-            "description": "Overrides the default statement timeout used by the connector. The default of zero disables statement timeouts entirely.",
+            "description": "Overrides the statement timeout used by the connector. Leave blank to use the default of 2 minutes. Set to '0' to disable statement timeouts entirely.",
             "default": ""
           },
           "discover_only_published": {
