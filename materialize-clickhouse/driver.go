@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -22,6 +23,12 @@ import (
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
 )
+
+// connectorVersion is the connector's release tag, embedded so the client
+// identification reported to ClickHouse stays in sync with the image version.
+//
+//go:embed VERSION
+var connectorVersion string
 
 type authType string
 
@@ -134,7 +141,16 @@ func (c config) newClickhouseOptions() *clickhouse.Options {
 	}
 	return &clickhouse.Options{
 		Addr: []string{c.resolvedAddress()},
-		TLS:  tlsConfig,
+		// Identify Estuary Flow in the client name reported to ClickHouse
+		// (system.query_log, system.processes, etc.), which otherwise only
+		// shows the generic clickhouse-go driver.
+		ClientInfo: clickhouse.ClientInfo{
+			Products: []struct{ Name, Version string }{
+				{Name: "EstuaryFlow", Version: strings.TrimSpace(connectorVersion)},
+			},
+			Comment: []string{"materialize-clickhouse"},
+		},
+		TLS: tlsConfig,
 		Auth: clickhouse.Auth{
 			Database: c.Database,
 			Username: c.Credentials.Username,
