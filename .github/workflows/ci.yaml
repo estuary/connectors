@@ -67,6 +67,16 @@ jobs:
   build_connectors:
     runs-on: ubuntu-24.04
     needs: build_base_image
+    env:
+      # The estuary/flow repository stores some large files in Git LFS, so Go
+      # module zips of a commit pseudo-version differ depending on whether Git
+      # LFS is installed on the machine building them: the GitHub runner (LFS
+      # installed) smudges the real file contents, while proxy.golang.org and
+      # the Docker builder (no LFS) keep the small pointer files, and only one
+      # of the two resulting checksums can match go.sum. Skipping the smudge
+      # makes every step of this job produce the pointer-file zips that match
+      # proxy.golang.org. See also the same setting on the Go tests step.
+      GIT_LFS_SKIP_SMUDGE: 1
     strategy:
       fail-fast: false
       matrix:
