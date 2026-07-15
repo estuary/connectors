@@ -315,15 +315,7 @@ func newTransactor(
 		}
 	}
 
-	var sdkStreaming bool
-	if featureFlags["snowpipe_streaming_sdk"] && sdkSM != nil {
-		// Only the v2 runtime populates the Open request's sealed config.
-		if len(open.SealedConfigJson) == 0 {
-			log.Info("snowpipe_streaming_sdk is enabled but this task is not running on the v2 runtime; using the original streaming protocol")
-		} else {
-			sdkStreaming = true
-		}
-	}
+	var sdkStreaming = featureFlags["snowpipe_streaming_sdk"] && sdkSM != nil
 
 	var d = &transactor{
 		runtimeCheckpoint: fence.Checkpoint,
