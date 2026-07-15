@@ -36,6 +36,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
+	"github.com/twmb/avro/ocf"
 )
 
 const (
@@ -154,6 +155,10 @@ func TestIntegration(t *testing.T) {
 		runCheckpointFenceRegression(t, cfg)
 	})
 
+	t.Run("manifest-null-partitions-regression", func(t *testing.T) {
+		runManifestListNullPartitionsRegression(t, cfg)
+	})
+
 	// Migration test is skipped because Iceberg does not support the type
 	// migrations exercised by the test (e.g. long→string).
 	//t.Run("migrate", func(t *testing.T) {
@@ -206,6 +211,10 @@ func TestIntegrationGlue(t *testing.T) {
 
 	t.Run("checkpoint-fence-regression", func(t *testing.T) {
 		runCheckpointFenceRegression(t, cfg)
+	})
+
+	t.Run("manifest-null-partitions-regression", func(t *testing.T) {
+		runManifestListNullPartitionsRegression(t, cfg)
 	})
 }
 
@@ -412,6 +421,217 @@ func runCheckpointFenceRegression(t *testing.T, cfg config) {
 		}
 	}
 	require.ElementsMatch(t, []string{first, second}, livePaths)
+}
+
+// runManifestListNullPartitionsRegression reproduces issue #4816. iceberg-go
+// v0.6.0 re-encoded a present-but-empty `partitions` field summary in the
+// manifest list as the Avro null union branch whenever a commit inherited
+// manifests from a prior snapshot (apache/iceberg-go#1309); strict readers
+// such as Redshift Spectrum reject those files, and Athena can silently
+// return NULLs. The upstream fix (apache/iceberg-go#1464) stops writing new
+// nulls but preserves decoded nulls, so a manifest list corrupted during the
+// exposure window re-corrupts every subsequent commit and never heals on its
+// own — this test demonstrates that propagation against the fixed dependency.
+//
+// Every table this connector creates is unpartitioned, so for our tables a
+// null `partitions` in the current manifest list is unambiguous corruption,
+// and normalizing it to an empty array cannot change query results. Opening
+// the materialization must repair the current snapshot's manifest list in
+// place: all entries decode with a present `partitions` array, the embedded
+// writer schema is byte-identical, and the set of live data files is
+// untouched.
+func runManifestListNullPartitionsRegression(t *testing.T, cfg config) {
+	ctx := context.Background()
+
+	const materialization = "acmeCo/tests/regression"
+
+	rt := newRegressionTable(t, ctx, cfg, "manifest_null_partitions_regression",
+		iceberg.NestedField{ID: 1, Name: "v", Type: iceberg.PrimitiveTypes.String, Required: false}, nil)
+
+	vCol := writer.ParquetSchemaElement{Name: "v", DataType: writer.LogicalTypeString, Required: false}
+	first := rt.uploadParquet(t, ctx, vCol, "one")
+	require.NoError(t, rt.cat.appendFiles(ctx, materialization, rt.ident,
+		[]string{first}, "", "checkpoint-1"))
+
+	cleanNulls, cleanTotal, cleanSchema := readManifestListPartitions(t, rt.getObject(t, ctx, rt.currentManifestListKey(t, ctx)))
+	require.Zero(t, cleanNulls)
+	require.Equal(t, 1, cleanTotal)
+
+	corruptManifestListPartitions(t, ctx, rt)
+
+	nulls, total, corruptSchema := readManifestListPartitions(t, rt.getObject(t, ctx, rt.currentManifestListKey(t, ctx)))
+	require.Equal(t, total, nulls, "fixture: every manifest-list entry must carry null partitions")
+	require.Equal(t, string(cleanSchema), string(corruptSchema), "fixture: corruption must not change the writer schema")
+
+	// The next commit inherits the corrupted entry: decode of the null branch
+	// yields a nil partition list that the fixed writer deliberately leaves
+	// null, so the new manifest list is corrupted too. This is the propagation
+	// that makes the corruption permanent without an explicit repair.
+	second := rt.uploadParquet(t, ctx, vCol, "two")
+	require.NoError(t, rt.cat.appendFiles(ctx, materialization, rt.ident,
+		[]string{second}, "checkpoint-1", "checkpoint-2"))
+
+	key := rt.currentManifestListKey(t, ctx)
+	nulls, total, corruptSchema = readManifestListPartitions(t, rt.getObject(t, ctx, key))
+	require.Positive(t, nulls, "corruption must propagate to the next commit's manifest list")
+	require.Equal(t, 2, total)
+
+	// Opening the materialization runs the connector's per-table startup path,
+	// which is where issue #4816's self-heal must repair the current manifest
+	// list before any transactions run.
+	mat, err := newMaterialization(ctx, materialization, cfg, map[string]bool{})
+	require.NoError(t, err)
+	_, err = mat.NewTransactor(ctx,
+		pm.Request_Open{Materialization: &pf.MaterializationSpec{Name: pf.Materialization(materialization)}},
+		mboilerplate.InfoSchema{},
+		[]mboilerplate.MappedBinding[config, resource, mappedType]{
+			{MaterializationSpec_Binding: pf.MaterializationSpec_Binding{ResourcePath: rt.ident}},
+		},
+		nil,
+	)
+	require.NoError(t, err)
+
+	healedNulls, healedTotal, healedSchema := readManifestListPartitions(t, rt.getObject(t, ctx, key))
+	require.Zero(t, healedNulls, "opening the materialization must heal null partitions in the current manifest list")
+	require.Equal(t, total, healedTotal)
+	require.Equal(t, string(corruptSchema), string(healedSchema), "the repair must re-encode with the file's own writer schema")
+
+	// The repaired table must still be fully readable, with exactly the two
+	// appended files live.
+	tbl, err := rt.cat.cat.LoadTable(ctx, rt.ident)
+	require.NoError(t, err)
+	fs, err := tbl.FS(ctx)
+	require.NoError(t, err)
+	manifests, err := tbl.CurrentSnapshot().Manifests(fs)
+	require.NoError(t, err)
+	var livePaths []string
+	for _, m := range manifests {
+		for entry, err := range m.Entries(fs, true) {
+			require.NoError(t, err)
+			livePaths = append(livePaths, entry.DataFile().FilePath())
+		}
+	}
+	require.ElementsMatch(t, []string{first, second}, livePaths)
+
+	// A clean manifest list is left untouched by subsequent Opens. Any
+	// rewrite is byte-detectable because the OCF sync marker is freshly
+	// randomized on every encode.
+	before := rt.getObject(t, ctx, key)
+	_, err = mat.NewTransactor(ctx,
+		pm.Request_Open{Materialization: &pf.MaterializationSpec{Name: pf.Materialization(materialization)}},
+		mboilerplate.InfoSchema{},
+		[]mboilerplate.MappedBinding[config, resource, mappedType]{
+			{MaterializationSpec_Binding: pf.MaterializationSpec_Binding{ResourcePath: rt.ident}},
+		},
+		nil,
+	)
+	require.NoError(t, err)
+	require.Equal(t, before, rt.getObject(t, ctx, key), "a second Open must not rewrite a clean manifest list")
+}
+
+// currentManifestListKey returns the S3 object key of the table's current
+// snapshot's manifest list.
+func (rt *regressionTable) currentManifestListKey(t *testing.T, ctx context.Context) string {
+	t.Helper()
+
+	tbl, err := rt.cat.cat.LoadTable(ctx, rt.ident)
+	require.NoError(t, err)
+	snap := tbl.CurrentSnapshot()
+	require.NotNil(t, snap)
+	return strings.TrimPrefix(snap.ManifestList, "s3://"+rt.cfg.Bucket+"/")
+}
+
+func (rt *regressionTable) getObject(t *testing.T, ctx context.Context, key string) []byte {
+	t.Helper()
+
+	out, err := rt.s3client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(rt.cfg.Bucket),
+		Key:    aws.String(key),
+	})
+	require.NoError(t, err)
+	defer out.Body.Close()
+	data, err := io.ReadAll(out.Body)
+	require.NoError(t, err)
+	return data
+}
+
+// readManifestListPartitions decodes a raw manifest-list Avro file and counts
+// entries whose `partitions` field is the null union branch, alongside the
+// file's embedded writer schema. iceberg-go's ManifestFile.Partitions()
+// cannot be used for this: it returns an empty slice for both the null and
+// the present-but-empty encoding, and the distinction between those two is
+// exactly what issue #4816 is about. Decoding each record generically into a
+// map surfaces it — the null branch decodes to a nil interface, while a
+// present (possibly empty) array is non-nil.
+func readManifestListPartitions(t *testing.T, data []byte) (nullPartitions, total int, schemaJSON []byte) {
+	t.Helper()
+
+	rd, err := ocf.NewReader(bytes.NewReader(data))
+	require.NoError(t, err)
+	defer rd.Close()
+	schemaJSON = bytes.Clone(rd.Metadata()["avro.schema"])
+	for {
+		var rec map[string]any
+		if err := rd.Decode(&rec); errors.Is(err, io.EOF) {
+			break
+		} else {
+			require.NoError(t, err)
+		}
+		total++
+		if rec["partitions"] == nil {
+			nullPartitions++
+		}
+	}
+	return nullPartitions, total, schemaJSON
+}
+
+// corruptManifestListPartitions rewrites the current snapshot's manifest list
+// in place with every entry's `partitions` field encoded as the Avro null
+// union branch, recreating on disk what iceberg-go v0.6.0 wrote during the
+// issue #4816 exposure window. The entries are rebuilt through the public
+// ManifestBuilder without setting a partition list: the fixed writer
+// normalizes only a present-but-nil list, so a genuinely absent one still
+// encodes as null. The manifest list is referenced by exact path with no
+// checksum, so overwriting the object needs no catalog commit.
+func corruptManifestListPartitions(t *testing.T, ctx context.Context, rt *regressionTable) {
+	t.Helper()
+
+	tbl, err := rt.cat.cat.LoadTable(ctx, rt.ident)
+	require.NoError(t, err)
+	snap := tbl.CurrentSnapshot()
+	require.NotNil(t, snap)
+	key := strings.TrimPrefix(snap.ManifestList, "s3://"+rt.cfg.Bucket+"/")
+
+	entries, err := iceberg.ReadManifestList(bytes.NewReader(rt.getObject(t, ctx, key)))
+	require.NoError(t, err)
+
+	corrupted := make([]iceberg.ManifestFile, 0, len(entries))
+	for _, m := range entries {
+		b := iceberg.NewManifestFile(m.Version(), m.FilePath(), m.Length(), m.PartitionSpecID(), m.SnapshotID()).
+			Content(m.ManifestContent()).
+			SequenceNum(m.SequenceNum(), m.MinSequenceNum()).
+			AddedFiles(m.AddedDataFiles()).
+			ExistingFiles(m.ExistingDataFiles()).
+			DeletedFiles(m.DeletedDataFiles()).
+			AddedRows(m.AddedRows()).
+			ExistingRows(m.ExistingRows()).
+			DeletedRows(m.DeletedRows())
+		if km := m.KeyMetadata(); km != nil {
+			b = b.KeyMetadata(km)
+		}
+		corrupted = append(corrupted, b.Build())
+	}
+
+	var buf bytes.Buffer
+	require.NoError(t, iceberg.WriteManifestList(tbl.Metadata().Version(), &buf,
+		snap.SnapshotID, snap.ParentSnapshotID, &snap.SequenceNumber, 0, corrupted))
+
+	_, err = rt.s3client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(rt.cfg.Bucket),
+		Key:    aws.String(key),
+		Body:   bytes.NewReader(buf.Bytes()),
+	})
+	require.NoError(t, err)
 }
 
 // TestNormalizeLegacyCredentials guards the parity with the removed Python

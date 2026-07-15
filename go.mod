@@ -79,6 +79,7 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/tidwall/gjson v1.17.3
 	github.com/tidwall/sjson v1.2.5
+	github.com/twmb/avro v1.7.2
 	github.com/wk8/go-ordered-map/v2 v2.1.8
 	go.gazette.dev/core v0.103.1-0.20260505142537-ce718ada37ee
 	go.mongodb.org/mongo-driver v1.17.7
@@ -258,7 +259,6 @@ require (
 	github.com/substrait-io/substrait-protobuf/go v0.85.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
-	github.com/twmb/avro v1.7.2 // indirect
 	github.com/twmb/murmur3 v1.1.8 // indirect
 	github.com/twpayne/go-geom v1.6.1 // indirect
 	github.com/vmihailenco/msgpack/v5 v5.4.1 // indirect
