@@ -680,24 +680,24 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 				// A committed-but-unacknowledged transaction has rows staged
 				// in this binding's store table. Move them; never truncate or
 				// re-create a stage table holding pending rows.
-				err := t.moveStorePartitionsToTarget(ctx, b, si, true)
-				if err == nil {
-					continue
+				if err := t.moveStorePartitionsToTarget(ctx, b, si, true); err != nil {
+					if !isUnknownTableErr(err) {
+						return nil, fmt.Errorf("recovering stage to target %s: %w", b.target.Identifier, err)
+					}
+					// The store table was dropped out-of-band, so there are no
+					// staged rows left to recover. Fall through to re-create
+					// the temp tables rather than crash-looping on the missing
+					// table; ReplacingMergeTree lets later transactions refresh
+					// the lost rows.
+					log.WithField("target", b.target.Identifier).Warn(
+						"store table missing during recovery; nothing to recover, re-creating temp tables")
 				}
-				if !isUnknownTableErr(err) {
-					return nil, fmt.Errorf("recovering stage to target %s: %w", b.target.Identifier, err)
-				}
-				// The store table was lost out-of-band (e.g. dropped) while the
-				// connector state still recorded a pending commit referencing
-				// it. No staged rows remain to recover -- the same situation as
-				// a commit that fully completed before the previous process
-				// exited -- so fall through to (re-)create the temp tables for
-				// the next transaction instead of crash-looping forever on the
-				// missing table. The pending transaction's rows are
-				// unrecoverable regardless; ReplacingMergeTree lets later
-				// transactions refresh them.
-				log.WithField("target", b.target.Identifier).Warn(
-					"store table missing during recovery; nothing to recover, re-creating temp tables")
+				// A successful recovery move leaves the store table empty, so
+				// falling through to ensureTempTables is safe and reconciles
+				// any target-schema drift that occurred while the commit was
+				// pending. Skipping it would fail the next MOVE PARTITION with
+				// code 122 ("Tables have different structure") -- a permanent
+				// recovery crash-loop (issue #4817).
 			}
 			if err := t.ensureTempTables(ctx, b); err != nil {
 				return nil, fmt.Errorf("ensuring temp tables of %s: %w", b.target.Identifier, err)
@@ -840,8 +840,9 @@ func (t *transactor) moveStorePartitionsToTarget(ctx context.Context, b *binding
 // their schema has drifted from the target's (a migration ran in a prior
 // session -- migrations only happen in the Apply RPC, never while a session
 // is running), and truncated otherwise to discard rows staged by a
-// transaction that never committed. It must never be called for a binding
-// with a pending commit recorded in the connector state.
+// transaction that never committed. It must only be called when the store
+// table holds no staged rows of a pending commit; on the recovery path this
+// is guaranteed by moveStorePartitionsToTarget's post-move emptiness check.
 func (t *transactor) ensureTempTables(ctx context.Context, b *binding) error {
 	ensure := func(createSQL, truncateSQL, dropSQL string, tableName string) error {
 		if err := t.store.conn.Exec(ctx, createSQL); err != nil {
