@@ -31,6 +31,7 @@ import (
 	"github.com/invopop/jsonschema"
 	iso8601 "github.com/senseyeio/duration"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 )
 
 var featureFlagDefaults = map[string]bool{
@@ -572,18 +573,43 @@ func (d *materialization) NewTransactor(
 		})
 	}
 
-	tablePaths, err := d.catalog.tablePaths(ctx, resourcePaths)
+	tableInfos, err := d.catalog.tableInfos(ctx, resourcePaths)
 	if err != nil {
 		return nil, fmt.Errorf("looking up table paths: %w", err)
 	}
 
 	for idx := range bindings {
-		bindings[idx].catalogTablePath = tablePaths[idx]
+		bindings[idx].catalogTablePath = tableInfos[idx].location
 	}
 
 	s3store, err := filesink.NewS3Store(ctx, d.cfg.s3StoreConfig())
 	if err != nil {
 		return nil, fmt.Errorf("creating s3 store: %w", err)
+	}
+
+	// Heal manifest lists corrupted by iceberg-go v0.6.0 (issue #4816) before
+	// any transactions run. Open is the one point where this is race-free: the
+	// connector is each table's sole appender, and a concurrent external
+	// rewrite (e.g. a compaction) only makes the repair moot — the check runs
+	// again on the next Open. The repair is sound only for unpartitioned
+	// tables, where null and empty partition summaries are semantically
+	// identical; a bound pre-existing partitioned table may legitimately carry
+	// null summaries, so it is left alone.
+	g, gctx := errgroup.WithContext(ctx)
+	g.SetLimit(10)
+	for idx := range bindings {
+		if !tableInfos[idx].unpartitioned {
+			continue
+		}
+		g.Go(func() error {
+			if err := repairManifestListNullPartitions(gctx, s3store.Client(), d.cfg.Bucket, tableInfos[idx].manifestList); err != nil {
+				return fmt.Errorf("repairing manifest list of table %q: %w", pathToFQN(bindings[idx].path), err)
+			}
+			return nil
+		})
+	}
+	if err := g.Wait(); err != nil {
+		return nil, err
 	}
 
 	return &transactor{
@@ -605,12 +631,12 @@ func (d *materialization) CleanupTestTask(ctx context.Context, taskName string) 
 }
 
 func (d *materialization) SnapshotTestResource(ctx context.Context, path []string) ([]string, [][]any, error) {
-	tablePaths, err := d.catalog.tablePaths(ctx, [][]string{path})
+	tableInfos, err := d.catalog.tableInfos(ctx, [][]string{path})
 	if err != nil {
 		return nil, nil, fmt.Errorf("getting table path for %s.%s: %w", path[0], path[1], err)
 	}
 
-	tableLocation := tablePaths[0]
+	tableLocation := tableInfos[0].location
 	if tableLocation == "" {
 		return nil, nil, nil
 	}

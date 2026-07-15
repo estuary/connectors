@@ -332,16 +332,32 @@ func (c *catalog) populateInfoSchema(ctx context.Context, is *boilerplate.InfoSc
 	return nil
 }
 
-// tablePaths returns the registered storage path for each resource path in a
-// list, in the same order as the input.
-func (c *catalog) tablePaths(ctx context.Context, resourcePaths [][]string) ([]string, error) {
+// tableInfo is the per-table state read from the catalog at Open: the
+// registered storage location, the current snapshot's manifest list path
+// (empty when the table has no snapshots yet), and whether the table is
+// unpartitioned.
+type tableInfo struct {
+	location      string
+	manifestList  string
+	unpartitioned bool
+}
+
+// tableInfos returns the tableInfo for each resource path in a list, in the
+// same order as the input.
+func (c *catalog) tableInfos(ctx context.Context, resourcePaths [][]string) ([]tableInfo, error) {
 	idents := make([]icebergtable.Identifier, len(resourcePaths))
 	for i, p := range resourcePaths {
 		idents[i] = p
 	}
-	out := make([]string, len(idents))
+	out := make([]tableInfo, len(idents))
 	if err := c.forEachTable(ctx, idents, func(idx int, tbl *icebergtable.Table) error {
-		out[idx] = tbl.Location()
+		out[idx] = tableInfo{
+			location:      tbl.Location(),
+			unpartitioned: tbl.Spec().IsUnpartitioned(),
+		}
+		if snap := tbl.CurrentSnapshot(); snap != nil {
+			out[idx].manifestList = snap.ManifestList
+		}
 		return nil
 	}); err != nil {
 		return nil, err
