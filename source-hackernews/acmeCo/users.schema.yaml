@@ -1,0 +1,61 @@
+---
+$defs:
+  Meta:
+    properties:
+      op:
+        default: u
+        description: "Operation type (c: Create, u: Update, d: Delete)"
+        enum:
+          - c
+          - u
+          - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        title: Row Id
+        type: integer
+    title: Meta
+    type: object
+description: HackerNews User
+properties:
+  _meta:
+    allOf:
+      - $ref: "#/$defs/Meta"
+    default:
+      op: u
+      row_id: -1
+    description: Document metadata
+  id:
+    description: "The user's unique username"
+    title: Id
+    type: string
+  created:
+    description: "Creation date of the user account"
+    format: date-time
+    title: Created
+    type: string
+  karma:
+    description: "The user's karma score"
+    title: Karma
+    type: integer
+  about:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    description: "The user's optional self-description. HTML"
+    title: About
+  submitted:
+    description: "List of the user's submitted item IDs"
+    items:
+      type: integer
+    title: Submitted
+    type: array
+required:
+  - id
+  - created
+  - karma
+title: User
+type: object

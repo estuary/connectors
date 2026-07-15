@@ -1,0 +1,1001 @@
+[
+  {
+    "recommendedName": "items",
+    "resourceConfig": {
+      "name": "items",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "HackerNews Item model representing stories, comments, jobs, polls, and poll options.\nAll timestamps are converted from Unix time to datetime objects.",
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "id": {
+          "description": "The item's unique id.",
+          "title": "Id",
+          "type": "integer"
+        },
+        "deleted": {
+          "default": false,
+          "description": "true if the item is deleted.",
+          "title": "Deleted",
+          "type": "boolean"
+        },
+        "type": {
+          "description": "The type of item. One of \"job\", \"story\", \"comment\", \"poll\", or \"pollopt\".",
+          "title": "Type",
+          "type": "string"
+        },
+        "by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The username of the item's author.",
+          "title": "By"
+        },
+        "time": {
+          "description": "Creation date of the item, converted from Unix timestamp.",
+          "format": "date-time",
+          "title": "Time",
+          "type": "string"
+        },
+        "text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The comment, story or poll text. HTML.",
+          "title": "Text"
+        },
+        "dead": {
+          "default": false,
+          "description": "true if the item is dead.",
+          "title": "Dead",
+          "type": "boolean"
+        },
+        "parent": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The comment's parent: either another comment or the relevant story.",
+          "title": "Parent"
+        },
+        "poll": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The pollopt's associated poll.",
+          "title": "Poll"
+        },
+        "kids": {
+          "description": "The ids of the item's comments, in ranked display order.",
+          "items": {
+            "type": "integer"
+          },
+          "title": "Kids",
+          "type": "array"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "maxLength": 2083,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The URL of the story.",
+          "title": "Url"
+        },
+        "score": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The story's score, or the votes for a pollopt.",
+          "title": "Score"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The title of the story, poll or job. HTML.",
+          "title": "Title"
+        },
+        "parts": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A list of related pollopts, in display order.",
+          "title": "Parts"
+        },
+        "descendants": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "In the case of stories or polls, the total comment count.",
+          "title": "Descendants"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "time"
+      ],
+      "title": "Item",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "users",
+    "resourceConfig": {
+      "name": "users",
+      "interval": "PT10M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "HackerNews User model representing user profiles and metadata.",
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "id": {
+          "description": "The user's unique username.",
+          "title": "Id",
+          "type": "string"
+        },
+        "created": {
+          "description": "Creation date of the user account, converted from Unix timestamp.",
+          "format": "date-time",
+          "title": "Created",
+          "type": "string"
+        },
+        "karma": {
+          "description": "The user's karma score.",
+          "title": "Karma",
+          "type": "integer"
+        },
+        "about": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The user's optional self-description. HTML.",
+          "title": "About"
+        },
+        "submitted": {
+          "description": "List of the user's submitted item IDs.",
+          "items": {
+            "type": "integer"
+          },
+          "title": "Submitted",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "created",
+        "karma"
+      ],
+      "title": "User",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "updates",
+    "resourceConfig": {
+      "name": "updates",
+      "interval": "PT1M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "HackerNews Updates model representing changed items and profiles.",
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "items": {
+          "description": "List of updated item IDs.",
+          "items": {
+            "type": "integer"
+          },
+          "title": "Items",
+          "type": "array"
+        },
+        "profiles": {
+          "description": "List of updated user profiles.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Profiles",
+          "type": "array"
+        }
+      },
+      "title": "UpdatedItems",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "topstories",
+    "resourceConfig": {
+      "name": "topstories",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "A point-in-time snapshot of one of HackerNews' ranking lists (top, new, best,\nAsk, Show, or job stories).\n\nCaptured as an append-only log so the ordering can be reconstructed over time:\na story's rank is its index within `story_ids`. This data is not derivable from\nitems alone, since an item does not record its own ranking.",
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "category": {
+          "description": "The ranking list this snapshot is from, e.g. \"topstories\".",
+          "title": "Category",
+          "type": "string"
+        },
+        "retrieved_at": {
+          "description": "When this ranking snapshot was captured.",
+          "format": "date-time",
+          "title": "Retrieved At",
+          "type": "string"
+        },
+        "story_ids": {
+          "description": "Story IDs in ranked display order; the list index is the rank.",
+          "items": {
+            "type": "integer"
+          },
+          "title": "Story Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "category",
+        "retrieved_at"
+      ],
+      "title": "StoryRanking",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "newstories",
+    "resourceConfig": {
+      "name": "newstories",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "A point-in-time snapshot of one of HackerNews' ranking lists (top, new, best,\nAsk, Show, or job stories).\n\nCaptured as an append-only log so the ordering can be reconstructed over time:\na story's rank is its index within `story_ids`. This data is not derivable from\nitems alone, since an item does not record its own ranking.",
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "category": {
+          "description": "The ranking list this snapshot is from, e.g. \"topstories\".",
+          "title": "Category",
+          "type": "string"
+        },
+        "retrieved_at": {
+          "description": "When this ranking snapshot was captured.",
+          "format": "date-time",
+          "title": "Retrieved At",
+          "type": "string"
+        },
+        "story_ids": {
+          "description": "Story IDs in ranked display order; the list index is the rank.",
+          "items": {
+            "type": "integer"
+          },
+          "title": "Story Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "category",
+        "retrieved_at"
+      ],
+      "title": "StoryRanking",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "beststories",
+    "resourceConfig": {
+      "name": "beststories",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "A point-in-time snapshot of one of HackerNews' ranking lists (top, new, best,\nAsk, Show, or job stories).\n\nCaptured as an append-only log so the ordering can be reconstructed over time:\na story's rank is its index within `story_ids`. This data is not derivable from\nitems alone, since an item does not record its own ranking.",
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "category": {
+          "description": "The ranking list this snapshot is from, e.g. \"topstories\".",
+          "title": "Category",
+          "type": "string"
+        },
+        "retrieved_at": {
+          "description": "When this ranking snapshot was captured.",
+          "format": "date-time",
+          "title": "Retrieved At",
+          "type": "string"
+        },
+        "story_ids": {
+          "description": "Story IDs in ranked display order; the list index is the rank.",
+          "items": {
+            "type": "integer"
+          },
+          "title": "Story Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "category",
+        "retrieved_at"
+      ],
+      "title": "StoryRanking",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "askstories",
+    "resourceConfig": {
+      "name": "askstories",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "A point-in-time snapshot of one of HackerNews' ranking lists (top, new, best,\nAsk, Show, or job stories).\n\nCaptured as an append-only log so the ordering can be reconstructed over time:\na story's rank is its index within `story_ids`. This data is not derivable from\nitems alone, since an item does not record its own ranking.",
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "category": {
+          "description": "The ranking list this snapshot is from, e.g. \"topstories\".",
+          "title": "Category",
+          "type": "string"
+        },
+        "retrieved_at": {
+          "description": "When this ranking snapshot was captured.",
+          "format": "date-time",
+          "title": "Retrieved At",
+          "type": "string"
+        },
+        "story_ids": {
+          "description": "Story IDs in ranked display order; the list index is the rank.",
+          "items": {
+            "type": "integer"
+          },
+          "title": "Story Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "category",
+        "retrieved_at"
+      ],
+      "title": "StoryRanking",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "showstories",
+    "resourceConfig": {
+      "name": "showstories",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "A point-in-time snapshot of one of HackerNews' ranking lists (top, new, best,\nAsk, Show, or job stories).\n\nCaptured as an append-only log so the ordering can be reconstructed over time:\na story's rank is its index within `story_ids`. This data is not derivable from\nitems alone, since an item does not record its own ranking.",
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "category": {
+          "description": "The ranking list this snapshot is from, e.g. \"topstories\".",
+          "title": "Category",
+          "type": "string"
+        },
+        "retrieved_at": {
+          "description": "When this ranking snapshot was captured.",
+          "format": "date-time",
+          "title": "Retrieved At",
+          "type": "string"
+        },
+        "story_ids": {
+          "description": "Story IDs in ranked display order; the list index is the rank.",
+          "items": {
+            "type": "integer"
+          },
+          "title": "Story Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "category",
+        "retrieved_at"
+      ],
+      "title": "StoryRanking",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "jobstories",
+    "resourceConfig": {
+      "name": "jobstories",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "A point-in-time snapshot of one of HackerNews' ranking lists (top, new, best,\nAsk, Show, or job stories).\n\nCaptured as an append-only log so the ordering can be reconstructed over time:\na story's rank is its index within `story_ids`. This data is not derivable from\nitems alone, since an item does not record its own ranking.",
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "category": {
+          "description": "The ranking list this snapshot is from, e.g. \"topstories\".",
+          "title": "Category",
+          "type": "string"
+        },
+        "retrieved_at": {
+          "description": "When this ranking snapshot was captured.",
+          "format": "date-time",
+          "title": "Retrieved At",
+          "type": "string"
+        },
+        "story_ids": {
+          "description": "Story IDs in ranked display order; the list index is the rank.",
+          "items": {
+            "type": "integer"
+          },
+          "title": "Story Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "category",
+        "retrieved_at"
+      ],
+      "title": "StoryRanking",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  }
+]

@@ -1,0 +1,47 @@
+---
+$defs:
+  Meta:
+    properties:
+      op:
+        default: u
+        description: "Operation type (c: Create, u: Update, d: Delete)"
+        enum:
+          - c
+          - u
+          - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        title: Row Id
+        type: integer
+    title: Meta
+    type: object
+description: HackerNews Story Ranking
+properties:
+  _meta:
+    allOf:
+      - $ref: "#/$defs/Meta"
+    default:
+      op: u
+      row_id: -1
+    description: Document metadata
+  category:
+    description: "The ranking list this snapshot is from, e.g. topstories"
+    title: Category
+    type: string
+  retrieved_at:
+    description: When this ranking snapshot was captured
+    format: date-time
+    title: Retrieved At
+    type: string
+  story_ids:
+    description: "Story IDs in ranked display order; the list index is the rank"
+    items:
+      type: integer
+    title: Story Ids
+    type: array
+required: []
+title: StoryRanking
+type: object

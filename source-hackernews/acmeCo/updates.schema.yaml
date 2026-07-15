@@ -1,0 +1,44 @@
+---
+$defs:
+  Meta:
+    properties:
+      op:
+        default: u
+        description: "Operation type (c: Create, u: Update, d: Delete)"
+        enum:
+          - c
+          - u
+          - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        title: Row Id
+        type: integer
+    title: Meta
+    type: object
+description: HackerNews Updates
+properties:
+  _meta:
+    allOf:
+      - $ref: "#/$defs/Meta"
+    default:
+      op: u
+      row_id: -1
+    description: Document metadata
+  items:
+    description: "List of updated item IDs"
+    items:
+      type: integer
+    title: Items
+    type: array
+  profiles:
+    description: "List of updated user profiles"
+    items:
+      type: string
+    title: Profiles
+    type: array
+required: []
+title: UpdatedItems
+type: object
