@@ -18,3 +18,6 @@
 
 (anything that might help someone review this PR)
 
+**Checklist:**
+
+- [ ] If this change is user-visible, the affected connector's `CHANGELOG.md` and documentation have been updated (see [CONTRIBUTING.md](../CONTRIBUTING.md#changelog-entries)). The `Docs / CHANGELOG check` CI job reviews this automatically; apply the `docs-check-skip` label to dismiss a false positive.
