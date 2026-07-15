@@ -1276,6 +1276,44 @@ func TestAcknowledgeRecoveryMatrix(t *testing.T) {
 		require.EqualValues(t, 1, countTable(t, ctx, tr, stageName))
 	})
 
+	t.Run("schema drift is reconciled after a trivial pending-commit recovery", func(t *testing.T) {
+		// Reproduces issue #4817. A committed-but-unacknowledged transaction
+		// left pending state behind, but its rows had already been moved to the
+		// target before the prior crash -- so the store table is empty. In the
+		// interim an Apply RPC migrated the target, so the store table's
+		// structure no longer matches. On the first Acknowledge,
+		// moveStorePartitionsToTarget(recovery=true) trivially succeeds against
+		// the empty store table; the drift must still be reconciled so the next
+		// commit's MOVE PARTITION does not fail with code 122 ("Tables have
+		// different structure"), which would otherwise crash-loop recovery
+		// forever.
+		tr, b := newTestTransactor(t, ctx, "test_recovery_drift_pending")
+		require.NoError(t, tr.ensureTempTables(ctx, b))
+		stageName := tr.dialect.Identifier(storeTableName(b.target, 0))
+		targetName := tr.dialect.Identifier("test_recovery_drift_pending")
+
+		// Migrate the target as the Apply RPC would while the commit was
+		// pending; the store table keeps its pre-migration structure.
+		require.NoError(t, tr.store.conn.Exec(ctx,
+			fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s String", targetName, tr.dialect.Identifier("extra"))))
+
+		// Pending state with rows already moved (StoredRows > 0, empty stage):
+		// this is what drives Acknowledge through the trivial recovery move.
+		tr.ensured = false
+		tr.recovery = true
+		tr.state[b.target.StateKey] = &stateItem{StoredRows: 1}
+		_, err := tr.Acknowledge(ctx)
+		require.NoError(t, err)
+
+		// The next transaction must stage and commit cleanly. On the unfixed
+		// connector the store table is still pre-migration and the move fails
+		// with code 122.
+		stageTestRows(t, ctx, tr, b, []any{"k1", "v1", "c", testTime, `{"id":"k1"}`})
+		require.NoError(t, tr.moveStorePartitionsToTarget(ctx, b, &stateItem{StoredRows: 1}, false))
+		require.EqualValues(t, 1, countTable(t, ctx, tr, targetName))
+		require.EqualValues(t, 0, countTable(t, ctx, tr, stageName))
+	})
+
 	t.Run("pre-StoredRows checkpoint state recovers without executing persisted SQL", func(t *testing.T) {
 		tr, b := newTestTransactor(t, ctx, "test_recovery_upgrade")
 		require.NoError(t, tr.ensureTempTables(ctx, b))
