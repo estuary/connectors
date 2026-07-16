@@ -1,6 +1,6 @@
 import asyncio
 from bisect import bisect_right
-from datetime import datetime
+from datetime import datetime, timedelta, UTC
 from enum import StrEnum
 from logging import Logger
 from typing import AsyncGenerator, Callable, Literal, cast, overload
@@ -38,6 +38,14 @@ CACHE_TTL = MINIMUM_AZURE_SYNAPSE_LINK_EXPORT_INTERVAL / 5   # 1 minute
 # other streams for CPU time and can finish processing the contents
 # of a timestamp folder in a reasonable amount of time.
 FOLDER_PROCESSING_SEMAPHORE = asyncio.Semaphore(5)
+# A timestamp folder's model.json is written when the folder finalizes at the
+# end of its export interval, so it can lags behind the folder's CSV data. Retries
+# can also abandon a folder that has CSV data but never gets a model.json,
+# re-committing those changes into a later folder. SETTLE_DELAY is how long we
+# wait after a folder should have finalized before treating a missing
+# model.json as an abandoned folder we skip rather than one still being
+# written.
+SETTLE_DELAY = timedelta(hours=1)
 # A transformed CSV row. Keys are the standard Synapse Link metadata
 # columns (Id, IsDelete, versionnumber, SinkModifiedOn, _meta) plus
 # arbitrary table-specific columns.
@@ -47,6 +55,15 @@ TransformedRow = dict[str, str | bool | None | dict[str, str]]
 class ModelFormat(StrEnum):
     BYTES = "bytes"
     PYDANTIC = "pydantic"
+
+
+class TimestampFolderModelNotFoundError(Exception):
+    """Raised when a timestamp folder has table CSV data but no folder-level
+    model.json, indicating the folder has not been finalized."""
+
+    def __init__(self, folder: str):
+        self.folder = folder
+        super().__init__(f"Timestamp folder {folder} has no model.json.")
 
 
 # model.json metadata files are not updated after they're written.
@@ -299,12 +316,21 @@ async def read_csvs_in_folder(
     if not csvs:
         return
 
-    table_metadata = await get_table_metadata(
-        timestamp=folder,
-        table_name=table_name,
-        client=client,
-        log=log,
-    )
+    # The folder has CSV data for this table but its model.json is fetched
+    # separately. A 404 here means the folder was never finalized (see
+    # SETTLE_DELAY). We surface it so fetch_changes can decide
+    # whether to wait for finalization or skip the incomplete folder.
+    try:
+        table_metadata = await get_table_metadata(
+            timestamp=folder,
+            table_name=table_name,
+            client=client,
+            log=log,
+        )
+    except HTTPError as err:
+        if err.code == 404:
+            raise TimestampFolderModelNotFoundError(folder) from err
+        raise
 
     def open_csv(csv: ADLSPathMetadata) -> AsyncGenerator[TransformedRow, None]:
         async def gen() -> AsyncGenerator[TransformedRow, None]:
@@ -339,6 +365,33 @@ def transform_row(row: dict[str, str | None], boolean_fields: frozenset[str], cs
     return result
 
 
+def should_wait_for_finalization(next_folder: str, now: datetime) -> bool:
+    """Decide whether to keep waiting for a folder that has table data but no
+    model.json to finalize (True) rather than treating it as incomplete and
+    skipping it (False).
+
+    `next_folder` is the chronological successor of the folder in question.
+    Its creation time is when the folder in question stopped being written,
+    since one folder closes as the next one opens. We give the folder
+    SETTLE_DELAY after it closed for its model.json to appear before treating
+    a still-missing model.json as an abandoned folder.
+
+        folder created     folder closes (successor created)      +SETTLE_DELAY
+           |------ folder is being written ------|------ grace period ------|
+                                                 ^                          ^
+                                                 model.json should          if still no
+                                                 appear around here         model.json, skip
+
+    We can't measure this from the folder's own timestamp because that's when
+    it was created (started), not when it closed, and the interval length is
+    configurable, so the successor's creation time is what tells us when the
+    folder closed. This basis is interval-agnostic: an old abandoned folder is
+    skipped immediately, while only a folder that closed recently gets the
+    benefit of the doubt.
+    """
+    return now - str_to_dt(next_folder) < SETTLE_DELAY
+
+
 async def fetch_changes(
     client: ADLSGen2Client,
     table_name: str,
@@ -355,11 +408,42 @@ async def fetch_changes(
     # skipping folders we've already read on previous sweeps.
     start_index = bisect_right(finalized_folders, log_cursor, key=str_to_dt)
 
-    for folder in finalized_folders[start_index:]:
+    for index in range(start_index, len(finalized_folders)):
+        folder = finalized_folders[index]
         async with FOLDER_PROCESSING_SEMAPHORE:
             log.debug(f"Reading CSVs in {folder}/{table_name}.")
-            async for row in read_csvs_in_folder(folder, table_name, client, log):
-                yield row
+            try:
+                async for row in read_csvs_in_folder(folder, table_name, client, log):
+                    yield row
+            except TimestampFolderModelNotFoundError:
+                # The folder has table data but no model.json. This folder should
+                # be finalized when the next folder is created, and we use the next
+                # folder to determine if SETTLE_DELAY has elapsed. If so, then we
+                # assume the current folder's export was interrupted/aborted by D365
+                # & the changes shouldn't be replicated.
+                if index + 1 < len(finalized_folders):
+                    next_folder = finalized_folders[index + 1]
+                else:
+                    next_folder = await get_in_progress_timestamp_folder(client)
+
+                if should_wait_for_finalization(next_folder, datetime.now(tz=UTC)):
+                    log.info(
+                        "Timestamp folder has table data but no model.json yet and "
+                        "it may still be finalizing. Will retry on the next sweep.",
+                        {"folder": folder, "table": table_name},
+                    )
+                    return
+
+                # The folder had ample time to finalize but still has no
+                # model.json, so it's an incomplete/abandoned folder. Skip it
+                # and advance past it. Its changes are expected to be
+                # re-committed in a later folder.
+                log.warning(
+                    "Skipping timestamp folder with table data but no model.json. "
+                    "The folder appears incomplete and was never finalized. Its changes "
+                    "are expected to be re-committed in a later folder.",
+                    {"folder": folder, "table": table_name},
+                )
 
             log.debug(f"Read all CSVs in folder. Yielding folder name as new cursor.", {
                 "folder": str_to_dt(folder),
