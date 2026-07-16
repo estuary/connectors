@@ -597,10 +597,10 @@ DROP TABLE IF EXISTS {{ template "loadTableName" . }};
 -- because the target table uses ReplacingMergeTree, which deduplicates by ORDER BY
 -- key and flow_published_at version — re-applying a partial commit is idempotent.
 --
--- At session start the store table is truncated when there is no pending commit
--- recorded in the connector state, discarding rows staged by a transaction that
--- never committed. It is dropped and re-created only when its schema has drifted
--- from the target's (a migration ran in a prior session).
+-- At session start, once any pending commit has been recovered, the store table is
+-- truncated, discarding rows staged by a transaction that never committed. It is
+-- dropped and re-created only when its schema has drifted from the target's (a
+-- migration ran in a prior session).
 
 {{ define "storeTableNameIdentifier" -}}
 {{ printf "flow_temp_store_%s_%s" $.RangeKey (index $.Path 0) | ColumnIdentifier }}
