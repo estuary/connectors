@@ -779,15 +779,8 @@ func (d *transactor) acknowledgeApply(ctx context.Context, exec func(context.Con
 // stateKey still has an active binding, deleting the staged files afterwards.
 // It returns the stateKeys which were executed.
 func (d *transactor) applyCheckpoint(ctx context.Context, exec func(context.Context, string) error, cp checkpoint) ([]string, error) {
-	var stateKeys = make([]string, 0, len(cp))
-	for stateKey := range cp {
-		stateKeys = append(stateKeys, stateKey)
-	}
-	sort.Strings(stateKeys)
-
 	var executed []string
-	for _, stateKey := range stateKeys {
-		var item = cp[stateKey]
+	for stateKey, item := range cp {
 		path := d.pathForStateKey(stateKey)
 		// we skip queries that belong to tables which do not have a binding anymore
 		// since these tables might be deleted already
