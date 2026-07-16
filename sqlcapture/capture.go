@@ -1,6 +1,7 @@
 package sqlcapture
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -8,6 +9,8 @@ import (
 	"math"
 	"math/rand"
 	"os"
+	"runtime"
+	"runtime/pprof"
 	"slices"
 	"strings"
 	"sync"
@@ -591,6 +594,7 @@ func (c *Capture) streamToFence(ctx context.Context, replStream ReplicationStrea
 	// so the two callers of logProgress never overlap on the shared interval state.
 	var progressDone = make(chan struct{})
 	var progressWG sync.WaitGroup
+	var progressTicks int
 	progressWG.Go(func() {
 		var ticker = time.NewTicker(streamingProgressInterval)
 		defer ticker.Stop()
@@ -601,6 +605,12 @@ func (c *Capture) streamToFence(ctx context.Context, replStream ReplicationStrea
 			case <-ticker.C:
 				logProgress("processing replication events")
 				log.Warn("replication streaming has been ongoing for an unexpectedly long amount of time, running replication diagnostics")
+				// Dump goroutine stacks on the first tick and every fifth tick thereafter
+				// to help with investigations into potentially stalled captures.
+				if progressTicks%5 == 0 {
+					dumpGoroutineStacks()
+				}
+				progressTicks++
 				if err := c.Database.ReplicationDiagnostics(ctx); err != nil {
 					log.WithField("err", err).Error("replication diagnostics error")
 				}
@@ -649,6 +659,20 @@ func (c *Capture) streamToFence(ctx context.Context, replStream ReplicationStrea
 	}
 
 	return nil
+}
+
+// dumpGoroutineStacks emits a full goroutine stack dump when a replication
+// streaming cycle has been running longer than expected.
+func dumpGoroutineStacks() {
+	var buf bytes.Buffer
+	if err := pprof.Lookup("goroutine").WriteTo(&buf, 2); err != nil {
+		log.WithField("err", err).Warn("failed to capture goroutine stack dump")
+		return
+	}
+	log.WithFields(log.Fields{
+		"goroutines": runtime.NumGoroutine(),
+		"stacks":     buf.String(),
+	}).Warn("goroutine stack dump for long-running replication streaming")
 }
 
 func (c *Capture) handleReplicationEvent(event DatabaseEvent) (int, error) {
