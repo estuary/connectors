@@ -14,6 +14,8 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/estuary/connectors/go/logsanitize"
+
 	"github.com/apache/arrow-go/v18/arrow/decimal128"
 	"github.com/apache/arrow-go/v18/parquet"
 	"github.com/apache/arrow-go/v18/parquet/compress"
@@ -701,13 +703,13 @@ func getIntVal(val any) (got int64, err error) {
 		}
 
 		if p, parseErr := strconv.Atoi(v); parseErr != nil {
-			err = fmt.Errorf("unable to parse string %q as integer: %w", v, parseErr)
+			err = fmt.Errorf("unable to parse string %s as integer: %w", logsanitize.Quoted(v), parseErr)
 		} else {
 			got = int64(p)
 		}
 	case float64:
 		if f := big.NewFloat(v); f.Cmp(minInt64) < 0 || f.Cmp(maxInt64) > 0 {
-			err = fmt.Errorf("float64 value %f is out of range for int64", v)
+			err = fmt.Errorf("float64 value %s is out of range for int64", logsanitize.Value(v))
 		} else {
 			got, _ = f.Int64()
 		}
