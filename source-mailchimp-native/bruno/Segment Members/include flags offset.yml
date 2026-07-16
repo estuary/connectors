@@ -1,0 +1,168 @@
+info:
+  name: include flags offset
+  type: http
+  seq: 3
+
+http:
+  method: GET
+  url: "{{base_url}}/lists/{{list_id}}/segments/{{segment_id}}/members?count=1&offset=2&include_cleaned=true&include_transactional=true&include_unsubscribed=true"
+  params:
+    - name: count
+      value: "1"
+      type: query
+    - name: offset
+      value: "2"
+      type: query
+    - name: include_cleaned
+      value: "true"
+      type: query
+    - name: include_transactional
+      value: "true"
+      type: query
+    - name: include_unsubscribed
+      value: "true"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - offset indexes expanded set
+    request:
+      url: "{{base_url}}/lists/{{list_id}}/segments/{{segment_id}}/members?count=1&offset=2&include_cleaned=true&include_transactional=true&include_unsubscribed=true"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "members": [
+              {
+                "id": "7bfb50d36252f5094fec17e378483cf1",
+                "email_address": "nicolas+estuary-test-3@estuary.dev",
+                "full_name": "",
+                "unique_email_id": "bf79c35454",
+                "email_type": "html",
+                "status": "unsubscribed",
+                "merge_fields": {
+                  "FNAME": "",
+                  "LNAME": "",
+                  "ADDRESS": "",
+                  "PHONE": "",
+                  "BIRTHDAY": "",
+                  "COMPANY": ""
+                },
+                "interests": {
+                  "6fbed1c079": false
+                },
+                "stats": "REDACTED",
+                "ip_signup": "",
+                "timestamp_signup": "",
+                "ip_opt": "201.235.239.178",
+                "timestamp_opt": "2026-06-12T13:32:34+00:00",
+                "member_rating": 2,
+                "last_changed": "2026-06-12T13:32:42+00:00",
+                "language": "",
+                "vip": false,
+                "email_client": "",
+                "location": {
+                  "latitude": 0,
+                  "longitude": 0,
+                  "gmtoff": 0,
+                  "dstoff": 0,
+                  "country_code": "",
+                  "timezone": ""
+                },
+                "list_id": "f34247943d",
+                "_links": "REDACTED"
+              }
+            ],
+            "total_items": 2,
+            "_links": "REDACTED"
+          }
+  - name: 200 - count=1 offset=1 honored
+    request:
+      url: "{{base_url}}/lists/{{list_id}}/segments/{{segment_id}}/members?count=1&offset=1"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "members": [
+              {
+                "id": "3abd9d34d7d6953d8a91a79904b6631d",
+                "email_address": "nicolas+estuary-test-2@estuary.dev",
+                "full_name": "",
+                "unique_email_id": "e8feaf0c3c",
+                "email_type": "html",
+                "status": "subscribed",
+                "merge_fields": {
+                  "FNAME": "",
+                  "LNAME": "",
+                  "ADDRESS": "",
+                  "PHONE": "",
+                  "BIRTHDAY": "",
+                  "COMPANY": ""
+                },
+                "interests": {
+                  "6fbed1c079": false
+                },
+                "stats": "REDACTED",
+                "ip_signup": "",
+                "timestamp_signup": "",
+                "ip_opt": "201.235.239.178",
+                "timestamp_opt": "2026-06-12T13:12:38+00:00",
+                "member_rating": 2,
+                "last_changed": "2026-06-12T13:12:38+00:00",
+                "language": "",
+                "vip": false,
+                "email_client": "",
+                "location": {
+                  "latitude": 0,
+                  "longitude": 0,
+                  "gmtoff": 0,
+                  "dstoff": 0,
+                  "country_code": "",
+                  "timezone": ""
+                },
+                "list_id": "f34247943d",
+                "_links": "REDACTED"
+              }
+            ],
+            "total_items": 2,
+            "_links": "REDACTED"
+          }
+
+docs: |-
+  **REFERENCE:** [API reference](https://mailchimp.com/developer/marketing/api/list-segment-members/list-members-in-segment/)
+
+  **WHY:** offset pagination on segment members — its own request because the
+  path (lists/{{list_id}}/segments/{{segment_id}}/members) is a unique
+  two-parent depth that no other endpoint shares. Probed under the include_*
+  flags the connector always passes: with them the expanded response carries
+  MORE items than total_items reports (3 members vs total_items=2 — total_items
+  counts only the default population), so the load-bearing question is what
+  `offset` indexes — the expanded set or the default population. A flagless
+  `count=1&offset=1` control run is saved alongside.
+
+  **VERIFIED (2026-06-30):** offset=2&count=1 under the flags returns exactly
+  the third (unsubscribed) member — offset indexes the EXPANDED set, so
+  offset/count paging works. But completion MUST use the short-page signal,
+  never offset >= total_items, or flag-included members beyond total_items are
+  silently dropped. The flagless control (`count=1&offset=1`, second example)
+  is likewise honored.

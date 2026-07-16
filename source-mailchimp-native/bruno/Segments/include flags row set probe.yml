@@ -1,0 +1,118 @@
+info:
+  name: include flags row set probe
+  type: http
+  seq: 5
+
+http:
+  method: GET
+  url: "{{base_url}}/lists/{{list_id}}/segments?count=1000&include_cleaned=true&include_transactional=true&include_unsubscribed=true"
+  params:
+    - name: count
+      value: "1000"
+      type: query
+    - name: include_cleaned
+      value: "true"
+      type: query
+    - name: include_transactional
+      value: "true"
+      type: query
+    - name: include_unsubscribed
+      value: "true"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - same 4 rows as bare, member_count includes unsubscribed
+    request:
+      url: "{{base_url}}/lists/{{list_id}}/segments?count=1000&include_cleaned=true&include_transactional=true&include_unsubscribed=true"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "segments": [
+              {
+                "id": 2225591,
+                "name": "estuary-test-tag",
+                "member_count": 2,
+                "type": "static",
+                "created_at": "2026-06-12T13:12:06+00:00",
+                "updated_at": "2026-06-12T13:12:06+00:00",
+                "list_id": "f34247943d",
+                "_links": "REDACTED"
+              },
+              {
+                "id": 2225592,
+                "name": "estuary-other-tag",
+                "member_count": 1,
+                "type": "static",
+                "created_at": "2026-06-12T13:12:38+00:00",
+                "updated_at": "2026-06-12T13:12:38+00:00",
+                "list_id": "f34247943d",
+                "_links": "REDACTED"
+              },
+              {
+                "id": 2225593,
+                "name": "estuary-test-segment (cursor probe)",
+                "member_count": 3,
+                "type": "static",
+                "created_at": "2026-06-12T13:12:53+00:00",
+                "updated_at": "2026-06-12T14:26:44+00:00",
+                "list_id": "f34247943d",
+                "_links": "REDACTED"
+              },
+              {
+                "id": 2225594,
+                "name": "estuary-test-saved-segment",
+                "member_count": 2,
+                "type": "saved",
+                "created_at": "2026-06-12T13:12:59+00:00",
+                "updated_at": "2026-06-12T13:12:59+00:00",
+                "options": {
+                  "match": "all",
+                  "conditions": [
+                    {
+                      "condition_type": "TextMerge",
+                      "field": "FNAME",
+                      "op": "contains",
+                      "value": "Estuary"
+                    }
+                  ]
+                },
+                "list_id": "f34247943d",
+                "_links": "REDACTED"
+              }
+            ],
+            "list_id": "f34247943d",
+            "total_items": 4,
+            "_links": "REDACTED"
+          }
+
+docs: |-
+  **REFERENCE:** [API reference](https://mailchimp.com/developer/marketing/api/list-segments/list-segments/)
+
+  **WHY:** hidden-partition audit, flag arm: the segments listing also takes
+  `include_cleaned` / `include_transactional` / `include_unsubscribed`
+  (documented as "Include cleaned/transactional/unsubscribed members in
+  response" — member-counting semantics, not segment visibility). Teaches
+  whether the flags change WHICH segments are listed.
+
+  **VERIFIED (2026-07-02):** with all three flags on, the segment ROW SET is
+  identical to `Segments / bare` (same 4 ids) — no hidden segments surface.
+  Only `member_count` moves: segment 2225593 reports 3 here vs 2 bare, the
+  delta being the unsubscribed member 3 (see `Seeding/B7 - Unsubscribe Member
+  3`). So the flags change how members are COUNTED per segment, not which
+  segments are listed — and, corollary, the bare listing's `member_count`
+  silently excludes unsubscribed/cleaned/transactional members.

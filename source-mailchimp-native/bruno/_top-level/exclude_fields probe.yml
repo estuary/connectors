@@ -1,0 +1,201 @@
+info:
+  name: exclude_fields probe
+  type: http
+  seq: 3
+
+http:
+  method: GET
+  url: "{{base_url}}/{{resource}}?count=1&exclude_fields={{resource}}._links,_links"
+  params:
+    - name: count
+      value: "1"
+      type: query
+    - name: exclude_fields
+      value: "{{resource}}._links,_links"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - lists - _links absent from items and envelope
+    request:
+      url: "{{base_url}}/lists?count=1&exclude_fields=lists._links,_links"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "lists": [
+              {
+                "id": "f34247943d",
+                "web_id": 615256,
+                "name": "Estuary",
+                "contact": {
+                  "company": "Estuary",
+                  "address1": "244 5th Ave Ste 1277",
+                  "address2": "",
+                  "city": "New York",
+                  "state": "NY",
+                  "zip": "10001-7604",
+                  "country": "US",
+                  "phone": ""
+                },
+                "permission_reminder": "You are receiving this email because you opted in via our website.",
+                "use_archive_bar": true,
+                "campaign_defaults": {
+                  "from_name": "Estuary",
+                  "from_email": "connector-dev+mailchimp@estuary.dev",
+                  "subject": "",
+                  "language": "en"
+                },
+                "notify_on_subscribe": "",
+                "notify_on_unsubscribe": "",
+                "date_created": "2026-06-09T15:12:23+00:00",
+                "list_rating": 0,
+                "email_type_option": false,
+                "subscribe_url_short": "http://eepurl.com/MqKi2PfCnl",
+                "subscribe_url_long": "https://dev.us16.list-manage.com/subscribe?u=05c093afb0e356009f1c0f3af&id=f34247943d",
+                "beamer_address": "us16-c18bf75d09-9a6ca81c73@inbound.mailchimp.com",
+                "visibility": "prv",
+                "double_optin": false,
+                "has_welcome": false,
+                "marketing_permissions": false,
+                "modules": [],
+                "stats": "REDACTED"
+              }
+            ],
+            "total_items": 1,
+            "constraints": {
+              "may_create": false,
+              "max_instances": 1,
+              "current_total_instances": 1
+            }
+          }
+  - name: 200 - campaigns - _links absent from items and envelope
+    request:
+      url: "{{base_url}}/campaigns?count=1&exclude_fields=campaigns._links,_links"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "campaigns": [
+              {
+                "id": "61cc0c44a6",
+                "web_id": 6783366,
+                "type": "regular",
+                "create_time": "2026-06-10T18:28:42+00:00",
+                "archive_url": "http://eepurl.com/YKoF3m3RBn",
+                "long_archive_url": "https://us16.campaign-archive.com/?u=05c093afb0e356009f1c0f3af&id=61cc0c44a6",
+                "status": "sent",
+                "emails_sent": 1,
+                "send_time": "2026-06-10T18:41:10+00:00",
+                "content_type": "html",
+                "needs_block_refresh": false,
+                "resendable": true,
+                "recipients": {
+                  "list_id": "f34247943d",
+                  "list_is_active": true,
+                  "list_name": "Estuary",
+                  "segment_text": "",
+                  "recipient_count": 1
+                },
+                "settings": {
+                  "subject_line": "[estuary test] email-activity seed",
+                  "title": "estuary-seed email-activity",
+                  "from_name": "Estuary Connector Test",
+                  "reply_to": "connector-dev+mailchimp@estuary.dev",
+                  "use_conversation": false,
+                  "to_name": "",
+                  "folder_id": "",
+                  "authenticate": true,
+                  "auto_footer": false,
+                  "inline_css": false,
+                  "auto_tweet": false,
+                  "fb_comments": true,
+                  "timewarp": false,
+                  "template_id": 0,
+                  "drag_and_drop": false
+                },
+                "tracking": {
+                  "opens": true,
+                  "html_clicks": true,
+                  "text_clicks": false,
+                  "goal_tracking": false,
+                  "ecomm360": false,
+                  "google_analytics": "",
+                  "clicktale": ""
+                },
+                "report_summary": {
+                  "opens": 0,
+                  "unique_opens": 0,
+                  "open_rate": 0,
+                  "clicks": 0,
+                  "subscriber_clicks": 0,
+                  "click_rate": 0,
+                  "ecommerce": {
+                    "total_orders": 0,
+                    "total_spent": 0,
+                    "total_revenue": 0
+                  }
+                },
+                "delivery_status": {
+                  "enabled": false
+                }
+              }
+            ],
+            "total_items": 5
+          }
+  - name: 200 - automations - empty collection, envelope _links absent
+    request:
+      url: "{{base_url}}/automations?count=1&exclude_fields=automations._links,_links"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "automations": [],
+            "total_items": 0
+          }
+
+docs: |-
+  **REFERENCE:** `exclude_fields` semantics from
+  [Methods and Parameters](https://mailchimp.com/developer/marketing/docs/methods-parameters/).
+
+  **WHY:** the connector strips HATEOAS `_links` server-side on every
+  collection request (`fetch_collection_page` injects
+  `exclude_fields=<items_key>._links,_links`). `Email Activity /
+  exclude_fields probe` proved the mechanism on one deep endpoint; this run
+  proves it on the top-level URL shape. Set `resource` to: lists, campaigns,
+  automations (items key == resource name for all three). One saved example
+  per resource. Key ABSENCE in examples is the API's doing — the collection
+  redaction script replaces `_links` values but never removes keys.
+
+  **VERIFIED (2026-07-29):** all three resources return 200 with `_links`
+  absent from both the items and the envelope. The automations run (empty
+  collection on this account) still proves the envelope-level exclusion. The
+  `/lists` envelope's `constraints` object is untouched — the exclusion
+  removes only the named paths.

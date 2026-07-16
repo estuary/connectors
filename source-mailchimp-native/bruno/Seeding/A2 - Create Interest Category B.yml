@@ -1,0 +1,30 @@
+info:
+  name: A2 - Create Interest Category B
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{base_url}}/lists/{{list_id}}/interest-categories"
+  body:
+    type: json
+    data: |-
+      {
+        "title": "Estuary Test Category B",
+        "type": "dropdown"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [API reference](https://mailchimp.com/developer/marketing/api/interest-categories/add-interest-category/)
+
+  SEEDING REQUEST — only the user runs this; never the assistant.
+
+  **WHY:** second category, so offset pagination on interest-categories can be
+  proven and so the `type` field is observed with more than one value.

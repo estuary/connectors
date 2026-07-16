@@ -1,0 +1,125 @@
+info:
+  name: offset page
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/lists/{{list_id}}/{{child}}?count=1&offset=1"
+  params:
+    - name: count
+      value: "1"
+      type: query
+    - name: offset
+      value: "1"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: interest-categories - count=1 offset=1 honored
+    request:
+      url: "{{base_url}}/lists/{{list_id}}/{{child}}?count=1&offset=1"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "list_id": "f34247943d",
+            "categories": [
+              {
+                "list_id": "f34247943d",
+                "id": "f9a37e2cd1",
+                "title": "Estuary Test Category B",
+                "display_order": 1,
+                "type": "dropdown",
+                "_links": "REDACTED"
+              }
+            ],
+            "total_items": 2,
+            "_links": "REDACTED"
+          }
+  - name: segments - second row, stable total_items
+    request:
+      url: "{{base_url}}/lists/{{list_id}}/{{child}}?count=1&offset=1"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "segments": [
+              {
+                "id": 2225592,
+                "name": "estuary-other-tag",
+                "member_count": 0,
+                "type": "static",
+                "created_at": "2026-06-12T13:12:38+00:00",
+                "updated_at": "2026-06-12T13:12:38+00:00",
+                "list_id": "f34247943d",
+                "_links": "REDACTED"
+              }
+            ],
+            "list_id": "f34247943d",
+            "total_items": 4,
+            "_links": "REDACTED"
+          }
+  - name: tag-search - undocumented count-offset honored
+    request:
+      url: "{{base_url}}/lists/{{list_id}}/{{child}}?count=1&offset=1"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "tags": [
+              {
+                "id": 2225592,
+                "name": "estuary-other-tag"
+              }
+            ],
+            "total_items": 3
+          }
+
+docs: |-
+  **WHY:** pagination probe for list-child endpoints under /lists/{{list_id}}/ —
+  one request per URL shape. Set the `child` env var to one of: members,
+  segments, interest-categories, tag-search (`list_id` from the environment).
+  Teaches whether count/offset paging is honored on child paths. Collapsed from
+  the per-resource offset probes (interest-categories, segments, tag-search);
+  members keeps its own sorted offset probe, and deeper paths (segment-members)
+  have their own requests.
+
+  **VERIFIED (2026-06-30):** honored on all three probed children — see the
+  saved examples (interest-categories, segments, and tag-search, whose
+  count/offset support is undocumented by the provider).
+
+  **LIMITATION (VERIFIED 2026-06-30):** the snapshot child streams reached
+  through this shape (`interest_categories`, `interests`, `tags`,
+  `segment_members`, `automation_emails`) have no top-level list endpoint — they
+  must re-enumerate their parents on every poll via id-projected requests.
+  Per-poll request count therefore grows with lists × (categories + segments).
+  The default 1h binding interval suits small accounts; raise it for large
+  multi-list or many-segment accounts.

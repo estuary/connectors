@@ -1,0 +1,32 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/automations/{{workflow_id}}/emails"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [List automated emails](https://mailchimp.com/developer/marketing/api/automation-email/list-automated-emails/)
+
+  **WHY:** child list (`automations → emails`) — should confirm the
+  `{emails, total_items, _links}` envelope, the per-item field set (`id`,
+  `workflow_id`, `position`, `status`, `create_time`, `start_time`), and
+  whether the endpoint accepts `offset`/`count` (none are documented — expected:
+  the full set in one response).
+
+  **UNOBSERVABLE:** all of the above — the request can't be run.
+  `{{workflow_id}}` is unpinned (`PIN_FROM_AUTOMATIONS_BARE`) because the
+  account has **0** automations (`Automations / bare` → empty; classic
+  automations is feature-gated and UI-only to create, so no parent can be
+  seeded). The connector's shape for this stream is docs-based. If an account
+  with a workflow ever becomes available: pin its `workflow_id`, run, and
+  confirm the envelope, field set, and pagination behavior.

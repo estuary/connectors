@@ -1,0 +1,36 @@
+info:
+  name: D1 - Update Member (touch last_changed)
+  type: http
+  seq: 14
+
+http:
+  method: PATCH
+  url: "{{base_url}}/lists/{{list_id}}/members/6409961b1c262a7e6fb62624ce95ddf5"
+  body:
+    type: json
+    data: |-
+      {
+        "merge_fields": {
+          "FNAME": "Estuary Cursor Probe"
+        }
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [API reference](https://mailchimp.com/developer/marketing/api/list-members/update-list-member/)
+
+  SEEDING REQUEST — only the user runs this; never the assistant.
+
+  **WHY:** touches a no-op-shaped field (a merge field) so the member's
+  `last_changed` advances, proving the incremental cursor moves on update and
+  that `since_last_changed` picks the member back up. The path id is pinned to
+  MD5("nicolas+estuary-test-1@estuary.dev") — the member created by "B1 - Add
+  Tagged Member 1", which must run first. It deliberately does NOT touch the
+  account's original member, whose stale last_changed is the narrowing probe's
+  excluded-side evidence.

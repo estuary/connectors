@@ -1,0 +1,94 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/campaigns?count=10"
+  params:
+    - name: count
+      value: "10"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - 3 campaigns; full shape of the sent one (1 of 3 shown)
+    request:
+      url: "{{base_url}}/campaigns?count=10"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "campaigns": [
+              {
+                "id": "61cc0c44a6",
+                "web_id": 6783366,
+                "type": "regular",
+                "create_time": "2026-06-10T18:28:42+00:00",
+                "status": "sent",
+                "emails_sent": 1,
+                "send_time": "2026-06-10T18:41:10+00:00",
+                "content_type": "html",
+                "resendable": true,
+                "recipients": {
+                  "list_id": "f34247943d",
+                  "list_is_active": true,
+                  "list_name": "Estuary",
+                  "segment_text": "",
+                  "recipient_count": 1
+                },
+                "settings": {
+                  "subject_line": "[estuary test] email-activity seed",
+                  "title": "estuary-seed email-activity",
+                  "from_name": "Estuary Connector Test",
+                  "reply_to": "connector-dev+mailchimp@estuary.dev",
+                  "template_id": 0
+                },
+                "tracking": {
+                  "opens": true,
+                  "html_clicks": true,
+                  "text_clicks": false
+                },
+                "report_summary": {
+                  "opens": 0,
+                  "unique_opens": 0,
+                  "open_rate": 0,
+                  "clicks": 0,
+                  "subscriber_clicks": 0,
+                  "click_rate": 0,
+                  "ecommerce": { "total_orders": 0, "total_spent": 0, "total_revenue": 0 }
+                },
+                "delivery_status": { "enabled": false }
+              }
+            ],
+            "total_items": 3
+          }
+
+docs: |-
+  **REFERENCE:** [List campaigns](https://mailchimp.com/developer/marketing/api/campaigns/list-campaigns/)
+
+  **WHY:** bare list for the `campaigns` stream. Teaches the envelope, the
+  per-campaign field set, and the baseline `total_items` for the silent-default
+  audit — compare against `Campaigns / status filter` to prove the bare list
+  doesn't default-filter by status. The connector must capture **all** statuses
+  (`save`, `paused`, `schedule`, `sending`, `sent`).
+
+  **VERIFIED (2026-06-30):** envelope `{campaigns, total_items, _links}`;
+  per-campaign fields include `id`, `create_time`, `send_time`, `status`,
+  `report_summary`. `total_items` = **3** (one `sent`, two `save`); `save` +
+  `sent` already sum back to 3, so the bare list does **not** silently drop any
+  partition (see `Campaigns / status filter` for the partition run).
