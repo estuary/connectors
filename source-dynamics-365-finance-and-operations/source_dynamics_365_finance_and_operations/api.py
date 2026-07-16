@@ -137,7 +137,13 @@ async def get_timestamp_folders(
         if path.isDirectory and is_datetime_format(path.name):
             timestamp_folders.append(path.name)
 
-    return sorted(timestamp_folders, key=str_to_dt)
+    sorted_timestamp_folders = sorted(timestamp_folders, key=str_to_dt)
+
+    client.log.debug("Found timestamp folders", {
+        "timestamp folders": sorted_timestamp_folders
+    })
+
+    return sorted_timestamp_folders
 
 
 @alru_cache(maxsize=1, ttl=CACHE_TTL)
