@@ -686,26 +686,18 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 		return nil, nil
 	}
 
-	var pending = len(d.cp)
-	for _, bucket := range d.peerShardsCheckpoints {
-		pending += len(bucket)
+	// Opening is lazy (no connection is dialed until a query runs), so an
+	// Acknowledge with nothing to execute costs nothing here.
+	db, err := d.openDB()
+	if err != nil {
+		return nil, err
 	}
+	defer db.Close()
 
-	var exec func(context.Context, string) error
-	if pending > 0 {
-		db, err := d.openDB()
-		if err != nil {
-			return nil, err
-		}
-		defer db.Close()
-
-		exec = func(ctx context.Context, query string) error {
-			_, err := db.ExecContext(ctx, query)
-			return err
-		}
-	}
-
-	return d.acknowledgeApply(ctx, exec)
+	return d.acknowledgeApply(ctx, func(ctx context.Context, query string) error {
+		_, err := db.ExecContext(ctx, query)
+		return err
+	})
 }
 
 // acknowledgeApply executes all pending checkpoint entries — this shard's
