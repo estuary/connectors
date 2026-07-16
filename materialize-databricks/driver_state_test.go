@@ -2,8 +2,11 @@ package main
 
 import (
 	"context"
+	stdsql "database/sql"
+	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"testing"
 
 	m "github.com/estuary/connectors/go/materialize"
@@ -26,8 +29,6 @@ func testTransactor(scaleOut bool, rangeKey string, stateKeys ...string) *transa
 		rangeKey:              rangeKey,
 		be:                    &m.BindingEvents{},
 	}
-	d.deleteFiles = func(context.Context, []string) {}
-
 	for _, sk := range stateKeys {
 		d.bindings = append(d.bindings, &binding{target: sql.Table{
 			TableShape: sql.TableShape{Path: sql.TablePath{"schema", sk}},
@@ -39,6 +40,51 @@ func testTransactor(scaleOut bool, rangeKey string, stateKeys ...string) *transa
 
 func item(query string, toDelete ...string) *checkpointItem {
 	return &checkpointItem{Queries: []string{query}, ToDelete: toDelete}
+}
+
+// recordingDriver is a database/sql driver whose connections record every
+// executed statement (or fail with a configured error), so Acknowledge tests
+// run against a real *sql.DB without a Databricks connection.
+type recordingDriver struct{}
+
+type recordingConn struct{}
+
+var recording struct {
+	executed []string
+	failWith error
+}
+
+func (recordingDriver) Open(string) (driver.Conn, error) { return recordingConn{}, nil }
+
+func (recordingConn) Prepare(string) (driver.Stmt, error) {
+	return nil, fmt.Errorf("prepare is not implemented")
+}
+func (recordingConn) Close() error              { return nil }
+func (recordingConn) Begin() (driver.Tx, error) { return nil, fmt.Errorf("begin is not implemented") }
+
+func (recordingConn) ExecContext(_ context.Context, query string, _ []driver.NamedValue) (driver.Result, error) {
+	if recording.failWith != nil {
+		return nil, recording.failWith
+	}
+	recording.executed = append(recording.executed, query)
+	return driver.RowsAffected(0), nil
+}
+
+var registerRecordingDriver = sync.OnceFunc(func() {
+	stdsql.Register("recording", recordingDriver{})
+})
+
+// recordingDB resets the recorder and returns a *sql.DB whose statements it
+// captures.
+func recordingDB(t *testing.T, failWith error) *stdsql.DB {
+	t.Helper()
+	registerRecordingDriver()
+
+	recording.executed, recording.failWith = nil, failWith
+	db, err := stdsql.Open("recording", "")
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+	return db
 }
 
 func TestUnmarshalStateRouting(t *testing.T) {
@@ -157,24 +203,13 @@ func TestMergePeerStatePatches(t *testing.T) {
 }
 
 func TestAcknowledge(t *testing.T) {
-	var recordingExec = func(queries *[]string, failWith error) func(context.Context, string) error {
-		return func(_ context.Context, query string) error {
-			if failWith != nil {
-				return failWith
-			}
-			*queries = append(*queries, query)
-			return nil
-		}
-	}
-
 	t.Run("flag off clearing patch matches legacy shape", func(t *testing.T) {
 		var d = testTransactor(false, fullRangeKey, "a_table.v1", "b_table.v1")
 		d.cp["a_table.v1"] = item("Q1")
 
-		var executed []string
-		state, err := d.acknowledgeApply(context.Background(), recordingExec(&executed, nil))
+		state, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil))
 		require.NoError(t, err)
-		require.Equal(t, []string{"Q1"}, executed)
+		require.Equal(t, []string{"Q1"}, recording.executed)
 		require.True(t, state.MergePatch)
 		require.Equal(t, `{"a_table.v1":null,"b_table.v1":null}`, string(state.UpdatedJson))
 		require.Empty(t, d.cp)
@@ -186,10 +221,9 @@ func TestAcknowledge(t *testing.T) {
 		d.peerShardsCheckpoints[upperRangeKey] = checkpoint{"a_table.v1": item("PEER")}
 		d.peerShardsCheckpoints[legacyRangeKey] = checkpoint{"a_table.v1": item("LEGACY")}
 
-		var executed []string
-		state, err := d.acknowledgeApply(context.Background(), recordingExec(&executed, nil))
+		state, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil))
 		require.NoError(t, err)
-		require.Equal(t, []string{"OWN", "LEGACY", "PEER"}, executed)
+		require.Equal(t, []string{"OWN", "LEGACY", "PEER"}, recording.executed)
 		require.True(t, state.MergePatch)
 		require.JSONEq(t, `{
 			"00000000-7fffffff": {"a_table.v1": null},
@@ -207,10 +241,9 @@ func TestAcknowledge(t *testing.T) {
 			"removed_table.v1": item("REMOVED"),
 		}
 
-		var executed []string
-		state, err := d.acknowledgeApply(context.Background(), recordingExec(&executed, nil))
+		state, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil))
 		require.NoError(t, err)
-		require.Equal(t, []string{"PEER"}, executed)
+		require.Equal(t, []string{"PEER"}, recording.executed)
 		require.JSONEq(t, `{
 			"00000000-7fffffff": {"a_table.v1": null},
 			"80000000-ffffffff": {"a_table.v1": null}
@@ -237,13 +270,12 @@ func TestAcknowledge(t *testing.T) {
 		d.cp["a_table.v1"] = item("Q1")
 		d.cpRecovery = true
 
-		var executed []string
-		_, err := d.acknowledgeApply(context.Background(), recordingExec(&executed, fmt.Errorf("some PATH_NOT_FOUND error")))
+		_, err := d.acknowledgeApply(context.Background(), recordingDB(t, fmt.Errorf("some PATH_NOT_FOUND error")))
 		require.NoError(t, err)
 		require.False(t, d.cpRecovery)
 
 		d.cp["a_table.v1"] = item("Q1")
-		_, err = d.acknowledgeApply(context.Background(), recordingExec(&executed, fmt.Errorf("some PATH_NOT_FOUND error")))
+		_, err = d.acknowledgeApply(context.Background(), recordingDB(t, fmt.Errorf("some PATH_NOT_FOUND error")))
 		require.Error(t, err) // no longer a recovery apply
 	})
 }
