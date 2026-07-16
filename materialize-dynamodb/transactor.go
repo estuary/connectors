@@ -305,7 +305,6 @@ func (t *transactor) storeWorker(ctx context.Context, batches <-chan map[string]
 					RequestItems: batch,
 				})
 				if err != nil {
-					log.WithField("batch", batch).Error("failed batch write")
 					return err
 				}
 

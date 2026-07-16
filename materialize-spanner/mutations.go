@@ -413,13 +413,6 @@ func (f *asyncBatchFlusher) flushSingleBatch(mutations []*spanner.Mutation, muta
 
 	_, batchDuration, err := f.t.timedSpannerApply(f.ctx, mutations, fmt.Sprintf("%s-batch-%d", f.operation, batchNum))
 	if err != nil {
-		for i, m := range mutations {
-			log.WithFields(log.Fields{
-				"batch":    batchNum,
-				"mutation": i,
-				"detail":   fmt.Sprintf("%v", m),
-			}).Error("failed mutation detail")
-		}
 		return 0, fmt.Errorf("applying %s batch %d (%d operations, %d mutations): %w", f.operation, batchNum, len(mutations), mutationCount, err)
 	}
 
