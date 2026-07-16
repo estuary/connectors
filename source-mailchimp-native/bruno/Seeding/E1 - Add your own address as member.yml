@@ -1,0 +1,43 @@
+info:
+  name: E1 - Add your own address as member
+  type: http
+  seq: 18
+
+http:
+  method: POST
+  url: "{{base_url}}/lists/{{list_id}}/members"
+  body:
+    type: json
+    data: |-
+      {
+        "email_address": "connector-dev+mailchimp@estuary.dev",
+        "status": "subscribed",
+        "merge_fields": { "FNAME": "Estuary", "LNAME": "Seed" }
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Add member to list](https://mailchimp.com/developer/marketing/api/list-members/add-member-to-list/)
+
+  SEEDING REQUEST — only the user runs this; never the assistant. State-mutating.
+
+  **WHY:** email_activity engagement seeding. The original seed email (campaign
+  61cc0c44a6, sent 2026-06-10 to connector-dev+mailchimp@estuary.dev) can't be
+  found in any accessible inbox, and Mailchimp has NO API to fabricate an
+  open/click — the tracking pixel and rewritten link URLs are generated
+  per-recipient at send time, so engagement can only come from a real mail
+  client. Therefore: subscribe an address you can actually open (e.g. your own),
+  then re-run C1 -> C2 -> C3 to send a fresh campaign, open it with image
+  loading enabled (fires the open pixel) and click its link. Expect the report
+  pipeline to lag a few minutes before /reports/{id}/email-activity shows the
+  events.
+
+  Outcome: ran 2026-07-08; produced the open/click events VERIFIED in `Email
+  Activity / bare`, `Email Activity / since filter`, and `Reports / recency
+  fields probe`.

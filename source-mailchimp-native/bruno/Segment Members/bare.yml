@@ -1,0 +1,239 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/lists/{{list_id}}/segments/{{segment_id}}/members?count=1000"
+  params:
+    - name: count
+      value: "1000"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - 2 of 3 members, unsubscribed excluded by default
+    request:
+      url: "{{base_url}}/lists/{{list_id}}/segments/{{segment_id}}/members?count=1000"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "members": [
+              {
+                "id": "6409961b1c262a7e6fb62624ce95ddf5",
+                "email_address": "nicolas+estuary-test-1@estuary.dev",
+                "full_name": "",
+                "unique_email_id": "277db7ffd1",
+                "email_type": "html",
+                "status": "subscribed",
+                "merge_fields": {
+                  "FNAME": "",
+                  "LNAME": "",
+                  "ADDRESS": "",
+                  "PHONE": "",
+                  "BIRTHDAY": "",
+                  "COMPANY": ""
+                },
+                "interests": {
+                  "6fbed1c079": false
+                },
+                "stats": "REDACTED",
+                "ip_signup": "",
+                "timestamp_signup": "",
+                "ip_opt": "201.235.239.178",
+                "timestamp_opt": "2026-06-12T13:12:06+00:00",
+                "member_rating": 2,
+                "last_changed": "2026-06-12T13:12:06+00:00",
+                "language": "",
+                "vip": false,
+                "email_client": "",
+                "location": {
+                  "latitude": 0,
+                  "longitude": 0,
+                  "gmtoff": 0,
+                  "dstoff": 0,
+                  "country_code": "",
+                  "timezone": ""
+                },
+                "list_id": "f34247943d",
+                "_links": "REDACTED"
+              },
+              {
+                "id": "3abd9d34d7d6953d8a91a79904b6631d",
+                "email_address": "nicolas+estuary-test-2@estuary.dev",
+                "full_name": "",
+                "unique_email_id": "e8feaf0c3c",
+                "email_type": "html",
+                "status": "subscribed",
+                "merge_fields": {
+                  "FNAME": "",
+                  "LNAME": "",
+                  "ADDRESS": "",
+                  "PHONE": "",
+                  "BIRTHDAY": "",
+                  "COMPANY": ""
+                },
+                "interests": {
+                  "6fbed1c079": false
+                },
+                "stats": "REDACTED",
+                "ip_signup": "",
+                "timestamp_signup": "",
+                "ip_opt": "201.235.239.178",
+                "timestamp_opt": "2026-06-12T13:12:38+00:00",
+                "member_rating": 2,
+                "last_changed": "2026-06-12T13:12:38+00:00",
+                "language": "",
+                "vip": false,
+                "email_client": "",
+                "location": {
+                  "latitude": 0,
+                  "longitude": 0,
+                  "gmtoff": 0,
+                  "dstoff": 0,
+                  "country_code": "",
+                  "timezone": ""
+                },
+                "list_id": "f34247943d",
+                "_links": "REDACTED"
+              }
+            ],
+            "total_items": 2,
+            "_links": "REDACTED"
+          }
+  - name: 200 - populated, 2 members
+    request:
+      url: "{{base_url}}/lists/{{list_id}}/segments/{{segment_id}}/members?count=1000"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "members": [
+              {
+                "id": "6409961b1c262a7e6fb62624ce95ddf5",
+                "email_address": "nicolas+estuary-test-1@estuary.dev",
+                "full_name": "",
+                "unique_email_id": "277db7ffd1",
+                "email_type": "html",
+                "status": "subscribed",
+                "merge_fields": {
+                  "FNAME": "",
+                  "LNAME": "",
+                  "ADDRESS": "",
+                  "PHONE": "",
+                  "BIRTHDAY": "",
+                  "COMPANY": ""
+                },
+                "interests": {
+                  "6fbed1c079": false
+                },
+                "stats": "REDACTED",
+                "ip_signup": "",
+                "timestamp_signup": "",
+                "ip_opt": "201.235.239.178",
+                "timestamp_opt": "2026-06-12T13:12:06+00:00",
+                "member_rating": 2,
+                "last_changed": "2026-06-12T13:12:06+00:00",
+                "language": "",
+                "vip": false,
+                "email_client": "",
+                "location": {
+                  "latitude": 0,
+                  "longitude": 0,
+                  "gmtoff": 0,
+                  "dstoff": 0,
+                  "country_code": "",
+                  "timezone": ""
+                },
+                "list_id": "f34247943d",
+                "_links": "REDACTED"
+              },
+              {
+                "id": "3abd9d34d7d6953d8a91a79904b6631d",
+                "email_address": "nicolas+estuary-test-2@estuary.dev",
+                "full_name": "",
+                "unique_email_id": "e8feaf0c3c",
+                "email_type": "html",
+                "status": "subscribed",
+                "merge_fields": {
+                  "FNAME": "",
+                  "LNAME": "",
+                  "ADDRESS": "",
+                  "PHONE": "",
+                  "BIRTHDAY": "",
+                  "COMPANY": ""
+                },
+                "interests": {
+                  "6fbed1c079": false
+                },
+                "stats": "REDACTED",
+                "ip_signup": "",
+                "timestamp_signup": "",
+                "ip_opt": "201.235.239.178",
+                "timestamp_opt": "2026-06-12T13:12:38+00:00",
+                "member_rating": 2,
+                "last_changed": "2026-06-12T13:12:38+00:00",
+                "language": "",
+                "vip": false,
+                "email_client": "",
+                "location": {
+                  "latitude": 0,
+                  "longitude": 0,
+                  "gmtoff": 0,
+                  "dstoff": 0,
+                  "country_code": "",
+                  "timezone": ""
+                },
+                "list_id": "f34247943d",
+                "_links": "REDACTED"
+              }
+            ],
+            "total_items": 2,
+            "_links": "REDACTED"
+          }
+
+docs: |-
+  **REFERENCE:** [API reference](https://mailchimp.com/developer/marketing/api/list-segment-members/list-members-in-segment/)
+
+  **WHY:** grandchild list (lists → segments → members). Teaches the envelope,
+  the per-item field set, that count=1000 is accepted (max page size), that NO
+  date filters exist (snapshot classification), and — the silent-data-loss audit
+  — whether members in cleaned/transactional/unsubscribed states appear in the
+  bare response (the docs define include_* params, implying they don't).
+
+  **VERIFIED (2026-06-30):** envelope `{members: [...], total_items, _links}`;
+  items carry `id` (MD5 subscriber hash), `email_address`, `status`,
+  `last_changed`; `count=1000` accepted; no date filters. Default exclusion
+  confirmed: the bare run returns 2 of 3 members — the unsubscribed member 3 is
+  excluded by the endpoint's defaults (compare `Segment Members / include
+  flags`).
+
+  **VERIFIED (2026-07-02, cross-stream note, archived-segments audit):** the
+  concern was that the parent-ID sweep feeding this stream (GET
+  /lists/{list_id}/segments) might hide archived segments the way the members
+  listing hides archived members (see `Members / status archived`). Audited and
+  closed: Mailchimp segments have NO archived state — see the finding in
+  `Segments / bare` and the two `Segments / * probe` requests. The parent
+  drain here needs no change.

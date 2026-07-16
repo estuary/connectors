@@ -1,0 +1,53 @@
+info:
+  name: offset page
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/{{resource}}?count=1&offset=1"
+  params:
+    - name: count
+      value: "1"
+      type: query
+    - name: offset
+      value: "1"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: lists - offset past end returns empty page, total_items unchanged
+    request:
+      url: "{{base_url}}/lists?count=1&offset=1"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "lists": [],
+            "total_items": 1
+          }
+
+docs: |-
+  **WHY:** pagination probe for the top-level list endpoints — one request per URL
+  shape, so every variable is visible in the URL. Set the `resource` env var to
+  one of: `lists`, `campaigns`, `automations`. Teaches whether `count`/`offset`
+  paging is honored, which the connector's page-walk depends on. Collapsed from
+  the former per-resource offset probes (lists, automations); campaigns keeps its
+  own sorted offset probe.
+
+  **VERIFIED (2026-06-30):** honored. With `resource=lists` (1 list in the
+  account), `count=1&offset=1` returns an empty page with `total_items` still 1 —
+  i.e. offset past the end yields a short page, the connector's completion signal.

@@ -1,0 +1,46 @@
+info:
+  name: B7 - Unsubscribe Member 3
+  type: http
+  seq: 10
+
+http:
+  method: PATCH
+  url: "{{base_url}}/lists/{{list_id}}/members/{{seed_member3_hash}}"
+  body:
+    type: json
+    data: |-
+      {
+        "status": "unsubscribed"
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // seed_member3_hash normally arrives from B5's post-response capture. Fail
+        // loudly out-of-session rather than PATCHing a malformed URL.
+        if (!bru.getVar('seed_member3_hash')) {
+          throw new Error(
+            'seed_member3_hash not set — run "B5 - Add Member 3 (to unsubscribe)" '
+            + 'first in this session (the hash is the MD5 of the lowercased email)',
+          );
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [API reference](https://mailchimp.com/developer/marketing/api/list-members/update-list-member/)
+
+  SEEDING REQUEST — only the user runs this; never the assistant.
+
+  **WHY:** flips member 3 (already inside the static segment via B6) to
+  unsubscribed. Afterward the read probes demonstrate the include_* divergence
+  empirically: "Segment Members / bare" should return 2 members (member 3
+  excluded by the endpoint's defaults) while "Segment Members / include flags"
+  returns 3. Touches ONLY the dedicated member 3 — the sibling sessions' members
+  (B1/B2) keep their subscribed status.

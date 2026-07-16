@@ -1,0 +1,57 @@
+info:
+  name: get by id
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/batches/{{batch_id}}"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - finished batch (3 read-only ops, ~2s turnaround)
+    request:
+      url: "{{base_url}}/batches/{{batch_id}}"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "id": "rh0kvyhbd6",
+            "status": "finished",
+            "total_operations": 3,
+            "finished_operations": 3,
+            "errored_operations": 0,
+            "submitted_at": "2026-07-13T17:24:53+00:00",
+            "completed_at": "2026-07-13T17:24:55+00:00",
+            "response_body_url": "REDACTED",
+            "_links": "REDACTED"
+          }
+
+docs: |-
+  **REFERENCE:** [Get batch operation status](https://mailchimp.com/developer/marketing/api/batch-operations/get-batch-operation-status/)
+
+  **WHY:** read-only. The single-batch object you poll to track a batch job (see
+  `Seeding/F1` to create one) — recorded so the rejected batch alternative's
+  operational shape is on file. Pin `batch_id` to the value F1 printed.
+
+  **VERIFIED (2026-07-13):** batch `rh0kvyhbd6` (3 read-only GET ops) finished
+  in **~2 s** (`submitted_at 17:24:53Z` → `completed_at 17:24:55Z`) — too fast
+  to observe the intermediate `pending/preprocessing/started/finalizing` states
+  on a poll. Object shape verified in the saved example. `response_body_url` is
+  a signed, dc-scoped, ~10-min-expiry link to a gzipped tar of per-op JSON
+  (redacted here). NB: 3 ops is trivial; the batch model's real cost is the
+  fixed async overhead + that a large batch is one monolithic,
+  un-checkpointable job (the basis for rejecting it — see `Batches / list`).

@@ -1,0 +1,47 @@
+info:
+  name: B3 - Create Static Segment
+  type: http
+  seq: 6
+
+http:
+  method: POST
+  url: "{{base_url}}/lists/{{list_id}}/segments"
+  body:
+    type: json
+    data: |-
+      {
+        "name": "Estuary Test Segment",
+        "static_segment": [
+          "nicolas+estuary-test-1@estuary.dev",
+          "nicolas+estuary-test-2@estuary.dev"
+        ]
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // Chain: the "Segment Members / *" read probes consume this id as
+        // {{segment_id}}. Runtime var only (resource id, not a credential).
+        if (res.status === 200 && res.body?.id) {
+          bru.setVar('segment_id', res.body.id);
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [API reference](https://mailchimp.com/developer/marketing/api/list-segments/add-segment/)
+
+  SEEDING REQUEST — only the user runs this; never the assistant.
+
+  **WHY:** creates a static segment containing both seeded members, so the
+  Segment Members probes have a populated parent. Run AFTER both "B1/B2 - Add
+  Tagged Member" requests; the listed addresses must already be list members.
+  Post-response: captures the new segment id into the segment_id runtime var,
+  overriding the pinned env value for this session; for later sessions the env
+  var's pinned id is used (re-pin it from "Segments / bare" if it goes stale).

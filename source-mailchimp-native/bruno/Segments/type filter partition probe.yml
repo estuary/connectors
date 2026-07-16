@@ -1,0 +1,208 @@
+info:
+  name: type filter partition probe
+  type: http
+  seq: 4
+
+http:
+  method: GET
+  url: "{{base_url}}/lists/{{list_id}}/segments?count=1000&type=static"
+  params:
+    - name: count
+      value: "1000"
+      type: query
+    - name: type
+      value: static
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - type static, 3 rows, subset of bare
+    request:
+      url: "{{base_url}}/lists/{{list_id}}/segments?count=1000&type=static"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "segments": [
+              {
+                "id": 2225591,
+                "name": "estuary-test-tag",
+                "member_count": 2,
+                "type": "static",
+                "created_at": "2026-06-12T13:12:06+00:00",
+                "updated_at": "2026-06-12T13:12:06+00:00",
+                "list_id": "f34247943d",
+                "_links": "REDACTED"
+              },
+              {
+                "id": 2225592,
+                "name": "estuary-other-tag",
+                "member_count": 1,
+                "type": "static",
+                "created_at": "2026-06-12T13:12:38+00:00",
+                "updated_at": "2026-06-12T13:12:38+00:00",
+                "list_id": "f34247943d",
+                "_links": "REDACTED"
+              },
+              {
+                "id": 2225593,
+                "name": "estuary-test-segment (cursor probe)",
+                "member_count": 2,
+                "type": "static",
+                "created_at": "2026-06-12T13:12:53+00:00",
+                "updated_at": "2026-06-12T14:26:44+00:00",
+                "list_id": "f34247943d",
+                "_links": "REDACTED"
+              }
+            ],
+            "list_id": "f34247943d",
+            "total_items": 3,
+            "_links": "REDACTED"
+          }
+  - name: 200 - type saved, 1 row, completes the bare set with static
+    request:
+      url: "{{base_url}}/lists/{{list_id}}/segments?count=1000&type=saved"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "segments": [
+              {
+                "id": 2225594,
+                "name": "estuary-test-saved-segment",
+                "member_count": 2,
+                "type": "saved",
+                "created_at": "2026-06-12T13:12:59+00:00",
+                "updated_at": "2026-06-12T13:12:59+00:00",
+                "options": {
+                  "match": "all",
+                  "conditions": [
+                    {
+                      "condition_type": "TextMerge",
+                      "field": "FNAME",
+                      "op": "contains",
+                      "value": "Estuary"
+                    }
+                  ]
+                },
+                "list_id": "f34247943d",
+                "_links": "REDACTED"
+              }
+            ],
+            "list_id": "f34247943d",
+            "total_items": 1,
+            "_links": "REDACTED"
+          }
+  - name: 200 - type fuzzy, empty (account has no pre-built segments)
+    request:
+      url: "{{base_url}}/lists/{{list_id}}/segments?count=1000&type=fuzzy"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "segments": [],
+            "list_id": "f34247943d",
+            "total_items": 0,
+            "_links": "REDACTED"
+          }
+  - name: 200 - type archived, empty (same as garbage - not a sentinel)
+    request:
+      url: "{{base_url}}/lists/{{list_id}}/segments?count=1000&type=archived"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "segments": [],
+            "list_id": "f34247943d",
+            "total_items": 0,
+            "_links": "REDACTED"
+          }
+  - name: 200 - garbage type value, identical empty response
+    request:
+      url: "{{base_url}}/lists/{{list_id}}/segments?count=1000&type=zz-definitely-not-a-type"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "segments": [],
+            "list_id": "f34247943d",
+            "total_items": 0,
+            "_links": "REDACTED"
+          }
+
+docs: |-
+  **REFERENCE:** [API reference](https://mailchimp.com/developer/marketing/api/list-segments/list-segments/)
+
+  **WHY:** hidden-partition audit for the archived-segments bugfix session: is
+  the bare segments listing the FULL population, or does a `type` partition hide
+  rows by default (the way `status` hides archived members — see `Members /
+  status archived`)? The documented `type` values are `saved`, `static`,
+  `fuzzy` (fuzzy = Mailchimp's pre-built/predicted segments); the audit also
+  probes the undocumented `type=archived` — does the listing accept an archived
+  sentinel the way the members listing does? — against a garbage `type` value
+  as the control. Run once per value (edit the `type` param between runs; one
+  saved example each) and check the union of the filtered row sets against
+  `Segments / bare` by segment id.
+
+  **VERIFIED (2026-07-02):** union holds exactly — bare listing returned ids
+  {2225591, 2225592, 2225593, 2225594}; type=static returned {2225591, 2225592,
+  2225593}, type=saved returned {2225594}, type=fuzzy returned the empty set.
+  static ∪ saved ∪ fuzzy == bare, so the bare listing hides no `type` partition
+  on this account state.
+
+  **VERIFIED (2026-07-02, archived sentinel):** `type=archived` returns 200
+  with an empty set — but so does a garbage value
+  (`type=zz-definitely-not-a-type`, the control example). The endpoint does not
+  validate `type` against an enum; any unmatched string simply filters to
+  nothing. `archived` is therefore NOT a recognized sentinel — its empty result
+  is indistinguishable from garbage and is no evidence of an archived
+  partition. Note for connector authors: because unknown `type` values fail
+  SILENTLY (200-empty, no 4xx), a typo'd `type` param in a sweep would zero the
+  stream without an error — keep any `type` literal covered by tests.
+
+  **UNOBSERVABLE:** fuzzy's inclusion in the bare listing is proven only
+  vacuously — the account has no fuzzy/pre-built segments and one cannot be
+  seeded via the API, which offers only `static` and `saved` on create
+  (Mailchimp generates pre-built segments itself). Trust the docs' description
+  of `type` as a filter, not a visibility gate.

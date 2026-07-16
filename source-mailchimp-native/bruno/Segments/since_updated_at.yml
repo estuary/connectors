@@ -1,0 +1,70 @@
+info:
+  name: since_updated_at
+  type: http
+  seq: 3
+
+http:
+  method: GET
+  url: "{{base_url}}/lists/{{list_id}}/segments?count=10&since_updated_at=2026-06-12T14:00:00Z"
+  params:
+    - name: count
+      value: "10"
+      type: query
+    - name: since_updated_at
+      value: 2026-06-12T14:00:00Z
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - narrowed 4 to 1, only renamed segment
+    request:
+      url: "{{base_url}}/lists/{{list_id}}/segments?count=10&since_updated_at=2026-06-12T14:00:00Z"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "segments": [
+              {
+                "id": 2225593,
+                "name": "estuary-test-segment (cursor probe)",
+                "member_count": 1,
+                "type": "static",
+                "created_at": "2026-06-12T13:12:53+00:00",
+                "updated_at": "2026-06-12T14:26:44+00:00",
+                "list_id": "f34247943d",
+                "_links": "REDACTED"
+              }
+            ],
+            "list_id": "f34247943d",
+            "total_items": 1,
+            "_links": "REDACTED"
+          }
+
+docs: |-
+  **REFERENCE:** [API reference](https://mailchimp.com/developer/marketing/api/list-segments/list-segments/)
+
+  **WHY:** exercises the `segments` stream's incremental filter:
+  `since_updated_at` (ISO 8601). The endpoint documents no sort parameter, so
+  the connector advances its cursor only after a filtered walk completes.
+  Teaches that the filter narrows results vs. `Segments / bare` (run the
+  `D3 - Update Segment` seed first to put one segment's updated_at past the
+  threshold). The threshold is pinned between the seeded segments' creation
+  updated_at values (13:12:xx) and the renamed segment's post-update value
+  (14:26:44), so it must return exactly the renamed segment (1 of 4).
+
+  **VERIFIED (2026-06-30):** honored — narrowed 4 → 1, returning only the
+  renamed segment (see the saved example), so `since_updated_at` is applied
+  server-side and D3's rename advanced `updated_at` as expected.

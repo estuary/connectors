@@ -1,0 +1,123 @@
+info:
+  name: recency fields probe
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/reports?count=10&fields=reports.id,reports.send_time,reports.emails_sent,reports.opens.last_open,reports.clicks.last_click,reports.bounces,total_items"
+  params:
+    - name: count
+      value: "10"
+      type: query
+    - name: fields
+      value: reports.id,reports.send_time,reports.emails_sent,reports.opens.last_open,reports.clicks.last_click,reports.bounces,total_items
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - sent campaign only; last_open/last_click empty-string sentinels
+    request:
+      url: "{{base_url}}/reports?count=10&fields=reports.id,reports.send_time,reports.emails_sent,reports.opens.last_open,reports.clicks.last_click,reports.bounces,total_items"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "reports": [
+              {
+                "id": "61cc0c44a6",
+                "emails_sent": 1,
+                "send_time": "2026-06-10T18:41:10+00:00",
+                "bounces": {
+                  "hard_bounces": 0,
+                  "soft_bounces": 0,
+                  "syntax_errors": 0
+                },
+                "opens": {
+                  "last_open": ""
+                },
+                "clicks": {
+                  "last_click": ""
+                }
+              }
+            ],
+            "total_items": 1
+          }
+  - name: "200 - last_click SET (excerpt: 5dfc22e163 row from a 3-report response)"
+    request:
+      url: "{{base_url}}/reports?count=10&fields=reports.id,reports.send_time,reports.opens.last_open,reports.clicks.last_click,reports.bounces,total_items"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "reports": [
+              {
+                "id": "5dfc22e163",
+                "emails_sent": 3,
+                "send_time": "2026-07-08T17:56:07+00:00",
+                "bounces": {
+                  "hard_bounces": 0,
+                  "soft_bounces": 0,
+                  "syntax_errors": 0
+                },
+                "opens": {
+                  "last_open": "2026-07-13T15:22:48+00:00"
+                },
+                "clicks": {
+                  "last_click": "2026-07-08T18:01:39+00:00"
+                }
+              }
+            ],
+            "total_items": 3
+          }
+
+docs: |-
+  **REFERENCE:** [List campaign reports](https://mailchimp.com/developer/marketing/api/reports/list-campaign-reports/)
+
+  **WHY:** the email_activity sweep's parent drain + activity-recency gate:
+  instead of fetching /reports/{id}/email-activity for every campaign every
+  poll, the sweep lists /reports and only descends into campaigns whose
+  `opens.last_open` / `clicks.last_click` is newer than the cursor's lookback,
+  or whose `send_time` is within the bounce grace window (bounces expose only
+  counts, no timestamp). Teaches whether those gate inputs exist and can be
+  trusted.
+
+  **VERIFIED (2026-07-08):** with 1 sent + 2 draft campaigns, /reports returns
+  ONLY the sent one (total_items = 1) — drafts have no report, so the drain
+  needs no status filtering. `opens.last_open` and `clicks.last_click` are
+  present and are the EMPTY STRING (not null, not absent) when no such event has
+  occurred. `bounces` carries counts only (hard_bounces/soft_bounces/
+  syntax_errors), no timestamp.
+
+  **VERIFIED (2026-07-08, post-seeding):** last_open/last_click DO advance —
+  after the seeded open+click on campaign `5dfc22e163`, the re-run showed
+  `last_open: 2026-07-08T18:01:27+00:00` and
+  `last_click: 2026-07-08T18:01:39+00:00`, matching the newest matching events
+  on /reports/{id}/email-activity exactly. The recency gate's inputs are
+  reliable.
+
+  **VERIFIED (2026-07-13):** /reports also carries an `unsubscribed` COUNT per
+  campaign — after a member unsubscribed from the list, campaign `5dfc22e163`'s
+  `unsubscribed` went 0 → 1. Count-only, no timestamp (same shape as
+  `bounces`). Not used by the email_activity gate, and unsubscribes are NOT
+  email-activity events (see `Email Activity / bare`).
