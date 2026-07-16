@@ -1,13 +1,17 @@
+from datetime import timedelta
 from typing import AsyncGenerator, Callable
 
 import pytest
 
 from source_dynamics_365_finance_and_operations.adls_gen2_client import ADLSPathMetadata
 from source_dynamics_365_finance_and_operations.api import (
+    SETTLE_DELAY,
     TransformedRow,
+    should_wait_for_finalization,
     stream_folder_rows,
     transform_row,
 )
+from source_dynamics_365_finance_and_operations.shared import str_to_dt
 
 
 CSV_NAME = "2026-01-01T00:00:00.000Z/Table/data.csv"
@@ -246,4 +250,32 @@ class TestStreamFolderRows:
         })
         result = await collect(stream_folder_rows(csvs, factory))
         assert [(r["Id"], r["versionnumber"]) for r in result] == [("A", "10")]
+
+
+class TestShouldWaitForFinalization:
+    """Tests for the settle-window decision used when a timestamp folder has
+    table data but no model.json."""
+
+    SUCCESSOR = "2024-09-11T16.29.10Z"
+
+    def test_ancient_successor_is_not_waited_on(self):
+        """A folder whose successor is long past is treated as incomplete and
+        not waited on."""
+        now = str_to_dt(self.SUCCESSOR) + timedelta(days=730)
+        assert should_wait_for_finalization(self.SUCCESSOR, now) is False
+
+    def test_recent_successor_is_waited_on(self):
+        """A folder whose successor is younger than SETTLE_DELAY may still be
+        finalizing, so we keep waiting."""
+        now = str_to_dt(self.SUCCESSOR) + (SETTLE_DELAY - timedelta(minutes=1))
+        assert should_wait_for_finalization(self.SUCCESSOR, now) is True
+
+    def test_settle_delay_boundary_is_not_waited_on(self):
+        """At exactly SETTLE_DELAY the folder has had enough time to finalize."""
+        now = str_to_dt(self.SUCCESSOR) + SETTLE_DELAY
+        assert should_wait_for_finalization(self.SUCCESSOR, now) is False
+
+    def test_just_under_settle_delay_is_waited_on(self):
+        now = str_to_dt(self.SUCCESSOR) + SETTLE_DELAY - timedelta(seconds=1)
+        assert should_wait_for_finalization(self.SUCCESSOR, now) is True
 
