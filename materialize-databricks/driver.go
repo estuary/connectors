@@ -130,7 +130,6 @@ type transactor struct {
 	ep                    *sql.Endpoint[config]
 	templates             templates
 	materializationName   string
-	deleteFiles           func(ctx context.Context, files []string)
 }
 
 func (d *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSpec, _ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
@@ -282,8 +281,6 @@ func newTransactor(
 		ep:                    ep,
 		templates:             renderTemplates(ep.Dialect),
 	}
-	d.deleteFiles = d.deleteStagedFiles
-
 	db, err := d.openDB()
 	if err != nil {
 		return nil, err
@@ -534,7 +531,7 @@ func parseRangeBucket(key string, val json.RawMessage) (checkpoint, bool) {
 	return bucket, true
 }
 
-func (d *transactor) deleteStagedFiles(ctx context.Context, files []string) {
+func (d *transactor) deleteFiles(ctx context.Context, files []string) {
 	for _, f := range files {
 		if err := d.wsClient.Files.DeleteByFilePath(ctx, f); err != nil {
 			log.WithFields(log.Fields{
@@ -694,17 +691,14 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	}
 	defer db.Close()
 
-	return d.acknowledgeApply(ctx, func(ctx context.Context, query string) error {
-		_, err := db.ExecContext(ctx, query)
-		return err
-	})
+	return d.acknowledgeApply(ctx, db)
 }
 
 // acknowledgeApply executes all pending checkpoint entries — this shard's
 // own, and (as the primary) those of peer shards and of prior sessions — and
 // builds the state update which clears the executed entries.
-func (d *transactor) acknowledgeApply(ctx context.Context, exec func(context.Context, string) error) (*pf.ConnectorState, error) {
-	if _, err := d.applyCheckpoint(ctx, exec, d.cp); err != nil {
+func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB) (*pf.ConnectorState, error) {
+	if _, err := d.applyCheckpoint(ctx, db, d.cp); err != nil {
 		return nil, err
 	}
 
@@ -716,7 +710,7 @@ func (d *transactor) acknowledgeApply(ctx context.Context, exec func(context.Con
 
 	var executedPeers = make(map[string][]string)
 	for _, rk := range peerRangeKeys {
-		executed, err := d.applyCheckpoint(ctx, exec, d.peerShardsCheckpoints[rk])
+		executed, err := d.applyCheckpoint(ctx, db, d.peerShardsCheckpoints[rk])
 		if err != nil {
 			return nil, err
 		}
@@ -778,7 +772,7 @@ func (d *transactor) acknowledgeApply(ctx context.Context, exec func(context.Con
 // applyCheckpoint executes the staged queries of every entry in cp whose
 // stateKey still has an active binding, deleting the staged files afterwards.
 // It returns the stateKeys which were executed.
-func (d *transactor) applyCheckpoint(ctx context.Context, exec func(context.Context, string) error, cp checkpoint) ([]string, error) {
+func (d *transactor) applyCheckpoint(ctx context.Context, db *stdsql.DB, cp checkpoint) ([]string, error) {
 	var executed []string
 	for stateKey, item := range cp {
 		path := d.pathForStateKey(stateKey)
@@ -797,7 +791,7 @@ func (d *transactor) applyCheckpoint(ctx context.Context, exec func(context.Cont
 		}
 		d.be.StartedResourceCommit(path)
 		for _, query := range queries {
-			if err := exec(ctx, query); err != nil {
+			if _, err := db.ExecContext(ctx, query); err != nil {
 				// When doing a recovery apply, it may be the case that some tables & files have already been deleted after being applied
 				// it is okay to skip them in this case
 				if d.cpRecovery {
