@@ -66,17 +66,30 @@ func listPublishedTables(ctx context.Context, conn *pgxpool.Pool, publicationNam
 }
 
 // recreateReplicationSlot attempts to drop and then recreate a replication slot with the specified name.
-func recreateReplicationSlot(ctx context.Context, conn *pgxpool.Pool, slotName string) error {
+func recreateReplicationSlot(ctx context.Context, pool *pgxpool.Pool, slotName string) error {
 	var logEntry = logrus.WithField("slot", slotName)
 	logEntry.Info("attempting to drop replication slot")
-	if _, err := conn.Exec(ctx, fmt.Sprintf(`SELECT pg_drop_replication_slot('%s');`, slotName)); err != nil {
+	if _, err := pool.Exec(ctx, fmt.Sprintf(`SELECT pg_drop_replication_slot('%s');`, slotName)); err != nil {
 		// Not a fatal error because we don't want a failure to drop a nonexistent slot
 		// to prevent the subsequent attempt to create it.
 		logEntry.WithField("err", err).Debug("failed to drop replication slot")
 	}
+
 	logEntry.Info("attempting to create replication slot")
-	if _, err := conn.Exec(ctx, fmt.Sprintf(`SELECT pg_create_logical_replication_slot('%s', 'pgoutput');`, slotName)); err != nil {
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("error opening transaction for replication slot creation: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	// Disable statement timeout within this transaction so that long-running transactions
+	// on the server can't cause slot creation to timeout.
+	if _, err := tx.Exec(ctx, `SET LOCAL statement_timeout = 0;`); err != nil {
+		return fmt.Errorf("error disabling statement timeout for replication slot creation: %w", err)
+	} else if _, err := tx.Exec(ctx, fmt.Sprintf(`SELECT pg_create_logical_replication_slot('%s', 'pgoutput');`, slotName)); err != nil {
 		return fmt.Errorf("replication slot %q couldn't be created", slotName)
+	} else if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("error committing replication slot creation: %w", err)
 	}
 	logEntry.Info("created replication slot")
 	return nil
