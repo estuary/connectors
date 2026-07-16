@@ -735,16 +735,17 @@ func (d *transactor) acknowledgeApply(ctx context.Context, exec func(context.Con
 	// the binding and running the queries that are pending for its last transaction.
 	var clear = make(map[string]interface{})
 
-	var ownClear = make(map[string]interface{})
-	for _, b := range d.bindings {
-		ownClear[b.target.StateKey] = nil
-		delete(d.cp, b.target.StateKey)
-	}
 	if d.scaleOut {
+		var ownClear = make(map[string]interface{})
+		for _, b := range d.bindings {
+			ownClear[b.target.StateKey] = nil
+			delete(d.cp, b.target.StateKey)
+		}
 		clear[d.rangeKey] = ownClear
 	} else {
-		for stateKey := range ownClear {
-			clear[stateKey] = nil
+		for _, b := range d.bindings {
+			clear[b.target.StateKey] = nil
+			delete(d.cp, b.target.StateKey)
 		}
 	}
 
