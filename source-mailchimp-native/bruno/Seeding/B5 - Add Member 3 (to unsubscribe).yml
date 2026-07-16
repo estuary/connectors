@@ -1,0 +1,43 @@
+info:
+  name: B5 - Add Member 3 (to unsubscribe)
+  type: http
+  seq: 8
+
+http:
+  method: POST
+  url: "{{base_url}}/lists/{{list_id}}/members"
+  body:
+    type: json
+    data: |-
+      {
+        "email_address": "nicolas+estuary-test-3@estuary.dev",
+        "status": "subscribed"
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // Chain: B7 PATCHes this member by subscriber hash (res.body.id is the MD5
+        // of the lowercased email). Runtime var only (resource id, not a credential).
+        if (res.status === 200 && res.body?.id) {
+          bru.setVar('seed_member3_hash', res.body.id);
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [API reference](https://mailchimp.com/developer/marketing/api/list-members/add-member-to-list/)
+
+  SEEDING REQUEST — only the user runs this; never the assistant.
+
+  **WHY:** B5-B7 demonstrate the segment-members include_* divergence
+  empirically: a third, dedicated member (so the sibling sessions' B1/B2 members
+  stay untouched) is created subscribed, added to the static segment while still
+  addable, then unsubscribed. Post-response: captures the subscriber hash into
+  the seed_member3_hash runtime var consumed by B7.

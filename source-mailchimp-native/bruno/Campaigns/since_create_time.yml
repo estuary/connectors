@@ -1,0 +1,106 @@
+info:
+  name: since_create_time
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/campaigns?count=10&since_create_time=2026-06-01T00:00:00Z&sort_field=create_time&sort_dir=ASC"
+  params:
+    - name: count
+      value: "10"
+      type: query
+    - name: since_create_time
+      value: 2026-06-01T00:00:00Z
+      type: query
+    - name: sort_field
+      value: create_time
+      type: query
+    - name: sort_dir
+      value: ASC
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - all 3 honored, oldest-first under ASC sort
+    request:
+      url: "{{base_url}}/campaigns?count=10&since_create_time=2026-06-01T00:00:00Z&sort_field=create_time&sort_dir=ASC"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "campaigns": [
+              { "id": "61cc0c44a6", "status": "sent", "create_time": "2026-06-10T18:28:42+00:00" },
+              { "id": "524c905696", "status": "save", "create_time": "2026-06-10T18:40:54+00:00" },
+              { "id": "cff6ca453b", "status": "save", "create_time": "2026-06-11T17:13:33+00:00" }
+            ],
+            "total_items": 3
+          }
+  - name: 200 - narrowed 3 to 2, pre-bound campaign excluded
+    request:
+      url: "{{base_url}}/campaigns?count=10&since_create_time=2026-06-10T18:30:00Z&sort_field=create_time&sort_dir=ASC"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "campaigns": [
+              { "id": "524c905696", "status": "save", "create_time": "2026-06-10T18:40:54+00:00" },
+              { "id": "cff6ca453b", "status": "save", "create_time": "2026-06-11T17:13:33+00:00" }
+            ],
+            "total_items": 2
+          }
+
+docs: |-
+  **REFERENCE:** [List campaigns](https://mailchimp.com/developer/marketing/api/campaigns/list-campaigns/)
+
+  **WHY:** exercises the cursor the connector will actually use:
+  `since_create_time` (RFC3339) sorted by `create_time` ASC — and, with the
+  threshold moved, proves the filter actually *narrows* (a filter can be
+  "accepted" yet ignored). Two runs, one saved example each (edit
+  `since_create_time` between runs): a `2026-06-01` threshold below every
+  campaign (accept + sort arm), and `2026-06-10T18:30:00Z`, pinned just after
+  the oldest campaign's `create_time` (`61cc0c44a6` @ 18:28:42), so exactly
+  that one must drop out (narrowing arm).
+
+  **VERIFIED (2026-06-30, accept + sort):** honored and oldest-first. With the
+  `2026-06-01` threshold all 3 campaigns come back in ascending `create_time`
+  order (`61cc0c44a6` 06-10 18:28 → `524c905696` 06-10 18:40 → `cff6ca453b`
+  06-11). The example is projected to the cursor-relevant fields; the full
+  objects match `Campaigns / bare`.
+
+  **VERIFIED (2026-06-30, narrowing):** narrowed **3 → 2** — `61cc0c44a6`
+  (pre-bound) is excluded; `524c905696` (18:40) and `cff6ca453b` (06-11)
+  remain. So `since_create_time` is applied server-side, not ignored.
+
+  **LIMITATION (VERIFIED 2026-06-30):** the only time filters Mailchimp exposes
+  on `/campaigns` are created-time (`since_create_time` / `before_create_time`)
+  — there is no updated-time filter. But campaign records mutate after creation
+  (status transitions, report stats), so incremental created-time polling never
+  re-fetches a row once seen. The connector recovers updates with a daily
+  scheduled backfill; campaign *deletions* are not captured at all (no tombstone
+  endpoint).
+
+  > Note: an earlier version of the narrowing doc expected "exactly the later
+  > one (`524c905696`)" because only two campaigns existed when it was written.
+  > A third (`cff6ca453b`) was created later, so the live result is 2 items —
+  > the narrowing conclusion is unchanged.

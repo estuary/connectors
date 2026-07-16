@@ -1,0 +1,93 @@
+info:
+  name: bounce shape
+  type: http
+  seq: 5
+
+http:
+  method: GET
+  url: "{{base_url}}/reports/{{campaign_id}}/email-activity?count=25"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - hard bounce record (action=bounce, type=hard, has timestamp, no ip/url)
+    request:
+      url: "{{base_url}}/reports/{{campaign_id}}/email-activity?count=25"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "emails": [
+              {
+                "campaign_id": "3f69f3a595",
+                "list_id": "f34247943d",
+                "list_is_active": true,
+                "email_id": "9d97fea4b607b51b8e137e96b2e60982",
+                "email_address": "bounce-seed-nonexistent@estuary.dev",
+                "activity": [
+                  {
+                    "action": "open",
+                    "timestamp": "2026-07-13T13:16:07+00:00",
+                    "ip": "72.14.199.40"
+                  },
+                  {
+                    "action": "bounce",
+                    "type": "hard",
+                    "timestamp": "2026-07-13T13:16:11+00:00"
+                  }
+                ],
+                "_links": "REDACTED"
+              }
+            ],
+            "campaign_id": "3f69f3a595",
+            "total_items": 4,
+            "_links": "REDACTED"
+          }
+
+docs: |-
+  **REFERENCE:** [List email activity](https://mailchimp.com/developer/marketing/api/email-activity-reports/list-email-activity/)
+
+  **WHY:** pins the bounce record shape — the third `activity[].action` the docs
+  promise, and the one a mail client can't produce. Load-bearing for the PK
+  `[campaign_id, email_id, action, timestamp]`: a bounce entry without a
+  `timestamp` would break it. Requires `campaign_id = 3f69f3a595` (the
+  bounce-seeded campaign from `Seeding/E2` + C1–C3: a non-existent mailbox at a
+  controlled domain hard-bounced). The env default `campaign_id` is
+  `5dfc22e163` (opens/clicks), so pin `3f69f3a595` to reproduce.
+
+  **VERIFIED (2026-07-13):** a hard bounce is another `activity[]` entry
+  alongside opens/clicks:
+  `{"action": "bounce", "type": "hard", "timestamp": "..."}`.
+  - `action` is `"bounce"`.
+  - A bounce carries a `type` field (`"hard"`) that opens/clicks lack.
+  - A bounce has a `timestamp` (RFC3339, same shape as open/click) — so the PK
+    `[campaign_id, email_id, action, timestamp]` and the required `timestamp`
+    model field hold unchanged.
+  - A bounce has NO `ip` and NO `url`.
+
+  **VERIFIED (2026-07-13, timing):** the bounce's event timestamp was 14s after
+  `send_time` (send 13:15:57Z, bounce 13:16:11Z); it was already visible on the
+  first poll at 13:19:39Z, so API-visibility lag is ≤226s (could not be bounded
+  tighter — polling started ~3.7min post-send). Comfortably within
+  LOOKBACK=10min. Data-quality note: the same address logged a Google
+  image-proxy prefetch `open` (IP 72.14.199.x) 4s BEFORE the bounce.
+
+  **UNOBSERVABLE:** the SOFT bounce record (`type: "soft"`, presumably). A hard
+  bounce can be seeded with a non-existent mailbox at a controlled domain; a
+  soft bounce needs a real, existing mailbox to fail *transiently* (full inbox,
+  greylisting, mail server down) at exactly send time — circumstances outside
+  our control and not reproducible on demand. Trust the docs that `type`
+  distinguishes hard/soft; the record shape that matters to the connector is
+  pinned by the hard-bounce observation.

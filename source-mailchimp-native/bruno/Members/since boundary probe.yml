@@ -1,0 +1,64 @@
+info:
+  name: since boundary probe
+  type: http
+  seq: 3
+
+http:
+  method: GET
+  url: "{{base_url}}/lists/{{list_id}}/members?count=10&since_last_changed=2026-06-12T14:26:23Z&sort_field=last_changed&sort_dir=ASC"
+  params:
+    - name: count
+      value: "10"
+      type: query
+    - name: since_last_changed
+      value: 2026-06-12T14:26:23Z
+      type: query
+    - name: sort_field
+      value: last_changed
+      type: query
+    - name: sort_dir
+      value: ASC
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - empty, since is EXCLUSIVE of the exact timestamp
+    request:
+      url: "{{base_url}}/lists/{{list_id}}/members?count=10&since_last_changed=2026-06-12T14:26:23Z&sort_field=last_changed&sort_dir=ASC"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "members": [],
+            "list_id": "f34247943d",
+            "total_items": 0,
+            "_links": "REDACTED"
+          }
+
+docs: |-
+  **REFERENCE:** [API reference](https://mailchimp.com/developer/marketing/api/list-members/list-members-info/)
+
+  **WHY:** boundary-semantics probe: the threshold equals one member's
+  last_changed EXACTLY (the seeded test-1 member after its cursor-probe update).
+  If that member is returned, `since_*` is inclusive — the connector re-fetches
+  the boundary instant on resume and relies on key-based dedupe; if excluded,
+  exclusive — cursor-re-anchored paging must keep an offset tiebreaker for runs
+  of identical timestamps. The docs don't state the semantics either way.
+
+  **VERIFIED (2026-06-30):** `since_last_changed` is EXCLUSIVE of the exact
+  timestamp — the boundary member does not return (empty result; see the saved
+  example). Mirror probe: `Members / before boundary probe` (`before_*` is
+  inclusive — asymmetric).

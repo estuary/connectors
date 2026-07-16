@@ -1,0 +1,49 @@
+info:
+  name: C1 - Create test campaign
+  type: http
+  seq: 11
+
+http:
+  method: POST
+  url: "{{base_url}}/campaigns"
+  body:
+    type: json
+    data: |-
+      {
+        "type": "regular",
+        "recipients": { "list_id": "{{list_id}}" },
+        "settings": {
+          "title": "estuary-seed email-activity",
+          "subject_line": "[estuary test] email-activity seed",
+          "from_name": "Estuary Connector Test",
+          "reply_to": "PIN_VERIFIED_SENDER_ADDRESS"
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // Capture the created campaign's id into the campaign_id runtime var so
+        // {{campaign_id}} resolves without hand-copying — consumed by seed steps C2
+        // and C3 AND by the "Email Activity / *" read probes. Runtime var only.
+        const id = res.getBody()?.id;
+        if (res.getStatus() < 300 && id) bru.setVar('campaign_id', id);
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [API reference](https://mailchimp.com/developer/marketing/api/campaigns/add-campaign/)
+
+  SEEDING REQUEST — only the user runs this; never the assistant. State-mutating
+  seed step 1/3.
+
+  **WHY:** creates a draft campaign targeting an audience that contains a test
+  address you control — the parent every email-activity probe needs. Pin list_id
+  from "Lists / bare" and reply_to to a verified sender. Note the returned
+  campaign "id" — steps C2 and C3 need it.

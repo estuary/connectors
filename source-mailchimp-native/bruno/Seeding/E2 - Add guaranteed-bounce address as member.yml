@@ -1,0 +1,55 @@
+info:
+  name: E2 - Add guaranteed-bounce address as member
+  type: http
+  seq: 19
+
+http:
+  method: POST
+  url: "{{base_url}}/lists/{{list_id}}/members"
+  body:
+    type: json
+    data: |-
+      {
+        "email_address": "bounce-seed-nonexistent@estuary.dev",
+        "status": "subscribed",
+        "merge_fields": { "FNAME": "Estuary", "LNAME": "BounceSeed" }
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Add member to list](https://mailchimp.com/developer/marketing/api/list-members/add-member-to-list/)
+
+  SEEDING REQUEST — only the user runs this; never the assistant. State-mutating.
+
+  **WHY:** the `/reports/{id}/email-activity` docs say the endpoint reports
+  "opens, clicks, and bounces", but every campaign seeded before this went to
+  deliverable addresses, so no bounce had ever been observed live — leaving the
+  bounce record shape unknown: the `action` value, whether it carries a
+  hard/soft `type` sub-field, and — the load-bearing one for the PK
+  `[campaign_id, email_id, action, timestamp]` — whether a bounce entry even
+  has a `timestamp`. This seed manufactures a HARD bounce to answer those
+  questions.
+
+  **Procedure:**
+  1. Run this request. It subscribes a syntactically valid address whose
+     mailbox does not exist at a domain we control (`estuary.dev`), so the
+     send reaches the domain's mail server and gets a 550 → HARD bounce within
+     minutes. Using a domain we own avoids spam-trap / third-party fallout. If
+     Mailchimp's Omnivore validation rejects the add, pick a different
+     non-existent local part (keep the domain one you control).
+  2. Re-run C1 -> C2 -> C3 to create and send a FRESH campaign to {{list_id}}
+     (which now contains the bad address). C1's post-response repoints the
+     `campaign_id` runtime var to the new campaign.
+  3. Wait a few minutes for delivery + bounce processing, then run "Email
+     Activity / bare" against the new `campaign_id` and inspect the bad
+     address's `activity[]` entry.
+
+  Outcome: ran 2026-07-13 (campaign `3f69f3a595`); the bounce shape is VERIFIED
+  in `Email Activity / bounce shape`. Soft bounces remain UNOBSERVABLE (see
+  that request's docs).

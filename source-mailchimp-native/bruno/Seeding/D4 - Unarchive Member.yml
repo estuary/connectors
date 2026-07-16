@@ -1,0 +1,40 @@
+info:
+  name: D4 - Unarchive Member
+  type: http
+  seq: 17
+
+http:
+  method: PUT
+  url: "{{base_url}}/lists/{{list_id}}/members/3abd9d34d7d6953d8a91a79904b6631d"
+  body:
+    type: json
+    data: |-
+      {
+        "email_address": "nicolas+estuary-test-2@estuary.dev",
+        "status": "subscribed"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [API reference](https://mailchimp.com/developer/marketing/api/list-members/add-or-update-list-member/)
+
+  SEEDING REQUEST — only the user runs this; never the assistant.
+
+  **WHY:** re-subscribes the member archived by `D2 - Archive Member` (PUT
+  upsert is the documented path back from archived; PATCH is rejected for
+  archived members). Settles the archived→active transition question for the
+  list_members per-sweep cursor design: if unarchiving advances `last_changed`,
+  the default sweep's since-filter picks the member back up and its `status`
+  heals downstream; if it does NOT, an unarchived member stays invisible to
+  every since-filtered sweep until its next real update — a documented staleness
+  gap. Compare the member's `last_changed` in `Members / bare` before/after
+  (pre-run value: 2026-06-12T14:27:04+00:00, the archive instant).
+
+  Outcome: unarchiving DOES advance `last_changed` — VERIFIED (2026-07-06) in
+  `Members / bare` ("after D4 unarchive" example).

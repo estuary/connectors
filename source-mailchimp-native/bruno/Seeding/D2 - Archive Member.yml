@@ -1,0 +1,27 @@
+info:
+  name: D2 - Archive Member
+  type: http
+  seq: 15
+
+http:
+  method: DELETE
+  url: "{{base_url}}/lists/{{list_id}}/members/3abd9d34d7d6953d8a91a79904b6631d"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [API reference](https://mailchimp.com/developer/marketing/api/list-members/archive-list-member/)
+
+  SEEDING REQUEST — only the user runs this; never the assistant.
+
+  **WHY:** archives one member (soft delete — recoverable, not permanent) so the
+  `Members / status archived` partition probe has data, answering whether the
+  unfiltered members list silently drops archived members. The path id is pinned
+  to MD5("nicolas+estuary-test-2@estuary.dev") — the member created by "B2 - Add
+  Tagged Member 2", which must run first — so the first seeded member and the
+  account's original member survive for the cursor probes.

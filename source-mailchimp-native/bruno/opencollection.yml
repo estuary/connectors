@@ -1,0 +1,190 @@
+opencollection: 1.0.0
+
+info:
+  name: Mailchimp
+
+request:
+  scripts:
+    - type: before-request
+      code: |-
+        // Mailchimp auth via the connector's sops-encrypted config.yaml. The key is
+        // re-derived from sops on every request and lives only on `req` — it is never
+        // persisted to a var or env file. Requires the developer JS sandbox:
+        //   CLI: `bru run <request>.yml --env Mailchimp --sandbox developer`
+        //   GUI: jsSandboxMode "developer" in ~/.config/bruno/collection-security.json
+        const { execFileSync } = require('child_process');
+        const path = require('path');
+        const configured = bru.getEnvVar('config_path');
+        if (!configured) throw new Error('config_path env var is not set');
+        // Resolve relative to the collection root, not the process cwd — the GUI's
+        // cwd is wherever Bruno was launched from, only the CLI runs from bruno/.
+        const configPath = path.isAbsolute(configured)
+          ? configured
+          : path.resolve(bru.cwd(), configured);
+        const decrypted = execFileSync(
+          'sops', ['-d', '--output-type=json', configPath], { encoding: 'utf8' },
+        );
+        // Raw `sops -d` keeps the `_sops` encrypted-suffix on key names (the platform
+        // strips it at runtime, sops itself does not) — accept both spellings.
+        const creds = JSON.parse(decrypted)?.credentials;
+        const apiKey = creds?.api_key ?? creds?.api_key_sops;
+        if (!apiKey) {
+          throw new Error('credentials.api_key(_sops) missing from decrypted config');
+        }
+
+        // Mailchimp API keys end in their data center (e.g. "-us21"). Request URLs in
+        // this collection use a literal "dc" subdomain placeholder; rewrite it here so
+        // the committed environment file never hardcodes the account's data center.
+        const dc = apiKey.split('-').pop();
+        if (!dc || dc === apiKey) throw new Error('API key is missing its data center suffix');
+        // At pre-request time req.getUrl() returns the raw template — {{base_url}} is
+        // not yet interpolated (verified empirically against bru 2.x). Substitute the
+        // resolved data-center URL for the template var; also handle an already-
+        // interpolated URL in case a future Bruno version changes the ordering.
+        const resolved = `https://${dc}.api.mailchimp.com/3.0`;
+        req.setUrl(
+          req.getUrl()
+            .replace('{{base_url}}', resolved)
+            .replace('https://dc.api.mailchimp.com/3.0', resolved),
+        );
+
+        // HTTP Basic: Mailchimp ignores the username; the API key is the password.
+        const basic = Buffer.from(`anystring:${apiKey}`).toString('base64');
+        req.setHeader('Authorization', `Basic ${basic}`);
+    - type: after-response
+      code: |-
+        // Redact noisy fields from the response so any Response Example saved from a run
+        // is already clean — no manual edit step. This MUST cover REDACTED_FIELDS in
+        // tests/test_snapshots.py (see the "Redaction" docs note below): a field
+        // redacted in the snapshot tests is redacted here, with the same "REDACTED"
+        // marker, so examples reflect what the tests assert. Keep this list MINIMAL —
+        // only fields you never need to inspect during live verification, since this
+        // also hides them from `bru run` output. `_links` is Mailchimp's HATEOAS block
+        // (voluminous; hrefs embed the data-center subdomain) — the connector excludes
+        // it server-side so it's out of the tests' list, but raw probe requests here
+        // still receive it; `stats` is derived analytics (rates/counts/activity dates)
+        // that drift with account activity, so it would otherwise flake the capture
+        // snapshot.
+        const REDACTED_FIELDS = ['_links', 'stats'];
+        function redact(v) {
+          if (Array.isArray(v)) return v.map(redact);
+          if (v && typeof v === 'object') {
+            const o = {};
+            for (const k of Object.keys(v)) {
+              o[k] = REDACTED_FIELDS.includes(k) ? 'REDACTED' : redact(v[k]);
+            }
+            return o;
+          }
+          return v;
+        }
+        const body = res.getBody();
+        // Only touch JSON object/array bodies; leave throttle errors and empty bodies
+        // alone (Mailchimp sometimes returns non-JSON on 429/403 — never parse those).
+        if (body && typeof body === 'object') res.setBody(redact(body));
+
+docs:
+  content: |-
+    ## API constraints (account-wide)
+
+    Facts that hold for the whole Mailchimp account, not any single endpoint. This
+    block is the collection root, so it is the first thing read when surveying the
+    API — treat it as the canonical home for cross-cutting limits.
+
+    - **Base URL (data-center-dependent):** `https://{dc}.api.mailchimp.com/3.0`,
+      where `{dc}` is the account's data center. Derive `{dc}` from the API key's
+      suffix (the part after the last `-`, e.g. `...-us21` → `us21`); for OAuth
+      tokens it comes from the OAuth metadata endpoint instead. The connector does
+      this in `resolve_base_url` (`api.py`); this collection's pre-request script
+      does the API-key-suffix form (see the `dc` derivation above).
+    - **Concurrency:** 10 simultaneous connections per account; no documented
+      req/sec bucket — https://mailchimp.com/developer/marketing/docs/fundamentals/#api-limits
+    - **Request timeout:** 120 s per request (provider-side hard cut).
+    - **No tighter per-endpoint buckets** observed on `/lists`, `/campaigns`,
+      `/automations`, or `/reports/*` during live verification.
+    - **Throttling (429/403):** may return either status, **sometimes without a
+      JSON body** — rely on status codes and never parse throttle-error bodies as
+      JSON. No documented Retry-After; use the CDK's standard backoff.
+    - **Partial responses (all collection endpoints):** `fields` /
+      `exclude_fields` take comma-separated dot-notation paths; the two are
+      mutually exclusive and error when combined —
+      https://mailchimp.com/developer/marketing/docs/methods-parameters/
+      (DOCUMENTED 2026-07-29). `exclude_fields` VERIFIED 2026-07-29 on every
+      URL shape the connector captures — the exclusion path is the response
+      items key, and the connector injects it on all collection requests
+      (`fetch_collection_page`): `_top-level / exclude_fields probe`,
+      `_list-child / exclude_fields probe` (incl. the items-key rule and the
+      no-error-on-absent-field finding), `Segment Members / exclude_fields
+      probe`, `Interests / exclude_fields probe`,
+      `Email Activity / exclude_fields probe`.
+    - **Batch endpoint (`POST /batches`):** max 500 pending batches account-wide;
+      results expire after 7 days. Not used by this connector (evaluated and
+      rejected for v1 — full rationale on `Batches / list`).
+
+    ## Docs conventions
+
+    Request docs follow the `bruno-probe-endpoint` skill's conventions: a
+    `**WHY:**` opener plus dated, classified findings (`**VERIFIED
+    (YYYY-MM-DD):**` / `**PENDING:**` / `**UNOBSERVABLE:**` /
+    `**DOCUMENTED (YYYY-MM-DD):**` for doc-sourced facts), with
+    `**LIMITATION**` marking endpoint-specific constraints that carry connector
+    consequences. The conventions themselves live in the skill; this file only
+    indexes what is here. Enumerate markers with
+    `grep -rl '\*\*PENDING' . | grep -v opencollection.yml` (likewise for the
+    others) — this root file matches only because of the mentions above.
+
+    ### Per-endpoint limitations
+
+    - `Campaigns / since_create_time` — campaigns mutate post-creation but only
+      created-time filters exist (updates need a scheduled backfill; deletes are lost).
+    - `Campaigns / status filter` — drafts carry `send_time: ""` (empty string, not null).
+    - `Tag Search / name filter` — `tags` are static segments under the hood.
+    - `Segment Members / include flags` — under the include_* flags `total_items` undercounts.
+    - `Email Activity / bare` — `activity[].action` never includes unsubscribes.
+    - `_list-child / offset page` — snapshot children re-enumerate parents each poll.
+
+    ## Shared cross-resource requests
+
+    The mechanical pagination probes are grouped by URL shape, so every variable is
+    visible in the request URL (no scripted path rewriting):
+
+    - `_top-level / offset page` / `_top-level / count limits probe` — `{{base_url}}/{{resource}}`.
+      Set `resource` to: lists, campaigns, automations.
+    - `_list-child / offset page` / `_list-child / count limits probe` — `{{base_url}}/lists/{{list_id}}/{{child}}`.
+      Set `child` to: members, segments, interest-categories, tag-search (`list_id` from this env).
+
+    Deeper / differently-rooted paths keep their own requests because no other
+    endpoint shares their shape: `Segment Members / *` (lists/{{list_id}}/segments/{{segment_id}}/members),
+    `Email Activity / *` (reports/{{campaign_id}}/email-activity), `Interests / bare`
+    (two-level under a category), `Automation Emails / bare` (under /automations).
+
+    Save each run as a resource-named response example (e.g. "members - count 1000
+    accepted") so per-resource evidence is kept. Resource-specific probes (bare
+    lists, since_*/status/include/fields filters) remain their own requests — they
+    capture distinct per-resource findings.
+
+    ## Format
+
+    This collection is stored in Bruno's OpenCollection YAML format
+    (`opencollection.yml` + one `.yml` per request) — it requires Bruno / bru
+    CLI >= 3.0.0. Run requests with:
+    `bru run <request>.yml --env Mailchimp --sandbox developer`
+    (the developer sandbox is required by the sops pre-request script above).
+
+    ## Redaction
+
+    The `script:post-response` above redacts `_links` (HATEOAS block —
+    voluminous, and its hrefs embed the account's data-center subdomain) and
+    `stats` (derived analytics — rates, counts, activity dates — that drift with
+    account activity) from every response, so saved examples come out already
+    clean. Its `REDACTED_FIELDS` list must cover the one in
+    `tests/test_snapshots.py` (currently just `stats`); `_links` is extra here
+    because the connector excludes it server-side while raw probe requests
+    still receive it. Keep the list minimal (it also hides those fields from
+    live `bru run` output).
+  type: text/markdown
+bundled: false
+extensions:
+  bruno:
+    ignore:
+      - node_modules
+      - .git

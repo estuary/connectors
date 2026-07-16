@@ -1,0 +1,229 @@
+info:
+  name: count limits probe
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/lists/{{list_id}}/{{child}}?count=1001"
+  params:
+    - name: count
+      value: "1001"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - count 1001 accepted, over documented max (members)
+    request:
+      url: "{{base_url}}/lists/{{list_id}}/members?count=1001"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "members": [
+              {
+                "id": "4c172e0eb420fb2c5678834e0b5e55b4",
+                "email_address": "connector-dev+mailchimp@estuary.dev",
+                "status": "subscribed"
+              },
+              {
+                "id": "6409961b1c262a7e6fb62624ce95ddf5",
+                "email_address": "nicolas+estuary-test-1@estuary.dev",
+                "status": "subscribed"
+              },
+              {
+                "id": "7bfb50d36252f5094fec17e378483cf1",
+                "email_address": "nicolas+estuary-test-3@estuary.dev",
+                "status": "unsubscribed"
+              }
+            ],
+            "list_id": "f34247943d",
+            "total_items": 3
+          }
+  - name: members - count 1000 accepted
+    request:
+      url: "{{base_url}}/lists/{{list_id}}/{{child}}?count=1000"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "members": [
+              {
+                "id": "4c172e0eb420fb2c5678834e0b5e55b4",
+                "email_address": "connector-dev+mailchimp@estuary.dev",
+                "unique_email_id": "d7c26fdb43",
+                "contact_id": "47f004504f1869d6508905c179231fb7",
+                "full_name": "connector-dev+mailchimp@estuary.dev",
+                "web_id": 360308877,
+                "email_type": "html",
+                "status": "subscribed",
+                "consents_to_one_to_one_messaging": true,
+                "sms_phone_number": "",
+                "sms_subscription_status": "",
+                "sms_subscription_last_updated": "",
+                "merge_fields": {
+                  "FNAME": "connector-dev+mailchimp@estuary.dev",
+                  "LNAME": "",
+                  "ADDRESS": {
+                    "addr1": "Estuary\n244 5th Ave Ste 1277\nNew York, NY 10001-7604\nUSA",
+                    "addr2": "",
+                    "city": "",
+                    "state": "",
+                    "zip": "",
+                    "country": "US"
+                  },
+                  "PHONE": "",
+                  "BIRTHDAY": "",
+                  "COMPANY": ""
+                },
+                "stats": "REDACTED",
+                "ip_signup": "",
+                "timestamp_signup": "",
+                "ip_opt": "186.132.55.36",
+                "timestamp_opt": "2026-06-09T15:12:24+00:00",
+                "member_rating": 2,
+                "last_changed": "2026-06-09T15:12:24+00:00",
+                "language": "",
+                "vip": false,
+                "email_client": "",
+                "location": {
+                  "latitude": 0,
+                  "longitude": 0,
+                  "gmtoff": 0,
+                  "dstoff": 0,
+                  "country_code": "",
+                  "timezone": "",
+                  "region": ""
+                },
+                "source": "Admin Add",
+                "tags_count": 0,
+                "tags": [],
+                "list_id": "f34247943d",
+                "_links": "REDACTED"
+              }
+            ],
+            "list_id": "f34247943d",
+            "total_items": 1,
+            "_links": "REDACTED"
+          }
+  - name: segments - count 1000 accepted
+    request:
+      url: "{{base_url}}/lists/{{list_id}}/{{child}}?count=1000"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "segments": [
+              {
+                "id": 2225591,
+                "name": "estuary-test-tag",
+                "member_count": 1,
+                "type": "static",
+                "created_at": "2026-06-12T13:12:06+00:00",
+                "updated_at": "2026-06-12T13:12:06+00:00",
+                "list_id": "f34247943d",
+                "_links": "REDACTED"
+              },
+              {
+                "id": 2225592,
+                "name": "estuary-other-tag",
+                "member_count": 0,
+                "type": "static",
+                "created_at": "2026-06-12T13:12:38+00:00",
+                "updated_at": "2026-06-12T13:12:38+00:00",
+                "list_id": "f34247943d",
+                "_links": "REDACTED"
+              },
+              {
+                "id": 2225593,
+                "name": "estuary-test-segment (cursor probe)",
+                "member_count": 1,
+                "type": "static",
+                "created_at": "2026-06-12T13:12:53+00:00",
+                "updated_at": "2026-06-12T14:26:44+00:00",
+                "list_id": "f34247943d",
+                "_links": "REDACTED"
+              },
+              {
+                "id": 2225594,
+                "name": "estuary-test-saved-segment",
+                "member_count": 1,
+                "type": "saved",
+                "created_at": "2026-06-12T13:12:59+00:00",
+                "updated_at": "2026-06-12T13:12:59+00:00",
+                "options": {
+                  "match": "all",
+                  "conditions": [
+                    {
+                      "condition_type": "TextMerge",
+                      "field": "FNAME",
+                      "op": "contains",
+                      "value": "Estuary"
+                    }
+                  ]
+                },
+                "list_id": "f34247943d",
+                "_links": "REDACTED"
+              }
+            ],
+            "list_id": "f34247943d",
+            "total_items": 4,
+            "_links": "REDACTED"
+          }
+
+docs: |-
+  **WHY:** count-limit probe for list-child endpoints under
+  `/lists/{{list_id}}/`. Set `child` to one of: members, segments,
+  interest-categories, tag-search (`list_id` from the environment). Two arms,
+  one saved example per run (edit `count` between runs): `count=1000` — the
+  documented max and the page size the connector requests — and `count=1001` to
+  learn the enforcement mode past the documented max. Collapsed from the
+  per-resource count-cap probes (members, segments).
+
+  **VERIFIED (2026-06-30):** `count=1000` accepted (`200`) on members and
+  segments — see the saved examples.
+
+  **VERIFIED (2026-06-30):** `count=1001` returns `200` on
+  `/lists/{id}/members` — no `400`, matching the top-level endpoints (see
+  `_top-level / count limits probe`). Mailchimp does not enforce the documented
+  max as a hard reject on child paths either. The saved example is the members
+  run on the unseeded account (3 members).
+
+  **UNOBSERVABLE:** cap truncation order. When `total_items > 1000`, two things
+  cannot be observed here: (a) whether the page is server-clamped at 1000 at
+  all, and (b) the property that matters most — that a clamp returns the *first*
+  1000 in the requested sort and omits exactly the sort-order **tail** (not an
+  arbitrary middle row), so that resuming from `offset=1000` / `cursor = max
+  sort value seen` recovers precisely the omitted rows. Observing either needs
+  >1000 seeded members (a bulk-subscribe seeder + per-item delete-loop cleanup),
+  which we decline to add — clarity over coverage. We trust Mailchimp's
+  documented sorted pagination for the cap. (If the clamp ever truncated the
+  middle instead of the tail, offset/cursor continuation would skip those rows —
+  silent loss.)
