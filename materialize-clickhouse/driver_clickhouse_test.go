@@ -247,14 +247,12 @@ func TestTruncateTable(t *testing.T) {
 	require.Equal(t, 0, count)
 }
 
-// TestAlterTableOrphanedSortingKeyColumn is a regression test for
-// https://github.com/estuary/connectors/issues/4829: a pre-existing table
-// (adopted via allow_existing_tables_for_new_bindings) can have non-nullable
-// columns in its ORDER BY key that are not in the current field selection. The
-// boilerplate orphan sweep marks every such column as newly nullable, and
-// AlterTable renders MODIFY COLUMN ... Nullable(...) for it — which ClickHouse
-// forbids for sorting-key columns (code 524), crash-looping the task on every
-// restart. Sorting-key columns must be skipped, while non-key orphaned columns
+// TestAlterTableOrphanedSortingKeyColumn verifies that AlterTable does not make
+// a sorting-key or partition-key column nullable, which ClickHouse forbids for
+// key columns (code 524). A pre-existing table (adopted via
+// allow_existing_tables_for_new_bindings) can have non-nullable key columns that
+// are not in the field selection, which the boilerplate orphan sweep marks as
+// newly nullable. Such columns must be skipped, while non-key orphaned columns
 // must still be widened.
 func TestAlterTableOrphanedSortingKeyColumn(t *testing.T) {
 	if testing.Short() {

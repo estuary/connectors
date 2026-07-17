@@ -249,11 +249,9 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	var stmts []string
 
 	// ClickHouse forbids changing the type of a sorting-key or partition-key
-	// column (code 524), so such a column can never be widened to Nullable.
-	// It doesn't need to be either: inserts name their columns explicitly, and
-	// a non-nullable column omitted from an insert receives the type's zero
-	// value. Skip these columns rather than crash-looping on an ALTER that can
-	// never succeed.
+	// column (code 524), so such a column cannot be widened to Nullable. It
+	// doesn't need to be: inserts name their columns explicitly, and a
+	// non-nullable column omitted from an insert receives the type's zero value.
 	var dropNotNulls []boilerplate.ExistingField
 	for _, col := range ta.DropNotNulls {
 		if meta, ok := col.Meta.(existingFieldMeta); ok && meta.isKeyColumn {
