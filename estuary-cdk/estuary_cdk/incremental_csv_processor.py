@@ -68,6 +68,14 @@ class CSVProcessingError(Exception):
         super().__init__(message)
 
 
+# Sentinels for column-count validation. aiocsv's dict reader collects surplus
+# cells under `restkey` and pads short rows with `restval`. Using unique objects
+# for both lets us detect either mismatch without mistaking a genuinely empty
+# field ("") for a missing one.
+_SURPLUS_COLUMNS_KEY = object()
+_MISSING_COLUMN = object()
+
+
 class _AsyncByteReader(aiocsv.protocols.WithAsyncRead):
     """Internal class that handles incremental decoding for aiocsv."""
 
@@ -245,8 +253,34 @@ class IncrementalCSVProcessor(Generic[T]):
         if self.fieldnames is not None:
             reader_kwargs['fieldnames'] = self.fieldnames
 
+        # Route surplus cells and short-row padding to sentinels so a
+        # column-count mismatch is detectable and distinct from an empty field.
+        reader_kwargs['restkey'] = _SURPLUS_COLUMNS_KEY
+        reader_kwargs['restval'] = _MISSING_COLUMN
+
         try:
-            async for row in aiocsv.AsyncDictReader(async_reader, **reader_kwargs):
+            reader = aiocsv.AsyncDictReader(async_reader, **reader_kwargs)
+            async for row in reader:
+                self._validate_column_count(row, reader)
                 yield row
         except csv.Error as e:
             raise CSVProcessingError(f"Failed to parse CSV data: {str(e)}", config=reader_kwargs) from e
+
+    @staticmethod
+    def _validate_column_count(row: dict[Any, Any], reader: "aiocsv.AsyncDictReader") -> None:
+        """Raise CSVProcessingError if `row` has more or fewer columns than the
+        reader's header/fieldnames."""
+        expected = len(reader.fieldnames or [])
+
+        if _SURPLUS_COLUMNS_KEY in row:
+            actual = expected + len(row[_SURPLUS_COLUMNS_KEY])
+            raise CSVProcessingError(
+                f"CSV row {reader.line_num} has {actual} columns but {expected} were expected."
+            )
+
+        missing = sum(1 for value in row.values() if value is _MISSING_COLUMN)
+        if missing:
+            raise CSVProcessingError(
+                f"CSV row {reader.line_num} has {expected - missing} columns but "
+                f"{expected} were expected."
+            )
