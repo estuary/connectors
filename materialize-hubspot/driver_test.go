@@ -333,46 +333,6 @@ func (c *LocalDevClient) AccountStatus(ctx context.Context, portal *Portal, test
 	return response.Status, nil
 }
 
-func (c *LocalDevClient) CreatePersonalAccessKey(ctx context.Context, portal *Portal, testAccount *TestAccount) (Secret, error) {
-	uri := baseURL.JoinPath(fmt.Sprintf("/integrators/test-portals/v3/generate-pak/%d", testAccount.ID))
-	params := url.Values{}
-	params.Set("portalId", portal.ID)
-	uri.RawQuery = params.Encode()
-
-	var response struct {
-		PersonalAccessKey Secret `json:"personalAccessKey"`
-	}
-	err := Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
-		req, err := http.NewRequestWithContext(ctx, "GET", uri.String(), nil)
-		if err != nil {
-			return err
-		}
-		req.Header.Set("Authorization", "Bearer "+portal.Token().Expose())
-
-		resp, err := c.httpClient.Do(req)
-		if err != nil {
-			return err
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode != 200 {
-			apiError := parseAPIError(resp)
-			return fmt.Errorf("unexpected response: %w", apiError)
-		}
-
-		if resp.ContentLength > int64(MaxResponseBytes) {
-			return fmt.Errorf("response body too large: %d", resp.ContentLength)
-		}
-
-		return parseBody(resp, &response, MaxResponseBytes)
-	})
-	if err != nil {
-		return "", err
-	}
-
-	return response.PersonalAccessKey, nil
-}
-
 // DeleteTestAccount deletes a test-account.
 //
 // If deleting the account fails it can be manually removed in the webapp from
