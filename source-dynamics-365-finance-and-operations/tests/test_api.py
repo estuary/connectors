@@ -1,12 +1,18 @@
+import logging
 from datetime import timedelta
 from typing import AsyncGenerator, Callable
 
+import orjson
 import pytest
 
+from estuary_cdk.http import HTTPError
 from source_dynamics_365_finance_and_operations.adls_gen2_client import ADLSPathMetadata
 from source_dynamics_365_finance_and_operations.api import (
     SETTLE_DELAY,
+    TRICKLE_FEED_SERVICE_DIR,
+    TableSchemaUnavailableError,
     TransformedRow,
+    get_table_metadata,
     should_wait_for_finalization,
     stream_folder_rows,
     transform_row,
@@ -250,6 +256,99 @@ class TestStreamFolderRows:
         })
         result = await collect(stream_folder_rows(csvs, factory))
         assert [(r["Id"], r["versionnumber"]) for r in result] == [("A", "10")]
+
+
+def entity(name: str) -> dict:
+    """A model.json entity with the standard metadata columns plus one boolean."""
+    return {
+        "$type": "LocalEntity",
+        "name": name,
+        "description": "",
+        "attributes": [
+            {"name": "Id", "dataType": "guid"},
+            {"name": "IsDelete", "dataType": "string"},
+            {"name": "IsActive", "dataType": "boolean"},
+        ],
+    }
+
+
+def model_json(table_names: list[str]) -> bytes:
+    return orjson.dumps({"name": "cdm", "entities": [entity(n) for n in table_names]})
+
+
+class FakeADLSClient:
+    """Serves file bytes by path and raises a 404 HTTPError for anything else,
+    matching how ADLSGen2Client surfaces missing files."""
+
+    def __init__(self, files: dict[str, bytes]):
+        self._files = files
+        self.log = logging.getLogger("test-d365-api")
+
+    async def read_file(self, path: str) -> bytes:
+        if path not in self._files:
+            raise HTTPError("The specified path does not exist.", 404)
+        return self._files[path]
+
+
+class TestGetTableMetadata:
+    """Tests for schema resolution, including the per-table model.json fallback
+    used when a folder-level model.json was written but truncated."""
+
+    TIMESTAMP = "2025-04-11T06.24.48Z"
+    TABLE = "whsworktrans"
+
+    def per_table_path(self) -> str:
+        return f"{self.TIMESTAMP}/{TRICKLE_FEED_SERVICE_DIR}/{self.TABLE}-model.json"
+
+    @pytest.mark.asyncio
+    async def test_uses_folder_level_model_json(self):
+        client = FakeADLSClient({
+            f"{self.TIMESTAMP}/model.json": model_json(["customers", self.TABLE]),
+        })
+        metadata = await get_table_metadata(self.TIMESTAMP, self.TABLE, client, client.log)
+        assert metadata.name == self.TABLE
+        assert metadata.field_names == ["Id", "IsDelete", "IsActive"]
+        assert metadata.boolean_fields == frozenset({"IsActive"})
+
+    @pytest.mark.asyncio
+    async def test_falls_back_to_per_table_model_json_when_truncated(self):
+        """A truncated folder-level model.json (lists earlier tables but not this
+        one) falls back to the authoritative per-table model.json."""
+        client = FakeADLSClient({
+            f"{self.TIMESTAMP}/model.json": model_json(["customers", "vendinvoicetrans"]),
+            self.per_table_path(): model_json([self.TABLE]),
+        })
+        metadata = await get_table_metadata(self.TIMESTAMP, self.TABLE, client, client.log)
+        assert metadata.name == self.TABLE
+        assert metadata.field_names == ["Id", "IsDelete", "IsActive"]
+
+    @pytest.mark.asyncio
+    async def test_raises_when_truncated_and_no_per_table_model_json(self):
+        client = FakeADLSClient({
+            f"{self.TIMESTAMP}/model.json": model_json(["customers", "vendinvoicetrans"]),
+        })
+        with pytest.raises(TableSchemaUnavailableError, match="no per-table model.json"):
+            await get_table_metadata(self.TIMESTAMP, self.TABLE, client, client.log)
+
+    @pytest.mark.asyncio
+    async def test_does_not_fall_back_when_folder_model_json_has_no_entities(self):
+        """An empty folder-level model.json means the folder hasn't finalized;
+        we must not trust a per-table model.json even if one exists."""
+        client = FakeADLSClient({
+            f"{self.TIMESTAMP}/model.json": model_json([]),
+            self.per_table_path(): model_json([self.TABLE]),
+        })
+        with pytest.raises(TableSchemaUnavailableError, match="lists no entities"):
+            await get_table_metadata(self.TIMESTAMP, self.TABLE, client, client.log)
+
+    @pytest.mark.asyncio
+    async def test_raises_when_per_table_model_json_lacks_table(self):
+        client = FakeADLSClient({
+            f"{self.TIMESTAMP}/model.json": model_json(["customers", "vendinvoicetrans"]),
+            self.per_table_path(): model_json(["a_different_table"]),
+        })
+        with pytest.raises(TableSchemaUnavailableError, match="does not describe the table"):
+            await get_table_metadata(self.TIMESTAMP, self.TABLE, client, client.log)
 
 
 class TestShouldWaitForFinalization:

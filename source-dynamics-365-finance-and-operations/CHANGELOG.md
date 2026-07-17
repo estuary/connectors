@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-07-17
+
+### Fixed
+- Captures no longer crash when a timestamp folder's `model.json` is present but does not list an entity for a given binding. The connector now falls back to the per-table `model.json` that Synapse Link writes under `Microsoft.Athena.TrickleFeedService/`.
+- CSV rows whose column count doesn't match their table's schema now fail with a clear error instead of being silently padded or truncated, guarding against misaligned reads from a fallback per-table `model.json`.
+
 ## 2026-07-16
 
 ### Fixed

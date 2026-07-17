@@ -52,18 +52,38 @@ SETTLE_DELAY = timedelta(hours=1)
 TransformedRow = dict[str, str | bool | None | dict[str, str]]
 
 
+# Alongside the folder level model.json, D365's Synapse Link export (via its
+# TrickleFeedService) writes a per-table model.json at
+# {timestamp}/{TRICKLE_FEED_SERVICE_DIR}/{table}-model.json. It has the same
+# shape as the folder level model.json but describes a single table, and serves
+# as an fallback when the folder level model.json was written but
+# truncated (see get_table_metadata).
+TRICKLE_FEED_SERVICE_DIR = "Microsoft.Athena.TrickleFeedService"
+
+
 class ModelFormat(StrEnum):
     BYTES = "bytes"
     PYDANTIC = "pydantic"
 
 
-class TimestampFolderModelNotFoundError(Exception):
-    """Raised when a timestamp folder has table CSV data but no folder-level
-    model.json, indicating the folder has not been finalized."""
+class TableSchemaUnavailableError(Exception):
+    """Raised when a timestamp folder has CSV data for a table but no usable
+    schema to read it with. Observed causes, all suspected to be due to
+    aborted/interrupted Synapse Link exports, include:
 
-    def __init__(self, folder: str):
+    - the folder level model.json is absent (404),
+    - the folder level model.json is present but lists no entities, or
+    - neither the folder level model.json (which can be truncated, dropping a
+      lexicographically-ordered tail of entities) nor the table's per-table
+      model.json describes the table.
+    """
+
+    def __init__(self, folder: str, detail: str):
         self.folder = folder
-        super().__init__(f"Timestamp folder {folder} has no model.json.")
+        self.detail = detail
+        super().__init__(
+            f"No usable schema for the table in timestamp folder {folder}: {detail}."
+        )
 
 
 # model.json metadata files are not updated after they're written.
@@ -114,6 +134,21 @@ async def fetch_model_dot_json(
     return raw_bytes
 
 
+def _find_entity(entities: list[dict], table_name: str) -> dict | None:
+    return next((e for e in entities if e["name"] == table_name), None)
+
+
+def _table_metadata_from_entity(entity: dict) -> TableMetadata:
+    return TableMetadata(
+        name=entity["name"],
+        field_names=[attr["name"] for attr in entity["attributes"]],
+        boolean_fields=frozenset(
+            attr["name"] for attr in entity["attributes"]
+            if attr["dataType"] == "boolean"
+        ),
+    )
+
+
 async def get_table_metadata(
     timestamp: str,
     table_name: str,
@@ -121,20 +156,62 @@ async def get_table_metadata(
     log: Logger,
 ) -> TableMetadata:
     raw_bytes = await fetch_model_dot_json(client, log, timestamp)
-    data = orjson.loads(raw_bytes)
+    entities = orjson.loads(raw_bytes).get("entities") or []
 
-    for entity in data["entities"]:
-        if entity["name"] == table_name:
-            return TableMetadata(
-                name=entity["name"],
-                field_names=[attr["name"] for attr in entity["attributes"]],
-                boolean_fields=frozenset(
-                    attr["name"] for attr in entity["attributes"]
-                    if attr["dataType"] == "boolean"
-                ),
-            )
+    entity = _find_entity(entities, table_name)
+    if entity is not None:
+        return _table_metadata_from_entity(entity)
 
-    raise KeyError(f"Table {table_name} not found in timestamp folder {timestamp}.")
+    if not entities:
+        # We haven't observed the case where the folder level model.json
+        # doesn't have _any_ entities present, but I'm not confident it
+        # would be safe to fallback to the per-table model.json under
+        # TRICKLE_FEED_SERVICE_DIR in that situation. Raise so we can
+        # investigate if this happens.
+        raise TableSchemaUnavailableError(
+            timestamp, "folder level model.json lists no entities"
+        )
+
+    # The model.json lists other entities but not this one. It was written but
+    # truncated (entities are emitted in lexicographic order, and an aborted
+    # export can cut the list off partway through). The folder did finalize its
+    # schemas, so fall back to the per-table model.json.
+    return await _get_table_metadata_from_per_table_model_dot_json(
+        timestamp, table_name, client, log
+    )
+
+
+async def _get_table_metadata_from_per_table_model_dot_json(
+    timestamp: str,
+    table_name: str,
+    client: ADLSGen2Client,
+    log: Logger,
+) -> TableMetadata:
+    path = f"{timestamp}/{TRICKLE_FEED_SERVICE_DIR}/{table_name}-model.json"
+    try:
+        raw_bytes = await client.read_file(path)
+    except HTTPError as err:
+        if err.code == 404:
+            raise TableSchemaUnavailableError(
+                timestamp,
+                f"folder level model.json omits table {table_name} and no "
+                f"per-table model.json exists for it",
+            ) from err
+        raise
+
+    entity = _find_entity(orjson.loads(raw_bytes).get("entities") or [], table_name)
+    if entity is None:
+        raise TableSchemaUnavailableError(
+            timestamp, f"per-table model.json for {table_name} does not describe the table"
+        )
+
+    log.info(
+        "The folder level model.json omitted this table. Reading its CSVs with the "
+        "per-table model.json instead.",
+        {"folder": timestamp, "table": table_name, "path": path},
+    )
+
+    return _table_metadata_from_entity(entity)
 
 
 async def get_in_progress_timestamp_folder(
@@ -316,9 +393,10 @@ async def read_csvs_in_folder(
     if not csvs:
         return
 
-    # The folder has CSV data for this table but its model.json is fetched
-    # separately. A 404 here means the folder was never finalized (see
-    # SETTLE_DELAY). We surface it so fetch_changes can decide
+    # The folder has CSV data for this table but its schema is
+    # fetched separately. A 404 means the folder level model.json is missing
+    # entirely. get_table_metadata raises TableSchemaUnavailableError for
+    # the other unusable-schema cases. We surface it so fetch_changes can decide
     # whether to wait for finalization or skip the incomplete folder.
     try:
         table_metadata = await get_table_metadata(
@@ -329,7 +407,9 @@ async def read_csvs_in_folder(
         )
     except HTTPError as err:
         if err.code == 404:
-            raise TimestampFolderModelNotFoundError(folder) from err
+            raise TableSchemaUnavailableError(
+                folder, "folder level model.json is missing"
+            ) from err
         raise
 
     def open_csv(csv: ADLSPathMetadata) -> AsyncGenerator[TransformedRow, None]:
@@ -415,12 +495,12 @@ async def fetch_changes(
             try:
                 async for row in read_csvs_in_folder(folder, table_name, client, log):
                     yield row
-            except TimestampFolderModelNotFoundError:
-                # The folder has table data but no model.json. This folder should
-                # be finalized when the next folder is created, and we use the next
-                # folder to determine if SETTLE_DELAY has elapsed. If so, then we
-                # assume the current folder's export was interrupted/aborted by D365
-                # & the changes shouldn't be replicated.
+            except TableSchemaUnavailableError as err:
+                # The folder has table data but no usable schema for this table.
+                # This folder should be finalized when the next folder is created,
+                # and we use the next folder to determine if SETTLE_DELAY has elapsed.
+                # If so, then we assume the current folder's export was interrupted/aborted
+                # by D365 & the changes shouldn't be replicated.
                 if index + 1 < len(finalized_folders):
                     next_folder = finalized_folders[index + 1]
                 else:
@@ -428,21 +508,21 @@ async def fetch_changes(
 
                 if should_wait_for_finalization(next_folder, datetime.now(tz=UTC)):
                     log.info(
-                        "Timestamp folder has table data but no model.json yet and "
-                        "it may still be finalizing. Will retry on the next sweep.",
-                        {"folder": folder, "table": table_name},
+                        "Timestamp folder has table data but no usable schema yet "
+                        "and it may still be finalizing. Will retry on the next sweep.",
+                        {"folder": folder, "table": table_name, "detail": err.detail},
                     )
                     return
 
-                # The folder had ample time to finalize but still has no
-                # model.json, so it's an incomplete/abandoned folder. Skip it
-                # and advance past it. Its changes are expected to be
-                # re-committed in a later folder.
+                # The folder had ample time to finalize but still has no usable
+                # schema, so it's an incomplete/abandoned folder. Skip it and
+                # advance past it. Its changes are expected to be re-committed in
+                # a later folder.
                 log.warning(
-                    "Skipping timestamp folder with table data but no model.json. "
+                    "Skipping timestamp folder with table data but no usable schema. "
                     "The folder appears incomplete and was never finalized. Its changes "
                     "are expected to be re-committed in a later folder.",
-                    {"folder": folder, "table": table_name},
+                    {"folder": folder, "table": table_name, "detail": err.detail},
                 )
 
             log.debug(f"Read all CSVs in folder. Yielding folder name as new cursor.", {
