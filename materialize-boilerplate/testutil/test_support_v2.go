@@ -1,7 +1,6 @@
 package testutil
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -135,8 +134,8 @@ func skipUnlessRuntimeV2Flowctl(t *testing.T) {
 
 	if help, err := exec.Command("flowctl", "raw", "preview-next", "--help").Output(); err != nil {
 		t.Skipf("flowctl raw preview-next is unavailable: %v", err)
-	} else if !strings.Contains(string(help), "hash-routed") {
-		t.Skip("the flowctl on PATH does not support multi-shard fixtures")
+	} else if !strings.Contains(string(help), "hash-routed") || !strings.Contains(string(help), "drain session") {
+		t.Skip("the flowctl on PATH does not support multi-shard fixtures with a drain session")
 	}
 }
 
@@ -186,19 +185,15 @@ func runMaterializationTestForTaskV2[EC boilerplate.EndpointConfiger, FC boilerp
 		cleanupTestTasks(t, ctx, materializer, tsSuffix)
 	})
 
-	fixturePath, fixtureTxns := drainableFixture(t, relativePath(t, "testdata/integration/fixture.materialize.json"))
-
-	// Drive the task on the v2 runtime. The first session runs every fixture
-	// transaction; the second consumes only the appended empty transaction,
-	// recovery-applying the first session's final (committed but not yet
-	// acknowledged) transaction on its way.
+	// Drive the task on the v2 runtime: one session runs every fixture
+	// transaction, and flowctl's final drain session recovery-applies the
+	// last (committed but not yet acknowledged) one.
 	args := []string{
 		"raw", "preview-next",
 		"--name", rt.workingTaskName,
 		"--source", rt.sourcePath,
-		"--fixture", fixturePath,
+		"--fixture", relativePath(t, "testdata/integration/fixture.materialize.json"),
 		"--shards", strconv.Itoa(shards),
-		"--sessions", fmt.Sprintf("%d,1", fixtureTxns),
 		"--timeout", timeout.String(),
 		"--network", "flow-test",
 	}
@@ -216,37 +211,4 @@ func runMaterializationTestForTaskV2[EC boilerplate.EndpointConfiger, FC boilerp
 	}
 
 	return snap.String()
-}
-
-// drainableFixture copies the fixture at `path`, appending one trailing empty
-// transaction for the run's final drain session to consume, and returns the
-// copy's path along with the original fixture's transaction count.
-func drainableFixture(t *testing.T, path string) (string, int) {
-	t.Helper()
-
-	content, err := os.ReadFile(path)
-	require.NoError(t, err)
-
-	var transactions int
-	var trailingDocs bool
-	for _, line := range bytes.Split(content, []byte("\n")) {
-		line = bytes.TrimSpace(line)
-		if len(line) == 0 {
-			continue
-		} else if bytes.HasPrefix(line, []byte("{")) && gjson.GetBytes(line, "commit").Bool() {
-			transactions++
-			trailingDocs = false
-		} else {
-			trailingDocs = true
-		}
-	}
-	// Documents after a final commit marker would merge into the appended
-	// drain transaction, which must stay empty.
-	require.False(t, trailingDocs, "fixture %s must end with a {\"commit\": true} marker", path)
-
-	derived := filepath.Join(t.TempDir(), filepath.Base(path))
-	content = append(content, []byte("\n{\"commit\": true}\n")...)
-	require.NoError(t, os.WriteFile(derived, content, 0o600))
-
-	return derived, transactions
 }
