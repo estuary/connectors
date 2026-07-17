@@ -1,0 +1,5 @@
+collections:
+  acmeCo/example_topic.example_subscription:
+    schema: example_topic.example_subscription.schema.yaml
+    key:
+    - /sequence_number
