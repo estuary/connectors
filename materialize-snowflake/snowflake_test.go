@@ -60,6 +60,12 @@ func TestIntegration(t *testing.T) {
 			return regexp.MustCompile(`"channel_name":\s*"([^_]+_[^_]+_[^_]+_[^_]+_)[A-F0-9]+(_[^"]+)"`).ReplaceAllString(s, `"channel_name":"${1}<channel_id>${2}"`)
 		},
 		func(s string) string {
+			return regexp.MustCompile(`"Channel":\s*"[^"]*"`).ReplaceAllString(s, `"Channel": "<channel>"`)
+		},
+		func(s string) string {
+			return regexp.MustCompile(`"LocalDir":\s*"[^"]*"`).ReplaceAllString(s, `"LocalDir": "<dir>"`)
+		},
+		func(s string) string {
 			return regexp.MustCompile(`"path":\s*"[^"]*"`).ReplaceAllString(s, `"path": "<path>"`)
 		},
 		func(s string) string {
@@ -96,6 +102,14 @@ func TestIntegration(t *testing.T) {
 
 	t.Run("materialize", func(t *testing.T) {
 		sql.RunMaterializationTest(t, newSnowflakeDriver(), "testdata/materialize.flow.yaml", makeResourceFn, actionDescSanitizers)
+	})
+
+	// Same harness with the snowpipe_streaming_v2 feature flag enabled, so
+	// delta-updates bindings run through the Python SDK sidecar while a
+	// standard-updates binding exercises the mixed-eligibility paths.
+	t.Run("materialize-v2", func(t *testing.T) {
+		t.Setenv("SNOWPIPE_SIDECAR_PYTHON", testSidecarPython(t))
+		sql.RunMaterializationTest(t, newSnowflakeDriver(), "testdata/materialize-v2.flow.yaml", makeResourceFn, actionDescSanitizers)
 	})
 
 	t.Run("apply", func(t *testing.T) {
