@@ -321,7 +321,62 @@ func newTransactor(
 		}
 	}
 
+	if cfg.HardDelete {
+		for _, b := range t.bindings {
+			if b.target.DeltaUpdates {
+				continue
+			}
+			if err = t.requireIsDeletedColumn(ctx, b); err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	return t, nil
+}
+
+// requireIsDeletedColumn fails with a clear, actionable error when a
+// standard-updates target table exists but lacks the connector-internal
+// _is_deleted column that hard-delete mode depends on.
+//
+// With hard delete enabled, renderTemplates bakes an `INSERT ... (_is_deleted)`
+// into every standard-updates store, and the persistent stage table is created
+// `AS` the target -- so a target without the column makes every Store fail with a
+// cryptic ClickHouse "No such column _is_deleted in table ..." (code 16), which
+// crash-loops the task and blocks all of its bindings (issue #4834). Because
+// _is_deleted is purely internal (never a Flow projection), the Apply diffing can
+// never add it, so a table adopted via allow_existing_tables_for_new_bindings (or
+// created before hard delete was enabled) can never acquire it on its own.
+// Surface the problem plainly at session start rather than as that exception, and
+// deliberately do not attempt to add the column: an in-place ALTER cannot restore
+// the ReplacingMergeTree engine's _is_deleted cleanup argument, so the table must
+// be recreated by the connector to get correct hard-delete semantics.
+func (t *transactor) requireIsDeletedColumn(ctx context.Context, b *binding) error {
+	var total, hasIsDeleted uint64
+	if err := t.store.conn.QueryRow(ctx,
+		"SELECT count(), countIf(name = '_is_deleted') FROM system.columns WHERE database = currentDatabase() AND table = ?",
+		b.target.Path[0],
+	).Scan(&total, &hasIsDeleted); err != nil {
+		return fmt.Errorf("checking for _is_deleted column in %s: %w", b.target.Identifier, err)
+	}
+
+	// total == 0: the table does not exist yet, so Apply will create it with the
+	// column. hasIsDeleted > 0: the column is already present.
+	if total == 0 || hasIsDeleted > 0 {
+		return nil
+	}
+
+	return fmt.Errorf(
+		"table %s is missing the required _is_deleted column. This materialization has hard delete "+
+			"enabled, which requires an internal _is_deleted column (UInt8) on every standard-updates "+
+			"table: the connector materializes each table as a ReplacingMergeTree that uses _is_deleted "+
+			"to remove rows deleted in the source. This table exists without that column -- it was "+
+			"pre-created, or hard delete was enabled after the table was created -- so the connector "+
+			"cannot store to it. To resolve this, either backfill this binding (increment its backfill "+
+			"counter) so the connector re-creates the table with the correct schema, or disable hard "+
+			"delete for this materialization",
+		b.target.Identifier,
+	)
 }
 
 type binding struct {
