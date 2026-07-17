@@ -181,8 +181,16 @@ func (r tableConfig) Parameters() ([]string, bool, error) {
 	return []string{r.Table}, r.Delta, nil
 }
 
-func newClickHouseDriver() *sql.Driver[config, tableConfig] {
-	return &sql.Driver[config, tableConfig]{
+// driver wraps the generic SQL driver so that Validate can be customized
+// beyond what the generic implementation provides. See validate.go.
+type driver struct {
+	sqlDriver *sql.Driver[config, tableConfig]
+}
+
+var _ boilerplate.Connector = &driver{}
+
+func newClickHouseDriver() *driver {
+	sqlDriver := &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-clickhouse",
 		StartTunnel: func(ctx context.Context, cfg config) error {
 			return nil
@@ -216,6 +224,21 @@ func newClickHouseDriver() *sql.Driver[config, tableConfig] {
 		},
 		PreReqs: preReqs,
 	}
+	return &driver{
+		sqlDriver: sqlDriver,
+	}
+}
+
+func (d *driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
+	return d.sqlDriver.Spec(ctx, req)
+}
+
+func (d *driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
+	return d.sqlDriver.Apply(ctx, req)
+}
+
+func (d *driver) NewTransactor(ctx context.Context, req pm.Request_Open, be *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
+	return d.sqlDriver.NewTransactor(ctx, req, be)
 }
 
 type transactor struct {
