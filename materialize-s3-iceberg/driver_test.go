@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"iter"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -18,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	parquetfile "github.com/apache/arrow-go/v18/parquet/file"
 	"github.com/apache/iceberg-go"
 	icebergcatalog "github.com/apache/iceberg-go/catalog"
 	icebergio "github.com/apache/iceberg-go/io"
@@ -138,6 +140,10 @@ func TestIntegration(t *testing.T) {
 		boilerplate.RunMaterializationTest(t, newMaterialization, "testdata/materialize.flow.yaml", makeResourceFn, materializeSanitizers())
 	})
 
+	t.Run("materialize-ns", func(t *testing.T) {
+		boilerplate.RunMaterializationTest(t, newMaterialization, "testdata/materialize-ns.flow.yaml", makeResourceFn, materializeSanitizers())
+	})
+
 	t.Run("apply", func(t *testing.T) {
 		boilerplate.RunApplyTest(t, &driver{}, newMaterialization, "testdata/apply.flow.yaml", makeResourceFn)
 	})
@@ -152,6 +158,18 @@ func TestIntegration(t *testing.T) {
 
 	t.Run("checkpoint-fence-regression", func(t *testing.T) {
 		runCheckpointFenceRegression(t, cfg)
+	})
+
+	t.Run("ns-timestamp", func(t *testing.T) {
+		runNanosecondTimestampTest(t, cfg)
+	})
+
+	t.Run("ns-v2-upgrade", func(t *testing.T) {
+		runNanosecondV2UpgradeTest(t, cfg)
+	})
+
+	t.Run("ns-create-v3", func(t *testing.T) {
+		runNanosecondCreateResourceTest(t, cfg)
 	})
 
 	// Migration test is skipped because Iceberg does not support the type
@@ -192,6 +210,10 @@ func TestIntegrationGlue(t *testing.T) {
 		boilerplate.RunMaterializationTest(t, newMaterialization, "testdata/materialize-glue.flow.yaml", makeResourceFn, materializeSanitizers())
 	})
 
+	t.Run("materialize-ns", func(t *testing.T) {
+		boilerplate.RunMaterializationTest(t, newMaterialization, "testdata/materialize-glue-ns.flow.yaml", makeResourceFn, materializeSanitizers())
+	})
+
 	t.Run("apply", func(t *testing.T) {
 		boilerplate.RunApplyTest(t, &driver{}, newMaterialization, "testdata/apply-glue.flow.yaml", makeResourceFn)
 	})
@@ -207,6 +229,18 @@ func TestIntegrationGlue(t *testing.T) {
 	t.Run("checkpoint-fence-regression", func(t *testing.T) {
 		runCheckpointFenceRegression(t, cfg)
 	})
+
+	t.Run("ns-timestamp", func(t *testing.T) {
+		runNanosecondTimestampTest(t, cfg)
+	})
+
+	t.Run("ns-v2-upgrade", func(t *testing.T) {
+		runNanosecondV2UpgradeTest(t, cfg)
+	})
+
+	t.Run("ns-create-v3", func(t *testing.T) {
+		runNanosecondCreateResourceTest(t, cfg)
+	})
 }
 
 // TestRestGlueSnapshotParity enforces that the REST and Glue materialize
@@ -214,12 +248,14 @@ func TestIntegrationGlue(t *testing.T) {
 // catalog code paths produced different results — the drift this coverage
 // exists to catch.
 func TestRestGlueSnapshotParity(t *testing.T) {
-	rest, err := os.ReadFile(".snapshots/TestIntegration-materialize")
-	require.NoError(t, err)
-	glue, err := os.ReadFile(".snapshots/TestIntegrationGlue-materialize")
-	require.NoError(t, err)
-	require.Equal(t, string(rest), string(glue),
-		"REST and Glue materialize snapshots diverged; this indicates catalog-specific drift")
+	for _, name := range []string{"materialize", "materialize-ns"} {
+		rest, err := os.ReadFile(".snapshots/TestIntegration-" + name)
+		require.NoError(t, err)
+		glue, err := os.ReadFile(".snapshots/TestIntegrationGlue-" + name)
+		require.NoError(t, err)
+		require.Equal(t, string(rest), string(glue),
+			"REST and Glue %s snapshots diverged; this indicates catalog-specific drift", name)
+	}
 }
 
 // runTimestampOverflowRegression reproduces a production failure observed at
@@ -235,7 +271,7 @@ func runTimestampOverflowRegression(t *testing.T, cfg config) {
 
 	clampedTS, err := clampTimestamp("9999-12-31T23:59:59-14:00")
 	require.NoError(t, err)
-	s3Path := rt.uploadParquet(t, ctx,
+	s3Path, _ := rt.uploadParquet(t, ctx,
 		writer.ParquetSchemaElement{Name: "ts", DataType: writer.LogicalTypeTimestamp, Required: false}, clampedTS)
 
 	require.NoError(t, rt.cat.appendFiles(ctx,
@@ -317,8 +353,9 @@ func newRegressionTable(t *testing.T, ctx context.Context, cfg config, table str
 }
 
 // uploadParquet writes rows into a single-column parquet file and uploads it to
-// the table's data prefix, returning its s3 path.
-func (rt *regressionTable) uploadParquet(t *testing.T, ctx context.Context, col writer.ParquetSchemaElement, rows ...any) string {
+// the table's data prefix, returning the s3 path and the local path for tests
+// that inspect the encoded bytes.
+func (rt *regressionTable) uploadParquet(t *testing.T, ctx context.Context, col writer.ParquetSchemaElement, rows ...any) (string, string) {
 	t.Helper()
 
 	parquetPath := filepath.Join(t.TempDir(), "data.parquet")
@@ -344,7 +381,7 @@ func (rt *regressionTable) uploadParquet(t *testing.T, ctx context.Context, col 
 	})
 	require.NoError(t, err)
 
-	return s3Path
+	return s3Path, parquetPath
 }
 
 // runDateOverflowRegression is the date analog of runTimestampOverflowRegression.
@@ -358,7 +395,7 @@ func runDateOverflowRegression(t *testing.T, cfg config) {
 
 	clampedDate, err := clampDate("10000-01-01")
 	require.NoError(t, err)
-	s3Path := rt.uploadParquet(t, ctx,
+	s3Path, _ := rt.uploadParquet(t, ctx,
 		writer.ParquetSchemaElement{Name: "d", DataType: writer.LogicalTypeDate, Required: false}, clampedDate)
 
 	require.NoError(t, rt.cat.appendFiles(ctx,
@@ -384,7 +421,7 @@ func runCheckpointFenceRegression(t *testing.T, cfg config) {
 		iceberg.NestedField{ID: 1, Name: "v", Type: iceberg.PrimitiveTypes.String, Required: false}, nil)
 
 	vCol := writer.ParquetSchemaElement{Name: "v", DataType: writer.LogicalTypeString, Required: false}
-	first := rt.uploadParquet(t, ctx, vCol, "one")
+	first, _ := rt.uploadParquet(t, ctx, vCol, "one")
 	require.NoError(t, rt.cat.appendFiles(ctx, materialization, rt.ident,
 		[]string{first}, "", "checkpoint-1"))
 
@@ -393,7 +430,7 @@ func runCheckpointFenceRegression(t *testing.T, cfg config) {
 	require.NoError(t, rt.cat.appendFiles(ctx, materialization, rt.ident,
 		[]string{first}, "", "checkpoint-1"))
 
-	second := rt.uploadParquet(t, ctx, vCol, "two")
+	second, _ := rt.uploadParquet(t, ctx, vCol, "two")
 	require.NoError(t, rt.cat.appendFiles(ctx, materialization, rt.ident,
 		[]string{second}, "checkpoint-1", "checkpoint-2"))
 
@@ -585,6 +622,200 @@ func TestPopulateInfoSchemaSkipsAbsentNamespace(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, fake.listTablesCalled)
 	})
+}
+
+// runNanosecondTimestampTest verifies that timestamptz_ns (Iceberg v3 format) columns:
+//   - write nanosecond-precision timestamps correctly
+//   - clamp out-of-range values (before 1677 / after 2262) to int64 min/max rather than overflowing
+//   - encode exact int64 nanosecond values in the produced Parquet file
+//     (asserted against the raw column bytes)
+func runNanosecondTimestampTest(t *testing.T, cfg config) {
+	t.Helper()
+	ctx := context.Background()
+
+	// Advanced is a pointer shared with the caller's cfg: clone it before
+	// mutating so the flag doesn't leak into subtests that run after this one.
+	adv := advancedConfig{}
+	if cfg.Advanced != nil {
+		adv = *cfg.Advanced
+	}
+	adv.NanosecondTimestamps = true
+	cfg.Advanced = &adv
+	rt := newRegressionTable(t, ctx, cfg, "ns_timestamp",
+		iceberg.NestedField{ID: 1, Name: "ts", Type: iceberg.PrimitiveTypes.TimestampTzNs, Required: false},
+		iceberg.Properties{icebergtable.PropertyFormatVersion: "3"})
+
+	// Values pass through clampTimestampNanos as they do in production, where
+	// MapType wires it as the binding's ElementConverter.
+	var rows []any
+	for _, raw := range []string{
+		"2023-01-15T12:34:56.123456789Z", // in-range: sub-microsecond digits (789) must survive the round-trip
+		"1000-01-01T00:00:00Z",           // out-of-range past: clamps to math.MinInt64 rather than overflowing
+		"3000-01-01T00:00:00Z",           // out-of-range future: clamps to math.MaxInt64 rather than overflowing
+	} {
+		v, err := clampTimestampNanos(raw)
+		require.NoError(t, err)
+		rows = append(rows, v)
+	}
+	s3Path, parquetPath := rt.uploadParquet(t, ctx,
+		writer.ParquetSchemaElement{Name: "ts", DataType: writer.LogicalTypeTimestampNanos, Required: false}, rows...)
+
+	require.NoError(t, rt.cat.appendFiles(ctx,
+		"acmeCo/tests/ns-timestamp",
+		rt.ident,
+		[]string{s3Path},
+		"",
+		"deadbeefdeadbeef",
+	))
+
+	// Verify nanosecond precision by reading the raw int64 values from the Parquet file.
+	// DuckDB maps nanosecond Parquet timestamps to TIMESTAMPTZ (microsecond precision),
+	// dropping sub-microsecond digits — so we read the encoded bytes directly instead.
+	pqf, err := os.Open(parquetPath)
+	require.NoError(t, err)
+	defer pqf.Close()
+
+	pqr, err := parquetfile.NewParquetReader(pqf)
+	require.NoError(t, err)
+	defer pqr.Close()
+
+	col, err := pqr.RowGroup(0).Column(0)
+	require.NoError(t, err)
+
+	int64Col := col.(*parquetfile.Int64ColumnChunkReader)
+	vals := make([]int64, 3)
+	defLevels := make([]int16, 3)
+	_, valuesRead, err := int64Col.ReadBatch(3, vals, defLevels, nil)
+	require.NoError(t, err)
+	require.Equal(t, 3, valuesRead)
+	// 2023-01-15T12:34:56.123456789Z → unix nanoseconds
+	require.Equal(t, int64(1673786096123456789), vals[0], "in-range: sub-microsecond precision lost")
+	require.Equal(t, int64(math.MinInt64), vals[1], "out-of-range past not clamped to MinInt64")
+	require.Equal(t, int64(math.MaxInt64), vals[2], "out-of-range future not clamped to MaxInt64")
+}
+
+// runNanosecondV2UpgradeTest reproduces adding a timestamptz_ns column to a
+// table that predates nanosecond_timestamps being enabled: the table is still
+// format v2 (and had no date-time columns, so flipping the flag forces no
+// backfill), and UpdateResource must upgrade it to v3 for the AddColumn to be
+// valid.
+func runNanosecondV2UpgradeTest(t *testing.T, cfg config) {
+	t.Helper()
+	ctx := context.Background()
+
+	// Advanced is a pointer shared with the caller's cfg: clone it before
+	// mutating so the flag doesn't leak into subtests that run after this one.
+	adv := advancedConfig{}
+	if cfg.Advanced != nil {
+		adv = *cfg.Advanced
+	}
+	adv.NanosecondTimestamps = true
+	cfg.Advanced = &adv
+	rt := newRegressionTable(t, ctx, cfg, "ns_v2_upgrade",
+		iceberg.NestedField{ID: 1, Name: "id", Type: iceberg.PrimitiveTypes.String, Required: false},
+		iceberg.Properties{icebergtable.PropertyFormatVersion: "2"})
+	cat := rt.cat
+	tableIdent := rt.ident
+
+	tbl, err := cat.cat.LoadTable(ctx, tableIdent)
+	require.NoError(t, err)
+	require.Equal(t, 2, tbl.Metadata().Version())
+
+	update := mboilerplate.BindingUpdate[config, resource, mappedType]{
+		Binding: mboilerplate.MappedBinding[config, resource, mappedType]{
+			MaterializationSpec_Binding: pf.MaterializationSpec_Binding{
+				ResourcePath: tableIdent,
+			},
+		},
+		NewProjections: []mboilerplate.MappedProjection[mappedType]{{
+			Projection: mboilerplate.Projection{
+				Projection: pf.Projection{
+					Field: "ts",
+					Inference: pf.Inference{
+						Types:   []string{"string"},
+						String_: &pf.Inference_String{Format: "date-time"},
+					},
+				},
+			},
+		}},
+	}
+
+	_, apply, err := cat.UpdateResource(ctx, update)
+	require.NoError(t, err)
+	require.NoError(t, apply(ctx))
+
+	tbl, err = cat.cat.LoadTable(ctx, tableIdent)
+	require.NoError(t, err)
+	require.Equal(t, 3, tbl.Metadata().Version())
+	f, ok := tbl.Schema().FindFieldByName("ts")
+	require.True(t, ok)
+	require.True(t, f.Type.Equals(iceberg.PrimitiveTypes.TimestampTzNs))
+}
+
+// runNanosecondCreateResourceTest exercises the connector's own CreateResource
+// path with nanosecond_timestamps enabled: a user-supplied format-version
+// table property that conflicts with the required v3 is rejected with an
+// explicit error, and a clean create yields a format v3 table with a
+// timestamptz_ns column.
+func runNanosecondCreateResourceTest(t *testing.T, cfg config) {
+	t.Helper()
+	ctx := context.Background()
+
+	// Advanced is a pointer shared with the caller's cfg: clone it before
+	// mutating so the flag doesn't leak into subtests that run after this one.
+	adv := advancedConfig{}
+	if cfg.Advanced != nil {
+		adv = *cfg.Advanced
+	}
+	adv.NanosecondTimestamps = true
+	cfg.Advanced = &adv
+
+	cat, err := newCatalog(ctx, cfg, NestedLocationStyle)
+	require.NoError(t, err)
+	ensureNamespace(t, cfg)
+
+	// Same per-run naming convention as newRegressionTable, so concurrent runs
+	// can't collide and leaked tables are swept by the boilerplate cleanup.
+	table := fmt.Sprintf("ns_create_flow_test_%d", time.Now().Unix())
+	ident := icebergtable.Identifier{cfg.Namespace, table}
+
+	binding := &pf.MaterializationSpec_Binding{
+		ResourcePath: ident,
+		Collection: pf.CollectionSpec{
+			Name: "acmeCo/tests/ns-create",
+			Projections: []pf.Projection{{
+				Field: "ts",
+				Inference: pf.Inference{
+					Types:   []string{"string"},
+					String_: &pf.Inference_String{Format: "date-time"},
+				},
+			}},
+		},
+		FieldSelection: pf.FieldSelection{Values: []string{"ts"}},
+	}
+
+	_, _, err = cat.CreateResource(ctx, binding, resource{
+		AdditionalTableProperties: map[string]string{
+			icebergtable.PropertyFormatVersion: "2",
+		},
+	})
+	require.ErrorContains(t, err, "requires format version 3")
+
+	_, apply, err := cat.CreateResource(ctx, binding, resource{})
+	require.NoError(t, err)
+	require.NoError(t, apply(ctx))
+	t.Cleanup(func() {
+		if err := cat.cat.DropTable(ctx, ident); err != nil {
+			t.Log("failed to drop table", ident, err)
+		}
+	})
+
+	tbl, err := cat.cat.LoadTable(ctx, ident)
+	require.NoError(t, err)
+	require.Equal(t, 3, tbl.Metadata().Version())
+	f, ok := tbl.Schema().FindFieldByName("ts")
+	require.True(t, ok)
+	require.True(t, f.Type.Equals(iceberg.PrimitiveTypes.TimestampTzNs))
 }
 
 func loadTestConfig(t *testing.T) config {
@@ -820,4 +1051,41 @@ func TestMapTypeIgnoreStringFormatOnNonStringField(t *testing.T) {
 
 	require.Equal(t, "long", mt.String())
 	require.Nil(t, conv)
+}
+
+// TestMapTypeNanosecondWiring guards the MapType switch arm that installs
+// clampTimestampNanos for date-time fields when nanosecond_timestamps is
+// enabled. The integration tests invoke the clamp directly, so a silent
+// fallback to the microsecond clamp would pass every other test while
+// overflowing int64 nanoseconds in production.
+func TestMapTypeNanosecondWiring(t *testing.T) {
+	proj := mboilerplate.Projection{
+		Projection: pf.Projection{
+			Field: "ts",
+			Inference: pf.Inference{
+				Exists:  pf.Inference_MUST,
+				Types:   []string{"string"},
+				String_: &pf.Inference_String{Format: "date-time"},
+			},
+		},
+	}
+
+	// Year 3000 distinguishes the two clamps: in-range for the microsecond
+	// clamp (years 1-9999), beyond the int64-nanoseconds band for the
+	// nanosecond clamp.
+	const probe = "3000-01-01T00:00:00Z"
+
+	var micro = &materialization{}
+	mt, conv := micro.MapType(proj, fieldConfig{})
+	require.Equal(t, "timestamptz", mt.String())
+	v, err := conv(probe)
+	require.NoError(t, err)
+	require.Equal(t, probe, v)
+
+	var nanos = &materialization{cfg: config{Advanced: &advancedConfig{NanosecondTimestamps: true}}}
+	mt, conv = nanos.MapType(proj, fieldConfig{})
+	require.Equal(t, "timestamptz_ns", mt.String())
+	v, err = conv(probe)
+	require.NoError(t, err)
+	require.Equal(t, "2262-04-11T23:47:16.854775807Z", v)
 }
