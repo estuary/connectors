@@ -13,11 +13,21 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	log "github.com/sirupsen/logrus"
 )
 
 type client struct {
 	db *stdsql.DB
 	ep *sql.Endpoint[config]
+}
+
+// existingFieldMeta is ClickHouse-specific column metadata attached to
+// boilerplate.ExistingField.Meta by PopulateInfoSchema.
+type existingFieldMeta struct {
+	// isKeyColumn is set for columns in the table's sorting key or partition
+	// key. ClickHouse forbids ALTERing the type of such columns (code 524),
+	// including widening them to Nullable.
+	isKeyColumn bool
 }
 
 func newClient(_ context.Context, materializationName string, ep *sql.Endpoint[config]) (sql.Client, error) {
@@ -73,7 +83,7 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 	// Query columns from system.columns.
 	var colRows *stdsql.Rows
 	colRows, err = c.db.QueryContext(ctx, fmt.Sprintf(
-		"SELECT database, table, name, type, default_expression FROM system.columns WHERE database = %s",
+		"SELECT database, table, name, type, default_expression, is_in_sorting_key, is_in_partition_key FROM system.columns WHERE database = %s",
 		c.ep.Dialect.Literal(database),
 	))
 	if err != nil {
@@ -83,7 +93,8 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 
 	for colRows.Next() {
 		var dbName, tableName, colName, colType, defaultExpr string
-		if err := colRows.Scan(&dbName, &tableName, &colName, &colType, &defaultExpr); err != nil {
+		var isInSortingKey, isInPartitionKey uint8
+		if err := colRows.Scan(&dbName, &tableName, &colName, &colType, &defaultExpr, &isInSortingKey, &isInPartitionKey); err != nil {
 			return fmt.Errorf("scanning column row: %w", err)
 		}
 
@@ -104,6 +115,7 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 			Nullable:   isNullable,
 			Type:       baseType,
 			HasDefault: defaultExpr != "",
+			Meta:       existingFieldMeta{isKeyColumn: isInSortingKey == 1 || isInPartitionKey == 1},
 		})
 	}
 	if err := colRows.Err(); err != nil {
@@ -235,6 +247,25 @@ var clickHouseMigrationSteps = []sql.ColumnMigrationStep{
 
 func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boilerplate.ActionApplyFn, error) {
 	var stmts []string
+
+	// ClickHouse forbids changing the type of a sorting-key or partition-key
+	// column (code 524), so such a column can never be widened to Nullable.
+	// It doesn't need to be either: inserts name their columns explicitly, and
+	// a non-nullable column omitted from an insert receives the type's zero
+	// value. Skip these columns rather than crash-looping on an ALTER that can
+	// never succeed.
+	var dropNotNulls []boilerplate.ExistingField
+	for _, col := range ta.DropNotNulls {
+		if meta, ok := col.Meta.(existingFieldMeta); ok && meta.isKeyColumn {
+			log.WithFields(log.Fields{
+				"table":  ta.Identifier,
+				"column": col.Name,
+			}).Warn("not making key column nullable because ClickHouse forbids ALTER of sorting-key and partition-key columns")
+			continue
+		}
+		dropNotNulls = append(dropNotNulls, col)
+	}
+	ta.DropNotNulls = dropNotNulls
 
 	if len(ta.AddColumns) > 0 || len(ta.DropNotNulls) > 0 {
 		var alterStmtBuilder strings.Builder
