@@ -41,7 +41,6 @@ func NewMappedField(projection pf.Projection, fc FieldConfig) (*MappedField, err
 	}
 	property := &Property{
 		Name:           propertyName,
-		GroupName:      flowPropertyGroupName,
 		Label:          projection.Inference.Title,
 		Description:    projection.Inference.Description,
 		HasUniqueValue: projection.IsPrimaryKey,

@@ -150,35 +150,6 @@ func (*InspectTokensCmd) Run(ctx context.Context, client *hubspot.Client) error 
 	return nil
 }
 
-type CreatePropertyCmd struct {
-	Object      string                    `arg:"positional,required"`
-	Name        string                    `arg:"--name,required"`
-	GroupName   string                    `arg:"--group,required"`
-	Label       string                    `arg:"--label"`
-	Type        hubspot.PropertyType      `arg:"--type" default:"string"`
-	FieldType   hubspot.PropertyFieldType `arg:"--field-type" default:"text"`
-	Description string                    `arg:"--desc"`
-	Unique      bool                      `arg:"--unique"`
-}
-
-func (c *CreatePropertyCmd) Run(ctx context.Context, client *hubspot.Client) error {
-	object, err := hubspot.NewCRMObject(c.Object)
-	if err != nil {
-		return err
-	}
-
-	property := &hubspot.Property{
-		Name:           c.Name,
-		Type:           c.Type,
-		FieldType:      c.FieldType,
-		Description:    c.Description,
-		GroupName:      c.GroupName,
-		HasUniqueValue: c.Unique,
-	}
-
-	return client.CreateProperty(ctx, object, property)
-}
-
 type GetPropertyCmd struct {
 	Object string `arg:"positional,required"`
 	Name   string `arg:"--name,required"`
@@ -226,86 +197,6 @@ func (c *ListPropertiesCmd) Run(ctx context.Context, client *hubspot.Client) err
 
 	fmt.Printf("%s\n", data)
 	return nil
-}
-
-type DeletePropertyCmd struct {
-	Object string `arg:"positional,required"`
-	Name   string `arg:"required"`
-}
-
-func (c *DeletePropertyCmd) Run(ctx context.Context, client *hubspot.Client) error {
-	object, err := hubspot.NewCRMObject(c.Object)
-	if err != nil {
-		return err
-	}
-
-	return client.DeleteProperty(ctx, object, c.Name)
-}
-
-type CreatePropertyGroupCmd struct {
-	Object string `arg:"positional,required"`
-	Name   string `arg:"--name,required"`
-	Label  string `arg:"--label"`
-}
-
-func (c *CreatePropertyGroupCmd) Run(ctx context.Context, client *hubspot.Client) error {
-	object, err := hubspot.NewCRMObject(c.Object)
-	if err != nil {
-		return err
-	}
-
-	group := &hubspot.PropertyGroup{
-		Archived:     false,
-		Name:         c.Name,
-		Label:        c.Label,
-		DisplayOrder: hubspot.DisplayOrderLast,
-	}
-
-	err = client.CreatePropertyGroup(ctx, object, group)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-type GetPropertyGroupCmd struct {
-	Object string `arg:"positional,required"`
-	Name   string `arg:"--name,required"`
-}
-
-func (c *GetPropertyGroupCmd) Run(ctx context.Context, client *hubspot.Client) error {
-	object, err := hubspot.NewCRMObject(c.Object)
-	if err != nil {
-		return err
-	}
-
-	group, err := client.GetPropertyGroup(ctx, object, c.Name)
-	if err != nil {
-		return err
-	}
-
-	data, err := json.MarshalIndent(group, "", "    ")
-	if err != nil {
-		return err
-	}
-
-	fmt.Printf("%s\n", data)
-	return nil
-}
-
-type DeletePropertyGroupCmd struct {
-	Object string `arg:"positional,required"`
-	Name   string `arg:"--name,required"`
-}
-
-func (c *DeletePropertyGroupCmd) Run(ctx context.Context, client *hubspot.Client) error {
-	object, err := hubspot.NewCRMObject(c.Object)
-	if err != nil {
-		return err
-	}
-
-	return client.DeletePropertyGroup(ctx, object, c.Name)
 }
 
 type ListPropertyGroupsCmd struct {
@@ -402,17 +293,12 @@ func (c *SearchEqualCmd) Run(ctx context.Context, client *hubspot.Client) error 
 type Args struct {
 	Config string `arg:"-c,--config" default:"-"`
 
-	Auth                *AuthCmd                `arg:"subcommand:auth"`
-	RefreshTokens       *RefreshTokensCmd       `arg:"subcommand:refresh-tokens"`
-	InspectTokens       *InspectTokensCmd       `arg:"subcommand:inspect-tokens"`
-	CreateProperty      *CreatePropertyCmd      `arg:"subcommand:create-property"`
-	DeleteProperty      *DeletePropertyCmd      `arg:"subcommand:delete-property"`
-	GetProperty         *GetPropertyCmd         `arg:"subcommand:get-property"`
-	ListProperties      *ListPropertiesCmd      `arg:"subcommand:list-properties"`
-	CreatePropertyGroup *CreatePropertyGroupCmd `arg:"subcommand:create-property-group"`
-	DeletePropertyGroup *DeletePropertyGroupCmd `arg:"subcommand:delete-property-group"`
-	GetPropertyGroup    *GetPropertyGroupCmd    `arg:"subcommand:get-property-group"`
-	ListPropertyGroups  *ListPropertyGroupsCmd  `arg:"subcommand:list-property-groups"`
+	Auth               *AuthCmd               `arg:"subcommand:auth"`
+	RefreshTokens      *RefreshTokensCmd      `arg:"subcommand:refresh-tokens"`
+	InspectTokens      *InspectTokensCmd      `arg:"subcommand:inspect-tokens"`
+	GetProperty        *GetPropertyCmd        `arg:"subcommand:get-property"`
+	ListProperties     *ListPropertiesCmd     `arg:"subcommand:list-properties"`
+	ListPropertyGroups *ListPropertyGroupsCmd `arg:"subcommand:list-property-groups"`
 
 	BatchRead   *BatchReadCmd   `arg:"subcommand:batch-read"`
 	SearchEqual *SearchEqualCmd `arg:"subcommand:search-equal"`
@@ -463,22 +349,12 @@ func main() {
 		err = args.RefreshTokens.Run(ctx, client)
 	case args.InspectTokens != nil:
 		err = args.InspectTokens.Run(ctx, client)
-	case args.CreateProperty != nil:
-		err = args.CreateProperty.Run(ctx, client)
 	case args.GetProperty != nil:
 		err = args.GetProperty.Run(ctx, client)
 	case args.ListProperties != nil:
 		err = args.ListProperties.Run(ctx, client)
-	case args.DeleteProperty != nil:
-		err = args.DeleteProperty.Run(ctx, client)
 	case args.ListPropertyGroups != nil:
 		err = args.ListPropertyGroups.Run(ctx, client)
-	case args.CreatePropertyGroup != nil:
-		err = args.CreatePropertyGroup.Run(ctx, client)
-	case args.GetPropertyGroup != nil:
-		err = args.GetPropertyGroup.Run(ctx, client)
-	case args.DeletePropertyGroup != nil:
-		err = args.DeletePropertyGroup.Run(ctx, client)
 	case args.BatchRead != nil:
 		err = args.BatchRead.Run(ctx, client)
 	case args.SearchEqual != nil:

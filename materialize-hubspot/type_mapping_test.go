@@ -34,7 +34,6 @@ func TestNewMappedFieldConvert(t *testing.T) {
 				Ptr:  "/email",
 				Property: &Property{
 					Name:           "email",
-					GroupName:      "flow",
 					Label:          "My Title",
 					Description:    "My Description",
 					HasUniqueValue: true,
@@ -60,7 +59,6 @@ func TestNewMappedFieldConvert(t *testing.T) {
 				Ptr:  "/firstname",
 				Property: &Property{
 					Name:        "firstname",
-					GroupName:   "flow",
 					Label:       "My Title",
 					Description: "My Description",
 					Type:        StringPropertyType,

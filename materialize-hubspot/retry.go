@@ -3,7 +3,6 @@ package hubspot
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -14,10 +13,6 @@ import (
 type TemporaryError struct {
 	err        error
 	extraDelay time.Duration
-}
-
-func NewTemporaryError(format string, a ...any) *TemporaryError {
-	return &TemporaryError{err: fmt.Errorf(format, a...)}
 }
 
 func (e *TemporaryError) Error() string {

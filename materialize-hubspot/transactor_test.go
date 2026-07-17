@@ -496,7 +496,7 @@ func TestStoreBatches(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			it := NewStoreIterator(t, tt.items)
-			client, err := NewClientDefaultLimiter(Credentials{})
+			client, err := NewClient(Credentials{}, nil, nil)
 			require.NoError(t, err)
 
 			transactor := &transactor{
