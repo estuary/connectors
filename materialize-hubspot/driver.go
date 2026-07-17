@@ -17,21 +17,6 @@ import (
 	"go.gazette.dev/core/consumer/protocol"
 )
 
-var (
-	flowPropertyGroupName = "flow"
-
-	// flowPropertyGroup is the property group created to hold properties
-	// created by the materialization.
-	//
-	// Property groups are per CRMObject and all properties must be assigned to
-	// a group, so this group is created for each object that is materialized.
-	flowPropertyGroup = &PropertyGroup{
-		Name:         flowPropertyGroupName,
-		Label:        "Estuary properties",
-		DisplayOrder: DisplayOrderLast,
-	}
-)
-
 type Driver struct{}
 
 var _ boilerplate.Connector = (*Driver)(nil)
@@ -168,21 +153,7 @@ func (*Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_A
 	for _, b := range mapped {
 		for _, field := range b.fields {
 			if _, ok := schema.GetProperty(b.object, field.Property.Name); !ok {
-				if !schema.HasPropertyGroup(b.object, flowPropertyGroupName) {
-					actions = append(actions, fmt.Sprintf("Create Property Group %q", flowPropertyGroup.Name))
-					if err := materializer.CreatePropertyGroup(ctx, b.object, flowPropertyGroup); err != nil {
-						return nil, err
-					}
-
-					schema.AddPropertyGroup(b.object, flowPropertyGroup)
-				}
-
-				actions = append(actions, fmt.Sprintf("Create Property %q", field.Property.Name))
-
-				err := materializer.CreateProperty(ctx, b.object, field.Property)
-				if err != nil {
-					return nil, fmt.Errorf("unable to create property for field %q: %w", field.Property.Name, err)
-				}
+				return nil, fmt.Errorf("unable to locate required property: %q", field.Property.Name)
 			}
 		}
 	}
@@ -223,14 +194,6 @@ func (m *materialization) CheckPrerequisites(ctx context.Context) *cerrors.Prere
 	}
 
 	return errs
-}
-
-func (m *materialization) CreatePropertyGroup(ctx context.Context, object CRMObject, group *PropertyGroup) error {
-	return m.client.CreatePropertyGroup(ctx, object, group)
-}
-
-func (m *materialization) CreateProperty(ctx context.Context, object CRMObject, property *Property) error {
-	return m.client.CreateProperty(ctx, object, property)
 }
 
 func (m *materialization) NewTransactor(

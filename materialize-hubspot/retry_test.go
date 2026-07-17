@@ -10,6 +10,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func NewTemporaryError(format string, a ...any) *TemporaryError {
+	return &TemporaryError{err: fmt.Errorf(format, a...)}
+}
+
 func TestRetry(t *testing.T) {
 	tests := []struct {
 		name           string

@@ -7,13 +7,6 @@ type CRMObjectSchema struct {
 	Properties     map[string]*Property
 }
 
-func NewCRMObjectSchema() *CRMObjectSchema {
-	return &CRMObjectSchema{
-		PropertyGroups: make(map[string]*PropertyGroup),
-		Properties:     make(map[string]*Property),
-	}
-}
-
 type CRMSchema struct {
 	Objects map[CRMObject]*CRMObjectSchema
 }
@@ -63,25 +56,6 @@ func LoadSchema(ctx context.Context, client *Client, resources []Resource) (*Sch
 	}
 
 	return schema, nil
-}
-
-func (s *Schema) AddPropertyGroup(object CRMObject, group *PropertyGroup) {
-	objectSchema, ok := s.CRM.Objects[object]
-	if !ok {
-		objectSchema = NewCRMObjectSchema()
-		s.CRM.Objects[object] = objectSchema
-	}
-	objectSchema.PropertyGroups[group.Name] = group
-}
-
-func (s *Schema) HasPropertyGroup(object CRMObject, groupName string) bool {
-	objectSchema, ok := s.CRM.Objects[object]
-	if !ok {
-		return false
-	}
-
-	_, ok = objectSchema.PropertyGroups[groupName]
-	return ok
 }
 
 func (s *Schema) GetProperty(object CRMObject, propName string) (*Property, bool) {

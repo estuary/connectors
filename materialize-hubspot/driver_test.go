@@ -404,7 +404,7 @@ func getTokens(ctx context.Context, creds Credentials) (*TokenUpdate, error) {
 		Path:   "oauth",
 	}
 
-	client, err := NewClientDefaultLimiter(creds)
+	client, err := NewClient(creds, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -596,7 +596,7 @@ func snapshotBinding(ctx context.Context, task Task, binding TestBinding, action
 		return "", err
 	}
 
-	client, err := NewClientDefaultLimiter(task.Config.Credentials)
+	client, err := NewClient(task.Config.Credentials, nil, nil)
 	if err != nil {
 		return "", err
 	}

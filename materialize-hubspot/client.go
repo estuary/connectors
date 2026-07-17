@@ -401,10 +401,6 @@ func NewClient(credentials Credentials, limiter, searchLimiter *rate.Limiter) (*
 	}, nil
 }
 
-func NewClientDefaultLimiter(credentials Credentials) (*Client, error) {
-	return NewClient(credentials, nil, nil)
-}
-
 func (c *Client) Close() {
 	c.httpClient.CloseIdleConnections()
 }
@@ -802,124 +798,6 @@ func (c *Client) ListPropertyGroups(ctx context.Context, object CRMObject) ([]*P
 	return value.Results, nil
 }
 
-func (c *Client) CreatePropertyGroup(ctx context.Context, object CRMObject, group *PropertyGroup) error {
-	uri := baseURL.JoinPath(propertyPath, object.String(), "groups")
-
-	data, err := json.Marshal(&group)
-	if err != nil {
-		return fmt.Errorf("unable to marshal property group: %w", err)
-	}
-
-	err = Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
-		req, err := c.newRequest(ctx, "POST", uri, bytes.NewBuffer(data))
-		if err != nil {
-			return err
-		}
-		req.Header.Set("Content-Type", "application/json")
-
-		start := time.Now()
-		if err := c.limiter.Wait(ctx); err != nil {
-			return err
-		}
-		delay := time.Since(start)
-
-		resp, err := c.httpClient.Do(req)
-		if err != nil {
-			return err
-		}
-		defer resp.Body.Close()
-		defer logExchange(resp, start, delay)
-
-		if resp.StatusCode != 201 {
-			apiError := parseAPIError(resp)
-			return fmt.Errorf("unexpected response: %w", apiError)
-		}
-		return nil
-	})
-	return err
-}
-
-// GetPropertyGroup returns property group by name.
-func (c *Client) GetPropertyGroup(ctx context.Context, object CRMObject, groupName string) (*PropertyGroup, error) {
-	uri := baseURL.JoinPath(propertyPath, object.String(), "groups", groupName)
-
-	var propertyGroup PropertyGroup
-	err := Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
-		req, err := c.newRequest(ctx, "GET", uri, nil)
-		if err != nil {
-			return err
-		}
-
-		start := time.Now()
-		if err := c.limiter.Wait(ctx); err != nil {
-			return err
-		}
-		delay := time.Since(start)
-
-		resp, err := c.httpClient.Do(req)
-		if err != nil {
-			return err
-		}
-		defer resp.Body.Close()
-		defer logExchange(resp, start, delay)
-
-		if resp.StatusCode != 200 {
-			apiError := parseAPIError(resp)
-			return fmt.Errorf("unexpected response: %w", apiError)
-		}
-
-		err = parseBody(resp, &propertyGroup, MaxResponseBytes)
-		if err != nil {
-			return fmt.Errorf("unable to parse property group: %w", err)
-		}
-
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return &propertyGroup, nil
-}
-
-// DeletePropertyGroup deletes a property group by name.
-func (c *Client) DeletePropertyGroup(ctx context.Context, object CRMObject, groupName string) error {
-	uri := baseURL.JoinPath(propertyPath, object.String(), "groups", groupName)
-
-	return Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
-		req, err := c.newRequest(ctx, "DELETE", uri, nil)
-		if err != nil {
-			return err
-		}
-
-		start := time.Now()
-		if err := c.limiter.Wait(ctx); err != nil {
-			return err
-		}
-		delay := time.Since(start)
-
-		resp, err := c.httpClient.Do(req)
-		if err != nil {
-			return err
-		}
-		defer resp.Body.Close()
-		defer logExchange(resp, start, delay)
-
-		// Assume that it was deleted when a prior attempt triggered a
-		// temporary error.
-		if resp.StatusCode == 404 && attempt > 1 {
-			return nil
-		}
-
-		if resp.StatusCode != 204 {
-			apiError := parseAPIError(resp)
-			return fmt.Errorf("unexpected response: %w", apiError)
-		}
-
-		return nil
-	})
-}
-
 func (c *Client) ListProperties(ctx context.Context, object CRMObject) ([]*Property, error) {
 	uri := baseURL.JoinPath(propertyPath, object.String())
 
@@ -965,43 +843,6 @@ func (c *Client) ListProperties(ctx context.Context, object CRMObject) ([]*Prope
 	return value.Results, nil
 }
 
-func (c *Client) CreateProperty(ctx context.Context, object CRMObject, property *Property) error {
-	uri := baseURL.JoinPath(propertyPath, object.String())
-
-	data, err := json.Marshal(&property)
-	if err != nil {
-		return fmt.Errorf("unable to marshal property: %w", err)
-	}
-
-	err = Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
-		req, err := c.newRequest(ctx, "POST", uri, bytes.NewBuffer(data))
-		if err != nil {
-			return err
-		}
-		req.Header.Set("Content-Type", "application/json")
-
-		start := time.Now()
-		if err := c.limiter.Wait(ctx); err != nil {
-			return err
-		}
-		delay := time.Since(start)
-
-		resp, err := c.httpClient.Do(req)
-		if err != nil {
-			return err
-		}
-		defer resp.Body.Close()
-		defer logExchange(resp, start, delay)
-
-		if resp.StatusCode != 201 {
-			apiError := parseAPIError(resp)
-			return fmt.Errorf("unexpected response: %w", apiError)
-		}
-		return nil
-	})
-	return err
-}
-
 // GetProperty returns property by name.
 func (c *Client) GetProperty(ctx context.Context, object CRMObject, name string) (*Property, error) {
 	uri := baseURL.JoinPath(propertyPath, object.String(), name)
@@ -1043,43 +884,6 @@ func (c *Client) GetProperty(ctx context.Context, object CRMObject, name string)
 	}
 
 	return &property, nil
-}
-
-func (c *Client) DeleteProperty(ctx context.Context, object CRMObject, name string) error {
-	uri := baseURL.JoinPath(propertyPath, object.String(), name)
-
-	return Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
-		req, err := c.newRequest(ctx, "DELETE", uri, nil)
-		if err != nil {
-			return err
-		}
-
-		start := time.Now()
-		if err := c.limiter.Wait(ctx); err != nil {
-			return err
-		}
-		delay := time.Since(start)
-
-		resp, err := c.httpClient.Do(req)
-		if err != nil {
-			return err
-		}
-		defer resp.Body.Close()
-		defer logExchange(resp, start, delay)
-
-		// Assume that property was deleted when a prior attempt triggered a
-		// temporary error.
-		if resp.StatusCode == 404 && attempt > 1 {
-			return nil
-		}
-
-		if resp.StatusCode != 204 {
-			apiError := parseAPIError(resp)
-			return fmt.Errorf("unexpected response: %w", apiError)
-		}
-
-		return nil
-	})
 }
 
 // AccessToken returns the access token, suitable to use as the bearer token.
