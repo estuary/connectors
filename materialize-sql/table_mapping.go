@@ -30,6 +30,11 @@ type TableShape struct {
 	// Materializer constructs are more thoroughly integrated into
 	// materialize-sql.
 	FieldConfigJsonMap map[string]json.RawMessage
+	// The raw resource config of the binding which produced this table, for
+	// dialects that render resource-level options (e.g. a custom PARTITION BY)
+	// into DDL. Nil when the table is not from a binding, such as the
+	// checkpoints meta table.
+	ResourceConfigJson json.RawMessage
 
 	Keys, Values []Projection
 	Document     *Projection
@@ -237,6 +242,7 @@ func BuildTableShape(materializationName string, binding *pf.MaterializationSpec
 		Comment:            comment,
 		DeltaUpdates:       deltaUpdates,
 		FieldConfigJsonMap: binding.FieldSelection.FieldConfigJsonMap,
+		ResourceConfigJson: binding.ResourceConfigJson,
 		Keys:               keys,
 		Values:             values,
 		Document:           document,
