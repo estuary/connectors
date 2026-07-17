@@ -12,6 +12,7 @@ import (
 	chdriver "github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 	clickhouseproto "github.com/ClickHouse/clickhouse-go/v2/lib/proto"
 	m "github.com/estuary/connectors/go/materialize"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
@@ -244,6 +245,107 @@ func TestTruncateTable(t *testing.T) {
 	var count int
 	require.NoError(t, db.QueryRowContext(ctx, fmt.Sprintf("SELECT count() FROM %s", dialect.Identifier(tableName))).Scan(&count))
 	require.Equal(t, 0, count)
+}
+
+// TestAlterTableOrphanedSortingKeyColumn verifies that AlterTable does not make
+// a sorting-key or partition-key column nullable, which ClickHouse forbids for
+// key columns (code 524). A pre-existing table (adopted via
+// allow_existing_tables_for_new_bindings) can have non-nullable key columns that
+// are not in the field selection, which the boilerplate orphan sweep marks as
+// newly nullable. Such columns must be skipped, while non-key orphaned columns
+// must still be widened.
+func TestAlterTableOrphanedSortingKeyColumn(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	ensureDockerUp(t)
+
+	var cfg = testConfig()
+	var ctx = t.Context()
+	var dialect = clickHouseDialect(cfg.Database)
+	var ep = &sql.Endpoint[config]{Config: cfg, Dialect: dialect}
+	var tableName = "test_orphaned_sorting_key"
+	var table = buildTestTable(t, dialect, tableName)
+
+	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
+	defer db.Close()
+	_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
+
+	// The table reflects an older keying of the data: legacy_key participates
+	// in ORDER BY but is no longer part of the collection or field selection,
+	// and orphaned_value is a non-key column that is also no longer selected.
+	_, err := db.ExecContext(ctx, fmt.Sprintf(`
+		CREATE TABLE %s (
+			id String,
+			legacy_key String,
+			orphaned_value String,
+			value Nullable(String),
+			`+"`_meta/op`"+` String,
+			flow_published_at DateTime64(6, 'UTC'),
+			flow_document String,
+			_is_deleted UInt8 DEFAULT 0
+		) ENGINE = ReplacingMergeTree(flow_published_at, _is_deleted)
+		ORDER BY (id, legacy_key)`,
+		dialect.Identifier(tableName),
+	))
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(context.Background(), fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
+	})
+
+	c, err := newClient(ctx, "test", ep)
+	require.NoError(t, err)
+	defer c.Close()
+
+	var is = boilerplate.NewInfoSchema(
+		sql.ToLocatePathFn(dialect.TableLocator),
+		dialect.SchemaLocator,
+		dialect.ColumnLocator,
+		dialect.CaseInsensitiveColumns,
+		dialect.CaseInsensitiveResources,
+	)
+	require.NoError(t, c.PopulateInfoSchema(ctx, is, [][]string{{tableName}}))
+	existing := is.GetResource([]string{tableName})
+	require.NotNil(t, existing)
+
+	// Mirror the orphan sweep of materialize-boilerplate's computeBindingUpdate:
+	// every existing non-nullable column that isn't in the field selection is
+	// marked as newly nullable and arrives at AlterTable as a DropNotNulls entry.
+	var inSelection = make(map[string]bool)
+	for _, col := range table.Columns() {
+		inSelection[col.Field] = true
+	}
+	var dropNotNulls []boilerplate.ExistingField
+	var droppedNames []string
+	for _, f := range existing.AllFields() {
+		if !inSelection[f.Name] && !f.Nullable {
+			dropNotNulls = append(dropNotNulls, f)
+			droppedNames = append(droppedNames, f.Name)
+		}
+	}
+	require.ElementsMatch(t, []string{"legacy_key", "orphaned_value"}, droppedNames)
+
+	_, applyFn, err := c.AlterTable(ctx, sql.TableAlter{Table: table, DropNotNulls: dropNotNulls})
+	require.NoError(t, err)
+	require.NoError(t, applyFn(ctx))
+
+	// The sorting-key column must be left untouched, and the non-key orphaned
+	// column must still be widened to Nullable.
+	colTypes := make(map[string]string)
+	rows, err := db.QueryContext(ctx, fmt.Sprintf(
+		"SELECT name, type FROM system.columns WHERE database = %s AND table = %s",
+		dialect.Literal(cfg.Database), dialect.Literal(tableName),
+	))
+	require.NoError(t, err)
+	defer rows.Close()
+	for rows.Next() {
+		var name, typ string
+		require.NoError(t, rows.Scan(&name, &typ))
+		colTypes[name] = typ
+	}
+	require.NoError(t, rows.Err())
+	require.Equal(t, "String", colTypes["legacy_key"])
+	require.Equal(t, "Nullable(String)", colTypes["orphaned_value"])
 }
 
 func TestOpenNativeConn(t *testing.T) {
