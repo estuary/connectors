@@ -55,10 +55,12 @@ newline",15.50
 
     def csv_with_special_chars(self, delimiter: str = '|') -> str:
         """CSV with special characters and custom delimiter."""
-        return f"""name{delimiter}age{delimiter}city
-John{delimiter}Product with, comma{delimiter}"Quoted notes"
-Jane{delimiter}Another product{delimiter}Simple notes
-Bob{delimiter}"Quoted product"{delimiter}Notes with {delimiter} delimiter"""
+        return (
+            f"name{delimiter}age{delimiter}city\n"
+            f'John{delimiter}Product with, comma{delimiter}"Quoted notes"\n'
+            f"Jane{delimiter}Another product{delimiter}Simple notes\n"
+            f'Bob{delimiter}"Quoted product"{delimiter}"Notes with {delimiter} delimiter"'
+        )
 
     async def create_byte_chunk_iterator(self, data: str, chunk_size: int = 10, encoding: str = 'utf-8') -> AsyncGenerator[bytes, None]:
         """Helper to create async byte chunk iterator."""
@@ -320,13 +322,60 @@ Fran\xc3\xa7ois,Paris,France
         assert len(rows) == 2  # Empty lines should be filtered out.
 
     @pytest.mark.asyncio
-    async def test_csv_with_inconsistent_fields_is_allowed(self):
-        """Test that CSV with inconsistent field counts is actually allowed by CSV parsers."""
-        # This is actually valid CSV - parsers fill missing fields with None.
-        csv_with_varying_fields = b'name,age,city\nJohn,25,New York\nJane\nBob,35\n,,'
+    async def test_row_with_too_few_columns_raises(self):
+        """A row with fewer columns than the header raises rather than being
+        silently padded with None."""
+        csv_data = b'name,age,city\nJohn,25,New York\nJane,30'
 
         async def csv_iterator():
-            yield csv_with_varying_fields
+            yield csv_data
+
+        processor = IncrementalCSVProcessor(csv_iterator(), BasicRecord)
+
+        with pytest.raises(CSVProcessingError, match="2 columns but 3 were expected"):
+            async for _ in processor:
+                pass
+
+    @pytest.mark.asyncio
+    async def test_row_with_too_many_columns_raises(self):
+        """A row with more columns than the header raises rather than the
+        surplus being silently dropped."""
+        csv_data = b'name,age,city\nJohn,25,New York\nJane,30,LA,extra'
+
+        async def csv_iterator():
+            yield csv_data
+
+        processor = IncrementalCSVProcessor(csv_iterator(), BasicRecord)
+
+        with pytest.raises(CSVProcessingError, match="4 columns but 3 were expected"):
+            async for _ in processor:
+                pass
+
+    @pytest.mark.asyncio
+    async def test_too_few_columns_with_explicit_fieldnames_raises(self):
+        """Validation also applies when fieldnames are supplied for a headerless
+        CSV."""
+        csv_data = b'John,25,New York\nJane,30'
+
+        async def csv_iterator():
+            yield csv_data
+
+        processor = IncrementalCSVProcessor(
+            csv_iterator(), BasicRecord, fieldnames=['name', 'age', 'city']
+        )
+
+        with pytest.raises(CSVProcessingError, match="2 columns but 3 were expected"):
+            async for _ in processor:
+                pass
+
+    @pytest.mark.asyncio
+    async def test_empty_fields_are_not_a_column_count_mismatch(self):
+        """A row of the right width whose fields are empty is valid; empty
+        strings are not treated as missing columns."""
+        csv_data = b'name,age,city\nJohn,,New York\n,,'
+
+        async def csv_iterator():
+            yield csv_data
 
         processor = IncrementalCSVProcessor(csv_iterator(), BasicRecord)
 
@@ -334,12 +383,9 @@ Fran\xc3\xa7ois,Paris,France
         async for row in processor:
             rows.append(row)
 
-        # Should get all rows, including ones with missing fields and empty rows.
-        assert len(rows) == 4
-        assert rows[0].name == "John" and rows[0].age == "25" and rows[0].city == "New York"
-        assert rows[1].name == "Jane" and rows[1].age is None and rows[1].city is None
-        assert rows[2].name == "Bob" and rows[2].age == "35" and rows[2].city is None
-        assert rows[3].name == "" and rows[3].age == "" and rows[3].city == ""
+        assert len(rows) == 2
+        assert rows[0].name == "John" and rows[0].age == "" and rows[0].city == "New York"
+        assert rows[1].name == "" and rows[1].age == "" and rows[1].city == ""
 
     @pytest.mark.asyncio
     async def test_headers_only(self):
