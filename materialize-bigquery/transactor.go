@@ -196,13 +196,25 @@ func schemaForCols(cols []*sql.Column, fieldSchemas map[string]*bigquery.FieldSc
 			return nil, fmt.Errorf("could not find metadata for field '%s'", col.Field)
 		}
 
+		// Copy the field schema rather than reusing the destination table's, both to avoid
+		// mutating the caller's view of the destination schema and so that modifications made
+		// here never leak back to BigQuery via the temp/external table definition.
+		tempSchema := *schema
+
 		// Use a placeholder value instead of the actual field name for the external table schema.
 		// This allows for materialized tables to use "Flexible column names", which is not yet
 		// supported by external tables. A similar placeholder is used in the generated SQL queries
 		// to match this.
-		schema.Name = fmt.Sprintf("c%d", idx)
+		tempSchema.Name = fmt.Sprintf("c%d", idx)
 
-		s = append(s, schema)
+		// Never carry the destination column's policy tags onto the temp/external table:
+		// BigQuery enforces column-level security on the query-scoped external table itself,
+		// and Fine-Grained Reader grants do not extend to it, so a tagged temp column fails
+		// with a 403 that no customer permissioning can fix. See
+		// https://github.com/estuary/connectors/issues/4833.
+		tempSchema.PolicyTags = nil
+
+		s = append(s, &tempSchema)
 	}
 
 	return s, nil
