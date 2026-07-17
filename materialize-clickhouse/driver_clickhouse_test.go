@@ -593,6 +593,104 @@ func TestPrepareNewTransactor(t *testing.T) {
 	txn.Destroy()
 }
 
+// TestNewTransactorRejectsMissingIsDeletedColumn verifies that a standard-updates
+// binding materializing to a pre-existing table that lacks the connector-internal
+// _is_deleted column fails at session start with a clear, actionable error rather
+// than crash-looping every Store with a cryptic ClickHouse "No such column
+// _is_deleted" (code 16). Regression test for issue #4834.
+func TestNewTransactorRejectsMissingIsDeletedColumn(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	ensureDockerUp(t)
+
+	var cfg = testConfig()
+	cfg.HardDelete = true
+	var ctx = t.Context()
+	var dialect = clickHouseDialect(cfg.Database)
+	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var ep = &sql.Endpoint[config]{Config: cfg, Dialect: dialect}
+	var be = &m.BindingEvents{}
+	var open = pm.Request_Open{Range: &pf.RangeSpec{}}
+
+	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
+	defer db.Close()
+
+	t.Run("rejects adopted table without _is_deleted", func(t *testing.T) {
+		var tableName = "test_missing_is_deleted"
+		var table = buildTestTable(t, dialect, tableName)
+
+		_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
+		// A table adopted via allow_existing_tables_for_new_bindings that was
+		// pre-created WITHOUT the connector's internal _is_deleted column.
+		_, err := db.ExecContext(ctx, fmt.Sprintf(`
+			CREATE TABLE %s (
+				id String,
+				value Nullable(String),
+				`+"`_meta/op`"+` String,
+				flow_published_at DateTime64(6, 'UTC'),
+				flow_document String
+			) ENGINE = ReplacingMergeTree(flow_published_at)
+			ORDER BY (id)`,
+			dialect.Identifier(tableName),
+		))
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			_, _ = db.ExecContext(context.Background(), fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
+		})
+
+		_, err = newTransactor(ctx, "test", nil, ep, sql.Fence{}, []sql.Table{table}, open, nil, be)
+		require.Error(t, err)
+		require.ErrorContains(t, err, "_is_deleted")
+		require.ErrorContains(t, err, tableName)
+	})
+
+	t.Run("accepts table created with _is_deleted", func(t *testing.T) {
+		var tableName = "test_present_is_deleted"
+		var table = buildTestTable(t, dialect, tableName)
+
+		_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
+		createSQL, err := sql.RenderTableTemplate(table, tpls.createTargetTable)
+		require.NoError(t, err)
+		_, err = db.ExecContext(ctx, createSQL)
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			_, _ = db.ExecContext(context.Background(), fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
+		})
+
+		txn, err := newTransactor(ctx, "test", nil, ep, sql.Fence{}, []sql.Table{table}, open, nil, be)
+		require.NoError(t, err)
+		txn.Destroy()
+	})
+
+	t.Run("ignores delta-updates binding without _is_deleted", func(t *testing.T) {
+		var tableName = "test_delta_no_is_deleted"
+		var table = buildTestTable(t, dialect, tableName)
+		table.DeltaUpdates = true
+
+		_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
+		_, err := db.ExecContext(ctx, fmt.Sprintf(`
+			CREATE TABLE %s (
+				id String,
+				value Nullable(String),
+				`+"`_meta/op`"+` String,
+				flow_published_at DateTime64(6, 'UTC'),
+				flow_document String
+			) ENGINE = MergeTree()
+			ORDER BY (id)`,
+			dialect.Identifier(tableName),
+		))
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			_, _ = db.ExecContext(context.Background(), fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
+		})
+
+		txn, err := newTransactor(ctx, "test", nil, ep, sql.Fence{}, []sql.Table{table}, open, nil, be)
+		require.NoError(t, err)
+		txn.Destroy()
+	})
+}
+
 // TestHardDeleteTombstone verifies that delete rows with _meta/op="d"
 // (which infer _is_deleted=1 via the MATERIALIZED expression) are hidden by FINAL.
 func TestHardDeleteTombstone(t *testing.T) {
