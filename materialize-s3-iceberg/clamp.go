@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"regexp"
 	"strconv"
 	"time"
@@ -46,6 +47,36 @@ func clampTimestamp(v tuple.TupleElement) (any, error) {
 		return time.Date(maxYear, 12, 31, 23, 59, 59, 999999000, time.UTC).Format(time.RFC3339Nano), nil
 	case year < minYear:
 		return time.Date(minYear, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339Nano), nil
+	}
+	return canonical, nil
+}
+
+// nsMinTime and nsMaxTime are the bounds of the int64 nanoseconds-since-epoch
+// encoding of an Iceberg timestamptz_ns column (roughly years 1677 to 2262).
+// Beyond them time.Time.UnixNano is undefined and wraps, so out-of-range values
+// are clamped to the boundary instants before they reach the writer.
+var (
+	nsMinTime = time.Unix(0, math.MinInt64).UTC()
+	nsMaxTime = time.Unix(0, math.MaxInt64).UTC()
+)
+
+// clampTimestampNanos is the nanosecond-precision analog of clampTimestamp,
+// bounded by the int64-ns band rather than [minYear, maxYear].
+func clampTimestampNanos(v tuple.TupleElement) (any, error) {
+	s, ok := v.(string)
+	if !ok {
+		return v, nil
+	}
+
+	t, canonical, err := sql.ParseRFC3339Nano(s)
+	if err != nil {
+		return nil, err
+	}
+	switch {
+	case t.After(nsMaxTime):
+		return nsMaxTime.Format(time.RFC3339Nano), nil
+	case t.Before(nsMinTime):
+		return nsMinTime.Format(time.RFC3339Nano), nil
 	}
 	return canonical, nil
 }

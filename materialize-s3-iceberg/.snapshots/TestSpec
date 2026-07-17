@@ -242,6 +242,12 @@
                   "string",
                   "null"
                 ]
+              },
+              "nanosecond_timestamps": {
+                "type": "boolean",
+                "title": "Nanosecond Timestamps",
+                "description": "Use nanosecond precision (Iceberg format v3) for date-time columns instead of microsecond precision (format v2). Toggling this on an existing materialization triggers a backfill because Iceberg has no in-place promotion between the two timestamp encodings.",
+                "default": false
               }
             },
             "additionalProperties": false,

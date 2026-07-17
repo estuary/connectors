@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"slices"
 	"time"
 
 	"github.com/apache/iceberg-go"
@@ -372,9 +373,18 @@ func (c *catalog) createNamespace(ctx context.Context, namespace string) error {
 func (c *catalog) CreateResource(ctx context.Context, b *pf.MaterializationSpec_Binding, res resource) (string, boilerplate.ActionApplyFn, error) {
 	location := tablePath(c.cfg.Bucket, c.cfg.Prefix, b.ResourcePath[0], b.ResourcePath[1], c.locationStyle)
 
-	parquetSchema, err := parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap)
+	parquetSchema, err := parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap, c.cfg.nanosecondTimestamps())
 	if err != nil {
 		return "", nil, err
+	}
+
+	// Reject a conflicting user-supplied format version rather than silently
+	// overriding it: timestamptz_ns columns are only valid in format v3.
+	if v, ok := res.AdditionalTableProperties[icebergtable.PropertyFormatVersion]; ok &&
+		c.cfg.nanosecondTimestamps() && v != "3" {
+		return "", nil, fmt.Errorf(
+			"additional table property %s=%q conflicts with the nanosecond_timestamps option, which requires format version 3: remove the property or set it to \"3\"",
+			icebergtable.PropertyFormatVersion, v)
 	}
 
 	fields := make([]iceberg.NestedField, 0, len(parquetSchema))
@@ -397,6 +407,9 @@ func (c *catalog) CreateResource(ctx context.Context, b *pf.MaterializationSpec_
 		}
 		props := iceberg.Properties{
 			icebergtable.DefaultNameMappingKey: string(nameMappingJSON),
+		}
+		if c.cfg.nanosecondTimestamps() {
+			props[icebergtable.PropertyFormatVersion] = "3"
 		}
 		for k, v := range res.AdditionalTableProperties {
 			// Never let a user-supplied key override the name mapping.
@@ -451,7 +464,7 @@ func (c *catalog) UpdateResource(_ context.Context, bindingUpdate boilerplate.Bi
 			}
 		}
 
-		s, err := projectionToParquetSchemaElement(p.Projection.Projection, fc)
+		s, err := projectionToParquetSchemaElement(p.Projection.Projection, fc, c.cfg.nanosecondTimestamps())
 		if err != nil {
 			return "", nil, err
 		}
@@ -472,6 +485,16 @@ func (c *catalog) UpdateResource(_ context.Context, bindingUpdate boilerplate.Bi
 		}
 
 		tx := tbl.NewTransaction()
+		// timestamptz_ns columns are only valid in Iceberg format v3. A table
+		// created before nanosecond_timestamps was enabled may still be v2, so
+		// upgrade it as part of the same transaction as the schema change.
+		if tbl.Metadata().Version() < 3 && slices.ContainsFunc(adds, func(a addCol) bool {
+			return a.typ.Equals(iceberg.PrimitiveTypes.TimestampTzNs)
+		}) {
+			if err := tx.UpgradeFormatVersion(3); err != nil {
+				return fmt.Errorf("upgrading table %q to format version 3: %w", fqn, err)
+			}
+		}
 		// caseSensitive=true matches pyiceberg's update_schema() default that
 		// the removed Python tool relied on; the connector's field names are
 		// case-sensitive, so column matches during add/relax must be too.
