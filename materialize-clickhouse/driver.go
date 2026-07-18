@@ -706,6 +706,23 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 		// of the next transaction's store phase).
 		for _, b := range t.bindings {
 			if si, pending := t.state[b.target.StateKey]; pending {
+				// A store table whose partition key differs from the target's
+				// predates a partition-changing backfill: the backfill dropped
+				// and re-created the target, so the staged rows belong to a
+				// table generation that no longer exists and the backfill will
+				// re-send them. MOVE PARTITION into the new target can never
+				// succeed (code 36), so skip the move and let ensureTempTables
+				// re-create the store table.
+				if drifted, err := t.storePartitionKeyDrifted(ctx, b); err != nil {
+					return nil, fmt.Errorf("comparing store and target partition keys of %s: %w", b.target.Identifier, err)
+				} else if drifted {
+					log.WithField("target", b.target.Identifier).Warn(
+						"store table partition key differs from target; staged rows predate a partition-changing backfill and are discarded")
+					if err := t.ensureTempTables(ctx, b); err != nil {
+						return nil, fmt.Errorf("ensuring temp tables of %s: %w", b.target.Identifier, err)
+					}
+					continue
+				}
 				// A committed-but-unacknowledged transaction has rows staged
 				// in this binding's store table. Move them; never truncate or
 				// re-create a stage table holding pending rows.
@@ -908,6 +925,40 @@ func (t *transactor) ensureTempTables(ctx context.Context, b *binding) error {
 		}
 	}
 	return nil
+}
+
+// storePartitionKeyDrifted reports whether the binding's store table and
+// target table both exist but have different partition keys. If either table
+// is missing it reports false, leaving that condition to the caller's
+// existing handling (a recovery MOVE against a missing table raises the
+// unknown-table error, which is tolerated).
+func (t *transactor) storePartitionKeyDrifted(ctx context.Context, b *binding) (bool, error) {
+	var storeTable = storeTableName(b.target, t._range.KeyBegin)
+	var targetTable = b.target.Path[0]
+
+	rows, err := t.store.conn.Query(ctx,
+		"SELECT name, partition_key FROM system.tables WHERE database = currentDatabase() AND name IN (?, ?)",
+		storeTable, targetTable)
+	if err != nil {
+		return false, fmt.Errorf("querying partition keys: %w", err)
+	}
+	defer rows.Close()
+
+	var keys = make(map[string]string)
+	for rows.Next() {
+		var name, pk string
+		if err := rows.Scan(&name, &pk); err != nil {
+			return false, fmt.Errorf("scanning partition key: %w", err)
+		}
+		keys[name] = pk
+	}
+	if err := rows.Err(); err != nil {
+		return false, err
+	}
+
+	storeKey, haveStore := keys[storeTable]
+	targetKey, haveTarget := keys[targetTable]
+	return haveStore && haveTarget && storeKey != targetKey, nil
 }
 
 // tempTableMatchesTarget reports whether the temp table's columns are a

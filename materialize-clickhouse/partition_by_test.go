@@ -372,6 +372,95 @@ func TestPartitionByDataPath(t *testing.T) {
 	require.JSONEq(t, `{"id":"k2"}`, docs[0])
 }
 
+// TestRecoveryAfterPartitionChangingBackfill covers the window where a
+// backfill re-created the target with a different PARTITION BY while a
+// commit was still pending: the store table holds staged rows keyed on the
+// old expression, so MOVE PARTITION into the new target can never succeed
+// (code 36, "Tables have different partition key"). Those rows belong to a
+// table generation that no longer exists -- the backfill re-sends
+// everything -- so recovery must discard them and re-create the store table
+// rather than crash-looping on the move.
+func TestRecoveryAfterPartitionChangingBackfill(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	ensureDockerUp(t)
+
+	var cfg = testConfig()
+	var ctx = t.Context()
+	var dialect = clickHouseDialect(cfg.Database)
+	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tableName = "test_recovery_partition_backfill"
+	var table = partitionedTestTable(t, dialect, tableName, "toYYYYMM(flow_published_at)")
+
+	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
+	defer db.Close()
+	var storeName = storeTableName(table, 0)
+	for _, name := range []string{tableName, storeName} {
+		_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(name)))
+	}
+	t.Cleanup(func() {
+		for _, name := range []string{tableName, storeName} {
+			_, _ = db.ExecContext(context.Background(), fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(name)))
+		}
+	})
+
+	// The target as the backfill re-created it, with the new partition key.
+	createSQL, err := sql.RenderTableTemplate(table, tpls.createTargetTable)
+	require.NoError(t, err)
+	_, err = db.ExecContext(ctx, createSQL)
+	require.NoError(t, err)
+
+	// The store table as the pre-backfill session left it: same columns, old
+	// (default, empty) partition key.
+	var stale = buildTestTable(t, dialect, storeName)
+	staleSQL, err := sql.RenderTableTemplate(stale, tpls.createTargetTable)
+	require.NoError(t, err)
+	_, err = db.ExecContext(ctx, staleSQL)
+	require.NoError(t, err)
+
+	var tr = &transactor{
+		dialect:   dialect,
+		templates: tpls,
+		cfg:       cfg,
+		_range:    &pf.RangeSpec{},
+		state:     make(connectorState),
+	}
+	storeConn, err := clickhouse.Open(cfg.newClickhouseOptions())
+	require.NoError(t, err)
+	tr.store.conn = storeConn
+	defer storeConn.Close()
+	loadConn, err := clickhouse.Open(cfg.newClickhouseOptions())
+	require.NoError(t, err)
+	tr.load.conn = loadConn
+	defer loadConn.Close()
+	require.NoError(t, tr.addBinding(ctx, table))
+	var b = tr.bindings[0]
+
+	// A staged row of the pending pre-backfill commit.
+	stageTestRows(t, ctx, tr, b, []any{"k1", "v1", "c", testTime, `{"id":"k1"}`})
+
+	tr.ensured = false
+	tr.recovery = true
+	tr.state[b.target.StateKey] = &stateItem{StoredRows: 1}
+	_, err = tr.Acknowledge(ctx)
+	require.NoError(t, err)
+	require.Empty(t, tr.state)
+
+	// The stale staged row was discarded, not moved into the new target.
+	require.EqualValues(t, 0, countTable(t, ctx, tr, dialect.Identifier(tableName)))
+
+	// The store table was re-created with the target's partition key and
+	// accepts a fresh round of staged rows.
+	var pk string
+	require.NoError(t, db.QueryRowContext(ctx, fmt.Sprintf(
+		"SELECT partition_key FROM system.tables WHERE database = currentDatabase() AND name = %s", dialect.Literal(storeName),
+	)).Scan(&pk))
+	require.Equal(t, "toYYYYMM(flow_published_at)", pk)
+	stageTestRows(t, ctx, tr, b, []any{"k2", "v2", "c", testTime, `{"id":"k2"}`})
+	require.EqualValues(t, 1, countTable(t, ctx, tr, dialect.Identifier(storeName)))
+}
+
 // TestAlterTableRejectsPartitionKeyColumnMigration verifies that a column
 // type migration targeting a column referenced by the table's PARTITION BY
 // key fails up front with an actionable error. ClickHouse forbids both
