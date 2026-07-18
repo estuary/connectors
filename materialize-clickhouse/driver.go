@@ -166,6 +166,11 @@ func (c config) newClickhouseOptions() *clickhouse.Options {
 type tableConfig struct {
 	Table string `json:"table" jsonschema:"title=Table,description=Name of the database table." jsonschema_extras:"x-collection-name=true"`
 	Delta bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false." jsonschema_extras:"x-delta-updates=true"`
+	// PartitionBy is spliced verbatim into the table's PARTITION BY clause.
+	// It runs as DDL with the user's own credentials against their own
+	// database, so it is the same trust plane as the rest of the endpoint
+	// config; malformed input fails the dry-run CREATE TABLE at Validate time.
+	PartitionBy string `json:"partition_by,omitempty" jsonschema:"title=Partition By,description=Optional expression to use as the table's PARTITION BY clause\\, for example toYYYYMM(flow_published_at). Leave blank for ClickHouse's default single partition. Use a low-cardinality expression: ClickHouse recommends well under 1000 total partitions\\, and inserts spanning more than 100 partitions are rejected by default. Changing this value requires backfilling the binding\\, which drops and re-creates the table." jsonschema_extras:"advanced=true"`
 }
 
 func (r tableConfig) Validate() error {
@@ -181,8 +186,9 @@ func (r tableConfig) Parameters() ([]string, bool, error) {
 	return []string{r.Table}, r.Delta, nil
 }
 
-// driver wraps the generic SQL driver so that Validate can be customized
-// beyond what the generic implementation provides. See validate.go.
+// driver wraps the generic SQL driver to customize Validate: a changed
+// partition_by requires re-creating the table, and partition expressions are
+// verified with a dry-run CREATE TABLE. See validate.go.
 type driver struct {
 	sqlDriver *sql.Driver[config, tableConfig]
 }

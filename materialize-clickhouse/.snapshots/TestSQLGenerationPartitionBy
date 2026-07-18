@@ -1,0 +1,92 @@
+--- Begin standard hard-delete createTargetTable ---
+
+CREATE TABLE IF NOT EXISTS target_table (
+		`id` String,
+		value Nullable(String),
+		`_meta/op` String,
+		flow_published_at DateTime64(6, 'UTC'),
+		flow_document String,
+		_is_deleted UInt8 DEFAULT 0
+)
+ENGINE = ReplacingMergeTree(flow_published_at, _is_deleted)
+PARTITION BY (toYYYYMM(flow_published_at))
+ORDER BY (`id`)
+SETTINGS
+	allow_experimental_replacing_merge_with_cleanup = 1,
+	min_age_to_force_merge_seconds = 604800,
+	min_age_to_force_merge_on_partition_only = 1,
+	enable_replacing_merge_with_cleanup_for_min_age_to_force_merge = 1;
+--- End standard hard-delete createTargetTable ---
+
+--- Begin standard hard-delete createStoreTable ---
+
+CREATE TABLE IF NOT EXISTS flow_temp_store_0_target_table
+AS target_table;
+--- End standard hard-delete createStoreTable ---
+
+--- Begin standard soft-delete createTargetTable ---
+
+CREATE TABLE IF NOT EXISTS target_table (
+		`id` String,
+		value Nullable(String),
+		`_meta/op` String,
+		flow_published_at DateTime64(6, 'UTC'),
+		flow_document String
+)
+ENGINE = ReplacingMergeTree(flow_published_at)
+PARTITION BY (toYYYYMM(flow_published_at))
+ORDER BY (`id`)
+SETTINGS
+	allow_experimental_replacing_merge_with_cleanup = 1,
+	min_age_to_force_merge_seconds = 604800,
+	min_age_to_force_merge_on_partition_only = 1,
+	enable_replacing_merge_with_cleanup_for_min_age_to_force_merge = 1;
+--- End standard soft-delete createTargetTable ---
+
+--- Begin standard soft-delete createStoreTable ---
+
+CREATE TABLE IF NOT EXISTS flow_temp_store_0_target_table
+AS target_table;
+--- End standard soft-delete createStoreTable ---
+
+--- Begin delta createTargetTable ---
+
+CREATE TABLE IF NOT EXISTS target_table (
+		`id` String,
+		value Nullable(String),
+		`_meta/op` String,
+		flow_published_at DateTime64(6, 'UTC')
+)
+ENGINE = MergeTree
+PARTITION BY (toYYYYMM(flow_published_at))
+ORDER BY (`id`)
+;
+--- End delta createTargetTable ---
+
+--- Begin delta createStoreTable ---
+
+CREATE TABLE IF NOT EXISTS flow_temp_store_0_target_table
+AS target_table;
+--- End delta createStoreTable ---
+
+--- Begin composite expression createTargetTable ---
+
+CREATE TABLE IF NOT EXISTS composite_table (
+		`id` String,
+		value Nullable(String),
+		`_meta/op` String,
+		flow_published_at DateTime64(6, 'UTC'),
+		flow_document String,
+		_is_deleted UInt8 DEFAULT 0
+)
+ENGINE = ReplacingMergeTree(flow_published_at, _is_deleted)
+PARTITION BY (value, toYYYYMM(flow_published_at))
+ORDER BY (`id`)
+SETTINGS
+	allow_experimental_replacing_merge_with_cleanup = 1,
+	min_age_to_force_merge_seconds = 604800,
+	min_age_to_force_merge_on_partition_only = 1,
+	enable_replacing_merge_with_cleanup_for_min_age_to_force_merge = 1;
+--- End composite expression createTargetTable ---
+
+

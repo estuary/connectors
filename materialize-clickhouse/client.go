@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	stdsql "database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -317,8 +318,21 @@ func (c *client) ExecStatements(ctx context.Context, statements []string) error 
 	return sql.StdSQLExecStatements(ctx, c.db, statements)
 }
 
-func (c *client) MustRecreateResource(_ *pm.Request_Apply, _, _ *pf.MaterializationSpec_Binding) (bool, error) {
-	return false, nil
+// MustRecreateResource reports a changed partition_by, which can only be
+// applied by dropping and re-creating the table: ClickHouse never accepts
+// PARTITION BY via ALTER, and TRUNCATE preserves the partition key.
+func (c *client) MustRecreateResource(_ *pm.Request_Apply, lastBinding, newBinding *pf.MaterializationSpec_Binding) (bool, error) {
+	if lastBinding == nil || newBinding == nil {
+		return false, nil
+	}
+	var lastRC, newRC tableConfig
+	if err := json.Unmarshal(lastBinding.ResourceConfigJson, &lastRC); err != nil {
+		return false, fmt.Errorf("parsing last binding resource config: %w", err)
+	}
+	if err := json.Unmarshal(newBinding.ResourceConfigJson, &newRC); err != nil {
+		return false, fmt.Errorf("parsing new binding resource config: %w", err)
+	}
+	return strings.TrimSpace(lastRC.PartitionBy) != strings.TrimSpace(newRC.PartitionBy), nil
 }
 
 func (c *client) ListCheckpointsEntries(ctx context.Context) ([]string, error) {
