@@ -370,3 +370,80 @@ func TestPartitionByDataPath(t *testing.T) {
 	require.Len(t, docs, 1)
 	require.JSONEq(t, `{"id":"k2"}`, docs[0])
 }
+
+// TestStoreTablePartitionDrift verifies that the ensure pass re-creates a
+// persistent store table whose partition key has drifted from the target's,
+// which happens when a backfill re-creates the target with a different
+// partition_by. Without re-creation every MOVE PARTITION would fail.
+func TestStoreTablePartitionDrift(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	ensureDockerUp(t)
+
+	var cfg = testConfig()
+	var ctx = t.Context()
+	var dialect = clickHouseDialect(cfg.Database)
+	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tableName = "test_partition_drift"
+	var table = partitionedTestTable(t, dialect, tableName, "toYYYYMM(flow_published_at)")
+
+	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
+	defer db.Close()
+	var storeName = storeTableName(table, 0)
+	for _, name := range []string{tableName, storeName} {
+		_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(name)))
+	}
+	t.Cleanup(func() {
+		for _, name := range []string{tableName, storeName} {
+			_, _ = db.ExecContext(context.Background(), fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(name)))
+		}
+	})
+
+	createSQL, err := sql.RenderTableTemplate(table, tpls.createTargetTable)
+	require.NoError(t, err)
+	_, err = db.ExecContext(ctx, createSQL)
+	require.NoError(t, err)
+
+	// Simulate the stale store table left behind by a pre-backfill session:
+	// identical columns, but no partition key.
+	var unpartitioned = buildTestTable(t, dialect, storeName)
+	staleSQL, err := sql.RenderTableTemplate(unpartitioned, tpls.createTargetTable)
+	require.NoError(t, err)
+	_, err = db.ExecContext(ctx, staleSQL)
+	require.NoError(t, err)
+
+	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}}
+	loadConn, err := clickhouse.Open(cfg.newClickhouseOptions())
+	require.NoError(t, err)
+	tr.load.conn = loadConn
+	defer tr.load.conn.Close()
+	storeConn, err := clickhouse.Open(cfg.newClickhouseOptions())
+	require.NoError(t, err)
+	tr.store.conn = storeConn
+	defer storeConn.Close()
+	require.NoError(t, tr.addBinding(ctx, table))
+
+	require.NoError(t, tr.ensureTempTables(ctx, tr.bindings[0]))
+
+	partitionKey := func(name string) string {
+		var pk string
+		require.NoError(t, db.QueryRowContext(ctx, fmt.Sprintf(
+			"SELECT partition_key FROM system.tables WHERE database = currentDatabase() AND name = %s", dialect.Literal(name),
+		)).Scan(&pk))
+		return pk
+	}
+	require.Equal(t, "toYYYYMM(flow_published_at)", partitionKey(storeName), "drifted store table must be re-created with the target's partition key")
+
+	// A commit through the re-created store table succeeds.
+	storeRows(t, ctx, storeConn, tr.bindings[0], cfg.Database,
+		[]any{"k1", "v1", "c", testTime, `{"id":"k1"}`},
+		[]any{"k2", "v2", "c", testTime.AddDate(0, 1, 0), `{"id":"k2"}`},
+	)
+
+	var rowCount uint64
+	require.NoError(t, db.QueryRowContext(ctx, fmt.Sprintf(
+		"SELECT count() FROM %s", dialect.Identifier(tableName),
+	)).Scan(&rowCount))
+	require.EqualValues(t, 2, rowCount)
+}

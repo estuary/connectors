@@ -966,6 +966,35 @@ func (t *transactor) tempTableMatchesTarget(ctx context.Context, tempTable strin
 			return false, nil
 		}
 	}
+
+	// Store tables must also share the target's partition key: commits move
+	// whole partitions between them, and MOVE PARTITION requires it. A drifted
+	// key arises when a backfill re-creates the target with a different
+	// partition_by while the persistent store table keeps the old one. Load
+	// tables are never moved, so their partition key is irrelevant.
+	if tempTable == storeTableName(b.target, t._range.KeyBegin) {
+		readPartitionKey := func(table string) (string, error) {
+			var pk string
+			if err := t.store.conn.QueryRow(ctx,
+				"SELECT partition_key FROM system.tables WHERE database = currentDatabase() AND name = ?", table,
+			).Scan(&pk); err != nil {
+				return "", fmt.Errorf("querying partition key of %q: %w", table, err)
+			}
+			return pk, nil
+		}
+		tempKey, err := readPartitionKey(tempTable)
+		if err != nil {
+			return false, err
+		}
+		targetKey, err := readPartitionKey(b.target.Path[0])
+		if err != nil {
+			return false, err
+		}
+		if tempKey != targetKey {
+			return false, nil
+		}
+	}
+
 	return true, nil
 }
 
