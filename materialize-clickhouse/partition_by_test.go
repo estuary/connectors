@@ -10,6 +10,7 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/bradleyjkemp/cupaloy"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
@@ -369,6 +370,78 @@ func TestPartitionByDataPath(t *testing.T) {
 	docs := loadDocuments(t, ctx, tr.load.conn, b, []any{"k2"})
 	require.Len(t, docs, 1)
 	require.JSONEq(t, `{"id":"k2"}`, docs[0])
+}
+
+// TestAlterTableRejectsPartitionKeyColumnMigration verifies that a column
+// type migration targeting a column referenced by the table's PARTITION BY
+// key fails up front with an actionable error. ClickHouse forbids both
+// MODIFY COLUMN (code 524) and DROP COLUMN (code 47) on partition-key
+// columns, so the multi-step rename migration can never succeed -- without
+// the guard it fails midway with a raw server error and leaves a temporary
+// column behind.
+func TestAlterTableRejectsPartitionKeyColumnMigration(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	ensureDockerUp(t)
+
+	var cfg = testConfig()
+	var ctx = t.Context()
+	var dialect = clickHouseDialect(cfg.Database)
+	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tableName = "test_partition_key_migration"
+	var table = partitionedTestTable(t, dialect, tableName, "toYYYYMM(flow_published_at)")
+
+	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
+	defer db.Close()
+	_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
+	createSQL, err := sql.RenderTableTemplate(table, tpls.createTargetTable)
+	require.NoError(t, err)
+	_, err = db.ExecContext(ctx, createSQL)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(context.Background(), fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
+	})
+
+	c, err := newClient(ctx, "test", &sql.Endpoint[config]{Config: cfg, Dialect: dialect})
+	require.NoError(t, err)
+	defer c.Close()
+
+	// A DateTime64 -> String migration, exactly as the generic driver would
+	// construct it when the collection's schema widens the field.
+	var col sql.Column
+	for _, cc := range table.Columns() {
+		if cc.Field == "flow_published_at" {
+			col = *cc
+		}
+	}
+	require.NotEmpty(t, col.Field)
+	var strProjection = sql.Projection{
+		Projection: pf.Projection{
+			Field: "flow_published_at",
+			Inference: pf.Inference{
+				Types:   []string{"string"},
+				Exists:  pf.Inference_MUST,
+				String_: &pf.Inference_String{},
+			},
+		},
+	}
+	var mapped = dialect.MapType(&strProjection, sql.FieldConfig{})
+	var spec = dialect.MigratableTypes.FindMigrationSpec(
+		boilerplate.ExistingField{Name: "flow_published_at", Type: "DateTime64(6, 'UTC')"}, mapped)
+	require.NotNil(t, spec)
+	col.MappedType = mapped
+
+	_, _, err = c.AlterTable(ctx, sql.TableAlter{
+		Table: table,
+		ColumnTypeChanges: []sql.ColumnTypeMigration{{
+			Column:               col,
+			MigrationSpec:        *spec,
+			OriginalColumnExists: true,
+		}},
+	})
+	require.ErrorContains(t, err, "backfill")
+	require.ErrorContains(t, err, "flow_published_at")
 }
 
 // TestStoreTablePartitionDrift verifies that the ensure pass re-creates a
