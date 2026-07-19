@@ -90,11 +90,16 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
           # Bounded diff of connector code for the model, skipping files
-          # that are large or mechanical.
+          # that are large or mechanical. Write the full diff to a file and
+          # truncate from there rather than piping straight into `head -c`:
+          # when the diff exceeds the cap, `head` closes the pipe and `git
+          # diff` dies with SIGPIPE (141), which `pipefail` would turn into a
+          # step failure. Reading the cap from a regular file avoids that.
           git diff "$BASE_SHA" "$HEAD_SHA" -- $CONNECTORS \
             ':(exclude)**/go.sum' ':(exclude)**/poetry.lock' ':(exclude)**/uv.lock' \
             ':(exclude)**/*.snapshot' ':(exclude)**/testdata/**' ':(exclude)**/snapshots/**' \
-            | head -c 180000 > /tmp/connector.diff
+            > /tmp/connector.full.diff
+          head -c 180000 /tmp/connector.full.diff > /tmp/connector.diff
           echo "Diff size for review: $(wc -c < /tmp/connector.diff) bytes"
 
       - name: Ask Claude whether docs / changelog updates are warranted
