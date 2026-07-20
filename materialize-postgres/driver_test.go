@@ -82,12 +82,23 @@ func TestIntegration(t *testing.T) {
 			"testdata/fence.flow.yaml",
 			makeResourceFn,
 			testTemplates.createTargetTable,
-			func(ctx context.Context, client sql.Client, fence sql.Fence) error {
+			func(ctx context.Context, c sql.Client, fence sql.Fence) error {
 				var fenceUpdate strings.Builder
 				if err := testTemplates.updateFence.Execute(&fenceUpdate, fence); err != nil {
 					return fmt.Errorf("evaluating fence template: %w", err)
 				}
-				return client.ExecStatements(ctx, []string{fenceUpdate.String()})
+				// The fence update is parameterized, so it must be executed with
+				// bind arguments rather than as a plain statement, mirroring the
+				// driver's own fenced-off detection via RowsAffected.
+				res, err := c.(*client).db.ExecContext(ctx, fenceUpdate.String(), fenceUpdateArgs(fence)...)
+				if err != nil {
+					return fmt.Errorf("updating fence: %w", err)
+				} else if rows, err := res.RowsAffected(); err != nil {
+					return fmt.Errorf("fetching fence update rows: %w", err)
+				} else if rows != 1 {
+					return fmt.Errorf("this instance was fenced off by another")
+				}
+				return nil
 			},
 		)
 	})

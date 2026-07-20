@@ -329,19 +329,12 @@ limit 1
 --- End Fence Install ---
 
 --- Begin Fence Update ---
-DO $$
-BEGIN
-	UPDATE path."to".checkpoints
-		SET   checkpoint = 'AAECAwQFBgcICQ=='
-		WHERE materialization = 'some/Materialization'
-		AND   key_begin = 1122867
-		AND   key_end   = 4293844428
-		AND   fence     = 123;
-
-	IF NOT FOUND THEN
-		RAISE 'This instance was fenced off by another';
-	END IF;
-END $$;
+UPDATE path."to".checkpoints
+	SET   checkpoint = $1
+	WHERE materialization = $2
+	AND   key_begin = $3
+	AND   key_end   = $4
+	AND   fence     = $5;
 --- End Fence Update ---
 
 --- Begin createTargetTable [jsonb contentMediaType] ---
