@@ -97,6 +97,10 @@ When the connector captures related entities in separate streams, reference the 
 ### Error Handling
 - Do not swallow errors, we must propagate errors and should never silently drop errors
 
+### Logging
+- Never emit customer data (record/field values, keys, request/response bodies, credentials) into logs or error messages. Log structural context instead — field/column/table names, types, counts, status codes.
+- When a customer-derived value genuinely must appear in a log or error to be actionable, it MUST be wrapped with the `go/logsanitize` helpers (`Value`/`Quoted`/`Goval`, Go connectors only) so the downstream log-obfuscation pass can find and redact it. Wrapping is the only permitted way to emit such a value. `grep -rn 'logsanitize\.'` is the canonical inventory of deliberate emissions; every new one must show up there.
+
 ## Protocol References
 
 - [capture.proto](https://github.com/estuary/flow/blob/master/go/protocols/capture/capture.proto) — Capture protocol
