@@ -68,6 +68,7 @@ MIN_CHECKPOINT_INTERVAL = 200
 MISSING_RESOURCE_TITLE = r"Oops, you&#39;ve found a dead link"
 CUSTOM_FIELD_NOT_FOUND = r"The custom field was not found."
 BOARD_DOES_NOT_SUPPORT_SPRINTS = r"The board does not support sprints"
+BOARD_HAS_NO_MAPPED_STATUS = r"This board has no columns with a mapped status"
 DOES_NOT_EXIST = r"does not exist"
 NEXT_GEN_ISSUE = r"The request contains a next-gen issue"
 
@@ -753,6 +754,11 @@ async def snapshot_board_child_resources(
                     seen_ids.add(doc.id)
         except HTTPError as err:
             if err.code == 400 and BOARD_DOES_NOT_SUPPORT_SPRINTS in err.message:
+                continue
+            # Scrum boards whose column configuration maps no statuses cannot
+            # compute sprints, and Jira rejects the request with a 422. This is
+            # a permanent board misconfiguration, so skip the board.
+            elif err.code == 422 and BOARD_HAS_NO_MAPPED_STATUS in err.message:
                 continue
             else:
                 raise
