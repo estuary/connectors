@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/estuary/connectors/go/logsanitize"
 	m "github.com/estuary/connectors/go/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -286,7 +285,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			escaped_blocks = strings.ReplaceAll(escaped_blocks, ">", "&gt;")
 
 			if err := json.Unmarshal([]byte(escaped_blocks), &blocksParsed); err != nil {
-				return nil, fmt.Errorf("invalid blocks value %q, %s: %w", reflect.TypeOf(blocks), logsanitize.Quoted(string(blocks)), err)
+				return nil, fmt.Errorf("invalid blocks value %q, %q: %w", reflect.TypeOf(blocks), string(blocks), err)
 			}
 
 			blockSet = blocksParsed.BlockSet

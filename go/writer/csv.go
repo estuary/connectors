@@ -12,7 +12,6 @@ import (
 	"unicode/utf8"
 	"unsafe"
 
-	"github.com/estuary/connectors/go/logsanitize"
 	"github.com/klauspost/pgzip"
 )
 
@@ -148,7 +147,7 @@ func (w *csvWriter) writeRow(row []any) error {
 		case nil:
 			continue
 		default:
-			return fmt.Errorf("unsupported value type: %T of value %s", value, logsanitize.Goval(value))
+			return fmt.Errorf("unsupported value type: %T of value %#v", value, value)
 		}
 	}
 

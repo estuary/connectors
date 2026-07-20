@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/estuary/connectors/go/logsanitize"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 )
 
@@ -56,7 +55,7 @@ func ToStr(te tuple.TupleElement) (any, error) {
 	case nil:
 		return nil, nil
 	default:
-		return nil, fmt.Errorf("could not convert %s (%T) to string in ToStr", logsanitize.Goval(te), te)
+		return nil, fmt.Errorf("could not convert %#v (%T) to string in ToStr", te, te)
 	}
 }
 
@@ -79,7 +78,7 @@ func ToJsonBytes(te tuple.TupleElement) (any, error) {
 		// Everything else is serialized to its JSON representation.
 		bytes, err := json.Marshal(te)
 		if err != nil {
-			return nil, fmt.Errorf("could not serialize %s as json bytes: %w", logsanitize.Quoted(te), err)
+			return nil, fmt.Errorf("could not serialize %q as json bytes: %w", te, err)
 		}
 
 		return json.RawMessage(bytes), nil
@@ -132,7 +131,7 @@ var StrToInt ElementConverter = StringCastConverter(func(str string) (interface{
 	var i big.Int
 	out, ok := i.SetString(str, 10)
 	if !ok {
-		return nil, fmt.Errorf("could not convert %s to big.Int", logsanitize.Quoted(str))
+		return nil, fmt.Errorf("could not convert %q to big.Int", str)
 	}
 	return out, nil
 })
@@ -155,7 +154,7 @@ func StrToFloat(nan, posInfinity, negInfinity interface{}) ElementConverter {
 		default:
 			out, err := strconv.ParseFloat(str, 64)
 			if err != nil {
-				return nil, fmt.Errorf("could not convert %s to float64: %w", logsanitize.Quoted(str), err)
+				return nil, fmt.Errorf("could not convert %q to float64: %w", str, err)
 			}
 			return out, nil
 		}
@@ -190,7 +189,7 @@ func ParseRFC3339Nano(str string) (time.Time, string, error) {
 			return parsed, parsed.Format(time.RFC3339Nano), nil
 		}
 	}
-	return time.Time{}, "", fmt.Errorf("could not parse %s as RFC3339 date-time", logsanitize.Quoted(str))
+	return time.Time{}, "", fmt.Errorf("could not parse %q as RFC3339 date-time", str)
 }
 
 // NormalizeDatetimeString rewrites near-RFC3339 datetimes (lowercase "z", space separator)
