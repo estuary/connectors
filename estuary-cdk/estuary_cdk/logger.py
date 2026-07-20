@@ -37,7 +37,7 @@ class LogFormatter(logging.Formatter):
         elif record.stack_info:
             fields["stack"] = self.formatStack(record.stack_info).splitlines()
 
-        return OpsLog(level=record.levelname, msg=record.msg, fields=fields).model_dump_json()
+        return OpsLog(level=record.levelname, msg=record.getMessage(), fields=fields).model_dump_json()
 
 
 # Boolean log field set to True on log lines we aggregate across the whole
