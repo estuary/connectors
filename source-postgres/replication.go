@@ -221,7 +221,7 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursorJS
 			// care about any prior state in the replication slot, and if we're able to drop
 			// it then we also have the necessary permissions to recreate it. Any errors here
 			// aren't fatal, just to be on the safe side.
-			if err := recreateReplicationSlot(ctx, db.conn, slot); err != nil {
+			if err := recreateReplicationSlot(ctx, conn, slot); err != nil {
 				logrus.WithField("err", err).Debug("error recreating replication slot")
 			}
 		}
