@@ -665,7 +665,6 @@ func (d *transactor) startCommitState() (*pf.ConnectorState, error) {
 }
 
 // Acknowledge merges data from temporary table to main table
-// TODO: run these queries concurrently for improved performance
 func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage) (*pf.ConnectorState, error) {
 	if err := d.mergePeerStatePatches(statePatches); err != nil {
 		return nil, err
@@ -772,6 +771,7 @@ func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB) (*pf.C
 // applyCheckpoint executes the staged queries of every entry in cp whose
 // stateKey still has an active binding, deleting the staged files afterwards.
 // It returns the stateKeys which were executed.
+// TODO: run these queries concurrently for improved performance
 func (d *transactor) applyCheckpoint(ctx context.Context, db *stdsql.DB, cp checkpoint) ([]string, error) {
 	var executed []string
 	for stateKey, item := range cp {
