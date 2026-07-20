@@ -155,10 +155,12 @@ jobs:
             exit 0
           fi
 
-          # Extract the JSON array, tolerating stray fences.
+          # Extract the JSON array, tolerating stray fences and a bare
+          # object (the model sometimes drops the array wrapper when only
+          # one connector changed).
           jq -r '.content[0].text' /tmp/response.json \
             | sed -e 's/^```json//' -e 's/^```//' -e 's/```$//' \
-            | jq -c '.' > /tmp/verdict.json
+            | jq -c 'if type == "array" then . else [.] end' > /tmp/verdict.json
           echo "Verdict:"
           jq '.' /tmp/verdict.json
 
