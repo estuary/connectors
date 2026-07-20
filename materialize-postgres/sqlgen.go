@@ -436,12 +436,10 @@ limit 1
 ;
 {{ end }}
 
--- Templated parameterized update of the fence checkpoint. The bind parameters
--- ($1..$5) are supplied by fenceUpdateArgs. Emitting this as ordinary DML with
--- placeholders (rather than a DO block with inlined literals) lets Postgres'
--- pg_stat_statements collapse every commit into a single normalized entry; a
--- DO block is a utility statement whose body cannot be normalized, so each
--- unique checkpoint would otherwise create a distinct entry. The fenced-off
+-- Update the fence checkpoint. The bind parameters ($1..$5) are supplied by
+-- fenceUpdateArgs. This must stay parameterized rather than inlining the
+-- checkpoint as a literal, so that pg_stat_statements collapses every commit
+-- into a single normalized entry instead of one per checkpoint. The fenced-off
 -- check is performed in Go via the reported RowsAffected.
 
 {{ define "updateFence" }}
