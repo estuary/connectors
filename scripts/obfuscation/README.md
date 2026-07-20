@@ -1,98 +1,68 @@
 # Obfuscation scripts
 
-Utilities for producing sanitized copies of Estuary data and logs — for sharing
-reproductions, debugging, or test fixtures without leaking customer content.
+Utilities for producing sanitized copies of Estuary catalogs and collection data —
+for sharing reproductions, debugging, or test fixtures without exposing anything
+about the customer.
 
-| Script | Input | What it obfuscates |
+| Script | Input | What it does |
 | --- | --- | --- |
-| `obfuscate_jsonl.py` | A JSONL collection document file + a Flow catalog | Every field value except the collection key and `_meta` |
-| `obfuscate_logs.py` | Connector logs (Flow ops logs / logrus JSON) | Only values connectors explicitly marked as sensitive |
-| `obfuscate_common.py` | — | Shared obfuscation core (not run directly) |
+| `obfuscate_jsonl.py` | A JSONL collection-document file | Obfuscates **every** value except `/_meta/uuid` and `/_meta/op` |
+| `strip_catalog.py` | A Flow catalog (YAML/JSON) | Strips connector configs to an **allow-list** of customer-agnostic knobs |
+| `config_allowlist.txt` | — | The allow-list of config keys `strip_catalog.py` keeps |
 
-## How obfuscation works
-
-All three share one deterministic, **shape-preserving** core (`obfuscate_common.py`):
-
-- **Deterministic** — the same input value plus `--salt` always maps to the same
-  output. A value that is unchanged across two records/lines stays unchanged
-  after obfuscation, so diffs are preserved. The mapping is value-based (not
-  field-based), so cross-references between fields survive too.
-- **Shape-preserving** — strings keep their length and per-character class
-  (letter→letter of the same case, digit→digit, punctuation/separators kept),
-  numbers keep sign and magnitude, and RFC3339 date-times are shifted to another
-  *valid* date-time. Booleans are flipped deterministically; `null` stays `null`.
-- **Consistent across artifacts** — because both scripts use the same core, a
-  given value obfuscates identically whether it appears in a materialized
-  document or in a log line.
-
-Change `--salt` to get a different (but still internally consistent) mapping.
-
-## `obfuscate_jsonl.py` — document values
+## `obfuscate_jsonl.py` — collection documents
 
 ```bash
-python3 obfuscate_jsonl.py <input.jsonl> <catalog.flow.yaml> [-c COLLECTION] [-o OUT]
+python3 obfuscate_jsonl.py <input.jsonl> [-o OUT] [--salt SALT]
 ```
 
-Obfuscates every field value **except**, which are passed through unchanged:
+Obfuscates **absolutely everything** — every field value at every depth,
+including the collection key and `/_meta/source` — **except** `/_meta/uuid` and
+`/_meta/op`, which are preserved (they drive reduction ordering and carry no
+customer data). No catalog is needed; the preserved set is fixed.
 
-- the collection's key fields (the `key:` JSON pointers from the matching
-  collection in the catalog),
-- `/_meta/uuid`, `/_meta/source`, `/_meta/op`.
+Obfuscation is **deterministic and shape-preserving**:
 
-These are preserved so the documents stay valid and reducible: the key still
-identifies each document and the UUID still drives reduction ordering.
+- Same input value + `--salt` → same output, so relationships across documents
+  survive (the mapping is value-based, not field-based). Change `--salt` for a
+  different but still internally-consistent mapping.
+- Strings keep length and per-character class (letter→letter same case,
+  digit→digit, punctuation/separators kept); numbers keep sign and magnitude;
+  RFC3339 date-times shift to another *valid* date-time; booleans flip; `null`
+  stays `null`.
 
-- The catalog may be YAML or JSON. If it defines more than one collection, pass
-  `-c/--collection`. JSON catalogs need no dependencies; YAML needs PyYAML — if
-  the current interpreter lacks it, the script re-execs into one that has it.
-- `-` reads the JSONL from stdin; output defaults to stdout.
+`-` reads from stdin; output defaults to stdout.
 
-## `obfuscate_logs.py` — marked log values
+## `strip_catalog.py` — catalog config
 
 ```bash
-python3 obfuscate_logs.py <log> [--mode obfuscate|redact|keep-markers] [-o OUT]
+python3 strip_catalog.py <catalog.flow.yaml> [-o OUT]
 ```
 
-Connectors do **not** log raw customer data. Where a value genuinely must appear
-in a log or error message, the connector wraps it with sentinel code points
-(`U+E000` … `U+E001`) via the Go [`go/logsanitize`](../../go/logsanitize)
-package. This script finds those marked spans and rewrites the value inside them;
-everything else in the line is left untouched. It handles both JSON logs (decoded,
-obfuscated, re-encoded so the output stays valid JSON) and plain text.
+Connector endpoint configs and binding resource configs are full of
+customer-identifying data (hosts, credentials, account/user names, database /
+schema / table names, buckets, regions, …). This tool removes **all** of it and
+keeps **only** keys on the allow-list in `config_allowlist.txt`.
 
-Modes:
+It is an **allow-list, strip-by-default** design: a config value survives only if
+its own leaf key name is allow-listed — recursively, so an agnostic knob nested
+inside an otherwise-stripped block (e.g. `advanced.batch_size`) is kept while its
+customer-specific siblings (e.g. `advanced.skip_backfills`) are dropped. Anything
+unknown is removed, so the output is **guaranteed not to expose customer
+information** even as connectors add new, unclassified fields. The trade-off is
+that a genuinely-agnostic new knob is stripped until added to the allow-list —
+safe, never a leak.
 
-- `obfuscate` (default) — replace with shape-preserving obfuscated text, drop the markers.
-- `redact` — replace the value with `«redacted»`, drop the markers.
-- `keep-markers` — obfuscate but leave the markers in place, for traceability.
+It processes every connector/`local` `config` and every binding `resource`
+across captures, materializations, and connector-based derivations. Structural
+catalog fields (image, collection schemas, keys, targets/sources) are left
+intact. YAML in → YAML out; JSON in → JSON out. (YAML needs PyYAML; if the
+current interpreter lacks it, the script re-execs into one that has it, and JSON
+catalogs work with no dependency.)
 
-### Age gate — logs from before the feature are refused
+### Maintaining the allow-list
 
-The marking only exists in logs emitted **after** connectors shipped the
-`logsanitize` change (`MARKING_RELEASED` in the script). In older logs there are
-no markers, so the *absence* of a marked span does not mean the *absence* of
-sensitive data — obfuscating such a log would produce output that looks safe but
-isn't.
-
-To prevent that, the script reads each line's timestamp (`ts`, then `time`,
-`timestamp`, `@ts`, `@timestamp`) and **refuses the whole batch** — before writing
-any output — if any line predates the release, or if a line has no timestamp it
-can verify. The error is explicit:
-
-> these logs are not clearly marked with sensitive information and as such cannot
-> be safely obfuscated
-
-Flags:
-
-- `--skip-age-check` — bypass the gate. **Unsafe**; only use it for logs you
-  independently know postdate the marking release (e.g. in tests).
-
-> **Maintainers:** set `MARKING_RELEASED` to the actual production release/deploy
-> date of the `logsanitize` change.
-
-## Marking new sensitive values
-
-If a connector must log a customer-derived value, wrap it at the source with
-`go/logsanitize` (`Value` / `Quoted` / `Goval`) rather than emitting it directly.
-`grep -rn logsanitize.` is the canonical inventory of every site that knowingly
-logs customer data.
+`config_allowlist.txt` is one key per line (`#` comments allowed). Add a key
+**only** if it reveals nothing about the customer — a pure behaviour / format /
+performance / scheduling toggle. When in doubt, leave it out. Both camelCase and
+snake_case spellings are listed because Go and Python connectors differ.

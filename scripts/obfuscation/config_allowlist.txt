@@ -1,0 +1,160 @@
+# Customer-agnostic connector config keys — the ONLY keys strip_catalog.py keeps.
+#
+# strip-by-default: a config value survives only if its leaf key name appears
+# here. Everything else (hosts, credentials, accounts, database/schema/table
+# names, buckets, regions, start dates, cursors, stream names, customer-authored
+# reports, ...) is removed.
+#
+# Add a key here ONLY if it reveals NOTHING about the customer — a pure
+# behaviour / format / performance / scheduling toggle. When in doubt, leave it
+# out (stripping a harmless knob is safe; keeping a revealing one is a leak).
+# Deliberately EXCLUDED as too-revealing or too-generic: auth_type, catalog_type,
+# compute_type, method, mode, is_sandbox, timezone, region, name, limit, days,
+# start_date, cursor*, and every host/credential/account/schema/table field.
+#
+# Derived from a survey of every Go + Python connector config schema. Both
+# camelCase and snake_case spellings are listed because Go and Python differ.
+# Re-review when connectors add config fields.
+
+# --- capture / CDC / sync behaviour (pure toggles & mode enums) ---
+historyMode
+read_only_capture
+capture_as_partitions
+discover_unpublished_tables
+discover_only_published
+discover_only_enabled
+discover_tables_without_ct
+discover_views
+skip_discovery
+skip_binlog_retention_check
+change_table_cleanup
+capture_instance_management
+fullCopySnapshots
+batchAndChangeStream
+disablePreImages
+exclusiveCollectionFilter
+disable_real_time
+disable_backfill
+is_free_plan
+capture_intermediate
+captureMode
+backfillMode
+syncMode
+stream_type
+feed
+hardDelete
+hard_delete
+delta_updates
+no_flow_document
+disableFieldTruncation
+disable_key_distribution_optimization
+lowercase_column_names
+timestamp_type
+create_default_subscription
+embeddingModel
+include_deleted
+fetch_thumbnail_images
+action_breakdowns_allow_empty
+capturePropertyHistory
+useLegacyNamingForCustomObjects
+expand_issue_changelog
+render_fields
+expand_issue_transition
+issues_stream_expand_with
+enable_experimental_streams
+minimal_cohort_members_properties
+use_companies_list_endpoint
+use_orders_deprecated_api
+should_use_composite_key
+capture_connected_accounts
+sync_subaccounts
+include_company_id_in_documents
+
+# --- scheduling / windows / lookback (durations, cadences, window sizes) ---
+syncSchedule
+syncFrequency
+schedule
+interval
+poll
+pollSchedule
+polling_interval
+heartbeat_interval
+maxAwaitTime
+minBackfillInterval
+min_backfill_interval
+max_backfill_interval
+statement_timeout
+list_users_timeout
+window_size
+window_type
+window_days
+date_window_size
+incremental_window_size
+lookback_window
+lookback_window_size
+lookback_window_minutes
+calls_lookback_window
+insights_lookback_window
+conversion_window_days
+attribution_window
+time_increment
+fastSyncStartTime
+fastSyncStopTime
+fastSyncEnabledDays
+uploadInterval
+upload_interval
+snapshot_retention_days
+orphan_file_retention_days
+
+# --- batching / performance / limits (numeric knobs) ---
+backfill_chunk_size
+incremental_chunk_size
+incremental_scn_range
+backfillSegments
+scanLimit
+rcuAllocation
+priority
+node_id
+page_size
+search_page_size
+max_batch_size
+incremental_limit
+backfill_limit
+fileSizeLimit
+rowGroupRowLimit
+rowGroupByteLimit
+bufferSize
+number_of_replicas
+number_of_shards
+number_of_snapshots_to_retain
+enable_compaction
+enable_retention
+enable_orphan_file_deletion
+
+# --- file format / parser options ---
+format
+compression
+contentType
+contentEncoding
+defaultOffset
+encoding
+delimiter
+quote
+escape
+skipHeaders
+ascendingKeys
+
+# --- connection behaviour (non-identifying) ---
+sslmode
+dictionary_mode
+api_version
+
+# --- Estuary-internal behavioural flags ---
+feature_flags
+
+# --- synthetic / test connectors ---
+rate
+greetings
+skip_state
+fail_after
+exit_after
