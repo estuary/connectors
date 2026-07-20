@@ -20,15 +20,15 @@ func TestIntegration(t *testing.T) {
 	}
 
 	t.Run("materialize", func(t *testing.T) {
-		sql.RunMaterializationTest(t, newClickHouseDriver(), "testdata/materialize.flow.yaml", makeResourceFn, nil)
+		sql.RunMaterializationTest(t, newClickHouseDriver().sqlDriver, "testdata/materialize.flow.yaml", makeResourceFn, nil)
 	})
 
 	t.Run("apply", func(t *testing.T) {
-		sql.RunApplyTest(t, newClickHouseDriver(), "testdata/apply.flow.yaml", makeResourceFn)
+		sql.RunApplyTest(t, newClickHouseDriver().sqlDriver, "testdata/apply.flow.yaml", makeResourceFn)
 	})
 
 	t.Run("migrate", func(t *testing.T) {
-		sql.RunMigrationTest(t, newClickHouseDriver(), "testdata/migrate.flow.yaml", makeResourceFn, nil)
+		sql.RunMigrationTest(t, newClickHouseDriver().sqlDriver, "testdata/migrate.flow.yaml", makeResourceFn, nil)
 	})
 }
 

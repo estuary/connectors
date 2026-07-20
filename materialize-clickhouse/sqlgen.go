@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"math/big"
@@ -306,6 +307,20 @@ type templates struct {
 	dropStoreTable                   *template.Template
 }
 
+// partitionExpr extracts the trimmed partition_by expression from a binding's
+// raw resource config. Empty or absent yields "", which renders no PARTITION
+// BY clause.
+func partitionExpr(rawResourceConfig json.RawMessage) (string, error) {
+	if len(rawResourceConfig) == 0 {
+		return "", nil
+	}
+	var rc tableConfig
+	if err := json.Unmarshal(rawResourceConfig, &rc); err != nil {
+		return "", fmt.Errorf("parsing resource config for partition_by: %w", err)
+	}
+	return strings.TrimSpace(rc.PartitionBy), nil
+}
+
 func renderTemplates(dialect sql.Dialect, hardDelete bool) templates {
 	var isDeletedColumn string
 	var isDeletedEngineArg string
@@ -360,6 +375,9 @@ CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
 ENGINE = MergeTree
 {{ else -}}
 ENGINE = ReplacingMergeTree(flow_published_at`+isDeletedEngineArg+`)
+{{ end -}}
+{{ with PartitionExpr $.ResourceConfigJson -}}
+PARTITION BY ({{ . }})
 {{ end -}}
 ORDER BY (
 	{{- range $ind, $key := $.Keys }}
@@ -644,7 +662,7 @@ TRUNCATE TABLE IF EXISTS {{ template "storeTableNameIdentifier" . }};
 {{ define "dropStoreTable" }}
 DROP TABLE IF EXISTS {{ template "storeTableNameIdentifier" . }};
 {{ end }}
-`)
+`, template.FuncMap{"PartitionExpr": partitionExpr})
 
 	return templates{
 		createTargetTable:                tplAll.Lookup("createTargetTable"),

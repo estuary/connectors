@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	stdsql "database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -281,7 +282,24 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	}
 
 	if len(ta.ColumnTypeChanges) > 0 {
-		var steps, err = sql.StdColumnTypeMigrations(ctx, c.ep.Dialect, ta.Table, ta.ColumnTypeChanges, clickHouseMigrationSteps...)
+		// A column referenced by the table's PARTITION BY key cannot change
+		// type at all: ClickHouse forbids both MODIFY COLUMN (code 524) and
+		// DROP COLUMN (code 47) on partition-key columns, so the multi-step
+		// rename migration can never succeed. Fail before executing any step,
+		// so no temporary column is left behind and the error says what to do.
+		partitionKeyCols, err := c.partitionKeyColumns(ctx, ta.Path[0])
+		if err != nil {
+			return "", nil, err
+		}
+		for _, m := range ta.ColumnTypeChanges {
+			if partitionKeyCols[m.Field] {
+				return "", nil, fmt.Errorf(
+					"cannot change the type of column %q: it is referenced by the PARTITION BY key of table %s, which ClickHouse forbids altering; backfill the binding to re-create the table with the new column type",
+					m.Field, ta.Identifier)
+			}
+		}
+
+		steps, err := sql.StdColumnTypeMigrations(ctx, c.ep.Dialect, ta.Table, ta.ColumnTypeChanges, clickHouseMigrationSteps...)
 		if err != nil {
 			return "", nil, fmt.Errorf("rendering column migration steps: %w", err)
 		}
@@ -296,6 +314,29 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 		}
 		return nil
 	}, nil
+}
+
+// partitionKeyColumns returns the set of column names referenced by the
+// table's PARTITION BY key.
+func (c *client) partitionKeyColumns(ctx context.Context, table string) (map[string]bool, error) {
+	rows, err := c.db.QueryContext(ctx, fmt.Sprintf(
+		"SELECT name FROM system.columns WHERE database = %s AND table = %s AND is_in_partition_key = 1",
+		c.ep.Dialect.Literal(c.ep.Config.Database), c.ep.Dialect.Literal(table),
+	))
+	if err != nil {
+		return nil, fmt.Errorf("querying partition key columns of %q: %w", table, err)
+	}
+	defer rows.Close()
+
+	var out = make(map[string]bool)
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, fmt.Errorf("scanning partition key column of %q: %w", table, err)
+		}
+		out[name] = true
+	}
+	return out, rows.Err()
 }
 
 func (c *client) TruncateTable(_ context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
@@ -317,8 +358,21 @@ func (c *client) ExecStatements(ctx context.Context, statements []string) error 
 	return sql.StdSQLExecStatements(ctx, c.db, statements)
 }
 
-func (c *client) MustRecreateResource(_ *pm.Request_Apply, _, _ *pf.MaterializationSpec_Binding) (bool, error) {
-	return false, nil
+// MustRecreateResource reports a changed partition_by, which can only be
+// applied by dropping and re-creating the table: ClickHouse never accepts
+// PARTITION BY via ALTER, and TRUNCATE preserves the partition key.
+func (c *client) MustRecreateResource(_ *pm.Request_Apply, lastBinding, newBinding *pf.MaterializationSpec_Binding) (bool, error) {
+	if lastBinding == nil || newBinding == nil {
+		return false, nil
+	}
+	var lastRC, newRC tableConfig
+	if err := json.Unmarshal(lastBinding.ResourceConfigJson, &lastRC); err != nil {
+		return false, fmt.Errorf("parsing last binding resource config: %w", err)
+	}
+	if err := json.Unmarshal(newBinding.ResourceConfigJson, &newRC); err != nil {
+		return false, fmt.Errorf("parsing new binding resource config: %w", err)
+	}
+	return strings.TrimSpace(lastRC.PartitionBy) != strings.TrimSpace(newRC.PartitionBy), nil
 }
 
 func (c *client) ListCheckpointsEntries(ctx context.Context) ([]string, error) {

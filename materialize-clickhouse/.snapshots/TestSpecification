@@ -168,6 +168,12 @@
         "description": "Should updates to this table be done via delta updates. Default is false.",
         "default": false,
         "x-delta-updates": true
+      },
+      "partition_by": {
+        "type": "string",
+        "title": "Partition By",
+        "description": "Optional expression to use as the table's PARTITION BY clause, for example toYYYYMM(flow_published_at). Leave blank for ClickHouse's default single partition. Use a low-cardinality expression: ClickHouse recommends well under 1000 total partitions, and inserts spanning more than 100 partitions are rejected by default. Changing this value requires backfilling the binding, which drops and re-creates the table.",
+        "advanced": true
       }
     },
     "type": "object",

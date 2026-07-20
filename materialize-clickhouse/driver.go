@@ -166,6 +166,11 @@ func (c config) newClickhouseOptions() *clickhouse.Options {
 type tableConfig struct {
 	Table string `json:"table" jsonschema:"title=Table,description=Name of the database table." jsonschema_extras:"x-collection-name=true"`
 	Delta bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false." jsonschema_extras:"x-delta-updates=true"`
+	// PartitionBy is spliced verbatim into the table's PARTITION BY clause.
+	// It runs as DDL with the user's own credentials against their own
+	// database, so it is the same trust plane as the rest of the endpoint
+	// config; malformed input fails the dry-run CREATE TABLE at Validate time.
+	PartitionBy string `json:"partition_by,omitempty" jsonschema:"title=Partition By,description=Optional expression to use as the table's PARTITION BY clause\\, for example toYYYYMM(flow_published_at). Leave blank for ClickHouse's default single partition. Use a low-cardinality expression: ClickHouse recommends well under 1000 total partitions\\, and inserts spanning more than 100 partitions are rejected by default. Changing this value requires backfilling the binding\\, which drops and re-creates the table." jsonschema_extras:"advanced=true"`
 }
 
 func (r tableConfig) Validate() error {
@@ -181,8 +186,17 @@ func (r tableConfig) Parameters() ([]string, bool, error) {
 	return []string{r.Table}, r.Delta, nil
 }
 
-func newClickHouseDriver() *sql.Driver[config, tableConfig] {
-	return &sql.Driver[config, tableConfig]{
+// driver wraps the generic SQL driver to customize Validate: a changed
+// partition_by requires re-creating the table, and partition expressions are
+// verified with a dry-run CREATE TABLE. See validate.go.
+type driver struct {
+	sqlDriver *sql.Driver[config, tableConfig]
+}
+
+var _ boilerplate.Connector = &driver{}
+
+func newClickHouseDriver() *driver {
+	sqlDriver := &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-clickhouse",
 		StartTunnel: func(ctx context.Context, cfg config) error {
 			return nil
@@ -216,6 +230,21 @@ func newClickHouseDriver() *sql.Driver[config, tableConfig] {
 		},
 		PreReqs: preReqs,
 	}
+	return &driver{
+		sqlDriver: sqlDriver,
+	}
+}
+
+func (d *driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
+	return d.sqlDriver.Spec(ctx, req)
+}
+
+func (d *driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
+	return d.sqlDriver.Apply(ctx, req)
+}
+
+func (d *driver) NewTransactor(ctx context.Context, req pm.Request_Open, be *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
+	return d.sqlDriver.NewTransactor(ctx, req, be)
 }
 
 type transactor struct {
@@ -732,6 +761,23 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 		// of the next transaction's store phase).
 		for _, b := range t.bindings {
 			if si, pending := t.state[b.target.StateKey]; pending {
+				// A store table whose partition key differs from the target's
+				// predates a partition-changing backfill: the backfill dropped
+				// and re-created the target, so the staged rows belong to a
+				// table generation that no longer exists and the backfill will
+				// re-send them. MOVE PARTITION into the new target can never
+				// succeed (code 36), so skip the move and let ensureTempTables
+				// re-create the store table.
+				if drifted, err := t.storePartitionKeyDrifted(ctx, b); err != nil {
+					return nil, fmt.Errorf("comparing store and target partition keys of %s: %w", b.target.Identifier, err)
+				} else if drifted {
+					log.WithField("target", b.target.Identifier).Warn(
+						"store table partition key differs from target; staged rows predate a partition-changing backfill and are discarded")
+					if err := t.ensureTempTables(ctx, b); err != nil {
+						return nil, fmt.Errorf("ensuring temp tables of %s: %w", b.target.Identifier, err)
+					}
+					continue
+				}
 				// A committed-but-unacknowledged transaction has rows staged
 				// in this binding's store table. Move them; never truncate or
 				// re-create a stage table holding pending rows.
@@ -936,6 +982,40 @@ func (t *transactor) ensureTempTables(ctx context.Context, b *binding) error {
 	return nil
 }
 
+// storePartitionKeyDrifted reports whether the binding's store table and
+// target table both exist but have different partition keys. If either table
+// is missing it reports false, leaving that condition to the caller's
+// existing handling (a recovery MOVE against a missing table raises the
+// unknown-table error, which is tolerated).
+func (t *transactor) storePartitionKeyDrifted(ctx context.Context, b *binding) (bool, error) {
+	var storeTable = storeTableName(b.target, t._range.KeyBegin)
+	var targetTable = b.target.Path[0]
+
+	rows, err := t.store.conn.Query(ctx,
+		"SELECT name, partition_key FROM system.tables WHERE database = currentDatabase() AND name IN (?, ?)",
+		storeTable, targetTable)
+	if err != nil {
+		return false, fmt.Errorf("querying partition keys: %w", err)
+	}
+	defer rows.Close()
+
+	var keys = make(map[string]string)
+	for rows.Next() {
+		var name, pk string
+		if err := rows.Scan(&name, &pk); err != nil {
+			return false, fmt.Errorf("scanning partition key: %w", err)
+		}
+		keys[name] = pk
+	}
+	if err := rows.Err(); err != nil {
+		return false, err
+	}
+
+	storeKey, haveStore := keys[storeTable]
+	targetKey, haveTarget := keys[targetTable]
+	return haveStore && haveTarget && storeKey != targetKey, nil
+}
+
 // tempTableMatchesTarget reports whether the temp table's columns are a
 // (positional, typed) prefix-compatible match for what the connector will
 // insert into it. The temp table is compared against its own expected shape:
@@ -992,6 +1072,35 @@ func (t *transactor) tempTableMatchesTarget(ctx context.Context, tempTable strin
 			return false, nil
 		}
 	}
+
+	// Store tables must also share the target's partition key: commits move
+	// whole partitions between them, and MOVE PARTITION requires it. A drifted
+	// key arises when a backfill re-creates the target with a different
+	// partition_by while the persistent store table keeps the old one. Load
+	// tables are never moved, so their partition key is irrelevant.
+	if tempTable == storeTableName(b.target, t._range.KeyBegin) {
+		readPartitionKey := func(table string) (string, error) {
+			var pk string
+			if err := t.store.conn.QueryRow(ctx,
+				"SELECT partition_key FROM system.tables WHERE database = currentDatabase() AND name = ?", table,
+			).Scan(&pk); err != nil {
+				return "", fmt.Errorf("querying partition key of %q: %w", table, err)
+			}
+			return pk, nil
+		}
+		tempKey, err := readPartitionKey(tempTable)
+		if err != nil {
+			return false, err
+		}
+		targetKey, err := readPartitionKey(b.target.Path[0])
+		if err != nil {
+			return false, err
+		}
+		if tempKey != targetKey {
+			return false, nil
+		}
+	}
+
 	return true, nil
 }
 
