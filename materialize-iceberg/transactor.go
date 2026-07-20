@@ -12,7 +12,6 @@ import (
 	"sync"
 
 	"github.com/estuary/connectors/go/blob"
-	"github.com/estuary/connectors/go/logsanitize"
 	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/estuary/connectors/materialize-iceberg/python"
@@ -371,7 +370,7 @@ func (t *transactor) loadWorker(ctx context.Context, loaded func(binding int, do
 		for scanner.Scan() {
 			line := scanner.Bytes()
 			if commaIdx := bytes.IndexByte(line, '\u0000'); commaIdx == -1 {
-				return fmt.Errorf("could not find comma in load binding line: %s", logsanitize.Quoted(string(line)))
+				return fmt.Errorf("could not find comma in load binding line: %s", line)
 			} else if binding, err := strconv.Atoi(string(line[:commaIdx])); err != nil {
 				return fmt.Errorf("parsing binding index number: %w", err)
 			} else if err := loaded(binding, line[commaIdx+1:]); err != nil {
