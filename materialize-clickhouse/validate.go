@@ -6,11 +6,11 @@ import (
 	stdsql "database/sql"
 	"encoding/json"
 	"fmt"
-	"slices"
 	"strings"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
@@ -44,7 +44,7 @@ func (d *driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 		}
 		var newExpr = strings.TrimSpace(rc.PartitionBy)
 
-		var last = findLastBinding([]string{rc.Table}, req.LastMaterialization)
+		var last = boilerplate.FindLastBinding([]string{rc.Table}, req.LastMaterialization)
 		var lastExpr string
 		if last != nil {
 			var lastRC tableConfig
@@ -184,24 +184,4 @@ func synthesizeFieldSelection(rb *pm.Request_Validate_Binding, vb *pm.Response_V
 		out.Values = append(out.Values, p.Field)
 	}
 	return out
-}
-
-// findLastBinding mirrors the unexported helper of materialize-boilerplate: a
-// previously disabled binding still constrains the current one, so inactive
-// bindings are consulted as well.
-func findLastBinding(resourcePath []string, lastSpec *pf.MaterializationSpec) *pf.MaterializationSpec_Binding {
-	if lastSpec == nil {
-		return nil
-	}
-	for _, b := range lastSpec.Bindings {
-		if slices.Equal(resourcePath, b.ResourcePath) {
-			return b
-		}
-	}
-	for _, b := range lastSpec.InactiveBindings {
-		if slices.Equal(resourcePath, b.ResourcePath) {
-			return b
-		}
-	}
-	return nil
 }
