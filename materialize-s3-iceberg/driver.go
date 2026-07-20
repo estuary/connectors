@@ -128,7 +128,7 @@ func (catalogConfig) JSONSchema() *jsonschema.Schema {
 
 type advancedConfig struct {
 	FeatureFlags         *string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.,nullable"`
-	NanosecondTimestamps bool    `json:"nanosecond_timestamps,omitempty" jsonschema:"title=Nanosecond Timestamps,description=Use nanosecond precision (Iceberg format v3) for date-time columns instead of microsecond precision (format v2). Toggling this on an existing materialization triggers a backfill because Iceberg has no in-place promotion between the two timestamp encodings.,default=false"`
+	NanosecondTimestamps bool    `json:"nanosecond_timestamps,omitempty" jsonschema:"title=Nanosecond Timestamps,description=Use nanosecond precision (Iceberg format v3) for date-time columns instead of microsecond precision (format v2). Toggling this on an existing materialization applies to data going forward: existing rows read as null for converted columns unless the binding is explicitly backfilled.,default=false"`
 }
 
 func (c config) s3StoreConfig() filesink.S3StoreConfig {
@@ -581,13 +581,28 @@ func (d *materialization) NewTransactor(
 		})
 	}
 
-	tablePaths, err := d.catalog.tablePaths(ctx, resourcePaths)
+	tableInfos, err := d.catalog.tableInfos(ctx, resourcePaths)
 	if err != nil {
-		return nil, fmt.Errorf("looking up table paths: %w", err)
+		return nil, fmt.Errorf("looking up tables: %w", err)
 	}
 
 	for idx := range bindings {
-		bindings[idx].catalogTablePath = tablePaths[idx]
+		b := &bindings[idx]
+		b.catalogTablePath = tableInfos[idx].location
+
+		// Embed the table's field IDs in written parquet files so they are
+		// self-describing: readers then never consult the table's name mapping
+		// for them, which is what allows a schema-evolved column (new field ID,
+		// same name) to read correctly from new files while old ID-less files
+		// resolve to null.
+		for i := range b.pqSchema {
+			id, ok := tableInfos[idx].fieldIDs[b.pqSchema[i].Name]
+			if !ok {
+				return nil, fmt.Errorf("selected field %q has no column in table %q", b.pqSchema[i].Name, pathToFQN(b.path))
+			}
+			fieldID := int32(id)
+			b.pqSchema[i].FieldId = &fieldID
+		}
 	}
 
 	s3store, err := filesink.NewS3Store(ctx, d.cfg.s3StoreConfig())

@@ -336,13 +336,37 @@ func (c *catalog) populateInfoSchema(ctx context.Context, is *boilerplate.InfoSc
 // tablePaths returns the registered storage path for each resource path in a
 // list, in the same order as the input.
 func (c *catalog) tablePaths(ctx context.Context, resourcePaths [][]string) ([]string, error) {
+	infos, err := c.tableInfos(ctx, resourcePaths)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]string, len(infos))
+	for i, info := range infos {
+		out[i] = info.location
+	}
+	return out, nil
+}
+
+// tableInfo carries the per-table facts the transactor needs at Open: the
+// registered storage location, and the current schema's name→field-ID
+// assignments so written parquet files can embed the table's real field IDs.
+type tableInfo struct {
+	location string
+	fieldIDs map[string]int
+}
+
+func (c *catalog) tableInfos(ctx context.Context, resourcePaths [][]string) ([]tableInfo, error) {
 	idents := make([]icebergtable.Identifier, len(resourcePaths))
 	for i, p := range resourcePaths {
 		idents[i] = p
 	}
-	out := make([]string, len(idents))
+	out := make([]tableInfo, len(idents))
 	if err := c.forEachTable(ctx, idents, func(idx int, tbl *icebergtable.Table) error {
-		out[idx] = tbl.Location()
+		fieldIDs := make(map[string]int)
+		for _, f := range tbl.Schema().Fields() {
+			fieldIDs[f.Name] = f.ID
+		}
+		out[idx] = tableInfo{location: tbl.Location(), fieldIDs: fieldIDs}
 		return nil
 	}); err != nil {
 		return nil, err
@@ -443,9 +467,10 @@ func (c *catalog) DeleteResource(ctx context.Context, path []string) (string, bo
 }
 
 func (c *catalog) UpdateResource(_ context.Context, bindingUpdate boilerplate.BindingUpdate[config, resource, mappedType]) (string, boilerplate.ActionApplyFn, error) {
-	if len(bindingUpdate.NewProjections) == 0 && len(bindingUpdate.NewlyNullableFields) == 0 {
-		// Nothing to do, since only adding new columns or dropping nullability
-		// constraints is supported currently.
+	if len(bindingUpdate.NewProjections) == 0 && len(bindingUpdate.NewlyNullableFields) == 0 &&
+		len(bindingUpdate.FieldsToMigrate) == 0 {
+		// Nothing to do, since only adding new columns, dropping nullability
+		// constraints, and migrating timestamp precision is supported currently.
 		return "", nil, nil
 	}
 
@@ -454,6 +479,11 @@ func (c *catalog) UpdateResource(_ context.Context, bindingUpdate boilerplate.Bi
 		typ  iceberg.Type
 	}
 	var adds []addCol
+
+	var migrates []addCol
+	for _, f := range bindingUpdate.FieldsToMigrate {
+		migrates = append(migrates, addCol{name: f.From.Name, typ: f.To.Mapped.icebergType})
+	}
 	for _, p := range bindingUpdate.NewProjections {
 		var fc fieldConfig
 		if rawFieldConfig, ok := bindingUpdate.Binding.FieldSelection.FieldConfigJsonMap[p.Field]; ok {
@@ -488,9 +518,12 @@ func (c *catalog) UpdateResource(_ context.Context, bindingUpdate boilerplate.Bi
 		// timestamptz_ns columns are only valid in Iceberg format v3. A table
 		// created before nanosecond_timestamps was enabled may still be v2, so
 		// upgrade it as part of the same transaction as the schema change.
-		if tbl.Metadata().Version() < 3 && slices.ContainsFunc(adds, func(a addCol) bool {
-			return a.typ.Equals(iceberg.PrimitiveTypes.TimestampTzNs)
-		}) {
+		hasNs := func(cols []addCol) bool {
+			return slices.ContainsFunc(cols, func(a addCol) bool {
+				return a.typ.Equals(iceberg.PrimitiveTypes.TimestampTzNs)
+			})
+		}
+		if tbl.Metadata().Version() < 3 && (hasNs(adds) || hasNs(migrates)) {
 			if err := tx.UpgradeFormatVersion(3); err != nil {
 				return fmt.Errorf("upgrading table %q to format version 3: %w", fqn, err)
 			}
@@ -507,8 +540,26 @@ func (c *catalog) UpdateResource(_ context.Context, bindingUpdate boilerplate.Bi
 				Required: iceberg.Optional[bool]{Val: false, Valid: true},
 			})
 		}
+		// Iceberg cannot change a column's type in place. Migrate by dropping
+		// and re-adding the column under a new field ID: data going forward is
+		// written with the new type, while prior rows read as null for this
+		// column (their values remain in old data files under the retired
+		// field ID, reachable via time travel).
+		for _, mig := range migrates {
+			us = us.DeleteColumn([]string{mig.name})
+			us = us.AddColumn([]string{mig.name}, mig.typ, "", false, nil)
+		}
 		if err := us.Commit(); err != nil {
 			return fmt.Errorf("staging schema update for %q: %w", fqn, err)
+		}
+		if len(migrates) > 0 {
+			migratedNames := make([]string, len(migrates))
+			for i, mig := range migrates {
+				migratedNames[i] = mig.name
+			}
+			if err := removeFromNameMapping(tx, tbl.Properties(), migratedNames); err != nil {
+				return fmt.Errorf("updating name mapping of %q: %w", fqn, err)
+			}
 		}
 		if _, err := tx.Commit(ctx); err != nil {
 			return fmt.Errorf("altering table %q: %w", fqn, err)
@@ -516,6 +567,32 @@ func (c *catalog) UpdateResource(_ context.Context, bindingUpdate boilerplate.Bi
 
 		return nil
 	}, nil
+}
+
+// removeFromNameMapping strips migrated column names from the table's default
+// name mapping. Legacy files without embedded field IDs must resolve a
+// re-added column to null rather than misreading their old-encoding values as
+// the new type; files written after the migration embed field IDs and never
+// consult the mapping.
+func removeFromNameMapping(tx *icebergtable.Transaction, props iceberg.Properties, migrated []string) error {
+	raw, ok := props[icebergtable.DefaultNameMappingKey]
+	if !ok {
+		return nil
+	}
+	var mapping iceberg.NameMapping
+	if err := json.Unmarshal([]byte(raw), &mapping); err != nil {
+		return fmt.Errorf("parsing name mapping: %w", err)
+	}
+	mapping = slices.DeleteFunc(mapping, func(f iceberg.MappedField) bool {
+		return slices.ContainsFunc(migrated, func(name string) bool {
+			return slices.Contains(f.Names, name)
+		})
+	})
+	mappingJSON, err := json.Marshal(mapping)
+	if err != nil {
+		return fmt.Errorf("marshaling name mapping: %w", err)
+	}
+	return tx.SetProperties(iceberg.Properties{icebergtable.DefaultNameMappingKey: string(mappingJSON)})
 }
 
 func (c *catalog) appendFiles(

@@ -120,6 +120,13 @@ func (mt mappedType) Compatible(existing boilerplate.ExistingField) bool {
 	return strings.EqualFold(existing.Type, mt.icebergType.String())
 }
 
+// CanMigrate permits exactly the microsecond↔nanosecond timestamp pair, in
+// both directions. Iceberg forbids changing a column's type in place, so
+// UpdateResource migrates by dropping and re-adding the column under a new
+// field ID: the new type applies to data going forward, and prior rows read
+// as null for the column.
 func (mt mappedType) CanMigrate(existing boilerplate.ExistingField) bool {
-	return false
+	from, to := strings.ToLower(existing.Type), mt.icebergType.String()
+	return (from == "timestamptz" && to == "timestamptz_ns") ||
+		(from == "timestamptz_ns" && to == "timestamptz")
 }
