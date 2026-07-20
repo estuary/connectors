@@ -1,5 +1,10 @@
 # materialize-postgres
 
+## 2026-07-20
+
+### Fixed
+- Checkpoint fence updates are now issued as a parameterized `UPDATE` instead of a `DO` block with the checkpoint inlined as a literal. Because a `DO` block is a utility statement whose body cannot be normalized, every commit previously created a distinct `pg_stat_statements` entry, which could exhaust `pg_stat_statements.max` and cause `LWLock:pg_stat_statements` contention on the destination. The parameterized statement collapses into a single normalized entry.
+
 ## v4, 2022-11-30
 
 This version includes breaking changes to materialized table columns. These will provide more

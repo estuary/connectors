@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -678,8 +679,10 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			return nil, m.FinishedOperation(fmt.Errorf("evaluating fence template: %w", err))
 		}
 
-		// Add the update to the fence as the last statement in the batch.
-		batch.Queue(fenceUpdate.String())
+		// Add the update to the fence as the last statement in the batch. It is
+		// parameterized so that Postgres' pg_stat_statements collapses every
+		// commit into a single normalized entry rather than one per checkpoint.
+		batch.Queue(fenceUpdate.String(), fenceUpdateArgs(d.store.fence)...)
 
 		results := txn.SendBatch(ctx, &batch)
 
@@ -690,9 +693,13 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			}
 		}
 
-		// The fence update is always the last operation in the batch.
-		if _, err := results.Exec(); err != nil {
+		// The fence update is always the last operation in the batch. A single
+		// affected row confirms this instance still owns the fence; anything
+		// else means we were fenced off by another instance.
+		if tag, err := results.Exec(); err != nil {
 			return nil, m.FinishedOperation(fmt.Errorf("updating flow checkpoint: %w", err))
+		} else if tag.RowsAffected() != 1 {
+			return nil, m.FinishedOperation(fmt.Errorf("this instance was fenced off by another"))
 		} else if err = results.Close(); err != nil {
 			return nil, m.FinishedOperation(fmt.Errorf("results.Close(): %w", err))
 		}
@@ -705,6 +712,20 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 		return nil, nil
 	}, nil
+}
+
+// fenceUpdateArgs returns the positional bind parameters ($1..$5) for the
+// parameterized updateFence statement, in the order the template references
+// them. The checkpoint is stored as standard base64 text, matching how
+// installFence writes it.
+func fenceUpdateArgs(fence sql.Fence) []any {
+	return []any{
+		base64.StdEncoding.EncodeToString(fence.Checkpoint),
+		fence.Materialization.String(),
+		fence.KeyBegin,
+		fence.KeyEnd,
+		fence.Fence,
+	}
 }
 
 func (d *transactor) Destroy() {

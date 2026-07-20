@@ -436,20 +436,21 @@ limit 1
 ;
 {{ end }}
 
-{{ define "updateFence" }}
-DO $$
-BEGIN
-	UPDATE {{ Identifier $.TablePath }}
-		SET   checkpoint = {{ Literal (Base64Std $.Checkpoint) }}
-		WHERE materialization = {{ Literal $.Materialization.String }}
-		AND   key_begin = {{ $.KeyBegin }}
-		AND   key_end   = {{ $.KeyEnd }}
-		AND   fence     = {{ $.Fence }};
+-- Templated parameterized update of the fence checkpoint. The bind parameters
+-- ($1..$5) are supplied by fenceUpdateArgs. Emitting this as ordinary DML with
+-- placeholders (rather than a DO block with inlined literals) lets Postgres'
+-- pg_stat_statements collapse every commit into a single normalized entry; a
+-- DO block is a utility statement whose body cannot be normalized, so each
+-- unique checkpoint would otherwise create a distinct entry. The fenced-off
+-- check is performed in Go via the reported RowsAffected.
 
-	IF NOT FOUND THEN
-		RAISE 'This instance was fenced off by another';
-	END IF;
-END $$;
+{{ define "updateFence" }}
+UPDATE {{ Identifier $.TablePath }}
+	SET   checkpoint = $1
+	WHERE materialization = $2
+	AND   key_begin = $3
+	AND   key_end   = $4
+	AND   fence     = $5;
 {{ end }}
 `)
 
