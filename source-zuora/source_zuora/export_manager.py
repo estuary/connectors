@@ -5,8 +5,22 @@ from typing import AsyncGenerator
 from estuary_cdk.http import HTTPError, HTTPSession
 from estuary_cdk.incremental_csv_processor import IncrementalCSVProcessor
 
-from .models import ExportStatus, ExportStatusResponse, ExportSubmitResponse
+from .models import AquaJobResponse, AquaJobStatus
 from .shared import VERSION_HEADERS
+
+# AQuA request schema version. With partner/project omitted the job runs in
+# stateless mode regardless, so this only selects the response semantics.
+AQUA_VERSION = "1.2"
+
+# Informational job/query name shown in Zuora's UI and result file names.
+AQUA_JOB_NAME = "estuary-capture-connector"
+
+TERMINAL_FAILURE_STATUSES = (
+    AquaJobStatus.ERROR,
+    AquaJobStatus.ABORTED,
+    AquaJobStatus.CANCELLED,
+    AquaJobStatus.FAILED,
+)
 
 # An oversized export file (over 2047 MB) fails download with a 403 whose XML
 # body carries this marker, e.g. <security:max-object-size>2047MB</...>. A 403
@@ -31,9 +45,10 @@ MAX_RETRIES = 3
 RETRY_BACKOFF_BASE_SECONDS = 30
 RETRY_BACKOFF_FACTOR = 2
 
-# Cap on concurrent export jobs. Zuora limits concurrent exports per tenant to
-# around 5, so one semaphore shared across a task's bindings keeps us under it.
-MAX_CONCURRENT_EXPORTS = 4
+# Cap on concurrent export jobs. Zuora allows up to 50 concurrent stateless
+# AQuA jobs per tenant; staying far below that leaves room for the tenant's
+# other AQuA integrations and keeps our polling load modest.
+MAX_CONCURRENT_EXPORTS = 10
 
 
 class ExportError(Exception):
@@ -52,7 +67,7 @@ class ExportError(Exception):
         message: str,
         *,
         job_id: str | None = None,
-        status: ExportStatus | None = None,
+        status: AquaJobStatus | None = None,
     ):
         super().__init__(message)
         self.job_id = job_id
@@ -68,14 +83,17 @@ class ExportTooLargeError(Exception):
 
 
 class ExportManager:
-    """Runs Zuora REST Export API jobs.
+    """Runs Zuora AQuA (Aggregate Query API) export jobs in stateless mode.
 
-    Each export is an async job: submit a ZOQL query, poll until it reaches a
-    terminal status, then stream the resulting CSV. Callers build their own
-    queries (see api.build_query), so the manager stays query-agnostic.
+    Each export is an async job: submit an Export ZOQL query, poll until it
+    reaches a terminal status, then stream the resulting CSV file(s). Callers
+    build their own queries (see api.build_query), so the manager stays
+    query-agnostic. AQuA is used over the legacy /v1/object/export API because
+    some tenants feature-gate fields out of the legacy engine that AQuA (and
+    describe's export context) still consider exportable.
 
     One manager is shared across all of a task's bindings, so its semaphore
-    bounds total concurrent export jobs (Zuora allows ~5 per tenant).
+    bounds total concurrent export jobs.
     """
 
     def __init__(self, http: HTTPSession, log: Logger, base_url: str):
@@ -85,12 +103,15 @@ class ExportManager:
         self._semaphore = asyncio.Semaphore(MAX_CONCURRENT_EXPORTS)
 
     async def export_rows(self, query: str) -> AsyncGenerator[dict, None]:
-        file_id = await self._run_job(query)
-        async for row in self._fetch_results(file_id):
-            yield row
+        # Each segment file is a self-contained CSV with its own header row, so
+        # streaming them back-to-back through per-file processors is seamless.
+        for file_id in await self._run_job(query):
+            async for row in self._fetch_results(file_id):
+                yield row
 
-    async def _run_job(self, query: str) -> str:
-        """Submit an export job, poll until complete, and return the file ID.
+    async def _run_job(self, query: str) -> list[str]:
+        """Submit an export job, poll until complete, and return its file IDs
+        (multiple when the tenant has AQuA file segmentation enabled).
 
         Holds the semaphore for the full duration so at most
         MAX_CONCURRENT_EXPORTS jobs run concurrently, staying within Zuora's
@@ -120,68 +141,90 @@ class ExportManager:
                 )
                 await asyncio.sleep(wait)
         # The final attempt always returns or re-raises above, so the loop never
-        # exits normally. This assert satisfies the type checker's -> str path.
+        # exits normally. This assert satisfies the type checker's return path.
         assert False, "unreachable"
 
     async def _submit(self, query: str) -> str:
-        url = f"{self.base_url}/v1/object/export"
-        payload = {"Format": "csv", "Query": query}
-        # Logged before the request so a submit-time rejection (e.g. a 400 for a
-        # field describe claimed was exportable) sits next to the query that
-        # caused it in the task logs.
+        url = f"{self.base_url}/v1/batch-query/"
+        # partner/project are deliberately omitted: that runs the job in
+        # stateless mode, and cursor windows in the query's WHERE clause carry
+        # our incremental state instead.
+        payload = {
+            "format": "csv",
+            "version": AQUA_VERSION,
+            "name": AQUA_JOB_NAME,
+            # dateTimeUtc keeps datetime output in
+            # UTC rather than the tenant's local timezone, which cursor parsing
+            # (AwareDatetime) depends on. 
+            "dateTimeUtc": "true",
+            # useQueryLabels makes CSV headers echo the
+            # query's field names (e.g. "AccountNumber"). Without it they are
+            # "Object: Field Label" display labels that match nothing in describe.
+            "useQueryLabels": "true",
+            "queries": [
+                {"name": AQUA_JOB_NAME, "query": query, "type": "zoqlexport"}
+            ],
+        }
+        # Logged before the request so a submit-time rejection (e.g. for a field
+        # describe claimed was exportable) sits next to the query that caused it
+        # in the task logs.
         self.log.debug("submitting export job", {"query": query})
         submit_bytes = await self.http.request(
             self.log, url, method="POST", json=payload, headers=VERSION_HEADERS
         )
-        submit = ExportSubmitResponse.model_validate_json(submit_bytes)
-        if not submit.Success or submit.Id is None:
-            reason = "; ".join(
-                f"{e.Code}: {e.Message}" for e in submit.Errors
-            ) or "no error detail"
+        submit = AquaJobResponse.model_validate_json(submit_bytes)
+        if submit.message or submit.id is None:
             raise ExportError(
-                f"Export job submission failed for query {query!r}: {reason}"
+                f"Export job submission failed for query {query!r}: "
+                f"{submit.message or 'no error detail'}",
+                status=submit.status,
             )
-        self.log.debug("created export job", {"job_id": submit.Id})
-        return submit.Id
+        self.log.debug("created export job", {"job_id": submit.id})
+        return submit.id
 
-    async def _check_job(self, job_id: str) -> ExportStatusResponse:
-        url = f"{self.base_url}/v1/object/export/{job_id}"
-        return ExportStatusResponse.model_validate_json(
+    async def _check_job(self, job_id: str) -> AquaJobResponse:
+        url = f"{self.base_url}/v1/batch-query/jobs/{job_id}"
+        return AquaJobResponse.model_validate_json(
             await self.http.request(self.log, url, headers=VERSION_HEADERS)
         )
 
-    async def _poll_until_complete(self, job_id: str) -> str:
-        """Poll a submitted job until it completes, returning its file ID."""
-        last_status: ExportStatus | None = None
+    async def _poll_until_complete(self, job_id: str) -> list[str]:
+        """Poll a submitted job until it completes, returning its file IDs."""
+        last_status: AquaJobStatus | None = None
         for attempt in range(MAX_POLL_ATTEMPTS):
             job = await self._check_job(job_id)
+            batch = job.batches[0] if job.batches else None
             # Logged only on transitions (not every poll) so a long-running job
             # stays visible in the logs without flooding them.
-            if job.Status is not last_status:
-                last_status = job.Status
+            if job.status is not last_status:
+                last_status = job.status
                 self.log.debug(
                     "export job status",
                     {
                         "job_id": job_id,
-                        "status": job.Status,
-                        "file_id": job.FileId,
+                        "status": job.status,
+                        "record_count": batch.recordCount if batch else None,
                         "elapsed_s": attempt * POLL_INTERVAL,
                     },
                 )
-            if job.Status is ExportStatus.COMPLETED:
-                if job.FileId is None:
+            if job.status is AquaJobStatus.COMPLETED:
+                file_ids = (
+                    batch.segments or ([batch.fileId] if batch.fileId else [])
+                ) if batch else []
+                if not file_ids:
                     raise ExportError(
-                        f"Export job {job_id} completed without a FileId",
+                        f"Export job {job_id} completed without any file IDs",
                         job_id=job_id,
-                        status=job.Status,
+                        status=job.status,
                     )
-                return job.FileId
-            if job.Status in (ExportStatus.CANCELED, ExportStatus.FAILED):
+                return file_ids
+            if job.status in TERMINAL_FAILURE_STATUSES:
+                detail = (batch.message if batch else None) or job.message
                 raise ExportError(
-                    f"Export job {job_id} {job.Status}: "
-                    f"{job.StatusReason or 'no reason given'}",
+                    f"Export job {job_id} {job.status}: "
+                    f"{detail or 'no reason given'}",
                     job_id=job_id,
-                    status=job.Status,
+                    status=job.status,
                 )
             await asyncio.sleep(POLL_INTERVAL)
         raise ExportError(

@@ -83,34 +83,43 @@ class TransactionDateDocument(ZuoraDocument):
         return self.TransactionDate
 
 
-class ExportStatus(StrEnum):
-    # https://developer.zuora.com/v1-api-reference/older-api/operation/Object_POSTExport/
-    PENDING = "Pending"
-    PROCESSING = "Processing"
-    COMPLETED = "Completed"
-    CANCELED = "Canceled"
-    FAILED = "Failed"
+class AquaJobStatus(StrEnum):
+    # https://developer.zuora.com/v1-api-reference/api/operation/GET_BatchQueryJob/
+    SUBMITTED = "submitted"
+    PENDING = "pending"
+    EXECUTING = "executing"
+    COMPLETED = "completed"
+    ERROR = "error"
+    ABORTED = "aborted"
+    CANCELLED = "cancelled"
+    # failed is undocumented, but it seems like it's a possible status since
+    # the legacy Export API had it.
+    FAILED = "failed"
 
 
-class ExportSubmitError(BaseModel, extra="allow"):
-    """One error entry within a POST /v1/object/export response's Errors list.
+class AquaBatch(BaseModel, extra="allow"):
+    """One entry in an AQuA job's batches list, corresponding to one submitted
+    query. When the tenant has AQuA file segmentation enabled, a large result
+    arrives as multiple files listed in segments instead of a single fileId.
     """
-    Code: str | None = None
-    Message: str | None = None
+    status: str | None = None
+    fileId: str | None = None
+    segments: list[str] | None = None
+    recordCount: int | None = None
+    message: str | None = None
 
 
-class ExportSubmitResponse(BaseModel, extra="allow"):
-    """Response from POST /v1/object/export."""
-    Success: bool = False
-    Id: str | None = None
-    Errors: list[ExportSubmitError] = Field(default_factory=list)
+class AquaJobResponse(BaseModel, extra="allow"):
+    """Response from POST /v1/batch-query/ and GET /v1/batch-query/jobs/{id}.
 
-
-class ExportStatusResponse(BaseModel, extra="allow"):
-    """Response from GET /v1/object/export/{id}."""
-    Status: ExportStatus
-    FileId: str | None = None
-    StatusReason: str | None = None
+    A submission rejected at validation time reports the problem in the
+    top-level message field rather than an HTTP error status, so status and id
+    are optional to keep such responses parseable.
+    """
+    id: str | None = None
+    status: AquaJobStatus | None = None
+    message: str | None = None
+    batches: list[AquaBatch] = Field(default_factory=list)
 
 
 class DescribeField(BaseModel, extra="allow"):
