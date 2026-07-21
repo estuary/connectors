@@ -4,7 +4,10 @@ import (
 	"regexp"
 	"testing"
 
+
 	"github.com/bradleyjkemp/cupaloy"
+        "github.com/estuary/connectors/sqlcapture" 
+        "github.com/stretchr/testify/require"
 )
 
 func TestDiscoveryComplex(t *testing.T) {
@@ -112,4 +115,38 @@ func TestFloatKeyDiscovery(t *testing.T) {
 	tc.Discover("Discover Tables")
 	tc.Run("Capture", transactionCountBaseline+1)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
+}
+
+func TestDiscoveryCrossSchemaIsolation(t *testing.T) {
+	var db, tc = blackboxTestSetup(t)
+
+	db.Exec(t, `CREATE SCHEMA IF NOT EXISTS otherschema`)
+	db.Exec(t, `GRANT USAGE ON SCHEMA otherschema TO flow_capture`)
+	t.Cleanup(func() { db.Exec(t, `DROP SCHEMA IF EXISTS otherschema CASCADE`) })
+
+	db.CreateTable(t, `<NAME>`, `(k1 INTEGER PRIMARY KEY, foo TEXT)`)
+	db.Exec(t, `CREATE TABLE otherschema.tbl<ID> (
+		k2 TEXT PRIMARY KEY,
+		bar INTEGER,
+		gen INTEGER GENERATED ALWAYS AS (bar + 1) STORED
+	)`)
+	db.Exec(t, `GRANT SELECT ON ALL TABLES IN SCHEMA otherschema TO flow_capture`)
+	db.Exec(t, `CREATE UNIQUE INDEX decoy_idx<ID> ON otherschema.tbl<ID> (bar)`)
+	db.Exec(t, `COMMENT ON COLUMN otherschema.tbl<ID>.bar IS 'should never appear'`)
+
+	tc.DiscoverFull("Discover Tables")
+	cupaloy.SnapshotT(t, tc.Transcript.String())
+}
+
+func TestSchemaFilterHelpers(t *testing.T) {
+	var filter, args = schemaFilter("nc.nspname", nil)
+	require.Equal(t, "", filter)
+	require.Nil(t, args)
+
+	filter, args = schemaFilter("nc.nspname", []string{"a", "b"})
+	require.Equal(t, "AND nc.nspname = ANY($1)", filter)
+	require.Equal(t, []any{[]string{"a", "b"}}, args)
+
+	require.Equal(t, []string{"a", "b"},
+		distinctSchemas([]sqlcapture.TableID{{Schema: "a"}, {Schema: "b"}, {Schema: "a"}}))
 }
