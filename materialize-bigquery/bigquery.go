@@ -102,6 +102,7 @@ type config struct {
 type advancedConfig struct {
 	DisableFieldTruncation bool   `json:"disableFieldTruncation,omitempty" jsonschema:"title=Disable Field Truncation,description=Disables truncation of materialized fields. May result in errors for documents with extremely large values or complex nested structures."`
 	NoFlowDocument         bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false"`
+	Endpoint               string `json:"endpoint,omitempty" jsonschema:"title=BigQuery Endpoint,description=The BigQuery endpoint URI to connect to. Use if you're materializing to a compatible API that isn't provided by Google."`
 	FeatureFlags           string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
@@ -122,11 +123,13 @@ func (c config) Validate() error {
 		// Sanity check: Are the provided credentials valid JSON? A common error is to upload
 		// credentials that are not valid JSON, and the resulting error is fairly cryptic if fed
 		// directly to bigquery.NewClient.
-		if !json.Valid([]byte(c.CredentialsJSON)) {
+		if c.Advanced.Endpoint == "" && !json.Valid([]byte(c.CredentialsJSON)) {
 			return fmt.Errorf("service account credentials must be valid JSON, and the provided credentials were not")
 		}
-	} else if err := c.Credentials.Validate(); err != nil {
-		return err
+	} else if c.Advanced.Endpoint == "" {
+		if err := c.Credentials.Validate(); err != nil {
+			return err
+		}
 	}
 
 	if err := c.Schedule.Validate(); err != nil {
@@ -166,17 +169,30 @@ func (c config) CredentialsClientOption() (option.ClientOption, error) {
 	return nil, fmt.Errorf("unknown 'auth_type'")
 }
 
-func (c config) client(ctx context.Context, ep *sql.Endpoint[config]) (*client, error) {
-	var clientOpts []option.ClientOption
+func (c config) bigQueryClientOptions() ([]option.ClientOption, error) {
+	clientOpts := []option.ClientOption{
+		option.WithUserAgent("EstuaryFlow (GPN:Estuary;)"),
+	}
+
+	if c.Advanced.Endpoint != "" {
+		return append(clientOpts,
+			option.WithEndpoint(c.Advanced.Endpoint),
+			option.WithoutAuthentication(),
+		), nil
+	}
 
 	credOption, err := c.CredentialsClientOption()
 	if err != nil {
 		return nil, err
 	}
-	clientOpts = append(clientOpts,
-		credOption,
-		option.WithUserAgent("EstuaryFlow (GPN:Estuary;)"),
-	)
+	return append(clientOpts, credOption), nil
+}
+
+func (c config) client(ctx context.Context, ep *sql.Endpoint[config]) (*client, error) {
+	clientOpts, err := c.bigQueryClientOptions()
+	if err != nil {
+		return nil, err
+	}
 
 	// Allow overriding the main 'project_id' with 'billing_project_id' for client operation billing.
 	var billingProjectID = c.BillingProjectID
@@ -192,8 +208,10 @@ func (c config) client(ctx context.Context, ep *sql.Endpoint[config]) (*client, 
 	// Read Session User" role. Result iterators will automatically fall back to
 	// the standard but much slower job/table read API if the storage API can't
 	// be accessed.
-	if err := bigqueryClient.EnableStorageReadClient(ctx, clientOpts...); err != nil {
-		return nil, fmt.Errorf("enabling storage read client: %w", err)
+	if c.Advanced.Endpoint == "" {
+		if err := bigqueryClient.EnableStorageReadClient(ctx, clientOpts...); err != nil {
+			return nil, fmt.Errorf("enabling storage read client: %w", err)
+		}
 	}
 
 	return &client{
@@ -253,9 +271,10 @@ func newBigQueryDriver() *sql.Driver[config, tableConfig] {
 				"region":      cfg.Region,
 				"bucket":      cfg.Bucket,
 				"bucket_path": cfg.effectiveBucketPath(),
+				"endpoint":    cfg.Advanced.Endpoint,
 			}).Info("creating bigquery endpoint")
 
-			dialect := bqDialect(featureFlags)
+			dialect := bqDialect(featureFlags, cfg.Advanced.Endpoint != "")
 			templates := renderTemplates(dialect)
 
 			// BigQuery's default SerPolicy has historically had limits of 1500

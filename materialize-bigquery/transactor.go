@@ -94,8 +94,8 @@ func prepareNewTransactor(
 			skipCleanup:       featureFlags["skip_cleanup"],
 			client:            client,
 			be:                be,
-			loadFiles:         boilerplate.NewStagedFiles(stagedFileClient{}, bucket, writer.DefaultJsonFileSizeLimit, cfg.effectiveBucketPath(), false, false),
-			storeFiles:        boilerplate.NewStagedFiles(stagedFileClient{}, bucket, writer.DefaultJsonFileSizeLimit, cfg.effectiveBucketPath(), true, false),
+			loadFiles:         boilerplate.NewStagedFiles(stagedFileClient{disableGzip: cfg.Advanced.Endpoint != ""}, bucket, writer.DefaultJsonFileSizeLimit, cfg.effectiveBucketPath(), false, false),
+			storeFiles:        boilerplate.NewStagedFiles(stagedFileClient{disableGzip: cfg.Advanced.Endpoint != ""}, bucket, writer.DefaultJsonFileSizeLimit, cfg.effectiveBucketPath(), true, false),
 		}
 
 		for _, binding := range bindings {
@@ -276,7 +276,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 				return fmt.Errorf("rendering load query template: %w", err)
 			} else {
 				subqueries = append(subqueries, loadQuery)
-				edcTableDefs[b.tempTableName] = edc(uris, b.loadSchema)
+				edcTableDefs[b.tempTableName] = edc(uris, b.loadSchema, t.cfg.Advanced.Endpoint != "")
 				externalData[b.tempTableName] = uris
 			}
 		}
@@ -289,7 +289,17 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	// Build the query across all tables.
 	queryStr := strings.Join(subqueries, "\nUNION ALL\n") + ";"
 	query := t.client.newQuery(queryStr)
-	query.TableDefinitions = edcTableDefs // Tell bigquery where to get the external references in gcs.
+	
+	if t.cfg.Advanced.Endpoint != "" {
+		cleanup, err := applyEmulatorLoadWorkaround(ctx, t.client, edcTableDefs)
+		if err != nil {
+			return fmt.Errorf("emulator workaround: %w", err)
+		}
+		defer cleanup()
+	} else {
+		query.TableDefinitions = edcTableDefs // Tell bigquery where to get the external references in gcs.
+	}
+	
 	ll := log.WithFields(log.Fields{"query": queryStr, "external_data": externalData})
 
 	t.be.StartedEvaluatingLoads()

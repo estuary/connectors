@@ -138,6 +138,7 @@ func tableMetadataWithRetry(ctx context.Context, table *bigquery.Table) (*bigque
 }
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
+	log.Infof("CREATE TABLE SQL: %s", tc.TableCreateSql)
 	_, err := c.query(ctx, tc.TableCreateSql)
 	return err
 }
@@ -252,6 +253,10 @@ func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, e
 
 func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
+
+	if cfg.Advanced.Endpoint != "" {
+		return errs
+	}
 
 	credOption, err := cfg.CredentialsClientOption()
 	if err != nil {

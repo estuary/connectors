@@ -1,0 +1,7 @@
+project_id: test-project
+dataset: testing
+region: US
+bucket: test-bucket
+advanced:
+  endpoint: http://localhost:9050/bigquery/v2/
+  feature_flags: allow_existing_tables_for_new_bindings
