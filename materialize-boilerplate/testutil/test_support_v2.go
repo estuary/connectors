@@ -3,9 +3,9 @@ package testutil
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -125,20 +125,6 @@ type RuntimeV2Config struct {
 	Timeout time.Duration
 }
 
-// skipUnlessRuntimeV2Flowctl skips the test, rather than failing it, while
-// the flowctl release on PATH predates multi-shard fixture support in
-// `raw preview-next` (which v2 runs of any shard count depend on, for its
-// legacy-matching fixture document clocks).
-func skipUnlessRuntimeV2Flowctl(t *testing.T) {
-	t.Helper()
-
-	if help, err := exec.Command("flowctl", "raw", "preview-next", "--help").Output(); err != nil {
-		t.Skipf("flowctl raw preview-next is unavailable: %v", err)
-	} else if !strings.Contains(string(help), "hash-routed") || !strings.Contains(string(help), "drain session") {
-		t.Skip("the flowctl on PATH does not support multi-shard fixtures with a drain session")
-	}
-}
-
 func runMaterializationTestForTaskV2[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
 	t *testing.T,
 	ctx context.Context,
@@ -156,6 +142,16 @@ func runMaterializationTestForTaskV2[EC boilerplate.EndpointConfiger, FC boilerp
 	timeout := v2.Timeout
 	if timeout == 0 {
 		timeout = 10 * time.Minute
+	}
+	// Keep flowctl's own timeout inside Go's `-test.timeout`, leaving a buffer so
+	// flowctl can stop gracefully (finishing its drain session and tearing down
+	// connector containers) before the test binary is force-killed on timeout.
+	if f := flag.Lookup("test.timeout"); f != nil {
+		if testTimeout, err := time.ParseDuration(f.Value.String()); err == nil && testTimeout > time.Minute {
+			if capped := testTimeout - time.Minute; capped < timeout {
+				timeout = capped
+			}
+		}
 	}
 
 	// Extra feature flags are appended to whatever the source config already
