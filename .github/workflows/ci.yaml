@@ -117,6 +117,7 @@ jobs:
           - materialize-gcs-parquet
           - materialize-google-pubsub
           - materialize-google-sheets
+          - materialize-hubspot
           - materialize-iceberg
           - materialize-kafka
           - materialize-mongodb
