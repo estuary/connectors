@@ -64,23 +64,32 @@ def _obfuscate_string(s: str, salt: str) -> str:
     if dt is not None:
         return _obfuscate_datetime(s, dt, salt)
     r = _rng(s, salt)
-    chars = []
-    for ch in s:
-        if ch.isdigit():
-            chars.append(r.choice(string.digits))
-        elif ch.islower():
-            chars.append(r.choice(string.ascii_lowercase))
-        elif ch.isupper():
-            chars.append(r.choice(string.ascii_uppercase))
-        elif unicodedata.category(ch).startswith("L"):
-            # Caseless scripts (CJK, Hebrew, Arabic, Thai, ...) have no
-            # upper/lower form, so they'd otherwise pass through unobfuscated.
-            # Map each to a deterministic CJK ideograph: still a letter, same
-            # length, and definitely changed.
-            chars.append(chr(r.randint(0x4E00, 0x9FA5)))
-        else:
-            chars.append(ch)  # punctuation / whitespace / separators kept
-    return "".join(chars)
+    return "".join(_obfuscate_char(ch, r) for ch in s)
+
+
+# CJK Unified Ideographs — a deterministic, length-preserving target for any
+# "content" character that has no cased Latin/digit equivalent.
+_CJK_LO, _CJK_HI = 0x4E00, 0x9FA5
+
+
+def _obfuscate_char(ch: str, r: random.Random) -> str:
+    if ch.isdigit():
+        return r.choice(string.digits)
+    if ch.islower():
+        return r.choice(string.ascii_lowercase)
+    if ch.isupper():
+        return r.choice(string.ascii_uppercase)
+    category = unicodedata.category(ch)
+    # Obfuscate everything that carries content but has no cased/digit form:
+    #   - caseless letters (Lo/Lm/Lt): CJK, Japanese kana, Korean, Hebrew,
+    #     Arabic, Thai, Devanagari, ...
+    #   - non-decimal numerics (Nl/No): roman numerals, fractions, ...
+    #   - non-ASCII symbols and emoji (So/Sk/Sm/Sc above U+007F).
+    # ASCII symbols ($, =, +, ...), punctuation, whitespace, and combining
+    # marks are treated as structure and kept, so the shape is preserved.
+    if category[0] in ("L", "N") or (category[0] == "S" and ord(ch) > 0x7F):
+        return chr(r.randint(_CJK_LO, _CJK_HI))
+    return ch
 
 
 def _obfuscate_number(n: int | float, salt: str) -> int | float:
