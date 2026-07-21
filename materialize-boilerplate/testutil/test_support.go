@@ -149,10 +149,6 @@ func RunMaterializationTest[EC boilerplate.EndpointConfiger, FC boilerplate.Fiel
 	actionDescSanitizers []func(string) string,
 	v2 ...RuntimeV2Config,
 ) {
-	if len(v2) > 0 {
-		skipUnlessRuntimeV2Flowctl(t)
-	}
-
 	ctx := context.Background()
 	var snap strings.Builder
 	tsSuffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
@@ -180,10 +176,6 @@ func RunMaterializationTestParallel[EC boilerplate.EndpointConfiger, FC boilerpl
 	actionDescSanitizers []func(string) string,
 	v2 ...RuntimeV2Config,
 ) {
-	if len(v2) > 0 {
-		skipUnlessRuntimeV2Flowctl(t)
-	}
-
 	ctx := context.Background()
 	tsSuffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
 
