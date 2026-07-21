@@ -21,15 +21,21 @@ including the collection key and `/_meta/source` — **except** `/_meta/uuid` an
 `/_meta/op`, which are preserved (they drive reduction ordering and carry no
 customer data). No catalog is needed; the preserved set is fixed.
 
-Obfuscation is **deterministic and shape-preserving**:
+Obfuscation is **deterministic**:
 
 - Same input value + `--salt` → same output, so relationships across documents
   survive (the mapping is value-based, not field-based). Change `--salt` for a
   different but still internally-consistent mapping.
-- Strings keep length and per-character class (letter→letter same case,
-  digit→digit, punctuation/separators kept); numbers keep sign and magnitude;
-  RFC3339 date-times shift to another *valid* date-time; booleans flip; `null`
-  stays `null`.
+- **Every character in a string is obfuscated.** ASCII cased letters and digits
+  map within their class (letter→letter same case, digit→digit); everything else
+  — caseless letters of any script (CJK, Japanese, Korean, Arabic, Hebrew, Thai,
+  …), punctuation, symbols, emoji, whitespace, and combining marks — maps to a
+  CJK ideograph. Only the character count is preserved, so no original structure
+  survives. Numbers keep sign and magnitude; booleans flip; `null` stays `null`.
+- **Exception:** RFC3339 date-times are shifted to another *valid* date-time, so
+  date-time fields stay schema-valid. This still obfuscates the instant; the
+  surviving format characters reveal nothing the collection schema doesn't
+  already declare.
 
 `-` reads from stdin; output defaults to stdout.
 

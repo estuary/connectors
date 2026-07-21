@@ -11,9 +11,16 @@ nested value — is obfuscated, so the output cannot expose anything about the
 customer. No catalog is needed: the preserved set is fixed.
 
 Obfuscation is deterministic (the same input value plus ``--salt`` always maps
-to the same output) so relationships across documents survive, and it preserves
-the *shape* of values — string length and per-character class, number sign and
-magnitude, and RFC3339 date-times stay valid date-times.
+to the same output) so relationships across documents survive. Within a string,
+EVERY character is obfuscated — ASCII cased letters and digits map within their
+class, and everything else (caseless letters of any script, punctuation,
+symbols, emoji, whitespace, combining marks) maps to a CJK ideograph; only the
+character count is preserved, so no original structure survives. Numbers keep
+sign and magnitude, booleans flip, and ``null`` stays ``null``.
+
+The one exception is RFC3339 date-times: the instant is shifted (obfuscated) but
+kept a valid date-time, so date-time fields stay schema-valid. The format
+characters that survive reveal nothing the collection schema doesn't declare.
 """
 
 from __future__ import annotations
@@ -24,7 +31,6 @@ import json
 import random
 import string
 import sys
-import unicodedata
 from datetime import datetime, timedelta, timezone
 
 # Token-paths preserved verbatim (with their entire subtree). Nothing else is.
@@ -79,17 +85,11 @@ def _obfuscate_char(ch: str, r: random.Random) -> str:
         return r.choice(string.ascii_lowercase)
     if ch.isupper():
         return r.choice(string.ascii_uppercase)
-    category = unicodedata.category(ch)
-    # Obfuscate everything that carries content but has no cased/digit form:
-    #   - caseless letters (Lo/Lm/Lt): CJK, Japanese kana, Korean, Hebrew,
-    #     Arabic, Thai, Devanagari, ...
-    #   - non-decimal numerics (Nl/No): roman numerals, fractions, ...
-    #   - non-ASCII symbols and emoji (So/Sk/Sm/Sc above U+007F).
-    # ASCII symbols ($, =, +, ...), punctuation, whitespace, and combining
-    # marks are treated as structure and kept, so the shape is preserved.
-    if category[0] in ("L", "N") or (category[0] == "S" and ord(ch) > 0x7F):
-        return chr(r.randint(_CJK_LO, _CJK_HI))
-    return ch
+    # EVERYTHING else is obfuscated too — caseless letters (all scripts),
+    # numerics, punctuation, symbols, emoji, whitespace, and combining marks —
+    # mapped to a deterministic CJK ideograph. Nothing passes through; only the
+    # character count is preserved.
+    return chr(r.randint(_CJK_LO, _CJK_HI))
 
 
 def _obfuscate_number(n: int | float, salt: str) -> int | float:
