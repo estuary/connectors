@@ -9,7 +9,6 @@ length-preserving.
 
 from __future__ import annotations
 
-import unicodedata
 import unittest
 
 from obfuscate_jsonl import _obfuscate_string, obfuscate
@@ -42,17 +41,18 @@ SAMPLES = {
 
 
 def _target_class(ch: str) -> str:
-    """The class the obfuscator must map `ch` into (mirrors the contract)."""
+    """The class the obfuscator must map `ch` into (mirrors the contract).
+
+    Every character is obfuscated: ASCII cased letters and digits stay within
+    their class; EVERYTHING else (punctuation, symbols, emoji, whitespace,
+    marks, caseless letters) maps to CJK. Nothing is kept."""
     if ch.isdigit():
         return "digit"
     if ch.islower():
         return "lower"
     if ch.isupper():
         return "upper"
-    cat = unicodedata.category(ch)
-    if cat[0] in ("L", "N") or (cat[0] == "S" and ord(ch) > 0x7F):
-        return "cjk"
-    return "keep"
+    return "cjk"
 
 
 def _in_class(ch: str, cls: str) -> bool:
@@ -62,27 +62,22 @@ def _in_class(ch: str, cls: str) -> bool:
         return "a" <= ch <= "z"
     if cls == "upper":
         return "A" <= ch <= "Z"
-    if cls == "cjk":
-        return 0x4E00 <= ord(ch) <= 0x9FA5
-    return True  # "keep" checked separately against the original
+    return 0x4E00 <= ord(ch) <= 0x9FA5  # cjk
 
 
 class TestObfuscateString(unittest.TestCase):
     def test_all_scripts_fully_covered(self):
-        """Every content char is obfuscated to its target class; structure is
-        preserved char-for-char. Catches any script slipping through."""
+        """Every char maps to its obfuscation target class. Catches any script
+        or character type slipping through unobfuscated."""
         for name, s in SAMPLES.items():
             out = _obfuscate_string(s, SALT)
             self.assertEqual(len(out), len(s), f"{name}: length changed")
             for i, (src, dst) in enumerate(zip(s, out)):
                 cls = _target_class(src)
-                if cls == "keep":
-                    self.assertEqual(dst, src, f"{name}[{i}] {src!r} should be kept")
-                else:
-                    self.assertTrue(
-                        _in_class(dst, cls),
-                        f"{name}[{i}] {src!r} (want {cls}) not obfuscated -> {dst!r}",
-                    )
+                self.assertTrue(
+                    _in_class(dst, cls),
+                    f"{name}[{i}] {src!r} (want {cls}) not obfuscated -> {dst!r}",
+                )
 
     def test_no_caseless_letter_or_emoji_passes_through(self):
         """Regression for the review finding: caseless letters and emoji must
@@ -93,14 +88,16 @@ class TestObfuscateString(unittest.TestCase):
             self.assertEqual(len(out), 1)
             self.assertTrue(0x4E00 <= ord(out) <= 0x9FA5, f"{s!r} -> {out!r} not obfuscated")
 
-    def test_structure_preserved(self):
-        s = "jane.doe+tag@example.co.uk / id-123 = {a:b}"
+    def test_structure_is_obfuscated(self):
+        """Punctuation, symbols and whitespace are obfuscated too (to CJK) —
+        no original structure survives."""
+        s = "jane.doe+tag@example.co.uk / id-123 = {a:b}\ttab space"
         out = _obfuscate_string(s, SALT)
         self.assertEqual(len(out), len(s))
         for src, dst in zip(s, out):
-            if not (src.isalnum()):  # punctuation/space/symbols kept in place
-                self.assertEqual(dst, src)
-        self.assertNotEqual(out, s)  # the alphanumerics did change
+            self.assertTrue(_in_class(dst, _target_class(src)))
+        for structural in (" ", ".", "@", "/", "=", "+", "{", ":", "-", "\t"):
+            self.assertNotIn(structural, out)
 
     def test_deterministic(self):
         for s in SAMPLES.values():
