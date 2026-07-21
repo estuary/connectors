@@ -283,7 +283,7 @@ func EncodeKeyFDB(key, ktype any) (tuple.TupleElement, error) {
 	switch key := key.(type) {
 	case time.Time:
 		switch ktype {
-		case "datetime":
+		case "datetime", "smalldatetime":
 			return key.Format(DatetimeKeyEncoding), nil
 		default:
 			return key.Format(SortableRFC3339Nano), nil
