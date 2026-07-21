@@ -142,6 +142,14 @@ func (v *Validator) NewConstraint(
 
 	switch {
 	case projection.IsPrimaryKey:
+		if slices.Contains(projection.Inference.Types, "numeric") {
+			return &pm.Response_Validated_Constraint{
+				Type:        pm.Response_Validated_Constraint_FIELD_FORBIDDEN,
+				Reason:      "Numeric types are not supported as the primary key",
+				FoldedField: name,
+			}, nil
+		}
+
 		if len(keys) != 0 {
 			return &pm.Response_Validated_Constraint{
 				Type:        pm.Response_Validated_Constraint_FIELD_FORBIDDEN,
