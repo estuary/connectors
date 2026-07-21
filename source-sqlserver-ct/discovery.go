@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/estuary/connectors/go/capture/sqlserver/datatypes"
+	"github.com/estuary/connectors/go/tableglob"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/invopop/jsonschema"
 	log "github.com/sirupsen/logrus"
@@ -25,6 +26,62 @@ const discoveryChunkSize = 100
 type discoveryOptions struct {
 	DiscoverOnlyEnabled bool     // Only discover tables with Change Tracking enabled
 	IncludeSchemas      []string // If non-empty, discovery is restricted to these schemas
+}
+
+type discoveryFilters struct {
+	IncludeSchemas []string `json:"include_schemas,omitempty" jsonschema:"title=Include Schemas,description=If specified only tables in the listed schemas will be discovered."`
+	ExcludeSchemas []string `json:"exclude_schemas,omitempty" jsonschema:"title=Exclude Schemas,description=Tables in the listed schemas will be excluded from discovery."`
+	TablePatterns  []string `json:"table_patterns,omitempty"  jsonschema:"title=Table Patterns,description=If specified only tables matching at least one of these glob patterns will be discovered. A pattern containing a '.' matches against the qualified 'schema.table' name. A pattern without a '.' matches the unqualified table name in any schema. Use '*' or '?' as wildcards."`
+	DiscoverNonCT  bool     `json:"discover_tables_without_ct,omitempty" jsonschema:"title=Discover Tables Without Change Tracking,description=When set the connector will discover all tables even if they do not have Change Tracking enabled. Combined as a union with the equivalent setting under Advanced Options."`
+}
+
+// Validate checks that the configured discovery filters are well-formed. The
+// only thing that can actually be invalid here is a malformed table pattern.
+func (f *discoveryFilters) Validate() error {
+	for _, raw := range f.TablePatterns {
+		if _, err := tableglob.Compile(raw); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// apply filters the input table list by the configured exclude-schemas and
+// table patterns. The include-schemas list is intentionally not consulted
+// here: it is expected to have already been pushed into the listTables query.
+func (f *discoveryFilters) apply(tables []sqlcapture.TableID) ([]sqlcapture.TableID, error) {
+	var patterns = make([]*tableglob.Pattern, 0, len(f.TablePatterns))
+	for _, raw := range f.TablePatterns {
+		var p, err = tableglob.Compile(raw)
+		if err != nil {
+			return nil, err
+		}
+		patterns = append(patterns, p)
+	}
+	var excluded = make(map[string]struct{}, len(f.ExcludeSchemas))
+	for _, schema := range f.ExcludeSchemas {
+		excluded[schema] = struct{}{}
+	}
+	var filtered = make([]sqlcapture.TableID, 0, len(tables))
+	for _, t := range tables {
+		if _, ok := excluded[t.Schema]; ok {
+			continue
+		}
+		if len(patterns) > 0 && !matchesAnyPattern(patterns, t) {
+			continue
+		}
+		filtered = append(filtered, t)
+	}
+	return filtered, nil
+}
+
+func matchesAnyPattern(patterns []*tableglob.Pattern, t sqlcapture.TableID) bool {
+	for _, p := range patterns {
+		if p.MatchTable(t.Schema, t.Table) {
+			return true
+		}
+	}
+	return false
 }
 
 // tableIDsPredicate builds a WHERE-clause predicate matching any of the
@@ -54,11 +111,16 @@ func tableIDsPredicate(schemaCol, tableCol string, tables []sqlcapture.TableID, 
 // connector's configured discovery filters are applied.
 func (db *sqlserverDatabase) ListTables(ctx context.Context) ([]sqlcapture.TableID, error) {
 	var opts = discoveryOptions{
-		DiscoverOnlyEnabled: !db.config.Advanced.DiscoverNonEnabled,
+		DiscoverOnlyEnabled: !(db.config.Advanced.DiscoverNonEnabled || db.config.DiscoveryFilters.DiscoverNonCT),
+		IncludeSchemas:      db.config.DiscoveryFilters.IncludeSchemas,
 	}
 	var tables, err = listTables(ctx, db.conn, opts)
 	if err != nil {
 		return nil, fmt.Errorf("unable to list database tables: %w", err)
+	}
+	tables, err = db.config.DiscoveryFilters.apply(tables)
+	if err != nil {
+		return nil, fmt.Errorf("error applying discovery filters: %w", err)
 	}
 	return tables, nil
 }

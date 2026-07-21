@@ -1,0 +1,4 @@
+sql> CREATE TABLE dbo.SchemaWhitelist_Default_880405 (id INTEGER PRIMARY KEY, data TEXT)
+=== Discover: Discover Tables ===
+acmeCo/test_capture/dbo/schemawhitelist_default_880405
+

@@ -1,0 +1,3 @@
+sql> CREATE TABLE dbo.SchemaWhitelist_Excluded_533051 (id INTEGER PRIMARY KEY, data TEXT)
+=== Discover: Discover Tables ===
+

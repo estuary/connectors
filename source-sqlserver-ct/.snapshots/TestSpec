@@ -40,6 +40,43 @@
         "default": false,
         "order": 5
       },
+      "discoveryFilters": {
+        "properties": {
+          "include_schemas": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Include Schemas",
+            "description": "If specified only tables in the listed schemas will be discovered."
+          },
+          "exclude_schemas": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Exclude Schemas",
+            "description": "Tables in the listed schemas will be excluded from discovery."
+          },
+          "table_patterns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Table Patterns",
+            "description": "If specified only tables matching at least one of these glob patterns will be discovered. A pattern containing a '.' matches against the qualified 'schema.table' name. A pattern without a '.' matches the unqualified table name in any schema. Use '*' or '?' as wildcards."
+          },
+          "discover_tables_without_ct": {
+            "type": "boolean",
+            "title": "Discover Tables Without Change Tracking",
+            "description": "When set the connector will discover all tables even if they do not have Change Tracking enabled. Combined as a union with the equivalent setting under Advanced Options."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Discovery Filters",
+        "description": "Options that restrict which tables are visible to discovery."
+      },
       "advanced": {
         "properties": {
           "discover_tables_without_ct": {
