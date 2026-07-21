@@ -63,6 +63,63 @@ func TestClampTimestamp(t *testing.T) {
 	}
 }
 
+func TestClampTimestampNanos(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   any
+		want    any
+		wantErr bool
+	}{
+		{
+			name:  "non-string passthrough",
+			input: 42,
+			want:  42,
+		},
+		{
+			name:    "unparseable returns error",
+			input:   "not-a-timestamp",
+			wantErr: true,
+		},
+		{
+			name:  "beyond int64-ns max clamps to boundary",
+			input: "3000-01-01T00:00:00Z",
+			want:  "2262-04-11T23:47:16.854775807Z",
+		},
+		{
+			name:  "before int64-ns min clamps to boundary",
+			input: "1000-01-01T00:00:00Z",
+			want:  "1677-09-21T00:12:43.145224192Z",
+		},
+		{
+			name:  "in-range value passes through unchanged",
+			input: "2025-06-15T12:00:00.123456789Z",
+			want:  "2025-06-15T12:00:00.123456789Z",
+		},
+		{
+			name:  "space separator normalizes to RFC3339",
+			input: "2025-11-29 01:05:28+00:00",
+			want:  "2025-11-29T01:05:28Z",
+		},
+		{
+			name:    "missing offset returns error",
+			input:   "2025-11-29 01:05:28",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := clampTimestampNanos(tt.input)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestClampDate(t *testing.T) {
 	tests := []struct {
 		name    string

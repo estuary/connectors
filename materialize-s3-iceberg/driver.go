@@ -127,7 +127,8 @@ func (catalogConfig) JSONSchema() *jsonschema.Schema {
 }
 
 type advancedConfig struct {
-	FeatureFlags *string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.,nullable"`
+	FeatureFlags         *string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.,nullable"`
+	NanosecondTimestamps bool    `json:"nanosecond_timestamps,omitempty" jsonschema:"title=Nanosecond Timestamps,description=Use nanosecond precision (Iceberg format v3) for date-time columns instead of microsecond precision (format v2). Toggling this on an existing materialization applies to data going forward: existing rows read as null for converted columns unless the binding is explicitly backfilled.,default=false"`
 }
 
 func (c config) s3StoreConfig() filesink.S3StoreConfig {
@@ -251,6 +252,10 @@ func (c config) FeatureFlags() (string, map[string]bool) {
 		return "", featureFlagDefaults
 	}
 	return strVal(c.Advanced.FeatureFlags), featureFlagDefaults
+}
+
+func (c config) nanosecondTimestamps() bool {
+	return c.Advanced != nil && c.Advanced.NanosecondTimestamps
 }
 
 func parse8601(in string) (time.Duration, error) {
@@ -490,22 +495,26 @@ func (d *materialization) NewConstraint(p pf.Projection, deltaUpdates bool, fc f
 }
 
 func (d *materialization) MapType(p boilerplate.Projection, fc fieldConfig) (mappedType, boilerplate.ElementConverter) {
-	s, err := projectionToParquetSchemaElement(p.Projection, fc)
+	s, err := projectionToParquetSchemaElement(p.Projection, fc, d.cfg.nanosecondTimestamps())
 	if err != nil {
 		// The only error here is ignoreStringFormat being set on a non-string
 		// field, where it is a no-op. Map by the field's native type rather
 		// than returning a zero mappedType, whose nil iceberg.Type would panic
 		// in String/Compatible. The misconfiguration still surfaces with a
 		// clear error at table creation (parquetSchema).
-		s, _ = projectionToParquetSchemaElement(p.Projection, fieldConfig{})
+		s, _ = projectionToParquetSchemaElement(p.Projection, fieldConfig{}, d.cfg.nanosecondTimestamps())
 	}
 
-	// Clamp date and timestamp values to years 1-9999 before they reach the
-	// writer. See clampDate/clampTimestamp for the bound's origin.
+	// Clamp date and timestamp values before they reach the writer: microsecond
+	// timestamps and dates to years 1-9999 (see clampDate/clampTimestamp for the
+	// bound's origin), nanosecond timestamps to the int64-ns band. The converters
+	// also normalize near-RFC3339 variants that the writer's strict parse rejects.
 	var elementConverter boilerplate.ElementConverter
 	switch s.DataType {
 	case writer.LogicalTypeTimestamp:
 		elementConverter = clampTimestamp
+	case writer.LogicalTypeTimestampNanos:
+		elementConverter = clampTimestampNanos
 	case writer.LogicalTypeDate:
 		elementConverter = clampDate
 	}
@@ -558,7 +567,7 @@ func (d *materialization) NewTransactor(
 
 	for i := range mappedBindings {
 		b := &mappedBindings[i]
-		pqSchema, err := parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap)
+		pqSchema, err := parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap, d.cfg.nanosecondTimestamps())
 		if err != nil {
 			return nil, err
 		}
@@ -572,13 +581,28 @@ func (d *materialization) NewTransactor(
 		})
 	}
 
-	tablePaths, err := d.catalog.tablePaths(ctx, resourcePaths)
+	tableInfos, err := d.catalog.tableInfos(ctx, resourcePaths)
 	if err != nil {
-		return nil, fmt.Errorf("looking up table paths: %w", err)
+		return nil, fmt.Errorf("looking up tables: %w", err)
 	}
 
 	for idx := range bindings {
-		bindings[idx].catalogTablePath = tablePaths[idx]
+		b := &bindings[idx]
+		b.catalogTablePath = tableInfos[idx].location
+
+		// Embed the table's field IDs in written parquet files so they are
+		// self-describing: readers then never consult the table's name mapping
+		// for them, which is what allows a schema-evolved column (new field ID,
+		// same name) to read correctly from new files while old ID-less files
+		// resolve to null.
+		for i := range b.pqSchema {
+			id, ok := tableInfos[idx].fieldIDs[b.pqSchema[i].Name]
+			if !ok {
+				return nil, fmt.Errorf("selected field %q has no column in table %q", b.pqSchema[i].Name, pathToFQN(b.path))
+			}
+			fieldID := int32(id)
+			b.pqSchema[i].FieldId = &fieldID
+		}
 	}
 
 	s3store, err := filesink.NewS3Store(ctx, d.cfg.s3StoreConfig())

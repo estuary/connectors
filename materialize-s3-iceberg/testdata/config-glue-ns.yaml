@@ -1,0 +1,36 @@
+# AWS Glue integration-test config.
+#
+# Disabled by default: TestIntegrationGlue only runs with -s3iceberg.test-glue
+# (or S3_ICEBERG_TEST_GLUE set) and needs real AWS credentials with Glue Data
+# Catalog + S3 access. Replace the REPLACE_ME placeholders below and sops-encrypt
+# this file before enabling the test. The connector creates the `namespace`
+# (a Glue database) and its tables; the S3 `bucket` must already exist or be
+# creatable by the supplied credentials.
+# Shared test bucket + Glue account also used by materialize-iceberg. The prefix
+# and namespace are deliberately distinct from that connector's so the two do not
+# clobber each other's tables in the shared Glue catalog.
+bucket: estuary-connector-test-bucket
+region: us-east-2
+prefix: s3-iceberg-test
+namespace: tests
+upload_interval: PT1S
+credentials:
+    auth_type: AWSAccessKey
+    awsAccessKeyId_sops: ENC[AES256_GCM,data:MtlUFvpUs3yZDM+UGBlUU6jRKKo=,iv:WsNfvZvSbwh+esBiDigdVnqxg5o/03PNY+9GZNp37kY=,tag:mx9ncxv1UETmBn7HpQ5J0w==,type:str]
+    awsSecretAccessKey_sops: ENC[AES256_GCM,data:TEBxk8CcDVArTurZkRjf/M9n6iWXJCpcTDssfqnttUIfvuw4a/pAbw==,iv:DJqRhL952DBCAgK9FKAVi4i6jfNe2Z15ADZLWxvJb0c=,tag:naG9wlJTOZHcsvEJnW9f1Q==,type:str]
+catalog:
+    catalog_type: AWS Glue
+    # glue_id is optional; defaults to the account ID of the credentials above.
+    # Set to 076183946664 if the credentials belong to a different account.
+advanced:
+    feature_flags: allow_existing_tables_for_new_bindings
+    nanosecond_timestamps: true
+sops:
+    gcp_kms:
+        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+          created_at: "2026-07-17T23:12:34Z"
+          enc: CiUAdmEdwqV0pPxTTaGNVcoC9OWfwhlSJ0eAu+5JAgk0nzt4HnroEkkApbezqgPNJP4KubS8KXEg6K0Cz9dsuJD/A8ntGW7dLX7QXGB8FsRdRPZObtcqwCnIgqQo3bEkCnnGlpu0qeZba59DIvQRCqJ3
+    lastmodified: "2026-07-17T23:12:34Z"
+    mac: ENC[AES256_GCM,data:prhAMeSpQRbpKNOU+eQmtQzO2NdfVjci/jX/um4H+44Mh+obFJXczDJk3tLa9R3utvjcvQNbvGVu1C+WNndg/uDW4ctGuZt9fpq8pps3Ha+LKkpmsXQKrokWx6jJwIISr7/ZYddEFF816Zf2iQPlneG4KWItZEPAUrFxS3YnVgI=,iv:L1P+mq2hJh99lrAYCOh0u6YVBPC/goWiotcuBe2qurc=,tag:i0KFfpyNqtoLtFaUJhXR8w==,type:str]
+    encrypted_suffix: _sops
+    version: 3.12.1
