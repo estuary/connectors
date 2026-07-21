@@ -26,9 +26,10 @@ type MappedField struct {
 }
 
 func NewMappedField(projection pf.Projection, fc FieldConfig) (*MappedField, error) {
-	types := projection.Inference.Types
+	types := append([]string(nil), projection.Inference.Types...)
 
-	// All properties can be set to null, but doing so is a no-opt.
+	// All properties can be set to null but doing so is a no-op; the property
+	// will not be modified.
 	//
 	// To clear a property set it to "", this will be allowed for any property
 	// type.
