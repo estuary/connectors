@@ -1,0 +1,6 @@
+sql> CREATE TABLE dbo.tp_375199_alpha_evt (id INTEGER PRIMARY KEY, data TEXT)
+sql> CREATE TABLE dbo.tp_375199_beta_evt (id INTEGER PRIMARY KEY, data TEXT)
+sql> CREATE TABLE dbo.tp_375199_alpha_log (id INTEGER PRIMARY KEY, data TEXT)
+sql> CREATE TABLE dbo.tp_375199_beta_log (id INTEGER PRIMARY KEY, data TEXT)
+=== Discover: Discover Tables ===
+

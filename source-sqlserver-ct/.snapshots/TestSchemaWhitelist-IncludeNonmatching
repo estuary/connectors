@@ -1,0 +1,3 @@
+sql> CREATE TABLE dbo.SchemaWhitelist_IncludeNonmatching_302469 (id INTEGER PRIMARY KEY, data TEXT)
+=== Discover: Discover Tables ===
+

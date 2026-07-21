@@ -1,0 +1,4 @@
+sql> CREATE TABLE dbo.SchemaWhitelist_IncludeMatching_990902 (id INTEGER PRIMARY KEY, data TEXT)
+=== Discover: Discover Tables ===
+acmeCo/test_capture/dbo/schemawhitelist_includematching_990902
+
