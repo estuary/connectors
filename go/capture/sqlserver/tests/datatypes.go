@@ -291,6 +291,11 @@ func testScanKeyTypes(t *testing.T, setup testSetupFunc) {
 			"('1991-08-31T12:34:54.333', 'Data 1')",
 			"('2000-01-01T01:01:01', 'Data 2')",
 		}},
+		{"SmallDateTime", "SMALLDATETIME", []string{
+			"('1991-08-31T12:34:00', 'Data 0')",
+			"('1991-08-31T12:35:00', 'Data 1')",
+			"('2000-01-01T01:01:00', 'Data 2')",
+		}},
 	} {
 		t.Run(testCase.Name, func(t *testing.T) {
 			var db, tc = setup(t)
