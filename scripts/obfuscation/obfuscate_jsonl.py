@@ -24,6 +24,7 @@ import json
 import random
 import string
 import sys
+import unicodedata
 from datetime import datetime, timedelta, timezone
 
 # Token-paths preserved verbatim (with their entire subtree). Nothing else is.
@@ -65,12 +66,18 @@ def _obfuscate_string(s: str, salt: str) -> str:
     r = _rng(s, salt)
     chars = []
     for ch in s:
-        if ch.islower():
+        if ch.isdigit():
+            chars.append(r.choice(string.digits))
+        elif ch.islower():
             chars.append(r.choice(string.ascii_lowercase))
         elif ch.isupper():
             chars.append(r.choice(string.ascii_uppercase))
-        elif ch.isdigit():
-            chars.append(r.choice(string.digits))
+        elif unicodedata.category(ch).startswith("L"):
+            # Caseless scripts (CJK, Hebrew, Arabic, Thai, ...) have no
+            # upper/lower form, so they'd otherwise pass through unobfuscated.
+            # Map each to a deterministic CJK ideograph: still a letter, same
+            # length, and definitely changed.
+            chars.append(chr(r.randint(0x4E00, 0x9FA5)))
         else:
             chars.append(ch)  # punctuation / whitespace / separators kept
     return "".join(chars)
