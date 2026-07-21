@@ -126,6 +126,10 @@ class ExportManager:
     async def _submit(self, query: str) -> str:
         url = f"{self.base_url}/v1/object/export"
         payload = {"Format": "csv", "Query": query}
+        # Logged before the request so a submit-time rejection (e.g. a 400 for a
+        # field describe claimed was exportable) sits next to the query that
+        # caused it in the task logs.
+        self.log.debug("submitting export job", {"query": query})
         submit_bytes = await self.http.request(
             self.log, url, method="POST", json=payload, headers=VERSION_HEADERS
         )
@@ -148,8 +152,22 @@ class ExportManager:
 
     async def _poll_until_complete(self, job_id: str) -> str:
         """Poll a submitted job until it completes, returning its file ID."""
-        for _ in range(MAX_POLL_ATTEMPTS):
+        last_status: ExportStatus | None = None
+        for attempt in range(MAX_POLL_ATTEMPTS):
             job = await self._check_job(job_id)
+            # Logged only on transitions (not every poll) so a long-running job
+            # stays visible in the logs without flooding them.
+            if job.Status is not last_status:
+                last_status = job.Status
+                self.log.debug(
+                    "export job status",
+                    {
+                        "job_id": job_id,
+                        "status": job.Status,
+                        "file_id": job.FileId,
+                        "elapsed_s": attempt * POLL_INTERVAL,
+                    },
+                )
             if job.Status is ExportStatus.COMPLETED:
                 if job.FileId is None:
                     raise ExportError(

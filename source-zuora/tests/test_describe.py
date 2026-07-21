@@ -6,10 +6,14 @@ the `./fields/field` scoping that ignores nested <field>s — logic that the
 spec/capture tests don't touch.
 """
 
+import logging
+
 import pytest
 
 from source_zuora import api
 from source_zuora.models import DescribeField
+
+_LOG = logging.getLogger("test")
 
 
 # --- DescribeField.is_exportable ----------------------------------------------
@@ -138,7 +142,7 @@ class _FakeHTTP:
 @pytest.mark.asyncio
 async def test_describe_object_returns_exportable_field_names():
     http = _FakeHTTP(_DESCRIBE_XML)
-    fields = await api.fetch_object_fields("https://rest.zuora.com", http, None, "Account")
+    fields = await api.fetch_object_fields("https://rest.zuora.com", http, _LOG, "Account")
     assert fields == ["Id", "UpdatedDate"]
     assert http.urls == ["https://rest.zuora.com/v1/describe/Account"]
 
@@ -148,7 +152,7 @@ async def test_describe_requests_pin_api_version_header():
     from source_zuora.shared import ZUORA_API_VERSION
 
     http = _FakeHTTP(_DESCRIBE_XML)
-    await api.fetch_object_fields("https://rest.zuora.com", http, None, "Account")
+    await api.fetch_object_fields("https://rest.zuora.com", http, _LOG, "Account")
     assert http.headers[0].get("Zuora-Version") == ZUORA_API_VERSION
 
 
@@ -156,6 +160,6 @@ async def test_describe_requests_pin_api_version_header():
 async def test_discover_object_names_returns_catalog_names():
     xml = b"<objects><object><name>Account</name></object><object><name>Order</name></object></objects>"
     http = _FakeHTTP(xml)
-    names = await api.discover_object_names("https://rest.zuora.com", http, None)
+    names = await api.discover_object_names("https://rest.zuora.com", http, _LOG)
     assert names == ["Account", "Order"]
     assert http.urls == ["https://rest.zuora.com/v1/describe"]
