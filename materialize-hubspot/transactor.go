@@ -123,7 +123,7 @@ func (t *transactor) storeNonUniqueProperty(ctx context.Context, b *binding, bat
 	searchRequest := &SearchRequest{
 		FilterGroups: NewFilterGroupsIn(b.idProperty.Name, ids),
 		Properties:   []string{"id", b.idProperty.Name},
-		Limit:        101,
+		Limit:        101, // One more than the largest batch; for duplicate detection below.
 	}
 	response, err := t.client.Search(ctx, b.object, searchRequest)
 	if err != nil {
@@ -133,7 +133,7 @@ func (t *transactor) storeNonUniqueProperty(ctx context.Context, b *binding, bat
 	// If we received more results than we have ids, there are duplicate
 	// records with this idProperty.  A user will need to go in and merge the
 	// records to fix this, or better yet switch to a unique property.
-	if len(response.Results) != len(ids) {
+	if len(response.Results) > len(ids) {
 		log.WithFields(log.Fields{
 			"object":      b.object,
 			"id_property": b.idProperty.Name,
