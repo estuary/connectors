@@ -77,6 +77,8 @@ For materialization connector work: each database (Snowflake, Spanner, BigQuery,
 
 All connector configurations use JSON Schema. See [config_schema_guidelines.md](config_schema_guidelines.md) for field annotations (`title`, `description`, `secret`, `advanced`, `discriminator`).
 
+When adding a config field that is completely customer-agnostic (a pure behaviour / format / performance / scheduling knob that reveals nothing about the customer), add its key to [scripts/obfuscation/config_allowlist.txt](scripts/obfuscation/config_allowlist.txt) so it survives catalog sanitization. That file is a strip-by-default allow-list: anything not listed is removed from sanitized catalog specs, so leaving an agnostic knob out only makes sanitized configs less complete — never unsafe. When in doubt, leave it out.
+
 ### Data Types
 
 - Date-time values with `format: date-time` must be RFC3339 compliant

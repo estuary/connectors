@@ -8,6 +8,11 @@
 # Add a key here ONLY if it reveals NOTHING about the customer — a pure
 # behaviour / format / performance / scheduling toggle. When in doubt, leave it
 # out (stripping a harmless knob is safe; keeping a revealing one is a leak).
+#
+# Only SCALAR-valued keys (and lists of scalars) are kept, matched by their own
+# leaf key name. Listing an OBJECT's key has no effect — objects are always
+# recursed into. To keep the contents of a nested object, add each scalar key
+# inside it individually.
 # Deliberately EXCLUDED as too-revealing or too-generic: auth_type, catalog_type,
 # compute_type, method, mode, is_sandbox, timezone, region, name, limit, days,
 # start_date, cursor*, and every host/credential/account/schema/table field.
