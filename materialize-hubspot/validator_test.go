@@ -17,7 +17,7 @@ func TestValidateBinding(t *testing.T) {
 		binding     *pm.Request_Validate_Binding
 		lastSpec    *pf.MaterializationSpec
 		expectedErr string
-		expected    map[string]*pm.Response_Validated_Constraint
+		expected    map[string][]*pm.Response_Validated_Constraint
 	}{
 		{
 			name: "no bindings",
@@ -30,7 +30,7 @@ func TestValidateBinding(t *testing.T) {
 			},
 			binding:  &pm.Request_Validate_Binding{},
 			lastSpec: nil,
-			expected: map[string]*pm.Response_Validated_Constraint{},
+			expected: map[string][]*pm.Response_Validated_Constraint{},
 		},
 		{
 			name: "nullable key field no default",
@@ -98,16 +98,20 @@ func TestValidateBinding(t *testing.T) {
 				},
 			},
 			lastSpec: nil,
-			expected: map[string]*pm.Response_Validated_Constraint{
-				"howdy": &pm.Response_Validated_Constraint{
-					Type:        pm.Response_Validated_Constraint_FIELD_FORBIDDEN,
-					Reason:      `A property for this field does not exist: "howdy"`,
-					FoldedField: "howdy",
+			expected: map[string][]*pm.Response_Validated_Constraint{
+				"howdy": {
+					&pm.Response_Validated_Constraint{
+						Type:        pm.Response_Validated_Constraint_FIELD_FORBIDDEN,
+						Reason:      `A property for this field does not exist: "howdy"`,
+						FoldedField: "howdy",
+					},
 				},
-				"name": &pm.Response_Validated_Constraint{
-					Type:        pm.Response_Validated_Constraint_FIELD_OPTIONAL,
-					Reason:      "This field is able to be materialized",
-					FoldedField: "name",
+				"name": {
+					&pm.Response_Validated_Constraint{
+						Type:        pm.Response_Validated_Constraint_FIELD_OPTIONAL,
+						Reason:      "This field is able to be materialized",
+						FoldedField: "name",
+					},
 				},
 			},
 		},
@@ -143,11 +147,13 @@ func TestValidateBinding(t *testing.T) {
 				},
 			},
 			lastSpec: nil,
-			expected: map[string]*pm.Response_Validated_Constraint{
-				"domain": &pm.Response_Validated_Constraint{
-					Type:        pm.Response_Validated_Constraint_FIELD_REQUIRED,
-					Reason:      "One collections key field is required",
-					FoldedField: "domain",
+			expected: map[string][]*pm.Response_Validated_Constraint{
+				"domain": {
+					&pm.Response_Validated_Constraint{
+						Type:        pm.Response_Validated_Constraint_FIELD_REQUIRED,
+						Reason:      "One collections key field is required",
+						FoldedField: "domain",
+					},
 				},
 			},
 		},
@@ -198,21 +204,27 @@ func TestValidateBinding(t *testing.T) {
 				},
 			},
 			lastSpec: nil,
-			expected: map[string]*pm.Response_Validated_Constraint{
-				"email": &pm.Response_Validated_Constraint{
-					Type:        pm.Response_Validated_Constraint_FIELD_REQUIRED,
-					Reason:      "One collections key field is required",
-					FoldedField: "email",
+			expected: map[string][]*pm.Response_Validated_Constraint{
+				"email": {
+					&pm.Response_Validated_Constraint{
+						Type:        pm.Response_Validated_Constraint_FIELD_REQUIRED,
+						Reason:      "One collections key field is required",
+						FoldedField: "email",
+					},
 				},
-				"firstname": &pm.Response_Validated_Constraint{
-					Type:        pm.Response_Validated_Constraint_FIELD_FORBIDDEN,
-					Reason:      "Only one key field may be selected for record matching",
-					FoldedField: "firstname",
+				"firstname": {
+					&pm.Response_Validated_Constraint{
+						Type:        pm.Response_Validated_Constraint_FIELD_FORBIDDEN,
+						Reason:      "Only one key field may be selected for record matching",
+						FoldedField: "firstname",
+					},
 				},
-				"lastname": &pm.Response_Validated_Constraint{
-					Type:        pm.Response_Validated_Constraint_FIELD_OPTIONAL,
-					Reason:      "This field is able to be materialized",
-					FoldedField: "lastname",
+				"lastname": {
+					&pm.Response_Validated_Constraint{
+						Type:        pm.Response_Validated_Constraint_FIELD_OPTIONAL,
+						Reason:      "This field is able to be materialized",
+						FoldedField: "lastname",
+					},
 				},
 			},
 		},
@@ -259,16 +271,20 @@ func TestValidateBinding(t *testing.T) {
 				},
 			},
 			lastSpec: nil,
-			expected: map[string]*pm.Response_Validated_Constraint{
-				"email": &pm.Response_Validated_Constraint{
-					Type:        pm.Response_Validated_Constraint_FIELD_REQUIRED,
-					Reason:      "One collections key field is required",
-					FoldedField: "email",
+			expected: map[string][]*pm.Response_Validated_Constraint{
+				"email": {
+					&pm.Response_Validated_Constraint{
+						Type:        pm.Response_Validated_Constraint_FIELD_REQUIRED,
+						Reason:      "One collections key field is required",
+						FoldedField: "email",
+					},
 				},
-				"followercount": &pm.Response_Validated_Constraint{
-					Type:        pm.Response_Validated_Constraint_FIELD_FORBIDDEN,
-					Reason:      `The existing property for this field has an incompatible type: "number"`,
-					FoldedField: "followercount",
+				"followercount": {
+					&pm.Response_Validated_Constraint{
+						Type:        pm.Response_Validated_Constraint_FIELD_FORBIDDEN,
+						Reason:      `The existing property for this field has an incompatible type: "number"`,
+						FoldedField: "followercount",
+					},
 				},
 			},
 		},

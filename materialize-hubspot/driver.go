@@ -96,7 +96,7 @@ func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 		} else {
 			out = append(out, &pm.Response_Validated_Binding{
 				CaseInsensitiveFields: false,
-				Constraints:           constraints,
+				ProjectionConstraints: boilerplate.ValidatedConstraints(constraints),
 				DeltaUpdates:          true,
 				ResourcePath:          path,
 				SerPolicy:             nil,
