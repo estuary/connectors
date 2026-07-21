@@ -18,7 +18,9 @@ from .models import (
 )
 from .shared import VERSION_HEADERS
 
-# Maximum date range for a single REST export job, enforced by Zuora.
+# Maximum date range for a single export job. Zuora's legacy export API
+# enforced 30 days; the same cap is kept under AQuA so no single job grows
+# unboundedly large and checkpoints stay reasonably frequent.
 MAX_EXPORT_WINDOW = timedelta(days=30)
 
 # Hold the leading edge this far behind real time. Zuora's export index is
@@ -105,7 +107,8 @@ async def fetch_object_fields(
         await http.request(log, url, headers=VERSION_HEADERS)
     )
     # Field availability in exports is tenant-dependent and describe has been
-    # seen disagreeing with what POST /v1/object/export actually accepts, so
+    # seen disagreeing with what the export engine actually accepts (the reason
+    # this connector uses AQuA over the legacy /v1/object/export API), so
     # record exactly how each field was classified and why.
     log.debug(
         "described object",
