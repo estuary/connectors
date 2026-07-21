@@ -78,7 +78,9 @@ async def discover_object_names(
     catalog = _parse_catalog(
         await http.request(log, url, headers=VERSION_HEADERS)
     )
-    return [obj.name for obj in catalog.objects]
+    names = [obj.name for obj in catalog.objects]
+    log.debug("discovered objects", {"count": len(names), "objects": names})
+    return names
 
 
 def _parse_catalog(response_bytes: bytes) -> DescribeCatalog:
@@ -99,9 +101,25 @@ async def fetch_object_fields(
 ) -> list[str]:
     """Return the exportable field names for a Zuora object."""
     url = f"{base_url}/v1/describe/{object_name}"
-    return _parse_describe_object(
+    described = _parse_describe_object(
         await http.request(log, url, headers=VERSION_HEADERS)
-    ).exportable_field_names
+    )
+    # Field availability in exports is tenant-dependent and describe has been
+    # seen disagreeing with what POST /v1/object/export actually accepts, so
+    # record exactly how each field was classified and why.
+    log.debug(
+        "described object",
+        {
+            "object": object_name,
+            "exportable_fields": described.exportable_field_names,
+            "excluded_fields": {
+                f.name: {"selectable": f.selectable, "contexts": f.contexts}
+                for f in described.fields
+                if not f.is_exportable
+            },
+        },
+    )
+    return described.exportable_field_names
 
 
 def _parse_describe_object(response_bytes: bytes) -> DescribeObject:
@@ -165,7 +183,10 @@ async def _export_window(
     window rather than the opaque Zuora file id.
     """
     max_cursor: datetime | None = None
+    # count drives intermediate checkpoints and resets at each one; total is the
+    # window's whole-lifetime document count, kept separately for the summary log.
     count = 0
+    total = 0
     while True:
         query = build_query(
             object_name, fields, model.CURSOR_FIELD,
@@ -184,6 +205,7 @@ async def _export_window(
                     count = 0
                 yield doc
                 count += 1
+                total += 1
                 if max_cursor is None or cursor > max_cursor:
                     max_cursor = cursor
             break
@@ -195,8 +217,27 @@ async def _export_window(
                     f"[{_format_dt_to_utc(window_start)}, {_format_dt_to_utc(window_end)}) "
                     f"still exceeds Zuora's size limit and cannot be narrowed further"
                 ) from err
+            log.debug(
+                "export exceeded size limit, bisecting window",
+                {
+                    "object": object_name,
+                    "window_start": _format_dt_to_utc(window_start),
+                    "window_end": _format_dt_to_utc(window_end),
+                    "new_window_end": _format_dt_to_utc(mid),
+                },
+            )
             window_end = mid
 
+    log.debug(
+        "export window complete",
+        {
+            "object": object_name,
+            "window_start": _format_dt_to_utc(window_start),
+            "covered_end": _format_dt_to_utc(window_end),
+            "docs": total,
+            "max_cursor": max_cursor.isoformat() if max_cursor is not None else None,
+        },
+    )
     yield _WindowEnd(max_cursor=max_cursor, covered_end=window_end)
 
 
@@ -222,11 +263,25 @@ async def fetch_changes(
             yield item  # a document or an intermediate datetime checkpoint
         elif item.max_cursor is not None:
             # Advance only to just past the last second that held data.
-            yield _second_floor(item.max_cursor) + timedelta(seconds=1)
+            new_cursor = _second_floor(item.max_cursor) + timedelta(seconds=1)
+            log.debug(
+                "advancing cursor just past the last second holding data",
+                {"object": object_name, "cursor": _format_dt_to_utc(new_cursor)},
+            )
+            yield new_cursor
         elif item.covered_end < now:
             # A full-sized window that yielded nothing. Advance past all of it
             # rather than leaving the cursor stuck in the past.
+            log.debug(
+                "empty window, advancing cursor to its end",
+                {"object": object_name, "cursor": _format_dt_to_utc(item.covered_end)},
+            )
             yield item.covered_end
+        else:
+            log.debug(
+                "empty window at the leading edge, cursor unchanged",
+                {"object": object_name, "cursor": _format_dt_to_utc(log_cursor)},
+            )
 
 
 async def fetch_page(
@@ -260,7 +315,13 @@ async def fetch_page(
             # window (covered_end == cutoff) ends on documents so backfill
             # completes without emitting a further page.
             if item.covered_end < cutoff:
+                log.debug(
+                    "backfill window complete, resuming from next page cursor",
+                    {"object": object_name, "next_page": item.covered_end.isoformat()},
+                )
                 yield item.covered_end.isoformat()
+            else:
+                log.debug("backfill reached cutoff", {"object": object_name})
         elif isinstance(item, datetime):
             yield item.isoformat()  # PageCursors are isoformat strings
         else:
