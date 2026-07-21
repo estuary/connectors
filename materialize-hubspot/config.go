@@ -92,10 +92,10 @@ func (Credentials) JSONSchema() *jsonschema.Schema {
 }
 
 type AdvancedConfig struct {
-	Limit       float64 `json:"limit" jsonschema:"title=Request Limit,description=Maximum requests per second across all bindings excluding search.,default=10,exclusiveMinimum=0,maximum=250"`
-	Burst       int     `json:"burst" jsonschema:"title=Request Burst Count,description=Burst requests across all bindings excluding search.,default=100,minimum=1,maximum=1000"`
-	SearchLimit float64 `json:"search_limit" jsonschema:"title=Search Request Limit,description=Maximum search requests per second across all bindings.,default=5,exclusiveMinimum=0,maximum=250"`
-	SearchBurst int     `json:"search_burst" jsonschema:"title=Search Request Burst Count,description=Burst search requests across all bindings.,default=5,minimum=1,maximum=1000"`
+	Limit       float64 `json:"limit,omitempty" jsonschema:"title=Request Limit,description=Maximum requests per second across all bindings excluding search.,default=10,exclusiveMinimum=0,maximum=250"`
+	Burst       int     `json:"burst,omitempty" jsonschema:"title=Request Burst Count,description=Burst requests across all bindings excluding search.,default=100,minimum=1,maximum=1000"`
+	SearchLimit float64 `json:"search_limit,omitempty" jsonschema:"title=Search Request Limit,description=Maximum search requests per second across all bindings.,default=5,exclusiveMinimum=0,maximum=250"`
+	SearchBurst int     `json:"search_burst,omitempty" jsonschema:"title=Search Request Burst Count,description=Burst search requests across all bindings.,default=5,minimum=1,maximum=1000"`
 
 	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
