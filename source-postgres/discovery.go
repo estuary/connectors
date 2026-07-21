@@ -37,19 +37,26 @@ func (db *postgresDatabase) DiscoverTableDetails(ctx context.Context, requested 
 	if err != nil {
 		return nil, fmt.Errorf("unable to list database tables: %w", err)
 	}
-	columns, err := getColumns(ctx, db.conn)
+
+	// Restrict subsequent catalog queries to just the schemas containing requested
+	// tables. On databases with very large catalogs (hundreds of thousands of tables)
+	// the unfiltered queries can return millions of rows, which is both slow and can
+	// exhaust connector memory.
+	var schemas = distinctSchemas(requested)
+
+	columns, err := getColumns(ctx, db.conn, schemas)
 	if err != nil {
 		return nil, fmt.Errorf("unable to list database columns: %w", err)
 	}
-	primaryKeys, err := getPrimaryKeys(ctx, db.conn)
+	primaryKeys, err := getPrimaryKeys(ctx, db.conn, schemas)
 	if err != nil {
 		return nil, fmt.Errorf("unable to list database primary keys: %w", err)
 	}
-	secondaryIndexes, err := getSecondaryIndexes(ctx, db.conn)
+	secondaryIndexes, err := getSecondaryIndexes(ctx, db.conn, schemas)
 	if err != nil {
 		return nil, fmt.Errorf("unable to list database secondary indexes: %w", err)
 	}
-	generatedColumns, err := getGeneratedColumns(ctx, db.conn)
+	generatedColumns, err := getGeneratedColumns(ctx, db.conn, schemas)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if !errors.As(err, &pgErr) || pgErr.Code != "42703" {
@@ -63,7 +70,7 @@ func (db *postgresDatabase) DiscoverTableDetails(ctx context.Context, requested 
 
 	// Column descriptions just add a bit of user-friendliness. They're so unimportant
 	// that failure to list them shouldn't even be a fatal error.
-	columnDescriptions, err := getColumnDescriptions(ctx, db.conn)
+	columnDescriptions, err := getColumnDescriptions(ctx, db.conn, schemas)
 	if err != nil {
 		logrus.WithField("err", err).Warn("error fetching column descriptions")
 	}
@@ -452,6 +459,29 @@ func getTables(ctx context.Context, conn *pgxpool.Pool, selectedSchemas []string
 	return tables, rows.Err()
 }
 
+// distinctSchemas returns the distinct schema names of the provided tables.
+func distinctSchemas(tables []sqlcapture.TableID) []string {
+	var seen = make(map[string]bool)
+	var schemas []string
+	for _, t := range tables {
+		if !seen[t.Schema] {
+			seen[t.Schema] = true
+			schemas = append(schemas, t.Schema)
+		}
+	}
+	return schemas
+}
+
+// schemaFilter returns a SQL predicate (and matching query arguments) which
+// restricts the named schema column to the provided list of schemas, or an
+// empty predicate when no schemas are specified.
+func schemaFilter(column string, schemas []string) (string, []any) {
+	if len(schemas) == 0 {
+		return "", nil
+	}
+	return fmt.Sprintf("AND %s = ANY($1)", column), []any{schemas}
+}
+
 const queryDiscoverColumns = `
   SELECT nc.nspname as table_schema,
          c.relname as table_name,
@@ -471,12 +501,14 @@ const queryDiscoverColumns = `
 	  AND a.attnum > 0
 	  AND NOT a.attisdropped
 	  AND (c.relkind = ANY (ARRAY['r'::"char", 'v'::"char", 'f'::"char", 'p'::"char"]))
+	  %s
 	ORDER BY nc.nspname, c.relname, a.attnum;`
 
-func getColumns(ctx context.Context, conn *pgxpool.Pool) ([]sqlcapture.ColumnInfo, error) {
+func getColumns(ctx context.Context, conn *pgxpool.Pool, schemas []string) ([]sqlcapture.ColumnInfo, error) {
 	logrus.Debug("listing all columns in the database")
+	var filter, args = schemaFilter("nc.nspname", schemas)
 	var columns []sqlcapture.ColumnInfo
-	var rows, err = conn.Query(ctx, queryDiscoverColumns)
+	var rows, err = conn.Query(ctx, fmt.Sprintf(queryDiscoverColumns, filter), args...)
 	if err != nil {
 		return nil, fmt.Errorf("error executing query: %w", err)
 	}
@@ -717,6 +749,7 @@ const queryDiscoverPrimaryKeys = `
       JOIN pg_catalog.pg_index i ON (a.attrelid = i.indrelid)
       JOIN pg_catalog.pg_class ci ON (ci.oid = i.indexrelid)
     WHERE i.indisprimary
+	  %s
   ) result
   WHERE result.A_ATTNUM = (result.KEYS).x
   ORDER BY result.table_name, result.pk_name, result.key_seq;
@@ -726,10 +759,11 @@ const queryDiscoverPrimaryKeys = `
 // primary keys. Table names are fully qualified as "<schema>.<name>", and
 // primary keys are represented as a list of column names, in the order that
 // they form the table's primary key.
-func getPrimaryKeys(ctx context.Context, conn *pgxpool.Pool) (map[sqlcapture.StreamID][]string, error) {
+func getPrimaryKeys(ctx context.Context, conn *pgxpool.Pool, schemas []string) (map[sqlcapture.StreamID][]string, error) {
 	logrus.Debug("listing all primary-key columns in the database")
+	var filter, args = schemaFilter("n.nspname", schemas)
 	var keys = make(map[sqlcapture.StreamID][]string)
-	var rows, err = conn.Query(ctx, queryDiscoverPrimaryKeys)
+	var rows, err = conn.Query(ctx, fmt.Sprintf(queryDiscoverPrimaryKeys, filter), args...)
 	if err != nil {
 		return nil, fmt.Errorf("error executing query: %w", err)
 	}
@@ -765,18 +799,20 @@ FROM (
 	   JOIN pg_catalog.pg_attribute a ON (a.attrelid = tc.oid)
   WHERE ix.indisunique AND ix.indexprs IS NULL AND tc.relkind = 'r'
     AND NOT ix.indisprimary
+	%s
   ORDER BY tc.relname, ic.relname
 ) r
 WHERE r.column_number = (r.index_keys).x
 ORDER BY r.table_schema, r.table_name, r.index_name, (r.index_keys).n
 `
 
-func getSecondaryIndexes(ctx context.Context, conn *pgxpool.Pool) (map[sqlcapture.StreamID]map[string][]string, error) {
+func getSecondaryIndexes(ctx context.Context, conn *pgxpool.Pool, schemas []string) (map[sqlcapture.StreamID]map[string][]string, error) {
 	logrus.Debug("listing secondary indexes")
 	// Run the 'list secondary indexes' query and aggregate results into
 	// a `map[StreamID]map[IndexName][]ColumnName`
 	var streamIndexColumns = make(map[sqlcapture.StreamID]map[string][]string)
-	var rows, err = conn.Query(ctx, queryDiscoverSecondaryIndices)
+	var filter, args = schemaFilter("tn.nspname", schemas)
+	var rows, err = conn.Query(ctx, fmt.Sprintf(queryDiscoverSecondaryIndices, filter), args...)
 	if err != nil {
 		return nil, fmt.Errorf("error executing query: %w", err)
 	}
@@ -810,12 +846,14 @@ const queryListGeneratedColumns = `
 	JOIN pg_catalog.pg_class c ON a.attrelid = c.oid
 	JOIN pg_catalog.pg_namespace n ON c.relnamespace = n.oid
 	WHERE a.attgenerated = 's'
+	  %s
 	ORDER BY n.nspname, c.relname, a.attname;
 `
 
-func getGeneratedColumns(ctx context.Context, conn *pgxpool.Pool) (map[sqlcapture.StreamID][]string, error) {
+func getGeneratedColumns(ctx context.Context, conn *pgxpool.Pool, schemas []string) (map[sqlcapture.StreamID][]string, error) {
 	logrus.Debug("listing generated columns")
-	var rows, err = conn.Query(ctx, queryListGeneratedColumns)
+	var filter, args = schemaFilter("n.nspname", schemas)
+	var rows, err = conn.Query(ctx, fmt.Sprintf(queryListGeneratedColumns, filter), args...)
 	if err != nil {
 		return nil, fmt.Errorf("error querying generated columns: %w", err)
 	}
@@ -842,9 +880,10 @@ const queryColumnDescriptions = `
 		    isc.table_schema,
 			isc.table_name,
 			isc.column_name,
-			pg_catalog.col_description(format('"%s"."%s"',isc.table_schema,isc.table_name)::regclass::oid,isc.ordinal_position) description
+			pg_catalog.col_description(format('"%%s"."%%s"',isc.table_schema,isc.table_name)::regclass::oid,isc.ordinal_position) description
 		FROM information_schema.columns isc
 		WHERE isc.table_schema NOT IN ('pg_catalog', 'pg_internal', 'information_schema', 'catalog_history', 'cron', 'pglogical')
+		  %s
 	) as descriptions WHERE description != '';
 `
 
@@ -855,9 +894,10 @@ type columnDescription struct {
 	Description string
 }
 
-func getColumnDescriptions(ctx context.Context, conn *pgxpool.Pool) ([]columnDescription, error) {
+func getColumnDescriptions(ctx context.Context, conn *pgxpool.Pool, schemas []string) ([]columnDescription, error) {
+	var filter, args = schemaFilter("isc.table_schema", schemas)
 	var descriptions []columnDescription
-	var rows, err = conn.Query(ctx, queryColumnDescriptions)
+	var rows, err = conn.Query(ctx, fmt.Sprintf(queryColumnDescriptions, filter), args...)
 	if err != nil {
 		return nil, fmt.Errorf("error executing query: %w", err)
 	}
