@@ -72,8 +72,14 @@ sql> COMMENT ON COLUMN test.discoverycomplex_934635.k1 IS 'I think this is a key
     "allOf": [
       {
         "if": {
+          "required": [
+            "_meta"
+          ],
           "properties": {
             "_meta": {
+              "required": [
+                "op"
+              ],
               "properties": {
                 "op": {
                   "const": "d"

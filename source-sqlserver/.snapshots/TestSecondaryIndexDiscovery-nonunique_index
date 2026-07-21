@@ -42,8 +42,14 @@ sql> CREATE INDEX UX_591008_k23 ON dbo.SecondaryIndexDiscovery_nonunique_index_5
     "allOf": [
       {
         "if": {
+          "required": [
+            "_meta"
+          ],
           "properties": {
             "_meta": {
+              "required": [
+                "op"
+              ],
               "properties": {
                 "op": {
                   "const": "d"

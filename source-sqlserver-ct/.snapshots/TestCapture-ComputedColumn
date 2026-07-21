@@ -46,8 +46,14 @@ sql> CREATE TABLE dbo.Capture_ComputedColumn_345410 (id INTEGER PRIMARY KEY, a V
     "allOf": [
       {
         "if": {
+          "required": [
+            "_meta"
+          ],
           "properties": {
             "_meta": {
+              "required": [
+                "op"
+              ],
               "properties": {
                 "op": {
                   "const": "d"
