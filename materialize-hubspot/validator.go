@@ -36,7 +36,7 @@ func (v *Validator) ValidateBinding(
 	resource Resource,
 	binding *pm.Request_Validate_Binding,
 	lastSpec *pf.MaterializationSpec,
-) (map[string]*pm.Response_Validated_Constraint, error) {
+) (map[string][]*pm.Response_Validated_Constraint, error) {
 	path, err := resource.Path()
 	if err != nil {
 		return nil, err
@@ -68,14 +68,14 @@ func (v *Validator) ValidateBinding(
 		return nil, err
 	}
 
-	constraints := make(map[string]*pm.Response_Validated_Constraint)
+	constraints := make(map[string][]*pm.Response_Validated_Constraint)
 	keys := []string{}
 	for _, projection := range binding.Collection.Projections {
 		constraint, err := v.NewConstraint(projection, object, binding, lastBinding, keys)
 		if err != nil {
 			return nil, err
 		}
-		constraints[projection.Field] = constraint
+		constraints[projection.Field] = []*pm.Response_Validated_Constraint{constraint}
 
 		if projection.IsPrimaryKey && constraint.Type != pm.Response_Validated_Constraint_FIELD_FORBIDDEN {
 			keys = append(keys, projection.Field)
