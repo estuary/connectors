@@ -154,6 +154,20 @@ async def _execution_wrapper(
         yield end
 
 
+def _should_fallback_to_rest_api(err: BulkJobError, name: str, log: Logger) -> bool:
+    # If this object can't be queried via the Bulk API, fallback to using the REST API.
+    should_fallback = False
+    if err.errors:
+        if CANNOT_FETCH_COMPOUND_DATA in err.errors or NOT_SUPPORTED_BY_BULK_API in err.errors:
+            log.info(f"{name} cannot be queried via the Bulk API. Attempting to use the REST API instead.", {"errors": err.errors})
+            should_fallback = True
+        elif DAILY_MAX_BULK_API_QUERY_VOLUME_EXCEEDED in err.errors or DAILY_MAX_BULK_API_QUERY_LIMIT_EXCEEDED in err.errors:
+            log.info(f"{err.message}. Attempting to use the REST API instead.", {"errors": err.errors})
+            should_fallback = True
+
+    return should_fallback
+
+
 async def backfill_incremental_resources(
     http: HTTPSession,
     is_supported_by_bulk_api: bool,
@@ -243,17 +257,7 @@ async def backfill_incremental_resources(
         async for doc_or_str in gen:
             yield doc_or_str
     except BulkJobError as err:
-        # If this object can't be queried via the Bulk API, fallback to using the REST API.
-        should_fallback_to_rest_api = False
-        if err.errors:
-            if CANNOT_FETCH_COMPOUND_DATA in err.errors or NOT_SUPPORTED_BY_BULK_API in err.errors:
-                log.info(f"{name} cannot be queried via the Bulk API. Attempting to use the REST API instead.", {"errors": err.errors})
-                should_fallback_to_rest_api = True
-            elif DAILY_MAX_BULK_API_QUERY_VOLUME_EXCEEDED in err.errors or DAILY_MAX_BULK_API_QUERY_LIMIT_EXCEEDED in err.errors:
-                log.info(f"{err.message}. Attempting to use the REST API instead.", {"errors": err.errors})
-                should_fallback_to_rest_api = True
-
-        if should_fallback_to_rest_api:
+        if _should_fallback_to_rest_api(err, name, log):
             async for doc_or_str in _execute_rest():
                 yield doc_or_str
         else:
