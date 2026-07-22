@@ -34,11 +34,11 @@ DATATYPE_MAP: dict[str, Any] = {
     "TIMESTAMP": AwareDatetime,
     "ENUM": str,
     "DECIMAL": str,
-    # TODO(whb): Update the remaining types once we see some values and know
-    # what they look like. `str` is just a placeholder, and may or may not be
-    # appropriate.
     "CURRENCY": str,
     "PERCENT": str,
+    # TODO(bair): Update SEQUENCE once we see some values and know what they
+    # look like. `str` is just a placeholder, and may or may not be
+    # appropriate.
     "SEQUENCE": str,
 }
 
@@ -115,9 +115,9 @@ class SageRecord(BaseModel):
                     assert isinstance(val, str)
                     if val == "":
                         continue
-                case "DECIMAL":
+                case "DECIMAL" | "CURRENCY" | "PERCENT":
                     val = str(val)
-                case "CURRENCY" | "SEQUENCE" | "PERCENT":
+                case "SEQUENCE":
                     # TODO(whb): Update this once we see some values and know
                     # what they look like.
                     raise ValueError(
@@ -156,12 +156,12 @@ class SageRecord(BaseModel):
                         "type": "string",
                         "format": "date-time",
                     }
-                case "DECIMAL":
+                case "DECIMAL" | "CURRENCY" | "PERCENT":
                     field_schema = {
                         "type": "string",
                         "format": "number",
                     }
-                case "CURRENCY" | "SEQUENCE" | "PERCENT":
+                case "SEQUENCE":
                     # TODO(whb): Update this to an appropriate type once we see
                     # some values and know what they look like.
                     continue
