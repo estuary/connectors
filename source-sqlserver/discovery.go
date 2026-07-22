@@ -25,7 +25,6 @@ const discoveryChunkSize = 100
 
 // discoveryOptions controls how discovery queries are constructed.
 type discoveryOptions struct {
-	UppercaseQueries    bool     // Use uppercase identifiers for compatibility with tricky collations
 	DiscoverOnlyEnabled bool     // Only discover tables with CDC capture instances
 	IncludeSchemas      []string // If non-empty, discovery is restricted to these schemas
 }
@@ -113,7 +112,6 @@ func tableIDsPredicate(schemaCol, tableCol string, tables []sqlcapture.TableID, 
 // connector's configured discovery filters are applied.
 func (db *sqlserverDatabase) ListTables(ctx context.Context) ([]sqlcapture.TableID, error) {
 	var opts = discoveryOptions{
-		UppercaseQueries:    db.featureFlags["uppercase_discovery_queries"],
 		DiscoverOnlyEnabled: db.config.Advanced.DiscoverOnlyEnabled || db.config.DiscoveryFilters.DiscoverOnlyEnabled,
 		IncludeSchemas:      db.config.DiscoveryFilters.IncludeSchemas,
 	}
@@ -132,11 +130,6 @@ func (db *sqlserverDatabase) ListTables(ctx context.Context) ([]sqlcapture.Table
 // about the specified tables. The per-table metadata queries are chunked into
 // batches so that discovery scales to databases with very large catalogs.
 func (db *sqlserverDatabase) DiscoverTableDetails(ctx context.Context, requested []sqlcapture.TableID) (map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, error) {
-	var opts = discoveryOptions{
-		UppercaseQueries:    db.featureFlags["uppercase_discovery_queries"],
-		DiscoverOnlyEnabled: db.config.Advanced.DiscoverOnlyEnabled || db.config.DiscoveryFilters.DiscoverOnlyEnabled,
-	}
-
 	// Replication needs the watermarks table in the result map even when no binding
 	// references it, so we ensure it's in the requested list.
 	if !db.featureFlags["read_only"] {
@@ -151,7 +144,7 @@ func (db *sqlserverDatabase) DiscoverTableDetails(ctx context.Context, requested
 	var tableMap = make(map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, len(requested))
 	for i := 0; i < len(requested); i += discoveryChunkSize {
 		var end = min(i+discoveryChunkSize, len(requested))
-		if err := db.extendTableDetails(ctx, opts, tableMap, requested[i:end]); err != nil {
+		if err := db.extendTableDetails(ctx, tableMap, requested[i:end]); err != nil {
 			return nil, err
 		}
 	}
@@ -174,8 +167,8 @@ func (db *sqlserverDatabase) DiscoverTableDetails(ctx context.Context, requested
 // exactly one chunk, all of its metadata is fetched together and the per-table
 // derivations (fallback keys, key-ordering predictability) can be finalized
 // here rather than after all chunks complete.
-func (db *sqlserverDatabase) extendTableDetails(ctx context.Context, opts discoveryOptions, dst map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, requested []sqlcapture.TableID) error {
-	tables, err := getTables(ctx, db.conn, opts, requested)
+func (db *sqlserverDatabase) extendTableDetails(ctx context.Context, dst map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, requested []sqlcapture.TableID) error {
+	tables, err := getTables(ctx, db.conn, requested)
 	if err != nil {
 		return fmt.Errorf("unable to list database tables: %w", err)
 	}
@@ -202,7 +195,7 @@ func (db *sqlserverDatabase) extendTableDetails(ctx context.Context, opts discov
 		dst[streamID] = table
 	}
 
-	columns, err := getColumns(ctx, db.conn, opts, requested)
+	columns, err := getColumns(ctx, db.conn, requested)
 	if err != nil {
 		return fmt.Errorf("unable to list database columns: %w", err)
 	}
@@ -220,7 +213,7 @@ func (db *sqlserverDatabase) extendTableDetails(ctx context.Context, opts discov
 		dst[streamID] = info
 	}
 
-	primaryKeys, err := getPrimaryKeys(ctx, db.conn, opts, requested)
+	primaryKeys, err := getPrimaryKeys(ctx, db.conn, requested)
 	if err != nil {
 		return fmt.Errorf("unable to list database primary keys: %w", err)
 	}
@@ -355,7 +348,7 @@ SELECT DISTINCT IST.TABLE_SCHEMA, IST.TABLE_NAME
     ON IST.TABLE_SCHEMA = sch.name AND IST.TABLE_NAME = tbl.name
   WHERE IST.TABLE_SCHEMA NOT IN ('INFORMATION_SCHEMA', 'PERFORMANCE_SCHEMA', 'SYS', 'CDC')
     AND IST.TABLE_NAME != 'SYSTRANSCHEMAS'`)
-	} else if opts.UppercaseQueries {
+	} else {
 		schemaCol = "TABLE_SCHEMA"
 		query.WriteString(`
   SELECT TABLE_SCHEMA, TABLE_NAME
@@ -363,14 +356,6 @@ SELECT DISTINCT IST.TABLE_SCHEMA, IST.TABLE_NAME
   WHERE TABLE_SCHEMA != 'INFORMATION_SCHEMA' AND TABLE_SCHEMA != 'PERFORMANCE_SCHEMA'
     AND TABLE_SCHEMA != 'SYS' AND TABLE_SCHEMA != 'CDC'
     AND TABLE_NAME != 'SYSTRANSCHEMAS'`)
-	} else {
-		schemaCol = "table_schema"
-		query.WriteString(`
-  SELECT table_schema, table_name
-  FROM information_schema.tables
-  WHERE table_schema != 'information_schema' AND table_schema != 'performance_schema'
-    AND table_schema != 'sys' AND table_schema != 'cdc'
-    AND table_name != 'systranschemas'`)
 	}
 
 	if len(opts.IncludeSchemas) > 0 {
@@ -405,16 +390,12 @@ SELECT DISTINCT IST.TABLE_SCHEMA, IST.TABLE_NAME
 
 // getTables fetches table-level discovery metadata for a specific set of
 // tables, pushing the requested set down into the query predicate.
-func getTables(ctx context.Context, conn *sql.DB, opts discoveryOptions, requested []sqlcapture.TableID) ([]*sqlcapture.DiscoveryInfo, error) {
+func getTables(ctx context.Context, conn *sql.DB, requested []sqlcapture.TableID) ([]*sqlcapture.DiscoveryInfo, error) {
 	if len(requested) == 0 {
 		return nil, nil
 	}
-	var tableRef, schemaCol, nameCol, typeCol = "information_schema.tables", "table_schema", "table_name", "table_type"
-	if opts.UppercaseQueries {
-		tableRef, schemaCol, nameCol, typeCol = "INFORMATION_SCHEMA.TABLES", "TABLE_SCHEMA", "TABLE_NAME", "TABLE_TYPE"
-	}
-	var predicate, args = tableIDsPredicate(schemaCol, nameCol, requested, 1)
-	var query = fmt.Sprintf("SELECT %s, %s, %s FROM %s WHERE %s;", schemaCol, nameCol, typeCol, tableRef, predicate)
+	var predicate, args = tableIDsPredicate("TABLE_SCHEMA", "TABLE_NAME", requested, 1)
+	var query = fmt.Sprintf("SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE FROM INFORMATION_SCHEMA.TABLES WHERE %s;", predicate)
 
 	rows, err := conn.QueryContext(ctx, query, args...)
 	if err != nil {
@@ -441,31 +422,20 @@ func getTables(ctx context.Context, conn *sql.DB, opts discoveryOptions, request
 	return tables, nil
 }
 
-func queryDiscoverColumns(opts discoveryOptions, predicate string) string {
-	if opts.UppercaseQueries {
-		return fmt.Sprintf(`
+func queryDiscoverColumns(predicate string) string {
+	return fmt.Sprintf(`
   SELECT TABLE_SCHEMA, TABLE_NAME, ORDINAL_POSITION, COLUMN_NAME, IS_NULLABLE, DATA_TYPE, COLLATION_NAME, CHARACTER_MAXIMUM_LENGTH
   FROM INFORMATION_SCHEMA.COLUMNS
   WHERE %s
   ORDER BY TABLE_SCHEMA, TABLE_NAME, ORDINAL_POSITION;`, predicate)
-	}
-	return fmt.Sprintf(`
-  SELECT table_schema, table_name, ordinal_position, column_name, is_nullable, data_type, collation_name, character_maximum_length
-  FROM information_schema.columns
-  WHERE %s
-  ORDER BY table_schema, table_name, ordinal_position;`, predicate)
 }
 
-func getColumns(ctx context.Context, conn *sql.DB, opts discoveryOptions, requested []sqlcapture.TableID) ([]sqlcapture.ColumnInfo, error) {
+func getColumns(ctx context.Context, conn *sql.DB, requested []sqlcapture.TableID) ([]sqlcapture.ColumnInfo, error) {
 	if len(requested) == 0 {
 		return nil, nil
 	}
-	var schemaCol, nameCol = "table_schema", "table_name"
-	if opts.UppercaseQueries {
-		schemaCol, nameCol = "TABLE_SCHEMA", "TABLE_NAME"
-	}
-	var predicate, args = tableIDsPredicate(schemaCol, nameCol, requested, 1)
-	var rows, err = conn.QueryContext(ctx, queryDiscoverColumns(opts, predicate), args...)
+	var predicate, args = tableIDsPredicate("TABLE_SCHEMA", "TABLE_NAME", requested, 1)
+	var rows, err = conn.QueryContext(ctx, queryDiscoverColumns(predicate), args...)
 	if err != nil {
 		return nil, fmt.Errorf("error querying columns: %w", err)
 	}
@@ -525,9 +495,8 @@ func getColumns(ctx context.Context, conn *sql.DB, opts discoveryOptions, reques
 // Joining on the 6-tuple {CONSTRAINT,TABLE}_{CATALOG,SCHEMA,NAME} is probably
 // overkill but shouldn't hurt, and helps to make absolutely sure that we're
 // matching up the constraint type with the column names/positions correctly.
-func queryDiscoverPrimaryKeys(opts discoveryOptions, predicate string) string {
-	if opts.UppercaseQueries {
-		return fmt.Sprintf(`
+func queryDiscoverPrimaryKeys(predicate string) string {
+	return fmt.Sprintf(`
 SELECT KCU.TABLE_SCHEMA, KCU.TABLE_NAME, KCU.COLUMN_NAME, KCU.ORDINAL_POSITION
   FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE KCU
   JOIN INFORMATION_SCHEMA.TABLE_CONSTRAINTS TCS
@@ -539,31 +508,14 @@ SELECT KCU.TABLE_SCHEMA, KCU.TABLE_NAME, KCU.COLUMN_NAME, KCU.ORDINAL_POSITION
     AND TCS.TABLE_NAME = KCU.TABLE_NAME
   WHERE TCS.CONSTRAINT_TYPE = 'PRIMARY KEY' AND %s
   ORDER BY KCU.TABLE_SCHEMA, KCU.TABLE_NAME, KCU.ORDINAL_POSITION;`, predicate)
-	}
-	return fmt.Sprintf(`
-SELECT kcu.table_schema, kcu.table_name, kcu.column_name, kcu.ordinal_position
-  FROM information_schema.key_column_usage kcu
-  JOIN information_schema.table_constraints tcs
-    ON  tcs.constraint_catalog = kcu.constraint_catalog
-    AND tcs.constraint_schema = kcu.constraint_schema
-    AND tcs.constraint_name = kcu.constraint_name
-    AND tcs.table_catalog = kcu.table_catalog
-    AND tcs.table_schema = kcu.table_schema
-    AND tcs.table_name = kcu.table_name
-  WHERE tcs.constraint_type = 'PRIMARY KEY' AND %s
-  ORDER BY kcu.table_schema, kcu.table_name, kcu.ordinal_position;`, predicate)
 }
 
-func getPrimaryKeys(ctx context.Context, conn *sql.DB, opts discoveryOptions, requested []sqlcapture.TableID) (map[sqlcapture.StreamID][]string, error) {
+func getPrimaryKeys(ctx context.Context, conn *sql.DB, requested []sqlcapture.TableID) (map[sqlcapture.StreamID][]string, error) {
 	if len(requested) == 0 {
 		return make(map[sqlcapture.StreamID][]string), nil
 	}
-	var schemaCol, nameCol = "kcu.table_schema", "kcu.table_name"
-	if opts.UppercaseQueries {
-		schemaCol, nameCol = "KCU.TABLE_SCHEMA", "KCU.TABLE_NAME"
-	}
-	var predicate, args = tableIDsPredicate(schemaCol, nameCol, requested, 1)
-	var rows, err = conn.QueryContext(ctx, queryDiscoverPrimaryKeys(opts, predicate), args...)
+	var predicate, args = tableIDsPredicate("KCU.TABLE_SCHEMA", "KCU.TABLE_NAME", requested, 1)
+	var rows, err = conn.QueryContext(ctx, queryDiscoverPrimaryKeys(predicate), args...)
 	if err != nil {
 		return nil, fmt.Errorf("error querying primary keys: %w", err)
 	}

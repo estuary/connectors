@@ -47,12 +47,6 @@ var featureFlagDefaults = map[string]bool{
 	// so that Flow can have access to 'official' schema information from the source DB.
 	"emit_sourced_schemas": true,
 
-	// When set, discovery queries will use a variant with all identifiers capitalized.
-	// We believe this should probably be a safe change (and it's required for discovery
-	// to work in the Turkish_CI_AS locale), but didn't want to release it unconditionally
-	// on a Friday without much testing so it's gated behind a flag for now.
-	"uppercase_discovery_queries": false,
-
 	// When true, the capture will use a fence mechanism based on observing CDC worker runs
 	// and LSN positions rather than the old watermark write mechanism.
 	"read_only": true,
