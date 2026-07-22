@@ -1,5 +1,8 @@
 # source-sqlserver-ct
 
-## v1, 2026-01-20
+## 2026-07-22
 
-- Connector created.
+### Changed
+
+- Change polling now uses a single batched query to identify tables with new changes prior
+  to reading out those changes. This improves efficiency when capturing mostly-idle tables.
