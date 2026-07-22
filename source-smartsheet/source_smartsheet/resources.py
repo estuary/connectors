@@ -18,14 +18,13 @@ from estuary_cdk.http import HTTPError, HTTPMixin, TokenSource
 from .api import (
     backfill_sheet_rows,
     backfill_sheets,
-    base_url,
     fetch_sheet_rows,
     fetch_sheets,
     list_all_sheet_ids,
     snapshot_report_rows,
     snapshot_reports,
 )
-from .models import EndpointConfig, Report, ReportRow, Sheet, SheetRow
+from .models import EndpointConfig, Report, ReportRow, Sheet, SheetRow, base_url
 
 # Daily reconciliation schedule for `sheet_rows` — its `rowsModifiedSince`
 # cursor has confirmed gaps (blank/never-cell-written rows are invisible to

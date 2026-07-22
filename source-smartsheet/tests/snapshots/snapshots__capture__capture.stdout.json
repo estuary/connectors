@@ -114,25 +114,10 @@
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "accessLevel": "OWNER",
-      "cellImageUploadEnabled": true,
-      "createdAt": "2026-07-21T13:54:39Z",
-      "effectiveAttachmentOptions": [
-        "BOX_COM",
-        "DROPBOX",
-        "EGNYTE",
-        "EVERNOTE",
-        "FILE",
-        "GOOGLE_DRIVE",
-        "LINK",
-        "ONEDRIVE"
-      ],
-      "ganttEnabled": false,
       "id": 3852843205396356,
       "isSummaryReport": false,
-      "modifiedAt": "2026-07-21T13:54:39Z",
       "name": "Estuary Connector Test Report",
-      "permalink": "https://app.smartsheet.eu/reports/xqcjPxpg4pMJgvQJfQr94v9whM9HcFH3RHccr2w1",
-      "totalRowCount": 3
+      "permalink": "https://app.smartsheet.eu/reports/xqcjPxpg4pMJgvQJfQr94v9whM9HcFH3RHccr2w1"
     }
   ],
   [

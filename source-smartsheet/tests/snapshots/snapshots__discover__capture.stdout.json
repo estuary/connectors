@@ -140,10 +140,16 @@
         "id": {
           "title": "Id",
           "type": "integer"
+        },
+        "modifiedAt": {
+          "format": "date-time",
+          "title": "Modifiedat",
+          "type": "string"
         }
       },
       "required": [
-        "id"
+        "id",
+        "modifiedAt"
       ],
       "title": "SheetRow",
       "type": "object",
@@ -210,7 +216,7 @@
         }
       },
       "additionalProperties": true,
-      "description": "One document per report: catalog/metadata only, never row data",
+      "description": "One document per report, mirroring a `GET /reports` list item.",
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
@@ -219,21 +225,6 @@
         "id": {
           "title": "Id",
           "type": "integer"
-        },
-        "effectiveAttachmentOptions": {
-          "anyOf": [
-            {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Effectiveattachmentoptions"
         }
       },
       "required": [

@@ -1,13 +1,10 @@
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Any, ClassVar, Literal
+from typing import ClassVar, Literal, override
 
-from estuary_cdk.capture.common import (
-    ResourceState,
-)
-from estuary_cdk.capture.common import (
-    ConnectorState as GenericConnectorState,
-)
+from estuary_cdk.capture.common import ConnectorState as GenericConnectorState
+from estuary_cdk.capture.common import ResourceState
 from estuary_cdk.capture.document import BaseDocument
 from estuary_cdk.flow import AccessToken
 from pydantic import (
@@ -15,6 +12,7 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    JsonValue,
     ValidationInfo,
     field_validator,
     model_validator,
@@ -57,6 +55,19 @@ class EndpointConfig(BaseModel):
 
 ConnectorState = GenericConnectorState[ResourceState]
 
+# Keys mirror EndpointConfig.region's Literal values.
+REGION_BASE_URLS = {
+    "us": "https://api.smartsheet.com/2.0",
+    "eu": "https://api.smartsheet.eu/2.0",
+    "gov": "https://api.smartsheetgov.com/2.0",
+    "au": "https://api.smartsheet.au/2.0",
+}
+
+
+def base_url(region: str) -> str:
+    return REGION_BASE_URLS[region]
+
+
 # =============================================================================
 # Shared API envelopes -- the sheets and reports endpoint families return one
 # list-page and one detail-page shape.
@@ -81,27 +92,40 @@ class DetailPageMeta(BaseModel, extra="allow"):
     """Remainder of a `GET /sheets/{id}` / `GET /reports/{id}` detail page
     once the `rows[]` items have been streamed out: the entity's full
     metadata envelope, plus `totalRowCount` -- the row walks' client-side
-    pagination bound. `Sheet.from_detail` / `Report.from_detail` dump this
-    wholesale into the metadata streams' output."""
+    pagination bound. `Sheet.from_detail` dumps this wholesale into the sheets
+    metadata stream's output."""
 
     totalRowCount: int
 
 
-class SortedAttachmentOptionsMixin(BaseDocument):
-    """Shared by `Sheet` and `Report`: Smartsheet returns
-    `effectiveAttachmentOptions` in non-deterministic order across
-    otherwise-identical requests, so it's sorted for stable, comparable output.
+class RowValidationContext(ABC):
+    __slots__: tuple[str, ...] = ()
 
-    Validator-only (`check_fields=False`): subclasses declare the field
-    themselves, keeping it after `id` in field -- and thus output -- order.
+    @abstractmethod
+    def inject(self, meta: dict[str, JsonValue]) -> None:
+        """Write this context's parent id into a row's `_meta` mapping."""
+        ...
+
+
+class RowScopedMixin(BaseDocument):
+    """Base for detail-row documents scoped to a parent entity (a sheet or a
+    report). Applies whatever `RowValidationContext` is supplied at validation
+    time; concrete subclasses declare the specific `_meta` id field the context
+    writes into.
     """
 
-    @field_validator("effectiveAttachmentOptions", check_fields=False)
+    @model_validator(mode="before")
     @classmethod
-    def _sort_effective_attachment_options(
-        cls, v: list[str] | None
-    ) -> list[str] | None:
-        return sorted(v) if v is not None else v
+    def _inject_id_from_context(
+        cls, data: JsonValue, info: ValidationInfo
+    ) -> JsonValue:
+        if not isinstance(data, dict):
+            return data
+        if isinstance(info.context, RowValidationContext):
+            meta = data.get("_meta") or {}
+            info.context.inject(meta)
+            data["_meta"] = meta
+        return data
 
 
 # =============================================================================
@@ -109,22 +133,31 @@ class SortedAttachmentOptionsMixin(BaseDocument):
 # =============================================================================
 
 
-class RawRow(BaseModel, extra="allow"):
-    modifiedAt: AwareDatetime
-
-
 class SheetSummary(BaseModel, extra="allow"):
     id: int
     modifiedAt: AwareDatetime
 
+    @staticmethod
+    def build_url(region: str) -> str:
+        return f"{base_url(region)}/sheets"
 
-class Sheet(SortedAttachmentOptionsMixin, BaseDocument):
+
+class Sheet(BaseDocument):
     """One document per sheet: catalog/metadata only, never row data."""
 
     resource_name: ClassVar[str] = "sheets"
 
     id: int
     effectiveAttachmentOptions: list[str] | None = None
+
+    @field_validator("effectiveAttachmentOptions")
+    @classmethod
+    def _sort_effective_attachment_options(
+        cls, v: list[str] | None
+    ) -> list[str] | None:
+        # Option ordering is non-deterministic and can cause snapshot tests to
+        # fail. Sort for stable, comparable output.
+        return sorted(v) if v is not None else v
 
     @classmethod
     def from_detail(cls, meta: DetailPageMeta) -> "Sheet":
@@ -134,15 +167,16 @@ class Sheet(SortedAttachmentOptionsMixin, BaseDocument):
 
 
 @dataclass(frozen=True, slots=True)
-class SheetIdValidationContext:
+class SheetIdValidationContext(RowValidationContext):
     sheet_id: int
 
+    @override
+    def inject(self, meta: dict[str, JsonValue]) -> None:
+        meta["sheet_id"] = self.sheet_id
 
-class SheetScopedMixin(BaseDocument):
-    """Mixin for documents scoped to a Smartsheet sheet.
 
-    Extends _meta with sheet_id and injects it from validation context.
-    """
+class SheetScopedMixin(RowScopedMixin):
+    """Documents scoped to a Smartsheet sheet."""
 
     class Meta(BaseDocument.Meta):
         model_config = ConfigDict(validate_assignment=True)
@@ -157,22 +191,16 @@ class SheetScopedMixin(BaseDocument):
         description="Document metadata",
     )
 
-    @model_validator(mode="before")
-    @classmethod
-    def _inject_sheet_id_from_context(cls, data: Any, info: ValidationInfo) -> Any:
-        if not isinstance(data, dict):
-            return data
-        if info.context and isinstance(info.context, SheetIdValidationContext):
-            meta = data.get("_meta") or {}
-            meta["sheet_id"] = info.context.sheet_id
-            data["_meta"] = meta
-        return data
-
 
 class SheetRow(SheetScopedMixin, BaseDocument):
     resource_name: ClassVar[str] = "sheet_rows"
 
     id: int
+    modifiedAt: AwareDatetime
+
+    @staticmethod
+    def build_url(region: str, sheet_id: int) -> str:
+        return f"{base_url(region)}/sheets/{sheet_id}"
 
 
 # =============================================================================
@@ -186,38 +214,30 @@ class SheetRow(SheetScopedMixin, BaseDocument):
 # =============================================================================
 
 
-class ReportSummary(BaseModel, extra="allow"):
-    """One `GET /reports` list-page item. Only `id` is needed -- report
-    metadata is refetched from the detail endpoint (cheaply, `pageSize=1`),
-    not trusted from the list summary."""
-
-    id: int
-
-
-class Report(SortedAttachmentOptionsMixin, BaseDocument):
-    """One document per report: catalog/metadata only, never row data"""
+class Report(BaseDocument):
+    """One document per report, mirroring a `GET /reports` list item."""
 
     resource_name: ClassVar[str] = "reports"
 
     id: int
-    effectiveAttachmentOptions: list[str] | None = None
 
-    @classmethod
-    def from_detail(cls, meta: DetailPageMeta) -> "Report":
-        # The remainder still carries the streamed-out `rows` key (as an
-        # empty array); `columns[]` is report-definition detail that doesn't
-        # belong on the metadata document -- drop both.
-        return cls(**meta.model_dump(exclude={"columns", "rows"}))
+    @staticmethod
+    def build_url(region: str) -> str:
+        return f"{base_url(region)}/reports"
 
 
 @dataclass(frozen=True, slots=True)
-class ReportIdValidationContext:
-    """Validation context carrying the report_id for ReportRow construction."""
-
+class ReportIdValidationContext(RowValidationContext):
     report_id: int
 
+    @override
+    def inject(self, meta: dict[str, JsonValue]) -> None:
+        meta["report_id"] = self.report_id
 
-class ReportScopedMixin(BaseDocument):
+
+class ReportScopedMixin(RowScopedMixin):
+    """Documents scoped to a Smartsheet report."""
+
     class Meta(BaseDocument.Meta):
         model_config = ConfigDict(validate_assignment=True)
         report_id: int = Field(
@@ -231,19 +251,12 @@ class ReportScopedMixin(BaseDocument):
         description="Document metadata",
     )
 
-    @model_validator(mode="before")
-    @classmethod
-    def _inject_report_id_from_context(cls, data: Any, info: ValidationInfo) -> Any:
-        if not isinstance(data, dict):
-            return data
-        if info.context and isinstance(info.context, ReportIdValidationContext):
-            meta = data.get("_meta") or {}
-            meta["report_id"] = info.context.report_id
-            data["_meta"] = meta
-        return data
-
 
 class ReportRow(ReportScopedMixin, BaseDocument):
     resource_name: ClassVar[str] = "report_rows"
 
     id: int
+
+    @staticmethod
+    def build_url(region: str, report_id: int) -> str:
+        return f"{base_url(region)}/reports/{report_id}"
