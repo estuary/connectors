@@ -15,11 +15,12 @@ from .bulk_job_manager import (
     MAX_BULK_QUERY_SET_SIZE,
 )
 from .rest_query_manager import MAX_REST_RESPONSE_SIZE, RestQueryManager, chunk_fields
-from .shared import build_query, dt_to_str, str_to_dt, now, should_retry, VERSION
+from .shared import build_date_window_query, build_id_page_query, build_snapshot_query, dt_to_str, is_salesforce_id, str_to_dt, now, should_retry, VERSION
 from .models import (
     MIN_INCREMENTAL_WINDOW_SIZE,
     FieldDetails,
     FieldDetailsDict,
+    QueryResponse,
     SalesforceRecord,
     CursorFields,
     SObject,
@@ -29,6 +30,10 @@ from .models import (
 # Checkpoint intervals match the transports' page sizes; records arrive at most a page at a time.
 REST_CHECKPOINT_INTERVAL = MAX_REST_RESPONSE_SIZE
 BULK_CHECKPOINT_INTERVAL = MAX_BULK_QUERY_SET_SIZE
+
+# Page sizes for Id-based keyset pagination during backfills.
+BULK_ID_PAGE_LIMIT = 500_000
+REST_ID_PAGE_LIMIT = MAX_REST_RESPONSE_SIZE
 
 # We have reason to believe the Salesforce API is eventually consistent to some degree. Fivetran
 # re-fetches all records in the 5 minutes before their cursor value to combat eventual consistency.
@@ -110,14 +115,14 @@ async def snapshot_resources(
 
     async for record in bulk_job_manager.execute(
         name,
-        build_query(name, list(fields.keys())),
+        build_snapshot_query(name, list(fields.keys())),
         model_cls,
     ):
         yield record
 
 
-# _execution_wrapper centralizes the cursor management logic for incremental resources.
-async def _execution_wrapper(
+# _datetime_execution_wrapper centralizes the datetime cursor management logic for incremental resources.
+async def _datetime_execution_wrapper(
     record_generator: AsyncGenerator[SalesforceRecord, None],
     cursor_field: CursorFields,
     start: datetime,
@@ -154,6 +159,67 @@ async def _execution_wrapper(
         yield end
 
 
+# _id_execution_wrapper interleaves Id page cursors into a strictly Id-ordered record stream.
+# A trailing cursor is emitted only if the page was full: a short page means no records remain.
+async def _id_execution_wrapper(
+    record_generator: AsyncGenerator[SalesforceRecord, None],
+    checkpoint_interval: int,
+    limit: int,
+) -> AsyncGenerator[SalesforceRecord | str, None]:
+    last_id: str | None = None
+    count = 0
+    count_since_checkpoint = 0
+
+    async for record in record_generator:
+        if last_id is not None and count_since_checkpoint >= checkpoint_interval:
+            yield last_id
+            count_since_checkpoint = 0
+
+        yield record
+        last_id = record.Id
+        count += 1
+        count_since_checkpoint += 1
+
+    if count >= limit and last_id is not None:
+        yield last_id
+
+
+# _fetch_id_page_boundary locates the Id of the next page's last record so every field-chunk
+# query can share an identical closed Id range and merge deterministically. A None boundary
+# means fewer than a full page remains, which stays true since updates only ever move records'
+# cursor fields past the cutoff and out of the window.
+async def _fetch_id_page_boundary(
+    http: HTTPSession,
+    instance_url: str,
+    name: str,
+    cursor_field: CursorFields,
+    start: datetime,
+    end: datetime,
+    last_id: str | None,
+    log: Logger,
+) -> str | None:
+    query = build_id_page_query(
+        name,
+        ["Id"],
+        cursor_field,
+        start,
+        end,
+        last_id=last_id,
+        limit=1,
+        offset=REST_ID_PAGE_LIMIT - 1,
+    )
+    url = f"{instance_url}/services/data/v{VERSION}/queryAll"
+
+    response = QueryResponse.model_validate_json(
+        await http.request(log, url, params={"q": query}, should_retry=should_retry)
+    )
+
+    if not response.records:
+        return None
+
+    return response.records[0]["Id"]
+
+
 def _should_fallback_to_rest_api(err: BulkJobError, name: str, log: Logger) -> bool:
     # If this object can't be queried via the Bulk API, fallback to using the REST API.
     should_fallback = False
@@ -186,22 +252,6 @@ async def backfill_incremental_resources(
 ) -> AsyncGenerator[SalesforceRecord | PageCursor, None]:
     assert isinstance(cutoff, datetime)
 
-    if page is None:
-        start = start_date
-    else:
-        assert isinstance(page, str)
-        start = str_to_dt(page)
-
-    if start >= cutoff:
-        log.debug("Page cursor is after cutoff, indicating backfill is complete.", {
-            "start": start,
-            "cutoff": cutoff,
-        })
-        return
-
-    max_window_size = min(window_size, cutoff - start)
-    end = min(cutoff, start + max_window_size)
-
     cursor_field = _determine_cursor_field(fields)
 
     # On connector-initiated backfills, only fetch formula fields and rely on the top level
@@ -218,11 +268,142 @@ async def backfill_incremental_resources(
         if not has_fields_to_refresh:
             return
 
+    if page is not None:
+        assert isinstance(page, str)
+
+    # Backfills that started before Id-based pagination existed persisted a datetime page cursor
+    # and are driven to completion with the original date window strategy.
+    # TODO(bair): Remove the backwards-compatible date window logic once we're sure all on-going
+    # backfills have completed.
+    if isinstance(page, str) and not is_salesforce_id(page):
+        gen = _backfill_with_date_windows(
+            is_supported_by_bulk_api,
+            bulk_job_manager,
+            rest_query_manager,
+            name,
+            fields,
+            model_cls,
+            cursor_field,
+            window_size,
+            log,
+            str_to_dt(page),
+            cutoff,
+        )
+    else:
+        gen = _backfill_with_id_pages(
+            http,
+            is_supported_by_bulk_api,
+            bulk_job_manager,
+            rest_query_manager,
+            instance_url,
+            name,
+            fields,
+            model_cls,
+            cursor_field,
+            start_date,
+            log,
+            page,
+            cutoff,
+        )
+
+    async for record_or_cursor in gen:
+        yield record_or_cursor
+
+
+async def _backfill_with_id_pages(
+    http: HTTPSession,
+    is_supported_by_bulk_api: bool,
+    bulk_job_manager: BulkJobManager,
+    rest_query_manager: RestQueryManager,
+    instance_url: str,
+    name: str,
+    fields: FieldDetailsDict,
+    model_cls: type[SalesforceRecord],
+    cursor_field: CursorFields,
+    start_date: datetime,
+    log: Logger,
+    last_id: str | None,
+    cutoff: datetime,
+) -> AsyncGenerator[SalesforceRecord | str, None]:
+    if start_date >= cutoff:
+        log.debug("Start date is at or after cutoff, indicating there is no date range to backfill.", {
+            "start_date": start_date,
+            "cutoff": cutoff,
+        })
+        return
+
+    async def _execute_bulk() -> AsyncGenerator[SalesforceRecord | str, None]:
+        gen = bulk_job_manager.execute(
+            name,
+            build_id_page_query(name, list(fields.keys()), cursor_field, start_date, cutoff, last_id=last_id, limit=BULK_ID_PAGE_LIMIT),
+            model_cls,
+        )
+
+        async for record_or_id in _id_execution_wrapper(gen, BULK_CHECKPOINT_INTERVAL, BULK_ID_PAGE_LIMIT):
+            yield record_or_id
+
+    # The boundary Id is yielded as the page cursor after the page's records; no boundary means
+    # this is the final page, and ending without a trailing cursor completes the backfill.
+    async def _execute_rest() -> AsyncGenerator[SalesforceRecord | str, None]:
+        boundary_id = await _fetch_id_page_boundary(http, instance_url, name, cursor_field, start_date, cutoff, last_id, log)
+
+        queries = [
+            build_id_page_query(name, chunk, cursor_field, start_date, cutoff, last_id=last_id, max_id=boundary_id)
+            for chunk in chunk_fields(fields, cursor_field)
+        ]
+
+        async for record in rest_query_manager.execute(name, queries, model_cls, cursor_field, cutoff):
+            yield record
+
+        if boundary_id is not None:
+            yield boundary_id
+
+    log.debug("Executing backfill page.", {
+        "last_id": last_id,
+        "cutoff": cutoff,
+        "is_supported_by_bulk_api": is_supported_by_bulk_api,
+    })
+
+    try:
+        gen = _execute_bulk() if is_supported_by_bulk_api else _execute_rest()
+        async for record_or_id in gen:
+            yield record_or_id
+    except BulkJobError as err:
+        if _should_fallback_to_rest_api(err, name, log):
+            async for record_or_id in _execute_rest():
+                yield record_or_id
+        else:
+            raise
+
+
+async def _backfill_with_date_windows(
+    is_supported_by_bulk_api: bool,
+    bulk_job_manager: BulkJobManager,
+    rest_query_manager: RestQueryManager,
+    name: str,
+    fields: FieldDetailsDict,
+    model_cls: type[SalesforceRecord],
+    cursor_field: CursorFields,
+    window_size: timedelta,
+    log: Logger,
+    start: datetime,
+    cutoff: datetime,
+) -> AsyncGenerator[SalesforceRecord | str, None]:
+    if start >= cutoff:
+        log.debug("Page cursor is after cutoff, indicating backfill is complete.", {
+            "start": start,
+            "cutoff": cutoff,
+        })
+        return
+
+    max_window_size = min(window_size, cutoff - start)
+    end = min(cutoff, start + max_window_size)
+
     async def _execute(
         gen: AsyncGenerator[SalesforceRecord, None],
         checkpoint_interval: int
     ) -> AsyncGenerator[SalesforceRecord | str, None]:
-        async for record_or_dt in _execution_wrapper(gen, cursor_field, start, end, max_window_size, checkpoint_interval):
+        async for record_or_dt in _datetime_execution_wrapper(gen, cursor_field, start, end, max_window_size, checkpoint_interval):
             if isinstance(record_or_dt, datetime):
                 yield dt_to_str(record_or_dt)
             else:
@@ -231,7 +412,7 @@ async def backfill_incremental_resources(
     def _execute_bulk() -> AsyncGenerator[SalesforceRecord | str, None]:
         gen = bulk_job_manager.execute(
             name,
-            build_query(name, list(fields.keys()), cursor_field, start, end),
+            build_date_window_query(name, list(fields.keys()), cursor_field, start, end),
             model_cls,
         )
 
@@ -239,7 +420,7 @@ async def backfill_incremental_resources(
 
     def _execute_rest() -> AsyncGenerator[SalesforceRecord | str, None]:
         queries = [
-            build_query(name, chunk, cursor_field, start, end)
+            build_date_window_query(name, chunk, cursor_field, start, end)
             for chunk in chunk_fields(fields, cursor_field)
         ]
         gen = rest_query_manager.execute(name, queries, model_cls, cursor_field, end)
@@ -302,12 +483,12 @@ async def fetch_incremental_resources(
     })
 
     queries = [
-        build_query(name, chunk, cursor_field, log_cursor, end)
+        build_date_window_query(name, chunk, cursor_field, log_cursor, end)
         for chunk in chunk_fields(fields, cursor_field)
     ]
     gen = rest_query_manager.execute(name, queries, model_cls, cursor_field, end)
 
-    async for record_or_dt in _execution_wrapper(gen, cursor_field, log_cursor, end, window_size, REST_CHECKPOINT_INTERVAL):
+    async for record_or_dt in _datetime_execution_wrapper(gen, cursor_field, log_cursor, end, window_size, REST_CHECKPOINT_INTERVAL):
         yield record_or_dt
 
     log.debug("Finished fetching incremental changes.", {
