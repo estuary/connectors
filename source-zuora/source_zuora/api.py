@@ -23,6 +23,12 @@ from .shared import VERSION_HEADERS
 # unboundedly large and checkpoints stay reasonably frequent.
 MAX_EXPORT_WINDOW = timedelta(days=30)
 
+# Records per Id-ordered backfill page. Zuora's export file cap is 2047 MB,
+# so this budgets ~8.5 KB per CSV row before a page overflows and
+# _fetch_page_by_id halves its LIMIT; per-page job overhead is small (~10s
+# measured), so a conservative page size costs little.
+BACKFILL_PAGE_SIZE = 250_000
+
 # Hold the leading edge this far behind real time. Zuora's export index is
 # eventually consistent, so a record can become visible with an UpdatedDate a
 # little in the past. Staying this far back gives such records time to appear
@@ -68,6 +74,33 @@ def build_query(
     if conditions:
         query = f"{query} WHERE {' AND '.join(conditions)} ORDER BY {cursor_field}"
     return query
+
+
+def build_id_page_query(
+    object_name: str,
+    fields: list[str],
+    cursor_field: str,
+    *,
+    start: datetime,
+    cutoff: datetime,
+    after_id: str | None,
+    limit: int,
+) -> str:
+    """Build an Export ZOQL query for one Id-ordered backfill page: rows in the
+    half-open cursor_field range [start, cutoff) with Id strictly above
+    after_id (None for the first page), ordered by Id so `Id >` resume is
+    dupe-free, capped at limit rows.
+    """
+    conditions = [
+        f"{cursor_field} >= '{_format_dt_to_utc(start)}'",
+        f"{cursor_field} < '{_format_dt_to_utc(cutoff)}'",
+    ]
+    if after_id is not None:
+        conditions.append(f"Id > '{after_id}'")
+    return (
+        f"SELECT {', '.join(fields)} FROM {object_name} "
+        f"WHERE {' AND '.join(conditions)} ORDER BY Id LIMIT {limit}"
+    )
 
 
 async def discover_object_names(
@@ -157,9 +190,9 @@ class _WindowEnd:
     """Terminal item _export_window yields once, after all documents and
     intermediate checkpoints: the largest cursor value seen in the window (None
     if it was empty) and the effective end of the window actually covered (the
-    original window_end, or a smaller value if bisection shrank it). Each caller
-    turns this into its own final cursor, so the incremental and backfill
-    end-of-window advance rules stay distinct while sharing one export engine.
+    original window_end, or a smaller value if bisection shrank it).
+    fetch_changes turns this into its final cursor, choosing between the
+    advance rules for data-bearing, empty-full, and leading-edge windows.
     """
     max_cursor: datetime | None
     covered_end: datetime
@@ -298,37 +331,68 @@ async def fetch_page(
     cutoff: LogCursor,
 ) -> AsyncGenerator[ZuoraDocument | str, None]:
     assert isinstance(cutoff, datetime)
-
-    if page is None:
-        window_start = start_date
-    else:
+    if page is not None:
         assert isinstance(page, str)
-        window_start = datetime.fromisoformat(page)
 
-    if window_start >= cutoff:
-        return
+    resume_id: str | None = page
+    limit = BACKFILL_PAGE_SIZE
+    docs_since_checkpoint = 0
 
-    window_end = min(window_start + MAX_EXPORT_WINDOW, cutoff)
+    while True:
+        query = build_id_page_query(
+            object_name,
+            fields,
+            model.CURSOR_FIELD,
+            start=start_date,
+            cutoff=cutoff,
+            after_id=resume_id,
+            limit=limit,
+        )
+        count = 0
+        try:
+            async for row in manager.export_rows(query):
+                doc = model.model_validate(row)
+                if resume_id is not None and doc.Id <= resume_id:
+                    # `Id >` resume is only correct if ORDER BY Id is a stable
+                    # total order. Fail loudly if a tenant violates that.
+                    raise RuntimeError(
+                        f"{object_name}: Id ordering violation: "
+                        f"{doc.Id!r} after {resume_id!r}"
+                    )
+                if docs_since_checkpoint >= CHECKPOINT_INTERVAL and resume_id is not None:
+                    yield resume_id
+                    docs_since_checkpoint = 0
+                yield doc
+                resume_id = doc.Id
+                count += 1
+                docs_since_checkpoint += 1
+            break
+        except ExportTooLargeError as err:
+            # The size overflow surfaces before any row of the attempt streams,
+            # so normally the whole page retries; if rows did stream, resume_id
+            # has advanced past them and the retry continues where they ended.
+            limit //= 2
+            if limit < 1:
+                raise ExportTooLargeError(
+                    f"{object_name}: a single-record export page still exceeds "
+                    f"Zuora's size limit and cannot be narrowed further"
+                ) from err
+            log.debug(
+                "export exceeded size limit, halving backfill page",
+                {"object": object_name, "limit": limit, "resume_id": resume_id},
+            )
 
-    async for item in _export_window(
-        object_name, fields, model, manager, window_start, window_end, log
-    ):
-        if isinstance(item, _WindowEnd):
-            # A non-final window ends on a PageCursor to resume from; the final
-            # window (covered_end == cutoff) ends on documents so backfill
-            # completes without emitting a further page.
-            if item.covered_end < cutoff:
-                log.debug(
-                    "backfill window complete, resuming from next page cursor",
-                    {"object": object_name, "next_page": item.covered_end.isoformat()},
-                )
-                yield item.covered_end.isoformat()
-            else:
-                log.debug("backfill reached cutoff", {"object": object_name})
-        elif isinstance(item, datetime):
-            yield item.isoformat()  # PageCursors are isoformat strings
-        else:
-            yield item
+    log.debug(
+        "backfill page complete",
+        {
+            "object": object_name,
+            "docs": count,
+            "last_id": resume_id,
+            "full_page": count == limit,
+        },
+    )
+    if count == limit and resume_id is not None:
+        yield resume_id
 
 
 async def fetch_snapshot(
