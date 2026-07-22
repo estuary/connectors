@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-07-22
+
+### Changed
+- Backfills now paginate by `Id` (`WHERE Id > :last ORDER BY Id LIMIT 250000`) instead of walking 30-day cursor-field windows. An oversized page halves its `LIMIT` and retries.
+
 ## 2026-07-21
 
 ### Changed
