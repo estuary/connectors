@@ -14,8 +14,8 @@ from .bulk_job_manager import (
     NOT_SUPPORTED_BY_BULK_API,
     MAX_BULK_QUERY_SET_SIZE,
 )
-from .rest_query_manager import RestQueryManager
-from .shared import dt_to_str, str_to_dt, now, should_retry, VERSION
+from .rest_query_manager import MAX_REST_RESPONSE_SIZE, RestQueryManager, chunk_fields
+from .shared import build_query, dt_to_str, str_to_dt, now, should_retry, VERSION
 from .models import (
     MIN_INCREMENTAL_WINDOW_SIZE,
     FieldDetails,
@@ -26,7 +26,8 @@ from .models import (
     create_salesforce_model,
 )
 
-REST_CHECKPOINT_INTERVAL = 2_000
+# Checkpoint intervals match the transports' page sizes; records arrive at most a page at a time.
+REST_CHECKPOINT_INTERVAL = MAX_REST_RESPONSE_SIZE
 BULK_CHECKPOINT_INTERVAL = MAX_BULK_QUERY_SET_SIZE
 
 # We have reason to believe the Salesforce API is eventually consistent to some degree. Fivetran
@@ -109,7 +110,7 @@ async def snapshot_resources(
 
     async for record in bulk_job_manager.execute(
         name,
-        fields,
+        build_query(name, list(fields.keys())),
         model_cls,
     ):
         yield record
@@ -204,23 +205,32 @@ async def backfill_incremental_resources(
             return
 
     async def _execute(
-        manager: BulkJobManager | RestQueryManager, 
+        gen: AsyncGenerator[SalesforceRecord, None],
         checkpoint_interval: int
     ) -> AsyncGenerator[SalesforceRecord | str, None]:
-        gen = manager.execute(
-            name,
-            fields,
-            model_cls,
-            cursor_field,
-            start,
-            end,
-        )
-
         async for record_or_dt in _execution_wrapper(gen, cursor_field, start, end, max_window_size, checkpoint_interval):
             if isinstance(record_or_dt, datetime):
                 yield dt_to_str(record_or_dt)
             else:
                 yield record_or_dt
+
+    def _execute_bulk() -> AsyncGenerator[SalesforceRecord | str, None]:
+        gen = bulk_job_manager.execute(
+            name,
+            build_query(name, list(fields.keys()), cursor_field, start, end),
+            model_cls,
+        )
+
+        return _execute(gen, BULK_CHECKPOINT_INTERVAL)
+
+    def _execute_rest() -> AsyncGenerator[SalesforceRecord | str, None]:
+        queries = [
+            build_query(name, chunk, cursor_field, start, end)
+            for chunk in chunk_fields(fields, cursor_field)
+        ]
+        gen = rest_query_manager.execute(name, queries, model_cls, cursor_field, end)
+
+        return _execute(gen, REST_CHECKPOINT_INTERVAL)
 
     log.debug("Executing backfill.", {
         "start": start,
@@ -229,7 +239,7 @@ async def backfill_incremental_resources(
     })
 
     try:
-        gen = _execute(bulk_job_manager, BULK_CHECKPOINT_INTERVAL) if is_supported_by_bulk_api else _execute(rest_query_manager, REST_CHECKPOINT_INTERVAL)
+        gen = _execute_bulk() if is_supported_by_bulk_api else _execute_rest()
         async for doc_or_str in gen:
             yield doc_or_str
     except BulkJobError as err:
@@ -244,7 +254,7 @@ async def backfill_incremental_resources(
                 should_fallback_to_rest_api = True
 
         if should_fallback_to_rest_api:
-            async for doc_or_str in _execute(rest_query_manager, REST_CHECKPOINT_INTERVAL):
+            async for doc_or_str in _execute_rest():
                 yield doc_or_str
         else:
             raise
@@ -287,14 +297,11 @@ async def fetch_incremental_resources(
         "is_support_by_bulk_api": is_supported_by_bulk_api,
     })
 
-    gen = rest_query_manager.execute(
-        name,
-        fields,
-        model_cls,
-        cursor_field,
-        log_cursor,
-        end,
-    )
+    queries = [
+        build_query(name, chunk, cursor_field, log_cursor, end)
+        for chunk in chunk_fields(fields, cursor_field)
+    ]
+    gen = rest_query_manager.execute(name, queries, model_cls, cursor_field, end)
 
     async for record_or_dt in _execution_wrapper(gen, cursor_field, log_cursor, end, window_size, REST_CHECKPOINT_INTERVAL):
         yield record_or_dt
