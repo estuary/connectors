@@ -517,18 +517,18 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			chBatch, err = t.load.conn.PrepareBatch(ctx, t.bindings[lastBinding].load.insertSQL)
 			return err
 		}); err != nil {
-			return fmt.Errorf("preparing load batch: %w", err)
+			return fmt.Errorf("preparing load batch for %s: %w", t.bindings[lastBinding].target.Identifier, err)
 		}
 		defer chBatch.Close()
 		for _, record := range batch {
 			if err = chBatch.Append(record...); err != nil {
-				return fmt.Errorf("appending load batch: %w", err)
+				return fmt.Errorf("appending load batch for %s: %w", t.bindings[lastBinding].target.Identifier, err)
 			}
 		}
 		batch = batch[:0]
 		batchBytes = 0
 		if err = chBatch.Send(); err != nil {
-			return fmt.Errorf("flushing load batch: %w", err)
+			return fmt.Errorf("flushing load batch for %s: %w", t.bindings[lastBinding].target.Identifier, err)
 		}
 		return nil
 	}
@@ -556,7 +556,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 				// The load table exists (ensured at session start); truncate
 				// clears any keys left over from a previous round.
 				if err = t.load.conn.Exec(ctx, b.load.truncateSQL); err != nil {
-					return fmt.Errorf("truncating load stage table: %w", err)
+					return fmt.Errorf("truncating load stage table for %s: %w", b.target.Identifier, err)
 				}
 				activeBindings[it.Binding] = 0
 			}
@@ -565,7 +565,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		b := t.bindings[it.Binding]
 		converted, err := b.target.ConvertKey(it.Key)
 		if err != nil {
-			return fmt.Errorf("converting load key: %w", err)
+			return fmt.Errorf("converting load key for %s: %w", b.target.Identifier, err)
 		}
 		batch = append(batch, converted)
 		batchBytes += len(it.PackedKey)
@@ -596,7 +596,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		b := t.bindings[i]
 		var counted uint64
 		if err = t.load.conn.QueryRow(ctx, b.load.countKeysSQL).Scan(&counted); err != nil {
-			return fmt.Errorf("counting load table keys: %w", err)
+			return fmt.Errorf("counting load table keys for %s: %w", b.target.Identifier, err)
 		}
 		if int64(counted) != inserted {
 			return fmt.Errorf(
@@ -630,7 +630,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 					}
 					if len(b.nullFieldsToStrip) > 0 {
 						if doc, err = sql.StripNullFields(doc, b.nullFieldsToStrip); err != nil {
-							return fmt.Errorf("stripping null fields: %w", err)
+							return fmt.Errorf("stripping null fields for %s: %w", b.target.Identifier, err)
 						}
 					}
 					emitted = true
@@ -672,18 +672,18 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			chBatch, err = t.store.conn.PrepareBatch(ctx, t.bindings[lastBinding].store.insertSQL)
 			return err
 		}); err != nil {
-			return fmt.Errorf("preparing store batch: %w", err)
+			return fmt.Errorf("preparing store batch for %s: %w", t.bindings[lastBinding].target.Identifier, err)
 		}
 		defer chBatch.Close()
 		for _, record := range batch {
 			if err = chBatch.Append(record...); err != nil {
-				return fmt.Errorf("appending store batch: %w", err)
+				return fmt.Errorf("appending store batch for %s: %w", t.bindings[lastBinding].target.Identifier, err)
 			}
 		}
 		batch = batch[:0]
 		batchBytes = 0
 		if err = chBatch.Send(); err != nil {
-			return fmt.Errorf("flushing store batch: %w", err)
+			return fmt.Errorf("flushing store batch for %s: %w", t.bindings[lastBinding].target.Identifier, err)
 		}
 		return nil
 	}
@@ -708,7 +708,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		b := t.bindings[it.Binding]
 		converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON)
 		if err != nil {
-			return nil, fmt.Errorf("converting store record: %w", err)
+			return nil, fmt.Errorf("converting store record for %s: %w", b.target.Identifier, err)
 		}
 		if t.cfg.HardDelete && !b.target.DeltaUpdates {
 			var deleteState uint8 = 0

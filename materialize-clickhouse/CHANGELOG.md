@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-07-22
+
+### Changed
+- Errors that occur while loading or storing data now name the affected table, for example ``flushing store batch for `db`.`my_table`: code: 252, ...``. Previously these errors did not identify which table caused them, which made diagnosis difficult on materializations with many bindings.
+
 ## 2026-07-17
 
 ### Added
