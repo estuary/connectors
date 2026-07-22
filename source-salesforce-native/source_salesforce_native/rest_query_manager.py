@@ -3,7 +3,7 @@ from logging import Logger
 from typing import Any, AsyncGenerator, TypedDict
 
 from estuary_cdk.http import HTTPSession
-from .shared import build_query, should_retry, str_to_dt, VERSION
+from .shared import should_retry, str_to_dt, VERSION
 from .models import (
     CursorFields,
     FieldDetailsDict,
@@ -19,6 +19,9 @@ from .models import (
 # https://developer.salesforce.com/docs/atlas.en-us.salesforce_app_limits_cheatsheet.meta/salesforce_app_limits_cheatsheet/salesforce_app_limits_platform_api.htm#:~:text=In%20each%20REST%20call%2C%20the%20maximum%20length%20for%20the%20combined%20URI%20and%20headers%20is%2016%2C384%20bytes.
 MAX_URI_LENGTH = 16_384
 MAX_FIELDS_LENGTH = MAX_URI_LENGTH - 2_500
+
+# Salesforce returns at most this many records in a single REST API query response.
+MAX_REST_RESPONSE_SIZE = 2_000
 
 REST_VALIDATION_CONTEXT = ValidationContext(SalesforceDataSource.REST_API)
 
@@ -92,62 +95,62 @@ class RecordAndChunksCompleted(TypedDict):
     chunks_completed_count: int
 
 
+# chunk_fields splits an object's fields into chunks that fit within Salesforce's URI length
+# limits. Callers build one query per chunk with an identical WHERE clause, and RestQueryManager
+# merges the per-chunk results back into complete records.
+def chunk_fields(fields: FieldDetailsDict, cursor_field: CursorFields) -> list[list[str]]:
+    # The Id and cursor field are required later to merge together documents across
+    # chunks and detect if a document was updated between querys.
+    mandatory_fields: list[str] = ['Id', cursor_field]
+    mandatory_fields_length = sum([len(field) for field in mandatory_fields])
+
+    field_names = [f for f in list(fields.keys()) if f not in mandatory_fields]
+    chunks: list[list[str]] = []
+
+    chunk_fields_length = mandatory_fields_length
+    chunk: list[str] = [*mandatory_fields]
+    for field in field_names:
+        if chunk_fields_length + len(field) > MAX_FIELDS_LENGTH:
+            chunks.append(chunk)
+
+            chunk = [field, *mandatory_fields]
+            chunk_fields_length = len(field) + mandatory_fields_length
+        else:
+            chunk.append(field)
+            chunk_fields_length += len(field)
+
+    if len(chunk) > len(mandatory_fields):
+        chunks.append(chunk)
+
+    return chunks
+
+
 class RestQueryManager:
     def __init__(self, http: HTTPSession, log: Logger, instance_url: str):
         self.http = http
         self.log = log
         self.base_url = f"{instance_url}/services/data/v{VERSION}/queryAll"
 
-    def _chunk_fields(self, fields: FieldDetailsDict, cursor_field: CursorFields) -> list[list[str]]:
-        # The Id and cursor field are required later to merge together documents across
-        # chunks and detect if a document was updated between querys.
-        mandatory_fields: list[str] = ['Id', cursor_field]
-        mandatory_fields_length = sum([len(field) for field in mandatory_fields])
-
-        field_names = [f for f in list(fields.keys()) if f not in mandatory_fields]
-        chunks: list[list[str]] = []
-
-        chunk_fields_length = mandatory_fields_length
-        chunk: list[str] = [*mandatory_fields]
-        for field in field_names:
-            if chunk_fields_length + len(field) > MAX_FIELDS_LENGTH:
-                chunks.append(chunk)
-
-                chunk = [field, *mandatory_fields]
-                chunk_fields_length = len(field) + mandatory_fields_length
-            else:
-                chunk.append(field)
-                chunk_fields_length += len(field)
-
-        if len(chunk) > len(mandatory_fields):
-            chunks.append(chunk)
-
-        return chunks
-
-
+    # execute runs one caller-provided SOQL query per chunk_fields chunk and merges their results
+    # into complete records. The queries must share an identical WHERE clause; cursor_field and
+    # end are only used to suppress records that were updated past `end` while the queries ran.
     async def execute(
         self,
         object_name: str,
-        fields: FieldDetailsDict,
+        queries_soql: list[str],
         model_cls: type[SalesforceRecord],
         cursor_field: CursorFields,
-        start: datetime,
         end: datetime,
     ) -> AsyncGenerator[SalesforceRecord, None]:
-        # All fields are chunked across separate queries to avoid Salesforce's URI length limits. Results from
-        # each query are merged together before yielding the complete record.
-        field_chunks = self._chunk_fields(fields, cursor_field)
-
         queries: list[Query] = []
-        for chunk in field_chunks:
-            q = Query(self.http, self.log, self.base_url, build_query(object_name, chunk, cursor_field, start, end))
+        for soql in queries_soql:
+            q = Query(self.http, self.log, self.base_url, soql)
             queries.append(q)
 
         records: dict[str, RecordAndChunksCompleted] = {}
 
         self.log.debug("Executing REST API queries.", {
             "object_name": object_name,
-            "start": start,
             "end": end,
             "len(queries)": len(queries),
         })
@@ -191,7 +194,7 @@ class RestQueryManager:
                 record = records[id]["record"]
 
                 # Do not emit a record if we haven't fetched all of its fields yet.
-                if chunk_completed_count < len(field_chunks):
+                if chunk_completed_count < len(queries):
                     continue
 
                 # If the record was updated after our end date, we ignore it since we should capture it on a future sweep.
@@ -209,10 +212,9 @@ class RestQueryManager:
                 # These are ignored since they should be captured on a future incremental sweep.
                 if len(records) > 0:
                     self.log.debug(f"There were {len(records)} records that were not yielded when all queries completed. These updated records will be picked up on the next incremental sweep.")
-                
+
                 self.log.debug("Finished executing REST API queries.", {
                     "object_name": object_name,
-                    "start": start,
                     "end": end,
                     "len(queries)": len(queries),
                 })
