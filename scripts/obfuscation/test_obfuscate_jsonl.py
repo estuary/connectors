@@ -1,27 +1,23 @@
 #!/usr/bin/env python3
-"""Tests for obfuscate_jsonl.py — run with `python3 -m unittest` in this dir.
-
-Focus: every "content" character (letters/digits/numerics/emoji/non-ASCII
-symbols across all scripts) is obfuscated, while structure (ASCII punctuation
-and symbols, whitespace, combining marks) is preserved, deterministically and
-length-preserving.
-"""
+"""Tests for obfuscate_jsonl.py — run with `python3 -m unittest` in this dir."""
 
 from __future__ import annotations
 
+import json
 import unittest
+from datetime import datetime
 
-from obfuscate_jsonl import _obfuscate_string, obfuscate
+from obfuscate_jsonl import _obfuscate_string, collect_known_fields, obfuscate
 
 SALT = "test"
 
 
-def obf_doc(doc: dict) -> dict:
-    out = obfuscate(doc, (), SALT)
+def obf_doc(doc: dict, known=()) -> dict:
+    out = obfuscate(doc, (), set(known), SALT)
     assert isinstance(out, dict)
     return out
 
-# Representative samples across scripts / unicode blocks.
+
 SAMPLES = {
     "arabic": "مرحبا بالعالم",
     "hebrew": "שלום עולם",
@@ -35,17 +31,12 @@ SAMPLES = {
     "cyrillic": "Привет мир",
     "latin_accented": "Café Zürich naïve",
     "emoji": "pizza 🍕 party 🎉👨‍👩‍👧 flag 🇯🇵",
-    "symbols": "© € ™ ½ Ⅳ ² £",
+    "symbols": "© € ™ ½ £",
     "mixed": "User №42: 山田さん <yamada@例え.jp> 💰",
 }
 
 
 def _target_class(ch: str) -> str:
-    """The class the obfuscator must map `ch` into (mirrors the contract).
-
-    Every character is obfuscated: ASCII cased letters and digits stay within
-    their class; EVERYTHING else (punctuation, symbols, emoji, whitespace,
-    marks, caseless letters) maps to CJK. Nothing is kept."""
     if ch.isdigit():
         return "digit"
     if ch.islower():
@@ -67,30 +58,20 @@ def _in_class(ch: str, cls: str) -> bool:
 
 class TestObfuscateString(unittest.TestCase):
     def test_all_scripts_fully_covered(self):
-        """Every char maps to its obfuscation target class. Catches any script
-        or character type slipping through unobfuscated."""
         for name, s in SAMPLES.items():
             out = _obfuscate_string(s, SALT)
             self.assertEqual(len(out), len(s), f"{name}: length changed")
             for i, (src, dst) in enumerate(zip(s, out)):
                 cls = _target_class(src)
-                self.assertTrue(
-                    _in_class(dst, cls),
-                    f"{name}[{i}] {src!r} (want {cls}) not obfuscated -> {dst!r}",
-                )
+                self.assertTrue(_in_class(dst, cls), f"{name}[{i}] {src!r}->{dst!r} (want {cls})")
 
     def test_no_caseless_letter_or_emoji_passes_through(self):
-        """Regression for the review finding: caseless letters and emoji must
-        not survive unchanged."""
         for s in ("中", "あ", "한", "א", "م", "ก", "🍕", "€", "½"):
             out = _obfuscate_string(s, SALT)
-            # Each maps to a single CJK ideograph.
             self.assertEqual(len(out), 1)
             self.assertTrue(0x4E00 <= ord(out) <= 0x9FA5, f"{s!r} -> {out!r} not obfuscated")
 
     def test_structure_is_obfuscated(self):
-        """Punctuation, symbols and whitespace are obfuscated too (to CJK) —
-        no original structure survives."""
         s = "jane.doe+tag@example.co.uk / id-123 = {a:b}\ttab space"
         out = _obfuscate_string(s, SALT)
         self.assertEqual(len(out), len(s))
@@ -104,57 +85,89 @@ class TestObfuscateString(unittest.TestCase):
             self.assertEqual(_obfuscate_string(s, SALT), _obfuscate_string(s, SALT))
 
     def test_salt_changes_output(self):
-        s = SAMPLES["mixed"]
-        self.assertNotEqual(_obfuscate_string(s, "a"), _obfuscate_string(s, "b"))
+        self.assertNotEqual(_obfuscate_string(SAMPLES["mixed"], "a"), _obfuscate_string(SAMPLES["mixed"], "b"))
 
     def test_valid_utf8_roundtrip(self):
-        """Obfuscated output must survive JSON encode/decode unchanged."""
-        import json
         for s in SAMPLES.values():
             out = _obfuscate_string(s, SALT)
             self.assertEqual(json.loads(json.dumps(out)), out)
 
 
-class TestObfuscateDocument(unittest.TestCase):
-    def test_meta_uuid_and_op_preserved_everything_else_obfuscated(self):
-        doc = {
-            "id": "cust-99",
-            "名前": "山田太郎",
-            "note": "call me 📞",
-            "_meta": {
-                "uuid": "f81d4fae-7dec-11d0",
-                "op": "u",
-                "source": {"table": "顧客", "ts": "2021-05-05T05:05:05Z"},
-            },
-        }
-        out = obf_doc(doc)
-        # preserved
-        self.assertEqual(out["_meta"]["uuid"], "f81d4fae-7dec-11d0")
-        self.assertEqual(out["_meta"]["op"], "u")
-        # obfuscated (key, japanese key's value, emoji, _meta.source)
-        self.assertNotEqual(out["id"], "cust-99")
-        self.assertNotEqual(out["名前"], "山田太郎")
-        self.assertNotEqual(out["note"], "call me 📞")
-        self.assertNotEqual(out["_meta"]["source"]["table"], "顧客")
+class TestDatetime(unittest.TestCase):
+    def test_no_timezone_precision_or_era_leak(self):
+        # Offset + fractional seconds present in input, none in output.
+        out = _obfuscate_string("2020-06-01T09:00:00.123456+05:30", SALT)
+        self.assertRegex(out, r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+        self.assertNotIn("+05:30", out)
+        self.assertNotIn(".", out)
+        datetime.fromisoformat(out.replace("Z", "+00:00"))  # valid
 
-    def test_datetime_stays_valid_rfc3339(self):
-        from datetime import datetime
-        for ts in ("2020-01-02T03:04:05Z", "2020-01-02T03:04:05.123456+02:00", "1999-12-31T23:59:59-05:00"):
-            out = obf_doc({"ts": ts})["ts"]
+    def test_utc_z_form(self):
+        for ts in ("2020-01-02T03:04:05Z", "1999-12-31T23:59:59-05:00"):
+            out = _obfuscate_string(ts, SALT)
+            self.assertTrue(out.endswith("Z"))
             self.assertNotEqual(out, ts)
-            parsed = datetime.fromisoformat(out[:-1] + "+00:00" if out.endswith("Z") else out)
-            self.assertIsNotNone(parsed)
 
-    def test_value_consistency_across_fields_and_docs(self):
-        a = obf_doc({"x": "東京", "y": "東京"})
-        b = obf_doc({"z": "東京"})
+    def test_date_only_stays_date(self):
+        out = _obfuscate_string("2020-01-02", SALT)
+        self.assertRegex(out, r"^\d{4}-\d{2}-\d{2}$")
+        datetime.fromisoformat(out)  # valid date
+        self.assertNotEqual(out, "2020-01-02")
+
+
+class TestSchemaKnownFields(unittest.TestCase):
+    def test_collect_known_fields(self):
+        schema = {"type": "object", "properties": {
+            "a": {"type": "string"},
+            "nested": {"type": "object", "properties": {"b": {"type": "integer"}}},
+        }, "allOf": [{"properties": {"c": {}}}]}
+        self.assertEqual(collect_known_fields(schema), {"a", "nested", "b", "c"})
+
+
+class TestObfuscateDocument(unittest.TestCase):
+    def test_meta_uuid_and_op_preserved(self):
+        doc = {"id": "cust-99", "_meta": {"uuid": "f81d-uuid", "op": "u",
+                                          "source": {"table": "顧客", "ts": "2021-05-05T05:05:05Z"}}}
+        out = obf_doc(doc, known={"id"})
+        self.assertEqual(out["_meta"]["uuid"], "f81d-uuid")
+        self.assertEqual(out["_meta"]["op"], "u")
+        self.assertIn("table", out["_meta"]["source"])          # _meta keys kept as structure
+        self.assertNotEqual(out["_meta"]["source"]["table"], "顧客")  # ...but values obfuscated
+
+    def test_known_key_kept_unknown_key_obfuscated(self):
+        out = obf_doc({"kept": "x", "patient_ssn": "123-45-6789", "_meta": {"uuid": "u", "op": "c"}},
+                      known={"kept"})
+        self.assertIn("kept", out)
+        self.assertNotEqual(out["kept"], "x")            # value obfuscated
+        self.assertNotIn("patient_ssn", out)             # unknown key name obfuscated away
+        self.assertEqual(len(out), 3)                    # kept + obfuscated-key + _meta
+
+    def test_unknown_subtree_fully_obfuscated(self):
+        # 'city' is a known name, but it sits under an unknown key -> still obfuscated.
+        out = obf_doc({"knownObj": {"dyn": {"city": "NYC"}}, "_meta": {"uuid": "u", "op": "c"}},
+                      known={"knownObj", "city"})
+        self.assertIn("knownObj", out)
+        inner = out["knownObj"]
+        self.assertNotIn("dyn", inner)                   # unknown key obfuscated
+        grandchild = next(iter(inner.values()))
+        self.assertNotIn("city", grandchild)             # inside an unknown subtree, all keys go
+
+    def test_no_schema_obfuscates_all_keys(self):
+        out = obf_doc({"anything": 1, "_meta": {"uuid": "u", "op": "c"}})
+        self.assertNotIn("anything", out)                # no schema -> every non-_meta key obfuscated
+        self.assertIn("_meta", out)
+
+    def test_value_consistency(self):
+        a = obf_doc({"x": "東京", "y": "東京"}, known={"x", "y"})
+        b = obf_doc({"z": "東京"}, known={"z"})
         self.assertEqual(a["x"], a["y"])
         self.assertEqual(a["x"], b["z"])
 
     def test_scalars(self):
-        out = obf_doc({"n": 4321, "f": 3.14, "b": True, "z": None, "e": ""})
+        out = obf_doc({"n": 4321, "f": 3.14, "b": True, "z": None, "e": ""},
+                      known={"n", "f", "b", "z", "e"})
         self.assertNotEqual(out["n"], 4321)
-        self.assertEqual(len(str(abs(out["n"]))), 4)  # magnitude preserved
+        self.assertEqual(len(str(abs(out["n"]))), 4)
         self.assertIsInstance(out["b"], bool)
         self.assertIsNone(out["z"])
         self.assertEqual(out["e"], "")

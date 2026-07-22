@@ -1,26 +1,29 @@
 #!/usr/bin/env python3
 """Obfuscate every value in a JSONL collection-document file.
 
-ALL field values are obfuscated, at every depth, EXCEPT:
+ALL field values are obfuscated, at every depth, EXCEPT ``/_meta/uuid`` and
+``/_meta/op`` (the document UUID and change operation, which carry no customer
+data and drive reduction). The collection key, ``/_meta/source``, and every
+nested value are obfuscated.
 
-  * ``/_meta/uuid`` — the document UUID (drives reduction ordering)
-  * ``/_meta/op``   — the change operation (c/u/d)
+Field names: a document's object keys are preserved only when they are part of
+the collection schema (pass ``--schema`` or ``--catalog``/``--collection``).
+Any key present in a document but NOT defined by the schema — i.e. a
+customer-controlled / dynamic key, as produced by document stores and
+``additionalProperties`` schemas — is obfuscated too. With no schema, every key
+is treated as unknown and obfuscated (``_meta`` and its fields are always kept
+as Flow structure).
 
-Everything else — including the collection key, ``/_meta/source``, and every
-nested value — is obfuscated, so the output cannot expose anything about the
-customer. No catalog is needed: the preserved set is fixed.
+Obfuscation is deterministic (the same input value always maps to the same
+output) so relationships across documents survive. Within a string, every
+character is obfuscated — ASCII cased letters and digits map within their class,
+everything else (caseless letters of any script, punctuation, symbols, emoji,
+whitespace, combining marks) maps to a CJK ideograph; only the character count
+is preserved. Numbers keep sign and magnitude, booleans flip, ``null`` stays.
 
-Obfuscation is deterministic (the same input value plus ``--salt`` always maps
-to the same output) so relationships across documents survive. Within a string,
-EVERY character is obfuscated — ASCII cased letters and digits map within their
-class, and everything else (caseless letters of any script, punctuation,
-symbols, emoji, whitespace, combining marks) maps to a CJK ideograph; only the
-character count is preserved, so no original structure survives. Numbers keep
-sign and magnitude, booleans flip, and ``null`` stays ``null``.
-
-The one exception is RFC3339 date-times: the instant is shifted (obfuscated) but
-kept a valid date-time, so date-time fields stay schema-valid. The format
-characters that survive reveal nothing the collection schema doesn't declare.
+RFC3339 date-times are replaced with a random valid date-time (or date) in UTC,
+so date-time fields stay schema-valid while leaking neither the instant, the
+original timezone, nor sub-second precision.
 """
 
 from __future__ import annotations
@@ -33,18 +36,20 @@ import string
 import sys
 from datetime import datetime, timedelta, timezone
 
+from _load import load_structured
+from _salt import user_salt
+
 # Token-paths preserved verbatim (with their entire subtree). Nothing else is.
 PRESERVED: set[tuple[str, ...]] = {("_meta", "uuid"), ("_meta", "op")}
 
 
 def _rng(value: object, salt: str) -> random.Random:
-    """A deterministic RNG seeded by the value's content and a run-wide salt."""
+    """A deterministic RNG seeded by the value's content and the user's salt."""
     digest = hashlib.sha256(f"{salt}\0{value!r}".encode()).digest()
     return random.Random(int.from_bytes(digest, "big"))
 
 
-def _try_parse_datetime(s: str) -> datetime | None:
-    # Normalise a trailing 'Z': fromisoformat only accepts it on Python 3.11+.
+def _looks_like_datetime(s: str) -> datetime | None:
     normalised = s[:-1] + "+00:00" if s.endswith("Z") else s
     try:
         return datetime.fromisoformat(normalised)
@@ -52,29 +57,20 @@ def _try_parse_datetime(s: str) -> datetime | None:
         return None
 
 
-def _obfuscate_datetime(s: str, dt: datetime, salt: str) -> str:
-    r = _rng(s, salt)
-    # Shift by a deterministic amount that keeps the value a plausible, valid
-    # date-time (a valid date can't be produced by scrambling digits blindly).
-    shifted = dt + timedelta(days=r.randint(-3650, 3650), seconds=r.randint(0, 86399))
-    out = shifted.isoformat()
-    if s.endswith("Z") and shifted.tzinfo == timezone.utc:
-        out = shifted.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
-    return out
+# ~1970..2036, in seconds, for the randomized replacement instant.
+_MAX_EPOCH = 2_082_758_399
 
 
-def _obfuscate_string(s: str, salt: str) -> str:
-    if not s:
-        return s
-    dt = _try_parse_datetime(s)
-    if dt is not None:
-        return _obfuscate_datetime(s, dt, salt)
+def _obfuscate_datetime(s: str, salt: str) -> str:
     r = _rng(s, salt)
-    return "".join(_obfuscate_char(ch, r) for ch in s)
+    shifted = datetime(1970, 1, 1, tzinfo=timezone.utc) + timedelta(seconds=r.randint(0, _MAX_EPOCH))
+    if ":" not in s:  # a date with no time component
+        return shifted.date().isoformat()
+    return shifted.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 # CJK Unified Ideographs — a deterministic, length-preserving target for any
-# "content" character that has no cased Latin/digit equivalent.
+# character that has no cased Latin/digit equivalent.
 _CJK_LO, _CJK_HI = 0x4E00, 0x9FA5
 
 
@@ -85,11 +81,18 @@ def _obfuscate_char(ch: str, r: random.Random) -> str:
         return r.choice(string.ascii_lowercase)
     if ch.isupper():
         return r.choice(string.ascii_uppercase)
-    # EVERYTHING else is obfuscated too — caseless letters (all scripts),
-    # numerics, punctuation, symbols, emoji, whitespace, and combining marks —
-    # mapped to a deterministic CJK ideograph. Nothing passes through; only the
-    # character count is preserved.
+    # Everything else — caseless letters (all scripts), numerics, punctuation,
+    # symbols, emoji, whitespace, combining marks — maps to a CJK ideograph.
     return chr(r.randint(_CJK_LO, _CJK_HI))
+
+
+def _obfuscate_string(s: str, salt: str) -> str:
+    if not s:
+        return s
+    if _looks_like_datetime(s) is not None:
+        return _obfuscate_datetime(s, salt)
+    r = _rng(s, salt)
+    return "".join(_obfuscate_char(ch, r) for ch in s)
 
 
 def _obfuscate_number(n: int | float, salt: str) -> int | float:
@@ -102,8 +105,7 @@ def _obfuscate_number(n: int | float, salt: str) -> int | float:
         digits = len(str(abs(n)))
         magnitude = r.randint(10 ** (digits - 1), 10 ** digits - 1)
         return magnitude if n > 0 else -magnitude
-    # float: keep sign and rough magnitude
-    return round(n * (0.5 + r.random()), 6)
+    return round(n * (0.5 + r.random()), 6)  # float: keep sign and rough magnitude
 
 
 def obfuscate_leaf(value: object, salt: str) -> object:
@@ -116,22 +118,86 @@ def obfuscate_leaf(value: object, salt: str) -> object:
     return value
 
 
-def obfuscate(value: object, path: tuple[str, ...], salt: str) -> object:
+def obfuscate(value: object, path: tuple[str, ...], known: set[str], salt: str,
+              *, keep_ctx: bool = True, in_meta: bool = False) -> object:
     if path in PRESERVED:
         return value  # preserve this value and its entire subtree
     if isinstance(value, dict):
-        return {k: obfuscate(v, path + (k,), salt) for k, v in value.items()}
+        out: dict[object, object] = {}
+        for k, v in value.items():
+            child = path + (k,)
+            structural = in_meta or (path == () and k == "_meta")
+            if structural:
+                out_key, child_keep, child_meta = k, True, True
+            elif keep_ctx and k in known:
+                out_key, child_keep, child_meta = k, True, False
+            else:
+                out_key, child_keep, child_meta = _obfuscate_string(k, salt), False, False
+            out[out_key] = obfuscate(v, child, known, salt, keep_ctx=child_keep, in_meta=child_meta)
+        return out
     if isinstance(value, list):
-        return [obfuscate(v, path + (str(i),), salt) for i, v in enumerate(value)]
+        return [obfuscate(v, path + (str(i),), known, salt, keep_ctx=keep_ctx, in_meta=in_meta)
+                for i, v in enumerate(value)]
     return obfuscate_leaf(value, salt)
+
+
+def collect_known_fields(schema: object) -> set[str]:
+    """Every property name defined anywhere in a JSON schema. A document key is
+    kept only if it is one of these; anything else is obfuscated."""
+    names: set[str] = set()
+
+    def walk(node: object) -> None:
+        if isinstance(node, dict):
+            props = node.get("properties")
+            if isinstance(props, dict):
+                names.update(str(k) for k in props)
+            for v in node.values():
+                walk(v)
+        elif isinstance(node, list):
+            for v in node:
+                walk(v)
+
+    walk(schema)
+    return names
+
+
+def known_fields_from_args(args: argparse.Namespace) -> set[str]:
+    if args.schema:
+        schema, _ = load_structured(args.schema)
+        return collect_known_fields(schema)
+    if args.catalog:
+        catalog, _ = load_structured(args.catalog)
+        collections = (catalog or {}).get("collections") if isinstance(catalog, dict) else None
+        if not collections:
+            raise SystemExit(f"no collections in catalog {args.catalog!r}")
+        name = args.collection
+        if name is None:
+            if len(collections) == 1:
+                name = next(iter(collections))
+            else:
+                raise SystemExit("catalog has multiple collections; pass --collection")
+        elif name not in collections:
+            raise SystemExit(f"collection {name!r} not in catalog")
+        spec = collections[name]
+        known: set[str] = set()
+        for key in ("schema", "writeSchema", "readSchema"):
+            if isinstance(spec.get(key), dict):
+                known |= collect_known_fields(spec[key])
+        return known
+    return set()  # no schema -> every key is unknown (fail-safe)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("jsonl", help="Input JSONL file ('-' for stdin)")
     parser.add_argument("-o", "--output", help="Output JSONL file (default: stdout)")
-    parser.add_argument("--salt", default="obfuscate", help="Salt for deterministic obfuscation (default: 'obfuscate')")
+    parser.add_argument("--schema", help="JSON-Schema file (YAML/JSON) defining known field names")
+    parser.add_argument("--catalog", help="Flow catalog (YAML/JSON) to take the collection schema from")
+    parser.add_argument("--collection", help="Collection name in --catalog (required if it has more than one)")
     args = parser.parse_args()
+
+    known = known_fields_from_args(args)
+    salt = user_salt()
 
     infile = sys.stdin if args.jsonl == "-" else open(args.jsonl)
     outfile = open(args.output, "w") if args.output else sys.stdout
@@ -144,7 +210,7 @@ def main() -> None:
                 doc = json.loads(line)
             except json.JSONDecodeError as e:
                 raise SystemExit(f"{args.jsonl}:{lineno}: invalid JSON: {e}")
-            outfile.write(json.dumps(obfuscate(doc, (), args.salt), separators=(",", ":")) + "\n")
+            outfile.write(json.dumps(obfuscate(doc, (), known, salt), separators=(",", ":")) + "\n")
     finally:
         if infile is not sys.stdin:
             infile.close()
