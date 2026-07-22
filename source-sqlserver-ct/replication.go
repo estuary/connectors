@@ -247,8 +247,8 @@ func (rs *sqlserverCTReplicationStream) pollChanges(ctx context.Context, toVersi
 		return fmt.Errorf("error getting min valid CT versions: %w", err)
 	}
 
-	// Build list of tables to poll, handling expired CT data along the way
-	var tablesToPoll []*ctTablePollInfo
+	// Build the list of candidate tables to poll, checking that the CT versions are valid
+	var candidates []*ctTablePollInfo
 	for streamID, info := range rs.tables {
 		fromVersion := rs.tableVersions[streamID]
 		minValid, ctEnabled := minValidVersions[streamID]
@@ -284,7 +284,7 @@ func (rs *sqlserverCTReplicationStream) pollChanges(ctx context.Context, toVersi
 			continue
 		}
 
-		tablesToPoll = append(tablesToPoll, &ctTablePollInfo{
+		candidates = append(candidates, &ctTablePollInfo{
 			StreamID:    streamID,
 			Schema:      info.Schema,
 			Table:       info.Table,
@@ -294,6 +294,35 @@ func (rs *sqlserverCTReplicationStream) pollChanges(ctx context.Context, toVersi
 			FromVersion: fromVersion,
 			ToVersion:   toVersion,
 		})
+	}
+
+	// Issue a single query to determine which tables actually have changes more
+	// recent than their previous FromVersion.
+	tableHasChanges, err := ctGetChangedTables(ctx, rs.conn, candidates)
+	if err != nil {
+		return fmt.Errorf("error detecting changed tables: %w", err)
+	}
+
+	// Divide the candidates list into tables which have new changes for us to read and
+	// tables which can be safely skipped ahead to toVersion without reading.
+	var tablesToSkip = make(map[sqlcapture.StreamID]int64)
+	var tablesToPoll []*ctTablePollInfo
+	for _, info := range candidates {
+		if tableHasChanges[info.StreamID] {
+			tablesToPoll = append(tablesToPoll, info)
+		} else {
+			tablesToSkip[info.StreamID] = toVersion
+		}
+	}
+
+	// Emit updated version checkpoints for all skippable tables. It's necessary to keep
+	// cursors updated for idle tables so they don't run afoul of the min_valid_version
+	// sanity checking.
+	if len(tablesToSkip) > 0 {
+		maps.Copy(rs.tableVersions, tablesToSkip)
+		if err := callback(&sqlserverCommitEventCT{Versions: tablesToSkip}); err != nil {
+			return err
+		}
 	}
 
 	// Poll each table, updating versions and emitting a small checkpoint after each one
@@ -522,6 +551,59 @@ func ctGetMinValidVersions(ctx context.Context, conn *sql.DB) (map[sqlcapture.St
 		return nil, fmt.Errorf("error iterating min valid versions: %w", err)
 	}
 	return result, nil
+}
+
+// ctGetChangedTables issues a single batched query to determine which of the provided candidate
+// tables have at least one change after their FromVersion, and returns the set of their stream
+// IDs. This lets pollChanges skip issuing full reads against idle tables.
+//
+// The EXISTS check has no upper version bound because changes beyond the current cycle's
+// toVersion can only cause us to do an empty read of a table which is active in general but
+// has no changes in (fromVersion, toVersion]. This is benign and keeps the query simple.
+//
+// This query should work up till ~2000 bindings after which we might need chunking.
+func ctGetChangedTables(ctx context.Context, conn *sql.DB, candidates []*ctTablePollInfo) (map[sqlcapture.StreamID]bool, error) {
+	if len(candidates) == 0 {
+		return nil, nil
+	}
+
+	// Sort candidates by name so the query is stable across polling cycles
+	var sorted = slices.Clone(candidates)
+	slices.SortFunc(sorted, func(a, b *ctTablePollInfo) int {
+		return strings.Compare(a.StreamID.String(), b.StreamID.String())
+	})
+
+	var args = make([]any, 0, len(sorted))
+	var subqueries = make([]string, 0, len(sorted))
+	for idx, info := range sorted {
+		var quotedTable = backfill.QuoteTableName(info.Schema, info.Table)
+		subqueries = append(subqueries, fmt.Sprintf(
+			"SELECT %d AS idx, CASE WHEN EXISTS (SELECT 1 FROM CHANGETABLE(CHANGES %s, @p%d) AS CT) THEN 1 ELSE 0 END AS changed",
+			idx, quotedTable, idx+1))
+		args = append(args, info.FromVersion)
+	}
+	var query = strings.Join(subqueries, " UNION ALL ")
+
+	rows, err := conn.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("error executing batched change detection query: %w", err)
+	}
+	defer rows.Close()
+
+	var changed = make(map[sqlcapture.StreamID]bool)
+	for rows.Next() {
+		var idx, isChanged int
+		if err := rows.Scan(&idx, &isChanged); err != nil {
+			return nil, fmt.Errorf("error scanning change detection result: %w", err)
+		}
+		if idx < 0 || idx >= len(sorted) {
+			return nil, fmt.Errorf("internal error: change detection result index %d out of range for candidate list of length %d", idx, len(sorted))
+		}
+		if isChanged != 0 {
+			changed[sorted[idx].StreamID] = true
+		}
+	}
+	return changed, rows.Err()
 }
 
 // ctEnabledTables returns the set of stream IDs for tables that have Change Tracking enabled.
