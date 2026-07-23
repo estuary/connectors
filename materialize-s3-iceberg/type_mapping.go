@@ -26,10 +26,12 @@ var schemaOptions = []writer.ParquetSchemaOption{
 	writer.WithParquetUUIDAsString(),
 }
 
-// nsSchemaOptions is precomputed rather than appended per call: appending to
-// schemaOptions at a call site would alias its backing array if it ever gained
-// spare capacity.
+// The option-flavored variants are precomputed rather than appended per call:
+// appending to schemaOptions at a call site would alias its backing array if
+// it ever gained spare capacity.
 var nsSchemaOptions = append(slices.Clip(schemaOptions), writer.WithParquetTimestampAsNanoseconds())
+var variantSchemaOptions = append(slices.Clip(schemaOptions), writer.WithParquetSchemaJSONAsVariant())
+var nsVariantSchemaOptions = append(slices.Clip(nsSchemaOptions), writer.WithParquetSchemaJSONAsVariant())
 
 type fieldConfig struct {
 	// IgnoreStringFormat can be set to true to indicate that the field should
@@ -45,7 +47,7 @@ func (fc fieldConfig) CastToString() bool {
 	return fc.IgnoreStringFormat
 }
 
-func parquetSchema(fields []string, collection pf.CollectionSpec, fieldConfigJsonMap map[string]json.RawMessage, nanoseconds bool) (writer.ParquetSchema, error) {
+func parquetSchema(fields []string, collection pf.CollectionSpec, fieldConfigJsonMap map[string]json.RawMessage, nanoseconds bool, variants bool) (writer.ParquetSchema, error) {
 	out := make(writer.ParquetSchema, 0, len(fields))
 
 	for _, f := range fields {
@@ -58,7 +60,7 @@ func parquetSchema(fields []string, collection pf.CollectionSpec, fieldConfigJso
 			}
 		}
 
-		s, err := projectionToParquetSchemaElement(*collection.GetProjection(f), fc, nanoseconds)
+		s, err := projectionToParquetSchemaElement(*collection.GetProjection(f), fc, nanoseconds, variants)
 		if err != nil {
 			return nil, err
 		}
@@ -68,7 +70,7 @@ func parquetSchema(fields []string, collection pf.CollectionSpec, fieldConfigJso
 	return out, nil
 }
 
-func projectionToParquetSchemaElement(p pf.Projection, fc fieldConfig, nanoseconds bool) (writer.ParquetSchemaElement, error) {
+func projectionToParquetSchemaElement(p pf.Projection, fc fieldConfig, nanoseconds bool, variants bool) (writer.ParquetSchemaElement, error) {
 	if fc.IgnoreStringFormat {
 		if p.Inference.String_ == nil {
 			return writer.ParquetSchemaElement{}, fmt.Errorf("cannot set ignoreStringFormat on non-string field %q", p.Field)
@@ -76,9 +78,23 @@ func projectionToParquetSchemaElement(p pf.Projection, fc fieldConfig, nanosecon
 		p.Inference.String_.Format = ""
 	}
 
-	opts := schemaOptions
-	if nanoseconds {
+	// Collection key fields keep their conservative (string) mapping even with
+	// variant_columns enabled: Iceberg forbids variant as an identifier field,
+	// and keys are meant to be joined and filtered on across engines.
+	// ignoreStringFormat likewise remains an escape hatch forcing a JSON
+	// string column.
+	useVariant := variants && !p.IsPrimaryKey && !fc.IgnoreStringFormat
+
+	var opts []writer.ParquetSchemaOption
+	switch {
+	case nanoseconds && useVariant:
+		opts = nsVariantSchemaOptions
+	case nanoseconds:
 		opts = nsSchemaOptions
+	case useVariant:
+		opts = variantSchemaOptions
+	default:
+		opts = schemaOptions
 	}
 	return writer.ProjectionToParquetSchemaElement(p, false, opts...), nil
 }
@@ -103,9 +119,15 @@ func parquetTypeToIcebergType(pqt writer.ParquetDataType) iceberg.Type {
 		return iceberg.PrimitiveTypes.TimestampTzNs
 	case writer.LogicalTypeUuid:
 		return iceberg.PrimitiveTypes.UUID
+	case writer.LogicalTypeVariant:
+		return iceberg.VariantType{}
 	default:
 		panic(fmt.Sprintf("unhandled parquet data type: %T (%#v)", pqt, pqt))
 	}
+}
+
+func isVariant(typ iceberg.Type) bool {
+	return typ.Equals(iceberg.VariantType{})
 }
 
 type mappedType struct {
@@ -120,13 +142,26 @@ func (mt mappedType) Compatible(existing boilerplate.ExistingField) bool {
 	return strings.EqualFold(existing.Type, mt.icebergType.String())
 }
 
-// CanMigrate permits exactly the microsecond↔nanosecond timestamp pair, in
-// both directions. Iceberg forbids changing a column's type in place, so
-// UpdateResource migrates by dropping and re-adding the column under a new
-// field ID: the new type applies to data going forward, and prior rows read
-// as null for the column.
+// CanMigrate permits the microsecond↔nanosecond timestamp pair in both
+// directions, any non-variant type to variant (the variant_columns flip,
+// including column types a JSON-shaped field had previously evolved to), and
+// variant back to string (disabling variant_columns or applying castToString).
+// Iceberg forbids changing a column's type in place, so UpdateResource
+// migrates by dropping and re-adding the column under a new field ID: the new
+// type applies to data going forward, and prior rows read as null for the
+// column.
 func (mt mappedType) CanMigrate(existing boilerplate.ExistingField) bool {
 	from, to := strings.ToLower(existing.Type), mt.icebergType.String()
-	return (from == "timestamptz" && to == "timestamptz_ns") ||
-		(from == "timestamptz_ns" && to == "timestamptz")
+	switch {
+	case from == "timestamptz" && to == "timestamptz_ns":
+		return true
+	case from == "timestamptz_ns" && to == "timestamptz":
+		return true
+	case to == "variant":
+		return from != "variant"
+	case from == "variant":
+		return to == "string"
+	default:
+		return false
+	}
 }

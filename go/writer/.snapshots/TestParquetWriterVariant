@@ -1,0 +1,10 @@
+[{"idField":0,"variantField":{"a":1,"b":{"c":[1,2,"three"],"d":null}},"reqVariantField":{"seq":0},"strField":"str_0"},
+{"idField":1,"variantField":[1,"two",3.5,false,null,{"nested":true}],"reqVariantField":{"seq":1},"strField":"str_1"},
+{"idField":2,"variantField":"just a string","reqVariantField":{"seq":2},"strField":"str_2"},
+{"idField":3,"variantField":12345.678,"reqVariantField":{"seq":3},"strField":"str_3"},
+{"idField":4,"variantField":true,"reqVariantField":{"seq":4},"strField":"str_4"},
+{"idField":5,"variantField":null,"reqVariantField":{"seq":5},"strField":"str_5"},
+{"idField":6,"variantField":null,"reqVariantField":{"seq":6},"strField":"str_6"},
+{"idField":7,"variantField":9223372036854775807,"reqVariantField":{"seq":7},"strField":"str_7"},
+{"idField":8,"variantField":{"marshalled":true},"reqVariantField":{"seq":8},"strField":"str_8"}]
+
