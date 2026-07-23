@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/apache/arrow-go/v18/arrow/array"
+	"github.com/apache/arrow-go/v18/arrow/extensions"
 	parquetfile "github.com/apache/arrow-go/v18/parquet/file"
 	"github.com/apache/iceberg-go"
 	icebergcatalog "github.com/apache/iceberg-go/catalog"
@@ -145,6 +146,10 @@ func TestIntegration(t *testing.T) {
 		boilerplate.RunMaterializationTest(t, newMaterialization, "testdata/materialize-ns.flow.yaml", makeResourceFn, materializeSanitizers())
 	})
 
+	t.Run("materialize-variant", func(t *testing.T) {
+		boilerplate.RunMaterializationTest(t, newMaterialization, "testdata/materialize-variant.flow.yaml", makeResourceFn, materializeSanitizers())
+	})
+
 	t.Run("apply", func(t *testing.T) {
 		boilerplate.RunApplyTest(t, &driver{}, newMaterialization, "testdata/apply.flow.yaml", makeResourceFn)
 	})
@@ -175,6 +180,22 @@ func TestIntegration(t *testing.T) {
 
 	t.Run("ns-migrate", func(t *testing.T) {
 		runNanosecondMigrateTest(t, cfg)
+	})
+
+	t.Run("variant-create-v3", func(t *testing.T) {
+		runVariantCreateResourceTest(t, cfg)
+	})
+
+	t.Run("variant-duckdb-regression", func(t *testing.T) {
+		runVariantDuckDBRegression(t, cfg)
+	})
+
+	t.Run("variant-migrate", func(t *testing.T) {
+		runVariantMigrateTest(t, cfg)
+	})
+
+	t.Run("variant-disable-flip", func(t *testing.T) {
+		runVariantDisableFlipTest(t, cfg)
 	})
 
 	// Migration test is skipped because Iceberg does not support the type
@@ -219,6 +240,10 @@ func TestIntegrationGlue(t *testing.T) {
 		boilerplate.RunMaterializationTest(t, newMaterialization, "testdata/materialize-glue-ns.flow.yaml", makeResourceFn, materializeSanitizers())
 	})
 
+	t.Run("materialize-variant", func(t *testing.T) {
+		boilerplate.RunMaterializationTest(t, newMaterialization, "testdata/materialize-glue-variant.flow.yaml", makeResourceFn, materializeSanitizers())
+	})
+
 	t.Run("apply", func(t *testing.T) {
 		boilerplate.RunApplyTest(t, &driver{}, newMaterialization, "testdata/apply-glue.flow.yaml", makeResourceFn)
 	})
@@ -250,6 +275,18 @@ func TestIntegrationGlue(t *testing.T) {
 	t.Run("ns-migrate", func(t *testing.T) {
 		runNanosecondMigrateTest(t, cfg)
 	})
+
+	t.Run("variant-create-v3", func(t *testing.T) {
+		runVariantCreateResourceTest(t, cfg)
+	})
+
+	t.Run("variant-migrate", func(t *testing.T) {
+		runVariantMigrateTest(t, cfg)
+	})
+
+	t.Run("variant-disable-flip", func(t *testing.T) {
+		runVariantDisableFlipTest(t, cfg)
+	})
 }
 
 // TestRestGlueSnapshotParity enforces that the REST and Glue materialize
@@ -257,7 +294,7 @@ func TestIntegrationGlue(t *testing.T) {
 // catalog code paths produced different results — the drift this coverage
 // exists to catch.
 func TestRestGlueSnapshotParity(t *testing.T) {
-	for _, name := range []string{"materialize", "materialize-ns"} {
+	for _, name := range []string{"materialize", "materialize-ns", "materialize-variant"} {
 		rest, err := os.ReadFile(".snapshots/TestIntegration-" + name)
 		require.NoError(t, err)
 		glue, err := os.ReadFile(".snapshots/TestIntegrationGlue-" + name)
@@ -642,6 +679,20 @@ func TestPopulateInfoSchemaSkipsAbsentNamespace(t *testing.T) {
 	})
 }
 
+// withAdvanced returns cfg with a cloned Advanced block mutated by set.
+// Advanced is a pointer shared with the caller's cfg, so it is cloned rather
+// than mutated in place to keep flags from leaking into subtests that run
+// later.
+func withAdvanced(cfg config, set func(*advancedConfig)) config {
+	var adv = advancedConfig{}
+	if cfg.Advanced != nil {
+		adv = *cfg.Advanced
+	}
+	set(&adv)
+	cfg.Advanced = &adv
+	return cfg
+}
+
 // runNanosecondTimestampTest verifies that timestamptz_ns (Iceberg v3 format) columns:
 //   - write nanosecond-precision timestamps correctly
 //   - clamp out-of-range values (before 1677 / after 2262) to int64 min/max rather than overflowing
@@ -651,14 +702,7 @@ func runNanosecondTimestampTest(t *testing.T, cfg config) {
 	t.Helper()
 	ctx := context.Background()
 
-	// Advanced is a pointer shared with the caller's cfg: clone it before
-	// mutating so the flag doesn't leak into subtests that run after this one.
-	adv := advancedConfig{}
-	if cfg.Advanced != nil {
-		adv = *cfg.Advanced
-	}
-	adv.NanosecondTimestamps = true
-	cfg.Advanced = &adv
+	cfg = withAdvanced(cfg, func(a *advancedConfig) { a.NanosecondTimestamps = true })
 	rt := newRegressionTable(t, ctx, cfg, "ns_timestamp", iceberg.Properties{icebergtable.PropertyFormatVersion: "3"},
 		iceberg.NestedField{ID: 1, Name: "ts", Type: iceberg.PrimitiveTypes.TimestampTzNs, Required: false})
 
@@ -720,14 +764,7 @@ func runNanosecondV2UpgradeTest(t *testing.T, cfg config) {
 	t.Helper()
 	ctx := context.Background()
 
-	// Advanced is a pointer shared with the caller's cfg: clone it before
-	// mutating so the flag doesn't leak into subtests that run after this one.
-	adv := advancedConfig{}
-	if cfg.Advanced != nil {
-		adv = *cfg.Advanced
-	}
-	adv.NanosecondTimestamps = true
-	cfg.Advanced = &adv
+	cfg = withAdvanced(cfg, func(a *advancedConfig) { a.NanosecondTimestamps = true })
 	rt := newRegressionTable(t, ctx, cfg, "ns_v2_upgrade", iceberg.Properties{icebergtable.PropertyFormatVersion: "2"},
 		iceberg.NestedField{ID: 1, Name: "id", Type: iceberg.PrimitiveTypes.String, Required: false})
 	cat := rt.cat
@@ -777,14 +814,7 @@ func runNanosecondCreateResourceTest(t *testing.T, cfg config) {
 	t.Helper()
 	ctx := context.Background()
 
-	// Advanced is a pointer shared with the caller's cfg: clone it before
-	// mutating so the flag doesn't leak into subtests that run after this one.
-	adv := advancedConfig{}
-	if cfg.Advanced != nil {
-		adv = *cfg.Advanced
-	}
-	adv.NanosecondTimestamps = true
-	cfg.Advanced = &adv
+	cfg = withAdvanced(cfg, func(a *advancedConfig) { a.NanosecondTimestamps = true })
 
 	cat, err := newCatalog(ctx, cfg, NestedLocationStyle)
 	require.NoError(t, err)
@@ -938,13 +968,15 @@ func runNanosecondMigrateTest(t *testing.T, cfg config) {
 // scanColumn reads the named column of every row through iceberg-go's scanner,
 // which applies the table's current schema and name mapping the same way
 // external query engines do. Values are returned as int64 epoch offsets in the
-// column's unit, with nil for nulls.
-func scanColumn(t *testing.T, ctx context.Context, rt *regressionTable, name string) []any {
+// column's unit (timestamps), Go strings (strings), or compact JSON strings
+// (variants), with nil for nulls. Scan options allow time travel to a prior
+// snapshot, which reads under that snapshot's schema.
+func scanColumn(t *testing.T, ctx context.Context, rt *regressionTable, name string, opts ...icebergtable.ScanOption) []any {
 	t.Helper()
 
 	tbl, err := rt.cat.cat.LoadTable(ctx, rt.ident)
 	require.NoError(t, err)
-	arrowTbl, err := tbl.Scan().ToArrowTable(ctx)
+	arrowTbl, err := tbl.Scan(opts...).ToArrowTable(ctx)
 	require.NoError(t, err)
 	defer arrowTbl.Release()
 
@@ -963,6 +995,12 @@ func scanColumn(t *testing.T, ctx context.Context, rt *regressionTable, name str
 				out = append(out, int64(arr.Value(i)))
 			case *array.String:
 				out = append(out, arr.Value(i))
+			case *extensions.VariantArray:
+				v, err := arr.Value(i)
+				require.NoError(t, err)
+				j, err := json.Marshal(v)
+				require.NoError(t, err)
+				out = append(out, string(j))
 			default:
 				t.Fatalf("column %q has unhandled arrow type %T", name, chunk)
 			}
@@ -1243,13 +1281,736 @@ func TestMapTypeNanosecondWiring(t *testing.T) {
 	require.Equal(t, "2262-04-11T23:47:16.854775807Z", v)
 }
 
-// TestCanMigrate pins the migratable set to exactly the microsecond↔nanosecond
-// timestamp pair: anything else must remain INCOMPATIBLE (backfill) rather
+// A user-supplied format-version conflict must name every enabled option that
+// requires format v3: with both nanosecond_timestamps and variant_columns on,
+// blaming only one of them misleads the user about what to reconfigure. The
+// conflict check runs before any catalog access, so a bare catalog struct is
+// enough here.
+func TestCreateResourceFormatVersionConflictNamesOptions(t *testing.T) {
+	ctx := context.Background()
+
+	binding := &pf.MaterializationSpec_Binding{
+		ResourcePath: []string{"test_namespace", "format_version_conflict"},
+		Collection: pf.CollectionSpec{
+			Name: "acmeCo/tests/format-version-conflict",
+			Projections: []pf.Projection{{
+				Field: "f",
+				Ptr:   "/f",
+				Inference: pf.Inference{
+					Types:   []string{"string"},
+					String_: &pf.Inference_String{},
+				},
+			}},
+		},
+		FieldSelection: pf.FieldSelection{Values: []string{"f"}},
+	}
+
+	for _, tt := range []struct {
+		name   string
+		adv    advancedConfig
+		expect []string
+	}{
+		{"nanosecond timestamps only", advancedConfig{NanosecondTimestamps: true}, []string{"nanosecond_timestamps"}},
+		{"variant columns only", advancedConfig{VariantColumns: true}, []string{"variant_columns"}},
+		{"both options", advancedConfig{NanosecondTimestamps: true, VariantColumns: true}, []string{"nanosecond_timestamps", "variant_columns"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var adv = tt.adv
+			var cat = &catalog{cfg: &config{Advanced: &adv}, locationStyle: NestedLocationStyle}
+			_, _, err := cat.CreateResource(ctx, binding, resource{
+				AdditionalTableProperties: map[string]string{
+					icebergtable.PropertyFormatVersion: "2",
+				},
+			})
+			for _, want := range tt.expect {
+				require.ErrorContains(t, err, want)
+			}
+		})
+	}
+}
+
+// runVariantCreateResourceTest exercises the connector's CreateResource path
+// with variant_columns enabled: a user-supplied format-version table property
+// that conflicts with the required v3 is rejected with an explicit error, and
+// a clean create yields a format v3 table where the JSON-shaped fields —
+// object, array, multi-type, and the root document — are variant columns,
+// while the (multi-type) collection key and an ignoreStringFormat-overridden
+// field keep their string mapping.
+func runVariantCreateResourceTest(t *testing.T, cfg config) {
+	t.Helper()
+	ctx := context.Background()
+
+	cfg = withAdvanced(cfg, func(a *advancedConfig) { a.VariantColumns = true })
+
+	cat, err := newCatalog(ctx, cfg, NestedLocationStyle)
+	require.NoError(t, err)
+	ensureNamespace(t, cfg)
+
+	// Same per-run naming convention as newRegressionTable, so concurrent runs
+	// can't collide and leaked tables are swept by the boilerplate cleanup.
+	table := fmt.Sprintf("variant_create_flow_test_%d", time.Now().Unix())
+	ident := icebergtable.Identifier{cfg.Namespace, table}
+
+	// A multi-type collection key is not expressible in a Flow catalog today
+	// (keys must be a single scalar type), but legacy or synthesized specs can
+	// still present one, so the binding is built directly to pin that a key
+	// never maps to variant.
+	binding := &pf.MaterializationSpec_Binding{
+		ResourcePath: ident,
+		Collection: pf.CollectionSpec{
+			Name: "acmeCo/tests/variant-create",
+			Projections: []pf.Projection{
+				{Field: "arr", Ptr: "/arr", Inference: pf.Inference{Types: []string{"array"}}},
+				{Field: "cast", Ptr: "/cast", Inference: pf.Inference{
+					Types:   []string{"integer", "string"},
+					String_: &pf.Inference_String{},
+				}},
+				{Field: "flow_document", Ptr: "", Inference: pf.Inference{
+					Types:  []string{"object"},
+					Exists: pf.Inference_MUST,
+				}},
+				{Field: "multi", Ptr: "/multi", Inference: pf.Inference{
+					Types:   []string{"integer", "string"},
+					String_: &pf.Inference_String{},
+				}},
+				{Field: "multiKey", Ptr: "/multiKey", IsPrimaryKey: true, Inference: pf.Inference{
+					Types:   []string{"integer", "string"},
+					String_: &pf.Inference_String{},
+					Exists:  pf.Inference_MUST,
+				}},
+				{Field: "obj", Ptr: "/obj", Inference: pf.Inference{Types: []string{"object"}}},
+			},
+		},
+		FieldSelection: pf.FieldSelection{
+			Keys:     []string{"multiKey"},
+			Values:   []string{"arr", "cast", "multi", "obj"},
+			Document: "flow_document",
+			FieldConfigJsonMap: map[string]json.RawMessage{
+				"cast": json.RawMessage(`{"ignoreStringFormat": true}`),
+			},
+		},
+	}
+
+	_, _, err = cat.CreateResource(ctx, binding, resource{
+		AdditionalTableProperties: map[string]string{
+			icebergtable.PropertyFormatVersion: "2",
+		},
+	})
+	require.ErrorContains(t, err, "requires format version 3")
+
+	_, apply, err := cat.CreateResource(ctx, binding, resource{})
+	require.NoError(t, err)
+	require.NoError(t, apply(ctx))
+	t.Cleanup(func() {
+		if err := cat.cat.DropTable(ctx, ident); err != nil {
+			t.Log("failed to drop table", ident, err)
+		}
+	})
+
+	tbl, err := cat.cat.LoadTable(ctx, ident)
+	require.NoError(t, err)
+	require.Equal(t, 3, tbl.Metadata().Version())
+
+	for name, want := range map[string]iceberg.Type{
+		"arr":           iceberg.VariantType{},
+		"cast":          iceberg.PrimitiveTypes.String,
+		"flow_document": iceberg.VariantType{},
+		"multi":         iceberg.VariantType{},
+		"multiKey":      iceberg.PrimitiveTypes.String,
+		"obj":           iceberg.VariantType{},
+	} {
+		f, ok := tbl.Schema().FindFieldByName(name)
+		require.True(t, ok, "column %q missing", name)
+		require.True(t, f.Type.Equals(want), "column %q: got %s, want %s", name, f.Type, want)
+	}
+}
+
+// duckdbAttachQuery runs query against the test REST catalog using a pinned
+// dockerized DuckDB: an independent Iceberg v3 implementation whose version
+// isn't tied to anything in go.mod. The catalog is attached as `ice`, with
+// direct S3 credentials (the local rustfs has no STS, so credential vending is
+// disabled via ACCESS_DELEGATION_MODE none). The container uses host
+// networking so the catalog and S3 endpoints resolve at localhost.
+func duckdbAttachQuery(t *testing.T, cfg config, query string) string {
+	t.Helper()
+
+	clientID, clientSecret, ok := strings.Cut(cfg.Catalog.Credential, ":")
+	require.True(t, ok, "catalog credential must be client_id:client_secret")
+
+	script := fmt.Sprintf(`
+INSTALL iceberg; LOAD iceberg;
+CREATE SECRET s3sec (TYPE S3, KEY_ID '%s', SECRET '%s', REGION '%s', ENDPOINT '%s', URL_STYLE 'path', USE_SSL false);
+CREATE SECRET icesec (TYPE ICEBERG, CLIENT_ID '%s', CLIENT_SECRET '%s', OAUTH2_SERVER_URI '%s/v1/oauth/tokens', OAUTH2_SCOPE '%s');
+ATTACH '%s' AS ice (TYPE iceberg, SECRET icesec, ENDPOINT '%s', ACCESS_DELEGATION_MODE 'none');
+%s`,
+		cfg.Credentials.AWSAccessKeyID, cfg.Credentials.AWSSecretAccessKey, cfg.Region,
+		strings.TrimPrefix(cfg.S3Endpoint, "http://"),
+		clientID, clientSecret, cfg.Catalog.URI, cfg.Catalog.Scope,
+		cfg.Catalog.Warehouse, cfg.Catalog.URI,
+		query,
+	)
+
+	// Capture stdout only: docker writes image-pull progress to stderr when
+	// the pinned image isn't cached (as on a fresh CI runner), which must not
+	// pollute the query result that callers parse.
+	cmd := exec.Command("docker", "run", "--rm", "--network", "host",
+		writer.DuckDBDockerImage, "duckdb", "-json", "-c", script,
+	)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
+	require.NoError(t, err, "dockerized duckdb query failed: %s", stderr.String())
+
+	return string(out)
+}
+
+// runVariantDuckDBRegression proves that variant data written by the connector
+// is readable by an independent Iceberg v3 reader: a pinned dockerized DuckDB
+// attaches the test REST catalog and round-trips nested objects, arrays,
+// mixed-type fields, and nulls from the variant column. It runs only against
+// the REST catalog: DuckDB cannot attach the Glue catalog with this mechanism,
+// and the variant encoding under test is identical for both.
+func runVariantDuckDBRegression(t *testing.T, cfg config) {
+	t.Helper()
+	ctx := context.Background()
+
+	cfg = withAdvanced(cfg, func(a *advancedConfig) { a.VariantColumns = true })
+
+	cat, err := newCatalog(ctx, cfg, NestedLocationStyle)
+	require.NoError(t, err)
+	ensureNamespace(t, cfg)
+
+	table := fmt.Sprintf("variant_duckdb_flow_test_%d", time.Now().Unix())
+	ident := icebergtable.Identifier{cfg.Namespace, table}
+
+	binding := &pf.MaterializationSpec_Binding{
+		ResourcePath: ident,
+		Collection: pf.CollectionSpec{
+			Name: "acmeCo/tests/variant-duckdb",
+			Projections: []pf.Projection{
+				{Field: "id", Ptr: "/id", IsPrimaryKey: true, Inference: pf.Inference{
+					Types:  []string{"integer"},
+					Exists: pf.Inference_MUST,
+				}},
+				{Field: "v", Ptr: "/v", Inference: pf.Inference{
+					Types:   []string{"array", "boolean", "number", "object", "string"},
+					String_: &pf.Inference_String{},
+				}},
+			},
+		},
+		FieldSelection: pf.FieldSelection{
+			Keys:   []string{"id"},
+			Values: []string{"v"},
+		},
+	}
+
+	_, apply, err := cat.CreateResource(ctx, binding, resource{})
+	require.NoError(t, err)
+	require.NoError(t, apply(ctx))
+	t.Cleanup(func() {
+		if err := cat.cat.DropTable(ctx, ident); err != nil {
+			t.Log("failed to drop table", ident, err)
+		}
+	})
+
+	tbl, err := cat.cat.LoadTable(ctx, ident)
+	require.NoError(t, err)
+	vField, ok := tbl.Schema().FindFieldByName("v")
+	require.True(t, ok)
+	require.True(t, vField.Type.Equals(iceberg.VariantType{}),
+		"column v: got %s, want variant", vField.Type)
+	idField, ok := tbl.Schema().FindFieldByName("id")
+	require.True(t, ok)
+
+	rt := &regressionTable{
+		cfg:      cfg,
+		cat:      cat,
+		ident:    ident,
+		location: tbl.Location(),
+		s3client: newTestS3Client(cfg),
+	}
+
+	// The JSON round-tripped through the variant encoding, in `id` order. A
+	// JSON null value and an absent (SQL NULL) value both read back as NULL.
+	vals := []string{
+		`{"a": 1, "b": {"c": [1, 2, "three"], "d": null}}`,
+		`[1, "two", 3.5, false, null, {"nested": true}]`,
+		`"plain string"`,
+		`3.5`,
+		`true`,
+		`null`,
+		"",
+	}
+
+	idID, vID := int32(idField.ID), int32(vField.ID)
+	rows := make([][]any, len(vals))
+	for i, v := range vals {
+		row := []any{i + 1, any(nil)}
+		if v != "" {
+			row[1] = []byte(v)
+		}
+		rows[i] = row
+	}
+	s3Path, _ := rt.uploadParquetRows(t, ctx, writer.ParquetSchema{
+		{Name: "id", DataType: writer.PrimitiveTypeInteger, Required: true, FieldId: &idID},
+		{Name: "v", DataType: writer.LogicalTypeVariant, Required: false, FieldId: &vID},
+	}, rows...)
+	require.NoError(t, rt.cat.appendFiles(ctx, "acmeCo/tests/variant-duckdb", rt.ident,
+		[]string{s3Path}, "", "deadbeefdeadbeef"))
+
+	out := duckdbAttachQuery(t, cfg, fmt.Sprintf(
+		`SELECT id, v::JSON AS v FROM ice.%s."%s" ORDER BY id;`, cfg.Namespace, table))
+
+	// The final -json result set is the last JSON array in the output (the
+	// preceding statements each emit a small success array).
+	start := strings.LastIndex(out, "[{")
+	require.NotEqual(t, -1, start, "no result rows in duckdb output: %s", out)
+	var got []struct {
+		ID int64           `json:"id"`
+		V  json.RawMessage `json:"v"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(out[start:]), &got))
+	require.Len(t, got, len(vals))
+
+	for i, want := range vals {
+		require.Equal(t, int64(i+1), got[i].ID)
+		if want == "" || want == "null" {
+			require.True(t, got[i].V == nil || string(got[i].V) == "null",
+				"row %d: want NULL, got %s", i+1, got[i].V)
+			continue
+		}
+		require.JSONEq(t, want, string(got[i].V), "row %d", i+1)
+	}
+}
+
+// newTestS3Client builds an S3 client from the test config, using path-style
+// addressing only for S3-compatible stacks with a custom endpoint (rustfs in
+// TestIntegration); real AWS (Glue) uses the default endpoint resolution.
+func newTestS3Client(cfg config) *s3.Client {
+	s3opts := s3.Options{
+		Region:      cfg.Region,
+		Credentials: credentials.NewStaticCredentialsProvider(cfg.Credentials.AWSAccessKeyID, cfg.Credentials.AWSSecretAccessKey, ""),
+	}
+	if cfg.S3Endpoint != "" {
+		s3opts.BaseEndpoint = aws.String(cfg.S3Endpoint)
+		s3opts.UsePathStyle = true
+	}
+	return s3.New(s3opts)
+}
+
+// migrateProbe pairs a projection with its field config for computing a
+// migration set through the connector's real MapType/Compatible/CanMigrate
+// seam.
+type migrateProbe struct {
+	proj pf.Projection
+	fc   fieldConfig
+}
+
+// computeMigrateSet mirrors the boilerplate apply path's migration computation
+// over the given value fields: a selected field whose mapped type is
+// incompatible with its existing column either migrates or forces a
+// recreation — a variant_columns flip in either direction must always take the
+// former.
+func computeMigrateSet(t *testing.T, ctx context.Context, rt *regressionTable, d *materialization, fields []migrateProbe) []mboilerplate.MigrateField[mappedType] {
+	t.Helper()
+	tbl, err := rt.cat.cat.LoadTable(ctx, rt.ident)
+	require.NoError(t, err)
+
+	var out []mboilerplate.MigrateField[mappedType]
+	for _, field := range fields {
+		existing, ok := tbl.Schema().FindFieldByName(field.proj.Field)
+		require.True(t, ok)
+		ef := mboilerplate.ExistingField{
+			Name:     existing.Name,
+			Type:     existing.Type.Type(),
+			Nullable: !existing.Required,
+		}
+		mt, _ := d.MapType(mboilerplate.Projection{Projection: field.proj}, field.fc)
+		if !mt.Compatible(ef) && mt.CanMigrate(ef) {
+			out = append(out, mboilerplate.MigrateField[mappedType]{
+				From: ef,
+				To: mboilerplate.MappedProjection[mappedType]{
+					Projection: mboilerplate.Projection{Projection: field.proj},
+					Mapped:     mt,
+				},
+			})
+		} else {
+			require.True(t, mt.Compatible(ef),
+				"field %q must either migrate or remain compatible: the flip must never force recreation", field.proj.Field)
+		}
+	}
+	return out
+}
+
+// nameMappingNames returns the set of column names present in the table's
+// default name mapping.
+func nameMappingNames(t *testing.T, tbl *icebergtable.Table) map[string]bool {
+	t.Helper()
+	var mapping iceberg.NameMapping
+	require.NoError(t, json.Unmarshal([]byte(tbl.Properties()[icebergtable.DefaultNameMappingKey]), &mapping))
+	mapped := make(map[string]bool)
+	for _, mf := range mapping {
+		for _, n := range mf.Names {
+			mapped[n] = true
+		}
+	}
+	return mapped
+}
+
+// runVariantMigrateTest exercises the column conversion performed when
+// variant_columns is toggled on an existing materialization: the JSON-shaped
+// column's conversion must route through the migration path (never table
+// recreation), dropping and re-adding the column under the same name with a
+// new field ID, upgrading the table to format v3 in the same transaction, and
+// scrubbing the replaced name from the default name mapping. The decisive
+// reads go through iceberg-go's spec-compliant scanner: pre-flip rows read
+// null for the converted column — never a misread of their JSON-text values —
+// post-flip rows read as variant, time travel to the pre-flip snapshot reads
+// the old schema fully populated for field-ID-embedded files, and the key and
+// castToString columns are untouched. The migration set is computed through the connector's real
+// MapType/Compatible/CanMigrate seam exactly as the boilerplate apply path
+// does, and recomputing it after the flip yields nothing, pinning that
+// repeated applies cause no schema churn.
+func runVariantMigrateTest(t *testing.T, cfg config) {
+	t.Helper()
+	ctx := context.Background()
+
+	cfg = withAdvanced(cfg, func(a *advancedConfig) { a.VariantColumns = true })
+
+	// The table as the connector created it before the flip: the JSON-shaped
+	// field v is a JSON-text string column, alongside a string key and a
+	// castToString-overridden field.
+	rt := newRegressionTable(t, ctx, cfg, "variant_migrate", nil,
+		iceberg.NestedField{ID: 1, Name: "id", Type: iceberg.PrimitiveTypes.String, Required: false},
+		iceberg.NestedField{ID: 2, Name: "v", Type: iceberg.PrimitiveTypes.String, Required: false},
+		iceberg.NestedField{ID: 3, Name: "cast", Type: iceberg.PrimitiveTypes.String, Required: false})
+
+	// Two pre-flip rows land before the flip: a legacy row in a file without
+	// embedded field IDs, as the connector wrote before field-ID embedding, and
+	// a recent row in a file with the table's field IDs embedded, as the
+	// connector writes today.
+	legacyPath, _ := rt.uploadParquetRows(t, ctx, writer.ParquetSchema{
+		{Name: "id", DataType: writer.LogicalTypeString, Required: false},
+		{Name: "v", DataType: writer.LogicalTypeString, Required: false},
+		{Name: "cast", DataType: writer.LogicalTypeString, Required: false},
+	}, []any{"legacy", `{"l":true}`, "kept-legacy"})
+	preIDID, preVID, preCastID := int32(1), int32(2), int32(3)
+	oldPath, _ := rt.uploadParquetRows(t, ctx, writer.ParquetSchema{
+		{Name: "id", DataType: writer.LogicalTypeString, Required: false, FieldId: &preIDID},
+		{Name: "v", DataType: writer.LogicalTypeString, Required: false, FieldId: &preVID},
+		{Name: "cast", DataType: writer.LogicalTypeString, Required: false, FieldId: &preCastID},
+	}, []any{"old", `{"a":1}`, "kept"})
+	require.NoError(t, rt.cat.appendFiles(ctx, "acmeCo/tests/variant-migrate", rt.ident,
+		[]string{legacyPath, oldPath}, "", "checkpoint-1"))
+
+	preFlip, err := rt.cat.cat.LoadTable(ctx, rt.ident)
+	require.NoError(t, err)
+	preFlipSnapshot := preFlip.CurrentSnapshot().SnapshotID
+
+	keyProj := pf.Projection{Field: "id", Ptr: "/id", IsPrimaryKey: true, Inference: pf.Inference{
+		Types:   []string{"string"},
+		String_: &pf.Inference_String{},
+		Exists:  pf.Inference_MUST,
+	}}
+	vProj := pf.Projection{Field: "v", Ptr: "/v", Inference: pf.Inference{Types: []string{"object"}}}
+	castProj := pf.Projection{Field: "cast", Ptr: "/cast", Inference: pf.Inference{
+		Types:   []string{"integer", "string"},
+		String_: &pf.Inference_String{},
+	}}
+
+	d := &materialization{cfg: cfg}
+
+	computeMigrates := func() []mboilerplate.MigrateField[mappedType] {
+		return computeMigrateSet(t, ctx, rt, d, []migrateProbe{
+			{vProj, fieldConfig{}},
+			{castProj, fieldConfig{IgnoreStringFormat: true}},
+		})
+	}
+
+	// The key column keeps its string mapping with the option on, so the flip
+	// leaves it compatible (the boilerplate additionally never migrates keys).
+	keyMapped, _ := d.MapType(mboilerplate.Projection{Projection: keyProj}, fieldConfig{})
+	require.True(t, keyMapped.Compatible(mboilerplate.ExistingField{Name: "id", Type: "string"}))
+
+	migrates := computeMigrates()
+	require.Len(t, migrates, 1, "the variant_columns flip must route the JSON-shaped column through migration")
+	require.Equal(t, "v", migrates[0].From.Name)
+
+	_, apply, err := rt.cat.UpdateResource(ctx, mboilerplate.BindingUpdate[config, resource, mappedType]{
+		Binding: mboilerplate.MappedBinding[config, resource, mappedType]{
+			MaterializationSpec_Binding: pf.MaterializationSpec_Binding{
+				ResourcePath: rt.ident,
+			},
+		},
+		FieldsToMigrate: migrates,
+	})
+	require.NoError(t, err)
+	require.NoError(t, apply(ctx))
+
+	tbl, err := rt.cat.cat.LoadTable(ctx, rt.ident)
+	require.NoError(t, err)
+	require.Equal(t, 3, tbl.Metadata().Version(), "the flip must upgrade the table to format v3")
+	f, ok := tbl.Schema().FindFieldByName("v")
+	require.True(t, ok, "the converted column must keep its name")
+	require.True(t, f.Type.Equals(iceberg.VariantType{}))
+	require.NotEqual(t, 2, f.ID, "the converted column must get a new field ID")
+
+	// The key and castToString columns are untouched by the flip.
+	for name, wantID := range map[string]int{"id": 1, "cast": 3} {
+		uf, ok := tbl.Schema().FindFieldByName(name)
+		require.True(t, ok)
+		require.Equal(t, wantID, uf.ID)
+		require.True(t, uf.Type.Equals(iceberg.PrimitiveTypes.String))
+	}
+
+	// The replaced name is scrubbed from the default name mapping so the
+	// pre-flip file's JSON-text column cannot mis-bind to the variant column;
+	// the untouched columns keep their entries.
+	mapped := nameMappingNames(t, tbl)
+	require.False(t, mapped["v"], "converted column must be removed from the name mapping")
+	require.True(t, mapped["id"] && mapped["cast"], "untouched columns must keep their name-mapping entries")
+
+	// The pre-flip rows survive the flip with their converted column reading
+	// null — never a misread of their JSON-text values — under the current
+	// schema, while their untouched columns stay fully readable (the legacy
+	// file's, via the surgically-scrubbed name mapping).
+	require.ElementsMatch(t, []any{"legacy", "old"}, scanColumn(t, ctx, rt, "id"))
+	require.ElementsMatch(t, []any{nil, nil}, scanColumn(t, ctx, rt, "v"))
+	require.ElementsMatch(t, []any{"kept-legacy", "kept"}, scanColumn(t, ctx, rt, "cast"))
+
+	// Time travel to the pre-flip snapshot reads the old schema: the field-ID-
+	// embedded row is fully populated, while the legacy row's converted column
+	// is null — the name mapping is a table property, not versioned per
+	// snapshot, so its scrubbed entry is gone for historical reads too, the
+	// same trade-off the nanosecond-timestamps migration shipped with.
+	require.ElementsMatch(t, []any{"legacy", "old"}, scanColumn(t, ctx, rt, "id", icebergtable.WithSnapshotID(preFlipSnapshot)))
+	require.ElementsMatch(t, []any{nil, `{"a":1}`}, scanColumn(t, ctx, rt, "v", icebergtable.WithSnapshotID(preFlipSnapshot)))
+	require.ElementsMatch(t, []any{"kept-legacy", "kept"}, scanColumn(t, ctx, rt, "cast", icebergtable.WithSnapshotID(preFlipSnapshot)))
+
+	// A post-flip row lands with the table's field IDs embedded and the
+	// converted column written as variant, as the connector now writes.
+	idID, castID, vID := int32(1), int32(3), int32(f.ID)
+	newPath, _ := rt.uploadParquetRows(t, ctx, writer.ParquetSchema{
+		{Name: "id", DataType: writer.LogicalTypeString, Required: false, FieldId: &idID},
+		{Name: "v", DataType: writer.LogicalTypeVariant, Required: false, FieldId: &vID},
+		{Name: "cast", DataType: writer.LogicalTypeString, Required: false, FieldId: &castID},
+	}, []any{"new", []byte(`{"b":2}`), "kept2"})
+	require.NoError(t, rt.cat.appendFiles(ctx, "acmeCo/tests/variant-migrate", rt.ident,
+		[]string{newPath}, "checkpoint-1", "checkpoint-2"))
+
+	require.ElementsMatch(t, []any{"legacy", "old", "new"}, scanColumn(t, ctx, rt, "id"))
+	require.ElementsMatch(t, []any{nil, nil, `{"b":2}`}, scanColumn(t, ctx, rt, "v"))
+
+	// Recomputing the migration set after the flip yields nothing: repeated
+	// applies are idempotent and cause no schema churn.
+	require.Empty(t, computeMigrates())
+}
+
+// runVariantDisableFlipTest is the mirror of runVariantMigrateTest: disabling
+// variant_columns on a materialization with existing variant columns must also
+// route through the migration path (never table recreation), dropping and
+// re-adding the column as a JSON-text string under the same name with a new
+// field ID, scrubbing the replaced name from the default name mapping, and
+// leaving the table at format v3. Pre-flip variant rows read null for the
+// converted column under the current schema — the same going-forward semantics
+// as the enable flip — while time travel to the pre-flip snapshot reads the
+// variant data fully populated (the connector always embeds field IDs when
+// writing variant, so no pre-flip file depends on the scrubbed mapping). The
+// key and castToString columns are untouched, and recomputing the migration
+// set after the flip yields nothing, pinning that repeated applies cause no
+// schema churn.
+func runVariantDisableFlipTest(t *testing.T, cfg config) {
+	t.Helper()
+	ctx := context.Background()
+
+	cfg = withAdvanced(cfg, func(a *advancedConfig) { a.VariantColumns = false })
+
+	// The table as the connector created it while variant_columns was on: the
+	// JSON-shaped field v is a variant column in a format v3 table, alongside
+	// a string key and a castToString-overridden field.
+	rt := newRegressionTable(t, ctx, cfg, "variant_disable",
+		iceberg.Properties{icebergtable.PropertyFormatVersion: "3"},
+		iceberg.NestedField{ID: 1, Name: "id", Type: iceberg.PrimitiveTypes.String, Required: false},
+		iceberg.NestedField{ID: 2, Name: "v", Type: iceberg.VariantType{}, Required: false},
+		iceberg.NestedField{ID: 3, Name: "cast", Type: iceberg.PrimitiveTypes.String, Required: false})
+
+	// A pre-flip row lands as the connector wrote it with the option on:
+	// field IDs embedded and v encoded as variant.
+	idID, vID, castID := int32(1), int32(2), int32(3)
+	prePath, _ := rt.uploadParquetRows(t, ctx, writer.ParquetSchema{
+		{Name: "id", DataType: writer.LogicalTypeString, Required: false, FieldId: &idID},
+		{Name: "v", DataType: writer.LogicalTypeVariant, Required: false, FieldId: &vID},
+		{Name: "cast", DataType: writer.LogicalTypeString, Required: false, FieldId: &castID},
+	}, []any{"pre", []byte(`{"a":1}`), "kept"})
+	require.NoError(t, rt.cat.appendFiles(ctx, "acmeCo/tests/variant-disable",
+		rt.ident, []string{prePath}, "", "checkpoint-1"))
+
+	preFlip, err := rt.cat.cat.LoadTable(ctx, rt.ident)
+	require.NoError(t, err)
+	preFlipSnapshot := preFlip.CurrentSnapshot().SnapshotID
+
+	keyProj := pf.Projection{Field: "id", Ptr: "/id", IsPrimaryKey: true, Inference: pf.Inference{
+		Types:   []string{"string"},
+		String_: &pf.Inference_String{},
+		Exists:  pf.Inference_MUST,
+	}}
+	vProj := pf.Projection{Field: "v", Ptr: "/v", Inference: pf.Inference{Types: []string{"object"}}}
+	castProj := pf.Projection{Field: "cast", Ptr: "/cast", Inference: pf.Inference{
+		Types:   []string{"integer", "string"},
+		String_: &pf.Inference_String{},
+	}}
+
+	d := &materialization{cfg: cfg}
+
+	computeMigrates := func() []mboilerplate.MigrateField[mappedType] {
+		return computeMigrateSet(t, ctx, rt, d, []migrateProbe{
+			{vProj, fieldConfig{}},
+			{castProj, fieldConfig{IgnoreStringFormat: true}},
+		})
+	}
+
+	// The key column's string mapping is unaffected by the option, so the flip
+	// leaves it compatible (the boilerplate additionally never migrates keys).
+	keyMapped, _ := d.MapType(mboilerplate.Projection{Projection: keyProj}, fieldConfig{})
+	require.True(t, keyMapped.Compatible(mboilerplate.ExistingField{Name: "id", Type: "string"}))
+
+	migrates := computeMigrates()
+	require.Len(t, migrates, 1, "the disable flip must route the variant column through migration")
+	require.Equal(t, "v", migrates[0].From.Name)
+
+	_, apply, err := rt.cat.UpdateResource(ctx, mboilerplate.BindingUpdate[config, resource, mappedType]{
+		Binding: mboilerplate.MappedBinding[config, resource, mappedType]{
+			MaterializationSpec_Binding: pf.MaterializationSpec_Binding{
+				ResourcePath: rt.ident,
+			},
+		},
+		FieldsToMigrate: migrates,
+	})
+	require.NoError(t, err)
+	require.NoError(t, apply(ctx))
+
+	tbl, err := rt.cat.cat.LoadTable(ctx, rt.ident)
+	require.NoError(t, err)
+	require.Equal(t, 3, tbl.Metadata().Version(), "the disable flip must leave the table at format v3")
+	f, ok := tbl.Schema().FindFieldByName("v")
+	require.True(t, ok, "the converted column must keep its name")
+	require.True(t, f.Type.Equals(iceberg.PrimitiveTypes.String))
+	require.NotEqual(t, 2, f.ID, "the converted column must get a new field ID")
+
+	// The key and castToString columns are untouched by the flip.
+	for name, wantID := range map[string]int{"id": 1, "cast": 3} {
+		uf, ok := tbl.Schema().FindFieldByName(name)
+		require.True(t, ok)
+		require.Equal(t, wantID, uf.ID)
+		require.True(t, uf.Type.Equals(iceberg.PrimitiveTypes.String))
+	}
+
+	// The replaced name is scrubbed from the default name mapping, matching
+	// the enable flip's guard against mis-binding field-ID-less files; the
+	// untouched columns keep their entries.
+	mapped := nameMappingNames(t, tbl)
+	require.False(t, mapped["v"], "converted column must be removed from the name mapping")
+	require.True(t, mapped["id"] && mapped["cast"], "untouched columns must keep their name-mapping entries")
+
+	// The pre-flip row survives the flip with its converted column reading
+	// null — never a misread of its variant bytes — under the current schema,
+	// while its untouched columns stay fully readable.
+	require.ElementsMatch(t, []any{"pre"}, scanColumn(t, ctx, rt, "id"))
+	require.ElementsMatch(t, []any{nil}, scanColumn(t, ctx, rt, "v"))
+	require.ElementsMatch(t, []any{"kept"}, scanColumn(t, ctx, rt, "cast"))
+
+	// Time travel to the pre-flip snapshot reads the old schema fully
+	// populated: the pre-flip file embeds field IDs, so the name-mapping scrub
+	// cannot affect it.
+	require.ElementsMatch(t, []any{"pre"}, scanColumn(t, ctx, rt, "id", icebergtable.WithSnapshotID(preFlipSnapshot)))
+	require.ElementsMatch(t, []any{`{"a":1}`}, scanColumn(t, ctx, rt, "v", icebergtable.WithSnapshotID(preFlipSnapshot)))
+
+	// A post-flip row lands with the converted column written as JSON text
+	// under its new field ID, as the connector now writes.
+	newVID := int32(f.ID)
+	newPath, _ := rt.uploadParquetRows(t, ctx, writer.ParquetSchema{
+		{Name: "id", DataType: writer.LogicalTypeString, Required: false, FieldId: &idID},
+		{Name: "v", DataType: writer.LogicalTypeString, Required: false, FieldId: &newVID},
+		{Name: "cast", DataType: writer.LogicalTypeString, Required: false, FieldId: &castID},
+	}, []any{"post", `{"b":2}`, "kept2"})
+	require.NoError(t, rt.cat.appendFiles(ctx, "acmeCo/tests/variant-disable",
+		rt.ident, []string{newPath}, "checkpoint-1", "checkpoint-2"))
+
+	require.ElementsMatch(t, []any{"pre", "post"}, scanColumn(t, ctx, rt, "id"))
+	require.ElementsMatch(t, []any{nil, `{"b":2}`}, scanColumn(t, ctx, rt, "v"))
+
+	// Recomputing the migration set after the flip yields nothing: repeated
+	// applies are idempotent and cause no schema churn.
+	require.Empty(t, computeMigrates())
+}
+
+// TestMapTypeVariantWiring pins the variant_columns mapping seam: with the
+// option enabled, object, array, multi-type, and root document projections map
+// to variant, while collection keys and ignoreStringFormat-overridden fields
+// keep their string mapping. With the option disabled, everything keeps the
+// current JSON-string mapping.
+func TestMapTypeVariantWiring(t *testing.T) {
+	mkProj := func(field string, isKey bool, withString bool, types ...string) mboilerplate.Projection {
+		inference := pf.Inference{Exists: pf.Inference_MUST, Types: types}
+		if withString {
+			inference.String_ = &pf.Inference_String{}
+		}
+		ptr := "/" + field
+		if field == "flow_document" {
+			ptr = ""
+		}
+		return mboilerplate.Projection{
+			Projection: pf.Projection{
+				Field:        field,
+				Ptr:          ptr,
+				IsPrimaryKey: isKey,
+				Inference:    inference,
+			},
+		}
+	}
+
+	var plain = &materialization{}
+	var variant = &materialization{cfg: config{Advanced: &advancedConfig{VariantColumns: true}}}
+
+	for _, tc := range []struct {
+		name        string
+		p           mboilerplate.Projection
+		fc          fieldConfig
+		wantPlain   string
+		wantVariant string
+	}{
+		{"object", mkProj("obj", false, false, "object"), fieldConfig{}, "string", "variant"},
+		{"array", mkProj("arr", false, false, "array"), fieldConfig{}, "string", "variant"},
+		{"multi-type", mkProj("multi", false, true, "integer", "string"), fieldConfig{}, "string", "variant"},
+		{"root document", mkProj("flow_document", false, false, "object"), fieldConfig{}, "string", "variant"},
+		{"multi-type key", mkProj("multiKey", true, true, "integer", "string"), fieldConfig{}, "string", "string"},
+		{"castToString override", mkProj("cast", false, true, "integer", "string"), fieldConfig{IgnoreStringFormat: true}, "string", "string"},
+		{"single scalar", mkProj("num", false, false, "integer"), fieldConfig{}, "long", "long"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			mt, conv := plain.MapType(tc.p, tc.fc)
+			require.Equal(t, tc.wantPlain, mt.String())
+			require.Nil(t, conv)
+
+			mt, conv = variant.MapType(tc.p, tc.fc)
+			require.Equal(t, tc.wantVariant, mt.String())
+			require.Nil(t, conv)
+		})
+	}
+}
+
+// TestCanMigrate pins the migratable set: the microsecond↔nanosecond
+// timestamp pair in both directions, any non-variant type to variant (the
+// variant_columns flip, including column types that had previously evolved),
+// and variant back to string (disabling variant_columns or applying
+// castToString). Anything else must remain INCOMPATIBLE (backfill) rather
 // than silently migrating.
 func TestCanMigrate(t *testing.T) {
 	us := mappedType{icebergType: iceberg.PrimitiveTypes.TimestampTz}
 	ns := mappedType{icebergType: iceberg.PrimitiveTypes.TimestampTzNs}
 	str := mappedType{icebergType: iceberg.PrimitiveTypes.String}
+	vnt := mappedType{icebergType: iceberg.VariantType{}}
+	lng := mappedType{icebergType: iceberg.PrimitiveTypes.Int64}
 
 	require.True(t, ns.CanMigrate(mboilerplate.ExistingField{Type: "timestamptz"}))
 	require.True(t, us.CanMigrate(mboilerplate.ExistingField{Type: "timestamptz_ns"}))
@@ -1258,4 +2019,15 @@ func TestCanMigrate(t *testing.T) {
 	require.False(t, ns.CanMigrate(mboilerplate.ExistingField{Type: "string"}))
 	require.False(t, str.CanMigrate(mboilerplate.ExistingField{Type: "timestamptz"}))
 	require.False(t, str.CanMigrate(mboilerplate.ExistingField{Type: "long"}))
+
+	// Enabling variant_columns converts existing JSON-string columns, and any
+	// column type a JSON-shaped field had previously evolved to, into variant.
+	require.True(t, vnt.CanMigrate(mboilerplate.ExistingField{Type: "string"}))
+	require.True(t, vnt.CanMigrate(mboilerplate.ExistingField{Type: "long"}))
+	require.True(t, vnt.CanMigrate(mboilerplate.ExistingField{Type: "timestamptz"}))
+	require.False(t, vnt.CanMigrate(mboilerplate.ExistingField{Type: "variant"}))
+	// Disabling variant_columns (or applying castToString) migrates variant
+	// back to a JSON string, but never to any other type.
+	require.True(t, str.CanMigrate(mboilerplate.ExistingField{Type: "variant"}))
+	require.False(t, lng.CanMigrate(mboilerplate.ExistingField{Type: "variant"}))
 }

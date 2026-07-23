@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
@@ -129,6 +130,7 @@ func (catalogConfig) JSONSchema() *jsonschema.Schema {
 type advancedConfig struct {
 	FeatureFlags         *string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.,nullable"`
 	NanosecondTimestamps bool    `json:"nanosecond_timestamps,omitempty" jsonschema:"title=Nanosecond Timestamps,description=Use nanosecond precision (Iceberg format v3) for date-time columns instead of microsecond precision (format v2). Toggling this on an existing materialization applies to data going forward: existing rows read as null for converted columns unless the binding is explicitly backfilled.,default=false"`
+	VariantColumns       bool    `json:"variant_columns,omitempty" jsonschema:"title=Variant Columns,description=Use the Iceberg variant column type (format v3) for object/array/multi-type fields and the root document instead of JSON strings. Toggling this on an existing materialization applies to data going forward: existing rows read as null for converted columns unless the binding is explicitly backfilled.,default=false"`
 }
 
 func (c config) s3StoreConfig() filesink.S3StoreConfig {
@@ -256,6 +258,10 @@ func (c config) FeatureFlags() (string, map[string]bool) {
 
 func (c config) nanosecondTimestamps() bool {
 	return c.Advanced != nil && c.Advanced.NanosecondTimestamps
+}
+
+func (c config) variantColumns() bool {
+	return c.Advanced != nil && c.Advanced.VariantColumns
 }
 
 func parse8601(in string) (time.Duration, error) {
@@ -671,7 +677,10 @@ func (d *materialization) SnapshotTestResource(ctx context.Context, path []strin
 
 	sort.Strings(parquetKeys)
 
-	// Read parquet files using duckdb.
+	// Read parquet files using a pinned dockerized DuckDB rather than a host
+	// CLI: snapshot content must not depend on whichever duckdb version a
+	// contributor or CI happens to have installed, and variant columns are
+	// only readable from DuckDB 1.5.3 on.
 	var allRows []map[string]any
 	for _, key := range parquetKeys {
 		getOut, err := s3client.GetObject(ctx, &s3.GetObjectInput{
@@ -688,22 +697,27 @@ func (d *materialization) SnapshotTestResource(ctx context.Context, path []strin
 			return nil, nil, fmt.Errorf("reading object %s: %w", key, err)
 		}
 
-		tmpFile, err := os.CreateTemp("", "iceberg-test-*.parquet")
+		tmpDir, err := os.MkdirTemp("", "iceberg-test-*")
 		if err != nil {
 			return nil, nil, err
 		}
-		tmpPath := tmpFile.Name()
-		if _, err := tmpFile.Write(data); err != nil {
-			tmpFile.Close()
-			os.Remove(tmpPath)
+		defer os.RemoveAll(tmpDir)
+		tmpPath := filepath.Join(tmpDir, "data.parquet")
+		if err := os.WriteFile(tmpPath, data, 0o644); err != nil {
 			return nil, nil, err
 		}
-		tmpFile.Close()
+		// The file and its directory must be readable from inside the
+		// container regardless of the container's user.
+		if err := os.Chmod(tmpDir, 0o755); err != nil {
+			return nil, nil, err
+		}
 
-		out, err := exec.CommandContext(ctx, "duckdb", "-json", ":memory:",
-			fmt.Sprintf("SET timezone TO 'UTC'; SELECT * FROM '%s' ORDER BY flow_published_at;", tmpPath),
+		out, err := exec.CommandContext(ctx, "docker", "run", "--rm",
+			"-v", tmpDir+":/data:ro",
+			writer.DuckDBDockerImage,
+			"duckdb", "-json", "-c",
+			"SET timezone TO 'UTC'; SELECT * FROM '/data/data.parquet' ORDER BY flow_published_at;",
 		).Output()
-		os.Remove(tmpPath)
 		if err != nil {
 			return nil, nil, fmt.Errorf("running duckdb on %s: %w", key, err)
 		}
