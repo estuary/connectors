@@ -56,20 +56,21 @@ type ParquetSchemaElement struct {
 type ParquetDataType int
 
 const (
-	PrimitiveTypeInteger ParquetDataType = iota // INT64 primitive type
-	PrimitiveTypeNumber                         // DOUBLE primitive type, which is a 64-bit float
-	PrimitiveTypeBoolean                        // BOOLEAN primitive type
-	PrimitiveTypeBinary                         // BYTE_ARRAY primitive type
-	LogicalTypeString                           // Extends BYTE_ARRAY
-	LogicalTypeJson                             // Extends BYTE_ARRAY
-	LogicalTypeDate                             // Extends BYTE_ARRAY
-	LogicalTypeTime                             // Extends INT64
-	LogicalTypeTimestamp                        // Extends INT64, microsecond precision
-	LogicalTypeTimestampNanos                   // Extends INT64, nanosecond precision
-	LogicalTypeUuid                             // Extends FIXED_LEN_BYTE_ARRAY, with a length of 16 bytes
-	LogicalTypeDecimal                          // Extends FIXED_LEN_BYTE_ARRAY, with a length of 16 bytes
-	LogicalTypeInterval                         // Extends FIXED_LEN_BYTE_ARRAY, with a length of 12 bytes
-	LogicalTypeUnknown                          // Must always be nil
+	PrimitiveTypeInteger      ParquetDataType = iota // INT64 primitive type
+	PrimitiveTypeNumber                              // DOUBLE primitive type, which is a 64-bit float
+	PrimitiveTypeBoolean                             // BOOLEAN primitive type
+	PrimitiveTypeBinary                              // BYTE_ARRAY primitive type
+	LogicalTypeString                                // Extends BYTE_ARRAY
+	LogicalTypeJson                                  // Extends BYTE_ARRAY
+	LogicalTypeDate                                  // Extends BYTE_ARRAY
+	LogicalTypeTime                                  // Extends INT64
+	LogicalTypeTimestamp                             // Extends INT64, microsecond precision
+	LogicalTypeTimestampNanos                        // Extends INT64, nanosecond precision
+	LogicalTypeUuid                                  // Extends FIXED_LEN_BYTE_ARRAY, with a length of 16 bytes
+	LogicalTypeDecimal                               // Extends FIXED_LEN_BYTE_ARRAY, with a length of 16 bytes
+	LogicalTypeInterval                              // Extends FIXED_LEN_BYTE_ARRAY, with a length of 12 bytes
+	LogicalTypeVariant                               // Group of required BYTE_ARRAY metadata and value fields
+	LogicalTypeUnknown                               // Must always be nil
 )
 
 // makeNode translates a ParquetSchemaElement into an actual parquet schema node.
