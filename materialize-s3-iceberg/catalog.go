@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/apache/iceberg-go"
@@ -397,18 +398,30 @@ func (c *catalog) createNamespace(ctx context.Context, namespace string) error {
 func (c *catalog) CreateResource(ctx context.Context, b *pf.MaterializationSpec_Binding, res resource) (string, boilerplate.ActionApplyFn, error) {
 	location := tablePath(c.cfg.Bucket, c.cfg.Prefix, b.ResourcePath[0], b.ResourcePath[1], c.locationStyle)
 
-	parquetSchema, err := parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap, c.cfg.nanosecondTimestamps())
+	parquetSchema, err := parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap, c.cfg.nanosecondTimestamps(), c.cfg.variantColumns())
 	if err != nil {
 		return "", nil, err
 	}
 
 	// Reject a conflicting user-supplied format version rather than silently
-	// overriding it: timestamptz_ns columns are only valid in format v3.
+	// overriding it: timestamptz_ns and variant columns are only valid in
+	// format v3.
 	if v, ok := res.AdditionalTableProperties[icebergtable.PropertyFormatVersion]; ok &&
-		c.cfg.nanosecondTimestamps() && v != "3" {
+		v != "3" && (c.cfg.nanosecondTimestamps() || c.cfg.variantColumns()) {
+		var opts []string
+		if c.cfg.nanosecondTimestamps() {
+			opts = append(opts, "nanosecond_timestamps")
+		}
+		if c.cfg.variantColumns() {
+			opts = append(opts, "variant_columns")
+		}
+		var noun, verb = "option", "requires"
+		if len(opts) > 1 {
+			noun, verb = "options", "require"
+		}
 		return "", nil, fmt.Errorf(
-			"additional table property %s=%q conflicts with the nanosecond_timestamps option, which requires format version 3: remove the property or set it to \"3\"",
-			icebergtable.PropertyFormatVersion, v)
+			"additional table property %s=%q conflicts with the %s %s, which %s format version 3: remove the property or set it to \"3\"",
+			icebergtable.PropertyFormatVersion, v, strings.Join(opts, " and "), noun, verb)
 	}
 
 	fields := make([]iceberg.NestedField, 0, len(parquetSchema))
@@ -432,7 +445,7 @@ func (c *catalog) CreateResource(ctx context.Context, b *pf.MaterializationSpec_
 		props := iceberg.Properties{
 			icebergtable.DefaultNameMappingKey: string(nameMappingJSON),
 		}
-		if c.cfg.nanosecondTimestamps() {
+		if c.cfg.nanosecondTimestamps() || c.cfg.variantColumns() {
 			props[icebergtable.PropertyFormatVersion] = "3"
 		}
 		for k, v := range res.AdditionalTableProperties {
@@ -494,7 +507,7 @@ func (c *catalog) UpdateResource(_ context.Context, bindingUpdate boilerplate.Bi
 			}
 		}
 
-		s, err := projectionToParquetSchemaElement(p.Projection.Projection, fc, c.cfg.nanosecondTimestamps())
+		s, err := projectionToParquetSchemaElement(p.Projection.Projection, fc, c.cfg.nanosecondTimestamps(), c.cfg.variantColumns())
 		if err != nil {
 			return "", nil, err
 		}
@@ -515,25 +528,45 @@ func (c *catalog) UpdateResource(_ context.Context, bindingUpdate boilerplate.Bi
 		}
 
 		tx := tbl.NewTransaction()
-		// timestamptz_ns columns are only valid in Iceberg format v3. A table
-		// created before nanosecond_timestamps was enabled may still be v2, so
-		// upgrade it as part of the same transaction as the schema change.
-		hasNs := func(cols []addCol) bool {
+		// timestamptz_ns and variant columns are only valid in Iceberg format
+		// v3. A table created before nanosecond_timestamps or variant_columns
+		// was enabled may still be v2, so upgrade it as part of the same
+		// commit as the schema change.
+		requiresV3 := func(cols []addCol) bool {
 			return slices.ContainsFunc(cols, func(a addCol) bool {
-				return a.typ.Equals(iceberg.PrimitiveTypes.TimestampTzNs)
+				return a.typ.Equals(iceberg.PrimitiveTypes.TimestampTzNs) || isVariant(a.typ)
 			})
 		}
-		if tbl.Metadata().Version() < 3 && (hasNs(adds) || hasNs(migrates)) {
+		var needsV3Upgrade = tbl.Metadata().Version() < 3 && (requiresV3(adds) || requiresV3(migrates))
+		if needsV3Upgrade {
 			if err := tx.UpgradeFormatVersion(3); err != nil {
 				return fmt.Errorf("upgrading table %q to format version 3: %w", fqn, err)
 			}
 		}
+
+		// iceberg-go's UpdateSchema.AddColumn does not accept VariantType (its
+		// validation predates the variant type), so variant columns are staged
+		// under a string placeholder and rewritten to variant in the computed
+		// successor schema by commitSchemaWithVariants.
+		var variantColumns []string
+		for _, col := range slices.Concat(adds, migrates) {
+			if isVariant(col.typ) {
+				variantColumns = append(variantColumns, col.name)
+			}
+		}
+		var stagedType = func(typ iceberg.Type) iceberg.Type {
+			if isVariant(typ) {
+				return iceberg.PrimitiveTypes.String
+			}
+			return typ
+		}
+
 		// caseSensitive=true matches pyiceberg's update_schema() default that
 		// the removed Python tool relied on; the connector's field names are
 		// case-sensitive, so column matches during add/relax must be too.
 		us := tx.UpdateSchema(true, false)
 		for _, a := range adds {
-			us = us.AddColumn([]string{a.name}, a.typ, "", false, nil)
+			us = us.AddColumn([]string{a.name}, stagedType(a.typ), "", false, nil)
 		}
 		for _, name := range relax {
 			us = us.UpdateColumn([]string{name}, icebergtable.ColumnUpdate{
@@ -545,18 +578,21 @@ func (c *catalog) UpdateResource(_ context.Context, bindingUpdate boilerplate.Bi
 		// written with the new type, while prior rows read as null for this
 		// column (their values remain in old data files under the retired
 		// field ID, reachable via time travel).
-		for _, mig := range migrates {
+		var migratedNames = make([]string, len(migrates))
+		for i, mig := range migrates {
 			us = us.DeleteColumn([]string{mig.name})
-			us = us.AddColumn([]string{mig.name}, mig.typ, "", false, nil)
+			us = us.AddColumn([]string{mig.name}, stagedType(mig.typ), "", false, nil)
+			migratedNames[i] = mig.name
 		}
+
+		if len(variantColumns) > 0 {
+			return c.commitSchemaWithVariants(ctx, bindingUpdate.Binding.ResourcePath, tbl, us, variantColumns, migratedNames, needsV3Upgrade)
+		}
+
 		if err := us.Commit(); err != nil {
 			return fmt.Errorf("staging schema update for %q: %w", fqn, err)
 		}
 		if len(migrates) > 0 {
-			migratedNames := make([]string, len(migrates))
-			for i, mig := range migrates {
-				migratedNames[i] = mig.name
-			}
 			if err := removeFromNameMapping(tx, tbl.Properties(), migratedNames); err != nil {
 				return fmt.Errorf("updating name mapping of %q: %w", fqn, err)
 			}
@@ -569,19 +605,93 @@ func (c *catalog) UpdateResource(_ context.Context, bindingUpdate boilerplate.Bi
 	}, nil
 }
 
+// commitSchemaWithVariants commits a staged schema update that introduces
+// variant columns. iceberg-go's UpdateSchema can stage and apply such an
+// update but not commit it (AddColumn rejects VariantType), so the successor
+// schema — whose variant columns were staged under a string placeholder — is
+// computed with Apply, the placeholders are rewritten to variant, and the
+// resulting updates are committed directly through the catalog as the same
+// single atomic commit the transaction path would have produced.
+func (c *catalog) commitSchemaWithVariants(
+	ctx context.Context,
+	path []string,
+	tbl *icebergtable.Table,
+	us *icebergtable.UpdateSchema,
+	variantColumns []string,
+	migratedNames []string,
+	needsV3Upgrade bool,
+) error {
+	var fqn = pathToFQN(path)
+
+	newSchema, err := us.Apply()
+	if err != nil {
+		return fmt.Errorf("staging schema update for %q: %w", fqn, err)
+	}
+	var fields = newSchema.Fields()
+	for i, f := range fields {
+		if slices.Contains(variantColumns, f.Name) {
+			fields[i].Type = iceberg.VariantType{}
+		}
+	}
+	var finalSchema = iceberg.NewSchemaWithIdentifiers(newSchema.ID, newSchema.IdentifierFieldIDs, fields...)
+
+	var updates []icebergtable.Update
+	if needsV3Upgrade {
+		updates = append(updates, icebergtable.NewUpgradeFormatVersionUpdate(3))
+	}
+	updates = append(updates,
+		icebergtable.NewAddSchemaUpdate(finalSchema),
+		icebergtable.NewSetCurrentSchemaUpdate(finalSchema.ID),
+	)
+	if len(migratedNames) > 0 {
+		mappingJSON, ok, err := scrubNameMapping(tbl.Properties(), migratedNames)
+		if err != nil {
+			return fmt.Errorf("updating name mapping of %q: %w", fqn, err)
+		}
+		if ok {
+			updates = append(updates, icebergtable.NewSetPropertiesUpdate(iceberg.Properties{
+				icebergtable.DefaultNameMappingKey: mappingJSON,
+			}))
+		}
+	}
+
+	// The same guards Transaction.Commit would have carried: the schema-ID
+	// assertion is what BuildUpdates emits for a schema change, and the UUID
+	// assertion is appended by every transaction commit.
+	var requirements = []icebergtable.Requirement{
+		icebergtable.AssertCurrentSchemaID(tbl.Schema().ID),
+		icebergtable.AssertTableUUID(tbl.Metadata().TableUUID()),
+	}
+	if _, _, err := c.cat.CommitTable(ctx, path, requirements, updates); err != nil {
+		return fmt.Errorf("altering table %q: %w", fqn, err)
+	}
+
+	return nil
+}
+
 // removeFromNameMapping strips migrated column names from the table's default
 // name mapping. Legacy files without embedded field IDs must resolve a
 // re-added column to null rather than misreading their old-encoding values as
 // the new type; files written after the migration embed field IDs and never
 // consult the mapping.
 func removeFromNameMapping(tx *icebergtable.Transaction, props iceberg.Properties, migrated []string) error {
+	mappingJSON, ok, err := scrubNameMapping(props, migrated)
+	if err != nil || !ok {
+		return err
+	}
+	return tx.SetProperties(iceberg.Properties{icebergtable.DefaultNameMappingKey: mappingJSON})
+}
+
+// scrubNameMapping returns the table's default name mapping with the migrated
+// column names removed, reporting ok=false when the table has no mapping.
+func scrubNameMapping(props iceberg.Properties, migrated []string) (string, bool, error) {
 	raw, ok := props[icebergtable.DefaultNameMappingKey]
 	if !ok {
-		return nil
+		return "", false, nil
 	}
 	var mapping iceberg.NameMapping
 	if err := json.Unmarshal([]byte(raw), &mapping); err != nil {
-		return fmt.Errorf("parsing name mapping: %w", err)
+		return "", false, fmt.Errorf("parsing name mapping: %w", err)
 	}
 	mapping = slices.DeleteFunc(mapping, func(f iceberg.MappedField) bool {
 		return slices.ContainsFunc(migrated, func(name string) bool {
@@ -590,9 +700,9 @@ func removeFromNameMapping(tx *icebergtable.Transaction, props iceberg.Propertie
 	})
 	mappingJSON, err := json.Marshal(mapping)
 	if err != nil {
-		return fmt.Errorf("marshaling name mapping: %w", err)
+		return "", false, fmt.Errorf("marshaling name mapping: %w", err)
 	}
-	return tx.SetProperties(iceberg.Properties{icebergtable.DefaultNameMappingKey: string(mappingJSON)})
+	return string(mappingJSON), true, nil
 }
 
 func (c *catalog) appendFiles(

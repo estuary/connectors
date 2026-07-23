@@ -501,14 +501,14 @@ func (d *materialization) NewConstraint(p pf.Projection, deltaUpdates bool, fc f
 }
 
 func (d *materialization) MapType(p boilerplate.Projection, fc fieldConfig) (mappedType, boilerplate.ElementConverter) {
-	s, err := projectionToParquetSchemaElement(p.Projection, fc, d.cfg.nanosecondTimestamps())
+	s, err := projectionToParquetSchemaElement(p.Projection, fc, d.cfg.nanosecondTimestamps(), d.cfg.variantColumns())
 	if err != nil {
 		// The only error here is ignoreStringFormat being set on a non-string
 		// field, where it is a no-op. Map by the field's native type rather
 		// than returning a zero mappedType, whose nil iceberg.Type would panic
 		// in String/Compatible. The misconfiguration still surfaces with a
 		// clear error at table creation (parquetSchema).
-		s, _ = projectionToParquetSchemaElement(p.Projection, fieldConfig{}, d.cfg.nanosecondTimestamps())
+		s, _ = projectionToParquetSchemaElement(p.Projection, fieldConfig{}, d.cfg.nanosecondTimestamps(), d.cfg.variantColumns())
 	}
 
 	// Clamp date and timestamp values before they reach the writer: microsecond
@@ -573,7 +573,7 @@ func (d *materialization) NewTransactor(
 
 	for i := range mappedBindings {
 		b := &mappedBindings[i]
-		pqSchema, err := parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap, d.cfg.nanosecondTimestamps())
+		pqSchema, err := parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap, d.cfg.nanosecondTimestamps(), d.cfg.variantColumns())
 		if err != nil {
 			return nil, err
 		}
