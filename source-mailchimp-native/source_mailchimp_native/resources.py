@@ -68,8 +68,6 @@ async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointCon
     try:
         base_url = await resolve_base_url(log, http, config.credentials)
         _ = await http.request(log, f"{base_url}/ping")
-    except ValueError as err:
-        raise ValidationError([str(err)])
     except HTTPError as err:
         if err.code == 401:
             msg = (
@@ -133,7 +131,7 @@ def campaigns(
     http: HTTPMixin, base_url: str, config: EndpointConfig
 ) -> MailchimpResource:
     """Return Resource for incremental + backfill campaigns capture."""
-    cutoff = datetime.now(tz=UTC)
+    cutoff = datetime.now(tz=UTC).replace(microsecond=0)
 
     def open(
         binding: CaptureBinding[ResourceConfigWithSchedule],
@@ -159,7 +157,9 @@ def campaigns(
         model=Campaign,
         open=open,
         initial_state=ResourceState(
-            inc=ResourceState.Incremental(cursor=cutoff),
+            # cutoff − 1s: the first incremental poll then emits from `cutoff`
+            # onward
+            inc=ResourceState.Incremental(cursor=cutoff - timedelta(seconds=1)),
             backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None),
         ),
         initial_config=ResourceConfigWithSchedule(
@@ -217,8 +217,11 @@ async def _patch_missing_subtask_states(
     await task.checkpoint(ConnectorState(bindingStateV1={binding.stateKey: state}))
 
 
-# Sweep params shared by both list_members subtasks: the ASC sort keeps the
-# walked prefix of a long backfill stable when rows change mid-walk.
+# Sweep params shared by both list_members subtasks. The ASC sort makes the
+# walk order deterministic among rows still in the window — it does NOT make
+# positions stable (an update moves a row out of a frozen window entirely,
+# renumbering the tail), which is why backfills never checkpoint an offset
+# across invocations.
 _MEMBER_SORT: dict[str, str | int] = {
     "sort_field": "last_changed",
     "sort_dir": "ASC",
@@ -243,7 +246,7 @@ def incremental_list_children(
     (list_members, segments).
 
     Each stream fans out into per-(list, sweep) subtasks, every subtask with
-    its own incremental cursor and integer-offset backfill. list_members needs
+    its own incremental cursor and windowed backfill. list_members needs
     two sweeps per list because the unfiltered listing silently excludes
     archived members — and the sweeps' cursors must be independent: a member
     unarchived between the two sweeps of a shared-cursor walk would be missed

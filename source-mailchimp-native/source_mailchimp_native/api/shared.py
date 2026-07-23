@@ -3,11 +3,12 @@ from datetime import UTC, datetime, timedelta
 from logging import Logger
 
 from estuary_cdk.capture.common import LogCursor, PageCursor
+from estuary_cdk.flow import ValidationError
 from estuary_cdk.http import HTTPSession
 from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
 from pydantic import BaseModel
 
-from .models import (
+from ..models import (
     ApiKey,
     Automation,
     Campaign,
@@ -18,6 +19,7 @@ from .models import (
     MailchimpChildEntity,
     MailchimpIncrementalChildEntity,
     MailchimpList,
+    OAuth2Credentials,
     OAuthMetadata,
     ParentContext,
     ParentId,
@@ -33,7 +35,9 @@ API = "https://{dc}.api.mailchimp.com/3.0"
 OAUTH_METADATA_URL = "https://login.mailchimp.com/oauth2/metadata"
 
 
-async def resolve_base_url(log: Logger, http: HTTPSession, credentials: object) -> str:
+async def resolve_base_url(
+    log: Logger, http: HTTPSession, credentials: OAuth2Credentials | ApiKey
+) -> str:
     """Resolve the account's data-center-specific base URL.
 
     API keys carry their data center as a suffix (`<key>-us6`); OAuth tokens
@@ -41,13 +45,15 @@ async def resolve_base_url(log: Logger, http: HTTPSession, credentials: object) 
     `api_endpoint` (e.g. "https://us6.api.mailchimp.com").
     """
     if isinstance(credentials, ApiKey):
-        _, _, dc = credentials.password.rpartition("-")
-        if not dc:
-            raise ValueError(
-                (
-                    "Mailchimp API key is missing its data center suffix "
-                    "(expected a key ending in e.g. -us21)."
-                )
+        _, sep, dc = credentials.password.rpartition("-")
+        if not sep or not dc:
+            raise ValidationError(
+                [
+                    (
+                        "Mailchimp API key is missing its data center suffix "
+                        "(expected a key ending in e.g. -us21)."
+                    )
+                ]
             )
         return API.format(dc=dc)
 
@@ -61,7 +67,7 @@ async def resolve_base_url(log: Logger, http: HTTPSession, credentials: object) 
 MAX_PAGE_SIZE = 1000
 
 
-async def _fetch_collection_page[T: BaseModel](
+async def fetch_collection_page[T: BaseModel](
     http: HTTPSession,
     base_url: str,
     path: str,
@@ -87,7 +93,7 @@ async def _fetch_collection_page[T: BaseModel](
         yield item
 
 
-async def _snapshot_collection[T: BaseModel](
+async def snapshot_collection[T: BaseModel](
     http: HTTPSession,
     base_url: str,
     path: str,
@@ -108,7 +114,7 @@ async def _snapshot_collection[T: BaseModel](
 
     while True:
         count = 0
-        page = _fetch_collection_page(
+        page = fetch_collection_page(
             http,
             base_url,
             path,
@@ -133,7 +139,7 @@ async def snapshot_lists(
     base_url: str,
     log: Logger,
 ) -> AsyncGenerator[MailchimpList, None]:
-    async for doc in _snapshot_collection(
+    async for doc in snapshot_collection(
         http, base_url, MailchimpList.PATH, MailchimpList.ITEMS_KEY, MailchimpList, log
     ):
         yield doc
@@ -144,7 +150,7 @@ async def snapshot_automations(
     base_url: str,
     log: Logger,
 ) -> AsyncGenerator[Automation, None]:
-    async for doc in _snapshot_collection(
+    async for doc in snapshot_collection(
         http, base_url, Automation.PATH, Automation.ITEMS_KEY, Automation, log
     ):
         yield doc
@@ -164,7 +170,7 @@ async def snapshot_interests(
         for category_id in await fetch_parent_ids(
             http, base_url, categories_path, InterestCategory.ITEMS_KEY, log
         ):
-            async for doc in _snapshot_collection(
+            async for doc in snapshot_collection(
                 http,
                 base_url,
                 Interest.PATH_TEMPLATE.format(list_id=list_id, category_id=category_id),
@@ -198,7 +204,7 @@ async def snapshot_segment_members(
         for segment_id in await fetch_parent_ids(
             http, base_url, segments_path, Segment.ITEMS_KEY, log
         ):
-            async for doc in _snapshot_collection(
+            async for doc in snapshot_collection(
                 http,
                 base_url,
                 SegmentMember.PATH_TEMPLATE.format(
@@ -225,19 +231,28 @@ async def fetch_parent_ids(
     """Drain a parent collection into bare IDs before any child request is
     made, projecting the response down to `fields=<items_key>.id` — the
     projection is honored on top-level and nested paths alike. `IdOnly`
-    rejects an empty ID, so a malformed child path can never be templated."""
-    return [
-        item.id
-        async for item in _snapshot_collection(
-            http,
-            base_url,
-            path,
-            items_key,
-            IdOnly,
-            log,
-            params={"fields": f"{items_key}.id"},
-        )
-    ]
+    rejects an empty ID, so a malformed child path can never be templated.
+
+    IDs are sorted so the child fan-out order is deterministic: snapshot
+    change-suppression digests the emitted byte stream, so an unstable
+    parent order would re-emit every child document each poll. Sorting is
+    by string form only because `ParentId` spans str and int; the order
+    itself carries no meaning."""
+    return sorted(
+        [
+            item.id
+            async for item in snapshot_collection(
+                http,
+                base_url,
+                path,
+                items_key,
+                IdOnly,
+                log,
+                params={"fields": f"{items_key}.id"},
+            )
+        ],
+        key=str,
+    )
 
 
 async def _resolve_leaf_contexts(
@@ -276,7 +291,7 @@ async def snapshot_children(
             else None
         )
 
-        async for doc in _snapshot_collection(
+        async for doc in snapshot_collection(
             http,
             base_url,
             spec.model.PATH_TEMPLATE.format(**ctx_to_snapshot),
@@ -288,11 +303,14 @@ async def snapshot_children(
             yield doc
 
 
-def _campaign_params(offset: int, since: datetime) -> dict[str, str | int]:
+def _campaign_params(
+    offset: int, since: datetime, before: datetime
+) -> dict[str, str | int]:
     return {
         "count": MAX_PAGE_SIZE,
         "offset": offset,
         "since_create_time": since.isoformat(),
+        "before_create_time": before.isoformat(),
         "sort_field": "create_time",
         "sort_dir": "ASC",
     }
@@ -304,7 +322,32 @@ async def fetch_campaigns(
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[Campaign | LogCursor, None]:
+    """Incrementally fetch campaigns created at `(cursor, horizon]`.
+
+    `create_time` is the only time filter `/campaigns` exposes, so a campaign is
+    seen once, at creation; later mutations (status transitions, report stats)
+    are recovered by the daily scheduled backfill.
+
+                      cursor  cursor + 1s  horizon = last elapsed second
+    ─────────────────────┼─────────┼──────────┼────▶ time (1s ticks)
+                         │         │          │
+    since_create_time ───(═════════╪══════════╪═══▶
+    before_create_time ══╪═════════╪══════════]
+    emitted ─────────────┼─────────[══════════]
+                         │         │          └─ the present second is still
+                         │         │             in progress; its campaigns
+                         │         │             wait for the next poll
+                         │         └─ first emitted second
+                         └─ excluded server-side, and create_time never
+                            changes, so no campaign can appear at or
+                            before this second later
+    """
     assert isinstance(log_cursor, datetime)
+
+    # Uses the last fully-elapsed second.
+    horizon = datetime.now(tz=UTC).replace(microsecond=0) - timedelta(seconds=1)
+    if horizon <= log_cursor:
+        return
 
     last_seen = log_cursor
     offset = 0
@@ -312,23 +355,19 @@ async def fetch_campaigns(
 
     while True:
         count = 0
-        page = _fetch_collection_page(
+        params = _campaign_params(offset, log_cursor, horizon)
+        page = fetch_collection_page(
             http,
             base_url,
             Campaign.PATH,
             Campaign.ITEMS_KEY,
             Campaign,
-            _campaign_params(offset, log_cursor),
+            params,
             log,
         )
 
         async for item in page:
             count += 1
-            # Suppressing docs at-or-before the cursor makes `since_*`
-            # boundary inclusivity irrelevant.
-            if item.create_time <= log_cursor:
-                continue
-
             yield item
             emitted = True
             if item.create_time > last_seen:
@@ -350,27 +389,49 @@ async def backfill_campaigns(
     page: PageCursor,
     cutoff: LogCursor,
 ) -> AsyncGenerator[Campaign | PageCursor, None]:
-    assert page is None or isinstance(page, int)
+    """Backfill campaigns over the `(start_date, cutoff − 1s]` window.
+
+                        start_date            cutoff − 1s cutoff
+    ────────────────────────┼─────────────────────┼───────┼──▶ time (1s ticks)
+                            │                     │       │
+    since_create_time ──────(═════════════════════╪═══════╪══▶
+    before_create_time ═════╪═════════════════════]       │
+    window ─────────────────(═════════════════════]       │
+                            │                     │       └─ covered by the
+                            │                     │          first incremental
+                            │                     │          poll
+                            │                     └─ last backfilled second
+                            └─ start-of-window precision is not load-bearing;
+                               since_create_time is exclusive, so the
+                               boundary instant just falls out
+
+    Row order is not guaranteed to be stable, so in-progress checkpoints are
+    not viable.
+    """
+    assert page is None
     assert isinstance(cutoff, datetime)
 
-    offset = page or 0
-    # ASC sort under a frozen [start_date, cutoff) query keeps offsets stable
-    # across restarts: new campaigns fall outside before_create_time.
-    params = _campaign_params(offset, start_date)
-    params["before_create_time"] = cutoff.isoformat()
+    offset = 0
+    window_end = cutoff - timedelta(seconds=1)
+    params = _campaign_params(offset, start_date, window_end)
 
-    count = 0
-    page_gen = _fetch_collection_page(
-        http, base_url, Campaign.PATH, Campaign.ITEMS_KEY, Campaign, params, log
-    )
+    while True:
+        params["offset"] = offset
+        count = 0
 
-    async for item in page_gen:
-        yield item
-        count += 1
+        page_gen = fetch_collection_page(
+            http, base_url, Campaign.PATH, Campaign.ITEMS_KEY, Campaign, params, log
+        )
 
-    # A full page means there may be more; a short page is the last one.
-    if count == MAX_PAGE_SIZE:
-        yield offset + count
+        async for item in page_gen:
+            yield item
+            count += 1
+
+        # A full page means there may be more; a short page is the last one.
+        if count < MAX_PAGE_SIZE:
+            return
+
+        offset += count
 
 
 async def fetch_list_children[T: MailchimpIncrementalChildEntity](
@@ -383,8 +444,7 @@ async def fetch_list_children[T: MailchimpIncrementalChildEntity](
     log_cursor: LogCursor,
 ) -> AsyncGenerator[T | LogCursor, None]:
     """Incrementally fetch one (list, sweep) subtask of a list-child stream
-    (list_members, segments), parametrized by sweep params (e.g.
-    `status=archived`); the cursor filter and value come from the model
+    (list_members, segments); the cursor filter and value come from the model
     (`SINCE_PARAM`, `get_cursor()`).
 
                   cursor   cursor + 1s  horizon = last elapsed second
@@ -403,8 +463,7 @@ async def fetch_list_children[T: MailchimpIncrementalChildEntity](
     """
     assert isinstance(log_cursor, datetime)
 
-    # The last fully-elapsed second; docs stamped in the still-in-progress
-    # second wait for the next poll's window.
+    # The last fully-elapsed second.
     horizon = datetime.now(tz=UTC).replace(microsecond=0) - timedelta(seconds=1)
     if horizon <= log_cursor:
         return
@@ -416,7 +475,7 @@ async def fetch_list_children[T: MailchimpIncrementalChildEntity](
 
     while True:
         count = 0
-        page = _fetch_collection_page(
+        page = fetch_collection_page(
             http,
             base_url,
             path,
@@ -459,9 +518,7 @@ async def backfill_list_children[T: MailchimpIncrementalChildEntity](
     cutoff: LogCursor,
 ) -> AsyncGenerator[T | PageCursor, None]:
     """Backfill one (list, sweep) subtask of a list-child stream over the
-    frozen `(start_date, cutoff − 1s]` window, checkpointing a plain int
-    offset per full page like `backfill_campaigns`. The window is frozen,
-    so nothing new ever enters it.
+    frozen `(start_date, cutoff − 1s]`.
 
               start_date            cutoff − 1s cutoff
     ──────────────┼─────────────────────┼───────┼──▶ time (1s ticks)
@@ -469,43 +526,44 @@ async def backfill_list_children[T: MailchimpIncrementalChildEntity](
     SINCE_PARAM ──(═════════════════════╪═══════╪══▶
     BEFORE_PARAM ═╪═════════════════════]       │
     window ───────(═════════════════════]       │
-                  │                     │       └─ covered by the FIRST
-                  │                     │          incremental poll: its cursor
-                  │                     │          seeds at cutoff − 1s,
-                  │                     │          putting its first emitted
-                  │                     │          second exactly here
+                  │                     │       └─ covered by the first
+                  │                     │          incremental poll
                   │                     └─ last backfilled second
                   └─ docs stamped exactly at start_date are skipped
-                     (since_* is exclusive) — start-of-window precision
-                     is not load-bearing, unlike the cutoff seam
+                     (since_* is exclusive)
+
+    Row order is not guaranteed to be stable, so in-progress checkpoints are
+    not viable.
     """
-    assert page is None or isinstance(page, int)
+    assert page is None
     assert isinstance(cutoff, datetime)
 
-    offset = page or 0
-    params: dict[str, str | int] = {
-        "count": MAX_PAGE_SIZE,
-        "offset": offset,
-        model.SINCE_PARAM: start_date.isoformat(),
-        model.BEFORE_PARAM: (cutoff - timedelta(seconds=1)).isoformat(),
-        **extra_request_params,
-    }
+    path = model.PATH_TEMPLATE.format(list_id=list_id)
+    offset = 0
 
-    count = 0
-    page_gen = _fetch_collection_page(
-        http,
-        base_url,
-        model.PATH_TEMPLATE.format(list_id=list_id),
-        model.ITEMS_KEY,
-        model,
-        params,
-        log,
-    )
+    while True:
+        count = 0
+        page_gen = fetch_collection_page(
+            http,
+            base_url,
+            path,
+            model.ITEMS_KEY,
+            model,
+            {
+                "count": MAX_PAGE_SIZE,
+                "offset": offset,
+                model.SINCE_PARAM: start_date.isoformat(),
+                model.BEFORE_PARAM: (cutoff - timedelta(seconds=1)).isoformat(),
+                **extra_request_params,
+            },
+            log,
+        )
 
-    async for item in page_gen:
-        yield item
-        count += 1
+        async for item in page_gen:
+            yield item
+            count += 1
 
-    # A full page means there may be more; a short page is the last one.
-    if count == MAX_PAGE_SIZE:
-        yield offset + count
+        offset += count
+        # A full page means there may be more; a short page is the last one.
+        if count < MAX_PAGE_SIZE:
+            return
