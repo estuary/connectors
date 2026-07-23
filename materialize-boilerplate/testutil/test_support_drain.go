@@ -107,35 +107,8 @@ func reduceConnectorState(t *testing.T, prior json.RawMessage, update *pf.Connec
 	var before, patch any
 	require.NoError(t, json.Unmarshal(prior, &before))
 	require.NoError(t, json.Unmarshal(update.UpdatedJson, &patch))
-	reduced, err := json.Marshal(applyMergePatch(before, patch))
+	reduced, err := json.Marshal(boilerplate.ApplyMergePatch(before, patch))
 	require.NoError(t, err)
 
 	return reduced
-}
-
-// applyMergePatch applies an RFC 7396 JSON merge patch to target, returning
-// the patched value without modifying target.
-func applyMergePatch(target, patch any) any {
-	patchObj, ok := patch.(map[string]any)
-	if !ok {
-		return patch
-	}
-
-	targetObj, ok := target.(map[string]any)
-	if !ok {
-		targetObj = nil
-	}
-
-	out := make(map[string]any, len(targetObj)+len(patchObj))
-	for k, v := range targetObj {
-		out[k] = v
-	}
-	for k, v := range patchObj {
-		if v == nil {
-			delete(out, k)
-		} else {
-			out[k] = applyMergePatch(out[k], v)
-		}
-	}
-	return out
 }
