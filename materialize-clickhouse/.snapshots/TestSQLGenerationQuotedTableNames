@@ -4,11 +4,11 @@ CREATE TABLE IF NOT EXISTS `key_value-@你好-``-"especiál` (
 		key1 Int64,
 		key2 Bool,
 		`key!binary` String,
+		`_meta/uuid` Nullable(String),
 		`array` Nullable(String),
 		binary Nullable(String),
 		boolean Nullable(Bool),
 		field_with_projection Nullable(String),
-		flow_published_at DateTime64(6, 'UTC'),
 		integer Nullable(Int64),
 		integerGt128Bit Nullable(Int256),
 		integerGt256Bit Nullable(String),
@@ -162,6 +162,7 @@ concat('{',
 	'"stringInteger66Chars":', ifNull(toJSONString(r.stringInteger66Chars), 'null'), ',',
 	'"stringInteger77Chars":', ifNull(toJSONString(r.stringInteger77Chars), 'null'), ',',
 	'"stringNumber":', ifNull(toJSONString(toString(r.stringNumber)), 'null')
+, ',', '"_meta":{"uuid":', ifNull(toJSONString(r.`_meta/uuid`), 'null'), '}'
 , '}') AS flow_document
 	FROM `key_value-@你好-``-"especiál` AS r FINAL
 	JOIN `flow_temp_load_0_key_value-@你好-``-"especiál` AS l
@@ -220,7 +221,7 @@ TRUNCATE TABLE IF EXISTS `flow_temp_store_0_delta_updates-@你好-``-"especiál`
 
 --- Begin `key_value-@你好-``-"especiál` insertStoreTable ---
 
-INSERT INTO `flow_temp_store_0_key_value-@你好-``-"especiál` (key1, key2, `key!binary`, `array`, binary, boolean, field_with_projection, flow_published_at, integer, integerGt128Bit, integerGt256Bit, integerGt64Bit, integerWithUserDDL, multiple, `nonAsciiκόσμε`, number, numberCastToString, object, string, stringInteger, stringInteger18Chars, stringInteger38Chars, stringInteger39Chars, stringInteger66Chars, stringInteger77Chars, stringNumber, flow_document, _is_deleted)
+INSERT INTO `flow_temp_store_0_key_value-@你好-``-"especiál` (key1, key2, `key!binary`, `_meta/uuid`, `array`, binary, boolean, field_with_projection, integer, integerGt128Bit, integerGt256Bit, integerGt64Bit, integerWithUserDDL, multiple, `nonAsciiκόσμε`, number, numberCastToString, object, string, stringInteger, stringInteger18Chars, stringInteger38Chars, stringInteger39Chars, stringInteger66Chars, stringInteger77Chars, stringNumber, flow_document, _is_deleted)
 --- End `key_value-@你好-``-"especiál` insertStoreTable ---
 
 --- Begin `delta_updates-@你好-``-"especiál` insertStoreTable ---

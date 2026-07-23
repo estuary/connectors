@@ -566,6 +566,7 @@ concat('{',
 	{{- if $i }}, ',',{{ end }}
 	'"{{ $col.Field }}":', {{ template "concatValue" (ColumnWithAlias $col "r") }}
 {{- end }}
+, ',', '"_meta":{"uuid":', {{ template "concatValue" (ColumnWithAlias $.MetaUUIDColumn "r") }}, '}'
 , '}') AS flow_document
 	FROM {{$.Identifier}} AS r FINAL
 	JOIN {{ template "loadTableName" . }} AS l

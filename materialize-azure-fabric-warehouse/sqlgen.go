@@ -289,12 +289,14 @@ JOIN {{ $.Identifier}} AS r
 {{- end }}
 
 {{ define "loadQueryNoFlowDocument" }}
-SELECT {{ $.Binding }}, 
+{{ if not $.DeltaUpdates -}}
+SELECT {{ $.Binding }},
 	JSON_OBJECT(
 		{{- range $i, $col := $.RootLevelColumns}}
 			{{- if $i}},{{end}}
 		{{Literal $col.Field}}: {{ template "uncast" (ColumnWithAlias $col "r") }}
-		{{- end}}
+		{{- end}},
+		{{Literal "_meta"}}: JSON_OBJECT({{Literal "uuid"}}: {{ template "uncast" (ColumnWithAlias $.MetaUUIDColumn "r") }})
 	) as flow_document
 FROM {{ template "temp_name_load" . }} AS l
 JOIN {{ $.Identifier}} AS r
@@ -303,6 +305,9 @@ JOIN {{ $.Identifier}} AS r
 	{{ template "maybe_unbase64_lhs" $bound }} = r.{{ $bound.Identifier }}
 	{{- if $bound.LiteralLower }} AND r.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND r.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
 {{- end }}
+{{ else -}}
+SELECT TOP 0 -1, NULL
+{{ end }}
 {{ end }}
 
 {{ define "dropLoadTable" }}

@@ -151,6 +151,24 @@ func (t *Table) RootLevelColumns() []*Column {
 	return rootLevelCols
 }
 
+// MetaUUIDColumn returns the column materializing the document UUID at
+// /_meta/uuid. It is used by the no_flow_document load queries to reconstruct
+// the nested {"_meta":{"uuid":...}} object so that Loaded responses carry the
+// document clock, which the runtime compares against a collection's backfill
+// markers for truncations. For standard (non-delta) bindings the corresponding
+// projection is made FIELD_REQUIRED during Validate when flow_document is
+// disabled, so this is always present in that path. Note that /_meta/uuid is
+// not a root-level pointer, so it is never among RootLevelColumns and must be
+// nested explicitly.
+func (t *Table) MetaUUIDColumn() *Column {
+	for _, col := range t.Columns() {
+		if col.Field == "_meta/uuid" {
+			return col
+		}
+	}
+	return nil
+}
+
 // KeyPtrs returns all keys of the Table as a single slice.
 func (t *Table) KeyPtrs() []*Column {
 	var out []*Column

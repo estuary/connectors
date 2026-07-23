@@ -489,7 +489,8 @@ SELECT {{ $.Binding }}, `+jsonBuildFunction+`(
 {{- range $i, $col := $.RootLevelColumns}}
 	{{- if $i}},{{end}}
     {{Literal $col.Field}}, {{ template "uncast" (ColumnWithAlias $col "r") }}
-{{- end}}
+{{- end}},
+    {{Literal "_meta"}}, `+jsonBuildFunction+`({{Literal "uuid"}}, {{ template "uncast" (ColumnWithAlias $.MetaUUIDColumn "r") }})
 ) as flow_document
 FROM {{ $.Identifier}} AS r
 JOIN {{ template "temp_load_name" . }} AS l

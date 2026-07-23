@@ -4,11 +4,11 @@ CREATE TABLE IF NOT EXISTS db."a-schema".key_value (
 	key1 BIGINT NOT NULL,
 	key2 BOOLEAN NOT NULL,
 	"key!binary" VARCHAR NOT NULL,
+	"_meta/uuid" UUID,
 	"array" JSON,
 	"binary" VARCHAR,
 	"boolean" BOOLEAN,
 	field_with_projection VARCHAR,
-	flow_published_at TIMESTAMP WITH TIME ZONE NOT NULL,
 	"integer" BIGINT,
 	"integerGt128Bit" HUGEINT,
 	"integerGt256Bit" HUGEINT,
@@ -95,6 +95,7 @@ json_object(
        'stringInteger66Chars', CAST(l."stringInteger66Chars" AS VARCHAR),                                                                                                                                         
        'stringInteger77Chars', CAST(l."stringInteger77Chars" AS VARCHAR),                                                                                                                                         
        'stringNumber', CAST(l."stringNumber" AS VARCHAR)                                                                                                                                                          
+, '_meta', json_object('uuid', l."_meta/uuid")
 ) as doc                                                                                                                                                           
 FROM db."a-schema".key_value AS l                                                                                                                                       
 JOIN read_json(                                                                                                                                                    
@@ -123,11 +124,11 @@ USING read_json(
 		key1: 'BIGINT NOT NULL',
 		key2: 'BOOLEAN NOT NULL',
 		"key!binary": 'VARCHAR NOT NULL',
+		"_meta/uuid": 'UUID',
 		"array": 'JSON',
 		"binary": 'VARCHAR',
 		"boolean": 'BOOLEAN',
 		field_with_projection: 'VARCHAR',
-		flow_published_at: 'TIMESTAMP WITH TIME ZONE NOT NULL',
 		"integer": 'BIGINT',
 		"integerGt128Bit": 'HUGEINT',
 		"integerGt256Bit": 'HUGEINT',
@@ -155,17 +156,17 @@ USING read_json(
 --- End db."a-schema".key_value storeDeleteQuery ---
 
 --- Begin db."a-schema".key_value storeQuery ---
-INSERT INTO db."a-schema".key_value (key1, key2, "key!binary", "array", "binary", "boolean", field_with_projection, flow_published_at, "integer", "integerGt128Bit", "integerGt256Bit", "integerGt64Bit", "integerWithUserDDL", multiple, "nonAsciiκόσμε", number, "numberCastToString", "object", string, "stringInteger", "stringInteger18Chars", "stringInteger38Chars", "stringInteger39Chars", "stringInteger66Chars", "stringInteger77Chars", "stringNumber", flow_document
+INSERT INTO db."a-schema".key_value (key1, key2, "key!binary", "_meta/uuid", "array", "binary", "boolean", field_with_projection, "integer", "integerGt128Bit", "integerGt256Bit", "integerGt64Bit", "integerWithUserDDL", multiple, "nonAsciiκόσμε", number, "numberCastToString", "object", string, "stringInteger", "stringInteger18Chars", "stringInteger38Chars", "stringInteger39Chars", "stringInteger66Chars", "stringInteger77Chars", "stringNumber", flow_document
 )
 SELECT
 		key1, 
 		key2, 
 		"key!binary", 
+		"_meta/uuid", 
 		"array", 
 		"binary", 
 		"boolean", 
 		field_with_projection, 
-		flow_published_at, 
 		"integer", 
 		"integerGt128Bit", 
 		"integerGt256Bit", 
@@ -194,11 +195,11 @@ FROM read_json(
 		key1: 'BIGINT NOT NULL',
 		key2: 'BOOLEAN NOT NULL',
 		"key!binary": 'VARCHAR NOT NULL',
+		"_meta/uuid": 'UUID',
 		"array": 'JSON',
 		"binary": 'VARCHAR',
 		"boolean": 'BOOLEAN',
 		field_with_projection: 'VARCHAR',
-		flow_published_at: 'TIMESTAMP WITH TIME ZONE NOT NULL',
 		"integer": 'BIGINT',
 		"integerGt128Bit": 'HUGEINT',
 		"integerGt256Bit": 'HUGEINT',

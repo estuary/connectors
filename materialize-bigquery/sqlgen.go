@@ -311,12 +311,14 @@ SELECT {{ $.Binding }}, l.{{$.Document.Identifier}}
 {{- end }}
 
 {{ define "loadQueryNoFlowDocument" -}}
+{{ if not $.DeltaUpdates -}}
 SELECT {{ $.Binding }},
 TO_JSON(STRUCT(
 {{- range $i, $col := $.RootLevelColumns}}
 	{{- if $i}}, {{end}}
 	{{ template "uncast" (ColumnWithAlias $col "l") }} AS {{ $col.Field }}
 {{- end}}
+, STRUCT({{ template "uncast" (ColumnWithAlias $.MetaUUIDColumn "l") }} AS uuid) AS _meta
 )) as flow_document
 FROM {{ $.Identifier }} AS l
 JOIN {{ template "tempTableName" . }} AS r
@@ -324,6 +326,9 @@ JOIN {{ template "tempTableName" . }} AS r
 	{{ if $ind }} AND {{ else }} ON {{ end -}}
 	l.{{ $bound.Identifier }} = r.c{{$ind}}
 	{{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+{{- end }}
+{{- else -}}
+(SELECT -1, CAST(NULL AS {{ $.ObjectType }}) LIMIT 0) as nodoc
 {{- end }}
 {{ end }}
 

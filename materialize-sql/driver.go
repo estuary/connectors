@@ -226,6 +226,17 @@ func (s *sqlMaterialization[EC, RC]) NewConstraint(p pf.Projection, deltaUpdates
 	case slices.Equal(p.Inference.Types, []string{"null"}):
 		constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
 		constraint.Reason = "Cannot materialize a field where the only possible type is 'null'"
+	case !deltaUpdates && s.endpoint.NoFlowDocument && p.Field == "_meta/uuid":
+		// When flow_document is disabled the reconstructed document is the only
+		// thing returned for a Loaded response, so the document UUID must be
+		// materialized in order for the runtime to extract the document clock
+		// (used to compare against a collection's backfill markers for
+		// truncations). This must be FIELD_REQUIRED rather than LOCATION_REQUIRED:
+		// flow_published_at projects the same /_meta/uuid location, so a
+		// LOCATION_REQUIRED constraint here would be satisfied by flow_published_at
+		// without _meta/uuid itself being materialized.
+		constraint.Type = pm.Response_Validated_Constraint_FIELD_REQUIRED
+		constraint.Reason = "The document UUID must be materialized when flow_document is disabled"
 	case !deltaUpdates && s.endpoint.NoFlowDocument && strings.Count(p.Ptr, "/") == 1 && p.Inference.Exists == pf.Inference_MUST:
 		// When flow_document is disabled, all root-level properties become LOCATION_REQUIRED
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED

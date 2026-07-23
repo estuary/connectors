@@ -341,6 +341,7 @@ SELECT {{ $.Binding }},
 	{{- end}}
 	)
 {{- end}}
+ || JSONB_BUILD_OBJECT('_meta', JSONB_BUILD_OBJECT('uuid', {{ template "uncast" (ColumnWithAlias $.MetaUUIDColumn "r") }}))
 ) as flow_document
 FROM {{ $.Identifier}} AS r
 JOIN {{ template "temp_name" . }} AS l
