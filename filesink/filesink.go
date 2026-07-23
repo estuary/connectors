@@ -433,14 +433,11 @@ func (t *transactor[T]) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 // Acknowledge completes all staged uploads and removes them from the
 // checkpoint, so that the checkpoint contains only the list of file counts.
 func (t *transactor[T]) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
-	var drainKeys = make(map[string]struct{}, len(stateKeys))
-	for _, sk := range stateKeys {
-		drainKeys[sk] = struct{}{}
-	}
+	shouldProcess := m.StateKeyFilter(stateKeys)
 
 	var processed bool
 	for _, b := range t.bindings {
-		if _, ok := drainKeys[b.stateKey]; !ok {
+		if !shouldProcess(b.stateKey) {
 			// This state key's pending work was not requested to be processed,
 			// so it remains staged in the persisted state.
 			continue

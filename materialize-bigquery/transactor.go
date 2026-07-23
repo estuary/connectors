@@ -420,11 +420,13 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	// unlimited just to maintain some sense of decorum.
 	group.SetLimit(100)
 
+	shouldProcess := m.StateKeyFilter(stateKeys)
+
 	var drained []string
-	for _, sk := range stateKeys {
-		item, ok := t.cp[sk]
-		if !ok {
-			// No pending work is staged for this state key.
+	for sk, item := range t.cp {
+		if !shouldProcess(sk) {
+			// This state key's pending work was not requested to be
+			// processed, so it remains staged in the persisted state.
 			continue
 		}
 

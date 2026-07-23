@@ -443,7 +443,7 @@ func TestRecoveryAfterPartitionChangingBackfill(t *testing.T) {
 	tr.ensured = false
 	tr.recovery = true
 	tr.state[b.target.StateKey] = &stateItem{StoredRows: 1}
-	_, err = tr.Acknowledge(ctx, nil, []string{b.target.StateKey})
+	_, err = tr.Acknowledge(ctx, nil, nil)
 	require.NoError(t, err)
 	require.Empty(t, tr.state)
 

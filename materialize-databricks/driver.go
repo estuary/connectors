@@ -670,10 +670,7 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 		return nil, err
 	}
 
-	var drainKeys = make(map[string]struct{}, len(stateKeys))
-	for _, sk := range stateKeys {
-		drainKeys[sk] = struct{}{}
-	}
+	shouldProcess := m.StateKeyFilter(stateKeys)
 
 	if d.scaleOut && !d.primary {
 		// Non-primary shards only stage files: their committed entries are
@@ -681,7 +678,7 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 		// state patches. Drop them from local bookkeeping, mirroring the
 		// clearing the primary emits.
 		for _, b := range d.bindings {
-			if _, ok := drainKeys[b.target.StateKey]; ok {
+			if shouldProcess(b.target.StateKey) {
 				delete(d.cp, b.target.StateKey)
 			}
 		}
@@ -697,15 +694,15 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	}
 	defer db.Close()
 
-	return d.acknowledgeApply(ctx, db, drainKeys)
+	return d.acknowledgeApply(ctx, db, shouldProcess)
 }
 
 // acknowledgeApply executes the pending checkpoint entries of the requested
 // state keys — this shard's own, and (as the primary) those of peer shards
 // and of prior sessions — and builds the state update which clears the
 // executed entries. It returns a nil state when no entry was executed.
-func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB, drainKeys map[string]struct{}) (*pf.ConnectorState, error) {
-	executedOwn, err := d.applyCheckpoint(ctx, db, d.cp, drainKeys)
+func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB, shouldProcess func(string) bool) (*pf.ConnectorState, error) {
+	executedOwn, err := d.applyCheckpoint(ctx, db, d.cp, shouldProcess)
 	if err != nil {
 		return nil, err
 	}
@@ -719,7 +716,7 @@ func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB, drainK
 	var executedPeers = make(map[string][]string)
 	var executedPeersCount int
 	for _, rk := range peerRangeKeys {
-		executed, err := d.applyCheckpoint(ctx, db, d.peerShardsCheckpoints[rk], drainKeys)
+		executed, err := d.applyCheckpoint(ctx, db, d.peerShardsCheckpoints[rk], shouldProcess)
 		if err != nil {
 			return nil, err
 		}
@@ -786,15 +783,15 @@ func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB, drainK
 }
 
 // applyCheckpoint executes the staged queries of every entry in cp whose
-// stateKey is in drainKeys and still has an active binding, deleting the
-// staged files afterwards. It returns the stateKeys which were executed.
+// stateKey passes shouldProcess and still has an active binding, deleting
+// the staged files afterwards. It returns the stateKeys which were executed.
 // TODO: run these queries concurrently for improved performance
-func (d *transactor) applyCheckpoint(ctx context.Context, db *stdsql.DB, cp checkpoint, drainKeys map[string]struct{}) ([]string, error) {
+func (d *transactor) applyCheckpoint(ctx context.Context, db *stdsql.DB, cp checkpoint, shouldProcess func(string) bool) ([]string, error) {
 	var executed []string
 	for stateKey, item := range cp {
 		// entries staged under other state keys are left untouched, remaining
 		// pending in the persisted state
-		if _, ok := drainKeys[stateKey]; !ok {
+		if !shouldProcess(stateKey) {
 			continue
 		}
 

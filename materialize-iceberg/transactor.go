@@ -226,14 +226,11 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	var mergeInput python.MergeInput
 	var allFileUris []string
 
-	var drainKeys = make(map[string]struct{}, len(stateKeys))
-	for _, sk := range stateKeys {
-		drainKeys[sk] = struct{}{}
-	}
+	shouldProcess := m.StateKeyFilter(stateKeys)
 
 	for _, b := range t.bindings {
 		sk := b.Mapped.StateKey
-		if _, ok := drainKeys[sk]; !ok {
+		if !shouldProcess(sk) {
 			// This state key's pending work was not requested to be processed,
 			// so it remains staged in the persisted state.
 			continue
