@@ -48,6 +48,11 @@ type ParquetSchemaElement struct {
 // integers that represent durations at different granularities of time. The first stores a number
 // in months, the second stores a number in days, and the third stores a number in milliseconds.
 //
+// Variants store semi-structured data as an unshredded Parquet Variant V1 group of two required
+// BYTE_ARRAY fields: metadata and value. Values must be provided as JSON, and are encoded to the
+// variant binary form as they are written. Column statistics are not written for variant columns,
+// since byte-wise min/max values of the binary encoding are meaningless and potentially large.
+//
 // Values for integers and numbers may be provided as strings, as long as those strings can be
 // parsed into their numeric values, as with strings with numeric format annotations in their JSON
 // schemas. Similarly, values for binary columns must be provided as base64-encoded strings. Date,
@@ -156,6 +161,21 @@ func makeNode(e ParquetSchemaElement) schema.Node {
 			-1,
 			fieldId,
 		))
+	case LogicalTypeVariant:
+		// An unshredded Parquet Variant V1 group: the group node carries the
+		// column's field ID, while the metadata and value sub-fields are part
+		// of the variant encoding rather than columns of the table schema and
+		// so carry no field IDs.
+		return schema.Must(schema.NewGroupNodeLogical(
+			e.Name,
+			repetition,
+			schema.FieldList{
+				schema.MustPrimitive(schema.NewPrimitiveNode("metadata", parquet.Repetitions.Required, parquet.Types.ByteArray, -1, -1)),
+				schema.MustPrimitive(schema.NewPrimitiveNode("value", parquet.Repetitions.Required, parquet.Types.ByteArray, -1, -1)),
+			},
+			schema.VariantLogicalType{},
+			fieldId,
+		))
 	case LogicalTypeInterval:
 		return schema.Must(schema.NewPrimitiveNodeLogical(
 			e.Name,
@@ -195,6 +215,18 @@ type parquetSchemaConfig struct {
 	timeAsString     bool
 	uuidAsString     bool
 	timestampAsNanos bool
+	jsonAsVariant    bool
+}
+
+// jsonDataType resolves the data type of a JSON-shaped location (array,
+// object, or multiple types). Variant takes precedence over an as-string
+// option: connectors that can't store the JSON logical type set both, and the
+// variant encoding is only produced when explicitly requested.
+func (cfg parquetSchemaConfig) jsonDataType(asString bool) ParquetDataType {
+	if cfg.jsonAsVariant {
+		return LogicalTypeVariant
+	}
+	return typeOrString(LogicalTypeJson, asString)
 }
 
 type ParquetSchemaOption func(*parquetSchemaConfig)
@@ -235,6 +267,12 @@ func WithParquetTimestampAsNanoseconds() ParquetSchemaOption {
 	}
 }
 
+func WithParquetSchemaJSONAsVariant() ParquetSchemaOption {
+	return func(cfg *parquetSchemaConfig) {
+		cfg.jsonAsVariant = true
+	}
+}
+
 func ProjectionToParquetSchemaElement(p pf.Projection, castToString bool, opts ...ParquetSchemaOption) ParquetSchemaElement {
 	cfg := parquetSchemaConfig{}
 	for _, o := range opts {
@@ -268,7 +306,7 @@ func ProjectionToParquetSchemaElement(p pf.Projection, castToString bool, opts .
 		}
 
 		if hadType {
-			out.DataType = typeOrString(LogicalTypeJson, cfg.objectAsString)
+			out.DataType = cfg.jsonDataType(cfg.objectAsString)
 			break
 		}
 
@@ -276,9 +314,9 @@ func ProjectionToParquetSchemaElement(p pf.Projection, castToString bool, opts .
 
 		switch t {
 		case "array":
-			out.DataType = typeOrString(LogicalTypeJson, cfg.arrayAsString)
+			out.DataType = cfg.jsonDataType(cfg.arrayAsString)
 		case "object":
-			out.DataType = typeOrString(LogicalTypeJson, cfg.objectAsString)
+			out.DataType = cfg.jsonDataType(cfg.objectAsString)
 		case "boolean":
 			out.DataType = PrimitiveTypeBoolean
 		case "integer":

@@ -660,6 +660,76 @@ func TestProjectionToParquetSchemaElement(t *testing.T) {
 			wantType:     LogicalTypeTimestampNanos,
 			wantRequired: true,
 		},
+		{
+			name: "WithParquetSchemaJSONAsVariant flips object to variant",
+			projection: pf.Projection{
+				Field: "f",
+				Inference: pf.Inference{
+					Exists: pf.Inference_MUST,
+					Types:  []string{"object"},
+				},
+			},
+			opts:         []ParquetSchemaOption{WithParquetSchemaJSONAsVariant()},
+			wantType:     LogicalTypeVariant,
+			wantRequired: true,
+		},
+		{
+			name: "WithParquetSchemaJSONAsVariant flips array to variant",
+			projection: pf.Projection{
+				Field: "f",
+				Inference: pf.Inference{
+					Exists: pf.Inference_MUST,
+					Types:  []string{"array"},
+				},
+			},
+			opts:         []ParquetSchemaOption{WithParquetSchemaJSONAsVariant()},
+			wantType:     LogicalTypeVariant,
+			wantRequired: true,
+		},
+		{
+			name: "WithParquetSchemaJSONAsVariant flips multi-type fallback to variant",
+			projection: pf.Projection{
+				Field: "f",
+				Inference: pf.Inference{
+					Exists: pf.Inference_MUST,
+					Types:  []string{"integer", "boolean"},
+				},
+			},
+			opts:         []ParquetSchemaOption{WithParquetSchemaJSONAsVariant()},
+			wantType:     LogicalTypeVariant,
+			wantRequired: true,
+		},
+		{
+			name: "WithParquetSchemaJSONAsVariant takes precedence over as-string options",
+			projection: pf.Projection{
+				Field: "f",
+				Inference: pf.Inference{
+					Exists: pf.Inference_MUST,
+					Types:  []string{"object"},
+				},
+			},
+			opts: []ParquetSchemaOption{
+				WithParquetSchemaArrayAsString(),
+				WithParquetSchemaObjectAsString(),
+				WithParquetSchemaJSONAsVariant(),
+			},
+			wantType:     LogicalTypeVariant,
+			wantRequired: true,
+		},
+		{
+			name: "castToString overrides WithParquetSchemaJSONAsVariant",
+			projection: pf.Projection{
+				Field: "f",
+				Inference: pf.Inference{
+					Exists: pf.Inference_MUST,
+					Types:  []string{"object"},
+				},
+			},
+			castToString: true,
+			opts:         []ParquetSchemaOption{WithParquetSchemaJSONAsVariant()},
+			wantType:     LogicalTypeString,
+			wantRequired: true,
+		},
 	}
 
 	for _, tt := range tests {
