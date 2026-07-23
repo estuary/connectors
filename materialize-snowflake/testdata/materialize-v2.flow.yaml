@@ -1,0 +1,33 @@
+import:
+  - ../../materialize-boilerplate/testdata/integration/collections.materialize.flow.yaml
+
+materializations:
+  acmeCo/tests/materialize-snowflake:
+    endpoint:
+      local:
+        command: ["go", "run", "."]
+        protobuf: true
+        config: config-v2.yaml
+    bindings:
+    # A standard-updates binding alongside streaming v2 bindings: its Load
+    # phase iterates all bindings, which is where mixed-eligibility bugs bite.
+    - resource:
+        table: simple_standard_v2
+        schema: PUBLIC
+      source: tests/simple
+      fields:
+        recommended: true
+    - resource:
+        table: simple_delta_v2
+        schema: PUBLIC
+        delta_updates: true
+      source: tests/simple
+      fields:
+        recommended: true
+    - resource:
+        table: data_types_v2
+        schema: PUBLIC
+        delta_updates: true
+      source: tests/data-types
+      fields:
+        recommended: true
