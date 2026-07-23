@@ -21,10 +21,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// duckdbDockerImage pins the DuckDB used to independently verify parquet
-// variant encoding. DuckDB 1.5.3 is the earliest release that reads variant
-// columns, per the Iceberg v3 support requirements.
-const duckdbDockerImage = "duckdb/duckdb:1.5.4"
+// DuckDBDockerImage pins the DuckDB used in tests as an independent reader of
+// parquet variant encoding and Iceberg v3 tables, here and in the connectors
+// that build on this writer. DuckDB 1.5.3 is the earliest release that reads
+// variant columns.
+const DuckDBDockerImage = "duckdb/duckdb:1.5.4"
 
 // duckdbDockerQueryFile runs query against the parquet file f using a pinned
 // dockerized DuckDB, substituting the container-side path of f for %s in
@@ -44,7 +45,7 @@ func duckdbDockerQueryFile(t *testing.T, f string, query string) string {
 	// pollute the query result that callers snapshot.
 	cmd := exec.Command("docker", "run", "--rm",
 		"-v", dir+":/data:ro",
-		duckdbDockerImage,
+		DuckDBDockerImage,
 		"duckdb", "-json", "-c", fmt.Sprintf(query, "/data/"+name),
 	)
 	var stderr bytes.Buffer
