@@ -1,0 +1,37 @@
+import:
+  - ../../materialize-boilerplate/testdata/integration/collections.materialize.flow.yaml
+
+materializations:
+  acmeCo/tests/materialize-s3-iceberg:
+    endpoint:
+      local:
+        command: ["go", "run", "."]
+        protobuf: true
+        config: config-variant.yaml
+    bindings:
+    # JSON-shaped fields as variant columns: objField (object) and the root
+    # document are not selected by "recommended" and so are included
+    # explicitly; arrayField and multipleField are recommended.
+    - resource:
+        table: data_types_delta
+        delta_updates: true
+      source: tests/data-types
+      fields:
+        recommended: true
+        include:
+          objField: {}
+          flow_document: {}
+        exclude:
+          - stringUint64Field
+    # The per-field castToString escape hatch: multipleField would map to
+    # variant, but ignoreStringFormat forces a JSON string column.
+    - resource:
+        table: cast_to_string_delta
+        delta_updates: true
+      source: tests/data-types
+      fields:
+        recommended: true
+        include:
+          multipleField: { ignoreStringFormat: true }
+        exclude:
+          - stringUint64Field
