@@ -77,7 +77,7 @@ properties:
     type:
     - 'null'
     - number
-  metrics.average_cpv:
+  metrics.trueview_average_cpv:
     type:
     - 'null'
     - number
@@ -213,11 +213,11 @@ properties:
     type:
     - 'null'
     - number
-  metrics.video_view_rate:
+  metrics.video_trueview_view_rate:
     type:
     - 'null'
     - number
-  metrics.video_views:
+  metrics.video_trueview_views:
     type:
     - 'null'
     - integer
