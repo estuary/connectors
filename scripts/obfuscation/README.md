@@ -8,6 +8,7 @@ about the customer.
 | --- | --- | --- |
 | `obfuscate_jsonl.py` | A JSONL collection-document file | Obfuscates every value, and every field name not defined by the schema |
 | `strip_catalog.py` | A Flow catalog (YAML/JSON) | Strips configs to an allow-list, and obfuscates names / schemas / derivations |
+| `strip_catalog_history.py` | `flowctl catalog history --models` output | Sanitizes each historical spec + the publisher identity, keeping the timeline |
 | `config_allowlist.txt` | — | The allow-list of config keys `strip_catalog.py` keeps |
 
 ## `obfuscate_jsonl.py` — collection documents
@@ -79,6 +80,28 @@ Removes or obfuscates every customer-identifying part of a catalog:
 
 YAML in → YAML out; JSON in → JSON out. (YAML needs PyYAML; if the interpreter
 lacks it, the script re-execs into one that has it; JSON works dependency-free.)
+
+## `strip_catalog_history.py` — task publication history
+
+```bash
+flowctl catalog history --name <task> --models --output json \
+  | python3 strip_catalog_history.py -
+```
+
+`flowctl catalog history --models` emits one JSON row per publication, each with
+the published `model` (spec) plus the publisher's identity. This tool rewrites
+every row so the history can be shared safely:
+
+- each `model` is sanitized exactly like a catalog spec (configs stripped,
+  schema annotations and derivation code removed, names/references obfuscated);
+- the task name and every reference are obfuscated — consistently with
+  `strip_catalog.py`, since both use the same per-user mapping;
+- the publisher's `userEmail` / `userFullName` / `userId` and the free-text
+  `detail` are obfuscated.
+
+The publication id, timestamp, and catalog type are kept, so the timeline stays
+intact. Reads newline-delimited JSON (flowctl's `--output json`) or a single
+JSON array; writes newline-delimited JSON.
 
 ### Maintaining the allow-list
 

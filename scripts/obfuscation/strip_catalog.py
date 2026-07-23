@@ -192,6 +192,25 @@ def obfuscate_names(catalog: dict, salt: str) -> None:
     _rename_refs(catalog, salt)
 
 
+def sanitize_spec(spec: object, allow: set[str], salt: str) -> None:
+    """Sanitize a single bare spec/model (capture, materialization, or
+    collection) in place — as returned by `flowctl catalog history --models`,
+    which yields the model without the `captures:`/`collections:` wrapper.
+
+    Applies the same treatment as a full catalog: strip configs to the
+    allow-list, drop `local.command`, strip schema annotations and derivation
+    code, and obfuscate references to other catalog names."""
+    if not isinstance(spec, dict):
+        return
+    sanitize_configs(spec, allow)
+    for sk in ("schema", "writeSchema", "readSchema"):
+        if sk in spec:
+            strip_schema_annotations(spec[sk])
+    if "derive" in spec:
+        strip_derivation(spec["derive"], salt)
+    _rename_refs(spec, salt)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("catalog", help="Flow catalog file (YAML or JSON)")
