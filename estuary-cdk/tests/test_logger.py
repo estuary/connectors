@@ -26,3 +26,16 @@ def test_fstring_message_unchanged():
         "flow", logging.INFO, __file__, 1, "already formatted", None, None
     )
     assert _fmt(r)["msg"] == "already formatted"
+
+
+def test_malformed_percent_args_fall_back_to_raw_template():
+    # Several connectors pass a context dict positionally (e.g.
+    # log.info(f"...", {"errors": ...})). When the (already-rendered) message
+    # contains a stray '%', getMessage() would raise on `msg % args`; we must
+    # fall back to the raw template rather than let logging drop the line.
+    r = logging.LogRecord(
+        "flow", logging.INFO, __file__, 1,
+        "query failed: LIKE '%x%'", ({"errors": ["boom"]},), None,
+    )
+    out = _fmt(r)
+    assert out["msg"] == "query failed: LIKE '%x%'"
