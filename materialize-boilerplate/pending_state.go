@@ -89,7 +89,7 @@ func stateUnchanged(prior json.RawMessage, update *pf.ConnectorState) bool {
 		if err := json.Unmarshal(update.UpdatedJson, &patch); err != nil {
 			return false
 		}
-		after = applyMergePatch(before, patch)
+		after = ApplyMergePatch(before, patch)
 	} else if err := json.Unmarshal(update.UpdatedJson, &after); err != nil {
 		return false
 	}
@@ -97,9 +97,9 @@ func stateUnchanged(prior json.RawMessage, update *pf.ConnectorState) bool {
 	return reflect.DeepEqual(before, after)
 }
 
-// applyMergePatch applies an RFC 7396 JSON merge patch to target, returning
+// ApplyMergePatch applies an RFC 7396 JSON merge patch to target, returning
 // the patched value without modifying target.
-func applyMergePatch(target, patch any) any {
+func ApplyMergePatch(target, patch any) any {
 	patchObj, ok := patch.(map[string]any)
 	if !ok {
 		return patch
@@ -118,7 +118,7 @@ func applyMergePatch(target, patch any) any {
 		if v == nil {
 			delete(out, k)
 		} else {
-			out[k] = applyMergePatch(out[k], v)
+			out[k] = ApplyMergePatch(out[k], v)
 		}
 	}
 	return out
