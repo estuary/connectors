@@ -57,6 +57,8 @@ lowercase_column_names
 table_identifier_case
 field_name_case
 timestamp_type
+nanosecond_timestamps
+variant_columns
 create_default_subscription
 embeddingModel
 include_deleted
