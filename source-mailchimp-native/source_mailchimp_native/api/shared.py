@@ -7,7 +7,7 @@ from estuary_cdk.http import HTTPSession
 from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
 from pydantic import BaseModel
 
-from .models import (
+from ..models import (
     ApiKey,
     Automation,
     Campaign,
@@ -18,6 +18,7 @@ from .models import (
     MailchimpChildEntity,
     MailchimpIncrementalChildEntity,
     MailchimpList,
+    OAuth2Credentials,
     OAuthMetadata,
     ParentContext,
     ParentId,
@@ -33,7 +34,9 @@ API = "https://{dc}.api.mailchimp.com/3.0"
 OAUTH_METADATA_URL = "https://login.mailchimp.com/oauth2/metadata"
 
 
-async def resolve_base_url(log: Logger, http: HTTPSession, credentials: object) -> str:
+async def resolve_base_url(
+    log: Logger, http: HTTPSession, credentials: OAuth2Credentials | ApiKey
+) -> str:
     """Resolve the account's data-center-specific base URL.
 
     API keys carry their data center as a suffix (`<key>-us6`); OAuth tokens
@@ -41,8 +44,8 @@ async def resolve_base_url(log: Logger, http: HTTPSession, credentials: object) 
     `api_endpoint` (e.g. "https://us6.api.mailchimp.com").
     """
     if isinstance(credentials, ApiKey):
-        _, _, dc = credentials.password.rpartition("-")
-        if not dc:
+        _, sep, dc = credentials.password.rpartition("-")
+        if not sep or not dc:
             raise ValueError(
                 (
                     "Mailchimp API key is missing its data center suffix "
@@ -61,7 +64,7 @@ async def resolve_base_url(log: Logger, http: HTTPSession, credentials: object) 
 MAX_PAGE_SIZE = 1000
 
 
-async def _fetch_collection_page[T: BaseModel](
+async def fetch_collection_page[T: BaseModel](
     http: HTTPSession,
     base_url: str,
     path: str,
@@ -87,7 +90,7 @@ async def _fetch_collection_page[T: BaseModel](
         yield item
 
 
-async def _snapshot_collection[T: BaseModel](
+async def snapshot_collection[T: BaseModel](
     http: HTTPSession,
     base_url: str,
     path: str,
@@ -108,7 +111,7 @@ async def _snapshot_collection[T: BaseModel](
 
     while True:
         count = 0
-        page = _fetch_collection_page(
+        page = fetch_collection_page(
             http,
             base_url,
             path,
@@ -133,7 +136,7 @@ async def snapshot_lists(
     base_url: str,
     log: Logger,
 ) -> AsyncGenerator[MailchimpList, None]:
-    async for doc in _snapshot_collection(
+    async for doc in snapshot_collection(
         http, base_url, MailchimpList.PATH, MailchimpList.ITEMS_KEY, MailchimpList, log
     ):
         yield doc
@@ -144,7 +147,7 @@ async def snapshot_automations(
     base_url: str,
     log: Logger,
 ) -> AsyncGenerator[Automation, None]:
-    async for doc in _snapshot_collection(
+    async for doc in snapshot_collection(
         http, base_url, Automation.PATH, Automation.ITEMS_KEY, Automation, log
     ):
         yield doc
@@ -164,7 +167,7 @@ async def snapshot_interests(
         for category_id in await fetch_parent_ids(
             http, base_url, categories_path, InterestCategory.ITEMS_KEY, log
         ):
-            async for doc in _snapshot_collection(
+            async for doc in snapshot_collection(
                 http,
                 base_url,
                 Interest.PATH_TEMPLATE.format(list_id=list_id, category_id=category_id),
@@ -198,7 +201,7 @@ async def snapshot_segment_members(
         for segment_id in await fetch_parent_ids(
             http, base_url, segments_path, Segment.ITEMS_KEY, log
         ):
-            async for doc in _snapshot_collection(
+            async for doc in snapshot_collection(
                 http,
                 base_url,
                 SegmentMember.PATH_TEMPLATE.format(
@@ -225,19 +228,28 @@ async def fetch_parent_ids(
     """Drain a parent collection into bare IDs before any child request is
     made, projecting the response down to `fields=<items_key>.id` — the
     projection is honored on top-level and nested paths alike. `IdOnly`
-    rejects an empty ID, so a malformed child path can never be templated."""
-    return [
-        item.id
-        async for item in _snapshot_collection(
-            http,
-            base_url,
-            path,
-            items_key,
-            IdOnly,
-            log,
-            params={"fields": f"{items_key}.id"},
-        )
-    ]
+    rejects an empty ID, so a malformed child path can never be templated.
+
+    IDs are sorted so the child fan-out order is deterministic: snapshot
+    change-suppression digests the emitted byte stream, so an unstable
+    parent order would re-emit every child document each poll. Sorting is
+    by string form only because `ParentId` spans str and int; the order
+    itself carries no meaning."""
+    return sorted(
+        [
+            item.id
+            async for item in snapshot_collection(
+                http,
+                base_url,
+                path,
+                items_key,
+                IdOnly,
+                log,
+                params={"fields": f"{items_key}.id"},
+            )
+        ],
+        key=str,
+    )
 
 
 async def _resolve_leaf_contexts(
@@ -276,7 +288,7 @@ async def snapshot_children(
             else None
         )
 
-        async for doc in _snapshot_collection(
+        async for doc in snapshot_collection(
             http,
             base_url,
             spec.model.PATH_TEMPLATE.format(**ctx_to_snapshot),
@@ -312,7 +324,7 @@ async def fetch_campaigns(
 
     while True:
         count = 0
-        page = _fetch_collection_page(
+        page = fetch_collection_page(
             http,
             base_url,
             Campaign.PATH,
@@ -360,7 +372,7 @@ async def backfill_campaigns(
     params["before_create_time"] = cutoff.isoformat()
 
     count = 0
-    page_gen = _fetch_collection_page(
+    page_gen = fetch_collection_page(
         http, base_url, Campaign.PATH, Campaign.ITEMS_KEY, Campaign, params, log
     )
 
@@ -416,7 +428,7 @@ async def fetch_list_children[T: MailchimpIncrementalChildEntity](
 
     while True:
         count = 0
-        page = _fetch_collection_page(
+        page = fetch_collection_page(
             http,
             base_url,
             path,
@@ -492,7 +504,7 @@ async def backfill_list_children[T: MailchimpIncrementalChildEntity](
     }
 
     count = 0
-    page_gen = _fetch_collection_page(
+    page_gen = fetch_collection_page(
         http,
         base_url,
         model.PATH_TEMPLATE.format(list_id=list_id),
