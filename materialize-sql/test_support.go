@@ -55,6 +55,82 @@ func RunApplyTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, 
 	testutil.RunApplyTest(t, driver, driver.newMaterialization, sourcePath, makeResourceFn)
 }
 
+// RunApplyDrainTest verifies the two-iteration Apply drain of a post-commit
+// apply connector. See the testutil function of the same name.
+func RunApplyDrainTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](
+	t *testing.T,
+	driver *Driver[EC, RC],
+	cfg EC,
+	res RC,
+	seedPending func(t *testing.T, appliedSpec *pf.MaterializationSpec) json.RawMessage,
+	verifyDrained func(t *testing.T, appliedSpec *pf.MaterializationSpec, colNames []string, rows [][]any),
+) {
+	testutil.RunApplyDrainTest(t, driver, driver.newMaterialization, cfg, res, seedPending, verifyDrained)
+}
+
+// DrainSeedInsertQuery builds an INSERT statement adding a single row to the
+// applied base specification's resource, covering every selected field. It
+// serves as the staged work of a committed-but-unacknowledged transaction
+// when seeding connector state for RunApplyDrainTest: post-commit apply SQL
+// connectors persist the queries of a staged transaction in their state and
+// execute them during Acknowledge. Identifiers are quoted and fields
+// translated by the connector's own dialect; jsonLiteral is the dialect's
+// expression for a JSON/object value.
+func DrainSeedInsertQuery[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](
+	t *testing.T,
+	driver *Driver[EC, RC],
+	cfg EC,
+	appliedSpec *pf.MaterializationSpec,
+	jsonLiteral string,
+) string {
+	t.Helper()
+	ctx := context.Background()
+
+	m, err := driver.newMaterialization(ctx, "apply-drain-seed", cfg, boilerplate.ParseFlags(cfg))
+	require.NoError(t, err)
+	defer m.Close(ctx)
+	s, ok := m.(*sqlMaterialization[EC, RC])
+	require.True(t, ok)
+	dialect := s.endpoint.Dialect
+
+	// Literals for the fields of the testutil drain fixture specs
+	// (validate_apply_test_cases base.flow.proto).
+	literals := map[string]string{
+		"key":                  "'k1'",
+		"flow_published_at":    "CURRENT_TIMESTAMP",
+		"_meta/flow_truncated": "false",
+		"optionalBoolean":      "true",
+		"requiredBoolean":      "true",
+		"optionalInteger":      "2",
+		"requiredInteger":      "1",
+		"optionalString":       "'opt'",
+		"requiredString":       "'req'",
+		"optionalObject":       jsonLiteral,
+		"requiredObject":       jsonLiteral,
+		"second_root":          jsonLiteral,
+		"flow_document":        jsonLiteral,
+	}
+
+	b := appliedSpec.Bindings[0]
+	fields := append(append([]string{}, b.FieldSelection.Keys...), b.FieldSelection.Values...)
+	if b.FieldSelection.Document != "" {
+		fields = append(fields, b.FieldSelection.Document)
+	}
+
+	var cols, vals []string
+	for _, f := range fields {
+		lit, ok := literals[f]
+		require.True(t, ok, "no seed literal for selected field %q", f)
+		cols = append(cols, dialect.Identifier(dialect.ColumnLocator(f)))
+		vals = append(vals, lit)
+	}
+
+	return fmt.Sprintf("INSERT INTO %s (%s) SELECT %s",
+		dialect.Identifier(b.ResourcePath...),
+		strings.Join(cols, ", "),
+		strings.Join(vals, ", "))
+}
+
 func RunMigrationTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](
 	t *testing.T,
 	driver *Driver[EC, RC],

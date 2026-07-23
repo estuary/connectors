@@ -24,6 +24,7 @@ import (
 	"github.com/estuary/connectors/materialize-iceberg/catalog"
 	"github.com/estuary/connectors/materialize-iceberg/python"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate/testutil"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/google/uuid"
 	"github.com/segmentio/encoding/json"
 	"github.com/stretchr/testify/require"
@@ -173,6 +174,133 @@ func TestIntegration(t *testing.T) {
 
 	t.Run("apply", func(t *testing.T) {
 		boilerplate.RunApplyTestParallel(t, &Driver{}, newMaterialization, applySpec, makeResourceFn)
+	})
+
+	t.Run("apply-drain", func(t *testing.T) {
+		boilerplate.RunTestAllTasks(t, applySpec, func(t *testing.T, bundled []byte, taskName string, cfg config) {
+			if cfg.Compute.ComputeType != computeTypeSparkStandalone {
+				// Row verification runs eager queries through the local spark
+				// daemon, which the cloud compute variants don't expose.
+				t.Skipf("apply-drain only runs against the local spark stack, not %q", cfg.Compute.ComputeType)
+			}
+
+			ctx := context.Background()
+			tableName := fmt.Sprintf("applydrain%s_flow_test_%d", uuid.NewString()[:8], time.Now().Unix())
+			res := makeResourceFn(tableName, false).WithDefaults(cfg)
+
+			// sparkExec runs an eagerly-evaluated statement through the local
+			// spark daemon, returning its error, since this connector has no
+			// direct query access to table data.
+			sparkExec := func(t *testing.T, query string) error {
+				t.Helper()
+				body, err := json.Marshal(struct {
+					Action string           `json:"action"`
+					Input  python.ExecInput `json:"input"`
+				}{Action: "exec", Input: python.ExecInput{Query: query}})
+				require.NoError(t, err)
+
+				resp, err := http.Post("http://localhost:9806/run", "application/json", bytes.NewReader(body))
+				require.NoError(t, err)
+				defer resp.Body.Close()
+				respBody, err := io.ReadAll(resp.Body)
+				require.NoError(t, err)
+				require.Equalf(t, http.StatusOK, resp.StatusCode, "daemon response: %s", respBody)
+
+				var result struct {
+					Success bool   `json:"success"`
+					Error   string `json:"error"`
+				}
+				require.NoError(t, json.Unmarshal(respBody, &result))
+				if !result.Success {
+					return fmt.Errorf("%s", result.Error)
+				}
+				return nil
+			}
+
+			seedPending := func(t *testing.T, appliedSpec *pf.MaterializationSpec) json.RawMessage {
+				// A staged transaction is a Spark SQL query persisted in the
+				// connector state along with the staged CSV files it consumes
+				// through a temporary view, keyed by the binding's state key.
+				// The file must exist since recovery prunes missing files and
+				// Acknowledge deletes them after the merge job succeeds.
+				bucket, err := cfg.toBucket(ctx)
+				require.NoError(t, err)
+				fileKey := stagedFileClient{}.NewKey([]string{cfg.Compute.BucketPath, fmt.Sprintf("applydrain-%s", uuid.NewString()), "seed"})
+				fileWriter := stagedFileClient{}.NewWriter(bucket.NewWriter(ctx, fileKey), []string{"key"})
+				require.NoError(t, fileWriter.Write([]any{"k1"}))
+				require.NoError(t, fileWriter.Close())
+
+				b := appliedSpec.Bindings[0]
+				fqnParts := []string{"`estuary`"}
+				for _, part := range b.ResourcePath {
+					fqnParts = append(fqnParts, quoteIdentifier(part))
+				}
+
+				// Literals for the fields of the drain fixture specs; the key
+				// is read from the staged file's temporary view.
+				literals := map[string]string{
+					"key":                  "r.`key`",
+					"flow_published_at":    "current_timestamp()",
+					"_meta/flow_truncated": "false",
+					"optionalBoolean":      "true",
+					"requiredBoolean":      "true",
+					"optionalInteger":      "2",
+					"requiredInteger":      "1",
+					"optionalString":       "'opt'",
+					"requiredString":       "'req'",
+					"optionalObject":       "'{}'",
+					"requiredObject":       "'{}'",
+					"second_root":          "'{}'",
+					"flow_document":        "'{}'",
+				}
+				fields := append(append([]string{}, b.FieldSelection.Keys...), b.FieldSelection.Values...)
+				if b.FieldSelection.Document != "" {
+					fields = append(fields, b.FieldSelection.Document)
+				}
+				var cols, vals []string
+				for _, f := range fields {
+					lit, ok := literals[f]
+					require.True(t, ok, "no seed literal for selected field %q", f)
+					cols = append(cols, quoteIdentifier(f))
+					vals = append(vals, lit)
+				}
+				query := fmt.Sprintf("INSERT INTO %s (%s) SELECT %s FROM merge_view_0 AS r",
+					strings.Join(fqnParts, "."), strings.Join(cols, ", "), strings.Join(vals, ", "))
+
+				state, err := json.Marshal(map[string]*python.MergeBinding{
+					b.StateKey: {
+						Binding: 0,
+						Query:   query,
+						Columns: []python.NestedField{{Name: "key", Type: "string"}},
+						Files:   []string{bucket.URI(fileKey)},
+					},
+				})
+				require.NoError(t, err)
+				return state
+			}
+
+			verifyDrained := func(t *testing.T, appliedSpec *pf.MaterializationSpec, _ []string, _ [][]any) {
+				// SnapshotTestResource is unimplemented for this connector, so
+				// assert on the committed row with an eager CTAS: assert_true
+				// fails the statement unless the target holds exactly the
+				// seeded row.
+				b := appliedSpec.Bindings[0]
+				fqnParts := []string{"`estuary`"}
+				for _, part := range b.ResourcePath {
+					fqnParts = append(fqnParts, quoteIdentifier(part))
+				}
+				fqn := strings.Join(fqnParts, ".")
+				verifyFQN := fmt.Sprintf("`estuary`.%s.%s", quoteIdentifier(b.ResourcePath[0]), quoteIdentifier(tableName+"_verify"))
+
+				require.NoError(t, sparkExec(t, fmt.Sprintf("DROP TABLE IF EXISTS %s", verifyFQN)))
+				require.NoError(t, sparkExec(t,
+					fmt.Sprintf("CREATE TABLE %s AS SELECT CAST(assert_true((SELECT count(*) FROM %s) = 1, 'expected exactly one committed row') AS STRING) AS ok", verifyFQN, fqn)),
+					"the staged transaction's row must have been committed")
+				require.NoError(t, sparkExec(t, fmt.Sprintf("DROP TABLE IF EXISTS %s", verifyFQN)))
+			}
+
+			boilerplate.RunApplyDrainTest(t, &Driver{}, newMaterialization, cfg, res, seedPending, verifyDrained)
+		})
 	})
 
 	t.Run("migrate", func(t *testing.T) {

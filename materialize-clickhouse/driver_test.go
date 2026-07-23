@@ -1,11 +1,16 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
+	"time"
 
+	"github.com/ClickHouse/clickhouse-go/v2"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
@@ -25,6 +30,56 @@ func TestIntegration(t *testing.T) {
 
 	t.Run("apply", func(t *testing.T) {
 		sql.RunApplyTest(t, newClickHouseDriver().sqlDriver, "testdata/apply.flow.yaml", makeResourceFn)
+	})
+
+	t.Run("apply-drain", func(t *testing.T) {
+		var ctx = t.Context()
+		var cfg = testConfig()
+		var dialect = clickHouseDialect(cfg.Database)
+
+		tableName := fmt.Sprintf("applydrain%s_flow_test_%d", uuid.NewString()[:8], time.Now().Unix())
+		res := makeResourceFn(tableName, false).WithDefaults(cfg)
+
+		conn, err := clickhouse.Open(cfg.newClickhouseOptions())
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = conn.Close() })
+
+		target := dialect.Identifier(tableName)
+		stage := dialect.Identifier(fmt.Sprintf("flow_temp_store_0_%s", tableName))
+		t.Cleanup(func() { _ = conn.Exec(context.Background(), "DROP TABLE IF EXISTS "+stage) })
+
+		count := func(t *testing.T, ident string) uint64 {
+			t.Helper()
+			var c uint64
+			require.NoError(t, conn.QueryRow(ctx, "SELECT count(*) FROM "+ident).Scan(&c))
+			return c
+		}
+
+		seedPending := func(t *testing.T, appliedSpec *pf.MaterializationSpec) json.RawMessage {
+			// Stage a row of a committed-but-unacknowledged transaction: the
+			// store stage table is a structural copy of the target, holding
+			// rows whose MOVE PARTITION into the target only happens at
+			// Acknowledge.
+			require.NoError(t, conn.Exec(ctx, fmt.Sprintf("CREATE TABLE %s AS %s", stage, target)))
+			require.NoError(t, conn.Exec(ctx, fmt.Sprintf(
+				"INSERT INTO %s (%s, %s, %s, %s, %s, %s) VALUES ('k1', now(), true, 1, 'req', '{}')",
+				stage,
+				dialect.Identifier("key"),
+				dialect.Identifier("flow_published_at"),
+				dialect.Identifier("requiredBoolean"),
+				dialect.Identifier("requiredInteger"),
+				dialect.Identifier("requiredString"),
+				dialect.Identifier("flow_document"),
+			)))
+			return json.RawMessage(fmt.Sprintf(`{%q: {"StoredRows": 1}}`, appliedSpec.Bindings[0].StateKey))
+		}
+
+		verifyDrained := func(t *testing.T, appliedSpec *pf.MaterializationSpec, colNames []string, rows [][]any) {
+			require.Len(t, rows, 1, "the staged row must have been moved to the target")
+			require.EqualValues(t, 0, count(t, stage), "the stage table must have been drained")
+		}
+
+		sql.RunApplyDrainTest(t, newClickHouseDriver().sqlDriver, cfg, res, seedPending, verifyDrained)
 	})
 
 	t.Run("migrate", func(t *testing.T) {

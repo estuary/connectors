@@ -149,6 +149,93 @@ func TestIntegration(t *testing.T) {
 		boilerplate.RunApplyTest(t, &driver{}, newMaterialization, "testdata/apply.flow.yaml", makeResourceFn)
 	})
 
+	t.Run("apply-drain", func(t *testing.T) {
+		ctx := context.Background()
+		tableName := fmt.Sprintf("applydrain%s_flow_test_%d", uuid.NewString()[:8], time.Now().Unix())
+		res := makeResourceFn(tableName, true).WithDefaults(cfg)
+
+		seedPending := func(t *testing.T, appliedSpec *pf.MaterializationSpec) json.RawMessage {
+			// A staged transaction is a set of parquet data files recorded in
+			// the connector state, appended to the Iceberg table during
+			// Acknowledge under a per-materialization checkpoint fence. The
+			// file must carry the table's field IDs, exactly as the connector
+			// writes them.
+			b := appliedSpec.Bindings[0]
+
+			cat, err := newCatalog(ctx, cfg, NestedLocationStyle)
+			require.NoError(t, err)
+			infos, err := cat.tableInfos(ctx, [][]string{b.ResourcePath})
+			require.NoError(t, err)
+			require.NotEmpty(t, infos[0].location, "the base Apply must have created the table")
+
+			pqSchema, err := parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap, cfg.nanosecondTimestamps())
+			require.NoError(t, err)
+			for i := range pqSchema {
+				id, ok := infos[0].fieldIDs[pqSchema[i].Name]
+				require.True(t, ok, "no field ID for column %q", pqSchema[i].Name)
+				id32 := int32(id)
+				pqSchema[i].FieldId = &id32
+			}
+
+			// Values for the fields of the drain fixture specs.
+			literals := map[string]any{
+				"key":                  "k1",
+				"flow_published_at":    "2024-01-01T00:00:00Z",
+				"_meta/flow_truncated": false,
+				"optionalBoolean":      true,
+				"requiredBoolean":      true,
+				"optionalInteger":      int64(2),
+				"requiredInteger":      int64(1),
+				"optionalString":       "opt",
+				"requiredString":       "req",
+				"optionalObject":       json.RawMessage(`{}`),
+				"requiredObject":       json.RawMessage(`{}`),
+				"second_root":          json.RawMessage(`{}`),
+				"flow_document":        json.RawMessage(`{}`),
+			}
+			var row []any
+			for _, f := range b.FieldSelection.AllFields() {
+				v, ok := literals[f]
+				require.True(t, ok, "no seed value for selected field %q", f)
+				row = append(row, v)
+			}
+
+			s3opts := s3.Options{
+				Region:      cfg.Region,
+				Credentials: credentials.NewStaticCredentialsProvider(cfg.Credentials.AWSAccessKeyID, cfg.Credentials.AWSSecretAccessKey, ""),
+			}
+			if cfg.S3Endpoint != "" {
+				s3opts.BaseEndpoint = aws.String(cfg.S3Endpoint)
+				s3opts.UsePathStyle = true
+			}
+			rt := &regressionTable{
+				cfg:      cfg,
+				cat:      cat,
+				ident:    icebergtable.Identifier(b.ResourcePath),
+				location: infos[0].location,
+				s3client: s3.New(s3opts),
+			}
+			s3Path, _ := rt.uploadParquetRows(t, ctx, pqSchema, row)
+
+			state, err := json.Marshal(map[string]any{
+				"bindingStates": map[string]any{
+					b.StateKey: map[string]any{
+						"fileKeys":          []string{s3Path},
+						"currentCheckpoint": "applydrain-" + uuid.NewString()[:8],
+					},
+				},
+			})
+			require.NoError(t, err)
+			return state
+		}
+
+		verifyDrained := func(t *testing.T, _ *pf.MaterializationSpec, _ []string, rows [][]any) {
+			require.Len(t, rows, 1, "the staged transaction's files must have been appended")
+		}
+
+		boilerplate.RunApplyDrainTest(t, &driver{}, newMaterialization, cfg, res, seedPending, verifyDrained)
+	})
+
 	t.Run("ts-overflow-regression", func(t *testing.T) {
 		runTimestampOverflowRegression(t, cfg)
 	})
