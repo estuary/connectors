@@ -51,7 +51,7 @@
     "campaign.dynamic_search_ads_setting.use_supplied_urls_only": {
       "type": ["null", "boolean"]
     },
-    "campaign.end_date": {
+    "campaign.end_date_time": {
       "type": ["null", "string"]
     },
     "campaign.excluded_parent_asset_field_types": {
@@ -165,7 +165,7 @@
     "campaign.shopping_setting.merchant_id": {
       "type": ["null", "integer"]
     },
-    "campaign.start_date": {
+    "campaign.start_date_time": {
       "type": ["null", "string"]
     },
     "campaign.status": {
@@ -234,9 +234,6 @@
     "campaign.vanity_pharma.vanity_pharma_text": {
       "type": ["null", "string"]
     },
-    "campaign.video_brand_safety_suitability": {
-      "type": ["null", "string"]
-    },
     "metrics.clicks": {
       "type": ["null", "integer"]
     },
@@ -255,7 +252,7 @@
     "metrics.impressions": {
       "type": ["null", "number"]
     },
-    "metrics.video_views": {
+    "metrics.video_trueview_views": {
       "type": ["null", "number"]
     },
     "metrics.video_quartile_p100_rate": {
