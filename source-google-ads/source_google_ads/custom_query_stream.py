@@ -14,6 +14,8 @@ from .utils import GAQL
 NON_DATE_FORMATTED_FIELDS = [
     "call_view.start_call_date_time",
     "call_view.end_call_date_time",
+    "campaign.start_date_time",
+    "campaign.end_date_time",
 ]
 
 class CustomQueryMixin:
@@ -73,7 +75,7 @@ class CustomQueryMixin:
             elif google_data_type == "MESSAGE":
                 # Represents protobuf message and could be anything, will be
                 # serialized to JSON string by GoogleAds._protobuf_to_json().
-                # https://developers.google.com/google-ads/api/reference/rpc/v11/GoogleAdsFieldDataTypeEnum.GoogleAdsFieldDataType?hl=en#message
+                # https://developers.google.com/google-ads/api/reference/rpc/v25/GoogleAdsFieldDataTypeEnum.GoogleAdsFieldDataType?hl=en#message
                 if node.is_repeated:
                     output_type = ["array", "null"]
                 else:

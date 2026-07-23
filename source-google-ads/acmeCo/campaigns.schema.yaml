@@ -69,7 +69,7 @@ properties:
     type:
     - 'null'
     - boolean
-  campaign.end_date:
+  campaign.end_date_time:
     type:
     - 'null'
     - string
@@ -210,7 +210,7 @@ properties:
     type:
     - 'null'
     - integer
-  campaign.start_date:
+  campaign.start_date_time:
     type:
     - 'null'
     - string
@@ -298,10 +298,6 @@ properties:
     type:
     - 'null'
     - string
-  campaign.video_brand_safety_suitability:
-    type:
-    - 'null'
-    - string
   metrics.clicks:
     type:
     - 'null'
@@ -326,7 +322,7 @@ properties:
     type:
     - 'null'
     - number
-  metrics.video_views:
+  metrics.video_trueview_views:
     type:
     - 'null'
     - number

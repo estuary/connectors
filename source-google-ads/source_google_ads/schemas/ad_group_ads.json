@@ -63,48 +63,6 @@
         "type": "string"
       }
     },
-    "ad_group_ad.ad.call_ad.business_name": {
-      "type": ["null", "string"]
-    },
-    "ad_group_ad.ad.call_ad.call_tracked": {
-      "type": ["null", "boolean"]
-    },
-    "ad_group_ad.ad.call_ad.conversion_action": {
-      "type": ["null", "string"]
-    },
-    "ad_group_ad.ad.call_ad.conversion_reporting_state": {
-      "type": ["null", "string"]
-    },
-    "ad_group_ad.ad.call_ad.country_code": {
-      "type": ["null", "string"]
-    },
-    "ad_group_ad.ad.call_ad.description1": {
-      "type": ["null", "string"]
-    },
-    "ad_group_ad.ad.call_ad.description2": {
-      "type": ["null", "string"]
-    },
-    "ad_group_ad.ad.call_ad.disable_call_conversion": {
-      "type": ["null", "boolean"]
-    },
-    "ad_group_ad.ad.call_ad.headline1": {
-      "type": ["null", "string"]
-    },
-    "ad_group_ad.ad.call_ad.headline2": {
-      "type": ["null", "string"]
-    },
-    "ad_group_ad.ad.call_ad.path1": {
-      "type": ["null", "string"]
-    },
-    "ad_group_ad.ad.call_ad.path2": {
-      "type": ["null", "string"]
-    },
-    "ad_group_ad.ad.call_ad.phone_number": {
-      "type": ["null", "string"]
-    },
-    "ad_group_ad.ad.call_ad.phone_number_verification_url": {
-      "type": ["null", "string"]
-    },
     "ad_group_ad.ad.device_preference": {
       "type": ["null", "string"]
     },

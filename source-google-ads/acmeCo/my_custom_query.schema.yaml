@@ -54,11 +54,10 @@ properties:
     type:
     - number
     - 'null'
-  campaign.start_date:
+  campaign.start_date_time:
     type:
     - string
     - 'null'
-    format: date
   segments.date:
     type: string
     format: date
