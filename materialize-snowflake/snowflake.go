@@ -842,7 +842,7 @@ func (d *transactor) copyHistory(ctx context.Context, tableName string, fileName
 }
 
 // Acknowledge merges data from temporary table to main table
-func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage) (*pf.ConnectorState, error) {
+func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
 	defer func() {
 		d.didRecovery = true
 	}()
@@ -851,14 +851,28 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	group, groupCtx := errgroup.WithContext(ctx)
 	group.SetLimit(MaxConcurrentQueries)
 
+	var drainKeys = make(map[string]struct{}, len(stateKeys))
+	for _, sk := range stateKeys {
+		drainKeys[sk] = struct{}{}
+	}
+
+	var drained []string
 	var pipes = make(map[string]*pipeRecord)
 	for stateKey, item := range d.cp {
+		// only process the state keys we've been asked to; other pending work
+		// remains staged in the persisted state
+		if _, ok := drainKeys[stateKey]; !ok {
+			continue
+		}
+
 		path := d.pathForStateKey(stateKey)
 		// we skip queries that belong to tables which do not have a binding anymore
 		// since these tables might be deleted already
 		if len(path) == 0 {
 			continue
 		}
+
+		drained = append(drained, stateKey)
 
 		if len(item.Query) > 0 {
 			item := item
@@ -1115,6 +1129,10 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 		}
 	}
 
+	if len(drained) == 0 {
+		return nil, nil
+	}
+
 	// After having applied the checkpoint, we try to clean up the checkpoint in the ack response
 	// so that a restart of the connector does not need to run the same queries again
 	// Note that this is an best-effort "attempt" and there is no guarantee that this checkpoint update
@@ -1124,9 +1142,9 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	// which has been disabled right after a failed attempt to run its queries, must be able to recover by enabling
 	// the binding and running the queries that are pending for its last transaction.
 	var checkpointClear = make(checkpoint)
-	for _, b := range d.bindings {
-		checkpointClear[b.target.StateKey] = nil
-		delete(d.cp, b.target.StateKey)
+	for _, sk := range drained {
+		checkpointClear[sk] = nil
+		delete(d.cp, sk)
 	}
 
 	checkpointJSON, err := json.Marshal(checkpointClear)

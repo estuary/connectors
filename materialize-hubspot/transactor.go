@@ -75,7 +75,7 @@ func (t *transactor) UnmarshalState(state json.RawMessage) error {
 	return nil
 }
 
-func (t *transactor) Acknowledge(context.Context, []json.RawMessage) (*pf.ConnectorState, error) {
+func (t *transactor) Acknowledge(context.Context, []json.RawMessage, []string) (*pf.ConnectorState, error) {
 	return nil, nil
 }
 
