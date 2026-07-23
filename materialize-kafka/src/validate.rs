@@ -3,7 +3,7 @@ use proto_flow::{
     flow::{MaterializationSpec, Projection, SerPolicy},
     materialize::{
         request::Validate,
-        response::validated::{constraint, Binding, Constraint},
+        response::validated::{constraint, Binding, Constraint, ProjectionConstraint},
     },
 };
 use rdkafka::producer::Producer;
@@ -46,17 +46,20 @@ pub async fn do_validate(req: Validate) -> Result<Vec<Binding>> {
             let res: Resource = serde_json::from_slice(&binding.resource_config_json)?;
 
             Ok(Binding {
-                constraints: binding
+                constraints: Default::default(),
+                projection_constraints: binding
                     .collection
                     .as_ref()
                     .expect("binding must have collection spec")
                     .projections
                     .iter()
-                    .map(|p| {
-                        (
-                            p.field.clone(),
-                            constraint_for_projection(p, &res, req.last_materialization.as_ref()),
-                        )
+                    .map(|p| ProjectionConstraint {
+                        field: p.field.clone(),
+                        constraint: Some(constraint_for_projection(
+                            p,
+                            &res,
+                            req.last_materialization.as_ref(),
+                        )),
                     })
                     .collect(),
                 resource_path: vec![res.topic],
@@ -67,7 +70,6 @@ pub async fn do_validate(req: Validate) -> Result<Vec<Binding>> {
                     nested_obj_truncate_after: 1000,
                     array_truncate_after: 1000,
                 }),
-                projection_constraints: Vec::new(),
             })
         })
         .collect::<Result<Vec<Binding>>>()
