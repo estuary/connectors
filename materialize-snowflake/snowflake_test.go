@@ -7,8 +7,11 @@ import (
 	"os/exec"
 	"regexp"
 	"testing"
+	"time"
 
 	sql "github.com/estuary/connectors/materialize-sql"
+	pf "github.com/estuary/flow/go/protocols/flow"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
 	_ "github.com/snowflakedb/gosnowflake/v2"
@@ -42,6 +45,37 @@ func TestIntegration(t *testing.T) {
 			Delta:  delta,
 		}
 	}
+
+	t.Run("apply-drain", func(t *testing.T) {
+		cfg := mustGetCfg(t)
+		tableName := fmt.Sprintf("applydrain%s_flow_test_%d", uuid.NewString()[:8], time.Now().Unix())
+		res := makeResourceFn(tableName, false).WithDefaults(cfg)
+
+		seedPending := func(t *testing.T, appliedSpec *pf.MaterializationSpec) json.RawMessage {
+			// A staged transaction is a query persisted in the connector
+			// state, keyed by the binding's state key, along with the staged
+			// directory holding its files. The directory is cleaned up after
+			// the query executes; a directory with no files under the
+			// connector's flow_v1 stage (created by Setup during the base
+			// Apply) stands in for one whose files were already consumed.
+			query := sql.DrainSeedInsertQuery(t, newSnowflakeDriver(), cfg, appliedSpec, "PARSE_JSON('{}')")
+			state, err := json.Marshal(map[string]any{
+				appliedSpec.Bindings[0].StateKey: map[string]any{
+					"Table":     tableName,
+					"Query":     query,
+					"StagedDir": fmt.Sprintf("@flow_v1/applydrain-%s", uuid.NewString()),
+				},
+			})
+			require.NoError(t, err)
+			return state
+		}
+
+		verifyDrained := func(t *testing.T, _ *pf.MaterializationSpec, _ []string, rows [][]any) {
+			require.Len(t, rows, 1, "the staged transaction's row must have been committed")
+		}
+
+		sql.RunApplyDrainTest(t, newSnowflakeDriver(), cfg, res, seedPending, verifyDrained)
+	})
 
 	actionDescSanitizers := []func(string) string{
 		func(s string) string {
