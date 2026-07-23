@@ -151,6 +151,33 @@ func (t *Table) RootLevelColumns() []*Column {
 	return rootLevelCols
 }
 
+// MetaUUIDColumn returns a materialized projection of the document UUID
+// location /_meta/uuid, or nil if none is materialized. It is used by the
+// no_flow_document load queries to reconstruct the nested {"_meta":{"uuid":...}}
+// object so that Loaded responses carry the document clock, which the runtime
+// compares against a collection's backfill markers for truncations.
+//
+// The raw _meta/uuid field is preferred. Otherwise any other projection of the
+// same location is used — most commonly flow_published_at, a date-time view of
+// /_meta/uuid — whose value must be synthesized into a UUID at Load time (see
+// SynthesizeMetaUUID). The raw projection is made FIELD_REQUIRED during Validate
+// when flow_document is disabled, but existing materializations may only have
+// flow_published_at, hence the fallback. Note that /_meta/uuid is not a
+// root-level pointer, so it is never among RootLevelColumns and must be nested
+// explicitly.
+func (t *Table) MetaUUIDColumn() *Column {
+	var fallback *Column
+	for _, col := range t.Columns() {
+		if col.Field == "_meta/uuid" {
+			return col
+		}
+		if col.Ptr == "/_meta/uuid" && fallback == nil {
+			fallback = col
+		}
+	}
+	return fallback
+}
+
 // KeyPtrs returns all keys of the Table as a single slice.
 func (t *Table) KeyPtrs() []*Column {
 	var out []*Column

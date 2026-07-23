@@ -214,12 +214,14 @@ SELECT -1, ""
 -- Templated query for no_flow_document feature flag - reconstructs JSON from root-level columns
 
 {{ define "loadQueryNoFlowDocument" }}
-SELECT {{ $.Table.Binding }}, 
+{{ if not $.Table.DeltaUpdates -}}
+SELECT {{ $.Table.Binding }},
 to_json(struct(
 {{- range $i, $col := $.Table.RootLevelColumns}}
 	{{- if $i}},{{end}}
 	{{ template "uncast" (ColumnWithAlias $col $.Table.Identifier) }} AS {{ $col.Field }}
 {{- end}}
+, struct({{ template "uncast" (ColumnWithAlias $.Table.MetaUUIDColumn $.Table.Identifier) }} AS uuid) AS _meta
 )) as flow_document
 FROM {{ $.Table.Identifier }}
 JOIN (
@@ -240,6 +242,9 @@ JOIN (
 {{ $.Table.Identifier }}.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
 {{- if $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
 {{- end }}
+{{ else -}}
+SELECT -1, ""
+{{ end }}
 {{ end }}
 
 -- TODO: this will not work with custom type definitions that require more than a single word

@@ -320,12 +320,14 @@ SELECT * FROM (SELECT -1, CAST(NULL AS VARIANT) LIMIT 0) as nodoc
 {{- end }}
 
 {{ define "loadQueryNoFlowDocument" }}
+{{ if not $.Table.DeltaUpdates -}}
 SELECT {{ $.Table.Binding }},
 OBJECT_CONSTRUCT_KEEP_NULL(
 {{- range $i, $col := $.Table.RootLevelColumns}}
 	{{- if $i}},{{end}}
 	{{Literal $col.Field}}, {{ template "uncast" (ColumnWithAlias $col $.Table.Identifier) }}
 {{- end}}
+, {{Literal "_meta"}}, OBJECT_CONSTRUCT_KEEP_NULL({{Literal "uuid"}}, {{ template "uncast" (ColumnWithAlias $.Table.MetaUUIDColumn $.Table.Identifier) }})
 ) as flow_document
 FROM {{ $.Table.Identifier }}
 JOIN (
@@ -340,6 +342,9 @@ JOIN (
 {{ $.Table.Identifier }}.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
 {{- if $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
 {{- end }}
+{{ else -}}
+SELECT * FROM (SELECT -1, CAST(NULL AS VARIANT) LIMIT 0) as nodoc
+{{ end }}
 {{ end }}
 
 {{ define "createPipe" }}

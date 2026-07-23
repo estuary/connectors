@@ -292,6 +292,7 @@ json_object(
        {{- if $i}}, {{end}}                                                                                                                                        
        '{{$col.Field}}', {{ template "uncast" (ColumnWithAlias $col "l") }}                                                                                                                     
 {{- end}}                                                                                                                                                          
+, '_meta', json_object('uuid', {{ template "uncast" (ColumnWithAlias $.MetaUUIDColumn "l") }})
 ) as doc                                                                                                                                                           
 FROM {{ $.Identifier }} AS l                                                                                                                                       
 JOIN read_json(                                                                                                                                                    

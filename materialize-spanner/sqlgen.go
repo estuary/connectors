@@ -297,12 +297,14 @@ SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
 {{- end }}
 
 {{ define "loadQueryNoFlowDocument" }}
+{{ if not $.DeltaUpdates -}}
 SELECT {{ $.Binding }},
 TO_JSON(STRUCT(
 {{- range $i, $col := $.RootLevelColumns}}
 	{{- if $i}}, {{end}}
 	{{ template "uncast" (ColumnWithAlias $col "r") }} AS {{ $col.Field }}
 {{- end}}
+, STRUCT({{ template "uncast" (ColumnWithAlias $.MetaUUIDColumn "r") }} AS uuid) AS _meta
 )) as flow_document
 FROM {{ template "temp_name" . }} AS l
 JOIN {{ $.Identifier}} AS r
@@ -310,6 +312,9 @@ JOIN {{ $.Identifier}} AS r
 	{{ if $ind }} AND {{ else }} ON  {{ end -}}
 	l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 {{- end }}
+{{ else -}}
+SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
+{{ end }}
 {{ end }}
 
 -- Templated drop of the temporary load table:

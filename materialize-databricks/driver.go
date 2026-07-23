@@ -333,6 +333,7 @@ func (t *transactor) openDB() (*stdsql.DB, error) {
 type binding struct {
 	target            sql.Table
 	nullFieldsToStrip []string
+	metaUUIDCol       *sql.Column
 
 	// path to where we store staging files
 	rootStagingPath string
@@ -355,6 +356,7 @@ func (t *transactor) addBinding(target sql.Table) error {
 
 	if t.cfg.Advanced.NoFlowDocument {
 		b.nullFieldsToStrip = target.NullableFieldsToStrip()
+		b.metaUUIDCol = target.MetaUUIDColumn()
 	}
 
 	b.rootStagingPath = fmt.Sprintf("/Volumes/%s/%s/%s/flow_temp_tables", t.cfg.CatalogName, target.Path[0], volumeName)
@@ -456,6 +458,11 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 				if b := d.bindings[binding]; len(b.nullFieldsToStrip) > 0 {
 					if doc, err = sql.StripNullFields(doc, b.nullFieldsToStrip); err != nil {
 						return fmt.Errorf("stripping null fields: %w", err)
+					}
+				}
+				if b := d.bindings[binding]; b.metaUUIDCol != nil {
+					if doc, err = sql.SynthesizeMetaUUID(doc, b.metaUUIDCol); err != nil {
+						return fmt.Errorf("synthesizing _meta/uuid: %w", err)
 					}
 				}
 				if err = loaded(binding, doc); err != nil {

@@ -4,11 +4,11 @@ CREATE TABLE IF NOT EXISTS key_value (
 		key1 BIGINT NOT NULL,
 		key2 BOOLEAN NOT NULL,
 		"key!binary" BYTEA NOT NULL,
+		"_meta/uuid" UUID,
 		"array" JSON,
 		"binary" BYTEA,
 		"boolean" BOOLEAN,
 		field_with_projection TEXT,
-		flow_published_at TIMESTAMPTZ NOT NULL,
 		"integer" BIGINT,
 		"integerGt128Bit" NUMERIC,
 		"integerGt256Bit" NUMERIC,
@@ -36,13 +36,11 @@ COMMENT ON TABLE key_value IS 'Generated for materialization test/sqlite of coll
 COMMENT ON COLUMN key_value.key1 IS 'auto-generated projection of JSON at: /key1 with inferred types: [integer]';
 COMMENT ON COLUMN key_value.key2 IS 'auto-generated projection of JSON at: /key2 with inferred types: [boolean]';
 COMMENT ON COLUMN key_value."key!binary" IS 'auto-generated projection of JSON at: /key!binary with inferred types: [string]';
+COMMENT ON COLUMN key_value."_meta/uuid" IS 'user-provided projection of JSON at: /_meta/uuid with inferred types: [string]';
 COMMENT ON COLUMN key_value."array" IS 'auto-generated projection of JSON at: /array with inferred types: [array]';
 COMMENT ON COLUMN key_value."binary" IS 'auto-generated projection of JSON at: /binary with inferred types: [string]';
 COMMENT ON COLUMN key_value."boolean" IS 'auto-generated projection of JSON at: /boolean with inferred types: [boolean]';
 COMMENT ON COLUMN key_value.field_with_projection IS 'user-provided projection of JSON at: /fieldWithProjection with inferred types: [string]';
-COMMENT ON COLUMN key_value.flow_published_at IS 'Flow Publication Time
-Flow publication date-time of this document
-auto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';
 COMMENT ON COLUMN key_value."integer" IS 'auto-generated projection of JSON at: /integer with inferred types: [integer]';
 COMMENT ON COLUMN key_value."integerGt128Bit" IS 'auto-generated projection of JSON at: /integerGt128Bit with inferred types: [integer]';
 COMMENT ON COLUMN key_value."integerGt256Bit" IS 'auto-generated projection of JSON at: /integerGt256Bit with inferred types: [integer]';
@@ -156,6 +154,7 @@ SELECT 0,
 		'stringInteger77Chars', CAST(r."stringInteger77Chars" AS TEXT),
 		'stringNumber', CAST(r."stringNumber" AS TEXT)
 	)
+ || JSONB_BUILD_OBJECT('_meta', JSONB_BUILD_OBJECT('uuid', r."_meta/uuid"))
 ) as flow_document
 FROM key_value AS r
 JOIN flow_temp_table_0 AS l
@@ -177,11 +176,11 @@ INSERT INTO key_value (
 		key1,
 		key2,
 		"key!binary",
+		"_meta/uuid",
 		"array",
 		"binary",
 		"boolean",
 		field_with_projection,
-		flow_published_at,
 		"integer",
 		"integerGt128Bit",
 		"integerGt256Bit",
@@ -216,11 +215,11 @@ INSERT INTO delta_updates (
 --- Begin key_value storeUpdate ---
 
 UPDATE key_value SET
-		"array" = $4,
-		"binary" = $5,
-		"boolean" = $6,
-		field_with_projection = $7,
-		flow_published_at = $8,
+		"_meta/uuid" = $4,
+		"array" = $5,
+		"binary" = $6,
+		"boolean" = $7,
+		field_with_projection = $8,
 		"integer" = $9,
 		"integerGt128Bit" = $10,
 		"integerGt256Bit" = $11,

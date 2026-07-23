@@ -421,7 +421,8 @@ OBJECT(
 {{- range $i, $col := $.RootLevelColumns}}
 	{{- if $i}},{{end}}
 	{{Literal $col.Field}}, {{ template "uncast" (ColumnWithAlias $col "r") }}
-{{- end}}
+{{- end}},
+	{{Literal "_meta"}}, OBJECT({{Literal "uuid"}}, {{ template "uncast" (ColumnWithAlias $.MetaUUIDColumn "r") }})
 ) as flow_document
 FROM {{ template "temp_name" . }} AS l
 JOIN {{ $.Identifier}} AS r

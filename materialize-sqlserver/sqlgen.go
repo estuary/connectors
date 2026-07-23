@@ -422,7 +422,8 @@ SELECT {{ $.Binding }},
 		{{- range $i, $col := $.RootLevelColumns}}
 			{{- if $i}},{{end}}
 		{{Literal $col.Field}} = {{ template "uncast" (ColumnWithAlias $col "r") }}
-		{{- end}}
+		{{- end}},
+		{{ Literal "_meta.uuid" }} = {{ template "uncast" (ColumnWithAlias $.MetaUUIDColumn "r") }}
 	FOR JSON PATH, INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER
 ) as flow_document
 FROM {{ $.Identifier}} AS r

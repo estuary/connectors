@@ -368,6 +368,7 @@ func prepareNewTransactor(
 type binding struct {
 	target                    sql.Table
 	nullFieldsToStrip         []string
+	metaUUIDCol               *sql.Column
 	varcharColumnMetas        []VarcharColumnMeta
 	loadFile                  *stagedFile
 	storeFile                 *stagedFile
@@ -420,6 +421,7 @@ func (t *transactor) addBinding(
 
 	if t.cfg.Advanced.NoFlowDocument {
 		b.nullFieldsToStrip = target.NullableFieldsToStrip()
+		b.metaUUIDCol = target.MetaUUIDColumn()
 	}
 
 	// Render templates that require specific S3 "COPY INTO" parameters.
@@ -628,6 +630,11 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		if b := d.bindings[binding]; len(b.nullFieldsToStrip) > 0 {
 			if doc, err = sql.StripNullFields(doc, b.nullFieldsToStrip); err != nil {
 				return fmt.Errorf("stripping null fields: %w", err)
+			}
+		}
+		if b := d.bindings[binding]; b.metaUUIDCol != nil {
+			if doc, err = sql.SynthesizeMetaUUID(doc, b.metaUUIDCol); err != nil {
+				return fmt.Errorf("synthesizing _meta/uuid: %w", err)
 			}
 		}
 		if err = loaded(binding, doc); err != nil {

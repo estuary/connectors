@@ -4,11 +4,11 @@ CREATE TABLE IF NOT EXISTS key_value (
 		key1 Int64,
 		key2 Bool,
 		`key!binary` String,
+		`_meta/uuid` Nullable(String),
 		`array` Nullable(String),
 		binary Nullable(String),
 		boolean Nullable(Bool),
 		field_with_projection Nullable(String),
-		flow_published_at DateTime64(6, 'UTC'),
 		integer Nullable(Int64),
 		integerGt128Bit Nullable(Int256),
 		integerGt256Bit Nullable(String),
@@ -40,7 +40,7 @@ SETTINGS
 
 --- Begin key_value insertStoreTable ---
 
-INSERT INTO flow_temp_store_0_key_value (key1, key2, `key!binary`, `array`, binary, boolean, field_with_projection, flow_published_at, integer, integerGt128Bit, integerGt256Bit, integerGt64Bit, integerWithUserDDL, multiple, `nonAsciiκόσμε`, number, numberCastToString, object, string, stringInteger, stringInteger18Chars, stringInteger38Chars, stringInteger39Chars, stringInteger66Chars, stringInteger77Chars, stringNumber, flow_document)
+INSERT INTO flow_temp_store_0_key_value (key1, key2, `key!binary`, `_meta/uuid`, `array`, binary, boolean, field_with_projection, integer, integerGt128Bit, integerGt256Bit, integerGt64Bit, integerWithUserDDL, multiple, `nonAsciiκόσμε`, number, numberCastToString, object, string, stringInteger, stringInteger18Chars, stringInteger38Chars, stringInteger39Chars, stringInteger66Chars, stringInteger77Chars, stringNumber, flow_document)
 --- End key_value insertStoreTable ---
 
 --- Begin delta_updates createTargetTable ---
