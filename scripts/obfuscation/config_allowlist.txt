@@ -55,6 +55,8 @@ disableFieldTruncation
 disable_key_distribution_optimization
 lowercase_column_names
 timestamp_type
+nanosecond_timestamps
+variant_columns
 create_default_subscription
 embeddingModel
 include_deleted
