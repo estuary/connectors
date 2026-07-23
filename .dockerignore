@@ -5,6 +5,9 @@ infra
 tests
 */target
 
+# Bruno API-verification collections (dev-only, live in <connector>/bruno)
+*/bruno
+
 # We use the statically-compiled parser cli in the docker builds, so we can't ignore it.
 !parser/target/x86_64-unknown-linux-musl/release/parser
 
