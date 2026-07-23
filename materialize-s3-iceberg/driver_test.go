@@ -173,7 +173,7 @@ func TestIntegration(t *testing.T) {
 			require.NoError(t, err)
 			require.NotEmpty(t, infos[0].location, "the base Apply must have created the table")
 
-			pqSchema, err := parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap, cfg.nanosecondTimestamps())
+			pqSchema, err := parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap, cfg.nanosecondTimestamps(), cfg.variantColumns())
 			require.NoError(t, err)
 			for i := range pqSchema {
 				id, ok := infos[0].fieldIDs[pqSchema[i].Name]

@@ -67,6 +67,7 @@ Estuary collections to your tables.
 | **`/namespace`**                  | Namespace             | Namespace for bound collection tables (unless overridden within the binding resource configuration).                                                | string | Required         |
 | `/upload_interval`                | Upload Interval       | Frequency at which files will be uploaded. Must be a valid ISO8601 duration string no greater than 4 hours.                                         | string | PT5M             |
 | `/advanced/nanosecond_timestamps` | Nanosecond Timestamps | Use nanosecond precision (Iceberg format v3) for date-time columns instead of microsecond precision (format v2).                                    | bool   | false            |
+| `/advanced/variant_columns`       | Variant Columns       | Use the Iceberg variant column type (format v3) for object/array/multi-type fields and the root document instead of JSON strings.                   | bool   | false            |
 | **`/catalog/catalog_type`**       | Catalog Type          | Either "Iceberg REST Server" or "AWS Glue".                                                                                                         | string | Required         |
 | `/catalog/glue_id`                | Glue Catalog ID       | Glue Catalog ID to use. If not specified, defaults to the account ID of the configured credentials. This enables cross-account Glue catalog access. | string |                  |
 | **`/catalog/uri`**                | URI                   | URI identifying the REST catalog, in the format of 'https://yourserver.com/catalog'.                                                                | string | Required         |
@@ -143,6 +144,16 @@ Enabling the option on an existing format v2 table also upgrades the table to fo
 Prior values remain
 readable in the table's earlier snapshots via time travel. To repopulate history under the new
 type, trigger a backfill of the binding, which re-materializes the table from the Flow collection.
+
+With the advanced option `variant_columns` enabled, fields that would otherwise be materialized as
+JSON strings — objects, arrays, multi-type fields, and the root document — are instead materialized
+as **[variant](https://iceberg.apache.org/spec/#semi-structured-types)** columns, and tables are
+created using [Iceberg format v3](https://iceberg.apache.org/spec/#version-3-extended-types-and-capabilities).
+Variant preserves the semi-structured shape of the data natively, so query engines can extract
+nested paths without parsing JSON text. Collection key fields keep their string mapping, and the
+per-field `castToString` option still forces a JSON string column. Make sure your query engine
+supports reading format v3 variant columns (for example Spark 4.0, Snowflake, or DuckDB 1.5.3 and
+later) before enabling this option.
 
 ## Table Maintenance
 
