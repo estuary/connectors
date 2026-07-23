@@ -375,7 +375,11 @@ type BindingEvents struct {
 	activeStores map[string]time.Time
 }
 
-func newBindingEvents() *BindingEvents {
+// NewBindingEvents returns a BindingEvents that discards all events until it
+// is activated by a transactions stream. Contexts without interactive logging,
+// like an Apply RPC draining staged work through Acknowledge, can pass it to a
+// Transactor as-is.
+func NewBindingEvents() *BindingEvents {
 	return &BindingEvents{activeStores: make(map[string]time.Time)}
 }
 

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"testing"
 
 	"cloud.google.com/go/bigquery"
@@ -8,6 +9,28 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/stretchr/testify/require"
 )
+
+func TestAcknowledgeSubsetLeavesOtherKeysPending(t *testing.T) {
+	tr := &transactor{
+		cp: checkpoint{
+			"a_table.v1": {Query: "MERGE INTO a", JobPrefix: "jp"},
+			"b_table.v1": {Query: "MERGE INTO b", JobPrefix: "jp"},
+		},
+		bindings: []*binding{
+			{target: sql.Table{StateKey: "a_table.v1"}},
+			{target: sql.Table{StateKey: "b_table.v1"}},
+		},
+	}
+
+	// No staged entry's state key is requested: nothing may execute (the nil
+	// client would panic if a query ran) and no state update is returned, so
+	// the entries remain pending in the persisted state.
+	state, err := tr.Acknowledge(context.Background(), nil, []string{"c_table.v1"})
+	require.NoError(t, err)
+	require.Nil(t, state)
+	require.NotNil(t, tr.cp["a_table.v1"])
+	require.NotNil(t, tr.cp["b_table.v1"])
+}
 
 func TestSchemaForColsStripsPolicyTags(t *testing.T) {
 	makeCol := func(field string) *sql.Column {

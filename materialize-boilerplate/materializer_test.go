@@ -233,6 +233,137 @@ func TestRunApplyRetainExistingDataOnBackfill(t *testing.T) {
 	}
 }
 
+func TestRunApplyDrainsPendingState(t *testing.T) {
+	ctx := context.Background()
+
+	pendingState := json.RawMessage(`{"key_value":{"query":"MERGE INTO ..."}}`)
+	clearingPatch := &pf.ConnectorState{UpdatedJson: json.RawMessage(`{"key_value":null}`), MergePatch: true}
+
+	for _, tt := range []struct {
+		name         string
+		newSpec      *pf.MaterializationSpec
+		stateJson    json.RawMessage
+		ackPatch     *pf.ConnectorState
+		featureFlags string
+		wantAckKeys  []string
+		wantState    *pf.ConnectorState
+		wantExecuted int
+	}{
+		{
+			name:         "pending state is drained before in-place updates",
+			newSpec:      loadMaterializerSpec(t, "updated.flow.proto"),
+			stateJson:    pendingState,
+			ackPatch:     clearingPatch,
+			wantAckKeys:  []string{"key_value"},
+			wantState:    clearingPatch,
+			wantExecuted: 0, // the drain returns early: no actions may run
+		},
+		{
+			name:         "no pending work proceeds to actions in the same invocation",
+			newSpec:      loadMaterializerSpec(t, "updated.flow.proto"),
+			stateJson:    pendingState,
+			ackPatch:     nil,
+			wantAckKeys:  []string{"key_value"},
+			wantState:    nil,
+			wantExecuted: 1,
+		},
+		{
+			name:         "a state update changing nothing proceeds to actions",
+			newSpec:      loadMaterializerSpec(t, "updated.flow.proto"),
+			stateJson:    pendingState,
+			ackPatch:     &pf.ConnectorState{UpdatedJson: json.RawMessage(`{"unrelated":null}`), MergePatch: true},
+			wantAckKeys:  []string{"key_value"},
+			wantState:    nil,
+			wantExecuted: 1,
+		},
+		{
+			name:         "no state means no drain",
+			newSpec:      loadMaterializerSpec(t, "updated.flow.proto"),
+			stateJson:    nil,
+			ackPatch:     clearingPatch,
+			wantAckKeys:  nil,
+			wantState:    nil,
+			wantExecuted: 1,
+		},
+		{
+			name:         "truncated backfill discards pending state without draining",
+			newSpec:      loadMaterializerSpec(t, "truncate.flow.proto"),
+			stateJson:    pendingState,
+			ackPatch:     clearingPatch,
+			wantAckKeys:  nil,
+			wantState:    nil,
+			wantExecuted: 2, // truncation + update
+		},
+		{
+			name:         "re-created backfill discards pending state without draining",
+			newSpec:      loadMaterializerSpec(t, "incompatible-changes.flow.proto"),
+			stateJson:    pendingState,
+			ackPatch:     clearingPatch,
+			wantAckKeys:  nil,
+			wantState:    nil,
+			wantExecuted: 2, // delete + create
+		},
+		{
+			name:         "data-retaining backfill drains the pre-backfill state key",
+			newSpec:      loadMaterializerSpec(t, "backfill-nullable.flow.proto"),
+			stateJson:    pendingState,
+			ackPatch:     clearingPatch,
+			featureFlags: "retain_existing_data_on_backfill",
+			wantAckKeys:  []string{"key_value"}, // NOT key_value.v1: pending work was staged under the pre-backfill key
+			wantState:    clearingPatch,
+			wantExecuted: 0,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			originalSpec := loadMaterializerSpec(t, "base.flow.proto")
+
+			req := &pm.Request_Apply{
+				Materialization:     tt.newSpec,
+				Version:             "thisone",
+				LastMaterialization: originalSpec,
+				LastVersion:         "oldone",
+				StateJson:           tt.stateJson,
+			}
+
+			if tt.featureFlags != "" {
+				var config testEndpointConfiger
+				require.NoError(t, json.Unmarshal(req.Materialization.ConfigJson, &config))
+				config.Config = map[string]any{
+					"advanced": map[string]any{"feature_flags": tt.featureFlags},
+				}
+				modifiedConfigJson, err := json.Marshal(config)
+				require.NoError(t, err)
+				req.Materialization.ConfigJson = modifiedConfigJson
+			}
+
+			is := testInfoSchemaFromSpec(t, originalSpec, func(in string) string { return in })
+			rec := &drainRecorder{ackPatch: tt.ackPatch}
+
+			applied, err := RunApply(ctx, req, makeDrainTestMaterializerFn(rec, is))
+			require.NoError(t, err)
+
+			require.Equal(t, tt.wantAckKeys, rec.ackKeys)
+			require.Equal(t, tt.wantState, applied.State)
+			require.Equal(t, tt.wantExecuted, rec.executedActions)
+
+			if tt.wantAckKeys != nil {
+				// The transactor must have been built from the last-applied
+				// specification and given the prior state, then destroyed.
+				require.Same(t, originalSpec, rec.openedSpec)
+				require.Equal(t, "oldone", rec.openedVersion)
+				require.Equal(t, tt.stateJson, rec.unmarshaled)
+				require.True(t, rec.destroyed)
+			} else {
+				require.Nil(t, rec.openedSpec) // no transactor was built
+			}
+
+			if tt.wantState != nil {
+				require.Contains(t, applied.ActionDescription, "key_value")
+			}
+		})
+	}
+}
+
 type testCalls struct {
 	createResource   [][]string
 	updateResource   [][]string
@@ -433,10 +564,90 @@ func (t *testTransactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	panic("unimplemented")
 }
 
-func (t *testTransactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage) (*pf.ConnectorState, error) {
+func (t *testTransactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
 	panic("unimplemented")
 }
 
 func (t *testTransactor) Destroy() {
 	panic("unimplemented")
+}
+
+// drainRecorder records the interactions of RunApply's pending-state drain:
+// which actions were actually executed, how the transactor was built, and the
+// state keys its Acknowledge was restricted to.
+type drainRecorder struct {
+	executedActions int
+	openedSpec      *pf.MaterializationSpec
+	openedVersion   string
+	unmarshaled     json.RawMessage
+	ackKeys         []string
+	ackPatch        *pf.ConnectorState // returned by Acknowledge
+	destroyed       bool
+}
+
+type drainTestMaterializer struct {
+	testMaterializer
+	rec *drainRecorder
+}
+
+func makeDrainTestMaterializerFn(rec *drainRecorder, is *InfoSchema) NewMaterializerFn[testEndpointConfiger, testFieldConfiger, testResourcer, testMappedTyper] {
+	return func(
+		ctx context.Context,
+		materializationName string,
+		endpointConfig testEndpointConfiger,
+		featureFlags map[string]bool,
+	) (Materializer[testEndpointConfiger, testFieldConfiger, testResourcer, testMappedTyper], error) {
+		return &drainTestMaterializer{
+			testMaterializer: testMaterializer{calls: &testCalls{}, is: is},
+			rec:              rec,
+		}, nil
+	}
+}
+
+func (d *drainTestMaterializer) countingAction() ActionApplyFn {
+	return func(context.Context) error {
+		d.rec.executedActions++
+		return nil
+	}
+}
+
+func (d *drainTestMaterializer) CreateResource(ctx context.Context, binding MappedBinding[testEndpointConfiger, testResourcer, testMappedTyper]) (string, ActionApplyFn, error) {
+	return "", d.countingAction(), nil
+}
+
+func (d *drainTestMaterializer) DeleteResource(ctx context.Context, path []string) (string, ActionApplyFn, error) {
+	return "", d.countingAction(), nil
+}
+
+func (d *drainTestMaterializer) UpdateResource(ctx context.Context, path []string, existing ExistingResource, update BindingUpdate[testEndpointConfiger, testResourcer, testMappedTyper]) (string, ActionApplyFn, error) {
+	return "", d.countingAction(), nil
+}
+
+func (d *drainTestMaterializer) TruncateResource(ctx context.Context, path []string) (string, ActionApplyFn, error) {
+	return "", d.countingAction(), nil
+}
+
+func (d *drainTestMaterializer) NewTransactor(ctx context.Context, req pm.Request_Open, is InfoSchema, bindings []MappedBinding[testEndpointConfiger, testResourcer, testMappedTyper], be *m.BindingEvents) (m.Transactor, error) {
+	d.rec.openedSpec = req.Materialization
+	d.rec.openedVersion = req.Version
+	return &drainTestTransactor{rec: d.rec}, nil
+}
+
+type drainTestTransactor struct {
+	testTransactor
+	rec *drainRecorder
+}
+
+func (t *drainTestTransactor) UnmarshalState(state json.RawMessage) error {
+	t.rec.unmarshaled = state
+	return nil
+}
+
+func (t *drainTestTransactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
+	t.rec.ackKeys = append([]string(nil), stateKeys...)
+	return t.rec.ackPatch, nil
+}
+
+func (t *drainTestTransactor) Destroy() {
+	t.rec.destroyed = true
 }

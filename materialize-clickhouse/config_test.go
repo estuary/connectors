@@ -74,10 +74,9 @@ func TestResolvedAddress(t *testing.T) {
 
 func TestAcknowledge(t *testing.T) {
 	var tr transactor
-	state, err := tr.Acknowledge(t.Context(), nil)
+	state, err := tr.Acknowledge(t.Context(), nil, nil)
 	require.NoError(t, err)
-	require.JSONEq(t, `{}`, string(state.UpdatedJson))
-	require.True(t, state.MergePatch)
+	require.Nil(t, state)
 }
 
 func TestSpecification(t *testing.T) {

@@ -665,9 +665,14 @@ func (d *transactor) startCommitState() (*pf.ConnectorState, error) {
 }
 
 // Acknowledge merges data from temporary table to main table
-func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage) (*pf.ConnectorState, error) {
+func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
 	if err := d.mergePeerStatePatches(statePatches); err != nil {
 		return nil, err
+	}
+
+	var drainKeys = make(map[string]struct{}, len(stateKeys))
+	for _, sk := range stateKeys {
+		drainKeys[sk] = struct{}{}
 	}
 
 	if d.scaleOut && !d.primary {
@@ -676,7 +681,9 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 		// state patches. Drop them from local bookkeeping, mirroring the
 		// clearing the primary emits.
 		for _, b := range d.bindings {
-			delete(d.cp, b.target.StateKey)
+			if _, ok := drainKeys[b.target.StateKey]; ok {
+				delete(d.cp, b.target.StateKey)
+			}
 		}
 		d.cpRecovery = false
 		return nil, nil
@@ -690,14 +697,16 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	}
 	defer db.Close()
 
-	return d.acknowledgeApply(ctx, db)
+	return d.acknowledgeApply(ctx, db, drainKeys)
 }
 
-// acknowledgeApply executes all pending checkpoint entries — this shard's
-// own, and (as the primary) those of peer shards and of prior sessions — and
-// builds the state update which clears the executed entries.
-func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB) (*pf.ConnectorState, error) {
-	if _, err := d.applyCheckpoint(ctx, db, d.cp); err != nil {
+// acknowledgeApply executes the pending checkpoint entries of the requested
+// state keys — this shard's own, and (as the primary) those of peer shards
+// and of prior sessions — and builds the state update which clears the
+// executed entries. It returns a nil state when no entry was executed.
+func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB, drainKeys map[string]struct{}) (*pf.ConnectorState, error) {
+	executedOwn, err := d.applyCheckpoint(ctx, db, d.cp, drainKeys)
+	if err != nil {
 		return nil, err
 	}
 
@@ -708,15 +717,21 @@ func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB) (*pf.C
 	sort.Strings(peerRangeKeys)
 
 	var executedPeers = make(map[string][]string)
+	var executedPeersCount int
 	for _, rk := range peerRangeKeys {
-		executed, err := d.applyCheckpoint(ctx, db, d.peerShardsCheckpoints[rk])
+		executed, err := d.applyCheckpoint(ctx, db, d.peerShardsCheckpoints[rk], drainKeys)
 		if err != nil {
 			return nil, err
 		}
 		executedPeers[rk] = executed
+		executedPeersCount += len(executed)
 	}
 
 	d.cpRecovery = false
+
+	if len(executedOwn)+executedPeersCount == 0 {
+		return nil, nil
+	}
 
 	// After having applied the checkpoint, we try to clean up the checkpoint in the ack response
 	// so that a restart of the connector does not need to run the same queries again
@@ -729,16 +744,18 @@ func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB) (*pf.C
 	var clear = make(map[string]interface{})
 
 	if d.scaleOut {
-		var ownClear = make(map[string]interface{})
-		for _, b := range d.bindings {
-			ownClear[b.target.StateKey] = nil
-			delete(d.cp, b.target.StateKey)
+		if len(executedOwn) > 0 {
+			var ownClear = make(map[string]interface{})
+			for _, sk := range executedOwn {
+				ownClear[sk] = nil
+				delete(d.cp, sk)
+			}
+			clear[d.rangeKey] = ownClear
 		}
-		clear[d.rangeKey] = ownClear
 	} else {
-		for _, b := range d.bindings {
-			clear[b.target.StateKey] = nil
-			delete(d.cp, b.target.StateKey)
+		for _, sk := range executedOwn {
+			clear[sk] = nil
+			delete(d.cp, sk)
 		}
 	}
 
@@ -760,7 +777,7 @@ func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB) (*pf.C
 		}
 	}
 
-	var checkpointJSON, err = json.Marshal(clear)
+	checkpointJSON, err := json.Marshal(clear)
 	if err != nil {
 		return nil, fmt.Errorf("creating checkpoint clearing json: %w", err)
 	}
@@ -769,12 +786,18 @@ func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB) (*pf.C
 }
 
 // applyCheckpoint executes the staged queries of every entry in cp whose
-// stateKey still has an active binding, deleting the staged files afterwards.
-// It returns the stateKeys which were executed.
+// stateKey is in drainKeys and still has an active binding, deleting the
+// staged files afterwards. It returns the stateKeys which were executed.
 // TODO: run these queries concurrently for improved performance
-func (d *transactor) applyCheckpoint(ctx context.Context, db *stdsql.DB, cp checkpoint) ([]string, error) {
+func (d *transactor) applyCheckpoint(ctx context.Context, db *stdsql.DB, cp checkpoint, drainKeys map[string]struct{}) ([]string, error) {
 	var executed []string
 	for stateKey, item := range cp {
+		// entries staged under other state keys are left untouched, remaining
+		// pending in the persisted state
+		if _, ok := drainKeys[stateKey]; !ok {
+			continue
+		}
+
 		path := d.pathForStateKey(stateKey)
 		// we skip queries that belong to tables which do not have a binding anymore
 		// since these tables might be deleted already
