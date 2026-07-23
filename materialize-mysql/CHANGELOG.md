@@ -3,7 +3,7 @@
 ## 2026-07-23
 
 ### Changed
-- When the `Exclude Flow Document` option is enabled for standard updates, the `_meta/uuid` field is now required to be materialized. This adds a `_meta/uuid` column to affected tables and includes the document UUID in materialized documents.
+- When the `Exclude Flow Document` option is enabled for standard updates, materialized documents now include the document UUID at `_meta/uuid` — materialized directly when the `_meta/uuid` field is present (now required), or synthesized from `flow_published_at` otherwise (using a `1970-01-01` sentinel when that value is absent).
 
 ## v1, 2023-08-01
 - Beginning of changelog.

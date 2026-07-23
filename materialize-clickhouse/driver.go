@@ -411,6 +411,7 @@ func (t *transactor) requireIsDeletedColumn(ctx context.Context, b *binding) err
 type binding struct {
 	target            sql.Table
 	nullFieldsToStrip []string
+	metaUUIDCol       *sql.Column
 	load              struct {
 		createTableSQL string
 		truncateSQL    string
@@ -435,6 +436,7 @@ func (t *transactor) addBinding(_ context.Context, target sql.Table) error {
 	var queryLoadTemplate = t.templates.queryLoadTable
 	if t.cfg.Advanced.NoFlowDocument {
 		b.nullFieldsToStrip = target.NullableFieldsToStrip()
+		b.metaUUIDCol = target.MetaUUIDColumn()
 		queryLoadTemplate = t.templates.queryLoadTableNoFlowDocument
 	}
 
@@ -631,6 +633,11 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 					if len(b.nullFieldsToStrip) > 0 {
 						if doc, err = sql.StripNullFields(doc, b.nullFieldsToStrip); err != nil {
 							return fmt.Errorf("stripping null fields for %s: %w", b.target.Identifier, err)
+						}
+					}
+					if b.metaUUIDCol != nil {
+						if doc, err = sql.SynthesizeMetaUUID(doc, b.metaUUIDCol); err != nil {
+							return fmt.Errorf("synthesizing _meta/uuid for %s: %w", b.target.Identifier, err)
 						}
 					}
 					emitted = true

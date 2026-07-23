@@ -19,6 +19,7 @@ import (
 type binding struct {
 	target            sql.Table
 	nullFieldsToStrip []string
+	metaUUIDCol       *sql.Column
 	hasBinaryColumns  bool
 
 	load struct {
@@ -93,6 +94,7 @@ func newTransactor(
 		}
 		if ep.Config.Advanced.NoFlowDocument {
 			b.nullFieldsToStrip = target.NullableFieldsToStrip()
+			b.metaUUIDCol = target.MetaUUIDColumn()
 		}
 		b.load.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, ep.Dialect.Literal)
 		b.store.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, ep.Dialect.Literal)
@@ -217,6 +219,11 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		if b := t.bindings[binding]; len(b.nullFieldsToStrip) > 0 {
 			if doc, err = sql.StripNullFields(doc, b.nullFieldsToStrip); err != nil {
 				return fmt.Errorf("stripping null fields: %w", err)
+			}
+		}
+		if b := t.bindings[binding]; b.metaUUIDCol != nil {
+			if doc, err = sql.SynthesizeMetaUUID(doc, b.metaUUIDCol); err != nil {
+				return fmt.Errorf("synthesizing _meta/uuid: %w", err)
 			}
 		}
 		if err = loaded(binding, doc); err != nil {

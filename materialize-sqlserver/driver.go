@@ -444,6 +444,7 @@ type binding struct {
 	tempLoadTruncate   string
 
 	nullFieldsToStrip []string
+	metaUUIDCol       *sql.Column
 
 	createStoreTableSQL string
 	tempStoreTableName  string
@@ -458,6 +459,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, featureFl
 	// Choose the appropriate load query template based on configuration
 	var loadQueryTemplate *template.Template
 	if t.cfg.Advanced.NoFlowDocument {
+		b.metaUUIDCol = target.MetaUUIDColumn()
 		loadQueryTemplate = t.templates.loadQueryNoFlowDocument
 	} else {
 		loadQueryTemplate = t.templates.loadQuery
@@ -585,6 +587,11 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		if b := d.bindings[binding]; len(b.nullFieldsToStrip) > 0 {
 			if doc, err = sql.StripNullFields(doc, b.nullFieldsToStrip); err != nil {
 				return fmt.Errorf("stripping null fields: %w", err)
+			}
+		}
+		if b := d.bindings[binding]; b.metaUUIDCol != nil {
+			if doc, err = sql.SynthesizeMetaUUID(doc, b.metaUUIDCol); err != nil {
+				return fmt.Errorf("synthesizing _meta/uuid: %w", err)
 			}
 		}
 		if err = loaded(binding, doc); err != nil {

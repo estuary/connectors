@@ -366,6 +366,7 @@ type binding struct {
 		mergeBounds *sql.MergeBoundsBuilder
 	}
 	nullFieldsToStrip []string
+	metaUUIDCol       *sql.Column
 	// Variables accessed by Prepare, Store, and Commit.
 	store struct {
 		stage       *stagedFile
@@ -380,6 +381,9 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, streaming
 	var b = new(binding)
 	b.target = target
 	b.nullFieldsToStrip = target.NullableFieldsToStrip()
+	if d.cfg.Advanced.NoFlowDocument {
+		b.metaUUIDCol = target.MetaUUIDColumn()
+	}
 	b.load.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
 	b.store.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
 
@@ -584,6 +588,12 @@ func (d *transactor) loadDocuments(ctx context.Context, ch chan *loadDoc, loaded
 				var err error
 				if loadDoc, err = sql.StripNullFields(loadDoc, b.nullFieldsToStrip); err != nil {
 					return fmt.Errorf("stripping null fields: %w", err)
+				}
+			}
+			if b := d.bindings[doc.binding]; b.metaUUIDCol != nil {
+				var err error
+				if loadDoc, err = sql.SynthesizeMetaUUID(loadDoc, b.metaUUIDCol); err != nil {
+					return fmt.Errorf("synthesizing _meta/uuid: %w", err)
 				}
 			}
 			if err := loaded(doc.binding, loadDoc); err != nil {

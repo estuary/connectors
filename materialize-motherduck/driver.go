@@ -132,6 +132,7 @@ func newTransactor(
 		}
 		if cfg.Advanced.NoFlowDocument {
 			b.nullFieldsToStrip = target.NullableFieldsToStrip()
+			b.metaUUIDCol = target.MetaUUIDColumn()
 		}
 		t.bindings = append(t.bindings, b)
 	}
@@ -142,6 +143,7 @@ func newTransactor(
 type binding struct {
 	target            sql.Table
 	nullFieldsToStrip []string
+	metaUUIDCol       *sql.Column
 	mustMerge         bool
 	expectedInserts   int
 	loadMergeBounds   *sql.MergeBoundsBuilder
@@ -281,6 +283,12 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			var err error
 			if loadDoc, err = sql.StripNullFields(loadDoc, b.nullFieldsToStrip); err != nil {
 				return fmt.Errorf("stripping null fields: %w", err)
+			}
+		}
+		if b := d.bindings[doc.Binding]; b.metaUUIDCol != nil {
+			var err error
+			if loadDoc, err = sql.SynthesizeMetaUUID(loadDoc, b.metaUUIDCol); err != nil {
+				return fmt.Errorf("synthesizing _meta/uuid: %w", err)
 			}
 		}
 		if err = loaded(doc.Binding, loadDoc); err != nil {

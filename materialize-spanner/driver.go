@@ -271,6 +271,7 @@ type transactor struct {
 type spannerBinding struct {
 	target             sql.Table
 	nullFieldsToStrip  []string
+	metaUUIDCol        *sql.Column
 	createLoadTableSQL string
 	loadQuerySQL       string
 	dropLoadTableSQL   string
@@ -531,6 +532,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 
 	if t.cfg.Advanced.NoFlowDocument {
 		b.nullFieldsToStrip = target.NullableFieldsToStrip()
+		b.metaUUIDCol = target.MetaUUIDColumn()
 	}
 
 	// Render createLoadTable template
@@ -799,6 +801,12 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			var err error
 			if rawDoc, err = sql.StripNullFields(rawDoc, b.nullFieldsToStrip); err != nil {
 				return fmt.Errorf("stripping null fields: %w", err)
+			}
+		}
+		if b := t.bindings[int(bindingNum)]; b.metaUUIDCol != nil {
+			var err error
+			if rawDoc, err = sql.SynthesizeMetaUUID(rawDoc, b.metaUUIDCol); err != nil {
+				return fmt.Errorf("synthesizing _meta/uuid: %w", err)
 			}
 		}
 		loadedCount++

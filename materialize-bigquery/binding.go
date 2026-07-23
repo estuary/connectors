@@ -11,6 +11,7 @@ import (
 type binding struct {
 	target            sql.Table
 	nullFieldsToStrip []string
+	metaUUIDCol       *sql.Column
 	storeInsertSQL    string
 
 	loadSchema       bigquery.Schema

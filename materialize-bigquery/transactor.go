@@ -157,6 +157,7 @@ func (t *transactor) addBinding(target sql.Table, fieldSchemas map[string]*bigqu
 
 	if t.cfg.Advanced.NoFlowDocument {
 		b.nullFieldsToStrip = target.NullableFieldsToStrip()
+		b.metaUUIDCol = target.MetaUUIDColumn()
 	}
 
 	for _, m := range []struct {
@@ -327,6 +328,12 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			var err error
 			if doc, err = sql.StripNullFields(doc, b.nullFieldsToStrip); err != nil {
 				return fmt.Errorf("stripping null fields: %w", err)
+			}
+		}
+		if b := t.bindings[bd.Binding]; b.metaUUIDCol != nil {
+			var err error
+			if doc, err = sql.SynthesizeMetaUUID(doc, b.metaUUIDCol); err != nil {
+				return fmt.Errorf("synthesizing _meta/uuid: %w", err)
 			}
 		}
 		if err = loaded(bd.Binding, doc); err != nil {
