@@ -66,6 +66,9 @@
     "customer.tracking_url_template": {
       "type": ["null", "string"]
     },
+    "customer.video_brand_safety_suitability": {
+      "type": ["null", "string"]
+    },
     "segments.date": {
       "type": ["string"],
       "format": "date"

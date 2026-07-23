@@ -109,7 +109,7 @@
               "query": {
                 "type": "string",
                 "title": "Custom Query",
-                "description": "A custom defined GAQL query for building the report. Should not contain segments.date expression because it is used by incremental streams. For more information, see Google's query builder at https://developers.google.com/google-ads/api/fields/v11/overview_query_builder.",
+                "description": "A custom defined GAQL query for building the report. Should not contain segments.date expression because it is used by incremental streams. For more information, see Google's query builder at https://developers.google.com/google-ads/api/fields/v25/overview_query_builder.",
                 "examples": [
                   "SELECT segments.ad_destination_type, campaign.advertising_channel_sub_type FROM campaign WHERE campaign.status = 'PAUSED'"
                 ]
