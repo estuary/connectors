@@ -6,10 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 
 	"cloud.google.com/go/bigquery"
 	"github.com/estuary/connectors/go/auth/iam"
 	"github.com/estuary/connectors/go/blob"
+	cerrors "github.com/estuary/connectors/go/connector-errors"
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
@@ -103,6 +105,7 @@ type advancedConfig struct {
 	DisableFieldTruncation bool   `json:"disableFieldTruncation,omitempty" jsonschema:"title=Disable Field Truncation,description=Disables truncation of materialized fields. May result in errors for documents with extremely large values or complex nested structures."`
 	NoFlowDocument         bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false"`
 	FeatureFlags           string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	Endpoint               string `json:"endpoint,omitempty" jsonschema:"title=BigQuery Endpoint,description=The BigQuery API endpoint to connect to. Use if you're materializing to a compatible API that isn't provided by Google. The client uses this as the full API base path — for example the goccy/bigquery-emulator requires http://host:9050/bigquery/v2/ rather than http://host:9050."`
 }
 
 func (c config) Validate() error {
@@ -118,15 +121,25 @@ func (c config) Validate() error {
 		}
 	}
 
-	if c.Credentials == nil {
+	// Credentials are required unless a custom endpoint is configured, in which case they are
+	// optional: an emulator behind the endpoint needs none, while a proxy in front of the real
+	// service may still require them. Credentials accompanying an endpoint must arrive via the
+	// structured 'credentials' configuration: the deprecated top-level 'credentials_json' exists
+	// only so pre-existing configs keep working, and rejecting the combination here keeps such
+	// credentials from being silently ignored by CredentialsClientOption.
+	if c.Credentials != nil {
+		if err := c.Credentials.Validate(); err != nil {
+			return err
+		}
+	} else if c.Advanced.Endpoint == "" {
 		// Sanity check: Are the provided credentials valid JSON? A common error is to upload
 		// credentials that are not valid JSON, and the resulting error is fairly cryptic if fed
 		// directly to bigquery.NewClient.
 		if !json.Valid([]byte(c.CredentialsJSON)) {
 			return fmt.Errorf("service account credentials must be valid JSON, and the provided credentials were not")
 		}
-	} else if err := c.Credentials.Validate(); err != nil {
-		return err
+	} else if c.CredentialsJSON != "" {
+		return fmt.Errorf("credentials for a custom endpoint must be provided via 'credentials', not the deprecated 'credentials_json' field")
 	}
 
 	if err := c.Schedule.Validate(); err != nil {
@@ -152,6 +165,13 @@ func (c config) effectiveBucketPath() string {
 
 func (c config) CredentialsClientOption() (option.ClientOption, error) {
 	if c.Credentials == nil {
+		// A custom endpoint without structured credentials means an unauthenticated server, like
+		// an emulator; a proxy in front of the real authenticated service takes its credentials
+		// through 'credentials'. Validate guarantees the deprecated top-level 'credentials_json'
+		// is empty whenever an endpoint is configured, so nothing is ignored here.
+		if c.Advanced.Endpoint != "" {
+			return option.WithoutAuthentication(), nil
+		}
 		return option.WithCredentialsJSON([]byte(c.CredentialsJSON)), nil
 	}
 
@@ -166,24 +186,41 @@ func (c config) CredentialsClientOption() (option.ClientOption, error) {
 	return nil, fmt.Errorf("unknown 'auth_type'")
 }
 
-func (c config) client(ctx context.Context, ep *sql.Endpoint[config]) (*client, error) {
-	var clientOpts []option.ClientOption
-
+// clientOptions returns the client options shared by every API client the
+// connector constructs, including the server-detection probe, so the probe
+// observes the server through exactly the same credentials and endpoint as
+// regular operation.
+func (c config) clientOptions() ([]option.ClientOption, error) {
 	credOption, err := c.CredentialsClientOption()
 	if err != nil {
 		return nil, err
 	}
-	clientOpts = append(clientOpts,
+	var clientOpts = []option.ClientOption{
 		credOption,
 		option.WithUserAgent("EstuaryFlow (GPN:Estuary;)"),
-	)
-
-	// Allow overriding the main 'project_id' with 'billing_project_id' for client operation billing.
-	var billingProjectID = c.BillingProjectID
-	if billingProjectID == "" {
-		billingProjectID = c.ProjectID
 	}
-	bigqueryClient, err := bigquery.NewClient(ctx, billingProjectID, clientOpts...)
+	if c.Advanced.Endpoint != "" {
+		clientOpts = append(clientOpts, option.WithEndpoint(c.Advanced.Endpoint))
+	}
+	return clientOpts, nil
+}
+
+// effectiveBillingProjectID allows overriding the main 'project_id' with
+// 'billing_project_id' for client operation billing.
+func (c config) effectiveBillingProjectID() string {
+	if c.BillingProjectID != "" {
+		return c.BillingProjectID
+	}
+	return c.ProjectID
+}
+
+func (c config) client(ctx context.Context, ep *sql.Endpoint[config], isEmulatorGoccy bool) (*client, error) {
+	clientOpts, err := c.clientOptions()
+	if err != nil {
+		return nil, err
+	}
+
+	bigqueryClient, err := bigquery.NewClient(ctx, c.effectiveBillingProjectID(), clientOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("creating bigquery client: %w", err)
 	}
@@ -191,15 +228,21 @@ func (c config) client(ctx context.Context, ep *sql.Endpoint[config]) (*client, 
 	// authorization provides sufficient access, typically via the "BigQuery
 	// Read Session User" role. Result iterators will automatically fall back to
 	// the standard but much slower job/table read API if the storage API can't
-	// be accessed.
-	if err := bigqueryClient.EnableStorageReadClient(ctx, clientOpts...); err != nil {
-		return nil, fmt.Errorf("enabling storage read client: %w", err)
+	// be accessed. The goccy emulator does not implement the Storage Read API,
+	// so it is skipped only for the detected emulator — a SaaS server behind a
+	// custom endpoint still gets it.
+	if !isEmulatorGoccy {
+		if err := bigqueryClient.EnableStorageReadClient(ctx, clientOpts...); err != nil {
+			return nil, fmt.Errorf("enabling storage read client: %w", err)
+		}
 	}
 
 	return &client{
-		bigqueryClient: bigqueryClient,
-		cfg:            c,
-		ep:             ep,
+		bigqueryClient:      bigqueryClient,
+		cfg:                 c,
+		ep:                  ep,
+		isEmulatorGoccy:     isEmulatorGoccy,
+		emulatorTempTableMu: &sync.Mutex{},
 	}, nil
 }
 
@@ -243,6 +286,12 @@ func Driver() *sql.Driver[config, tableConfig] {
 }
 
 func newBigQueryDriver() *sql.Driver[config, tableConfig] {
+	// PreReqs receives only the config, but must skip the GCS bucket check for
+	// a detected goccy emulator (see preReqs). CheckPrerequisites is invoked on
+	// the materializer built from NewEndpoint's result, so NewEndpoint — and
+	// with it the detection probe — always runs first; its result is recorded
+	// here for PreReqs to consult rather than re-probing the server.
+	var detectedEmulatorGoccy bool
 	return &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-bigquery",
 		StartTunnel:      func(ctx context.Context, cfg config) error { return nil },
@@ -255,8 +304,18 @@ func newBigQueryDriver() *sql.Driver[config, tableConfig] {
 				"bucket_path": cfg.effectiveBucketPath(),
 			}).Info("creating bigquery endpoint")
 
-			dialect := bqDialect(featureFlags)
-			templates := renderTemplates(dialect)
+			// Classify the server once per session; everything emulator-gated
+			// downstream keys off this single result (REQ-002). Spec never
+			// reaches NewEndpoint, so this probe never runs without a
+			// genuine need for a live server.
+			isEmulatorGoccy, err := detectEmulatorGoccy(ctx, cfg)
+			if err != nil {
+				return nil, err
+			}
+			detectedEmulatorGoccy = isEmulatorGoccy
+
+			dialect := bqDialect(featureFlags, isEmulatorGoccy)
+			templates := renderTemplates(dialect, isEmulatorGoccy)
 
 			// BigQuery's default SerPolicy has historically had limits of 1500
 			// for truncation, rather than the more common 1000.
@@ -270,13 +329,15 @@ func newBigQueryDriver() *sql.Driver[config, tableConfig] {
 			}
 
 			return &sql.Endpoint[config]{
-				Config:              cfg,
-				Dialect:             dialect,
-				SerPolicy:           serPolicy,
-				MetaCheckpoints:     nil,
-				NewClient:           newClient,
+				Config:          cfg,
+				Dialect:         dialect,
+				SerPolicy:       serPolicy,
+				MetaCheckpoints: nil,
+				NewClient: func(ctx context.Context, _ string, ep *sql.Endpoint[config]) (sql.Client, error) {
+					return ep.Config.client(ctx, ep, isEmulatorGoccy)
+				},
 				CreateTableTemplate: templates.createTargetTable,
-				NewTransactor:       prepareNewTransactor(templates),
+				NewTransactor:       prepareNewTransactor(templates, isEmulatorGoccy),
 				ConcurrentApply:     true,
 				NoFlowDocument:      cfg.Advanced.NoFlowDocument,
 				Options: m.MaterializeOptions{
@@ -289,7 +350,9 @@ func newBigQueryDriver() *sql.Driver[config, tableConfig] {
 				},
 			}, nil
 		},
-		PreReqs: preReqs,
+		PreReqs: func(ctx context.Context, cfg config) *cerrors.PrereqErr {
+			return preReqs(ctx, cfg, detectedEmulatorGoccy)
+		},
 	}
 }
 

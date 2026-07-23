@@ -39,3 +39,13 @@ You should specify one of `credentials_file` or `credentials_json`. It will also
 the `GOOGLE_APPLICATION_CREDENTIALS` environment variable if provided which can point
 to a service account file. If multiple options are listed, tt will first try `credentials_file`
 followed by `credentials_json` and then any provided `GOOGLE_APPLICATION_CREDENTIALS`.
+
+# Integration Tests
+
+Two integration suites live in this package, each gated by a boolean environment variable:
+
+- `TestIntegrationLocalEmulatorGoccy` runs against a local goccy/bigquery-emulator + fake-gcs-server
+  docker-compose stack, which the test starts and tears down itself. It needs no GCP access and takes
+  under a minute. Enabled by default; disable with `BIGQUERY_TEST_LOCAL_EMULATOR_GOCCY=0`.
+- `TestIntegration` runs against real SaaS BigQuery, needs GCP credentials, and takes ~10 minutes.
+  Disabled by default; enable with `BIGQUERY_TEST_SAAS=1`.
