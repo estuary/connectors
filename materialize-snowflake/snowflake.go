@@ -851,17 +851,14 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	group, groupCtx := errgroup.WithContext(ctx)
 	group.SetLimit(MaxConcurrentQueries)
 
-	var drainKeys = make(map[string]struct{}, len(stateKeys))
-	for _, sk := range stateKeys {
-		drainKeys[sk] = struct{}{}
-	}
+	shouldProcess := m.StateKeyFilter(stateKeys)
 
 	var drained []string
 	var pipes = make(map[string]*pipeRecord)
 	for stateKey, item := range d.cp {
 		// only process the state keys we've been asked to; other pending work
 		// remains staged in the persisted state
-		if _, ok := drainKeys[stateKey]; !ok {
+		if !shouldProcess(stateKey) {
 			continue
 		}
 

@@ -42,13 +42,13 @@ func item(query string, toDelete ...string) *checkpointItem {
 	return &checkpointItem{Queries: []string{query}, ToDelete: toDelete}
 }
 
-func keys(stateKeys ...string) map[string]struct{} {
-	var out = make(map[string]struct{}, len(stateKeys))
-	for _, sk := range stateKeys {
-		out[sk] = struct{}{}
-	}
-	return out
+// keys builds the non-nil restricted-processing predicate of Acknowledge's
+// stateKeys contract; allKeys is the nil process-everything form.
+func keys(stateKeys ...string) func(string) bool {
+	return m.StateKeyFilter(stateKeys)
 }
+
+var allKeys = m.StateKeyFilter(nil)
 
 // recordingDriver is a database/sql driver whose connections record every
 // executed statement (or fail with a configured error), so Acknowledge tests
@@ -215,7 +215,7 @@ func TestAcknowledge(t *testing.T) {
 		var d = testTransactor(false, fullRangeKey, "a_table.v1", "b_table.v1")
 		d.cp["a_table.v1"] = item("Q1")
 
-		state, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), keys("a_table.v1", "b_table.v1"))
+		state, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
 		require.NoError(t, err)
 		require.Equal(t, []string{"Q1"}, recording.executed)
 		require.True(t, state.MergePatch)
@@ -229,7 +229,7 @@ func TestAcknowledge(t *testing.T) {
 		d.peerShardsCheckpoints[upperRangeKey] = checkpoint{"a_table.v1": item("PEER")}
 		d.peerShardsCheckpoints[legacyRangeKey] = checkpoint{"a_table.v1": item("LEGACY")}
 
-		state, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), keys("a_table.v1"))
+		state, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
 		require.NoError(t, err)
 		require.Equal(t, []string{"OWN", "LEGACY", "PEER"}, recording.executed)
 		require.True(t, state.MergePatch)
@@ -249,7 +249,7 @@ func TestAcknowledge(t *testing.T) {
 			"removed_table.v1": item("REMOVED"),
 		}
 
-		state, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), keys("a_table.v1"))
+		state, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
 		require.NoError(t, err)
 		require.Equal(t, []string{"PEER"}, recording.executed)
 		require.JSONEq(t, `{
@@ -307,7 +307,7 @@ func TestAcknowledge(t *testing.T) {
 
 		// Acknowledge itself is callable here since the non-primary path
 		// never opens a database connection.
-		state, err := d.Acknowledge(context.Background(), nil, []string{"a_table.v1"})
+		state, err := d.Acknowledge(context.Background(), nil, nil)
 		require.NoError(t, err)
 		require.Nil(t, state)
 		require.Empty(t, d.cp)
@@ -319,12 +319,12 @@ func TestAcknowledge(t *testing.T) {
 		d.cp["a_table.v1"] = item("Q1")
 		d.cpRecovery = true
 
-		_, err := d.acknowledgeApply(context.Background(), recordingDB(t, fmt.Errorf("some PATH_NOT_FOUND error")), keys("a_table.v1"))
+		_, err := d.acknowledgeApply(context.Background(), recordingDB(t, fmt.Errorf("some PATH_NOT_FOUND error")), allKeys)
 		require.NoError(t, err)
 		require.False(t, d.cpRecovery)
 
 		d.cp["a_table.v1"] = item("Q1")
-		_, err = d.acknowledgeApply(context.Background(), recordingDB(t, fmt.Errorf("some PATH_NOT_FOUND error")), keys("a_table.v1"))
+		_, err = d.acknowledgeApply(context.Background(), recordingDB(t, fmt.Errorf("some PATH_NOT_FOUND error")), allKeys)
 		require.Error(t, err) // no longer a recovery apply
 	})
 }

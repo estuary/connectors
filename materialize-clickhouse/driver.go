@@ -754,10 +754,7 @@ func (t *transactor) bindingForStateKey(stateKey string) (*binding, bool) {
 }
 
 func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
-	var drainKeys = make(map[string]struct{}, len(stateKeys))
-	for _, sk := range stateKeys {
-		drainKeys[sk] = struct{}{}
-	}
+	shouldProcess := m.StateKeyFilter(stateKeys)
 	var drained []string
 
 	if !t.ensured {
@@ -767,13 +764,13 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 		// of the next transaction's store phase).
 		for _, b := range t.bindings {
 			if si, pending := t.state[b.target.StateKey]; pending {
-				if _, ok := drainKeys[b.target.StateKey]; !ok {
+				if !shouldProcess(b.target.StateKey) {
 					// This binding's pending work was not requested, so its
 					// staged rows must stay put. ensureTempTables would
 					// discard them, so it is skipped as well; a session
-					// always requests every active binding's state key, so
-					// this only happens in the Apply RPC's narrowed drain,
-					// where no Store follows.
+					// always processes every state key, so this only happens
+					// in the Apply RPC's narrowed drain, where no Store
+					// follows.
 					continue
 				}
 				drained = append(drained, b.target.StateKey)
@@ -823,7 +820,7 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 		t.ensured = true
 	} else {
 		for stateKey, si := range t.state {
-			if _, ok := drainKeys[stateKey]; !ok {
+			if !shouldProcess(stateKey) {
 				continue
 			}
 			// Skip target tables which do not have a binding anymore since
