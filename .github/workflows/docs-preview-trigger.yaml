@@ -1,0 +1,60 @@
+name: "Trigger connector docs preview"
+
+# estuary/docs owns the Docusaurus build (it aggregates this repo's docs/
+# via a git submodule), so a PR here that touches docs/ can't build its own
+# preview. This dispatches the build to estuary/docs, which reports back
+# with a sticky comment on this PR. See estuary/docs
+# .github/workflows/connector-docs-preview.yaml for the receiving side.
+#
+# Requires the "estuary-docs-previews" GitHub App (PREVIEW_APP_ID repo
+# variable + PREVIEW_APP_PRIVATE_KEY secret, installed on both estuary/docs
+# and estuary/connectors). Until those exist, this job skips rather than
+# failing, so it's safe to merge ahead of the App being created.
+
+on:
+  pull_request:
+    paths:
+      - docs/**
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - closed
+
+concurrency: connector-docs-preview-${{ github.event.pull_request.number }}
+
+# The job only ever uses the App-minted token (scoped to estuary/docs), never
+# the default GITHUB_TOKEN, so it needs none of the ambient token's scope.
+permissions: {}
+
+jobs:
+  dispatch:
+    if: ${{ vars.PREVIEW_APP_ID != '' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Mint token for estuary/docs
+        uses: actions/create-github-app-token@v2
+        id: app-token
+        with:
+          app-id: ${{ vars.PREVIEW_APP_ID }}
+          private-key: ${{ secrets.PREVIEW_APP_PRIVATE_KEY }}
+          owner: estuary
+          repositories: docs
+
+      - name: Dispatch preview build to estuary/docs
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_ACTION: ${{ github.event.action }}
+        run: |
+          gh api repos/estuary/docs/dispatches --input - <<EOF
+          {
+            "event_type": "connector-docs-preview",
+            "client_payload": {
+              "pr_number": ${PR_NUMBER},
+              "head_sha": "${HEAD_SHA}",
+              "action": "${PR_ACTION}"
+            }
+          }
+          EOF
