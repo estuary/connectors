@@ -167,13 +167,8 @@ func newMaterialization(ctx context.Context, materializationName string, cfg con
 }
 
 func (d *materialization) Config() boilerplate.MaterializeCfg {
-	var translate boilerplate.TranslateFieldFn
-	if d.cfg.Advanced.LowercaseColumnNames {
-		translate = func(f string) string { return strings.ToLower(f) }
-	}
-
 	return boilerplate.MaterializeCfg{
-		TranslateField:        translate,
+		TranslateField:        d.cfg.Advanced.translateFieldName,
 		ConcurrentApply:       true,
 		MaxFieldLength:        255,
 		CaseInsensitiveFields: true,
@@ -320,7 +315,7 @@ func (d *materialization) NewConstraint(p pf.Projection, deltaUpdates bool, fc f
 }
 
 func (d *materialization) MapType(p boilerplate.Projection, fc fieldConfig) (mapped, boilerplate.ElementConverter) {
-	m, converter := mapProjection(p, d.cfg.Advanced.LowercaseColumnNames)
+	m, converter := mapProjection(p, d.cfg.Advanced.translateFieldName)
 	m.Nullable = fc.Nullable
 	return m, converter
 }
