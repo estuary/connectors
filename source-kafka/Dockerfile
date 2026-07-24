@@ -1,8 +1,8 @@
-ARG BASE_IMAGE=ghcr.io/estuary/base-image:v1
+ARG BASE_IMAGE=ghcr.io/estuary/base-image:v2
 
 # Build Stage
 ################################################################################
-FROM golang:1.25-bookworm AS builder
+FROM golang:1.25-trixie AS builder
 
 RUN apt-get update \
     && apt-get install -y curl ca-certificates pkg-config cmake g++ libssl-dev libsasl2-dev libclang-dev \
@@ -42,13 +42,6 @@ WORKDIR /connector
 ENV PATH="/connector:$PATH"
 
 COPY --from=busybox:latest /bin/sh /bin/sh
-
-# Copy in the shared library files we linked against.
-COPY --from=builder /usr/lib/x86_64-linux-gnu/libdb-5.3.so* /usr/lib/x86_64-linux-gnu/
-COPY --from=builder /usr/lib/x86_64-linux-gnu/sasl2/libsasldb.so* /usr/lib/x86_64-linux-gnu/sasl2/
-COPY --from=builder /usr/lib/x86_64-linux-gnu/libsasl2.so.2* /usr/lib/x86_64-linux-gnu/
-COPY --from=builder /usr/lib/x86_64-linux-gnu/libssl.so.1* /usr/lib/x86_64-linux-gnu/
-COPY --from=builder /usr/lib/x86_64-linux-gnu/libcrypto.so.1* /usr/lib/x86_64-linux-gnu/
 
 # Copy in the connector artifact.
 COPY --from=builder /connector/target/release/source-kafka ./

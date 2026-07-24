@@ -1,8 +1,8 @@
-ARG BASE_IMAGE=ghcr.io/estuary/base-image:v1
+ARG BASE_IMAGE=ghcr.io/estuary/base-image:v2
 
 # Build Stage
 ################################################################################
-FROM golang:1.25-bookworm AS builder
+FROM golang:1.25-trixie AS builder
 
 RUN apt-get update \
     && apt-get install -y curl ca-certificates pkg-config cmake g++ protobuf-compiler \

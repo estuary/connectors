@@ -1,6 +1,6 @@
 # Build Stage
 ################################################################################
-FROM golang:1.25-bookworm AS builder
+FROM golang:1.25-trixie AS builder
 
 WORKDIR /builder
 
@@ -21,7 +21,7 @@ RUN go build -o ./connector -v ./source-alpaca/...
 
 # Runtime Stage
 ################################################################################
-FROM ghcr.io/estuary/base-image:v1
+FROM ghcr.io/estuary/base-image:v2
 
 WORKDIR /connector
 ENV PATH="/connector:$PATH"

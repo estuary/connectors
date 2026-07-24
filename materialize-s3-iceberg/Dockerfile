@@ -1,8 +1,8 @@
-ARG BASE_IMAGE=ghcr.io/estuary/base-image:v1
+ARG BASE_IMAGE=ghcr.io/estuary/base-image:v2
 
 # Build Stage
 ################################################################################
-FROM --platform=linux/amd64 golang:1.25-bookworm AS builder
+FROM --platform=linux/amd64 golang:1.25-trixie AS builder
 
 WORKDIR /builder
 
