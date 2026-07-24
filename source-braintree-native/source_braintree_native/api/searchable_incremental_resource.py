@@ -15,6 +15,7 @@ from .common import (
     braintree_object_to_dict,
     braintree_xml_to_dict,
     process_completed_fetches,
+    request_with_search_timeout_retries,
     search_limit_error_message,
     bisect_window,
 )
@@ -60,7 +61,10 @@ async def fetch_searchable_resource_ids_by_field_between(
 
     response = IdSearchResponse.model_validate(
         braintree_xml_to_dict(
-            await http.request(log, url, "POST", json=body, headers=HEADERS)
+            await request_with_search_timeout_retries(
+                log,
+                lambda: http.request(log, url, "POST", json=body, headers=HEADERS),
+            )
         )
     )
 
@@ -122,7 +126,10 @@ async def _fetch_resource_page(
     async with semaphore:
         response = response_model.model_validate(
             braintree_xml_to_dict(
-                await http.request(log, url, "POST", json=body, headers=HEADERS, should_retry=_should_retry)
+                await request_with_search_timeout_retries(
+                    log,
+                    lambda: http.request(log, url, "POST", json=body, headers=HEADERS, should_retry=_should_retry),
+                )
             )
         )
 

@@ -1,4 +1,5 @@
 import asyncio
+import random
 from braintree import (
     BraintreeGateway,
     AddOnGateway,
@@ -6,9 +7,12 @@ from braintree import (
     )
 from braintree.attribute_getter import AttributeGetter
 from datetime import datetime, timedelta, UTC
-from typing import Awaitable, Any, AsyncGenerator
+from logging import Logger
+from typing import Awaitable, Any, AsyncGenerator, Callable
 import xmltodict
 import re
+
+from estuary_cdk.http import HTTPError
 
 CONVENIENCE_OBJECTS = [
     'gateway'
@@ -25,6 +29,41 @@ SEARCH_LIMIT = 10_000
 TRANSACTION_SEARCH_LIMIT = 50_000
 
 SEARCH_PAGE_SIZE = 50
+
+# Braintree returns an HTTP 422 with a "timeout" reason when a search query times out
+# server-side (e.g. <unprocessable-entity><reason>timeout</reason></unprocessable-entity>).
+# This is transient and safe to retry, but the CDK treats all 4xx responses as
+# non-retryable and only consults `should_retry` for 5xx, so these timeouts crash the
+# binding task. We retry them here with exponential backoff before giving up and letting
+# the error propagate (which restarts the task from its last cursor/page).
+SEARCH_TIMEOUT_REASON = "<reason>timeout</reason>"
+SEARCH_TIMEOUT_MAX_ATTEMPTS = 5
+
+
+def _is_transient_search_timeout(err: HTTPError) -> bool:
+    return err.code == 422 and SEARCH_TIMEOUT_REASON in err.message
+
+
+async def request_with_search_timeout_retries(
+    log: Logger,
+    request_fn: Callable[[], Awaitable[bytes]],
+) -> bytes:
+    """Issue a Braintree search request, retrying transient server-side search timeouts."""
+    for attempt in range(1, SEARCH_TIMEOUT_MAX_ATTEMPTS + 1):
+        try:
+            return await request_fn()
+        except HTTPError as err:
+            if not _is_transient_search_timeout(err) or attempt == SEARCH_TIMEOUT_MAX_ATTEMPTS:
+                raise
+
+            delay = 2 ** attempt + random.uniform(0, 1)
+            log.warning(
+                "Braintree search timed out (HTTP 422); retrying.",
+                {"attempt": attempt, "delay": delay},
+            )
+            await asyncio.sleep(delay)
+
+    assert False, "unreachable: the loop above always returns a response or raises."
 
 
 async def process_completed_fetches(
