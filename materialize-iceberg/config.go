@@ -84,6 +84,15 @@ const (
 	identifierCasePreserve  identifierCase = "preserve"
 )
 
+func (c identifierCase) valid() bool {
+	switch c {
+	case "", identifierCaseLowercase, identifierCaseUppercase, identifierCasePreserve:
+		return true
+	default:
+		return false
+	}
+}
+
 type advancedConfig struct {
 	LowercaseColumnNames bool           `json:"lowercase_column_names,omitempty" jsonschema:"title=Lowercase Column Names,description=Create all columns with lowercase names. This is necessary for compatibility with some systems such as querying S3 Table Buckets with Athena."`
 	IdentifierCase       identifierCase `json:"identifier_case,omitempty" jsonschema:"title=Identifier Case,enum=lowercase,enum=uppercase,enum=preserve,default=lowercase,description=Casing for namespace and table names created by the materialization. 'lowercase' (the default) folds names to lower case; 'uppercase' folds names to upper case (needed for case-sensitive catalogs such as Snowflake's where unquoted identifiers resolve upper-case); 'preserve' keeps names as written in the spec."`
@@ -104,6 +113,10 @@ func (c config) Validate() error {
 
 	if strings.Contains(c.Namespace, ".") {
 		return fmt.Errorf("namespace %q must not contain dots", c.Namespace)
+	}
+
+	if !c.Advanced.IdentifierCase.valid() {
+		return fmt.Errorf("invalid identifier_case %q: must be one of %q, %q, or %q", c.Advanced.IdentifierCase, identifierCaseLowercase, identifierCaseUppercase, identifierCasePreserve)
 	}
 
 	catalogAuth, err := c.CatalogAuthConfig()
@@ -153,7 +166,18 @@ func (c config) Validate() error {
 }
 
 func (c config) DefaultNamespace() string {
-	return c.Namespace
+	// This must apply the same transform to the namespace that
+	// resource.Parameters applies to its namespace element, or the boilerplate
+	// will create a second, differently-cased namespace alongside the one
+	// tables are created in.
+	switch c.Advanced.IdentifierCase {
+	case identifierCaseUppercase:
+		return strings.ToUpper(sanitize(c.Namespace))
+	case identifierCasePreserve:
+		return sanitize(c.Namespace)
+	default: // "" (unset) or lowercase.
+		return strings.ToLower(sanitize(c.Namespace))
+	}
 }
 
 func (c config) FeatureFlags() (raw string, defaults map[string]bool) {
@@ -683,6 +707,10 @@ type resource struct {
 	Table                     string            `json:"table" jsonschema:"title=Table,description=Name of the database table." jsonschema_extras:"x-collection-name=true"`
 	Namespace                 string            `json:"namespace,omitempty" jsonschema:"title=Alternative Namespace,description=Alternative Namespace for this table (optional)." jsonschema_extras:"x-schema-name=true"`
 	AdditionalTableProperties map[string]string `json:"additional_table_properties,omitempty" jsonschema:"title=Additional Table Properties,description=Additional Iceberg table properties to set when the table is created. These are set only at creation time and cannot be changed afterwards. Example: {'write.parquet.compression-codec': 'zstd'}"`
+
+	// identifierCase is populated from the endpoint config in WithDefaults so
+	// that Parameters can case the elements of the resource path.
+	identifierCase identifierCase
 }
 
 func (r resource) Validate() error {
@@ -702,10 +730,19 @@ func (r resource) WithDefaults(cfg config) resource {
 	if r.Namespace == "" {
 		r.Namespace = cfg.Namespace
 	}
+	r.identifierCase = cfg.Advanced.IdentifierCase
 
 	return r
 }
 
 func (r resource) Parameters() (path []string, deltaUpdates bool, err error) {
-	return sanitizePath(r.Namespace, r.Table), false, nil
+	switch r.identifierCase {
+	case identifierCaseUppercase:
+		path = []string{strings.ToUpper(sanitize(r.Namespace)), strings.ToUpper(sanitize(r.Table))}
+	case identifierCasePreserve:
+		path = []string{sanitize(r.Namespace), sanitize(r.Table)}
+	default: // "" (unset) or lowercase: historical behavior.
+		path = sanitizePath(r.Namespace, r.Table)
+	}
+	return path, false, nil
 }
