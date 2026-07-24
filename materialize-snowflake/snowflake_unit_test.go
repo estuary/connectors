@@ -7,9 +7,28 @@ import (
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
+	sql "github.com/estuary/connectors/materialize-sql"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
 )
+
+func TestAcknowledgeSubsetLeavesOtherKeysPending(t *testing.T) {
+	d := &transactor{
+		cp: checkpoint{
+			"a_table.v1": {Table: "a_table", Query: "MERGE INTO a", StagedDir: "dir"},
+		},
+		bindings: []*binding{{target: sql.Table{StateKey: "a_table.v1"}}},
+	}
+
+	// The staged entry's state key is not requested: nothing may execute (the
+	// nil database would panic if a query ran) and no state update is
+	// returned, so the entry remains pending in the persisted state.
+	state, err := d.Acknowledge(context.Background(), nil, []string{"other_table.v1"})
+	require.NoError(t, err)
+	require.Nil(t, state)
+	require.NotNil(t, d.cp["a_table.v1"])
+	require.True(t, d.didRecovery)
+}
 
 func TestSpecification(t *testing.T) {
 	var resp, err = newSnowflakeDriver().

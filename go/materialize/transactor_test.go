@@ -7,6 +7,21 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestStateKeyFilter(t *testing.T) {
+	// nil processes everything, including keys that can't be enumerated from
+	// the active bindings.
+	all := StateKeyFilter(nil)
+	require.True(t, all("a_table.v1"))
+	require.True(t, all("removed_table.v1"))
+
+	// A non-nil list processes exactly those keys; an empty list processes
+	// nothing.
+	some := StateKeyFilter([]string{"a_table.v1"})
+	require.True(t, some("a_table.v1"))
+	require.False(t, some("b_table.v1"))
+	require.False(t, StateKeyFilter([]string{})("a_table.v1"))
+}
+
 func TestSplitStatePatches(t *testing.T) {
 	// Fixtures mirror the wire format produced by the runtime's patch
 	// encoder: a JSON array whose elements are each followed by a tab.

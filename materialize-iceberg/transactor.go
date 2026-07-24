@@ -220,14 +220,21 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}, nil
 }
 
-func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage) (*pf.ConnectorState, error) {
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
 	outputPrefix := path.Join(t.cfg.Compute.BucketPath, uuid.NewString())
 	checkpointClear := make(map[string]*python.MergeBinding)
 	var mergeInput python.MergeInput
 	var allFileUris []string
 
+	shouldProcess := m.StateKeyFilter(stateKeys)
+
 	for _, b := range t.bindings {
 		sk := b.Mapped.StateKey
+		if !shouldProcess(sk) {
+			// This state key's pending work was not requested to be processed,
+			// so it remains staged in the persisted state.
+			continue
+		}
 		if pyMergeBinding, ok := t.cp[sk]; ok {
 			delete(t.cp, sk)
 			checkpointClear[sk] = nil

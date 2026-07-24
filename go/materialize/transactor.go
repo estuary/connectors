@@ -70,16 +70,48 @@ type Transactor interface {
 	// applies it; a task that isn't sharded is its own primary, so connectors
 	// without multi-shard support simply ignore it.
 	//
+	// `stateKeys` restricts which binding state keys' pending staged work is
+	// processed. A nil stateKeys processes every state key, including ones a
+	// connector cannot enumerate from the active bindings alone (e.g. entries
+	// staged by since-removed bindings, subject to the connector's own
+	// handling of them); transaction sessions pass nil. A non-nil stateKeys
+	// processes exactly those keys, leaving entries under other state keys
+	// untouched and pending in the persisted state: the Apply RPC invokes
+	// Acknowledge with only the state keys of bindings about to receive
+	// schema updates, committing their staged work before any DDL runs.
+	//
 	// It returns an optional ConnectorState update which will be applied in a best-effort fashion
-	// upon its successful completion.
+	// upon its successful completion. When Acknowledge processed no pending
+	// work at all, it must return a nil ConnectorState rather than a no-op
+	// update, since the Apply RPC uses a non-nil update as its signal to
+	// persist state and re-run.
 	//
 	// Acknowledge may perform long-running, idempotent operations such as merging staged
 	// updates into a base table. Upon its successful return, response.Acknowledged is sent to
 	// the runtime, allowing the next pipelined transaction to begin to close.
-	Acknowledge(ctx context.Context, statePatches []json.RawMessage) (*pf.ConnectorState, error)
+	Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error)
 
 	// Destroy the Transactor, releasing any held resources.
 	Destroy()
+}
+
+// StateKeyFilter returns a predicate reporting whether pending work staged
+// under a state key must be processed by Acknowledge, per its stateKeys
+// contract: a nil stateKeys processes everything, and a non-nil stateKeys
+// processes exactly those keys.
+func StateKeyFilter(stateKeys []string) func(string) bool {
+	if stateKeys == nil {
+		return func(string) bool { return true }
+	}
+
+	set := make(map[string]struct{}, len(stateKeys))
+	for _, sk := range stateKeys {
+		set[sk] = struct{}{}
+	}
+	return func(sk string) bool {
+		_, ok := set[sk]
+		return ok
+	}
 }
 
 // SplitStatePatches decodes a state_patches_json payload into its individual
@@ -152,7 +184,7 @@ func RunTransactions(
 	open *pm.Request_Open,
 	lvl log.Level,
 ) (_err error) {
-	be := newBindingEvents()
+	be := NewBindingEvents()
 
 	openStart := time.Now()
 	log.Info("requesting materialization Open")
@@ -232,7 +264,7 @@ func RunTransactions(
 			return nil
 		}
 
-		if ackState, err := transactor.Acknowledge(ctx, statePatches); err != nil {
+		if ackState, err := transactor.Acknowledge(ctx, statePatches, nil); err != nil {
 			return err
 		} else if err := writeAcknowledged(stream, ackState, &txResponse); err != nil {
 			return err

@@ -230,13 +230,23 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}, nil
 }
 
-func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage) (*pf.ConnectorState, error) {
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
+	shouldProcess := m.StateKeyFilter(stateKeys)
+
+	var processed bool
 	for _, b := range t.bindings {
+		if !shouldProcess(b.stateKey) {
+			// This state key's pending work was not requested to be processed,
+			// so it remains staged in the persisted state.
+			continue
+		}
+
 		bindingState := t.state.BindingStates[b.stateKey]
 
 		if len(bindingState.FileKeys) == 0 {
 			continue // no data for this binding
 		}
+		processed = true
 
 		ll := log.WithFields(log.Fields{
 			"table":              pathToFQN(b.path),
@@ -253,6 +263,10 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 		ll.Info("finished appendFiles for table")
 
 		bindingState.FileKeys = nil // reset for next txn
+	}
+
+	if !processed {
+		return nil, nil
 	}
 
 	checkpointJSON, err := json.Marshal(t.state)

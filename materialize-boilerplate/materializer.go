@@ -435,11 +435,6 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 	}
 	defer materializer.Close(ctx)
 
-	// TODO(whb): Some point soon we will have the last committed checkpoint
-	// available here in the Apply message, and should start calling Unmarshal
-	// State + Acknowledge somewhere around here to commit any previously staged
-	// transaction before applying the next spec's updates.
-
 	mCfg := materializer.Config()
 
 	paths := make([][]string, 0, len(req.Materialization.Bindings))
@@ -521,6 +516,14 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 		return nil, err
 	}
 
+	// destructiveBindings are bindings whose existing resource is really being
+	// truncated or dropped & re-created by this Apply. drainBindings are
+	// bindings which retain their materialized data while their binding
+	// changes: any transaction previously staged for them must be committed
+	// before this Apply's actions run (see the drain below).
+	destructiveBindings := make(map[int]bool)
+	drainBindings := make(map[int]bool)
+
 	for _, bindingIdx := range common.newBindings {
 		if mapped, err := buildMappedBinding(endpointCfg, materializer, *req.Materialization, bindingIdx); err != nil {
 			return nil, err
@@ -590,12 +593,19 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 
 		if !mCfg.NoTruncateResources && !parsedFlags["always_drop_tables_on_backfill"] && doTruncate {
 			if parsedFlags["retain_existing_data_on_backfill"] {
-				// Only run TruncateTable if retain_existing_data_on_backfill is disabled
+				// Only run TruncateTable if retain_existing_data_on_backfill is disabled.
+				// Since the resource retains its data, a previously staged
+				// transaction remains applicable and must be committed: the
+				// backfill rotates the binding's state key, so pending work
+				// staged under the pre-backfill key would otherwise be
+				// orphaned, losing its staged-but-unacknowledged rows.
+				drainBindings[bindingIdx] = true
 			} else if desc, action, err := materializer.TruncateResource(ctx, thisBinding.ResourcePath); err != nil {
 				return nil, fmt.Errorf("getting TruncateResource action: %w", err)
 			} else {
 				truncationActionDescriptions = append(truncationActionDescriptions, desc)
 				truncationActions = append(truncationActions, action)
+				destructiveBindings[bindingIdx] = true
 			}
 
 			// A resource may be truncated, but require other updates as well.
@@ -615,6 +625,7 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 			} else if createDesc, createAction, err := materializer.CreateResource(ctx, *mapped); err != nil {
 				return nil, fmt.Errorf("getting CreateResource action to replace resource: %w", err)
 			} else {
+				destructiveBindings[bindingIdx] = true
 				descs := make([]string, 2)
 				if deleteAction != nil {
 					descs = append(descs, deleteDesc)
@@ -712,6 +723,54 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 			return nil, err
 		} else {
 			addResourceAction(desc, action)
+			if (action != nil || update.NewlyDeltaUpdates) && !destructiveBindings[bindingIdx] {
+				// The binding's resource is being updated in-place, so any
+				// transaction previously staged against it must be committed
+				// before the update runs.
+				drainBindings[bindingIdx] = true
+			}
+		}
+	}
+
+	// Post-commit apply connectors persist staged transactions in their
+	// connector state and only commit them during Acknowledge. Work pending
+	// for a binding of drainBindings was staged against the last-applied
+	// specification's resource, so it must be committed before that resource
+	// is altered. This is done by invoking the connector's own Acknowledge
+	// restricted to the affected state keys, and returning its state update in
+	// the Applied response WITHOUT running any of the computed actions: the
+	// runtime durably persists the update and invokes Apply again, and only
+	// that next invocation - finding no remaining pending work - performs the
+	// actions. Running them in the same invocation as the drain would risk a
+	// crash after the staged DML commits but before the state update persists,
+	// re-running staged queries against an altered schema on the next attempt.
+	//
+	// Bindings of destructiveBindings are deliberately not drained: their
+	// backfill rotates the binding's state key, so the pending entries become
+	// inert, the truncated or re-created resource is re-materialized in full
+	// anyway, and a user backfilling to recover from wedged pending work is
+	// not blocked by a failing drain.
+	if len(req.StateJson) > 0 && len(drainBindings) > 0 {
+		var commitKeys []string
+		for bindingIdx := range drainBindings {
+			// Pending work was staged under the last-applied binding's state
+			// key, which differs from the current binding's key when the
+			// backfill counter is changing.
+			if lastBinding := FindLastBinding(req.Materialization.Bindings[bindingIdx].ResourcePath, req.LastMaterialization); lastBinding != nil {
+				commitKeys = append(commitKeys, lastBinding.StateKey)
+			}
+		}
+		slices.Sort(commitKeys)
+
+		if len(commitKeys) > 0 {
+			if patch, err := drainPendingState(ctx, materializer, req, endpointCfg, is, commitKeys); err != nil {
+				return nil, fmt.Errorf("committing pending transaction before applying schema updates: %w", err)
+			} else if patch != nil {
+				return &pm.Response_Applied{
+					ActionDescription: fmt.Sprintf("committed previously staged transaction for state keys: %s", strings.Join(commitKeys, ", ")),
+					State:             patch,
+				}, nil
+			}
 		}
 	}
 

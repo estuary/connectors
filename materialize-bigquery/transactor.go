@@ -413,14 +413,23 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}, nil
 }
 
-func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage) (*pf.ConnectorState, error) {
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
 	group, groupCtx := errgroup.WithContext(ctx)
 	// You can run up to 1,000 concurrent multi-statement queries, so we use a
 	// generous concurrency limit here, while not leaving it completely
 	// unlimited just to maintain some sense of decorum.
 	group.SetLimit(100)
 
+	shouldProcess := m.StateKeyFilter(stateKeys)
+
+	var drained []string
 	for sk, item := range t.cp {
+		if !shouldProcess(sk) {
+			// This state key's pending work was not requested to be
+			// processed, so it remains staged in the persisted state.
+			continue
+		}
+
 		var b *binding
 		for _, binding := range t.bindings {
 			if binding.target.StateKey == sk {
@@ -434,6 +443,7 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 			continue
 		}
 
+		drained = append(drained, sk)
 		group.Go(func() error {
 			t.be.StartedResourceCommit(b.target.Path)
 			if err := t.client.queryIdempotent(groupCtx, b.storeSchema, item.Query, item.JobPrefix, item.SourceURIs, item.TempTableName); err != nil {
@@ -462,10 +472,14 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 		return nil, err
 	}
 
+	if len(drained) == 0 {
+		return nil, nil
+	}
+
 	var checkpointClear = make(checkpoint)
-	for _, b := range t.bindings {
-		checkpointClear[b.target.StateKey] = nil
-		delete(t.cp, b.target.StateKey)
+	for _, sk := range drained {
+		checkpointClear[sk] = nil
+		delete(t.cp, sk)
 	}
 	var checkpointJSON, err = json.Marshal(checkpointClear)
 	if err != nil {
