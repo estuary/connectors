@@ -13,6 +13,7 @@ from .common import (
     TRANSACTION_SEARCH_LIMIT,
     braintree_xml_to_dict,
     bisect_window,
+    request_with_search_timeout_retries,
 )
 from ..models import (
     IncrementalResource,
@@ -250,7 +251,10 @@ async def _fetch_transaction_ids_disbursed_between(
 
     response = IdSearchResponse.model_validate(
         braintree_xml_to_dict(
-            await http.request(log, url, "POST", json=body, headers=HEADERS)
+            await request_with_search_timeout_retries(
+                log,
+                lambda: http.request(log, url, "POST", json=body, headers=HEADERS),
+            )
         )
     )
 
@@ -329,7 +333,10 @@ async def _fetch_transaction_ids_disputed_between(
 
     response = IdSearchResponse.model_validate(
         braintree_xml_to_dict(
-            await http.request(log, url, "POST", json=body, headers=HEADERS)
+            await request_with_search_timeout_retries(
+                log,
+                lambda: http.request(log, url, "POST", json=body, headers=HEADERS),
+            )
         )
     )
 

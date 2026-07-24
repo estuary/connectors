@@ -7,7 +7,14 @@ from typing import AsyncGenerator, Awaitable, Any
 import braintree
 from estuary_cdk.http import HTTPSession
 
-from .common import HEADERS, SEARCH_PAGE_SIZE, braintree_object_to_dict, braintree_xml_to_dict, process_completed_fetches
+from .common import (
+    HEADERS,
+    SEARCH_PAGE_SIZE,
+    braintree_object_to_dict,
+    braintree_xml_to_dict,
+    process_completed_fetches,
+    request_with_search_timeout_retries,
+)
 from ..models import IncrementalResource, DisputeSearchField, DisputesSearchResponse
 
 async def _fetch_dispute_page(
@@ -36,7 +43,10 @@ async def _fetch_dispute_page(
     async with semaphore:
         response = DisputesSearchResponse.model_validate(
             braintree_xml_to_dict(
-                await http.request(log, url, "POST", params, body, headers=HEADERS)
+                await request_with_search_timeout_retries(
+                    log,
+                    lambda: http.request(log, url, "POST", params, body, headers=HEADERS),
+                )
             )
         )
 
@@ -73,7 +83,10 @@ async def _determine_total_pages(
 
     response = DisputesSearchResponse.model_validate(
         braintree_xml_to_dict(
-            await http.request(log, url, "POST", params, body, headers=HEADERS)
+            await request_with_search_timeout_retries(
+                log,
+                lambda: http.request(log, url, "POST", params, body, headers=HEADERS),
+            )
         )
     )
 

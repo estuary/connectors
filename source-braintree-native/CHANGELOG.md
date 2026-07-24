@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-07-29
+
+### Fixed
+- Transient Braintree search timeouts (`HTTP 422` responses with a `timeout` reason) are now retried instead of failing the capture.
+
 ## 2026-07-27
 
 ### Added
