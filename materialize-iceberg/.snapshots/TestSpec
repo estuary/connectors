@@ -394,6 +394,17 @@
             "title": "Lowercase Column Names",
             "description": "Create all columns with lowercase names. This is necessary for compatibility with some systems such as querying S3 Table Buckets with Athena."
           },
+          "identifier_case": {
+            "type": "string",
+            "enum": [
+              "lowercase",
+              "uppercase",
+              "preserve"
+            ],
+            "title": "Identifier Case",
+            "description": "Casing for namespace and table names created by the materialization. 'lowercase' (the default) folds names to lower case; 'uppercase' folds names to upper case (needed for case-sensitive catalogs such as Snowflake's where unquoted identifiers resolve upper-case); 'preserve' keeps names as written in the spec.",
+            "default": "lowercase"
+          },
           "feature_flags": {
             "type": "string",
             "title": "Feature Flags",

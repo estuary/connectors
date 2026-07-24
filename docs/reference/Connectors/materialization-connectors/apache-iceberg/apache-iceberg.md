@@ -635,6 +635,7 @@ See below for a full list of configuration options.
 |   `/compute/bucket_path`             | Bucket Path            | Optional prefix used to store staged data files.                                                                     | string           |                                 |
 |   `/compute/systems_manager_prefix`  | System Manager Prefix  | Prefix for parameters in Systems Manager as an absolute directory path (must start and end with `/`).                | string           | `/estuary/`                     |
 |   `/advanced/lowercase_column_names` | Lowercase Column Names | Create all columns with lowercase names.                                                                             | boolean          |                                 |
+|   `/advanced/identifier_case`        | Identifier Case        | Casing for namespace and table names: 'lowercase' (default), 'uppercase', or 'preserve'.                             | string           |                                 |
 |   `/glue_optimizers`                 | Glue Table Optimizers  | Configure AWS Glue managed table optimizers for compaction. See [configuration details](#glue-table-optimizers).    | object           |                                 |
 
 #### Credentials
