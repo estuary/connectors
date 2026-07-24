@@ -1,0 +1,20 @@
+# ================================
+# Collection "": 12 Documents
+# ================================
+{"_meta":{"queueUrl":"https://sqs.test.example/123456789012/test-capture-multi-busy","messageId":"<MESSAGE_ID>","sentTimestamp":"<TIMESTAMP>","approximateReceiveCount":1},"idx":0,"queue":"busy"}
+{"_meta":{"queueUrl":"https://sqs.test.example/123456789012/test-capture-multi-busy","messageId":"<MESSAGE_ID>","sentTimestamp":"<TIMESTAMP>","approximateReceiveCount":1},"idx":1,"queue":"busy"}
+{"_meta":{"queueUrl":"https://sqs.test.example/123456789012/test-capture-multi-busy","messageId":"<MESSAGE_ID>","sentTimestamp":"<TIMESTAMP>","approximateReceiveCount":1},"idx":10,"queue":"busy"}
+{"_meta":{"queueUrl":"https://sqs.test.example/123456789012/test-capture-multi-busy","messageId":"<MESSAGE_ID>","sentTimestamp":"<TIMESTAMP>","approximateReceiveCount":1},"idx":11,"queue":"busy"}
+{"_meta":{"queueUrl":"https://sqs.test.example/123456789012/test-capture-multi-busy","messageId":"<MESSAGE_ID>","sentTimestamp":"<TIMESTAMP>","approximateReceiveCount":1},"idx":2,"queue":"busy"}
+{"_meta":{"queueUrl":"https://sqs.test.example/123456789012/test-capture-multi-busy","messageId":"<MESSAGE_ID>","sentTimestamp":"<TIMESTAMP>","approximateReceiveCount":1},"idx":3,"queue":"busy"}
+{"_meta":{"queueUrl":"https://sqs.test.example/123456789012/test-capture-multi-busy","messageId":"<MESSAGE_ID>","sentTimestamp":"<TIMESTAMP>","approximateReceiveCount":1},"idx":4,"queue":"busy"}
+{"_meta":{"queueUrl":"https://sqs.test.example/123456789012/test-capture-multi-busy","messageId":"<MESSAGE_ID>","sentTimestamp":"<TIMESTAMP>","approximateReceiveCount":1},"idx":5,"queue":"busy"}
+{"_meta":{"queueUrl":"https://sqs.test.example/123456789012/test-capture-multi-busy","messageId":"<MESSAGE_ID>","sentTimestamp":"<TIMESTAMP>","approximateReceiveCount":1},"idx":6,"queue":"busy"}
+{"_meta":{"queueUrl":"https://sqs.test.example/123456789012/test-capture-multi-busy","messageId":"<MESSAGE_ID>","sentTimestamp":"<TIMESTAMP>","approximateReceiveCount":1},"idx":7,"queue":"busy"}
+{"_meta":{"queueUrl":"https://sqs.test.example/123456789012/test-capture-multi-busy","messageId":"<MESSAGE_ID>","sentTimestamp":"<TIMESTAMP>","approximateReceiveCount":1},"idx":8,"queue":"busy"}
+{"_meta":{"queueUrl":"https://sqs.test.example/123456789012/test-capture-multi-busy","messageId":"<MESSAGE_ID>","sentTimestamp":"<TIMESTAMP>","approximateReceiveCount":1},"idx":9,"queue":"busy"}
+# ================================
+# Final State Checkpoint
+# ================================
+{}
+
