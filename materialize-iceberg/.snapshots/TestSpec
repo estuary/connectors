@@ -392,7 +392,29 @@
           "lowercase_column_names": {
             "type": "boolean",
             "title": "Lowercase Column Names",
-            "description": "Create all columns with lowercase names. This is necessary for compatibility with some systems such as querying S3 Table Buckets with Athena."
+            "description": "Deprecated: set field_name_case to 'lowercase' instead. Create all columns with lowercase names."
+          },
+          "table_identifier_case": {
+            "type": "string",
+            "enum": [
+              "lowercase",
+              "uppercase",
+              "preserve"
+            ],
+            "title": "Table Identifier Case",
+            "description": "Casing applied to the namespace and table name (together the Iceberg table identifier) of tables created by this materialization. 'lowercase' (the default) folds them to lower case so a binding for MyTable creates the table mytable; 'uppercase' folds them to upper case which is needed for catalogs where unquoted identifiers resolve upper-case such as Snowflake's; 'preserve' uses them exactly as written in the binding. Tables that already exist are never renamed.",
+            "default": "lowercase"
+          },
+          "field_name_case": {
+            "type": "string",
+            "enum": [
+              "lowercase",
+              "uppercase",
+              "preserve"
+            ],
+            "title": "Field Name Case",
+            "description": "Casing applied to the names of columns created by this materialization. 'preserve' (the default) names them exactly as the fields are named in the collection; 'lowercase' folds them to lower case which is necessary for some systems such as querying S3 Table Buckets with Athena; 'uppercase' folds them to upper case which is needed for catalogs where unquoted identifiers resolve upper-case such as Snowflake's. Columns that already exist are matched case-insensitively and are never renamed.",
+            "default": "preserve"
           },
           "feature_flags": {
             "type": "string",
