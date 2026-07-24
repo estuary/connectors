@@ -1,6 +1,7 @@
 import abc
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from functools import cached_property
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, override
 
 from estuary_cdk.capture.common import (
@@ -8,6 +9,7 @@ from estuary_cdk.capture.common import (
 )
 from estuary_cdk.capture.common import (
     ResourceState,
+    make_cursor_dict,
 )
 from estuary_cdk.capture.document import BaseDocument
 from estuary_cdk.flow import (
@@ -19,6 +21,7 @@ from pydantic import (
     AwareDatetime,
     BaseModel,
     Field,
+    JsonValue,
     ValidationInfo,
     field_validator,
     model_validator,
@@ -139,7 +142,9 @@ class Campaign(MailchimpCollectionEntity):
     PATH: ClassVar[str] = "campaigns"
     ITEMS_KEY: ClassVar[str] = "campaigns"
 
+    # Declared because it's the collection key; nothing in code reads it.
     id: str
+
     create_time: AwareDatetime
 
 
@@ -276,70 +281,6 @@ class AutomationEmail(MailchimpChildEntity):
     id: str
 
 
-class MailchimpIncrementalChildEntity(MailchimpChildEntity, abc.ABC):
-    """List-child document with an updated-style cursor, captured
-    incrementally rather than by snapshot."""
-
-    # The endpoint's server-side cursor filters: `SINCE_PARAM` lower-bounds
-    # results by the cursor field (exclusive of the exact timestamp) and
-    # `BEFORE_PARAM` upper-bounds them
-    SINCE_PARAM: ClassVar[str]
-    BEFORE_PARAM: ClassVar[str]
-
-    @abc.abstractmethod
-    def get_cursor(self) -> AwareDatetime: ...
-
-
-class ListMember(MailchimpIncrementalChildEntity):
-    """Member (contact) of a list. `id` is the MD5 of the lowercase email
-    address, so it is unique only within its list — the stream key is the
-    (`list_id`, `id`) composite. The unfiltered listing silently excludes
-    archived members, so the stream walks each list twice: once bare, once
-    with `status=archived` (see the per-sweep subtasks in `resources.py`)."""
-
-    NAME: ClassVar[str] = "list_members"
-    PATH_TEMPLATE: ClassVar[str] = "lists/{list_id}/members"
-    ITEMS_KEY: ClassVar[str] = "members"
-    SINCE_PARAM: ClassVar[str] = "since_last_changed"
-    BEFORE_PARAM: ClassVar[str] = "before_last_changed"
-
-    id: str
-    list_id: str
-    email_address: str
-    # Cursor. Advances on update, archive, and unarchive, so both directions
-    # of the archive transition are observed.
-    last_changed: AwareDatetime
-    status: str
-
-    @override
-    def get_cursor(self) -> AwareDatetime:
-        return self.last_changed
-
-
-class Segment(MailchimpIncrementalChildEntity):
-    """List segment. Every `type` partition (`saved`, `static`, `fuzzy`) flows
-    through the one endpoint, and the bare listing is the full population —
-    segments have no archived/hidden state (unlike members). Member tags
-    materialize as `type: static` segments, so this stream is a superset of
-    the `tags` stream's projection."""
-
-    NAME: ClassVar[str] = "segments"
-    PATH_TEMPLATE: ClassVar[str] = "lists/{list_id}/segments"
-    ITEMS_KEY: ClassVar[str] = "segments"
-    SINCE_PARAM: ClassVar[str] = "since_updated_at"
-    BEFORE_PARAM: ClassVar[str] = "before_updated_at"
-
-    # Integer, unlike most Mailchimp IDs — and legitimately 0-able (see `IdOnly`).
-    id: int
-    list_id: str
-    # Cursor. Advances on rename/definition updates.
-    updated_at: AwareDatetime
-
-    @override
-    def get_cursor(self) -> AwareDatetime:
-        return self.updated_at
-
-
 @dataclass(frozen=True)
 class ParentLevel:
     """A parent collection drained for IDs that fill the `{placeholder}` in a
@@ -415,9 +356,232 @@ class IdOnly(BaseModel):
         return value
 
 
-# Streams whose records mutate after creation but expose only created-time
-# filters: a daily scheduled backfill is the only mechanism that recovers
-# updates (deletions are still not captured).
-SCHEDULED_BACKFILL_STREAMS = [
-    "campaigns",
-]
+class MailchimpIncrementalChildEntity(MailchimpChildEntity, abc.ABC):
+    """List-child document with an updated-style cursor, captured
+    incrementally rather than by snapshot."""
+
+    # The endpoint's server-side cursor filters: `SINCE_PARAM` lower-bounds
+    # results by the cursor field (exclusive of the exact timestamp) and
+    # `BEFORE_PARAM` upper-bounds them
+    SINCE_PARAM: ClassVar[str]
+    BEFORE_PARAM: ClassVar[str]
+
+    @abc.abstractmethod
+    def get_cursor(self) -> AwareDatetime: ...
+
+
+class ListMember(MailchimpIncrementalChildEntity):
+    """Member (contact) of a list. `id` is the MD5 of the lowercase email
+    address, so it is unique only within its list — the stream key is the
+    (`list_id`, `id`) composite. The unfiltered listing silently excludes
+    archived members, so the stream walks each list twice: once bare, once
+    with `status=archived` (see the per-sweep subtasks in `resources.py`)."""
+
+    NAME: ClassVar[str] = "list_members"
+    PATH_TEMPLATE: ClassVar[str] = "lists/{list_id}/members"
+    ITEMS_KEY: ClassVar[str] = "members"
+    SINCE_PARAM: ClassVar[str] = "since_last_changed"
+    BEFORE_PARAM: ClassVar[str] = "before_last_changed"
+
+    id: str
+    list_id: str
+    email_address: str
+    # Cursor. Advances on update, archive, and unarchive, so both directions
+    # of the archive transition are observed.
+    last_changed: AwareDatetime
+    status: str
+
+    @override
+    def get_cursor(self) -> AwareDatetime:
+        return self.last_changed
+
+
+class Segment(MailchimpIncrementalChildEntity):
+    """List segment. Every `type` partition (`saved`, `static`, `fuzzy`) flows
+    through the one endpoint, and the bare listing is the full population —
+    segments have no archived/hidden state (unlike members). Member tags
+    materialize as `type: static` segments, so this stream is a superset of
+    the `tags` stream's projection."""
+
+    NAME: ClassVar[str] = "segments"
+    PATH_TEMPLATE: ClassVar[str] = "lists/{list_id}/segments"
+    ITEMS_KEY: ClassVar[str] = "segments"
+    SINCE_PARAM: ClassVar[str] = "since_updated_at"
+    BEFORE_PARAM: ClassVar[str] = "before_updated_at"
+
+    # Integer, unlike most Mailchimp IDs — and legitimately 0-able (see `IdOnly`).
+    id: int
+    list_id: str
+    # Cursor. Advances on rename/definition updates.
+    updated_at: AwareDatetime
+
+    @override
+    def get_cursor(self) -> AwareDatetime:
+        return self.updated_at
+
+
+class EmailCampaignStub(BaseModel):
+    """Minimal `/reports` projection: the email_activity sweep's parent drain
+    and recency-gate input."""
+
+    class Opens(BaseModel):
+        # Empty string (not null/absent) until the campaign's first open.
+        last_open: AwareDatetime | None
+
+        @field_validator("last_open", mode="before")
+        @classmethod
+        def _empty_to_none(cls, value: object) -> object:
+            return None if value == "" else value
+
+    class Clicks(BaseModel):
+        # Empty string (not null/absent) until the campaign's first click.
+        last_click: AwareDatetime | None
+
+        @field_validator("last_click", mode="before")
+        @classmethod
+        def _empty_to_none(cls, value: object) -> object:
+            return None if value == "" else value
+
+    class Bounces(BaseModel):
+        # Counts only — `/reports` carries no bounce timestamps, which is why
+        # the settle-window gate clause exists (see `fetch_email_activity`).
+        hard_bounces: int
+        soft_bounces: int
+
+    id: str
+    send_time: AwareDatetime
+    opens: Opens
+    clicks: Clicks
+    bounces: Bounces
+
+    def has_activity_after(self, threshold: datetime) -> bool:
+        """Whether any open or click landed strictly after `threshold`."""
+
+        return (
+            self.opens.last_open is not None and self.opens.last_open > threshold
+        ) or (self.clicks.last_click is not None and self.clicks.last_click > threshold)
+
+    def has_bounces_settling(self, settle_floor: datetime) -> bool:
+        """Whether the campaign was sent recently enough that its bounces
+        may still be arriving. Bounces move no recency field, so send
+        recency is the only retention signal."""
+
+        return self.send_time > settle_floor and (
+            self.bounces.hard_bounces > 0 or self.bounces.soft_bounces > 0
+        )
+
+
+@dataclass(frozen=True)
+class EmailActivityBackfillCursor:
+    """Shape of the email_activity backfill's dict PageCursor.
+
+    - Keys: campaign IDs not yet fully drained, kept sorted.
+    - Values: always True (presence is the signal)
+
+    A drained campaign is removed by yielding a JSON merge patch:
+    `{"<campaign_id>": null}`.
+    """
+
+    remaining: dict[str, bool]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "remaining", dict(sorted(self.remaining.items())))
+
+    @classmethod
+    def from_cursor_dict(
+        cls, cursor_dict: dict[str, bool | None]
+    ) -> "EmailActivityBackfillCursor":
+        return cls(remaining={k: v for k, v in cursor_dict.items() if v is not None})
+
+    @classmethod
+    def from_campaign_ids(
+        cls, campaign_ids: list[str]
+    ) -> "EmailActivityBackfillCursor":
+        return cls(remaining={campaign_id: True for campaign_id in campaign_ids})
+
+    def create_initial_cursor(self) -> dict[str, bool]:
+        return make_cursor_dict(
+            self.remaining
+        )  # pyright: ignore[reportUnknownVariableType]
+
+    def create_completion_patch(self, campaign_id: str) -> dict[str, bool | None]:
+        return make_cursor_dict(
+            {campaign_id: None}
+        )  # pyright: ignore[reportUnknownVariableType]
+
+
+class RawEmailActivityEvent(BaseModel, extra="allow"):
+    """One nested `MemberEmailActivity.activity[]` entry as the API returns it:
+
+    - opens are `{action, timestamp, ip}`
+    - clicks add `url`
+    - bounces are `{action, type, timestamp}`
+    """
+
+    # Declared (rather than riding extra="allow") because it's a component of
+    # the collection key.
+    action: str
+    timestamp: AwareDatetime
+    # Bounce-only. Opens/clicks omit the field entirely (flattening and the
+    # CDK's document emission both dump with exclude_unset, so they never grow
+    # a null `type`).
+    type: Literal["hard"] | Literal["soft"] | None = None
+
+
+class MemberEmailActivity(BaseModel, extra="allow"):
+    """Raw `emails[]` item: one recipient with their nested activity events.
+    Quiet recipients return an empty `activity[]`, not an absent field.
+
+    Callers gate on the raw events in `activity` and call `flatten` only for
+    survivors, so discarded events never pay document construction."""
+
+    # The member side of the flattened document's PK, stamped into `_meta` by
+    # `flatten`
+    campaign_id: str
+    email_id: str
+    activity: list[RawEmailActivityEvent]
+
+    def event_cache_key(self, event: RawEmailActivityEvent) -> str:
+        return (
+            f"{self.campaign_id}/{self.email_id}"
+            f"/{event.action}/{event.timestamp.isoformat()}"
+        )
+
+    def flatten(self, event: RawEmailActivityEvent) -> "EmailActivityEvent":
+        return EmailActivityEvent.model_validate(
+            {**event.model_dump(exclude_unset=True), "_meta": self._envelope}
+        )
+
+    @cached_property
+    def _envelope(self) -> dict[str, JsonValue]:
+        return self.model_dump(exclude={"activity"})
+
+
+class EmailActivityEvent(RawEmailActivityEvent, MailchimpChildEntity):
+    """Flattened activity-event engagement document: the raw event plus the
+    member envelope in `_meta` and the stream's identity.
+
+    Subclasses `MailchimpChildEntity` rather than
+    `MailchimpIncrementalChildEntity`: the email-activity endpoint has no
+    before-style upper-bound param, so it can't ride the generic list-children
+    fetchers; `SINCE_PARAM` is declared directly."""
+
+    NAME: ClassVar[str] = "email_activity"
+    PATH_TEMPLATE: ClassVar[str] = "reports/{campaign_id}/email-activity"
+    ITEMS_KEY: ClassVar[str] = "emails"
+    SINCE_PARAM: ClassVar[str] = "since"
+
+    class Meta(MailchimpChildEntity.Meta):
+        """The recipient-row envelope the flattening dissolves."""
+
+        # Declared (rather than riding extra="allow") because it's a component
+        # of the collection key.
+        campaign_id: str
+        # Member hash (MD5 of the lowercase email address)
+        email_id: str
+
+    # fmt: off
+    meta_: Meta = Field(  # pyright: ignore[reportGeneralTypeIssues, reportIncompatibleVariableOverride]
+        alias="_meta", description="Document metadata"
+    )
+    # fmt: on

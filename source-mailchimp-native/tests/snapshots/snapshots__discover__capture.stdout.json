@@ -36,16 +36,9 @@
         "_meta": {
           "$ref": "#/$defs/Meta",
           "description": "Document metadata"
-        },
-        "id": {
-          "title": "Id",
-          "type": "string"
         }
       },
-      "required": [
-        "id"
-      ],
-      "title": "MailchimpList",
+      "title": "BaseDocument",
       "type": "object",
       "x-infer-schema": true,
       "if": {
@@ -109,21 +102,13 @@
         }
       },
       "additionalProperties": true,
-      "description": "Classic automation workflow. The endpoint is feature-gated and empty on\nthe test account, so this shape is docs-based; the required `id` fails\nloudly if a real payload disagrees.",
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
           "description": "Document metadata"
-        },
-        "id": {
-          "title": "Id",
-          "type": "string"
         }
       },
-      "required": [
-        "id"
-      ],
-      "title": "Automation",
+      "title": "BaseDocument",
       "type": "object",
       "x-infer-schema": true,
       "if": {
@@ -163,8 +148,6 @@
     "documentSchema": {
       "$defs": {
         "Meta": {
-          "additionalProperties": true,
-          "description": "`extra=\"allow\"` lets context-stamped parent IDs ride in `_meta`;\n`BaseDocument.Meta` otherwise drops unknown keys.",
           "properties": {
             "op": {
               "default": "u",
@@ -189,31 +172,13 @@
         }
       },
       "additionalProperties": true,
-      "description": "Items carry both parent IDs natively.",
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
           "description": "Document metadata"
-        },
-        "id": {
-          "title": "Id",
-          "type": "string"
-        },
-        "list_id": {
-          "title": "List Id",
-          "type": "string"
-        },
-        "category_id": {
-          "title": "Category Id",
-          "type": "string"
         }
       },
-      "required": [
-        "id",
-        "list_id",
-        "category_id"
-      ],
-      "title": "Interest",
+      "title": "BaseDocument",
       "type": "object",
       "x-infer-schema": true,
       "if": {
@@ -253,8 +218,6 @@
     "documentSchema": {
       "$defs": {
         "Meta": {
-          "additionalProperties": true,
-          "description": "`extra=\"allow\"` lets context-stamped parent IDs ride in `_meta`;\n`BaseDocument.Meta` otherwise drops unknown keys.",
           "properties": {
             "op": {
               "default": "u",
@@ -279,26 +242,13 @@
         }
       },
       "additionalProperties": true,
-      "description": "Items carry `list_id` natively, so it stays a body field; the parent\n`segment_id` is absent from the response and stamped into `_meta`.",
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
           "description": "Document metadata"
-        },
-        "id": {
-          "title": "Id",
-          "type": "string"
-        },
-        "list_id": {
-          "title": "List Id",
-          "type": "string"
         }
       },
-      "required": [
-        "id",
-        "list_id"
-      ],
-      "title": "SegmentMember",
+      "title": "BaseDocument",
       "type": "object",
       "x-infer-schema": true,
       "if": {
@@ -338,8 +288,6 @@
     "documentSchema": {
       "$defs": {
         "Meta": {
-          "additionalProperties": true,
-          "description": "`extra=\"allow\"` lets context-stamped parent IDs ride in `_meta`;\n`BaseDocument.Meta` otherwise drops unknown keys.",
           "properties": {
             "op": {
               "default": "u",
@@ -368,21 +316,9 @@
         "_meta": {
           "$ref": "#/$defs/Meta",
           "description": "Document metadata"
-        },
-        "id": {
-          "title": "Id",
-          "type": "string"
-        },
-        "list_id": {
-          "title": "List Id",
-          "type": "string"
         }
       },
-      "required": [
-        "id",
-        "list_id"
-      ],
-      "title": "InterestCategory",
+      "title": "BaseDocument",
       "type": "object",
       "x-infer-schema": true,
       "if": {
@@ -422,8 +358,6 @@
     "documentSchema": {
       "$defs": {
         "Meta": {
-          "additionalProperties": true,
-          "description": "`extra=\"allow\"` lets context-stamped parent IDs ride in `_meta`;\n`BaseDocument.Meta` otherwise drops unknown keys.",
           "properties": {
             "op": {
               "default": "u",
@@ -448,26 +382,13 @@
         }
       },
       "additionalProperties": true,
-      "description": "Tag-search items are bare `{id, name}`; the parent `list_id` is stamped\ninto `_meta` (the response omits it). Tags are Mailchimp static segments\nunder the hood \u2014 this stream is the `{id, name}` projection of the segments\nstream's `type: static` subset.\n\nPagination rides offset/count, which tag-search honors but does not\ndocument; if the provider ever drops it, the walker degrades to a single\npage of up to 1000 tags (fallback enumeration exists via\n`GET /lists/{list_id}/segments?type=static`).",
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
           "description": "Document metadata"
-        },
-        "id": {
-          "title": "Id",
-          "type": "integer"
-        },
-        "name": {
-          "title": "Name",
-          "type": "string"
         }
       },
-      "required": [
-        "id",
-        "name"
-      ],
-      "title": "Tag",
+      "title": "BaseDocument",
       "type": "object",
       "x-infer-schema": true,
       "if": {
@@ -507,8 +428,6 @@
     "documentSchema": {
       "$defs": {
         "Meta": {
-          "additionalProperties": true,
-          "description": "`extra=\"allow\"` lets context-stamped parent IDs ride in `_meta`;\n`BaseDocument.Meta` otherwise drops unknown keys.",
           "properties": {
             "op": {
               "default": "u",
@@ -533,21 +452,13 @@
         }
       },
       "additionalProperties": true,
-      "description": "Email in a classic automation workflow. Like its `Automation` parent,\nthe endpoint is feature-gated and empty on the test account, so this shape\nis docs-based; the required `id` fails loudly if a real payload disagrees.\n\nThe parent `workflow_id` is stamped into `_meta` (we can't live-verify\nwhether the response carries it), and the parent fan-out rejects an empty\n`workflow_id` rather than build a malformed `automations//emails` path.",
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
           "description": "Document metadata"
-        },
-        "id": {
-          "title": "Id",
-          "type": "string"
         }
       },
-      "required": [
-        "id"
-      ],
-      "title": "AutomationEmail",
+      "title": "BaseDocument",
       "type": "object",
       "x-infer-schema": true,
       "if": {
@@ -660,6 +571,125 @@
     },
     "key": [
       "/id"
+    ]
+  },
+  {
+    "recommendedName": "email_activity",
+    "resourceConfig": {
+      "name": "email_activity",
+      "interval": "PT20M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "additionalProperties": true,
+          "description": "The recipient-row envelope the flattening dissolves.",
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            },
+            "campaign_id": {
+              "title": "Campaign Id",
+              "type": "string"
+            },
+            "email_id": {
+              "title": "Email Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "campaign_id",
+            "email_id"
+          ],
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "Flattened activity-event engagement document: the raw event plus the\nmember envelope in `_meta` and the stream's identity.\n\nSubclasses `MailchimpChildEntity` rather than\n`MailchimpIncrementalChildEntity`: the email-activity endpoint has no\nbefore-style upper-bound param, so it can't ride the generic list-children\nfetchers; `SINCE_PARAM` is declared directly.",
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "action": {
+          "title": "Action",
+          "type": "string"
+        },
+        "timestamp": {
+          "format": "date-time",
+          "title": "Timestamp",
+          "type": "string"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "const": "hard",
+              "type": "string"
+            },
+            {
+              "const": "soft",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Type"
+        }
+      },
+      "required": [
+        "_meta",
+        "action",
+        "timestamp"
+      ],
+      "title": "EmailActivityEvent",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/_meta/campaign_id",
+      "/_meta/email_id",
+      "/action",
+      "/timestamp"
     ]
   },
   {

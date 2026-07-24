@@ -51,6 +51,11 @@ captures:
         schedule: 0 0 * * *
       target: acmeCo/campaigns
     - resource:
+        name: email_activity
+        interval: PT15M
+        schedule: ''
+      target: acmeCo/email_activity
+    - resource:
         name: list_members
         interval: PT5M
         schedule: ''
