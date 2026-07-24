@@ -17,8 +17,10 @@ from estuary_cdk.http import HTTPError, HTTPMixin, TokenSource
 
 from .api import (
     backfill_campaigns,
+    backfill_email_activity,
     backfill_list_children,
     fetch_campaigns,
+    fetch_email_activity,
     fetch_list_children,
     fetch_parent_ids,
     resolve_base_url,
@@ -30,11 +32,11 @@ from .api import (
 )
 from .models import (
     OAUTH2_SPEC,
-    SCHEDULED_BACKFILL_STREAMS,
     SNAPSHOT_CHILD_STREAMS,
     Automation,
     Campaign,
     ConnectorState,
+    EmailActivityEvent,
     EndpointConfig,
     Interest,
     ListMember,
@@ -165,9 +167,50 @@ def campaigns(
         initial_config=ResourceConfigWithSchedule(
             name=Campaign.NAME,
             interval=timedelta(minutes=5),
-            schedule=(
-                DEFAULT_SCHEDULE if Campaign.NAME in SCHEDULED_BACKFILL_STREAMS else ""
+            schedule=DEFAULT_SCHEDULE,
+        ),
+        schema_inference=True,
+    )
+
+
+def email_activity(
+    http: HTTPMixin, base_url: str, config: EndpointConfig
+) -> MailchimpResource:
+    cutoff = datetime.now(tz=UTC).replace(microsecond=0)
+
+    def open(
+        binding: CaptureBinding[ResourceConfigWithSchedule],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings,
+    ):
+        open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=functools.partial(
+                fetch_email_activity, http, base_url, config.start_date
             ),
+            fetch_page=functools.partial(
+                backfill_email_activity, http, base_url, config.start_date
+            ),
+        )
+
+    return MailchimpResource(
+        name=EmailActivityEvent.NAME,
+        key=["/_meta/campaign_id", "/_meta/email_id", "/action", "/timestamp"],
+        model=EmailActivityEvent,
+        open=open,
+        initial_state=ResourceState(
+            # cutoff − 1s collects only complete seconds
+            inc=ResourceState.Incremental(cursor=cutoff - timedelta(seconds=1)),
+            backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None),
+        ),
+        initial_config=ResourceConfigWithSchedule(
+            name=EmailActivityEvent.NAME,
+            interval=timedelta(minutes=20),
         ),
         schema_inference=True,
     )
@@ -212,7 +255,7 @@ async def _patch_missing_subtask_states(
 
     task.log.info(
         f"Checkpointing state to persist new subtasks for {binding.stateKey}.",
-        {"newSubtasks": missing},
+        {"new_subtasks": missing},
     )
     await task.checkpoint(ConnectorState(bindingStateV1={binding.stateKey: state}))
 
@@ -361,5 +404,6 @@ async def all_resources(
     return [
         *snapshot_resources(http, base_url),
         campaigns(http, base_url, config),
+        email_activity(http, base_url, config),
         *incremental_list_children(http, base_url, config, list_ids),
     ]

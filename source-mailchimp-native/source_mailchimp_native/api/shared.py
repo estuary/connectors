@@ -77,7 +77,12 @@ async def fetch_collection_page[T: BaseModel](
     """Stream one page of the collection endpoint at `path`, yielding each
     item. Iterating to completion drains the whole response — the envelope
     tail past the items array is read and discarded — so callers detect the
-    last page by its item count, not by anything in the envelope."""
+    last page by its item count, not by anything in the envelope.
+    """
+
+    if "fields" not in params and "exclude_fields" not in params:
+        # Strip Mailchimp's HATEOAS boilerplate
+        params = {"exclude_fields": f"{items_key}._links,_links", **params}
     _, body = await http.request_stream(log, f"{base_url}/{path}", params=params)
     processor = IncrementalJsonProcessor(
         body(),

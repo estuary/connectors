@@ -3,9 +3,12 @@ import subprocess
 
 # Fields redacted from capture snapshots. Anything listed here must also be
 # redacted in the bruno collection's saved examples (see the redaction note in
-# bruno/opencollection.yml) so the two stay in sync.
+# bruno/opencollection.yml) so the two stay in sync. The bruno list
+# additionally carries `_links`: captured documents no longer have it
+# (`fetch_collection_page` excludes it server-side), but bruno's raw probe
+# responses still do.
 REDACTED = "REDACTED"
-REDACTED_FIELDS = {"_links", "stats"}
+REDACTED_FIELDS = {"stats"}
 
 
 def _redact(value):
