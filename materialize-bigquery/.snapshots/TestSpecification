@@ -237,6 +237,11 @@
             "type": "string",
             "title": "Feature Flags",
             "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."
+          },
+          "endpoint": {
+            "type": "string",
+            "title": "BigQuery Endpoint",
+            "description": "The BigQuery API endpoint to connect to. Use if you're materializing to a compatible API that isn't provided by Google. The client uses this as the full API base path — for example the goccy/bigquery-emulator requires http://host:9050/bigquery/v2/ rather than http://host:9050."
           }
         },
         "additionalProperties": false,

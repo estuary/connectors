@@ -60,11 +60,39 @@ var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{
 	}
 }
 
-func bqDialect(featureFlags map[string]bool) sql.Dialect {
+// bqDialect builds the SQL dialect. isEmulatorGoccy carries the one-time
+// server classification from endpoint setup (see detectEmulatorGoccy); the
+// goccy-emulator dialect variants key off it, while the production (SaaS)
+// dialect is byte-identical to its historical output when it is false.
+func bqDialect(featureFlags map[string]bool, isEmulatorGoccy bool) sql.Dialect {
 	objAndArrayAsJson := featureFlags["objects_and_arrays_as_json"]
 	objAndArrayCol := sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes))
+	multipleCol := sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes))
+	if isEmulatorGoccy {
+		// goccy's SQLite-backed GCS load path parses JSON columns with
+		// googlesqlite_parse_json(), which rejects the connector's JSON byte
+		// encoding ("sqlite3: SQL logic error: invalid character 's' looking
+		// for beginning of value"), so the emulator stores these fields as
+		// stringified JSON instead of native JSON.
+		objAndArrayCol = sql.MapStatic("STRING", sql.UsingConverter(sql.ToJsonString))
+		multipleCol = objAndArrayCol
+	}
 	if !objAndArrayAsJson {
 		objAndArrayCol = sql.MapStatic("STRING", sql.UsingConverter(jsonConverter))
+	}
+
+	integerCol := sql.MapStatic("INTEGER")
+	if isEmulatorGoccy {
+		// goccy's zetasqlite analyzer — exercised whenever DDL uses
+		// fully-qualified `project`.dataset.table names, as the connector
+		// always does — accepts only canonical ZetaSQL type names: INTEGER
+		// fails with "googleapi: Error 400: failed to analyze: Type not
+		// found: INTEGER" while the INT64 alias works (verified hands-on
+		// against goccy/bigquery-emulator 0.8.1; unqualified 2-part names
+		// take a laxer path that accepts INTEGER, which is why simple
+		// experiments don't reproduce the failure). Table metadata still
+		// reports such columns as INTEGER, hence AlsoCompatibleWith.
+		integerCol = sql.MapStatic("INT64", sql.AlsoCompatibleWith("integer"))
 	}
 
 	primaryKeyTextType := sql.MapStatic("STRING")
@@ -90,7 +118,7 @@ func bqDialect(featureFlags map[string]bool) sql.Dialect {
 			sql.BINARY:  binaryMapping,
 			sql.BOOLEAN: sql.MapStatic("BOOLEAN"),
 			sql.INTEGER: sql.MapSignedInt64(
-				sql.MapStatic("INTEGER"),
+				integerCol,
 				sql.MapStatic("BIGNUMERIC(38,0)", sql.AlsoCompatibleWith("bignumeric")),
 			),
 			// We used to materialize these as "BIGNUMERIC(38,0)", so
@@ -100,7 +128,7 @@ func bqDialect(featureFlags map[string]bool) sql.Dialect {
 			sql.OBJECT: objAndArrayCol,
 			// Note that MULTIPLE fields have always been materialized into JSON
 			// columns, so there is no configurability for these.
-			sql.MULTIPLE: sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes)),
+			sql.MULTIPLE: multipleCol,
 			sql.STRING_INTEGER: sql.MapStringMaxLen(
 				// BigQuery's table metadata APIs include the precision and
 				// scale with BIGNUMERIC columns, and we strip that off when
@@ -123,6 +151,24 @@ func bqDialect(featureFlags map[string]bool) sql.Dialect {
 		sql.WithNotNullSuffix("NOT NULL"),
 	)
 
+	// The wildcard fallback migration below covers any source type migrating
+	// into a MULTIPLE field (e.g. boolToMulti) that has no more specific
+	// entry above — boolean is the only such type. On production it targets
+	// JSON, matching MULTIPLE's JSON column mapping. The emulator maps
+	// MULTIPLE (and OBJECT/ARRAY) to STRING instead (see objAndArrayCol
+	// above), so the wildcard must target STRING there too, or CanMigrate
+	// never matches and the migrate integration test fails loading a value
+	// into a column that was never migrated off its original type.
+	// TO_JSON_STRING accepts any BigQuery scalar type, so jsonToStringCast
+	// (normally used for the JSON->STRING entry below) doubles as the
+	// scalar->STRING cast here.
+	var wildcardTarget = "json"
+	var wildcardCastSQL = toJsonCast
+	if isEmulatorGoccy {
+		wildcardTarget = "string"
+		wildcardCastSQL = jsonToStringCast
+	}
+
 	return sql.Dialect{
 		MigratableTypes: sql.MigrationSpecs{
 			"integer": {
@@ -136,7 +182,7 @@ func bqDialect(featureFlags map[string]bool) sql.Dialect {
 			"string":     {sql.NewMigrationSpec([]string{"bytes"}, sql.WithCastSQL(stringToBytesCast))},
 			"bytes":      {sql.NewMigrationSpec([]string{"string"}, sql.WithCastSQL(bytesToStringCast))},
 			"json":       {sql.NewMigrationSpec([]string{"string"}, sql.WithCastSQL(jsonToStringCast))},
-			"*":          {sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(toJsonCast))},
+			"*":          {sql.NewMigrationSpec([]string{wildcardTarget}, sql.WithCastSQL(wildcardCastSQL))},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			return sql.InfoTableLocation{
@@ -222,7 +268,7 @@ type templates struct {
 	storeUpdate             *template.Template
 }
 
-func renderTemplates(dialect sql.Dialect) templates {
+func renderTemplates(dialect sql.Dialect, isEmulatorGoccy bool) templates {
 	var tplAll = sql.MustParseTemplate(dialect, "root", `
 {{ define "tempTableName" -}}
 flow_temp_table_{{ $.Binding }}
@@ -448,6 +494,34 @@ UPDATE {{ Identifier $.TablePath }}
 	AND fence={{ $.Fence }};
 {{ end }}
 `)
+
+	if isEmulatorGoccy {
+		// goccy handles only one ALTER command per statement, so the emulator
+		// variant renders each added column and dropped constraint as its own
+		// statement; client.go AlterTable splits the rendered output on ";"
+		// and submits each statement as a separate query. Note that on
+		// goccy/bigquery-emulator 0.8.1 every query-path ALTER TABLE is
+		// accepted but silently ignored (no error, no schema change), so
+		// AlterTable applies these statements' schema changes by recreating
+		// the table instead — see emulator_alter.go.
+		//
+		// The storeUpdate MERGE template is deliberately NOT overridden:
+		// hands-on verification against goccy 0.8.1 (job path, fully
+		// qualified table names, the exact production template shape) shows
+		// the "l." alias prefix in UPDATE SET is accepted and the MERGE
+		// updates/inserts/deletes correctly, so PR #4721's unconditional
+		// alias removal was unnecessary.
+		tplAll = template.Must(tplAll.Parse(`
+{{ define "alterTableColumns" }}
+{{- range $col := $.AddColumns }}
+ALTER TABLE {{$.Identifier}} ADD COLUMN {{$col.Identifier}} {{$col.NullableDDL}};
+{{- end }}
+{{- range $col := $.DropNotNulls }}
+ALTER TABLE {{$.Identifier}} ALTER COLUMN {{ ColumnIdentifier $col.Name }} DROP NOT NULL;
+{{- end }}
+{{ end }}
+`))
+	}
 
 	return templates{
 		tempTableName:           tplAll.Lookup("tempTableName"),

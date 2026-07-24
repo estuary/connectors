@@ -1,0 +1,17 @@
+import:
+  - ../../materialize-boilerplate/testdata/integration/collections.materialize.flow.yaml
+
+materializations:
+  acmeCo/tests/materialize-bigquery-local-emulator-goccy:
+    endpoint:
+      local:
+        command: ["go", "run", "."]
+        protobuf: true
+        config: config.local-emulator-goccy.yaml
+    bindings:
+    - resource:
+        table: simple_standard
+        dataset: testing
+      source: tests/simple
+      fields:
+        recommended: true

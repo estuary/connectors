@@ -29,10 +29,15 @@ type client struct {
 	bigqueryClient *bigquery.Client
 	cfg            config
 	ep             *sql.Endpoint[config]
-}
-
-func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint[config]) (sql.Client, error) {
-	return ep.Config.client(ctx, ep)
+	// isEmulatorGoccy is the server classification made once at endpoint setup
+	// (see detectEmulatorGoccy); it is threaded here so per-operation code
+	// never re-probes the server.
+	isEmulatorGoccy bool
+	// emulatorTempTableMu serializes the emulator-path sections of Load and
+	// Acknowledge, which materialize real native tables under the shared
+	// flow_temp_table_<binding> names (see emulator_load.go). A pointer so the
+	// value-receiver methods on client share the one lock.
+	emulatorTempTableMu *sync.Mutex
 }
 
 func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
@@ -185,7 +190,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	var stmts []string
 	if len(ta.DropNotNulls) > 0 || len(ta.AddColumns) > 0 {
 		var alterColumnStmtBuilder strings.Builder
-		if err := renderTemplates(c.ep.Dialect).alterTableColumns.Execute(&alterColumnStmtBuilder, ta); err != nil {
+		if err := renderTemplates(c.ep.Dialect, c.isEmulatorGoccy).alterTableColumns.Execute(&alterColumnStmtBuilder, ta); err != nil {
 			return "", nil, fmt.Errorf("rendering alter table columns statement: %w", err)
 		}
 		// The template can render both an ADD COLUMN and a DROP NOT NULL
@@ -201,22 +206,42 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 		}
 	}
 
+	var migrationStmts []string
 	if len(ta.ColumnTypeChanges) > 0 {
 		if steps, err := sql.StdColumnTypeMigrations(ctx, c.ep.Dialect, ta.Table, ta.ColumnTypeChanges, columnMigrationSteps...); err != nil {
 			return "", nil, fmt.Errorf("rendering column migration steps: %w", err)
 		} else {
-			stmts = append(stmts, steps...)
+			migrationStmts = append(migrationStmts, steps...)
 		}
 	}
+	stmts = append(stmts, migrationStmts...)
 
-	return strings.Join(stmts, "\n"), func(ctx context.Context) error {
+	action := func(ctx context.Context) error {
 		for _, stmt := range stmts {
 			if _, err := c.query(ctx, stmt); err != nil {
 				return err
 			}
 		}
 		return nil
-	}, nil
+	}
+	if c.isEmulatorGoccy {
+		// The goccy emulator silently ignores ALTER TABLE, so the added
+		// columns, dropped constraints, and column type migrations are all
+		// applied by recreating the table instead (see emulatorAlterTable).
+		// The rendered ALTER/migration statements remain the action
+		// description: they describe the logical schema change being made,
+		// which is what the description is for.
+		action = func(ctx context.Context) error {
+			if len(ta.DropNotNulls) > 0 || len(ta.AddColumns) > 0 || len(ta.ColumnTypeChanges) > 0 {
+				if err := c.emulatorAlterTable(ctx, ta); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}
+
+	return strings.Join(stmts, "\n"), action, nil
 }
 
 func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
@@ -250,8 +275,17 @@ func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, e
 	return fmt.Sprintf("CREATE DATASET %q.%q", c.cfg.ProjectID, schemaName), nil
 }
 
-func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
+func preReqs(ctx context.Context, cfg config, isEmulatorGoccy bool) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
+
+	// The GCS prerequisite check verifies bucket permissions against real
+	// Google Cloud Storage. A detected goccy emulator is paired with a GCS
+	// emulator (fake-gcs-server) that doesn't implement the permission
+	// self-checks, so the check is skipped only for the detected emulator — a
+	// SaaS server behind a custom endpoint still gets the full check.
+	if isEmulatorGoccy {
+		return errs
+	}
 
 	credOption, err := cfg.CredentialsClientOption()
 	if err != nil {

@@ -38,8 +38,30 @@ func (c client) queryIdempotent(
 ) error {
 	q := c.bigqueryClient.Query(query)
 	q.Location = c.cfg.Region
-	q.TableDefinitions = map[string]bigquery.ExternalData{
-		tempTableName: edc(sourceURIs, schema),
+	if c.isEmulatorGoccy {
+		// The emulator does not implement external table definitions, so the
+		// temp table is materialized as a real native table instead; see
+		// emulator_load.go for why this needs the lock and the query defaults.
+		// At-most-once semantics are preserved on this path: the deterministic
+		// job-ID scheme below guards the query that mutates the target table
+		// exactly as in production, and re-staging the temp table on a retried
+		// acknowledgement is harmless because the table is recreated from the
+		// same staged files each time.
+		c.emulatorTempTableMu.Lock()
+		defer c.emulatorTempTableMu.Unlock()
+		cleanup, err := c.prepareEmulatorTempTables(ctx, []emulatorTempTable{
+			{name: tempTableName, schema: schema, uris: sourceURIs},
+		})
+		if err != nil {
+			return fmt.Errorf("preparing emulator temp table for acknowledge: %w", err)
+		}
+		defer cleanup()
+		q.DefaultProjectID = c.cfg.ProjectID
+		q.DefaultDatasetID = c.cfg.Dataset
+	} else {
+		q.TableDefinitions = map[string]bigquery.ExternalData{
+			tempTableName: edc(sourceURIs, schema),
+		}
 	}
 
 	var attempt uint32 = 1
