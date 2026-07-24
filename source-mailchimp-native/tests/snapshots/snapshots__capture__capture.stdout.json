@@ -2,7 +2,6 @@
   [
     "acmeCo/lists",
     {
-      "_links": "REDACTED",
       "_meta": {
         "op": "c",
         "row_id": 0,
@@ -48,7 +47,6 @@
   [
     "acmeCo/interests",
     {
-      "_links": "REDACTED",
       "_meta": {
         "op": "c",
         "row_id": 0,
@@ -65,7 +63,6 @@
   [
     "acmeCo/segment_members",
     {
-      "_links": "REDACTED",
       "_meta": {
         "op": "c",
         "row_id": 0,
@@ -73,7 +70,7 @@
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "email_address": "nicolas+estuary-test-1@estuary.dev",
-      "email_client": "",
+      "email_client": "Gmail",
       "email_type": "html",
       "full_name": "Estuary Cursor Probe",
       "id": "6409961b1c262a7e6fb62624ce95ddf5",
@@ -113,7 +110,6 @@
   [
     "acmeCo/interest_categories",
     {
-      "_links": "REDACTED",
       "_meta": {
         "op": "c",
         "row_id": 0,
@@ -142,29 +138,41 @@
   [
     "acmeCo/campaigns",
     {
-      "_links": "REDACTED",
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
-      "archive_url": "http://eepurl.com/DMv_gvMJJV",
-      "content_type": "template",
-      "create_time": "2026-06-10T18:40:54Z",
+      "archive_url": "http://eepurl.com/JSUElAT-Ab",
+      "content_type": "html",
+      "create_time": "2026-07-13T13:15:41Z",
       "delivery_status": {
         "enabled": false
       },
-      "emails_sent": 0,
-      "id": "524c905696",
-      "long_archive_url": "https://us16.campaign-archive.com/?u=05c093afb0e356009f1c0f3af&id=524c905696",
+      "emails_sent": 4,
+      "id": "3f69f3a595",
+      "long_archive_url": "https://us16.campaign-archive.com/?u=05c093afb0e356009f1c0f3af&id=3f69f3a595",
       "needs_block_refresh": false,
       "recipients": {
         "list_id": "f34247943d",
         "list_is_active": true,
         "list_name": "Estuary",
-        "recipient_count": 3,
+        "recipient_count": 4,
         "segment_text": ""
       },
+      "report_summary": {
+        "click_rate": 0,
+        "clicks": 0,
+        "ecommerce": {
+          "total_orders": 0,
+          "total_revenue": 0,
+          "total_spent": 0
+        },
+        "open_rate": "1.3333333333333333",
+        "opens": 10,
+        "subscriber_clicks": 0,
+        "unique_opens": 4
+      },
       "resendable": false,
-      "send_time": "",
+      "send_time": "2026-07-13T13:15:57+00:00",
       "settings": {
         "authenticate": true,
         "auto_footer": false,
@@ -174,7 +182,7 @@
         "folder_id": "",
         "from_name": "Estuary Connector Test",
         "inline_css": false,
-        "reply_to": "connector-dev+mailchimp@estuary.dev",
+        "reply_to": "bounce-seed-nonexistent@estuary.dev",
         "subject_line": "[estuary test] email-activity seed",
         "template_id": 0,
         "timewarp": false,
@@ -182,7 +190,7 @@
         "to_name": "",
         "use_conversation": false
       },
-      "status": "save",
+      "status": "sent",
       "tracking": {
         "clicktale": "",
         "ecomm360": false,
@@ -193,20 +201,35 @@
         "text_clicks": false
       },
       "type": "regular",
-      "web_id": 6783369
+      "web_id": 6785876
+    }
+  ],
+  [
+    "acmeCo/email_activity",
+    {
+      "_meta": {
+        "campaign_id": "3f69f3a595",
+        "email_address": "nicolas+estuary-test-2@estuary.dev",
+        "email_id": "3abd9d34d7d6953d8a91a79904b6631d",
+        "list_id": "f34247943d",
+        "list_is_active": true,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "action": "open",
+      "ip": "72.14.199.35",
+      "timestamp": "2026-07-13T13:16:07Z"
     }
   ],
   [
     "acmeCo/list_members",
     {
-      "_links": "REDACTED",
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "consents_to_one_to_one_messaging": true,
       "contact_id": "1bc3bc1c920d4a6cef2ee0d620f08bb0",
       "email_address": "nicolas+estuary-test-2@estuary.dev",
-      "email_client": "",
+      "email_client": "Gmail",
       "email_type": "html",
       "full_name": "",
       "id": "3abd9d34d7d6953d8a91a79904b6631d",
@@ -267,7 +290,6 @@
   [
     "acmeCo/segments",
     {
-      "_links": "REDACTED",
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },

@@ -1,0 +1,81 @@
+$defs:
+  Meta:
+    additionalProperties: true
+    description: |-
+      The recipient-row envelope the flattening dissolves. The response
+      does carry these fields (unlike stamped parent IDs, cf.
+      `ParentIdValidationContext`) — but on the member row, not the event,
+      so from the emitted document's perspective they're provenance.
+
+      `email_id` is the member hash (MD5 of the lowercase email address),
+      stable across campaigns — the stream key leads with `campaign_id` to
+      split same-second same-action events by one member across
+      campaigns.
+    properties:
+      op:
+        default: u
+        description: 'Operation type (c: Create, u: Update, d: Delete)'
+        enum:
+        - c
+        - u
+        - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: Row ID of the Document, counting up from zero, or -1 if not known
+        title: Row Id
+        type: integer
+      campaign_id:
+        title: Campaign Id
+        type: string
+      email_id:
+        title: Email Id
+        type: string
+    required:
+    - campaign_id
+    - email_id
+    title: Meta
+    type: object
+additionalProperties: true
+description: |-
+  Flattened activity-event engagement document: the event fields are the
+  body (`action`, `timestamp`, plus `ip`/`url`/`type` riding
+  `extra="allow"`); the recipient-row envelope is stamped into `_meta`.
+
+  Subclasses `MailchimpChildEntity` rather than
+  `MailchimpIncrementalChildEntity`: the email-activity endpoint has no
+  before-style upper-bound param, so it can't ride the generic
+  list-children fetchers; `SINCE_PARAM` is declared directly.
+properties:
+  _meta:
+    $ref: '#/$defs/Meta'
+    description: Document metadata
+  action:
+    title: Action
+    type: string
+  timestamp:
+    format: date-time
+    title: Timestamp
+    type: string
+required:
+- _meta
+- action
+- timestamp
+title: EmailActivity
+type: object
+x-infer-schema: true
+if:
+  required:
+  - _meta
+  properties:
+    _meta:
+      required:
+      - op
+      properties:
+        op:
+          const: d
+then:
+  reduce:
+    strategy: merge
+    delete: true

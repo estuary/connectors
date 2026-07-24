@@ -11,6 +11,13 @@ collections:
     schema: campaigns.schema.yaml
     key:
     - /id
+  acmeCo/email_activity:
+    schema: email_activity.schema.yaml
+    key:
+    - /_meta/campaign_id
+    - /_meta/email_id
+    - /action
+    - /timestamp
   acmeCo/interest_categories:
     schema: interest_categories.schema.yaml
     key:
