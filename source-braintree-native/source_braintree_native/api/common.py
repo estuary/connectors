@@ -69,11 +69,22 @@ async def request_with_search_timeout_retries(
 async def process_completed_fetches(
     fetch_coroutines: list[Awaitable[list[dict[str, Any]]]],
 ) -> AsyncGenerator[dict[str, Any], None]:
-    """Helper to process fetching multiple pages of resources and yield individual resources."""
-    for coro in asyncio.as_completed(fetch_coroutines):
-        result = await coro
-        for resource in result:
-            yield resource
+    """Helper to process fetching multiple pages of resources and yield individual resources.
+
+    If one fetch raises or the consumer stops iterating early, the remaining in-flight
+    fetches are cancelled so they don't outlive this generator and emit "Session is closed"
+    warnings when they touch the torn-down HTTP session.
+    """
+    tasks = [asyncio.ensure_future(coro) for coro in fetch_coroutines]
+    try:
+        for task in asyncio.as_completed(tasks):
+            result = await task
+            for resource in result:
+                yield resource
+    finally:
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
 
 
 def braintree_xml_to_dict(xml_data):
