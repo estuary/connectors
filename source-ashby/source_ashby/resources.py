@@ -138,12 +138,10 @@ def _create_snapshot_resource(
             state,
             task,
             fetch_snapshot=functools.partial(snapshot_fn, entity_cls, http),
-            tombstone=BaseDocument(_meta=BaseDocument.Meta(op="d")),
         )
 
     return SnapshotResource(
         name=entity_cls.name,
-        model=entity_cls,
         open=open,
         initial_config=ResourceConfig(
             name=entity_cls.name,
