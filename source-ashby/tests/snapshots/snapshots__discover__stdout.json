@@ -190,16 +190,9 @@
         "_meta": {
           "$ref": "#/$defs/Meta",
           "description": "Document metadata"
-        },
-        "id": {
-          "title": "Id",
-          "type": "string"
         }
       },
-      "required": [
-        "id"
-      ],
-      "title": "ArchiveReasons",
+      "title": "BaseDocument",
       "type": "object",
       "x-infer-schema": true,
       "if": {
@@ -883,16 +876,9 @@
         "_meta": {
           "$ref": "#/$defs/Meta",
           "description": "Document metadata"
-        },
-        "id": {
-          "title": "Id",
-          "type": "string"
         }
       },
-      "required": [
-        "id"
-      ],
-      "title": "InterviewStages",
+      "title": "BaseDocument",
       "type": "object",
       "x-infer-schema": true,
       "if": {
@@ -1114,16 +1100,9 @@
         "_meta": {
           "$ref": "#/$defs/Meta",
           "description": "Document metadata"
-        },
-        "id": {
-          "title": "Id",
-          "type": "string"
         }
       },
-      "required": [
-        "id"
-      ],
-      "title": "JobPostings",
+      "title": "BaseDocument",
       "type": "object",
       "x-infer-schema": true,
       "if": {
@@ -1653,16 +1632,9 @@
         "_meta": {
           "$ref": "#/$defs/Meta",
           "description": "Document metadata"
-        },
-        "id": {
-          "title": "Id",
-          "type": "string"
         }
       },
-      "required": [
-        "id"
-      ],
-      "title": "Sources",
+      "title": "BaseDocument",
       "type": "object",
       "x-infer-schema": true,
       "if": {
