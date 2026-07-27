@@ -11,7 +11,6 @@ from estuary_cdk.http import HTTPError, HTTPSession
 from .common import (
     HEADERS,
     SEARCH_PAGE_SIZE,
-    SEMAPHORE_LIMIT,
     SEARCH_LIMIT,
     braintree_object_to_dict,
     braintree_xml_to_dict,
@@ -186,9 +185,10 @@ async def fetch_by_ids(
     ids: list[str],
     gateway: BraintreeGateway,
     braintree_class: IncrementalResourceBraintreeClass,
+    concurrency: int,
     log: Logger,
 ) -> AsyncGenerator[IncrementalResource, None]:
-    semaphore = asyncio.Semaphore(SEMAPHORE_LIMIT)
+    semaphore = asyncio.Semaphore(concurrency)
 
     async for resource in process_completed_fetches(
         [_fetch_resource_batch(http, base_url, path, response_model, list(chunk), semaphore, log)
@@ -210,6 +210,7 @@ async def fetch_searchable_resources_created_between(
     end: datetime,
     gateway: BraintreeGateway,
     braintree_class: IncrementalResourceBraintreeClass,
+    concurrency: int,
     log: Logger,
 ) -> AsyncGenerator[IncrementalResource, None]:
     ids = await fetch_searchable_resource_ids_by_field_between(
@@ -234,6 +235,7 @@ async def fetch_searchable_resources_created_between(
         ids,
         gateway,
         braintree_class,
+        concurrency,
         log,
     ):
         yield doc

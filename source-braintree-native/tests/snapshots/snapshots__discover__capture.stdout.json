@@ -3,7 +3,8 @@
     "recommendedName": "add_ons",
     "resourceConfig": {
       "name": "add_ons",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "concurrency": 1
     },
     "documentSchema": {
       "$defs": {
@@ -74,7 +75,8 @@
     "resourceConfig": {
       "name": "credit_card_verifications",
       "interval": "PT5M",
-      "schedule": "0 20 * * 5"
+      "schedule": "0 20 * * 5",
+      "concurrency": 20
     },
     "documentSchema": {
       "$defs": {
@@ -164,7 +166,8 @@
     "resourceConfig": {
       "name": "customers",
       "interval": "PT5M",
-      "schedule": "0 20 * * 5"
+      "schedule": "0 20 * * 5",
+      "concurrency": 20
     },
     "documentSchema": {
       "$defs": {
@@ -253,7 +256,8 @@
     "recommendedName": "discounts",
     "resourceConfig": {
       "name": "discounts",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "concurrency": 1
     },
     "documentSchema": {
       "$defs": {
@@ -323,7 +327,8 @@
     "recommendedName": "disputes",
     "resourceConfig": {
       "name": "disputes",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "concurrency": 5
     },
     "documentSchema": {
       "$defs": {
@@ -412,7 +417,8 @@
     "recommendedName": "merchant_accounts",
     "resourceConfig": {
       "name": "merchant_accounts",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "concurrency": 1
     },
     "documentSchema": {
       "$defs": {
@@ -482,7 +488,8 @@
     "recommendedName": "plans",
     "resourceConfig": {
       "name": "plans",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "concurrency": 1
     },
     "documentSchema": {
       "$defs": {
@@ -553,7 +560,8 @@
     "resourceConfig": {
       "name": "subscriptions",
       "interval": "PT5M",
-      "schedule": "0 20 * * 5"
+      "schedule": "0 20 * * 5",
+      "concurrency": 20
     },
     "documentSchema": {
       "$defs": {
@@ -642,7 +650,8 @@
     "recommendedName": "transactions",
     "resourceConfig": {
       "name": "transactions",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "concurrency": 20
     },
     "documentSchema": {
       "$defs": {

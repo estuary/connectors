@@ -25,7 +25,6 @@ SEARCH_LIMIT = 10_000
 TRANSACTION_SEARCH_LIMIT = 50_000
 
 SEARCH_PAGE_SIZE = 50
-SEMAPHORE_LIMIT = 20
 
 
 async def process_completed_fetches(

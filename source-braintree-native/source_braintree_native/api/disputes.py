@@ -7,7 +7,7 @@ from typing import AsyncGenerator, Awaitable, Any
 import braintree
 from estuary_cdk.http import HTTPSession
 
-from .common import HEADERS, SEARCH_PAGE_SIZE, SEMAPHORE_LIMIT, braintree_object_to_dict, braintree_xml_to_dict, process_completed_fetches
+from .common import HEADERS, SEARCH_PAGE_SIZE, braintree_object_to_dict, braintree_xml_to_dict, process_completed_fetches
 from ..models import IncrementalResource, DisputeSearchField, DisputesSearchResponse
 
 async def _fetch_dispute_page(
@@ -92,11 +92,12 @@ async def fetch_disputes_between(
     search_field: DisputeSearchField,
     start: datetime,
     end: datetime,
+    concurrency: int,
     log: Logger,
 ) -> AsyncGenerator[IncrementalResource, None]:
     total_pages = await _determine_total_pages(
         http,
-        base_url, 
+        base_url,
         search_field,
         start,
         end,
@@ -106,7 +107,7 @@ async def fetch_disputes_between(
     if total_pages == 0:
         return
 
-    semaphore = asyncio.Semaphore(SEMAPHORE_LIMIT)
+    semaphore = asyncio.Semaphore(concurrency)
 
     async for dispute in process_completed_fetches(
         [_fetch_dispute_page(http, base_url, search_field, start, end, page, semaphore, log)
