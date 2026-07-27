@@ -1,5 +1,14 @@
 # materialize-snowflake
 
+## 2026-07-27
+
+### Changed
+- The `Snowflake Timestamp Type` option now lists `TIMESTAMP_NTZ (normalize to
+  UTC)` first instead of `TIMESTAMP_LTZ`, since `TIMESTAMP_NTZ` is Snowflake's
+  default `TIMESTAMP_TYPE_MAPPING` and so is the right choice for most accounts.
+  This only changes the order the options are presented in; existing
+  materializations keep whatever they already have selected.
+
 ## 2026-07-23
 
 ### Changed
