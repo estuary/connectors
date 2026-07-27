@@ -64,6 +64,7 @@ async def fetch_transactions(
     base_url: str,
     braintree_gateway: BraintreeGateway,
     window_size: int,
+    concurrency: int,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[IncrementalResource | LogCursor, None]:
@@ -103,6 +104,7 @@ async def fetch_transactions(
             start=lookback_start,
             end=end,
             gateway=braintree_gateway,
+            concurrency=concurrency,
             log=log,
         ):
             yield doc
@@ -113,6 +115,7 @@ async def fetch_transactions(
             start=lookback_start,
             end=end,
             gateway=braintree_gateway,
+            concurrency=concurrency,
             log=log,
         ):
             yield doc
@@ -123,6 +126,7 @@ async def fetch_transactions(
         start=log_cursor,
         end=end,
         gateway=braintree_gateway,
+        concurrency=concurrency,
         log=log,
     ):
         yield doc
@@ -135,6 +139,7 @@ async def backfill_transactions(
     base_url: str,
     braintree_gateway: BraintreeGateway,
     window_size: int,
+    concurrency: int,
     start_date: datetime,
     log: Logger,
     page: PageCursor | None,
@@ -173,6 +178,7 @@ async def backfill_transactions(
         start,
         end,
         braintree_gateway,
+        concurrency,
         log,
     ):
         # Yield the document if it has been updated before the cutoff (i.e. the incremental task won't capture it).
@@ -190,6 +196,7 @@ async def fetch_incremental_resources(
     braintree_gateway: BraintreeGateway,
     braintree_class: IncrementalResourceBraintreeClass,
     window_size: int,
+    concurrency: int,
     log: Logger,
     log_cursor: LogCursor
 ) -> AsyncGenerator[IncrementalResource | LogCursor, None]:
@@ -220,6 +227,7 @@ async def fetch_incremental_resources(
         end,
         braintree_gateway,
         braintree_class,
+        concurrency,
         log,
     ):
         if doc.created_at > log_cursor:
@@ -242,6 +250,7 @@ async def backfill_incremental_resources(
     braintree_gateway: BraintreeGateway,
     braintree_class: IncrementalResourceBraintreeClass,
     window_size: int,
+    concurrency: int,
     start_date: datetime,
     log: Logger,
     page: PageCursor | None,
@@ -282,6 +291,7 @@ async def backfill_incremental_resources(
         end,
         braintree_gateway,
         braintree_class,
+        concurrency,
         log,
     ):
         if doc.created_at < cutoff:
@@ -294,6 +304,7 @@ async def fetch_disputes(
         http: HTTPSession,
         base_url: str,
         window_size: int,
+        concurrency: int,
         log: Logger,
         log_cursor: LogCursor,
 ) -> AsyncGenerator[IncrementalResource | LogCursor, None]:
@@ -313,6 +324,7 @@ async def fetch_disputes(
         DisputeSearchField.EFFECTIVE_DATE,
         log_cursor,
         end,
+        concurrency,
         log,
     ):
         if cache.should_yield("disputes", doc.id, doc.updated_at):
@@ -325,6 +337,7 @@ async def backfill_disputes(
     http: HTTPSession,
     base_url: str,
     window_size: int,
+    concurrency: int,
     start_date: datetime,
     log: Logger,
     page: PageCursor | None,
@@ -350,6 +363,7 @@ async def backfill_disputes(
         DisputeSearchField.EFFECTIVE_DATE,
         start,
         end,
+        concurrency,
         log,
     ):
         if cache.should_yield("disputes", doc.id, doc.updated_at):
