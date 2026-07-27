@@ -44,9 +44,9 @@
       "timestamp_type": {
         "type": "string",
         "enum": [
-          "TIMESTAMP_LTZ",
-          "TIMESTAMP_NTZ (discard TZ)",
           "TIMESTAMP_NTZ (normalize to UTC)",
+          "TIMESTAMP_NTZ (discard TZ)",
+          "TIMESTAMP_LTZ",
           "TIMESTAMP_TZ"
         ],
         "title": "Snowflake Timestamp Type",
