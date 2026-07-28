@@ -4,25 +4,25 @@ description: Connect Google Ads accounts to Estuary for campaign, ad group, keyw
 
 # Google Ads
 
-This connector captures data from [resources](https://developers.google.com/google-ads/api/fields/v11/overview) in one or more Google Ads accounts into Estuary collections via the Google Ads API.
+This connector captures data from [resources](https://developers.google.com/google-ads/api/fields/v25/overview) in one or more Google Ads accounts into Estuary collections via the Google Ads API.
 
 ## Supported data resources
 
 The following data resources are supported.
 Resources ending in `_report` represent legacy resources from the [Google Adwords API](https://developers.google.com/google-ads/api/docs/migration).
 
-* [ad_group_ads](https://developers.google.com/google-ads/api/fields/latest/ad_group_ad)
-* [ad_group_ad_label](https://developers.google.com/google-ads/api/fields/latest/ad_group_ad_label)
-* [ad_groups](https://developers.google.com/google-ads/api/fields/latest/ad_group)
-* [ad_group_label](https://developers.google.com/google-ads/api/fields/latest/ad_group_label)
-* [campaigns](https://developers.google.com/google-ads/api/fields/v9/campaign)
-* [campaign_labels](https://developers.google.com/google-ads/api/fields/latest/campaign_label)
-* [click_view](https://developers.google.com/google-ads/api/reference/rpc/latest/ClickView)
-* [customer](https://developers.google.com/google-ads/api/fields/latest/customer)
-* [geographic_view](https://developers.google.com/google-ads/api/fields/latest/geographic_view)
-* [geo_target_constant](https://developers.google.com/google-ads/api/fields/v22/geo_target_constant)
-* [keyword_view](https://developers.google.com/google-ads/api/fields/latest/keyword_view)
-* [user_location_view](https://developers.google.com/google-ads/api/fields/latest/user_location_view)
+* [ad_group_ads](https://developers.google.com/google-ads/api/fields/v25/ad_group_ad)
+* [ad_group_ad_label](https://developers.google.com/google-ads/api/fields/v25/ad_group_ad_label)
+* [ad_groups](https://developers.google.com/google-ads/api/fields/v25/ad_group)
+* [ad_group_label](https://developers.google.com/google-ads/api/fields/v25/ad_group_label)
+* [campaigns](https://developers.google.com/google-ads/api/fields/v25/campaign)
+* [campaign_labels](https://developers.google.com/google-ads/api/fields/v25/campaign_label)
+* [click_view](https://developers.google.com/google-ads/api/reference/rpc/v25/ClickView)
+* [customer](https://developers.google.com/google-ads/api/fields/v25/customer)
+* [geographic_view](https://developers.google.com/google-ads/api/fields/v25/geographic_view)
+* [geo_target_constant](https://developers.google.com/google-ads/api/fields/v25/geo_target_constant)
+* [keyword_view](https://developers.google.com/google-ads/api/fields/v25/keyword_view)
+* [user_location_view](https://developers.google.com/google-ads/api/fields/v25/user_location_view)
 * [account_performance_report](https://developers.google.com/google-ads/api/docs/migration/mapping#account_performance)
 * [ad_performance_report](https://developers.google.com/google-ads/api/docs/migration/mapping#ad_performance)
 * [display_keyword_performance_report](https://developers.google.com/google-ads/api/docs/migration/mapping#display_keyword_performance)
@@ -130,7 +130,7 @@ so many of these properties aren't required.
 | **`/credentials/developer_token`** | Developer Token | Developer token granted by Google to use their APIs. | string | Required |
 | **`/credentials/refresh_token`** | Refresh Token | The token for obtaining a new access token. | string | Required |
 | `/custom_queries` | Custom GAQL Queries (Optional) |  | array |  |
-| _`/custom_queries/-/query`_ | Custom Query | A custom defined GAQL query for building the report. Should not contain segments.date expression. See Google&#x27;s [query builder](https://developers.google.com/google-ads/api/fields/v11/overview_query_builder) for more information. | string |  |
+| _`/custom_queries/-/query`_ | Custom Query | A custom defined GAQL query for building the report. Should not contain segments.date expression. See Google&#x27;s [query builder](https://developers.google.com/google-ads/api/fields/v25/overview_query_builder) for more information. | string |  |
 | _`/custom_queries/-/table_name`_ | Destination Table Name | The table name in your destination database for chosen query. | string |  |
 | _`/custom_queries/-/primary_key`_ | Destination Table Primary Key | The primary key in your destination database. Accepts a comma delimited string of fields present in your query. | string |  |
 | **`/customer_id`** | Customer ID(s) | Comma separated list of (client) customer IDs. Each customer ID must be specified as a 10-digit number without dashes. More instruction on how to find this value in our docs.  Metrics streams like AdGroupAdReport cannot be requested for a manager account. | string | Required |
@@ -187,7 +187,7 @@ captures:
 
 You can create custom resources using Google Analytics Query Language (GAQL) queries.
 Each generated resource will be mapped to an Estuary collection.
-For help generating a valid query, see [Google's query builder documentation](https://developers.google.com/google-ads/api/fields/v11/overview_query_builder).
+For help generating a valid query, see [Google's query builder documentation](https://developers.google.com/google-ads/api/fields/v25/overview_query_builder).
 
 If a query fails to validate against a given Google Ads account, it will be skipped.
 
@@ -222,4 +222,4 @@ Also, data can only be requested for periods 90 days before the time of the requ
 
 In practical terms, this means that you can only search ClickView data limited to 3 months ago. Anything before this is not returned.
 
-For more information, check [Google's Ads API documentation](https://developers.google.com/google-ads/api/fields/v15/click_view)
+For more information, check [Google's Ads API documentation](https://developers.google.com/google-ads/api/fields/v25/click_view)
