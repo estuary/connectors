@@ -73,14 +73,15 @@
         "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "accepted_payment_instrument_logos": [],
       "accepted_payment_methods": [
         "AMERICAN_EXPRESS",
         "DISCOVER",
         "JCB",
+        "LOCAL_PAYMENT",
         "MASTERCARD",
-        "VISA",
         "PAYPAL_ACCOUNT",
-        "LOCAL_PAYMENT"
+        "VISA"
       ],
       "bank_account": "",
       "business_details": {
@@ -89,6 +90,7 @@
       "currency_iso_code": "USD",
       "default": true,
       "funding_details": {},
+      "has_active_processor_connections": true,
       "id": "redacted",
       "individual_details": {
         "address_details": {}
@@ -96,6 +98,7 @@
       "paypal_account": "",
       "status": "active",
       "sub_merchant_account": false,
+      "supports_public_descriptors": false,
       "three_d_secure": {
         "v1": {
           "card_types": [],
@@ -112,7 +115,8 @@
           "enabled": true
         }
       },
-      "type": "MERCHANT_ACCOUNT"
+      "type": "MERCHANT_ACCOUNT",
+      "unique_identifier": "d79qgm3"
     }
   ],
   [
