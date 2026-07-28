@@ -21,6 +21,8 @@ Before iterating to fetch children, drain the parent stream into a list of **onl
 
 **Reject empty parent IDs at the drain step.** An empty parent ID templates a malformed child path (e.g. `parents//children`) that typically returns nothing, silently orphaning every child instead of failing. Reject only the empty string, not every falsy value: integer IDs can legitimately be `0`.
 
+**Sort the drained parent IDs** (`sorted(..., key=str)` — the key makes the sort total when the ID type spans str and int; the order itself carries no meaning). This matters for **snapshot children**: the CDK suppresses an unchanged snapshot by comparing an order-sensitive xxh3 digest of the emitted byte stream, and the whole parent fan-out shares one digest — so an unstable parent order re-emits every child document on every poll even when nothing changed. Correctness is unaffected either way (row_id keying + tombstones make each pass converge); the cost is pure churn. Sorting parents pins the fan-out order for free since the list is already materialized; per-parent item order within a page can only be pinned where the endpoint supports a sort parameter. Incremental children (per-parent cursors) carry no digest, but sort anyway — it costs nothing and keeps request order reproducible in logs.
+
 ## Pattern
 
 ### 1. Validation-context dataclass (`models.py`)
