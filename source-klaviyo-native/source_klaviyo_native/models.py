@@ -1,3 +1,4 @@
+import re
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from typing import Annotated, Any, ClassVar, Generic, Literal, TypeVar
@@ -22,14 +23,12 @@ def default_start_date():
 
 class ApiKey(AccessToken):
     credentials_title: Literal["API Key"] = Field(
-        default="API Key",
-        json_schema_extra={"type": "string", "order": 0}
+        default="API Key", json_schema_extra={"type": "string", "order": 0}
     )
     access_token: str = Field(
         title="API Key",
         json_schema_extra={"secret": True, "order": 1},
     )
-
 
 
 class EndpointConfig(BaseModel):
@@ -43,21 +42,26 @@ class EndpointConfig(BaseModel):
         discriminator="credentials_title",
         title="Authentication",
     )
+
     class Advanced(BaseModel):
-        window_size: Annotated[timedelta, Field(
-            description="Date window size for the events backfill in ISO 8601 format. ex: P30D means 30 days, PT6H means 6 hours.",
-            title="Window size",
-            default=timedelta(hours=1),
-            ge=timedelta(seconds=30),
-            le=timedelta(days=365),
-        )]
+        window_size: Annotated[
+            timedelta,
+            Field(
+                description="Date window size for the events backfill in ISO 8601 format. ex: P30D means 30 days, PT6H means 6 hours.",
+                title="Window size",
+                default=timedelta(hours=1),
+                ge=timedelta(seconds=30),
+                le=timedelta(days=365),
+            ),
+        ]
 
     advanced: Advanced = Field(
-        default_factory=Advanced, #type: ignore
+        default_factory=Advanced,  # type: ignore
         title="Advanced Config",
         description="Advanced settings for the connector.",
         json_schema_extra={"advanced": True},
     )
+
 
 ConnectorState = GenericConnectorState[ResourceState]
 
@@ -84,12 +88,58 @@ class CampaignType(StrEnum):
     MOBILE_PUSH = "mobile_push"
 
 
+# Klaviyo emits some datetime fields (e.g. consent timestamps) space-separated
+# (e.g. "2026-06-23 00:15:23.918411+00:00") rather than RFC3339. When schema
+# inference tags such a field `format: date-time`, the collection advertises an
+# RFC3339 contract the value violates, breaking downstream consumers. Rather
+# than enumerate the known offenders (Klaviyo custom properties are free-form,
+# so new ones surface unpredictably), we normalize any string that matches the
+# space-separated shape and leave everything else untouched. The anchored regex
+# is what keeps free-text values (e.g. "May 5, 2021") safe from mangling.
+#
+# Matches the observed Klaviyo format "YYYY-MM-DD HH:MM:SS[.ffffff]+HH:MM".
+_SPACE_SEPARATED_DATETIME_RE = re.compile(
+    r"^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}(?:\.\d+)?)([+-]\d{2}:\d{2})\Z"
+)
+
+
+def _normalize_datetime(value: str) -> str:
+    match = _SPACE_SEPARATED_DATETIME_RE.match(value)
+    if not match:
+        return value
+    date, time, tz = match.groups()
+    return f"{date}T{time}{tz}"
+
+
+def _normalize_datetimes(data: Any) -> None:
+    """Recursively normalize space-separated datetime strings in place."""
+    if isinstance(data, dict):
+        for key, value in data.items():
+            if isinstance(value, str):
+                data[key] = _normalize_datetime(value)
+            elif isinstance(value, (dict, list)):
+                _normalize_datetimes(value)
+    elif isinstance(data, list):
+        for i, item in enumerate(data):
+            if isinstance(item, str):
+                data[i] = _normalize_datetime(item)
+            elif isinstance(item, (dict, list)):
+                _normalize_datetimes(item)
+
+
 class BaseStream(BaseDocument, extra="allow"):
     name: ClassVar[str]
     path: ClassVar[str]
     extra_params: ClassVar[dict[str, str | int] | None] = None
 
     id: str
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_space_separated_datetimes(cls, values: Any) -> Any:
+        if isinstance(values, dict):
+            _normalize_datetimes(values)
+        return values
 
 
 class IncrementalStream(BaseStream):
@@ -105,7 +155,7 @@ class IncrementalStream(BaseStream):
 
     def get_cursor_value(self) -> datetime:
         cursor_str: str = getattr(self.attributes, self.cursor_field.value)
-        return datetime.fromisoformat(cursor_str.replace('Z', '+00:00'))
+        return datetime.fromisoformat(cursor_str.replace("Z", "+00:00"))
 
 
 # Stream for validating credentials
@@ -119,12 +169,14 @@ class Metrics(BaseStream):
     name: ClassVar[str] = "metrics"
     path: ClassVar[str] = "metrics"
 
+
 class Tags(BaseStream):
     name: ClassVar[str] = "tags"
     path: ClassVar[str] = "tags"
     extra_params: ClassVar[dict[str, str]] = {
         "include": "tag-group",
     }
+
 
 class TagGroups(BaseStream):
     name: ClassVar[str] = "tag_groups"
@@ -138,9 +190,11 @@ class PushTokens(BaseStream):
         "include": "profile",
     }
 
+
 class Coupons(BaseStream):
     name: ClassVar[str] = "coupons"
     path: ClassVar[str] = "coupons"
+
 
 class CouponCodes(BaseStream):
     name: ClassVar[str] = "coupon_codes"
@@ -148,6 +202,7 @@ class CouponCodes(BaseStream):
     extra_params: ClassVar[dict[str, str]] = {
         "include": "coupon",
     }
+
 
 # Incremental streams
 class Campaigns(IncrementalStream):
@@ -161,13 +216,14 @@ class EmailCampaigns(Campaigns):
         f"equals(messages.channel,'{CampaignType.EMAIL}')",
     ]
 
+
 class EmailCampaignsArchived(Campaigns):
     # The Klaviyo API occasionally returns archived email campaigns in
     # slightly unsorted order despite the sort query parameter.
     assume_sorted: ClassVar[bool] = False
     additional_filters: ClassVar[list[str] | None] = [
         f"equals(messages.channel,'{CampaignType.EMAIL}')",
-        "equals(archived,true)"
+        "equals(archived,true)",
     ]
 
 
@@ -180,7 +236,7 @@ class SmsCampaigns(Campaigns):
 class SmsCampaignsArchived(Campaigns):
     additional_filters: ClassVar[list[str] | None] = [
         f"equals(messages.channel,'{CampaignType.SMS}')",
-        "equals(archived,true)"
+        "equals(archived,true)",
     ]
 
 
@@ -193,7 +249,7 @@ class MobilePushCampaigns(Campaigns):
 class MobilePushCampaignsArchived(Campaigns):
     additional_filters: ClassVar[list[str] | None] = [
         f"equals(messages.channel,'{CampaignType.MOBILE_PUSH}')",
-        "equals(archived,true)"
+        "equals(archived,true)",
     ]
 
 
@@ -204,9 +260,7 @@ class Flows(IncrementalStream):
 
 
 class FlowsArchived(Flows):
-    additional_filters: ClassVar[list[str] | None] = [
-        "equals(archived,true)"
-    ]
+    additional_filters: ClassVar[list[str] | None] = ["equals(archived,true)"]
 
 
 class Templates(IncrementalStream):
