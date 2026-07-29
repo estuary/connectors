@@ -498,6 +498,12 @@ const (
 func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) (err error) {
 	var ctx = it.Context()
 
+	// Staging keys writes to the persistent load tables, which Acknowledge
+	// establishes via ensureTempTables. RunTransactions runs Acknowledge and
+	// Load in concurrent goroutines, so those tables are only guaranteed to
+	// exist once the acknowledgement has completed.
+	it.WaitForAcknowledged()
+
 	// activeBindings tracks the number of keys inserted into each binding's
 	// load table this round, for verification against an authoritative count
 	// before the join.
