@@ -43,6 +43,14 @@ COPY materialize-snowflake/sidecar /sidecar
 RUN python3 -m venv /opt/venv \
      && /opt/venv/bin/pip install --no-cache-dir /sidecar
 
+# Test the sidecar, as the builder stage does the connector. Its suite stubs the
+# SDK, so a throwaway venv holding only pytest runs it — which also keeps the
+# test dependencies out of the venv the image ships.
+RUN python3 -m venv /tmp/testvenv \
+     && /tmp/testvenv/bin/pip install --no-cache-dir pytest \
+     && PYTHONPATH=/sidecar /tmp/testvenv/bin/python -m pytest -q /sidecar/tests \
+     && rm -rf /tmp/testvenv
+
 # Runtime Stage
 ################################################################################
 FROM ${BASE_IMAGE}
