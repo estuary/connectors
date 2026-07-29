@@ -53,6 +53,12 @@ func (d gatedDriver) NewTransactor(ctx context.Context, req pm.Request_Open, be 
 // correct if an interrupted transaction is replayed identically — a guarantee
 // the v2 runtime makes and the v1 runtime does not.
 func requireStreamingV2Runtime(spec *pf.MaterializationSpec) error {
+	// The gate reads the spec before anything else validates it, so an absent one
+	// is reported here rather than dereferenced.
+	if spec == nil {
+		return fmt.Errorf("request carries no materialization spec")
+	}
+
 	// The full configuration is validated by the boilerplate, which reports a
 	// better error than this gate could. Only the feature flags are read here.
 	var cfg config
