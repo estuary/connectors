@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-07-29
+
+### Fixed
+- Fixed a permanent restart loop with the error `refusing to load <table>: load
+  table contains N keys but M were inserted` on ClickHouse Cloud. Truncating a
+  replicated table — which on Cloud is every table, since `MergeTree` is
+  transparently `SharedMergeTree` — happens asynchronously unless `SYNC` is
+  requested, so a queued truncate of an internal staging table could execute
+  after the rows of the next transaction had been staged and silently drop them.
+  Truncating a table when backfilling a binding was exposed the same way, which
+  could drop rows materialized just after the backfill was applied.
+
 ## 2026-07-23
 
 ### Changed
