@@ -25,6 +25,24 @@ RUN go test  -tags nozstd -v ./materialize-sql/...
 RUN go test  -tags nozstd -short -v ./materialize-snowflake/...
 RUN go build -tags nozstd -v -o ./connector ./materialize-snowflake/...
 
+# Python Sidecar Stage
+################################################################################
+# The Snowpipe Streaming sidecar venv is built on the same base image as the
+# runtime stage so its interpreter and site-packages exactly match the python3
+# installed there.
+FROM ${BASE_IMAGE} AS pybuilder
+
+USER root
+RUN apt-get update -y \
+     && apt-get install --no-install-recommends -y \
+     python3 \
+     python3-venv \
+     && rm -rf /var/lib/apt/lists/*
+
+COPY materialize-snowflake/sidecar /sidecar
+RUN python3 -m venv /opt/venv \
+     && /opt/venv/bin/pip install --no-cache-dir /sidecar
+
 # Runtime Stage
 ################################################################################
 FROM ${BASE_IMAGE}
@@ -34,7 +52,11 @@ RUN apt-get update -y \
      ca-certificates \
      curl \
      unzip \
+     python3 \
      && rm -rf /var/lib/apt/lists/*
+
+# The Snowpipe Streaming (high-performance) python SDK sidecar.
+COPY --from=pybuilder /opt/venv /opt/venv
 
 # Avoid running the connector as root.
 USER nonroot:nonroot

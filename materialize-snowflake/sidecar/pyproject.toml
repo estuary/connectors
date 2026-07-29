@@ -1,0 +1,16 @@
+[project]
+name = "snowpipe-sidecar"
+version = "0.1.0"
+description = "Snowpipe Streaming (high-performance) sidecar for materialize-snowflake"
+requires-python = ">=3.9"
+dependencies = ["snowpipe-streaming==1.6.2"]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["snowpipe_sidecar"]
