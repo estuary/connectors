@@ -1,15 +1,19 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
+	"github.com/estuary/connectors/go/capture/blackbox"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/stretchr/testify/require"
 )
@@ -374,4 +378,83 @@ func TestCatalogPrimaryKey(t *testing.T) {
 	db.Exec(t, `INSERT INTO <NAME> VALUES (3, 'carol', 300), (4, 'dave', 400)`)
 	tc.Run("Replication", -1)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
+}
+
+// TestPopulateSourceTimestamps verifies the populate_source_ts_ms advanced
+// option: CDC events carry the transaction commit time as
+// _meta/source/ts_ms; backfill rows and flag-off captures do not.
+func TestPopulateSourceTimestamps(t *testing.T) {
+	var db, tc = blackboxTestSetup(t)
+	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data TEXT)`)
+
+	// Redact ts_ms values in the snapshot so commit timestamps don't
+	// destabilize the snapshot across runs. Equality and ordering are
+	// asserted programmatically below against the raw capture output.
+	tc.DocumentSanitizers = append(tc.DocumentSanitizers, blackbox.JSONSanitizer{
+		Matcher:     regexp.MustCompile(`"ts_ms":\d+`),
+		Replacement: `"ts_ms":0`,
+	})
+
+	// Backfill (flag off): no ts_ms expected.
+	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'zero'), (1, 'one')`)
+	tc.Discover("Discover Tables")
+	require.Empty(t, extractTsMsValues(t, tc.Run("Initial Backfill (flag off)", -1)),
+		"backfill events must not have ts_ms")
+
+	// Replication (flag off): no ts_ms expected.
+	db.Exec(t, `INSERT INTO <NAME> VALUES (2, 'two')`)
+	require.Empty(t, extractTsMsValues(t, tc.Run("Replication (flag off)", -1)),
+		"flag-off replication events must not have ts_ms")
+
+	require.NoError(t, tc.Capture.EditConfig("advanced.populate_source_ts_ms", true))
+
+	// Single transaction with multiple rows: all rows must share ts_ms.
+	db.Exec(t, `INSERT INTO <NAME> VALUES (3, 'three'), (4, 'four'), (5, 'five')`)
+	multiTxn := extractTsMsValues(t, tc.Run("Replication (multi-row transaction, flag on)", -1))
+	require.Len(t, multiTxn, 3)
+	for _, v := range multiTxn {
+		require.NotZero(t, v)
+		require.Equal(t, multiTxn[0], v, "rows from one transaction must share ts_ms")
+	}
+
+	// Separate transactions: ts_ms must be monotonically non-decreasing.
+	time.Sleep(50 * time.Millisecond)
+	db.Exec(t, `INSERT INTO <NAME> VALUES (6, 'six')`)
+	time.Sleep(50 * time.Millisecond)
+	db.Exec(t, `INSERT INTO <NAME> VALUES (7, 'seven')`)
+	sepTxn := extractTsMsValues(t, tc.Run("Replication (separate transactions, flag on)", -1))
+	require.Len(t, sepTxn, 2)
+	require.LessOrEqual(t, sepTxn[0], sepTxn[1],
+		"ts_ms must be monotonically non-decreasing across transactions")
+
+	cupaloy.SnapshotT(t, tc.Transcript.String())
+}
+
+// extractTsMsValues returns the _meta/source/ts_ms value of every captured
+// document, in emission order. Documents without ts_ms are skipped.
+func extractTsMsValues(t *testing.T, raw []byte) []int64 {
+	t.Helper()
+	var values []int64
+	for line := range bytes.SplitSeq(raw, []byte("\n")) {
+		if len(line) == 0 {
+			continue
+		}
+		var parts []json.RawMessage
+		require.NoError(t, json.Unmarshal(line, &parts))
+		if len(parts) < 2 {
+			continue
+		}
+		var doc struct {
+			Meta struct {
+				Source struct {
+					TsMs *int64 `json:"ts_ms"`
+				} `json:"source"`
+			} `json:"_meta"`
+		}
+		require.NoError(t, json.Unmarshal(parts[1], &doc))
+		if doc.Meta.Source.TsMs != nil {
+			values = append(values, *doc.Meta.Source.TsMs)
+		}
+	}
+	return values
 }

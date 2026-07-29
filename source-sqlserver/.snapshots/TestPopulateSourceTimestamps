@@ -1,0 +1,214 @@
+sql> CREATE TABLE dbo.PopulateSourceTimestamps_731765 (id INTEGER PRIMARY KEY, data TEXT)
+sql> INSERT INTO dbo.PopulateSourceTimestamps_731765 VALUES (0, 'zero'), (1, 'one')
+=== Discover: Discover Tables ===
+acmeCo/test_capture/dbo/populatesourcetimestamps_731765
+=== Run: Initial Backfill (flag off) ===
+[
+  "acmeCo/test_capture/dbo/populatesourcetimestamps_731765",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "PopulateSourceTimestamps_731765"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "zero",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/dbo/populatesourcetimestamps_731765",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "PopulateSourceTimestamps_731765"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "one",
+    "id": 1
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FPopulateSourceTimestamps_731765": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO dbo.PopulateSourceTimestamps_731765 VALUES (2, 'two')
+=== Run: Replication (flag off) ===
+[
+  "acmeCo/test_capture/dbo/populatesourcetimestamps_731765",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "PopulateSourceTimestamps_731765",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "two",
+    "id": 2
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FPopulateSourceTimestamps_731765": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO dbo.PopulateSourceTimestamps_731765 VALUES (3, 'three'), (4, 'four'), (5, 'five')
+=== Run: Replication (multi-row transaction, flag on) ===
+[
+  "acmeCo/test_capture/dbo/populatesourcetimestamps_731765",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "PopulateSourceTimestamps_731765",
+        "ts_ms": 0,
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "three",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/dbo/populatesourcetimestamps_731765",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "PopulateSourceTimestamps_731765",
+        "ts_ms": 0,
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "four",
+    "id": 4
+  }
+]
+[
+  "acmeCo/test_capture/dbo/populatesourcetimestamps_731765",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "PopulateSourceTimestamps_731765",
+        "ts_ms": 0,
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "five",
+    "id": 5
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FPopulateSourceTimestamps_731765": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO dbo.PopulateSourceTimestamps_731765 VALUES (6, 'six')
+sql> INSERT INTO dbo.PopulateSourceTimestamps_731765 VALUES (7, 'seven')
+=== Run: Replication (separate transactions, flag on) ===
+[
+  "acmeCo/test_capture/dbo/populatesourcetimestamps_731765",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "PopulateSourceTimestamps_731765",
+        "ts_ms": 0,
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "six",
+    "id": 6
+  }
+]
+[
+  "acmeCo/test_capture/dbo/populatesourcetimestamps_731765",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "PopulateSourceTimestamps_731765",
+        "ts_ms": 0,
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "seven",
+    "id": 7
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FPopulateSourceTimestamps_731765": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+
