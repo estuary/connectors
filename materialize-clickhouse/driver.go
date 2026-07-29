@@ -540,7 +540,14 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			// drop: the load table's identity must stay stable so that key
 			// inserts and the join query resolve the same table from any
 			// replica of a clustered deployment.
-			_ = t.load.conn.Exec(ctx, b.load.truncateSQL)
+			//
+			// A failure leaves this round's keys in the table, so it is
+			// reported: should the truncate at the start of the next round
+			// fail too, that round's key-count check trips with no indication
+			// of why the table was not empty.
+			if truncErr := t.load.conn.Exec(ctx, b.load.truncateSQL); truncErr != nil && err == nil {
+				err = fmt.Errorf("truncating load table for %s after load: %w", b.target.Identifier, truncErr)
+			}
 		}
 	}()
 
