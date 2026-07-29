@@ -29,8 +29,8 @@ import (
 type tableConfig struct {
 	Table      string `json:"table" jsonschema_extras:"x-collection-name=true"`
 	Schema     string `json:"schema,omitempty" jsonschema:"title=Alternative Schema,description=Alternative schema for this table (optional)" jsonschema_extras:"x-schema-name=true"`
-	Delta      bool   `json:"delta_updates,omitempty" jsonschema:"title=Delta Updates,description=Use Private Key authentication to enable Snowpipe Streaming for Delta Update bindings" jsonschema_extras:"x-delta-updates=true"`
-	Clustering string `json:"clustering,omitempty" jsonschema:"title=Clustering Keys,description=Comma-separated list of column names to use as the clustering key for Snowflake Automatic Clustering. Leave empty to disable clustering. Recommended only for large tables queried with selective filters on the chosen columns. Consumes additional Snowflake credits." jsonschema_extras:"advanced=true"`
+	Delta      bool   `json:"delta_updates,omitempty" jsonschema:"title=Delta Updates,description=Use Private Key authentication to enable Snowpipe Streaming for Delta Update bindings" jsonschema_extras:"x-delta-updates=true,nonsensitive=true"`
+	Clustering string `json:"clustering,omitempty" jsonschema:"title=Clustering Keys,description=Comma-separated list of column names to use as the clustering key for Snowflake Automatic Clustering. Leave empty to disable clustering. Recommended only for large tables queried with selective filters on the chosen columns. Consumes additional Snowflake credits." jsonschema_extras:"advanced=true,nonsensitive=true"`
 
 	// If the endpoint schema is the same as the resource schema, the resource path will be only the
 	// table name. This is to provide compatibility for materializations that were created prior to

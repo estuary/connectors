@@ -32,6 +32,7 @@
         "type": "string",
         "title": "Timezone",
         "description": "Timezone to use when materializing datetime columns. Should normally be left blank to use the database's 'time_zone' system variable. Only required if the 'time_zone' system variable cannot be read. Must be a valid IANA time zone name or +HH:MM offset. Takes precedence over the 'time_zone' system variable if both are set.",
+        "nonsensitive": true,
         "order": 4
       },
       "hardDelete": {
@@ -39,6 +40,7 @@
         "title": "Hard Delete",
         "description": "If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).",
         "default": false,
+        "nonsensitive": true,
         "order": 5
       },
       "dbt_job_trigger": {
@@ -79,13 +81,15 @@
             ],
             "title": "Job Trigger Mode",
             "description": "Specifies how should already-running jobs be treated. Defaults to 'skip' which skips the trigger if a job is already running; 'replace' cancels the running job and runs a new one; while 'ignore' triggers a new job regardless of existing jobs.",
-            "default": "skip"
+            "default": "skip",
+            "nonsensitive": true
           },
           "interval": {
             "type": "string",
             "title": "Minimum Run Interval",
             "description": "Minimum time between dbt job triggers. This interval is only triggered if data has been materialized by your task.",
-            "default": "30m"
+            "default": "30m",
+            "nonsensitive": true
           }
         },
         "additionalProperties": false,
@@ -137,12 +141,14 @@
             "type": "boolean",
             "title": "Exclude Flow Document",
             "description": "When enabled the root document will not be required for standard updates.",
-            "default": false
+            "default": false,
+            "nonsensitive": true
           },
           "feature_flags": {
             "type": "string",
             "title": "Feature Flags",
-            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."
+            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.",
+            "nonsensitive": true
           }
         },
         "additionalProperties": false,
@@ -214,6 +220,7 @@
         "title": "Delta Update",
         "description": "Should updates to this table be done via delta updates. Default is false.",
         "default": false,
+        "nonsensitive": true,
         "x-delta-updates": true
       }
     },

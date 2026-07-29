@@ -54,7 +54,7 @@ type credentials struct {
 type config struct {
 	Credentials credentials `json:"credentials"`
 	Endpoint    string      `json:"endpoint"`
-	HardDelete  bool        `json:"hardDelete,omitempty"`
+	HardDelete  bool        `json:"hardDelete,omitempty" jsonschema_extras:"nonsensitive=true"`
 
 	Advanced advancedConfig `json:"advanced,omitempty"`
 
@@ -62,8 +62,8 @@ type config struct {
 }
 
 type advancedConfig struct {
-	Replicas     *int   `json:"number_of_replicas,omitempty"`
-	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	Replicas     *int   `json:"number_of_replicas,omitempty" jsonschema_extras:"nonsensitive=true"`
+	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
 }
 
 // The `go-schema-gen` package doesn't have a good way of dealing with oneOf, and I couldn't get it
@@ -86,7 +86,8 @@ func configSchema() json.RawMessage {
 		    "title": "Hard Delete",
 		    "description": "If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).",
 		    "default": false,
-		    "order": 1
+		    "order": 1,
+		    "nonsensitive": true
 		  },
 		  "credentials": {
 			"type": "object",
@@ -135,12 +136,14 @@ func configSchema() json.RawMessage {
 			  "number_of_replicas": {
 				"type": "integer",
 				"title": "Index Replicas",
-				"description": "The number of replicas to create new indexes with. Leave blank to use the cluster default."
+				"description": "The number of replicas to create new indexes with. Leave blank to use the cluster default.",
+				"nonsensitive": true
 			  },
 			  "feature_flags": {
 				"type": "string",
 				"title": "Feature Flags",
-				"description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."
+				"description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.",
+				"nonsensitive": true
 			  }
 			},
 			"type": "object",
@@ -327,8 +330,8 @@ func (p productHeaderInjector) RoundTrip(req *http.Request) (*http.Response, err
 
 type resource struct {
 	Index        string `json:"index" jsonschema_extras:"x-collection-name=true"`
-	DeltaUpdates bool   `json:"delta_updates" jsonschema:"default=false" jsonschema_extras:"x-delta-updates=true"`
-	Shards       *int   `json:"number_of_shards,omitempty"`
+	DeltaUpdates bool   `json:"delta_updates" jsonschema:"default=false" jsonschema_extras:"x-delta-updates=true,nonsensitive=true"`
+	Shards       *int   `json:"number_of_shards,omitempty" jsonschema_extras:"nonsensitive=true"`
 }
 
 func (r resource) Validate() error {
