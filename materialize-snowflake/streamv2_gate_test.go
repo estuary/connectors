@@ -160,6 +160,10 @@ func TestRequireStreamingV2Runtime(t *testing.T) {
 		spec.ConfigJson = json.RawMessage(`{"host":`)
 		require.ErrorContains(t, requireStreamingV2Runtime(spec), "parsing endpoint config")
 	})
+
+	t.Run("a missing spec is an error rather than a panic", func(t *testing.T) {
+		require.ErrorContains(t, requireStreamingV2Runtime(nil), "no materialization spec")
+	})
 }
 
 // TestGatedDriverRefusals pins the RPCs the gate is wired into. Both refuse
