@@ -432,8 +432,17 @@ func (t *transactor[T]) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 // Acknowledge completes all staged uploads and removes them from the
 // checkpoint, so that the checkpoint contains only the list of file counts.
-func (t *transactor[T]) Acknowledge(ctx context.Context, statePatches []json.RawMessage) (*pf.ConnectorState, error) {
+func (t *transactor[T]) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
+	shouldProcess := m.StateKeyFilter(stateKeys)
+
+	var processed bool
 	for _, b := range t.bindings {
+		if !shouldProcess(b.stateKey) {
+			// This state key's pending work was not requested to be processed,
+			// so it remains staged in the persisted state.
+			continue
+		}
+
 		uploads, ok := t.state.Uploads[b.stateKey]
 		if !ok {
 			continue
@@ -446,9 +455,13 @@ func (t *transactor[T]) Acknowledge(ctx context.Context, statePatches []json.Raw
 			log.WithField("key", upload.FileKey()).Info("completed file upload")
 		}
 
+		delete(t.state.Uploads, b.stateKey)
+		processed = true
 	}
 
-	t.state.Uploads = make(map[string][]T)
+	if !processed {
+		return nil, nil
+	}
 
 	checkpointJSON, err := json.Marshal(t.state)
 	if err != nil {

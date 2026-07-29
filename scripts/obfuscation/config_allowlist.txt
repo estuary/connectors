@@ -114,6 +114,7 @@ snapshot_retention_days
 orphan_file_retention_days
 
 # --- batching / performance / limits (numeric knobs) ---
+concurrency
 backfill_chunk_size
 incremental_chunk_size
 incremental_scn_range

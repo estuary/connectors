@@ -436,9 +436,25 @@ async def _fetch_parts(
     async with parts_semaphore:
         url = f"{API}/conversations/{conversation_id}"
 
-        response = ConversationResponse.model_validate_json(
-            await http.request(log, url, headers={API_VERSION_HEADER: api_version})
-        )
+        try:
+            response = ConversationResponse.model_validate_json(
+                await http.request(log, url, headers={API_VERSION_HEADER: api_version})
+            )
+        except HTTPError as err:
+            # Conversations can be deleted between when the search endpoint returns them and when
+            # their parts are requested. Intercom's 404 responses don't consistently identify the
+            # missing resource, so any 404 is assumed to be a deleted conversation.
+            if err.code == 404:
+                log.warning(
+                    "Could not fetch conversation's parts, likely because it was deleted.",
+                    extra={
+                        "conversation_id": conversation_id,
+                        "err.code": err.code,
+                        "err.message": err.message,
+                    },
+                )
+                return []
+            raise
 
         for part in response.conversation_parts.conversation_parts:
             # Add conversation_id to the conversation part to align with the Airbyte connector.
@@ -608,7 +624,18 @@ async def fetch_company_segments(
                 await http.request(log, segments_url, headers={API_VERSION_HEADER: api_version})
             )
         except HTTPError as err:
-            if err.code == 404 and 'Company Not Found' in err.message:
+            # Companies can be deleted between when they're listed and when their segments are
+            # requested. Intercom usually says 'Company Not Found' in these 404s, but it sometimes
+            # returns a bare nginx 404 page instead, so any 404 is assumed to be a deleted company.
+            if err.code == 404:
+                log.warning(
+                    "Could not fetch company's segments, likely because it was deleted.",
+                    extra={
+                        "company_id": id,
+                        "err.code": err.code,
+                        "err.message": err.message,
+                    },
+                )
                 continue
             else:
                 raise

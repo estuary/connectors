@@ -495,8 +495,15 @@ ORDER BY (
 );
 {{ end }}
 
+{{/*
+Every truncate and drop of a staging table carries SYNC. Without it ClickHouse
+executes the statement asynchronously on a replicated table -- which on
+ClickHouse Cloud is every table, since MergeTree is transparently
+SharedMergeTree -- so a queued truncate can execute after subsequent INSERTs
+and drop the rows they just staged.
+*/}}
 {{ define "truncateLoadTable" }}
-TRUNCATE TABLE IF EXISTS {{ template "loadTableName" . }};
+TRUNCATE TABLE IF EXISTS {{ template "loadTableName" . }} SYNC;
 {{ end }}
 
 {{ define "countLoadKeys" }}
@@ -580,7 +587,7 @@ SELECT ''::String LIMIT 0
 {{ end }}
 
 {{ define "dropLoadTable" }}
-DROP TABLE IF EXISTS {{ template "loadTableName" . }};
+DROP TABLE IF EXISTS {{ template "loadTableName" . }} SYNC;
 {{ end }}
 
 ---- Store tables
@@ -656,11 +663,11 @@ TO TABLE {{ $.Identifier }};
 {{ end }}
 
 {{ define "truncateStoreTable" }}
-TRUNCATE TABLE IF EXISTS {{ template "storeTableNameIdentifier" . }};
+TRUNCATE TABLE IF EXISTS {{ template "storeTableNameIdentifier" . }} SYNC;
 {{ end }}
 
 {{ define "dropStoreTable" }}
-DROP TABLE IF EXISTS {{ template "storeTableNameIdentifier" . }};
+DROP TABLE IF EXISTS {{ template "storeTableNameIdentifier" . }} SYNC;
 {{ end }}
 `, template.FuncMap{"PartitionExpr": partitionExpr})
 

@@ -185,7 +185,7 @@ type transactor struct {
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
-func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage) (*pf.ConnectorState, error) { return nil, nil }
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) { return nil, nil }
 
 // Load should not be called and panics.
 func (d *transactor) Load(it *m.LoadIterator, _ func(int, json.RawMessage) error) error {

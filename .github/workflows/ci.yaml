@@ -102,6 +102,7 @@ jobs:
           - source-sqlserver
           - source-sqlserver-batch
           - source-sqlserver-ct
+          - source-sqs
           - source-test
           - source-azure-blob-storage
           - materialize-azure-blob-parquet
@@ -205,6 +206,7 @@ jobs:
             "source-sqlserver",
             "source-sqlserver-batch",
             "source-sqlserver-ct",
+            "source-sqs",
             "source-mongodb"
             ]'), matrix.connector)
         run: |
@@ -227,7 +229,8 @@ jobs:
             "source-postgres",
             "source-redshift-batch",
             "source-sqlserver",
-            "source-sqlserver-ct"
+            "source-sqlserver-ct",
+            "source-sqs"
             ]'), matrix.connector)
         run: |
           ${{ matrix.connector }}/run_tests.sh

@@ -540,7 +540,14 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			// drop: the load table's identity must stay stable so that key
 			// inserts and the join query resolve the same table from any
 			// replica of a clustered deployment.
-			_ = t.load.conn.Exec(ctx, b.load.truncateSQL)
+			//
+			// A failure leaves this round's keys in the table, so it is
+			// reported: should the truncate at the start of the next round
+			// fail too, that round's key-count check trips with no indication
+			// of why the table was not empty.
+			if truncErr := t.load.conn.Exec(ctx, b.load.truncateSQL); truncErr != nil && err == nil {
+				err = fmt.Errorf("truncating load table for %s after load: %w", b.target.Identifier, truncErr)
+			}
 		}
 	}()
 
@@ -753,7 +760,10 @@ func (t *transactor) bindingForStateKey(stateKey string) (*binding, bool) {
 	return nil, false
 }
 
-func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage) (*pf.ConnectorState, error) {
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
+	shouldProcess := m.StateKeyFilter(stateKeys)
+	var drained []string
+
 	if !t.ensured {
 		// First Acknowledge of the session: recover pending commits and
 		// ensure every binding's persistent temp tables. This always runs
@@ -761,6 +771,16 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 		// of the next transaction's store phase).
 		for _, b := range t.bindings {
 			if si, pending := t.state[b.target.StateKey]; pending {
+				if !shouldProcess(b.target.StateKey) {
+					// This binding's pending work was not requested, so its
+					// staged rows must stay put. ensureTempTables would
+					// discard them, so it is skipped as well; a session
+					// always processes every state key, so this only happens
+					// in the Apply RPC's narrowed drain, where no Store
+					// follows.
+					continue
+				}
+				drained = append(drained, b.target.StateKey)
 				// A store table whose partition key differs from the target's
 				// predates a partition-changing backfill: the backfill dropped
 				// and re-created the target, so the staged rows belong to a
@@ -807,6 +827,9 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 		t.ensured = true
 	} else {
 		for stateKey, si := range t.state {
+			if !shouldProcess(stateKey) {
+				continue
+			}
 			// Skip target tables which do not have a binding anymore since
 			// these tables might be deleted already. Note that the persistent
 			// stage table of a removed binding with pending state is stranded
@@ -819,6 +842,7 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 			if err := t.moveStorePartitionsToTarget(ctx, b, si, false); err != nil {
 				return nil, fmt.Errorf("moving stage to target %s: %w", b.target.Identifier, err)
 			}
+			drained = append(drained, stateKey)
 		}
 	}
 	t.recovery = false
@@ -831,10 +855,14 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	// that have been committed in this transaction. The reason is that it may be the case that a binding
 	// which has been disabled right after a failed attempt to run its queries, must be able to recover by enabling
 	// the binding and running the queries that are pending for its last transaction.
-	var stateClear = make(connectorState, len(t.bindings))
-	for _, b := range t.bindings {
-		stateClear[b.target.StateKey] = nil
-		delete(t.state, b.target.StateKey)
+	if len(drained) == 0 {
+		return nil, nil
+	}
+
+	var stateClear = make(connectorState, len(drained))
+	for _, sk := range drained {
+		stateClear[sk] = nil
+		delete(t.state, sk)
 	}
 
 	checkpointJSON, err := json.Marshal(stateClear)

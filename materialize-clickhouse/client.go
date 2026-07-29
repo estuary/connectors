@@ -340,7 +340,10 @@ func (c *client) partitionKeyColumns(ctx context.Context, table string) (map[str
 }
 
 func (c *client) TruncateTable(_ context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
-	var stmt = fmt.Sprintf("TRUNCATE TABLE %s;", c.ep.Dialect.Identifier(path...))
+	// SYNC because a replicated table (every table on ClickHouse Cloud)
+	// otherwise truncates asynchronously, and a queued truncate would drop the
+	// rows the shard materializes once this backfill has been applied.
+	var stmt = fmt.Sprintf("TRUNCATE TABLE %s SYNC;", c.ep.Dialect.Identifier(path...))
 	return stmt, func(ctx context.Context) error {
 		if _, err := c.db.ExecContext(ctx, stmt); err != nil {
 			return fmt.Errorf("executing truncate table: %w", err)

@@ -1387,7 +1387,7 @@ func TestAcknowledgeRecoveryMatrix(t *testing.T) {
 		tr.ensured = false
 		tr.recovery = true
 		tr.state[b.target.StateKey] = &stateItem{StoredRows: 1}
-		_, err := tr.Acknowledge(ctx, nil)
+		_, err := tr.Acknowledge(ctx, nil, nil)
 		require.NoError(t, err)
 		require.EqualValues(t, 1, countTable(t, ctx, tr, tr.dialect.Identifier("test_recovery_full")))
 		require.Empty(t, tr.state)
@@ -1404,7 +1404,7 @@ func TestAcknowledgeRecoveryMatrix(t *testing.T) {
 		tr.ensured = false
 		tr.recovery = true
 		tr.state[b.target.StateKey] = &stateItem{StoredRows: 3}
-		_, err := tr.Acknowledge(ctx, nil)
+		_, err := tr.Acknowledge(ctx, nil, nil)
 		require.NoError(t, err)
 		require.EqualValues(t, 1, countTable(t, ctx, tr, tr.dialect.Identifier("test_recovery_partial")))
 	})
@@ -1422,7 +1422,7 @@ func TestAcknowledgeRecoveryMatrix(t *testing.T) {
 		tr.ensured = false
 		tr.recovery = true
 		tr.state[b.target.StateKey] = &stateItem{StoredRows: 1}
-		_, err := tr.Acknowledge(ctx, nil)
+		_, err := tr.Acknowledge(ctx, nil, nil)
 		require.NoError(t, err)
 		require.Empty(t, tr.state)
 
@@ -1441,7 +1441,7 @@ func TestAcknowledgeRecoveryMatrix(t *testing.T) {
 		// No pending state for the binding: the staged row was never
 		// committed and must be discarded, not moved.
 		tr.ensured = false
-		_, err := tr.Acknowledge(ctx, nil)
+		_, err := tr.Acknowledge(ctx, nil, nil)
 		require.NoError(t, err)
 		require.EqualValues(t, 0, countTable(t, ctx, tr, tr.dialect.Identifier(storeTableName(b.target, 0))))
 		require.EqualValues(t, 0, countTable(t, ctx, tr, tr.dialect.Identifier("test_recovery_leftovers")))
@@ -1452,7 +1452,7 @@ func TestAcknowledgeRecoveryMatrix(t *testing.T) {
 		_ = tr.store.conn.Exec(ctx, b.store.dropTableSQL)
 
 		tr.ensured = false
-		_, err := tr.Acknowledge(ctx, nil)
+		_, err := tr.Acknowledge(ctx, nil, nil)
 		require.NoError(t, err)
 		require.EqualValues(t, 0, countTable(t, ctx, tr, tr.dialect.Identifier(storeTableName(b.target, 0))))
 	})
@@ -1467,7 +1467,7 @@ func TestAcknowledgeRecoveryMatrix(t *testing.T) {
 			fmt.Sprintf("ALTER TABLE %s DROP COLUMN %s", stageName, tr.dialect.Identifier("value"))))
 
 		tr.ensured = false
-		_, err := tr.Acknowledge(ctx, nil)
+		_, err := tr.Acknowledge(ctx, nil, nil)
 		require.NoError(t, err)
 
 		// The stage table must once again match the target (and so accept
@@ -1502,7 +1502,7 @@ func TestAcknowledgeRecoveryMatrix(t *testing.T) {
 		tr.ensured = false
 		tr.recovery = true
 		tr.state[b.target.StateKey] = &stateItem{StoredRows: 1}
-		_, err := tr.Acknowledge(ctx, nil)
+		_, err := tr.Acknowledge(ctx, nil, nil)
 		require.NoError(t, err)
 
 		// The next transaction must stage and commit cleanly. On the unfixed
@@ -1532,7 +1532,7 @@ func TestAcknowledgeRecoveryMatrix(t *testing.T) {
 		require.True(t, tr.recovery)
 
 		tr.ensured = false
-		_, err := tr.Acknowledge(ctx, nil)
+		_, err := tr.Acknowledge(ctx, nil, nil)
 		require.NoError(t, err)
 		require.EqualValues(t, 1, countTable(t, ctx, tr, tr.dialect.Identifier("test_recovery_upgrade")))
 	})
@@ -1561,5 +1561,46 @@ func TestAcknowledgeRecoveryMatrix(t *testing.T) {
 		require.NoError(t, batch.Send())
 		require.NoError(t, tr.store.conn.QueryRow(ctx, b.load.countKeysSQL).Scan(&counted))
 		require.EqualValues(t, 1, counted)
+	})
+
+	t.Run("subset drain leaves other bindings' staged rows pending", func(t *testing.T) {
+		// The Apply RPC invokes Acknowledge with only the state keys of
+		// bindings receiving schema updates: pending rows of every other
+		// binding must remain staged, and their state entries retained.
+		tr, b1 := newTestTransactor(t, ctx, "test_subset_a")
+		b1.target.StateKey = "test_subset_a.v1"
+
+		table2 := buildTestTable(t, tr.dialect, "test_subset_b")
+		table2.StateKey = "test_subset_b.v1"
+		createSQL, err := sql.RenderTableTemplate(table2, tr.templates.createTargetTable)
+		require.NoError(t, err)
+		require.NoError(t, tr.store.conn.Exec(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", tr.dialect.Identifier("test_subset_b"))))
+		require.NoError(t, tr.store.conn.Exec(ctx, createSQL))
+		require.NoError(t, tr.addBinding(ctx, table2))
+		b2 := tr.bindings[1]
+
+		require.NoError(t, tr.ensureTempTables(ctx, b1))
+		require.NoError(t, tr.ensureTempTables(ctx, b2))
+		stageTestRows(t, ctx, tr, b1, []any{"k1", "v1", "c", testTime, `{"id":"k1"}`})
+		stageTestRows(t, ctx, tr, b2, []any{"k2", "v2", "c", testTime, `{"id":"k2"}`})
+
+		tr.ensured = false
+		tr.recovery = true
+		tr.state[b1.target.StateKey] = &stateItem{StoredRows: 1}
+		tr.state[b2.target.StateKey] = &stateItem{StoredRows: 1}
+
+		state, err := tr.Acknowledge(ctx, nil, []string{b1.target.StateKey})
+		require.NoError(t, err)
+		require.NotNil(t, state)
+		require.JSONEq(t, fmt.Sprintf(`{%q: null}`, b1.target.StateKey), string(state.UpdatedJson))
+		require.True(t, state.MergePatch)
+
+		// b1's staged row was moved to its target; b2's remains staged with
+		// its state entry intact.
+		require.EqualValues(t, 1, countTable(t, ctx, tr, tr.dialect.Identifier("test_subset_a")))
+		require.EqualValues(t, 0, countTable(t, ctx, tr, tr.dialect.Identifier("test_subset_b")))
+		require.EqualValues(t, 1, countTable(t, ctx, tr, tr.dialect.Identifier(storeTableName(b2.target, 0))))
+		require.Nil(t, tr.state[b1.target.StateKey])
+		require.NotNil(t, tr.state[b2.target.StateKey])
 	})
 }

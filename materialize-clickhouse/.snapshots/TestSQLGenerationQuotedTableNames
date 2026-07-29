@@ -98,12 +98,12 @@ ORDER BY (theKey);
 
 --- Begin `key_value-@你好-``-"especiál` truncateLoadTable ---
 
-TRUNCATE TABLE IF EXISTS `flow_temp_load_0_key_value-@你好-``-"especiál`;
+TRUNCATE TABLE IF EXISTS `flow_temp_load_0_key_value-@你好-``-"especiál` SYNC;
 --- End `key_value-@你好-``-"especiál` truncateLoadTable ---
 
 --- Begin `delta_updates-@你好-``-"especiál` truncateLoadTable ---
 
-TRUNCATE TABLE IF EXISTS `flow_temp_load_0_delta_updates-@你好-``-"especiál`;
+TRUNCATE TABLE IF EXISTS `flow_temp_load_0_delta_updates-@你好-``-"especiál` SYNC;
 --- End `delta_updates-@你好-``-"especiál` truncateLoadTable ---
 
 --- Begin `key_value-@你好-``-"especiál` countLoadKeys ---
@@ -188,12 +188,12 @@ INSERT INTO `flow_temp_load_0_delta_updates-@你好-``-"especiál` (theKey)
 
 --- Begin `key_value-@你好-``-"especiál` dropLoadTable ---
 
-DROP TABLE IF EXISTS `flow_temp_load_0_key_value-@你好-``-"especiál`;
+DROP TABLE IF EXISTS `flow_temp_load_0_key_value-@你好-``-"especiál` SYNC;
 --- End `key_value-@你好-``-"especiál` dropLoadTable ---
 
 --- Begin `delta_updates-@你好-``-"especiál` dropLoadTable ---
 
-DROP TABLE IF EXISTS `flow_temp_load_0_delta_updates-@你好-``-"especiál`;
+DROP TABLE IF EXISTS `flow_temp_load_0_delta_updates-@你好-``-"especiál` SYNC;
 --- End `delta_updates-@你好-``-"especiál` dropLoadTable ---
 
 --- Begin `key_value-@你好-``-"especiál` createStoreTable ---
@@ -210,12 +210,12 @@ AS `delta_updates-@你好-``-"especiál`;
 
 --- Begin `key_value-@你好-``-"especiál` truncateStoreTable ---
 
-TRUNCATE TABLE IF EXISTS `flow_temp_store_0_key_value-@你好-``-"especiál`;
+TRUNCATE TABLE IF EXISTS `flow_temp_store_0_key_value-@你好-``-"especiál` SYNC;
 --- End `key_value-@你好-``-"especiál` truncateStoreTable ---
 
 --- Begin `delta_updates-@你好-``-"especiál` truncateStoreTable ---
 
-TRUNCATE TABLE IF EXISTS `flow_temp_store_0_delta_updates-@你好-``-"especiál`;
+TRUNCATE TABLE IF EXISTS `flow_temp_store_0_delta_updates-@你好-``-"especiál` SYNC;
 --- End `delta_updates-@你好-``-"especiál` truncateStoreTable ---
 
 --- Begin `key_value-@你好-``-"especiál` insertStoreTable ---
@@ -258,12 +258,12 @@ TO TABLE `delta_updates-@你好-``-"especiál`;
 
 --- Begin `key_value-@你好-``-"especiál` dropStoreTable ---
 
-DROP TABLE IF EXISTS `flow_temp_store_0_key_value-@你好-``-"especiál`;
+DROP TABLE IF EXISTS `flow_temp_store_0_key_value-@你好-``-"especiál` SYNC;
 --- End `key_value-@你好-``-"especiál` dropStoreTable ---
 
 --- Begin `delta_updates-@你好-``-"especiál` dropStoreTable ---
 
-DROP TABLE IF EXISTS `flow_temp_store_0_delta_updates-@你好-``-"especiál`;
+DROP TABLE IF EXISTS `flow_temp_store_0_delta_updates-@你好-``-"especiál` SYNC;
 --- End `delta_updates-@你好-``-"especiál` dropStoreTable ---
 
 

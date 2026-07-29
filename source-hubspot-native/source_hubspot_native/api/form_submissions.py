@@ -20,6 +20,12 @@ from .shared import (
 )
 
 
+
+# HubSpot refuses to export submissions for blog_comment forms, responding 400
+# FORM_TYPE_NOT_ALLOWED.
+FORM_TYPES_WITHOUT_SUBMISSIONS = frozenset({"blog_comment"})
+
+
 async def _fetch_form_submissions_since(
     http: HTTPSession,
     log: Logger,
@@ -66,6 +72,9 @@ async def fetch_form_submissions(
     form_ids: list[str] = []
 
     async for form in fetch_forms(http, log):
+        if form.formType in FORM_TYPES_WITHOUT_SUBMISSIONS:
+            continue
+
         form_ids.append(form.id)
 
     latest_submitted_at = log_cursor

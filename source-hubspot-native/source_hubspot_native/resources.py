@@ -643,7 +643,11 @@ def forms(http: HTTPSession) -> Resource:
             task,
             fetch_snapshot=functools.partial(fetch_forms, http),
             tombstone=Form(
-                _meta=Form.Meta(op="d"), id="", createdAt=None, updatedAt=None
+                _meta=Form.Meta(op="d"),
+                id="",
+                formType="",
+                createdAt=None,
+                updatedAt=None,
             ),
         )
 

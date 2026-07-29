@@ -106,6 +106,16 @@ When the connector captures related entities in separate streams, reference the 
 
 See top-level [README.md](README.md) for transactional semantics and connector patterns.
 
+## Agent skills
+
+### Issue tracker
+
+Issues live as GitHub issues in `estuary/connectors`, driven by the `gh` CLI (the org enforces SAML SSO — `gh auth refresh` if a call is rejected). See [docs/agents/issue-tracker.md](docs/agents/issue-tracker.md).
+
+### Domain docs
+
+Multi-context: [CONTEXT-MAP.md](CONTEXT-MAP.md) splits captures from materializations, with per-context glossaries and ADRs under `docs/contexts/`. See [docs/agents/domain.md](docs/agents/domain.md).
+
 # Debugging
  
 When debugging CI test failures, always ask the user for complete CI logs before exploring the codebase extensively. Do not theorize about root causes from incomplete output — request the full logs first.

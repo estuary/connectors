@@ -1,5 +1,32 @@
 # Changelog
 
+## 2026-07-29
+
+### Fixed
+- Fixed a permanent restart loop with the error `refusing to load <table>: load
+  table contains N keys but M were inserted` on ClickHouse Cloud. Truncating a
+  replicated table — which on Cloud is every table, since `MergeTree` is
+  transparently `SharedMergeTree` — happens asynchronously unless `SYNC` is
+  requested, so a queued truncate of an internal staging table could execute
+  after the rows of the next transaction had been staged and silently drop them.
+  Truncating a table when backfilling a binding was exposed the same way, which
+  could drop rows materialized just after the backfill was applied.
+
+## 2026-07-23
+
+### Changed
+- Schema changes now first commit any transaction that was staged but not yet
+  fully applied to the tables they affect, instead of leaving it to be applied
+  afterwards. This prevents failures where staged data built against the
+  previous table schema could no longer be applied after a column was added,
+  made nullable, or had its type migrated.
+
+### Fixed
+- With the `retain_existing_data_on_backfill` feature flag enabled, backfilling
+  a binding no longer risks losing the rows of a transaction that was committed
+  but not yet fully applied to the destination: the pending transaction is now
+  applied before the backfill takes effect.
+
 ## 2026-07-22
 
 ### Changed

@@ -231,6 +231,7 @@ class Owner(BaseDocument, extra="allow"):
 
 class Form(BaseDocument, extra="allow"):
     id: str
+    formType: str
     createdAt: AwareDatetime | None
     updatedAt: AwareDatetime | None
 

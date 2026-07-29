@@ -382,7 +382,7 @@ class PortfoliosMemberships(AsanaStream):
         self, stream_slice: Mapping[str, Any] = None, **kwargs
     ) -> MutableMapping[str, Any]:
         params = super().request_params(stream_slice=stream_slice, **kwargs)
-        params["portfolio"] = stream_slice["porfolio_gid"]
+        params["portfolio"] = stream_slice["portfolio_gid"]
         return params
 
     def parse_response(

@@ -2134,6 +2134,10 @@
           "title": "Id",
           "type": "string"
         },
+        "formType": {
+          "title": "Formtype",
+          "type": "string"
+        },
         "createdAt": {
           "anyOf": [
             {
@@ -2161,6 +2165,7 @@
       },
       "required": [
         "id",
+        "formType",
         "createdAt",
         "updatedAt"
       ],

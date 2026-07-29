@@ -98,12 +98,12 @@ ORDER BY (theKey);
 
 --- Begin key_value truncateLoadTable ---
 
-TRUNCATE TABLE IF EXISTS flow_temp_load_0_key_value;
+TRUNCATE TABLE IF EXISTS flow_temp_load_0_key_value SYNC;
 --- End key_value truncateLoadTable ---
 
 --- Begin delta_updates truncateLoadTable ---
 
-TRUNCATE TABLE IF EXISTS flow_temp_load_0_delta_updates;
+TRUNCATE TABLE IF EXISTS flow_temp_load_0_delta_updates SYNC;
 --- End delta_updates truncateLoadTable ---
 
 --- Begin key_value countLoadKeys ---
@@ -188,12 +188,12 @@ INSERT INTO flow_temp_load_0_delta_updates (theKey)
 
 --- Begin key_value dropLoadTable ---
 
-DROP TABLE IF EXISTS flow_temp_load_0_key_value;
+DROP TABLE IF EXISTS flow_temp_load_0_key_value SYNC;
 --- End key_value dropLoadTable ---
 
 --- Begin delta_updates dropLoadTable ---
 
-DROP TABLE IF EXISTS flow_temp_load_0_delta_updates;
+DROP TABLE IF EXISTS flow_temp_load_0_delta_updates SYNC;
 --- End delta_updates dropLoadTable ---
 
 --- Begin key_value createStoreTable ---
@@ -210,12 +210,12 @@ AS delta_updates;
 
 --- Begin key_value truncateStoreTable ---
 
-TRUNCATE TABLE IF EXISTS flow_temp_store_0_key_value;
+TRUNCATE TABLE IF EXISTS flow_temp_store_0_key_value SYNC;
 --- End key_value truncateStoreTable ---
 
 --- Begin delta_updates truncateStoreTable ---
 
-TRUNCATE TABLE IF EXISTS flow_temp_store_0_delta_updates;
+TRUNCATE TABLE IF EXISTS flow_temp_store_0_delta_updates SYNC;
 --- End delta_updates truncateStoreTable ---
 
 --- Begin key_value insertStoreTable ---
@@ -258,12 +258,12 @@ TO TABLE delta_updates;
 
 --- Begin key_value dropStoreTable ---
 
-DROP TABLE IF EXISTS flow_temp_store_0_key_value;
+DROP TABLE IF EXISTS flow_temp_store_0_key_value SYNC;
 --- End key_value dropStoreTable ---
 
 --- Begin delta_updates dropStoreTable ---
 
-DROP TABLE IF EXISTS flow_temp_store_0_delta_updates;
+DROP TABLE IF EXISTS flow_temp_store_0_delta_updates SYNC;
 --- End delta_updates dropStoreTable ---
 
 
