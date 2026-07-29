@@ -1,0 +1,138 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$defs": {
+        "Advanced": {
+          "properties": {
+            "start_date": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "YYYY-MM-DD to begin the first sync from. Defaults to 2 days ago.",
+              "title": "Start Date"
+            },
+            "end_date": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "YYYY-MM-DD (inclusive) to stop pulling at. Leave empty to keep pulling up to the current day. Set it only for a bounded historical backfill.",
+              "title": "End Date"
+            },
+            "lookback_days": {
+              "default": 1,
+              "description": "Re-pull this many days before the cursor each run to catch late-arriving data. Duplicates are deduped by event_id.",
+              "title": "Lookback Days",
+              "type": "integer"
+            },
+            "skip_invalid_events": {
+              "default": false,
+              "description": "If CleverTap rejects an event name as invalid, log a warning and continue with the next event instead of failing the whole capture.",
+              "title": "Skip Invalid Events",
+              "type": "boolean"
+            }
+          },
+          "title": "Advanced",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "account_id": {
+          "description": "Value sent as the X-CleverTap-Account-Id header.",
+          "title": "CleverTap Account ID",
+          "type": "string"
+        },
+        "secret": {
+          "description": "Value sent as the X-CleverTap-Passcode header.",
+          "secret": true,
+          "title": "CleverTap Passcode",
+          "type": "string"
+        },
+        "event_names": {
+          "description": "CleverTap event names to pull (the connector fetches each one).",
+          "items": {
+            "type": "string"
+          },
+          "title": "Event Names",
+          "type": "array"
+        },
+        "api_base_url": {
+          "default": "https://eu1.api.clevertap.com/1/events.json",
+          "description": "Region-specific CleverTap events.json endpoint (eu1, us1, in1, ...).",
+          "title": "API Base URL",
+          "type": "string"
+        },
+        "timezone": {
+          "default": "Asia/Kolkata",
+          "description": "Timezone used to derive the CleverTap from/to date range.",
+          "title": "Timezone",
+          "type": "string"
+        },
+        "advanced": {
+          "$ref": "#/$defs/Advanced",
+          "advanced": true,
+          "title": "Advanced Config"
+        }
+      },
+      "required": [
+        "account_id",
+        "secret",
+        "event_names"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "description": "ResourceConfig is a common resource configuration shape.",
+      "properties": {
+        "_meta": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Meta"
+        },
+        "name": {
+          "description": "Name of this resource",
+          "title": "Name",
+          "type": "string"
+        },
+        "interval": {
+          "default": "PT0S",
+          "description": "Interval between updates for this resource",
+          "format": "duration",
+          "title": "Interval",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ResourceConfig",
+      "type": "object"
+    },
+    "documentationUrl": "https://docs.estuary.dev",
+    "resourcePathPointers": [
+      "/name"
+    ]
+  }
+]

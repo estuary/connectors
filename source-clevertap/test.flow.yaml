@@ -1,0 +1,28 @@
+---
+import:
+- acmeCo/flow.yaml
+captures:
+  acmeCo/source-clevertap:
+    endpoint:
+      local:
+        command:
+        - python
+        - -m
+        - source_clevertap
+        config:
+          account_id: dummy_account_id
+          secret: dummy_passcode
+          event_names:
+          - Example Event
+    bindings:
+    - resource:
+        name: events_data
+        interval: P1D
+      target: acmeCo/events_data
+    - resource:
+        name: profile_data
+        interval: P1D
+      target: acmeCo/profile_data
+    interval: 3m
+    shards:
+      logLevel: debug
