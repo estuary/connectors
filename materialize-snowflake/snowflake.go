@@ -1443,5 +1443,5 @@ func main() {
 	// intermixed with our connector logs. We disable the gosnowflake logger here and log as needed
 	// when handling errors from the sql driver.
 	sf.GetLogger().SetLogLevel("OFF")
-	boilerplate.RunMain(newSnowflakeDriver())
+	boilerplate.RunMain(gatedDriver{newSnowflakeDriver()})
 }
