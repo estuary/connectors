@@ -1,0 +1,22 @@
+import:
+- acmeCo/flow.yaml
+captures:
+  acmeCo/source-azure-servicebus:
+    endpoint:
+      local:
+        command:
+        - python
+        - -m
+        - source_azure_servicebus
+        config:
+          connection_string: dummy_connection_string
+          topic_name: example_topic
+          subscription_name: example_subscription
+    bindings:
+    - resource:
+        name: example_topic.example_subscription
+        interval: PT15M
+      target: acmeCo/example_topic.example_subscription
+    interval: 15m
+    shards:
+      logLevel: debug
