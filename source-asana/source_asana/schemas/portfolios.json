@@ -26,11 +26,14 @@
     },
     "due_on": { "type": ["null", "string"], "format": "date-time" },
     "members": {
-      "type": ["null", "object"],
-      "properties": {
-        "gid": { "type": ["null", "string"] },
-        "resource_type": { "type": ["null", "string"] },
-        "name": { "type": ["null", "string"] }
+      "type": ["null", "array"],
+      "items": {
+        "type": ["null", "object"],
+        "properties": {
+          "gid": { "type": ["null", "string"] },
+          "resource_type": { "type": ["null", "string"] },
+          "name": { "type": ["null", "string"] }
+        }
       }
     },
     "owner": {
@@ -53,11 +56,14 @@
     "permalink_url": { "type": ["null", "string"] },
     "public": { "type": ["null", "boolean"] },
     "project_templates": {
-      "type": ["null", "object"],
-      "properties": {
-        "gid": { "type": ["null", "string"] },
-        "resource_type": { "type": ["null", "string"] },
-        "name": { "type": ["null", "string"] }
+      "type": ["null", "array"],
+      "items": {
+        "type": ["null", "object"],
+        "properties": {
+          "gid": { "type": ["null", "string"] },
+          "resource_type": { "type": ["null", "string"] },
+          "name": { "type": ["null", "string"] }
+        }
       }
     }
   }
