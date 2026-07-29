@@ -89,6 +89,20 @@ func TestDefaultNamespace(t *testing.T) {
 	}
 }
 
+func TestDeprecatedLowercaseColumnNamesIsHidden(t *testing.T) {
+	resp, err := (Driver{}).Spec(context.Background(), &pm.Request_Spec{})
+	require.NoError(t, err)
+	require.NotContains(t, string(resp.ConfigSchemaJson), "lowercase_column_names",
+		"a deprecated option must not be offered to new users in the config schema")
+
+	// Specs that already set it must still decode, since hiding the option from
+	// the schema does not remove it from published specs.
+	var cfg config
+	require.NoError(t, json.Unmarshal([]byte(`{"advanced":{"lowercase_column_names":true}}`), &cfg))
+	require.True(t, cfg.Advanced.LowercaseColumnNames)
+	require.Equal(t, identifierCaseLowercase, cfg.Advanced.fieldNameCase())
+}
+
 func TestFieldNameCase(t *testing.T) {
 	for _, tt := range []struct {
 		name                 string
