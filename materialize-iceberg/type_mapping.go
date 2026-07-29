@@ -53,14 +53,11 @@ var allowedMigrations = boilerplate.TypeMigrations[iceberg.Type]{
 
 var migrateFieldSuffix = "_flow_tmp"
 
-func mapProjection(p boilerplate.Projection, lowercaseColumnNames bool) (mapped, boilerplate.ElementConverter) {
+func mapProjection(p boilerplate.Projection, translateField boilerplate.TranslateFieldFn) (mapped, boilerplate.ElementConverter) {
 	var m mapped
 	var converter boilerplate.ElementConverter
 
-	m.Name = p.Field
-	if lowercaseColumnNames {
-		m.Name = strings.ToLower(m.Name)
-	}
+	m.Name = translateField(p.Field)
 
 	switch ft := p.FlatType.(type) {
 	case boilerplate.FlatTypeArray:

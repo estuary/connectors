@@ -54,6 +54,8 @@ no_flow_document
 disableFieldTruncation
 disable_key_distribution_optimization
 lowercase_column_names
+table_identifier_case
+field_name_case
 timestamp_type
 create_default_subscription
 embeddingModel

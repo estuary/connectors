@@ -72,9 +72,61 @@ func (c glueOptimizersConfig) anyEnabled() bool {
 	return c.EnableCompaction || c.EnableRetention || c.EnableOrphanFileDeletion
 }
 
+// identifierCase is the set of casing behaviors that can be applied to
+// identifiers created by the materialization. The empty value means "whatever
+// specs published before this option existed did", which is not the same for
+// every option: table_identifier_case defaults to identifierCaseLowercase,
+// while field_name_case defaults to identifierCasePreserve.
+type identifierCase string
+
+const (
+	identifierCaseLowercase identifierCase = "lowercase"
+	identifierCaseUppercase identifierCase = "uppercase"
+	identifierCasePreserve  identifierCase = "preserve"
+)
+
+func (c identifierCase) valid() bool {
+	switch c {
+	case "", identifierCaseLowercase, identifierCaseUppercase, identifierCasePreserve:
+		return true
+	default:
+		return false
+	}
+}
+
+// fieldNameCase resolves field_name_case together with the deprecated
+// lowercase_column_names option it replaces.
+func (c advancedConfig) fieldNameCase() identifierCase {
+	if c.FieldNameCase != "" {
+		return c.FieldNameCase
+	} else if c.LowercaseColumnNames {
+		return identifierCaseLowercase
+	}
+
+	return identifierCasePreserve
+}
+
+// translateFieldName cases a Flow field name the way a column created for it is
+// named.
+func (c advancedConfig) translateFieldName(field string) string {
+	switch c.fieldNameCase() {
+	case identifierCaseLowercase:
+		return strings.ToLower(field)
+	case identifierCaseUppercase:
+		return strings.ToUpper(field)
+	default:
+		return field
+	}
+}
+
 type advancedConfig struct {
-	LowercaseColumnNames bool   `json:"lowercase_column_names,omitempty" jsonschema:"title=Lowercase Column Names,description=Create all columns with lowercase names. This is necessary for compatibility with some systems such as querying S3 Table Buckets with Athena."`
-	FeatureFlags         string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	// LowercaseColumnNames is superseded by FieldNameCase and hidden from the
+	// generated schema so that new materializations are not offered it, but it
+	// is still decoded and honored for specs that already set it.
+	LowercaseColumnNames bool           `json:"lowercase_column_names,omitempty" jsonschema:"-"`
+	TableIdentifierCase  identifierCase `json:"table_identifier_case,omitempty" jsonschema:"title=Table Identifier Case,enum=lowercase,enum=uppercase,enum=preserve,default=lowercase,description=Casing applied to the namespace and table name (together the Iceberg table identifier) of tables created by this materialization. 'lowercase' (the default) folds them to lower case so a binding for MyTable creates the table mytable; 'uppercase' folds them to upper case which is needed for catalogs where unquoted identifiers resolve upper-case such as Snowflake's; 'preserve' uses them exactly as written in the binding. Tables that already exist are never renamed."`
+	FieldNameCase        identifierCase `json:"field_name_case,omitempty" jsonschema:"title=Field Name Case,enum=lowercase,enum=uppercase,enum=preserve,default=preserve,description=Casing applied to the names of columns created by this materialization. 'preserve' (the default) names them exactly as the fields are named in the collection; 'lowercase' folds them to lower case which is necessary for some systems such as querying S3 Table Buckets with Athena; 'uppercase' folds them to upper case which is needed for catalogs where unquoted identifiers resolve upper-case such as Snowflake's. Columns that already exist are matched case-insensitively and are never renamed."`
+	FeatureFlags         string         `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
 func (c config) Validate() error {
@@ -91,6 +143,18 @@ func (c config) Validate() error {
 
 	if strings.Contains(c.Namespace, ".") {
 		return fmt.Errorf("namespace %q must not contain dots", c.Namespace)
+	}
+
+	if !c.Advanced.TableIdentifierCase.valid() {
+		return fmt.Errorf("invalid table_identifier_case %q: must be one of %q, %q, or %q", c.Advanced.TableIdentifierCase, identifierCaseLowercase, identifierCaseUppercase, identifierCasePreserve)
+	}
+
+	if !c.Advanced.FieldNameCase.valid() {
+		return fmt.Errorf("invalid field_name_case %q: must be one of %q, %q, or %q", c.Advanced.FieldNameCase, identifierCaseLowercase, identifierCaseUppercase, identifierCasePreserve)
+	}
+
+	if c.Advanced.LowercaseColumnNames && c.Advanced.FieldNameCase != "" && c.Advanced.FieldNameCase != identifierCaseLowercase {
+		return fmt.Errorf("field_name_case %q conflicts with the deprecated lowercase_column_names option: unset lowercase_column_names to use field_name_case %q", c.Advanced.FieldNameCase, c.Advanced.FieldNameCase)
 	}
 
 	catalogAuth, err := c.CatalogAuthConfig()
@@ -140,7 +204,18 @@ func (c config) Validate() error {
 }
 
 func (c config) DefaultNamespace() string {
-	return c.Namespace
+	// This must apply the same transform to the namespace that
+	// resource.Parameters applies to its namespace element, or the boilerplate
+	// will create a second, differently-cased namespace alongside the one
+	// tables are created in.
+	switch c.Advanced.TableIdentifierCase {
+	case identifierCaseUppercase:
+		return strings.ToUpper(sanitize(c.Namespace))
+	case identifierCasePreserve:
+		return sanitize(c.Namespace)
+	default: // "" (unset) or lowercase.
+		return strings.ToLower(sanitize(c.Namespace))
+	}
 }
 
 func (c config) FeatureFlags() (raw string, defaults map[string]bool) {
@@ -670,6 +745,10 @@ type resource struct {
 	Table                     string            `json:"table" jsonschema:"title=Table,description=Name of the database table." jsonschema_extras:"x-collection-name=true"`
 	Namespace                 string            `json:"namespace,omitempty" jsonschema:"title=Alternative Namespace,description=Alternative Namespace for this table (optional)." jsonschema_extras:"x-schema-name=true"`
 	AdditionalTableProperties map[string]string `json:"additional_table_properties,omitempty" jsonschema:"title=Additional Table Properties,description=Additional Iceberg table properties to set when the table is created. These are set only at creation time and cannot be changed afterwards. Example: {'write.parquet.compression-codec': 'zstd'}"`
+
+	// tableIdentifierCase is populated from the endpoint config in WithDefaults
+	// so that Parameters can case the elements of the resource path.
+	tableIdentifierCase identifierCase
 }
 
 func (r resource) Validate() error {
@@ -689,10 +768,19 @@ func (r resource) WithDefaults(cfg config) resource {
 	if r.Namespace == "" {
 		r.Namespace = cfg.Namespace
 	}
+	r.tableIdentifierCase = cfg.Advanced.TableIdentifierCase
 
 	return r
 }
 
 func (r resource) Parameters() (path []string, deltaUpdates bool, err error) {
-	return sanitizePath(r.Namespace, r.Table), false, nil
+	switch r.tableIdentifierCase {
+	case identifierCaseUppercase:
+		path = []string{strings.ToUpper(sanitize(r.Namespace)), strings.ToUpper(sanitize(r.Table))}
+	case identifierCasePreserve:
+		path = []string{sanitize(r.Namespace), sanitize(r.Table)}
+	default: // "" (unset) or lowercase: historical behavior.
+		path = sanitizePath(r.Namespace, r.Table)
+	}
+	return path, false, nil
 }
