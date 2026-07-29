@@ -389,11 +389,6 @@
       },
       "advanced": {
         "properties": {
-          "lowercase_column_names": {
-            "type": "boolean",
-            "title": "Lowercase Column Names",
-            "description": "Deprecated: set field_name_case to 'lowercase' instead. Create all columns with lowercase names."
-          },
           "table_identifier_case": {
             "type": "string",
             "enum": [

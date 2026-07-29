@@ -1,6 +1,6 @@
 # Changelog
 
-## 2026-07-23
+## 2026-07-29
 
 ### Added
 - New advanced option `table_identifier_case` controls the casing of namespace
@@ -20,7 +20,9 @@
 ### Deprecated
 - The advanced option `lowercase_column_names` is deprecated in favor of
   `field_name_case: lowercase`, which it remains equivalent to. Setting it
-  alongside a `field_name_case` of `uppercase` or `preserve` is an error.
+  alongside a `field_name_case` of `uppercase` or `preserve` is an error. It is
+  no longer offered in the connector's configuration schema, but materializations
+  that already set it continue to work.
 
 ### Fixed
 - The namespace pre-created at apply time now always matches the namespace that

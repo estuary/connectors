@@ -120,7 +120,10 @@ func (c advancedConfig) translateFieldName(field string) string {
 }
 
 type advancedConfig struct {
-	LowercaseColumnNames bool           `json:"lowercase_column_names,omitempty" jsonschema:"title=Lowercase Column Names,description=Deprecated: set field_name_case to 'lowercase' instead. Create all columns with lowercase names."`
+	// LowercaseColumnNames is superseded by FieldNameCase and hidden from the
+	// generated schema so that new materializations are not offered it, but it
+	// is still decoded and honored for specs that already set it.
+	LowercaseColumnNames bool           `json:"lowercase_column_names,omitempty" jsonschema:"-"`
 	TableIdentifierCase  identifierCase `json:"table_identifier_case,omitempty" jsonschema:"title=Table Identifier Case,enum=lowercase,enum=uppercase,enum=preserve,default=lowercase,description=Casing applied to the namespace and table name (together the Iceberg table identifier) of tables created by this materialization. 'lowercase' (the default) folds them to lower case so a binding for MyTable creates the table mytable; 'uppercase' folds them to upper case which is needed for catalogs where unquoted identifiers resolve upper-case such as Snowflake's; 'preserve' uses them exactly as written in the binding. Tables that already exist are never renamed."`
 	FieldNameCase        identifierCase `json:"field_name_case,omitempty" jsonschema:"title=Field Name Case,enum=lowercase,enum=uppercase,enum=preserve,default=preserve,description=Casing applied to the names of columns created by this materialization. 'preserve' (the default) names them exactly as the fields are named in the collection; 'lowercase' folds them to lower case which is necessary for some systems such as querying S3 Table Buckets with Athena; 'uppercase' folds them to upper case which is needed for catalogs where unquoted identifiers resolve upper-case such as Snowflake's. Columns that already exist are matched case-insensitively and are never renamed."`
 	FeatureFlags         string         `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
