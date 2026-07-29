@@ -26,6 +26,10 @@ var sidecarReadyTimeout = 30 * time.Second
 // sidecarStopTimeout is a var so tests can shorten it.
 var sidecarStopTimeout = 10 * time.Second
 
+// sidecarKillTimeout bounds how long kill waits for a SIGKILLed sidecar's exit
+// to be observed. It is a var so tests can shorten it.
+var sidecarKillTimeout = 30 * time.Second
+
 const (
 
 	// stderrTailLines/Bytes bound the ring buffer of recent sidecar stderr
@@ -145,7 +149,12 @@ func startSidecar(ctx context.Context, argv []string) (*sidecarSupervisor, *side
 	// The auth token travels over stdin so it appears in no argv or environ;
 	// the sidecar must echo it in the configure RPC.
 	go func() {
-		io.WriteString(stdin, s.authToken+"\n")
+		// A token the sidecar never receives makes every RPC fail authentication,
+		// so naming this failure is what makes the configure error below
+		// diagnosable rather than an unexplained rejection.
+		if _, err := io.WriteString(stdin, s.authToken+"\n"); err != nil {
+			log.WithError(err).Warn("could not write auth token to sidecar stdin")
+		}
 	}()
 
 	// readyCh receives the single ready line the sidecar prints to stdout.
@@ -181,15 +190,15 @@ func startSidecar(ctx context.Context, argv []string) (*sidecarSupervisor, *side
 	select {
 	case ready = <-readyCh:
 	case err := <-readyErrCh:
-		s.kill()
+		s.killAfterFailure()
 		return nil, nil, s.exitError(err)
 	case <-s.died:
 		return nil, nil, s.exitError(fmt.Errorf("sidecar exited before becoming ready"))
 	case <-time.After(sidecarReadyTimeout):
-		s.kill()
+		s.killAfterFailure()
 		return nil, nil, s.exitError(fmt.Errorf("sidecar not ready after %s", sidecarReadyTimeout))
 	case <-ctx.Done():
-		s.kill()
+		s.killAfterFailure()
 		return nil, nil, ctx.Err()
 	}
 
@@ -202,7 +211,7 @@ func startSidecar(ctx context.Context, argv []string) (*sidecarSupervisor, *side
 		err = fmt.Errorf("sidecar reported unknown transport %q", ready.Transport)
 	}
 	if err != nil {
-		s.kill()
+		s.killAfterFailure()
 		return nil, nil, s.exitError(fmt.Errorf("connecting to sidecar: %w", err))
 	}
 	log.WithField("transport", ready.Transport).Debug("connected to snowpipe streaming sidecar")
@@ -293,9 +302,36 @@ func (s *sidecarSupervisor) signal(sig syscall.Signal) error {
 	return syscall.Kill(-s.cmd.Process.Pid, sig)
 }
 
-func (s *sidecarSupervisor) kill() {
-	s.signal(syscall.SIGKILL)
-	<-s.died
+// kill force-kills the sidecar's process group and waits for its exit to be
+// observed. Both the signal and the wait are bounded: the exit can only be
+// observed once cmd.Wait returns, which a failed signal would leave waiting for
+// a process that is never going to die.
+func (s *sidecarSupervisor) kill() error {
+	select {
+	case <-s.died:
+		return nil
+	default:
+	}
+
+	if err := s.signal(syscall.SIGKILL); err != nil {
+		return fmt.Errorf("killing sidecar process group: %w", err)
+	}
+
+	select {
+	case <-s.died:
+		return nil
+	case <-time.After(sidecarKillTimeout):
+		return fmt.Errorf("sidecar did not exit within %s of SIGKILL", sidecarKillTimeout)
+	}
+}
+
+// killAfterFailure force-kills the sidecar while another failure is being
+// reported, where the kill's own failure must be visible without displacing the
+// error the caller is already returning.
+func (s *sidecarSupervisor) killAfterFailure() {
+	if err := s.kill(); err != nil {
+		log.WithError(err).Warn("could not kill snowpipe streaming sidecar")
+	}
 }
 
 // stop tears the sidecar down gracefully: shutdown RPC, then SIGTERM, then
@@ -312,19 +348,23 @@ func (s *sidecarSupervisor) stop(client *sidecarClient) {
 
 		if client != nil {
 			var ctx, cancel = context.WithTimeout(context.Background(), rpcTimeoutShutdown)
-			client.Shutdown(ctx)
+			if err := client.Shutdown(ctx); err != nil {
+				log.WithError(err).Debug("sidecar shutdown RPC failed; falling back to signals")
+			}
 			cancel()
 		}
 		if s.conn != nil {
 			s.conn.Close()
 		}
 
-		s.signal(syscall.SIGTERM)
+		if err := s.signal(syscall.SIGTERM); err != nil {
+			log.WithError(err).Debug("could not SIGTERM sidecar; awaiting the kill escalation")
+		}
 		select {
 		case <-s.died:
 		case <-time.After(sidecarStopTimeout):
 			log.Warn("sidecar did not exit after SIGTERM; killing")
-			s.kill()
+			s.killAfterFailure()
 		}
 	})
 }

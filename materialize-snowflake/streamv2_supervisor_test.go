@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 	"syscall"
@@ -181,6 +182,56 @@ func TestSidecarStopEscalatesToKill(t *testing.T) {
 		t.Fatal("sidecar still running after stop")
 	}
 	require.Contains(t, sup.waitErr.Error(), "killed")
+}
+
+// TestSidecarKillReportsSignalFailure covers a supervisor whose process cannot
+// be signalled and whose exit has therefore never been observed: kill must
+// report why rather than wait for an exit which can never come.
+func TestSidecarKillReportsSignalFailure(t *testing.T) {
+	var sup = &sidecarSupervisor{
+		// A pid far above any this system has allocated, so that signalling its
+		// process group fails with ESRCH.
+		cmd:  &exec.Cmd{Process: &os.Process{Pid: 1 << 30}},
+		died: make(chan struct{}),
+		tail: newTailBuffer(stderrTailLines, stderrTailBytes),
+	}
+
+	var done = make(chan error, 1)
+	go func() { done <- sup.kill() }()
+
+	select {
+	case err := <-done:
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "killing sidecar process group")
+	case <-time.After(10 * time.Second):
+		t.Fatal("kill blocked on an exit which cannot happen")
+	}
+}
+
+// TestSidecarKillTimesOutAwaitingExit covers the signal succeeding while the
+// exit is never observed: kill must give up rather than block indefinitely.
+func TestSidecarKillTimesOutAwaitingExit(t *testing.T) {
+	defer func(d time.Duration) { sidecarKillTimeout = d }(sidecarKillTimeout)
+	sidecarKillTimeout = 500 * time.Millisecond
+
+	var sup = &sidecarSupervisor{
+		// Signalling our own process group would succeed but kill the test
+		// binary, so signal nothing at all and let the wait do the work.
+		cmd:  &exec.Cmd{},
+		died: make(chan struct{}),
+		tail: newTailBuffer(stderrTailLines, stderrTailBytes),
+	}
+
+	var done = make(chan error, 1)
+	go func() { done <- sup.kill() }()
+
+	select {
+	case err := <-done:
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "did not exit within")
+	case <-time.After(10 * time.Second):
+		t.Fatal("kill blocked past its own timeout")
+	}
 }
 
 func TestSidecarProcessGroupSignal(t *testing.T) {
