@@ -24,7 +24,7 @@
         "resource_subtype": { "type": ["null", "string"] }
       }
     },
-    "due_on": { "type": ["null", "string"], "format": "date-time" },
+    "due_on": { "type": ["null", "string"], "format": "date" },
     "members": {
       "type": ["null", "array"],
       "items": {
@@ -44,7 +44,7 @@
         "name": { "type": ["null", "string"] }
       }
     },
-    "start_on": { "type": ["null", "string"], "format": "date-time" },
+    "start_on": { "type": ["null", "string"], "format": "date" },
     "workspace": {
       "type": ["null", "object"],
       "properties": {

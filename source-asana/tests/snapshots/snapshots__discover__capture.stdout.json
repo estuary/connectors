@@ -900,7 +900,7 @@
             "null",
             "string"
           ],
-          "format": "date-time"
+          "format": "date"
         },
         "members": {
           "type": [
@@ -965,7 +965,7 @@
             "null",
             "string"
           ],
-          "format": "date-time"
+          "format": "date"
         },
         "workspace": {
           "type": [
@@ -1008,26 +1008,32 @@
         "project_templates": {
           "type": [
             "null",
-            "object"
+            "array"
           ],
-          "properties": {
-            "gid": {
-              "type": [
-                "null",
-                "string"
-              ]
-            },
-            "resource_type": {
-              "type": [
-                "null",
-                "string"
-              ]
-            },
-            "name": {
-              "type": [
-                "null",
-                "string"
-              ]
+          "items": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "properties": {
+              "gid": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "resource_type": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "name": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              }
             }
           }
         },
