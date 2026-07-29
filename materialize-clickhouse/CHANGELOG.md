@@ -3,6 +3,14 @@
 ## 2026-07-29
 
 ### Fixed
+- Fixed a restart loop with the error `Table <database>.flow_temp_load_… does
+  not exist` (code 60) on materializations with many bindings. The load phase
+  began staging keys before the internal staging tables had finished being
+  established, which happens concurrently, so a large materialization could
+  reference a table that did not exist yet. Materializations using the
+  `allow_existing_tables_for_new_bindings` or `retain_existing_data_on_backfill`
+  feature flags were the most exposed, because those flags load every binding
+  rather than skipping bindings known to be empty.
 - Fixed a permanent restart loop with the error `refusing to load <table>: load
   table contains N keys but M were inserted` on ClickHouse Cloud. Truncating a
   replicated table — which on Cloud is every table, since `MergeTree` is
