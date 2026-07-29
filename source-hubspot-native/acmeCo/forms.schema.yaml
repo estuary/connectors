@@ -25,6 +25,9 @@ properties:
   id:
     title: Id
     type: string
+  formType:
+    title: Formtype
+    type: string
   createdAt:
     anyOf:
     - format: date-time
@@ -39,6 +42,7 @@ properties:
     title: Updatedat
 required:
 - id
+- formType
 - createdAt
 - updatedAt
 title: Form
