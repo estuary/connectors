@@ -78,6 +78,7 @@ class EndpointConfig(BaseModel):
             default=24,
             ge=1,
             le=168,
+            json_schema_extra={"nonsensitive": True},
         )
 
     advanced: Advanced = Field(

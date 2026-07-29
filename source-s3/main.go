@@ -118,7 +118,7 @@ type config struct {
 }
 
 type advancedConfig struct {
-	AscendingKeys bool   `json:"ascendingKeys" jsonschema="title=Ascending Keys,description=Improve sync speeds by listing files from the end of the last sync, rather than listing the entire bucket prefix. This requires that you write objects in ascending lexicographic order, such as an RFC-3339 timestamp, so that key ordering matches modification time ordering. For more information see https://go.estuary.dev/xKswdo."`
+	AscendingKeys bool   `json:"ascendingKeys" jsonschema="title=Ascending Keys,description=Improve sync speeds by listing files from the end of the last sync, rather than listing the entire bucket prefix. This requires that you write objects in ascending lexicographic order, such as an RFC-3339 timestamp, so that key ordering matches modification time ordering. For more information see https://go.estuary.dev/xKswdo." jsonschema_extras:"nonsensitive=true"`
 	Endpoint      string `json:"endpoint" jsonschema="title=AWS Endpoint,description=The AWS endpoint URI to connect to. Use if you're capturing from a S3-compatible API that isn't provided by AWS`
 }
 

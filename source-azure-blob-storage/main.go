@@ -26,7 +26,7 @@ type config struct {
 	ContainerName string         `json:"containerName"`
 }
 type advancedConfig struct {
-	AscendingKeys bool `json:"ascendingKeys,omitempty"`
+	AscendingKeys bool `json:"ascendingKeys,omitempty" jsonschema_extras:"nonsensitive=true"`
 }
 
 type credentials struct {

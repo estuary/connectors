@@ -27,6 +27,7 @@
         "type": "boolean",
         "description": "Capture change events without reducing them to a final state.",
         "default": false,
+        "nonsensitive": true,
         "order": 3
       },
       "credentials": {
@@ -158,7 +159,8 @@
             },
             "type": "array",
             "title": "Include Schemas",
-            "description": "If specified only tables in the listed schemas will be discovered. Combined as a union with the 'Discovery Schema Selection' setting under Advanced Options."
+            "description": "If specified only tables in the listed schemas will be discovered. Combined as a union with the 'Discovery Schema Selection' setting under Advanced Options.",
+            "nonsensitive": true
           },
           "exclude_schemas": {
             "items": {
@@ -166,7 +168,8 @@
             },
             "type": "array",
             "title": "Exclude Schemas",
-            "description": "Tables in the listed schemas will be excluded from discovery."
+            "description": "Tables in the listed schemas will be excluded from discovery.",
+            "nonsensitive": true
           },
           "table_patterns": {
             "items": {
@@ -174,12 +177,14 @@
             },
             "type": "array",
             "title": "Table Patterns",
-            "description": "If specified only tables matching at least one of these glob patterns will be discovered. A pattern containing a '.' matches against the qualified 'schema.table' name. A pattern without a '.' matches the unqualified table name in any schema. Use '*' or '?' as wildcards."
+            "description": "If specified only tables matching at least one of these glob patterns will be discovered. A pattern containing a '.' matches against the qualified 'schema.table' name. A pattern without a '.' matches the unqualified table name in any schema. Use '*' or '?' as wildcards.",
+            "nonsensitive": true
           },
           "discover_unpublished_tables": {
             "type": "boolean",
             "title": "Discover Unpublished Tables",
-            "description": "When set the capture will discover all tables including those not currently in the publication. Combined as a union with the equivalent setting under Advanced Options."
+            "description": "When set the capture will discover all tables including those not currently in the publication. Combined as a union with the equivalent setting under Advanced Options.",
+            "nonsensitive": true
           }
         },
         "additionalProperties": false,
@@ -213,7 +218,8 @@
             "type": "integer",
             "title": "Backfill Chunk Size",
             "description": "The number of rows which should be fetched from the database in a single backfill query.",
-            "default": 50000
+            "default": 50000,
+            "nonsensitive": true
           },
           "sslmode": {
             "type": "string",
@@ -234,7 +240,8 @@
             },
             "type": "array",
             "title": "Discovery Schema Selection",
-            "description": "If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas."
+            "description": "If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas.",
+            "nonsensitive": true
           },
           "min_backfill_xid": {
             "type": "string",
@@ -245,22 +252,26 @@
           "read_only_capture": {
             "type": "boolean",
             "title": "Read-Only Capture",
-            "description": "When set the capture will operate in read-only mode and avoid operations such as watermark writes. This comes with some tradeoffs; consult the connector documentation for more information."
+            "description": "When set the capture will operate in read-only mode and avoid operations such as watermark writes. This comes with some tradeoffs; consult the connector documentation for more information.",
+            "nonsensitive": true
           },
           "capture_as_partitions": {
             "type": "boolean",
             "title": "Capture Partitioned Tables As Partitions",
-            "description": "When set the capture will discover and capture partitioned tables as individual partitions rather than as a single root table. This requires the publication to be created without 'publish_via_partition_root'."
+            "description": "When set the capture will discover and capture partitioned tables as individual partitions rather than as a single root table. This requires the publication to be created without 'publish_via_partition_root'.",
+            "nonsensitive": true
           },
           "discover_unpublished_tables": {
             "type": "boolean",
             "title": "Discover Unpublished Tables",
-            "description": "When set the capture will discover all tables including those not currently in the publication. Unpublished tables will be added to the publication at capture time if possible. Use with caution as this requires appropriate database permissions."
+            "description": "When set the capture will discover all tables including those not currently in the publication. Unpublished tables will be added to the publication at capture time if possible. Use with caution as this requires appropriate database permissions.",
+            "nonsensitive": true
           },
           "source_tag": {
             "type": "string",
             "title": "Source Tag",
-            "description": "When set the capture will add this value as the property 'tag' in the source metadata of each document."
+            "description": "When set the capture will add this value as the property 'tag' in the source metadata of each document.",
+            "nonsensitive": true
           },
           "rediscovery_interval": {
             "type": "string",
@@ -272,7 +283,8 @@
           "feature_flags": {
             "type": "string",
             "title": "Feature Flags",
-            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."
+            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.",
+            "nonsensitive": true
           },
           "statement_timeout": {
             "type": "string",
@@ -287,10 +299,12 @@
             ],
             "title": "Statement Timeout",
             "description": "Overrides the statement timeout used by the connector. Leave blank to use the default of 2 minutes. Set to '0' to disable statement timeouts entirely.",
-            "default": ""
+            "default": "",
+            "nonsensitive": true
           },
           "discover_only_published": {
             "type": "boolean",
+            "nonsensitive": true,
             "x-hidden-field": true
           }
         },
