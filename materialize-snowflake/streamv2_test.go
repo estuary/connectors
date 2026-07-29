@@ -465,6 +465,15 @@ func TestStreamV2Datatypes(t *testing.T) {
 			vals: []any{"hello", "", nil, "1234", "true", "1234.1234", []byte("hello bytes")},
 		},
 		{
+			ddl: "BINARY",
+			// The column type native_binary_column_type produces, which is on by
+			// default. A []byte is JSON-encoded as base64 on its way to the SDK,
+			// so these prove Snowflake decodes that back into the column's bytes
+			// — including bytes which are not valid UTF-8, and so could not have
+			// survived as text.
+			vals: []any{[]byte("hello bytes"), []byte{}, nil, []byte{0x00, 0xff, 0xfe}, []byte{0xde, 0xad, 0xbe, 0xef}},
+		},
+		{
 			ddl: "VARIANT",
 			// Every value of a VARIANT column passes through ToJsonBytes, so the
 			// connector only ever appends pre-encoded JSON or nothing. An absent
