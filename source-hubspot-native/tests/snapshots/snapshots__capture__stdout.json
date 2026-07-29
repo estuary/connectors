@@ -76,22 +76,6 @@
         "hs_csm_sentiment": null,
         "hs_current_customer": null,
         "hs_customer_success_ticket_sentiment": null,
-        "hs_date_entered_customer": "redacted",
-        "hs_date_entered_evangelist": "redacted",
-        "hs_date_entered_lead": "redacted",
-        "hs_date_entered_marketingqualifiedlead": "redacted",
-        "hs_date_entered_opportunity": "redacted",
-        "hs_date_entered_other": "redacted",
-        "hs_date_entered_salesqualifiedlead": "redacted",
-        "hs_date_entered_subscriber": "redacted",
-        "hs_date_exited_customer": "redacted",
-        "hs_date_exited_evangelist": "redacted",
-        "hs_date_exited_lead": "redacted",
-        "hs_date_exited_marketingqualifiedlead": "redacted",
-        "hs_date_exited_opportunity": "redacted",
-        "hs_date_exited_other": "redacted",
-        "hs_date_exited_salesqualifiedlead": "redacted",
-        "hs_date_exited_subscriber": "redacted",
         "hs_domain_status": null,
         "hs_employee_range": null,
         "hs_excluded_from_cross_account_data_mirroring": null,
@@ -189,14 +173,6 @@
         "hs_target_account_recommendation_state": null,
         "hs_task_label": "HubSpot",
         "hs_tax_id": null,
-        "hs_time_in_customer": "redacted",
-        "hs_time_in_evangelist": "redacted",
-        "hs_time_in_lead": "redacted",
-        "hs_time_in_marketingqualifiedlead": "redacted",
-        "hs_time_in_opportunity": "redacted",
-        "hs_time_in_other": "redacted",
-        "hs_time_in_salesqualifiedlead": "redacted",
-        "hs_time_in_subscriber": "redacted",
         "hs_total_deal_value": null,
         "hs_unique_creation_key": null,
         "hs_updated_by_user_id": null,
@@ -391,7 +367,6 @@
             "value": "sample-contact"
           }
         ],
-        "hs_date_entered_lead": "redacted",
         "hs_lastmodifieddate": "redacted",
         "hs_logo_url": [
           {
@@ -508,7 +483,6 @@
             "value": "HubSpot"
           }
         ],
-        "hs_time_in_lead": "redacted",
         "hs_v2_date_entered_current_stage": [
           {
             "sourceId": "RecalculateCalculatedPropertiesHelper",
@@ -700,6 +674,7 @@
         "hs_email_customer_quarantined_reason": null,
         "hs_email_delivered": null,
         "hs_email_domain": "hubspot.com",
+        "hs_email_engagement_likelihood_category": null,
         "hs_email_first_click_date": null,
         "hs_email_first_open_date": null,
         "hs_email_first_reply_date": null,
@@ -1540,6 +1515,7 @@
         "hs_email_customer_quarantined_reason": null,
         "hs_email_delivered": null,
         "hs_email_domain": "hubspot.com",
+        "hs_email_engagement_likelihood_category": null,
         "hs_email_first_click_date": null,
         "hs_email_first_open_date": null,
         "hs_email_first_reply_date": null,
@@ -2376,6 +2352,7 @@
         "hs_email_customer_quarantined_reason": null,
         "hs_email_delivered": null,
         "hs_email_domain": "test.com",
+        "hs_email_engagement_likelihood_category": null,
         "hs_email_first_click_date": null,
         "hs_email_first_open_date": null,
         "hs_email_first_reply_date": null,
@@ -3298,7 +3275,7 @@
         "hs_unique_creation_key": null,
         "hs_updated_by_user_id": "73074756",
         "hs_user_ids_of_all_notification_followers": null,
-        "hs_user_ids_of_all_notification_recipients": null,
+        "hs_user_ids_of_all_notification_recipients": "73074756",
         "hs_user_ids_of_all_notification_unfollowers": null,
         "hs_user_ids_of_all_owners": "73074756",
         "hs_v2_cumulative_time_in_appointmentscheduled": null,
@@ -3739,6 +3716,14 @@
             "sourceType": "CRM_UI",
             "timestamp": "2025-04-03T12:59:10.726000Z",
             "updatedByUserId": 73074756,
+            "value": "73074756"
+          }
+        ],
+        "hs_user_ids_of_all_notification_recipients": [
+          {
+            "sourceId": "com.hubspot.crm.notifications.data.property.NotificationRecipientsUpdater",
+            "sourceType": "CALCULATED",
+            "timestamp": "2026-07-16T20:55:20.476000Z",
             "value": "73074756"
           }
         ],
