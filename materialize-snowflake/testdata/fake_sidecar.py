@@ -130,8 +130,6 @@ def main():
                 reply({"id": rid, "ok": False, "error": f"token {params['token']} not committed (at {tok})", "code": "timeout"})
         elif op == "channel_status":
             reply({"id": rid, "ok": True, "result": status(params["channel"])})
-        elif op == "close_channel":
-            reply({"id": rid, "ok": True})
         elif op == "shutdown":
             log("info", "fake sidecar shutting down")
             reply({"id": rid, "ok": True})

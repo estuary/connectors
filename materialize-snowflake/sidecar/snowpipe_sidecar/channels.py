@@ -149,16 +149,6 @@ class ChannelManager:
             raise _wrap_sdk_error(err) from err
         return _status_dict(st)
 
-    def close_channel(self, channel: str) -> None:
-        with self._mu:
-            ch = self._channels.pop(channel, None)
-        if ch is None:
-            return
-        try:
-            ch.close()
-        except Exception as err:
-            raise _wrap_sdk_error(err) from err
-
     def close(self) -> None:
         """Close all channels then clients, flushing buffered data."""
         with self._mu:

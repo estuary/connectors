@@ -273,12 +273,6 @@ func (c *sidecarClient) ChannelStatus(ctx context.Context, channel string) (*cha
 	return &res, nil
 }
 
-func (c *sidecarClient) CloseChannel(ctx context.Context, channel string) error {
-	return c.call(ctx, "close_channel", struct {
-		Channel string `json:"channel"`
-	}{channel}, rpcTimeoutOpenChannel, nil)
-}
-
 // Shutdown asks the sidecar to drain and exit cleanly. Errors are expected if
 // the process is already gone.
 func (c *sidecarClient) Shutdown(ctx context.Context) error {
