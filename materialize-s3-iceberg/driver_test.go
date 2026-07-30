@@ -2072,6 +2072,9 @@ func TestMapTypeVariantWiring(t *testing.T) {
 		{"root document", mkProj("flow_document", false, false, "object"), fieldConfig{}, "string", "variant"},
 		{"multi-type key", mkProj("multiKey", true, true, "integer", "string"), fieldConfig{}, "string", "string"},
 		{"castToString override", mkProj("cast", false, true, "integer", "string"), fieldConfig{IgnoreStringFormat: true}, "string", "string"},
+		{"castToString on object", mkProj("castObj", false, false, "object"), fieldConfig{IgnoreStringFormat: true}, "string", "string"},
+		{"castToString on array", mkProj("castArr", false, false, "array"), fieldConfig{IgnoreStringFormat: true}, "string", "string"},
+		{"castToString on root document", mkProj("flow_document", false, false, "object"), fieldConfig{IgnoreStringFormat: true}, "string", "string"},
 		{"single scalar", mkProj("num", false, false, "integer"), fieldConfig{}, "long", "long"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -2084,6 +2087,35 @@ func TestMapTypeVariantWiring(t *testing.T) {
 			require.Nil(t, conv)
 		})
 	}
+}
+
+// TestParquetSchemaCastToStringOnJSONField pins the castToString escape hatch
+// at the seam that builds table schemas. With variant_columns enabled it is
+// the only way to keep a JSON-shaped field as a string column, and object and
+// array fields are exactly the ones a user reaches for it on. With the option
+// disabled it stays a rejected no-op, as before.
+func TestParquetSchemaCastToStringOnJSONField(t *testing.T) {
+	collection := pf.CollectionSpec{
+		Name: "acmeCo/tests/cast",
+		Projections: []pf.Projection{
+			{Field: "arr", Ptr: "/arr", Inference: pf.Inference{Exists: pf.Inference_MUST, Types: []string{"array"}}},
+			{Field: "obj", Ptr: "/obj", Inference: pf.Inference{Exists: pf.Inference_MUST, Types: []string{"object"}}},
+		},
+	}
+	fields := []string{"arr", "obj"}
+	fieldConfigs := map[string]json.RawMessage{
+		"arr": json.RawMessage(`{"ignoreStringFormat": true}`),
+		"obj": json.RawMessage(`{"ignoreStringFormat": true}`),
+	}
+
+	got, err := parquetSchema(fields, collection, fieldConfigs, false, true)
+	require.NoError(t, err)
+	for _, el := range got {
+		require.Equalf(t, writer.LogicalTypeString, el.DataType, "field %s", el.Name)
+	}
+
+	_, err = parquetSchema(fields, collection, fieldConfigs, false, false)
+	require.ErrorContains(t, err, "cannot set ignoreStringFormat on non-string field")
 }
 
 // TestCanMigrate pins the migratable set: the microsecond↔nanosecond

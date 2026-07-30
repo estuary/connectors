@@ -71,11 +71,16 @@ func parquetSchema(fields []string, collection pf.CollectionSpec, fieldConfigJso
 }
 
 func projectionToParquetSchemaElement(p pf.Projection, fc fieldConfig, nanoseconds bool, variants bool) (writer.ParquetSchemaElement, error) {
+	// With variant_columns enabled ignoreStringFormat is the only way to keep a
+	// JSON-shaped field as a string column, so it is meaningful on object and
+	// array fields that carry no string type. It stays a rejected no-op when
+	// the option is off, where such a field maps to a JSON string regardless.
 	if fc.IgnoreStringFormat {
-		if p.Inference.String_ == nil {
+		if p.Inference.String_ != nil {
+			p.Inference.String_.Format = ""
+		} else if !variants {
 			return writer.ParquetSchemaElement{}, fmt.Errorf("cannot set ignoreStringFormat on non-string field %q", p.Field)
 		}
-		p.Inference.String_.Format = ""
 	}
 
 	// Collection key fields keep their conservative (string) mapping even with
