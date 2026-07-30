@@ -606,9 +606,9 @@ func writeColumn[T parquetValue](
 // resulting metadata and value byte arrays are written as consecutive columns of the row group,
 // sharing the definition levels of the enclosing variant group.
 func writeVariantColumn(colIdx int, buf [][]any, rgWriter file.SerialRowGroupWriter) error {
-	metaVals := make([]parquet.ByteArray, 0, len(buf))
-	valueVals := make([]parquet.ByteArray, 0, len(buf))
-	defLevels := make([]int16, 0, len(buf))
+	var metaVals = make([]parquet.ByteArray, 0, len(buf))
+	var valueVals = make([]parquet.ByteArray, 0, len(buf))
+	var defLevels = make([]int16, 0, len(buf))
 
 	for _, row := range buf {
 		if row[colIdx] == nil {

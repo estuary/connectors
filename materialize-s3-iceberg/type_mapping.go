@@ -88,7 +88,7 @@ func projectionToParquetSchemaElement(p pf.Projection, fc fieldConfig, nanosecon
 	// and keys are meant to be joined and filtered on across engines.
 	// ignoreStringFormat likewise remains an escape hatch forcing a JSON
 	// string column.
-	useVariant := variants && !p.IsPrimaryKey && !fc.IgnoreStringFormat
+	var useVariant = variants && !p.IsPrimaryKey && !fc.IgnoreStringFormat
 
 	var opts []writer.ParquetSchemaOption
 	switch {

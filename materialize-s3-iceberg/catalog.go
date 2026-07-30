@@ -532,7 +532,7 @@ func (c *catalog) UpdateResource(_ context.Context, bindingUpdate boilerplate.Bi
 		// v3. A table created before nanosecond_timestamps or variant_columns
 		// was enabled may still be v2, so upgrade it as part of the same
 		// commit as the schema change.
-		requiresV3 := func(cols []addCol) bool {
+		var requiresV3 = func(cols []addCol) bool {
 			return slices.ContainsFunc(cols, func(a addCol) bool {
 				return a.typ.Equals(iceberg.PrimitiveTypes.TimestampTzNs) || isVariant(a.typ)
 			})
