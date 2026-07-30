@@ -26,13 +26,6 @@ var schemaOptions = []writer.ParquetSchemaOption{
 	writer.WithParquetUUIDAsString(),
 }
 
-// The option-flavored variants are precomputed rather than appended per call:
-// appending to schemaOptions at a call site would alias its backing array if
-// it ever gained spare capacity.
-var nsSchemaOptions = append(slices.Clip(schemaOptions), writer.WithParquetTimestampAsNanoseconds())
-var variantSchemaOptions = append(slices.Clip(schemaOptions), writer.WithParquetSchemaJSONAsVariant())
-var nsVariantSchemaOptions = append(slices.Clip(nsSchemaOptions), writer.WithParquetSchemaJSONAsVariant())
-
 type fieldConfig struct {
 	// IgnoreStringFormat can be set to true to indicate that the field should
 	// be materialized as a string, disregarding any format annotations.
@@ -92,17 +85,16 @@ func projectionToParquetSchemaElement(p pf.Projection, fc fieldConfig, cfg confi
 	// string column.
 	var useVariant = variants && !p.IsPrimaryKey && !fc.IgnoreStringFormat
 
-	var opts []writer.ParquetSchemaOption
-	switch {
-	case nanoseconds && useVariant:
-		opts = nsVariantSchemaOptions
-	case nanoseconds:
-		opts = nsSchemaOptions
-	case useVariant:
-		opts = variantSchemaOptions
-	default:
-		opts = schemaOptions
+	// Clipped so that appending an option below allocates a new backing array
+	// rather than writing into schemaOptions'.
+	var opts = slices.Clip(schemaOptions)
+	if nanoseconds {
+		opts = append(opts, writer.WithParquetTimestampAsNanoseconds())
 	}
+	if useVariant {
+		opts = append(opts, writer.WithParquetSchemaJSONAsVariant())
+	}
+
 	return writer.ProjectionToParquetSchemaElement(p, false, opts...), nil
 }
 
