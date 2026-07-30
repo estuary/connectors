@@ -1,0 +1,92 @@
+sql> CREATE TABLE dbo.Datatypes_CompositeScanKey_333023 (k SMALLDATETIME, k2 INTEGER, v TEXT, PRIMARY KEY (k, k2))
+sql> INSERT INTO dbo.Datatypes_CompositeScanKey_333023 VALUES
+		('1991-08-31T12:34:00', 1, 'Data 0'),
+		('1991-08-31T12:34:00', 2, 'Data 1'),
+		('1991-08-31T12:34:00', 3, 'Data 2'),
+		('2000-01-01T01:01:00', 1, 'Data 3')
+=== Discover: Discover Tables ===
+acmeCo/test_capture/dbo/datatypes_compositescankey_333023
+=== Run: Backfill ===
+[
+  "acmeCo/test_capture/dbo/datatypes_compositescankey_333023",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Datatypes_CompositeScanKey_333023"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "k": "1991-08-31T12:34:00Z",
+    "k2": 1,
+    "v": "Data 0"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/datatypes_compositescankey_333023",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Datatypes_CompositeScanKey_333023"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "k": "1991-08-31T12:34:00Z",
+    "k2": 2,
+    "v": "Data 1"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/datatypes_compositescankey_333023",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Datatypes_CompositeScanKey_333023"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "k": "1991-08-31T12:34:00Z",
+    "k2": 3,
+    "v": "Data 2"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/datatypes_compositescankey_333023",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Datatypes_CompositeScanKey_333023"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "k": "2000-01-01T01:01:00Z",
+    "k2": 1,
+    "v": "Data 3"
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FDatatypes_CompositeScanKey_333023": {
+      "backfilled": 4,
+      "key_columns": [
+        "k",
+        "k2"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+
