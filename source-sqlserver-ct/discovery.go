@@ -11,6 +11,7 @@ import (
 	"github.com/estuary/connectors/go/tableglob"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/invopop/jsonschema"
+	mssqldb "github.com/microsoft/go-mssqldb"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -97,12 +98,23 @@ func matchesAnyPattern(patterns []*tableglob.Pattern, t sqlcapture.TableID) bool
 // This disjunction-of-equalities form plans as per-table index seeks on the
 // system catalogs, but only so long as discoveryChunkSize is kept smallish.
 // Currently we use 100 and that's probably in the sweet spot.
+//
+// Arguments are bound as nvarchar(max) rather than as plain Go strings, so that
+// the parameter type signature stays identical regardless of how long the
+// identifiers are. go-mssqldb otherwise sizes each string parameter to the value
+// it happens to carry (makeStrParam sets ti.Size = len(res.buffer)), and that
+// declaration forms part of SQL Server's plan cache key, so binding them plainly
+// would declare as '(@p1 nvarchar(3), @p2 nvarchar(23), ...)' and every distinct
+// combination of identifier lengths would compile a plan of its own. Since each
+// of those plans is only ever used once it would also be a prime eviction
+// candidate. A constant declaration lets one cached plan serve every chunk
+// holding the same number of tables.
 func tableIDsPredicate(schemaCol, tableCol string, tables []sqlcapture.TableID, startArg int) (string, []any) {
 	var terms = make([]string, len(tables))
 	var args = make([]any, 0, len(tables)*2)
 	for i, t := range tables {
 		terms[i] = fmt.Sprintf("(%s = @p%d AND %s = @p%d)", schemaCol, startArg+2*i, tableCol, startArg+2*i+1)
-		args = append(args, t.Schema, t.Table)
+		args = append(args, mssqldb.NVarCharMax(t.Schema), mssqldb.NVarCharMax(t.Table))
 	}
 	return "(" + strings.Join(terms, " OR ") + ")", args
 }
