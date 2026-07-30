@@ -87,9 +87,11 @@ func generateMinimalSchema() json.RawMessage {
 			"x-infer-schema": true,
 		},
 		If: &jsonschema.Schema{
+			Required: []string{"_meta"},
 			Extras: map[string]interface{}{
 				"properties": map[string]*jsonschema.Schema{
 					"_meta": {
+						Required: []string{"op"},
 						Extras: map[string]interface{}{
 							"properties": map[string]*jsonschema.Schema{
 								"op": {
