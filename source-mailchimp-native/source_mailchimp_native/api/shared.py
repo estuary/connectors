@@ -367,14 +367,37 @@ async def backfill_campaigns(
     page: PageCursor,
     cutoff: LogCursor,
 ) -> AsyncGenerator[Campaign | PageCursor, None]:
+    """Backfill campaigns over the frozen `(start_date, cutoff − 1s]` window,
+    checkpointing a plain int offset per full page.
+
+                        start_date            cutoff − 1s cutoff
+    ────────────────────────┼─────────────────────┼───────┼──▶ time (1s ticks)
+                            │                     │       │
+    since_create_time ──────(═════════════════════╪═══════╪══▶
+    before_create_time ═════╪═════════════════════]       │
+    window ─────────────────(═════════════════════]       │
+                            │                     │       └─ covered by the
+                            │                     │          FIRST incremental
+                            │                     │          poll: its cursor
+                            │                     │          seeds at cutoff − 1s
+                            │                     └─ last backfilled second
+                            └─ start-of-window precision is not load-bearing;
+                               campaigns' since_* boundary inclusivity is
+                               unverified (only narrowing is pinned)
+
+    `before_create_time` is inclusive of the exact timestamp
+    (`Campaigns / before boundary probe`), matching the members/segments
+    family, so `cutoff − 1s` covers exactly the seconds the incremental
+    rail skips.
+    """
     assert page is None or isinstance(page, int)
     assert isinstance(cutoff, datetime)
 
     offset = page or 0
-    # ASC sort under a frozen [start_date, cutoff) query keeps offsets stable
-    # across restarts: new campaigns fall outside before_create_time.
+    # New campaigns fall outside before_create_time, so inserts never shift
+    # offsets across restarts.
     params = _campaign_params(offset, start_date)
-    params["before_create_time"] = cutoff.isoformat()
+    params["before_create_time"] = (cutoff - timedelta(seconds=1)).isoformat()
 
     count = 0
     page_gen = fetch_collection_page(

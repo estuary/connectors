@@ -135,7 +135,7 @@ def campaigns(
     http: HTTPMixin, base_url: str, config: EndpointConfig
 ) -> MailchimpResource:
     """Return Resource for incremental + backfill campaigns capture."""
-    cutoff = datetime.now(tz=UTC)
+    cutoff = datetime.now(tz=UTC).replace(microsecond=0)
 
     def open(
         binding: CaptureBinding[ResourceConfigWithSchedule],
@@ -161,7 +161,10 @@ def campaigns(
         model=Campaign,
         open=open,
         initial_state=ResourceState(
-            inc=ResourceState.Incremental(cursor=cutoff),
+            # cutoff − 1s: the first incremental poll then emits from
+            # `cutoff` onward, exactly one second after backfill's last
+            # covered second (`cutoff − 1s`) — no gap, no overlap.
+            inc=ResourceState.Incremental(cursor=cutoff - timedelta(seconds=1)),
             backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None),
         ),
         initial_config=ResourceConfigWithSchedule(
