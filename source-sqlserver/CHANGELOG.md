@@ -2,6 +2,13 @@
 
 ## 2026-07-30
 
+### Fixed
+- Discovery queries are now shaped so that SQL Server reuses a single cached
+  query plan across repeated discovery passes, rather than compiling a new plan
+  for every chunk of tables every time. On instances hosting many databases the
+  previous behavior could exhaust query compile memory and drive the server to
+  sustained high CPU, blocking unrelated queries.
+
 ### Changed
 - Backfill resume keys for `DATETIME2`, `SMALLDATETIME`, `DATETIMEOFFSET` and `DATE`
   primary-key columns are now bound as typed datetime parameters rather than as
