@@ -47,6 +47,7 @@ func TestSidecarHappyPath(t *testing.T) {
 	opened, err := client.OpenChannel(ctx, "DB", "SCHEMA", "TBL", "chan_0")
 	require.NoError(t, err)
 	require.Nil(t, opened.CommittedToken)
+	require.Nil(t, opened.committedToken())
 
 	var rows = []json.RawMessage{json.RawMessage(`{"ID":1}`), json.RawMessage(`{"ID":2}`)}
 	require.NoError(t, client.Append(ctx, "chan_0", "1", "2", rows))
@@ -61,6 +62,9 @@ func TestSidecarHappyPath(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, status.CommittedToken)
 	require.Equal(t, "2", *status.CommittedToken)
+	// The log field carries the token itself, not the address of the pointer
+	// holding it.
+	require.Equal(t, "2", status.committedToken())
 
 	// Reopen reports the committed token.
 	opened, err = client.OpenChannel(ctx, "DB", "SCHEMA", "TBL", "chan_0")

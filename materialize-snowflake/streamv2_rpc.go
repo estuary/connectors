@@ -263,6 +263,16 @@ type channelStatusResult struct {
 	LastErrorMessage string  `json:"last_error_message"`
 }
 
+// committedToken renders the token for a log field. Logging the pointer itself
+// prints an address, and it is a reconcile refusal — where the token is the one
+// thing an operator needs to read — that this field exists for.
+func (s *channelStatusResult) committedToken() any {
+	if s.CommittedToken == nil {
+		return nil
+	}
+	return *s.CommittedToken
+}
+
 func (c *sidecarClient) ChannelStatus(ctx context.Context, channel string) (*channelStatusResult, error) {
 	var res channelStatusResult
 	if err := c.call(ctx, "channel_status", struct {

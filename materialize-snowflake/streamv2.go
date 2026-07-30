@@ -267,7 +267,7 @@ func (m *streamV2Manager) ensureChannel(ctx context.Context, b *streamV2Binding)
 	log.WithFields(log.Fields{
 		"table":          b.table,
 		"channel":        b.channel,
-		"committedToken": status.CommittedToken,
+		"committedToken": status.committedToken(),
 		"counter":        b.counter,
 		"skipThrough":    skip,
 		"rowsErrorCount": status.RowsErrorCount,
