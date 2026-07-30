@@ -415,13 +415,9 @@ func (c *catalog) CreateResource(ctx context.Context, b *pf.MaterializationSpec_
 		if c.cfg.variantColumns() {
 			opts = append(opts, "variant_columns")
 		}
-		var noun, verb = "option", "requires"
-		if len(opts) > 1 {
-			noun, verb = "options", "require"
-		}
 		return "", nil, fmt.Errorf(
-			"additional table property %s=%q conflicts with the %s %s, which %s format version 3: remove the property or set it to \"3\"",
-			icebergtable.PropertyFormatVersion, v, strings.Join(opts, " and "), noun, verb)
+			"additional table property %s=%q conflicts with %s, which requires format version 3: remove the property or set it to \"3\"",
+			icebergtable.PropertyFormatVersion, v, strings.Join(opts, " and "))
 	}
 
 	fields := make([]iceberg.NestedField, 0, len(parquetSchema))
