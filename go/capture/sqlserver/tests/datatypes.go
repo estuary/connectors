@@ -23,6 +23,7 @@ func TestDatatypes(t *testing.T, setup testSetupFunc) {
 	t.Run("MiscTypes", func(t *testing.T) { testMiscTypes(t, setup) })
 	t.Run("NotNullTypes", func(t *testing.T) { testNotNullTypes(t, setup) })
 	t.Run("ScanKeyTypes", func(t *testing.T) { testScanKeyTypes(t, setup) })
+	t.Run("CompositeScanKey", func(t *testing.T) { testCompositeScanKey(t, setup) })
 	t.Run("OversizedFields", func(t *testing.T) { testOversizedFields(t, setup) })
 	t.Run("BitNotNullDeletion", func(t *testing.T) { testBitNotNullDeletion(t, setup) })
 	t.Run("RowversionTypes", func(t *testing.T) { testRowversionTypes(t, setup) })
@@ -296,6 +297,21 @@ func testScanKeyTypes(t *testing.T, setup testSetupFunc) {
 			"('1991-08-31T12:35:00', 'Data 1')",
 			"('2000-01-01T01:01:00', 'Data 2')",
 		}},
+		{"DateTime2", "DATETIME2", []string{
+			"('1991-08-31T12:34:54.1234567', 'Data 0')",
+			"('1991-08-31T12:34:54.7654321', 'Data 1')",
+			"('2000-01-01T01:01:01', 'Data 2')",
+		}},
+		{"Date", "DATE", []string{
+			"('1991-08-31', 'Data 0')",
+			"('1991-09-01', 'Data 1')",
+			"('2000-01-01', 'Data 2')",
+		}},
+		{"Time", "TIME", []string{
+			"('00:00:00', 'Data 0')",
+			"('12:34:54.1234567', 'Data 1')",
+			"('23:59:59.9999999', 'Data 2')",
+		}},
 	} {
 		t.Run(testCase.Name, func(t *testing.T) {
 			var db, tc = setup(t)
@@ -308,6 +324,21 @@ func testScanKeyTypes(t *testing.T, setup testSetupFunc) {
 			cupaloy.SnapshotT(t, tc.Transcript.String())
 		})
 	}
+}
+
+func testCompositeScanKey(t *testing.T, setup testSetupFunc) {
+	var db, tc = setup(t)
+	db.CreateTable(t, `<NAME>`, `(k SMALLDATETIME, k2 INTEGER, v TEXT, PRIMARY KEY (k, k2))`)
+	db.Exec(t, `INSERT INTO <NAME> VALUES
+		('1991-08-31T12:34:00', 1, 'Data 0'),
+		('1991-08-31T12:34:00', 2, 'Data 1'),
+		('1991-08-31T12:34:00', 3, 'Data 2'),
+		('2000-01-01T01:01:00', 1, 'Data 3')`)
+
+	require.NoError(t, tc.Capture.EditConfig("advanced.backfill_chunk_size", 1))
+	tc.Discover("Discover Tables")
+	tc.Run("Backfill", -1)
+	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
 // TestOversizedFields tests the behavior of the connector when it encounters
