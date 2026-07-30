@@ -2,14 +2,54 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"math"
 	"testing"
 
 	snowflake_auth "github.com/estuary/connectors/go/auth/snowflake"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	jsonpatch "github.com/evanphx/json-patch/v5"
 	"github.com/stretchr/testify/require"
 )
+
+// TestStreamV2CheckpointHoldsOneItemPerChannel pins the shape of the streaming
+// v2 driver checkpoint against the only runtime this write path runs on. Every
+// shard of a v2 task merge-patches its connector state into one task-global
+// document, so two shards of the same binding write the same JSON path. The
+// counter each records is durable state rather than pending work, so it needs a
+// key of its own: keyed by state key alone it is overwritten by whichever
+// sibling reduced last, and the survivor is then reconciled against a channel it
+// does not describe.
+func TestStreamV2CheckpointHoldsOneItemPerChannel(t *testing.T) {
+	const stateKey = "shared.v1"
+	const loChannel, hiChannel = "task_00000000_shared_v1", "task_80000000_shared_v1"
+	var lo = fmt.Sprintf(`{"Channel":%q,"Counter":7,"KeyBegin":0,"KeyEnd":2147483647}`, loChannel)
+	var hi = fmt.Sprintf(`{"Channel":%q,"Counter":3,"KeyBegin":2147483648,"KeyEnd":4294967295}`, hiChannel)
+
+	// Under one key per state key the two shards collide: a merge patch replaces
+	// the scalars of the object they share, so only the shard which reduced last
+	// is left. This is the loss the per-channel key exists to prevent.
+	collided, err := jsonpatch.MergePatch(
+		fmt.Appendf(nil, `{%q:{"StreamV2":%s}}`, stateKey, lo),
+		fmt.Appendf(nil, `{%q:{"StreamV2":%s}}`, stateKey, hi),
+	)
+	require.NoError(t, err)
+	require.NotContains(t, string(collided), loChannel)
+
+	// Under one key per channel, each shard patches a key of its own and both
+	// counters survive the reduce.
+	reduced, err := jsonpatch.MergePatch(
+		fmt.Appendf(nil, `{%q:{"StreamV2":{%q:%s}}}`, stateKey, loChannel, lo),
+		fmt.Appendf(nil, `{%q:{"StreamV2":{%q:%s}}}`, stateKey, hiChannel, hi),
+	)
+	require.NoError(t, err)
+
+	var cp checkpoint
+	require.NoError(t, json.Unmarshal(reduced, &cp))
+	require.Len(t, cp[stateKey].StreamV2, 2)
+}
 
 // TestStreamV2RejectedRows covers, without credentials, what the live test
 // covers against Snowflake: a rejected row fails the transaction that produced
