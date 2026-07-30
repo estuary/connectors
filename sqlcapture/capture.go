@@ -86,6 +86,15 @@ func (c *Capture) bindingTableIDs() []TableID {
 	for _, binding := range c.Bindings {
 		ids = append(ids, TableID{Schema: binding.Resource.Namespace, Table: binding.Resource.Stream})
 	}
+	// Sort so the returned results are in a stable order. Most notably, this
+	// helps increase query plan cache hit rates for discovery implementations
+	// that chunk the list into multiple discovery queries.
+	slices.SortFunc(ids, func(a, b TableID) int {
+		if n := strings.Compare(a.Schema, b.Schema); n != 0 {
+			return n
+		}
+		return strings.Compare(a.Table, b.Table)
+	})
 	return ids
 }
 
