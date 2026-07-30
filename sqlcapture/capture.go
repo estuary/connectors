@@ -195,6 +195,14 @@ var (
 	ErrFenceNotReached = fmt.Errorf("replication stream closed before reaching fence")
 )
 
+// nextRediscovery returns the time at which a capture should next re-run discovery.
+//
+// The delay is jittered across an interval-wide window rather than being exactly
+// rediscoverInterval.
+func nextRediscovery() time.Time {
+	return time.Now().Add(rediscoverInterval/2 + time.Duration(rand.Int63n(int64(rediscoverInterval))))
+}
+
 // Run is the top level entry point of the capture process.
 func (c *Capture) Run(ctx context.Context) (err error) {
 	// Fetch detailed schema info for the tables that this capture's bindings
@@ -279,7 +287,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 			if err := c.activatePendingStreams(ctx, discovery, replStream); err != nil {
 				return fmt.Errorf("error initializing pending streams: %w", err)
 			}
-			rediscoverAfter = time.Now().Add(rediscoverInterval)
+			rediscoverAfter = nextRediscovery()
 		}
 
 		if time.Now().After(periodicChecksAfter) {
