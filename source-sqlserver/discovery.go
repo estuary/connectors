@@ -86,6 +86,30 @@ func matchesAnyPattern(patterns []*tableglob.Pattern, t sqlcapture.TableID) bool
 	return false
 }
 
+// padChunk repeats the final table until the chunk holds exactly
+// discoveryChunkSize entries, so that a trailing partial chunk generates the
+// same query text as a full one and shares its cached plan.
+//
+// Repeating a table is fine. The predicate is a disjunction of equalities,
+// so the extra terms match rows which already matched and the result set is
+// unchanged.
+//
+// Callers should only do this when the table list actually spans more than one
+// chunk. A capture whose bindings all fit in a single chunk already issues just
+// one query shape, so padding it out would add redundant predicate terms
+// without consolidating anything.
+func padChunk(chunk []sqlcapture.TableID) []sqlcapture.TableID {
+	if len(chunk) == 0 || len(chunk) >= discoveryChunkSize {
+		return chunk
+	}
+	var padded = make([]sqlcapture.TableID, discoveryChunkSize)
+	copy(padded, chunk)
+	for i := len(chunk); i < discoveryChunkSize; i++ {
+		padded[i] = chunk[len(chunk)-1]
+	}
+	return padded
+}
+
 // tableIDsPredicate builds a WHERE-clause predicate matching any of the
 // specified tables, using the given column expressions for the schema and
 // table names. The returned clause has the form
@@ -109,7 +133,7 @@ func matchesAnyPattern(patterns []*tableglob.Pattern, t sqlcapture.TableID) bool
 // combination of identifier lengths would compile a plan of its own. Since each
 // of those plans is only ever used once it would also be a prime eviction
 // candidate. A constant declaration lets one cached plan serve every chunk
-// holding the same number of tables.
+// holding the same number of tables. padChunk handles the trailing partial one.
 func tableIDsPredicate(schemaCol, tableCol string, tables []sqlcapture.TableID, startArg int) (string, []any) {
 	var terms = make([]string, len(tables))
 	var args = make([]any, 0, len(tables)*2)
@@ -153,10 +177,18 @@ func (db *sqlserverDatabase) DiscoverTableDetails(ctx context.Context, requested
 		}
 	}
 
+	// When the list spans several chunks the trailing partial chunk is padded so
+	// that every chunk yields the same query text.
+	var padPartialChunk = len(requested) > discoveryChunkSize
+
 	var tableMap = make(map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, len(requested))
 	for i := 0; i < len(requested); i += discoveryChunkSize {
 		var end = min(i+discoveryChunkSize, len(requested))
-		if err := db.extendTableDetails(ctx, tableMap, requested[i:end]); err != nil {
+		var chunk = requested[i:end]
+		if padPartialChunk {
+			chunk = padChunk(chunk)
+		}
+		if err := db.extendTableDetails(ctx, tableMap, chunk); err != nil {
 			return nil, err
 		}
 	}
