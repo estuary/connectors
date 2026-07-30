@@ -512,7 +512,7 @@ JOIN {{ template "temp_load_name" . }} AS l
 	l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 {{- end }}
 {{ else -}}
-SELECT * FROM (SELECT -1, NULL, NULL, NULL LIMIT 0) as nodoc
+SELECT * FROM (SELECT -1 AS binding, NULL AS doc, NULL AS meta, NULL AS clock LIMIT 0) as nodoc
 {{ end }}
 {{ end }}
 

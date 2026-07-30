@@ -209,7 +209,7 @@ JOIN flow_temp_load_table_0 AS l
 
 --- Begin delta_updates loadQueryNoFlowDocument ---
 
-SELECT * FROM (SELECT -1, NULL, NULL, NULL LIMIT 0) as nodoc
+SELECT * FROM (SELECT -1 AS binding, NULL AS doc, NULL AS meta, NULL AS clock LIMIT 0) as nodoc
 
 --- End delta_updates loadQueryNoFlowDocument ---
 
