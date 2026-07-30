@@ -732,7 +732,7 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 	if d.streamV2 != nil {
 		var err error
 		if streamV2Items, err = d.streamV2.flush(ctx); err != nil {
-			return nil, fmt.Errorf("flushing stream v2 manager: %w", err)
+			return nil, fmt.Errorf("committing stream v2 rows: %w", err)
 		}
 	}
 
@@ -941,36 +941,15 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 		}
 
 		if len(item.StreamV2) > 0 {
-			// The streaming v2 counter is durable per-binding state rather than
-			// pending work: its rows reached Snowflake during Store, and the
-			// counter must outlive this transaction to be reconciled against
-			// Snowflake's committed offset token at the next Open. So this state
-			// key is deliberately not drained.
+			// There is nothing to apply for a streaming v2 binding: its rows were
+			// appended and committed to Snowflake before this transaction's
+			// checkpoint was produced, since a commit awaited here could no longer
+			// fail the transaction whose counter it belongs to.
 			//
-			// A nil manager means the endpoint no longer authenticates with a key
-			// pair and so the binding no longer uses this write path. There is
-			// nothing to wait for, and the stale counter is displaced by the
-			// binding's next transaction on whichever path it now takes.
-			if d.streamV2 == nil {
-				log.WithField("path", path).Info("ignoring Snowpipe Streaming v2 state of a binding which no longer uses that write path")
-				continue
-			}
-			group.Go(func() error {
-				d.be.StartedResourceCommit(path)
-				// A channel of the task's other shards is not open in this session,
-				// which waitCommit reports as nothing to wait for. A nil entry is a
-				// retired channel's pending deletion.
-				for _, sv2 := range item.StreamV2 {
-					if sv2 == nil {
-						continue
-					} else if err := d.streamV2.waitCommit(groupCtx, sv2); err != nil {
-						return fmt.Errorf("committing streaming v2 rows for %s: %w", path, err)
-					}
-				}
-				d.be.FinishedResourceCommit(path)
-
-				return nil
-			})
+			// The counter is durable per-binding state rather than pending work —
+			// it must outlive this transaction to be reconciled against
+			// Snowflake's committed offset token at the next Open — so this state
+			// key is deliberately not drained.
 			continue
 		}
 

@@ -146,7 +146,6 @@ func TestStreamV2Manager(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, items, 1)
 		require.Equal(t, int64(100), items[0].Counter)
-		require.NoError(t, m.waitCommit(ctx, items[0]))
 		require.Equal(t, 100, countRows())
 
 		// VARIANT columns must round-trip as real JSON objects, not strings.
@@ -165,7 +164,6 @@ func TestStreamV2Manager(t *testing.T) {
 		items, err = m.flush(ctx)
 		require.NoError(t, err)
 		require.Equal(t, int64(150), items[0].Counter)
-		require.NoError(t, m.waitCommit(ctx, items[0]))
 		require.Equal(t, 150, countRows())
 	})
 
@@ -185,7 +183,6 @@ func TestStreamV2Manager(t *testing.T) {
 		items, err := m.flush(ctx)
 		require.NoError(t, err)
 		require.Equal(t, int64(50), items[0].Counter)
-		require.NoError(t, m.waitCommit(ctx, items[0]))
 		require.Equal(t, 50, countRows())
 	})
 
@@ -218,7 +215,6 @@ func TestStreamV2Manager(t *testing.T) {
 		items, err := m2.flush(ctx)
 		require.NoError(t, err)
 		require.Equal(t, int64(5), items[0].Counter)
-		require.NoError(t, m2.waitCommit(ctx, items[0]))
 		require.Equal(t, 5, countRows())
 
 		// A second interruption, now with a checkpoint counter to reconcile the
@@ -239,7 +235,6 @@ func TestStreamV2Manager(t *testing.T) {
 		items, err = m3.flush(ctx)
 		require.NoError(t, err)
 		require.Equal(t, int64(8), items[0].Counter)
-		require.NoError(t, m3.waitCommit(ctx, items[0]))
 		require.Equal(t, 8, countRows())
 	})
 
@@ -260,7 +255,6 @@ func TestStreamV2Manager(t *testing.T) {
 		writeRows(parent, 0, 5)
 		items, err := parent.flush(ctx)
 		require.NoError(t, err)
-		require.NoError(t, parent.waitCommit(ctx, items[0]))
 		var checkpointed = *items[0]
 		parent.stop()
 
@@ -280,7 +274,6 @@ func TestStreamV2Manager(t *testing.T) {
 		items, err = low.flush(ctx)
 		require.NoError(t, err)
 		require.Equal(t, int64(8), items[0].Counter)
-		require.NoError(t, low.waitCommit(ctx, items[0]))
 
 		// The high child's key-begin is the pivot, so it opens a channel which has
 		// committed nothing: there is no token to reconcile the inherited counter
@@ -303,7 +296,6 @@ func TestStreamV2Manager(t *testing.T) {
 		// it inherited.
 		require.Equal(t, high.bindings[0].channel, items[0].Channel)
 		require.Equal(t, pivot, items[0].KeyBegin)
-		require.NoError(t, high.waitCommit(ctx, items[0]))
 
 		// Neither child re-appended what the parent had already stored, and
 		// neither dropped a document of its own.
@@ -327,14 +319,12 @@ func TestStreamV2Manager(t *testing.T) {
 		writeRows(lo, 0, 3)
 		loItems, err := lo.flush(ctx)
 		require.NoError(t, err)
-		require.NoError(t, lo.waitCommit(ctx, loItems[0]))
 
 		var hi = newManager(&pf.RangeSpec{KeyBegin: pivot, KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
 		hi.addBinding(cfg.Database, cfg.Schema, tableName, tgt, nil)
 		writeRows(hi, 100, 105)
 		hiItems, err := hi.flush(ctx)
 		require.NoError(t, err)
-		require.NoError(t, hi.waitCommit(ctx, hiItems[0]))
 		require.NotEqual(t, loItems[0].Channel, hiItems[0].Channel)
 		require.Equal(t, 8, countRows())
 		lo.stop()
@@ -351,7 +341,6 @@ func TestStreamV2Manager(t *testing.T) {
 		items, err := loAgain.flush(ctx)
 		require.NoError(t, err)
 		require.Equal(t, int64(5), items[0].Counter)
-		require.NoError(t, loAgain.waitCommit(ctx, items[0]))
 		require.Equal(t, 10, countRows())
 		loAgain.stop()
 
@@ -373,7 +362,6 @@ func TestStreamV2Manager(t *testing.T) {
 		items, err = joined.flush(ctx)
 		require.NoError(t, err)
 		require.Equal(t, int64(8), items[0].Counter)
-		require.NoError(t, joined.waitCommit(ctx, items[0]))
 
 		// The absorbed shard's rows are still in the table, and the joined shard
 		// added its own without re-appending any of them.
@@ -396,8 +384,6 @@ func TestStreamV2Manager(t *testing.T) {
 		writeRows(interrupted, 105, 108)
 		_, err = interrupted.flush(ctx) // appended and committed, never checkpointed
 		require.NoError(t, err)
-		_, err = interrupted.client.WaitCommit(ctx, hiItems[0].Channel, "8")
-		require.NoError(t, err)
 		require.Equal(t, 16, countRows())
 		interrupted.sup.kill()
 
@@ -419,7 +405,6 @@ func TestStreamV2Manager(t *testing.T) {
 		require.NoError(t, afterBackfill.writeRow(ctx, 0, []any{"k", 1, json.RawMessage(`{}`)}))
 		items, err = afterBackfill.flush(ctx)
 		require.NoError(t, err)
-		require.NoError(t, afterBackfill.waitCommit(ctx, items[0]))
 		require.Equal(t, rowsBefore+1, countRows())
 	})
 
@@ -435,7 +420,6 @@ func TestStreamV2Manager(t *testing.T) {
 		writeRows(m, 0, 2)
 		items, err := m.flush(ctx)
 		require.NoError(t, err)
-		require.NoError(t, m.waitCommit(ctx, items[0]))
 		var checkpointed = *items[0]
 
 		writeRows(m, 2, 4)
@@ -501,12 +485,10 @@ func TestStreamV2Manager(t *testing.T) {
 
 		require.NoError(t, m.writeRow(ctx, 0, []any{"kept", json.RawMessage(`{"a":1}`)}))
 		require.NoError(t, m.writeRow(ctx, 0, []any{"dropped", nil}))
-		items, err := m.flush(ctx)
-		require.NoError(t, err)
-
-		var waitErr = m.waitCommit(ctx, items[0])
+		items, waitErr := m.flush(ctx)
 		require.Error(t, waitErr)
 		require.ErrorContains(t, waitErr, channel)
+		require.Empty(t, items)
 
 		// The failure carries Snowflake's own account of the rejection, rather
 		// than this connector's guess at what Snowflake objected to.
@@ -523,14 +505,14 @@ func TestStreamV2Manager(t *testing.T) {
 		require.Equal(t, "kept", keys)
 
 		// The failure outlives the session that saw it. Snowflake's count is
-		// cumulative for the life of the channel, and the transaction which
-		// provoked the rejection never got to acknowledge, so a restart still
-		// reconciles against a checkpoint accounting for none of it: it refuses
-		// as the channel opens rather than replaying the transaction and
-		// acknowledging it with the row still missing.
+		// cumulative for the life of the channel, and the transaction failed
+		// before it could checkpoint, so a restart reconciles against a checkpoint
+		// accounting for none of it: it refuses as the channel opens rather than
+		// replaying the transaction and acknowledging it with the row still
+		// missing.
 		m.sup.kill()
 		var m2 = newManager(fullRange)
-		m2.addBinding(cfg.Database, cfg.Schema, notNullTable, notNullTarget, priorOf(items[0]))
+		m2.addBinding(cfg.Database, cfg.Schema, notNullTable, notNullTarget, nil)
 		require.ErrorContains(t,
 			m2.writeRow(ctx, 0, []any{"kept", json.RawMessage(`{"a":1}`)}),
 			"rejected and discarded by Snowflake")
@@ -544,9 +526,8 @@ func TestStreamV2Manager(t *testing.T) {
 		var m3 = newManager(fullRange)
 		m3.addBinding(cfg.Database, cfg.Schema, notNullTable, backfilled, nil)
 		require.NoError(t, m3.writeRow(ctx, 0, []any{"backfilled", json.RawMessage(`{"a":2}`)}))
-		items, err = m3.flush(ctx)
+		_, err = m3.flush(ctx)
 		require.NoError(t, err)
-		require.NoError(t, m3.waitCommit(ctx, items[0]))
 
 		require.NoError(t, db.QueryRowContext(ctx, fmt.Sprintf("SELECT LISTAGG(KEY, ',') WITHIN GROUP (ORDER BY KEY) FROM %s;", notNullTable)).Scan(&keys))
 		require.Equal(t, "backfilled,kept", keys)
@@ -558,8 +539,9 @@ func TestStreamV2Manager(t *testing.T) {
 		// and so does appending to it — the rejection reaches the SDK's
 		// background informer afterwards. So an incompatible table cannot be
 		// detected before Store (there is no silent fall-through for one), and
-		// what the connector sees is the commit wait failing promptly with a
-		// classified error rather than hanging.
+		// what the connector sees is the commit wait which produces the
+		// checkpoint failing promptly with a classified error rather than
+		// hanging.
 		_, err = db.ExecContext(ctx, fmt.Sprintf("CREATE OR REPLACE VIEW STREAMV2_TEST_VIEW AS SELECT * FROM %s;", tableName))
 		require.NoError(t, err)
 		defer db.ExecContext(ctx, "DROP VIEW IF EXISTS STREAMV2_TEST_VIEW;")
@@ -571,11 +553,9 @@ func TestStreamV2Manager(t *testing.T) {
 		m.addBinding(cfg.Database, cfg.Schema, "STREAMV2_TEST_VIEW", viewTarget, nil)
 
 		require.NoError(t, m.writeRow(ctx, 0, []any{"k", 1, json.RawMessage(`{}`)}))
-		items, err := m.flush(ctx)
-		require.NoError(t, err)
 
 		var start = time.Now()
-		err = m.waitCommit(ctx, items[0])
+		_, err = m.flush(ctx)
 		require.Error(t, err)
 		var scErr *sidecarError
 		require.ErrorAs(t, err, &scErr)
@@ -743,7 +723,6 @@ func TestStreamV2Datatypes(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, items, 1, "only the binding stored to this transaction reports an item")
 			require.Equal(t, int64(len(tt.vals)), items[binding].Counter)
-			require.NoError(t, m.waitCommit(ctx, items[binding]))
 
 			dump, err := sql.StdDumpTable(ctx, db, tbl)
 			require.NoError(t, err)

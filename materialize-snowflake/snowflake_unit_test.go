@@ -45,9 +45,10 @@ func TestAcknowledgeKeepsStreamV2Counter(t *testing.T) {
 		},
 		bindings: []*binding{{target: sql.Table{StateKey: "a_table.v1"}, streamingV2: true}},
 		be:       m.NewBindingEvents(),
-		// A manager with no open channel: this session appended nothing, so
-		// there is nothing to wait for and no sidecar is needed.
-		streamV2: &streamV2Manager{byChannel: make(map[string]*streamV2Binding)},
+		// The rows the counter accounts for were committed as the checkpoint was
+		// produced, so Acknowledge needs nothing from the manager and no sidecar
+		// is started.
+		streamV2: &streamV2Manager{},
 	}
 
 	state, err := d.Acknowledge(context.Background(), nil, []string{"a_table.v1"})

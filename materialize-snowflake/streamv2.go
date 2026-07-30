@@ -9,10 +9,12 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 )
 
 // A batch is appended once it holds either this many documents or this many
@@ -89,8 +91,13 @@ type streamV2Binding struct {
 	// counted but not appended again. Because indices are absolute, this single
 	// threshold suffices for the whole session.
 	skip int64
-	// committed is the highest index known to be durably committed, so that
-	// Acknowledge does not re-wait on a counter which has not moved.
+	// committed is the highest index known to be durably committed: Snowflake's
+	// committed offset token when the channel was opened, and thereafter each
+	// counter this session has committed. A counter at or below it must not be
+	// waited on, because the wait is for the channel's committed token to *equal*
+	// the requested one — which a channel already past it never will, so the wait
+	// would run to its timeout. A replay whose documents Snowflake already holds
+	// produces exactly such a counter.
 	committed int64
 
 	// buf accumulates the documents of the batch being built, and bufFirst is
@@ -131,10 +138,11 @@ func (p *appendPipe) wait() error {
 
 // streamV2Manager implements the high-performance Snowpipe Streaming write path
 // by supervising the Python SDK sidecar. Rows are appended to a per-binding
-// channel as they are stored, and the runtime's idempotent replay of an
-// interrupted transaction is reconciled against Snowflake's committed offset
-// token before that channel's next append. The sidecar is spawned on first use;
-// any sidecar failure is fatal to the connector (crash-only).
+// channel as they are stored and committed as the transaction's checkpoint is
+// produced, and the runtime's idempotent replay of an interrupted transaction is
+// reconciled against Snowflake's committed offset token before that channel's
+// next append. The sidecar is spawned on first use; any sidecar failure is fatal
+// to the connector (crash-only).
 type streamV2Manager struct {
 	cfg         *config
 	accountName string
@@ -145,9 +153,9 @@ type streamV2Manager struct {
 
 	// procCtx bounds the sidecar process lifetime to the transactor session
 	// rather than to whichever caller's context first triggers ensureStarted.
-	// A per-call context (e.g. an Acknowledge errgroup context) would otherwise
-	// SIGTERM the sidecar as soon as that call returned. procCancel is invoked
-	// by stop().
+	// A per-call context (e.g. the errgroup context flush awaits its commits on)
+	// would otherwise SIGTERM the sidecar as soon as that call returned.
+	// procCancel is invoked by stop().
 	procCtx    context.Context
 	procCancel context.CancelFunc
 
@@ -155,8 +163,7 @@ type streamV2Manager struct {
 	sup    *sidecarSupervisor
 	client *sidecarClient
 
-	bindings  map[int]*streamV2Binding
-	byChannel map[string]*streamV2Binding
+	bindings map[int]*streamV2Binding
 
 	// bufBytes is the sum of every binding's buffered bytes, bounded by
 	// streamV2MaxBufferedBytes. Written only from Store and flush, which the
@@ -176,7 +183,6 @@ func newStreamV2Manager(ctx context.Context, cfg *config, materialization string
 		procCtx:     procCtx,
 		procCancel:  procCancel,
 		bindings:    make(map[int]*streamV2Binding),
-		byChannel:   make(map[string]*streamV2Binding),
 	}
 }
 
@@ -300,10 +306,6 @@ func (m *streamV2Manager) ensureChannel(ctx context.Context, b *streamV2Binding)
 		return err
 	}
 	b.skip, b.committed, b.opened = skip, skip, true
-
-	m.mu.Lock()
-	m.byChannel[b.channel] = b
-	m.mu.Unlock()
 
 	log.WithFields(log.Fields{
 		"table":          b.table,
@@ -564,10 +566,20 @@ func (m *streamV2Manager) appendBatch(ctx context.Context, b *streamV2Binding) e
 	return nil
 }
 
-// flush appends each binding's remaining buffered documents and waits for every
-// in-flight append, so that the counter it reports for a binding is exactly what
-// has been handed to Snowflake. It returns a checkpoint item for each binding
-// whose counter advanced during this transaction.
+// flush appends each binding's remaining buffered documents, waits for every
+// in-flight append, and then waits for Snowflake to durably commit them. It
+// returns a checkpoint item for each binding whose counter advanced during this
+// transaction — reported only once Snowflake holds the documents that counter
+// accounts for.
+//
+// The commit is awaited here, as part of producing the checkpoint, rather than
+// at Acknowledge. The runtime's own checkpoint is durable before Acknowledge
+// runs, so a commit which failed there could no longer fail the transaction
+// whose counter it belongs to: the task would resume from a counter Snowflake
+// never committed, which the next Open can only refuse, and no replay would
+// re-append rows the runtime already considers delivered. Failing here instead
+// leaves the transaction to be replayed, and the documents Snowflake did commit
+// are skipped by that Open's reconciliation.
 func (m *streamV2Manager) flush(ctx context.Context) (map[int]*streamV2Item, error) {
 	var items = make(map[int]*streamV2Item)
 	for idx, b := range m.bindings {
@@ -604,28 +616,30 @@ func (m *streamV2Manager) flush(ctx context.Context) (map[int]*streamV2Item, err
 			KeyEnd:   m.keyEnd,
 		}
 	}
+
+	// Channels commit independently, and the sidecar serializes its ops per
+	// channel rather than globally, so a wide materialization does not pay each
+	// binding's commit latency in series.
+	group, groupCtx := errgroup.WithContext(ctx)
+	group.SetLimit(MaxConcurrentQueries)
+	for idx, item := range items {
+		var b = m.bindings[idx]
+		group.Go(func() error { return m.waitCommit(groupCtx, b, item.Counter) })
+	}
+	if err := group.Wait(); err != nil {
+		return nil, err
+	}
+
 	return items, nil
 }
 
-// waitCommit blocks until the channel has durably committed every document the
-// transaction appended to it, and refuses to acknowledge the transaction if
-// Snowflake rejected any of its rows. Nothing is applied here — the rows reached
-// Snowflake during Store — but the wait is retained deliberately: without it, a
-// failed commit would only surface on the following transaction's append, and a
-// rejected row would not surface at all.
-func (m *streamV2Manager) waitCommit(ctx context.Context, item *streamV2Item) error {
-	m.mu.Lock()
-	b, isOpen := m.byChannel[item.Channel]
-	m.mu.Unlock()
-
-	if !isOpen {
-		// This session appended nothing to the channel — it stored no documents
-		// for the binding, or the binding no longer uses this write path — so
-		// there is nothing to wait for. The counter stays in the checkpoint
-		// against the day the binding appends to the channel again.
-		log.WithField("channel", item.Channel).Debug("snowpipe streaming v2: checkpointed counter has no open channel; nothing to commit")
-		return nil
-	} else if item.Counter <= b.committed {
+// waitCommit blocks until the binding's channel has durably committed every
+// document counted through counter, and fails the transaction if Snowflake
+// rejected any of its rows.
+func (m *streamV2Manager) waitCommit(ctx context.Context, b *streamV2Binding, counter int64) error {
+	// A replay of documents Snowflake already holds appends nothing, so its
+	// counter is already committed and must not be waited on.
+	if counter <= b.committed {
 		return nil
 	}
 
@@ -634,24 +648,35 @@ func (m *streamV2Manager) waitCommit(ctx context.Context, item *streamV2Item) er
 		return err
 	}
 
-	var token = strconv.FormatInt(item.Counter, 10)
-	status, err := client.WaitCommit(ctx, item.Channel, token)
+	// The commit is awaited before StartedCommit reaches the runtime, which is
+	// ahead of the runtime's own periodic reporting of a commit in progress, so
+	// this wait is otherwise unaccounted for until it returns or times out.
+	log.WithFields(log.Fields{
+		"table":   b.table,
+		"channel": b.channel,
+		"counter": counter,
+	}).Info("snowpipe streaming v2: awaiting commit")
+
+	var started = time.Now()
+	var token = strconv.FormatInt(counter, 10)
+	status, err := client.WaitCommit(ctx, b.channel, token)
 	if err != nil {
-		return fmt.Errorf("waiting for commit of document %s on channel %q: %w", token, item.Channel, err)
+		return fmt.Errorf("waiting for commit of document %s on channel %q: %w", token, b.channel, err)
 	}
 
 	// The token landing is the earliest this transaction's own rejections can be
-	// seen. A count which lags even that only delays the refusal to a later
-	// transaction or to the channel's next Open, since it never resets.
-	if err := rejectedRowsError(item.Channel, b.table, status); err != nil {
+	// seen, and this is now before its counter is checkpointed: a rejection fails
+	// the transaction which produced it rather than a later one.
+	if err := rejectedRowsError(b.channel, b.table, status); err != nil {
 		return err
 	}
-	b.committed = item.Counter
+	b.committed = counter
 
 	log.WithFields(log.Fields{
 		"table":   b.table,
-		"channel": item.Channel,
-		"counter": item.Counter,
+		"channel": b.channel,
+		"counter": counter,
+		"took":    time.Since(started).String(),
 	}).Info("snowpipe streaming v2: committed")
 	return nil
 }
