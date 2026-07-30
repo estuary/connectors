@@ -1,6 +1,6 @@
 # Session conduct
 
-How to run a connector session. These leave no trace in a diff — see the `conduct-only` tag in [README.md](README.md); a reviewer must not comment on them.
+How to run a connector session. Rules tagged `conduct-only` leave no trace in a diff — they are the `conduct` checkability class in [rules-index.md](rules-index.md#checkability); a reviewer must not comment on them.
 
 ---
 
@@ -45,6 +45,20 @@ Checkable from a diff in one direction only: a new fetch function that structura
 ### `CONDUCT-GREP-BEFORE-CITE` · conduct-only
 
 If you propose a function, field, or flag that you _remember_ seeing in the connector, grep for it before recommending it. The codebase may have changed since that memory formed, and a confidently-cited symbol that no longer exists costs more trust than an admitted uncertainty.
+
+---
+
+### `CONDUCT-CLEAN-ROOM` · conduct-only
+
+Kick off the connector's existing test suite (typically `pytest` from the connector directory) in the background as soon as the session's first phase begins. Read-only and planning phases may proceed in parallel while it runs — do **not** block on it. The result is a **gate on the first code edit**: confirm the baseline passes before writing anything, so later failures are attributable to your change, not pre-existing drift.
+
+If the suite fails:
+
+- **Simple schema drift** (spec/discover snapshots have shifted but the code is unchanged): dispatch the `regenerate-flow-discovery` agent to refresh them, then commit that alone — message `<connector-name>: update tests` — **before any other work**, so the real change diffs against a green baseline and stays scoped (`REVIEW-SNAPSHOT-SCOPE`).
+- **Flakey fields in the diff** (timestamps like `updated_at`, ETags, anything that changes between runs): surface them and ask whether to add them to the connector's `FIELDS_TO_REDACT` list in its snapshot test module (name varies — grep for `FIELDS_TO_REDACT`).
+- **Anything else:** stop and surface the failure before editing; a pre-existing failure changes what "done" or "fixed" means.
+
+One more check before the first edit: **format the files you're about to touch**. For Python connectors we use `ruff format`. If that produces a diff, commit it alone — message `<connector-name>: formatting` — before your edits, so the real change diffs clean instead of mixing fix and cleanup.
 
 ---
 
