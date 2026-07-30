@@ -3,6 +3,7 @@ from datetime import UTC, datetime, timedelta
 from logging import Logger
 
 from estuary_cdk.capture.common import LogCursor, PageCursor
+from estuary_cdk.flow import ValidationError
 from estuary_cdk.http import HTTPSession
 from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
 from pydantic import BaseModel
@@ -46,11 +47,11 @@ async def resolve_base_url(
     if isinstance(credentials, ApiKey):
         _, sep, dc = credentials.password.rpartition("-")
         if not sep or not dc:
-            raise ValueError(
-                (
+            raise ValidationError(
+                [
                     "Mailchimp API key is missing its data center suffix "
                     "(expected a key ending in e.g. -us21)."
-                )
+                ]
             )
         return API.format(dc=dc)
 

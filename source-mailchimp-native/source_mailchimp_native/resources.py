@@ -70,8 +70,6 @@ async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointCon
     try:
         base_url = await resolve_base_url(log, http, config.credentials)
         _ = await http.request(log, f"{base_url}/ping")
-    except ValueError as err:
-        raise ValidationError([str(err)])
     except HTTPError as err:
         if err.code == 401:
             msg = (
