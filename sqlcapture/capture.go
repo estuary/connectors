@@ -212,6 +212,8 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 		return fmt.Errorf("error discovering database tables: %w", err)
 	} else if err := c.emitSourcedSchemas(discovery); err != nil {
 		return err
+	} else if err := c.emitState(); err != nil { // Emit state so any SourcedSchema changes commit immediately.
+		return err
 	}
 	for streamID, discoveryInfo := range discovery {
 		log.WithFields(log.Fields{
@@ -270,7 +272,12 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 		return fmt.Errorf("error streaming until fence: %w", err)
 	}
 
-	var rediscoverAfter time.Time
+	// Activate any pending streams using the schema information already fetched during
+	// startup, then schedule the first rediscovery a full interval out.
+	if err := c.activatePendingStreams(ctx, discovery, replStream); err != nil {
+		return fmt.Errorf("error initializing pending streams: %w", err)
+	}
+	var rediscoverAfter = nextRediscovery()
 	var periodicChecksAfter time.Time
 	for ctx.Err() == nil {
 		if time.Now().After(rediscoverAfter) {
