@@ -233,6 +233,73 @@ func TestStreamV2Manager(t *testing.T) {
 		require.Equal(t, 8, countRows())
 	})
 
+	t.Run("a key split gives the high child a channel of its own", func(t *testing.T) {
+		// Both children of a key split inherit the parent's checkpoint, and Flow
+		// gives the low child the parent's key-begin while the high child takes
+		// the pivot (activate::map_shard_to_split). A channel is named for its
+		// shard's key-begin, so the low child continues on the parent's channel
+		// and the high child derives one of its own — which is why the counter
+		// the two children inherit means something different to each of them.
+		truncate(t)
+		var tgt = target("split.v1")
+		var pivot uint32 = math.MaxUint32/2 + 1
+
+		var parent = newManager(fullRange)
+		parent.addBinding(cfg.Database, cfg.Schema, tableName, tgt, nil)
+		var parentChannel = parent.bindings[0].channel
+
+		writeRows(parent, 0, 5)
+		items, err := parent.flush(ctx)
+		require.NoError(t, err)
+		require.NoError(t, parent.waitCommit(ctx, items[0]))
+		var checkpointed = *items[0]
+		parent.stop()
+
+		// Each child stores documents of its own, standing in for the disjoint
+		// key subsets a re-shuffled journal read would deliver to them.
+		var low = newManager(&pf.RangeSpec{KeyEnd: pivot - 1, RClockEnd: math.MaxUint32})
+		low.addBinding(cfg.Database, cfg.Schema, tableName, tgt, &checkpointed)
+		require.Equal(t, parentChannel, low.bindings[0].channel)
+
+		// The low child's range is narrower than the one recorded alongside the
+		// counter it inherited, which is not by itself a problem: the guard
+		// against a re-split shard's replay is consulted only when Snowflake is
+		// ahead of that counter, and a split from a checkpointed parent leaves
+		// the two level.
+		writeRows(low, 5, 8)
+		require.Equal(t, int64(5), low.bindings[0].skip)
+		items, err = low.flush(ctx)
+		require.NoError(t, err)
+		require.Equal(t, int64(8), items[0].Counter)
+		require.NoError(t, low.waitCommit(ctx, items[0]))
+
+		// The high child's key-begin is the pivot, so it opens a channel which has
+		// committed nothing: there is no token to reconcile the inherited counter
+		// against, and nothing to skip. Its documents are appended in full.
+		var high = newManager(&pf.RangeSpec{KeyBegin: pivot, KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
+		high.addBinding(cfg.Database, cfg.Schema, tableName, tgt, &checkpointed)
+		require.NotEqual(t, parentChannel, high.bindings[0].channel)
+
+		writeRows(high, 100, 103)
+		require.Zero(t, high.bindings[0].skip)
+
+		items, err = high.flush(ctx)
+		require.NoError(t, err)
+		// The counter carries over from the parent rather than restarting, so the
+		// fresh channel's offset tokens begin above one. Only their order matters,
+		// and skipping a stretch of them costs nothing.
+		require.Equal(t, int64(8), items[0].Counter)
+		// The item names the high child's own channel and range, not the parent's
+		// it inherited.
+		require.Equal(t, high.bindings[0].channel, items[0].Channel)
+		require.Equal(t, pivot, items[0].KeyBegin)
+		require.NoError(t, high.waitCommit(ctx, items[0]))
+
+		// Neither child re-appended what the parent had already stored, and
+		// neither dropped a document of its own.
+		require.Equal(t, 11, countRows())
+	})
+
 	t.Run("refusals", func(t *testing.T) {
 		truncate(t)
 		smallBatches(t)
