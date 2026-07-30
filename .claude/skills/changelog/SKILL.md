@@ -22,12 +22,14 @@ for the convention.
    ```bash
    git diff --name-only main...HEAD
    ```
-   Group changed files by top-level directory. Keep only connector
-   directories that have an existing `CHANGELOG.md` at their root —
-   ignore directories without one (per opt-in convention).
+   Group changed files by top-level directory. Every affected connector
+   gets an entry — if one has no `CHANGELOG.md` at its root yet, create
+   it as part of applying the draft (per CONTRIBUTING.md, each connector
+   has its own changelog).
 
 2. **For each affected connector**, gather context:
-   - Read its existing `CHANGELOG.md` to understand existing voice/format.
+   - Read its existing `CHANGELOG.md` to understand existing voice/format
+     (skip if the file doesn't exist yet).
    - Read its recent diff: `git diff main...HEAD -- <connector-dir>/`.
    - Identify *user-visible* effects:
      - New/removed/renamed config fields → schema diff (look for changes
@@ -82,7 +84,8 @@ for the convention.
 
 5. **Apply on confirmation.** Insert the new entry below `# Changelog`
    and above the most recent existing entry. Don't delete or modify
-   existing entries.
+   existing entries. If the connector has no `CHANGELOG.md`, create it
+   with a `# Changelog` heading followed by the new entry.
 
 6. **Multiple connectors.** If the PR touches multiple connectors,
    show all drafts at once, then apply all on a single confirmation.
@@ -101,5 +104,6 @@ for the convention.
 
 - Don't invent changes that aren't in the diff.
 - Don't commit the CHANGELOG edits — let the user review and commit them.
-- Don't add a CHANGELOG.md to a connector that doesn't already have one;
-  that's a deliberate opt-in step the user should take manually.
+- Don't skip a connector because it lacks a `CHANGELOG.md` — a missing
+  file means the connector predates the convention, not that it opted out.
+  Create it.
