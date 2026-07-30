@@ -739,12 +739,9 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 	for idx, b := range d.bindings {
 		if b.streamingV2 {
 			if item, ok := streamV2Items[idx]; ok {
-				// Patching only this shard's channel leaves the entries of the
-				// task's other shards in place, since the runtime reduces this
-				// state as a merge patch.
 				d.cp[b.target.StateKey] = &checkpointItem{
 					Table:    b.target.Identifier,
-					StreamV2: map[string]*streamV2Item{item.Channel: item},
+					StreamV2: d.streamV2.checkpointFor(idx, item),
 				}
 			}
 			continue
@@ -961,9 +958,12 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 			group.Go(func() error {
 				d.be.StartedResourceCommit(path)
 				// A channel of the task's other shards is not open in this session,
-				// which waitCommit reports as nothing to wait for.
+				// which waitCommit reports as nothing to wait for. A nil entry is a
+				// retired channel's pending deletion.
 				for _, sv2 := range item.StreamV2 {
-					if err := d.streamV2.waitCommit(groupCtx, sv2); err != nil {
+					if sv2 == nil {
+						continue
+					} else if err := d.streamV2.waitCommit(groupCtx, sv2); err != nil {
 						return fmt.Errorf("committing streaming v2 rows for %s: %w", path, err)
 					}
 				}

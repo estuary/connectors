@@ -174,40 +174,17 @@ func TestReconcileStreamV2Channel(t *testing.T) {
 			wantSkip:  42,
 		},
 		{
-			// The other shards of the task each keep an item of their own in the
-			// shared checkpoint. Their key-begins fall outside this shard's range,
-			// so neither side has taken over the other's documents.
-			name:      "the channels of living sibling shards are ignored",
-			committed: token("42"),
-			prior: map[string]*streamV2Item{
-				"chan":   {Channel: "chan", Counter: 42, KeyBegin: keyBegin, KeyEnd: keyEnd},
-				"higher": {Channel: "higher", Counter: 99, KeyBegin: keyEnd + 1, KeyEnd: math.MaxUint32},
-				"lower":  {Channel: "lower", Counter: 7, KeyBegin: 0, KeyEnd: keyBegin - 1},
-			},
-			wantSkip: 42,
-		},
-		{
-			// Two shards joined into one: the absorbed shard's key-begin lies
-			// inside the range this shard now covers, which exact tiling makes
-			// impossible for a shard that is still running.
-			name:      "a channel whose shard range this one absorbed is refused",
+			// Every shard of the task keeps an item of its own in the checkpoint
+			// they share. Only this channel's item bears on this channel's skip
+			// threshold; the rest are settled by retireAbsorbedChannels.
+			name:      "the items of other shards do not bear on this channel",
 			committed: token("42"),
 			prior: map[string]*streamV2Item{
 				"chan":     {Channel: "chan", Counter: 42, KeyBegin: keyBegin, KeyEnd: keyEnd},
-				"absorbed": {Channel: "absorbed", Counter: 99, KeyBegin: keyBegin + 0x08000000, KeyEnd: keyEnd},
-			},
-			wantErr: "has absorbed",
-		},
-		{
-			// The refusal does not wait on a committed token of this shard's own:
-			// a join whose surviving shard has never appended has still taken over
-			// the absorbed shard's documents.
-			name:      "an absorbed range is refused before this channel commits anything",
-			committed: nil,
-			prior: map[string]*streamV2Item{
+				"higher":   {Channel: "higher", Counter: 99, KeyBegin: keyEnd + 1, KeyEnd: math.MaxUint32},
 				"absorbed": {Channel: "absorbed", Counter: 99, KeyBegin: keyBegin + 1, KeyEnd: keyEnd},
 			},
-			wantErr: "has absorbed",
+			wantSkip: 42,
 		},
 		{
 			name:      "committed behind the checkpoint is refused",
@@ -230,6 +207,119 @@ func TestReconcileStreamV2Channel(t *testing.T) {
 			}
 			require.NoError(t, err)
 			require.Equal(t, tt.wantSkip, skip)
+		})
+	}
+}
+
+// TestAbsorbedChannels covers which of the checkpoint's channels a shard reads as
+// belonging to a shard whose key range it has taken over. Shard ranges tile the
+// key space exactly, so this is decided by the recorded key-begins alone.
+func TestAbsorbedChannels(t *testing.T) {
+	var item = func(channel string, keyBegin, keyEnd uint32) *streamV2Item {
+		return &streamV2Item{Channel: channel, Counter: 10, KeyBegin: keyBegin, KeyEnd: keyEnd}
+	}
+	// A shard which has been widened over the upper half of the key space.
+	const keyBegin, keyEnd uint32 = 0, 0xffffffff
+
+	var channelsOf = func(items []*streamV2Item) []string {
+		var names []string
+		for _, item := range items {
+			names = append(names, item.Channel)
+		}
+		return names
+	}
+
+	t.Run("a shard which has absorbed nothing", func(t *testing.T) {
+		// The item of a shard covering the upper half is not absorbed by a shard
+		// which covers only the lower half.
+		var prior = map[string]*streamV2Item{
+			"mine":   item("mine", 0, 0x7fffffff),
+			"higher": item("higher", 0x80000000, 0xffffffff),
+		}
+		require.Empty(t, absorbedChannels("mine", prior, 0, 0x7fffffff))
+	})
+
+	t.Run("a shard's own channel is never absorbed", func(t *testing.T) {
+		// The widened shard's own item still records the narrower range it had
+		// when it was written, which is inside the range it now covers.
+		var prior = map[string]*streamV2Item{"mine": item("mine", 0, 0x7fffffff)}
+		require.Empty(t, absorbedChannels("mine", prior, keyBegin, keyEnd))
+	})
+
+	t.Run("the channels of absorbed shards, by range", func(t *testing.T) {
+		var prior = map[string]*streamV2Item{
+			"mine":     item("mine", 0, 0x3fffffff),
+			"second":   item("second", 0x40000000, 0x7fffffff),
+			"fourth":   item("fourth", 0xc0000000, 0xffffffff),
+			"third":    item("third", 0x80000000, 0xbfffffff),
+			"retired":  nil,
+			"outsider": item("outsider", 0, 0xffffffff),
+		}
+		// A four-way split joined back into one: the three shards above this one
+		// are absorbed, reported in the order of the ranges they covered. The item
+		// recording a key-begin at or below this shard's own is not absorbed, and
+		// neither is a channel already retired.
+		require.Equal(t,
+			[]string{"second", "third", "fourth"},
+			channelsOf(absorbedChannels("mine", prior, keyBegin, keyEnd)))
+	})
+}
+
+// TestAbsorbedChannelSettled covers whether an absorbed shard's channel holds
+// exactly what the checkpoint accounts for, which is what decides whether a join
+// can proceed or demands a backfill.
+func TestAbsorbedChannelSettled(t *testing.T) {
+	var token = func(s string) *string { return &s }
+	var absorbed = &streamV2Item{Channel: "absorbed", Counter: 42, KeyBegin: 0x80000000, KeyEnd: 0xffffffff}
+
+	for _, tt := range []struct {
+		name      string
+		committed *string
+		wantErr   string
+		// A channel this connector did not write is a misconfiguration rather
+		// than lost state, and like the same case on a shard's own channel it
+		// does not promise a backfill would help.
+		noBackfillHint bool
+	}{
+		{
+			// The absorbed shard committed everything it appended, so the task's
+			// frontier accounts for those documents and they are not replayed here.
+			name:      "settled at the checkpointed counter",
+			committed: token("42"),
+		},
+		{
+			name:      "interrupted beyond the checkpointed counter",
+			committed: token("44"),
+			wantErr:   "will be replayed to this shard",
+		},
+		{
+			name:      "behind the checkpointed counter",
+			committed: token("41"),
+			wantErr:   "has lost committed data",
+		},
+		{
+			name:      "nothing committed at all",
+			committed: nil,
+			wantErr:   "has lost committed data",
+		},
+		{
+			name:           "a token this connector could not have written",
+			committed:      token("basetok0000000001:7"),
+			wantErr:        "which is not a document count",
+			noBackfillHint: true,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var err = absorbedChannelSettled(absorbed, tt.committed, 0, math.MaxUint32)
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.ErrorContains(t, err, tt.wantErr)
+			require.ErrorContains(t, err, absorbed.Channel)
+			if !tt.noBackfillHint {
+				require.ErrorContains(t, err, "Backfill this binding")
+			}
 		})
 	}
 }

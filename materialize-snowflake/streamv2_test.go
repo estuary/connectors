@@ -310,12 +310,13 @@ func TestStreamV2Manager(t *testing.T) {
 		require.Equal(t, 11, countRows())
 	})
 
-	t.Run("joining two shards into one is refused", func(t *testing.T) {
+	t.Run("joining two shards into one", func(t *testing.T) {
 		// Flow has no join command, but nothing in the runtime forbids one:
 		// shard ranges need only tile the key space exactly, so widening a
 		// surviving shard and deleting its sibling is a legal topology. The
 		// survivor then covers keys whose documents the deleted shard had been
-		// appending to a channel of its own.
+		// appending to a channel of its own, and whether it may carry on turns on
+		// whether that shard left its channel settled.
 		truncate(t)
 		var tgt = target("join.v1")
 		var pivot uint32 = math.MaxUint32/2 + 1
@@ -357,25 +358,69 @@ func TestStreamV2Manager(t *testing.T) {
 		// The join: the survivor keeps the low shard's key-begin, and so its
 		// channel, but now covers the whole range — which puts the deleted
 		// shard's key-begin inside it.
+		var loItem = items[0]
 		var joined = newManager(fullRange)
-		joined.addBinding(cfg.Database, cfg.Schema, tableName, tgt, priorOf(items[0], hiItems[0]))
+		joined.addBinding(cfg.Database, cfg.Schema, tableName, tgt, priorOf(loItem, hiItems[0]))
 
-		var refusal = joined.writeRow(ctx, 0, []any{"k", 1, json.RawMessage(`{}`)})
-		require.ErrorContains(t, refusal, "has absorbed")
-		require.ErrorContains(t, refusal, hiItems[0].Channel)
-		require.Equal(t, 10, countRows())
-		t.Logf("join refused with: %s", refusal)
+		// The absorbed shard committed everything its checkpoint accounted for, so
+		// the task's frontier accounts for those documents too and they are not
+		// delivered here again. The join needs no backfill: the absorbed channel is
+		// settled and retired, and this shard carries on appending to its own.
+		writeRows(joined, 5, 8)
+		require.Equal(t, []string{hiItems[0].Channel}, joined.bindings[0].retire)
+		require.Equal(t, int64(5), joined.bindings[0].skip)
 
-		// Backfilling the binding is the recovery the refusal asks for: it
-		// rotates the channel, and the item of the absorbed shard is not carried
-		// into the new state key.
-		var joinedAfterBackfill = newManager(fullRange)
-		joinedAfterBackfill.addBinding(cfg.Database, cfg.Schema, tableName, target("join.v2"), nil)
-		require.NoError(t, joinedAfterBackfill.writeRow(ctx, 0, []any{"k", 1, json.RawMessage(`{}`)}))
-		items, err = joinedAfterBackfill.flush(ctx)
+		items, err = joined.flush(ctx)
 		require.NoError(t, err)
-		require.NoError(t, joinedAfterBackfill.waitCommit(ctx, items[0]))
-		require.Equal(t, 11, countRows())
+		require.Equal(t, int64(8), items[0].Counter)
+		require.NoError(t, joined.waitCommit(ctx, items[0]))
+
+		// The absorbed shard's rows are still in the table, and the joined shard
+		// added its own without re-appending any of them.
+		require.Equal(t, 13, countRows())
+
+		// The retirement is reported as a deletion of the absorbed channel's
+		// entry, which a merge patch applies while leaving this shard's own.
+		var entries = joined.checkpointFor(0, items[0])
+		require.Len(t, entries, 2)
+		require.Equal(t, items[0], entries[items[0].Channel])
+		require.Nil(t, entries[hiItems[0].Channel])
+		joined.stop()
+
+		// An absorbed shard which was interrupted is a different matter: it left
+		// documents committed beyond what its checkpoint accounts for, so the
+		// frontier will deliver them here, to a channel whose committed offset
+		// token cannot tell them from new ones.
+		var interrupted = newManager(&pf.RangeSpec{KeyBegin: pivot, KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
+		interrupted.addBinding(cfg.Database, cfg.Schema, tableName, tgt, priorOf(hiItems[0]))
+		writeRows(interrupted, 105, 108)
+		_, err = interrupted.flush(ctx) // appended and committed, never checkpointed
+		require.NoError(t, err)
+		_, err = interrupted.client.WaitCommit(ctx, hiItems[0].Channel, "8")
+		require.NoError(t, err)
+		require.Equal(t, 16, countRows())
+		interrupted.sup.kill()
+
+		var rowsBefore = countRows()
+		var joinedAgain = newManager(fullRange)
+		joinedAgain.addBinding(cfg.Database, cfg.Schema, tableName, tgt, priorOf(loItem, hiItems[0]))
+
+		var refusal = joinedAgain.writeRow(ctx, 0, []any{"k", 1, json.RawMessage(`{}`)})
+		require.ErrorContains(t, refusal, "will be replayed to this shard")
+		require.ErrorContains(t, refusal, hiItems[0].Channel)
+		require.Equal(t, rowsBefore, countRows())
+		t.Logf("interrupted join refused with: %s", refusal)
+
+		// Backfilling the binding is the recovery that refusal asks for: it
+		// rotates the channel, and no item of the absorbed shard is carried into
+		// the new state key.
+		var afterBackfill = newManager(fullRange)
+		afterBackfill.addBinding(cfg.Database, cfg.Schema, tableName, target("join.v2"), nil)
+		require.NoError(t, afterBackfill.writeRow(ctx, 0, []any{"k", 1, json.RawMessage(`{}`)}))
+		items, err = afterBackfill.flush(ctx)
+		require.NoError(t, err)
+		require.NoError(t, afterBackfill.waitCommit(ctx, items[0]))
+		require.Equal(t, rowsBefore+1, countRows())
 	})
 
 	t.Run("refusals", func(t *testing.T) {

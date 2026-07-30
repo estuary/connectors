@@ -32,10 +32,11 @@
   shards were split while an interrupted transaction's rows were outstanding —
   it fails rather than risk duplicating or dropping rows. Backfilling the
   affected binding recovers from either case.
-- Splitting a task's shards needs no backfill. Reducing their number does:
-  a shard which takes over the key range of another cannot establish which of
-  that shard's rows Snowflake already holds, so bindings on this path fail until
-  they are backfilled.
+- Splitting a task's shards needs no backfill, and neither does reducing their
+  number: a shard which takes over the key range of another settles that shard's
+  rows before appending any of its own. It fails, and asks for a backfill, only
+  if the shard it took over was interrupted with rows outstanding — the one case
+  in which those rows would be materialized twice.
 
 ## 2026-07-23
 
