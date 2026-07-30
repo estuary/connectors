@@ -21,8 +21,10 @@
 - New advanced option `variant_columns` materializes object, array, and
   multi-type fields — and the root document — as Iceberg `variant` columns
   instead of JSON strings, and creates new tables with Iceberg format v3.
-  Collection key fields keep their string mapping, and the per-field
-  `castToString` option still forces a JSON string column. Reading variant
+  Collection key fields keep their string mapping, the per-field
+  `castToString` option still forces a JSON string column, and string-encoded
+  numbers (`string` plus `integer`/`number` with a matching `format`
+  annotation) keep their numeric column. Reading variant
   columns requires an Iceberg v3-capable query engine (for example Spark 4.0,
   Snowflake, or DuckDB 1.5.3 and later).
 - Enabling `variant_columns` on an existing materialization converts its
