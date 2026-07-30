@@ -1,5 +1,16 @@
 # source-sqlserver-ct
 
+## 2026-07-30
+
+### Changed
+- Backfill resume keys for `DATETIME2`, `SMALLDATETIME`, `DATETIMEOFFSET` and `DATE`
+  primary-key columns are now bound as typed datetime parameters rather than as
+  formatted strings. Comparing a datetime column against a string parameter left an
+  implicit conversion inside the chunk query's resume predicate, which prevented SQL
+  Server from using an index seek on tables whose primary key has more than one
+  column. Each chunk instead rescanned every row it had already read, so backfills of
+  large tables progressed more and more slowly as they went on.
+
 ## 2026-07-22
 
 ### Added
