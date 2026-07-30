@@ -321,7 +321,39 @@ async def fetch_campaigns(
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[Campaign | LogCursor, None]:
+    """Incrementally fetch campaigns created after the cursor, up to the last
+    fully-elapsed second.
+
+    `create_time` is the only time filter `/campaigns` exposes, so a campaign is
+    seen once, at creation; later mutations (status transitions, report stats)
+    are recovered by the daily scheduled backfill.
+
+                      cursor  cursor + 1s  horizon = last elapsed second
+    ─────────────────────┼─────────┼──────────┼────▶ time (1s ticks)
+                         │         │          │
+    since_create_time ───(═════════╪══════════╪═══▶
+    before_create_time ══╪═════════╪══════════]
+    emitted ─────────────┼─────────[══════════]
+                         │         │          └─ the present second is still
+                         │         │             in progress; its campaigns
+                         │         │             wait for the next poll
+                         │         └─ first emitted second
+                         └─ at-or-before-cursor docs are dropped client-side
+
+    `before_create_time` is inclusive, so the horizon second is emitted by this
+    poll rather than the next (`Campaigns / before boundary probe`).
+    `since_create_time` has no exact-boundary probe on `/campaigns`, which is
+    why the client-side drop at the cursor stays: it makes that inclusivity
+    irrelevant.
+    """
     assert isinstance(log_cursor, datetime)
+
+    # The last fully-elapsed second. Capping here keeps the cursor out of a
+    # half-elapsed second, which would permanently suppress a campaign created
+    # later in that same second — the drop below would skip it on every poll.
+    horizon = datetime.now(tz=UTC).replace(microsecond=0) - timedelta(seconds=1)
+    if horizon <= log_cursor:
+        return
 
     last_seen = log_cursor
     offset = 0
@@ -329,13 +361,15 @@ async def fetch_campaigns(
 
     while True:
         count = 0
+        params = _campaign_params(offset, log_cursor)
+        params["before_create_time"] = horizon.isoformat()
         page = fetch_collection_page(
             http,
             base_url,
             Campaign.PATH,
             Campaign.ITEMS_KEY,
             Campaign,
-            _campaign_params(offset, log_cursor),
+            params,
             log,
         )
 

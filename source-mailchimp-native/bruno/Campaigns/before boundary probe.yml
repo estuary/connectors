@@ -1,0 +1,87 @@
+info:
+  name: before boundary probe
+  type: http
+  seq: 5
+
+http:
+  method: GET
+  url: "{{base_url}}/campaigns?count=10&before_create_time=2026-06-10T18:28:42Z&sort_field=create_time&sort_dir=ASC&fields=campaigns.id,campaigns.create_time,total_items"
+  params:
+    - name: count
+      value: "10"
+      type: query
+    - name: before_create_time
+      value: 2026-06-10T18:28:42Z
+      type: query
+    - name: sort_field
+      value: create_time
+      type: query
+    - name: sort_dir
+      value: ASC
+      type: query
+    - name: fields
+      value: campaigns.id,campaigns.create_time,total_items
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - narrowed 5 to 1, before is INCLUSIVE of the exact timestamp
+    request:
+      url: "{{base_url}}/campaigns?count=10&before_create_time=2026-06-10T18:28:42Z&sort_field=create_time&sort_dir=ASC&fields=campaigns.id,campaigns.create_time,total_items"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "campaigns": [
+              { "id": "61cc0c44a6", "create_time": "2026-06-10T18:28:42+00:00" }
+            ],
+            "total_items": 1
+          }
+
+docs: |-
+  **REFERENCE:** [List campaigns](https://mailchimp.com/developer/marketing/api/campaigns/list-campaigns/)
+
+  **WHY:** boundary-semantics probe, mirror of `Members / before boundary probe`
+  for the campaigns family: the threshold equals campaign `61cc0c44a6`'s
+  `create_time` EXACTLY (2026-06-10T18:28:42, the account's oldest — see
+  `Campaigns / since_create_time`). That campaign returned means
+  `before_create_time` is INCLUSIVE of the exact timestamp; excluded means
+  exclusive. Every other campaign is later, so it must be absent either way —
+  its absence doubles as proof the filter is applied, not ignored. Two things
+  depend on this:
+
+  - `fetch_campaigns` caps its window at `before_create_time = horizon` (the
+    last fully-elapsed second) so the cursor can never land inside an
+    in-progress second and suppress a same-second campaign. That only holds if
+    the filter is applied server-side at all.
+  - The seam between `backfill_campaigns` and the first incremental poll:
+    inclusive means the backfill's `before_create_time = cutoff − 1s` covers the
+    `cutoff − 1s` second the incremental cursor seeds at.
+
+  The docs don't state the semantics either way.
+
+  **VERIFIED (2026-07-29):** `before_create_time` is applied server-side and is
+  INCLUSIVE of the exact timestamp. The account holds 5 campaigns at probe time
+  (`61cc0c44a6` 06-10 18:28:42, `524c905696` 06-10 18:40:54, `cff6ca453b` 06-11,
+  `5dfc22e163` 07-08, `3f69f3a595` 07-13 — re-run `Campaigns / since_create_time`
+  for the current set); the threshold narrowed **5 → 1**, returning exactly the
+  campaign whose `create_time` equals it. So the filter is honored rather than
+  ignored, and the horizon second `fetch_campaigns` queries is included in the
+  window rather than deferred. Matches `before_last_changed` on members and
+  segments (`Members / before boundary probe`), and asymmetric with `since_*`,
+  which is exclusive there — `/campaigns` has no exact-boundary `since_*` probe,
+  which is why `fetch_campaigns` still suppresses at-or-before-cursor docs
+  client-side.
