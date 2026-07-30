@@ -3,6 +3,7 @@ package backfill
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/estuary/connectors/go/capture/sqlserver/datatypes"
 	"github.com/estuary/connectors/sqlcapture"
@@ -35,6 +36,13 @@ func BuildBackfillQuery(
 			if len(resumeKey) != len(keyColumns) {
 				return "", nil, fmt.Errorf("expected %d resume-key values but got %d", len(keyColumns), len(resumeKey))
 			}
+			for idx, colName := range keyColumns {
+				var retyped, err = retypeResumeKey(resumeKey[idx], columnTypes[colName])
+				if err != nil {
+					return "", nil, fmt.Errorf("error preparing resume key for %q: %w", streamID, err)
+				}
+				resumeKey[idx] = retyped
+			}
 			var query = buildScanQuery(false, keyColumns, columnTypes, schema, table, chunkSize)
 			return query, resumeKey, nil
 		}
@@ -44,6 +52,51 @@ func BuildBackfillQuery(
 	default:
 		return "", nil, fmt.Errorf("invalid backfill mode %q", state.Mode)
 	}
+}
+
+// retypeResumeKey converts a resume key value back into a Go type which the driver will
+// bind as the column's own SQL type.
+//
+// EncodeKeyFDB formats datetime values with time.Format so that serialized row keys sort
+// correctly as FDB tuples. Binding that string straight back into a chunk query
+// leaves SQL Server comparing a datetime column against an nvarchar parameter. The
+// disjunctive shape of the resume predicate combined with that implicit conversion
+// stops the optimizer from recognizing that `k1 > @p1` and `k1 = @p1 AND k2 > @p2`
+// share a lower bound. Unable to derive a seek range, it scans from the start of the
+// index instead, and every chunk re-reads the already backfilled portion of the table.
+// So, we use retypeResumeKey to convert the resume key so SQL Server does not perform
+// an implicit conversion and the optimizer decides to seek instead of scan.
+//
+// DATETIME and TIME are deliberately excluded:
+//
+//   - DATETIME is a lossy-encoding problem. DatetimeKeyEncoding keeps only three
+//     fractional digits and Go truncates them, but the column resolves to
+//     1/300s, so a stored .003333 is persisted as .003.
+//
+//   - TIME is a parameter-type problem. A Go time.Time is always a date as well as a
+//     time, so the driver can only send it as DATETIMEOFFSET, and SQL Server has no
+//     implicit conversion between TIME and DATETIMEOFFSET.
+func retypeResumeKey(value any, columnType any) (any, error) {
+	var text, isText = value.(string)
+	if !isText {
+		return value, nil
+	}
+
+	var layout string
+	switch columnType {
+	case "smalldatetime":
+		layout = datatypes.DatetimeKeyEncoding
+	case "datetime2", "datetimeoffset", "date":
+		layout = datatypes.SortableRFC3339Nano
+	default:
+		return value, nil
+	}
+
+	var parsed, err = time.Parse(layout, text)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing %v resume key %q: %w", columnType, text, err)
+	}
+	return parsed, nil
 }
 
 // keylessScanQuery builds a query for scanning a table without a primary key.
