@@ -291,7 +291,7 @@ func rejectedRowsError(channel, table string, status *channelStatusResult) error
 		return nil
 	}
 	return fmt.Errorf(
-		"channel %q had %d row(s) rejected and discarded by Snowflake, which reported: %s. Those rows are not in %s, and Snowflake's committed offset token has advanced past them, so they cannot be identified and re-sent. Backfill this binding to materialize it from the beginning",
+		"channel %q had %d row(s) rejected and discarded by Snowflake, which reported: %s. Those rows are not in %s, and Snowflake's committed offset token has advanced past them, so they cannot be identified and re-sent. Backfill this binding",
 		channel, status.RowsErrorCount, status.LastErrorMessage, table,
 	)
 }
@@ -324,7 +324,7 @@ func reconcileStreamV2Channel(channel string, committedToken *string, prior *str
 
 	if committed < counter {
 		return 0, fmt.Errorf(
-			"channel %q has committed %d documents but this task's checkpoint records %d as appended: the channel has lost committed data, so the missing rows cannot be identified. Backfill this binding to materialize it from the beginning",
+			"channel %q has committed %d documents but this task's checkpoint records %d as appended: the channel has lost committed data, so the missing rows cannot be identified. Backfill this binding",
 			channel, committed, counter,
 		)
 	} else if committed > counter && prior != nil && (prior.KeyBegin != keyBegin || prior.KeyEnd != keyEnd) {
@@ -334,7 +334,7 @@ func reconcileStreamV2Channel(channel string, committedToken *string, prior *str
 		// recorded range to contradict, and the documents Snowflake holds are
 		// still the ones this shard is about to replay.
 		return 0, fmt.Errorf(
-			"channel %q has %d documents Snowflake committed beyond the %d this task's checkpoint records, and the shard key range has changed from [%08x, %08x) to [%08x, %08x) since they were appended: the interrupted transaction cannot be replayed identically, so the uncommitted rows cannot be skipped safely. Backfill this binding to materialize it from the beginning",
+			"channel %q has %d documents Snowflake committed beyond the %d this task's checkpoint records, and the shard key range has changed from [%08x, %08x) to [%08x, %08x) since they were appended: the interrupted transaction cannot be replayed identically, so the uncommitted rows cannot be skipped safely. Backfill this binding",
 			channel, committed, counter, prior.KeyBegin, prior.KeyEnd, keyBegin, keyEnd,
 		)
 	}
@@ -445,7 +445,7 @@ func (m *streamV2Manager) flush(ctx context.Context) (map[int]*streamV2Item, err
 		// grows from there.
 		if b.opened && b.counter < b.skip {
 			return nil, fmt.Errorf(
-				"channel %q holds %d committed documents but the transaction replayed against it produced only %d: it was not replayed identically, so the rows Snowflake already holds cannot be identified. Backfill this binding to materialize it from the beginning",
+				"channel %q holds %d committed documents but the transaction replayed against it produced only %d: it was not replayed identically, so the rows Snowflake already holds cannot be identified. Backfill this binding",
 				b.channel, b.skip, b.counter,
 			)
 		}
