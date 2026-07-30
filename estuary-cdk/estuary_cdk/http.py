@@ -34,6 +34,7 @@ from .utils import format_error_message
 
 DEFAULT_AUTHORIZATION_HEADER = "Authorization"
 DEFAULT_AUTHORIZATION_TOKEN_TYPE = "Bearer"
+OAUTH2_TOKEN_EXCHANGE_TIMEOUT = 30.0  # seconds, per attempt
 
 T = TypeVar("T")
 
@@ -432,6 +433,10 @@ class TokenSource:
             headers=headers,
             form=form,
             with_token=False,
+            # Bound each attempt and don't retry server errors forever, so that
+            # a misbehaving provider surfaces as a loggable failure.
+            should_retry=lambda status, headers, body, attempt: attempt < 5,
+            timeout=aiohttp.ClientTimeout(total=OAUTH2_TOKEN_EXCHANGE_TIMEOUT),
         )
         return self.AccessTokenResponse.model_validate_json(response)
 
