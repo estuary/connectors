@@ -24,7 +24,7 @@ Establish what's actually wrong before touching code:
 - **Symptom class**: missing documents, duplicate documents, wrong field values, a crash, a stall, or a capture that never advances its cursor. Missing documents and stalled cursors are the data-loss cases — treat them as urgent and expect the root cause to be in the fetch layer's window or checkpoint logic.
 - **Since when** — is this a regression? `git log --oneline -- <connector>/` and check whether a recent change touched the affected stream.
 
-Run the connector's test suite in the background now, as a baseline (`CONDUCT-CLEAN-ROOM`). A pre-existing failure changes what "fixed" means.
+Run the connector's test suite in the background now, as a baseline (`CONDUCT-ESTABLISH-BASELINE`). A pre-existing failure changes what "fixed" means.
 
 ## Phase 1 — Reproduce
 
@@ -44,7 +44,7 @@ If the defect is in fetch or cursor logic, **invoke the `fetch-function-rules` s
 
 ## Phase 3 — Fix
 
-**Clean-room gate (`CONDUCT-CLEAN-ROOM`).** The Phase 0 baseline must have completed and been inspected before the first edit. Pre-existing drift commits first, before any fix work: stale snapshots as `source-$1: update tests`; and run the formatter over the files you're about to edit, committing any resulting diff as `source-$1: formatting`. Full failure handling is in [session-conduct.md](../../shared/session-conduct.md).
+**Baseline gate (`CONDUCT-ESTABLISH-BASELINE`).** The Phase 0 baseline must have completed and been inspected before the first edit. Pre-existing drift commits first, before any fix work: stale snapshots as `source-$1: update tests`; and run the formatter over the files you're about to edit, committing any resulting diff as `source-$1: formatting`. Full failure handling is in [session-conduct.md](../../shared/session-conduct.md).
 
 Match the surrounding code. `.claude/rules/connector-python.md` auto-loads while you edit and carries the always-apply rules; `fetch-function-rules` carries the window and checkpoint semantics.
 
@@ -71,9 +71,9 @@ Report the sweep result either way. "Checked all six streams, only `campaigns` w
 
 ## Phase 6 — Land
 
-- **Changelog:** invoke the `changelog` skill. Every bug fix gets an entry, whether or not it looks user-visible (`REVIEW-CHANGELOG-ENTRY`).
+- **Changelog:** invoke the `changelog` skill. Don't pre-judge a fix as too internal to be worth mentioning — if the connector keeps a `CHANGELOG.md`, the fix gets an entry (`REVIEW-CHANGELOG-ENTRY`). Adding the file to a connector that has none stays the user's opt-in call.
 - **Self-review:** invoke `review-connector-change` on the working diff before handing off.
-- Commit scoped to the fix. Snapshot regeneration unrelated to the bug goes in its own `source-$1: update tests` commit, ordered before the fix (see the Phase 3 clean-room gate).
+- Commit scoped to the fix. Snapshot regeneration unrelated to the bug goes in its own `source-$1: update tests` commit, ordered before the fix (see the Phase 3 baseline gate).
 - **Documentation:** if the fix changes user-visible behavior described in the connector's docs, update them (connector docs are mirrored into the flow repo's `site/docs` via a sibling PR).
 - **PR body:** follow [.github/pull_request_template.md](../../../.github/pull_request_template.md). Fill every section — drop **Regression?** only when the fix isn't one; list created or affected docs under **Documentation links affected:**; and state under **Notes for reviewers:** how the change was tested (unit tests, snapshot tests, `flowctl preview`, local stack tests, or another method — name what actually ran).
 - **Never push or open a PR without asking.** Always stop and confirm with the user before `git push` or `gh pr create` — even when the fix is verified and the user asked for the fix in the first place.
