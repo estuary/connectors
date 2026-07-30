@@ -295,6 +295,14 @@ type Database interface {
 	// HistoryMode returns whether history mode (non-associative reduction of events) is enabled
 	HistoryMode() bool
 
+	// RediscoveryInterval returns how long the capture should wait between mid-capture
+	// rediscovery passes, or zero to use the default interval. Rediscovery costs a handful of
+	// catalog queries per capture per interval, which is insignificant on its own but not when
+	// hundreds or thousands of captures share one source database, so connectors surface this
+	// as a config setting for those users to trade responsiveness to schema changes against
+	// load on their server. Implement it with ParseRediscoveryInterval.
+	RediscoveryInterval() time.Duration
+
 	// The collection key which should be suggested if discovery fails to find suitable
 	// primary key. This should be some property or combination of properties in the
 	// source metadata which encodes the database change sequence.

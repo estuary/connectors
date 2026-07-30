@@ -199,8 +199,56 @@ var (
 //
 // The delay is jittered across an interval-wide window rather than being exactly
 // rediscoverInterval.
-func nextRediscovery() time.Time {
-	return time.Now().Add(rediscoverInterval/2 + time.Duration(rand.Int63n(int64(rediscoverInterval))))
+func (c *Capture) nextRediscovery() time.Time {
+	var interval = c.rediscoveryInterval()
+	return time.Now().Add(interval/2 + time.Duration(rand.Int63n(int64(interval))))
+}
+
+// rediscoveryInterval returns how long this capture waits between rediscoveries.
+func (c *Capture) rediscoveryInterval() time.Duration {
+	if interval := c.Database.RediscoveryInterval(); interval > 0 {
+		return interval
+	}
+	return rediscoverInterval
+}
+
+const (
+	// minRediscoveryInterval and maxRediscoveryInterval bound a user-configured rediscovery
+	// interval. A year already means "effectively never rediscover", and staying far below the
+	// point where the jittered delay (which reaches 1.5x the interval) would overflow an int64
+	// duration keeps an absurdly large value from wrapping negative and thereby inverting into
+	// rediscovery on every pass of the capture loop.
+	minRediscoveryInterval = 1 * time.Minute
+	maxRediscoveryInterval = 365 * 24 * time.Hour
+)
+
+// ValidateRediscoveryInterval checks a connector's 'rediscovery_interval' config setting.
+// An empty value means "use the default interval" and is always valid.
+func ValidateRediscoveryInterval(interval string) error {
+	if interval == "" {
+		return nil
+	}
+	var parsed, err = time.ParseDuration(interval)
+	if err != nil {
+		return fmt.Errorf("invalid 'rediscovery_interval' configuration %q: %w", interval, err)
+	} else if parsed < minRediscoveryInterval {
+		return fmt.Errorf("invalid 'rediscovery_interval' configuration %q: must be at least %s", interval, minRediscoveryInterval)
+	} else if parsed > maxRediscoveryInterval {
+		return fmt.Errorf("invalid 'rediscovery_interval' configuration %q: must not exceed %s", interval, maxRediscoveryInterval)
+	}
+	return nil
+}
+
+// ParseRediscoveryInterval converts a 'rediscovery_interval' config setting into a duration
+// for connectors to implement Database.RediscoveryInterval with. Empty values yield zero,
+// meaning the default interval applies, and so do unparseable ones since a config which got
+// this far has already been accepted by ValidateRediscoveryInterval.
+func ParseRediscoveryInterval(interval string) time.Duration {
+	var parsed, err = time.ParseDuration(interval)
+	if err != nil {
+		return 0
+	}
+	return parsed
 }
 
 // Run is the top level entry point of the capture process.
@@ -277,7 +325,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	if err := c.activatePendingStreams(ctx, discovery, replStream); err != nil {
 		return fmt.Errorf("error initializing pending streams: %w", err)
 	}
-	var rediscoverAfter = nextRediscovery()
+	var rediscoverAfter = c.nextRediscovery()
 	var periodicChecksAfter time.Time
 	for ctx.Err() == nil {
 		if time.Now().After(rediscoverAfter) {
@@ -294,7 +342,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 			if err := c.activatePendingStreams(ctx, discovery, replStream); err != nil {
 				return fmt.Errorf("error initializing pending streams: %w", err)
 			}
-			rediscoverAfter = nextRediscovery()
+			rediscoverAfter = c.nextRediscovery()
 		}
 
 		if time.Now().After(periodicChecksAfter) {

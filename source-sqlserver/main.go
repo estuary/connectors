@@ -92,6 +92,7 @@ type advancedConfig struct {
 	Filegroup                   string `json:"filegroup,omitempty" jsonschema:"title=CDC Instance Filegroup,description=When set the connector will create new CDC instances with the specified 'filegroup_name' argument. Has no effect if CDC instances are managed manually."`
 	RoleName                    string `json:"role_name,omitempty" jsonschema:"title=CDC Instance Access Role,description=When set the connector will create new CDC instances with the specified 'role_name' argument as the gating role. When unset the capture user name is used as the 'role_name' instead. Has no effect if CDC instances are managed manually."`
 	SourceTag                   string `json:"source_tag,omitempty" jsonschema:"title=Source Tag,description=When set the capture will add this value as the property 'tag' in the source metadata of each document."`
+	RediscoveryInterval         string `json:"rediscovery_interval,omitempty" jsonschema:"title=Rediscovery Interval,default=15m,description=How often the connector re-runs discovery while a capture is running to notice schema changes and newly added tables. Accepts duration strings like '15m' or '1h'. Defaults to 15m when unspecified." jsonschema_extras:"pattern=^[0-9]+(ms|s|m|h)$"`
 	FeatureFlags                string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 	WatermarksTable             string `json:"watermarksTable,omitempty" jsonschema:"default=dbo.flow_watermarks,description=This property is deprecated for new captures as they will no longer use watermark writes by default. The name of the table used for watermark writes during backfills. Must be fully-qualified in '<schema>.<table>' form."`
 }
@@ -131,6 +132,9 @@ func (c *Config) Validate() error {
 		} else if parsedInterval < 100*time.Millisecond {
 			return fmt.Errorf("invalid 'polling_interval' configuration %q: must be at least 100ms", c.Advanced.PollingInterval)
 		}
+	}
+	if err := sqlcapture.ValidateRediscoveryInterval(c.Advanced.RediscoveryInterval); err != nil {
+		return err
 	}
 
 	if c.Advanced.WatermarksTable != "" && !strings.Contains(c.Advanced.WatermarksTable, ".") {
@@ -381,3 +385,7 @@ func (db *sqlserverDatabase) FallbackCollectionKey() []string {
 }
 
 func (db *sqlserverDatabase) RequestTxIDs(schema, table string) {}
+
+func (db *sqlserverDatabase) RediscoveryInterval() time.Duration {
+	return sqlcapture.ParseRediscoveryInterval(db.config.Advanced.RediscoveryInterval)
+}

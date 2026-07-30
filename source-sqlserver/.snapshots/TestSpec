@@ -129,6 +129,13 @@
             "title": "Source Tag",
             "description": "When set the capture will add this value as the property 'tag' in the source metadata of each document."
           },
+          "rediscovery_interval": {
+            "type": "string",
+            "title": "Rediscovery Interval",
+            "description": "How often the connector re-runs discovery while a capture is running to notice schema changes and newly added tables. Accepts duration strings like '15m' or '1h'. Defaults to 15m when unspecified.",
+            "default": "15m",
+            "pattern": "^[0-9]+(ms|s|m|h)$"
+          },
           "feature_flags": {
             "type": "string",
             "title": "Feature Flags",

@@ -172,6 +172,7 @@ type advancedConfig struct {
 	CaptureAsPartitions       bool     `json:"capture_as_partitions,omitempty" jsonschema:"title=Capture Partitioned Tables As Partitions,description=When set the capture will discover and capture partitioned tables as individual partitions rather than as a single root table. This requires the publication to be created without 'publish_via_partition_root'."`
 	DiscoverUnpublishedTables bool     `json:"discover_unpublished_tables,omitempty" jsonschema:"title=Discover Unpublished Tables,description=When set the capture will discover all tables including those not currently in the publication. Unpublished tables will be added to the publication at capture time if possible. Use with caution as this requires appropriate database permissions."`
 	SourceTag                 string   `json:"source_tag,omitempty" jsonschema:"title=Source Tag,description=When set the capture will add this value as the property 'tag' in the source metadata of each document."`
+	RediscoveryInterval       string   `json:"rediscovery_interval,omitempty" jsonschema:"title=Rediscovery Interval,default=15m,description=How often the connector re-runs discovery while a capture is running to notice schema changes and newly added tables. Accepts duration strings like '15m' or '1h'. Defaults to 15m when unspecified." jsonschema_extras:"pattern=^[0-9]+(ms|s|m|h)$"`
 	FeatureFlags              string   `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 	StatementTimeout          string   `json:"statement_timeout,omitempty" jsonschema:"title=Statement Timeout,description=Overrides the statement timeout used by the connector. Leave blank to use the default of 2 minutes. Set to '0' to disable statement timeouts entirely.,enum=,enum=0,enum=30s,enum=1m,enum=2m,enum=5m,enum=30m,default="`
 
@@ -297,6 +298,9 @@ func (c *Config) Validate() error {
 		if _, err := time.ParseDuration(c.Advanced.StatementTimeout); err != nil {
 			return fmt.Errorf("invalid statement timeout %q: %w", c.Advanced.StatementTimeout, err)
 		}
+	}
+	if err := sqlcapture.ValidateRediscoveryInterval(c.Advanced.RediscoveryInterval); err != nil {
+		return err
 	}
 	if err := c.DiscoveryFilters.Validate(); err != nil {
 		return err
@@ -531,6 +535,10 @@ func (db *postgresDatabase) SourceMetadataSchema(writeSchema bool) *jsonschema.S
 
 func (db *postgresDatabase) FallbackCollectionKey() []string {
 	return []string{"/_meta/source/loc/0", "/_meta/source/loc/1", "/_meta/source/loc/2"}
+}
+
+func (db *postgresDatabase) RediscoveryInterval() time.Duration {
+	return sqlcapture.ParseRediscoveryInterval(db.config.Advanced.RediscoveryInterval)
 }
 
 func (db *postgresDatabase) ShouldBackfill(streamID sqlcapture.StreamID) bool {
