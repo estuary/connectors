@@ -263,9 +263,8 @@ async def _patch_missing_subtask_states(
 # Sweep params shared by both list_members subtasks. The ASC sort makes the
 # walk order deterministic among rows still in the window — it does NOT make
 # positions stable (an update moves a row out of a frozen window entirely,
-# renumbering the tail), which is why backfills resume by value watermark,
-# never by stored offset. It's also what makes the watermark meaningful:
-# `backfill_list_children` requires it for `watermark_resume`.
+# renumbering the tail), which is why backfills never checkpoint an offset
+# across invocations.
 _MEMBER_SORT: dict[str, str | int] = {
     "sort_field": "last_changed",
     "sort_dir": "ASC",
@@ -318,7 +317,6 @@ def incremental_list_children(
     def resource[T: MailchimpIncrementalChildEntity](
         model: type[T],
         subtasks: dict[str, _ListChildSubtask],
-        watermark_resume: bool,
     ) -> MailchimpResource:
         incremental_fetchers = {
             key: functools.partial(
@@ -339,7 +337,6 @@ def incremental_list_children(
                 model,
                 subtask.list_id,
                 subtask.request_params,
-                watermark_resume,
                 config.start_date,
             )
             for key, subtask in subtasks.items()
@@ -390,11 +387,8 @@ def incremental_list_children(
         )
 
     return [
-        # Members ride the probed `last_changed ASC` sort, so their backfills
-        # resume from a value watermark. The segments endpoint documents no
-        # sort, so its backfills carry no resume state and restart instead.
-        resource(ListMember, member_subtasks, watermark_resume=True),
-        resource(Segment, segment_subtasks, watermark_resume=False),
+        resource(ListMember, member_subtasks),
+        resource(Segment, segment_subtasks),
     ]
 
 

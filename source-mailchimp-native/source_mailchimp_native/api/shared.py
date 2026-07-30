@@ -367,34 +367,24 @@ async def backfill_campaigns(
     page: PageCursor,
     cutoff: LogCursor,
 ) -> AsyncGenerator[Campaign | PageCursor, None]:
-    """Backfill campaigns over the frozen `[start_date, cutoff)` window,
-    walked in `create_time ASC` order and checkpointing the max `create_time`
-    seen after each full page.
+    """Backfill campaigns over the frozen `[start_date, cutoff)` window in a
+    single invocation, checkpointing nothing.
 
-    Resume is by value, never by stored offset: `create_time` is immutable,
-    but a campaign deleted mid-backfill still renumbers every later position,
-    so a resumed offset would skip an untouched neighbor — lost until the
-    daily scheduled backfill. A resume instead re-anchors `since_create_time`
-    at `watermark − 1s`; re-reading the boundary second costs only duplicates
-    the collection key collapses, and makes the (unprobed) inclusivity of
-    `since_create_time` irrelevant. Page offsets stay local to a single
-    invocation, anchored to that invocation's `since` value.
+    `create_time` is immutable, but a campaign deleted mid-backfill still
+    renumbers every later position, so an offset must never cross a
+    checkpoint: resuming from one would skip an untouched neighbor. Offsets
+    stay local to this invocation and an interrupted backfill restarts its
+    window — a re-read costs only duplicates the collection key collapses,
+    while a skipped row is lost until the daily scheduled backfill.
     """
-    assert page is None or isinstance(page, str)
+    assert page is None
     assert isinstance(cutoff, datetime)
 
-    since = (
-        datetime.fromisoformat(page) - timedelta(seconds=1)
-        if page is not None
-        else start_date
-    )
-
     offset = 0
-    watermark: datetime | None = None
 
     while True:
         count = 0
-        params = _campaign_params(offset, since)
+        params = _campaign_params(offset, start_date)
         params["before_create_time"] = cutoff.isoformat()
 
         page_gen = fetch_collection_page(
@@ -404,16 +394,11 @@ async def backfill_campaigns(
         async for item in page_gen:
             yield item
             count += 1
-            if watermark is None or item.create_time > watermark:
-                watermark = item.create_time
 
         offset += count
         # A full page means there may be more; a short page is the last one.
         if count < MAX_PAGE_SIZE:
             return
-
-        if watermark is not None:
-            yield watermark.isoformat()
 
 
 async def fetch_list_children[T: MailchimpIncrementalChildEntity](
@@ -496,14 +481,14 @@ async def backfill_list_children[T: MailchimpIncrementalChildEntity](
     model: type[T],
     list_id: ParentId,
     extra_request_params: dict[str, str | int],
-    watermark_resume: bool,
     start_date: datetime,
     log: Logger,
     page: PageCursor,
     cutoff: LogCursor,
 ) -> AsyncGenerator[T | PageCursor, None]:
     """Backfill one (list, sweep) subtask of a list-child stream over the
-    frozen `(start_date, cutoff − 1s]` window.
+    frozen `(start_date, cutoff − 1s]` window in a single invocation,
+    checkpointing nothing.
 
               start_date            cutoff − 1s cutoff
     ──────────────┼─────────────────────┼───────┼──▶ time (1s ticks)
@@ -525,30 +510,16 @@ async def backfill_list_children[T: MailchimpIncrementalChildEntity](
     update stamps a cursor past the cutoff, which renumbers every later row,
     so a positional offset must never cross a checkpoint — a resumed offset
     would skip an untouched row that neither this backfill nor the incremental
-    task (seeded at `cutoff − 1s`) ever revisits.
-
-    With `watermark_resume` (list_members — requires a server-side ASC sort on
-    the model's cursor field in `extra_request_params`), each full page
-    checkpoints the max cursor seen; a resume re-anchors `SINCE_PARAM` at
-    `watermark − 1s`, re-reading the boundary second so same-second ties
-    behind a crash are never skipped — duplicates collapse under the
-    collection key. Without it (segments — the endpoint documents no sort, so
-    no order survives a resume gap), nothing is checkpointed and a resumed
-    backfill restarts the window from scratch. Page offsets stay local to a
-    single invocation either way.
+    task (seeded at `cutoff − 1s`) ever revisits. Offsets therefore stay local
+    to this invocation and an interrupted backfill restarts its window: a
+    re-read costs only duplicates the collection key collapses, while a
+    skipped row is lost for good.
     """
-    assert page is None or isinstance(page, str)
+    assert page is None
     assert isinstance(cutoff, datetime)
-
-    since = (
-        datetime.fromisoformat(page) - timedelta(seconds=1)
-        if page is not None
-        else start_date
-    )
 
     path = model.PATH_TEMPLATE.format(list_id=list_id)
     offset = 0
-    watermark: datetime | None = None
 
     while True:
         count = 0
@@ -561,7 +532,7 @@ async def backfill_list_children[T: MailchimpIncrementalChildEntity](
             {
                 "count": MAX_PAGE_SIZE,
                 "offset": offset,
-                model.SINCE_PARAM: since.isoformat(),
+                model.SINCE_PARAM: start_date.isoformat(),
                 model.BEFORE_PARAM: (cutoff - timedelta(seconds=1)).isoformat(),
                 **extra_request_params,
             },
@@ -571,14 +542,8 @@ async def backfill_list_children[T: MailchimpIncrementalChildEntity](
         async for item in page_gen:
             yield item
             count += 1
-            cursor = item.get_cursor()
-            if watermark is None or cursor > watermark:
-                watermark = cursor
 
         offset += count
         # A full page means there may be more; a short page is the last one.
         if count < MAX_PAGE_SIZE:
             return
-
-        if watermark_resume and watermark is not None:
-            yield watermark.isoformat()
