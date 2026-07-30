@@ -51,6 +51,41 @@ func TestStreamV2CheckpointHoldsOneItemPerChannel(t *testing.T) {
 	require.Len(t, cp[stateKey].StreamV2, 2)
 }
 
+// TestStreamV2CommitPrecedesCheckpoint pins where the commit is awaited. The
+// driver checkpoint records a counter as appended, and Snowflake's committed
+// offset token is what the next Open reconciles that counter against. The
+// runtime's own checkpoint is durable before Acknowledge runs, so a commit
+// awaited there cannot fail the transaction whose counter it belongs to: the
+// task would resume from a counter Snowflake never committed, which Open can
+// only refuse, and no replay can re-append rows the runtime considers
+// delivered. So the wait belongs to the call which produces the counter.
+func TestStreamV2CommitPrecedesCheckpoint(t *testing.T) {
+	var ctx = context.Background()
+
+	// Appends succeed and the committed token never advances, as a channel whose
+	// rows Snowflake accepted but never committed would report.
+	t.Setenv("FAKE_SIDECAR_MODE", "commit_never_lands")
+
+	var m = newStreamV2Manager(ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/commitFirst", "acct",
+		&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
+	m.argv = fakeSidecarArgv(t)
+	t.Cleanup(m.stop)
+
+	m.addBinding("DB", "SCH", "TBL", sql.Table{
+		TableShape: sql.TableShape{Binding: 0, DeltaUpdates: true},
+		Identifier: "TBL",
+		Keys:       []sql.Column{{Identifier: `KEY`}},
+		Values:     []sql.Column{{Identifier: `VAL`}},
+		StateKey:   "committed.v1",
+	}, nil)
+
+	require.NoError(t, m.writeRow(ctx, 0, []any{"k", "v"}))
+
+	items, err := m.flush(ctx)
+	require.ErrorContains(t, err, "not committed")
+	require.Empty(t, items)
+}
+
 // TestStreamV2RejectedRows covers, without credentials, what the live test
 // covers against Snowflake: a rejected row fails the transaction that produced
 // it, and goes on refusing the channel it was appended to.
@@ -86,13 +121,14 @@ func TestStreamV2RejectedRows(t *testing.T) {
 		require.NoError(t, m.writeRow(ctx, 0, []any{"kept", "v", nil}))
 		require.NoError(t, m.writeRow(ctx, 0, []any{"dropped", "v", true}))
 
+		// The rejection is the transaction's own, so it must fail the transaction
+		// rather than the one after it: the count is read as the commit is awaited,
+		// which is before the counter reaches the checkpoint.
 		items, err := m.flush(ctx)
-		require.NoError(t, err)
-
-		err = m.waitCommit(ctx, items[0])
 		require.ErrorContains(t, err, "1 row(s) rejected")
 		require.ErrorContains(t, err, m.bindings[0].channel)
 		require.ErrorContains(t, err, "fake rejection")
+		require.Empty(t, items)
 	})
 
 	t.Run("a rejection already on the channel is refused when it opens", func(t *testing.T) {

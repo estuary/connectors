@@ -8,6 +8,7 @@ Fault injection via the FAKE_SIDECAR_MODE environment variable:
   exit_before_ready     exits 7 before printing the ready line
   crash_after_configure prints garbage to stderr and exits 9 after configure
   hang_on_append        accepts appends but never responds to them
+  commit_never_lands    accepts appends but never advances the committed token
   garbage_stderr        emits non-JSON stderr noise alongside normal operation
   ignore_sigterm        ignores SIGTERM so only SIGKILL can end it
 
@@ -118,7 +119,8 @@ def main():
             if MODE == "hang_on_append":
                 continue  # never respond
             ch = params["channel"]
-            committed[ch] = params["end_token"]
+            if MODE != "commit_never_lands":
+                committed[ch] = params["end_token"]
             errors[ch] = rejected_count(ch) + sum(1 for row in params["rows"] if "REJECT" in row)
             reply({"id": rid, "ok": True, "result": {"appended": len(params["rows"])}})
         elif op == "wait_commit":
