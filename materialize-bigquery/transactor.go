@@ -1,9 +1,11 @@
 package connector
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"strings"
 	"text/template"
 
@@ -31,7 +33,19 @@ type checkpointItem struct {
 	TempTableName string
 }
 
-type checkpoint = map[string]*checkpointItem
+type checkpoint = map[CheckpointKey]*checkpointItem
+
+// CheckpointKey is a key that combines the bindings StateKey and the shard range.
+type CheckpointKey string
+
+func NewCheckpointKey(stateKey string, rangeKey string) CheckpointKey {
+	return CheckpointKey(stateKey + ":" + rangeKey)
+}
+
+// Return the StateKey portion of the key which identifies only the binding.
+func (k CheckpointKey) StateKey() string {
+	return strings.SplitN(string(k), ":", 2)[0]
+}
 
 var _ m.Transactor = (*transactor)(nil)
 
@@ -45,9 +59,11 @@ type transactor struct {
 	storeFiles *boilerplate.StagedFiles
 	loadFiles  *boilerplate.StagedFiles
 
-	bindings []*binding
-	be       *m.BindingEvents
-	cp       checkpoint
+	bindings     []*binding
+	be           *m.BindingEvents
+	cp           checkpoint
+	primaryShard bool
+	rangeKey     string
 
 	objAndArrayAsJson       bool
 	loggedStorageApiMessage bool
@@ -85,6 +101,16 @@ func prepareNewTransactor(
 			return nil, fmt.Errorf("creating GCS bucket: %w", err)
 		}
 
+		var keyBegin, keyEnd uint32 = 0, math.MaxUint32
+		if open.Range != nil {
+			keyBegin, keyEnd = open.Range.KeyBegin, open.Range.KeyEnd
+		}
+
+		primaryShard := true
+		if boilerplate.IsMaterializationSpecRuntimeV2(open.Materialization) {
+			primaryShard = keyBegin == 0
+		}
+
 		t := &transactor{
 			runtimeCheckpoint: fence.Checkpoint,
 			cfg:               cfg,
@@ -94,6 +120,9 @@ func prepareNewTransactor(
 			skipCleanup:       featureFlags["skip_cleanup"],
 			client:            client,
 			be:                be,
+			cp:                make(checkpoint, 0),
+			primaryShard:      primaryShard,
+			rangeKey:          fmt.Sprintf("%08x-%08x", keyBegin, keyEnd),
 			loadFiles:         boilerplate.NewStagedFiles(stagedFileClient{}, bucket, writer.DefaultJsonFileSizeLimit, cfg.effectiveBucketPath(), false, false),
 			storeFiles:        boilerplate.NewStagedFiles(stagedFileClient{}, bucket, writer.DefaultJsonFileSizeLimit, cfg.effectiveBucketPath(), true, false),
 		}
@@ -225,6 +254,12 @@ func (t *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSp
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error {
+	// Non-primary shards do not recover state.  This avoids them incorporating
+	// state from other shards into their own checkpoint data.
+	if !t.primaryShard {
+		return nil
+	}
+
 	if err := json.Unmarshal(state, &t.cp); err != nil {
 		return fmt.Errorf("unmarshaling checkpoint state: %w", err)
 	}
@@ -395,7 +430,8 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil, fmt.Errorf("flushing store file for %s: %w", b.target.Path, err)
 		}
 
-		t.cp[b.target.StateKey] = &checkpointItem{
+		cpKey := NewCheckpointKey(b.target.StateKey, t.rangeKey)
+		t.cp[cpKey] = &checkpointItem{
 			Query:         query,
 			SourceURIs:    uris,
 			JobPrefix:     uuid.NewString(),
@@ -409,11 +445,50 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil, m.FinishedOperation(fmt.Errorf("creating checkpoint json: %w", err))
 		}
 
-		return &pf.ConnectorState{UpdatedJson: checkpointJSON}, nil
+		return &pf.ConnectorState{UpdatedJson: checkpointJSON, MergePatch: true}, nil
 	}, nil
 }
 
+func isJSONNull(data json.RawMessage) bool {
+	return bytes.Equal(bytes.TrimSpace(data), []byte("null"))
+}
+
+func mergeStatePatches(cp checkpoint, patches []json.RawMessage) error {
+	for _, patch := range patches {
+		if isJSONNull(patch) {
+			clear(cp)
+		}
+
+		var raw map[string]json.RawMessage
+		if err := json.Unmarshal(patch, &raw); err != nil {
+			return fmt.Errorf("parsing state patch: %w", err)
+		}
+
+		for key, val := range raw {
+			var item checkpointItem
+			if err := json.Unmarshal(val, &item); err != nil {
+				return fmt.Errorf("parsing state patch checkpoint item %q: %w", key, err)
+			}
+
+			cp[CheckpointKey(key)] = &item
+		}
+	}
+	return nil
+}
+
 func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
+	if !t.primaryShard {
+		for k := range t.cp {
+			delete(t.cp, k)
+		}
+		return nil, nil
+	}
+
+	err := mergeStatePatches(t.cp, statePatches)
+	if err != nil {
+		return nil, err
+	}
+
 	group, groupCtx := errgroup.WithContext(ctx)
 	// You can run up to 1,000 concurrent multi-statement queries, so we use a
 	// generous concurrency limit here, while not leaving it completely
@@ -422,8 +497,9 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 
 	shouldProcess := m.StateKeyFilter(stateKeys)
 
-	var drained []string
-	for sk, item := range t.cp {
+	var drained []CheckpointKey
+	for cpKey, item := range t.cp {
+		sk := cpKey.StateKey()
 		if !shouldProcess(sk) {
 			// This state key's pending work was not requested to be
 			// processed, so it remains staged in the persisted state.
@@ -443,7 +519,7 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 			continue
 		}
 
-		drained = append(drained, sk)
+		drained = append(drained, cpKey)
 		group.Go(func() error {
 			t.be.StartedResourceCommit(b.target.Path)
 			if err := t.client.queryIdempotent(groupCtx, b.storeSchema, item.Query, item.JobPrefix, item.SourceURIs, item.TempTableName); err != nil {
@@ -477,11 +553,11 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	}
 
 	var checkpointClear = make(checkpoint)
-	for _, sk := range drained {
-		checkpointClear[sk] = nil
-		delete(t.cp, sk)
+	for _, cpKey := range drained {
+		checkpointClear[cpKey] = nil
+		delete(t.cp, cpKey)
 	}
-	var checkpointJSON, err = json.Marshal(checkpointClear)
+	checkpointJSON, err := json.Marshal(checkpointClear)
 	if err != nil {
 		return nil, fmt.Errorf("creating checkpoint clearing json: %w", err)
 	}
