@@ -48,7 +48,7 @@ If you propose a function, field, or flag that you _remember_ seeing in the conn
 
 ---
 
-### `CONDUCT-CLEAN-ROOM` · conduct-only
+### `CONDUCT-ESTABLISH-BASELINE` · conduct-only
 
 Kick off the connector's existing test suite (typically `pytest` from the connector directory) in the background as soon as the session's first phase begins. Read-only and planning phases may proceed in parallel while it runs — do **not** block on it. The result is a **gate on the first code edit**: confirm the baseline passes before writing anything, so later failures are attributable to your change, not pre-existing drift.
 
