@@ -585,6 +585,3 @@ class EmailActivityEvent(RawEmailActivityEvent, MailchimpChildEntity):
         alias="_meta", description="Document metadata"
     )
     # fmt: on
-
-    def get_cursor(self) -> AwareDatetime:
-        return self.timestamp
