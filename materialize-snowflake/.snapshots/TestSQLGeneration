@@ -148,7 +148,9 @@ OBJECT_CONSTRUCT_KEEP_NULL(
 	'stringInteger66Chars', TO_VARCHAR("a-schema".key_value.stringInteger66Chars),
 	'stringInteger77Chars', TO_VARCHAR("a-schema".key_value.stringInteger77Chars),
 	'stringNumber', TO_VARCHAR("a-schema".key_value.stringNumber)
-) as flow_document
+) as flow_document,
+CAST(NULL AS VARIANT) as flow_meta,
+DATE_PART(EPOCH_MICROSECOND, "a-schema".key_value.flow_published_at) as flow_clock
 FROM "a-schema".key_value
 JOIN (
 	SELECT $1[0] AS key1, $1[1] AS key2, BASE64_DECODE_BINARY($1[2]) AS "key!binary"
@@ -157,6 +159,7 @@ JOIN (
 ON "a-schema".key_value.key1 = r.key1 AND "a-schema".key_value.key1 >= 10 AND "a-schema".key_value.key1 <= 100
 AND "a-schema".key_value.key2 = r.key2
 AND "a-schema".key_value."key!binary" = r."key!binary" AND "a-schema".key_value."key!binary" >= 'aGVsbG8K' AND "a-schema".key_value."key!binary" <= 'Z29vZGJ5ZQo='
+
 --- End "a-schema".key_value loadQueryNoFlowDocument ---
 
 --- Begin "a-schema".key_value mergeInto ---

@@ -282,9 +282,16 @@ FROM read_json(
 {{- end -}}
 {{- end }}
 
+-- Renders a date-time column as Unix microseconds, from which the connector
+-- synthesizes the document UUID without parsing a formatted timestamp.
+
+{{ define "unix_micros" -}}
+epoch_us({{ $.Alias }}.{{ $.Identifier }})
+{{- end }}
+
 {{ define "loadQueryNoFlowDocument" }}                                                                                                                             
 {{ if $.DeltaUpdates -}}                                                                                                                                           
-SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc                                                                                                     
+SELECT * FROM (SELECT -1, CAST(NULL AS JSON), CAST(NULL AS JSON), CAST(NULL AS BIGINT) LIMIT 0) as nodoc
 {{ else -}}                                                                                                                                                        
 SELECT {{ $.Binding }} AS binding,                                                                                                                                 
 json_object(                                                                                                                                                       
@@ -292,7 +299,14 @@ json_object(
        {{- if $i}}, {{end}}                                                                                                                                        
        '{{$col.Field}}', {{ template "uncast" (ColumnWithAlias $col "l") }}                                                                                                                     
 {{- end}}                                                                                                                                                          
-) as doc                                                                                                                                                           
+) as doc,
+{{ if $.MetaColumns }}json_object(
+{{- range $i, $col := $.MetaColumns}}
+	{{- if $i}}, {{end}}
+	'{{$col.MetaKey}}', {{ template "uncast" (ColumnWithAlias $col "l") }}
+{{- end}}
+){{ else }}CAST(NULL AS JSON){{ end }} as meta,
+{{ if $.MetaUUIDClockColumn }}{{ template "unix_micros" (ColumnWithAlias $.MetaUUIDClockColumn "l") }}{{ else }}CAST(NULL AS BIGINT){{ end }} as clock
 FROM {{ $.Identifier }} AS l                                                                                                                                       
 JOIN read_json(                                                                                                                                                    
        [                                                                                                                                                           

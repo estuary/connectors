@@ -366,6 +366,7 @@ type binding struct {
 		mergeBounds *sql.MergeBoundsBuilder
 	}
 	nullFieldsToStrip []string
+	hasMetaClock      bool
 	// Variables accessed by Prepare, Store, and Commit.
 	store struct {
 		stage       *stagedFile
@@ -380,6 +381,9 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, streaming
 	var b = new(binding)
 	b.target = target
 	b.nullFieldsToStrip = target.NullableFieldsToStrip()
+	if d.cfg.Advanced.NoFlowDocument {
+		b.hasMetaClock = target.MetaUUIDClockColumn() != nil
+	}
 	b.load.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
 	b.store.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
 
@@ -433,6 +437,10 @@ const MaxConcurrentQueries = 5
 type loadDoc struct {
 	binding  int
 	document json.RawMessage
+	// The no_flow_document load query reports the reconstructed _meta object and
+	// the document's publication clock separately, see sql.SpliceMeta.
+	metaJSON    []byte
+	clockMicros *int64
 }
 
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) (returnErr error) {
@@ -528,6 +536,8 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 			var binding int
 			var document stdsql.RawBytes
+			var metaJSON stdsql.RawBytes
+			var clockMicros *int64
 
 			log.WithFields(log.Fields{
 				"query":           query,
@@ -536,13 +546,23 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 			rowsProcessed := 0
 			for rows.Next() {
-				if err = rows.Scan(&binding, &document); err != nil {
+				if d.cfg.Advanced.NoFlowDocument {
+					err = rows.Scan(&binding, &document, &metaJSON, &clockMicros)
+				} else {
+					err = rows.Scan(&binding, &document)
+				}
+				if err != nil {
 					return fmt.Errorf("scanning Load document(%d): %w", rowsProcessed, err)
 				}
 				rowsProcessed += 1
 
 				message := slices.Clone(document)
-				doc := &loadDoc{binding: binding, document: json.RawMessage(message)}
+				doc := &loadDoc{
+					binding:     binding,
+					document:    json.RawMessage(message),
+					metaJSON:    slices.Clone(metaJSON),
+					clockMicros: clockMicros,
+				}
 				select {
 				case <-groupCtx.Done():
 					return groupCtx.Err()
@@ -584,6 +604,13 @@ func (d *transactor) loadDocuments(ctx context.Context, ch chan *loadDoc, loaded
 				var err error
 				if loadDoc, err = sql.StripNullFields(loadDoc, b.nullFieldsToStrip); err != nil {
 					return fmt.Errorf("stripping null fields: %w", err)
+				}
+			}
+			if d.cfg.Advanced.NoFlowDocument {
+				var err error
+				b := d.bindings[doc.binding]
+				if loadDoc, err = sql.SpliceMeta(loadDoc, doc.metaJSON, doc.clockMicros, b.hasMetaClock); err != nil {
+					return fmt.Errorf("reconstructing _meta: %w", err)
 				}
 			}
 			if err := loaded(doc.binding, loadDoc); err != nil {

@@ -11,6 +11,7 @@ import (
 type binding struct {
 	target            sql.Table
 	nullFieldsToStrip []string
+	hasMetaClock      bool
 	storeInsertSQL    string
 
 	loadSchema       bigquery.Schema
@@ -25,12 +26,18 @@ type binding struct {
 type bindingDocument struct {
 	Binding  int
 	Document json.RawMessage
+	// The no_flow_document load query reports the reconstructed _meta object and
+	// the document's publication clock separately, see sql.SpliceMeta.
+	MetaJSON    []byte
+	ClockMicros *int64
 }
 
 // Load implements the bigquery ValueLoader interface for mapping data from the database to this struct
 // It requires 2 values, the first must be the binding and the second must be the flow_document
 func (bd *bindingDocument) Load(v []bigquery.Value, s bigquery.Schema) error {
-	if len(v) != 2 {
+	// The no_flow_document load query adds the reconstructed _meta object and the
+	// document's publication clock.
+	if len(v) != 2 && len(v) != 4 {
 		return fmt.Errorf("invalid value count: %d", len(v))
 	}
 	if binding, ok := v[0].(int64); !ok {
@@ -42,6 +49,26 @@ func (bd *bindingDocument) Load(v []bigquery.Value, s bigquery.Schema) error {
 		return fmt.Errorf("value[1] wrong type %T expecting string", v[0])
 	} else {
 		bd.Document = json.RawMessage(document)
+	}
+
+	// Reset per-row, since the iterator reuses this struct across rows.
+	bd.MetaJSON, bd.ClockMicros = nil, nil
+
+	if len(v) == 4 {
+		if v[2] != nil {
+			meta, ok := v[2].(string)
+			if !ok {
+				return fmt.Errorf("value[2] wrong type %T expecting string", v[2])
+			}
+			bd.MetaJSON = []byte(meta)
+		}
+		if v[3] != nil {
+			clock, ok := v[3].(int64)
+			if !ok {
+				return fmt.Errorf("value[3] wrong type %T expecting int64", v[3])
+			}
+			bd.ClockMicros = &clock
+		}
 	}
 
 	return nil

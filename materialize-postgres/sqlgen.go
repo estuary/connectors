@@ -327,6 +327,13 @@ SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
 {{- end -}}
 {{- end }}
 
+-- Renders a date-time column as Unix microseconds, from which the connector
+-- synthesizes the document UUID without parsing a formatted timestamp.
+
+{{ define "unix_micros" -}}
+(EXTRACT(EPOCH FROM {{ $.Alias }}.{{ $.Identifier }}) * 1000000)::BIGINT
+{{- end }}
+
 {{ define "loadQueryNoFlowDocument" }}
 {{ if not $.DeltaUpdates -}}
 SELECT {{ $.Binding }},
@@ -341,7 +348,22 @@ SELECT {{ $.Binding }},
 	{{- end}}
 	)
 {{- end}}
-) as flow_document
+) as flow_document,
+{{ if $.MetaColumns -}}
+JSONB_BUILD_OBJECT(
+{{- range $i, $col := $.MetaColumns}}
+	{{- if $i}},{{end}}
+	{{Literal $col.MetaKey}}, {{ template "uncast" (ColumnWithAlias $col "r") }}
+{{- end}}
+)
+{{- else -}}
+CAST(NULL AS JSONB)
+{{- end }} as flow_meta,
+{{ if $.MetaUUIDClockColumn -}}
+{{ template "unix_micros" (ColumnWithAlias $.MetaUUIDClockColumn "r") }}
+{{- else -}}
+CAST(NULL AS BIGINT)
+{{- end }} as flow_clock
 FROM {{ $.Identifier}} AS r
 JOIN {{ template "temp_name" . }} AS l
 {{- range $ind, $key := $.Keys }}
@@ -349,7 +371,7 @@ JOIN {{ template "temp_name" . }} AS l
 	l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 {{- end }}
 {{ else -}}
-SELECT * FROM (SELECT -1, CAST(NULL AS JSONB) LIMIT 0) as nodoc
+SELECT * FROM (SELECT -1, CAST(NULL AS JSONB), CAST(NULL AS JSONB), CAST(NULL AS BIGINT) LIMIT 0) as nodoc
 {{ end }}
 {{ end }}
 

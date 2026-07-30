@@ -840,6 +840,7 @@ func RunNewTransactor[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	transactor = newTruncationGuard(transactor, mapped)
 
 	checkpoint, err := transactor.RecoverCheckpoint(ctx, *req.Materialization, *req.Range)
 	if err != nil {

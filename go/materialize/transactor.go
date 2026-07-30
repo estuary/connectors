@@ -114,6 +114,20 @@ func StateKeyFilter(stateKeys []string) func(string) bool {
 	}
 }
 
+// FlushTransactor is an optional interface which a Transactor may implement to
+// observe the Flush request of each transaction. It is called after the final
+// Loaded response of the transaction and before any of its Store requests, and
+// returning an error fails the transaction.
+//
+// Flush carries the backfill markers observed during the transaction, which are
+// the signal for truncations: a marker's Timestamp is the truncation boundary of
+// a source collection's backfill, and destination rows whose documents were
+// published before it have been superseded. Acting on a marker requires the
+// document clock of loaded documents, which is carried by /_meta/uuid.
+type FlushTransactor interface {
+	Flush(context.Context, *pm.Request_Flush) error
+}
+
 // SplitStatePatches decodes a state_patches_json payload into its individual
 // RFC 7396 merge patches. The wire format is a JSON array whose elements are
 // each followed by a tab; tabs are JSON whitespace, so a standard decode
@@ -370,7 +384,13 @@ func RunTransactions(
 
 		if err = validateIsFlush(&rxRequest); err != nil {
 			return err
-		} else if err = writeFlushed(stream, &txResponse); err != nil {
+		}
+		if ft, ok := transactor.(FlushTransactor); ok {
+			if err = ft.Flush(ctx, rxRequest.Flush); err != nil {
+				return fmt.Errorf("transactor.Flush: %w", err)
+			}
+		}
+		if err = writeFlushed(stream, &txResponse); err != nil {
 			return err
 		}
 

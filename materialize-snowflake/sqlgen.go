@@ -319,14 +319,29 @@ SELECT * FROM (SELECT -1, CAST(NULL AS VARIANT) LIMIT 0) as nodoc
 {{- end -}}
 {{- end }}
 
+-- Renders a date-time column as Unix microseconds, from which the connector
+-- synthesizes the document UUID without parsing a formatted timestamp.
+
+{{ define "unix_micros" -}}
+DATE_PART(EPOCH_MICROSECOND, {{ $.Alias }}.{{ $.Identifier }})
+{{- end }}
+
 {{ define "loadQueryNoFlowDocument" }}
+{{ if not $.Table.DeltaUpdates -}}
 SELECT {{ $.Table.Binding }},
 OBJECT_CONSTRUCT_KEEP_NULL(
 {{- range $i, $col := $.Table.RootLevelColumns}}
 	{{- if $i}},{{end}}
 	{{Literal $col.Field}}, {{ template "uncast" (ColumnWithAlias $col $.Table.Identifier) }}
 {{- end}}
-) as flow_document
+) as flow_document,
+{{ if $.Table.MetaColumns }}OBJECT_CONSTRUCT_KEEP_NULL(
+{{- range $i, $col := $.Table.MetaColumns}}
+	{{- if $i}},{{end}}
+	{{Literal $col.MetaKey}}, {{ template "uncast" (ColumnWithAlias $col $.Table.Identifier) }}
+{{- end}}
+){{ else }}CAST(NULL AS VARIANT){{ end }} as flow_meta,
+{{ if $.Table.MetaUUIDClockColumn }}{{ template "unix_micros" (ColumnWithAlias $.Table.MetaUUIDClockColumn $.Table.Identifier) }}{{ else }}CAST(NULL AS NUMBER){{ end }} as flow_clock
 FROM {{ $.Table.Identifier }}
 JOIN (
 	SELECT {{ range $ind, $bound := $.Bounds }}
@@ -340,6 +355,9 @@ JOIN (
 {{ $.Table.Identifier }}.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
 {{- if $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
 {{- end }}
+{{ else -}}
+SELECT * FROM (SELECT -1, CAST(NULL AS VARIANT), CAST(NULL AS VARIANT), CAST(NULL AS NUMBER) LIMIT 0) as nodoc
+{{ end }}
 {{ end }}
 
 {{ define "createPipe" }}

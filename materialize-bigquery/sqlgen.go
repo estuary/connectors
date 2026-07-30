@@ -310,20 +310,38 @@ SELECT {{ $.Binding }}, l.{{$.Document.Identifier}}
 {{- end -}}
 {{- end }}
 
+-- Renders a date-time column as Unix microseconds, from which the connector
+-- synthesizes the document UUID without parsing a formatted timestamp.
+
+{{ define "unix_micros" -}}
+UNIX_MICROS({{ $.Alias }}.{{ $.Identifier }})
+{{- end }}
+
 {{ define "loadQueryNoFlowDocument" -}}
+{{ if not $.DeltaUpdates -}}
 SELECT {{ $.Binding }},
 TO_JSON(STRUCT(
 {{- range $i, $col := $.RootLevelColumns}}
 	{{- if $i}}, {{end}}
 	{{ template "uncast" (ColumnWithAlias $col "l") }} AS {{ $col.Field }}
 {{- end}}
-)) as flow_document
+)) as flow_document,
+{{ if $.MetaColumns }}TO_JSON(STRUCT(
+{{- range $i, $col := $.MetaColumns}}
+	{{- if $i}}, {{end}}
+	{{ template "uncast" (ColumnWithAlias $col "l") }} AS {{ $col.MetaKey }}
+{{- end}}
+)){{ else }}CAST(NULL AS {{ $.ObjectType }}){{ end }} as flow_meta,
+{{ if $.MetaUUIDClockColumn }}{{ template "unix_micros" (ColumnWithAlias $.MetaUUIDClockColumn "l") }}{{ else }}CAST(NULL AS INT64){{ end }} as flow_clock
 FROM {{ $.Identifier }} AS l
 JOIN {{ template "tempTableName" . }} AS r
 {{- range $ind, $bound := $.Bounds }}
 	{{ if $ind }} AND {{ else }} ON {{ end -}}
 	l.{{ $bound.Identifier }} = r.c{{$ind}}
 	{{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+{{- end }}
+{{- else -}}
+(SELECT -1, CAST(NULL AS {{ $.ObjectType }}), CAST(NULL AS {{ $.ObjectType }}), CAST(NULL AS INT64) LIMIT 0) as nodoc
 {{- end }}
 {{ end }}
 

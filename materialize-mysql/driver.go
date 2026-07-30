@@ -435,8 +435,10 @@ func (t *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSp
 	return t.store.fence.Checkpoint, nil
 }
 
-func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
-func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) { return nil, nil }
+func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
+	return nil, nil
+}
 
 func prepareNewTransactor(
 	templates templates,
@@ -501,6 +503,7 @@ type varcharColumnMeta struct {
 type binding struct {
 	target            sql.Table
 	nullFieldsToStrip []string
+	hasMetaClock      bool
 
 	varcharColumnMetas []varcharColumnMeta
 	tempVarcharMetas   []varcharColumnMeta
@@ -532,6 +535,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 
 	if t.cfg.Advanced.NoFlowDocument {
 		b.nullFieldsToStrip = target.NullableFieldsToStrip()
+		b.hasMetaClock = target.MetaUUIDClockColumn() != nil
 	}
 
 	// Choose the appropriate load query template based on configuration
@@ -709,15 +713,30 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	for rows.Next() {
 		var binding int
 		var document json.RawMessage
+		// The no_flow_document load query reports the reconstructed _meta object
+		// and the document's publication clock separately, see sql.SpliceMeta.
+		var metaJSON []byte
+		var clockMicros *int64
 
-		if err = rows.Scan(&binding, &document); err != nil {
+		if d.cfg.Advanced.NoFlowDocument {
+			err = rows.Scan(&binding, &document, &metaJSON, &clockMicros)
+		} else {
+			err = rows.Scan(&binding, &document)
+		}
+		if err != nil {
 			return fmt.Errorf("scanning Load document: %w", err)
 		}
 
 		doc := json.RawMessage(document)
-		if b := d.bindings[binding]; len(b.nullFieldsToStrip) > 0 {
+		b := d.bindings[binding]
+		if len(b.nullFieldsToStrip) > 0 {
 			if doc, err = sql.StripNullFields(doc, b.nullFieldsToStrip); err != nil {
 				return fmt.Errorf("stripping null fields: %w", err)
+			}
+		}
+		if d.cfg.Advanced.NoFlowDocument {
+			if doc, err = sql.SpliceMeta(doc, metaJSON, clockMicros, b.hasMetaClock); err != nil {
+				return fmt.Errorf("reconstructing _meta: %w", err)
 			}
 		}
 		if err = loaded(binding, doc); err != nil {

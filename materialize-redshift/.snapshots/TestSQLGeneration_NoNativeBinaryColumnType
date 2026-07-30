@@ -147,7 +147,9 @@ OBJECT(
 	'stringInteger66Chars', CAST(r."stringInteger66Chars" AS VARCHAR),
 	'stringInteger77Chars', CAST(r."stringInteger77Chars" AS VARCHAR),
 	'stringNumber', CAST(r."stringNumber" AS VARCHAR)
-) as flow_document
+) as flow_document,
+CAST(NULL AS SUPER) as flow_meta,
+CAST(DATE_PART(EPOCH, r.flow_published_at) * 1000000 AS BIGINT) as flow_clock
 FROM flow_temp_table_0 AS l
 JOIN "a-schema".key_value AS r
 	 ON  l.key1 = r.key1
@@ -158,7 +160,7 @@ JOIN "a-schema".key_value AS r
 
 --- Begin "a-schema".delta_updates loadQueryNoFlowDocument ---
 
-SELECT * FROM (SELECT -1, CAST(NULL AS SUPER) LIMIT 0) as nodoc
+SELECT * FROM (SELECT -1, CAST(NULL AS SUPER), CAST(NULL AS SUPER), CAST(NULL AS BIGINT) LIMIT 0) as nodoc
 
 --- End "a-schema".delta_updates loadQueryNoFlowDocument ---
 

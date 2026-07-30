@@ -288,14 +288,33 @@ JOIN {{ $.Identifier}} AS r
 {{- end -}}
 {{- end }}
 
+-- Renders a date-time column as Unix microseconds, from which the connector
+-- synthesizes the document UUID without parsing a formatted timestamp.
+
+{{ define "unix_micros" -}}
+DATEDIFF_BIG(microsecond, CAST('1970-01-01' AS DATETIME2), {{ $.Alias }}.{{ $.Identifier }})
+{{- end }}
+
 {{ define "loadQueryNoFlowDocument" }}
-SELECT {{ $.Binding }}, 
+{{ if not $.DeltaUpdates -}}
+SELECT {{ $.Binding }},
 	JSON_OBJECT(
 		{{- range $i, $col := $.RootLevelColumns}}
 			{{- if $i}},{{end}}
 		{{Literal $col.Field}}: {{ template "uncast" (ColumnWithAlias $col "r") }}
 		{{- end}}
-	) as flow_document
+	) as flow_document,
+	{{ if $.MetaColumns -}}
+	JSON_OBJECT(
+		{{- range $i, $col := $.MetaColumns}}
+			{{- if $i}},{{end}}
+		{{Literal $col.MetaKey}}: {{ template "uncast" (ColumnWithAlias $col "r") }}
+		{{- end}}
+	)
+	{{- else -}}
+	CAST(NULL AS VARCHAR(MAX))
+	{{- end }} as flow_meta,
+	{{ if $.MetaUUIDClockColumn }}{{ template "unix_micros" (ColumnWithAlias $.MetaUUIDClockColumn "r") }}{{ else }}CAST(NULL AS BIGINT){{ end }} as flow_clock
 FROM {{ template "temp_name_load" . }} AS l
 JOIN {{ $.Identifier}} AS r
 {{- range $ind, $bound := $.Bounds }}
@@ -303,6 +322,9 @@ JOIN {{ $.Identifier}} AS r
 	{{ template "maybe_unbase64_lhs" $bound }} = r.{{ $bound.Identifier }}
 	{{- if $bound.LiteralLower }} AND r.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND r.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
 {{- end }}
+{{ else -}}
+SELECT TOP 0 -1, NULL, NULL, NULL
+{{ end }}
 {{ end }}
 
 {{ define "dropLoadTable" }}

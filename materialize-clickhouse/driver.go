@@ -411,6 +411,7 @@ func (t *transactor) requireIsDeletedColumn(ctx context.Context, b *binding) err
 type binding struct {
 	target            sql.Table
 	nullFieldsToStrip []string
+	hasMetaClock      bool
 	load              struct {
 		createTableSQL string
 		truncateSQL    string
@@ -435,6 +436,7 @@ func (t *transactor) addBinding(_ context.Context, target sql.Table) error {
 	var queryLoadTemplate = t.templates.queryLoadTable
 	if t.cfg.Advanced.NoFlowDocument {
 		b.nullFieldsToStrip = target.NullableFieldsToStrip()
+		b.hasMetaClock = target.MetaUUIDClockColumn() != nil
 		queryLoadTemplate = t.templates.queryLoadTableNoFlowDocument
 	}
 
@@ -638,12 +640,28 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 				for rows.Next() {
 					var doc json.RawMessage
-					if err = rows.Scan(&doc); err != nil {
+					// The no_flow_document load query reports the reconstructed
+					// _meta object and the document's publication clock
+					// separately, see sql.SpliceMeta.
+					var metaJSON []byte
+					var clockMicros *int64
+
+					if t.cfg.Advanced.NoFlowDocument {
+						err = rows.Scan(&doc, &metaJSON, &clockMicros)
+					} else {
+						err = rows.Scan(&doc)
+					}
+					if err != nil {
 						return fmt.Errorf("scanning Load document for %s: %w", b.target.Identifier, err)
 					}
 					if len(b.nullFieldsToStrip) > 0 {
 						if doc, err = sql.StripNullFields(doc, b.nullFieldsToStrip); err != nil {
 							return fmt.Errorf("stripping null fields for %s: %w", b.target.Identifier, err)
+						}
+					}
+					if t.cfg.Advanced.NoFlowDocument {
+						if doc, err = sql.SpliceMeta(doc, metaJSON, clockMicros, b.hasMetaClock); err != nil {
+							return fmt.Errorf("reconstructing _meta for %s: %w", b.target.Identifier, err)
 						}
 					}
 					emitted = true

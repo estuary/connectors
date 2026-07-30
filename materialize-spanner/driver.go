@@ -271,6 +271,7 @@ type transactor struct {
 type spannerBinding struct {
 	target             sql.Table
 	nullFieldsToStrip  []string
+	hasMetaClock       bool
 	createLoadTableSQL string
 	loadQuerySQL       string
 	dropLoadTableSQL   string
@@ -531,6 +532,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 
 	if t.cfg.Advanced.NoFlowDocument {
 		b.nullFieldsToStrip = target.NullableFieldsToStrip()
+		b.hasMetaClock = target.MetaUUIDClockColumn() != nil
 	}
 
 	// Render createLoadTable template
@@ -586,8 +588,10 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 	return nil
 }
 
-func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
-func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) { return nil, nil }
+func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
+	return nil, nil
+}
 
 // timedSpannerApply wraps spanner.Client.Apply with timing instrumentation
 func (t *transactor) timedSpannerApply(ctx context.Context, mutations []*spanner.Mutation, operation string) (time.Time, time.Duration, error) {
@@ -772,8 +776,16 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	err := iter.Do(func(row *spanner.Row) error {
 		var bindingNum int64
 		var document spanner.NullJSON
+		// The no_flow_document load query reports the reconstructed _meta object
+		// and the document's publication clock separately, see sql.SpliceMeta.
+		var metaJSON spanner.NullJSON
+		var clockMicros spanner.NullInt64
 
-		if err := row.Columns(&bindingNum, &document); err != nil {
+		if t.cfg.Advanced.NoFlowDocument {
+			if err := row.Columns(&bindingNum, &document, &metaJSON, &clockMicros); err != nil {
+				return fmt.Errorf("scanning load result row: %w", err)
+			}
+		} else if err := row.Columns(&bindingNum, &document); err != nil {
 			return fmt.Errorf("scanning load result row: %w", err)
 		}
 
@@ -799,6 +811,24 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			var err error
 			if rawDoc, err = sql.StripNullFields(rawDoc, b.nullFieldsToStrip); err != nil {
 				return fmt.Errorf("stripping null fields: %w", err)
+			}
+		}
+		if t.cfg.Advanced.NoFlowDocument {
+			var rawMeta []byte
+			if metaJSON.Valid {
+				var err error
+				if rawMeta, err = nullJSONBytes(metaJSON); err != nil {
+					return fmt.Errorf("decoding reconstructed _meta: %w", err)
+				}
+			}
+			var clock *int64
+			if clockMicros.Valid {
+				clock = &clockMicros.Int64
+			}
+			var err error
+			b := t.bindings[int(bindingNum)]
+			if rawDoc, err = sql.SpliceMeta(rawDoc, rawMeta, clock, b.hasMetaClock); err != nil {
+				return fmt.Errorf("reconstructing _meta: %w", err)
 			}
 		}
 		loadedCount++
@@ -1055,4 +1085,16 @@ func (t *transactor) Destroy() {
 
 func main() {
 	boilerplate.RunMain(&driver{})
+}
+
+// nullJSONBytes renders a valid spanner.NullJSON as its raw JSON encoding.
+func nullJSONBytes(v spanner.NullJSON) ([]byte, error) {
+	switch t := v.Value.(type) {
+	case []byte:
+		return t, nil
+	case string:
+		return []byte(t), nil
+	default:
+		return json.Marshal(t)
+	}
 }

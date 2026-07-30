@@ -565,6 +565,13 @@ SETTINGS select_sequential_consistency = 1;
 {{- end -}}
 {{- end }}
 
+-- Renders a date-time column as Unix microseconds, from which the connector
+-- synthesizes the document UUID without parsing a formatted timestamp.
+
+{{ define "unix_micros" -}}
+toUnixTimestamp64Micro(toDateTime64({{ $.Alias }}.{{ $.Identifier }}, 6))
+{{- end }}
+
 {{ define "queryLoadTableNoFlowDocument" }}
 {{ if not $.DeltaUpdates -}}
 SELECT
@@ -573,7 +580,18 @@ concat('{',
 	{{- if $i }}, ',',{{ end }}
 	'"{{ $col.Field }}":', {{ template "concatValue" (ColumnWithAlias $col "r") }}
 {{- end }}
-, '}') AS flow_document
+, '}') AS flow_document,
+{{ if $.MetaColumns -}}
+concat('{',
+{{- range $i, $col := $.MetaColumns -}}
+	{{- if $i }}, ',',{{ end }}
+	'"{{ $col.MetaKey }}":', {{ template "concatValue" (ColumnWithAlias $col "r") }}
+{{- end }}
+, '}')
+{{- else -}}
+CAST(NULL AS Nullable(String))
+{{- end }} AS flow_meta,
+{{ if $.MetaUUIDClockColumn }}{{ template "unix_micros" (ColumnWithAlias $.MetaUUIDClockColumn "r") }}{{ else }}CAST(NULL AS Nullable(Int64)){{ end }} AS flow_clock
 	FROM {{$.Identifier}} AS r FINAL
 	JOIN {{ template "loadTableName" . }} AS l
 	{{- range $ind, $key := $.Keys }}
@@ -582,7 +600,7 @@ concat('{',
 	{{- end }}
 SETTINGS select_sequential_consistency = 1;
 {{ else -}}
-SELECT ''::String LIMIT 0
+SELECT ''::String, CAST(NULL AS Nullable(String)), CAST(NULL AS Nullable(Int64)) LIMIT 0
 {{ end -}}
 {{ end }}
 

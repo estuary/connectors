@@ -157,6 +157,7 @@ func (t *transactor) addBinding(target sql.Table, fieldSchemas map[string]*bigqu
 
 	if t.cfg.Advanced.NoFlowDocument {
 		b.nullFieldsToStrip = target.NullableFieldsToStrip()
+		b.hasMetaClock = target.MetaUUIDClockColumn() != nil
 	}
 
 	for _, m := range []struct {
@@ -327,6 +328,13 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			var err error
 			if doc, err = sql.StripNullFields(doc, b.nullFieldsToStrip); err != nil {
 				return fmt.Errorf("stripping null fields: %w", err)
+			}
+		}
+		if t.cfg.Advanced.NoFlowDocument {
+			var err error
+			b := t.bindings[bd.Binding]
+			if doc, err = sql.SpliceMeta(doc, bd.MetaJSON, bd.ClockMicros, b.hasMetaClock); err != nil {
+				return fmt.Errorf("reconstructing _meta: %w", err)
 			}
 		}
 		if err = loaded(bd.Binding, doc); err != nil {

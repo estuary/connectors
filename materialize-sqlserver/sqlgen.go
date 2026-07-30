@@ -414,6 +414,13 @@ SELECT TOP 0 -1, NULL
 {{- end -}}
 {{- end }}
 
+-- Renders a date-time column as Unix microseconds, from which the connector
+-- synthesizes the document UUID without parsing a formatted timestamp.
+
+{{ define "unix_micros" -}}
+DATEDIFF_BIG(microsecond, CAST('1970-01-01' AS DATETIME2), {{ $.Alias }}.{{ $.Identifier }})
+{{- end }}
+
 {{ define "loadQueryNoFlowDocument" }}
 {{ if not $.DeltaUpdates -}}
 SELECT {{ $.Binding }},
@@ -424,7 +431,20 @@ SELECT {{ $.Binding }},
 		{{Literal $col.Field}} = {{ template "uncast" (ColumnWithAlias $col "r") }}
 		{{- end}}
 	FOR JSON PATH, INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER
-) as flow_document
+) as flow_document,
+{{ if $.MetaColumns -}}
+(
+	SELECT
+		{{- range $i, $col := $.MetaColumns}}
+			{{- if $i}},{{end}}
+		{{Literal $col.MetaKey}} = {{ template "uncast" (ColumnWithAlias $col "r") }}
+		{{- end}}
+	FOR JSON PATH, INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER
+)
+{{- else -}}
+CAST(NULL AS NVARCHAR(MAX))
+{{- end }} as flow_meta,
+{{ if $.MetaUUIDClockColumn }}{{ template "unix_micros" (ColumnWithAlias $.MetaUUIDClockColumn "r") }}{{ else }}CAST(NULL AS BIGINT){{ end }} as flow_clock
 FROM {{ $.Identifier}} AS r
 JOIN {{ template "temp_load_name" . }} AS l
 {{- range $ind, $key := $.Keys }}
@@ -432,7 +452,7 @@ JOIN {{ template "temp_load_name" . }} AS l
 	l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 {{- end }}
 {{ else -}}
-SELECT TOP 0 -1, NULL
+SELECT TOP 0 -1, NULL, NULL, NULL
 {{ end }}
 {{ end }}
 

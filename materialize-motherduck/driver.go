@@ -132,6 +132,7 @@ func newTransactor(
 		}
 		if cfg.Advanced.NoFlowDocument {
 			b.nullFieldsToStrip = target.NullableFieldsToStrip()
+			b.hasMetaClock = target.MetaUUIDClockColumn() != nil
 		}
 		t.bindings = append(t.bindings, b)
 	}
@@ -142,14 +143,17 @@ func newTransactor(
 type binding struct {
 	target            sql.Table
 	nullFieldsToStrip []string
+	hasMetaClock      bool
 	mustMerge         bool
 	expectedInserts   int
 	loadMergeBounds   *sql.MergeBoundsBuilder
 	storeMergeBounds  *sql.MergeBoundsBuilder
 }
 
-func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
-func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) { return nil, nil }
+func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
+	return nil, nil
+}
 
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
@@ -264,6 +268,10 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	type bindingDoc struct {
 		Binding int
 		Doc     json.RawMessage
+		// The no_flow_document load query reports the reconstructed _meta object
+		// and the document's publication clock separately, see sql.SpliceMeta.
+		Meta  json.RawMessage
+		Clock *int64
 	}
 
 	dec := json.NewDecoder(gzr)
@@ -281,6 +289,13 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			var err error
 			if loadDoc, err = sql.StripNullFields(loadDoc, b.nullFieldsToStrip); err != nil {
 				return fmt.Errorf("stripping null fields: %w", err)
+			}
+		}
+		if d.cfg.Advanced.NoFlowDocument {
+			var err error
+			b := d.bindings[doc.Binding]
+			if loadDoc, err = sql.SpliceMeta(loadDoc, doc.Meta, doc.Clock, b.hasMetaClock); err != nil {
+				return fmt.Errorf("reconstructing _meta: %w", err)
 			}
 		}
 		if err = loaded(doc.Binding, loadDoc); err != nil {

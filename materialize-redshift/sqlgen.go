@@ -414,6 +414,13 @@ SELECT * FROM (SELECT -1, CAST(NULL AS SUPER) LIMIT 0) as nodoc
 {{- end -}}
 {{- end }}
 
+-- Renders a date-time column as Unix microseconds, from which the connector
+-- synthesizes the document UUID without parsing a formatted timestamp.
+
+{{ define "unix_micros" -}}
+CAST(DATE_PART(EPOCH, {{ $.Alias }}.{{ $.Identifier }}) * 1000000 AS BIGINT)
+{{- end }}
+
 {{ define "loadQueryNoFlowDocument" }}
 {{ if not $.DeltaUpdates -}}
 SELECT {{ $.Binding }},
@@ -422,7 +429,14 @@ OBJECT(
 	{{- if $i}},{{end}}
 	{{Literal $col.Field}}, {{ template "uncast" (ColumnWithAlias $col "r") }}
 {{- end}}
-) as flow_document
+) as flow_document,
+{{ if $.MetaColumns }}OBJECT(
+{{- range $i, $col := $.MetaColumns}}
+	{{- if $i}},{{end}}
+	{{Literal $col.MetaKey}}, {{ template "uncast" (ColumnWithAlias $col "r") }}
+{{- end}}
+){{ else }}CAST(NULL AS SUPER){{ end }} as flow_meta,
+{{ if $.MetaUUIDClockColumn }}{{ template "unix_micros" (ColumnWithAlias $.MetaUUIDClockColumn "r") }}{{ else }}CAST(NULL AS BIGINT){{ end }} as flow_clock
 FROM {{ template "temp_name" . }} AS l
 JOIN {{ $.Identifier}} AS r
 {{- range $ind, $key := $.Keys }}
@@ -430,7 +444,7 @@ JOIN {{ $.Identifier}} AS r
 		l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 {{- end }}
 {{ else -}}
-SELECT * FROM (SELECT -1, CAST(NULL AS SUPER) LIMIT 0) as nodoc
+SELECT * FROM (SELECT -1, CAST(NULL AS SUPER), CAST(NULL AS SUPER), CAST(NULL AS BIGINT) LIMIT 0) as nodoc
 {{ end }}
 {{ end }}
 

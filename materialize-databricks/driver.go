@@ -333,6 +333,7 @@ func (t *transactor) openDB() (*stdsql.DB, error) {
 type binding struct {
 	target            sql.Table
 	nullFieldsToStrip []string
+	hasMetaClock      bool
 
 	// path to where we store staging files
 	rootStagingPath string
@@ -355,6 +356,7 @@ func (t *transactor) addBinding(target sql.Table) error {
 
 	if t.cfg.Advanced.NoFlowDocument {
 		b.nullFieldsToStrip = target.NullableFieldsToStrip()
+		b.hasMetaClock = target.MetaUUIDClockColumn() != nil
 	}
 
 	b.rootStagingPath = fmt.Sprintf("/Volumes/%s/%s/%s/flow_temp_tables", t.cfg.CatalogName, target.Path[0], volumeName)
@@ -448,14 +450,30 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		for rows.Next() {
 			var binding int
 			var document string
+			// The no_flow_document load query reports the reconstructed _meta
+			// object and the document's publication clock separately, see
+			// sql.SpliceMeta.
+			var metaJSON []byte
+			var clockMicros *int64
 
-			if err = rows.Scan(&binding, &document); err != nil {
+			if d.cfg.Advanced.NoFlowDocument {
+				err = rows.Scan(&binding, &document, &metaJSON, &clockMicros)
+			} else {
+				err = rows.Scan(&binding, &document)
+			}
+			if err != nil {
 				return fmt.Errorf("scanning Load document: %w", err)
 			} else if binding > -1 {
 				doc := json.RawMessage([]byte(document))
-				if b := d.bindings[binding]; len(b.nullFieldsToStrip) > 0 {
+				b := d.bindings[binding]
+				if len(b.nullFieldsToStrip) > 0 {
 					if doc, err = sql.StripNullFields(doc, b.nullFieldsToStrip); err != nil {
 						return fmt.Errorf("stripping null fields: %w", err)
+					}
+				}
+				if d.cfg.Advanced.NoFlowDocument {
+					if doc, err = sql.SpliceMeta(doc, metaJSON, clockMicros, b.hasMetaClock); err != nil {
+						return fmt.Errorf("reconstructing _meta: %w", err)
 					}
 				}
 				if err = loaded(binding, doc); err != nil {

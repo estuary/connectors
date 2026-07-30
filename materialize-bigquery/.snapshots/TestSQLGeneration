@@ -196,7 +196,9 @@ TO_JSON(STRUCT(
 	CAST(l.stringInteger66Chars AS STRING) AS stringInteger66Chars, 
 	CAST(l.stringInteger77Chars AS STRING) AS stringInteger77Chars, 
 	CAST(l.stringNumber AS STRING) AS stringNumber
-)) as flow_document
+)) as flow_document,
+CAST(NULL AS ) as flow_meta,
+UNIX_MICROS(l.flow_published_at) as flow_clock
 FROM projectID.dataset.key_value AS l
 JOIN flow_temp_table_0 AS r
 	 ON l.key1 = r.c0 AND l.key1 >= 10 AND l.key1 <= 100

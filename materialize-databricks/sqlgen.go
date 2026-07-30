@@ -213,14 +213,29 @@ SELECT -1, ""
 
 -- Templated query for no_flow_document feature flag - reconstructs JSON from root-level columns
 
+-- Renders a date-time column as Unix microseconds, from which the connector
+-- synthesizes the document UUID without parsing a formatted timestamp.
+
+{{ define "unix_micros" -}}
+unix_micros({{ $.Alias }}.{{ $.Identifier }})
+{{- end }}
+
 {{ define "loadQueryNoFlowDocument" }}
-SELECT {{ $.Table.Binding }}, 
+{{ if not $.Table.DeltaUpdates -}}
+SELECT {{ $.Table.Binding }},
 to_json(struct(
 {{- range $i, $col := $.Table.RootLevelColumns}}
 	{{- if $i}},{{end}}
 	{{ template "uncast" (ColumnWithAlias $col $.Table.Identifier) }} AS {{ $col.Field }}
 {{- end}}
-)) as flow_document
+)) as flow_document,
+{{ if $.Table.MetaColumns }}to_json(struct(
+{{- range $i, $col := $.Table.MetaColumns}}
+	{{- if $i}},{{end}}
+	{{ template "uncast" (ColumnWithAlias $col $.Table.Identifier) }} AS {{ $col.MetaKey }}
+{{- end}}
+)){{ else }}CAST(NULL AS STRING){{ end }} as flow_meta,
+{{ if $.Table.MetaUUIDClockColumn }}{{ template "unix_micros" (ColumnWithAlias $.Table.MetaUUIDClockColumn $.Table.Identifier) }}{{ else }}CAST(NULL AS BIGINT){{ end }} as flow_clock
 FROM {{ $.Table.Identifier }}
 JOIN (
 	{{- range $fi, $file := $.Files }}
@@ -240,6 +255,9 @@ JOIN (
 {{ $.Table.Identifier }}.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
 {{- if $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
 {{- end }}
+{{ else -}}
+SELECT -1, "", CAST(NULL AS STRING), CAST(NULL AS BIGINT)
+{{ end }}
 {{ end }}
 
 -- TODO: this will not work with custom type definitions that require more than a single word

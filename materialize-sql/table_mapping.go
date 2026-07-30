@@ -151,6 +151,60 @@ func (t *Table) RootLevelColumns() []*Column {
 	return rootLevelCols
 }
 
+// MetaColumns returns the materialized columns of /_meta/<name> locations, which
+// the no_flow_document load queries reconstruct into a nested _meta object. This
+// covers _meta/op — which drives delete reduction and would otherwise be dropped,
+// since /_meta/* is never among RootLevelColumns — as well as the raw _meta/uuid
+// field when it is materialized.
+//
+// A date-time projection of /_meta/uuid (flow_published_at) is deliberately
+// excluded: its value is a view of the location rather than the location's own
+// value, so it cannot be reconstructed verbatim. It is instead reported
+// separately as a clock, see MetaUUIDClockColumn.
+func (t *Table) MetaColumns() []*Column {
+	var out []*Column
+	for _, col := range t.Columns() {
+		if metaKeyOf(col.Ptr) == "" || col == t.MetaUUIDClockColumn() {
+			continue
+		}
+		out = append(out, col)
+	}
+	return out
+}
+
+// MetaUUIDClockColumn returns the date-time projection of /_meta/uuid whose value
+// the document UUID is synthesized from, or nil when there is none — either
+// because the raw _meta/uuid field is materialized (and needs no synthesis) or
+// because no projection of the location is materialized at all.
+func (t *Table) MetaUUIDClockColumn() *Column {
+	var clock *Column
+	for _, col := range t.Columns() {
+		if col.Ptr != metaUUIDPtr {
+			continue
+		} else if col.Inference.String_ == nil || col.Inference.String_.Format != "date-time" {
+			// The raw document UUID; prefer it and synthesize nothing.
+			return nil
+		} else if clock == nil {
+			clock = col
+		}
+	}
+	return clock
+}
+
+// MetaKey is the key of this column within a reconstructed _meta object, or
+// empty if the column is not a /_meta/<name> location. It comes from the JSON
+// pointer rather than the field name, which may be a user-chosen alias.
+func (c *Column) MetaKey() string { return metaKeyOf(c.Ptr) }
+
+// metaKeyOf returns the single path component of a /_meta/<name> pointer.
+func metaKeyOf(ptr string) string {
+	rest, ok := strings.CutPrefix(ptr, "/_meta/")
+	if !ok || rest == "" || strings.Contains(rest, "/") {
+		return ""
+	}
+	return rest
+}
+
 // KeyPtrs returns all keys of the Table as a single slice.
 func (t *Table) KeyPtrs() []*Column {
 	var out []*Column
