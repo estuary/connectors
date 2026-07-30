@@ -173,7 +173,7 @@ func TestIntegration(t *testing.T) {
 			require.NoError(t, err)
 			require.NotEmpty(t, infos[0].location, "the base Apply must have created the table")
 
-			pqSchema, err := parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap, cfg.nanosecondTimestamps(), cfg.variantColumns())
+			pqSchema, err := parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap, cfg)
 			require.NoError(t, err)
 			for i := range pqSchema {
 				id, ok := infos[0].fieldIDs[pqSchema[i].Name]
@@ -2119,13 +2119,15 @@ func TestParquetSchemaCastToStringOnJSONField(t *testing.T) {
 		"obj": json.RawMessage(`{"ignoreStringFormat": true}`),
 	}
 
-	got, err := parquetSchema(fields, collection, fieldConfigs, false, true)
+	var variantCfg = withAdvanced(config{}, func(a *advancedConfig) { a.VariantColumns = true })
+
+	got, err := parquetSchema(fields, collection, fieldConfigs, variantCfg)
 	require.NoError(t, err)
 	for _, el := range got {
 		require.Equalf(t, writer.LogicalTypeString, el.DataType, "field %s", el.Name)
 	}
 
-	_, err = parquetSchema(fields, collection, fieldConfigs, false, false)
+	_, err = parquetSchema(fields, collection, fieldConfigs, config{})
 	require.ErrorContains(t, err, "cannot set ignoreStringFormat on non-string field")
 }
 

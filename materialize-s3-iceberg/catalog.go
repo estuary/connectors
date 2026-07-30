@@ -398,7 +398,7 @@ func (c *catalog) createNamespace(ctx context.Context, namespace string) error {
 func (c *catalog) CreateResource(ctx context.Context, b *pf.MaterializationSpec_Binding, res resource) (string, boilerplate.ActionApplyFn, error) {
 	location := tablePath(c.cfg.Bucket, c.cfg.Prefix, b.ResourcePath[0], b.ResourcePath[1], c.locationStyle)
 
-	parquetSchema, err := parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap, c.cfg.nanosecondTimestamps(), c.cfg.variantColumns())
+	parquetSchema, err := parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap, *c.cfg)
 	if err != nil {
 		return "", nil, err
 	}
@@ -507,7 +507,7 @@ func (c *catalog) UpdateResource(_ context.Context, bindingUpdate boilerplate.Bi
 			}
 		}
 
-		s, err := projectionToParquetSchemaElement(p.Projection.Projection, fc, c.cfg.nanosecondTimestamps(), c.cfg.variantColumns())
+		s, err := projectionToParquetSchemaElement(p.Projection.Projection, fc, *c.cfg)
 		if err != nil {
 			return "", nil, err
 		}
