@@ -2056,6 +2056,12 @@ func TestMapTypeVariantWiring(t *testing.T) {
 		}
 	}
 
+	mkFormattedNumeric := func(field string, format string, types ...string) mboilerplate.Projection {
+		p := mkProj(field, false, true, types...)
+		p.Inference.String_.Format = format
+		return p
+	}
+
 	var plain = &materialization{}
 	var variant = &materialization{cfg: config{Advanced: &advancedConfig{VariantColumns: true}}}
 
@@ -2075,6 +2081,11 @@ func TestMapTypeVariantWiring(t *testing.T) {
 		{"castToString on object", mkProj("castObj", false, false, "object"), fieldConfig{IgnoreStringFormat: true}, "string", "string"},
 		{"castToString on array", mkProj("castArr", false, false, "array"), fieldConfig{IgnoreStringFormat: true}, "string", "string"},
 		{"castToString on root document", mkProj("flow_document", false, false, "object"), fieldConfig{IgnoreStringFormat: true}, "string", "string"},
+		// String-encoded numbers are pinned to a single type by their format
+		// annotation, so they keep their numeric column rather than widening
+		// to variant along with other multi-type fields.
+		{"string-formatted integer", mkFormattedNumeric("strInt", "integer", "integer", "string"), fieldConfig{}, "long", "long"},
+		{"string-formatted number", mkFormattedNumeric("strNum", "number", "number", "string"), fieldConfig{}, "double", "double"},
 		{"single scalar", mkProj("num", false, false, "integer"), fieldConfig{}, "long", "long"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

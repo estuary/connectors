@@ -151,7 +151,10 @@ as **[variant](https://iceberg.apache.org/spec/#semi-structured-types)** columns
 created using [Iceberg format v3](https://iceberg.apache.org/spec/#version-3-extended-types-and-capabilities).
 Variant preserves the semi-structured shape of the data natively, so query engines can extract
 nested paths without parsing JSON text. Collection key fields keep their string mapping, and the
-per-field `castToString` option still forces a JSON string column. Make sure your query engine
+per-field `castToString` option still forces a JSON string column. String-encoded numbers — a
+field typed as both `string` and `integer` or `number` with a matching `format` annotation — also
+keep their numeric column, since their values are already pinned to a single type. Make sure your
+query engine
 supports reading format v3 variant columns (for example Spark 4.0, Snowflake, or DuckDB 1.5.3 and
 later) before enabling this option.
 
