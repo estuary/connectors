@@ -61,12 +61,13 @@ type Config struct {
 }
 
 type advancedConfig struct {
-	DiscoverNonEnabled bool   `json:"discover_tables_without_ct,omitempty" jsonschema:"title=Discover Tables Without Change Tracking,description=When set the connector will discover all tables even if they do not have Change Tracking enabled. By default only CT-enabled tables are discovered."`
-	SkipBackfills      string `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled."`
-	BackfillChunkSize  int    `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=50000,description=The number of rows which should be fetched from the database in a single backfill query."`
-	PollingInterval    string `json:"polling_interval,omitempty" jsonschema:"title=Change Tracking Polling Interval,default=500ms,description=The interval at which the connector polls for Change Tracking changes. Accepts duration strings like '500ms' or '30s' or '1m'. Defaults to 500ms when unspecified." jsonschema_extras:"pattern=^[0-9]+(ms|s|m|h)$"`
-	SourceTag          string `json:"source_tag,omitempty" jsonschema:"title=Source Tag,description=When set the capture will add this value as the property 'tag' in the source metadata of each document."`
-	FeatureFlags       string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	DiscoverNonEnabled  bool   `json:"discover_tables_without_ct,omitempty" jsonschema:"title=Discover Tables Without Change Tracking,description=When set the connector will discover all tables even if they do not have Change Tracking enabled. By default only CT-enabled tables are discovered."`
+	SkipBackfills       string `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled."`
+	BackfillChunkSize   int    `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=50000,description=The number of rows which should be fetched from the database in a single backfill query."`
+	PollingInterval     string `json:"polling_interval,omitempty" jsonschema:"title=Change Tracking Polling Interval,default=500ms,description=The interval at which the connector polls for Change Tracking changes. Accepts duration strings like '500ms' or '30s' or '1m'. Defaults to 500ms when unspecified." jsonschema_extras:"pattern=^[0-9]+(ms|s|m|h)$"`
+	SourceTag           string `json:"source_tag,omitempty" jsonschema:"title=Source Tag,description=When set the capture will add this value as the property 'tag' in the source metadata of each document."`
+	RediscoveryInterval string `json:"rediscovery_interval,omitempty" jsonschema:"title=Rediscovery Interval,default=15m,description=How often the connector re-runs discovery while a capture is running to notice schema changes and newly added tables. Accepts duration strings like '15m' or '1h'. Defaults to 15m when unspecified." jsonschema_extras:"pattern=^[0-9]+(ms|s|m|h)$"`
+	FeatureFlags        string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
 type tunnelConfig struct {
@@ -106,6 +107,9 @@ func (c *Config) Validate() error {
 		} else if parsedInterval > sqlcapture.StreamingFenceInterval {
 			return fmt.Errorf("invalid 'polling_interval' configuration %q: must not exceed %s", c.Advanced.PollingInterval, sqlcapture.StreamingFenceInterval)
 		}
+	}
+	if err := sqlcapture.ValidateRediscoveryInterval(c.Advanced.RediscoveryInterval); err != nil {
+		return err
 	}
 
 	if c.Advanced.SkipBackfills != "" {
@@ -366,3 +370,7 @@ func (db *sqlserverDatabase) FallbackCollectionKey() []string {
 }
 
 func (db *sqlserverDatabase) RequestTxIDs(schema, table string) {}
+
+func (db *sqlserverDatabase) RediscoveryInterval() time.Duration {
+	return sqlcapture.ParseRediscoveryInterval(db.config.Advanced.RediscoveryInterval)
+}

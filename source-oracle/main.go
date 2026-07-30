@@ -174,6 +174,7 @@ type advancedConfig struct {
 	NodeID               uint32   `json:"node_id,omitempty" jsonschema:"title=Node ID,description=Node ID for the capture. Each node in a replication cluster must have a unique 32-bit ID. The specific value doesn't matter so long as it is unique. If unset or zero the connector will pick a value."`
 	DictionaryMode       string   `json:"dictionary_mode,omitempty" jsonschema:"title=Dictionary Mode,description=How should dictionaries be used in Logminer: one of online or extract. When using online mode schema changes to the table may break the capture but resource usage is limited. When using extract mode schema changes are handled gracefully but more resources of your database (including disk) are used by the process. Defaults to smart which automatically switches between the two modes based on requirements.,enum=extract,enum=online,enum=smart"`
 	SourceTag            string   `json:"source_tag,omitempty" jsonschema:"title=Source Tag,description=When set the capture will add this value as the property 'tag' in the source metadata of each document."`
+	RediscoveryInterval  string   `json:"rediscovery_interval,omitempty" jsonschema:"title=Rediscovery Interval,default=15m,description=How often the connector re-runs discovery while a capture is running to notice schema changes and newly added tables. Accepts duration strings like '15m' or '1h'. Defaults to 15m when unspecified." jsonschema_extras:"pattern=^[0-9]+(ms|s|m|h)$"`
 	FeatureFlags         string   `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
@@ -196,6 +197,10 @@ func (c *Config) Validate() error {
 
 	if !slices.Contains([]string{"", DictionaryModeExtract, DictionaryModeOnline, DictionaryModeSmart}, c.Advanced.DictionaryMode) {
 		return fmt.Errorf("dictionary mode must be one of %s or %s or %s", DictionaryModeExtract, DictionaryModeOnline, DictionaryModeSmart)
+	}
+
+	if err := sqlcapture.ValidateRediscoveryInterval(c.Advanced.RediscoveryInterval); err != nil {
+		return err
 	}
 
 	return nil
@@ -358,6 +363,10 @@ func (db *oracleDatabase) SourceMetadataSchema(writeSchema bool) *jsonschema.Sch
 
 func (db *oracleDatabase) FallbackCollectionKey() []string {
 	return []string{"/_meta/source/rs_id", "/_meta/source/ssn"}
+}
+
+func (db *oracleDatabase) RediscoveryInterval() time.Duration {
+	return sqlcapture.ParseRediscoveryInterval(db.config.Advanced.RediscoveryInterval)
 }
 
 func encodeKeyFDB(key any, colType oracleColumnType) (tuple.TupleElement, error) {
