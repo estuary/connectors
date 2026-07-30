@@ -66,13 +66,18 @@ func TestStreamV2RejectedRows(t *testing.T) {
 		// The fake sidecar rejects a row which carries the REJECT column, as
 		// Snowflake rejects one it cannot store: the append and the commit both
 		// succeed, and only the channel's row-error count moves.
+		var priorByChannel map[string]*streamV2Item
+		if prior != nil {
+			priorByChannel = map[string]*streamV2Item{m.channelFor("rejected.v1"): prior}
+		}
+
 		m.addBinding("DB", "SCH", "TBL", sql.Table{
 			TableShape: sql.TableShape{Binding: 0, DeltaUpdates: true},
 			Identifier: "TBL",
 			Keys:       []sql.Column{{Identifier: `KEY`}},
 			Values:     []sql.Column{{Identifier: `VAL`}, {Identifier: `REJECT`}},
 			StateKey:   "rejected.v1",
-		}, prior)
+		}, priorByChannel)
 		return m
 	}
 
@@ -104,8 +109,8 @@ func TestStreamV2RejectedRows(t *testing.T) {
 
 func TestReconcileStreamV2Channel(t *testing.T) {
 	var token = func(s string) *string { return &s }
-	var prior = func(counter int64, keyBegin, keyEnd uint32) *streamV2Item {
-		return &streamV2Item{Channel: "chan", Counter: counter, KeyBegin: keyBegin, KeyEnd: keyEnd}
+	var prior = func(counter int64, keyBegin, keyEnd uint32) map[string]*streamV2Item {
+		return map[string]*streamV2Item{"chan": {Channel: "chan", Counter: counter, KeyBegin: keyBegin, KeyEnd: keyEnd}}
 	}
 
 	const keyBegin, keyEnd uint32 = 0x10000000, 0x1fffffff
@@ -113,7 +118,7 @@ func TestReconcileStreamV2Channel(t *testing.T) {
 	for _, tt := range []struct {
 		name      string
 		committed *string
-		prior     *streamV2Item
+		prior     map[string]*streamV2Item
 		wantSkip  int64
 		wantErr   string
 	}{
@@ -167,6 +172,42 @@ func TestReconcileStreamV2Channel(t *testing.T) {
 			committed: token("42"),
 			prior:     prior(42, 0, math.MaxUint32),
 			wantSkip:  42,
+		},
+		{
+			// The other shards of the task each keep an item of their own in the
+			// shared checkpoint. Their key-begins fall outside this shard's range,
+			// so neither side has taken over the other's documents.
+			name:      "the channels of living sibling shards are ignored",
+			committed: token("42"),
+			prior: map[string]*streamV2Item{
+				"chan":   {Channel: "chan", Counter: 42, KeyBegin: keyBegin, KeyEnd: keyEnd},
+				"higher": {Channel: "higher", Counter: 99, KeyBegin: keyEnd + 1, KeyEnd: math.MaxUint32},
+				"lower":  {Channel: "lower", Counter: 7, KeyBegin: 0, KeyEnd: keyBegin - 1},
+			},
+			wantSkip: 42,
+		},
+		{
+			// Two shards joined into one: the absorbed shard's key-begin lies
+			// inside the range this shard now covers, which exact tiling makes
+			// impossible for a shard that is still running.
+			name:      "a channel whose shard range this one absorbed is refused",
+			committed: token("42"),
+			prior: map[string]*streamV2Item{
+				"chan":     {Channel: "chan", Counter: 42, KeyBegin: keyBegin, KeyEnd: keyEnd},
+				"absorbed": {Channel: "absorbed", Counter: 99, KeyBegin: keyBegin + 0x08000000, KeyEnd: keyEnd},
+			},
+			wantErr: "has absorbed",
+		},
+		{
+			// The refusal does not wait on a committed token of this shard's own:
+			// a join whose surviving shard has never appended has still taken over
+			// the absorbed shard's documents.
+			name:      "an absorbed range is refused before this channel commits anything",
+			committed: nil,
+			prior: map[string]*streamV2Item{
+				"absorbed": {Channel: "absorbed", Counter: 99, KeyBegin: keyBegin + 1, KeyEnd: keyEnd},
+			},
+			wantErr: "has absorbed",
 		},
 		{
 			name:      "committed behind the checkpoint is refused",

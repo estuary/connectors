@@ -39,7 +39,9 @@ func TestAcknowledgeSubsetLeavesOtherKeysPending(t *testing.T) {
 func TestAcknowledgeKeepsStreamV2Counter(t *testing.T) {
 	d := &transactor{
 		cp: checkpoint{
-			"a_table.v1": {Table: "a_table", StreamV2: &streamV2Item{Channel: "chan", Counter: 42}},
+			"a_table.v1": {Table: "a_table", StreamV2: map[string]*streamV2Item{
+				"chan": {Channel: "chan", Counter: 42},
+			}},
 		},
 		bindings: []*binding{{target: sql.Table{StateKey: "a_table.v1"}, streamingV2: true}},
 		be:       m.NewBindingEvents(),
@@ -51,7 +53,7 @@ func TestAcknowledgeKeepsStreamV2Counter(t *testing.T) {
 	state, err := d.Acknowledge(context.Background(), nil, []string{"a_table.v1"})
 	require.NoError(t, err)
 	require.Nil(t, state)
-	require.Equal(t, int64(42), d.cp["a_table.v1"].StreamV2.Counter)
+	require.Equal(t, int64(42), d.cp["a_table.v1"].StreamV2["chan"].Counter)
 }
 
 func TestSpecification(t *testing.T) {

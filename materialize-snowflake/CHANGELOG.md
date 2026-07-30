@@ -28,10 +28,14 @@
   backfilled. Tables mark a column NOT NULL only for a field the collection
   schema requires, which the runtime therefore always supplies.
 - If the connector cannot establish which rows Snowflake already holds on this
-  path — because the destination lost committed data, or because the task was
-  rescaled while an interrupted transaction's rows were outstanding — it fails
-  rather than risk duplicating or dropping rows. Backfilling the affected
-  binding recovers from either case.
+  path — because the destination lost committed data, or because the task's
+  shards were split while an interrupted transaction's rows were outstanding —
+  it fails rather than risk duplicating or dropping rows. Backfilling the
+  affected binding recovers from either case.
+- Splitting a task's shards needs no backfill. Reducing their number does:
+  a shard which takes over the key range of another cannot establish which of
+  that shard's rows Snowflake already holds, so bindings on this path fail until
+  they are backfilled.
 
 ## 2026-07-23
 

@@ -89,6 +89,16 @@ func TestStreamV2Manager(t *testing.T) {
 
 	var fullRange = &pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32}
 
+	// priorOf keys checkpoint items by channel the way the connector's driver
+	// checkpoint does, so that a shard reads back only the item it wrote.
+	var priorOf = func(items ...*streamV2Item) map[string]*streamV2Item {
+		var byChannel = make(map[string]*streamV2Item, len(items))
+		for _, item := range items {
+			byChannel[item.Channel] = item
+		}
+		return byChannel
+	}
+
 	var newManager = func(keyRange *pf.RangeSpec) *streamV2Manager {
 		var m = newStreamV2Manager(ctx, &cfg, "test/streamV2Materialization", accountName, keyRange)
 		t.Cleanup(m.stop)
@@ -222,7 +232,7 @@ func TestStreamV2Manager(t *testing.T) {
 		m2.sup.kill()
 
 		var m3 = newManager(fullRange)
-		m3.addBinding(cfg.Database, cfg.Schema, tableName, tgt, checkpointed)
+		m3.addBinding(cfg.Database, cfg.Schema, tableName, tgt, priorOf(checkpointed))
 
 		writeRows(m3, 5, 8)
 		require.Equal(t, int64(7), m3.bindings[0].skip)
@@ -238,8 +248,7 @@ func TestStreamV2Manager(t *testing.T) {
 		// gives the low child the parent's key-begin while the high child takes
 		// the pivot (activate::map_shard_to_split). A channel is named for its
 		// shard's key-begin, so the low child continues on the parent's channel
-		// and the high child derives one of its own — which is why the counter
-		// the two children inherit means something different to each of them.
+		// and its counter, while the high child derives a channel of its own.
 		truncate(t)
 		var tgt = target("split.v1")
 		var pivot uint32 = math.MaxUint32/2 + 1
@@ -258,7 +267,7 @@ func TestStreamV2Manager(t *testing.T) {
 		// Each child stores documents of its own, standing in for the disjoint
 		// key subsets a re-shuffled journal read would deliver to them.
 		var low = newManager(&pf.RangeSpec{KeyEnd: pivot - 1, RClockEnd: math.MaxUint32})
-		low.addBinding(cfg.Database, cfg.Schema, tableName, tgt, &checkpointed)
+		low.addBinding(cfg.Database, cfg.Schema, tableName, tgt, priorOf(&checkpointed))
 		require.Equal(t, parentChannel, low.bindings[0].channel)
 
 		// The low child's range is narrower than the one recorded alongside the
@@ -277,7 +286,7 @@ func TestStreamV2Manager(t *testing.T) {
 		// committed nothing: there is no token to reconcile the inherited counter
 		// against, and nothing to skip. Its documents are appended in full.
 		var high = newManager(&pf.RangeSpec{KeyBegin: pivot, KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
-		high.addBinding(cfg.Database, cfg.Schema, tableName, tgt, &checkpointed)
+		high.addBinding(cfg.Database, cfg.Schema, tableName, tgt, priorOf(&checkpointed))
 		require.NotEqual(t, parentChannel, high.bindings[0].channel)
 
 		writeRows(high, 100, 103)
@@ -285,10 +294,11 @@ func TestStreamV2Manager(t *testing.T) {
 
 		items, err = high.flush(ctx)
 		require.NoError(t, err)
-		// The counter carries over from the parent rather than restarting, so the
-		// fresh channel's offset tokens begin above one. Only their order matters,
-		// and skipping a stretch of them costs nothing.
-		require.Equal(t, int64(8), items[0].Counter)
+		// The counter belongs to the channel rather than to the binding, so this
+		// one starts from nothing: the counter the checkpoint carries is the low
+		// child's to continue, and counting on from it here would leave this
+		// channel's offset tokens claiming documents it never held.
+		require.Equal(t, int64(3), items[0].Counter)
 		// The item names the high child's own channel and range, not the parent's
 		// it inherited.
 		require.Equal(t, high.bindings[0].channel, items[0].Channel)
@@ -297,6 +307,74 @@ func TestStreamV2Manager(t *testing.T) {
 
 		// Neither child re-appended what the parent had already stored, and
 		// neither dropped a document of its own.
+		require.Equal(t, 11, countRows())
+	})
+
+	t.Run("joining two shards into one is refused", func(t *testing.T) {
+		// Flow has no join command, but nothing in the runtime forbids one:
+		// shard ranges need only tile the key space exactly, so widening a
+		// surviving shard and deleting its sibling is a legal topology. The
+		// survivor then covers keys whose documents the deleted shard had been
+		// appending to a channel of its own.
+		truncate(t)
+		var tgt = target("join.v1")
+		var pivot uint32 = math.MaxUint32/2 + 1
+		var loRange = &pf.RangeSpec{KeyEnd: pivot - 1, RClockEnd: math.MaxUint32}
+
+		var lo = newManager(loRange)
+		lo.addBinding(cfg.Database, cfg.Schema, tableName, tgt, nil)
+		writeRows(lo, 0, 3)
+		loItems, err := lo.flush(ctx)
+		require.NoError(t, err)
+		require.NoError(t, lo.waitCommit(ctx, loItems[0]))
+
+		var hi = newManager(&pf.RangeSpec{KeyBegin: pivot, KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
+		hi.addBinding(cfg.Database, cfg.Schema, tableName, tgt, nil)
+		writeRows(hi, 100, 105)
+		hiItems, err := hi.flush(ctx)
+		require.NoError(t, err)
+		require.NoError(t, hi.waitCommit(ctx, hiItems[0]))
+		require.NotEqual(t, loItems[0].Channel, hiItems[0].Channel)
+		require.Equal(t, 8, countRows())
+		lo.stop()
+		hi.stop()
+
+		// Steady state first: the two shards share one connector-state document,
+		// so each reads the other's item back and must carry on regardless. The
+		// sibling's key-begin is outside this shard's range, which is what says
+		// the sibling is still running.
+		var loAgain = newManager(loRange)
+		loAgain.addBinding(cfg.Database, cfg.Schema, tableName, tgt, priorOf(loItems[0], hiItems[0]))
+		writeRows(loAgain, 3, 5)
+		require.Equal(t, int64(3), loAgain.bindings[0].skip)
+		items, err := loAgain.flush(ctx)
+		require.NoError(t, err)
+		require.Equal(t, int64(5), items[0].Counter)
+		require.NoError(t, loAgain.waitCommit(ctx, items[0]))
+		require.Equal(t, 10, countRows())
+		loAgain.stop()
+
+		// The join: the survivor keeps the low shard's key-begin, and so its
+		// channel, but now covers the whole range — which puts the deleted
+		// shard's key-begin inside it.
+		var joined = newManager(fullRange)
+		joined.addBinding(cfg.Database, cfg.Schema, tableName, tgt, priorOf(items[0], hiItems[0]))
+
+		var refusal = joined.writeRow(ctx, 0, []any{"k", 1, json.RawMessage(`{}`)})
+		require.ErrorContains(t, refusal, "has absorbed")
+		require.ErrorContains(t, refusal, hiItems[0].Channel)
+		require.Equal(t, 10, countRows())
+		t.Logf("join refused with: %s", refusal)
+
+		// Backfilling the binding is the recovery the refusal asks for: it
+		// rotates the channel, and the item of the absorbed shard is not carried
+		// into the new state key.
+		var joinedAfterBackfill = newManager(fullRange)
+		joinedAfterBackfill.addBinding(cfg.Database, cfg.Schema, tableName, target("join.v2"), nil)
+		require.NoError(t, joinedAfterBackfill.writeRow(ctx, 0, []any{"k", 1, json.RawMessage(`{}`)}))
+		items, err = joinedAfterBackfill.flush(ctx)
+		require.NoError(t, err)
+		require.NoError(t, joinedAfterBackfill.waitCommit(ctx, items[0]))
 		require.Equal(t, 11, countRows())
 	})
 
@@ -330,7 +408,7 @@ func TestStreamV2Manager(t *testing.T) {
 			ahead.Counter = 100
 
 			var m2 = newManager(fullRange)
-			m2.addBinding(cfg.Database, cfg.Schema, tableName, tgt, &ahead)
+			m2.addBinding(cfg.Database, cfg.Schema, tableName, tgt, priorOf(&ahead))
 			require.ErrorContains(t, m2.writeRow(ctx, 0, []any{"k", 1, json.RawMessage(`{}`)}), "has lost committed data")
 			require.Equal(t, rowsBefore, countRows())
 		})
@@ -339,7 +417,7 @@ func TestStreamV2Manager(t *testing.T) {
 			// The shard kept its key-begin, and so its channel, but now covers
 			// half the range: a replay would carry a different set of documents.
 			var m2 = newManager(&pf.RangeSpec{KeyEnd: math.MaxUint32 / 2, RClockEnd: math.MaxUint32})
-			m2.addBinding(cfg.Database, cfg.Schema, tableName, tgt, &checkpointed)
+			m2.addBinding(cfg.Database, cfg.Schema, tableName, tgt, priorOf(&checkpointed))
 			require.ErrorContains(t, m2.writeRow(ctx, 0, []any{"k", 1, json.RawMessage(`{}`)}), "shard key range has changed")
 			require.Equal(t, rowsBefore, countRows())
 		})
@@ -407,7 +485,7 @@ func TestStreamV2Manager(t *testing.T) {
 		// acknowledging it with the row still missing.
 		m.sup.kill()
 		var m2 = newManager(fullRange)
-		m2.addBinding(cfg.Database, cfg.Schema, notNullTable, notNullTarget, items[0])
+		m2.addBinding(cfg.Database, cfg.Schema, notNullTable, notNullTarget, priorOf(items[0]))
 		require.ErrorContains(t,
 			m2.writeRow(ctx, 0, []any{"kept", json.RawMessage(`{"a":1}`)}),
 			"rejected and discarded by Snowflake")

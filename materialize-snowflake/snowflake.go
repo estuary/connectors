@@ -270,7 +270,7 @@ func (d *transactor) UnmarshalState(state json.RawMessage) error {
 
 // priorStreamV2 returns the streaming v2 state the checkpoint records for a
 // binding, or nil if it records none.
-func (d *transactor) priorStreamV2(stateKey string) *streamV2Item {
+func (d *transactor) priorStreamV2(stateKey string) map[string]*streamV2Item {
 	if item, ok := d.cp[stateKey]; ok {
 		return item.StreamV2
 	}
@@ -646,11 +646,13 @@ func (d *transactor) pipeExists(ctx context.Context, pipeName string) (bool, err
 }
 
 type checkpointItem struct {
-	Table         string
-	Query         string
-	StagedDir     string
-	StreamBlobs   []*blobMetadata
-	StreamV2      *streamV2Item `json:",omitempty"`
+	Table       string
+	Query       string
+	StagedDir   string
+	StreamBlobs []*blobMetadata
+	// StreamV2 is keyed by channel name, so that each shard of the task patches
+	// an entry of its own into the one connector-state document they share.
+	StreamV2      map[string]*streamV2Item `json:",omitempty"`
 	PipeName      string
 	PipeFiles     []fileRecord
 	Version       string
@@ -737,9 +739,12 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 	for idx, b := range d.bindings {
 		if b.streamingV2 {
 			if item, ok := streamV2Items[idx]; ok {
+				// Patching only this shard's channel leaves the entries of the
+				// task's other shards in place, since the runtime reduces this
+				// state as a merge patch.
 				d.cp[b.target.StateKey] = &checkpointItem{
 					Table:    b.target.Identifier,
-					StreamV2: item,
+					StreamV2: map[string]*streamV2Item{item.Channel: item},
 				}
 			}
 			continue
@@ -938,7 +943,7 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 			continue
 		}
 
-		if item.StreamV2 != nil {
+		if len(item.StreamV2) > 0 {
 			// The streaming v2 counter is durable per-binding state rather than
 			// pending work: its rows reached Snowflake during Store, and the
 			// counter must outlive this transaction to be reconciled against
@@ -955,8 +960,12 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 			}
 			group.Go(func() error {
 				d.be.StartedResourceCommit(path)
-				if err := d.streamV2.waitCommit(groupCtx, item.StreamV2); err != nil {
-					return fmt.Errorf("committing streaming v2 rows for %s: %w", path, err)
+				// A channel of the task's other shards is not open in this session,
+				// which waitCommit reports as nothing to wait for.
+				for _, sv2 := range item.StreamV2 {
+					if err := d.streamV2.waitCommit(groupCtx, sv2); err != nil {
+						return fmt.Errorf("committing streaming v2 rows for %s: %w", path, err)
+					}
 				}
 				d.be.FinishedResourceCommit(path)
 

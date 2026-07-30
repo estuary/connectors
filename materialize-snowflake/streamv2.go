@@ -37,6 +37,12 @@ var streamV2MaxBufferedBytes = 128 * 1024 * 1024
 // pending work: it is durable per-binding state, reconciled against Snowflake's
 // committed offset token before the channel's next append, and never cleared by
 // Acknowledge.
+//
+// The checkpoint holds one of these per channel rather than one per binding.
+// Every shard of a v2 task merge-patches its connector state into a single
+// task-global document, so a binding's item must be keyed by something which
+// distinguishes the shard that wrote it, or a sibling shard's reduce overwrites
+// it. The channel name is that key: it is derived from the shard's key-begin.
 type streamV2Item struct {
 	Channel string
 	// Counter is the index of the last document appended to Channel, counted
@@ -58,8 +64,9 @@ type streamV2Binding struct {
 	// Table.ConvertAll, for building the by-name row objects the SDK ingests.
 	columns []string
 	// prior is the streaming v2 state the driver checkpoint recorded for this
-	// binding, or nil if it recorded none.
-	prior *streamV2Item
+	// binding, keyed by channel and covering every shard of the task, or nil if
+	// it recorded none.
+	prior map[string]*streamV2Item
 	// opened reports whether the channel has been opened and reconciled.
 	opened bool
 
@@ -195,32 +202,40 @@ func (m *streamV2Manager) ensureStarted(ctx context.Context) (*sidecarClient, er
 	return m.client, nil
 }
 
+// channelFor names the channel this shard appends a binding's documents to. It
+// is named for the binding's state key rather than its table, so that
+// backfilling a binding rotates its channel along with its checkpoint item. Both
+// then start empty together, which is what makes a backfill the escape from a
+// refusal — and what makes an absent checkpoint item alongside a present
+// committed token unambiguously an interruption of this generation's first
+// transaction rather than a fresh backfill.
+func (m *streamV2Manager) channelFor(stateKey string) string {
+	return fmt.Sprintf("%s_%s", m.channelBase, sanitizeAndAppendHash(stateKey))
+}
+
 // addBinding registers a binding on the streaming v2 write path, carrying
 // forward the document counter the driver checkpoint recorded for it. The
 // channel itself is opened on the binding's first document, by ensureChannel.
-func (m *streamV2Manager) addBinding(database, schema, table string, target sql.Table, prior *streamV2Item) {
+func (m *streamV2Manager) addBinding(database, schema, table string, target sql.Table, prior map[string]*streamV2Item) {
 	var columns []string
 	for _, col := range target.Columns() {
 		columns = append(columns, unquotedIdentifier(col.Identifier))
 	}
 
+	var channel = m.channelFor(target.StateKey)
+
 	var b = &streamV2Binding{
 		database: database,
 		schema:   schema,
 		table:    table,
-		// The channel is named for the binding's state key rather than its
-		// table, so that backfilling a binding rotates its channel along with
-		// its checkpoint item. Both then start empty together, which is what
-		// makes a backfill the escape from a refusal — and what makes an absent
-		// checkpoint item alongside a present committed token unambiguously an
-		// interruption of this generation's first transaction rather than a
-		// fresh backfill.
-		channel: fmt.Sprintf("%s_%s", m.channelBase, sanitizeAndAppendHash(target.StateKey)),
-		columns: columns,
-		prior:   prior,
+		channel:  channel,
+		columns:  columns,
+		prior:    prior,
 	}
-	if prior != nil {
-		b.counter, b.recorded = prior.Counter, prior.Counter
+	// Only this shard's own channel carries a counter this binding continues;
+	// the rest of the map belongs to the task's other shards.
+	if own := prior[channel]; own != nil {
+		b.counter, b.recorded = own.Counter, own.Counter
 	}
 
 	m.bindings[target.Binding] = b
@@ -301,12 +316,18 @@ func rejectedRowsError(channel, table string, status *channelStatusResult) error
 // and reports the highest document index Snowflake already holds — the
 // threshold below which a replayed document must not be appended again.
 //
-// prior is nil when the checkpoint records nothing for the channel, which reads
-// as a counter of zero.
-func reconcileStreamV2Channel(channel string, committedToken *string, prior *streamV2Item, keyBegin, keyEnd uint32) (int64, error) {
+// prior holds the checkpoint's items for every channel of the task, of which at
+// most one is this channel's. An absent item for this channel reads as a counter
+// of zero.
+func reconcileStreamV2Channel(channel string, committedToken *string, prior map[string]*streamV2Item, keyBegin, keyEnd uint32) (int64, error) {
+	if err := refuseAbsorbedRanges(channel, prior, keyBegin, keyEnd); err != nil {
+		return 0, err
+	}
+
+	var own = prior[channel]
 	var counter int64
-	if prior != nil {
-		counter = prior.Counter
+	if own != nil {
+		counter = own.Counter
 	}
 
 	// Snowflake holds nothing for this channel, so there is nothing to skip.
@@ -327,19 +348,45 @@ func reconcileStreamV2Channel(channel string, committedToken *string, prior *str
 			"channel %q has committed %d documents but this task's checkpoint records %d as appended: the channel has lost committed data, so the missing rows cannot be identified. Backfill this binding",
 			channel, committed, counter,
 		)
-	} else if committed > counter && prior != nil && (prior.KeyBegin != keyBegin || prior.KeyEnd != keyEnd) {
+	} else if committed > counter && own != nil && (own.KeyBegin != keyBegin || own.KeyEnd != keyEnd) {
 		// Positional skipping is only sound when the replayed transaction holds
 		// the same documents in the same order, which a re-split shard's
 		// different subset of keys would not. With no prior item there is no
 		// recorded range to contradict, and the documents Snowflake holds are
 		// still the ones this shard is about to replay.
 		return 0, fmt.Errorf(
-			"channel %q has %d documents Snowflake committed beyond the %d this task's checkpoint records, and the shard key range has changed from [%08x, %08x) to [%08x, %08x) since they were appended: the interrupted transaction cannot be replayed identically, so the uncommitted rows cannot be skipped safely. Backfill this binding",
-			channel, committed, counter, prior.KeyBegin, prior.KeyEnd, keyBegin, keyEnd,
+			"channel %q has %d documents Snowflake committed beyond the %d this task's checkpoint records, and the shard key range has changed from [%08x, %08x] to [%08x, %08x] since they were appended: the interrupted transaction cannot be replayed identically, so the uncommitted rows cannot be skipped safely. Backfill this binding",
+			channel, committed, counter, own.KeyBegin, own.KeyEnd, keyBegin, keyEnd,
 		)
 	}
 
 	return committed, nil
+}
+
+// refuseAbsorbedRanges refuses a shard which has taken over the key range of
+// another shard that was appending to a channel of its own — what joining two
+// shards into one produces.
+//
+// A channel is named for its shard's key-begin, so an item under a channel which
+// is not this shard's belongs to a sibling. A sibling whose key-begin lies above
+// this shard's own and within its range is not a living sibling: shard ranges
+// tile the key space exactly, so no two live shards can stand in that relation.
+// Its rows are in the table and its counter is not this shard's to continue,
+// while the documents its final transaction left uncommitted will now be
+// delivered here and appended to a channel whose committed offset token says
+// nothing about them. Since this write path serves delta-updates bindings, that
+// would duplicate them for good.
+func refuseAbsorbedRanges(channel string, prior map[string]*streamV2Item, keyBegin, keyEnd uint32) error {
+	for ch, item := range prior {
+		if ch == channel || item.KeyBegin <= keyBegin || item.KeyBegin > keyEnd {
+			continue
+		}
+		return fmt.Errorf(
+			"channel %q records %d documents appended by a shard covering [%08x, %08x], which this shard's range [%08x, %08x] has absorbed: the joined shard cannot tell which of that shard's documents Snowflake already holds. Backfill this binding",
+			ch, item.Counter, item.KeyBegin, item.KeyEnd, keyBegin, keyEnd,
+		)
+	}
+	return nil
 }
 
 // writeRow counts one converted document and buffers it for append, sending the
