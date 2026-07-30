@@ -47,7 +47,7 @@ func (fc fieldConfig) CastToString() bool {
 	return fc.IgnoreStringFormat
 }
 
-func parquetSchema(fields []string, collection pf.CollectionSpec, fieldConfigJsonMap map[string]json.RawMessage, nanoseconds bool, variants bool) (writer.ParquetSchema, error) {
+func parquetSchema(fields []string, collection pf.CollectionSpec, fieldConfigJsonMap map[string]json.RawMessage, cfg config) (writer.ParquetSchema, error) {
 	out := make(writer.ParquetSchema, 0, len(fields))
 
 	for _, f := range fields {
@@ -60,7 +60,7 @@ func parquetSchema(fields []string, collection pf.CollectionSpec, fieldConfigJso
 			}
 		}
 
-		s, err := projectionToParquetSchemaElement(*collection.GetProjection(f), fc, nanoseconds, variants)
+		s, err := projectionToParquetSchemaElement(*collection.GetProjection(f), fc, cfg)
 		if err != nil {
 			return nil, err
 		}
@@ -70,7 +70,9 @@ func parquetSchema(fields []string, collection pf.CollectionSpec, fieldConfigJso
 	return out, nil
 }
 
-func projectionToParquetSchemaElement(p pf.Projection, fc fieldConfig, nanoseconds bool, variants bool) (writer.ParquetSchemaElement, error) {
+func projectionToParquetSchemaElement(p pf.Projection, fc fieldConfig, cfg config) (writer.ParquetSchemaElement, error) {
+	var nanoseconds, variants = cfg.nanosecondTimestamps(), cfg.variantColumns()
+
 	// With variant_columns enabled ignoreStringFormat is the only way to keep a
 	// JSON-shaped field as a string column, so it is meaningful on object and
 	// array fields that carry no string type. It stays a rejected no-op when
