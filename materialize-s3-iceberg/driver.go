@@ -697,34 +697,9 @@ func (d *materialization) SnapshotTestResource(ctx context.Context, path []strin
 			return nil, nil, fmt.Errorf("reading object %s: %w", key, err)
 		}
 
-		tmpDir, err := os.MkdirTemp("", "iceberg-test-*")
+		rows, err := duckdbReadParquet(ctx, data)
 		if err != nil {
-			return nil, nil, err
-		}
-		defer os.RemoveAll(tmpDir)
-		tmpPath := filepath.Join(tmpDir, "data.parquet")
-		if err := os.WriteFile(tmpPath, data, 0o644); err != nil {
-			return nil, nil, err
-		}
-		// The file and its directory must be readable from inside the
-		// container regardless of the container's user.
-		if err := os.Chmod(tmpDir, 0o755); err != nil {
-			return nil, nil, err
-		}
-
-		out, err := exec.CommandContext(ctx, "docker", "run", "--rm",
-			"-v", tmpDir+":/data:ro",
-			writer.DuckDBDockerImage,
-			"duckdb", "-json", "-c",
-			"SET timezone TO 'UTC'; SELECT * FROM '/data/data.parquet' ORDER BY flow_published_at;",
-		).Output()
-		if err != nil {
-			return nil, nil, fmt.Errorf("running duckdb on %s: %w", key, err)
-		}
-
-		var rows []map[string]any
-		if err := json.Unmarshal(out, &rows); err != nil {
-			return nil, nil, fmt.Errorf("parsing duckdb output: %w", err)
+			return nil, nil, fmt.Errorf("reading %s with duckdb: %w", key, err)
 		}
 		allRows = append(allRows, rows...)
 	}
@@ -769,6 +744,45 @@ func (d *materialization) SnapshotTestResource(ctx context.Context, path []strin
 	})
 
 	return columns, result, nil
+}
+
+// duckdbReadParquet runs the pinned dockerized DuckDB over a parquet file's
+// bytes and returns its rows. The file is staged in a temp directory bind
+// mounted into the container, which is removed before returning rather than
+// accumulating across a caller's loop.
+func duckdbReadParquet(ctx context.Context, data []byte) ([]map[string]any, error) {
+	tmpDir, err := os.MkdirTemp("", "iceberg-test-*")
+	if err != nil {
+		return nil, fmt.Errorf("creating temporary directory: %w", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	var tmpPath = filepath.Join(tmpDir, "data.parquet")
+	if err := os.WriteFile(tmpPath, data, 0o644); err != nil {
+		return nil, fmt.Errorf("writing %s: %w", tmpPath, err)
+	}
+	// The file and its directory must be readable from inside the container
+	// regardless of the container's user.
+	if err := os.Chmod(tmpDir, 0o755); err != nil {
+		return nil, fmt.Errorf("making %s container-readable: %w", tmpDir, err)
+	}
+
+	out, err := exec.CommandContext(ctx, "docker", "run", "--rm",
+		"-v", tmpDir+":/data:ro",
+		writer.DuckDBDockerImage,
+		"duckdb", "-json", "-c",
+		"SET timezone TO 'UTC'; SELECT * FROM '/data/data.parquet' ORDER BY flow_published_at;",
+	).Output()
+	if err != nil {
+		return nil, fmt.Errorf("running duckdb: %w", err)
+	}
+
+	var rows []map[string]any
+	if err := json.Unmarshal(out, &rows); err != nil {
+		return nil, fmt.Errorf("parsing duckdb output: %w", err)
+	}
+
+	return rows, nil
 }
 
 func (d *materialization) Close(ctx context.Context) {}
