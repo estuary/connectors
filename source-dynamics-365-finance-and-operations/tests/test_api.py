@@ -12,6 +12,7 @@ from source_dynamics_365_finance_and_operations.api import (
     SETTLE_DELAY,
     TRICKLE_FEED_SERVICE_DIR,
     RowSchemaMismatchError,
+    TableSchemaHistory,
     TableSchemaUnavailableError,
     TransformedRow,
     _table_metadata_from_entity,
@@ -344,6 +345,81 @@ class TestReadCsvRows:
 
         assert [(r["Id"], r["IsDelete"]) for r in result] == [("a", False), ("b", True)]
         assert "app_c" not in result[1]
+
+
+class TestTableSchemaHistory:
+    """Watches the premise the width rules rest on: that columns are only ever
+    appended to the end of a row."""
+
+    BASE = ["Id", "qty", "IsDelete", "notes"]
+
+    def test_first_schema_has_nothing_to_compare_against(self):
+        history = TableSchemaHistory()
+
+        assert history.observe("2026-01-01T00.00.00Z", self.BASE) is None
+
+    def test_appending_upholds_the_property(self):
+        history = TableSchemaHistory()
+        history.observe("2026-01-01T00.00.00Z", self.BASE)
+
+        assert history.observe("2026-01-01T01.00.00Z", self.BASE + ["added"]) is None
+
+    def test_unchanged_schema_upholds_the_property(self):
+        history = TableSchemaHistory()
+        history.observe("2026-01-01T00.00.00Z", self.BASE)
+
+        assert history.observe("2026-01-01T01.00.00Z", list(self.BASE)) is None
+
+    def test_insertion_is_reported(self):
+        history = TableSchemaHistory()
+        history.observe("2026-01-01T00.00.00Z", self.BASE)
+
+        violation = history.observe(
+            "2026-01-01T01.00.00Z", ["Id", "qty", "color", "IsDelete", "notes"]
+        )
+
+        assert violation is not None
+        assert "column 2 changed from 'IsDelete' to 'color'" in violation
+        assert "2026-01-01T00.00.00Z" in violation
+
+    def test_reorder_is_reported(self):
+        history = TableSchemaHistory()
+        history.observe("2026-01-01T00.00.00Z", self.BASE)
+
+        assert history.observe(
+            "2026-01-01T01.00.00Z", ["qty", "Id", "IsDelete", "notes"]
+        ) is not None
+
+    def test_removal_is_reported(self):
+        history = TableSchemaHistory()
+        history.observe("2026-01-01T00.00.00Z", self.BASE)
+
+        violation = history.observe("2026-01-01T01.00.00Z", ["Id", "qty", "IsDelete"])
+
+        assert violation is not None
+        assert "the column is gone" in violation
+
+    def test_skipped_folders_cannot_hide_a_violation(self):
+        """A table only appears in folders where it changed, so comparisons can
+        span several folders. The prefix relation is transitive, so an
+        insertion followed by an append is still caught."""
+        history = TableSchemaHistory()
+        history.observe("2026-01-01T00.00.00Z", self.BASE)
+
+        assert history.observe(
+            "2026-01-01T05.00.00Z",
+            ["Id", "qty", "color", "IsDelete", "notes", "added"],
+        ) is not None
+
+    def test_comparison_is_against_the_last_schema_seen(self):
+        """After a violation the new schema becomes the baseline, so a
+        subsequent append is not reported again."""
+        history = TableSchemaHistory()
+        history.observe("2026-01-01T00.00.00Z", self.BASE)
+        inserted = ["Id", "qty", "color", "IsDelete", "notes"]
+        assert history.observe("2026-01-01T01.00.00Z", inserted) is not None
+
+        assert history.observe("2026-01-01T02.00.00Z", inserted + ["added"]) is None
 
 
 class TestCsvBytesToDocuments:
@@ -725,3 +801,4 @@ class TestShouldWaitForFinalization:
     def test_just_under_settle_delay_is_waited_on(self):
         now = str_to_dt(self.SUCCESSOR) + SETTLE_DELAY - timedelta(seconds=1)
         assert should_wait_for_finalization(self.SUCCESSOR, now) is True
+

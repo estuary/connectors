@@ -434,11 +434,74 @@ async def stream_folder_rows(
             yield row
 
 
+class TableSchemaHistory:
+    """Remembers the schema last seen for a table so consecutive folders can be
+    compared.
+
+    Binding a row narrower than its folder's model.json relies on Synapse Link
+    only ever appending columns: that is what makes the narrow row a prefix of
+    the declared schema rather than a misaligned one. This watches that
+    property hold as the capture runs. Each folder's schema must begin with the
+    whole of the previously seen one, which an append satisfies and an
+    insertion, reorder or removal does not - all three move a column to a
+    different position, and position is all that binding has to go on.
+
+    Comparing against the last schema *seen* rather than the immediately
+    preceding folder is fine: a table only appears in folders where it changed,
+    and the prefix relation is transitive, so skipped folders cannot hide a
+    violation.
+
+    This only observes changes that happen while the connector is running.
+    A schema that stopped being append-only before the current cursor is
+    already reflected in both schemas being compared, so it goes unnoticed.
+
+    Note this assumes the folder level model.json and the per-table one under
+    TRICKLE_FEED_SERVICE_DIR list a table's attributes in the same order, since
+    get_table_metadata falls back to the latter. If they ever disagree, the
+    fallback looks like a reorder, and is reported as one in two folders rather
+    than one: the folder using the fallback, and the folder after it, which is
+    compared against the fallback's order once it becomes the baseline.
+    """
+
+    def __init__(self) -> None:
+        self._previous: list[str] | None = None
+        self._previous_folder: str | None = None
+
+    def observe(self, folder: str, field_names: list[str]) -> str | None:
+        """Record this folder's schema, returning a description of how it
+        breaks the append-only property, or None if it upholds it."""
+        previous, previous_folder = self._previous, self._previous_folder
+        self._previous = field_names
+        self._previous_folder = folder
+
+        if previous is None or field_names[:len(previous)] == previous:
+            return None
+
+        divergence = next(
+            (i for i, (a, b) in enumerate(zip(previous, field_names)) if a != b),
+            min(len(previous), len(field_names)),
+        )
+        now = (
+            repr(field_names[divergence])
+            if divergence < len(field_names)
+            else "nothing - the column is gone"
+        )
+
+        return (
+            f"the schema in {previous_folder} had {len(previous)} columns and this "
+            f"folder's has {len(field_names)}, but column {divergence} changed from "
+            f"{previous[divergence]!r} to {now}. Columns are expected to only ever "
+            f"be appended to the end, which would leave the earlier schema intact "
+            f"as a prefix of this one"
+        )
+
+
 async def read_csvs_in_folder(
     folder: str,
     table_name: str,
     client: ADLSGen2Client,
     log: Logger,
+    schema_history: TableSchemaHistory,
 ) -> AsyncGenerator[TransformedRow, None]:
     folder_contents = await get_folder_contents_for_table(folder, table_name, client)
 
@@ -473,6 +536,18 @@ async def read_csvs_in_folder(
                 folder, "folder level model.json is missing"
             ) from err
         raise
+
+    # Reported rather than raised, because a schema can break the append-only
+    # property without any row being read wrongly - a rename shifts nothing, so
+    # every row still binds to the right positions.
+    schema_violation = schema_history.observe(folder, table_metadata.field_names)
+
+    if schema_violation is not None:
+        log.warning(
+            "This table's columns changed in a way other than being appended to. "
+            "Rows narrower than the schema may no longer line up with it.",
+            {"folder": folder, "table": table_name, "detail": schema_violation},
+        )
 
     def open_csv(csv: ADLSPathMetadata) -> AsyncGenerator[TransformedRow, None]:
         return read_csv_rows(
@@ -676,6 +751,7 @@ def should_wait_for_finalization(next_folder: str, now: datetime) -> bool:
 async def fetch_changes(
     client: ADLSGen2Client,
     table_name: str,
+    schema_history: TableSchemaHistory,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[dict | LogCursor, None]:
@@ -694,7 +770,9 @@ async def fetch_changes(
         async with FOLDER_PROCESSING_SEMAPHORE:
             log.debug(f"Reading CSVs in {folder}/{table_name}.")
             try:
-                async for row in read_csvs_in_folder(folder, table_name, client, log):
+                async for row in read_csvs_in_folder(
+                    folder, table_name, client, log, schema_history
+                ):
                     yield row
             except TableSchemaUnavailableError as err:
                 # The folder has table data but no usable schema for this table.
