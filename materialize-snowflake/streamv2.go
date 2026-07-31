@@ -367,8 +367,25 @@ func reconcileStreamV2Channel(channel string, committedToken *string, prior map[
 		counter = own.Counter
 	}
 
-	// Snowflake holds nothing for this channel, so there is nothing to skip.
+	// Snowflake holds nothing for this channel. With no counter to account for
+	// there is nothing to skip; with one, the channel those documents were
+	// appended to is gone, and the token which says which of them Snowflake holds
+	// went with it.
+	//
+	// That is what a shard of an outgoing generation finds when it restarts into a
+	// backfill of its binding: the new generation's Apply drops and re-creates the
+	// table, taking every channel bound to it (client.MustRecreateResource), and
+	// this refusal is what stops the shard from re-creating its channel against
+	// the re-materialized table and appending to it again. A shard so refused is
+	// running a specification the runtime is already replacing, so the refusal is
+	// spent by the replacement rather than needing the backfill it asks for.
 	if committedToken == nil {
+		if counter > 0 {
+			return 0, fmt.Errorf(
+				"channel %q has committed nothing while this task's checkpoint records %d documents appended to it: the channel has lost committed data, so the missing rows cannot be identified. Backfill this binding",
+				channel, counter,
+			)
+		}
 		return 0, nil
 	}
 
