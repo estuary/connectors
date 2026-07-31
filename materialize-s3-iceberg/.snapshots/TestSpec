@@ -248,6 +248,12 @@
                 "title": "Nanosecond Timestamps",
                 "description": "Use nanosecond precision (Iceberg format v3) for date-time columns instead of microsecond precision (format v2). Toggling this on an existing materialization applies to data going forward: existing rows read as null for converted columns unless the binding is explicitly backfilled.",
                 "default": false
+              },
+              "variant_columns": {
+                "type": "boolean",
+                "title": "Variant Columns",
+                "description": "Use the Iceberg variant column type (format v3) for object/array/multi-type fields and the root document instead of JSON strings. Toggling this on an existing materialization applies to data going forward: existing rows read as null for converted columns unless the binding is explicitly backfilled.",
+                "default": false
               }
             },
             "additionalProperties": false,

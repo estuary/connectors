@@ -1,6 +1,7 @@
 package writer
 
 import (
+	"bytes"
 	"crypto/md5"
 	"database/sql"
 	"encoding/base64"
@@ -8,7 +9,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -17,6 +20,41 @@ import (
 	iso8601 "github.com/senseyeio/duration"
 	"github.com/stretchr/testify/require"
 )
+
+// DuckDBDockerImage pins the DuckDB used in tests as an independent reader of
+// parquet variant encoding and Iceberg v3 tables, here and in the connectors
+// that build on this writer. DuckDB 1.5.3 is the earliest release that reads
+// variant columns.
+const DuckDBDockerImage = "duckdb/duckdb:1.5.4"
+
+// duckdbDockerQueryFile runs query against the parquet file f using a pinned
+// dockerized DuckDB, substituting the container-side path of f for %s in
+// query, and returns the result rows as JSON. Unlike duckdbReadFile's
+// in-process DuckDB, this is an independent reader whose version isn't tied
+// to the duckdb-go dependency pinned in go.mod.
+func duckdbDockerQueryFile(t *testing.T, f string, query string) string {
+	dir, name := filepath.Split(f)
+
+	// The file and its host directory must be readable from inside the
+	// container regardless of the container's user.
+	require.NoError(t, os.Chmod(dir, 0o755))
+	require.NoError(t, os.Chmod(f, 0o644))
+
+	// Capture stdout only: docker writes image-pull progress to stderr when
+	// the pinned image isn't cached (as on a fresh CI runner), which must not
+	// pollute the query result that callers snapshot.
+	cmd := exec.Command("docker", "run", "--rm",
+		"-v", dir+":/data:ro",
+		DuckDBDockerImage,
+		"duckdb", "-json", "-c", fmt.Sprintf(query, "/data/"+name),
+	)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
+	require.NoError(t, err, "dockerized duckdb query failed: %s", stderr.String())
+
+	return string(out)
+}
 
 func duckdbReadFile(t *testing.T, f string, outFormat string) string {
 	db, err := sql.Open("duckdb", "") // opens an in-memory database
