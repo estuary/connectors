@@ -1,10 +1,12 @@
 import pytest
+import csv
 import asyncio
 from typing import Any, AsyncGenerator
 from pydantic import BaseModel
 
 from estuary_cdk.incremental_csv_processor import (
     IncrementalCSVProcessor,
+    IncrementalCSVRowProcessor,
     CSVConfig,
     CSVProcessingError,
 )
@@ -468,6 +470,23 @@ Bob,35,Chicago"""
         assert rows[2].name == "Bob" and rows[2].age == "35" and rows[2].city == "Chicago"
 
     @pytest.mark.asyncio
+    async def test_escapechar_is_honored(self):
+        """The dict reader's dialect kwargs are built by _dialect_kwargs too,
+        so escapechar has to survive that path as well."""
+        config = CSVConfig(escapechar="\\", quoting=csv.QUOTE_NONE)
+        chunk_iterator = self.create_byte_chunk_iterator(
+            "name,age,city\n" + r"a\,b,25,NYC", chunk_size=7
+        )
+        processor = IncrementalCSVProcessor(chunk_iterator, BasicRecord, config)
+
+        rows: list[BasicRecord] = []
+        async for row in processor:
+            rows.append(row)
+
+        assert len(rows) == 1
+        assert rows[0].name == "a,b" and rows[0].age == "25"
+
+    @pytest.mark.asyncio
     async def test_basic_dict_processing(self):
         """Test basic CSV processing without a Pydantic model yields dicts."""
         csv_data = """name,age,city
@@ -504,3 +523,94 @@ Jane,invalid_age,false,N/A"""
         # All values should be strings - no type conversion
         assert rows[0] == {"name": "John", "age": "25", "active": "true", "score": "99.5"}
         assert rows[1] == {"name": "Jane", "age": "invalid_age", "active": "false", "score": "N/A"}
+
+
+class TestIncrementalCSVRowProcessor:
+    """Test suite for the positional processor, which yields a row's cells
+    without binding them to field names or validating the column count."""
+
+    async def create_byte_chunk_iterator(self, data: str, chunk_size: int = 10, encoding: str = 'utf-8') -> AsyncGenerator[bytes, None]:
+        """Helper to create async byte chunk iterator."""
+        data_bytes = data.encode(encoding)
+        for i in range(0, len(data_bytes), chunk_size):
+            chunk = data_bytes[i:i + chunk_size]
+            yield chunk
+            await asyncio.sleep(0.001)
+
+    async def collect(self, data: str, chunk_size: int = 10, config: CSVConfig | None = None) -> list[list[str]]:
+        processor = IncrementalCSVRowProcessor(
+            self.create_byte_chunk_iterator(data, chunk_size=chunk_size), config
+        )
+        return [row async for row in processor]
+
+    @pytest.mark.asyncio
+    async def test_yields_lists_of_cells(self):
+        """Rows are yielded as lists, with no header handling."""
+        rows = await self.collect("John,25,New York\nJane,30,Los Angeles")
+
+        assert rows == [
+            ["John", "25", "New York"],
+            ["Jane", "30", "Los Angeles"],
+        ]
+
+    @pytest.mark.asyncio
+    async def test_ragged_rows_are_yielded_unchanged(self):
+        """Rows of differing widths are yielded as-is. Deciding whether a width
+        is acceptable is the caller's job, so nothing is padded or rejected."""
+        rows = await self.collect("a,b,c\nd,e\nf,g,h,i")
+
+        assert rows == [["a", "b", "c"], ["d", "e"], ["f", "g", "h", "i"]]
+
+    @pytest.mark.asyncio
+    async def test_blank_lines_are_skipped(self):
+        """Blank lines are skipped, matching the dict reader's behavior."""
+        rows = await self.collect("a,b\n\nc,d\n")
+
+        assert rows == [["a", "b"], ["c", "d"]]
+
+    @pytest.mark.asyncio
+    async def test_multibyte_characters_split_across_chunks(self):
+        """A chunk size that splits multi-byte characters still decodes."""
+        rows = await self.collect("café,naïve\n日本語,Ünïcödé", chunk_size=3)
+
+        assert rows == [["café", "naïve"], ["日本語", "Ünïcödé"]]
+
+    @pytest.mark.asyncio
+    async def test_quoted_fields_with_embedded_delimiters_and_newlines(self):
+        rows = await self.collect('"a,b","c\nd",e\n"say ""hi""",f,g')
+
+        assert rows == [["a,b", "c\nd", "e"], ['say "hi"', "f", "g"]]
+
+    @pytest.mark.asyncio
+    async def test_custom_delimiter(self):
+        rows = await self.collect("a|b|c\nd|e|f", config=CSVConfig(delimiter="|"))
+
+        assert rows == [["a", "b", "c"], ["d", "e", "f"]]
+
+    @pytest.mark.asyncio
+    async def test_row_of_empty_quoted_fields_is_not_skipped(self):
+        """Only genuinely blank lines are skipped. A row whose single field is
+        an empty string is a row, and a positional caller must see it - it is
+        one cell wide, not zero."""
+        rows = await self.collect('a,b\n""\nc,d')
+
+        assert rows == [["a", "b"], [""], ["c", "d"]]
+
+    @pytest.mark.asyncio
+    async def test_escapechar_is_honored(self):
+        """Escapechar reaches the parser through _dialect_kwargs."""
+        rows = await self.collect(
+            r"a\,b,c", config=CSVConfig(escapechar="\\", quoting=csv.QUOTE_NONE)
+        )
+
+        assert rows == [["a,b", "c"]]
+
+    @pytest.mark.asyncio
+    async def test_empty_input_yields_nothing(self):
+        assert await self.collect("") == []
+
+    @pytest.mark.asyncio
+    async def test_malformed_csv_raises(self):
+        """Parse errors still surface as CSVProcessingError."""
+        with pytest.raises(CSVProcessingError, match="Failed to parse CSV data"):
+            await self.collect('a,"unclosed,b\nc,d', config=CSVConfig(strict=True))
