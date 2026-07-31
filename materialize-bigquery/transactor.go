@@ -476,6 +476,22 @@ func mergeStatePatches(cp checkpoint, patches []json.RawMessage) error {
 	return nil
 }
 
+// groupByBinding groups cp's keys sharing a StateKey (destination table)
+// together, so callers can serialize same-table work while still processing
+// different tables concurrently.
+func groupByBinding(cp checkpoint) [][]CheckpointKey {
+	grouped := make(map[string][]CheckpointKey)
+	for cpKey := range cp {
+		grouped[cpKey.StateKey()] = append(grouped[cpKey.StateKey()], cpKey)
+	}
+
+	groups := make([][]CheckpointKey, 0, len(grouped))
+	for _, g := range grouped {
+		groups = append(groups, g)
+	}
+	return groups
+}
+
 func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
 	if !t.primaryShard {
 		for k := range t.cp {
@@ -492,14 +508,18 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	group, groupCtx := errgroup.WithContext(ctx)
 	// You can run up to 1,000 concurrent multi-statement queries, so we use a
 	// generous concurrency limit here, while not leaving it completely
-	// unlimited just to maintain some sense of decorum.
+	// unlimited just to maintain some sense of decorum. This bounds the
+	// number of tables processed concurrently, not the number of queries:
+	// items sharing a table are run sequentially within a single goroutine,
+	// since BigQuery does not support concurrent queries against the same
+	// table.
 	group.SetLimit(100)
 
 	shouldProcess := m.StateKeyFilter(stateKeys)
 
 	var drained []CheckpointKey
-	for cpKey, item := range t.cp {
-		sk := cpKey.StateKey()
+	for _, cpKeys := range groupByBinding(t.cp) {
+		sk := cpKeys[0].StateKey()
 		if !shouldProcess(sk) {
 			// This state key's pending work was not requested to be
 			// processed, so it remains staged in the persisted state.
@@ -519,24 +539,27 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 			continue
 		}
 
-		drained = append(drained, cpKey)
+		drained = append(drained, cpKeys...)
 		group.Go(func() error {
 			t.be.StartedResourceCommit(b.target.Path)
-			if err := t.client.queryIdempotent(groupCtx, b.storeSchema, item.Query, item.JobPrefix, item.SourceURIs, item.TempTableName); err != nil {
-				return fmt.Errorf("acknowledge query for %q: %w", b.target.Path, err)
-			}
-			log.WithFields(log.Fields{
-				"query":         item.Query,
-				"external_data": map[string][]string{item.TempTableName: item.SourceURIs},
-			}).Debug("acknowledge query executed")
+			for _, cpKey := range cpKeys {
+				item := t.cp[cpKey]
+				if err := t.client.queryIdempotent(groupCtx, b.storeSchema, item.Query, item.JobPrefix, item.SourceURIs, item.TempTableName); err != nil {
+					return fmt.Errorf("acknowledge query for %q: %w", b.target.Path, err)
+				}
+				log.WithFields(log.Fields{
+					"query":         item.Query,
+					"external_data": map[string][]string{item.TempTableName: item.SourceURIs},
+				}).Debug("acknowledge query executed")
 
-			if t.skipCleanup {
-				log.Warn("cleanup disabled; staged files retained")
-			} else if err := t.storeFiles.CleanupCheckpoint(ctx, item.SourceURIs); err != nil {
-				// Queries will fail if the source files have been deleted, but
-				// if queryIdempotent has returned without error then a job for
-				// that query will never be attempted again.
-				return fmt.Errorf("cleaning up staged files for %q: %w", b.target.Path, err)
+				if t.skipCleanup {
+					log.Warn("cleanup disabled; staged files retained")
+				} else if err := t.storeFiles.CleanupCheckpoint(ctx, item.SourceURIs); err != nil {
+					// Queries will fail if the source files have been deleted, but
+					// if queryIdempotent has returned without error then a job for
+					// that query will never be attempted again.
+					return fmt.Errorf("cleaning up staged files for %q: %w", b.target.Path, err)
+				}
 			}
 			t.be.FinishedResourceCommit(b.target.Path)
 

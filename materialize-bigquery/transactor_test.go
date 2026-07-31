@@ -12,6 +12,7 @@ import (
 
 func TestAcknowledgeSubsetLeavesOtherKeysPending(t *testing.T) {
 	tr := &transactor{
+		primaryShard: true,
 		cp: checkpoint{
 			"a_table.v1": {Query: "MERGE INTO a", JobPrefix: "jp"},
 			"b_table.v1": {Query: "MERGE INTO b", JobPrefix: "jp"},
@@ -30,6 +31,30 @@ func TestAcknowledgeSubsetLeavesOtherKeysPending(t *testing.T) {
 	require.Nil(t, state)
 	require.NotNil(t, tr.cp["a_table.v1"])
 	require.NotNil(t, tr.cp["b_table.v1"])
+}
+
+func TestGroupByBinding(t *testing.T) {
+	cp := checkpoint{
+		NewCheckpointKey("a_table.v1", "00000000-7fffffff"): {Query: "MERGE INTO a"},
+		NewCheckpointKey("a_table.v1", "80000000-ffffffff"): {Query: "MERGE INTO a"},
+		NewCheckpointKey("b_table.v1", "00000000-ffffffff"): {Query: "MERGE INTO b"},
+	}
+
+	groups := groupByBinding(cp)
+	require.Len(t, groups, 2)
+
+	byStateKey := make(map[string][]CheckpointKey)
+	for _, g := range groups {
+		byStateKey[g[0].StateKey()] = g
+	}
+
+	require.ElementsMatch(t, []CheckpointKey{
+		NewCheckpointKey("a_table.v1", "00000000-7fffffff"),
+		NewCheckpointKey("a_table.v1", "80000000-ffffffff"),
+	}, byStateKey["a_table.v1"])
+	require.ElementsMatch(t, []CheckpointKey{
+		NewCheckpointKey("b_table.v1", "00000000-ffffffff"),
+	}, byStateKey["b_table.v1"])
 }
 
 func TestSchemaForColsStripsPolicyTags(t *testing.T) {
