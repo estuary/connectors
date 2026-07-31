@@ -145,7 +145,8 @@ func (db *sqlserverDatabase) prerequisiteCDCEnabled(ctx context.Context) error {
 
 func isCDCEnabled(ctx context.Context, conn *sql.DB, dbName string) (bool, error) {
 	var cdcEnabled bool
-	if err := conn.QueryRowContext(ctx, fmt.Sprintf(`SELECT is_cdc_enabled FROM sys.databases WHERE name = '%s';`, dbName)).Scan(&cdcEnabled); err != nil {
+	const query = `SELECT is_cdc_enabled FROM sys.databases WHERE name = @p1;`
+	if err := conn.QueryRowContext(ctx, query, mssqldb.NVarCharMax(dbName)).Scan(&cdcEnabled); err != nil {
 		return false, fmt.Errorf("unable to query CDC status of database %q: %w", dbName, err)
 	}
 	return cdcEnabled, nil
