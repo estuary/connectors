@@ -26,17 +26,20 @@ LAG = 110
 
 
 # Klaviyo emits some datetime fields (e.g. consent timestamps) space-separated
-# (e.g. "2026-06-23 00:15:23.918411+00:00") rather than RFC3339. When schema inference
-# tags such a field `format: date-time`, the collection advertises an RFC3339 contract
-# the value violates, breaking downstream consumers. Rather than enumerate the known
-# offenders (Klaviyo custom properties are free-form, so new ones surface unpredictably),
-# we normalize any string that matches the space-separated shape and leave everything
-# else untouched. The anchored regex is what keeps free-text values (e.g. "May 5, 2021")
-# safe from mangling.
+# (e.g. "2026-06-23 00:15:23.918411+00:00") rather than RFC3339. When schema
+# inference tags such a field `format: date-time`, the collection advertises an
+# RFC3339 contract the value violates, breaking downstream consumers. Rather
+# than enumerate the known offenders (Klaviyo custom properties are free-form,
+# so new ones surface unpredictably), we normalize any string that matches the
+# space-separated shape and leave everything else untouched. The anchored regex
+# is what keeps free-text values (e.g. "May 5, 2021") safe from mangling; \Z
+# rather than $ is what keeps a trailing newline from being silently dropped.
 #
-# Matches the observed Klaviyo format "YYYY-MM-DD HH:MM:SS[.ffffff]+HH:MM".
+# Matches the observed Klaviyo format "YYYY-MM-DD HH:MM:SS[.ffffff][+HH:MM]". The UTC
+# offset is optional because the `events` stream previously normalized its cursor with an
+# unconditional str.replace, which did not require one.
 _SPACE_SEPARATED_DATETIME_RE = re.compile(
-    r"^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}(?:\.\d+)?)([+-]\d{2}:\d{2})$"
+    r"^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}(?:\.\d+)?)([+-]\d{2}:\d{2})?\Z"
 )
 
 
@@ -45,7 +48,7 @@ def _normalize_datetime(value: str) -> str:
     if not match:
         return value
     date, time, tz = match.groups()
-    return f"{date}T{time}{tz}"
+    return f"{date}T{time}{tz or ''}"
 
 
 def _normalize_datetimes(data: Any) -> None:
@@ -136,6 +139,10 @@ class KlaviyoStream(HttpStream, ABC):
     def map_record(self, record: MutableMapping[str, Any]) -> MutableMapping[str, Any]:
         """Subclasses can override this to apply custom mappings to a record"""
 
+        # Normalize before the cursor is copied up, so the copy carries the RFC3339 form.
+        # SemiIncrementalKlaviyoStream compares cursors as strings against state written
+        # as isoformat(), where a space-separated value sorts below its normalized twin.
+        _normalize_datetimes(record)
         record[self.cursor_field] = record["attributes"][self.cursor_field]
         return record
 
@@ -372,11 +379,6 @@ class Profiles(IncrementalKlaviyoStream):
         params.update({"additional-fields[profile]": "predictive_analytics,subscriptions"})
         return params
 
-    def map_record(self, record: MutableMapping[str, Any]) -> MutableMapping[str, Any]:
-        record = super().map_record(record)
-        _normalize_datetimes(record.get("attributes"))
-        return record
-
 
 class Campaigns(ArchivedRecordsMixin, IncrementalKlaviyoStream):
     """Docs: https://developers.klaviyo.com/en/v2023-06-15/reference/get_campaigns"""
@@ -479,8 +481,9 @@ class Events(IncrementalKlaviyoStream):
             self.record_amount = 0
 
         for record in response.json()["data"]:
-            record['datetime'] = record['attributes']['datetime'].replace(" ","T")
-            record['attributes']['datetime'] = record['attributes']['datetime'].replace(" ","T")
+            # map_record normalizes the whole record and copies the datetime cursor up.
+            # Event properties are free-form, so they carry space-separated datetimes too.
+            record = self.map_record(record)
 
             campaign_id = record["attributes"]['event_properties'].get("$message")
 
