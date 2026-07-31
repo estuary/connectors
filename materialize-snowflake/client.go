@@ -398,32 +398,70 @@ func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence 
 // generation may not then do is reopen one, which reconcileStreamV2Channel
 // refuses.
 func (c *client) MustRecreateResource(req *pm.Request_Apply, lastBinding, newBinding *pf.MaterializationSpec_Binding) (bool, error) {
-	// Every part of this is read from the specification being replaced rather than
-	// the one replacing it, because the channels at stake belong to the generation
-	// that specification is running: whether the binding was delta-updates, and
-	// whether its endpoint configuration put it on the streaming path at all. One
-	// publication may both bump the backfill counter and turn the write path off,
-	// and the generation it is replacing is streaming either way.
-	var outgoingCfg config
-	if req.LastMaterialization == nil {
-		// Nothing records how the replaced generation was configured, so the
-		// configuration in hand stands in for it.
-		outgoingCfg = c.cfg
-	} else if err := json.Unmarshal(req.LastMaterialization.ConfigJson, &outgoingCfg); err != nil {
-		return false, fmt.Errorf("parsing the last applied endpoint configuration: %w", err)
-	}
-	if outgoingCfg.Credentials == nil {
-		outgoingCfg.Credentials = c.cfg.Credentials
-	}
-
-	// With no last-applied binding there is nothing to say what has been writing
-	// to the table this backfill re-materializes, so it is re-created rather than
-	// assumed safe to empty: dropping a table which did not need it costs the table
-	// object, and emptying one which did costs duplicated rows.
+	// What decides this is whether the generation being replaced could hold
+	// channels on the table: a delta-updates binding, on an endpoint configured for
+	// the streaming path.
+	//
+	// Its binding is read from the specification being replaced, which carries it.
+	// With no last-applied binding there is nothing to say what has been writing to
+	// the table, so it is re-created rather than assumed safe to empty: dropping a
+	// table which did not need it costs the table object, and emptying one which
+	// did costs duplicated rows.
 	var outgoingDeltaUpdates = lastBinding == nil || lastBinding.DeltaUpdates
+	if !outgoingDeltaUpdates {
+		return false, nil
+	}
 
-	return streamsV2(&outgoingCfg, outgoingDeltaUpdates,
-		boilerplate.ParseFlags(outgoingCfg)[flagSnowpipeStreamingV2]), nil
+	// The endpoint configuration is read from the one in hand, which is the
+	// configuration that generation was running unless this same publication also
+	// changes the write path.
+	if streamsV2(&c.cfg, true, boilerplate.ParseFlags(c.cfg)[flagSnowpipeStreamingV2]) {
+		return true, nil
+	} else if req.LastMaterialization == nil {
+		return false, nil
+	}
+
+	// A publication may turn the write path off in the same breath as it bumps a
+	// backfill counter, and the generation it replaces is streaming either way. So
+	// the replaced specification's own configuration is consulted too — but only
+	// ever to widen this answer, never to narrow it, because a request carries that
+	// configuration in whatever shape the control plane stored it rather than the
+	// shape this connector is handed for itself.
+	outgoingCfg, ok := endpointConfigOf(req.LastMaterialization.ConfigJson)
+	if !ok {
+		return false, nil
+	}
+	return streamsV2(&outgoingCfg, true, boilerplate.ParseFlags(outgoingCfg)[flagSnowpipeStreamingV2]), nil
+}
+
+// endpointConfigOf parses the endpoint configuration out of a materialization
+// specification's configuration, which comes in either of two shapes.
+//
+// The runtime hands this connector its own configuration directly, decrypted. The
+// last-applied specification of an Apply request is not given that treatment: it
+// arrives as the control plane stores it, which is the endpoint spec — the
+// connector image alongside a configuration whose secrets are still sops
+// ciphertext. Both are read here, and a document which is neither reports false
+// rather than an empty configuration, so that a caller cannot mistake "could not
+// be read" for "configured no feature flags".
+func endpointConfigOf(configJson json.RawMessage) (config, bool) {
+	var direct config
+	if err := json.Unmarshal(configJson, &direct); err == nil && direct.Credentials != nil {
+		return direct, true
+	}
+
+	var wrapper struct {
+		Config json.RawMessage `json:"config"`
+	}
+	if err := json.Unmarshal(configJson, &wrapper); err != nil || len(wrapper.Config) == 0 {
+		return config{}, false
+	}
+
+	var inner config
+	if err := json.Unmarshal(wrapper.Config, &inner); err != nil || inner.Credentials == nil {
+		return config{}, false
+	}
+	return inner, true
 }
 
 func (c *client) DeleteCheckpointsEntry(ctx context.Context, taskName string) error {

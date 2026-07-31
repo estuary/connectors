@@ -260,10 +260,17 @@ func TestStreamV2BackfillRecreatesTheTable(t *testing.T) {
 		// publication replaces, and incoming the one it publishes. They differ
 		// whenever a publication changes the write path in the same breath as it
 		// bumps a backfill counter.
-		outgoing   *config
-		incoming   config
-		last, next *pf.MaterializationSpec_Binding
-		want       bool
+		outgoing *config
+		// storedShape wraps the outgoing configuration the way the control plane
+		// stores it — the connector image alongside it — which is how a request
+		// carries the specification being replaced.
+		storedShape bool
+		incoming    config
+		last, next  *pf.MaterializationSpec_Binding
+		want        bool
+		// unreadable carries a replaced specification whose configuration is
+		// neither shape this connector understands.
+		unreadable bool
 	}{
 		{
 			name:     "a streaming v2 binding",
@@ -287,23 +294,41 @@ func TestStreamV2BackfillRecreatesTheTable(t *testing.T) {
 		{
 			// Nor does turning the write path off protect the turnover: the shards
 			// this publication replaces are streaming while it is applied, whatever
-			// the shards replacing them will do.
-			name:     "a publication which also turns the write path off",
-			outgoing: &streamingCfg,
-			incoming: noFlagCfg,
-			last:     binding(true),
-			next:     binding(true),
-			want:     true,
+			// the shards replacing them will do. The replaced configuration is read
+			// in the shape the control plane stores it, which is how the request
+			// carries it.
+			name:        "a publication which also turns the write path off",
+			outgoing:    &streamingCfg,
+			storedShape: true,
+			incoming:    noFlagCfg,
+			last:        binding(true),
+			next:        binding(true),
+			want:        true,
 		},
 		{
 			// Nor does taking the key pair away, which is the other way to leave
 			// the write path.
-			name:     "a publication which also changes the authentication type",
-			outgoing: &streamingCfg,
-			incoming: noKeyPairCfg,
-			last:     binding(true),
-			next:     binding(true),
-			want:     true,
+			name:        "a publication which also changes the authentication type",
+			outgoing:    &streamingCfg,
+			storedShape: true,
+			incoming:    noKeyPairCfg,
+			last:        binding(true),
+			next:        binding(true),
+			want:        true,
+		},
+		{
+			// A configuration in hand which streams settles the answer, so a
+			// replaced configuration which cannot be read does not narrow it. This
+			// is the ordinary case: the request carries the replaced specification
+			// with its secrets still encrypted, and reading that as "no feature
+			// flags" would empty a table the outgoing generation streams into.
+			name:       "a replaced configuration which cannot be read",
+			outgoing:   nil,
+			incoming:   streamingCfg,
+			last:       binding(true),
+			next:       binding(true),
+			want:       true,
+			unreadable: true,
 		},
 		{
 			// The outgoing generation wrote this table through staged files, which
@@ -354,9 +379,20 @@ func TestStreamV2BackfillRecreatesTheTable(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			var req = new(pm.Request_Apply)
-			if tt.outgoing != nil {
+			if tt.unreadable {
+				req.LastMaterialization = &pf.MaterializationSpec{
+					ConfigJson: []byte(`{"image":"ghcr.io/estuary/materialize-snowflake:v1","config":"ENC[AES256_GCM,data:0Ld3]"}`),
+				}
+			} else if tt.outgoing != nil {
 				configJson, err := json.Marshal(tt.outgoing)
 				require.NoError(t, err)
+				if tt.storedShape {
+					configJson, err = json.Marshal(map[string]any{
+						"image":  "ghcr.io/estuary/materialize-snowflake:v1",
+						"config": json.RawMessage(configJson),
+					})
+					require.NoError(t, err)
+				}
 				req.LastMaterialization = &pf.MaterializationSpec{ConfigJson: configJson}
 			}
 
