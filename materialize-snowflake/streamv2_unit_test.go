@@ -205,6 +205,10 @@ func TestStreamV2ChannelRetirement(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, retireChannel(ctx, client, channel))
 
+	// A retired channel is out of service: the handle it was retired through is
+	// spent, so appending to it fails rather than quietly reviving it.
+	require.ErrorContains(t, client.Append(ctx, channel, "1", "1", nil), "is not open")
+
 	status, err := client.OpenChannel(ctx, "DB", "SCH", "TBL", channel)
 	require.NoError(t, err)
 	require.Nil(t, status.CommittedToken)

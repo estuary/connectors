@@ -89,8 +89,9 @@ def main():
     def persist():
         if not STATE_PATH:
             return
-        # Written whole and renamed into place, so a concurrent session never
-        # reads a half-written file.
+        # Renamed into place so that a reader never sees a half-written file.
+        # Sessions are assumed not to overlap on one state file, since each holds
+        # the whole of it in memory and writes it back whole.
         tmp = STATE_PATH + f".{os.getpid()}.tmp"
         with open(tmp, "w") as f:
             json.dump({"committed": committed, "errors": errors}, f)
@@ -99,6 +100,18 @@ def main():
     def reply(res):
         with wlock:
             conn.sendall((json.dumps(res) + "\n").encode())
+
+    # Channels this session holds a handle for. The real sidecar refuses a
+    # channel op it has no handle for — whether because the channel was never
+    # opened or because it has since been closed — and a fake which accepted
+    # them would let a caller pass tests the sidecar would reject.
+    opened = set()
+
+    def require_open(rid, ch):
+        if ch in opened:
+            return True
+        reply({"id": rid, "ok": False, "error": f"channel {ch!r} is not open", "code": "unknown_channel"})
+        return False
 
     def rejected_count(ch):
         return errors.get(ch, seeded_errors)
@@ -134,11 +147,14 @@ def main():
             if params["table"].startswith("UNSUPPORTED"):
                 reply({"id": rid, "ok": False, "error": "table not supported", "code": "unsupported_table"})
                 continue
+            opened.add(ch)
             reply({"id": rid, "ok": True, "result": status(ch)})
         elif op == "append":
             if MODE == "hang_on_append":
                 continue  # never respond
             ch = params["channel"]
+            if not require_open(rid, ch):
+                continue
             if MODE != "commit_never_lands":
                 committed[ch] = params["end_token"]
             errors[ch] = rejected_count(ch) + sum(1 for row in params["rows"] if "REJECT" in row)
@@ -146,19 +162,27 @@ def main():
             reply({"id": rid, "ok": True, "result": {"appended": len(params["rows"])}})
         elif op == "wait_commit":
             ch = params["channel"]
+            if not require_open(rid, ch):
+                continue
             tok = committed.get(ch)
             if tok == params["token"]:
                 reply({"id": rid, "ok": True, "result": status(ch)})
             else:
                 reply({"id": rid, "ok": False, "error": f"token {params['token']} not committed (at {tok})", "code": "timeout"})
         elif op == "channel_status":
-            reply({"id": rid, "ok": True, "result": status(params["channel"])})
-        elif op == "close_channel":
-            # Only a drop reaches "Snowflake", where it discards everything the
-            # channel had accumulated — which is what a reopen of the same name
-            # then finds, as verified against Snowflake itself by
-            # TestStreamV2Manager. A plain close is local to the session.
             ch = params["channel"]
+            if not require_open(rid, ch):
+                continue
+            reply({"id": rid, "ok": True, "result": status(ch)})
+        elif op == "close_channel":
+            ch = params["channel"]
+            if not require_open(rid, ch):
+                continue
+            # The handle goes either way, but only a drop reaches "Snowflake",
+            # where it discards everything the channel had accumulated — which is
+            # what a reopen of the same name then finds, as verified against
+            # Snowflake itself by TestStreamV2Manager.
+            opened.discard(ch)
             if params.get("drop"):
                 committed.pop(ch, None)
                 errors[ch] = 0
