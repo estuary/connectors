@@ -66,12 +66,15 @@ func TestStreamV2Manager(t *testing.T) {
 	var accountName string
 	require.NoError(t, db.QueryRowContext(ctx, "SELECT CURRENT_ACCOUNT()").Scan(&accountName))
 
+	// The columns writeRows stores, shared by every table this test appends to.
+	const testTableColumns = "(KEY TEXT, INTCOL NUMBER, DOC VARIANT)"
+
 	var tableName = "STREAMV2_TEST"
 	var cleanup = func() {
 		db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s;", tableName))
 	}
 	cleanup()
-	_, err = db.ExecContext(ctx, fmt.Sprintf("CREATE TABLE %s (key TEXT, intcol NUMBER, doc VARIANT);", tableName))
+	_, err = db.ExecContext(ctx, fmt.Sprintf("CREATE TABLE %s %s;", tableName, testTableColumns))
 	require.NoError(t, err)
 	defer cleanup()
 
@@ -105,11 +108,13 @@ func TestStreamV2Manager(t *testing.T) {
 		return m
 	}
 
-	var countRows = func() int {
+	var countRowsIn = func(table string) int {
 		var count int
-		require.NoError(t, db.QueryRowContext(ctx, fmt.Sprintf("SELECT COUNT(*) FROM %s;", tableName)).Scan(&count))
+		require.NoError(t, db.QueryRowContext(ctx, fmt.Sprintf("SELECT COUNT(*) FROM %s;", table)).Scan(&count))
 		return count
 	}
+
+	var countRows = func() int { return countRowsIn(tableName) }
 
 	var truncate = func(t *testing.T) {
 		_, err := db.ExecContext(ctx, fmt.Sprintf("TRUNCATE TABLE %s;", tableName))
@@ -546,7 +551,7 @@ func TestStreamV2Manager(t *testing.T) {
 		var recreateTable = func(t *testing.T) {
 			_, err := db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s;", turnoverTable))
 			require.NoError(t, err)
-			_, err = db.ExecContext(ctx, fmt.Sprintf("CREATE TABLE %s (KEY TEXT, INTCOL NUMBER, DOC VARIANT);", turnoverTable))
+			_, err = db.ExecContext(ctx, fmt.Sprintf("CREATE TABLE %s %s;", turnoverTable, testTableColumns))
 			require.NoError(t, err)
 		}
 		t.Cleanup(func() {
@@ -558,12 +563,6 @@ func TestStreamV2Manager(t *testing.T) {
 			tgt.Identifier = turnoverTable
 			tgt.DeltaUpdates = true
 			return tgt
-		}
-
-		var countTurnoverRows = func() int {
-			var count int
-			require.NoError(t, db.QueryRowContext(ctx, fmt.Sprintf("SELECT COUNT(*) FROM %s;", turnoverTable)).Scan(&count))
-			return count
 		}
 
 		// outgoingGeneration is a shard of the generation being replaced, holding
@@ -579,7 +578,7 @@ func TestStreamV2Manager(t *testing.T) {
 			items, err := m.flush(ctx)
 			require.NoError(t, err)
 			require.Equal(t, int64(3), items[0].Counter)
-			require.Equal(t, 3, countTurnoverRows())
+			require.Equal(t, 3, countRowsIn(turnoverTable))
 			return m, *items[0]
 		}
 
@@ -594,13 +593,13 @@ func TestStreamV2Manager(t *testing.T) {
 
 			_, err := db.ExecContext(ctx, fmt.Sprintf("TRUNCATE TABLE %s;", turnoverTable))
 			require.NoError(t, err)
-			require.Zero(t, countTurnoverRows())
+			require.Zero(t, countRowsIn(turnoverTable))
 
 			writeRows(outgoing, 3, 5)
 			items, err := outgoing.flush(ctx)
 			require.NoError(t, err)
 			require.Equal(t, int64(5), items[0].Counter)
-			require.Equal(t, 2, countTurnoverRows())
+			require.Equal(t, 2, countRowsIn(turnoverTable))
 			outgoing.stop()
 		})
 
@@ -615,7 +614,7 @@ func TestStreamV2Manager(t *testing.T) {
 			writeRows(outgoing, 3, 5)
 			_, err := outgoing.flush(ctx)
 			require.Error(t, err)
-			require.Zero(t, countTurnoverRows())
+			require.Zero(t, countRowsIn(turnoverTable))
 			t.Logf("the outgoing generation's append failed with: %s", err)
 			outgoing.sup.kill()
 
@@ -633,7 +632,7 @@ func TestStreamV2Manager(t *testing.T) {
 			var refusal = restarted.writeRow(ctx, 0, []any{"k", 1, json.RawMessage(`{}`)})
 			require.ErrorContains(t, refusal, "has lost committed data")
 			require.ErrorContains(t, refusal, checkpointed.Channel)
-			require.Zero(t, countTurnoverRows())
+			require.Zero(t, countRowsIn(turnoverTable))
 			t.Logf("the outgoing generation's reopen was refused with: %s", refusal)
 		})
 	})
