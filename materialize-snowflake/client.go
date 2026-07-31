@@ -193,6 +193,15 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 var errInsufficientPrivileges = regexp.MustCompile(`Insufficient privileges to operate on schema '([^']+)'`)
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
+	// A table a streaming v2 binding appends to records the generation of the
+	// binding it belongs to, and a generation naming no state key is one every
+	// shard of the task would read as another's. Settled before the table exists,
+	// since a table carrying that is worse than no table at all.
+	var recordGeneration = streamsV2(&c.cfg, tc.Table.DeltaUpdates, boilerplate.ParseFlags(c.cfg)[flagSnowpipeStreamingV2])
+	if recordGeneration && tc.StateKey == "" {
+		return fmt.Errorf("cannot record the generation of table %s: the binding resolved for it carries no state key", tc.Identifier)
+	}
+
 	if _, err := c.db.ExecContext(ctx, tc.TableCreateSql); err != nil {
 		if matches := errInsufficientPrivileges.FindStringSubmatch(err.Error()); len(matches) > 0 {
 			err = errors.New(matches[0])
@@ -200,13 +209,10 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 		return err
 	}
 
-	// A table a streaming v2 binding appends to records the generation of the
-	// binding it belongs to, which is what lets the shards of a generation a
-	// backfill has replaced tell that the table under them is no longer theirs —
-	// see streamV2GenerationConflict. It is recorded here, on the create, because
-	// a backfill of such a binding re-creates the table rather than emptying it
+	// The generation is recorded here, on the create, because a backfill of a
+	// streaming v2 binding re-creates the table rather than emptying it
 	// (MustRecreateResource), so every generation of the table passes through here.
-	if streamsV2(&c.cfg, tc.Table.DeltaUpdates, boilerplate.ParseFlags(c.cfg)[flagSnowpipeStreamingV2]) {
+	if recordGeneration {
 		var comment = streamV2GenerationComment(tc.Comment, streamV2Generation{
 			materialization: c.materializationName,
 			stateKey:        tc.StateKey,

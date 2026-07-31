@@ -378,7 +378,6 @@ func (s *sqlMaterialization[EC, RC]) NewTransactor(
 		if err != nil {
 			return nil, fmt.Errorf("getting table for binding %d: %w", binding.Index, err)
 		}
-		table.StateKey = binding.StateKey
 		tables = append(tables, table)
 	}
 
@@ -445,7 +444,16 @@ func getTable[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]]
 		return Table{}, fmt.Errorf("getting parameters for binding %d: %w", binding.Index, err)
 	}
 	tableShape := BuildTableShape(materializationName, &binding.MaterializationSpec_Binding, binding.Index, path, delta)
-	return ResolveTable(tableShape, endpoint.Dialect)
+	table, err := ResolveTable(tableShape, endpoint.Dialect)
+	if err != nil {
+		return Table{}, err
+	}
+	// Carried here rather than by each caller, so that a table resolved for an
+	// Apply action names the binding's generation as one resolved for a
+	// transactor does.
+	table.StateKey = binding.StateKey
+
+	return table, nil
 }
 
 // TxDefuser.MaybeRollback calls Rollback on a Tx, unless Defuse has previously

@@ -394,12 +394,48 @@ func TestStreamV2GenerationComment(t *testing.T) {
 			name:    "a marker without a state key",
 			comment: "flow_generation: acmeCo/materialize-snowflake",
 		},
+		{
+			// A half-written record names no generation rather than naming one no
+			// shard can match, which would turn every shard of the task away
+			// instead of only those a backfill has replaced.
+			name:    "a marker whose state key is empty",
+			comment: "flow_generation: acmeCo/materialize-snowflake ",
+		},
+		{
+			name:    "a marker whose task is empty",
+			comment: "flow_generation:  widgets.v3",
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			_, ok := streamV2GenerationOf(tt.comment)
 			require.False(t, ok)
 		})
 	}
+}
+
+// TestStreamV2CreateTableNeedsAStateKey pins what happens when the binding
+// resolved for a streaming v2 table carries no state key.
+//
+// The generation a table records is only as good as the state key in it: one
+// recording an empty state key matches no shard, so it would turn away the whole
+// task rather than only the generations a backfill has replaced. Refusing to
+// create the table at all is the only safe reading, and it has to happen before
+// any statement runs — which is what lets this drive a client with no connection.
+func TestStreamV2CreateTableNeedsAStateKey(t *testing.T) {
+	var c = &client{cfg: config{
+		Credentials: &snowflake_auth.CredentialConfig{AuthType: snowflake_auth.JWT},
+		Advanced:    advancedConfig{FeatureFlags: flagSnowpipeStreamingV2},
+	}}
+
+	var tc = sql.TableCreate{
+		Table: sql.Table{
+			TableShape: sql.TableShape{DeltaUpdates: true},
+			Identifier: "WIDGETS",
+		},
+		TableCreateSql: "CREATE TABLE WIDGETS (KEY TEXT);",
+	}
+
+	require.ErrorContains(t, c.CreateTable(context.Background(), tc), "carries no state key")
 }
 
 // TestStreamV2GenerationConflict covers which shards a table turns away.

@@ -112,7 +112,7 @@ func streamV2GenerationOf(comment string) (streamV2Generation, bool) {
 		rest, found := strings.CutPrefix(strings.TrimSpace(line), streamV2GenerationPrefix)
 		if !found {
 			continue
-		} else if materialization, stateKey, ok := strings.Cut(rest, " "); ok {
+		} else if materialization, stateKey, ok := strings.Cut(rest, " "); ok && materialization != "" && stateKey != "" {
 			return streamV2Generation{materialization: materialization, stateKey: stateKey}, true
 		}
 	}
@@ -123,6 +123,10 @@ func streamV2GenerationOf(comment string) (streamV2Generation, bool) {
 // where a streaming v2 table names the generation of the binding it belongs to. A
 // table which does not exist, or which carries no comment, reports the empty
 // string — neither names a generation.
+//
+// The table is named as Snowflake holds it, which is what the dialect's locator
+// reports and what an unquoted identifier is folded to: a name in any other casing
+// matches nothing here, and so would read as a table naming no generation.
 func streamV2TableComment(ctx context.Context, db *stdsql.DB, dialect sql.Dialect, database, schema, table string) (string, error) {
 	var query = fmt.Sprintf(
 		"SELECT COMMENT FROM %s.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?;",
