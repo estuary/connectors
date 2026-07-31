@@ -268,6 +268,22 @@ class TestReadCsvRows:
         assert rows[2]["app_c"] == "3"
 
     @pytest.mark.asyncio
+    async def test_narrowing_row_raises(self):
+        """A row narrower than one already seen did not come from an append,
+        so it is a row truncated by an interrupted export."""
+        with pytest.raises(RowSchemaMismatchError, match="only ever increase"):
+            await self.read([
+                ["a", "ts", "", "1", "2", "3"],
+                ["b", "ts", "", "1"],
+            ])
+
+    @pytest.mark.asyncio
+    async def test_equal_widths_are_not_treated_as_narrowing(self):
+        rows = await self.read([["a", "ts", ""], ["b", "ts", ""]])
+
+        assert len(rows) == 2
+
+    @pytest.mark.asyncio
     async def test_rows_are_transformed(self):
         """Rows arrive transformed, with booleans converted and _meta set."""
         rows = await self.read([["a", "ts", "True"], ["b", "ts", "True"]])
@@ -304,6 +320,30 @@ class TestReadCsvRows:
 
         assert excinfo.value.row_number == 3
 
+    @pytest.mark.asyncio
+    async def test_width_state_is_per_file_not_per_folder(self):
+        """stream_folder_rows reads a deferred delete file twice, once to
+        classify it and once to emit it, and reads other files in between.
+        Width is tracked per read, so a wide upsert file cannot make a
+        legitimately narrow delete file look truncated on its second pass -
+        which is what a folder-scoped counter would do here."""
+        log = logging.getLogger("test-d365-api")
+        rows_by_csv = {
+            "deletes.csv": [["b", "ts", "True"]],
+            "upserts.csv": [["a", "ts", "", "1", "2", "3"]],
+        }
+
+        def open_csv(csv: ADLSPathMetadata) -> AsyncGenerator[TransformedRow, None]:
+            async def values() -> AsyncGenerator[list[str], None]:
+                for row in rows_by_csv[csv.name]:
+                    yield row
+            return read_csv_rows(values(), self.METADATA, csv.name, log)
+
+        csvs = [fake_csv("deletes.csv"), fake_csv("upserts.csv")]
+        result = await collect(stream_folder_rows(csvs, open_csv))
+
+        assert [(r["Id"], r["IsDelete"]) for r in result] == [("a", False), ("b", True)]
+        assert "app_c" not in result[1]
 
 
 class TestCsvBytesToDocuments:
@@ -374,6 +414,15 @@ class TestCsvBytesToDocuments:
         assert rows[0]["Id"] == "a,1"
         assert rows[0]["app_a"] == "quoted, value"
 
+    @pytest.mark.asyncio
+    async def test_truncated_final_row_raises(self):
+        """An export cut off mid-write leaves a short final row whose width is
+        inside the range bind_row alone would accept."""
+        with pytest.raises(RowSchemaMismatchError, match="only ever increase"):
+            await self.read(
+                "a,ts,,1,2,3\r\n"
+                "b,ts,,1\r\n"
+            )
 
 
 class TestTableMetadataFromEntity:

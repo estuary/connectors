@@ -101,9 +101,10 @@ class RowSchemaMismatchError(Exception):
     Misalignment therefore can't be detected directly; it can only be inferred
     from signals that a correctly aligned row would never produce:
 
-    - a width outside the range a row may legitimately have (see bind_row).
+    - a width outside the range a row may legitimately have (see bind_row),
+    - a width narrower than an earlier row in the same file (see read_csv_rows).
 
-    That is a width signal, which is all a headerless row offers. It rests on
+    Both are width signals, which is all a headerless row offers. They rest on
     Synapse Link only ever appending columns to the end of a row, which is what
     makes a row narrower than its schema a prefix of it rather than a
     misaligned row.
@@ -489,17 +490,51 @@ async def read_csv_rows(
     log: Logger,
 ) -> AsyncGenerator[TransformedRow, None]:
     """
-    Bind and transform one CSV's rows.
+    Bind and transform one CSV's rows, enforcing the invariants that hold
+    across a file rather than within a single row.
+
+    Row widths within a file may only increase. Rows are appended in the order
+    Synapse Link writes them to the lake, and the schema change that adds a
+    column is observed by the exporter, so every row written before an append
+    precedes every row written after it. A row narrower than one already seen
+    therefore did not come from an append.
+
+    Note the ordering that matters here is the export's, not the source's.
+    SinkModifiedOn is non-decreasing across a whole file. versionnumber is
+    non-decreasing only within a single Id - across Ids it carries no ordering,
+    and adjacent rows have been observed going backwards - so it cannot stand
+    in for write order here, however well it orders changes to one row.
+
+    This is what distinguishes an old row from a truncated one, which bind_row
+    alone cannot do: an export interrupted mid-write leaves a final row cut
+    short, and its width can easily land within the range bind_row accepts.
+    Such a row would otherwise be captured with a partial value in its last
+    column and its remaining columns silently dropped.
 
     Row numbers in errors count data rows from 1. They are not line numbers -
     blank lines are skipped upstream and quoted values may span lines.
     """
     declared_columns = len(table_metadata.field_names)
+    widest_row_seen = 0
     logged_narrow_row = False
     row_number = 0
 
     async for values in rows:
         row_number += 1
+
+        if len(values) < widest_row_seen:
+            raise RowSchemaMismatchError(
+                csv_name,
+                row_number,
+                f"row has {len(values)} columns after an earlier row in the same "
+                f"file had {widest_row_seen}. Column counts within a CSV only ever "
+                f"increase, as Synapse Link appends columns added to the table, so "
+                f"this row did not come from such an append. An export interrupted "
+                f"mid-write would leave a final row cut short like this; so would a "
+                f"column being removed from the table partway through the file",
+            )
+
+        widest_row_seen = len(values)
 
         if not logged_narrow_row and len(values) < declared_columns:
             logged_narrow_row = True
