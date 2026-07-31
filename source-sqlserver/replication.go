@@ -1370,15 +1370,7 @@ func cdcGetDDLHistory(ctx context.Context, conn *sql.DB) (map[sqlcapture.StreamI
 // time. If we ever hit a scaling limit here we can implement chunking, but so far that doesn't
 // appear to be necessary.
 func cdcGetInstanceMaxLSNs(ctx context.Context, conn *sql.DB, instanceNames []string) (map[string]LSN, error) {
-	var subqueries []string
-	for idx, instanceName := range instanceNames {
-		// TODO(wgd): It would probably be a good idea to properly quote the CDC table name instead of just splatting
-		// the instance name into the query string. But currently we don't do that for backfills or for the actual
-		// replication polling query, so it would be premature to worry about it only here.
-		var subquery = fmt.Sprintf("SELECT %d AS idx, MAX(__$start_lsn) AS lsn FROM [cdc].[%s_CT]", idx, instanceName)
-		subqueries = append(subqueries, subquery)
-	}
-	var query = strings.Join(subqueries, " UNION ALL ")
+	var query, sortedInstanceNames = cdcInstanceMaxLSNsQuery(instanceNames)
 
 	rows, err := conn.QueryContext(ctx, query)
 	if err != nil {
@@ -1393,10 +1385,10 @@ func cdcGetInstanceMaxLSNs(ctx context.Context, conn *sql.DB, instanceNames []st
 		if err := rows.Scan(&index, &instanceMaxLSN); err != nil {
 			return nil, fmt.Errorf("error scanning result: %w", err)
 		}
-		if index < 0 || index >= len(instanceNames) {
-			return nil, fmt.Errorf("internal error: result index %d out of range for instance list %q", index, len(instanceNames))
+		if index < 0 || index >= len(sortedInstanceNames) {
+			return nil, fmt.Errorf("internal error: result index %d out of range for instance list of length %d", index, len(sortedInstanceNames))
 		}
-		var instanceName = instanceNames[index]
+		var instanceName = sortedInstanceNames[index]
 		log.WithFields(log.Fields{
 			"instance": instanceName,
 			"lsn":      instanceMaxLSN,
@@ -1404,6 +1396,25 @@ func cdcGetInstanceMaxLSNs(ctx context.Context, conn *sql.DB, instanceNames []st
 		results[instanceName] = instanceMaxLSN
 	}
 	return results, rows.Err()
+}
+
+// cdcInstanceMaxLSNsQuery builds the union query used by cdcGetInstanceMaxLSNs, and returns it
+// along with the ordered instance names which the `idx` column of each result row indexes into.
+//
+// The instance names are sorted so that the generated query text is stable across polling cycles.
+func cdcInstanceMaxLSNsQuery(instanceNames []string) (string, []string) {
+	var sorted = slices.Clone(instanceNames)
+	slices.Sort(sorted)
+
+	var subqueries []string
+	for idx, instanceName := range sorted {
+		// TODO(wgd): It would probably be a good idea to properly quote the CDC table name instead of just splatting
+		// the instance name into the query string. But currently we don't do that for backfills or for the actual
+		// replication polling query, so it would be premature to worry about it only here.
+		var subquery = fmt.Sprintf("SELECT %d AS idx, MAX(__$start_lsn) AS lsn FROM [cdc].[%s_CT]", idx, instanceName)
+		subqueries = append(subqueries, subquery)
+	}
+	return strings.Join(subqueries, " UNION ALL "), sorted
 }
 
 func cdcCleanupChangeTable(ctx context.Context, conn *sql.DB, instanceName string, belowLSN LSN) error {
