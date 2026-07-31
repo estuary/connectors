@@ -812,7 +812,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 				return fmt.Errorf("stripping null fields: %w", err)
 			}
 		}
-		if t.cfg.Advanced.NoFlowDocument {
+		if b := t.bindings[int(bindingNum)]; t.cfg.Advanced.NoFlowDocument && b.hasMetaClock {
 			var clock *int64
 			if clockMicros.Valid {
 				clock = &clockMicros.Int64

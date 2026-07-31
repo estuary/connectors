@@ -604,7 +604,7 @@ func (d *transactor) loadDocuments(ctx context.Context, ch chan *loadDoc, loaded
 					return fmt.Errorf("stripping null fields: %w", err)
 				}
 			}
-			if d.cfg.Advanced.NoFlowDocument {
+			if b := d.bindings[doc.binding]; d.cfg.Advanced.NoFlowDocument && b.hasMetaClock {
 				var err error
 				if loadDoc, err = sql.SpliceMeta(loadDoc, doc.clockMicros); err != nil {
 					return fmt.Errorf("reconstructing _meta: %w", err)

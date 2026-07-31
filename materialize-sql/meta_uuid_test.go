@@ -38,6 +38,9 @@ func TestSpliceMeta(t *testing.T) {
 			`"}}`, string(out))
 	})
 
+	// A NULL clock means the row predates the column, which is distinct from the
+	// binding having no clock column at all: connectors skip SpliceMeta entirely
+	// in that case rather than fabricating an epoch clock, see hasMetaClock.
 	t.Run("a null clock uses the 1970 sentinel", func(t *testing.T) {
 		out, err := SpliceMeta([]byte(`{"id":1}`), nil)
 		require.NoError(t, err)

@@ -290,7 +290,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 				return fmt.Errorf("stripping null fields: %w", err)
 			}
 		}
-		if d.cfg.Advanced.NoFlowDocument {
+		if b := d.bindings[doc.Binding]; d.cfg.Advanced.NoFlowDocument && b.hasMetaClock {
 			var err error
 			if loadDoc, err = sql.SpliceMeta(loadDoc, doc.Clock); err != nil {
 				return fmt.Errorf("reconstructing _meta: %w", err)
