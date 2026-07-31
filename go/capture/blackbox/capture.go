@@ -581,8 +581,17 @@ func (tc *TranscriptCapture) DiscoverFull(description string) []json.RawMessage 
 }
 
 func (tc *TranscriptCapture) Run(description string, sessions int) []byte {
+	return tc.RunWithContext(context.Background(), description, sessions)
+}
+
+// RunWithContext is Run with a caller-provided context bounding how long the capture may
+// run. When the context expires the capture process is killed and the resulting error is
+// recorded in the transcript, so a capture which stops making progress shows up as an
+// ordinary transcript difference instead of hanging until the test binary's own timeout,
+// which would panic and discard the results of every other test in the package.
+func (tc *TranscriptCapture) RunWithContext(ctx context.Context, description string, sessions int) []byte {
 	fmt.Fprintf(tc.Transcript, "=== Run: %s ===\n", description)
-	result, err := tc.Capture.Run(sessions)
+	result, err := tc.Capture.RunWithContext(ctx, sessions)
 	if err != nil {
 		fmt.Fprintf(tc.Transcript, "error: %v\n\n", err)
 		return nil
