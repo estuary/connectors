@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-07-31
+
+### Fixed
+- Captures with `read_only_capture` enabled no longer stall when the source
+  database writes WAL for tables which aren't being captured.
+
 ## 2026-07-30
 
 ### Added

@@ -70,6 +70,17 @@ acmeCo/test_capture/test/readonlycaptureidlefence_936845
 }
 sql> INSERT INTO test.unwatched_909099 VALUES (0, 'unwatched')
 === Run: Idle Fence ===
-error: flowctl preview failed: signal: killed
-
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Freadonlycaptureidlefence_936845": {
+      "backfilled": 3,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
 

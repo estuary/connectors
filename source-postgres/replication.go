@@ -61,6 +61,13 @@ var slotInUseRe = regexp.MustCompile(`replication slot ".*" is active for PID`)
 // liveness timeout, indicating a likely silently disconnected connection.
 var errReceiveTimeout = fmt.Errorf("no replication messages received from server within %s", replicationStreamReceiveTimeout)
 
+// errFenceReachedByKeepalive is returned by relayChanges when the server reports, via a
+// Primary Keepalive Message, that it has decoded past the fence position it was given.
+// This is a successful outcome rather than a failure, in the manner of io.EOF: callers
+// which pass a fence position must handle it. See the keepalive handling in relayChanges
+// for why it satisfies a fence.
+var errFenceReachedByKeepalive = errors.New("fence position reached via keepalive message")
+
 const standbyStatusInterval = 10 * time.Second
 
 var (
@@ -314,7 +321,7 @@ func (s *replicationStream) StreamToFence(ctx context.Context, fenceAfter time.D
 		logrus.WithField("cursor", latestCommitLSN).Debug("beginning timed streaming phase")
 		var relayCtx, cancelRelayCtx = context.WithTimeout(ctx, fenceAfter)
 		defer cancelRelayCtx()
-		if err := s.relayChanges(relayCtx, func(event sqlcapture.DatabaseEvent) error {
+		if err := s.relayChanges(relayCtx, 0, func(event sqlcapture.DatabaseEvent) error { // No fence yet, this phase ends on the timeout.
 			if err := callback(event); err != nil {
 				return err
 			}
@@ -365,13 +372,14 @@ func (s *replicationStream) StreamToFence(ctx context.Context, fenceAfter time.D
 		}
 	}
 
-	// Stream replication events until the fence is reached. Liveness is enforced inside
-	// relayChanges via replicationStreamReceiveTimeout.
+	// Stream replication events until the fence is reached, either by observing a commit at
+	// or past it or by the server reporting that it has decoded past it. Liveness is enforced
+	// inside relayChanges via replicationStreamReceiveTimeout.
 	var relayCtx, cancelRelayCtx = context.WithCancelCause(ctx)
 	var fenceReached = errors.New("fenced reached")
 	defer cancelRelayCtx(nil)
 
-	if err := s.relayChanges(relayCtx, func(event sqlcapture.DatabaseEvent) error {
+	if err := s.relayChanges(relayCtx, fenceLSN, func(event sqlcapture.DatabaseEvent) error {
 		if err := callback(event); err != nil {
 			return err
 		}
@@ -390,7 +398,15 @@ func (s *replicationStream) StreamToFence(ctx context.Context, fenceAfter time.D
 			}
 		}
 		return nil
-	}); errors.Is(err, context.Canceled) {
+	}); errors.Is(err, errFenceReachedByKeepalive) {
+		// The server decoded past the fence without producing any events for us, so we're at
+		// a valid position between transactions and can emit a synthetic commit event just
+		// like the already-at-fence case above.
+		logrus.WithField("cursor", fenceLSN.String()).Debug("finished fenced streaming phase via keepalive")
+		s.previousFenceLSN = fenceLSN
+		*s.reused.commitEvent = postgresCommitEvent{CommitLSN: fenceLSN}
+		return callback(s.reused.commitEvent)
+	} else if errors.Is(err, context.Canceled) {
 		if cause := context.Cause(relayCtx); !errors.Is(cause, fenceReached) {
 			return cause
 		}
@@ -470,7 +486,13 @@ func (s *replicationStream) StartReplication(ctx context.Context, discovery map[
 	}
 }
 
-func (s *replicationStream) relayChanges(ctx context.Context, callback func(event sqlcapture.DatabaseEvent) error) error {
+// relayChanges receives replication messages and dispatches decoded events to the callback
+// until the context is canceled or an error occurs.
+//
+// A nonzero fenceLSN asks the relay to also stop as soon as the server reports having decoded
+// past that position, returning errFenceReachedByKeepalive. Callers which aren't streaming
+// toward a fence pass zero.
+func (s *replicationStream) relayChanges(ctx context.Context, fenceLSN pglogrepl.LSN, callback func(event sqlcapture.DatabaseEvent) error) error {
 	// Bound the time we will wait for any message from the server so that a silently dead
 	// connection (e.g. a NAT or middlebox dropping the TCP session without sending RST) is
 	// detected instead of blocking forever. We expect Primary Keepalive Messages from the
@@ -524,12 +546,40 @@ func (s *replicationStream) relayChanges(ctx context.Context, callback func(even
 		var xld pglogrepl.XLogData
 		switch data[0] {
 		case pglogrepl.PrimaryKeepaliveMessageByteID:
-			if pkm, err := pglogrepl.ParsePrimaryKeepaliveMessage(data[1:]); err != nil {
+			pkm, err := pglogrepl.ParsePrimaryKeepaliveMessage(data[1:])
+			if err != nil {
 				return fmt.Errorf("error parsing keepalive: %w", err)
-			} else if pkm.ReplyRequested {
+			}
+			if pkm.ReplyRequested {
 				if err := s.sendStandbyStatusUpdate(false); err != nil {
 					return fmt.Errorf("error sending standby status update: %w", err)
 				}
+			}
+
+			// A keepalive reports how far the server has decoded, and it is queued behind
+			// everything the server decided to send us from below that position. So one at
+			// or past the fence proves that no published change before the fence is still in
+			// flight, which satisfies the fence just as well as observing a commit past it.
+			// This is the only thing which can satisfy a fence when the database produces no
+			// changes to captured tables, since a read-only capture can't force one by
+			// writing a watermark.
+			//
+			// It only satisfies the fence between transactions, hence the nextTxnFinalLSN
+			// check. The server assigns its reported position after processing a record, but
+			// emits a transaction's whole output while processing that transaction's commit
+			// record, so throughout the emission the reported position is the boundary before
+			// the commit and can already be past the fence. Keepalives do reach us in that
+			// window: the server stops mid-emission to process replies both when the socket is
+			// backed up and, independently, once half of wal_sender_timeout has passed without
+			// it reading one. That timer is not disarmed by our sending, because it only
+			// advances when the server actually processes a reply, which it cannot do while
+			// inside the decode. It covers a long transaction whose changes are all filtered
+			// out, where the server is sending us nothing at all. Our standby status updates
+			// request a reply, so it answers one with a keepalive. Completing a fence there
+			// would checkpoint a cursor inside a transaction, so the half already emitted would
+			// be sent again when replication resumed from it.
+			if fenceLSN > 0 && s.nextTxnFinalLSN == 0 && pkm.ServerWALEnd >= fenceLSN {
+				return errFenceReachedByKeepalive
 			}
 			continue // Keep looking for something we care about.
 		case pglogrepl.XLogDataByteID:
