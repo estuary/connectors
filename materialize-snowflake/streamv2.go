@@ -5,6 +5,7 @@ import (
 	"context"
 	stdsql "database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"strconv"
@@ -114,53 +115,25 @@ func streamV2GenerationOf(comment string) (streamV2Generation, bool) {
 	return streamV2Generation{}, false
 }
 
-// streamV2TableComments reads the comment of each given binding's table, keyed by
-// state key, in one query: it is the table's comment that names the generation of
-// the binding it belongs to. A table which does not exist yet contributes no
-// entry, as does one which carries no comment.
-func streamV2TableComments(ctx context.Context, db *stdsql.DB, dialect sql.Dialect, database string, targets []sql.Table) (map[string]string, error) {
-	if len(targets) == 0 {
-		return nil, nil
-	}
-
-	// A table is identified by the schema and name Snowflake holds it under,
-	// which is what the locator reports, while the binding is identified by its
-	// state key. INFORMATION_SCHEMA answers in the former and the caller asks in
-	// the latter, so both are needed.
-	var stateKeys = make(map[string]string, len(targets))
-	var predicates []string
-	for _, target := range targets {
-		var loc = dialect.TableLocator(target.Path)
-		stateKeys[loc.TableSchema+"."+loc.TableName] = target.StateKey
-		predicates = append(predicates, fmt.Sprintf("(TABLE_SCHEMA = %s AND TABLE_NAME = %s)",
-			dialect.Literal(loc.TableSchema), dialect.Literal(loc.TableName)))
-	}
-
+// streamV2TableComment reads the comment Snowflake holds for a table, which is
+// where a streaming v2 table names the generation of the binding it belongs to. A
+// table which does not exist, or which carries no comment, reports the empty
+// string — neither names a generation.
+func streamV2TableComment(ctx context.Context, db *stdsql.DB, dialect sql.Dialect, database, schema, table string) (string, error) {
 	var query = fmt.Sprintf(
-		"SELECT TABLE_SCHEMA, TABLE_NAME, COMMENT FROM %s.INFORMATION_SCHEMA.TABLES WHERE %s;",
-		dialect.Identifier(database), strings.Join(predicates, " OR "),
+		"SELECT COMMENT FROM %s.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?;",
+		dialect.Identifier(database),
 	)
 
-	rows, err := db.QueryContext(ctx, query)
-	if err != nil {
-		return nil, fmt.Errorf("querying table comments: %w", err)
+	var comment *string
+	if err := db.QueryRowContext(ctx, query, schema, table).Scan(&comment); errors.Is(err, stdsql.ErrNoRows) {
+		return "", nil
+	} else if err != nil {
+		return "", fmt.Errorf("querying the comment of table %s.%s: %w", schema, table, err)
+	} else if comment == nil {
+		return "", nil
 	}
-	defer rows.Close()
-
-	var comments = make(map[string]string)
-	for rows.Next() {
-		var schema, table string
-		var comment *string
-		if err := rows.Scan(&schema, &table, &comment); err != nil {
-			return nil, fmt.Errorf("scanning table comment: %w", err)
-		} else if comment == nil {
-			continue
-		} else if stateKey, ok := stateKeys[schema+"."+table]; ok {
-			comments[stateKey] = *comment
-		}
-	}
-
-	return comments, rows.Err()
+	return *comment, nil
 }
 
 // streamV2GenerationConflict refuses a binding whose table records a different
@@ -285,13 +258,17 @@ type streamV2Manager struct {
 	keyBegin        uint32
 	keyEnd          uint32
 
-	// tableComments holds the comment of each binding's table, keyed by state
-	// key, as the transactor read it while building. A table's comment names the
-	// generation of the binding it belongs to, which is what a channel opened
-	// against a re-created table cannot say for itself — see
-	// streamV2GenerationConflict. An absent entry names no generation, which is
-	// not a conflict.
-	tableComments map[string]string
+	// tableComment reports the comment Snowflake holds for a binding's table,
+	// which is where a table names the generation of the binding it belongs to —
+	// see streamV2GenerationConflict. The transactor supplies it, since it owns
+	// the connection the read needs.
+	//
+	// It is called as a channel is opened rather than when the session is built,
+	// because the backfill it exists to catch lands while the session is running:
+	// a comment read at startup would still name this shard's own generation.
+	// Where it is nil, or reports no comment, no table names a generation and
+	// none is refused.
+	tableComment func(ctx context.Context, database, schema, table string) (string, error)
 
 	// procCtx bounds the sidecar process lifetime to the transactor session
 	// rather than to whichever caller's context first triggers ensureStarted.
@@ -428,12 +405,17 @@ func (m *streamV2Manager) ensureChannel(ctx context.Context, b *streamV2Binding)
 	// Settled before a sidecar is started, let alone a channel opened: a shard
 	// whose binding's table has been re-created by a backfill has nothing to
 	// append there, whatever its own channel would report.
-	if err := streamV2GenerationConflict(
-		m.tableComments[b.stateKey],
-		streamV2Generation{materialization: m.materialization, stateKey: b.stateKey},
-		b.table,
-	); err != nil {
-		return err
+	if m.tableComment != nil {
+		comment, err := m.tableComment(ctx, b.database, b.schema, unquotedIdentifier(b.table))
+		if err != nil {
+			return err
+		} else if err := streamV2GenerationConflict(
+			comment,
+			streamV2Generation{materialization: m.materialization, stateKey: b.stateKey},
+			b.table,
+		); err != nil {
+			return err
+		}
 	}
 
 	client, err := m.ensureStarted(ctx)

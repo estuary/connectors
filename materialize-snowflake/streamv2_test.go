@@ -582,13 +582,10 @@ func TestStreamV2Manager(t *testing.T) {
 			return tgt
 		}
 
-		// commentsRead is what the transactor hands the manager: the comment of the
-		// binding's table as Snowflake reports it, read back through the same query.
-		var commentsRead = func(t *testing.T, stateKey string) map[string]string {
-			comments, err := streamV2TableComments(ctx, db, testDialect, cfg.Database,
-				[]sql.Table{turnoverTarget(stateKey)})
-			require.NoError(t, err)
-			return comments
+		// readComment is what the transactor hands the manager: the comment of the
+		// binding's table as Snowflake reports it, read as each channel is opened.
+		var readComment = func(ctx context.Context, database, schema, table string) (string, error) {
+			return streamV2TableComment(ctx, db, testDialect, database, schema, table)
 		}
 
 		// outgoingGeneration is a shard of the generation being replaced, holding
@@ -677,8 +674,7 @@ func TestStreamV2Manager(t *testing.T) {
 			// Steady state first: the table records this shard's own generation, so
 			// it appends as usual.
 			var owner = newManager(fullRange)
-			owner.tableComments = commentsRead(t, "turnover-owned.v1")
-			require.Contains(t, owner.tableComments["turnover-owned.v1"], "turnover-owned.v1")
+			owner.tableComment = readComment
 			owner.addBinding(cfg.Database, cfg.Schema, turnoverTable, turnoverTarget("turnover-owned.v1"), nil)
 
 			writeRows(owner, 0, 2)
@@ -689,13 +685,14 @@ func TestStreamV2Manager(t *testing.T) {
 			owner.stop()
 
 			// The turnover, with this shard having stored nothing for the binding of
-			// its own: it restarts, reads a table which names the generation that
-			// replaced it, and refuses before opening a channel at all.
-			recreateTable(t, "turnover-owned.v2")
-
+			// its own. This session is built before the backfill lands, as a shard
+			// which is still running through one is: what it may append is settled by
+			// the table as its channel opens, not by the table as it started.
 			var stale = newManager(fullRange)
-			stale.tableComments = commentsRead(t, "turnover-owned.v1")
+			stale.tableComment = readComment
 			stale.addBinding(cfg.Database, cfg.Schema, turnoverTable, turnoverTarget("turnover-owned.v1"), nil)
+
+			recreateTable(t, "turnover-owned.v2")
 
 			var refusal = stale.writeRow(ctx, 0, []any{"k", 1, json.RawMessage(`{}`)})
 			require.ErrorContains(t, refusal, "turnover-owned.v2")

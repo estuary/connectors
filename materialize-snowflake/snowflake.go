@@ -359,18 +359,12 @@ func newTransactor(
 	}
 
 	// A streaming v2 binding's table records which generation of the binding it
-	// belongs to, and this session may only append to a table which names its own.
-	// Read before any binding is added, since that is where the disagreement is
-	// refused.
+	// belongs to, and a channel may only be opened against a table which names this
+	// session's own. The manager reads it as it opens each channel, through this
+	// connection.
 	if sv2 != nil {
-		var streaming []sql.Table
-		for _, binding := range bindings {
-			if streamsV2(&cfg, binding.DeltaUpdates, featureFlags[flagSnowpipeStreamingV2]) {
-				streaming = append(streaming, binding)
-			}
-		}
-		if sv2.tableComments, err = streamV2TableComments(ctx, db, ep.Dialect, cfg.Database, streaming); err != nil {
-			return nil, err
+		sv2.tableComment = func(ctx context.Context, database, schema, table string) (string, error) {
+			return streamV2TableComment(ctx, db, ep.Dialect, database, schema, table)
 		}
 	}
 
