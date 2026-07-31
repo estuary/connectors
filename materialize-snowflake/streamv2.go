@@ -80,6 +80,10 @@ const streamV2GenerationPrefix = "flow_generation: "
 
 // streamV2Generation names one generation of one binding: the task, and the
 // binding's state key, which a backfill rotates.
+//
+// The task is named as the materialization specification names it, on both sides:
+// the client which writes a generation into a table's comment and the transactor
+// which reads it back both take it from that one name.
 type streamV2Generation struct {
 	materialization string
 	stateKey        string

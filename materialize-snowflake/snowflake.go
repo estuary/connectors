@@ -369,7 +369,7 @@ func newTransactor(
 	}
 
 	for _, binding := range bindings {
-		if err = d.addBinding(ctx, binding, featureFlags["snowpipe_streaming"], featureFlags[flagSnowpipeStreamingV2]); err != nil {
+		if err = d.addBinding(ctx, binding, featureFlags[flagSnowpipeStreaming], featureFlags[flagSnowpipeStreamingV2]); err != nil {
 			return nil, fmt.Errorf("adding binding for %s: %w", binding.Path, err)
 		}
 	}

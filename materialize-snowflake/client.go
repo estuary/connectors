@@ -211,7 +211,7 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 			materialization: c.materializationName,
 			stateKey:        tc.StateKey,
 		})
-		stmt := fmt.Sprintf("COMMENT ON TABLE %s IS %s;", tc.Identifier, c.ep.Dialect.Literal(comment))
+		var stmt = fmt.Sprintf("COMMENT ON TABLE %s IS %s;", tc.Identifier, c.ep.Dialect.Literal(comment))
 		if _, err := c.db.ExecContext(ctx, stmt); err != nil {
 			return fmt.Errorf("recording the generation of table %s: %w", tc.Identifier, err)
 		}
