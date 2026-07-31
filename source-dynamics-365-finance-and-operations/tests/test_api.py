@@ -19,6 +19,7 @@ from source_dynamics_365_finance_and_operations.api import (
     bind_row,
     get_table_metadata,
     read_csv_rows,
+    read_csvs_in_folder,
     should_wait_for_finalization,
     stream_folder_rows,
     transform_row,
@@ -251,7 +252,7 @@ class TestReadCsvRows:
         log = logging.getLogger("test-d365-api")
         return [
             row async for row in
-            read_csv_rows(self.as_values(rows), self.METADATA, CSV_NAME, log)
+            read_csv_rows(self.as_values(rows), self.METADATA, CSV_NAME, log, None)
         ]
 
     @pytest.mark.asyncio
@@ -338,7 +339,7 @@ class TestReadCsvRows:
             async def values() -> AsyncGenerator[list[str], None]:
                 for row in rows_by_csv[csv.name]:
                     yield row
-            return read_csv_rows(values(), self.METADATA, csv.name, log)
+            return read_csv_rows(values(), self.METADATA, csv.name, log, None)
 
         csvs = [fake_csv("deletes.csv"), fake_csv("upserts.csv")]
         result = await collect(stream_folder_rows(csvs, open_csv))
@@ -422,6 +423,137 @@ class TestTableSchemaHistory:
         assert history.observe("2026-01-01T02.00.00Z", inserted + ["added"]) is None
 
 
+class TestNarrowRowsUnderASchemaViolation:
+    """A narrow row is only bindable as a prefix while columns are append-only.
+    Once that stops holding, narrow rows become an error - but full-width rows
+    still line up with the schema whatever changed, so they are unaffected."""
+
+    METADATA = TestBindRow.METADATA
+    VIOLATION = "column 2 changed from 'IsDelete' to 'color'"
+
+    async def read(self, rows: list[list[str]], violation: str | None):
+        log = logging.getLogger("test-d365-api")
+
+        async def values():
+            for row in rows:
+                yield row
+
+        return [
+            row async for row in
+            read_csv_rows(values(), self.METADATA, CSV_NAME, log, violation)
+        ]
+
+    @pytest.mark.asyncio
+    async def test_narrow_row_raises_when_the_property_broke(self):
+        with pytest.raises(RowSchemaMismatchError, match="cannot be assumed here"):
+            await self.read([["a", "ts", ""]], self.VIOLATION)
+
+    @pytest.mark.asyncio
+    async def test_the_error_carries_the_violation(self):
+        with pytest.raises(RowSchemaMismatchError, match="changed from 'IsDelete'"):
+            await self.read([["a", "ts", ""]], self.VIOLATION)
+
+    @pytest.mark.asyncio
+    async def test_full_width_rows_are_unaffected(self):
+        """A rename breaks the prefix relation without shifting anything, so a
+        folder with no narrow rows must keep capturing."""
+        rows = await self.read([["a", "ts", "", "1", "2", "3"]], self.VIOLATION)
+
+        assert [r["Id"] for r in rows] == ["a"]
+
+    @pytest.mark.asyncio
+    async def test_narrow_rows_are_read_when_the_property_holds(self):
+        rows = await self.read([["a", "ts", ""]], None)
+
+        assert [r["Id"] for r in rows] == ["a"]
+
+    @pytest.mark.asyncio
+    async def test_an_illegal_width_is_reported_over_the_violation(self):
+        """A row stopping before IsDelete is misaligned whatever the schema
+        did, so it earns the specific width error rather than being lumped in
+        with rows that are merely untrustworthy."""
+        with pytest.raises(RowSchemaMismatchError, match="at least 3 columns wide"):
+            await self.read([["a", "ts"]], self.VIOLATION)
+
+    @pytest.mark.asyncio
+    async def test_a_surplus_width_is_reported_over_the_violation(self):
+        with pytest.raises(RowSchemaMismatchError, match="no field name to bind to"):
+            await self.read([["a", "ts", "", "1", "2", "3", "s"]], self.VIOLATION)
+
+
+class FakeCsvClient:
+    """Serves one folder: its listing, its model.json and one CSV's cells."""
+
+    def __init__(self, folder: str, table: str, attributes: list[dict],
+                 rows: list[list[str]]):
+        self.folder, self.table, self.rows = folder, table, rows
+        self._model = orjson.dumps({
+            "name": "cdm",
+            "entities": [{
+                "$type": "LocalEntity", "name": table, "description": "",
+                "attributes": attributes,
+            }],
+        })
+        self.log = logging.getLogger("test-d365-api")
+
+    async def list_paths(self, directory=None, recursive=False):
+        yield fake_csv(f"{self.folder}/{self.table}/data.csv")
+
+    async def read_file(self, path: str) -> bytes:
+        if path == f"{self.folder}/model.json":
+            return self._model
+        raise HTTPError("The specified path does not exist.", 404)
+
+    async def stream_csv(self, path: str):
+        for row in self.rows:
+            yield row
+
+
+class TestSchemaHistoryReachesTheRows:
+    """read_csvs_in_folder has to observe the schema and hand the result to
+    read_csv_rows. Without that wiring the checks in TableSchemaHistory would
+    be computed and dropped."""
+
+    FOLDER = "2026-01-01T00.00.00Z"
+    EARLIER = "2025-12-31T23.00.00Z"
+    ATTRIBUTES = [
+        {"name": "Id", "dataType": "guid"},
+        {"name": "inserted", "dataType": "string"},
+        {"name": "IsDelete", "dataType": "boolean"},
+        {"name": "appended", "dataType": "int64"},
+    ]
+
+    def client(self) -> FakeCsvClient:
+        # One narrow row - three of the four declared columns.
+        return FakeCsvClient(self.FOLDER, "prodtable", self.ATTRIBUTES, [["a", "", ""]])
+
+    @pytest.mark.asyncio
+    async def test_narrow_row_refused_after_a_column_was_inserted(self):
+        client = self.client()
+        history = TableSchemaHistory()
+        # The earlier folder had no "inserted" column, so this folder's schema
+        # does not begin with it - a column landed in the middle.
+        history.observe(self.EARLIER, ["Id", "IsDelete", "appended"])
+
+        with pytest.raises(RowSchemaMismatchError, match="cannot be assumed here"):
+            await collect(read_csvs_in_folder(
+                self.FOLDER, "prodtable", client, client.log, history
+            ))
+
+    @pytest.mark.asyncio
+    async def test_narrow_row_read_when_columns_were_only_appended(self):
+        client = self.client()
+        history = TableSchemaHistory()
+        history.observe(self.EARLIER, ["Id", "inserted", "IsDelete"])
+
+        rows = await collect(read_csvs_in_folder(
+            self.FOLDER, "prodtable", client, client.log, history
+        ))
+
+        assert [r["Id"] for r in rows] == ["a"]
+        assert "appended" not in rows[0]
+
+
 class TestCsvBytesToDocuments:
     """Covers the seam between the CDK's positional parser and the connector's
     binding: raw bytes in, capture documents out."""
@@ -442,6 +574,7 @@ class TestCsvBytesToDocuments:
                 self.METADATA,
                 CSV_NAME,
                 log,
+                None,
             )
         ]
 

@@ -102,12 +102,15 @@ class RowSchemaMismatchError(Exception):
     from signals that a correctly aligned row would never produce:
 
     - a width outside the range a row may legitimately have (see bind_row),
-    - a width narrower than an earlier row in the same file (see read_csv_rows).
+    - a width narrower than an earlier row in the same file (see read_csv_rows),
+    - a narrow row in a table whose columns stopped being append-only (see
+      TableSchemaHistory and read_csv_rows).
 
-    Both are width signals, which is all a headerless row offers. They rest on
-    Synapse Link only ever appending columns to the end of a row, which is what
-    makes a row narrower than its schema a prefix of it rather than a
-    misaligned row.
+    The first two are width signals, which is all a headerless row offers.
+    Both rest on Synapse Link only ever appending columns to the end of a row.
+    The third check watches that assumption as the capture runs rather than
+    inferring from the rows, and withdraws permission to bind narrow rows
+    once that assumption stops holding.
 
     Rows merely narrower than the schema because they predate an appended
     column are expected and do not raise.
@@ -458,9 +461,10 @@ class TableSchemaHistory:
     Note this assumes the folder level model.json and the per-table one under
     TRICKLE_FEED_SERVICE_DIR list a table's attributes in the same order, since
     get_table_metadata falls back to the latter. If they ever disagree, the
-    fallback looks like a reorder, and is reported as one in two folders rather
-    than one: the folder using the fallback, and the folder after it, which is
-    compared against the fallback's order once it becomes the baseline.
+    fallback looks like a reorder, and narrow rows are refused in two folders
+    rather than one: the folder using the fallback, and the folder after it,
+    which is compared against the fallback's order once it becomes the
+    baseline.
     """
 
     def __init__(self) -> None:
@@ -537,21 +541,25 @@ async def read_csvs_in_folder(
             ) from err
         raise
 
-    # Reported rather than raised, because a schema can break the append-only
-    # property without any row being read wrongly - a rename shifts nothing, so
-    # every row still binds to the right positions.
+    # Reported rather than raised here, because a schema can break the
+    # append-only property without any row being read wrongly - a rename shifts
+    # nothing, so every row still binds to the right positions. It only becomes
+    # fatal where the property is actually depended on, which is why it is
+    # handed to read_csv_rows rather than acted on now.
     schema_violation = schema_history.observe(folder, table_metadata.field_names)
 
     if schema_violation is not None:
         log.warning(
             "This table's columns changed in a way other than being appended to. "
-            "Rows narrower than the schema may no longer line up with it.",
+            "Rows narrower than the schema cannot be read while that holds, since "
+            "they may no longer line up with it.",
             {"folder": folder, "table": table_name, "detail": schema_violation},
         )
 
     def open_csv(csv: ADLSPathMetadata) -> AsyncGenerator[TransformedRow, None]:
         return read_csv_rows(
-            client.stream_csv(csv.name), table_metadata, csv.name, log
+            client.stream_csv(csv.name), table_metadata, csv.name, log,
+            schema_violation,
         )
 
     async for row in stream_folder_rows(csvs, open_csv):
@@ -563,10 +571,18 @@ async def read_csv_rows(
     table_metadata: TableMetadata,
     csv_name: str,
     log: Logger,
+    schema_violation: str | None,
 ) -> AsyncGenerator[TransformedRow, None]:
     """
     Bind and transform one CSV's rows, enforcing the invariants that hold
     across a file rather than within a single row.
+
+    `schema_violation` describes how this table's columns changed other than by
+    being appended to, if TableSchemaHistory saw that happen, and is None
+    otherwise. A narrow row is only safe to bind as a prefix while columns are
+    append-only, so its presence makes narrow rows an error rather than the
+    expected consequence of an append. Rows at the full width are unaffected -
+    they line up with the schema whatever changed.
 
     Row widths within a file may only increase. Rows are appended in the order
     Synapse Link writes them to the lake, and the schema change that adds a
@@ -611,6 +627,19 @@ async def read_csv_rows(
 
         widest_row_seen = len(values)
 
+        row = bind_row(values, table_metadata, csv_name, row_number)
+
+        if len(values) < declared_columns and schema_violation is not None:
+            raise RowSchemaMismatchError(
+                csv_name,
+                row_number,
+                f"row has {len(values)} of this table's {declared_columns} columns, "
+                f"which would normally mean it predates the columns appended since "
+                f"it was written. That cannot be assumed here: {schema_violation}. "
+                f"Binding the row would risk reading its values under the wrong "
+                f"column names",
+            )
+
         if not logged_narrow_row and len(values) < declared_columns:
             logged_narrow_row = True
             log.info(
@@ -625,11 +654,7 @@ async def read_csv_rows(
                 },
             )
 
-        yield transform_row(
-            bind_row(values, table_metadata, csv_name, row_number),
-            table_metadata.boolean_fields,
-            csv_name,
-        )
+        yield transform_row(row, table_metadata.boolean_fields, csv_name)
 
 
 def bind_row(
