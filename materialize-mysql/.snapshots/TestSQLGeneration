@@ -197,6 +197,7 @@ SELECT 0, JSON_OBJECT(
     'stringInteger77Chars', CAST(r.`stringInteger77Chars` AS CHAR),
     'stringNumber', CAST(r.`stringNumber` AS CHAR)
 ) as flow_document,
+NULL as flow_uuid,
 CAST(ROUND(UNIX_TIMESTAMP(r.flow_published_at) * 1000000) AS SIGNED) as flow_clock
 FROM key_value AS r
 JOIN flow_temp_load_table_0 AS l
@@ -208,7 +209,7 @@ JOIN flow_temp_load_table_0 AS l
 
 --- Begin delta_updates loadQueryNoFlowDocument ---
 
-SELECT * FROM (SELECT -1 AS binding, NULL AS doc, NULL AS clock LIMIT 0) as nodoc
+SELECT * FROM (SELECT -1 AS binding, NULL AS doc, NULL AS uuid, NULL AS clock LIMIT 0) as nodoc
 
 --- End delta_updates loadQueryNoFlowDocument ---
 

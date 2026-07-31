@@ -210,7 +210,8 @@ SELECT 0,
 		'stringInteger77Chars': CAST(r."stringInteger77Chars" AS VARCHAR(MAX)),
 		'stringNumber': CAST(r."stringNumber" AS VARCHAR(MAX))
 	) as flow_document,
-	DATEDIFF_BIG(microsecond, CAST('1970-01-01' AS DATETIME2), r.flow_published_at) as flow_clock
+	CAST(NULL AS VARCHAR(MAX)) as flow_uuid,
+DATEDIFF_BIG(microsecond, CAST('1970-01-01' AS DATETIME2), r.flow_published_at) as flow_clock
 FROM flow_temp_table_load_0 AS l
 JOIN "a-warehouse"."a-schema".key_value AS r
 	 ON  l.key1 = r.key1 AND r.key1 >= 10 AND r.key1 <= 100

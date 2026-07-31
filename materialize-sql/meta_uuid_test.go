@@ -30,7 +30,7 @@ func TestSpliceMeta(t *testing.T) {
 	published := time.Date(2024, 3, 4, 5, 6, 7, 891011000, time.UTC)
 
 	t.Run("synthesizes a uuid whose clock is the publication time", func(t *testing.T) {
-		out, err := SpliceMeta([]byte(`{"id":1,"canary":"a"}`), micros(published))
+		out, err := SpliceMeta([]byte(`{"id":1,"canary":"a"}`), nil, micros(published))
 		require.NoError(t, err)
 		require.WithinDuration(t, published, clockTime(t, out), time.Microsecond)
 		require.JSONEq(t, `{"id":1,"canary":"a","_meta":{"uuid":"`+
@@ -42,20 +42,20 @@ func TestSpliceMeta(t *testing.T) {
 	// binding having no clock column at all: connectors skip SpliceMeta entirely
 	// in that case rather than fabricating an epoch clock, see hasMetaClock.
 	t.Run("a null clock uses the 1970 sentinel", func(t *testing.T) {
-		out, err := SpliceMeta([]byte(`{"id":1}`), nil)
+		out, err := SpliceMeta([]byte(`{"id":1}`), nil, nil)
 		require.NoError(t, err)
 		require.WithinDuration(t, time.Unix(0, 0).UTC(), clockTime(t, out), time.Microsecond)
 	})
 
 	t.Run("an empty document object", func(t *testing.T) {
-		out, err := SpliceMeta([]byte(`{}`), micros(published))
+		out, err := SpliceMeta([]byte(`{}`), nil, micros(published))
 		require.NoError(t, err)
 		require.WithinDuration(t, published, clockTime(t, out), time.Microsecond)
 		require.NotContains(t, string(out), "{,")
 	})
 
 	t.Run("rejects a document that is not a JSON object", func(t *testing.T) {
-		_, err := SpliceMeta([]byte(`[1]`), nil)
+		_, err := SpliceMeta([]byte(`[1]`), nil, nil)
 		require.ErrorContains(t, err, "not a JSON object")
 	})
 
@@ -66,9 +66,35 @@ func TestSpliceMeta(t *testing.T) {
 			published,
 			time.Date(2099, 12, 31, 23, 59, 59, 999999000, time.UTC),
 		} {
-			out, err := SpliceMeta([]byte(`{"id":1}`), micros(ts))
+			out, err := SpliceMeta([]byte(`{"id":1}`), nil, micros(ts))
 			require.NoError(t, err)
 			require.WithinDuration(t, ts, clockTime(t, out), time.Microsecond)
 		}
+	})
+}
+
+func TestSpliceMetaRawUUID(t *testing.T) {
+	published := time.Date(2024, 3, 4, 5, 6, 7, 891011000, time.UTC)
+	raw := message.BuildUUID(message.NewProducerID(), message.NewClock(published), message.Flag_OUTSIDE_TXN).String()
+
+	t.Run("a materialized uuid is reported verbatim", func(t *testing.T) {
+		out, err := SpliceMeta([]byte(`{"id":1}`), &raw, nil)
+		require.NoError(t, err)
+		require.JSONEq(t, `{"id":1,"_meta":{"uuid":"`+raw+`"}}`, string(out))
+		// Its own clock survives, rather than being re-synthesized.
+		require.WithinDuration(t, published, clockTime(t, out), time.Microsecond)
+	})
+
+	t.Run("it is preferred over a clock", func(t *testing.T) {
+		other := time.Date(1999, 1, 1, 0, 0, 0, 0, time.UTC)
+		out, err := SpliceMeta([]byte(`{"id":1}`), &raw, micros(other))
+		require.NoError(t, err)
+		require.WithinDuration(t, published, clockTime(t, out), time.Microsecond)
+	})
+
+	t.Run("a non-uuid value fails rather than reaching the runtime", func(t *testing.T) {
+		bad := "2024-03-04T05:06:07.891011Z"
+		_, err := SpliceMeta([]byte(`{"id":1}`), &bad, nil)
+		require.ErrorContains(t, err, "is not a UUID")
 	})
 }

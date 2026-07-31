@@ -498,6 +498,7 @@ SELECT {{ $.Binding }}, `+jsonBuildFunction+`(
     {{Literal $col.Field}}, {{ template "uncast" (ColumnWithAlias $col "r") }}
 {{- end}}
 ) as flow_document,
+{{ if $.MetaUUIDColumn }}{{ template "uncast" (ColumnWithAlias $.MetaUUIDColumn "r") }}{{ else }}NULL{{ end }} as flow_uuid,
 {{ if $.MetaUUIDClockColumn }}{{ template "unix_micros" (ColumnWithAlias $.MetaUUIDClockColumn "r") }}{{ else }}NULL{{ end }} as flow_clock
 FROM {{ $.Identifier}} AS r
 JOIN {{ template "temp_load_name" . }} AS l
@@ -506,7 +507,7 @@ JOIN {{ template "temp_load_name" . }} AS l
 	l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 {{- end }}
 {{ else -}}
-SELECT * FROM (SELECT -1 AS binding, NULL AS doc, NULL AS clock LIMIT 0) as nodoc
+SELECT * FROM (SELECT -1 AS binding, NULL AS doc, NULL AS uuid, NULL AS clock LIMIT 0) as nodoc
 {{ end }}
 {{ end }}
 

@@ -149,6 +149,7 @@ OBJECT_CONSTRUCT_KEEP_NULL(
 	'stringInteger77Chars', TO_VARCHAR("a-schema".key_value.stringInteger77Chars),
 	'stringNumber', TO_VARCHAR("a-schema".key_value.stringNumber)
 ) as flow_document,
+CAST(NULL AS VARCHAR) as flow_uuid,
 DATE_PART(EPOCH_MICROSECOND, "a-schema".key_value.flow_published_at) as flow_clock
 FROM "a-schema".key_value
 JOIN (

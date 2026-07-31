@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
+
 	"go.gazette.dev/core/message"
 )
 
@@ -34,22 +36,37 @@ func synthesizeUUID(t time.Time) string {
 	return message.BuildUUID(zeroProducer, message.NewClock(t), message.Flag_OUTSIDE_TXN).String()
 }
 
-// SpliceMeta appends a document UUID to a no_flow_document document, from which
-// the runtime extracts the document clock.
+// SpliceMeta appends a document UUID to a no_flow_document document, which the
+// runtime reads by querying /_meta/uuid against the document to recover its
+// clock.
 //
 // It operates on raw bytes and never parses the document, which matters because
-// this runs once per loaded document. doc is the reconstructed document, and
-// clockMicros is the value of the binding's date-time projection of /_meta/uuid
-// (see Table.MetaUUIDClockColumn) as Unix microseconds. A nil clockMicros means
-// the row's column is NULL — for example a row written before the column existed
-// — and gets the 1970-01-01 sentinel, the earliest possible clock.
-func SpliceMeta(doc []byte, clockMicros *int64) ([]byte, error) {
+// this runs once per loaded document. Exactly one source is reported by the load
+// query, per the binding's materialized projections of /_meta/uuid:
+//
+//   - rawUUID is the document's own UUID, from a projection carrying the value
+//     itself (see Table.MetaUUIDColumn). It is used verbatim.
+//   - clockMicros is a date-time projection's value as Unix microseconds (see
+//     Table.MetaUUIDClockColumn), which a UUID is synthesized from.
+//
+// A nil value for the binding's source means the row's column is NULL — for
+// example a row written before the column existed — and gets the 1970-01-01
+// sentinel, the earliest possible clock.
+func SpliceMeta(doc []byte, rawUUID *string, clockMicros *int64) ([]byte, error) {
 	if len(doc) < 2 || doc[0] != '{' || doc[len(doc)-1] != '}' {
 		return nil, fmt.Errorf("reconstructed document is not a JSON object: %s", doc)
 	}
 
 	uuidVal := sentinelUUID
-	if clockMicros != nil {
+	if rawUUID != nil {
+		// Verify rather than trust: a load query that reported a different
+		// projection than the column describes would otherwise hand the runtime
+		// a document clock it cannot parse.
+		if _, err := uuid.Parse(*rawUUID); err != nil {
+			return nil, fmt.Errorf("materialized document UUID is not a UUID: %q", *rawUUID)
+		}
+		uuidVal = *rawUUID
+	} else if clockMicros != nil {
 		uuidVal = synthesizeUUID(time.UnixMicro(*clockMicros).UTC())
 	}
 

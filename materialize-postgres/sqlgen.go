@@ -349,6 +349,7 @@ SELECT {{ $.Binding }},
 	)
 {{- end}}
 ) as flow_document,
+{{ if $.MetaUUIDColumn }}{{ template "uncast" (ColumnWithAlias $.MetaUUIDColumn "r") }}{{ else }}CAST(NULL AS TEXT){{ end }} as flow_uuid,
 {{ if $.MetaUUIDClockColumn -}}
 {{ template "unix_micros" (ColumnWithAlias $.MetaUUIDClockColumn "r") }}
 {{- else -}}
@@ -361,7 +362,7 @@ JOIN {{ template "temp_name" . }} AS l
 	l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 {{- end }}
 {{ else -}}
-SELECT * FROM (SELECT -1, CAST(NULL AS JSONB), CAST(NULL AS BIGINT) LIMIT 0) as nodoc
+SELECT * FROM (SELECT -1, CAST(NULL AS JSONB), CAST(NULL AS TEXT), CAST(NULL AS BIGINT) LIMIT 0) as nodoc
 {{ end }}
 {{ end }}
 

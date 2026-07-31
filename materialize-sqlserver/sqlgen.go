@@ -432,6 +432,7 @@ SELECT {{ $.Binding }},
 		{{- end}}
 	FOR JSON PATH, INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER
 ) as flow_document,
+{{ if $.MetaUUIDColumn }}{{ template "uncast" (ColumnWithAlias $.MetaUUIDColumn "r") }}{{ else }}CAST(NULL AS NVARCHAR(MAX)){{ end }} as flow_uuid,
 {{ if $.MetaUUIDClockColumn }}{{ template "unix_micros" (ColumnWithAlias $.MetaUUIDClockColumn "r") }}{{ else }}CAST(NULL AS BIGINT){{ end }} as flow_clock
 FROM {{ $.Identifier}} AS r
 JOIN {{ template "temp_load_name" . }} AS l
@@ -440,7 +441,7 @@ JOIN {{ template "temp_load_name" . }} AS l
 	l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 {{- end }}
 {{ else -}}
-SELECT TOP 0 -1, NULL, NULL
+SELECT TOP 0 -1, NULL, NULL, NULL
 {{ end }}
 {{ end }}
 

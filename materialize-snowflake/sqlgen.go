@@ -335,6 +335,7 @@ OBJECT_CONSTRUCT_KEEP_NULL(
 	{{Literal $col.Field}}, {{ template "uncast" (ColumnWithAlias $col $.Table.Identifier) }}
 {{- end}}
 ) as flow_document,
+{{ if $.Table.MetaUUIDColumn }}{{ template "uncast" (ColumnWithAlias $.Table.MetaUUIDColumn $.Table.Identifier) }}{{ else }}CAST(NULL AS VARCHAR){{ end }} as flow_uuid,
 {{ if $.Table.MetaUUIDClockColumn }}{{ template "unix_micros" (ColumnWithAlias $.Table.MetaUUIDClockColumn $.Table.Identifier) }}{{ else }}CAST(NULL AS NUMBER){{ end }} as flow_clock
 FROM {{ $.Table.Identifier }}
 JOIN (
@@ -350,7 +351,7 @@ JOIN (
 {{- if $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
 {{- end }}
 {{ else -}}
-SELECT * FROM (SELECT -1, CAST(NULL AS VARIANT), CAST(NULL AS NUMBER) LIMIT 0) as nodoc
+SELECT * FROM (SELECT -1, CAST(NULL AS VARIANT), CAST(NULL AS VARCHAR), CAST(NULL AS NUMBER) LIMIT 0) as nodoc
 {{ end }}
 {{ end }}
 

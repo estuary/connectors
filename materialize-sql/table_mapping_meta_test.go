@@ -25,12 +25,48 @@ func TestMetaUUIDClockColumn(t *testing.T) {
 	}{
 		{"flow_published_at is the clock", []Column{col("flow_published_at", "/_meta/uuid", "date-time")}, "flow_published_at"},
 		{"a raw uuid field is not a clock", []Column{col("_meta/uuid", "/_meta/uuid", "uuid")}, ""},
+		{"a renamed uuid projection is not a clock", []Column{col("my_uuid", "/_meta/uuid", "uuid")}, ""},
 		{"an unrelated _meta field is not a clock", []Column{col("_meta/op", "/_meta/op", "")}, ""},
 		{"no projection of the location", []Column{col("id", "/id", "")}, ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			tbl := Table{Values: tc.vals}
 			got := tbl.MetaUUIDClockColumn()
+			if tc.found == "" {
+				require.Nil(t, got)
+			} else {
+				require.NotNil(t, got)
+				require.Equal(t, tc.found, got.Field)
+			}
+		})
+	}
+}
+
+// A projection of /_meta/uuid that carries the value itself is a UUID source
+// whatever it is named; the runtime reads the location, not the field name.
+func TestMetaUUIDColumn(t *testing.T) {
+	col := func(field, ptr, format string) Column {
+		inf := pf.Inference{Types: []string{"string"}}
+		if format != "" {
+			inf.String_ = &pf.Inference_String{Format: format}
+		}
+		return Column{Projection: Projection{Projection: pf.Projection{Field: field, Ptr: ptr, Inference: inf}}}
+	}
+
+	for _, tc := range []struct {
+		name  string
+		vals  []Column
+		found string
+	}{
+		{"the canonical field", []Column{col("_meta/uuid", "/_meta/uuid", "uuid")}, "_meta/uuid"},
+		{"a renamed projection", []Column{col("my_uuid", "/_meta/uuid", "uuid")}, "my_uuid"},
+		{"a projection with no format", []Column{col("my_uuid", "/_meta/uuid", "")}, "my_uuid"},
+		{"flow_published_at is not a uuid source", []Column{col("flow_published_at", "/_meta/uuid", "date-time")}, ""},
+		{"an unrelated location", []Column{col("id", "/id", "")}, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tbl := Table{Values: tc.vals}
+			got := tbl.MetaUUIDColumn()
 			if tc.found == "" {
 				require.Nil(t, got)
 			} else {

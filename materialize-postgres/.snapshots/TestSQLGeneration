@@ -157,6 +157,7 @@ SELECT 0,
 		'stringNumber', CAST(r."stringNumber" AS TEXT)
 	)
 ) as flow_document,
+CAST(NULL AS TEXT) as flow_uuid,
 (EXTRACT(EPOCH FROM r.flow_published_at) * 1000000)::BIGINT as flow_clock
 FROM key_value AS r
 JOIN flow_temp_table_0 AS l
@@ -168,7 +169,7 @@ JOIN flow_temp_table_0 AS l
 
 --- Begin delta_updates loadQueryNoFlowDocument ---
 
-SELECT * FROM (SELECT -1, CAST(NULL AS JSONB), CAST(NULL AS BIGINT) LIMIT 0) as nodoc
+SELECT * FROM (SELECT -1, CAST(NULL AS JSONB), CAST(NULL AS TEXT), CAST(NULL AS BIGINT) LIMIT 0) as nodoc
 
 --- End delta_updates loadQueryNoFlowDocument ---
 

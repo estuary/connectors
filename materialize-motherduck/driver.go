@@ -270,6 +270,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		Doc     json.RawMessage
 		// The no_flow_document load query reports the reconstructed _meta object
 		// and the document's publication clock separately, see sql.SpliceMeta.
+		UUID  *string
 		Clock *int64
 	}
 
@@ -292,7 +293,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		}
 		if b := d.bindings[doc.Binding]; d.cfg.Advanced.NoFlowDocument && b.hasMetaClock {
 			var err error
-			if loadDoc, err = sql.SpliceMeta(loadDoc, doc.Clock); err != nil {
+			if loadDoc, err = sql.SpliceMeta(loadDoc, doc.UUID, doc.Clock); err != nil {
 				return fmt.Errorf("reconstructing _meta: %w", err)
 			}
 		}

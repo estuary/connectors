@@ -110,9 +110,10 @@ func bindingReportsClock[EC EndpointConfiger, RC Resourcer[RC, EC], MT MappedTyp
 	}
 
 	for _, p := range b.SelectedProjections() {
-		// Only a date-time projection of the location (canonically
-		// flow_published_at) is reported as a clock.
-		if p.Ptr == metaUUIDPtr && p.Inference.String_ != nil && p.Inference.String_.Format == "date-time" {
+		// Any projection of the location works: one carrying the UUID itself is
+		// reported verbatim, and a date-time projection (canonically
+		// flow_published_at) has a UUID synthesized from its clock.
+		if p.Ptr == metaUUIDPtr {
 			return true
 		}
 	}

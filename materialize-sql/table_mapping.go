@@ -151,6 +151,27 @@ func (t *Table) RootLevelColumns() []*Column {
 	return rootLevelCols
 }
 
+// MetaUUIDColumn returns a materialized projection of /_meta/uuid that carries
+// the document UUID itself rather than a view of it — the canonical _meta/uuid
+// field, or any user-named projection of the location that is not a date-time.
+// Its value is reported to the runtime as-is, which is preferable to a
+// synthesized UUID because it is the document's own.
+//
+// The runtime reads the document UUID by querying /_meta/uuid against the Loaded
+// document, so the field's name is immaterial; only the value matters.
+func (t *Table) MetaUUIDColumn() *Column {
+	for _, col := range t.Columns() {
+		if col.Ptr == metaUUIDPtr && !isDateTime(col) {
+			return col
+		}
+	}
+	return nil
+}
+
+func isDateTime(col *Column) bool {
+	return col.Inference.String_ != nil && col.Inference.String_.Format == "date-time"
+}
+
 // MetaUUIDClockColumn returns the materialized date-time projection of
 // /_meta/uuid — canonically flow_published_at — whose value the no_flow_document
 // load queries report as a clock, so that Loaded responses can carry a document
@@ -162,7 +183,7 @@ func (t *Table) RootLevelColumns() []*Column {
 // RootLevelColumns and is never part of the reconstructed document itself.
 func (t *Table) MetaUUIDClockColumn() *Column {
 	for _, col := range t.Columns() {
-		if col.Ptr == metaUUIDPtr && col.Inference.String_ != nil && col.Inference.String_.Format == "date-time" {
+		if col.Ptr == metaUUIDPtr && isDateTime(col) {
 			return col
 		}
 	}

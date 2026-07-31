@@ -326,6 +326,7 @@ TO_JSON(STRUCT(
 	{{ template "uncast" (ColumnWithAlias $col "l") }} AS {{ $col.Field }}
 {{- end}}
 )) as flow_document,
+{{ if $.MetaUUIDColumn }}{{ template "uncast" (ColumnWithAlias $.MetaUUIDColumn "l") }}{{ else }}CAST(NULL AS STRING){{ end }} as flow_uuid,
 {{ if $.MetaUUIDClockColumn }}{{ template "unix_micros" (ColumnWithAlias $.MetaUUIDClockColumn "l") }}{{ else }}CAST(NULL AS INT64){{ end }} as flow_clock
 FROM {{ $.Identifier }} AS l
 JOIN {{ template "tempTableName" . }} AS r
@@ -335,7 +336,7 @@ JOIN {{ template "tempTableName" . }} AS r
 	{{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
 {{- end }}
 {{- else -}}
-(SELECT -1, CAST(NULL AS {{ $.ObjectType }}), CAST(NULL AS INT64) LIMIT 0) as nodoc
+(SELECT -1, CAST(NULL AS {{ $.ObjectType }}), CAST(NULL AS STRING), CAST(NULL AS INT64) LIMIT 0) as nodoc
 {{- end }}
 {{ end }}
 

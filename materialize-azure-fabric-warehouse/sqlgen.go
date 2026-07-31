@@ -304,7 +304,8 @@ SELECT {{ $.Binding }},
 		{{Literal $col.Field}}: {{ template "uncast" (ColumnWithAlias $col "r") }}
 		{{- end}}
 	) as flow_document,
-	{{ if $.MetaUUIDClockColumn }}{{ template "unix_micros" (ColumnWithAlias $.MetaUUIDClockColumn "r") }}{{ else }}CAST(NULL AS BIGINT){{ end }} as flow_clock
+	{{ if $.MetaUUIDColumn }}{{ template "uncast" (ColumnWithAlias $.MetaUUIDColumn "r") }}{{ else }}CAST(NULL AS VARCHAR(MAX)){{ end }} as flow_uuid,
+{{ if $.MetaUUIDClockColumn }}{{ template "unix_micros" (ColumnWithAlias $.MetaUUIDClockColumn "r") }}{{ else }}CAST(NULL AS BIGINT){{ end }} as flow_clock
 FROM {{ template "temp_name_load" . }} AS l
 JOIN {{ $.Identifier}} AS r
 {{- range $ind, $bound := $.Bounds }}
@@ -313,7 +314,7 @@ JOIN {{ $.Identifier}} AS r
 	{{- if $bound.LiteralLower }} AND r.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND r.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
 {{- end }}
 {{ else -}}
-SELECT TOP 0 -1, NULL, NULL
+SELECT TOP 0 -1, NULL, NULL, NULL
 {{ end }}
 {{ end }}
 

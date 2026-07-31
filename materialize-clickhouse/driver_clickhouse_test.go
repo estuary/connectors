@@ -489,9 +489,10 @@ func loadDocuments(t *testing.T, ctx context.Context, loadConn chdriver.Conn, b 
 	for rows.Next() {
 		var doc string
 		if noFlowDocument {
+			var rawUUID *string
 			var clockMicros *int64
-			require.NoError(t, rows.Scan(&doc, &clockMicros))
-			spliced, err := sql.SpliceMeta([]byte(doc), clockMicros)
+			require.NoError(t, rows.Scan(&doc, &rawUUID, &clockMicros))
+			spliced, err := sql.SpliceMeta([]byte(doc), rawUUID, clockMicros)
 			require.NoError(t, err)
 			doc = string(spliced)
 		} else {
