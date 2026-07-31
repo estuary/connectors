@@ -495,6 +495,10 @@ func (db *mysqlDatabase) RediscoveryInterval() time.Duration {
 	return sqlcapture.ParseRediscoveryInterval(db.config.Advanced.RediscoveryInterval)
 }
 
+func (db *mysqlDatabase) ReplicationPollingInterval() time.Duration {
+	return 0 // Binlog replication events arrive continuously rather than being polled for.
+}
+
 func (db *mysqlDatabase) ShouldBackfill(streamID sqlcapture.StreamID) bool {
 	// As a special case, the solitary value '*.*' means that nothing should be
 	// backfilled. This makes certain sorts of operation which would otherwise

@@ -303,6 +303,14 @@ type Database interface {
 	// load on their server. Implement it with ParseRediscoveryInterval.
 	RediscoveryInterval() time.Duration
 
+	// ReplicationPollingInterval returns how long a streaming cycle may legitimately spend
+	// waiting for the replication stream to deliver its next commit event, or zero for
+	// connectors whose replication events arrive continuously. A polling connector cannot
+	// finish a stream-to-fence cycle any faster than one polling period, so the threshold
+	// past which a long-running cycle is treated as anomalous scales with this value rather
+	// than being a fixed duration which a large polling interval would exceed every cycle.
+	ReplicationPollingInterval() time.Duration
+
 	// The collection key which should be suggested if discovery fails to find suitable
 	// primary key. This should be some property or combination of properties in the
 	// source metadata which encodes the database change sequence.

@@ -7,6 +7,13 @@
   lists those instances in a stable order. It was previously assembled in map
   iteration order, so its text differed on every polling cycle and SQL Server
   compiled a new plan for it each time instead of reusing a cached one.
+- Replication diagnostics are no longer collected on every streaming cycle when
+  a large `polling_interval` is configured. A streaming cycle cannot finish any
+  faster than one polling interval, so the fixed five minute threshold for
+  treating a cycle as unexpectedly long was exceeded on every cycle, and each
+  capture then repeatedly ran a set of queries against server-wide metadata.
+  The threshold is now that five minute grace period on top of the configured
+  polling interval.
 
 ## 2026-07-30
 

@@ -374,3 +374,20 @@ func (db *sqlserverDatabase) RequestTxIDs(schema, table string) {}
 func (db *sqlserverDatabase) RediscoveryInterval() time.Duration {
 	return sqlcapture.ParseRediscoveryInterval(db.config.Advanced.RediscoveryInterval)
 }
+
+func (db *sqlserverDatabase) ReplicationPollingInterval() time.Duration {
+	// Reported for consistency with source-sqlserver rather than out of necessity. Unlike the
+	// CDC connector, whose cycle can only end once a polling pass reports a commit position at
+	// or past the fence, this connector's stream-to-fence loop is bounded by the fence duration
+	// itself and polls within it, so its cycles don't lengthen with the polling interval. That
+	// interval is also validated to be no greater than sqlcapture.StreamingFenceInterval, which
+	// keeps the resulting threshold close to the default in any case.
+	//
+	// Validation has already rejected unparseable values and SetDefaults fills in an empty one,
+	// so a failure here can only mean we have no better estimate than the default threshold.
+	var interval, err = time.ParseDuration(db.config.Advanced.PollingInterval)
+	if err != nil {
+		return 0
+	}
+	return interval
+}

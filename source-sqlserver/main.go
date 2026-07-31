@@ -389,3 +389,15 @@ func (db *sqlserverDatabase) RequestTxIDs(schema, table string) {}
 func (db *sqlserverDatabase) RediscoveryInterval() time.Duration {
 	return sqlcapture.ParseRediscoveryInterval(db.config.Advanced.RediscoveryInterval)
 }
+
+func (db *sqlserverDatabase) ReplicationPollingInterval() time.Duration {
+	// A stream-to-fence cycle ends when a polling cycle reports a commit position at or past
+	// the fence, so it can't complete any faster than the CDC polling interval. Validation has
+	// already rejected unparseable values and SetDefaults fills in an empty one, so a failure
+	// here can only mean we have no better estimate than the default threshold.
+	var interval, err = time.ParseDuration(db.config.Advanced.PollingInterval)
+	if err != nil {
+		return 0
+	}
+	return interval
+}

@@ -251,6 +251,22 @@ func ParseRediscoveryInterval(interval string) time.Duration {
 	return parsed
 }
 
+// streamingDiagnosticsThreshold returns how long a single streaming cycle must run before it's
+// considered to have gone on for an unexpectedly long time and replication diagnostics are
+// collected.
+//
+// Diagnostics are more expensive than the progress logging they're interleaved with, since
+// for some connectors they query server-wide metadata, so they mustn't fire on cycles which are
+// slow due to their configuration. A polling connector can't complete a cycle any faster than one
+// polling period, so the threshold is that period plus a fixed grace interval rather than a
+// fixed duration on its own.
+func (c *Capture) streamingDiagnosticsThreshold() time.Duration {
+	if interval := c.Database.ReplicationPollingInterval(); interval > 0 {
+		return streamingProgressInterval + interval
+	}
+	return streamingProgressInterval
+}
+
 // Run is the top level entry point of the capture process.
 func (c *Capture) Run(ctx context.Context) (err error) {
 	// Fetch detailed schema info for the tables that this capture's bindings
@@ -666,23 +682,35 @@ func (c *Capture) streamToFence(ctx context.Context, replStream ReplicationStrea
 	// so the two callers of logProgress never overlap on the shared interval state.
 	var progressDone = make(chan struct{})
 	var progressWG sync.WaitGroup
-	var progressTicks int
+	var cycleStarted = time.Now()
+	var diagnosticTicks int
 	progressWG.Go(func() {
 		var ticker = time.NewTicker(streamingProgressInterval)
 		defer ticker.Stop()
+		// Diagnostics are gated on a separate, generally longer threshold than progress
+		// logging, and repeat less often than it once a cycle exceeds that threshold.
+		var diagnosticsAfter = c.streamingDiagnosticsThreshold()
 		for {
 			select {
 			case <-progressDone:
 				return
 			case <-ticker.C:
 				logProgress("processing replication events")
-				log.Warn("replication streaming has been ongoing for an unexpectedly long amount of time, running replication diagnostics")
-				// Dump goroutine stacks on the first tick and every fifth tick thereafter
-				// to help with investigations into potentially stalled captures.
-				if progressTicks%5 == 0 {
-					dumpGoroutineStacks()
+				if time.Since(cycleStarted) < diagnosticsAfter {
+					continue
 				}
-				progressTicks++
+				// Collect diagnostics and dump goroutine stacks on the first tick past the
+				// threshold and every fifth tick thereafter, to help with investigations
+				// into potentially stalled captures. The first report is the informative
+				// one and later ones mostly serve to show that a stalled capture is still
+				// stalled, so they don't need to be as frequent as progress logging.
+				var shouldRunDiagnostics = diagnosticTicks%5 == 0
+				diagnosticTicks++
+				if !shouldRunDiagnostics {
+					continue
+				}
+				log.Warn("replication streaming has been ongoing for an unexpectedly long amount of time, running replication diagnostics")
+				dumpGoroutineStacks()
 				if err := c.Database.ReplicationDiagnostics(ctx); err != nil {
 					log.WithField("err", err).Error("replication diagnostics error")
 				}

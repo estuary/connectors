@@ -541,6 +541,10 @@ func (db *postgresDatabase) RediscoveryInterval() time.Duration {
 	return sqlcapture.ParseRediscoveryInterval(db.config.Advanced.RediscoveryInterval)
 }
 
+func (db *postgresDatabase) ReplicationPollingInterval() time.Duration {
+	return 0 // Logical replication events arrive continuously rather than being polled for.
+}
+
 func (db *postgresDatabase) ShouldBackfill(streamID sqlcapture.StreamID) bool {
 	// Allow the setting "*.*" to skip backfilling any tables.
 	if db.config.Advanced.SkipBackfills == "*.*" {
