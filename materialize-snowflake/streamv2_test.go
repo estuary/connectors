@@ -408,6 +408,107 @@ func TestStreamV2Manager(t *testing.T) {
 		require.Equal(t, rowsBefore+1, countRows())
 	})
 
+	t.Run("retiring a channel discards what Snowflake holds for it", func(t *testing.T) {
+		// What a channel name outlives is the whole problem retirement exists for:
+		// it is derived from (task, key-begin, state key), so a shard deleted today
+		// and a shard given the same key-begin tomorrow derive the same name. This
+		// is the experiment that says which SDK operation actually retires the
+		// channel behind that name, since only Snowflake can answer it.
+		truncate(t)
+		var tgt = target("retire.v1")
+
+		var m = newManager(fullRange)
+		m.addBinding(cfg.Database, cfg.Schema, tableName, tgt, nil)
+		var channel = m.bindings[0].channel
+
+		writeRows(m, 0, 3)
+		items, err := m.flush(ctx)
+		require.NoError(t, err)
+		require.Equal(t, int64(3), items[0].Counter)
+
+		client, err := m.ensureStarted(ctx)
+		require.NoError(t, err)
+		var reopen = func() *channelStatusResult {
+			status, err := client.OpenChannel(ctx, cfg.Database, cfg.Schema, tableName, channel)
+			require.NoError(t, err)
+			return status
+		}
+
+		// Closing without dropping is the operation this connector used to have,
+		// and the one the retirement design was provisionally built on.
+		require.NoError(t, client.CloseChannel(ctx, channel, false))
+		var afterClose = reopen()
+		t.Logf("reopened %s after a close: committed token %v", channel, afterClose.committedToken())
+
+		require.NoError(t, retireChannel(ctx, client, channel))
+		var afterDrop = reopen()
+		t.Logf("reopened %s after a retirement: committed token %v", channel, afterDrop.committedToken())
+
+		// A close only releases the local handle: Snowflake still holds the
+		// channel, and hands its committed offset token to the next opener.
+		require.NotNil(t, afterClose.CommittedToken)
+		require.Equal(t, "3", *afterClose.CommittedToken)
+
+		// A drop is what retires it, so the same name reopens as a channel which
+		// has committed nothing.
+		require.Nil(t, afterDrop.CommittedToken)
+
+		// Retirement is about the channel, not the rows it delivered: those are
+		// committed to the table and stay there.
+		require.Equal(t, 3, countRows())
+
+		// A later shard reusing the retired key-begin — a scale-down followed by a
+		// scale-up — derives this same channel name, with no checkpoint item of its
+		// own to reconcile against. Nothing of the retired channel is adopted as a
+		// skip threshold, so its documents are appended in full rather than
+		// silently dropped as replays.
+		var reused = newManager(fullRange)
+		reused.addBinding(cfg.Database, cfg.Schema, tableName, tgt, nil)
+		require.Equal(t, channel, reused.bindings[0].channel)
+
+		writeRows(reused, 100, 104)
+		require.Zero(t, reused.bindings[0].skip)
+		items, err = reused.flush(ctx)
+		require.NoError(t, err)
+		require.Equal(t, int64(4), items[0].Counter)
+		require.Equal(t, 7, countRows())
+
+		// The committed offset token is not the only thing a channel accumulates:
+		// the row-error count which refuses a channel for good is kept for its
+		// whole life too. Whether a retirement takes that with it is measured here
+		// rather than assumed, because it is what the fake sidecar and the
+		// sidecar's own tests model a drop as doing.
+		var notNullTable = "STREAMV2_TEST_RETIRE_NOT_NULL"
+		_, err = db.ExecContext(ctx, fmt.Sprintf("CREATE OR REPLACE TABLE %s (KEY TEXT, VAL VARIANT NOT NULL);", notNullTable))
+		require.NoError(t, err)
+		defer db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s;", notNullTable))
+
+		var rejecting = newManager(fullRange)
+		rejecting.addBinding(cfg.Database, cfg.Schema, notNullTable, sql.Table{
+			TableShape: sql.TableShape{Binding: 0, DeltaUpdates: true},
+			Identifier: notNullTable,
+			Keys:       []sql.Column{{Identifier: `KEY`}},
+			Values:     []sql.Column{{Identifier: `VAL`}},
+			StateKey:   "retire-notnull.v1",
+		}, nil)
+		var rejected = rejecting.bindings[0].channel
+
+		require.NoError(t, rejecting.writeRow(ctx, 0, []any{"dropped", nil}))
+		_, err = rejecting.flush(ctx)
+		require.ErrorContains(t, err, "rejected and discarded by Snowflake")
+
+		rejectingClient, err := rejecting.ensureStarted(ctx)
+		require.NoError(t, err)
+		require.NoError(t, retireChannel(ctx, rejectingClient, rejected))
+
+		afterRejection, err := rejectingClient.OpenChannel(ctx, cfg.Database, cfg.Schema, notNullTable, rejected)
+		require.NoError(t, err)
+		t.Logf("reopened %s after a retirement: committed token %v, %d row(s) rejected",
+			rejected, afterRejection.committedToken(), afterRejection.RowsErrorCount)
+		require.Zero(t, afterRejection.RowsErrorCount)
+		require.Nil(t, afterRejection.CommittedToken)
+	})
+
 	t.Run("refusals", func(t *testing.T) {
 		truncate(t)
 		smallBatches(t)

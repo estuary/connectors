@@ -453,6 +453,37 @@ func (m *streamV2Manager) retireAbsorbedChannels(ctx context.Context, client *si
 	return nil
 }
 
+// retireChannel takes a channel out of service for good, by dropping it in
+// Snowflake rather than only closing the local handle.
+//
+// Retirement has to reach Snowflake because a channel name is deterministic —
+// derived from (task, key-begin, state key) — while the topology it names is
+// not. A shard which is deleted and a later shard which happens to be given the
+// same key-begin derive the same channel name, and a channel Snowflake still
+// holds hands its committed offset token to whoever opens it next. That token
+// would then be read as documents this generation of the channel had already
+// appended, and skipped: rows silently dropped, or a binding wedged against a
+// counter it cannot reach. Dropping the channel is what makes the next open of
+// the same name a genuinely fresh channel.
+//
+// That the drop is what does this, rather than a plain close of the channel, was
+// settled by experiment against live Snowflake rather than read off the SDK's
+// contract: a close releases only the local handle, and Snowflake goes on
+// reporting the same committed offset token to the next open of that name. The
+// retirement subtest of TestStreamV2Manager is that experiment; the same
+// sequence against the fake sidecar is TestStreamV2ChannelRetirement.
+//
+// The channel must already be open in this session, since the drop is expressed
+// through the handle an open produced. Its committed rows are untouched: this
+// retires the channel, not the data it delivered.
+func retireChannel(ctx context.Context, client *sidecarClient, channel string) error {
+	if err := client.CloseChannel(ctx, channel, true); err != nil {
+		return fmt.Errorf("retiring channel %q: %w", channel, err)
+	}
+	log.WithFields(log.Fields{"channel": channel}).Info("retired snowpipe streaming v2 channel")
+	return nil
+}
+
 // absorbedChannelSettled reports whether an absorbed shard's channel holds
 // exactly the documents the checkpoint accounts for, and so can be retired.
 func absorbedChannelSettled(item *streamV2Item, committedToken *string, keyBegin, keyEnd uint32) error {

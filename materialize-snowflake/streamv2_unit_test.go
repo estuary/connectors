@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"path/filepath"
 	"testing"
 
 	snowflake_auth "github.com/estuary/connectors/go/auth/snowflake"
@@ -141,6 +142,84 @@ func TestStreamV2RejectedRows(t *testing.T) {
 
 		require.ErrorContains(t, m.writeRow(ctx, 0, []any{"kept", "v", nil}), "3 row(s) rejected")
 	})
+}
+
+// TestStreamV2ChannelRetirement covers, without credentials, what the live test
+// establishes against Snowflake: a channel name outlives the shard it was named
+// for, and only retiring the channel stops the next shard to derive that name
+// from adopting its committed offset token as a skip threshold.
+func TestStreamV2ChannelRetirement(t *testing.T) {
+	var ctx = context.Background()
+
+	// The fake sidecar's channel state outlives its process, so each manager
+	// below stands in for a separate session against one Snowflake.
+	t.Setenv("FAKE_SIDECAR_STATE", filepath.Join(t.TempDir(), "channels.json"))
+
+	var target = sql.Table{
+		TableShape: sql.TableShape{Binding: 0, DeltaUpdates: true},
+		Identifier: "TBL",
+		Keys:       []sql.Column{{Identifier: `KEY`}},
+		Values:     []sql.Column{{Identifier: `VAL`}},
+		StateKey:   "retire.v1",
+	}
+
+	// Every manager here covers the whole key space, as the single shard of a
+	// task does — which is the point: a name derived from a key-begin is
+	// derived again, identically, by whichever shard next holds that key-begin.
+	var newSession = func(t *testing.T) *streamV2Manager {
+		var m = newStreamV2Manager(ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/retirement", "acct",
+			&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
+		m.argv = fakeSidecarArgv(t)
+		t.Cleanup(m.stop)
+		m.addBinding("DB", "SCH", "TBL", target, nil)
+		return m
+	}
+
+	// A shard appends and commits three documents and is then deleted, leaving
+	// the channel as its final transaction had it.
+	var first = newSession(t)
+	var channel = first.bindings[0].channel
+	for i := range 3 {
+		require.NoError(t, first.writeRow(ctx, 0, []any{"k", i}))
+	}
+	items, err := first.flush(ctx)
+	require.NoError(t, err)
+	require.Equal(t, int64(3), items[0].Counter)
+	first.stop()
+
+	// Un-retired, that channel wedges the next shard to derive its name: the
+	// documents it is about to store are taken for a replay of an interrupted
+	// transaction it never ran, and skipped.
+	var reused = newSession(t)
+	require.Equal(t, channel, reused.bindings[0].channel)
+	require.NoError(t, reused.writeRow(ctx, 0, []any{"k", 0}))
+	require.Equal(t, int64(3), reused.bindings[0].skip)
+	reused.stop()
+
+	// Retiring it is what makes the name reusable. The retiring session opens
+	// the channel first, as a shard absorbing another's key range does.
+	var retiring = newSession(t)
+	client, err := retiring.ensureStarted(ctx)
+	require.NoError(t, err)
+	_, err = client.OpenChannel(ctx, "DB", "SCH", "TBL", channel)
+	require.NoError(t, err)
+	require.NoError(t, retireChannel(ctx, client, channel))
+
+	status, err := client.OpenChannel(ctx, "DB", "SCH", "TBL", channel)
+	require.NoError(t, err)
+	require.Nil(t, status.CommittedToken)
+	retiring.stop()
+
+	// So the name now opens as a channel which has committed nothing, and the
+	// documents of the shard which reused it are appended in full.
+	var after = newSession(t)
+	require.Equal(t, channel, after.bindings[0].channel)
+	require.NoError(t, after.writeRow(ctx, 0, []any{"k", 0}))
+	require.Zero(t, after.bindings[0].skip)
+
+	items, err = after.flush(ctx)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), items[0].Counter)
 }
 
 func TestReconcileStreamV2Channel(t *testing.T) {
