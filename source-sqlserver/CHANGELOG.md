@@ -3,6 +3,9 @@
 ## 2026-07-31
 
 ### Fixed
+- The startup check for whether CDC is enabled now binds the database name as a
+  query parameter instead of splicing it into the statement, so every capture
+  issues the same query rather than one plan's worth of work per database name.
 - Automatic change table cleanup now binds its watermark as a query parameter
   instead of formatting it into the statement. Every cleanup call previously
   produced a statement SQL Server had never seen before, so it compiled a plan
