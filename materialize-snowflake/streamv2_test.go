@@ -128,6 +128,31 @@ func TestStreamV2Manager(t *testing.T) {
 		}
 	}
 
+	// rejectingTable creates a table Snowflake will reject a row of, and returns a
+	// delta-updates target for it.
+	//
+	// A null against a NOT NULL column is the rejection it provokes: omitting a
+	// column from the appended row object is how a nil converted value reaches
+	// Snowflake as SQL NULL, and the connector marks a column NOT NULL only for a
+	// field the collection schema requires, so the runtime does not in fact
+	// deliver a nil for one. Nothing about the rejection is specific to nulls —
+	// any rejected row takes the same path.
+	var rejectingTable = func(t *testing.T, table, stateKey string) sql.Table {
+		_, err := db.ExecContext(ctx, fmt.Sprintf("CREATE OR REPLACE TABLE %s (KEY TEXT, VAL VARIANT NOT NULL);", table))
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s;", table))
+		})
+
+		return sql.Table{
+			TableShape: sql.TableShape{Binding: 0, DeltaUpdates: true},
+			Identifier: table,
+			Keys:       []sql.Column{{Identifier: `KEY`}},
+			Values:     []sql.Column{{Identifier: `VAL`}},
+			StateKey:   stateKey,
+		}
+	}
+
 	// smallBatches cuts batches every two documents, so that a handful of rows
 	// exercises the boundaries a production batch needs ten thousand for.
 	var smallBatches = func(t *testing.T) {
@@ -479,18 +504,9 @@ func TestStreamV2Manager(t *testing.T) {
 		// rather than assumed, because it is what the fake sidecar and the
 		// sidecar's own tests model a drop as doing.
 		var notNullTable = "STREAMV2_TEST_RETIRE_NOT_NULL"
-		_, err = db.ExecContext(ctx, fmt.Sprintf("CREATE OR REPLACE TABLE %s (KEY TEXT, VAL VARIANT NOT NULL);", notNullTable))
-		require.NoError(t, err)
-		defer db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s;", notNullTable))
-
 		var rejecting = newManager(fullRange)
-		rejecting.addBinding(cfg.Database, cfg.Schema, notNullTable, sql.Table{
-			TableShape: sql.TableShape{Binding: 0, DeltaUpdates: true},
-			Identifier: notNullTable,
-			Keys:       []sql.Column{{Identifier: `KEY`}},
-			Values:     []sql.Column{{Identifier: `VAL`}},
-			StateKey:   "retire-notnull.v1",
-		}, nil)
+		rejecting.addBinding(cfg.Database, cfg.Schema, notNullTable,
+			rejectingTable(t, notNullTable, "retire-notnull.v1"), nil)
 		var rejected = rejecting.bindings[0].channel
 
 		require.NoError(t, rejecting.writeRow(ctx, 0, []any{"dropped", nil}))
@@ -560,25 +576,8 @@ func TestStreamV2Manager(t *testing.T) {
 		// table. Snowflake reports it only in the channel's row-error
 		// statistics, so the commit wait is where the transaction has to learn
 		// of it rather than acknowledging rows it did not deliver.
-		//
-		// A null against a NOT NULL column is the rejection this reproduces:
-		// omitting a column from the appended row object is how a nil converted
-		// value reaches Snowflake as SQL NULL, and the connector marks a column
-		// NOT NULL only for a field the collection schema requires, so the
-		// runtime does not in fact deliver a nil for one. Nothing here is
-		// specific to nulls — any rejected row takes the same path.
 		var notNullTable = "STREAMV2_TEST_NOT_NULL"
-		_, err = db.ExecContext(ctx, fmt.Sprintf("CREATE OR REPLACE TABLE %s (KEY TEXT, VAL VARIANT NOT NULL);", notNullTable))
-		require.NoError(t, err)
-		defer db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s;", notNullTable))
-
-		var notNullTarget = sql.Table{
-			TableShape: sql.TableShape{Binding: 0, DeltaUpdates: true},
-			Identifier: notNullTable,
-			Keys:       []sql.Column{{Identifier: `KEY`}},
-			Values:     []sql.Column{{Identifier: `VAL`}},
-			StateKey:   "notnull.v1",
-		}
+		var notNullTarget = rejectingTable(t, notNullTable, "notnull.v1")
 
 		var m = newManager(fullRange)
 		m.addBinding(cfg.Database, cfg.Schema, notNullTable, notNullTarget, nil)
