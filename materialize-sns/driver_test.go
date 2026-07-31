@@ -209,7 +209,7 @@ func applyOnBindings(t *testing.T, ctx context.Context, d driver, cfg *config, r
 		bindings = append(bindings, &pf.MaterializationSpec_Binding{
 			ResourceConfigJson: rJSON,
 			ResourcePath:       []string{r.TopicName},
-			Collection: dummyCollectionSpec("tests/dummy"),
+			Collection:         dummyCollectionSpec("tests/dummy"),
 		})
 	}
 

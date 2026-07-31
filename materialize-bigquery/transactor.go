@@ -332,8 +332,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		}
 		if t.cfg.Advanced.NoFlowDocument {
 			var err error
-			b := t.bindings[bd.Binding]
-			if doc, err = sql.SpliceMeta(doc, bd.MetaJSON, bd.ClockMicros, b.hasMetaClock); err != nil {
+			if doc, err = sql.SpliceMeta(doc, bd.ClockMicros); err != nil {
 				return fmt.Errorf("reconstructing _meta: %w", err)
 			}
 		}

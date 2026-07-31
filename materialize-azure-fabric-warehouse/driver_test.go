@@ -60,4 +60,3 @@ func TestIntegration(t *testing.T) {
 		)
 	})
 }
-

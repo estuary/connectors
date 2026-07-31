@@ -96,7 +96,6 @@ json_object(
        'stringInteger77Chars', CAST(l."stringInteger77Chars" AS VARCHAR),                                                                                                                                         
        'stringNumber', CAST(l."stringNumber" AS VARCHAR)                                                                                                                                                          
 ) as doc,
-CAST(NULL AS JSON) as meta,
 epoch_us(l.flow_published_at) as clock
 FROM db."a-schema".key_value AS l                                                                                                                                       
 JOIN read_json(                                                                                                                                                    

@@ -312,12 +312,6 @@ TO_JSON(STRUCT(
 	{{ template "uncast" (ColumnWithAlias $col "r") }} AS {{ $col.Field }}
 {{- end}}
 )) as flow_document,
-{{ if $.MetaColumns }}TO_JSON(STRUCT(
-{{- range $i, $col := $.MetaColumns}}
-	{{- if $i}}, {{end}}
-	{{ template "uncast" (ColumnWithAlias $col "r") }} AS {{ $col.MetaKey }}
-{{- end}}
-)){{ else }}CAST(NULL AS JSON){{ end }} as flow_meta,
 {{ if $.MetaUUIDClockColumn }}{{ template "unix_micros" (ColumnWithAlias $.MetaUUIDClockColumn "r") }}{{ else }}CAST(NULL AS INT64){{ end }} as flow_clock
 FROM {{ template "temp_name" . }} AS l
 JOIN {{ $.Identifier}} AS r
@@ -326,7 +320,7 @@ JOIN {{ $.Identifier}} AS r
 	l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 {{- end }}
 {{ else -}}
-SELECT * FROM (SELECT -1, CAST(NULL AS JSON), CAST(NULL AS JSON), CAST(NULL AS INT64) LIMIT 0) as nodoc
+SELECT * FROM (SELECT -1, CAST(NULL AS JSON), CAST(NULL AS INT64) LIMIT 0) as nodoc
 {{ end }}
 {{ end }}
 

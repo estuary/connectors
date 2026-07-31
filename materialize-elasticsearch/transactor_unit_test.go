@@ -81,7 +81,7 @@ func TestRetryBulkStoreResendsOnlyFailedItems(t *testing.T) {
 
 	responses := []*bulkResponse{
 		bulkResp(t, "", "retry_on_primary_exception", ""), // item 1 fails transiently
-		bulkResp(t, ""),                                   // resent item succeeds
+		bulkResp(t, ""), // resent item succeeds
 	}
 	var sentBodies [][]byte
 	send := func(body []byte) (*bulkResponse, error) {

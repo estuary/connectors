@@ -14,7 +14,7 @@ import (
 )
 
 var featureFlagDefaults = map[string]bool{
-	"datetime_keys_as_string": true,
+	"datetime_keys_as_string":          true,
 	"retain_existing_data_on_backfill": false,
 }
 

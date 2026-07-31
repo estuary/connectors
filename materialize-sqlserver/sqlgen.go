@@ -76,11 +76,11 @@ func createSqlServerDialect(collation string, defaultSchema string, featureFlags
 				sql.MapStatic("BIGINT"),
 				sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType), sql.UsingConverter(sql.ToStr)),
 			),
-			sql.NUMBER:  sql.MapStatic("DOUBLE PRECISION", sql.AlsoCompatibleWith("float")),
-			sql.BOOLEAN: sql.MapStatic("BIT"),
-			sql.OBJECT:  sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType), sql.UsingConverter(sql.ToJsonString)),
-			sql.ARRAY:   sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType), sql.UsingConverter(sql.ToJsonString)),
-			sql.BINARY:  binaryMapping,
+			sql.NUMBER:   sql.MapStatic("DOUBLE PRECISION", sql.AlsoCompatibleWith("float")),
+			sql.BOOLEAN:  sql.MapStatic("BIT"),
+			sql.OBJECT:   sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType), sql.UsingConverter(sql.ToJsonString)),
+			sql.ARRAY:    sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType), sql.UsingConverter(sql.ToJsonString)),
+			sql.BINARY:   binaryMapping,
 			sql.MULTIPLE: sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType), sql.UsingConverter(sql.ToJsonString)),
 			sql.STRING_INTEGER: sql.MapStringMaxLen(
 				sql.MapStatic("BIGINT", sql.UsingConverter(strToInt)),
@@ -432,18 +432,6 @@ SELECT {{ $.Binding }},
 		{{- end}}
 	FOR JSON PATH, INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER
 ) as flow_document,
-{{ if $.MetaColumns -}}
-(
-	SELECT
-		{{- range $i, $col := $.MetaColumns}}
-			{{- if $i}},{{end}}
-		{{Literal $col.MetaKey}} = {{ template "uncast" (ColumnWithAlias $col "r") }}
-		{{- end}}
-	FOR JSON PATH, INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER
-)
-{{- else -}}
-CAST(NULL AS NVARCHAR(MAX))
-{{- end }} as flow_meta,
 {{ if $.MetaUUIDClockColumn }}{{ template "unix_micros" (ColumnWithAlias $.MetaUUIDClockColumn "r") }}{{ else }}CAST(NULL AS BIGINT){{ end }} as flow_clock
 FROM {{ $.Identifier}} AS r
 JOIN {{ template "temp_load_name" . }} AS l
@@ -452,7 +440,7 @@ JOIN {{ template "temp_load_name" . }} AS l
 	l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 {{- end }}
 {{ else -}}
-SELECT TOP 0 -1, NULL, NULL, NULL
+SELECT TOP 0 -1, NULL, NULL
 {{ end }}
 {{ end }}
 

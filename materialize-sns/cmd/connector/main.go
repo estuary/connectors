@@ -3,8 +3,8 @@ package main
 import (
 	"os"
 
-	connector "github.com/estuary/connectors/materialize-sns"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
+	connector "github.com/estuary/connectors/materialize-sns"
 	"github.com/sirupsen/logrus"
 )
 

@@ -148,7 +148,6 @@ OBJECT(
 	'stringInteger77Chars', CAST(r."stringInteger77Chars" AS VARCHAR),
 	'stringNumber', CAST(r."stringNumber" AS VARCHAR)
 ) as flow_document,
-CAST(NULL AS SUPER) as flow_meta,
 DATEDIFF(microsecond, '1970-01-01'::TIMESTAMP, CAST(r.flow_published_at AS TIMESTAMP)) as flow_clock
 FROM flow_temp_table_0 AS l
 JOIN "a-schema".key_value AS r
@@ -160,7 +159,7 @@ JOIN "a-schema".key_value AS r
 
 --- Begin "a-schema".delta_updates loadQueryNoFlowDocument ---
 
-SELECT * FROM (SELECT -1, CAST(NULL AS SUPER), CAST(NULL AS SUPER), CAST(NULL AS BIGINT) LIMIT 0) as nodoc
+SELECT * FROM (SELECT -1, CAST(NULL AS SUPER), CAST(NULL AS BIGINT) LIMIT 0) as nodoc
 
 --- End "a-schema".delta_updates loadQueryNoFlowDocument ---
 

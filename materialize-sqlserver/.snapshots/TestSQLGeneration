@@ -245,7 +245,6 @@ SELECT 0,
 		'stringNumber' = CAST(r."stringNumber" AS NVARCHAR(MAX))
 	FOR JSON PATH, INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER
 ) as flow_document,
-CAST(NULL AS NVARCHAR(MAX)) as flow_meta,
 DATEDIFF_BIG(microsecond, CAST('1970-01-01' AS DATETIME2), r.flow_published_at) as flow_clock
 FROM key_value AS r
 JOIN #flow_temp_load_0 AS l
@@ -257,7 +256,7 @@ JOIN #flow_temp_load_0 AS l
 
 --- Begin delta_updates loadQueryNoFlowDocument ---
 
-SELECT TOP 0 -1, NULL, NULL, NULL
+SELECT TOP 0 -1, NULL, NULL
 
 --- End delta_updates loadQueryNoFlowDocument ---
 

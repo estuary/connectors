@@ -304,16 +304,6 @@ SELECT {{ $.Binding }},
 		{{Literal $col.Field}}: {{ template "uncast" (ColumnWithAlias $col "r") }}
 		{{- end}}
 	) as flow_document,
-	{{ if $.MetaColumns -}}
-	JSON_OBJECT(
-		{{- range $i, $col := $.MetaColumns}}
-			{{- if $i}},{{end}}
-		{{Literal $col.MetaKey}}: {{ template "uncast" (ColumnWithAlias $col "r") }}
-		{{- end}}
-	)
-	{{- else -}}
-	CAST(NULL AS VARCHAR(MAX))
-	{{- end }} as flow_meta,
 	{{ if $.MetaUUIDClockColumn }}{{ template "unix_micros" (ColumnWithAlias $.MetaUUIDClockColumn "r") }}{{ else }}CAST(NULL AS BIGINT){{ end }} as flow_clock
 FROM {{ template "temp_name_load" . }} AS l
 JOIN {{ $.Identifier}} AS r
@@ -323,7 +313,7 @@ JOIN {{ $.Identifier}} AS r
 	{{- if $bound.LiteralLower }} AND r.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND r.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
 {{- end }}
 {{ else -}}
-SELECT TOP 0 -1, NULL, NULL, NULL
+SELECT TOP 0 -1, NULL, NULL
 {{ end }}
 {{ end }}
 

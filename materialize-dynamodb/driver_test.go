@@ -46,4 +46,3 @@ func TestIntegration(t *testing.T) {
 		boilerplate.RunMigrationTest(t, newMaterialization, "testdata/migrate.flow.yaml", makeResourceFn, nil)
 	})
 }
-

@@ -28,7 +28,6 @@ type bindingDocument struct {
 	Document json.RawMessage
 	// The no_flow_document load query reports the reconstructed _meta object and
 	// the document's publication clock separately, see sql.SpliceMeta.
-	MetaJSON    []byte
 	ClockMicros *int64
 }
 
@@ -37,7 +36,7 @@ type bindingDocument struct {
 func (bd *bindingDocument) Load(v []bigquery.Value, s bigquery.Schema) error {
 	// The no_flow_document load query adds the reconstructed _meta object and the
 	// document's publication clock.
-	if len(v) != 2 && len(v) != 4 {
+	if len(v) != 2 && len(v) != 3 {
 		return fmt.Errorf("invalid value count: %d", len(v))
 	}
 	if binding, ok := v[0].(int64); !ok {
@@ -52,23 +51,14 @@ func (bd *bindingDocument) Load(v []bigquery.Value, s bigquery.Schema) error {
 	}
 
 	// Reset per-row, since the iterator reuses this struct across rows.
-	bd.MetaJSON, bd.ClockMicros = nil, nil
+	bd.ClockMicros = nil
 
-	if len(v) == 4 {
-		if v[2] != nil {
-			meta, ok := v[2].(string)
-			if !ok {
-				return fmt.Errorf("value[2] wrong type %T expecting string", v[2])
-			}
-			bd.MetaJSON = []byte(meta)
+	if len(v) == 3 && v[2] != nil {
+		clock, ok := v[2].(int64)
+		if !ok {
+			return fmt.Errorf("value[2] wrong type %T expecting int64", v[2])
 		}
-		if v[3] != nil {
-			clock, ok := v[3].(int64)
-			if !ok {
-				return fmt.Errorf("value[3] wrong type %T expecting int64", v[3])
-			}
-			bd.ClockMicros = &clock
-		}
+		bd.ClockMicros = &clock
 	}
 
 	return nil

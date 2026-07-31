@@ -437,8 +437,8 @@ const MaxConcurrentQueries = 5
 type loadDoc struct {
 	binding  int
 	document json.RawMessage
-	// The no_flow_document load query reports the reconstructed _meta object and
-	// the document's publication clock separately, see sql.SpliceMeta.
+	// The no_flow_document load query reports the document's publication clock,
+	// see sql.SpliceMeta.
 	metaJSON    []byte
 	clockMicros *int64
 }
@@ -536,7 +536,6 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 			var binding int
 			var document stdsql.RawBytes
-			var metaJSON stdsql.RawBytes
 			var clockMicros *int64
 
 			log.WithFields(log.Fields{
@@ -547,7 +546,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			rowsProcessed := 0
 			for rows.Next() {
 				if d.cfg.Advanced.NoFlowDocument {
-					err = rows.Scan(&binding, &document, &metaJSON, &clockMicros)
+					err = rows.Scan(&binding, &document, &clockMicros)
 				} else {
 					err = rows.Scan(&binding, &document)
 				}
@@ -560,7 +559,6 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 				doc := &loadDoc{
 					binding:     binding,
 					document:    json.RawMessage(message),
-					metaJSON:    slices.Clone(metaJSON),
 					clockMicros: clockMicros,
 				}
 				select {
@@ -608,8 +606,7 @@ func (d *transactor) loadDocuments(ctx context.Context, ch chan *loadDoc, loaded
 			}
 			if d.cfg.Advanced.NoFlowDocument {
 				var err error
-				b := d.bindings[doc.binding]
-				if loadDoc, err = sql.SpliceMeta(loadDoc, doc.metaJSON, doc.clockMicros, b.hasMetaClock); err != nil {
+				if loadDoc, err = sql.SpliceMeta(loadDoc, doc.clockMicros); err != nil {
 					return fmt.Errorf("reconstructing _meta: %w", err)
 				}
 			}

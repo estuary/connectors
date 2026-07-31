@@ -778,11 +778,10 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		var document spanner.NullJSON
 		// The no_flow_document load query reports the reconstructed _meta object
 		// and the document's publication clock separately, see sql.SpliceMeta.
-		var metaJSON spanner.NullJSON
 		var clockMicros spanner.NullInt64
 
 		if t.cfg.Advanced.NoFlowDocument {
-			if err := row.Columns(&bindingNum, &document, &metaJSON, &clockMicros); err != nil {
+			if err := row.Columns(&bindingNum, &document, &clockMicros); err != nil {
 				return fmt.Errorf("scanning load result row: %w", err)
 			}
 		} else if err := row.Columns(&bindingNum, &document); err != nil {
@@ -814,20 +813,12 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			}
 		}
 		if t.cfg.Advanced.NoFlowDocument {
-			var rawMeta []byte
-			if metaJSON.Valid {
-				var err error
-				if rawMeta, err = nullJSONBytes(metaJSON); err != nil {
-					return fmt.Errorf("decoding reconstructed _meta: %w", err)
-				}
-			}
 			var clock *int64
 			if clockMicros.Valid {
 				clock = &clockMicros.Int64
 			}
 			var err error
-			b := t.bindings[int(bindingNum)]
-			if rawDoc, err = sql.SpliceMeta(rawDoc, rawMeta, clock, b.hasMetaClock); err != nil {
+			if rawDoc, err = sql.SpliceMeta(rawDoc, clock); err != nil {
 				return fmt.Errorf("reconstructing _meta: %w", err)
 			}
 		}

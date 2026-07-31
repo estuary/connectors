@@ -643,11 +643,10 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 					// The no_flow_document load query reports the reconstructed
 					// _meta object and the document's publication clock
 					// separately, see sql.SpliceMeta.
-					var metaJSON []byte
 					var clockMicros *int64
 
 					if t.cfg.Advanced.NoFlowDocument {
-						err = rows.Scan(&doc, &metaJSON, &clockMicros)
+						err = rows.Scan(&doc, &clockMicros)
 					} else {
 						err = rows.Scan(&doc)
 					}
@@ -660,7 +659,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 						}
 					}
 					if t.cfg.Advanced.NoFlowDocument {
-						if doc, err = sql.SpliceMeta(doc, metaJSON, clockMicros, b.hasMetaClock); err != nil {
+						if doc, err = sql.SpliceMeta(doc, clockMicros); err != nil {
 							return fmt.Errorf("reconstructing _meta for %s: %w", b.target.Identifier, err)
 						}
 					}

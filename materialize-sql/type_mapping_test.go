@@ -163,40 +163,40 @@ func TestMapType_NullabilityDDL(t *testing.T) {
 
 func TestAsFlatType_Binary(t *testing.T) {
 	cases := []struct {
-		name            string
-		contentEncoding string
+		name             string
+		contentEncoding  string
 		contentMediaType string
-		want            FlatType
+		want             FlatType
 	}{
 		{
-			name:            "base64 without contentMediaTypee",
-			contentEncoding: "base64",
+			name:             "base64 without contentMediaTypee",
+			contentEncoding:  "base64",
 			contentMediaType: "",
-			want:            BINARY,
+			want:             BINARY,
 		},
 		{
-			name:            "base64 + application/octet-stream",
-			contentEncoding: "base64",
+			name:             "base64 + application/octet-stream",
+			contentEncoding:  "base64",
 			contentMediaType: "application/octet-stream",
-			want:            BINARY,
+			want:             BINARY,
 		},
 		{
-			name:            "base64 + unrelated contentMediaTypee routes to string",
-			contentEncoding: "base64",
+			name:             "base64 + unrelated contentMediaTypee routes to string",
+			contentEncoding:  "base64",
 			contentMediaType: "application/x-protobuf; proto=flow.MaterializationSpec",
-			want:            STRING,
+			want:             STRING,
 		},
 		{
-			name:            "no encoding",
-			contentEncoding: "",
+			name:             "no encoding",
+			contentEncoding:  "",
 			contentMediaType: "",
-			want:            STRING,
+			want:             STRING,
 		},
 		{
-			name:            "octet-stream without base64 stays string",
-			contentEncoding: "",
+			name:             "octet-stream without base64 stays string",
+			contentEncoding:  "",
 			contentMediaType: "application/octet-stream",
-			want:            STRING,
+			want:             STRING,
 		},
 	}
 

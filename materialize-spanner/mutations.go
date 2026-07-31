@@ -260,9 +260,9 @@ func calculateMutationByteSize(values []interface{}) int {
 
 // mutationBatch accumulates mutations for efficient batching
 type mutationBatch struct {
-	mutations    []*spanner.Mutation
+	mutations     []*spanner.Mutation
 	mutationCount int // Spanner mutation count (columns * operations)
-	byteSize     int // Approximate size in bytes
+	byteSize      int // Approximate size in bytes
 }
 
 const (

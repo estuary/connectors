@@ -267,7 +267,7 @@ func TestPartitionedBatches_GetPartitionIndex(t *testing.T) {
 		hash     int64
 		expected int
 	}{
-		{"positive hash", 12345, 5}, // 12345 % 10 = 5
+		{"positive hash", 12345, 5},  // 12345 % 10 = 5
 		{"negative hash", -12345, 5}, // abs(-12345) % 10 = 5
 		{"zero hash", 0, 0},
 		{"exactly divisible", 100, 0}, // 100 % 10 = 0
@@ -402,9 +402,9 @@ func TestCalculateMutationByteSize(t *testing.T) {
 		{
 			name: "with Spanner null types",
 			values: []interface{}{
-				spanner.NullInt64{Valid: true, Int64: 100},     // 9
+				spanner.NullInt64{Valid: true, Int64: 100},      // 9
 				spanner.NullString{Valid: true, StringVal: "x"}, // 2
-				spanner.NullBool{Valid: false},                 // 1
+				spanner.NullBool{Valid: false},                  // 1
 			},
 			expected: 9 + 2 + 1,
 		},
@@ -432,24 +432,24 @@ func TestCalculateMutationByteSize_AccuracyVsEstimate(t *testing.T) {
 	// the old fixed estimate of 100 bytes per column
 
 	tests := []struct {
-		name              string
-		values            []interface{}
-		oldEstimate       int // numColumns * 100
-		actualSize        int
+		name             string
+		values           []interface{}
+		oldEstimate      int // numColumns * 100
+		actualSize       int
 		accuracyImproved bool
 	}{
 		{
-			name:              "small values - old estimate too high",
-			values:            []interface{}{int64(1), int64(2), int64(3)},
-			oldEstimate:       3 * 100, // 300
-			actualSize:        3 * 8,   // 24
+			name:             "small values - old estimate too high",
+			values:           []interface{}{int64(1), int64(2), int64(3)},
+			oldEstimate:      3 * 100, // 300
+			actualSize:       3 * 8,   // 24
 			accuracyImproved: true,
 		},
 		{
-			name:              "mixed small and medium - old estimate still too high",
-			values:            []interface{}{int64(1), "test", true, float64(1.5)},
-			oldEstimate:       4 * 100,    // 400
-			actualSize:        8 + 4 + 1 + 8, // 21
+			name:             "mixed small and medium - old estimate still too high",
+			values:           []interface{}{int64(1), "test", true, float64(1.5)},
+			oldEstimate:      4 * 100,       // 400
+			actualSize:       8 + 4 + 1 + 8, // 21
 			accuracyImproved: true,
 		},
 		{
@@ -458,9 +458,9 @@ func TestCalculateMutationByteSize_AccuracyVsEstimate(t *testing.T) {
 				int64(1),
 				json.RawMessage(`{"very":"large","json":"document","with":"many","fields":"and","nested":{"objects":"here","array":[1,2,3,4,5]}}`),
 			},
-			oldEstimate:       2 * 100, // 200
-			actualSize:        8 + 111, // 119
-			accuracyImproved: false, // Old estimate was actually closer in this case
+			oldEstimate:      2 * 100, // 200
+			actualSize:       8 + 111, // 119
+			accuracyImproved: false,   // Old estimate was actually closer in this case
 		},
 	}
 

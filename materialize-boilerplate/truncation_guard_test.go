@@ -29,8 +29,13 @@ func guardBindingFor(collection string, delta bool, withDocument bool, valuePtrs
 	b.Collection = pf.CollectionSpec{Name: pf.Collection(collection)}
 	b.DeltaUpdates = delta
 	for _, ptr := range valuePtrs {
+		inf := pf.Inference{}
+		if ptr == metaUUIDPtr {
+			// Only a date-time projection of the location is a clock.
+			inf.String_ = &pf.Inference_String{Format: "date-time"}
+		}
 		b.Values = append(b.Values, MappedProjection[testMappedTyper]{
-			Projection: Projection{Projection: pf.Projection{Field: ptr, Ptr: ptr}},
+			Projection: Projection{Projection: pf.Projection{Field: ptr, Ptr: ptr, Inference: inf}},
 		})
 	}
 	if withDocument {
@@ -57,7 +62,7 @@ func TestTruncationGuard(t *testing.T) {
 		inner := &stubTransactor{}
 		got := newTruncationGuard[testEndpointConfiger, testResourcer, testMappedTyper](inner, []guardBinding{
 			guardBindingFor("acmeCo/a", false, true),                 // root document
-			guardBindingFor("acmeCo/b", false, false, "/_meta/uuid"), // raw uuid
+			guardBindingFor("acmeCo/b", false, false, "/_meta/uuid"), // flow_published_at
 			guardBindingFor("acmeCo/c", false, false, "/id", "/_meta/uuid"),
 			guardBindingFor("acmeCo/d", true, false, "/id"), // delta: exempt
 		})
@@ -75,7 +80,7 @@ func TestTruncationGuard(t *testing.T) {
 		for _, complete := range []bool{false, true} {
 			err := ft.Flush(context.Background(), flushWithBackfill(0, complete))
 			require.ErrorContains(t, err, "acmeCo/no-uuid")
-			require.ErrorContains(t, err, "_meta/uuid")
+			require.ErrorContains(t, err, "flow_published_at")
 		}
 	})
 

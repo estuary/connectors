@@ -229,12 +229,6 @@ to_json(struct(
 	{{ template "uncast" (ColumnWithAlias $col $.Table.Identifier) }} AS {{ $col.Field }}
 {{- end}}
 )) as flow_document,
-{{ if $.Table.MetaColumns }}to_json(struct(
-{{- range $i, $col := $.Table.MetaColumns}}
-	{{- if $i}},{{end}}
-	{{ template "uncast" (ColumnWithAlias $col $.Table.Identifier) }} AS {{ $col.MetaKey }}
-{{- end}}
-)){{ else }}CAST(NULL AS STRING){{ end }} as flow_meta,
 {{ if $.Table.MetaUUIDClockColumn }}{{ template "unix_micros" (ColumnWithAlias $.Table.MetaUUIDClockColumn $.Table.Identifier) }}{{ else }}CAST(NULL AS BIGINT){{ end }} as flow_clock
 FROM {{ $.Table.Identifier }}
 JOIN (
@@ -256,7 +250,7 @@ JOIN (
 {{- if $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
 {{- end }}
 {{ else -}}
-SELECT -1, "", CAST(NULL AS STRING), CAST(NULL AS BIGINT)
+SELECT -1, "", CAST(NULL AS BIGINT)
 {{ end }}
 {{ end }}
 

@@ -21,9 +21,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/estuary/connectors/go/writer"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate/testutil"
 	"github.com/estuary/connectors/materialize-iceberg/catalog"
 	"github.com/estuary/connectors/materialize-iceberg/python"
-	boilerplate "github.com/estuary/connectors/materialize-boilerplate/testutil"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/google/uuid"
 	"github.com/segmentio/encoding/json"
@@ -387,7 +387,7 @@ func runTimestampOverflowRegression(t *testing.T) {
 		}},
 	}
 	body, err := json.Marshal(struct {
-		Action string             `json:"action"`
+		Action string            `json:"action"`
 		Input  python.MergeInput `json:"input"`
 	}{Action: "merge", Input: mergeInput})
 	require.NoError(t, err)

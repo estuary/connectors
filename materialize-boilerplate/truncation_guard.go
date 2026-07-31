@@ -63,9 +63,8 @@ func (g *truncationGuard) check(binding uint32) error {
 	return fmt.Errorf(
 		"cannot apply the backfill of collection %s: this materialization does not report a document clock for that binding, "+
 			"which is required to determine which destination rows the backfill superseded. "+
-			"Materialize the root document, or add the %q field (or another projection of %s such as flow_published_at) "+
-			"to the binding's selected fields",
-		g.collections[binding], "_meta/uuid", metaUUIDPtr,
+			"Materialize the root document, or add the %q field to the binding's selected fields",
+		g.collections[binding], "flow_published_at",
 	)
 }
 
@@ -111,7 +110,9 @@ func bindingReportsClock[EC EndpointConfiger, RC Resourcer[RC, EC], MT MappedTyp
 	}
 
 	for _, p := range b.SelectedProjections() {
-		if p.Ptr == metaUUIDPtr {
+		// Only a date-time projection of the location (canonically
+		// flow_published_at) is reported as a clock.
+		if p.Ptr == metaUUIDPtr && p.Inference.String_ != nil && p.Inference.String_.Format == "date-time" {
 			return true
 		}
 	}
