@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -478,10 +479,25 @@ func loadDocuments(t *testing.T, ctx context.Context, loadConn chdriver.Conn, b 
 	rows, err := loadConn.Query(ctx, b.load.querySQL)
 	require.NoError(t, err)
 
+	// The no_flow_document load query also reports the reconstructed _meta object
+	// and the document clock, which the transactor reassembles via
+	// sql.SpliceMeta. Key off the rendered query rather than rows.Columns(),
+	// which clickhouse-go does not populate until the first Next().
+	var noFlowDocument = strings.Contains(b.load.querySQL, "flow_meta")
+
 	var docs []string
 	for rows.Next() {
 		var doc string
-		require.NoError(t, rows.Scan(&doc))
+		if noFlowDocument {
+			var metaJSON []byte
+			var clockMicros *int64
+			require.NoError(t, rows.Scan(&doc, &metaJSON, &clockMicros))
+			spliced, err := sql.SpliceMeta([]byte(doc), metaJSON, clockMicros, b.hasMetaClock)
+			require.NoError(t, err)
+			doc = string(spliced)
+		} else {
+			require.NoError(t, rows.Scan(&doc))
+		}
 		docs = append(docs, doc)
 	}
 	_ = rows.Close()

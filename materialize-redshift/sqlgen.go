@@ -418,7 +418,7 @@ SELECT * FROM (SELECT -1, CAST(NULL AS SUPER) LIMIT 0) as nodoc
 -- synthesizes the document UUID without parsing a formatted timestamp.
 
 {{ define "unix_micros" -}}
-DATEDIFF(microsecond, TIMESTAMPTZ '1970-01-01 00:00:00+00', {{ $.Alias }}.{{ $.Identifier }})
+DATEDIFF(microsecond, '1970-01-01'::TIMESTAMP, CAST({{ $.Alias }}.{{ $.Identifier }} AS TIMESTAMP))
 {{- end }}
 
 {{ define "loadQueryNoFlowDocument" }}
