@@ -11,6 +11,7 @@ import (
 	snowflake_auth "github.com/estuary/connectors/go/auth/snowflake"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	pm "github.com/estuary/flow/go/protocols/materialize"
 	jsonpatch "github.com/evanphx/json-patch/v5"
 	"github.com/stretchr/testify/require"
 )
@@ -226,6 +227,100 @@ func TestStreamV2ChannelRetirement(t *testing.T) {
 	require.Equal(t, int64(1), items[0].Counter)
 }
 
+// TestStreamV2BackfillRecreatesTheTable pins how a backfill of a streaming v2
+// binding must reach its table.
+//
+// Apply runs while the outgoing generation's shards are still storing, and their
+// channels are bound to the very table the new generation is about to
+// re-materialize. Truncating it leaves those channels valid and pointed at it, so
+// the rows they append next land after the truncate, survive it, and are
+// re-materialized a second time. Dropping the table is what takes the channels
+// with it — every one of them, including those of a shard the checkpoint names no
+// item for. The live experiment behind both halves of that is the backfill
+// subtest of TestStreamV2Manager.
+func TestStreamV2BackfillRecreatesTheTable(t *testing.T) {
+	var cfg = func(authType string, flags string) config {
+		return config{
+			Credentials: &snowflake_auth.CredentialConfig{AuthType: authType},
+			Advanced:    advancedConfig{FeatureFlags: flags},
+		}
+	}
+	var binding = func(deltaUpdates bool) *pf.MaterializationSpec_Binding {
+		return &pf.MaterializationSpec_Binding{DeltaUpdates: deltaUpdates}
+	}
+
+	for _, tt := range []struct {
+		name       string
+		cfg        config
+		last, next *pf.MaterializationSpec_Binding
+		want       bool
+	}{
+		{
+			name: "a streaming v2 binding",
+			cfg:  cfg(snowflake_auth.JWT, flagSnowpipeStreamingV2),
+			last: binding(true),
+			next: binding(true),
+			want: true,
+		},
+		{
+			// The channels which must not outlive the turnover are the outgoing
+			// generation's, so it is the write path that generation ran on which
+			// decides this, not the one the new generation will run.
+			name: "a binding leaving the streaming v2 path",
+			cfg:  cfg(snowflake_auth.JWT, flagSnowpipeStreamingV2),
+			last: binding(true),
+			next: binding(false),
+			want: true,
+		},
+		{
+			// A binding arriving on the path has no channels of its own yet, but
+			// its table may still be one another writer holds channels on.
+			name: "a binding arriving on the streaming v2 path",
+			cfg:  cfg(snowflake_auth.JWT, flagSnowpipeStreamingV2),
+			last: binding(false),
+			next: binding(true),
+			want: true,
+		},
+		{
+			// Standard updates are written through staged files, which a truncate
+			// cannot race.
+			name: "a standard updates binding",
+			cfg:  cfg(snowflake_auth.JWT, flagSnowpipeStreamingV2),
+			last: binding(false),
+			next: binding(false),
+		},
+		{
+			name: "the streaming v2 flag not set",
+			cfg:  cfg(snowflake_auth.JWT, ""),
+			last: binding(true),
+			next: binding(true),
+		},
+		{
+			// The write path needs a key pair to authenticate the sidecar with, so
+			// a binding of a password-authenticated task never streams.
+			name: "a task which cannot stream at all",
+			cfg:  cfg(snowflake_auth.UserPass, flagSnowpipeStreamingV2),
+			last: binding(true),
+			next: binding(true),
+		},
+		{
+			// A resource which exists without the last-applied specification
+			// binding it is one no generation of this task has been streaming to.
+			name: "a binding with no outgoing generation",
+			cfg:  cfg(snowflake_auth.JWT, flagSnowpipeStreamingV2),
+			last: nil,
+			next: binding(false),
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var c = &client{cfg: tt.cfg}
+			got, err := c.MustRecreateResource(&pm.Request_Apply{}, tt.last, tt.next)
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestReconcileStreamV2Channel(t *testing.T) {
 	var token = func(s string) *string { return &s }
 	var prior = func(counter int64, keyBegin, keyEnd uint32) map[string]*streamV2Item {
@@ -247,9 +342,15 @@ func TestReconcileStreamV2Channel(t *testing.T) {
 			prior:     nil,
 		},
 		{
-			name:      "nothing committed with a checkpointed counter",
+			// The channel Snowflake held those documents on is gone, and with it
+			// the token which says which of them it holds. A backfill of the
+			// binding is what does that — it re-creates the table, taking every
+			// channel bound to it — so this is what a shard of the outgoing
+			// generation finds when it restarts into a turnover.
+			name:      "nothing committed with a checkpointed counter is refused",
 			committed: nil,
 			prior:     prior(42, keyBegin, keyEnd),
+			wantErr:   "has lost committed data",
 		},
 		{
 			name:      "clean boundary",

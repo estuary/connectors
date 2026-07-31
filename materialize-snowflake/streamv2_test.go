@@ -531,6 +531,113 @@ func TestStreamV2Manager(t *testing.T) {
 		})
 	})
 
+	t.Run("a backfill the outgoing generation cannot race", func(t *testing.T) {
+		// Bumping a binding's backfill re-materializes it into the same table,
+		// and Apply does that while the outgoing generation's shards are still
+		// storing: nothing stops them first. Their channels are bound to that
+		// same table, so what Apply does to the table is what decides whether the
+		// rows they append next end up in what the new generation materializes.
+		// Only Snowflake can say which operation takes those channels with it, so
+		// each is measured here in turn.
+		var turnoverTable = "STREAMV2_TEST_TURNOVER"
+
+		// recreateTable drops and re-creates the table, as Apply does for a
+		// streaming v2 binding whose backfill counter has been bumped.
+		var recreateTable = func(t *testing.T) {
+			_, err := db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s;", turnoverTable))
+			require.NoError(t, err)
+			_, err = db.ExecContext(ctx, fmt.Sprintf("CREATE TABLE %s (KEY TEXT, INTCOL NUMBER, DOC VARIANT);", turnoverTable))
+			require.NoError(t, err)
+		}
+		t.Cleanup(func() {
+			db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s;", turnoverTable))
+		})
+
+		var turnoverTarget = func(stateKey string) sql.Table {
+			var tgt = target(stateKey)
+			tgt.Identifier = turnoverTable
+			tgt.DeltaUpdates = true
+			return tgt
+		}
+
+		var countTurnoverRows = func() int {
+			var count int
+			require.NoError(t, db.QueryRowContext(ctx, fmt.Sprintf("SELECT COUNT(*) FROM %s;", turnoverTable)).Scan(&count))
+			return count
+		}
+
+		// outgoingGeneration is a shard of the generation being replaced, holding
+		// an open channel with three documents appended, committed, and accounted
+		// for by its checkpoint.
+		var outgoingGeneration = func(t *testing.T, stateKey string) (*streamV2Manager, streamV2Item) {
+			recreateTable(t)
+
+			var m = newManager(fullRange)
+			m.addBinding(cfg.Database, cfg.Schema, turnoverTable, turnoverTarget(stateKey), nil)
+
+			writeRows(m, 0, 3)
+			items, err := m.flush(ctx)
+			require.NoError(t, err)
+			require.Equal(t, int64(3), items[0].Counter)
+			require.Equal(t, 3, countTurnoverRows())
+			return m, *items[0]
+		}
+
+		t.Run("a truncate leaves it appending", func(t *testing.T) {
+			// This is the defect. The truncate empties the table for the new
+			// generation while the outgoing generation's channel — untouched, and
+			// still bound to that table — goes on appending into it. Those rows
+			// land after the truncate, survive it, and are then re-materialized by
+			// the new generation: a duplicate of each, for good, on a
+			// delta-updates binding.
+			var outgoing, _ = outgoingGeneration(t, "turnover-truncate.v1")
+
+			_, err := db.ExecContext(ctx, fmt.Sprintf("TRUNCATE TABLE %s;", turnoverTable))
+			require.NoError(t, err)
+			require.Zero(t, countTurnoverRows())
+
+			writeRows(outgoing, 3, 5)
+			items, err := outgoing.flush(ctx)
+			require.NoError(t, err)
+			require.Equal(t, int64(5), items[0].Counter)
+			require.Equal(t, 2, countTurnoverRows())
+			outgoing.stop()
+		})
+
+		t.Run("a drop and re-create does not", func(t *testing.T) {
+			// Dropping the table takes every channel bound to it, named by the
+			// checkpoint or not, so the outgoing generation's appends fail instead
+			// of landing in the table the new generation is re-materializing.
+			var outgoing, checkpointed = outgoingGeneration(t, "turnover-drop.v1")
+
+			recreateTable(t)
+
+			writeRows(outgoing, 3, 5)
+			_, err := outgoing.flush(ctx)
+			require.Error(t, err)
+			require.Zero(t, countTurnoverRows())
+			t.Logf("the outgoing generation's append failed with: %s", err)
+			outgoing.sup.kill()
+
+			// Nor may it come back. A shard which has not yet been told to stop
+			// restarts and reopens a channel Snowflake no longer holds: its
+			// committed offset token is gone while the checkpoint still records
+			// three documents appended to it. That is the same lost-state refusal
+			// an absorbed channel gets from a join, and the only reading of it
+			// which does not append this generation's documents into a table that
+			// has been re-materialized under them.
+			var restarted = newManager(fullRange)
+			restarted.addBinding(cfg.Database, cfg.Schema, turnoverTable,
+				turnoverTarget("turnover-drop.v1"), priorOf(&checkpointed))
+
+			var refusal = restarted.writeRow(ctx, 0, []any{"k", 1, json.RawMessage(`{}`)})
+			require.ErrorContains(t, refusal, "has lost committed data")
+			require.ErrorContains(t, refusal, checkpointed.Channel)
+			require.Zero(t, countTurnoverRows())
+			t.Logf("the outgoing generation's reopen was refused with: %s", refusal)
+		})
+	})
+
 	t.Run("refusals", func(t *testing.T) {
 		truncate(t)
 		smallBatches(t)
