@@ -61,12 +61,12 @@ type streamV2Item struct {
 }
 
 // streamsV2 reports whether a binding's rows are written by the snowpipe
-// streaming v2 path: it appends rows to a channel as it stores them, which only a
-// delta-updates binding can do, and authenticates its sidecar with the key pair
-// JWT credentials carry.
+// streaming v2 path, which appends them to a channel as it stores them — something
+// only a delta-updates binding does, and only with the key pair JWT credentials
+// carry to authenticate its sidecar.
 //
-// It decides both how the transactor stores a binding's rows and what a backfill
-// of that binding may do to its table, which must agree — see
+// The transactor and Apply must agree on this: it decides both how a binding's
+// rows are stored and what a backfill of that binding may do to its table — see
 // client.MustRecreateResource.
 func streamsV2(cfg *config, deltaUpdates bool, flagEnabled bool) bool {
 	return deltaUpdates && cfg.Credentials.AuthType == snowflake_auth.JWT && flagEnabled
@@ -372,13 +372,12 @@ func reconcileStreamV2Channel(channel string, committedToken *string, prior map[
 	// appended to is gone, and the token which says which of them Snowflake holds
 	// went with it.
 	//
-	// That is what a shard of an outgoing generation finds when it restarts into a
-	// backfill of its binding: the new generation's Apply drops and re-creates the
-	// table, taking every channel bound to it (client.MustRecreateResource), and
-	// this refusal is what stops the shard from re-creating its channel against
-	// the re-materialized table and appending to it again. A shard so refused is
-	// running a specification the runtime is already replacing, so the refusal is
-	// spent by the replacement rather than needing the backfill it asks for.
+	// That is what a shard restarting into a backfill of its binding finds, since
+	// the backfill re-creates the table and takes every channel bound to it — see
+	// client.MustRecreateResource — and refusing is what stops that shard from
+	// appending into the table which has been re-materialized under it. The
+	// specification it is running is already being replaced, so the replacement
+	// settles the refusal rather than the backfill it asks for.
 	if committedToken == nil {
 		if counter > 0 {
 			return 0, fmt.Errorf(
