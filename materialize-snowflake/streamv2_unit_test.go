@@ -368,6 +368,101 @@ func TestStreamV2BackfillRecreatesTheTable(t *testing.T) {
 	}
 }
 
+// TestStreamV2GenerationComment covers the line a streaming v2 binding's table
+// carries to name the generation it belongs to: it must survive the round trip
+// through a comment which also carries prose meant for whoever reads the table.
+func TestStreamV2GenerationComment(t *testing.T) {
+	var gen = streamV2Generation{materialization: "acmeCo/materialize-snowflake", stateKey: "public%2Fwidgets.v3"}
+	var comment = streamV2GenerationComment("Generated for materialization acmeCo/materialize-snowflake of collection acmeCo/widgets", gen)
+
+	readBack, ok := streamV2GenerationOf(comment)
+	require.True(t, ok)
+	require.Equal(t, gen, readBack)
+
+	for _, tt := range []struct {
+		name    string
+		comment string
+	}{
+		{name: "no comment at all"},
+		{
+			name:    "a comment this connector wrote before it recorded generations",
+			comment: "Generated for materialization acmeCo/materialize-snowflake of collection acmeCo/widgets",
+		},
+		{
+			// Whoever rewrites the comment of a table takes the record with it,
+			// which reads as a table that never had one.
+			name:    "a marker without a state key",
+			comment: "flow_generation: acmeCo/materialize-snowflake",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			_, ok := streamV2GenerationOf(tt.comment)
+			require.False(t, ok)
+		})
+	}
+}
+
+// TestStreamV2GenerationConflict covers which shards a table turns away.
+//
+// A backfill re-creates the table, which takes every channel bound to it, but the
+// shards of the generation it replaces keep running and open channels against the
+// table again — and a channel opened against a re-created table looks exactly like
+// one opened against a table that was always empty. The generation the table
+// records is what tells them apart.
+func TestStreamV2GenerationConflict(t *testing.T) {
+	const task = "acmeCo/materialize-snowflake"
+	var mine = streamV2Generation{materialization: task, stateKey: "widgets.v3"}
+	var commentOf = func(gen streamV2Generation) string {
+		return streamV2GenerationComment("Generated for materialization "+gen.materialization, gen)
+	}
+
+	for _, tt := range []struct {
+		name    string
+		comment string
+		wantErr bool
+	}{
+		{
+			name:    "the table records this generation",
+			comment: commentOf(mine),
+		},
+		{
+			// The state key rotates with the backfill counter, so a table naming a
+			// different one of this task's own is a table this task has already
+			// been replaced on.
+			name:    "the table records a later generation of this binding",
+			comment: commentOf(streamV2Generation{materialization: task, stateKey: "widgets.v4"}),
+			wantErr: true,
+		},
+		{
+			// Two tasks materializing into one table are not generations of each
+			// other, and whichever created the table last is the one it names.
+			name:    "the table records another task",
+			comment: commentOf(streamV2Generation{materialization: "acmeCo/other", stateKey: "widgets.v4"}),
+		},
+		{
+			// A table created before this connector recorded generations, or by a
+			// standard-updates generation of the binding, says nothing about which
+			// generation may stream into it.
+			name:    "the table records no generation",
+			comment: "Generated for materialization " + task,
+		},
+		{
+			name: "the table has no comment",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var err = streamV2GenerationConflict(tt.comment, mine, "WIDGETS")
+			if !tt.wantErr {
+				require.NoError(t, err)
+				return
+			}
+			require.ErrorContains(t, err, "WIDGETS")
+			require.ErrorContains(t, err, "widgets.v3")
+			require.ErrorContains(t, err, "widgets.v4")
+		})
+	}
+}
+
 func TestReconcileStreamV2Channel(t *testing.T) {
 	var token = func(s string) *string { return &s }
 	var prior = func(counter int64, keyBegin, keyEnd uint32) map[string]*streamV2Item {

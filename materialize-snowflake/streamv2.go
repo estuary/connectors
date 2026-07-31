@@ -3,6 +3,7 @@ package main
 import (
 	"cmp"
 	"context"
+	stdsql "database/sql"
 	"encoding/json"
 	"fmt"
 	"slices"
@@ -72,11 +73,130 @@ func streamsV2(cfg *config, deltaUpdates bool, flagEnabled bool) bool {
 	return deltaUpdates && cfg.Credentials.AuthType == snowflake_auth.JWT && flagEnabled
 }
 
+// streamV2GenerationPrefix introduces the line a streaming v2 table's comment
+// carries to name the generation of the binding it belongs to.
+const streamV2GenerationPrefix = "flow_generation: "
+
+// streamV2Generation names one generation of one binding: the task, and the
+// binding's state key, which a backfill rotates.
+type streamV2Generation struct {
+	materialization string
+	stateKey        string
+}
+
+// streamV2GenerationComment renders the comment a streaming v2 binding's table
+// carries: the comment the table would have anyway, followed by a line naming the
+// generation the table belongs to.
+//
+// The table has to say this because a channel cannot. A backfill re-creates the
+// table (client.MustRecreateResource), which takes every channel bound to it, but
+// the shards of the generation being replaced are still running and will open
+// channels against the table again — and a channel opened against a re-created
+// table is indistinguishable from a channel opened against a new one. The table
+// itself is the only thing which outlives that drop and knows which generation it
+// was created for.
+func streamV2GenerationComment(comment string, gen streamV2Generation) string {
+	return fmt.Sprintf("%s\n%s%s %s", comment, streamV2GenerationPrefix, gen.materialization, gen.stateKey)
+}
+
+// streamV2GenerationOf reads back the generation a table's comment names, and
+// reports whether it named one at all. A comment written before this connector
+// recorded generations, or one an operator has rewritten, names none.
+func streamV2GenerationOf(comment string) (streamV2Generation, bool) {
+	for _, line := range strings.Split(comment, "\n") {
+		rest, found := strings.CutPrefix(strings.TrimSpace(line), streamV2GenerationPrefix)
+		if !found {
+			continue
+		} else if materialization, stateKey, ok := strings.Cut(rest, " "); ok {
+			return streamV2Generation{materialization: materialization, stateKey: stateKey}, true
+		}
+	}
+	return streamV2Generation{}, false
+}
+
+// streamV2TableComments reads the comment of each given binding's table, keyed by
+// state key, in one query: it is the table's comment that names the generation of
+// the binding it belongs to. A table which does not exist yet contributes no
+// entry, as does one which carries no comment.
+func streamV2TableComments(ctx context.Context, db *stdsql.DB, dialect sql.Dialect, database string, targets []sql.Table) (map[string]string, error) {
+	if len(targets) == 0 {
+		return nil, nil
+	}
+
+	// A table is identified by the schema and name Snowflake holds it under,
+	// which is what the locator reports, while the binding is identified by its
+	// state key. INFORMATION_SCHEMA answers in the former and the caller asks in
+	// the latter, so both are needed.
+	var stateKeys = make(map[string]string, len(targets))
+	var predicates []string
+	for _, target := range targets {
+		var loc = dialect.TableLocator(target.Path)
+		stateKeys[loc.TableSchema+"."+loc.TableName] = target.StateKey
+		predicates = append(predicates, fmt.Sprintf("(TABLE_SCHEMA = %s AND TABLE_NAME = %s)",
+			dialect.Literal(loc.TableSchema), dialect.Literal(loc.TableName)))
+	}
+
+	var query = fmt.Sprintf(
+		"SELECT TABLE_SCHEMA, TABLE_NAME, COMMENT FROM %s.INFORMATION_SCHEMA.TABLES WHERE %s;",
+		dialect.Identifier(database), strings.Join(predicates, " OR "),
+	)
+
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("querying table comments: %w", err)
+	}
+	defer rows.Close()
+
+	var comments = make(map[string]string)
+	for rows.Next() {
+		var schema, table string
+		var comment *string
+		if err := rows.Scan(&schema, &table, &comment); err != nil {
+			return nil, fmt.Errorf("scanning table comment: %w", err)
+		} else if comment == nil {
+			continue
+		} else if stateKey, ok := stateKeys[schema+"."+table]; ok {
+			comments[stateKey] = *comment
+		}
+	}
+
+	return comments, rows.Err()
+}
+
+// streamV2GenerationConflict refuses a binding whose table records a different
+// generation of that same binding as the one it belongs to.
+//
+// Such a table has been re-created by a backfill of the binding since this task's
+// specification was published, so this task is running the specification that
+// backfill replaced. Its rows are being re-materialized by the generation which
+// now owns the table, and anything this one appends is a duplicate of them.
+//
+// A comment which names no generation is not read as a conflict: a table created
+// before this connector recorded them, or one which a standard-updates generation
+// of the binding created, says nothing about which generation may stream into it.
+// Neither is a generation of another task: two tasks materializing into one table
+// are not generations of each other, and the last of them to create the table is
+// the one the comment names.
+func streamV2GenerationConflict(comment string, mine streamV2Generation, table string) error {
+	owner, ok := streamV2GenerationOf(comment)
+	if !ok || owner.materialization != mine.materialization || owner.stateKey == mine.stateKey {
+		return nil
+	}
+
+	return fmt.Errorf(
+		"table %s records state key %q of this binding as the generation materializing into it, while this task is materializing state key %q: the binding has been backfilled, which re-created the table, and this task is running the specification that backfill replaced. The runtime replaces this task with the one that backfill published; appending to the table before it does would duplicate the rows the backfill is re-materializing",
+		table, owner.stateKey, mine.stateKey,
+	)
+}
+
 type streamV2Binding struct {
 	database string
 	schema   string
 	table    string
 	channel  string
+	// stateKey names the generation of the binding this shard is materializing,
+	// which the table it appends to must agree it belongs to.
+	stateKey string
 	// columns holds unquoted Snowflake column names aligned with the output of
 	// Table.ConvertAll, for building the by-name row objects the SDK ingests.
 	columns []string
@@ -157,12 +277,21 @@ func (p *appendPipe) wait() error {
 // next append. The sidecar is spawned on first use; any sidecar failure is fatal
 // to the connector (crash-only).
 type streamV2Manager struct {
-	cfg         *config
-	accountName string
-	channelBase string
-	argv        []string
-	keyBegin    uint32
-	keyEnd      uint32
+	cfg             *config
+	materialization string
+	accountName     string
+	channelBase     string
+	argv            []string
+	keyBegin        uint32
+	keyEnd          uint32
+
+	// tableComments holds the comment of each binding's table, keyed by state
+	// key, as the transactor read it while building. A table's comment names the
+	// generation of the binding it belongs to, which is what a channel opened
+	// against a re-created table cannot say for itself — see
+	// streamV2GenerationConflict. An absent entry names no generation, which is
+	// not a conflict.
+	tableComments map[string]string
 
 	// procCtx bounds the sidecar process lifetime to the transactor session
 	// rather than to whichever caller's context first triggers ensureStarted.
@@ -187,15 +316,16 @@ type streamV2Manager struct {
 func newStreamV2Manager(ctx context.Context, cfg *config, materialization string, accountName string, keyRange *pf.RangeSpec) *streamV2Manager {
 	procCtx, procCancel := context.WithCancel(ctx)
 	return &streamV2Manager{
-		cfg:         cfg,
-		accountName: accountName,
-		channelBase: channelName(materialization, keyRange.KeyBegin),
-		argv:        defaultSidecarArgv(),
-		keyBegin:    keyRange.KeyBegin,
-		keyEnd:      keyRange.KeyEnd,
-		procCtx:     procCtx,
-		procCancel:  procCancel,
-		bindings:    make(map[int]*streamV2Binding),
+		cfg:             cfg,
+		materialization: materialization,
+		accountName:     accountName,
+		channelBase:     channelName(materialization, keyRange.KeyBegin),
+		argv:            defaultSidecarArgv(),
+		keyBegin:        keyRange.KeyBegin,
+		keyEnd:          keyRange.KeyEnd,
+		procCtx:         procCtx,
+		procCancel:      procCancel,
+		bindings:        make(map[int]*streamV2Binding),
 	}
 }
 
@@ -255,6 +385,7 @@ func (m *streamV2Manager) addBinding(database, schema, table string, target sql.
 		schema:   schema,
 		table:    table,
 		channel:  channel,
+		stateKey: target.StateKey,
 		columns:  columns,
 		prior:    prior,
 	}
@@ -292,6 +423,17 @@ func (m *streamV2Manager) checkpointFor(binding int, item *streamV2Item) map[str
 func (m *streamV2Manager) ensureChannel(ctx context.Context, b *streamV2Binding) error {
 	if b.opened {
 		return nil
+	}
+
+	// Settled before a sidecar is started, let alone a channel opened: a shard
+	// whose binding's table has been re-created by a backfill has nothing to
+	// append there, whatever its own channel would report.
+	if err := streamV2GenerationConflict(
+		m.tableComments[b.stateKey],
+		streamV2Generation{materialization: m.materialization, stateKey: b.stateKey},
+		b.table,
+	); err != nil {
+		return err
 	}
 
 	client, err := m.ensureStarted(ctx)

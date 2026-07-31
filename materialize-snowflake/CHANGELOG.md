@@ -44,6 +44,10 @@
   survive the backfill.
 - The `retain_existing_data_on_backfill` feature flag cannot be used with this
   path: backfilling a binding fails while both are enabled.
+- A table on this path carries an extra line in its comment, recording which
+  backfill generation of the binding materializes into it. A task which is still
+  running a specification that a backfill has replaced fails, rather than adding
+  rows to the table the backfill has re-created.
 
 ## 2026-07-23
 

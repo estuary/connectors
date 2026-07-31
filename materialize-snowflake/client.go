@@ -39,6 +39,10 @@ type client struct {
 	xdb        *sqlx.DB   // used to easily read the results of SHOW queries
 	cfg        config
 	ep         *sql.Endpoint[config]
+	// materializationName is the task this client acts for, which a table it
+	// creates for a streaming v2 binding records as part of the generation it
+	// belongs to.
+	materializationName string
 }
 
 func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint[config]) (sql.Client, error) {
@@ -63,11 +67,12 @@ func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint
 	}
 
 	return &client{
-		db:         db,
-		dbNoSchema: dbNoSchema,
-		xdb:        sqlx.NewDb(dbNoSchema, "snowflake").Unsafe(),
-		cfg:        ep.Config,
-		ep:         ep,
+		db:                  db,
+		dbNoSchema:          dbNoSchema,
+		xdb:                 sqlx.NewDb(dbNoSchema, "snowflake").Unsafe(),
+		cfg:                 ep.Config,
+		ep:                  ep,
+		materializationName: materializationName,
 	}, nil
 }
 
@@ -193,6 +198,23 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 			err = errors.New(matches[0])
 		}
 		return err
+	}
+
+	// A table a streaming v2 binding appends to records the generation of the
+	// binding it belongs to, which is what lets the shards of a generation a
+	// backfill has replaced tell that the table under them is no longer theirs —
+	// see streamV2GenerationConflict. It is recorded here, on the create, because
+	// a backfill of such a binding re-creates the table rather than emptying it
+	// (MustRecreateResource), so every generation of the table passes through here.
+	if streamsV2(&c.cfg, tc.Table.DeltaUpdates, boilerplate.ParseFlags(c.cfg)[flagSnowpipeStreamingV2]) {
+		var comment = streamV2GenerationComment(tc.Comment, streamV2Generation{
+			materialization: c.materializationName,
+			stateKey:        tc.StateKey,
+		})
+		stmt := fmt.Sprintf("COMMENT ON TABLE %s IS %s;", tc.Identifier, c.ep.Dialect.Literal(comment))
+		if _, err := c.db.ExecContext(ctx, stmt); err != nil {
+			return fmt.Errorf("recording the generation of table %s: %w", tc.Identifier, err)
+		}
 	}
 
 	if rc, ok := tc.Resource.(tableConfig); ok {

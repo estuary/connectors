@@ -358,8 +358,24 @@ func newTransactor(
 		return nil, fmt.Errorf("creating transfer stage: %w", err)
 	}
 
+	// A streaming v2 binding's table records which generation of the binding it
+	// belongs to, and this session may only append to a table which names its own.
+	// Read before any binding is added, since that is where the disagreement is
+	// refused.
+	if sv2 != nil {
+		var streaming []sql.Table
+		for _, binding := range bindings {
+			if streamsV2(&cfg, binding.DeltaUpdates, featureFlags[flagSnowpipeStreamingV2]) {
+				streaming = append(streaming, binding)
+			}
+		}
+		if sv2.tableComments, err = streamV2TableComments(ctx, db, ep.Dialect, cfg.Database, streaming); err != nil {
+			return nil, err
+		}
+	}
+
 	for _, binding := range bindings {
-		if err = d.addBinding(ctx, binding, featureFlags["snowpipe_streaming"], featureFlags["snowpipe_streaming_v2"]); err != nil {
+		if err = d.addBinding(ctx, binding, featureFlags["snowpipe_streaming"], featureFlags[flagSnowpipeStreamingV2]); err != nil {
 			return nil, fmt.Errorf("adding binding for %s: %w", binding.Path, err)
 		}
 	}
