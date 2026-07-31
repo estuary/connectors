@@ -19,6 +19,7 @@ import (
 	"github.com/estuary/connectors/go/encrow"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/google/uuid"
+	mssqldb "github.com/microsoft/go-mssqldb"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
@@ -1420,8 +1421,10 @@ func cdcInstanceMaxLSNsQuery(instanceNames []string) (string, []string) {
 func cdcCleanupChangeTable(ctx context.Context, conn *sql.DB, instanceName string, belowLSN LSN) error {
 	log.WithFields(log.Fields{"instance": instanceName, "lsn": fmt.Sprintf("%X", belowLSN)}).Debug("cleaning change table")
 
-	var query = fmt.Sprintf("EXEC sys.sp_cdc_cleanup_change_table @capture_instance = @p1, @low_water_mark = 0x%X; ", belowLSN)
-	if _, err := conn.ExecContext(ctx, query, instanceName); err != nil {
+	// Bind the instance name and watermark as parameters to improve query plan cache
+	// hit rate when making cleanup queries.
+	const query = "EXEC sys.sp_cdc_cleanup_change_table @capture_instance = @p1, @low_water_mark = @p2;"
+	if _, err := conn.ExecContext(ctx, query, mssqldb.NVarCharMax(instanceName), belowLSN); err != nil {
 		return fmt.Errorf("error cleaning capture instance %q below LSN %X: %w", instanceName, belowLSN, err)
 	}
 	return nil

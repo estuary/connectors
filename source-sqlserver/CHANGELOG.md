@@ -3,6 +3,11 @@
 ## 2026-07-31
 
 ### Fixed
+- Automatic change table cleanup now binds its watermark as a query parameter
+  instead of formatting it into the statement. Every cleanup call previously
+  produced a statement SQL Server had never seen before, so it compiled a plan
+  for each one, used it once and discarded it. This only affected captures with
+  `change_table_cleanup` enabled.
 - The polling query which checks each CDC capture instance for new changes now
   lists those instances in a stable order. It was previously assembled in map
   iteration order, so its text differed on every polling cycle and SQL Server
