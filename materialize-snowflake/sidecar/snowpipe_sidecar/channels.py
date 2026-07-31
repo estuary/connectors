@@ -149,6 +149,27 @@ class ChannelManager:
             raise _wrap_sdk_error(err) from err
         return _status_dict(st)
 
+    def close_channel(self, channel: str, drop: bool = False) -> None:
+        """Close a channel, optionally dropping it in Snowflake.
+
+        A plain close releases the local handle and flushes what it holds. Only
+        the drop reaches Snowflake, which is what retires the channel's
+        committed offset token rather than leaving it for a later open of the
+        same name to inherit."""
+        ch = self._channel(channel)
+        try:
+            ch.close(drop=drop)
+        except Exception as err:
+            raise _wrap_sdk_error(err) from err
+        finally:
+            # The handle is spent either way: a close which failed part-way
+            # leaves a channel this session can no longer account for, and the
+            # caller treats the failure as fatal to the write path regardless.
+            with self._mu:
+                self._channels.pop(channel, None)
+
+        logger.info("closed channel", extra={"channel": channel, "dropped": drop})
+
     def close(self) -> None:
         """Close all channels then clients, flushing buffered data."""
         with self._mu:

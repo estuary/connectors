@@ -21,7 +21,7 @@ from .channels import ChannelManager, SidecarError
 
 logger = logging.getLogger("snowpipe_sidecar.server")
 
-_CHANNEL_OPS = frozenset(["append", "wait_commit", "channel_status"])
+_CHANNEL_OPS = frozenset(["append", "wait_commit", "channel_status", "close_channel"])
 
 
 class Server:
@@ -119,6 +119,9 @@ class Server:
             self._reply(rid, status)
         elif op == "channel_status":
             self._reply(rid, self._manager.status(params["channel"]))
+        elif op == "close_channel":
+            self._manager.close_channel(params["channel"], params.get("drop", False))
+            self._reply(rid, None)
         elif op == "shutdown":
             logger.info("shutting down on request")
             self._manager.close()

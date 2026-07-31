@@ -51,8 +51,14 @@ class StubChannel:
     def get_channel_status(self):
         return self._status()
 
-    def close(self):
+    def close(self, drop=False, wait_for_flush=True, timeout_seconds=None):
         self.closed = True
+        if drop:
+            # Only a drop reaches Snowflake, where it takes the channel's
+            # committed offset token and row-error statistics with it.
+            self.client.committed.pop(self.name, None)
+            self.client.rows_error_count.pop(self.name, None)
+            self.client.last_error_message.pop(self.name, None)
 
 
 class StubClient:
@@ -216,6 +222,44 @@ def test_channels_are_independent(harness):
 
     assert harness.call("wait_commit", channel="ch_1", token="a:0", timeout_s=5)["result"]["committed_token"] == "a:0"
     assert harness.call("wait_commit", channel="ch_2", token="b:0", timeout_s=5)["result"]["committed_token"] == "b:0"
+
+
+def test_close_channel_releases_the_handle(harness):
+    assert configure(harness)["ok"]
+    assert harness.call("open_channel", database="DB", schema="SCH", table="TBL", channel="ch_0")["ok"]
+    assert harness.call("append", channel="ch_0", start_token="1", end_token="2", rows=[{"ID": 1}, {"ID": 2}])["ok"]
+
+    assert harness.call("close_channel", channel="ch_0")["ok"]
+    stub = harness.stub_clients[("DB", "SCH", "TBL")]
+
+    # The handle is spent, so an op which needs one is refused rather than
+    # silently working against a closed channel.
+    res = harness.call("append", channel="ch_0", start_token="3", end_token="3", rows=[{"ID": 3}])
+    assert not res["ok"] and res["code"] == "unknown_channel"
+
+    # Snowflake still holds the channel, so reopening it recovers the token.
+    res = harness.call("open_channel", database="DB", schema="SCH", table="TBL", channel="ch_0")
+    assert res["ok"] and res["result"]["committed_token"] == "2"
+    assert stub.committed["ch_0"] == "2"
+
+
+def test_close_channel_with_drop_retires_the_channel(harness):
+    # Dropping is what retires a channel: the name reopens as one which has
+    # committed nothing, so a later shard deriving it inherits no skip threshold.
+    assert configure(harness)["ok"]
+    assert harness.call("open_channel", database="DB", schema="SCH", table="TBL", channel="ch_0")["ok"]
+    assert harness.call("append", channel="ch_0", start_token="1", end_token="2", rows=[{"ID": 1}, {"ID": 2}])["ok"]
+
+    assert harness.call("close_channel", channel="ch_0", drop=True)["ok"]
+
+    res = harness.call("open_channel", database="DB", schema="SCH", table="TBL", channel="ch_0")
+    assert res["ok"] and res["result"]["committed_token"] is None
+
+
+def test_close_unopened_channel(harness):
+    assert configure(harness)["ok"]
+    res = harness.call("close_channel", channel="nope", drop=True)
+    assert not res["ok"] and res["code"] == "unknown_channel"
 
 
 class _FakeErrorCode:

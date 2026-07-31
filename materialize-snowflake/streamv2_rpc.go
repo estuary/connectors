@@ -283,6 +283,20 @@ func (c *sidecarClient) ChannelStatus(ctx context.Context, channel string) (*cha
 	return &res, nil
 }
 
+// CloseChannel closes an open channel. With drop set, the channel is also
+// dropped in Snowflake, which is what discards its committed offset token
+// instead of leaving it for a later open of the same name to inherit — see
+// retireChannel, which is the caller that needs that.
+//
+// The channel must be open in this session, since dropping one is expressed
+// through the handle an open produced.
+func (c *sidecarClient) CloseChannel(ctx context.Context, channel string, drop bool) error {
+	return c.call(ctx, "close_channel", struct {
+		Channel string `json:"channel"`
+		Drop    bool   `json:"drop"`
+	}{channel, drop}, rpcTimeoutOpenChannel, nil)
+}
+
 // Shutdown asks the sidecar to drain and exit cleanly. Errors are expected if
 // the process is already gone.
 func (c *sidecarClient) Shutdown(ctx context.Context) error {
