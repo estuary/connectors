@@ -6,18 +6,23 @@ import orjson
 import pytest
 
 from estuary_cdk.http import HTTPError
+from estuary_cdk.incremental_csv_processor import IncrementalCSVRowProcessor
 from source_dynamics_365_finance_and_operations.adls_gen2_client import ADLSPathMetadata
 from source_dynamics_365_finance_and_operations.api import (
     SETTLE_DELAY,
     TRICKLE_FEED_SERVICE_DIR,
+    RowSchemaMismatchError,
     TableSchemaUnavailableError,
     TransformedRow,
     _table_metadata_from_entity,
+    bind_row,
     get_table_metadata,
+    read_csv_rows,
     should_wait_for_finalization,
     stream_folder_rows,
     transform_row,
 )
+from source_dynamics_365_finance_and_operations.models import TableMetadata
 from source_dynamics_365_finance_and_operations.shared import str_to_dt
 
 
@@ -144,6 +149,276 @@ class TestTransformRow:
         assert "_meta" in row
 
 
+class TestBindRow:
+    """Tests for binding a headerless CSV row's cells to field names.
+
+    Synapse Link appends columns added to a table after its initial export to
+    the end of every row, past IsDelete. A CSV written across such an append
+    holds rows of both widths, so rows can be narrower than the folder's
+    model.json declares."""
+
+    # Three appended columns, so a row can legitimately fall short by more
+    # than one - the shape real tables have (prodtable spans 110..118
+    # columns, salesline 267..291).
+    _FIELD_NAMES = ["Id", "SinkModifiedOn", "IsDelete", "app_a", "app_b", "app_c"]
+    METADATA = TableMetadata(
+        name="prodtable",
+        field_names=_FIELD_NAMES,
+        boolean_fields=frozenset({"IsDelete"}),
+        # Derived the way _table_metadata_from_entity derives it, so the
+        # fixture cannot drift from what the connector would compute.
+        min_row_width=_FIELD_NAMES.index("IsDelete") + 1,
+    )
+
+    def test_full_width_row(self):
+        row = bind_row(["abc", "ts", "", "1", "2", "3"], self.METADATA, CSV_NAME, 1)
+
+        assert row == {
+            "Id": "abc", "SinkModifiedOn": "ts", "IsDelete": None,
+            "app_a": "1", "app_b": "2", "app_c": "3",
+        }
+
+    @pytest.mark.parametrize("absent", [1, 2, 3])
+    def test_rows_predating_appended_columns_omit_them(self, absent: int):
+        """A row written before the last `absent` columns were added binds its
+        cells and leaves those columns absent rather than null."""
+        width = len(self.METADATA.field_names) - absent
+        row = bind_row(["abc", "ts", ""] + ["x"] * (width - 3), self.METADATA, CSV_NAME, 1)
+
+        assert len(row) == width
+        assert [f for f in self.METADATA.field_names if f not in row] == \
+            self.METADATA.field_names[width:]
+
+    def test_narrowest_legal_row_is_min_row_width(self):
+        row = bind_row(["abc", "ts", "True"], self.METADATA, CSV_NAME, 1)
+
+        assert row == {"Id": "abc", "SinkModifiedOn": "ts", "IsDelete": "True"}
+
+    def test_empty_cells_become_none(self):
+        row = bind_row(["", "", "True", "", "", ""], self.METADATA, CSV_NAME, 1)
+
+        assert row == {
+            "Id": None, "SinkModifiedOn": None, "IsDelete": "True",
+            "app_a": None, "app_b": None, "app_c": None,
+        }
+
+    def test_row_narrower_than_min_row_width_raises(self):
+        """Truncation reaching past IsDelete means the cells no longer line up,
+        so it must not be read as a row predating an append."""
+        with pytest.raises(RowSchemaMismatchError, match="at least 3 columns wide"):
+            bind_row(["abc", "ts"], self.METADATA, CSV_NAME, 1)
+
+    def test_row_wider_than_schema_raises(self):
+        """Extra cells have no field name to bind to."""
+        with pytest.raises(RowSchemaMismatchError, match="no field name to bind to"):
+            bind_row(["abc", "ts", "", "1", "2", "3", "surplus"], self.METADATA, CSV_NAME, 1)
+
+    def test_error_names_the_csv(self):
+        with pytest.raises(RowSchemaMismatchError, match=CSV_NAME):
+            bind_row(["abc", "ts"], self.METADATA, CSV_NAME, 1)
+
+    def test_transform_row_leaves_absent_boolean_absent(self):
+        """An appended boolean column absent from an older row must not be
+        fabricated as False."""
+        metadata = TableMetadata(
+            name="prodtable",
+            field_names=["Id", "IsDelete", "appended_flag"],
+            boolean_fields=frozenset({"IsDelete", "appended_flag"}),
+            min_row_width=2,
+        )
+
+        row = transform_row(
+            bind_row(["abc", ""], metadata, CSV_NAME, 1), metadata.boolean_fields, CSV_NAME
+        )
+
+        assert "appended_flag" not in row
+        assert row["IsDelete"] is False
+        assert row["_meta"] == {"op": "u", "source_file": CSV_NAME}
+
+
+class TestReadCsvRows:
+    """Tests for the invariants that hold across a file rather than within a
+    single row."""
+
+    METADATA = TestBindRow.METADATA
+
+    async def as_values(self, rows: list[list[str]]) -> AsyncGenerator[list[str], None]:
+        for row in rows:
+            yield row
+
+    async def read(self, rows: list[list[str]]) -> list[TransformedRow]:
+        log = logging.getLogger("test-d365-api")
+        return [
+            row async for row in
+            read_csv_rows(self.as_values(rows), self.METADATA, CSV_NAME, log)
+        ]
+
+    @pytest.mark.asyncio
+    async def test_widening_rows_are_read(self):
+        """The observed shape: narrow rows predating an append, then wider
+        rows once the column exists."""
+        rows = await self.read([
+            ["a", "ts", ""],
+            ["b", "ts", ""],
+            ["c", "ts", "", "1", "2", "3"],
+        ])
+
+        assert [r["Id"] for r in rows] == ["a", "b", "c"]
+        assert "app_c" not in rows[0]
+        assert rows[2]["app_c"] == "3"
+
+    @pytest.mark.asyncio
+    async def test_rows_are_transformed(self):
+        """Rows arrive transformed, with booleans converted and _meta set."""
+        rows = await self.read([["a", "ts", "True"], ["b", "ts", "True"]])
+
+        assert rows[0]["IsDelete"] is True
+        assert rows[0]["_meta"] == {"op": "d", "source_file": CSV_NAME}
+
+    @pytest.mark.asyncio
+    async def test_empty_file_yields_nothing(self):
+        assert await self.read([]) == []
+
+    @pytest.mark.asyncio
+    async def test_every_row_narrow_is_read(self):
+        """A file written entirely before an append is uniformly narrow, which
+        is legal - widths never decrease."""
+        rows = await self.read([["a", "ts", ""], ["b", "ts", ""], ["c", "ts", ""]])
+
+        assert [r["Id"] for r in rows] == ["a", "b", "c"]
+
+    @pytest.mark.asyncio
+    async def test_first_row_narrower_than_min_row_width_raises(self):
+        with pytest.raises(RowSchemaMismatchError, match="at least 3 columns wide"):
+            await self.read([["a", "ts"]])
+
+    @pytest.mark.asyncio
+    async def test_error_reports_the_row_number(self):
+        """The row number is what makes a failure findable in a large CSV."""
+        with pytest.raises(RowSchemaMismatchError, match="row 3 of") as excinfo:
+            await self.read([
+                ["a", "ts", ""],
+                ["b", "ts", ""],
+                ["c", "ts", "", "1", "2", "3", "surplus"],
+            ])
+
+        assert excinfo.value.row_number == 3
+
+
+
+class TestCsvBytesToDocuments:
+    """Covers the seam between the CDK's positional parser and the connector's
+    binding: raw bytes in, capture documents out."""
+
+    METADATA = TestBindRow.METADATA
+
+    async def chunks(self, data: str, size: int = 7) -> AsyncGenerator[bytes, None]:
+        """Small chunks, so rows straddle chunk boundaries as they do over HTTP."""
+        raw = data.encode("utf-8")
+        for i in range(0, len(raw), size):
+            yield raw[i:i + size]
+
+    async def read(self, data: str) -> list[TransformedRow]:
+        log = logging.getLogger("test-d365-api")
+        return [
+            row async for row in read_csv_rows(
+                IncrementalCSVRowProcessor(self.chunks(data)),
+                self.METADATA,
+                CSV_NAME,
+                log,
+            )
+        ]
+
+    @pytest.mark.asyncio
+    async def test_mixed_width_file(self):
+        """The shape of a variable width CSV: narrow rows written before a column
+        was appended, then wider rows once it existed."""
+        rows = await self.read(
+            "a,ts,\r\n"
+            "b,ts,True\r\n"
+            "c,ts,,1,2,3\r\n"
+        )
+
+        assert [r["Id"] for r in rows] == ["a", "b", "c"]
+        assert "app_c" not in rows[0] and "app_c" not in rows[1]
+        assert rows[1]["_meta"]["op"] == "d"
+        assert rows[2]["app_c"] == "3"
+
+    @pytest.mark.asyncio
+    async def test_several_columns_appended_during_one_interval(self):
+        """Columns can be added at different points within a single export
+        interval, so one file can hold rows of three or more widths. Each row
+        binds the prefix of the schema that existed when it was written."""
+        rows = await self.read(
+            "a,ts,\r\n"
+            "b,ts,,1\r\n"
+            "c,ts,,1,2\r\n"
+            "d,ts,,1,2,3\r\n"
+        )
+
+        absent = [
+            [f for f in self.METADATA.field_names if f not in r] for r in rows
+        ]
+        assert absent == [
+            ["app_a", "app_b", "app_c"],
+            ["app_b", "app_c"],
+            ["app_c"],
+            [],
+        ]
+        assert [r["Id"] for r in rows] == ["a", "b", "c", "d"]
+
+    @pytest.mark.asyncio
+    async def test_quoted_values_spanning_chunks(self):
+        rows = await self.read('"a,1",ts,,"quoted, value",2,3\r\n')
+
+        assert rows[0]["Id"] == "a,1"
+        assert rows[0]["app_a"] == "quoted, value"
+
+
+
+class TestTableMetadataFromEntity:
+    """Tests for locating how narrow a row may be from model.json."""
+
+    def test_min_row_width_ends_at_is_delete(self):
+        metadata = _table_metadata_from_entity({
+            "name": "prodtable",
+            "attributes": [
+                {"name": "Id", "dataType": "guid"},
+                {"name": "IsDelete", "dataType": "boolean"},
+                {"name": "delta_custom", "dataType": "int64"},
+            ],
+        })
+
+        assert metadata.field_names == ["Id", "IsDelete", "delta_custom"]
+        assert metadata.min_row_width == 2
+        assert metadata.boolean_fields == frozenset({"IsDelete"})
+
+    def test_entity_with_non_boolean_is_delete_raises(self):
+        """A string IsDelete would stay out of boolean_fields, leaving every
+        delete row reading as an upsert with no error at all."""
+        with pytest.raises(ValueError, match="rather than 'boolean'"):
+            _table_metadata_from_entity({
+                "name": "odd",
+                "attributes": [
+                    {"name": "Id", "dataType": "guid"},
+                    {"name": "IsDelete", "dataType": "string"},
+                ],
+            })
+
+    def test_entity_without_is_delete_raises(self):
+        """IsDelete determines a row's operation and orders upserts ahead of
+        deletes, so a table lacking it cannot be read at all. Fail here with an
+        explanation rather than downstream on a KeyError."""
+        with pytest.raises(ValueError, match="no IsDelete column"):
+            _table_metadata_from_entity({
+                "name": "odd",
+                "attributes": [
+                    {"name": "Id", "dataType": "guid"},
+                    {"name": "other", "dataType": "string"},
+                ],
+            })
+
+
 def fake_csv(name: str) -> ADLSPathMetadata:
     """Build an ADLSPathMetadata."""
     return ADLSPathMetadata(
@@ -258,6 +533,29 @@ class TestStreamFolderRows:
         result = await collect(stream_folder_rows(csvs, factory))
         assert [(r["Id"], r["versionnumber"]) for r in result] == [("A", "10")]
 
+    @pytest.mark.asyncio
+    async def test_narrow_delete_row_is_still_deferred(self):
+        """A delete predating an appended column is narrower than the schema.
+        IsDelete is bound in every legal row width, so such a row is still
+        recognized as a delete and deferred to pass 2."""
+        metadata = TestBindRow.METADATA
+
+        def build(values: list[str]) -> TransformedRow:
+            return transform_row(
+                bind_row(values, metadata, CSV_NAME, 1), metadata.boolean_fields, CSV_NAME
+            )
+
+        csvs = [fake_csv("deletes.csv"), fake_csv("upserts.csv")]
+        factory = make_factory({
+            "deletes.csv": [build(["A", "ts", "True"])],
+            "upserts.csv": [build(["A", "ts", "", "1", "2", "3"])],
+        })
+
+        result = await collect(stream_folder_rows(csvs, factory))
+
+        assert [(r["Id"], r["IsDelete"]) for r in result] == [("A", False), ("A", True)]
+        assert "app_c" not in result[1]
+
 
 def entity(name: str) -> dict:
     """A model.json entity with the standard metadata columns plus one boolean."""
@@ -352,42 +650,6 @@ class TestGetTableMetadata:
             await get_table_metadata(self.TIMESTAMP, self.TABLE, client, client.log)
 
 
-class TestTableMetadataFromEntity:
-    """Tests for the IsDelete column the connector requires of every table."""
-
-    def test_boolean_is_delete_is_accepted(self):
-        metadata = _table_metadata_from_entity({
-            "name": "prodtable",
-            "attributes": [
-                {"name": "Id", "dataType": "guid"},
-                {"name": "IsDelete", "dataType": "boolean"},
-            ],
-        })
-
-        assert metadata.boolean_fields == frozenset({"IsDelete"})
-
-    def test_entity_without_is_delete_raises(self):
-        """IsDelete determines a row's operation and orders upserts ahead of
-        deletes, so a table lacking it cannot be read at all."""
-        with pytest.raises(ValueError, match="no IsDelete column"):
-            _table_metadata_from_entity({
-                "name": "odd",
-                "attributes": [{"name": "Id", "dataType": "guid"}],
-            })
-
-    def test_entity_with_non_boolean_is_delete_raises(self):
-        """A string IsDelete would stay out of boolean_fields, leaving every
-        delete row reading as an upsert with no error at all."""
-        with pytest.raises(ValueError, match="rather than 'boolean'"):
-            _table_metadata_from_entity({
-                "name": "odd",
-                "attributes": [
-                    {"name": "Id", "dataType": "guid"},
-                    {"name": "IsDelete", "dataType": "string"},
-                ],
-            })
-
-
 class TestShouldWaitForFinalization:
     """Tests for the settle-window decision used when a timestamp folder has
     table data but no model.json."""
@@ -414,4 +676,3 @@ class TestShouldWaitForFinalization:
     def test_just_under_settle_delay_is_waited_on(self):
         now = str_to_dt(self.SUCCESSOR) + SETTLE_DELAY - timedelta(seconds=1)
         assert should_wait_for_finalization(self.SUCCESSOR, now) is True
-

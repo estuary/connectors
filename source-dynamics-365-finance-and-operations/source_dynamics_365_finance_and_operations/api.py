@@ -3,7 +3,7 @@ from bisect import bisect_right
 from datetime import datetime, timedelta, UTC
 from enum import StrEnum
 from logging import Logger
-from typing import AsyncGenerator, Callable, Literal, cast, overload
+from typing import AsyncGenerator, AsyncIterator, Callable, Literal, cast, overload
 
 import orjson
 
@@ -61,7 +61,9 @@ TransformedRow = dict[str, str | bool | None | dict[str, str]]
 # truncated (see get_table_metadata).
 TRICKLE_FEED_SERVICE_DIR = "Microsoft.Athena.TrickleFeedService"
 
-# Flags a row as a deletion.
+# Flags a row as a deletion, and terminates the block of columns that every
+# exported row carries. Columns after it were appended to the table later, so
+# its position also marks how narrow a row may legitimately be.
 IS_DELETE = "IsDelete"
 
 
@@ -88,6 +90,33 @@ class TableSchemaUnavailableError(Exception):
         super().__init__(
             f"No usable schema for the table in timestamp folder {folder}: {detail}."
         )
+
+
+class RowSchemaMismatchError(Exception):
+    """Raised when a CSV row's cells cannot be bound to the field names
+    declared for its table.
+
+    Synapse Link CSVs are headerless, so cells are bound to names by position
+    and a row carries no evidence of which column any given cell belongs to.
+    Misalignment therefore can't be detected directly; it can only be inferred
+    from signals that a correctly aligned row would never produce:
+
+    - a width outside the range a row may legitimately have (see bind_row).
+
+    That is a width signal, which is all a headerless row offers. It rests on
+    Synapse Link only ever appending columns to the end of a row, which is what
+    makes a row narrower than its schema a prefix of it rather than a
+    misaligned row.
+
+    Rows merely narrower than the schema because they predate an appended
+    column are expected and do not raise.
+    """
+
+    def __init__(self, csv_name: str, row_number: int, detail: str):
+        self.csv_name = csv_name
+        self.row_number = row_number
+        self.detail = detail
+        super().__init__(f"Cannot read row {row_number} of {csv_name}: {detail}.")
 
 
 # model.json metadata files are not updated after they're written.
@@ -143,6 +172,8 @@ def _find_entity(entities: list[dict], table_name: str) -> dict | None:
 
 
 def _table_metadata_from_entity(entity: dict) -> TableMetadata:
+    field_names = [attr["name"] for attr in entity["attributes"]]
+
     # Every table Synapse Link exports carries a boolean IsDelete, and the
     # connector depends on it. It determines each row's operation and orders
     # upserts ahead of deletes within a folder. Both checks fail loudly here
@@ -166,13 +197,16 @@ def _table_metadata_from_entity(entity: dict) -> TableMetadata:
             f"unless {IS_DELETE} is converted to a boolean."
         )
 
+    is_delete_index = field_names.index(IS_DELETE)
+
     return TableMetadata(
         name=entity["name"],
-        field_names=[attr["name"] for attr in entity["attributes"]],
+        field_names=field_names,
         boolean_fields=frozenset(
             attr["name"] for attr in entity["attributes"]
             if attr["dataType"] == AttributeDataType.BOOLEAN
         ),
+        min_row_width=is_delete_index + 1,
     )
 
 
@@ -440,13 +474,114 @@ async def read_csvs_in_folder(
         raise
 
     def open_csv(csv: ADLSPathMetadata) -> AsyncGenerator[TransformedRow, None]:
-        async def gen() -> AsyncGenerator[TransformedRow, None]:
-            async for raw_row in client.stream_csv(csv.name, table_metadata.field_names):
-                yield transform_row(raw_row, table_metadata.boolean_fields, csv.name)
-        return gen()
+        return read_csv_rows(
+            client.stream_csv(csv.name), table_metadata, csv.name, log
+        )
 
     async for row in stream_folder_rows(csvs, open_csv):
         yield row
+
+
+async def read_csv_rows(
+    rows: AsyncIterator[list[str]],
+    table_metadata: TableMetadata,
+    csv_name: str,
+    log: Logger,
+) -> AsyncGenerator[TransformedRow, None]:
+    """
+    Bind and transform one CSV's rows.
+
+    Row numbers in errors count data rows from 1. They are not line numbers -
+    blank lines are skipped upstream and quoted values may span lines.
+    """
+    declared_columns = len(table_metadata.field_names)
+    logged_narrow_row = False
+    row_number = 0
+
+    async for values in rows:
+        row_number += 1
+
+        if not logged_narrow_row and len(values) < declared_columns:
+            logged_narrow_row = True
+            log.info(
+                "CSV contains rows written before columns were appended to "
+                "this table. Those columns are absent from such rows.",
+                {
+                    "csv": csv_name,
+                    "table": table_metadata.name,
+                    "row columns": len(values),
+                    "declared columns": declared_columns,
+                    "absent columns": table_metadata.field_names[len(values):],
+                },
+            )
+
+        yield transform_row(
+            bind_row(values, table_metadata, csv_name, row_number),
+            table_metadata.boolean_fields,
+            csv_name,
+        )
+
+
+def bind_row(
+    values: list[str],
+    table_metadata: TableMetadata,
+    csv_name: str,
+    row_number: int,
+) -> dict[str, str | None]:
+    """
+    Bind a headerless CSV row's cells to their field names by position.
+
+    Synapse Link appends columns added to a table after its initial export to
+    the end of every row, past the standard metadata block that ends with
+    IsDelete. A CSV can be written across such an append - rows written before
+    it are narrower than rows written after, within the same file - while the
+    folder's model.json describes only the schema as of finalization. Those
+    narrower rows are a prefix of the declared schema, so their cells still
+    bind correctly and the appended columns are left absent rather than
+    fabricated as null.
+
+    Any other width means the positions no longer line up: a row that stops
+    inside the standard block is misaligned, and a row with more cells than the
+    schema names has data we cannot label. Both raise.
+
+    Width is the only signal available here, so this cannot prove alignment.
+    A column inserted before IsDelete rather than appended after it would
+    leave an older row inside the accepted width range while shifting every
+    cell past the insertion point, and would be bound without complaint. See
+    RowSchemaMismatchError for why that is an accepted risk.
+
+    Empty cells are converted to None.
+    """
+    field_names = table_metadata.field_names
+
+    if len(values) > len(field_names):
+        raise RowSchemaMismatchError(
+            csv_name,
+            row_number,
+            f"row has {len(values)} columns but this folder's model.json declares "
+            f"only {len(field_names)} for {table_metadata.name}, leaving "
+            f"{len(values) - len(field_names)} with no field name to bind to",
+        )
+
+    if len(values) < table_metadata.min_row_width:
+        raise RowSchemaMismatchError(
+            csv_name,
+            row_number,
+            f"row has {len(values)} columns, but every {table_metadata.name} row is "
+            f"at least {table_metadata.min_row_width} columns wide - the columns up "
+            f"to and including {IS_DELETE}. Only columns appended after {IS_DELETE} "
+            f"may be absent from a row, so this row cannot be aligned to the "
+            f"{len(field_names)} columns declared in this folder's model.json",
+        )
+
+    # zip stops at the shorter of the two, so a row predating an appended
+    # column simply leaves that column's name unbound.
+    row = {
+        name: value if value != "" else None
+        for name, value in zip(field_names, values)
+    }
+
+    return row
 
 
 def transform_row(row: dict[str, str | None], boolean_fields: frozenset[str], csv_name: str) -> TransformedRow:
@@ -461,7 +596,11 @@ def transform_row(row: dict[str, str | None], boolean_fields: frozenset[str], cs
     result = cast(TransformedRow, row)
 
     for field_name in boolean_fields:
-        value = row.get(field_name)
+        # A row predating an appended column has no cell for it. Leave the
+        # column absent instead of fabricating a False for it.
+        if field_name not in row:
+            continue
+        value = row[field_name]
         result[field_name] = value.lower() == "true" if value else False
 
     result["_meta"] = {

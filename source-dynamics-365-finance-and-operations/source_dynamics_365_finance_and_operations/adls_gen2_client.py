@@ -5,7 +5,7 @@ from typing import AsyncGenerator, Any, Optional
 from pydantic import BaseModel, Field, computed_field
 
 from estuary_cdk.http import HTTPSession
-from estuary_cdk.incremental_csv_processor import IncrementalCSVProcessor
+from estuary_cdk.incremental_csv_processor import IncrementalCSVRowProcessor
 from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
 
 
@@ -119,13 +119,13 @@ class ADLSGen2Client:
     async def stream_csv(
         self,
         path: str,
-        field_names: list[str],
-    ) -> AsyncGenerator[dict[str, Any], None]:
+    ) -> AsyncGenerator[list[str], None]:
         """
-        Stream and parse a CSV file, yielding dict rows.
+        Stream and parse a CSV file, yielding each row's cells.
 
-        Transformations applied:
-        - Empty strings converted to None
+        Cells are left unbound to field names. Synapse Link CSVs are headerless
+        and a row can be narrower than the schema describing it, so binding is
+        the caller's responsibility.
         """
         url_without_sas = f"{self.base_url}/{self.filesystem}/{path}"
 
@@ -137,10 +137,5 @@ class ADLSGen2Client:
 
         _, body = await self.http.request_stream(self.log, url)
 
-        async for row in IncrementalCSVProcessor(body(), fieldnames=field_names):
-            # Convert empty strings to None
-            for key, value in row.items():
-                if value == "":
-                    row[key] = None
-
+        async for row in IncrementalCSVRowProcessor(body()):
             yield row
