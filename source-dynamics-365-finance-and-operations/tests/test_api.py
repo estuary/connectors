@@ -12,6 +12,7 @@ from source_dynamics_365_finance_and_operations.api import (
     TRICKLE_FEED_SERVICE_DIR,
     TableSchemaUnavailableError,
     TransformedRow,
+    _table_metadata_from_entity,
     get_table_metadata,
     should_wait_for_finalization,
     stream_folder_rows,
@@ -266,7 +267,7 @@ def entity(name: str) -> dict:
         "description": "",
         "attributes": [
             {"name": "Id", "dataType": "guid"},
-            {"name": "IsDelete", "dataType": "string"},
+            {"name": "IsDelete", "dataType": "boolean"},
             {"name": "IsActive", "dataType": "boolean"},
         ],
     }
@@ -308,7 +309,7 @@ class TestGetTableMetadata:
         metadata = await get_table_metadata(self.TIMESTAMP, self.TABLE, client, client.log)
         assert metadata.name == self.TABLE
         assert metadata.field_names == ["Id", "IsDelete", "IsActive"]
-        assert metadata.boolean_fields == frozenset({"IsActive"})
+        assert metadata.boolean_fields == frozenset({"IsActive", "IsDelete"})
 
     @pytest.mark.asyncio
     async def test_falls_back_to_per_table_model_json_when_truncated(self):
@@ -349,6 +350,42 @@ class TestGetTableMetadata:
         })
         with pytest.raises(TableSchemaUnavailableError, match="does not describe the table"):
             await get_table_metadata(self.TIMESTAMP, self.TABLE, client, client.log)
+
+
+class TestTableMetadataFromEntity:
+    """Tests for the IsDelete column the connector requires of every table."""
+
+    def test_boolean_is_delete_is_accepted(self):
+        metadata = _table_metadata_from_entity({
+            "name": "prodtable",
+            "attributes": [
+                {"name": "Id", "dataType": "guid"},
+                {"name": "IsDelete", "dataType": "boolean"},
+            ],
+        })
+
+        assert metadata.boolean_fields == frozenset({"IsDelete"})
+
+    def test_entity_without_is_delete_raises(self):
+        """IsDelete determines a row's operation and orders upserts ahead of
+        deletes, so a table lacking it cannot be read at all."""
+        with pytest.raises(ValueError, match="no IsDelete column"):
+            _table_metadata_from_entity({
+                "name": "odd",
+                "attributes": [{"name": "Id", "dataType": "guid"}],
+            })
+
+    def test_entity_with_non_boolean_is_delete_raises(self):
+        """A string IsDelete would stay out of boolean_fields, leaving every
+        delete row reading as an upsert with no error at all."""
+        with pytest.raises(ValueError, match="rather than 'boolean'"):
+            _table_metadata_from_entity({
+                "name": "odd",
+                "attributes": [
+                    {"name": "Id", "dataType": "guid"},
+                    {"name": "IsDelete", "dataType": "string"},
+                ],
+            })
 
 
 class TestShouldWaitForFinalization:

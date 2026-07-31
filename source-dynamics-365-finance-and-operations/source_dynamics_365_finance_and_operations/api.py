@@ -143,6 +143,29 @@ def _find_entity(entities: list[dict], table_name: str) -> dict | None:
 
 
 def _table_metadata_from_entity(entity: dict) -> TableMetadata:
+    # Every table Synapse Link exports carries a boolean IsDelete, and the
+    # connector depends on it. It determines each row's operation and orders
+    # upserts ahead of deletes within a folder. Both checks fail loudly here
+    # rather than downstream.
+    is_delete_attr = next(
+        (attr for attr in entity["attributes"] if attr["name"] == IS_DELETE), None
+    )
+
+    if is_delete_attr is None:
+        raise ValueError(
+            f"Table {entity['name']} has no {IS_DELETE} column in its model.json "
+            f"entity. Every Synapse Link table is expected to have one, and the "
+            f"connector cannot determine a row's operation without it."
+        )
+
+    if is_delete_attr["dataType"] != AttributeDataType.BOOLEAN:
+        raise ValueError(
+            f"Table {entity['name']} declares its {IS_DELETE} column as "
+            f"{is_delete_attr['dataType']!r} rather than 'boolean' in its "
+            f"model.json entity. The connector cannot determine a row's operation "
+            f"unless {IS_DELETE} is converted to a boolean."
+        )
+
     return TableMetadata(
         name=entity["name"],
         field_names=[attr["name"] for attr in entity["attributes"]],
