@@ -370,14 +370,32 @@ func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence 
 // generation may not then do is reopen one, which reconcileStreamV2Channel
 // refuses.
 func (c *client) MustRecreateResource(req *pm.Request_Apply, lastBinding, newBinding *pf.MaterializationSpec_Binding) (bool, error) {
-	// The channels at stake are the outgoing generation's, so it is the write path
-	// that generation ran on which decides this. A binding whose last-applied
-	// specification is not on hand is read as having been on that path: what wrote
-	// the table cannot be known, and dropping one that did not need it costs only
-	// the table object.
-	var wasStreaming = lastBinding == nil || lastBinding.DeltaUpdates
+	// Every part of this is read from the specification being replaced rather than
+	// the one replacing it, because the channels at stake belong to the generation
+	// that specification is running: whether the binding was delta-updates, and
+	// whether its endpoint configuration put it on the streaming path at all. One
+	// publication may both bump the backfill counter and turn the write path off,
+	// and the generation it is replacing is streaming either way.
+	var outgoingCfg config
+	if req.LastMaterialization == nil {
+		// Nothing records how the replaced generation was configured, so the
+		// configuration in hand stands in for it.
+		outgoingCfg = c.cfg
+	} else if err := json.Unmarshal(req.LastMaterialization.ConfigJson, &outgoingCfg); err != nil {
+		return false, fmt.Errorf("parsing the last applied endpoint configuration: %w", err)
+	}
+	if outgoingCfg.Credentials == nil {
+		outgoingCfg.Credentials = c.cfg.Credentials
+	}
 
-	return streamsV2(&c.cfg, wasStreaming, boilerplate.ParseFlags(c.cfg)[flagSnowpipeStreamingV2]), nil
+	// With no last-applied binding there is nothing to say what has been writing
+	// to the table this backfill re-materializes, so it is re-created rather than
+	// assumed safe to empty: dropping a table which did not need it costs the table
+	// object, and emptying one which did costs duplicated rows.
+	var outgoingDeltaUpdates = lastBinding == nil || lastBinding.DeltaUpdates
+
+	return streamsV2(&outgoingCfg, outgoingDeltaUpdates,
+		boilerplate.ParseFlags(outgoingCfg)[flagSnowpipeStreamingV2]), nil
 }
 
 func (c *client) DeleteCheckpointsEntry(ctx context.Context, taskName string) error {

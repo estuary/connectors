@@ -239,83 +239,129 @@ func TestStreamV2ChannelRetirement(t *testing.T) {
 // item for. The live experiment behind both halves of that is the backfill
 // subtest of TestStreamV2Manager.
 func TestStreamV2BackfillRecreatesTheTable(t *testing.T) {
-	var cfg = func(authType string, flags string) config {
-		return config{
-			Credentials: &snowflake_auth.CredentialConfig{AuthType: authType},
-			Advanced:    advancedConfig{FeatureFlags: flags},
-		}
+	var streamingCfg = config{
+		Credentials: &snowflake_auth.CredentialConfig{AuthType: snowflake_auth.JWT},
+		Advanced:    advancedConfig{FeatureFlags: flagSnowpipeStreamingV2},
+	}
+	var noFlagCfg = config{
+		Credentials: &snowflake_auth.CredentialConfig{AuthType: snowflake_auth.JWT},
+	}
+	var noKeyPairCfg = config{
+		Credentials: &snowflake_auth.CredentialConfig{AuthType: snowflake_auth.UserPass},
+		Advanced:    advancedConfig{FeatureFlags: flagSnowpipeStreamingV2},
 	}
 	var binding = func(deltaUpdates bool) *pf.MaterializationSpec_Binding {
 		return &pf.MaterializationSpec_Binding{DeltaUpdates: deltaUpdates}
 	}
 
 	for _, tt := range []struct {
-		name       string
-		cfg        config
+		name string
+		// outgoing is the endpoint configuration of the generation this
+		// publication replaces, and incoming the one it publishes. They differ
+		// whenever a publication changes the write path in the same breath as it
+		// bumps a backfill counter.
+		outgoing   *config
+		incoming   config
 		last, next *pf.MaterializationSpec_Binding
 		want       bool
 	}{
 		{
-			name: "a streaming v2 binding",
-			cfg:  cfg(snowflake_auth.JWT, flagSnowpipeStreamingV2),
-			last: binding(true),
-			next: binding(true),
-			want: true,
+			name:     "a streaming v2 binding",
+			outgoing: &streamingCfg,
+			incoming: streamingCfg,
+			last:     binding(true),
+			next:     binding(true),
+			want:     true,
 		},
 		{
 			// The channels which must not outlive the turnover are the outgoing
 			// generation's, so it is the write path that generation ran on which
 			// decides this, not the one the new generation will run.
-			name: "a binding leaving the streaming v2 path",
-			cfg:  cfg(snowflake_auth.JWT, flagSnowpipeStreamingV2),
-			last: binding(true),
-			next: binding(false),
-			want: true,
+			name:     "a binding leaving the streaming v2 path",
+			outgoing: &streamingCfg,
+			incoming: streamingCfg,
+			last:     binding(true),
+			next:     binding(false),
+			want:     true,
+		},
+		{
+			// Nor does turning the write path off protect the turnover: the shards
+			// this publication replaces are streaming while it is applied, whatever
+			// the shards replacing them will do.
+			name:     "a publication which also turns the write path off",
+			outgoing: &streamingCfg,
+			incoming: noFlagCfg,
+			last:     binding(true),
+			next:     binding(true),
+			want:     true,
+		},
+		{
+			// Nor does taking the key pair away, which is the other way to leave
+			// the write path.
+			name:     "a publication which also changes the authentication type",
+			outgoing: &streamingCfg,
+			incoming: noKeyPairCfg,
+			last:     binding(true),
+			next:     binding(true),
+			want:     true,
 		},
 		{
 			// The outgoing generation wrote this table through staged files, which
-			// hold no channel on it, so its backfill may empty it in place.
-			name: "a binding arriving on the streaming v2 path",
-			cfg:  cfg(snowflake_auth.JWT, flagSnowpipeStreamingV2),
-			last: binding(false),
-			next: binding(true),
+			// hold no channel on it, so its backfill may empty it in place — even
+			// though the generation replacing it will stream.
+			name:     "a binding arriving on the streaming v2 path",
+			outgoing: &streamingCfg,
+			incoming: streamingCfg,
+			last:     binding(false),
+			next:     binding(true),
 		},
 		{
 			// Standard updates are written through staged files, which a truncate
 			// cannot race.
-			name: "a standard updates binding",
-			cfg:  cfg(snowflake_auth.JWT, flagSnowpipeStreamingV2),
-			last: binding(false),
-			next: binding(false),
+			name:     "a standard updates binding",
+			outgoing: &streamingCfg,
+			incoming: streamingCfg,
+			last:     binding(false),
+			next:     binding(false),
 		},
 		{
-			name: "the streaming v2 flag not set",
-			cfg:  cfg(snowflake_auth.JWT, ""),
-			last: binding(true),
-			next: binding(true),
+			name:     "the streaming v2 flag not set",
+			outgoing: &noFlagCfg,
+			incoming: noFlagCfg,
+			last:     binding(true),
+			next:     binding(true),
 		},
 		{
 			// The write path needs a key pair to authenticate the sidecar with, so
 			// a binding of a password-authenticated task never streams.
-			name: "a task which cannot stream at all",
-			cfg:  cfg(snowflake_auth.UserPass, flagSnowpipeStreamingV2),
-			last: binding(true),
-			next: binding(true),
+			name:     "a task which cannot stream at all",
+			outgoing: &noKeyPairCfg,
+			incoming: noKeyPairCfg,
+			last:     binding(true),
+			next:     binding(true),
 		},
 		{
-			// A resource which exists while the last-applied specification does not
-			// bind it says nothing about what has been writing to it, so it is
+			// A resource which exists while the last-applied specification is not
+			// on hand says nothing about what has been writing to it, so it is
 			// re-created rather than assumed safe to empty.
-			name: "a binding with no outgoing generation",
-			cfg:  cfg(snowflake_auth.JWT, flagSnowpipeStreamingV2),
-			last: nil,
-			next: binding(false),
-			want: true,
+			name:     "no last applied specification",
+			outgoing: nil,
+			incoming: streamingCfg,
+			last:     nil,
+			next:     binding(false),
+			want:     true,
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			var c = &client{cfg: tt.cfg}
-			got, err := c.MustRecreateResource(&pm.Request_Apply{}, tt.last, tt.next)
+			var req = new(pm.Request_Apply)
+			if tt.outgoing != nil {
+				configJson, err := json.Marshal(tt.outgoing)
+				require.NoError(t, err)
+				req.LastMaterialization = &pf.MaterializationSpec{ConfigJson: configJson}
+			}
+
+			var c = &client{cfg: tt.incoming}
+			got, err := c.MustRecreateResource(req, tt.last, tt.next)
 			require.NoError(t, err)
 			require.Equal(t, tt.want, got)
 		})
