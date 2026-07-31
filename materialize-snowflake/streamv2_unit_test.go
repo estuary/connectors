@@ -273,13 +273,12 @@ func TestStreamV2BackfillRecreatesTheTable(t *testing.T) {
 			want: true,
 		},
 		{
-			// A binding arriving on the path has no channels of its own yet, but
-			// its table may still be one another writer holds channels on.
+			// The outgoing generation wrote this table through staged files, which
+			// hold no channel on it, so its backfill may empty it in place.
 			name: "a binding arriving on the streaming v2 path",
 			cfg:  cfg(snowflake_auth.JWT, flagSnowpipeStreamingV2),
 			last: binding(false),
 			next: binding(true),
-			want: true,
 		},
 		{
 			// Standard updates are written through staged files, which a truncate
@@ -304,12 +303,14 @@ func TestStreamV2BackfillRecreatesTheTable(t *testing.T) {
 			next: binding(true),
 		},
 		{
-			// A resource which exists without the last-applied specification
-			// binding it is one no generation of this task has been streaming to.
+			// A resource which exists while the last-applied specification does not
+			// bind it says nothing about what has been writing to it, so it is
+			// re-created rather than assumed safe to empty.
 			name: "a binding with no outgoing generation",
 			cfg:  cfg(snowflake_auth.JWT, flagSnowpipeStreamingV2),
 			last: nil,
 			next: binding(false),
+			want: true,
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {

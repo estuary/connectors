@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	snowflake_auth "github.com/estuary/connectors/go/auth/snowflake"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
@@ -57,6 +58,18 @@ type streamV2Item struct {
 	// subset of keys, which positional skipping cannot survive.
 	KeyBegin uint32
 	KeyEnd   uint32
+}
+
+// streamsV2 reports whether a binding's rows are written by the snowpipe
+// streaming v2 path: it appends rows to a channel as it stores them, which only a
+// delta-updates binding can do, and authenticates its sidecar with the key pair
+// JWT credentials carry.
+//
+// It decides both how the transactor stores a binding's rows and what a backfill
+// of that binding may do to its table, which must agree — see
+// client.MustRecreateResource.
+func streamsV2(cfg *config, deltaUpdates bool, flagEnabled bool) bool {
+	return deltaUpdates && cfg.Credentials.AuthType == snowflake_auth.JWT && flagEnabled
 }
 
 type streamV2Binding struct {

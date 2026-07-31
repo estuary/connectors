@@ -408,7 +408,7 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, streaming
 	b.load.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
 	b.store.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
 
-	if b.target.DeltaUpdates && d.cfg.Credentials.AuthType == snowflake_auth.JWT && streamingV2Enabled {
+	if streamsV2(&d.cfg, b.target.DeltaUpdates, streamingV2Enabled) {
 		// This path is an explicit opt-in, and the SDK validates table/column
 		// compatibility lazily at ingestion rather than when the channel is
 		// opened, so there is no incompatibility signal to degrade on here.

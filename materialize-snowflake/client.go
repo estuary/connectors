@@ -352,8 +352,32 @@ func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence 
 	return sql.Fence{}, nil
 }
 
+// MustRecreateResource reports whether a binding's backfill must drop and
+// re-create its table rather than emptying it in place.
+//
+// A backfill of a streaming v2 binding must. Apply runs while the outgoing
+// generation's shards are still storing — nothing stops them first — and their
+// channels are bound to the very table the new generation is about to
+// re-materialize. A truncate empties that table and leaves those channels valid
+// and pointed at it, so the rows they append next land after the truncate, survive
+// it, and are re-materialized a second time. Nothing about a channel says which
+// generation opened it, so the duplication is silent.
+//
+// Dropping the table is what takes those channels with it, and it takes all of
+// them: including the channel of a shard which has committed nothing for this
+// binding and so has no checkpoint item to name it by, which is what a retirement
+// of the channels the checkpoint does name could not reach. What the outgoing
+// generation may not then do is reopen one, which reconcileStreamV2Channel
+// refuses.
 func (c *client) MustRecreateResource(req *pm.Request_Apply, lastBinding, newBinding *pf.MaterializationSpec_Binding) (bool, error) {
-	return false, nil
+	// The channels at stake are the outgoing generation's, so it is the write path
+	// that generation ran on which decides this. A binding whose last-applied
+	// specification is not on hand is read as having been on that path: what wrote
+	// the table cannot be known, and dropping one that did not need it costs only
+	// the table object.
+	var wasStreaming = lastBinding == nil || lastBinding.DeltaUpdates
+
+	return streamsV2(&c.cfg, wasStreaming, boilerplate.ParseFlags(c.cfg)[flagSnowpipeStreamingV2]), nil
 }
 
 func (c *client) DeleteCheckpointsEntry(ctx context.Context, taskName string) error {
