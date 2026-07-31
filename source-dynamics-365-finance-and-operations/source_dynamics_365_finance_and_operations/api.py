@@ -19,6 +19,7 @@ from estuary_cdk.http import HTTPError
 
 from .adls_gen2_client import ADLSGen2Client, ADLSPathMetadata
 from .models import (
+    AttributeDataType,
     ModelDotJson,
     TableMetadata,
 )
@@ -59,6 +60,9 @@ TransformedRow = dict[str, str | bool | None | dict[str, str]]
 # as an fallback when the folder level model.json was written but
 # truncated (see get_table_metadata).
 TRICKLE_FEED_SERVICE_DIR = "Microsoft.Athena.TrickleFeedService"
+
+# Flags a row as a deletion.
+IS_DELETE = "IsDelete"
 
 
 class ModelFormat(StrEnum):
@@ -144,7 +148,7 @@ def _table_metadata_from_entity(entity: dict) -> TableMetadata:
         field_names=[attr["name"] for attr in entity["attributes"]],
         boolean_fields=frozenset(
             attr["name"] for attr in entity["attributes"]
-            if attr["dataType"] == "boolean"
+            if attr["dataType"] == AttributeDataType.BOOLEAN
         ),
     )
 
@@ -298,7 +302,7 @@ async def _read_upsert_file(
 ) -> AsyncGenerator[TransformedRow, None]:
     """Yield rows, raising if any is a delete."""
     async for row in rows:
-        if row["IsDelete"] is True:
+        if row[IS_DELETE] is True:
             raise RuntimeError(
                 f"{csv_name} contains a delete row after upserts. "
                 f"Each CSV must contain only deletes or non-deletes."
@@ -312,7 +316,7 @@ async def _read_delete_file(
 ) -> AsyncGenerator[TransformedRow, None]:
     """Yield rows, raising if any is not a delete (file was classified as deletes)."""
     async for row in rows:
-        if row["IsDelete"] is not True:
+        if row[IS_DELETE] is not True:
             raise RuntimeError(
                 f"{csv_name} contains a non-delete row after deletes. "
                 f"Each CSV must contain only deletes or non-deletes."
@@ -358,7 +362,7 @@ async def stream_folder_rows(
         except StopAsyncIteration:
             continue
 
-        if first_row["IsDelete"] is True:
+        if first_row[IS_DELETE] is True:
             deferred_csvs.append(csv)
             await stream.aclose()
             continue
@@ -438,7 +442,7 @@ def transform_row(row: dict[str, str | None], boolean_fields: frozenset[str], cs
         result[field_name] = value.lower() == "true" if value else False
 
     result["_meta"] = {
-        "op": "d" if result.get("IsDelete") else "u",
+        "op": "d" if result.get(IS_DELETE) else "u",
         "source_file": csv_name,
     }
 
