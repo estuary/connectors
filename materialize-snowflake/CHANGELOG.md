@@ -37,6 +37,13 @@
   rows before appending any of its own. It fails, and asks for a backfill, only
   if the shard it took over was interrupted with rows outstanding — the one case
   in which those rows would be materialized twice.
+- Backfilling a binding on this path drops and re-creates its table rather than
+  emptying it in place, and so does not preserve grants on that table. Emptying
+  it in place would leave the shards of the generation being replaced streaming
+  into it — they are still running while the backfill is applied — and their rows
+  would land after it was emptied and be materialized a second time. Dropping the
+  table takes their channels with it, and a shard of the replaced generation which
+  restarts into the backfill fails rather than opening a new one.
 
 ## 2026-07-23
 
