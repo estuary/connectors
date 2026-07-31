@@ -369,6 +369,12 @@ func (db *oracleDatabase) RediscoveryInterval() time.Duration {
 	return sqlcapture.ParseRediscoveryInterval(db.config.Advanced.RediscoveryInterval)
 }
 
+func (db *oracleDatabase) ReplicationPollingInterval() time.Duration {
+	// Replication events are produced by polling the logs on a fixed interval, so a
+	// stream-to-fence cycle can't complete any faster than that.
+	return pollInterval
+}
+
 func encodeKeyFDB(key any, colType oracleColumnType) (tuple.TupleElement, error) {
 	switch key := key.(type) {
 	case [16]uint8:
