@@ -1,5 +1,13 @@
 # source-sqlserver
 
+## 2026-07-31
+
+### Fixed
+- The polling query which checks each CDC capture instance for new changes now
+  lists those instances in a stable order. It was previously assembled in map
+  iteration order, so its text differed on every polling cycle and SQL Server
+  compiled a new plan for it each time instead of reusing a cached one.
+
 ## 2026-07-30
 
 ### Added
