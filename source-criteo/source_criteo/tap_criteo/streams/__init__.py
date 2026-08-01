@@ -1,1 +1,0 @@
-"""Streams for tap-criteo."""
