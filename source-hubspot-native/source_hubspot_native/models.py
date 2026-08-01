@@ -372,13 +372,6 @@ class BaseCRMObject(BaseDocument, extra="allow"):
                     "type": "string"
                 },
             },
-            "required": [
-                "archived",
-                "createdAt",
-                "id",
-                "properties",
-                "updatedAt",
-            ]
         }
 
         properties_schema = {
@@ -386,8 +379,6 @@ class BaseCRMObject(BaseDocument, extra="allow"):
             "type": "object",
             "properties": {},
         }
-
-        required_properties: list[str] = []
 
         for prop in properties:
             property_schema: dict[str, Any] = {
@@ -425,10 +416,8 @@ class BaseCRMObject(BaseDocument, extra="allow"):
                     continue
 
             properties_schema["properties"][prop.name] = property_schema
-            required_properties.append(prop.name)
 
         schema["properties"]["properties"] = properties_schema
-        schema["properties"]["properties"]["required"] = required_properties
         return schema
 
 

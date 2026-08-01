@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-08-04
+### Fixed
+- Sourced schemas now describe the `_meta` field.
+
 ## 2026-07-29
 ### Fixed
 - The `forms` binding now captures `captured`, `flow`, and `blog_comment` forms in
