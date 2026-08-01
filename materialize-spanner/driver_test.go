@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"cloud.google.com/go/spanner"
+	"github.com/estuary/connectors/go/common"
 	sql "github.com/estuary/connectors/materialize-sql"
 )
 
@@ -33,7 +34,7 @@ func TestIntegration(t *testing.T) {
 	})
 
 	t.Run("fence", func(t *testing.T) {
-		var testDialect = createSpannerDialect(featureFlagDefaults)
+		var testDialect = createSpannerDialect(common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{}))
 		var testTemplates = renderTemplates(testDialect, false)
 
 		sql.RunFencingTest(
@@ -57,4 +58,3 @@ func TestIntegration(t *testing.T) {
 		)
 	})
 }
-
