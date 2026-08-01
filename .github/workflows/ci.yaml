@@ -138,9 +138,6 @@ jobs:
           - materialize-sqlserver
           - materialize-webhook
         include:
-          - connector: source-criteo
-            connector_type: capture
-            python: true
           - connector: source-shopify
             connector_type: capture
             python: true
