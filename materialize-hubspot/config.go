@@ -6,13 +6,14 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/estuary/connectors/go/common"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	"github.com/invopop/jsonschema"
 	orderedmap "github.com/wk8/go-ordered-map/v2"
 	"golang.org/x/time/rate"
 )
 
-var featureFlagDefaults = map[string]bool{}
+var featureFlagDefaults = map[string]common.FlagDefault{}
 
 type AuthType string
 
@@ -114,7 +115,7 @@ func (c *Config) DefaultNamespace() string {
 	return ""
 }
 
-func (c *Config) FeatureFlags() (raw string, defaults map[string]bool) {
+func (c *Config) FeatureFlags() (raw string, defaults map[string]common.FlagDefault) {
 	return c.Advanced.FeatureFlags, featureFlagDefaults
 }
 

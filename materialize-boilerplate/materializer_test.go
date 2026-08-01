@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	m "github.com/estuary/connectors/go/materialize"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -378,6 +379,48 @@ type testMaterializer struct {
 	is    *InfoSchema
 }
 
+// TestRunApplyResolvesFlagsFromCreatedAt verifies that Apply resolves a
+// date-gated feature flag from the creation date stamped onto the task's spec,
+// with no dependence on connector state or on whether the task is being applied
+// for the first time.
+func TestRunApplyResolvesFlagsFromCreatedAt(t *testing.T) {
+	ctx := context.Background()
+
+	for _, tt := range []struct {
+		name      string
+		createdAt string
+		want      bool
+	}{
+		{"created before the flag's cutoff", "2020-01-01", false},
+		{"created after the flag's cutoff", "2030-01-01", true},
+		{"brand new task, creation not yet committed", "", true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			spec := loadMaterializerSpec(t, "base.flow.proto")
+			spec.CreatedAt = tt.createdAt
+			is := testInfoSchemaFromSpec(t, spec, func(in string) string { return in })
+
+			var gotFlags map[string]bool
+			capturingFn := func(
+				ctx context.Context,
+				materializationName string,
+				endpointConfig testEndpointConfiger,
+				featureFlags map[string]bool,
+			) (Materializer[testEndpointConfiger, testFieldConfiger, testResourcer, testMappedTyper], error) {
+				gotFlags = featureFlags
+				return &testMaterializer{calls: &testCalls{}, is: is}, nil
+			}
+
+			_, err := RunApply(ctx, &pm.Request_Apply{
+				Materialization:     spec,
+				LastMaterialization: spec,
+			}, capturingFn)
+			require.NoError(t, err)
+			require.Equal(t, tt.want, gotFlags["test_gated"])
+		})
+	}
+}
+
 func makeTestMaterializerFn(got *testCalls, is *InfoSchema) NewMaterializerFn[testEndpointConfiger, testFieldConfiger, testResourcer, testMappedTyper] {
 	return func(
 		ctx context.Context,
@@ -469,7 +512,7 @@ func (c testEndpointConfiger) DefaultNamespace() string {
 	return ""
 }
 
-func (c testEndpointConfiger) FeatureFlags() (string, map[string]bool) {
+func (c testEndpointConfiger) FeatureFlags() (string, map[string]common.FlagDefault) {
 	featureFlags := ""
 	if advanced, ok := c.Config["advanced"].(map[string]any); ok {
 		if ff, ok := advanced["feature_flags"].(string); ok {
@@ -477,8 +520,9 @@ func (c testEndpointConfiger) FeatureFlags() (string, map[string]bool) {
 		}
 	}
 
-	return featureFlags, map[string]bool{
-		"retain_existing_data_on_backfill": false,
+	return featureFlags, map[string]common.FlagDefault{
+		"retain_existing_data_on_backfill": common.FlagDisabled,
+		"test_gated":                       common.FlagEnabledForTasksCreatedAfter("2026-06-10"),
 	}
 }
 
