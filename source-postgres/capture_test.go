@@ -929,5 +929,10 @@ func TestReadOnlyCaptureIdleFence(t *testing.T) {
 	var ctx, cancel = context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	tc.RunWithContext(ctx, "Idle Fence", transactionCountBaseline)
+
+	// Cursor values are redacted from the snapshot, and "0/0" matches that redaction, so the
+	// position the fence checkpointed has to be asserted separately from it.
+	require.NotContains(t, string(tc.Capture.Checkpoint), `"cursor":"0/0"`, "the fence should have checkpointed the position it reached")
+
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
