@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -35,8 +36,8 @@ func (c config) DefaultNamespace() string {
 	return ""
 }
 
-func (c config) FeatureFlags() (string, map[string]bool) {
-	return "", make(map[string]bool)
+func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
+	return "", nil
 }
 
 type tableConfig struct {

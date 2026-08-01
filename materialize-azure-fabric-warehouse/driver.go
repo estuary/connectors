@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/estuary/connectors/go/common"
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -13,9 +14,9 @@ import (
 	"github.com/microsoft/go-mssqldb/azuread"
 )
 
-var featureFlagDefaults = map[string]bool{
-	"datetime_keys_as_string": true,
-	"retain_existing_data_on_backfill": false,
+var featureFlagDefaults = map[string]common.FlagDefault{
+	"datetime_keys_as_string":          common.FlagEnabled,
+	"retain_existing_data_on_backfill": common.FlagDisabled,
 }
 
 type advancedConfig struct {
@@ -90,7 +91,7 @@ func (c config) DefaultNamespace() string {
 	return c.Schema
 }
 
-func (c config) FeatureFlags() (string, map[string]bool) {
+func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
 	return c.Advanced.FeatureFlags, featureFlagDefaults
 }
 
@@ -128,7 +129,7 @@ func (r tableConfig) Parameters() ([]string, bool, error) {
 // SQL Server collations use _CI_ for case-insensitive and _CS_ for case-sensitive.
 func isCaseInsensitiveDatabase(ctx context.Context, db *stdsql.DB, warehouse string) (bool, error) {
 	// Create a temporary dialect just to get the Literal function for the query
-	tmpDialect := createDialect(featureFlagDefaults, false)
+	tmpDialect := createDialect(common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{}), false)
 	var collation string
 	if err := db.QueryRowContext(ctx, fmt.Sprintf(
 		"SELECT DATABASEPROPERTYEX(%s, 'Collation')",
