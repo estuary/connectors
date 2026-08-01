@@ -1,0 +1,29 @@
+---
+captures:
+  acmeCo/source-criteo:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_criteo
+        config:
+          credentials:
+            credentials_title: OAuth Credentials
+            client_id: client_id_placeholder
+            client_secret: client_secret_placeholder
+          start_date: "2025-09-01T00:00:00Z"
+          advertiser_ids: []
+          reports:
+            - name: MyReport
+              currency: GBP
+              grain: Day
+              dimensions:
+                - Campaign
+                - CampaignId
+              metrics:
+                - AdvertiserCost
+                - Clicks
+                - Displays
+                - Visits
+    bindings: []
