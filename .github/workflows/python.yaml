@@ -234,7 +234,7 @@ jobs:
             usage_rate: "1.0"
           - name: source-brevo
             type: capture
-            version: v1
+            version: v2
             usage_rate: "1.0"
           - name: source-impact-native
             type: capture
