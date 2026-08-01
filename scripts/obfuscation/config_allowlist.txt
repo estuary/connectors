@@ -104,6 +104,8 @@ calls_lookback_window
 insights_lookback_window
 conversion_window_days
 attribution_window
+report_window_size
+report_lookback_days
 time_increment
 fastSyncStartTime
 fastSyncStopTime
