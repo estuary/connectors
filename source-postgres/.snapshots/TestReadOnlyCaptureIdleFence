@@ -1,0 +1,86 @@
+sql> CREATE TABLE test.readonlycaptureidlefence_936845 (id INTEGER PRIMARY KEY, data VARCHAR(2000))
+sql> INSERT INTO test.readonlycaptureidlefence_936845 VALUES (0, 'A'), (1, 'bbb'), (2, 'CDEFGH')
+sql> CREATE TABLE test.unwatched_909099 (id INTEGER PRIMARY KEY, data VARCHAR(2000))
+=== Discover: Discover Tables ===
+acmeCo/test_capture/test/readonlycaptureidlefence_936845
+=== Run: Initial Backfill ===
+[
+  "acmeCo/test_capture/test/readonlycaptureidlefence_936845",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "readonlycaptureidlefence_936845"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "A",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/test/readonlycaptureidlefence_936845",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "readonlycaptureidlefence_936845"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "bbb",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/test/readonlycaptureidlefence_936845",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "readonlycaptureidlefence_936845"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "CDEFGH",
+    "id": 2
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Freadonlycaptureidlefence_936845": {
+      "backfilled": 3,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO test.unwatched_909099 VALUES (0, 'unwatched')
+=== Run: Idle Fence ===
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Freadonlycaptureidlefence_936845": {
+      "backfilled": 3,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

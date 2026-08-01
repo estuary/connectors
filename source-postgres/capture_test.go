@@ -879,3 +879,60 @@ func TestBackfillPriority(t *testing.T) {
 	tc.Run("Backfill 3 (Low Priority)", transactionCountBaseline+1)  // Run until everything else is backfilled
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
+
+// TestReadOnlyCaptureIdleFence exercises a read-only capture whose own tables are silent while
+// the server keeps writing WAL for a table outside the publication.
+//
+// Read-only captures skip the watermark write which normally guarantees a commit past each
+// fence, and the fence position comes from the server-wide flush LSN, so nothing the capture
+// can observe is guaranteed to arrive after it. Such a fence can only be satisfied by the
+// server reporting its decoding position in a keepalive; before that was implemented the
+// capture would wait here indefinitely.
+func TestReadOnlyCaptureIdleFence(t *testing.T) {
+	var db, tc = blackboxTestSetup(t)
+	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data VARCHAR(2000))`)
+	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'A'), (1, 'bbb'), (2, 'CDEFGH')`)
+
+	// A table the capture never sees: its name doesn't match the discovery filter, and the
+	// publication is scoped below so that its changes are never decoded for us either. The
+	// default test publication is FOR ALL TABLES, under which writes to any table produce a
+	// commit which would satisfy the fence through the ordinary path.
+	var unwatched = testSchemaName + `.unwatched_` + uniqueTableID(t, "unwatched")
+	db.CreateTable(t, unwatched, `(id INTEGER PRIMARY KEY, data VARCHAR(2000))`)
+	t.Cleanup(func() {
+		db.QuietExec(t, `DROP PUBLICATION IF EXISTS flow_publication`)
+		db.QuietExec(t, `CREATE PUBLICATION flow_publication FOR ALL TABLES`)
+		db.QuietExec(t, `ALTER PUBLICATION flow_publication SET (publish_via_partition_root = true)`)
+	})
+	db.QuietExec(t, `DROP PUBLICATION IF EXISTS flow_publication`)
+	db.QuietExec(t, `CREATE PUBLICATION flow_publication FOR TABLE <NAME>`)
+
+	// When the bounded run below expires it kills flowctl, which does not reap the connector
+	// it launched, so a failing run leaves a process holding the replication slot and every
+	// later test in the package fails to start replication. Release it so that a regression
+	// here fails this test alone.
+	t.Cleanup(func() {
+		db.QuietExec(t, `SELECT pg_terminate_backend(active_pid) FROM pg_replication_slots
+			WHERE slot_name = 'flow_slot' AND active`)
+	})
+
+	require.NoError(t, tc.Capture.EditConfig("advanced.read_only_capture", true))
+	tc.Discover("Discover Tables")
+	tc.Run("Initial Backfill", transactionCountBaseline+1)
+
+	// Advance the server's WAL past the capture's cursor using only writes it will never
+	// observe, then verify that the next capture still reaches its fence and shuts down.
+	// This run is bounded because the regression it guards against is an indefinite wait:
+	// without a deadline a failure hangs until the test binary's timeout and panics, taking
+	// every other test in the package down with it. A successful run takes a second or two.
+	db.Exec(t, `INSERT INTO `+unwatched+` VALUES (0, 'unwatched')`)
+	var ctx, cancel = context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	tc.RunWithContext(ctx, "Idle Fence", transactionCountBaseline)
+
+	// Cursor values are redacted from the snapshot, and "0/0" matches that redaction, so the
+	// position the fence checkpointed has to be asserted separately from it.
+	require.NotContains(t, string(tc.Capture.Checkpoint), `"cursor":"0/0"`, "the fence should have checkpointed the position it reached")
+
+	cupaloy.SnapshotT(t, tc.Transcript.String())
+}
