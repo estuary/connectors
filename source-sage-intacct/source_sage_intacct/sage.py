@@ -134,7 +134,6 @@ class SageRecord(BaseModel):
             "additionalProperties": False,
             "type": "object",
             "properties": {},
-            "required": [],
         }
 
         for field, datatype in zip(cls.field_names, cls.field_datatypes):
@@ -150,11 +149,15 @@ class SageRecord(BaseModel):
                     field_schema = {
                         "type": "string",
                         "format": "date",
+                        "minLength": 10,
+                        "maxLength": 10,
                     }
                 case "TIMESTAMP":
                     field_schema = {
                         "type": "string",
                         "format": "date-time",
+                        "minLength": 32,
+                        "maxLength": 32,
                     }
                 case "DECIMAL" | "CURRENCY" | "PERCENT":
                     field_schema = {
@@ -171,11 +174,9 @@ class SageRecord(BaseModel):
                     )
 
             schema["properties"][field] = field_schema
-            schema["required"].append(field)
 
         if cls.company_id:
             schema["properties"][COMPANY_ID_FIELD] = {"type": "string"}
-            schema["required"].append(COMPANY_ID_FIELD)
 
         return schema
 
