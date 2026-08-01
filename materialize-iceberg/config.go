@@ -18,6 +18,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/estuary/connectors/go/auth/iam"
 	"github.com/estuary/connectors/go/blob"
+	"github.com/estuary/connectors/go/common"
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
@@ -27,13 +28,13 @@ import (
 	orderedmap "github.com/wk8/go-ordered-map/v2"
 )
 
-var featureFlagDefaults = map[string]bool{
+var featureFlagDefaults = map[string]common.FlagDefault{
 	// An alternate naming style for the Iceberg table data.  By default (when
 	// false), the naming is:
 	//   <base_location>/<namespace>_<table>_<hash>
 	// When this flag is enabled:
 	//   <base_location>/<namespace>/<table>.<hash>
-	"nested_dot_hash_location_style": false,
+	"nested_dot_hash_location_style": common.FlagDisabled,
 	// Materialize objects, arrays, multi-type fields, and the root document
 	// as Iceberg format v3 `variant` columns instead of JSON strings. Tables
 	// with a variant column are created as (or upgraded to) format v3, and
@@ -41,7 +42,7 @@ var featureFlagDefaults = map[string]bool{
 	// later). Existing tasks keep their JSON string columns unless opted in;
 	// toggling the flag on an existing table migrates the affected columns in
 	// place, preserving rows.
-	"variant_columns": false,
+	"variant_columns": common.FlagDisabled,
 }
 
 var (
@@ -239,7 +240,7 @@ func (c config) DefaultNamespace() string {
 	}
 }
 
-func (c config) FeatureFlags() (raw string, defaults map[string]bool) {
+func (c config) FeatureFlags() (raw string, defaults map[string]common.FlagDefault) {
 	return c.Advanced.FeatureFlags, featureFlagDefaults
 }
 

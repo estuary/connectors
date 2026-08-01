@@ -303,7 +303,7 @@ func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
 	}
 
 	// Get feature flags and create dialect for preReqs function
-	_, featureFlags := cfg.FeatureFlags()
+	featureFlags := boilerplate.ParseFlags(cfg)
 	dialect := createDialect(featureFlags, caseInsensitiveResources)
 	var wh int
 	if err := db.QueryRowContext(pingCtx, fmt.Sprintf("SELECT 1 from sys.databases WHERE name = %s;", dialect.Literal(cfg.Warehouse))).Scan(&wh); err != nil {
