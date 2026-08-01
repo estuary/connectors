@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"net/url"
+
+	"github.com/estuary/connectors/go/common"
 )
 
 type sshForwarding struct {
@@ -57,8 +59,8 @@ func (c config) DefaultNamespace() string {
 	return ""
 }
 
-func (c config) FeatureFlags() (string, map[string]bool) {
-	return c.Advanced.FeatureFlags, make(map[string]bool)
+func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
+	return c.Advanced.FeatureFlags, nil
 }
 
 // ToURI converts the Config to a DSN string.

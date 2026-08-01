@@ -5,19 +5,20 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/estuary/connectors/go/common"
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
 	"github.com/invopop/jsonschema"
 	orderedmap "github.com/wk8/go-ordered-map/v2"
 )
 
-var featureFlagDefaults = map[string]bool{
-	"datetime_keys_as_string":          true,
-	"retain_existing_data_on_backfill": false,
+var featureFlagDefaults = map[string]common.FlagDefault{
+	"datetime_keys_as_string":          common.FlagEnabled,
+	"retain_existing_data_on_backfill": common.FlagDisabled,
 	// scale_out enables multi-shard operation under the v2 runtime: checkpoint
 	// state is scoped by shard key-range, and only the primary shard (key_begin
 	// 0) executes the staged MERGE/COPY queries of all shards at Acknowledge.
-	"scale_out": false,
+	"scale_out": common.FlagDisabled,
 }
 
 // config represents the endpoint configuration for sql server.
@@ -179,7 +180,7 @@ func (c config) DefaultNamespace() string {
 	return c.SchemaName
 }
 
-func (c config) FeatureFlags() (string, map[string]bool) {
+func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
 	return c.Advanced.FeatureFlags, featureFlagDefaults
 }
 
