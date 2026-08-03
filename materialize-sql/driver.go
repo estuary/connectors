@@ -71,15 +71,12 @@ func (d *Driver[EC, RC]) Validate(ctx context.Context, req *pm.Request_Validate)
 }
 
 func (d *Driver[EC, RC]) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
-	var opts []boilerplate.ApplyOption
-	if schema, err := schemagen.GenerateSchema("SQL Connection", new(EC)).MarshalJSON(); err == nil {
-		opts = append(opts, boilerplate.WithConfigUpdates(schema, []string{"advanced", "feature_flags"}))
-	}
-	return boilerplate.RunApply(ctx, req, d.NewMaterializer, opts...)
+	return boilerplate.RunApply(ctx, req, d.NewMaterializer)
 }
 
 func (d *Driver[EC, RC]) NewTransactor(ctx context.Context, req pm.Request_Open, be *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
-	return boilerplate.RunNewTransactor(ctx, req, be, d.NewMaterializer)
+	return boilerplate.RunNewTransactor(ctx, req, be, d.NewMaterializer,
+		boilerplate.WithConfigUpdates([]string{"advanced", "feature_flags"}))
 }
 
 type sqlMaterialization[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]] struct {

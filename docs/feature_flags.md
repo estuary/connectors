@@ -116,10 +116,26 @@ introduced, including those of long-running tasks.
 ### Recording the resolved value in the config
 
 So that a task's flags can be read off its config rather than inferred from its
-creation date, Apply emits a [`configUpdate`](observable_logs.md) event restating the
+creation date, Open emits a [`configUpdate`](observable_logs.md) event restating the
 endpoint config with each cutoff-gated flag written out explicitly — `new_thing` or
-`no_new_thing` in `/advanced/feature_flags`. It is recomputed on every Apply and stops
+`no_new_thing` in `/advanced/feature_flags`. It is recomputed on every Open and stops
 being emitted once the config contains the flag.
+
+The restatement never decrypts and re-encrypts the config. Open carries the task's
+sealed config alongside its decrypted one, and the flag is written into the plaintext
+`sops.overlay` of that document: the runtime merges the overlay over the decrypted
+config, having first checked that every location it touches is annotated
+`nonsensitive: true` in the connector's config schema — which is why
+`/advanced/feature_flags` must carry `jsonschema_extras:"nonsensitive=true"`. The
+encrypted values are copied across untouched, so a config stays under the key it was
+encrypted with, including a customer-managed one that Estuary cannot itself encrypt to.
+A config that isn't encrypted has no ciphertext to preserve and is restated directly.
+
+Property order does matter to sops, which computes its MAC over a document's values in
+the order it encounters them — but it is not something the connector has to preserve.
+The control plane parses the emitted config and re-serializes it when applying the
+update, which sorts its properties, so the restatement is sorted here as well and a
+config that verifies once stored verifies as emitted.
 
 This is a *record*, not a decision. The value written is the one the connector already
 resolved from the creation date, so the config can never contradict the connector's

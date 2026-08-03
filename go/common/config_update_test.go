@@ -2,9 +2,6 @@ package common
 
 import (
 	"encoding/json"
-	"io"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	log "github.com/sirupsen/logrus"
@@ -77,64 +74,79 @@ func TestSetJSONProperty(t *testing.T) {
 }
 
 func TestEmitConfigUpdate(t *testing.T) {
-	var requestBody []byte
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var err error
-		requestBody, err = io.ReadAll(r.Body)
-		require.NoError(t, err)
-		w.Write([]byte(`{"address":"db:5432","password_sops":"ENC[AES256_GCM,...]"}`))
-	}))
-	defer server.Close()
-	t.Setenv("ENCRYPTION_URL", server.URL)
-
 	hook := logtest.NewGlobal()
 	defer hook.Reset()
 
-	// Out-of-order keys and a large integer that doesn't round-trip through
-	// float64, to verify key sorting and number fidelity.
-	config := json.RawMessage(`{"port":1234567890123456789,"advanced":{"feature_flags":"foo"},"address":"db:5432"}`)
-	schema := json.RawMessage(`{"type":"object"}`)
-
-	require.NoError(t, EmitConfigUpdate(t.Context(), "updating config", config, schema))
-
-	require.JSONEq(t, `{
-		"config": {"address":"db:5432","advanced":{"feature_flags":"foo"},"port":1234567890123456789},
-		"schema": {"type":"object"}
-	}`, string(requestBody))
-
-	// Keys of the encrypted config must be in sorted order for sops HMAC
-	// stability, which JSONEq alone doesn't verify.
-	var body struct {
-		Config json.RawMessage `json:"config"`
-	}
-	require.NoError(t, json.Unmarshal(requestBody, &body))
-	require.Equal(t,
-		`{"address":"db:5432","advanced":{"feature_flags":"foo"},"port":1234567890123456789}`,
-		string(body.Config),
-	)
+	config := json.RawMessage(`{"address":"db:5432","sops":{"mac":"ENC[AES256_GCM,data:yy]"}}`)
+	EmitConfigUpdate("updating config", config)
 
 	require.Len(t, hook.Entries, 1)
 	entry := hook.LastEntry()
 	require.Equal(t, log.InfoLevel, entry.Level)
 	require.Equal(t, "updating config", entry.Message)
 	require.Equal(t, "configUpdate", entry.Data["eventType"])
-	require.JSONEq(t,
-		`{"address":"db:5432","password_sops":"ENC[AES256_GCM,...]"}`,
-		string(entry.Data["config"].(json.RawMessage)),
-	)
+	require.Equal(t, config, entry.Data["config"])
 }
 
-func TestEmitConfigUpdateEncryptionFailure(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "bad schema", http.StatusBadRequest)
-	}))
-	defer server.Close()
-	t.Setenv("ENCRYPTION_URL", server.URL)
+func TestSetSealedConfigProperty(t *testing.T) {
+	const sealed = `{"port":5432,"address":"db:5432","credentials":{"user":"flow","password_sops":"ENC[AES256_GCM,data:xx]"},"sops":{"encrypted_suffix":"_sops","mac":"ENC[AES256_GCM,data:yy]"}}`
 
-	hook := logtest.NewGlobal()
-	defer hook.Reset()
-
-	err := EmitConfigUpdate(t.Context(), "updating config", json.RawMessage(`{}`), json.RawMessage(`{}`))
-	require.ErrorContains(t, err, "status 400")
-	require.Empty(t, hook.Entries)
+	for _, tt := range []struct {
+		name    string
+		doc     string
+		path    []string
+		value   any
+		want    string
+		wantErr string
+	}{
+		{
+			// The encrypted values are carried across as they were: the overlay is
+			// what the runtime merges over them once they are decrypted.
+			name:  "sops document carries the value in an overlay",
+			doc:   sealed,
+			path:  []string{"advanced", "feature_flags"},
+			value: "gated_flag",
+			want:  `{"address":"db:5432","credentials":{"password_sops":"ENC[AES256_GCM,data:xx]","user":"flow"},"port":5432,"sops":{"encrypted_suffix":"_sops","mac":"ENC[AES256_GCM,data:yy]","overlay":{"advanced":{"feature_flags":"gated_flag"}}}}`,
+		},
+		{
+			name:  "existing overlay properties are kept",
+			doc:   `{"port":5432,"sops":{"overlay":{"other":true},"mac":"ENC[AES256_GCM,data:yy]"}}`,
+			path:  []string{"advanced", "feature_flags"},
+			value: "gated_flag",
+			want:  `{"port":5432,"sops":{"mac":"ENC[AES256_GCM,data:yy]","overlay":{"advanced":{"feature_flags":"gated_flag"},"other":true}}}`,
+		},
+		{
+			name:  "unencrypted config is set directly, without a sops stanza",
+			doc:   `{"port":5432,"address":"db:5432"}`,
+			path:  []string{"advanced", "feature_flags"},
+			value: "gated_flag",
+			want:  `{"address":"db:5432","advanced":{"feature_flags":"gated_flag"},"port":5432}`,
+		},
+		{
+			name: "null sops stanza is not a sops document",
+			// The runtime reads a null `sops` as an unencrypted config, so a
+			// restatement must not hand it an overlay to apply.
+			doc:   `{"port":5432,"sops":null}`,
+			path:  []string{"feature_flags"},
+			value: "gated_flag",
+			want:  `{"feature_flags":"gated_flag","port":5432,"sops":null}`,
+		},
+		{
+			name:    "non-object config",
+			doc:     `["not","a","config"]`,
+			path:    []string{"feature_flags"},
+			value:   "gated_flag",
+			wantErr: "config is not a JSON object",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := SetSealedConfigProperty(json.RawMessage(tt.doc), tt.path, tt.value)
+			if tt.wantErr != "" {
+				require.ErrorContains(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tt.want, string(got))
+		})
+	}
 }
