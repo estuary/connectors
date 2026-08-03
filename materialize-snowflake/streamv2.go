@@ -1,10 +1,12 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	stdsql "database/sql"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -53,8 +55,9 @@ type streamV2Item struct {
 	// from the channel's first document and never reset.
 	Counter int64
 	// KeyBegin and KeyEnd record the shard key range of the transaction which
-	// counted those documents, so that a change of topology since they were
-	// appended is recognised — see reconcileStreamV2Channel.
+	// counted those documents, which is how a later topology recognises the
+	// channels of shards whose key range it has taken over — see
+	// absorbedChannels.
 	KeyBegin uint32
 	KeyEnd   uint32
 }
@@ -241,6 +244,11 @@ type streamV2Binding struct {
 	prior map[string]*streamV2Item
 	// opened reports whether the channel has been opened and reconciled.
 	opened bool
+	// retire names the channels of shards whose key range this shard absorbed and
+	// which it has settled, to be deleted from the checkpoint. It is reported in
+	// every checkpoint of the session rather than just the first, so that a
+	// transaction which never commits does not lose the deletion.
+	retire []string
 
 	// counter is the index of the last document counted for this channel: the
 	// checkpointed Counter at Open, advancing by one per document stored.
@@ -445,10 +453,15 @@ func (m *streamV2Manager) addBinding(database, schema, table string, target sql.
 }
 
 // checkpointFor returns the checkpoint entries to record for a binding: the item
-// of this shard's own channel. The runtime reduces these as a merge patch, so the
-// entries of the task's other shards are left as they are.
+// of this shard's own channel, alongside a deletion for every channel this shard
+// has retired. The runtime reduces these as a merge patch, so the entries of the
+// task's other shards are left as they are.
 func (m *streamV2Manager) checkpointFor(binding int, item *streamV2Item) map[string]*streamV2Item {
-	return map[string]*streamV2Item{item.Channel: item}
+	var entries = map[string]*streamV2Item{item.Channel: item}
+	for _, channel := range m.bindings[binding].retire {
+		entries[channel] = nil
+	}
+	return entries
 }
 
 // ensureChannel opens the binding's channel and captures its skip threshold, on
@@ -484,6 +497,12 @@ func (m *streamV2Manager) ensureChannel(ctx context.Context, b *streamV2Binding)
 
 	client, err := m.ensureStarted(ctx)
 	if err != nil {
+		return err
+	}
+
+	// Settled before this shard's own channel is opened, so that a join this
+	// shard cannot account for is refused before it appends anything.
+	if err := m.retireAbsorbedChannels(ctx, client, b); err != nil {
 		return err
 	}
 
@@ -648,6 +667,172 @@ func reconcileStreamV2Channel(channel, table string, committedToken *string, pri
 	}
 
 	return committed, nil
+}
+
+// absorbedChannels reports the checkpoint items belonging to shards whose key
+// range this shard has taken over — what joining two shards into one produces —
+// ordered by the range they covered.
+//
+// A channel is named for its shard's key-begin, so an item under a channel which
+// is not this shard's belongs to another shard. One whose key-begin lies above
+// this shard's own and within its range is not a shard which is still running:
+// shard ranges tile the key space exactly, so no two live shards can stand in
+// that relation. This shard has absorbed it, and now carries the documents it
+// was appending to a channel of its own.
+func absorbedChannels(channel string, prior map[string]*streamV2Item, keyBegin, keyEnd uint32) []*streamV2Item {
+	var absorbed []*streamV2Item
+	for ch, item := range prior {
+		// A nil item is a channel already retired by an earlier session, whose
+		// deletion the runtime has not yet reduced away.
+		if ch == channel || item == nil || item.KeyBegin <= keyBegin || item.KeyBegin > keyEnd {
+			continue
+		}
+		absorbed = append(absorbed, item)
+	}
+	slices.SortFunc(absorbed, func(a, b *streamV2Item) int {
+		return cmp.Compare(a.KeyBegin, b.KeyBegin)
+	})
+	return absorbed
+}
+
+// retireAbsorbedChannels retires the channel of every shard whose key range this
+// shard has absorbed: it settles the channel against the checkpoint, drops it in
+// Snowflake, and marks its checkpoint item for removal.
+//
+// An absorbed shard's committed rows are in the table and its journal progress is
+// recorded in the task's frontier, which is not per-shard, so this shard will not
+// be delivered those documents again: the join needs no backfill. What it cannot
+// survive is an absorbed shard which was interrupted, having appended documents
+// its final transaction never committed. Those rows are in the table while the
+// frontier does not account for them, so they will be delivered here and appended
+// to this shard's own channel, where the absorbed channel's committed offset token
+// cannot skip them. Since this write path serves delta-updates bindings, that
+// would duplicate them for good.
+//
+// Deleting the checkpoint item is not on its own enough to retire the channel, and
+// deleting it alone is what wedges a task scaled down and then back up. A split
+// re-creates exactly the pivot boundaries a join removed, so the shard which
+// arrives derives this same channel name — and finds a channel Snowflake still
+// holds, with a committed offset token no checkpoint item is left to contradict.
+// That shard is refused, as a shard which cannot tell an interrupted attempt of
+// its own from another topology's leftovers must be. Dropping the channel in
+// Snowflake is what makes the name safe to derive again, so both halves of the
+// retirement happen here: the drop, and the deletion which takes the channel out
+// of the checkpoint. Only the drop is durable at once, which is why a retirement
+// must be safe to repeat — see absorbedChannelSettled.
+//
+// Opening an absorbed channel invalidates any opening its own shard still holds,
+// which is safe precisely because that shard is gone — the topology it belonged
+// to no longer tiles the key space, so the runtime will not start it.
+func (m *streamV2Manager) retireAbsorbedChannels(ctx context.Context, client *sidecarClient, b *streamV2Binding) error {
+	for _, item := range absorbedChannels(b.channel, b.prior, m.keyBegin, m.keyEnd) {
+		status, err := client.OpenChannel(ctx, b.database, b.schema, b.table, item.Channel)
+		if err != nil {
+			return fmt.Errorf("opening absorbed channel %q: %w", item.Channel, err)
+		} else if err := rejectedRowsError(item.Channel, b.table, status); err != nil {
+			return err
+		} else if err := absorbedChannelSettled(item, status.CommittedToken, m.keyBegin, m.keyEnd); err != nil {
+			return err
+		}
+
+		// Both checks above are ahead of the drop because the drop takes everything
+		// Snowflake holds for the channel, the cumulative row-error count included:
+		// a join must not become a way to clear a refusal for rows Snowflake
+		// discarded, which are missing from the table whether the channel that
+		// delivered them still exists or not.
+		if err := retireChannel(ctx, client, item.Channel); err != nil {
+			return err
+		}
+
+		b.retire = append(b.retire, item.Channel)
+
+		log.WithFields(log.Fields{
+			"table":          b.table,
+			"channel":        item.Channel,
+			"committedToken": status.committedToken(),
+			"counter":        item.Counter,
+			"absorbedRange":  fmt.Sprintf("[%08x, %08x]", item.KeyBegin, item.KeyEnd),
+		}).Info("retiring the channel of a shard whose key range this shard has absorbed")
+	}
+	return nil
+}
+
+// retireChannel takes a channel out of service for good, by dropping it in
+// Snowflake rather than only closing the local handle.
+//
+// Retirement has to reach Snowflake because a channel name is deterministic —
+// derived from (task, key-begin, state key) — while the topology it names is
+// not. A shard which is deleted and a later shard which happens to be given the
+// same key-begin derive the same channel name, and a channel Snowflake still
+// holds hands its committed offset token to whoever opens it next, which that
+// shard can only refuse — its own documents are not the ones the token counts,
+// and it has no way to tell which of them Snowflake holds. Dropping the channel
+// is what makes the next open of the same name a genuinely fresh channel, and so
+// what keeps a join from costing the next split a backfill.
+//
+// That the drop is what does this, rather than a plain close of the channel, was
+// settled by experiment against live Snowflake rather than read off the SDK's
+// contract: a close releases only the local handle, and Snowflake goes on
+// reporting the same committed offset token to the next open of that name. The
+// retirement subtest of TestStreamV2Manager is that experiment; the same
+// sequence against the fake sidecar is TestStreamV2ChannelRetirement.
+//
+// The channel must already be open in this session, since the drop is expressed
+// through the handle an open produced. Its committed rows are untouched: this
+// retires the channel, not the data it delivered.
+func retireChannel(ctx context.Context, client *sidecarClient, channel string) error {
+	if err := client.CloseChannel(ctx, channel, true); err != nil {
+		return fmt.Errorf("retiring channel %q: %w", channel, err)
+	}
+	log.WithFields(log.Fields{"channel": channel}).Info("retired snowpipe streaming v2 channel")
+	return nil
+}
+
+// absorbedChannelSettled reports whether an absorbed shard's channel holds
+// exactly the documents the checkpoint accounts for — or has already been retired
+// — and so may be retired now.
+func absorbedChannelSettled(item *streamV2Item, committedToken *string, keyBegin, keyEnd uint32) error {
+	// A channel holding nothing at all is one this shard has already retired: the
+	// drop is what discards a committed offset token, and it is reached only once
+	// the channel was found settled against this very item. The two halves of a
+	// retirement are not durable together — the drop reaches Snowflake as the
+	// channel is settled, while the deletion of this item becomes durable only with
+	// the transaction carrying it — so a shard interrupted in between restarts to
+	// exactly this, and repeats the retirement.
+	//
+	// A table re-created under the task reports the same thing, having taken the
+	// committed offset token of every channel bound to it. That is settled by the
+	// generation the table records and by the reconciliation of this shard's own
+	// channel, both of which refuse before anything is appended.
+	//
+	// Which is why reconcileStreamV2Channel reads the same report as lost data
+	// rather than as a retirement: nothing retires a shard's own channel, so there
+	// it has no benign explanation.
+	if committedToken == nil {
+		return nil
+	}
+
+	committed, _, ok := parseStreamV2Token(*committedToken)
+	if !ok {
+		return fmt.Errorf(
+			"absorbed channel %q reports the committed offset token %q, which is not a document count: this channel was written by something other than this connector's snowpipe_streaming_v2 write path, and continuing could duplicate or drop rows",
+			item.Channel, *committedToken,
+		)
+	}
+
+	if committed > item.Counter {
+		return fmt.Errorf(
+			"channel %q of a shard covering [%08x, %08x], which this shard's range [%08x, %08x] has absorbed, has %d documents Snowflake committed beyond the %d this task's checkpoint records: that shard was interrupted, and the documents it did not account for will be replayed to this shard, where they cannot be told apart from new ones. Backfill this binding",
+			item.Channel, item.KeyBegin, item.KeyEnd, keyBegin, keyEnd, committed, item.Counter,
+		)
+	} else if committed < item.Counter {
+		return fmt.Errorf(
+			"channel %q of a shard covering [%08x, %08x], which this shard's range [%08x, %08x] has absorbed, has committed %d documents but this task's checkpoint records %d as appended: the channel has lost committed data. Backfill this binding",
+			item.Channel, item.KeyBegin, item.KeyEnd, keyBegin, keyEnd, committed, item.Counter,
+		)
+	}
+
+	return nil
 }
 
 // writeRow counts one converted document and buffers it for append, sending the

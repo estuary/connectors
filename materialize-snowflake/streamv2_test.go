@@ -393,6 +393,282 @@ func TestStreamV2Manager(t *testing.T) {
 		require.Equal(t, 9, distinct)
 	})
 
+	t.Run("joining two shards into one", func(t *testing.T) {
+		// Flow has no join command, but nothing in the runtime forbids one:
+		// shard ranges need only tile the key space exactly, so widening a
+		// surviving shard and deleting its sibling is a legal topology. The
+		// survivor then covers keys whose documents the deleted shard had been
+		// appending to a channel of its own, and whether it may carry on turns on
+		// whether that shard left its channel settled.
+		truncate(t)
+		var tgt = target("join.v1")
+		var pivot uint32 = math.MaxUint32/2 + 1
+		var loRange = &pf.RangeSpec{KeyEnd: pivot - 1, RClockEnd: math.MaxUint32}
+
+		var lo = newManager(loRange)
+		lo.addBinding(cfg.Database, cfg.Schema, tableName, tgt, nil)
+		writeRows(lo, 0, 3)
+		loItems, err := lo.flush(ctx)
+		require.NoError(t, err)
+
+		var hi = newManager(&pf.RangeSpec{KeyBegin: pivot, KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
+		hi.addBinding(cfg.Database, cfg.Schema, tableName, tgt, nil)
+		writeRows(hi, 100, 105)
+		hiItems, err := hi.flush(ctx)
+		require.NoError(t, err)
+		require.NotEqual(t, loItems[0].Channel, hiItems[0].Channel)
+		require.Equal(t, 8, countRows())
+		lo.stop()
+		hi.stop()
+
+		// Steady state first: the two shards share one connector-state document,
+		// so each reads the other's item back and must carry on regardless. The
+		// sibling's key-begin is outside this shard's range, which is what says
+		// the sibling is still running.
+		var loAgain = newManager(loRange)
+		loAgain.addBinding(cfg.Database, cfg.Schema, tableName, tgt, priorOf(loItems[0], hiItems[0]))
+		writeRows(loAgain, 3, 5)
+		require.Equal(t, int64(3), loAgain.bindings[0].skip)
+		items, err := loAgain.flush(ctx)
+		require.NoError(t, err)
+		require.Equal(t, int64(5), items[0].Counter)
+		require.Equal(t, 10, countRows())
+		loAgain.stop()
+
+		// The join: the survivor keeps the low shard's key-begin, and so its
+		// channel, but now covers the whole range — which puts the deleted
+		// shard's key-begin inside it.
+		var loItem = items[0]
+		var joined = newManager(fullRange)
+		joined.addBinding(cfg.Database, cfg.Schema, tableName, tgt, priorOf(loItem, hiItems[0]))
+
+		// The absorbed shard committed everything its checkpoint accounted for, so
+		// the task's frontier accounts for those documents too and they are not
+		// delivered here again. The join needs no backfill: the absorbed channel is
+		// settled and retired, and this shard carries on appending to its own.
+		writeRows(joined, 5, 8)
+		require.Equal(t, []string{hiItems[0].Channel}, joined.bindings[0].retire)
+		require.Equal(t, int64(5), joined.bindings[0].skip)
+
+		items, err = joined.flush(ctx)
+		require.NoError(t, err)
+		require.Equal(t, int64(8), items[0].Counter)
+
+		// The absorbed shard's rows are still in the table, and the joined shard
+		// added its own without re-appending any of them.
+		require.Equal(t, 13, countRows())
+
+		// The retirement is reported as a deletion of the absorbed channel's
+		// entry, which a merge patch applies while leaving this shard's own.
+		var entries = joined.checkpointFor(0, items[0])
+		require.Len(t, entries, 2)
+		require.Equal(t, items[0], entries[items[0].Channel])
+		require.Nil(t, entries[hiItems[0].Channel])
+		joined.stop()
+
+		// An absorbed shard which was interrupted is a different matter: it left
+		// documents committed beyond what its checkpoint accounts for, so the
+		// frontier will deliver them here, to a channel whose committed offset
+		// token cannot tell them from new ones.
+		//
+		// The join retired the channel it absorbed, so the shard standing in for the
+		// interrupted one opens that name as a channel holding nothing and appends
+		// from there — which is what a scale-up onto the removed pivot now does.
+		var interrupted = newManager(&pf.RangeSpec{KeyBegin: pivot, KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
+		interrupted.addBinding(cfg.Database, cfg.Schema, tableName, tgt, nil)
+		writeRows(interrupted, 105, 106)
+		items, err = interrupted.flush(ctx)
+		require.NoError(t, err)
+		require.Equal(t, int64(1), items[0].Counter)
+		var interruptedItem = *items[0]
+
+		// Its final transaction commits in Snowflake and is then lost, leaving the
+		// checkpoint above as the last account of the channel.
+		writeRows(interrupted, 106, 108)
+		_, err = interrupted.flush(ctx) // appended and committed, never checkpointed
+		require.NoError(t, err)
+		require.Equal(t, 16, countRows())
+		interrupted.sup.kill()
+
+		var rowsBefore = countRows()
+		var joinedAgain = newManager(fullRange)
+		joinedAgain.addBinding(cfg.Database, cfg.Schema, tableName, tgt, priorOf(loItem, &interruptedItem))
+
+		var refusal = joinedAgain.writeRow(ctx, 0, []any{"k", 1, json.RawMessage(`{}`)})
+		require.ErrorContains(t, refusal, "will be replayed to this shard")
+		require.ErrorContains(t, refusal, interruptedItem.Channel)
+		require.Equal(t, rowsBefore, countRows())
+		t.Logf("interrupted join refused with: %s", refusal)
+
+		// Backfilling the binding is the recovery that refusal asks for: it
+		// rotates the channel, and no item of the absorbed shard is carried into
+		// the new state key.
+		var afterBackfill = newManager(fullRange)
+		afterBackfill.addBinding(cfg.Database, cfg.Schema, tableName, target("join.v2"), nil)
+		require.NoError(t, afterBackfill.writeRow(ctx, 0, []any{"k", 1, json.RawMessage(`{}`)}))
+		items, err = afterBackfill.flush(ctx)
+		require.NoError(t, err)
+		require.Equal(t, rowsBefore+1, countRows())
+	})
+
+	t.Run("a joined task splits back onto the pivot the join removed", func(t *testing.T) {
+		// Scaling a task down and then back up is the most routine scaling action
+		// there is, and it re-creates exactly the pivot boundaries the join
+		// removed: the shard which arrives derives the channel name of the shard
+		// the join absorbed. Only Snowflake can say what that name then opens, and
+		// what it holds is what decides whether the arriving shard appends its
+		// documents or takes them for a replay of a transaction it never ran.
+		truncate(t)
+		var tgt = target("rejoin.v1")
+		var pivot uint32 = math.MaxUint32/2 + 1
+		var loRange = &pf.RangeSpec{KeyEnd: pivot - 1, RClockEnd: math.MaxUint32}
+		var hiRange = &pf.RangeSpec{KeyBegin: pivot, KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32}
+
+		var lo = newManager(loRange)
+		lo.addBinding(cfg.Database, cfg.Schema, tableName, tgt, nil)
+		writeRows(lo, 0, 3)
+		loItems, err := lo.flush(ctx)
+		require.NoError(t, err)
+		lo.stop()
+
+		var hi = newManager(hiRange)
+		hi.addBinding(cfg.Database, cfg.Schema, tableName, tgt, nil)
+		writeRows(hi, 100, 105)
+		hiItems, err := hi.flush(ctx)
+		require.NoError(t, err)
+		require.Equal(t, int64(5), hiItems[0].Counter)
+		hi.stop()
+
+		// The scale-down, which settles the absorbed shard's channel and reports
+		// its checkpoint item for deletion.
+		var joined = newManager(fullRange)
+		joined.addBinding(cfg.Database, cfg.Schema, tableName, tgt, priorOf(loItems[0], hiItems[0]))
+		writeRows(joined, 3, 5)
+		require.Equal(t, []string{hiItems[0].Channel}, joined.bindings[0].retire)
+		joinedItems, err := joined.flush(ctx)
+		require.NoError(t, err)
+		require.Equal(t, 10, countRows())
+		joined.stop()
+
+		// The scale-up: this shard is given the pivot as its key-begin, so it
+		// derives the absorbed shard's channel name again — and the join deleted
+		// the only checkpoint item which described it. Nothing Snowflake reports
+		// for that name may be adopted as a skip threshold, or this shard's
+		// documents are dropped as replays of a transaction it never ran.
+		var splitHi = newManager(hiRange)
+		splitHi.addBinding(cfg.Database, cfg.Schema, tableName, tgt, priorOf(joinedItems[0]))
+		require.Equal(t, hiItems[0].Channel, splitHi.bindings[0].channel)
+
+		// Its skip threshold is exactly what Snowflake reported for that name as the
+		// channel opened, so zero is the statement that the retirement reached
+		// Snowflake and not only the checkpoint.
+		writeRows(splitHi, 200, 204)
+		require.Zero(t, splitHi.bindings[0].skip)
+
+		items, err := splitHi.flush(ctx)
+		require.NoError(t, err)
+		require.Equal(t, int64(4), items[0].Counter)
+		require.Equal(t, 14, countRows())
+	})
+
+	t.Run("retiring a channel discards what Snowflake holds for it", func(t *testing.T) {
+		// What a channel name outlives is the whole problem retirement exists for:
+		// it is derived from (task, key-begin, state key), so a shard deleted today
+		// and a shard given the same key-begin tomorrow derive the same name. This
+		// is the experiment that says which SDK operation actually retires the
+		// channel behind that name, since only Snowflake can answer it.
+		truncate(t)
+		var tgt = target("retire.v1")
+
+		var m = newManager(fullRange)
+		m.addBinding(cfg.Database, cfg.Schema, tableName, tgt, nil)
+		var channel = m.bindings[0].channel
+
+		writeRows(m, 0, 3)
+		items, err := m.flush(ctx)
+		require.NoError(t, err)
+		require.Equal(t, int64(3), items[0].Counter)
+
+		client, err := m.ensureStarted(ctx)
+		require.NoError(t, err)
+		var reopen = func() *channelStatusResult {
+			status, err := client.OpenChannel(ctx, cfg.Database, cfg.Schema, tableName, channel)
+			require.NoError(t, err)
+			return status
+		}
+
+		t.Run("a close leaves the committed offset token behind, a drop does not", func(t *testing.T) {
+			// Closing without dropping is the operation this connector used to
+			// have, and the one the retirement design was provisionally built on.
+			require.NoError(t, client.CloseChannel(ctx, channel, false))
+			var afterClose = reopen()
+			t.Logf("reopened %s after a close: committed token %v", channel, afterClose.committedToken())
+
+			require.NoError(t, retireChannel(ctx, client, channel))
+			var afterDrop = reopen()
+			t.Logf("reopened %s after a retirement: committed token %v", channel, afterDrop.committedToken())
+
+			// A close only releases the local handle: Snowflake still holds the
+			// channel, and hands its committed offset token to the next opener.
+			require.NotNil(t, afterClose.CommittedToken)
+			require.Equal(t, m.offsetToken(3), *afterClose.CommittedToken)
+
+			// A drop is what retires it, so the same name reopens as a channel
+			// which has committed nothing.
+			require.Nil(t, afterDrop.CommittedToken)
+
+			// Retirement is about the channel, not the rows it delivered: those
+			// are committed to the table and stay there.
+			require.Equal(t, 3, countRows())
+		})
+
+		t.Run("a later shard may reuse the retired name", func(t *testing.T) {
+			// A shard given the retired key-begin — a scale-down followed by a
+			// scale-up — derives this same channel name, with no checkpoint item of
+			// its own to reconcile against. Nothing of the retired channel is
+			// adopted as a skip threshold, so its documents are appended in full
+			// rather than silently dropped as replays.
+			var reused = newManager(fullRange)
+			reused.addBinding(cfg.Database, cfg.Schema, tableName, tgt, nil)
+			require.Equal(t, channel, reused.bindings[0].channel)
+
+			writeRows(reused, 100, 104)
+			require.Zero(t, reused.bindings[0].skip)
+			items, err := reused.flush(ctx)
+			require.NoError(t, err)
+			require.Equal(t, int64(4), items[0].Counter)
+			require.Equal(t, 7, countRows())
+		})
+
+		t.Run("the row-error count goes with it", func(t *testing.T) {
+			// The committed offset token is not the only thing a channel
+			// accumulates: the row-error count which refuses a channel for good is
+			// kept for its whole life too. Whether a retirement takes that with it
+			// is measured rather than assumed, because it is what the fake sidecar
+			// and the sidecar's own tests model a drop as doing.
+			var notNullTable = "STREAMV2_TEST_RETIRE_NOT_NULL"
+			var rejecting = newManager(fullRange)
+			rejecting.addBinding(cfg.Database, cfg.Schema, notNullTable,
+				rejectingTable(t, notNullTable, "retire-notnull.v1"), nil)
+			var rejected = rejecting.bindings[0].channel
+
+			require.NoError(t, rejecting.writeRow(ctx, 0, []any{"dropped", nil}))
+			_, err := rejecting.flush(ctx)
+			require.ErrorContains(t, err, "rejected and discarded by Snowflake")
+
+			rejectingClient, err := rejecting.ensureStarted(ctx)
+			require.NoError(t, err)
+			require.NoError(t, retireChannel(ctx, rejectingClient, rejected))
+
+			afterRejection, err := rejectingClient.OpenChannel(ctx, cfg.Database, cfg.Schema, notNullTable, rejected)
+			require.NoError(t, err)
+			t.Logf("reopened %s after a retirement: committed token %v, %d row(s) rejected",
+				rejected, afterRejection.committedToken(), afterRejection.RowsErrorCount)
+			require.Zero(t, afterRejection.RowsErrorCount)
+			require.Nil(t, afterRejection.CommittedToken)
+		})
+	})
+
 	t.Run("a backfill the outgoing generation cannot race", func(t *testing.T) {
 		// Bumping a binding's backfill re-materializes it into the same table,
 		// and Apply does that while the outgoing generation's shards are still
