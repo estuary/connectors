@@ -593,7 +593,7 @@ func (m *testMaterializer) Close(ctx context.Context) {}
 type testTransactor struct{}
 
 func (t *testTransactor) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, rangeSpec pf.RangeSpec) (m.RuntimeCheckpoint, error) {
-	panic("unimplemented")
+	return nil, nil
 }
 
 func (t *testTransactor) UnmarshalState(state json.RawMessage) error {
