@@ -1,9 +1,10 @@
 """Unit tests for discovery/describe parsing in source_zuora.api and the
 export-context filtering on the describe models.
 
-These cover the XML parsing, the default-closed `<contexts>` export filter, and
-the `./fields/field` scoping that ignores nested <field>s — logic that the
-spec/capture tests don't touch.
+These cover the XML parsing, the default-closed `<contexts>` export filter, the
+`./fields/field` scoping that ignores nested <field>s, and the
+`<related-objects>` -> `<Name>.Id` join expansion — logic that the spec/capture
+tests don't touch.
 """
 
 import logging
@@ -11,7 +12,7 @@ import logging
 import pytest
 
 from source_zuora import api
-from source_zuora.models import DescribeField
+from source_zuora.models import UNJOINABLE_OBJECTS, DescribeField, DescribeObject
 
 _LOG = logging.getLogger("test")
 
@@ -94,6 +95,62 @@ def test_parse_describe_object_ignores_nested_stray_fields():
     assert "StrayNestedField" not in obj.exportable_field_names
 
 
+# --- related objects / joined Id fields ----------------------------------------
+
+
+def test_parse_describe_object_extracts_related_object_names():
+    obj = api._parse_describe_object(_DESCRIBE_XML)
+    assert obj.related_object_names == ["Contact"]
+
+
+def test_query_field_names_appends_joined_ids_after_own_fields():
+    obj = api._parse_describe_object(_DESCRIBE_XML)
+    assert obj.query_field_names == ["Id", "UpdatedDate", "Contact.Id"]
+
+
+def test_joinable_object_names_drops_self_reference():
+    # `<Self>.Id` duplicates the object's own Id column, and stripping its prefix
+    # would collide with it.
+    obj = DescribeObject(name="Account", related_object_names=["Account", "Contact"])
+    assert obj.joinable_object_names == ["Contact"]
+    assert obj.query_field_names == ["Contact.Id"]
+
+
+def test_joinable_object_names_drops_relationships_already_exposed_as_a_field():
+    # `Account.Id` would flatten to "AccountId" and shadow the object's own
+    # AccountId column, so the cheaper scalar field wins and the join is dropped.
+    xml = b"""<object><name>Invoice</name><fields>
+      <field><name>Id</name><selectable>true</selectable>
+        <contexts><context>export</context></contexts></field>
+      <field><name>AccountId</name><selectable>true</selectable>
+        <contexts><context>export</context></contexts></field>
+    </fields>
+    <related-objects>
+      <object href="a"><name>Account</name></object>
+      <object href="b"><name>BillToContact</name></object>
+    </related-objects></object>"""
+    obj = api._parse_describe_object(xml)
+    assert obj.joinable_object_names == ["BillToContact"]
+    assert obj.query_field_names == ["Id", "AccountId", "BillToContact.Id"]
+
+
+def test_joinable_object_names_drops_unjoinable_objects():
+    # Joining these fails the whole export job, so they never reach a query.
+    unjoinable = next(iter(UNJOINABLE_OBJECTS))
+    obj = DescribeObject(name="Subscription", related_object_names=[unjoinable, "Account"])
+    assert obj.joinable_object_names == ["Account"]
+
+
+def test_parse_describe_object_without_related_objects_yields_own_fields_only():
+    xml = b"""<object><name>Obj</name><fields>
+      <field><name>Id</name><selectable>true</selectable>
+        <contexts><context>export</context></contexts></field>
+    </fields></object>"""
+    obj = api._parse_describe_object(xml)
+    assert obj.related_object_names == []
+    assert obj.query_field_names == ["Id"]
+
+
 def test_parse_describe_object_skips_fields_without_a_name():
     xml = b"""<object><name>Obj</name><fields>
       <field><selectable>true</selectable><contexts><context>export</context></contexts></field>
@@ -140,10 +197,10 @@ class _FakeHTTP:
 
 
 @pytest.mark.asyncio
-async def test_describe_object_returns_exportable_field_names():
+async def test_describe_object_returns_exportable_and_joined_field_names():
     http = _FakeHTTP(_DESCRIBE_XML)
     fields = await api.fetch_object_fields("https://rest.zuora.com", http, _LOG, "Account")
-    assert fields == ["Id", "UpdatedDate"]
+    assert fields == ["Id", "UpdatedDate", "Contact.Id"]
     assert http.urls == ["https://rest.zuora.com/v1/describe/Account"]
 
 

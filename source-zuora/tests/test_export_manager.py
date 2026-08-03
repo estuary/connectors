@@ -197,8 +197,56 @@ async def test_poll_times_out(monkeypatch):
 @pytest.mark.asyncio
 async def test_fetch_results_strips_object_prefix():
     http = FakeHTTP(downloads={"file1": b"Account.Id,Account.Name\n1,Acme\n"})
-    rows = [r async for r in _mgr(http)._fetch_results("file1")]
+    rows = [r async for r in _mgr(http)._fetch_results("file1", "Account")]
     assert rows == [{"Id": "1", "Name": "Acme"}]
+
+
+@pytest.mark.asyncio
+async def test_fetch_results_flattens_joined_columns_without_shadowing_id():
+    # A joined `<Related>.Id` must become "<Related>Id". Stripping the prefix the
+    # way an own column is stripped would land every join on "Id" and overwrite
+    # the document's own key with an unrelated object's id.
+    http = FakeHTTP(
+        downloads={
+            "file1": b"Invoice.Id,Invoice.InvoiceNumber,Account.Id,BillToContact.Id\n"
+            b"inv1,INV-1,acc1,con1\n"
+        }
+    )
+    rows = [r async for r in _mgr(http)._fetch_results("file1", "Invoice")]
+    assert rows == [
+        {
+            "Id": "inv1",
+            "InvoiceNumber": "INV-1",
+            "AccountId": "acc1",
+            "BillToContactId": "con1",
+        }
+    ]
+
+
+# --- _column_to_field ----------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "column, object_name, expected",
+    [
+        # Own columns drop the prefix so they match their describe names.
+        ("Invoice.Id", "Invoice", "Id"),
+        ("Invoice.AccountId", "Invoice", "AccountId"),
+        # Joined columns keep the related object as a flattened name.
+        ("Account.Id", "Invoice", "AccountId"),
+        ("AccountReceivableAccountingCode.Id", "InvoiceItem",
+         "AccountReceivableAccountingCodeId"),
+        # An object whose name is a prefix of another's must not be confused for
+        # it: an InvoiceItem export's own columns say "InvoiceItem.", while
+        # "Invoice." is the join.
+        ("InvoiceItem.Id", "InvoiceItem", "Id"),
+        ("Invoice.Id", "InvoiceItem", "InvoiceId"),
+        # A header without a prefix is passed through rather than mangled.
+        ("Id", "Account", "Id"),
+    ],
+)
+def test_column_to_field(column, object_name, expected):
+    assert em._column_to_field(column, object_name) == expected
 
 
 # A too-large 403 carries the max-object-size XML marker in its body, which the
@@ -215,7 +263,7 @@ _TOO_LARGE_403 = HTTPError(
 async def test_fetch_results_403_with_marker_raises_too_large():
     http = FakeHTTP(downloads={"file1": _TOO_LARGE_403})
     with pytest.raises(ExportTooLargeError):
-        [r async for r in _mgr(http)._fetch_results("file1")]
+        [r async for r in _mgr(http)._fetch_results("file1", "Account")]
 
 
 @pytest.mark.asyncio
@@ -233,7 +281,7 @@ async def test_fetch_results_403_without_marker_propagates():
         }
     )
     with pytest.raises(HTTPError) as exc:
-        [r async for r in _mgr(http)._fetch_results("file1")]
+        [r async for r in _mgr(http)._fetch_results("file1", "Account")]
     assert not isinstance(exc.value, ExportTooLargeError)
 
 
@@ -241,7 +289,7 @@ async def test_fetch_results_403_without_marker_propagates():
 async def test_fetch_results_other_http_error_propagates():
     http = FakeHTTP(downloads={"file1": HTTPError("server error", 500)})
     with pytest.raises(HTTPError):
-        [r async for r in _mgr(http)._fetch_results("file1")]
+        [r async for r in _mgr(http)._fetch_results("file1", "Account")]
 
 
 # --- export_rows (end to end) --------------------------------------------------
@@ -254,7 +302,7 @@ async def test_export_rows_submit_poll_stream():
         polls=[b'{"id": "job1", "status": "completed", "batches": [{"fileId": "file1"}]}'],
         downloads={"file1": b"Account.Id\n7\n"},
     )
-    rows = [r async for r in _mgr(http).export_rows("SELECT Id FROM Account")]
+    rows = [r async for r in _mgr(http).export_rows("SELECT Id FROM Account", "Account")]
     assert rows == [{"Id": "7"}]
 
 
@@ -272,7 +320,7 @@ async def test_export_rows_concatenates_segments_in_order():
             "s2": b"Account.Id\n3\n",
         },
     )
-    rows = [r async for r in _mgr(http).export_rows("SELECT Id FROM Account")]
+    rows = [r async for r in _mgr(http).export_rows("SELECT Id FROM Account", "Account")]
     assert rows == [{"Id": "1"}, {"Id": "2"}, {"Id": "3"}]
     assert http.downloaded_file_ids == ["s1", "s2"]
 
@@ -284,7 +332,7 @@ async def test_export_rows_pins_api_version_header():
         polls=[b'{"id": "job1", "status": "completed", "batches": [{"fileId": "file1"}]}'],
         downloads={"file1": b"Account.Id\n7\n"},
     )
-    _ = [r async for r in _mgr(http).export_rows("SELECT Id FROM Account")]
+    _ = [r async for r in _mgr(http).export_rows("SELECT Id FROM Account", "Account")]
     # submit + poll (request) and download (request_stream) all carry the pin
     assert http.request_headers  # submit + poll happened
     assert all(
