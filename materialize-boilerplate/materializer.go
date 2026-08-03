@@ -420,13 +420,12 @@ func RunValidate[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT
 	return &pm.Response_Validated{Bindings: out}, nil
 }
 
-type applyOptions struct {
-	configSchema     json.RawMessage
+type openOptions struct {
 	featureFlagsPath []string
 }
 
-// ApplyOption customizes the behavior of RunApply.
-type ApplyOption func(*applyOptions)
+// OpenOption customizes the behavior of RunNewTransactor.
+type OpenOption func(*openOptions)
 
 // WithConfigUpdates enables recording the resolved value of cutoff-gated feature
 // flags into the task's persisted endpoint config, via a configUpdate event, so
@@ -438,11 +437,10 @@ type ApplyOption func(*applyOptions)
 // The value written is the same value the connector resolves from the task's
 // creation date, so this is a record rather than a decision: the configUpdate is
 // published asynchronously and is only eventually consistent, but the task
-// behaves identically before and after it lands. It is recomputed on each Apply
+// behaves identically before and after it lands. It is recomputed on each Open
 // and stops being emitted once the config contains it.
-func WithConfigUpdates(configSchema json.RawMessage, featureFlagsPath []string) ApplyOption {
-	return func(o *applyOptions) {
-		o.configSchema = configSchema
+func WithConfigUpdates(featureFlagsPath []string) OpenOption {
+	return func(o *openOptions) {
 		o.featureFlagsPath = featureFlagsPath
 	}
 }
@@ -452,15 +450,9 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 	ctx context.Context,
 	req *pm.Request_Apply,
 	newMaterializer NewMaterializerFn[EC, FC, RC, MT],
-	opts ...ApplyOption,
 ) (*pm.Response_Applied, error) {
 	if err := req.Validate(); err != nil {
 		return nil, fmt.Errorf("validating request: %w", err)
-	}
-
-	var applyOpts applyOptions
-	for _, opt := range opts {
-		opt(&applyOpts)
 	}
 
 	var endpointCfg EC
@@ -830,10 +822,6 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 		}
 	}
 
-	if applyOpts.featureFlagsPath != nil {
-		pinFeatureFlags(ctx, endpointCfg, req.Materialization, createdAt, applyOpts)
-	}
-
 	allActions := append(namespaceActionDesciptions, setupActionDescriptions...)
 	allActions = append(allActions, truncationActionDescriptions...)
 	allActions = append(allActions, resourceActionDescriptions...)
@@ -848,34 +836,31 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 // creation date on every RPC, so the config is a record of behavior rather than
 // its source, and a task is unaffected by the write being late or lost.
 func pinFeatureFlags[EC EndpointConfiger](
-	ctx context.Context,
 	endpointCfg EC,
-	spec *pf.MaterializationSpec,
+	sealedConfig json.RawMessage,
 	createdAt common.CreatedAt,
-	applyOpts applyOptions,
+	openOpts openOptions,
 ) {
 	rawFlags, defaultFlags := endpointCfg.FeatureFlags()
 	toPin := common.PendingFlagPins(rawFlags, defaultFlags, createdAt)
-	if len(toPin) == 0 || applyOpts.configSchema == nil {
+	if len(toPin) == 0 {
 		return
 	}
 
-	// Connector events are only consumed from the runtime's JSON-formatted task
-	// logs, so any other log format means this is a test or ad-hoc CLI
-	// invocation where emitting would only produce a pointless call to the
-	// encryption service.
-	if _, isJSONLogs := log.StandardLogger().Formatter.(*log.JSONFormatter); !isJSONLogs {
+	if len(sealedConfig) == 0 {
+		// The sealed config is what a restatement of an encrypted config is
+		// built from, and runtimes predating it send nothing.
+		log.Debug("not recording feature flag defaults: runtime did not provide the sealed endpoint config")
 		return
 	}
 
-	pinned, err := common.SetJSONProperty(spec.ConfigJson, applyOpts.featureFlagsPath, common.PinnedFlagsString(rawFlags, toPin))
+	pinned, err := common.SetSealedConfigProperty(sealedConfig, openOpts.featureFlagsPath, common.PinnedFlagsString(rawFlags, toPin))
 	if err != nil {
 		log.WithError(err).Warn("failed to record feature flag defaults in endpoint config")
 		return
 	}
-	if err := common.EmitConfigUpdate(ctx, "Recording default values for newly introduced settings in the endpoint config.", pinned, applyOpts.configSchema); err != nil {
-		log.WithError(err).Warn("failed to emit config update recording feature flag defaults")
-	}
+
+	common.EmitConfigUpdate("Recording default values for newly introduced settings in the endpoint config.", pinned)
 }
 
 // RunNewTransactor builds a transactor and Opened response from an Open
@@ -885,9 +870,15 @@ func RunNewTransactor[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC
 	req pm.Request_Open,
 	be *m.BindingEvents,
 	newMaterializer NewMaterializerFn[EC, FC, RC, MT],
+	opts ...OpenOption,
 ) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
 	if err := req.Validate(); err != nil {
 		return nil, nil, nil, fmt.Errorf("validating request: %w", err)
+	}
+
+	var openOpts openOptions
+	for _, opt := range opts {
+		opt(&openOpts)
 	}
 
 	var epCfg EC
@@ -941,6 +932,10 @@ func RunNewTransactor[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC
 		if err := cp.Unmarshal(checkpoint); err != nil {
 			return nil, nil, nil, fmt.Errorf("unmarshalling checkpoint: %w", err)
 		}
+	}
+
+	if openOpts.featureFlagsPath != nil {
+		pinFeatureFlags(epCfg, req.SealedConfigJson, createdAt, openOpts)
 	}
 
 	return transactor, &pm.Response_Opened{
