@@ -31,10 +31,10 @@ type discoveryOptions struct {
 }
 
 type discoveryFilters struct {
-	IncludeSchemas      []string `json:"include_schemas,omitempty" jsonschema:"title=Include Schemas,description=If specified only tables in the listed schemas will be discovered." jsonschema_extras:"nonsensitive=true"`
-	ExcludeSchemas      []string `json:"exclude_schemas,omitempty" jsonschema:"title=Exclude Schemas,description=Tables in the listed schemas will be excluded from discovery." jsonschema_extras:"nonsensitive=true"`
-	TablePatterns       []string `json:"table_patterns,omitempty"  jsonschema:"title=Table Patterns,description=If specified only tables matching at least one of these glob patterns will be discovered. A pattern containing a '.' matches against the qualified 'schema.table' name. A pattern without a '.' matches the unqualified table name in any schema. Use '*' or '?' as wildcards." jsonschema_extras:"nonsensitive=true"`
-	DiscoverOnlyEnabled bool     `json:"discover_only_enabled,omitempty" jsonschema:"title=Discover Only CDC-Enabled Tables,description=When set the connector will only discover tables which have already had CDC capture instances enabled. Combined as a union with the equivalent setting under Advanced Options." jsonschema_extras:"nonsensitive=true"`
+	IncludeSchemas      []string `json:"include_schemas,omitempty" jsonschema:"title=Include Schemas,description=If specified only tables in the listed schemas will be discovered."`
+	ExcludeSchemas      []string `json:"exclude_schemas,omitempty" jsonschema:"title=Exclude Schemas,description=Tables in the listed schemas will be excluded from discovery."`
+	TablePatterns       []string `json:"table_patterns,omitempty"  jsonschema:"title=Table Patterns,description=If specified only tables matching at least one of these glob patterns will be discovered. A pattern containing a '.' matches against the qualified 'schema.table' name. A pattern without a '.' matches the unqualified table name in any schema. Use '*' or '?' as wildcards."`
+	DiscoverOnlyEnabled bool     `json:"discover_only_enabled,omitempty" jsonschema:"title=Discover Only CDC-Enabled Tables,description=When set the connector will only discover tables which have already had CDC capture instances enabled. Combined as a union with the equivalent setting under Advanced Options."`
 }
 
 // Validate checks that the configured discovery filters are well-formed. The

@@ -32,7 +32,6 @@
         "type": "boolean",
         "title": "Hard Delete",
         "description": "If this option is enabled items deleted in the source will also be deleted from the destination. It is disabled by default and _meta/op in the destination will signify whether rows have been deleted (soft-delete).",
-        "nonsensitive": true,
         "order": 4
       },
       "credentials": {
@@ -163,7 +162,6 @@
                 "type": "string",
                 "const": "AWS EMR Serverless",
                 "default": "AWS EMR Serverless",
-                "nonsensitive": true,
                 "order": 0
               },
               "region": {
@@ -298,21 +296,18 @@
             ],
             "title": "Sync Frequency",
             "description": "Frequency at which transactions are executed when the materialization is fully caught up and streaming changes. May be enabled only for certain time periods and days of the week if configured below; otherwise it is effective 24/7. Defaults to 30 minutes if unset.",
-            "nonsensitive": true,
             "order": 0
           },
           "timezone": {
             "type": "string",
             "title": "Timezone",
             "description": "Timezone applicable to sync time windows and active days. Must be a valid IANA time zone name or +HH:MM offset.",
-            "nonsensitive": true,
             "order": 1
           },
           "fastSyncStartTime": {
             "type": "string",
             "title": "Fast Sync Start Time",
             "description": "Time of day that transactions begin executing at the configured Sync Frequency. Prior to this time transactions will be executed more slowly. Must be in the form of '09:00'.",
-            "nonsensitive": true,
             "order": 2,
             "pattern": "^(0?[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$"
           },
@@ -320,7 +315,6 @@
             "type": "string",
             "title": "Fast Sync Stop Time",
             "description": "Time of day that transactions stop executing at the configured Sync Frequency. After this time transactions will be executed more slowly. Must be in the form of '17:00'.",
-            "nonsensitive": true,
             "order": 3,
             "pattern": "^(0?[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$"
           },
@@ -328,7 +322,6 @@
             "type": "string",
             "title": "Fast Sync Enabled Days",
             "description": "Days of the week that the configured Sync Frequency is active. On days that are not enabled, transactions will be executed more slowly for the entire day. Examples: 'M-F' (Monday through Friday, inclusive), 'M,W,F' (Monday, Wednesday, and Friday), 'Su-T,Th-S' (Sunday through Tuesday, inclusive; Thursday through Saturday, inclusive). All days are enabled if unset.",
-            "nonsensitive": true,
             "order": 4
           }
         },
@@ -375,15 +368,13 @@
             ],
             "title": "Job Trigger Mode",
             "description": "Specifies how should already-running jobs be treated. Defaults to 'skip' which skips the trigger if a job is already running; 'replace' cancels the running job and runs a new one; while 'ignore' triggers a new job regardless of existing jobs.",
-            "default": "skip",
-            "nonsensitive": true
+            "default": "skip"
           },
           "interval": {
             "type": "string",
             "title": "Minimum Run Interval",
             "description": "Minimum time between dbt job triggers. This interval is only triggered if data has been materialized by your task.",
-            "default": "30m",
-            "nonsensitive": true
+            "default": "30m"
           }
         },
         "additionalProperties": false,
@@ -407,8 +398,7 @@
             ],
             "title": "Table Identifier Case",
             "description": "Casing applied to the namespace and table name (together the Iceberg table identifier) of tables created by this materialization. 'lowercase' (the default) folds them to lower case so a binding for MyTable creates the table mytable; 'uppercase' folds them to upper case which is needed for catalogs where unquoted identifiers resolve upper-case such as Snowflake's; 'preserve' uses them exactly as written in the binding. Tables that already exist are never renamed.",
-            "default": "lowercase",
-            "nonsensitive": true
+            "default": "lowercase"
           },
           "field_name_case": {
             "type": "string",
@@ -419,14 +409,12 @@
             ],
             "title": "Field Name Case",
             "description": "Casing applied to the names of columns created by this materialization. 'preserve' (the default) names them exactly as the fields are named in the collection; 'lowercase' folds them to lower case which is necessary for some systems such as querying S3 Table Buckets with Athena; 'uppercase' folds them to upper case which is needed for catalogs where unquoted identifiers resolve upper-case such as Snowflake's. Columns that already exist are matched case-insensitively and are never renamed.",
-            "default": "preserve",
-            "nonsensitive": true
+            "default": "preserve"
           },
           "feature_flags": {
             "type": "string",
             "title": "Feature Flags",
-            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.",
-            "nonsensitive": true
+            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."
           }
         },
         "additionalProperties": false,
@@ -447,42 +435,36 @@
             "type": "boolean",
             "title": "Enable Compaction",
             "description": "Enable automatic compaction of small Iceberg data files to improve query performance.",
-            "nonsensitive": true,
             "order": 1
           },
           "enable_retention": {
             "type": "boolean",
             "title": "Enable Snapshot Retention",
             "description": "Enable automatic removal of old Iceberg table snapshots to reduce storage costs.",
-            "nonsensitive": true,
             "order": 2
           },
           "snapshot_retention_days": {
             "type": "integer",
             "title": "Snapshot Retention Days",
             "description": "Number of days to retain Iceberg snapshots. Uses the Glue default of 5 if unset.",
-            "nonsensitive": true,
             "order": 3
           },
           "number_of_snapshots_to_retain": {
             "type": "integer",
             "title": "Number of Snapshots to Retain",
             "description": "Minimum number of Iceberg snapshots to retain regardless of the retention period. Uses the Glue default of 1 if unset.",
-            "nonsensitive": true,
             "order": 4
           },
           "enable_orphan_file_deletion": {
             "type": "boolean",
             "title": "Enable Orphan File Deletion",
             "description": "Enable automatic deletion of files that are no longer referenced by any table snapshot.",
-            "nonsensitive": true,
             "order": 5
           },
           "orphan_file_retention_days": {
             "type": "integer",
             "title": "Orphan File Retention Days",
             "description": "Number of days to retain orphan files before deletion. Uses the Glue default of 3 if unset.",
-            "nonsensitive": true,
             "order": 6
           }
         },

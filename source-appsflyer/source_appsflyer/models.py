@@ -54,7 +54,6 @@ class EndpointConfig(BaseModel):
             ),
             default=timedelta(days=2),
             ge=timedelta(days=1),
-            json_schema_extra={"nonsensitive": True},
         )
 
     advanced: Advanced = Field(

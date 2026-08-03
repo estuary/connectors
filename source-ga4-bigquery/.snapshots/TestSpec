@@ -88,20 +88,17 @@
             "type": "string",
             "title": "Polling Schedule",
             "description": "When and how often to execute the polling cycle. Accepts a Go duration string like '24h' or a string like 'daily at 12:34Z' to poll at a specific time (specified in UTC) every day. Defaults to 'daily at 12:00Z'.",
-            "nonsensitive": true,
             "pattern": "^([-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+|daily at [0-9][0-9]?:[0-9]{2}Z)$"
           },
           "window_days": {
             "type": "integer",
             "title": "Window Days",
-            "description": "Number of recent daily tables treated as the live window. Each cycle final-captures the oldest table in this window (catching late events) and primary-captures the newest. Defaults to 4 which aligns with GA4's 72-hour late-event window.",
-            "nonsensitive": true
+            "description": "Number of recent daily tables treated as the live window. Each cycle final-captures the oldest table in this window (catching late events) and primary-captures the newest. Defaults to 4 which aligns with GA4's 72-hour late-event window."
           },
           "capture_intermediate": {
             "type": "boolean",
             "title": "Capture Intermediate Days",
-            "description": "If enabled the connector queries every table in the live window on each poll rather than just the newest and oldest. Trades higher BigQuery scan cost for fresher intermediate-day data. Defaults to false.",
-            "nonsensitive": true
+            "description": "If enabled the connector queries every table in the live window on each poll rather than just the newest and oldest. Trades higher BigQuery scan cost for fresher intermediate-day data. Defaults to false."
           },
           "min_date": {
             "type": "string",
@@ -112,8 +109,7 @@
           "source_tag": {
             "type": "string",
             "title": "Source Tag",
-            "description": "When set the capture will add this value as the property 'tag' in the source metadata of each document.",
-            "nonsensitive": true
+            "description": "When set the capture will add this value as the property 'tag' in the source metadata of each document."
           },
           "billing_project_id": {
             "type": "string",
@@ -123,8 +119,7 @@
           "feature_flags": {
             "type": "string",
             "title": "Feature Flags",
-            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.",
-            "nonsensitive": true
+            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."
           }
         },
         "additionalProperties": false,
@@ -160,7 +155,6 @@
           "users",
           "pseudonymous_users"
         ],
-        "nonsensitive": true,
         "order": 1
       }
     },

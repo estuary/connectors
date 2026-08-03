@@ -34,7 +34,7 @@ const (
 // one binding per (dataset, stream_type) pair which has matching tables.
 type Resource struct {
 	Dataset    string     `json:"dataset" jsonschema:"title=Dataset,description=The BigQuery dataset containing the GA4 export tables for this binding." jsonschema_extras:"order=0"`
-	StreamType StreamType `json:"stream_type" jsonschema:"title=Stream Type,description=Which GA4 logical stream this binding represents." jsonschema_extras:"enum=events,enum=users,enum=pseudonymous_users,order=1,nonsensitive=true"`
+	StreamType StreamType `json:"stream_type" jsonschema:"title=Stream Type,description=Which GA4 logical stream this binding represents." jsonschema_extras:"enum=events,enum=users,enum=pseudonymous_users,order=1"`
 }
 
 // Validate checks that the resource spec possesses all required properties.

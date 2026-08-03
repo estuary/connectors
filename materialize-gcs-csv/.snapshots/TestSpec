@@ -28,7 +28,6 @@
         "title": "Upload Interval",
         "description": "Frequency at which files will be uploaded. Must be a valid Go duration string.",
         "default": "5m",
-        "nonsensitive": true,
         "order": 2
       },
       "prefix": {
@@ -41,7 +40,6 @@
         "type": "integer",
         "title": "File Size Limit",
         "description": "Approximate maximum size of materialized files in bytes. Defaults to 10737418240 (10 GiB) if blank.",
-        "nonsensitive": true,
         "order": 4
       },
       "csvConfig": {
@@ -50,7 +48,6 @@
             "type": "boolean",
             "title": "Skip Headers",
             "description": "Do not write headers to files.",
-            "nonsensitive": true,
             "order": 2
           }
         },
@@ -64,8 +61,7 @@
           "feature_flags": {
             "type": "string",
             "title": "Feature Flags",
-            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.",
-            "nonsensitive": true
+            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."
           }
         },
         "additionalProperties": false,

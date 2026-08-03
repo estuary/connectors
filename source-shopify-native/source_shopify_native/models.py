@@ -142,7 +142,6 @@ class EndpointConfig(BaseModel):
                 "backfill / dataflow reset of all bindings) before adding additional stores "
                 "to a legacy capture."
             ),
-            json_schema_extra={"nonsensitive": True},
         )
 
     advanced: Advanced = Field(

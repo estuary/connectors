@@ -69,7 +69,6 @@ class EndpointConfig(BaseModel):
         le=30,
         title="Calls Lookback Window (Days)",
         description="Number of days to look back when fetching calls to capture post-call enrichment. Applied once per day.",
-        json_schema_extra={"nonsensitive": True},
     )
 
     @property

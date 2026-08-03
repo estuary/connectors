@@ -8,8 +8,7 @@
         "type": "number",
         "title": "Message Rate",
         "description": "Message rate in documents per second",
-        "default": 1,
-        "nonsensitive": true
+        "default": 1
       }
     },
     "type": "object",

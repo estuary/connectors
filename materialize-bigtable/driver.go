@@ -81,14 +81,14 @@ type config struct {
 	InstanceID  string             `json:"instance_id" jsonschema:"title=Instance ID,description=Bigtable instance ID for the materialized tables." jsonschema_extras:"order=1"`
 	AppProfile  string             `json:"app_profile,omitempty" jsonschema:"title=Application Profile,description=The Bigtable app profile ID to use for data operations. Leave blank to use the instance's default app profile." jsonschema_extras:"order=2"`
 	Credentials *CredentialsConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"x-iam-auth=true,order=3"`
-	HardDelete  bool               `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=4,nonsensitive=true"`
+	HardDelete  bool               `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=4"`
 
 	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 }
 
 type advancedConfig struct {
 	Endpoint     string `json:"endpoint,omitempty" jsonschema:"title=Bigtable Endpoint,description=The Bigtable endpoint URI to connect to. Use if you're materializing to a compatible API that isn't provided by Google."`
-	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
+	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
 func (c config) Validate() error {

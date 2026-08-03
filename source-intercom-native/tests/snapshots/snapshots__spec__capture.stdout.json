@@ -35,7 +35,6 @@
             "use_companies_list_endpoint": {
               "default": false,
               "description": "If selected, the /companies/list endpoint is used instead of the /companies/scroll endpoint. Typically, leave as the default unless the connector's logs indicate otherwise.",
-              "nonsensitive": true,
               "title": "Use /companies/list endpoint",
               "type": "boolean"
             },
@@ -49,7 +48,6 @@
             },
             "api_version": {
               "description": "The Intercom API version used for requests. Defaults to '2.11'.",
-              "nonsensitive": true,
               "pattern": "^\\d+\\.\\d+$",
               "title": "API Version",
               "type": "string"
@@ -156,7 +154,6 @@
           "default": "PT0S",
           "description": "Interval between updates for this resource",
           "format": "duration",
-          "nonsensitive": true,
           "title": "Interval",
           "type": "string"
         }

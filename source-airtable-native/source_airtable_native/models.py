@@ -82,8 +82,7 @@ class AirtableResourceConfigWithSchedule(ResourceConfigWithSchedule):
         default="",
         title="Formula Field Refresh Schedule",
         description="Schedule to automatically refresh formula fields. Accepts a cron expression.",
-        pattern=CRON_REGEX,
-        json_schema_extra={"nonsensitive": True},
+        pattern=CRON_REGEX
     )
 
 

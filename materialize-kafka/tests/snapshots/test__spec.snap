@@ -22,7 +22,6 @@ expression: "serde_json::to_string_pretty(&got).unwrap()"
           "snappy",
           "zstd"
         ],
-        "nonsensitive": true,
         "order": 4,
         "title": "Compression",
         "type": "string"
@@ -84,7 +83,6 @@ expression: "serde_json::to_string_pretty(&got).unwrap()"
           "Avro",
           "JSON"
         ],
-        "nonsensitive": true,
         "order": 3,
         "title": "Message Format",
         "type": "string"
@@ -134,7 +132,6 @@ expression: "serde_json::to_string_pretty(&got).unwrap()"
       "topic_partitions": {
         "default": 6,
         "description": "The number of partitions to create new topics with.",
-        "nonsensitive": true,
         "order": 6,
         "title": "Topic Partitions",
         "type": "integer"
@@ -142,7 +139,6 @@ expression: "serde_json::to_string_pretty(&got).unwrap()"
       "topic_replication_factor": {
         "default": 3,
         "description": "The replication factor to create new topics with.",
-        "nonsensitive": true,
         "order": 7,
         "title": "Topic Replication Factor",
         "type": "integer"

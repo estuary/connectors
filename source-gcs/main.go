@@ -30,7 +30,7 @@ type config struct {
 }
 
 type advancedConfig struct {
-	AscendingKeys   bool   `json:"ascendingKeys" jsonschema_extras:"nonsensitive=true"`
+	AscendingKeys   bool   `json:"ascendingKeys"`
 	MinimumModified string `json:"minimum_modified,omitempty"`
 }
 

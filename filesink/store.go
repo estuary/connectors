@@ -36,9 +36,9 @@ type GCSStoreConfig struct {
 	Bucket          string `json:"bucket" jsonschema:"title=Bucket,description=Bucket to store materialized objects." jsonschema_extras:"order=0"`
 	CredentialsJSON string `json:"credentialsJson" jsonschema:"title=Service Account JSON,description=The JSON credentials of the service account to use for authorization." jsonschema_extras:"secret=true,multiline=true,order=1"`
 
-	UploadInterval string `json:"uploadInterval" jsonschema:"title=Upload Interval,description=Frequency at which files will be uploaded. Must be a valid Go duration string.,enum=5m,enum=15m,enum=30m,enum=1h,default=5m" jsonschema_extras:"order=2,nonsensitive=true"`
+	UploadInterval string `json:"uploadInterval" jsonschema:"title=Upload Interval,description=Frequency at which files will be uploaded. Must be a valid Go duration string.,enum=5m,enum=15m,enum=30m,enum=1h,default=5m" jsonschema_extras:"order=2"`
 	Prefix         string `json:"prefix,omitempty" jsonschema:"title=Prefix,description=Optional prefix that will be used to store objects." jsonschema_extras:"order=3"`
-	FileSizeLimit  int    `json:"fileSizeLimit,omitempty" jsonschema:"title=File Size Limit,description=Approximate maximum size of materialized files in bytes. Defaults to 10737418240 (10 GiB) if blank." jsonschema_extras:"order=4,nonsensitive=true"`
+	FileSizeLimit  int    `json:"fileSizeLimit,omitempty" jsonschema:"title=File Size Limit,description=Approximate maximum size of materialized files in bytes. Defaults to 10737418240 (10 GiB) if blank." jsonschema_extras:"order=4"`
 }
 
 func (c GCSStoreConfig) Validate() error {
@@ -121,9 +121,9 @@ type AzureBlobConfig struct {
 	StorageAccountKey  string `json:"storageAccountKey" jsonschema:"title=Storage Account Key,description=Storage account key for the storage account that files will be written to." jsonschema_extras:"order=1,secret=true"`
 	ContainerName      string `json:"containerName" jsonschema:"title=Storage Account Container Name,description=Name of the container in the storage account where files will be written." jsonschema_extras:"order=2"`
 
-	UploadInterval string `json:"uploadInterval" jsonschema:"title=Upload Interval,description=Frequency at which files will be uploaded. Must be a valid Go duration string.,enum=5m,enum=15m,enum=30m,enum=1h,default=5m" jsonschema_extras:"order=3,nonsensitive=true"`
+	UploadInterval string `json:"uploadInterval" jsonschema:"title=Upload Interval,description=Frequency at which files will be uploaded. Must be a valid Go duration string.,enum=5m,enum=15m,enum=30m,enum=1h,default=5m" jsonschema_extras:"order=3"`
 	Prefix         string `json:"prefix,omitempty" jsonschema:"title=Prefix,description=Optional prefix that will be used to store objects." jsonschema_extras:"order=4"`
-	FileSizeLimit  int    `json:"fileSizeLimit,omitempty" jsonschema:"title=File Size Limit,description=Approximate maximum size of materialized files in bytes. Defaults to 10737418240 (10 GiB) if blank." jsonschema_extras:"order=5,nonsensitive=true"`
+	FileSizeLimit  int    `json:"fileSizeLimit,omitempty" jsonschema:"title=File Size Limit,description=Approximate maximum size of materialized files in bytes. Defaults to 10737418240 (10 GiB) if blank." jsonschema_extras:"order=5"`
 }
 
 func (c AzureBlobConfig) Validate() error {

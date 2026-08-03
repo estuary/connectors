@@ -37,8 +37,7 @@ class SalesforceResourceConfigWithSchedule(ResourceConfigWithSchedule):
         default="",
         title="Formula Field Refresh Schedule",
         description="Schedule to automatically refresh formula fields. Accepts a cron expression.",
-        pattern=CRON_REGEX,
-        json_schema_extra={"nonsensitive": True},
+        pattern=CRON_REGEX
     )
 
 
@@ -51,7 +50,7 @@ class WindowSizeInDays(BaseModel):
 
     window_type: Literal["days"] = Field(
         default="days",
-        json_schema_extra={"nonsensitive": True, "type": "string", "order": 0},
+        json_schema_extra={"type": "string", "order": 0},
     )
     days: int = Field(
         title="Days",
@@ -70,13 +69,13 @@ class WindowSizeAsInterval(BaseModel):
 
     window_type: Literal["interval"] = Field(
         default="interval",
-        json_schema_extra={"nonsensitive": True, "type": "string", "order": 0},
+        json_schema_extra={"type": "string", "order": 0},
     )
     interval: timedelta = Field(
         title="Interval",
         description="Window size as an ISO 8601 duration, e.g. PT1H for one hour.",
         gt=MIN_INCREMENTAL_WINDOW_SIZE,
-        json_schema_extra={"nonsensitive": True, "order": 1},
+        json_schema_extra={"order": 1},
     )
 
     @property
@@ -132,7 +131,6 @@ class EndpointConfig(BaseModel):
             title="Window size",
             default_factory=lambda: WindowSizeInDays(days=18250),
             discriminator="window_type",
-            json_schema_extra={"nonsensitive": True},
         )
 
         @model_validator(mode="before")
