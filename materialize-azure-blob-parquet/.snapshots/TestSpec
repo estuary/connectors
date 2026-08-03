@@ -33,7 +33,6 @@
         "title": "Upload Interval",
         "description": "Frequency at which files will be uploaded. Must be a valid Go duration string.",
         "default": "5m",
-        "nonsensitive": true,
         "order": 3
       },
       "prefix": {
@@ -46,7 +45,6 @@
         "type": "integer",
         "title": "File Size Limit",
         "description": "Approximate maximum size of materialized files in bytes. Defaults to 10737418240 (10 GiB) if blank.",
-        "nonsensitive": true,
         "order": 5
       },
       "parquetConfig": {
@@ -55,14 +53,12 @@
             "type": "integer",
             "title": "Row Group Row Limit",
             "description": "Maximum number of rows in a row group. Defaults to 1000000 if blank.",
-            "nonsensitive": true,
             "order": 0
           },
           "rowGroupByteLimit": {
             "type": "integer",
             "title": "Row Group Byte Limit",
             "description": "Approximate maximum number of bytes in a row group. Defaults to 536870912 (512 MiB) if blank.",
-            "nonsensitive": true,
             "order": 1
           },
           "bufferSize": {
@@ -70,7 +66,6 @@
             "title": "Buffer Size",
             "description": "Approximate size (in bytes) of the in-memory row buffer flushed to disk during writes. Defaults to 25 MiB if blank. Lowering this can reduce memory usage for schemas with very large individual field values. This may also reduce write throughput.",
             "advanced": true,
-            "nonsensitive": true,
             "order": 2
           }
         },
@@ -84,8 +79,7 @@
           "feature_flags": {
             "type": "string",
             "title": "Feature Flags",
-            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.",
-            "nonsensitive": true
+            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."
           }
         },
         "additionalProperties": false,

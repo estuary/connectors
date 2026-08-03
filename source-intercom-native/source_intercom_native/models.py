@@ -82,7 +82,6 @@ class EndpointConfig(BaseModel):
             description="If selected, the /companies/list endpoint is used instead of the /companies/scroll endpoint. Typically, leave as the default unless the connector's logs indicate otherwise.",
             title="Use /companies/list endpoint",
             default=False,
-            json_schema_extra={"nonsensitive": True},
         )
         search_page_size: Annotated[int, Field(
             description="Page size for streams that use Intercom's search endpoints. Typically, leave as the default unless streams using search endpoints encounter constant Intercom server timeouts.",
@@ -96,7 +95,6 @@ class EndpointConfig(BaseModel):
             title="API Version",
             default_factory=lambda: DEFAULT_API_VERSION,
             pattern=r"^\d+\.\d+$",
-            json_schema_extra={"nonsensitive": True},
         )
 
     advanced: Advanced = Field(

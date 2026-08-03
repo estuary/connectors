@@ -20,7 +20,7 @@ func main() {
 }
 
 type config struct {
-	Rate float32 `json:"rate" jsonschema:"title=Message Rate,description=Message rate in documents per second,default=1" jsonschema_extras:"nonsensitive=true"`
+	Rate float32 `json:"rate" jsonschema:"title=Message Rate,description=Message rate in documents per second,default=1"`
 }
 
 func (c config) Validate() error {

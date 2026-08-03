@@ -63,7 +63,7 @@ func (c *config) client(ctx context.Context) (*pubsub.Client, error) {
 type resource struct {
 	TopicName                 string `json:"topic" jsonschema:"title=Topic Name" jsonschema_extras:"x-collection-name=true"`
 	Identifier                string `json:"identifier,omitempty" jsonschema:"title=Resource Binding Identifier"`
-	CreateDefaultSubscription bool   `json:"create_default_subscription" jsonschema:"title=Create with Default Subscription,default=true" jsonschema_extras:"nonsensitive=true"`
+	CreateDefaultSubscription bool   `json:"create_default_subscription" jsonschema:"title=Create with Default Subscription,default=true"`
 }
 
 func (resource) GetFieldDocString(fieldName string) string {

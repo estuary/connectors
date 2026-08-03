@@ -71,7 +71,7 @@ type config struct {
 	Prefix             string                      `json:"prefix,omitempty" jsonschema:"title=Prefix,description=Optional prefix that will be used to store objects." jsonschema_extras:"order=4"`
 	Region             string                      `json:"region" jsonschema:"title=Region,description=AWS region." jsonschema_extras:"order=5"`
 	Namespace          string                      `json:"namespace" jsonschema:"title=Namespace,description=Namespace for bound collection tables (unless overridden within the binding resource configuration)." jsonschema_extras:"order=6,pattern=^[^.]*$"`
-	UploadInterval     string                      `json:"upload_interval,omitempty" jsonschema:"title=Upload Interval,description=Frequency at which files will be uploaded. Must be a valid ISO8601 duration string no greater than 4 hours.,default=PT5M,format=duration" jsonschema_extras:"order=7,nonsensitive=true"`
+	UploadInterval     string                      `json:"upload_interval,omitempty" jsonschema:"title=Upload Interval,description=Frequency at which files will be uploaded. Must be a valid ISO8601 duration string no greater than 4 hours.,default=PT5M,format=duration" jsonschema_extras:"order=7"`
 	S3Endpoint         string                      `json:"s3_endpoint,omitempty" jsonschema:"title=S3 Endpoint,description=Custom S3 endpoint URL. The default AWS S3 endpoint for the specified region is used if not provided." jsonschema_extras:"order=8"`
 	Catalog            catalogConfig               `json:"catalog" jsonschema:"title=Catalog" jsonschema_extras:"order=9"`
 	Advanced           *advancedConfig             `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these.,nullable" jsonschema_extras:"advanced=true,order=10"`
@@ -86,7 +86,7 @@ func strVal(s *string) string {
 }
 
 type catalogConfig struct {
-	CatalogType catalogType `json:"catalog_type" jsonschema_extras:"nonsensitive=true"`
+	CatalogType catalogType `json:"catalog_type"`
 
 	// Glue catalog configuration.
 	GlueID string `json:"glue_id,omitempty"`
@@ -127,8 +127,8 @@ func (catalogConfig) JSONSchema() *jsonschema.Schema {
 }
 
 type advancedConfig struct {
-	FeatureFlags         *string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.,nullable" jsonschema_extras:"nonsensitive=true"`
-	NanosecondTimestamps bool    `json:"nanosecond_timestamps,omitempty" jsonschema:"title=Nanosecond Timestamps,description=Use nanosecond precision (Iceberg format v3) for date-time columns instead of microsecond precision (format v2). Toggling this on an existing materialization applies to data going forward: existing rows read as null for converted columns unless the binding is explicitly backfilled.,default=false" jsonschema_extras:"nonsensitive=true"`
+	FeatureFlags         *string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.,nullable"`
+	NanosecondTimestamps bool    `json:"nanosecond_timestamps,omitempty" jsonschema:"title=Nanosecond Timestamps,description=Use nanosecond precision (Iceberg format v3) for date-time columns instead of microsecond precision (format v2). Toggling this on an existing materialization applies to data going forward: existing rows read as null for converted columns unless the binding is explicitly backfilled.,default=false"`
 }
 
 func (c config) s3StoreConfig() filesink.S3StoreConfig {
@@ -279,7 +279,7 @@ func parse8601(in string) (time.Duration, error) {
 type resource struct {
 	Table                     string            `json:"table" jsonschema:"title=Table,description=Name of the database table." jsonschema_extras:"x-collection-name=true"`
 	Namespace                 string            `json:"namespace,omitempty" jsonschema:"title=Alternative Namespace,description=Alternative namespace for this table (optional)."`
-	Delta                     *bool             `json:"delta_updates,omitempty" jsonschema:"default=true,title=Delta Update,description=Should updates to this table be done via delta updates. Currently this connector only supports delta updates." jsonschema_extras:"nonsensitive=true"`
+	Delta                     *bool             `json:"delta_updates,omitempty" jsonschema:"default=true,title=Delta Update,description=Should updates to this table be done via delta updates. Currently this connector only supports delta updates."`
 	AdditionalTableProperties map[string]string `json:"additional_table_properties,omitempty" jsonschema:"title=Additional Table Properties,description=Additional Iceberg table properties to set when the table is created. These are set only at creation time and cannot be changed afterwards. Example: {'write.parquet.compression-codec': 'zstd'}"`
 }
 

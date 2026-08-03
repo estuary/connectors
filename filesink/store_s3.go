@@ -85,9 +85,9 @@ type S3StoreConfig struct {
 
 	Credentials *CredentialsConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"x-iam-auth=true,order=4"`
 
-	UploadInterval string `json:"uploadInterval" jsonschema:"title=Upload Interval,description=Frequency at which files will be uploaded. Must be a valid Go duration string.,enum=1s,enum=1m,enum=5m,enum=15m,enum=30m,enum=1h,default=5m" jsonschema_extras:"order=5,nonsensitive=true"`
+	UploadInterval string `json:"uploadInterval" jsonschema:"title=Upload Interval,description=Frequency at which files will be uploaded. Must be a valid Go duration string.,enum=1s,enum=1m,enum=5m,enum=15m,enum=30m,enum=1h,default=5m" jsonschema_extras:"order=5"`
 	Prefix         string `json:"prefix,omitempty" jsonschema:"title=Prefix,description=Optional prefix that will be used to store objects. May contain date patterns." jsonschema_extras:"order=6"`
-	FileSizeLimit  int    `json:"fileSizeLimit,omitempty" jsonschema:"title=File Size Limit,description=Approximate maximum size of materialized files in bytes. Defaults to 10737418240 (10 GiB) if blank." jsonschema_extras:"order=7,nonsensitive=true"`
+	FileSizeLimit  int    `json:"fileSizeLimit,omitempty" jsonschema:"title=File Size Limit,description=Approximate maximum size of materialized files in bytes. Defaults to 10737418240 (10 GiB) if blank." jsonschema_extras:"order=7"`
 
 	Endpoint     string `json:"endpoint,omitempty" jsonschema:"title=Custom S3 Endpoint,description=The S3 endpoint URI to connect to. Use if you're materializing to a compatible API that isn't provided by AWS. Should normally be left blank." jsonschema_extras:"order=8"`
 	UsePathStyle bool   `json:"use_path_style,omitempty" jsonschema:"-"`

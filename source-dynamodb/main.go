@@ -97,8 +97,8 @@ type config struct {
 }
 
 type advancedConfig struct {
-	BackfillSegments int    `json:"backfillSegments,omitempty" jsonschema:"title=Backfill Table Segments,description=Number of segments to use for backfill table scans. Has no effect if changed after the backfill has started." jsonschema_extras:"nonsensitive=true"`
-	ScanLimit        int    `json:"scanLimit,omitempty" jsonschema:"title=Scan Limit,description=Limit the number of items to evaluate for each table backfill scan request." jsonschema_extras:"nonsensitive=true"`
+	BackfillSegments int    `json:"backfillSegments,omitempty" jsonschema:"title=Backfill Table Segments,description=Number of segments to use for backfill table scans. Has no effect if changed after the backfill has started."`
+	ScanLimit        int    `json:"scanLimit,omitempty" jsonschema:"title=Scan Limit,description=Limit the number of items to evaluate for each table backfill scan request."`
 	Endpoint         string `json:"endpoint,omitempty" jsonschema:"title=AWS Endpoint,description=The AWS endpoint URI to connect to. Use if you're capturing from a compatible API that isn't provided by AWS."`
 }
 
@@ -150,7 +150,7 @@ func (c *config) CredentialsProvider(ctx context.Context) (aws.CredentialsProvid
 
 type resource struct {
 	Table         string `json:"table" jsonschema:"title=Table Name,description=The name of the table to be captured."`
-	RcuAllocation int    `json:"rcuAllocation,omitempty" jsonschema:"title=RCU Allocation,description=Read capacity units the capture will attempt to consume during the table backfill. Leave blank to automatically determine based on the provisioned capacity of the table." jsonschema_extras:"nonsensitive=true"`
+	RcuAllocation int    `json:"rcuAllocation,omitempty" jsonschema:"title=RCU Allocation,description=Read capacity units the capture will attempt to consume during the table backfill. Leave blank to automatically determine based on the provisioned capacity of the table."`
 }
 
 func (r *resource) Validate() error {

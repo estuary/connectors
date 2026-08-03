@@ -43,7 +43,7 @@ type config struct {
 	InstanceID string `json:"instance_id" jsonschema:"title=Instance ID,description=Cloud Spanner Instance ID" jsonschema_extras:"order=1"`
 	Database   string `json:"database" jsonschema:"title=Database,description=Cloud Spanner Database name" jsonschema_extras:"order=2"`
 
-	HardDelete bool `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=3,nonsensitive=true"`
+	HardDelete bool `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=3"`
 
 	Credentials credentialConfig `json:"credentials" jsonschema:"title=Credentials,description=Google Cloud authentication credentials" jsonschema_extras:"order=4"`
 
@@ -51,9 +51,9 @@ type config struct {
 }
 
 type advancedConfig struct {
-	NoFlowDocument                     bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false" jsonschema_extras:"nonsensitive=true"`
-	DisableKeyDistributionOptimization bool   `json:"disable_key_distribution_optimization,omitempty" jsonschema:"title=Disable Key Distribution Optimization,description=When enabled the hash prefix normally added to table keys will be omitted. The hash prefix distributes writes across Spanner splits and avoids hotspots.,default=false" jsonschema_extras:"nonsensitive=true"`
-	FeatureFlags                       string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
+	NoFlowDocument                     bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false"`
+	DisableKeyDistributionOptimization bool   `json:"disable_key_distribution_optimization,omitempty" jsonschema:"title=Disable Key Distribution Optimization,description=When enabled the hash prefix normally added to table keys will be omitted. The hash prefix distributes writes across Spanner splits and avoids hotspots.,default=false"`
+	FeatureFlags                       string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
 // Validate the configuration

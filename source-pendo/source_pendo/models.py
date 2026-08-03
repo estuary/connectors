@@ -55,7 +55,6 @@ class EndpointConfig(BaseModel):
             default=DEFAULT_INCREMENTAL_LIMIT,
             ge=1,
             le=50000,
-            json_schema_extra={"nonsensitive": True},
         )
         backfill_limit: int = Field(
             description=f"Maximum number of documents to request per API call during historical backfills. Defaults to {DEFAULT_BACKFILL_LIMIT:,}.",
@@ -63,7 +62,6 @@ class EndpointConfig(BaseModel):
             default=DEFAULT_BACKFILL_LIMIT,
             ge=1,
             le=50000,
-            json_schema_extra={"nonsensitive": True},
         )
 
     advanced: Advanced = Field(

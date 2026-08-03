@@ -51,7 +51,6 @@
         ],
         "title": "Snowflake Timestamp Type",
         "description": "Controls how timestamp columns are stored in Snowflake.",
-        "nonsensitive": true,
         "order": 8
       },
       "hardDelete": {
@@ -59,7 +58,6 @@
         "title": "Hard Delete",
         "description": "If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).",
         "default": false,
-        "nonsensitive": true,
         "order": 9
       },
       "credentials": {
@@ -146,21 +144,18 @@
             ],
             "title": "Sync Frequency",
             "description": "Frequency at which transactions are executed when the materialization is fully caught up and streaming changes. May be enabled only for certain time periods and days of the week if configured below; otherwise it is effective 24/7. Defaults to 30 minutes if unset.",
-            "nonsensitive": true,
             "order": 0
           },
           "timezone": {
             "type": "string",
             "title": "Timezone",
             "description": "Timezone applicable to sync time windows and active days. Must be a valid IANA time zone name or +HH:MM offset.",
-            "nonsensitive": true,
             "order": 1
           },
           "fastSyncStartTime": {
             "type": "string",
             "title": "Fast Sync Start Time",
             "description": "Time of day that transactions begin executing at the configured Sync Frequency. Prior to this time transactions will be executed more slowly. Must be in the form of '09:00'.",
-            "nonsensitive": true,
             "order": 2,
             "pattern": "^(0?[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$"
           },
@@ -168,7 +163,6 @@
             "type": "string",
             "title": "Fast Sync Stop Time",
             "description": "Time of day that transactions stop executing at the configured Sync Frequency. After this time transactions will be executed more slowly. Must be in the form of '17:00'.",
-            "nonsensitive": true,
             "order": 3,
             "pattern": "^(0?[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$"
           },
@@ -176,7 +170,6 @@
             "type": "string",
             "title": "Fast Sync Enabled Days",
             "description": "Days of the week that the configured Sync Frequency is active. On days that are not enabled, transactions will be executed more slowly for the entire day. Examples: 'M-F' (Monday through Friday, inclusive), 'M,W,F' (Monday, Wednesday, and Friday), 'Su-T,Th-S' (Sunday through Tuesday, inclusive; Thursday through Saturday, inclusive). All days are enabled if unset.",
-            "nonsensitive": true,
             "order": 4
           }
         },
@@ -223,15 +216,13 @@
             ],
             "title": "Job Trigger Mode",
             "description": "Specifies how should already-running jobs be treated. Defaults to 'skip' which skips the trigger if a job is already running; 'replace' cancels the running job and runs a new one; while 'ignore' triggers a new job regardless of existing jobs.",
-            "default": "skip",
-            "nonsensitive": true
+            "default": "skip"
           },
           "interval": {
             "type": "string",
             "title": "Minimum Run Interval",
             "description": "Minimum time between dbt job triggers. This interval is only triggered if data has been materialized by your task.",
-            "default": "30m",
-            "nonsensitive": true
+            "default": "30m"
           }
         },
         "additionalProperties": false,
@@ -249,21 +240,18 @@
           "disableFieldTruncation": {
             "type": "boolean",
             "title": "Disable Field Truncation",
-            "description": "Disables truncation of materialized fields. May result in errors for documents with extremely large values or complex nested structures.",
-            "nonsensitive": true
+            "description": "Disables truncation of materialized fields. May result in errors for documents with extremely large values or complex nested structures."
           },
           "no_flow_document": {
             "type": "boolean",
             "title": "Exclude Flow Document",
             "description": "When enabled the root document will not be required for standard updates.",
-            "default": false,
-            "nonsensitive": true
+            "default": false
           },
           "feature_flags": {
             "type": "string",
             "title": "Feature Flags",
-            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.",
-            "nonsensitive": true
+            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."
           }
         },
         "additionalProperties": false,
@@ -301,15 +289,13 @@
         "type": "boolean",
         "title": "Delta Updates",
         "description": "Use Private Key authentication to enable Snowpipe Streaming for Delta Update bindings",
-        "nonsensitive": true,
         "x-delta-updates": true
       },
       "clustering": {
         "type": "string",
         "title": "Clustering Keys",
         "description": "Comma-separated list of column names to use as the clustering key for Snowflake Automatic Clustering. Leave empty to disable clustering. Recommended only for large tables queried with selective filters on the chosen columns. Consumes additional Snowflake credits.",
-        "advanced": true,
-        "nonsensitive": true
+        "advanced": true
       }
     },
     "type": "object",

@@ -74,7 +74,6 @@
           "default": "PT0S",
           "description": "Interval between updates for this resource",
           "format": "duration",
-          "nonsensitive": true,
           "title": "Interval",
           "type": "string"
         }

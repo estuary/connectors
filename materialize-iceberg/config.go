@@ -43,7 +43,7 @@ type config struct {
 	Warehouse             string                `json:"warehouse" jsonschema:"title=Warehouse,description=Warehouse to connect to. For AWS Glue this is the account ID." jsonschema_extras:"order=1"`
 	Namespace             string                `json:"namespace" jsonschema:"title=Namespace,description=Namespace for bound collection tables (unless overridden within the binding resource configuration).," jsonschema_extras:"order=2,pattern=^[^.]*$"`
 	BaseLocation          string                `json:"base_location,omitempty" jsonschema:"title=Base Location,description=Base location for the catalog tables. Required if using AWS Glue as a catalog. Example: 's3://your_bucket/your_prefix/'" jsonschema_extras:"order=3"`
-	HardDelete            bool                  `json:"hard_delete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. It is disabled by default and _meta/op in the destination will signify whether rows have been deleted (soft-delete)." jsonschema_extras:"order=4,nonsensitive=true"`
+	HardDelete            bool                  `json:"hard_delete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. It is disabled by default and _meta/op in the destination will signify whether rows have been deleted (soft-delete)." jsonschema_extras:"order=4"`
 	Credentials           *catalogAuthConfig    `json:"credentials" jsonschema_extras:"x-iam-auth=true,order=5"`
 	CatalogAuthentication *oldCatalogAuthConfig `json:"catalog_authentication,omitempty" jsonschema:"-"`
 	Compute               computeConfig         `json:"compute"`
@@ -60,12 +60,12 @@ type config struct {
 // is applied.
 type glueOptimizersConfig struct {
 	ExecutionRoleArn          string `json:"execution_role_arn,omitempty" jsonschema:"title=Execution Role ARN,description=IAM role ARN that Glue assumes to perform table optimization. The role must have permissions to read/write table data in S3 and access the Glue catalog." jsonschema_extras:"order=0"`
-	EnableCompaction          bool   `json:"enable_compaction,omitempty" jsonschema:"title=Enable Compaction,description=Enable automatic compaction of small Iceberg data files to improve query performance." jsonschema_extras:"order=1,nonsensitive=true"`
-	EnableRetention           bool   `json:"enable_retention,omitempty" jsonschema:"title=Enable Snapshot Retention,description=Enable automatic removal of old Iceberg table snapshots to reduce storage costs." jsonschema_extras:"order=2,nonsensitive=true"`
-	SnapshotRetentionDays     int    `json:"snapshot_retention_days,omitempty" jsonschema:"title=Snapshot Retention Days,description=Number of days to retain Iceberg snapshots. Uses the Glue default of 5 if unset." jsonschema_extras:"order=3,nonsensitive=true"`
-	NumberOfSnapshotsToRetain int    `json:"number_of_snapshots_to_retain,omitempty" jsonschema:"title=Number of Snapshots to Retain,description=Minimum number of Iceberg snapshots to retain regardless of the retention period. Uses the Glue default of 1 if unset." jsonschema_extras:"order=4,nonsensitive=true"`
-	EnableOrphanFileDeletion  bool   `json:"enable_orphan_file_deletion,omitempty" jsonschema:"title=Enable Orphan File Deletion,description=Enable automatic deletion of files that are no longer referenced by any table snapshot." jsonschema_extras:"order=5,nonsensitive=true"`
-	OrphanFileRetentionDays   int    `json:"orphan_file_retention_days,omitempty" jsonschema:"title=Orphan File Retention Days,description=Number of days to retain orphan files before deletion. Uses the Glue default of 3 if unset." jsonschema_extras:"order=6,nonsensitive=true"`
+	EnableCompaction          bool   `json:"enable_compaction,omitempty" jsonschema:"title=Enable Compaction,description=Enable automatic compaction of small Iceberg data files to improve query performance." jsonschema_extras:"order=1"`
+	EnableRetention           bool   `json:"enable_retention,omitempty" jsonschema:"title=Enable Snapshot Retention,description=Enable automatic removal of old Iceberg table snapshots to reduce storage costs." jsonschema_extras:"order=2"`
+	SnapshotRetentionDays     int    `json:"snapshot_retention_days,omitempty" jsonschema:"title=Snapshot Retention Days,description=Number of days to retain Iceberg snapshots. Uses the Glue default of 5 if unset." jsonschema_extras:"order=3"`
+	NumberOfSnapshotsToRetain int    `json:"number_of_snapshots_to_retain,omitempty" jsonschema:"title=Number of Snapshots to Retain,description=Minimum number of Iceberg snapshots to retain regardless of the retention period. Uses the Glue default of 1 if unset." jsonschema_extras:"order=4"`
+	EnableOrphanFileDeletion  bool   `json:"enable_orphan_file_deletion,omitempty" jsonschema:"title=Enable Orphan File Deletion,description=Enable automatic deletion of files that are no longer referenced by any table snapshot." jsonschema_extras:"order=5"`
+	OrphanFileRetentionDays   int    `json:"orphan_file_retention_days,omitempty" jsonschema:"title=Orphan File Retention Days,description=Number of days to retain orphan files before deletion. Uses the Glue default of 3 if unset." jsonschema_extras:"order=6"`
 }
 
 func (c glueOptimizersConfig) anyEnabled() bool {
@@ -124,9 +124,9 @@ type advancedConfig struct {
 	// generated schema so that new materializations are not offered it, but it
 	// is still decoded and honored for specs that already set it.
 	LowercaseColumnNames bool           `json:"lowercase_column_names,omitempty" jsonschema:"-"`
-	TableIdentifierCase  identifierCase `json:"table_identifier_case,omitempty" jsonschema:"title=Table Identifier Case,enum=lowercase,enum=uppercase,enum=preserve,default=lowercase,description=Casing applied to the namespace and table name (together the Iceberg table identifier) of tables created by this materialization. 'lowercase' (the default) folds them to lower case so a binding for MyTable creates the table mytable; 'uppercase' folds them to upper case which is needed for catalogs where unquoted identifiers resolve upper-case such as Snowflake's; 'preserve' uses them exactly as written in the binding. Tables that already exist are never renamed." jsonschema_extras:"nonsensitive=true"`
-	FieldNameCase        identifierCase `json:"field_name_case,omitempty" jsonschema:"title=Field Name Case,enum=lowercase,enum=uppercase,enum=preserve,default=preserve,description=Casing applied to the names of columns created by this materialization. 'preserve' (the default) names them exactly as the fields are named in the collection; 'lowercase' folds them to lower case which is necessary for some systems such as querying S3 Table Buckets with Athena; 'uppercase' folds them to upper case which is needed for catalogs where unquoted identifiers resolve upper-case such as Snowflake's. Columns that already exist are matched case-insensitively and are never renamed." jsonschema_extras:"nonsensitive=true"`
-	FeatureFlags         string         `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
+	TableIdentifierCase  identifierCase `json:"table_identifier_case,omitempty" jsonschema:"title=Table Identifier Case,enum=lowercase,enum=uppercase,enum=preserve,default=lowercase,description=Casing applied to the namespace and table name (together the Iceberg table identifier) of tables created by this materialization. 'lowercase' (the default) folds them to lower case so a binding for MyTable creates the table mytable; 'uppercase' folds them to upper case which is needed for catalogs where unquoted identifiers resolve upper-case such as Snowflake's; 'preserve' uses them exactly as written in the binding. Tables that already exist are never renamed."`
+	FieldNameCase        identifierCase `json:"field_name_case,omitempty" jsonschema:"title=Field Name Case,enum=lowercase,enum=uppercase,enum=preserve,default=preserve,description=Casing applied to the names of columns created by this materialization. 'preserve' (the default) names them exactly as the fields are named in the collection; 'lowercase' folds them to lower case which is necessary for some systems such as querying S3 Table Buckets with Athena; 'uppercase' folds them to upper case which is needed for catalogs where unquoted identifiers resolve upper-case such as Snowflake's. Columns that already exist are matched case-insensitively and are never renamed."`
+	FeatureFlags         string         `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
 func (c config) Validate() error {
@@ -412,7 +412,7 @@ const (
 )
 
 type computeConfig struct {
-	ComputeType computeType `json:"compute_type" jsonschema_extras:"nonsensitive=true"`
+	ComputeType computeType `json:"compute_type"`
 
 	emrConfig
 	sparkConfig
