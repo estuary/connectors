@@ -2,92 +2,60 @@ package common
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
-	"os"
-	"time"
 
 	log "github.com/sirupsen/logrus"
 )
 
-// defaultEncryptionURL is Estuary's config encryption service, which encrypts
-// any config properties marked as secret in the schema using sops.
-const defaultEncryptionURL = "https://config-encryption.estuary.dev/v1/encrypt-config"
-
-// EmitConfigUpdate encrypts a full restatement of the endpoint config against
-// its JSON schema and emits a "configUpdate" connector event. The control
-// plane reacts to the event by republishing the task's spec with its endpoint
-// config replaced wholesale by the emitted config, so config must be a
-// complete config document and not a partial patch.
-func EmitConfigUpdate(ctx context.Context, msg string, config, schema json.RawMessage) error {
-	encrypted, err := encryptConfig(ctx, config, schema)
-	if err != nil {
-		return fmt.Errorf("encrypting config: %w", err)
-	}
-
+// EmitConfigUpdate emits a "configUpdate" connector event carrying a full
+// restatement of the endpoint config. The control plane reacts to the event by
+// republishing the task's spec with its endpoint config replaced wholesale by
+// the emitted config, so config must be a complete config document and not a
+// partial patch.
+func EmitConfigUpdate(msg string, config json.RawMessage) {
 	log.WithFields(log.Fields{
 		"eventType": "configUpdate",
-		"config":    encrypted,
+		"config":    config,
 	}).Info(msg)
-
-	return nil
 }
 
-// encryptConfig submits the config and its schema to the config encryption
-// service and returns the encrypted config document.
-func encryptConfig(ctx context.Context, config, schema json.RawMessage) (json.RawMessage, error) {
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	// Flow always sorts object properties lexicographically, and sops relies
-	// on encountered property order when computing the HMAC portion of its
-	// stanza. Round-tripping through a map sorts keys recursively, since
-	// encoding/json marshals maps in sorted key order. UseNumber preserves
-	// numbers as json.Number instead of converting to float64.
-	var asMap map[string]any
-	var dec = json.NewDecoder(bytes.NewReader(config))
-	dec.UseNumber()
-	if err := dec.Decode(&asMap); err != nil {
-		return nil, fmt.Errorf("decoding config: %w", err)
+// SetSealedConfigProperty returns the task's sealed endpoint config with value
+// set at the given object path, as a complete config document ready to be
+// emitted with EmitConfigUpdate.
+//
+// A sops-encrypted config is never decrypted and re-encrypted to carry the new
+// value. The value is written into the plaintext `sops.overlay` of the config's
+// `sops` stanza instead, which the runtime merges over the decrypted config
+// (RFC 7396 merge patch) once it has checked that every location the overlay
+// touches is annotated `nonsensitive` in the connector's config schema. The
+// ciphertext is left alone, so the config keeps the key it was encrypted with
+// rather than being re-keyed to whatever an encryption service would pick, and
+// no secret is ever sent anywhere to be re-sealed.
+//
+// Encrypted values are copied across untouched, but the document is otherwise
+// re-serialized, which sorts its properties. That is safe despite sops computing
+// its MAC over values in the order it encounters them: the control plane parses
+// the emitted config into a `serde_json::Value` and re-serializes it when
+// applying the update, which sorts it the same way, so a config that verifies
+// after being stored verifies here too.
+func SetSealedConfigProperty(sealed json.RawMessage, path []string, value any) (json.RawMessage, error) {
+	var doc struct {
+		Sops json.RawMessage `json:"sops"`
+	}
+	if err := json.Unmarshal(sealed, &doc); err != nil {
+		return nil, fmt.Errorf("config is not a JSON object: %w", err)
 	}
 
-	body, err := json.Marshal(map[string]any{
-		"config": asMap,
-		"schema": schema,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("encoding request body: %w", err)
+	// A `sops` stanza is what marks the config as encrypted, so its absence means
+	// there is no ciphertext to protect and the value belongs in the document
+	// itself. Adding a stanza to such a config would send the runtime looking for
+	// ciphertext that isn't there.
+	if len(doc.Sops) != 0 && !bytes.Equal(doc.Sops, []byte("null")) {
+		path = append([]string{"sops", "overlay"}, path...)
 	}
 
-	var url = defaultEncryptionURL
-	if fromEnv := os.Getenv("ENCRYPTION_URL"); fromEnv != "" {
-		url = fromEnv
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
-	if err != nil {
-		return nil, fmt.Errorf("creating request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("requesting config encryption: %w", err)
-	}
-	defer res.Body.Close()
-
-	resBody, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, fmt.Errorf("reading config encryption response: %w", err)
-	}
-	if res.StatusCode < 200 || res.StatusCode > 299 {
-		return nil, fmt.Errorf("config encryption returned status %d: %s", res.StatusCode, string(resBody))
-	}
-
-	return json.RawMessage(resBody), nil
+	return SetJSONProperty(sealed, path, value)
 }
 
 // SetJSONProperty returns doc with value set at the given object path,

@@ -67,9 +67,11 @@ var FlagDisabled = FlagDefault{value: false}
 // that point keeps the old behavior for the rest of its life while new tasks get
 // the new one.
 //
-// The cutoff may be in the future, which is usually the easier thing to do: pick a
-// date comfortably after the change is expected to merge, and every task created
-// before it keeps the old behavior even though the code is already deployed.
+// The cutoff may be in the future, but keep it close to the release: tasks
+// created between the release and the cutoff get the old behavior at first and
+// the new behavior once the cutoff passes, and flipping the behavior of tasks
+// that are already running can be very costly. Time the release and the cutoff
+// as close together as possible.
 //
 // The cutoff is a date in CreatedAtLayout form ("2026-06-10"), matching the
 // creation date stamped onto the task's built spec by the control plane, which is
@@ -77,13 +79,6 @@ var FlagDisabled = FlagDefault{value: false}
 // not be honored. The two dates are compared directly, and resolution is a pure
 // function of the spec, yielding the same answer in every RPC, forever, with
 // nothing to persist.
-//
-// The date is derived from the task's control-plane ID rather than recorded at
-// build time, so every spec built since the field was introduced carries it,
-// including those of long-running tasks. A spec built before the field existed
-// has no date at all and resolves as brand new (see Resolve) — but a task can
-// only reach a connector version that knows about this flag by being
-// republished, which rebuilds its spec and stamps the date.
 //
 // Panics if date is not a valid date in CreatedAtLayout form, which is a
 // connector programming error.
@@ -99,9 +94,7 @@ func FlagEnabledForTasksCreatedAfter(date string) FlagDefault {
 //
 // A brand-new task has no date yet, because its creation is only being committed
 // now — so it resolves against today's date, which is the date it is about to be
-// stamped with. That is what makes a cutoff in the future safe to set: such a task
-// resolves the same way before and after its date is stamped, rather than flipping
-// once the control plane fills the field in.
+// stamped with.
 func (d FlagDefault) Resolve(createdAt CreatedAt) bool {
 	if d.enabledFrom == "" {
 		return d.value
