@@ -65,7 +65,7 @@ class FakeManager:
         self.too_large_over_rows = too_large_over_rows
         self.queries: list[str] = []
 
-    async def export_rows(self, query: str):
+    async def export_rows(self, query: str, object_name: str):
         self.queries.append(query)
         lo = re.search(rf"{self.cursor_field} >= '([^']+)'", query)
         hi = re.search(rf"{self.cursor_field} < '([^']+)'", query)
@@ -415,7 +415,7 @@ async def test_fetch_page_id_engine_ordering_violation_raises():
     # `Id >` resume is only dupe-free if ORDER BY Id is a stable total order;
     # out-of-order rows must kill the backfill rather than risk skipped records.
     class UnorderedManager:
-        async def export_rows(self, query):
+        async def export_rows(self, query, object_name):
             yield {"Id": "aa02", "UpdatedDate": "2020-01-02T00:00:00Z"}
             yield {"Id": "aa01", "UpdatedDate": "2020-01-01T00:00:00Z"}
 
@@ -495,7 +495,7 @@ async def test_fetch_snapshot_too_large_propagates():
     # A snapshot has no time cursor, so it can't be bisected — a too-large export
     # surfaces loudly rather than being silently truncated.
     class TooBig:
-        async def export_rows(self, query):
+        async def export_rows(self, query, object_name):
             raise ExportTooLargeError("too big")
             yield  # unreachable; makes this an async generator
 

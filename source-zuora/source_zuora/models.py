@@ -137,14 +137,54 @@ class DescribeField(BaseModel, extra="allow"):
         return self.selectable and "export" in self.contexts
 
 
+# Related objects that must never be joined, even though describe advertises them.
+UNJOINABLE_OBJECTS: frozenset[str] = frozenset({"SubscriptionStatusHistory"})
+
+
 class DescribeObject(BaseModel, extra="allow"):
     """A GET /v1/describe/{object} response."""
     name: str = ""
     fields: list[DescribeField] = Field(default_factory=list)
+    related_object_names: list[str] = Field(default_factory=list)
 
     @property
     def exportable_field_names(self) -> list[str]:
         return [f.name for f in self.fields if f.is_exportable]
+
+    @property
+    def joinable_object_names(self) -> list[str]:
+        """The related objects whose Id this object's export can select.
+
+        Three kinds of relationship are dropped:
+        1. a self-reference, because `<Self>.Id` would duplicate the object's
+           own Id column.
+        2. the UNJOINABLE_OBJECTS that fail the export job outright.
+        3.  any relationship the object already exposes as a scalar `<Name>Id` field.
+        """
+        own_field_names = set(self.exportable_field_names)
+        return [
+            name
+            for name in self.related_object_names
+            if name != self.name
+            and name not in UNJOINABLE_OBJECTS
+            and f"{name}Id" not in own_field_names
+        ]
+
+    @property
+    def query_field_names(self) -> list[str]:
+        """Every field an export of this object selects. Its own exportable
+        fields, then `<RelatedObject>.Id` for each joinable related object.
+
+        Export ZOQL exposes an object's foreign keys only as joins on the
+        related object rather than as scalar `<Related>Id` fields, and describe
+        lists those relationships in `<related-objects>` instead of `<fields>`.
+        Selecting only `<fields>` therefore yields rows with no way to reference
+        what they belong to: an InvoiceItem with no InvoiceId, a RatePlan with
+        no SubscriptionId.
+        """
+        return self.exportable_field_names + [
+            f"{name}.Id" for name in self.joinable_object_names
+        ]
 
 
 class CatalogObject(BaseModel, extra="allow"):

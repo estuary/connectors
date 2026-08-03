@@ -82,6 +82,21 @@ class ExportTooLargeError(Exception):
     """
 
 
+def _column_to_field(column: str, object_name: str) -> str:
+    """Map an export CSV column header to the field name documents carry.
+
+    With useQueryLabels every header is "<Object>.<Field>", for both the exported
+    object's own columns and any joined related object's. An own column drops the
+    prefix so it matches its describe name ("Account.Id" of an Account export ->
+    "Id"), while a joined column keeps it as a flattened name ("Account.Id" of an
+    Invoice export -> "AccountId").
+    """
+    prefix, _, field = column.partition(".")
+    if not field:
+        return column
+    return field if prefix == object_name else f"{prefix}{field}"
+
+
 class ExportManager:
     """Runs Zuora AQuA (Aggregate Query API) export jobs in stateless mode.
 
@@ -102,11 +117,21 @@ class ExportManager:
         self.base_url = base_url
         self._semaphore = asyncio.Semaphore(MAX_CONCURRENT_EXPORTS)
 
-    async def export_rows(self, query: str) -> AsyncGenerator[dict, None]:
+    async def export_rows(
+        self,
+        query: str,
+        object_name: str,
+    ) -> AsyncGenerator[dict, None]:
+        """Run `query` and stream its rows, keyed by field name.
+
+        object_name is the object `query` selects FROM. It's needed to tell an
+        own column apart from a joined one when naming fields (see
+        _column_to_field).
+        """
         # Each segment file is a self-contained CSV with its own header row, so
         # streaming them back-to-back through per-file processors is seamless.
         for file_id in await self._run_job(query):
-            async for row in self._fetch_results(file_id):
+            async for row in self._fetch_results(file_id, object_name):
                 yield row
 
     async def _run_job(self, query: str) -> list[str]:
@@ -232,7 +257,11 @@ class ExportManager:
             job_id=job_id,
         )
 
-    async def _fetch_results(self, file_id: str) -> AsyncGenerator[dict, None]:
+    async def _fetch_results(
+        self,
+        file_id: str,
+        object_name: str,
+    ) -> AsyncGenerator[dict, None]:
         url = f"{self.base_url}/v1/files/{file_id}"
         try:
             _resp_headers, body_factory = await self.http.request_stream(
@@ -244,7 +273,7 @@ class ExportManager:
                     f"Export file {file_id} exceeds Zuora's size limit"
                 ) from err
             raise
+        # Keyed by header name, never by position. Zuora does not return columns
+        # in the order the query selected them.
         async for row in IncrementalCSVProcessor(body_factory()):
-            # Zuora prefixes every CSV column with "ObjectName.". Strip it so
-            # fields match the describe names (e.g. "Id", not "Account.Id").
-            yield {k.split(".", 1)[-1]: v for k, v in row.items()}
+            yield {_column_to_field(k, object_name): v for k, v in row.items()}
