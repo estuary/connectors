@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"regexp"
 	"runtime/debug"
 	"strings"
@@ -45,7 +46,36 @@ func TestMain(m *testing.M) {
 	// Set a 900MiB memory limit, same as we use in production.
 	debug.SetMemoryLimit(900 * 1024 * 1024)
 
-	os.Exit(m.Run())
+	os.Exit(runTests(m))
+}
+
+// connectorBinary is the path to the connector built by runTests, which every capture in
+// this package is pointed at. Empty when tests are skipped for lack of a database.
+var connectorBinary string
+
+// runTests builds the connector once and runs the suite against that binary. Each test
+// performs many flowctl invocations and each one spawns the connector, so building here
+// avoids paying `go run`'s link step hundreds of times over.
+//
+// Split out from TestMain because os.Exit would skip deferred cleanup of the build.
+func runTests(m *testing.M) int {
+	if os.Getenv("TEST_DATABASE") == "yes" {
+		buildDir, err := os.MkdirTemp("", "source-sqlserver-ct-build-*")
+		if err != nil {
+			log.WithField("err", err).Error("error creating build directory")
+			return 1
+		}
+		defer os.RemoveAll(buildDir)
+
+		connectorBinary = buildDir + "/connector"
+		var build = exec.Command("go", "build", "-o", connectorBinary, ".")
+		build.Stderr = os.Stderr
+		if err := build.Run(); err != nil {
+			log.WithField("err", err).Error("error building connector for tests")
+			return 1
+		}
+	}
+	return m.Run()
 }
 
 var documentSanitizers = []blackbox.JSONSanitizer{
@@ -79,6 +109,7 @@ func blackboxTestSetup(t testing.TB) (*sqlserverTestDatabase, *blackbox.Transcri
 	tc.Capture.Logger = t.Log
 	tc.Capture.DiscoveryFilter = regexp.MustCompile(uniqueID)
 	tc.Capture.Env["SHUTDOWN_AFTER_POLLING"] = "yes"
+	require.NoError(t, tc.Capture.SetLocalCommand(connectorBinary))
 	tc.DocumentSanitizers = documentSanitizers
 	tc.CheckpointSanitizers = checkpointSanitizers
 
