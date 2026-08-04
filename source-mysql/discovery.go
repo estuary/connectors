@@ -28,9 +28,9 @@ const (
 )
 
 type discoveryFilters struct {
-	IncludeSchemas []string `json:"include_schemas,omitempty" jsonschema:"title=Include Schemas,description=If specified only tables in the listed schemas will be discovered. Combined as a union with the 'Discovery Schema Selection' setting under Advanced Options."`
-	ExcludeSchemas []string `json:"exclude_schemas,omitempty" jsonschema:"title=Exclude Schemas,description=Tables in the listed schemas will be excluded from discovery."`
-	TablePatterns  []string `json:"table_patterns,omitempty"  jsonschema:"title=Table Patterns,description=If specified only tables matching at least one of these glob patterns will be discovered. A pattern containing a '.' matches against the qualified 'schema.table' name. A pattern without a '.' matches the unqualified table name in any schema. Use '*' or '?' as wildcards."`
+	IncludeSchemas []string `json:"include_schemas,omitempty" jsonschema:"title=Include Schemas,description=If specified only tables in the listed schemas will be discovered. Combined as a union with the 'Discovery Schema Selection' setting under Advanced Options." jsonschema_extras:"nonsensitive=true"`
+	ExcludeSchemas []string `json:"exclude_schemas,omitempty" jsonschema:"title=Exclude Schemas,description=Tables in the listed schemas will be excluded from discovery." jsonschema_extras:"nonsensitive=true"`
+	TablePatterns  []string `json:"table_patterns,omitempty"  jsonschema:"title=Table Patterns,description=If specified only tables matching at least one of these glob patterns will be discovered. A pattern containing a '.' matches against the qualified 'schema.table' name. A pattern without a '.' matches the unqualified table name in any schema. Use '*' or '?' as wildcards." jsonschema_extras:"nonsensitive=true"`
 }
 
 // Validate checks that the configured discovery filters are well-formed. The

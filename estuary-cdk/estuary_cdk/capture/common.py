@@ -158,7 +158,9 @@ class ResourceConfig(BaseResourceConfig):
 
     name: str = Field(description="Name of this resource")
     interval: timedelta = Field(
-        default=timedelta(), description="Interval between updates for this resource"
+        default=timedelta(),
+        description="Interval between updates for this resource",
+        json_schema_extra={"nonsensitive": True},
     )
 
     # NOTE(johnny): If we need a namespace, introduce an ExtResourceConfig (?)
@@ -206,6 +208,7 @@ class ResourceConfigWithSchedule(ResourceConfig):
         title="Schedule",
         description="Schedule to automatically rebackfill this binding. Accepts a cron expression.",
         pattern=CRON_REGEX,
+        json_schema_extra={"nonsensitive": True},
     )
 
 

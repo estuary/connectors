@@ -44,6 +44,7 @@ class EndpointConfig(BaseModel):
     capture_connected_accounts: bool = Field(
         description="Whether to capture data from connected accounts.",
         default=False,
+        json_schema_extra={"nonsensitive": True},
     )
 
     class Advanced(BaseModel):
@@ -51,6 +52,7 @@ class EndpointConfig(BaseModel):
             description='The Stripe API version to use for all requests, e.g. "2024-06-20". If left blank, the account\'s default API version is used. Streams that require a newer API version than the one in effect are disabled.',
             title="API Version",
             default=None,
+            json_schema_extra={"nonsensitive": True},
         )
 
         @field_validator("api_version")

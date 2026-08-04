@@ -14,6 +14,7 @@
                 },
                 "propertyName": "window_type"
               },
+              "nonsensitive": true,
               "oneOf": [
                 {
                   "$ref": "#/$defs/WindowSizeAsInterval"
@@ -99,6 +100,7 @@
             "window_type": {
               "const": "interval",
               "default": "interval",
+              "nonsensitive": true,
               "order": 0,
               "title": "Window Type",
               "type": "string"
@@ -106,6 +108,7 @@
             "interval": {
               "description": "Window size as an ISO 8601 duration, e.g. PT1H for one hour.",
               "format": "duration",
+              "nonsensitive": true,
               "order": 1,
               "title": "Interval",
               "type": "string"
@@ -122,6 +125,7 @@
             "window_type": {
               "const": "days",
               "default": "days",
+              "nonsensitive": true,
               "order": 0,
               "title": "Window Type",
               "type": "string"
@@ -258,12 +262,14 @@
           "default": "PT0S",
           "description": "Interval between updates for this resource",
           "format": "duration",
+          "nonsensitive": true,
           "title": "Interval",
           "type": "string"
         },
         "schedule": {
           "default": "",
           "description": "Schedule to automatically refresh formula fields. Accepts a cron expression.",
+          "nonsensitive": true,
           "pattern": "^((?:[0-5]?\\d(?:-[0-5]?\\d)?|\\*(?:/[0-5]?\\d)?)(?:,(?:[0-5]?\\d(?:-[0-5]?\\d)?|\\*(?:/[0-5]?\\d)?))*)\\s+((?:[01]?\\d|2[0-3]|(?:[01]?\\d|2[0-3])-(?:[01]?\\d|2[0-3])|\\*(?:/[01]?\\d|/2[0-3])?)(?:,(?:[01]?\\d|2[0-3]|(?:[01]?\\d|2[0-3])-(?:[01]?\\d|2[0-3])|\\*(?:/[01]?\\d|/2[0-3])?))*)\\s+((?:0?[1-9]|[12]\\d|3[01]|(?:0?[1-9]|[12]\\d|3[01])-(?:0?[1-9]|[12]\\d|3[01])|\\*(?:/[0-9]|/1[0-9]|/2[0-9]|/3[01])?)(?:,(?:0?[1-9]|[12]\\d|3[01]|(?:0?[1-9]|[12]\\d|3[01])-(?:0?[1-9]|[12]\\d|3[01])|\\*(?:/[0-9]|/1[0-9]|/2[0-9]|/3[01])?))*)\\s+((?:[1-9]|1[0-2]|(?:[1-9]|1[0-2])-(?:[1-9]|1[0-2])|\\*(?:/[1-9]|/1[0-2])?)(?:,(?:[1-9]|1[0-2]|(?:[1-9]|1[0-2])-(?:[1-9]|1[0-2])|\\*(?:/[1-9]|/1[0-2])?))*)\\s+((?:[0-6]|(?:[0-6])-(?:[0-6])|\\*(?:/[0-6])?)(?:,(?:[0-6]|(?:[0-6])-(?:[0-6])|\\*(?:/[0-6])?))*)$|^$",
           "title": "Formula Field Refresh Schedule",
           "type": "string"

@@ -14,16 +14,16 @@ import (
 )
 
 type Config struct {
-	Greetings        int              `json:"greetings"`
-	SkipState        bool             `json:"skip_state"`
-	FailAfter        int              `json:"fail_after"`
-	ExitAfter        int              `json:"exit_after"`
+	Greetings        int              `json:"greetings" jsonschema_extras:"nonsensitive=true"`
+	SkipState        bool             `json:"skip_state" jsonschema_extras:"nonsensitive=true"`
+	FailAfter        int              `json:"fail_after" jsonschema_extras:"nonsensitive=true"`
+	ExitAfter        int              `json:"exit_after" jsonschema_extras:"nonsensitive=true"`
 	OAuthCredentials oauthCredentials `json:"credentials"`
 }
 
 type ResourceConfig struct {
 	Stream   string `json:"stream"`
-	SyncMode string `json:"syncMode"`
+	SyncMode string `json:"syncMode" jsonschema_extras:"nonsensitive=true"`
 }
 
 func (c *ResourceConfig) Validate() error { return nil }

@@ -128,6 +128,7 @@
         "title": "Upload Interval",
         "description": "Frequency at which files will be uploaded. Must be a valid ISO8601 duration string no greater than 4 hours.",
         "default": "PT5M",
+        "nonsensitive": true,
         "order": 7
       },
       "s3_endpoint": {
@@ -146,6 +147,7 @@
                 "type": "string",
                 "const": "Iceberg REST Server",
                 "default": "Iceberg REST Server",
+                "nonsensitive": true,
                 "order": 0
               },
               "uri": {
@@ -205,6 +207,7 @@
                 "type": "string",
                 "const": "AWS Glue",
                 "default": "AWS Glue",
+                "nonsensitive": true,
                 "order": 0
               },
               "glue_id": {
@@ -238,6 +241,7 @@
               "feature_flags": {
                 "title": "Feature Flags",
                 "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.",
+                "nonsensitive": true,
                 "type": [
                   "string",
                   "null"
@@ -247,7 +251,8 @@
                 "type": "boolean",
                 "title": "Nanosecond Timestamps",
                 "description": "Use nanosecond precision (Iceberg format v3) for date-time columns instead of microsecond precision (format v2). Toggling this on an existing materialization applies to data going forward: existing rows read as null for converted columns unless the binding is explicitly backfilled.",
-                "default": false
+                "default": false,
+                "nonsensitive": true
               }
             },
             "additionalProperties": false,
@@ -292,7 +297,8 @@
         "type": "boolean",
         "title": "Delta Update",
         "description": "Should updates to this table be done via delta updates. Currently this connector only supports delta updates.",
-        "default": true
+        "default": true,
+        "nonsensitive": true
       },
       "additional_table_properties": {
         "additionalProperties": {

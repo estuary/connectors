@@ -192,7 +192,8 @@ impl JsonSchema for EndpointConfig {
                     ],
                     "title": "Message Format",
                     "type": "string",
-                    "order": 3
+                    "order": 3,
+                    "nonsensitive": true
                 },
                 "compression": {
                     "description": "Compression algorithm to use for messages. Note that not all Kafka brokers support all compression algorithms.",
@@ -206,7 +207,8 @@ impl JsonSchema for EndpointConfig {
                     "title": "Compression",
                     "type": "string",
                     "default": "lz4",
-                    "order": 4
+                    "order": 4,
+                    "nonsensitive": true
                 },
                 "schema_registry": {
                     "title": "Schema Registry",
@@ -245,14 +247,16 @@ impl JsonSchema for EndpointConfig {
                     "description": "The number of partitions to create new topics with.",
                     "type": "integer",
                     "default": 6,
-                    "order": 6
+                    "order": 6,
+                    "nonsensitive": true
                 },
                 "topic_replication_factor": {
                     "title": "Topic Replication Factor",
                     "description": "The replication factor to create new topics with.",
                     "type": "integer",
                     "default": 3,
-                    "order": 7
+                    "order": 7,
+                    "nonsensitive": true
                 },
             }
         }))

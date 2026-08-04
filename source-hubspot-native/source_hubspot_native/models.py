@@ -96,7 +96,8 @@ class HubspotResourceConfigWithSchedule(ResourceConfigWithSchedule):
         default="",
         title="Calculated Property Refresh Schedule",
         description="Schedule to automatically refresh calculated properties. Accepts a cron expression.",
-        pattern=CRON_REGEX
+        pattern=CRON_REGEX,
+        json_schema_extra={"nonsensitive": True},
     )
 
 
@@ -109,12 +110,13 @@ class EndpointConfig(BaseModel):
         title="Capture Property History",
         description="Include historical data for changes to properties of HubSpot objects in captured documents.",
         default=False,
+        json_schema_extra={"nonsensitive": True},
     )
     useLegacyNamingForCustomObjects: bool = Field(
         title="Use Legacy Naming for Custom Objects",
         description="If selected, the legacy naming convention for custom objects is used. Otherwise, all discovered bindings for custom objects will have 'custom_' prepended to their names.",
         default=False,
-        json_schema_extra={"x-hidden-field": True},
+        json_schema_extra={"nonsensitive": True, "x-hidden-field": True},
     )
 
     # In order to publish this connector in the HubSpot marketplace, HubSpot requires
