@@ -81,11 +81,11 @@ var featureFlagDefaults = map[string]common.FlagDefault{
 }
 ```
 
-Set the cutoff to the date the flag ships. Every task in existence at that point is
-older than the cutoff and keeps the old behavior for the rest of its life, while every
-task created afterwards gets the new behavior from its first publication. A user can
-still opt either way per-task with `new_thing` / `no_new_thing` in
-`/advanced/feature_flags`, which always wins over the cutoff.
+Set the cutoff to the day after the pull request merges. Every task in existence at
+that point is older than the cutoff and keeps the old behavior for the rest of its
+life, while every task created afterwards gets the new behavior from its first
+publication. A user can still opt either way per-task with `new_thing` /
+`no_new_thing` in `/advanced/feature_flags`, which always wins over the cutoff.
 
 The cutoff is a date, not a timestamp, because a date is all a spec records about when
 a task was created — the two dates are compared directly. A flag therefore takes effect
@@ -106,12 +106,11 @@ boilerplate resolves flags from that date in every RPC:
 Resolution is therefore a pure function of the spec: it is stable for the life of the
 task, identical across the three RPCs, and needs nothing persisted in connector state.
 
-The date is empty only during a task's very first build, before its creation is
-committed and an ID assigned. That means "brand new", and resolves as though the task
-were created now — enabling every cutoff-gated flag, which is correct because a cutoff
-is never in the future. Since the date is derived from the task's ID rather than
-recorded at build time, it is present on every spec built since the field was
-introduced, including those of long-running tasks.
+The date is absent in exactly one place: the Validate of a task that has not been
+published yet, which has no previous spec to carry one. Publishing the task creates
+it, so its very first Apply and Open — and every RPC after that — do have the date.
+An absent date means "brand new" and resolves against today's, which is the date the
+task is about to be created with.
 
 ### Recording the resolved value in the config
 
