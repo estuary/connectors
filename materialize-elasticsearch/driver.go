@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -412,6 +412,10 @@ type driver struct{}
 
 var _ boilerplate.Connector = &driver{}
 
+// NewDriver builds the connector, and is its entry point: an importing
+// caller is handed the assembled connector rather than its pieces.
+func NewDriver() boilerplate.Connector { return new(driver) }
+
 func (driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
 	resourceSchema, err := schemagen.GenerateSchema("Elasticsearch Index", &resource{}).MarshalJSON()
 	if err != nil {
@@ -456,15 +460,15 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 		}
 	}
 
-	return boilerplate.RunValidate(ctx, req, newMaterialization)
+	return boilerplate.RunValidate(ctx, req, NewMaterializer)
 }
 
 func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
-	return boilerplate.RunApply(ctx, req, newMaterialization)
+	return boilerplate.RunApply(ctx, req, NewMaterializer)
 }
 
 func (driver) NewTransactor(ctx context.Context, req pm.Request_Open, be *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
-	return boilerplate.RunNewTransactor(ctx, req, be, newMaterialization)
+	return boilerplate.RunNewTransactor(ctx, req, be, NewMaterializer)
 }
 
 type materialization struct {
@@ -481,7 +485,7 @@ type materialization struct {
 
 var _ boilerplate.Materializer[config, fieldConfig, resource, property] = &materialization{}
 
-func newMaterialization(ctx context.Context, materializationName string, cfg config, featureFlags map[string]bool) (boilerplate.Materializer[config, fieldConfig, resource, property], error) {
+func NewMaterializer(ctx context.Context, materializationName string, cfg config, featureFlags map[string]bool) (boilerplate.Materializer[config, fieldConfig, resource, property], error) {
 	metaClient, err := cfg.toClient(true)
 	if err != nil {
 		return nil, fmt.Errorf("creating metadata client: %w", err)
@@ -795,4 +799,3 @@ func translateField(f string) string {
 	return f
 }
 
-func main() { boilerplate.RunMain(new(driver)) }

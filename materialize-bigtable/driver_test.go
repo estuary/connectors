@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"flag"
@@ -53,10 +53,10 @@ func TestIntegration(t *testing.T) {
 	}
 
 	t.Run("materialize", func(t *testing.T) {
-		boilerplate.RunMaterializationTest(t, newMaterialization, materializeSpec, makeResourceFn, nil)
+		boilerplate.RunMaterializationTest(t, NewMaterializer, materializeSpec, makeResourceFn, nil)
 	})
 
 	t.Run("apply", func(t *testing.T) {
-		boilerplate.RunApplyTest(t, &driver{}, newMaterialization, applySpec, makeResourceFn)
+		boilerplate.RunApplyTest(t, &driver{}, NewMaterializer, applySpec, makeResourceFn)
 	})
 }

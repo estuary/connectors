@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -58,7 +58,7 @@ func TestIntegration(t *testing.T) {
 			// the query executes; a directory with no files under the
 			// connector's flow_v1 stage (created by Setup during the base
 			// Apply) stands in for one whose files were already consumed.
-			query := sql.DrainSeedInsertQuery(t, newSnowflakeDriver(), cfg, appliedSpec, "PARSE_JSON('{}')")
+			query := sql.DrainSeedInsertQuery(t, NewDriver(), cfg, appliedSpec, "PARSE_JSON('{}')")
 			state, err := json.Marshal(map[string]any{
 				appliedSpec.Bindings[0].StateKey: map[string]any{
 					"Table":     tableName,
@@ -74,7 +74,7 @@ func TestIntegration(t *testing.T) {
 			require.Len(t, rows, 1, "the staged transaction's row must have been committed")
 		}
 
-		sql.RunApplyDrainTest(t, newSnowflakeDriver(), cfg, res, seedPending, verifyDrained)
+		sql.RunApplyDrainTest(t, NewDriver(), cfg, res, seedPending, verifyDrained)
 	})
 
 	actionDescSanitizers := []func(string) string{
@@ -129,15 +129,15 @@ func TestIntegration(t *testing.T) {
 	}
 
 	t.Run("materialize", func(t *testing.T) {
-		sql.RunMaterializationTest(t, newSnowflakeDriver(), "testdata/materialize.flow.yaml", makeResourceFn, actionDescSanitizers)
+		sql.RunMaterializationTest(t, NewDriver(), "testdata/materialize.flow.yaml", makeResourceFn, actionDescSanitizers)
 	})
 
 	t.Run("apply", func(t *testing.T) {
-		sql.RunApplyTest(t, newSnowflakeDriver(), "testdata/apply.flow.yaml", makeResourceFn)
+		sql.RunApplyTest(t, NewDriver(), "testdata/apply.flow.yaml", makeResourceFn)
 	})
 
 	t.Run("migrate", func(t *testing.T) {
-		sql.RunMigrationTest(t, newSnowflakeDriver(), "testdata/migrate.flow.yaml", makeResourceFn, nil)
+		sql.RunMigrationTest(t, NewDriver(), "testdata/migrate.flow.yaml", makeResourceFn, nil)
 	})
 }
 

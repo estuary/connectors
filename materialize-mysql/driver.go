@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -234,7 +234,7 @@ func (r tableConfig) Parameters() ([]string, bool, error) {
 	return []string{translateFlowIdentifier(r.Table)}, r.Delta, nil
 }
 
-func newMysqlDriver() *sql.Driver[config, tableConfig] {
+func NewDriver() *sql.Driver[config, tableConfig] {
 	return &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-mysql",
 		StartTunnel: func(ctx context.Context, cfg config) error {
@@ -916,6 +916,3 @@ func (d *transactor) Destroy() {
 	d.store.conn.Close()
 }
 
-func main() {
-	boilerplate.RunMain(newMysqlDriver())
-}

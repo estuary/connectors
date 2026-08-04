@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -291,7 +291,7 @@ func (c tableConfig) Parameters() ([]string, bool, error) {
 	return path, c.Delta, nil
 }
 
-func newPostgresDriver() *sql.Driver[config, tableConfig] {
+func NewDriver() *sql.Driver[config, tableConfig] {
 	return &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-postgresql",
 		StartTunnel: func(ctx context.Context, cfg config) error {
@@ -733,9 +733,6 @@ func (d *transactor) Destroy() {
 	d.store.conn.Close(context.Background())
 }
 
-func main() {
-	boilerplate.RunMain(newPostgresDriver())
-}
 
 // Send a single batch of queries with the given transaction, discarding any results. The batch is
 // zero'd upon completion.

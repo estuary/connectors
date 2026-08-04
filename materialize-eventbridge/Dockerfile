@@ -17,7 +17,7 @@ COPY materialize-eventbridge     ./materialize-eventbridge
 
 RUN go test -tags nozstd -short -v ./materialize-eventbridge/...
 
-RUN go build -tags nozstd -v -o ./connector ./materialize-eventbridge
+RUN go build -tags nozstd -v -o ./connector ./materialize-eventbridge/cmd/connector
 
 # Runtime Stage
 ################################################################################

@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 )
 
 func TestSpecification(t *testing.T) {
-	var resp, err = newDuckDriver().
+	var resp, err = NewDriver().
 		Spec(context.Background(), &pm.Request_Spec{})
 	require.NoError(t, err)
 

@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -50,22 +50,22 @@ func TestIntegration(t *testing.T) {
 	})
 
 	t.Run("materialize", func(t *testing.T) {
-		sql.RunMaterializationTest(t, newMysqlDriver(), "testdata/materialize.flow.yaml", makeResourceFn, nil)
+		sql.RunMaterializationTest(t, NewDriver(), "testdata/materialize.flow.yaml", makeResourceFn, nil)
 	})
 
 	t.Run("apply", func(t *testing.T) {
-		sql.RunApplyTest(t, newMysqlDriver(), "testdata/apply.flow.yaml", makeResourceFn)
+		sql.RunApplyTest(t, NewDriver(), "testdata/apply.flow.yaml", makeResourceFn)
 	})
 
 	t.Run("migrate", func(t *testing.T) {
-		sql.RunMigrationTest(t, newMysqlDriver(), "testdata/migrate.flow.yaml", makeResourceFn, nil)
+		sql.RunMigrationTest(t, NewDriver(), "testdata/migrate.flow.yaml", makeResourceFn, nil)
 	})
 
 	t.Run("fence", func(t *testing.T) {
 		var templates = renderTemplates(testDialect, "mysql")
 		sql.RunFencingTest(
 			t,
-			newMysqlDriver(),
+			NewDriver(),
 			"testdata/fence.flow.yaml",
 			makeResourceFn,
 			templates.createTargetTable,

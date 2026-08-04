@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"encoding/json"
@@ -80,7 +80,7 @@ func TestAcknowledge(t *testing.T) {
 }
 
 func TestSpecification(t *testing.T) {
-	resp, err := newClickHouseDriver().
+	resp, err := NewDriver().
 		Spec(t.Context(), &pm.Request_Spec{})
 	require.NoError(t, err)
 

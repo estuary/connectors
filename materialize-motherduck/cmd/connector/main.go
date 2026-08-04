@@ -2,8 +2,9 @@ package main
 
 import (
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
+	connector "github.com/estuary/connectors/materialize-motherduck"
 )
 
 func main() {
-	boilerplate.RunMain(driver{})
+	boilerplate.RunMain(connector.NewDriver())
 }

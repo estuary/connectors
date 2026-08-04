@@ -1,4 +1,4 @@
-package main
+package connector
 
 // Integration tests run against LocalStack EventBridge in docker compose.
 //
@@ -111,11 +111,11 @@ func TestIntegration(t *testing.T) {
 	}
 
 	t.Run("materialize", func(t *testing.T) {
-		bptest.RunMaterializationTestParallel(t, newMaterializationUnderTest, materializeSpec, makeResourceFn, nil)
+		bptest.RunMaterializationTestParallel(t, newMaterializerUnderTest, materializeSpec, makeResourceFn, nil)
 	})
 
 	t.Run("apply", func(t *testing.T) {
-		bptest.RunApplyTestParallel(t, &driver{}, newMaterializationUnderTest, applySpec, makeResourceFn)
+		bptest.RunApplyTestParallel(t, &driver{}, newMaterializerUnderTest, applySpec, makeResourceFn)
 	})
 }
 
@@ -144,8 +144,8 @@ type materializationUnderTest struct {
 
 var _ boilerplate.Materializer[config, fieldConfig, resource, mappedType] = &materializationUnderTest{}
 
-func newMaterializationUnderTest(ctx context.Context, name string, cfg config, flags map[string]bool) (boilerplate.Materializer[config, fieldConfig, resource, mappedType], error) {
-	base, err := newMaterialization(ctx, name, cfg, flags)
+func newMaterializerUnderTest(ctx context.Context, name string, cfg config, flags map[string]bool) (boilerplate.Materializer[config, fieldConfig, resource, mappedType], error) {
+	base, err := NewMaterializer(ctx, name, cfg, flags)
 	if err != nil {
 		return nil, err
 	}
