@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/binary"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -13,10 +14,12 @@ import (
 	"runtime/debug"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
 	"github.com/estuary/connectors/go/capture/blackbox"
 	"github.com/estuary/connectors/go/capture/sqlserver/tests"
+	mssqldb "github.com/microsoft/go-mssqldb"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
@@ -171,6 +174,51 @@ func (db *sqlserverTestDatabase) QuietExec(t testing.TB, query string) {
 	}
 }
 
+// sqlserverDeadlockVictim is the error number SQL Server reports to the session it kills
+// to break a deadlock. The victim's work is rolled back, so it just tries again.
+const sqlserverDeadlockVictim = 1205
+
+const (
+	maxDeadlockRetries = 10
+	deadlockRetryDelay = 250 * time.Millisecond
+)
+
+// isDeadlockError reports whether err is, or merely reports, SQL Server's deadlock-victim
+// error. The error number alone is not enough, because the stored procedures which
+// manipulate change tracking metadata catch a deadlock hit during their own work and
+// re-raise it under their own error number, quoting the original 1205 in the message.
+func isDeadlockError(err error) bool {
+	var mssqlErr mssqldb.Error
+	if errors.As(err, &mssqlErr) && mssqlErr.Number == sqlserverDeadlockVictim {
+		return true
+	}
+	return strings.Contains(err.Error(), "was deadlocked on lock resources")
+}
+
+// execWithDeadlockRetry executes a control query, retrying if this session is chosen as
+// the victim of a deadlock. Any other failure is fatal to the test.
+//
+// Retrying is safe even for statements which aren't idempotent, such as INSERT, because
+// being chosen as the deadlock victim rolls the statement back in its entirety.
+func (db *sqlserverTestDatabase) execWithDeadlockRetry(t testing.TB, query string) {
+	t.Helper()
+	for attempt := 1; ; attempt++ {
+		var _, err = db.conn.ExecContext(context.Background(), query)
+		if err == nil {
+			return
+		}
+		if !isDeadlockError(err) {
+			t.Fatalf("error executing control query %q: %v", query, err)
+		}
+		if attempt >= maxDeadlockRetries {
+			t.Fatalf("error executing control query %q: still deadlocking after %d attempts: %v", query, attempt, err)
+		}
+		// Back off proportionally to the attempt so that a pile-up of contending tests
+		// spreads out rather than retrying in lockstep.
+		time.Sleep(time.Duration(attempt) * deadlockRetryDelay)
+	}
+}
+
 // QueryRow executes a query and scans results into dest. Does not log to transcript.
 func (db *sqlserverTestDatabase) QueryRow(t testing.TB, query string, dest ...any) {
 	t.Helper()
@@ -188,11 +236,18 @@ func (db *sqlserverTestDatabase) CreateTable(t testing.TB, name, defs string) {
 	db.QuietExec(t, `IF OBJECT_ID('`+tableName+`', 'U') IS NOT NULL DROP TABLE `+tableName)
 	db.Exec(t, `CREATE TABLE `+tableName+` `+defs)
 
-	// Enable Change Tracking for the table
-	var ctQuery = fmt.Sprintf(`ALTER TABLE %s ENABLE CHANGE_TRACKING`, tableName)
-	db.QuietExec(t, ctQuery)
+	// Enable Change Tracking for the table. Guarded so that it stays idempotent under the
+	// deadlock retry, which can run after an attempt already took effect.
+	var ctQuery = fmt.Sprintf(
+		`IF NOT EXISTS (SELECT 1 FROM sys.change_tracking_tables WHERE object_id = OBJECT_ID('%s')) ALTER TABLE %s ENABLE CHANGE_TRACKING`,
+		tableName, tableName)
+	db.execWithDeadlockRetry(t, ctQuery)
 
-	t.Cleanup(func() { db.QuietExec(t, `IF OBJECT_ID('`+tableName+`', 'U') IS NOT NULL DROP TABLE `+tableName) })
+	// Dropping a change-tracked table implicitly disables change tracking for it, so this
+	// contends for the same metadata as enabling does.
+	t.Cleanup(func() {
+		db.execWithDeadlockRetry(t, `IF OBJECT_ID('`+tableName+`', 'U') IS NOT NULL DROP TABLE `+tableName)
+	})
 }
 
 // CreateTableWithoutCT creates a table without enabling Change Tracking, for tests that need manual control.
