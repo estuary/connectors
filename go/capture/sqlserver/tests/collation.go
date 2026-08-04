@@ -16,6 +16,7 @@ func TestCollation(t *testing.T, setup testSetupFunc) {
 }
 
 func testVarcharKeyDiscovery(t *testing.T, setup testSetupFunc) {
+	t.Parallel()
 	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(id VARCHAR(32) PRIMARY KEY, data TEXT)`)
 	tc.DiscoverFull("Discover Tables")
@@ -37,6 +38,7 @@ func testCollatedCapture(t *testing.T, setup testSetupFunc) {
 
 	for _, columnType := range []string{"Char", "VarChar", "NChar", "NVarChar"} {
 		t.Run(columnType, func(t *testing.T) {
+			t.Parallel()
 			var db, tc = setup(t)
 			db.CreateTable(t, `<NAME>`, fmt.Sprintf(`(id %s(32) COLLATE SQL_Latin1_General_CP1_CI_AS PRIMARY KEY, data TEXT)`, columnType))
 			require.NoError(t, tc.Capture.EditConfig("advanced.backfill_chunk_size", 1))
@@ -59,6 +61,7 @@ func testCollatedCapture(t *testing.T, setup testSetupFunc) {
 // TestCaptureWithCompoundTextAndIntegerKey verifies that a table with a
 // compound primary key which mixes text and integers still works.
 func testCaptureWithCompoundTextAndIntegerKey(t *testing.T, setup testSetupFunc) {
+	t.Parallel()
 	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(k1 VARCHAR(32), k2 INTEGER, k3 VARCHAR(8), k4 INTEGER, data TEXT, PRIMARY KEY (k1, k2, k3, k4))`)
 	require.NoError(t, tc.Capture.EditConfig("advanced.backfill_chunk_size", 1))

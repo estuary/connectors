@@ -93,6 +93,15 @@ var checkpointSanitizers = []blackbox.JSONSanitizer{
 	{Matcher: regexp.MustCompile(`"seqval":"[0-9A-Za-z+/=]+"`), Replacement: `"seqval":"REDACTED"`},
 }
 
+// blackboxTestSetup prepares an isolated capture for a test. Isolation comes from the
+// table names and discovery filter both deriving from the test's own name, so tests
+// neither collide on tables nor observe each other's, which is what lets a test declare
+// itself parallel by calling t.Parallel().
+//
+// The minority of tests which alter database-wide state, such as role membership or
+// server configuration, must not overlap with anything else and so omit that call. Go
+// defers every parallel test until the sequential ones have finished, so these get the
+// database to themselves.
 func blackboxTestSetup(t testing.TB) (*sqlserverTestDatabase, *blackbox.TranscriptCapture) {
 	t.Helper()
 
@@ -355,6 +364,7 @@ func uniqueTableID(t testing.TB, extra ...string) string {
 
 // TestSpec verifies the connector's spec output against a snapshot.
 func TestSpec(t *testing.T) {
+	t.Parallel()
 	var _, tc = blackboxTestSetup(t)
 	tc.Spec("Get Connector Spec")
 	cupaloy.SnapshotT(t, tc.Transcript.String())
