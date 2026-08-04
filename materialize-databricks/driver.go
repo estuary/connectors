@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"bytes"
@@ -68,8 +68,24 @@ func (c tableConfig) Parameters() ([]string, bool, error) {
 	return []string{c.Schema, tableSanitizerRegex.ReplaceAllString(c.Table, "_")}, c.Delta, nil
 }
 
-func newDatabricksDriver() *sql.Driver[config, tableConfig] {
+// NewDriver builds the Databricks materialization driver, and is the only entry
+// point into this package. The driver's operations assume an order of
+// initialization that it establishes itself — the endpoint configuration is
+// validated before a client is built, for instance — so callers are given the
+// assembled driver rather than its pieces.
+func NewDriver() *sql.Driver[config, tableConfig] {
 	useragent.WithProduct(productGlobalDescription.name, productGlobalDescription.version)
+
+	// The Databricks SQL driver logs copiously at INFO, which is noise in the
+	// connector's own logs. Both settings it needs are package-level globals of
+	// the SDK, so this is done here to apply to every user of the driver rather
+	// than only when running as a connector.
+	if log.GetLevel() != log.DebugLevel {
+		logger.DefaultLogger = &NoOpLogger{}
+		if err := dbsqllog.SetLogLevel("disabled"); err != nil {
+			panic(err)
+		}
+	}
 
 	return &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-databricks",
@@ -851,16 +867,4 @@ func pathsWithRoot(root string, paths []string) []string {
 }
 
 func (d *transactor) Destroy() {
-}
-
-func main() {
-	// Disable databricks driver logging on INFO level, it can be quite noisy and confusing
-	if log.GetLevel() != log.DebugLevel {
-		logger.DefaultLogger = &NoOpLogger{}
-		if err := dbsqllog.SetLogLevel("disabled"); err != nil {
-			panic(err)
-		}
-	}
-
-	boilerplate.RunMain(newDatabricksDriver())
 }
