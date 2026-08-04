@@ -65,10 +65,6 @@ func blackboxTestSetup(t testing.TB) (*sqlserverTestDatabase, *blackbox.Transcri
 		return nil, nil
 	}
 
-	// TODO(wgd): Probably scoping this to just flowctl invocations would be cleaner, but this works
-	os.Setenv("SHUTDOWN_AFTER_POLLING", "yes")
-	t.Cleanup(func() { os.Unsetenv("SHUTDOWN_AFTER_POLLING") })
-
 	// Setup: Unique filter ID and full table name
 	var uniqueID = uniqueTableID(t)
 	var baseName = strings.TrimPrefix(t.Name(), "Test") + "_" + uniqueID
@@ -82,6 +78,7 @@ func blackboxTestSetup(t testing.TB) (*sqlserverTestDatabase, *blackbox.Transcri
 	require.NoError(t, err)
 	tc.Capture.Logger = t.Log
 	tc.Capture.DiscoveryFilter = regexp.MustCompile(uniqueID)
+	tc.Capture.Env["SHUTDOWN_AFTER_POLLING"] = "yes"
 	tc.DocumentSanitizers = documentSanitizers
 	tc.CheckpointSanitizers = checkpointSanitizers
 
