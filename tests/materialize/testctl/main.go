@@ -91,6 +91,7 @@ func main() {
 		mode      = flag.String("mode", "", "snapshot the resource's rows, drop the resource, or sweep away what earlier test runs left behind")
 		taskName  = flag.String("task", "materialize-testctl", "materialization name to connect as, which only labels the connection")
 		logLevel  = flag.String("log-level", "info", "logging verbosity; debug reports the items a sweep left in place")
+		dryRun    = flag.Bool("dry-run", false, "for sweep, report what would be removed without removing it")
 	)
 	flag.Parse()
 
@@ -105,12 +106,12 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()
 
-	if err := run(ctx, *connector, *config, *resource, *mode, *taskName); err != nil {
+	if err := run(ctx, *connector, *config, *resource, *mode, *taskName, *dryRun); err != nil {
 		log.WithFields(log.Fields{"mode": *mode, "error": err}).Fatal("materialize-testctl failed")
 	}
 }
 
-func run(ctx context.Context, connector, configPath, resourcePath, mode, taskName string) error {
+func run(ctx context.Context, connector, configPath, resourcePath, mode, taskName string, dryRun bool) error {
 	openConnector, ok := connectors[connector]
 	if !ok {
 		return fmt.Errorf("unknown connector %q: expected one of %s", connector, strings.Join(slices.Sorted(maps.Keys(connectors)), ", "))
@@ -151,7 +152,7 @@ func run(ctx context.Context, connector, configPath, resourcePath, mode, taskNam
 		log.WithField("action", description).Info("dropped the resource")
 		return nil
 	default:
-		return sweep(ctx, m, path)
+		return sweep(ctx, m, path, dryRun)
 	}
 }
 
@@ -163,9 +164,9 @@ func run(ctx context.Context, connector, configPath, resourcePath, mode, taskNam
 // what is actually present, which is the point of sweeping rather than dropping
 // by name. An empty run suffix says this program has no resources of its own to
 // clean up, so only leftovers are considered.
-func sweep(ctx context.Context, m materializer, path []string) error {
-	resources, resourcesErr := testutil.SweepTestResources(ctx, m, [][]string{path}, "")
-	tasks, tasksErr := testutil.SweepTestTasks(ctx, m, "")
+func sweep(ctx context.Context, m materializer, path []string, dryRun bool) error {
+	resources, resourcesErr := testutil.SweepTestResources(ctx, m, [][]string{path}, "", dryRun)
+	tasks, tasksErr := testutil.SweepTestTasks(ctx, m, "", dryRun)
 
 	var errs = []error{resourcesErr, tasksErr}
 	for _, swept := range []struct {
@@ -179,6 +180,8 @@ func sweep(ctx context.Context, m materializer, path []string) error {
 				errs = append(errs, fmt.Errorf("sweeping %s %s: %w", kind, o.Item, o.Err))
 			} else if o.Swept {
 				entry.Info("swept")
+			} else if o.Selected {
+				entry.Info("would sweep")
 			} else {
 				entry.Debug("left in place")
 			}

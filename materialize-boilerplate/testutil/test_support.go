@@ -1108,7 +1108,7 @@ func cleanupTestTasks[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfi
 ) {
 	t.Helper()
 
-	outcomes, err := SweepTestTasks(ctx, m, tsSuffix)
+	outcomes, err := SweepTestTasks(ctx, m, tsSuffix, false)
 	require.NoError(t, err)
 	logSweep(t, "task", outcomes)
 }
@@ -1122,7 +1122,7 @@ func CleanupTestResources[EC boilerplate.EndpointConfiger, FC boilerplate.FieldC
 ) {
 	t.Helper()
 
-	outcomes, err := SweepTestResources(ctx, m, paths, tsSuffix)
+	outcomes, err := SweepTestResources(ctx, m, paths, tsSuffix, false)
 	require.NoError(t, err)
 	logSweep(t, "resource", outcomes)
 }
@@ -1153,10 +1153,10 @@ func shouldCleanup(now time.Time, item string, suffix string) (bool, string) {
 	}
 	if !strings.Contains(item, testItemIdentifier) {
 		return false, "not created for testing"
+		// A caller with no run of its own passes an empty suffix, which must not
+		// match here: it would otherwise claim every test item, including those
+		// a concurrent run is still using.
 	} else if suffix != "" && strings.HasSuffix(item, suffix) {
-		// An empty suffix must not match here: a caller with no run of its own
-		// passes one, and would otherwise sweep away every test item including
-		// those a concurrent run is still using.
 		return true, "created by this test run"
 	} else if parts := strings.Split(item, "_"); len(parts) < 2 {
 		return false, "malformed test item name"

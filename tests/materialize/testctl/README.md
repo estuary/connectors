@@ -44,12 +44,22 @@ accepts is one the connector accepts.
 - `drop` removes the resource named by `-resource`.
 - `sweep` removes every test resource in that resource's namespace, and the task
   metadata of test materializations, that an earlier run left behind. Anything
-  recent enough that a run still in flight could be using it is left alone.
+  recent enough that a run still in flight could be using it is left alone. Pass
+  `-dry-run` to see what it would remove, and `-log-level debug` to also see what
+  it would leave and why.
 
 `sweep` is the mode worth reaching for after a suite has been developed against a
 shared warehouse for a while. Dropping by name can only remove resources the
 caller knows it created, so the leftovers of runs that crashed or were cancelled
 accumulate; sweeping enumerates what is actually present.
+
+A resource is recognised as a test resource by its name: sweeping selects those
+containing `_flow_test_` followed by the run's unix timestamp, which is the
+convention this repository's integration tests follow. The timestamp is what
+allows a sweep to leave a concurrent run's resources alone, so a harness that
+wants to be cleaned up after should name its resources the same way —
+`<name>_flow_test_<unix>`. Resources named any other way are enumerated but
+never touched.
 
 ## Supported connectors
 
