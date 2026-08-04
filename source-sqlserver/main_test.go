@@ -93,7 +93,23 @@ var checkpointSanitizers = []blackbox.JSONSanitizer{
 	{Matcher: regexp.MustCompile(`"seqval":"[0-9A-Za-z+/=]+"`), Replacement: `"seqval":"REDACTED"`},
 }
 
+// blackboxTestSetup prepares an isolated capture for a test and marks that test as safe
+// to run concurrently with others. Isolation comes from the table names and discovery
+// filter both deriving from the test's own name, so tests neither collide on tables nor
+// observe each other's.
 func blackboxTestSetup(t testing.TB) (*sqlserverTestDatabase, *blackbox.TranscriptCapture) {
+	t.Helper()
+	if tp, ok := t.(*testing.T); ok {
+		tp.Parallel()
+	}
+	return blackboxTestSetupSerial(t)
+}
+
+// blackboxTestSetupSerial is for the minority of tests which alter database-wide state,
+// such as role membership or server configuration, and so must not overlap with anything
+// else. Go defers every parallel test until the sequential ones have finished, so these
+// get the database to themselves.
+func blackboxTestSetupSerial(t testing.TB) (*sqlserverTestDatabase, *blackbox.TranscriptCapture) {
 	t.Helper()
 
 	if os.Getenv("TEST_DATABASE") != "yes" {
