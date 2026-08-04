@@ -154,9 +154,13 @@ func OpenResource[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger,
 // SweepOutcome is what a sweep did, or declined to do, with one test resource or
 // task.
 type SweepOutcome struct {
-	Item   string
-	Swept  bool
-	Reason string
+	Item string
+	// Selected is whether the item was matched for removal, and Reason says why
+	// it was or was not. A dry run selects without removing, so Selected is set
+	// where Swept is not.
+	Selected bool
+	Swept    bool
+	Reason   string
 	// Err is set if the item was selected for removal but removing it failed.
 	// A sweep continues past a failure, so that one unremovable item does not
 	// strand everything after it.
@@ -175,7 +179,9 @@ type SweepOutcome struct {
 //
 // tsSuffix identifies the caller's own run, whose resources are removed
 // regardless of age; pass an empty string when the caller has no run of its own
-// and only leftovers should go.
+// and only leftovers should go. A dry run reports what it would remove without
+// removing anything, which is worth offering to whoever points this at a
+// warehouse they share with other people.
 //
 // The returned error reports a failure to enumerate; per-item failures are
 // carried in the outcomes.
@@ -184,6 +190,7 @@ func SweepTestResources(
 	m ResourceSweeper,
 	paths [][]string,
 	tsSuffix string,
+	dryRun bool,
 ) ([]SweepOutcome, error) {
 	is := boilerplate.InitInfoSchema(m.Config())
 	if err := m.PopulateInfoSchema(ctx, is, paths); err != nil {
@@ -194,9 +201,9 @@ func SweepTestResources(
 	var outcomes []SweepOutcome
 	for _, r := range is.Resources() {
 		location := r.Location()
-		cleanup, reason := shouldCleanup(now, location[len(location)-1], tsSuffix)
-		outcome := SweepOutcome{Item: strings.Join(location, "."), Reason: reason}
-		if cleanup {
+		selected, reason := shouldCleanup(now, location[len(location)-1], tsSuffix)
+		outcome := SweepOutcome{Item: strings.Join(location, "."), Selected: selected, Reason: reason}
+		if selected && !dryRun {
 			if _, err := DropResource(ctx, m, location); err != nil {
 				outcome.Err = err
 			} else {
@@ -211,8 +218,8 @@ func SweepTestResources(
 
 // SweepTestTasks removes the task metadata left behind by integration tests,
 // selecting tasks on the same basis as SweepTestResources selects resources,
-// tsSuffix included.
-func SweepTestTasks(ctx context.Context, m TestTaskCleaner, tsSuffix string) ([]SweepOutcome, error) {
+// tsSuffix and dryRun included.
+func SweepTestTasks(ctx context.Context, m TestTaskCleaner, tsSuffix string, dryRun bool) ([]SweepOutcome, error) {
 	tasks, err := m.ListTestTasks(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("listing test tasks: %w", err)
@@ -221,9 +228,9 @@ func SweepTestTasks(ctx context.Context, m TestTaskCleaner, tsSuffix string) ([]
 	now := time.Now()
 	var outcomes []SweepOutcome
 	for _, task := range tasks {
-		cleanup, reason := shouldCleanup(now, task, tsSuffix)
-		outcome := SweepOutcome{Item: task, Reason: reason}
-		if cleanup {
+		selected, reason := shouldCleanup(now, task, tsSuffix)
+		outcome := SweepOutcome{Item: task, Selected: selected, Reason: reason}
+		if selected && !dryRun {
 			if err := m.CleanupTestTask(ctx, task); err != nil {
 				outcome.Err = err
 			} else {
