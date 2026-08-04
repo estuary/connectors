@@ -94,7 +94,7 @@ func NewSQLiteDriver() *sql.Driver[config, tableConfig] {
 				ConcurrentApply:     false,
 			}, nil
 		},
-		PreReqs: func(context.Context, config) *cerrors.PrereqErr { return &cerrors.PrereqErr{} },
+		PreReqs: func(context.Context, config, map[string]bool) *cerrors.PrereqErr { return &cerrors.PrereqErr{} },
 	}
 }
 

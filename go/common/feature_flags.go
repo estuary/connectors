@@ -16,8 +16,10 @@ const CreatedAtLayout = "2006-01-02"
 // about fails the RPC rather than silently resolving flags from a value nobody
 // understood.
 //
-// The zero value means the task is brand new: the control plane stamps no date
-// during a task's first build, because its creation is not yet committed.
+// The zero value means the task is brand new. That happens in one place: the
+// Validate of a task which has not been published yet, so there is no previous
+// spec to carry a date. Publishing creates the task, so its first Apply and Open
+// — and every RPC after — carry one.
 type CreatedAt struct {
 	date string
 }
@@ -63,9 +65,9 @@ var FlagDisabled = FlagDefault{value: false}
 // FlagEnabledForTasksCreatedAfter is a flag that defaults to true for tasks
 // created on or after the given cutoff date, and false for tasks created before
 // it. Use it to introduce a behavior change that must not disturb existing tasks:
-// set the cutoff to the date the flag is released, so every task in existence at
-// that point keeps the old behavior for the rest of its life while new tasks get
-// the new one.
+// set the cutoff to the day after the pull request merges, so every task in
+// existence at that point keeps the old behavior for the rest of its life while
+// new tasks get the new one.
 //
 // The cutoff may be in the future, but keep it close to the release: tasks
 // created between the release and the cutoff get the old behavior at first and
