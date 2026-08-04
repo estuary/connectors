@@ -90,7 +90,36 @@ var checkpointSanitizers = []blackbox.JSONSanitizer{
 	{Matcher: regexp.MustCompile(`"cursor":{[^}]*}`), Replacement: `"cursor":"REDACTED"`},
 }
 
+// serialTests names tests which must not run concurrently with any other. They live here
+// rather than calling blackboxTestSetupSerial directly because their bodies are in the
+// suite shared with source-sqlserver, where the same test is safe to parallelize.
+//
+// DroppedAndRecreatedTable asserts that a recreated table's change tracking history is
+// still readable. Whether it is depends on the table's CHANGE_TRACKING_MIN_VALID_VERSION
+// relative to the capture's saved cursor, and because change tracking versions are
+// database-wide, any concurrent writer advances that version past the saved cursor and the
+// recreated table always reads as expired instead.
+var serialTests = map[string]bool{
+	"TestCapture/DroppedAndRecreatedTable": true,
+}
+
+// blackboxTestSetup prepares an isolated capture for a test and, unless the test is listed
+// in serialTests, marks it as safe to run concurrently with others. Isolation comes from
+// the table names and discovery filter both deriving from the test's own name, so tests
+// neither collide on tables nor observe each other's.
 func blackboxTestSetup(t testing.TB) (*sqlserverTestDatabase, *blackbox.TranscriptCapture) {
+	t.Helper()
+	if tp, ok := t.(*testing.T); ok && !serialTests[t.Name()] {
+		tp.Parallel()
+	}
+	return blackboxTestSetupSerial(t)
+}
+
+// blackboxTestSetupSerial is for the minority of tests which alter database-wide state,
+// such as role membership or server configuration, and so must not overlap with anything
+// else. Go defers every parallel test until the sequential ones have finished, so these
+// get the database to themselves.
+func blackboxTestSetupSerial(t testing.TB) (*sqlserverTestDatabase, *blackbox.TranscriptCapture) {
 	t.Helper()
 
 	if os.Getenv("TEST_DATABASE") != "yes" {
