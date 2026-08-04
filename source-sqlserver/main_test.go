@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/binary"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -18,6 +19,7 @@ import (
 	"github.com/bradleyjkemp/cupaloy"
 	"github.com/estuary/connectors/go/capture/blackbox"
 	"github.com/estuary/connectors/go/capture/sqlserver/tests"
+	mssqldb "github.com/microsoft/go-mssqldb"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
@@ -174,6 +176,109 @@ func (db *sqlserverTestDatabase) QuietExec(t testing.TB, query string) {
 	}
 }
 
+// sqlserverDeadlockVictim is the error number SQL Server reports to the session it kills
+// to break a deadlock. The victim's work is rolled back, so it just tries again.
+const sqlserverDeadlockVictim = 1205
+
+const (
+	maxDeadlockRetries = 10
+	deadlockRetryDelay = 250 * time.Millisecond
+)
+
+// isDeadlockError reports whether err is, or merely reports, SQL Server's deadlock-victim
+// error. The error number alone is not enough: sp_cdc_enable_table catches a deadlock hit
+// during its own work and re-raises it as error 22834, quoting the original 1205 only in
+// the message text.
+func isDeadlockError(err error) bool {
+	var mssqlErr mssqldb.Error
+	if errors.As(err, &mssqlErr) && mssqlErr.Number == sqlserverDeadlockVictim {
+		return true
+	}
+	return strings.Contains(err.Error(), "was deadlocked on lock resources")
+}
+
+// execWithDeadlockRetry executes a control query, retrying if this session is chosen as
+// the victim of a deadlock. Any other failure is fatal to the test.
+//
+// Retrying is safe even for statements which aren't idempotent, such as INSERT, because
+// being chosen as the deadlock victim rolls the statement back in its entirety. The
+// exception is a stored procedure which catches the deadlock internally and returns its own
+// error after leaving work behind, which is why enableCDC needs its own retry.
+func (db *sqlserverTestDatabase) execWithDeadlockRetry(t testing.TB, query string) {
+	t.Helper()
+	for attempt := 1; ; attempt++ {
+		var _, err = db.conn.ExecContext(context.Background(), query)
+		if err == nil {
+			return
+		}
+		if !isDeadlockError(err) {
+			t.Fatalf("error executing control query %q: %v", query, err)
+		}
+		if attempt >= maxDeadlockRetries {
+			t.Fatalf("error executing control query %q: still deadlocking after %d attempts: %v", query, attempt, err)
+		}
+		// Back off proportionally to the attempt so that a pile-up of contending tests
+		// spreads out rather than retrying in lockstep.
+		time.Sleep(time.Duration(attempt) * deadlockRetryDelay)
+	}
+}
+
+// sqlserverCaptureInstanceExists is reported when sp_cdc_enable_table is asked to create a
+// capture instance which already exists. That is the state a partially-failed earlier
+// attempt leaves behind: the capture instance gets created but the table is not marked as
+// tracked, so the operation half-happened.
+const sqlserverCaptureInstanceExists = 22926
+
+func isCaptureInstanceExistsError(err error) bool {
+	var mssqlErr mssqldb.Error
+	if errors.As(err, &mssqlErr) && mssqlErr.Number == sqlserverCaptureInstanceExists {
+		return true
+	}
+	return strings.Contains(err.Error(), "already exists in the current database")
+}
+
+// enableCDC turns on CDC for a table. Enabling CDC, and dropping a table which has it
+// enabled, both take locks on the shared CDC metadata tables, so tests doing either
+// concurrently can deadlock.
+//
+// This needs its own retry rather than execWithDeadlockRetry because sp_cdc_enable_table
+// is not idempotent, so each retry has to clear the partial state a failed attempt leaves
+// behind before trying again.
+func (db *sqlserverTestDatabase) enableCDC(t testing.TB, schema, name string) {
+	t.Helper()
+	var enable = fmt.Sprintf(`EXEC sys.sp_cdc_enable_table @source_schema = '%s', @source_name = '%s', @role_name = '%s'`,
+		schema, name, *dbCaptureUser)
+	for attempt := 1; ; attempt++ {
+		var _, err = db.conn.ExecContext(context.Background(), enable)
+		if err == nil {
+			return
+		}
+		if !isDeadlockError(err) && !isCaptureInstanceExistsError(err) {
+			t.Fatalf("error enabling CDC for %s.%s: %v", schema, name, err)
+		}
+		if attempt >= maxDeadlockRetries {
+			t.Fatalf("error enabling CDC for %s.%s: giving up after %d attempts: %v", schema, name, attempt, err)
+		}
+		time.Sleep(time.Duration(attempt) * deadlockRetryDelay)
+		db.dropCaptureInstances(t, schema, name)
+	}
+}
+
+// dropCaptureInstances removes any capture instances for a table, tolerating there being
+// none. This clears the leftovers of a partially-failed sp_cdc_enable_table so that the
+// next attempt starts from a clean slate.
+func (db *sqlserverTestDatabase) dropCaptureInstances(t testing.TB, schema, name string) {
+	t.Helper()
+	var query = fmt.Sprintf(`IF EXISTS (SELECT 1 FROM cdc.change_tables WHERE source_object_id = OBJECT_ID('%s.%s')) `+
+		`EXEC sys.sp_cdc_disable_table @source_schema = '%s', @source_name = '%s', @capture_instance = 'all'`,
+		schema, name, schema, name)
+	if _, err := db.conn.ExecContext(context.Background(), query); err != nil {
+		// Not fatal: the following enable attempt will report the real problem if this
+		// left the table in a state it can't recover from.
+		t.Logf("error clearing capture instances for %s.%s before retry: %v", schema, name, err)
+	}
+}
+
 // QueryRow executes a query and scans results into dest. Does not log to transcript.
 func (db *sqlserverTestDatabase) QueryRow(t testing.TB, query string, dest ...any) {
 	t.Helper()
@@ -200,12 +305,13 @@ func (db *sqlserverTestDatabase) CreateTable(t testing.TB, name, defs string) {
 	db.Exec(t, `CREATE TABLE `+tableName+` `+defs)
 
 	// Enable CDC for the table
-	time.Sleep(1 * time.Second) // Sleep to make deadlocks less likely
-	var cdcQuery = fmt.Sprintf(`EXEC sys.sp_cdc_enable_table @source_schema = '%s', @source_name = '%s', @role_name = '%s'`,
-		schema, shortName, *dbCaptureUser)
-	db.QuietExec(t, cdcQuery)
+	db.enableCDC(t, schema, shortName)
 
-	t.Cleanup(func() { db.QuietExec(t, `IF OBJECT_ID('`+tableName+`', 'U') IS NOT NULL DROP TABLE `+tableName) })
+	// Dropping a CDC-enabled table implicitly disables CDC for it, so this contends for
+	// the same metadata as enabling does.
+	t.Cleanup(func() {
+		db.execWithDeadlockRetry(t, `IF OBJECT_ID('`+tableName+`', 'U') IS NOT NULL DROP TABLE `+tableName)
+	})
 }
 
 // CreateTableWithoutCDC creates a table without enabling CDC, for tests that need manual control.
