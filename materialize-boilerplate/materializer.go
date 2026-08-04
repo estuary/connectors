@@ -1112,12 +1112,23 @@ func (c *constrainterAdapter[EC, FC, RC, MT]) DescriptionForType(p *pf.Projectio
 	return mt.String(), nil
 }
 
-// ParseFlags resolves feature flags without a task spec to take the creation
-// date from, and so resolves date-gated flags as for a brand-new task. It is
-// intended for call sites outside the Validate/Apply/Open RPCs, such as
-// prerequisite checks and tests.
-func ParseFlags(cfg EndpointConfiger) map[string]bool {
-	return resolveFlags(cfg, common.CreatedAt{})
+// ResolveFlags returns the feature flags of the task described by spec, for
+// connectors which implement the materialization RPCs themselves rather than
+// through RunValidate, RunApply and RunNewTransactor.
+//
+// The spec is required: a date-gated default can only be resolved against the
+// creation date the runtime stamped onto it, and resolving one without a spec
+// would silently hand the task whichever behavior a brand-new task gets. Take it
+// from `req.LastMaterialization` in Validate, and from `req.Materialization` in
+// Apply and Open. Anywhere further from the RPC boundary, thread down the flags
+// resolved there instead of re-resolving them.
+func ResolveFlags[EC EndpointConfiger](cfg EC, spec *pf.MaterializationSpec) (map[string]bool, error) {
+	createdAt, err := specCreatedAt(spec)
+	if err != nil {
+		return nil, err
+	}
+
+	return resolveFlags(cfg, createdAt), nil
 }
 
 // resolveFlags resolves the feature flags of a task created on createdAt. Since
