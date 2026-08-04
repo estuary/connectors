@@ -67,15 +67,15 @@ func (d *Driver[EC, RC]) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Re
 }
 
 func (d *Driver[EC, RC]) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
-	return boilerplate.RunValidate(ctx, req, d.newMaterialization)
+	return boilerplate.RunValidate(ctx, req, d.NewMaterializer)
 }
 
 func (d *Driver[EC, RC]) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
-	return boilerplate.RunApply(ctx, req, d.newMaterialization)
+	return boilerplate.RunApply(ctx, req, d.NewMaterializer)
 }
 
 func (d *Driver[EC, RC]) NewTransactor(ctx context.Context, req pm.Request_Open, be *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
-	return boilerplate.RunNewTransactor(ctx, req, be, d.newMaterialization)
+	return boilerplate.RunNewTransactor(ctx, req, be, d.NewMaterializer)
 }
 
 type sqlMaterialization[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]] struct {
@@ -86,7 +86,13 @@ type sqlMaterialization[EC boilerplate.EndpointConfiger, RC boilerplate.Resource
 	client              Client
 }
 
-func (d *Driver[EC, RC]) newMaterialization(ctx context.Context, materializationName string, cfg EC, featureFlags map[string]bool) (boilerplate.Materializer[EC, FieldConfig, RC, MappedType], error) {
+// NewMaterializer connects to the endpoint and returns a Materializer for it. It
+// is exported so that a caller outside of the connector — an integration test, or
+// a test harness importing the connector's package — can reach the Materializer
+// without reproducing the order this establishes: a network tunnel is started
+// before anything connects through it, and the endpoint is built before the
+// client that talks to it.
+func (d *Driver[EC, RC]) NewMaterializer(ctx context.Context, materializationName string, cfg EC, featureFlags map[string]bool) (boilerplate.Materializer[EC, FieldConfig, RC, MappedType], error) {
 	if err := d.StartTunnel(ctx, cfg); err != nil {
 		return nil, fmt.Errorf("starting network tunnel: %w", err)
 	}

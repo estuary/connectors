@@ -43,7 +43,7 @@ func RunMaterializationTest[EC boilerplate.EndpointConfiger, RC boilerplate.Reso
 	actionDescSanitizers []func(string) string,
 	v2 ...RuntimeV2Config,
 ) {
-	testutil.RunMaterializationTest(t, driver.newMaterialization, source, makeResourceFn, actionDescSanitizers, v2...)
+	testutil.RunMaterializationTest(t, driver.NewMaterializer, source, makeResourceFn, actionDescSanitizers, v2...)
 }
 
 func RunApplyTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](
@@ -52,7 +52,7 @@ func RunApplyTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, 
 	sourcePath string,
 	makeResourceFn func(string, bool) RC,
 ) {
-	testutil.RunApplyTest(t, driver, driver.newMaterialization, sourcePath, makeResourceFn)
+	testutil.RunApplyTest(t, driver, driver.NewMaterializer, sourcePath, makeResourceFn)
 }
 
 // RunApplyDrainTest verifies the two-iteration Apply drain of a post-commit
@@ -65,7 +65,7 @@ func RunApplyDrainTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer
 	seedPending func(t *testing.T, appliedSpec *pf.MaterializationSpec) json.RawMessage,
 	verifyDrained func(t *testing.T, appliedSpec *pf.MaterializationSpec, colNames []string, rows [][]any),
 ) {
-	testutil.RunApplyDrainTest(t, driver, driver.newMaterialization, cfg, res, seedPending, verifyDrained)
+	testutil.RunApplyDrainTest(t, driver, driver.NewMaterializer, cfg, res, seedPending, verifyDrained)
 }
 
 // DrainSeedInsertQuery builds an INSERT statement adding a single row to the
@@ -86,7 +86,7 @@ func DrainSeedInsertQuery[EC boilerplate.EndpointConfiger, RC boilerplate.Resour
 	t.Helper()
 	ctx := context.Background()
 
-	m, err := driver.newMaterialization(ctx, "apply-drain-seed", cfg, boilerplate.ParseFlags(cfg))
+	m, err := driver.NewMaterializer(ctx, "apply-drain-seed", cfg, boilerplate.ParseFlags(cfg))
 	require.NoError(t, err)
 	defer m.Close(ctx)
 	s, ok := m.(*sqlMaterialization[EC, RC])
@@ -138,7 +138,7 @@ func RunMigrationTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[
 	makeResourceFn func(string, bool) RC,
 	actionDescSanitizers []func(string) string,
 ) {
-	testutil.RunMigrationTest(t, driver.newMaterialization, sourcePath, makeResourceFn, actionDescSanitizers)
+	testutil.RunMigrationTest(t, driver.NewMaterializer, sourcePath, makeResourceFn, actionDescSanitizers)
 }
 
 // FeatureFlagMigrationPhase is one apply of a RunFeatureFlagMigrationTest.
@@ -156,7 +156,7 @@ func RunFeatureFlagMigrationTest[EC boilerplate.EndpointConfiger, RC boilerplate
 	phases []FeatureFlagMigrationPhase,
 	actionDescSanitizers []func(string) string,
 ) {
-	testutil.RunFeatureFlagMigrationTest(t, driver.newMaterialization, sourcePath, makeResourceFn, phases, actionDescSanitizers)
+	testutil.RunFeatureFlagMigrationTest(t, driver.NewMaterializer, sourcePath, makeResourceFn, phases, actionDescSanitizers)
 }
 
 // RunFencingTest is a generalized form of test cases over fencing behavior,
@@ -169,29 +169,6 @@ func RunFencingTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC
 	createTableTpl *template.Template,
 	updateFence func(context.Context, Client, Fence) error,
 ) {
-	dumpTable := func(
-		ctx context.Context,
-		m boilerplate.Materializer[EC, FieldConfig, RC, MappedType],
-		path []string,
-	) (string, error) {
-		columnNames, rows, err := m.SnapshotTestResource(ctx, path)
-		if err != nil {
-			return "", err
-		}
-
-		var out strings.Builder
-		enc := json.NewEncoder(&out)
-		for _, r := range rows {
-			doc := make(map[string]any, len(columnNames))
-			for i, col := range columnNames {
-				doc[col] = r[i]
-			}
-			require.NoError(t, enc.Encode(doc))
-		}
-
-		return out.String(), nil
-	}
-
 	// runTest takes zero or more key range fixtures, followed by a final pair
 	// which is the key range under test.
 	var runTest = func(t *testing.T, taskName string, cfg EC, ranges ...uint32) {
@@ -207,7 +184,7 @@ func RunFencingTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC
 		ep, err := driver.NewEndpoint(ctx, cfg, parsedFlags)
 		require.NoError(t, err)
 
-		m, err := driver.newMaterialization(ctx, taskName, cfg, parsedFlags)
+		m, err := driver.NewMaterializer(ctx, taskName, cfg, parsedFlags)
 		require.NoError(t, err)
 
 		dialect := ep.Dialect
@@ -258,7 +235,7 @@ func RunFencingTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC
 		})
 		require.NoError(t, err)
 
-		dump1, err := dumpTable(ctx, m, checkpointsPath)
+		dump1, err := testutil.SnapshotResource(ctx, m, checkpointsPath)
 		require.NoError(t, err)
 
 		// Install the fence under test
@@ -272,14 +249,14 @@ func RunFencingTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC
 		})
 		require.NoError(t, err)
 
-		dump2, err := dumpTable(ctx, m, checkpointsPath)
+		dump2, err := testutil.SnapshotResource(ctx, m, checkpointsPath)
 		require.NoError(t, err)
 
 		// Update it once.
 		fence.Checkpoint = append(fence.Checkpoint, []byte{0, 0, 0, 0, 0, 0, 0, 0}...)
 		require.NoError(t, updateFence(ctx, client, fence))
 
-		dump3, err := dumpTable(ctx, m, checkpointsPath)
+		dump3, err := testutil.SnapshotResource(ctx, m, checkpointsPath)
 		require.NoError(t, err)
 
 		snapshotter := cupaloy.New(cupaloy.SnapshotSubdirectory(snapshotPath))
