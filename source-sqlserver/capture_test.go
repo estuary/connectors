@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -48,7 +47,7 @@ func TestCaptureInstanceCleanup(t *testing.T) {
 			tc.Run("Initial Backfill", -1)
 
 			// For the ongoing capture, we need to disable SHUTDOWN_AFTER_POLLING
-			os.Unsetenv("SHUTDOWN_AFTER_POLLING")
+			delete(tc.Capture.Env, "SHUTDOWN_AFTER_POLLING")
 
 			// Launch the ongoing capture in a background goroutine
 			var captureCtx, cancelCapture = context.WithCancel(context.Background())
