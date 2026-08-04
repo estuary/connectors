@@ -31,6 +31,7 @@ func TestDatatypes(t *testing.T, setup testSetupFunc) {
 
 // TestIntegerTypes exercises integer column types.
 func testIntegerTypes(t *testing.T, setup testSetupFunc) {
+	t.Parallel()
 	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(
 		id INTEGER PRIMARY KEY,
@@ -55,6 +56,7 @@ func testIntegerTypes(t *testing.T, setup testSetupFunc) {
 
 // TestDecimalTypes exercises decimal and money column types.
 func testDecimalTypes(t *testing.T, setup testSetupFunc) {
+	t.Parallel()
 	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(
 		id INTEGER PRIMARY KEY,
@@ -79,6 +81,7 @@ func testDecimalTypes(t *testing.T, setup testSetupFunc) {
 
 // TestFloatingPointTypes exercises float and real column types.
 func testFloatingPointTypes(t *testing.T, setup testSetupFunc) {
+	t.Parallel()
 	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(
 		id INTEGER PRIMARY KEY,
@@ -102,6 +105,7 @@ func testFloatingPointTypes(t *testing.T, setup testSetupFunc) {
 
 // TestBooleanTypes exercises the bit column type.
 func testBooleanTypes(t *testing.T, setup testSetupFunc) {
+	t.Parallel()
 	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(
 		id INTEGER PRIMARY KEY,
@@ -123,6 +127,7 @@ func testBooleanTypes(t *testing.T, setup testSetupFunc) {
 
 // TestStringTypes exercises character and text column types.
 func testStringTypes(t *testing.T, setup testSetupFunc) {
+	t.Parallel()
 	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(
 		id INTEGER PRIMARY KEY,
@@ -149,6 +154,7 @@ func testStringTypes(t *testing.T, setup testSetupFunc) {
 
 // TestBinaryTypes exercises binary column types.
 func testBinaryTypes(t *testing.T, setup testSetupFunc) {
+	t.Parallel()
 	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(
 		id INTEGER PRIMARY KEY,
@@ -171,6 +177,7 @@ func testBinaryTypes(t *testing.T, setup testSetupFunc) {
 
 // TestTemporalTypes exercises date and time column types.
 func testTemporalTypes(t *testing.T, setup testSetupFunc) {
+	t.Parallel()
 	var db, tc = setup(t)
 	// Set timezone to America/Chicago to match the old test behavior
 	require.NoError(t, tc.Capture.EditConfig("timezone", "America/Chicago"))
@@ -199,6 +206,7 @@ func testTemporalTypes(t *testing.T, setup testSetupFunc) {
 
 // TestMiscTypes exercises uniqueidentifier, xml, and hierarchyid column types.
 func testMiscTypes(t *testing.T, setup testSetupFunc) {
+	t.Parallel()
 	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(
 		id INTEGER PRIMARY KEY,
@@ -222,6 +230,7 @@ func testMiscTypes(t *testing.T, setup testSetupFunc) {
 
 // TestNotNullTypes exercises NOT NULL variants of various types to verify schema generation.
 func testNotNullTypes(t *testing.T, setup testSetupFunc) {
+	t.Parallel()
 	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(
 		id INTEGER PRIMARY KEY,
@@ -314,6 +323,7 @@ func testScanKeyTypes(t *testing.T, setup testSetupFunc) {
 		}},
 	} {
 		t.Run(testCase.Name, func(t *testing.T) {
+			t.Parallel()
 			var db, tc = setup(t)
 			db.CreateTable(t, `<NAME>`, fmt.Sprintf(`(k %s PRIMARY KEY, v TEXT)`, testCase.ColumnType))
 			db.Exec(t, `INSERT INTO <NAME> VALUES `+strings.Join(testCase.Values, ", "))
@@ -327,6 +337,7 @@ func testScanKeyTypes(t *testing.T, setup testSetupFunc) {
 }
 
 func testCompositeScanKey(t *testing.T, setup testSetupFunc) {
+	t.Parallel()
 	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(k SMALLDATETIME, k2 INTEGER, v TEXT, PRIMARY KEY (k, k2))`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES
@@ -356,6 +367,7 @@ func testOversizedFields(t *testing.T, setup testSetupFunc) {
 	if testing.Short() {
 		t.Skip("skipping test in short mode")
 	}
+	t.Parallel()
 	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, v_text TEXT, v_varchar VARCHAR(max), v_binary VARBINARY(max), v_xml XML)`)
 
@@ -378,6 +390,7 @@ func testOversizedFields(t *testing.T, setup testSetupFunc) {
 
 // TestBitNotNullDeletion exercises deletions from a table with BIT NOT NULL columns.
 func testBitNotNullDeletion(t *testing.T, setup testSetupFunc) {
+	t.Parallel()
 	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, v_a BIT, v_b BIT NOT NULL, v_c BIT NOT NULL DEFAULT 0, v_d BIT NOT NULL DEFAULT 1)`)
 
@@ -400,6 +413,7 @@ func testBitNotNullDeletion(t *testing.T, setup testSetupFunc) {
 func testRowversionTypes(t *testing.T, setup testSetupFunc) {
 	for _, columnType := range []string{"timestamp", "rowversion"} {
 		t.Run(columnType, func(t *testing.T) {
+			t.Parallel()
 			var db, tc = setup(t)
 			db.CreateTable(t, `<NAME>`, fmt.Sprintf(`(id INTEGER PRIMARY KEY, data VARCHAR(32), rv %s)`, columnType))
 
