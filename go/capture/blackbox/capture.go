@@ -418,6 +418,24 @@ func (c *Capture) RunWithContext(ctx context.Context, sessions int) ([]byte, err
 	return documents, nil
 }
 
+// SetLocalCommand replaces the command used to invoke local-endpoint captures in the
+// catalog. Tests use this to run a connector binary built once up front, rather than
+// having each of the hundreds of flowctl invocations in a suite re-link it via `go run`.
+func (c *Capture) SetLocalCommand(argv ...string) error {
+	for _, captureName := range gjson.GetBytes(c.Catalog, "captures.@keys").Array() {
+		var fullPath = `captures.` + captureName.String() + `.endpoint.local`
+		if !gjson.GetBytes(c.Catalog, fullPath).Exists() {
+			continue // Not a local endpoint, nothing to override
+		}
+		var result, err = sjson.SetBytes(c.Catalog, fullPath+`.command`, argv)
+		if err != nil {
+			return err
+		}
+		c.Catalog = result
+	}
+	return nil
+}
+
 // EditConfig modifies a property of the endpoint config(s) of all captures in the catalog.
 func (c *Capture) EditConfig(path string, val any) error {
 	for _, captureName := range gjson.GetBytes(c.Catalog, "captures.@keys").Array() {
