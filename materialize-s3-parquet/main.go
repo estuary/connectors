@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -83,6 +83,6 @@ var driver = filesink.FileDriver[*filesink.S3MultipartUpload, filesink.S3Resourc
 	},
 }
 
-func main() {
-	boilerplate.RunMain(driver)
-}
+// NewDriver builds the connector, and is its entry point: an importing
+// caller is handed the assembled connector rather than its pieces.
+func NewDriver() boilerplate.Connector { return driver }

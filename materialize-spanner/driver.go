@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -173,6 +173,18 @@ var sqlDriver = &sql.Driver[config, tableConfig]{
 type driver struct{}
 
 var _ boilerplate.Connector = &driver{}
+
+// NewDriver builds the connector, and is its entry point: an importing
+// caller is handed the assembled connector rather than its pieces.
+func NewDriver() boilerplate.Connector { return &driver{} }
+
+// NewMaterializer opens a Materializer for the endpoint. Spanner wraps the
+// standard SQL driver to add its own validation, so this reaches through to the
+// wrapped driver's entry point, which is what establishes the initialization
+// order the driver's operations assume.
+func NewMaterializer(ctx context.Context, materializationName string, cfg config, featureFlags map[string]bool) (boilerplate.Materializer[config, sql.FieldConfig, tableConfig, sql.MappedType], error) {
+	return sqlDriver.NewMaterializer(ctx, materializationName, cfg, featureFlags)
+}
 
 func (driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
 	return sqlDriver.Spec(ctx, req)
@@ -1053,6 +1065,3 @@ func (t *transactor) Destroy() {
 	t.adminClient.Close()
 }
 
-func main() {
-	boilerplate.RunMain(&driver{})
-}

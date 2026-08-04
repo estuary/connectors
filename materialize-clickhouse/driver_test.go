@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -25,11 +25,11 @@ func TestIntegration(t *testing.T) {
 	}
 
 	t.Run("materialize", func(t *testing.T) {
-		sql.RunMaterializationTest(t, newClickHouseDriver().sqlDriver, "testdata/materialize.flow.yaml", makeResourceFn, nil)
+		sql.RunMaterializationTest(t, NewDriver().sqlDriver, "testdata/materialize.flow.yaml", makeResourceFn, nil)
 	})
 
 	t.Run("apply", func(t *testing.T) {
-		sql.RunApplyTest(t, newClickHouseDriver().sqlDriver, "testdata/apply.flow.yaml", makeResourceFn)
+		sql.RunApplyTest(t, NewDriver().sqlDriver, "testdata/apply.flow.yaml", makeResourceFn)
 	})
 
 	t.Run("apply-drain", func(t *testing.T) {
@@ -79,11 +79,11 @@ func TestIntegration(t *testing.T) {
 			require.EqualValues(t, 0, count(t, stage), "the stage table must have been drained")
 		}
 
-		sql.RunApplyDrainTest(t, newClickHouseDriver().sqlDriver, cfg, res, seedPending, verifyDrained)
+		sql.RunApplyDrainTest(t, NewDriver().sqlDriver, cfg, res, seedPending, verifyDrained)
 	})
 
 	t.Run("migrate", func(t *testing.T) {
-		sql.RunMigrationTest(t, newClickHouseDriver().sqlDriver, "testdata/migrate.flow.yaml", makeResourceFn, nil)
+		sql.RunMigrationTest(t, NewDriver().sqlDriver, "testdata/migrate.flow.yaml", makeResourceFn, nil)
 	})
 }
 

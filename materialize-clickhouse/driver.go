@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -195,7 +195,7 @@ type driver struct {
 
 var _ boilerplate.Connector = &driver{}
 
-func newClickHouseDriver() *driver {
+func NewDriver() *driver {
 	sqlDriver := &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-clickhouse",
 		StartTunnel: func(ctx context.Context, cfg config) error {
@@ -233,6 +233,14 @@ func newClickHouseDriver() *driver {
 	return &driver{
 		sqlDriver: sqlDriver,
 	}
+}
+
+// NewMaterializer opens a Materializer for the endpoint. ClickHouse wraps the
+// standard SQL driver to add its own validation, so this reaches through to the
+// wrapped driver's entry point, which is what establishes the initialization
+// order the driver's operations assume.
+func NewMaterializer(ctx context.Context, materializationName string, cfg config, featureFlags map[string]bool) (boilerplate.Materializer[config, sql.FieldConfig, tableConfig, sql.MappedType], error) {
+	return NewDriver().sqlDriver.NewMaterializer(ctx, materializationName, cfg, featureFlags)
 }
 
 func (d *driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
@@ -1147,8 +1155,4 @@ func (t *transactor) Destroy() {
 	// their schema has drifted from the target's.
 	_ = t.store.conn.Close()
 	_ = t.load.conn.Close()
-}
-
-func main() {
-	boilerplate.RunMain(newClickHouseDriver())
 }

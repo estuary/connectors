@@ -17,7 +17,7 @@ COPY materialize-mongodb     ./materialize-mongodb
 
 # Test and build the connector.
 RUN go test  -tags nozstd -short -v ./materialize-mongodb/...
-RUN go build -tags nozstd -v -o ./connector ./materialize-mongodb
+RUN go build -tags nozstd -v -o ./connector ./materialize-mongodb/cmd/connector
 
 # Runtime Stage
 ################################################################################

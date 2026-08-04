@@ -19,7 +19,7 @@ RUN go test -tags nozstd -v ./materialize-boilerplate/...
 RUN go test -tags nozstd -short -v ./materialize-bigtable/...
 
 # Build the connector.
-RUN go build -tags nozstd -v -o ./connector ./materialize-bigtable
+RUN go build -tags nozstd -v -o ./connector ./materialize-bigtable/cmd/connector
 
 # Runtime Stage
 ################################################################################

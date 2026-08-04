@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -27,6 +27,10 @@ import (
 type driver struct{}
 
 var _ boilerplate.Connector = &driver{}
+
+// NewDriver builds the connector, and is its entry point: an importing
+// caller is handed the assembled connector rather than its pieces.
+func NewDriver() boilerplate.Connector { return driver{} }
 
 func connect(ctx context.Context, cfg config) (*mongo.Client, error) {
 	// If SSH Endpoint is configured, then try to start a tunnel before establishing connections.
@@ -103,15 +107,15 @@ func (d driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Sp
 }
 
 func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
-	return boilerplate.RunValidate(ctx, req, newMaterialization)
+	return boilerplate.RunValidate(ctx, req, NewMaterializer)
 }
 
 func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
-	return boilerplate.RunApply(ctx, req, newMaterialization)
+	return boilerplate.RunApply(ctx, req, NewMaterializer)
 }
 
 func (d driver) NewTransactor(ctx context.Context, req pm.Request_Open, be *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
-	return boilerplate.RunNewTransactor(ctx, req, be, newMaterialization)
+	return boilerplate.RunNewTransactor(ctx, req, be, NewMaterializer)
 }
 
 type materialization struct {
@@ -121,7 +125,7 @@ type materialization struct {
 
 var _ boilerplate.Materializer[config, fieldConfig, resource, mappedType] = &materialization{}
 
-func newMaterialization(ctx context.Context, materializationName string, cfg config, featureFlags map[string]bool) (boilerplate.Materializer[config, fieldConfig, resource, mappedType], error) {
+func NewMaterializer(ctx context.Context, materializationName string, cfg config, featureFlags map[string]bool) (boilerplate.Materializer[config, fieldConfig, resource, mappedType], error) {
 	client, err := connect(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("connecting to database: %w", err)
@@ -375,7 +379,3 @@ func (d *materialization) SnapshotTestResource(ctx context.Context, path []strin
 }
 
 func (d *materialization) Close(ctx context.Context) {}
-
-func main() {
-	boilerplate.RunMain(driver{})
-}

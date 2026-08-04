@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -96,8 +96,18 @@ func (c tableConfig) Parameters() ([]string, bool, error) {
 	return path, c.Delta, nil
 }
 
-// newSnowflakeDriver creates a new Driver for Snowflake.
-func newSnowflakeDriver() *sql.Driver[config, tableConfig] {
+// NewDriver creates a new Driver for Snowflake, and is this connector's entry
+// point: an importing caller is handed the assembled driver rather than its
+// pieces.
+func NewDriver() *sql.Driver[config, tableConfig] {
+	// gosnowflake also uses logrus for logging and the logs it produces may be
+	// confusing when intermixed with our connector logs. We disable the
+	// gosnowflake logger here and log as needed when handling errors from the
+	// sql driver. Its logger is a package-level global of the SDK, so this is
+	// done here to apply to every user of the driver rather than only when
+	// running as a connector.
+	sf.GetLogger().SetLogLevel("OFF")
+
 	return &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-snowflake",
 		StartTunnel:      func(ctx context.Context, cfg config) error { return nil },
@@ -1436,12 +1446,4 @@ func (d *transactor) logAllClusteringInfo(ctx context.Context) {
 		}
 		logClusteringInfo(ctx, d.db, b.target.Identifier, b.clusteringExpr)
 	}
-}
-
-func main() {
-	// gosnowflake also uses logrus for logging and the logs it produces may be confusing when
-	// intermixed with our connector logs. We disable the gosnowflake logger here and log as needed
-	// when handling errors from the sql driver.
-	sf.GetLogger().SetLogLevel("OFF")
-	boilerplate.RunMain(newSnowflakeDriver())
 }

@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -140,7 +140,7 @@ func isCaseInsensitiveDatabase(ctx context.Context, db *stdsql.DB, warehouse str
 	return strings.Contains(collation, "_CI_"), nil
 }
 
-func newDriver() *sql.Driver[config, tableConfig] {
+func NewDriver() *sql.Driver[config, tableConfig] {
 	return &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-azure-fabric-warehouse",
 		StartTunnel:      func(ctx context.Context, cfg config) error { return nil },

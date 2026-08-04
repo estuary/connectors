@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -51,7 +51,7 @@ func TestPostgresConfig(t *testing.T) {
 }
 
 func TestSpecification(t *testing.T) {
-	var resp, err = newPostgresDriver().
+	var resp, err = NewDriver().
 		Spec(context.Background(), &pm.Request_Spec{})
 	require.NoError(t, err)
 

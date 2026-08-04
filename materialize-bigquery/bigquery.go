@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -239,10 +239,10 @@ func (c tableConfig) Parameters() ([]string, bool, error) {
 }
 
 func Driver() *sql.Driver[config, tableConfig] {
-	return newBigQueryDriver()
+	return NewDriver()
 }
 
-func newBigQueryDriver() *sql.Driver[config, tableConfig] {
+func NewDriver() *sql.Driver[config, tableConfig] {
 	return &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-bigquery",
 		StartTunnel:      func(ctx context.Context, cfg config) error { return nil },
@@ -291,8 +291,4 @@ func newBigQueryDriver() *sql.Driver[config, tableConfig] {
 		},
 		PreReqs: preReqs,
 	}
-}
-
-func main() {
-	boilerplate.RunMain(newBigQueryDriver())
 }

@@ -2,7 +2,7 @@ materializations:
   acmeCo/tests/materialize-s3-iceberg:
     endpoint:
       local:
-        command: ["go", "run", "."]
+        command: ["go", "run", "./cmd/connector"]
         protobuf: true
         config: config.yaml
     bindings: []

@@ -1,4 +1,4 @@
-package main
+package connector
 
 // Ref: https://docs.aws.amazon.com/redshift/latest/dg/r_pg_keywords.html
 //

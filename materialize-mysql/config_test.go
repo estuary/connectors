@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -58,7 +58,7 @@ func TestMySQLConfig(t *testing.T) {
 }
 
 func TestSpecification(t *testing.T) {
-	var resp, err = newMysqlDriver().
+	var resp, err = NewDriver().
 		Spec(context.Background(), &pm.Request_Spec{})
 	require.NoError(t, err)
 
