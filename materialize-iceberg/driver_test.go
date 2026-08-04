@@ -169,11 +169,11 @@ func TestIntegration(t *testing.T) {
 	}
 
 	t.Run("materialize", func(t *testing.T) {
-		boilerplate.RunMaterializationTestParallel(t, newMaterialization, materializeSpec, makeResourceFn, actionDescSanitizers)
+		boilerplate.RunMaterializationTestParallel(t, NewMaterializer, materializeSpec, makeResourceFn, actionDescSanitizers)
 	})
 
 	t.Run("apply", func(t *testing.T) {
-		boilerplate.RunApplyTestParallel(t, &Driver{}, newMaterialization, applySpec, makeResourceFn)
+		boilerplate.RunApplyTestParallel(t, &Driver{}, NewMaterializer, applySpec, makeResourceFn)
 	})
 
 	t.Run("apply-drain", func(t *testing.T) {
@@ -299,12 +299,12 @@ func TestIntegration(t *testing.T) {
 				require.NoError(t, sparkExec(t, fmt.Sprintf("DROP TABLE IF EXISTS %s", verifyFQN)))
 			}
 
-			boilerplate.RunApplyDrainTest(t, &Driver{}, newMaterialization, cfg, res, seedPending, verifyDrained)
+			boilerplate.RunApplyDrainTest(t, &Driver{}, NewMaterializer, cfg, res, seedPending, verifyDrained)
 		})
 	})
 
 	t.Run("migrate", func(t *testing.T) {
-		boilerplate.RunMigrationTestParallel(t, newMaterialization, migrateSpec, makeResourceFn, nil)
+		boilerplate.RunMigrationTestParallel(t, NewMaterializer, migrateSpec, makeResourceFn, nil)
 	})
 
 	t.Run("ts-overflow-regression", func(t *testing.T) {

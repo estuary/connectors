@@ -40,9 +40,26 @@ import (
 	"strings"
 	"syscall"
 
+	azurefabric "github.com/estuary/connectors/materialize-azure-fabric-warehouse"
+	bigquery "github.com/estuary/connectors/materialize-bigquery"
+	bigtable "github.com/estuary/connectors/materialize-bigtable"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/estuary/connectors/materialize-boilerplate/testutil"
+	clickhouse "github.com/estuary/connectors/materialize-clickhouse"
 	databricks "github.com/estuary/connectors/materialize-databricks"
+	dynamodb "github.com/estuary/connectors/materialize-dynamodb"
+	elasticsearch "github.com/estuary/connectors/materialize-elasticsearch"
+	iceberg "github.com/estuary/connectors/materialize-iceberg"
+	mongodb "github.com/estuary/connectors/materialize-mongodb"
+	motherduck "github.com/estuary/connectors/materialize-motherduck"
+	mysql "github.com/estuary/connectors/materialize-mysql"
+	postgres "github.com/estuary/connectors/materialize-postgres"
+	redshift "github.com/estuary/connectors/materialize-redshift"
+	s3iceberg "github.com/estuary/connectors/materialize-s3-iceberg"
+	snowflake "github.com/estuary/connectors/materialize-snowflake"
+	spanner "github.com/estuary/connectors/materialize-spanner"
+	sql "github.com/estuary/connectors/materialize-sql"
+	sqlserver "github.com/estuary/connectors/materialize-sqlserver"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -62,25 +79,53 @@ type materializer interface {
 // endpoint, returning the resource's path along with the materializer.
 type opener func(ctx context.Context, taskName string, endpointConfig, resourceConfig json.RawMessage) (materializer, []string, error)
 
-// connectors are the materialization connectors this program can drive. A
-// connector can be added here once its package is importable, which means
-// `package connector` with func main under cmd/connector.
+// connectors are the materialization connectors this program can drive: those
+// whose package is importable, and whose destination is something a snapshot can
+// be read back out of. A connector that materializes into an event bus or an API
+// rather than a queryable store is left out, since there is nothing there to
+// enumerate.
 var connectors = map[string]opener{
-	"materialize-databricks": func(ctx context.Context, taskName string, endpointConfig, resourceConfig json.RawMessage) (materializer, []string, error) {
-		return open(ctx, databricks.NewDriver().NewMaterializer, taskName, endpointConfig, resourceConfig)
-	},
+	"materialize-azure-fabric-warehouse": fromSQLDriver(azurefabric.NewDriver),
+	"materialize-bigquery":               fromSQLDriver(bigquery.NewDriver),
+	"materialize-bigtable":               fromMaterializer(bigtable.NewMaterializer),
+	"materialize-clickhouse":             fromMaterializer(clickhouse.NewMaterializer),
+	"materialize-databricks":             fromSQLDriver(databricks.NewDriver),
+	"materialize-dynamodb":               fromMaterializer(dynamodb.NewMaterializer),
+	"materialize-elasticsearch":          fromMaterializer(elasticsearch.NewMaterializer),
+	"materialize-iceberg":                fromMaterializer(iceberg.NewMaterializer),
+	"materialize-mongodb":                fromMaterializer(mongodb.NewMaterializer),
+	"materialize-motherduck":             fromSQLDriver(motherduck.NewDriver),
+	"materialize-mysql":                  fromSQLDriver(mysql.NewDriver),
+	"materialize-postgres":               fromSQLDriver(postgres.NewDriver),
+	"materialize-redshift":               fromSQLDriver(redshift.NewDriver),
+	"materialize-s3-iceberg":             fromMaterializer(s3iceberg.NewMaterializer),
+	"materialize-snowflake":              fromSQLDriver(snowflake.NewDriver),
+	"materialize-spanner":                fromMaterializer(spanner.NewMaterializer),
+	"materialize-sqlserver":              fromSQLDriver(sqlserver.NewDriver),
 }
 
-// open adapts testutil.OpenResource, whose result is parameterized by the
-// connector's configuration types, to the type-erased view above. The type
-// parameters are inferred from the connector's entry point.
-func open[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
-	ctx context.Context,
+// fromMaterializer adapts a connector's exported NewMaterializer, whose result is
+// parameterized by that connector's own configuration types, to the type-erased
+// view above. The type parameters are inferred from the function, so a
+// connector's unexported config types are never named here.
+func fromMaterializer[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
 	newMaterializer boilerplate.NewMaterializerFn[EC, FC, RC, MT],
-	taskName string,
-	endpointConfig, resourceConfig json.RawMessage,
-) (materializer, []string, error) {
-	return testutil.OpenResource(ctx, newMaterializer, taskName, endpointConfig, resourceConfig)
+) opener {
+	return func(ctx context.Context, taskName string, endpointConfig, resourceConfig json.RawMessage) (materializer, []string, error) {
+		return testutil.OpenResource(ctx, newMaterializer, taskName, endpointConfig, resourceConfig)
+	}
+}
+
+// fromSQLDriver adapts a SQL connector, whose entry point is a *sql.Driver
+// carrying the same NewMaterializer. The driver is built when the connector is
+// actually used rather than when this map is, since constructing one can set
+// process-wide state in a vendor SDK.
+func fromSQLDriver[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](
+	newDriver func() *sql.Driver[EC, RC],
+) opener {
+	return func(ctx context.Context, taskName string, endpointConfig, resourceConfig json.RawMessage) (materializer, []string, error) {
+		return testutil.OpenResource(ctx, newDriver().NewMaterializer, taskName, endpointConfig, resourceConfig)
+	}
 }
 
 func main() {
