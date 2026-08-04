@@ -77,15 +77,15 @@ func (Driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec
 }
 
 func (Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
-	return boilerplate.RunValidate(ctx, req, newMaterialization)
+	return boilerplate.RunValidate(ctx, req, NewMaterializer)
 }
 
 func (Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
-	return boilerplate.RunApply(ctx, req, newMaterialization)
+	return boilerplate.RunApply(ctx, req, NewMaterializer)
 }
 
 func (Driver) NewTransactor(ctx context.Context, req pm.Request_Open, be *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
-	return boilerplate.RunNewTransactor(ctx, req, be, newMaterialization)
+	return boilerplate.RunNewTransactor(ctx, req, be, NewMaterializer)
 }
 
 type materialization struct {
@@ -101,7 +101,7 @@ type materialization struct {
 
 var _ boilerplate.Materializer[config, fieldConfig, resource, mapped] = &materialization{}
 
-func newMaterialization(ctx context.Context, materializationName string, cfg config, featureFlags map[string]bool) (boilerplate.Materializer[config, fieldConfig, resource, mapped], error) {
+func NewMaterializer(ctx context.Context, materializationName string, cfg config, featureFlags map[string]bool) (boilerplate.Materializer[config, fieldConfig, resource, mapped], error) {
 	catalog, err := cfg.toCatalog(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("creating catalog: %w", err)

@@ -63,8 +63,32 @@ never touched.
 
 ## Supported connectors
 
-A connector can be driven once its package is importable, which means `package
-connector` with `func main` under `cmd/connector` (see `materialize-iceberg` or
-`materialize-databricks`). Add it to the `connectors` map in `main.go`.
-
+- `materialize-azure-fabric-warehouse`
+- `materialize-bigquery`
+- `materialize-bigtable`
+- `materialize-clickhouse`
 - `materialize-databricks`
+- `materialize-dynamodb`
+- `materialize-elasticsearch`
+- `materialize-iceberg`
+- `materialize-mongodb`
+- `materialize-motherduck`
+- `materialize-mysql`
+- `materialize-postgres`
+- `materialize-redshift`
+- `materialize-s3-iceberg`
+- `materialize-snowflake`
+- `materialize-spanner`
+- `materialize-sqlserver`
+
+A connector can be driven once two things are true. Its package must be
+importable — `package connector` with `func main` under `cmd/connector` — and it
+must expose the Materializer: either `NewDriver`, whose `*sql.Driver` carries
+`NewMaterializer`, or a package-level `NewMaterializer`. Then add it to the
+`connectors` map in `main.go`.
+
+Connectors materializing into something that cannot be read back are left out
+even though they are importable: `materialize-eventbridge` and `materialize-sns`
+publish to an event bus, `materialize-hubspot` writes through an API, and
+`materialize-s3-parquet` writes files rather than a queryable store. There is
+nothing for a snapshot or a sweep to enumerate in any of them.
