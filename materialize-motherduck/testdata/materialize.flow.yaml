@@ -37,7 +37,7 @@ materializations:
         command:
           - go
           - run
-          - .
+          - ./cmd/connector
         protobuf: true
         config: config.gcs.yaml
     bindings: *bindings
