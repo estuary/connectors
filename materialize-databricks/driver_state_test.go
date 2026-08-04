@@ -328,3 +328,15 @@ func TestAcknowledge(t *testing.T) {
 		require.Error(t, err) // no longer a recovery apply
 	})
 }
+
+func TestValidateShardRange(t *testing.T) {
+	// A shard covering the full keyspace is a single-shard task and is fine in
+	// either mode; a partial-range shard requires scale_out.
+	require.NoError(t, validateShardRange(false, 0, 0xffffffff))
+	require.NoError(t, validateShardRange(true, 0, 0xffffffff))
+	require.NoError(t, validateShardRange(true, 0, 0x7fffffff))
+	require.NoError(t, validateShardRange(true, 0x80000000, 0xffffffff))
+
+	require.ErrorContains(t, validateShardRange(false, 0, 0x7fffffff), "scale_out")
+	require.ErrorContains(t, validateShardRange(false, 0x80000000, 0xffffffff), "80000000-ffffffff")
+}
