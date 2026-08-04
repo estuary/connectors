@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"runtime/debug"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -126,8 +127,17 @@ func blackboxTestSetup(t testing.TB) (*sqlserverTestDatabase, *blackbox.Transcri
 		Database: *dbName,
 	}).ToURI()
 	t.Logf("opening control connection: addr=%q, user=%q", *dbControlAddress, *dbControlUser)
-	conn, err := sql.Open("sqlserver", controlURI)
+	connector, err := mssqldb.NewConnector(controlURI)
 	require.NoError(t, err)
+
+	// Lose deadlocks deliberately. Tests run concurrently, so one test setting up its
+	// tables can deadlock against another test's capture reading that same metadata. The
+	// connector under test does not retry those reads, and should not have to for the sake
+	// of our test harness, whereas this control connection retries cheaply. Volunteering as
+	// the victim keeps the contention on the side which can recover from it.
+	connector.SessionInitSQL = "SET DEADLOCK_PRIORITY LOW"
+
+	var conn = sql.OpenDB(connector)
 	t.Cleanup(func() { conn.Close() })
 
 	// Setup: Create database interface with <NAME> templating
@@ -163,17 +173,13 @@ func (db *sqlserverTestDatabase) Exec(t testing.TB, query string) {
 	if db.transcript != nil {
 		fmt.Fprintf(db.transcript, "sql> %s\n", query)
 	}
-	if _, err := db.conn.ExecContext(context.Background(), query); err != nil {
-		t.Fatalf("error executing control query %q: %v", query, err)
-	}
+	db.execWithDeadlockRetry(t, query)
 }
 
 func (db *sqlserverTestDatabase) QuietExec(t testing.TB, query string) {
 	t.Helper()
 	query = db.Expand(query)
-	if _, err := db.conn.ExecContext(context.Background(), query); err != nil {
-		t.Fatalf("error executing control query %q: %v", query, err)
-	}
+	db.execWithDeadlockRetry(t, query)
 }
 
 // sqlserverDeadlockVictim is the error number SQL Server reports to the session it kills
@@ -223,6 +229,13 @@ func (db *sqlserverTestDatabase) execWithDeadlockRetry(t testing.TB, query strin
 	}
 }
 
+// cdcMetadataLock serializes the operations which mutate CDC metadata. SQL Server already
+// serializes these internally, via an exclusive applock held against the 'cdc' principal,
+// so performing them concurrently gains nothing: it only converts the wait into deadlocks
+// and lock starvation which retrying does not reliably clear. Tests still run in parallel,
+// they just queue for this one step.
+var cdcMetadataLock sync.Mutex
+
 // sqlserverCaptureInstanceExists is reported when sp_cdc_enable_table is asked to create a
 // capture instance which already exists. That is the state a partially-failed earlier
 // attempt leaves behind: the capture instance gets created but the table is not marked as
@@ -246,6 +259,9 @@ func isCaptureInstanceExistsError(err error) bool {
 // behind before trying again.
 func (db *sqlserverTestDatabase) enableCDC(t testing.TB, schema, name string) {
 	t.Helper()
+	cdcMetadataLock.Lock()
+	defer cdcMetadataLock.Unlock()
+
 	var enable = fmt.Sprintf(`EXEC sys.sp_cdc_enable_table @source_schema = '%s', @source_name = '%s', @role_name = '%s'`,
 		schema, name, *dbCaptureUser)
 	for attempt := 1; ; attempt++ {
@@ -308,8 +324,10 @@ func (db *sqlserverTestDatabase) CreateTable(t testing.TB, name, defs string) {
 	db.enableCDC(t, schema, shortName)
 
 	// Dropping a CDC-enabled table implicitly disables CDC for it, so this contends for
-	// the same metadata as enabling does.
+	// the same metadata as enabling does and takes the same lock.
 	t.Cleanup(func() {
+		cdcMetadataLock.Lock()
+		defer cdcMetadataLock.Unlock()
 		db.execWithDeadlockRetry(t, `IF OBJECT_ID('`+tableName+`', 'U') IS NOT NULL DROP TABLE `+tableName)
 	})
 }

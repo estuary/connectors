@@ -124,8 +124,17 @@ func blackboxTestSetup(t testing.TB) (*sqlserverTestDatabase, *blackbox.Transcri
 		Database: *dbName,
 	}).ToURI()
 	t.Logf("opening control connection: addr=%q, user=%q", *dbControlAddress, *dbControlUser)
-	conn, err := sql.Open("sqlserver", controlURI)
+	connector, err := mssqldb.NewConnector(controlURI)
 	require.NoError(t, err)
+
+	// Lose deadlocks deliberately. Tests run concurrently, so one test setting up its
+	// tables can deadlock against another test's capture reading that same metadata. The
+	// connector under test does not retry those reads, and should not have to for the sake
+	// of our test harness, whereas this control connection retries cheaply. Volunteering as
+	// the victim keeps the contention on the side which can recover from it.
+	connector.SessionInitSQL = "SET DEADLOCK_PRIORITY LOW"
+
+	var conn = sql.OpenDB(connector)
 	t.Cleanup(func() { conn.Close() })
 
 	// Setup: Create database interface with <NAME> templating
@@ -161,17 +170,13 @@ func (db *sqlserverTestDatabase) Exec(t testing.TB, query string) {
 	if db.transcript != nil {
 		fmt.Fprintf(db.transcript, "sql> %s\n", query)
 	}
-	if _, err := db.conn.ExecContext(context.Background(), query); err != nil {
-		t.Fatalf("error executing control query %q: %v", query, err)
-	}
+	db.execWithDeadlockRetry(t, query)
 }
 
 func (db *sqlserverTestDatabase) QuietExec(t testing.TB, query string) {
 	t.Helper()
 	query = db.Expand(query)
-	if _, err := db.conn.ExecContext(context.Background(), query); err != nil {
-		t.Fatalf("error executing control query %q: %v", query, err)
-	}
+	db.execWithDeadlockRetry(t, query)
 }
 
 // sqlserverDeadlockVictim is the error number SQL Server reports to the session it kills
