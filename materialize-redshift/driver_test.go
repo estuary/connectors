@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/estuary/connectors/go/common"
 	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	testutil "github.com/estuary/connectors/materialize-boilerplate/testutil"
@@ -115,7 +116,7 @@ func TestIntegration(t *testing.T) {
 			// The drain applies under the fixture spec's own name and leaves
 			// its tokens row behind.
 			t.Cleanup(func() {
-				materializer, err := NewDriver().NewMaterializer(ctx, taskName, cfg, boilerplate.ParseFlags(cfg))
+				materializer, err := NewDriver().NewMaterializer(ctx, taskName, cfg, testFlags(t, cfg))
 				require.NoError(t, err)
 				defer materializer.Close(ctx)
 				require.NoError(t, materializer.CleanupTestTask(ctx, "test/sqlite"))
@@ -140,7 +141,7 @@ func stageRows(t *testing.T, cfg config, fields []string, rows [][]any) *stateIt
 	t.Helper()
 	ctx := context.Background()
 
-	client, err := cfg.toS3Client(ctx, boilerplate.ParseFlags(cfg))
+	client, err := cfg.toS3Client(ctx, testFlags(t, cfg))
 	require.NoError(t, err)
 
 	f := newStagedFile(newS3Store(client, cfg.Bucket), cfg.effectiveBucketPath(), fields)
@@ -161,7 +162,7 @@ func stageRows(t *testing.T, cfg config, fields []string, rows [][]any) *stateIt
 func runIdempotencyTest(t *testing.T, makeResourceFn func(string, bool) tableConfig) {
 	ctx := context.Background()
 	cfg := mustGetCfg(t)
-	flags := boilerplate.ParseFlags(cfg)
+	flags := testFlags(t, cfg)
 	suffix := fmt.Sprintf("%s_flow_test_%d", uuid.NewString()[:8], time.Now().Unix())
 
 	driver := NewDriver()
@@ -390,7 +391,18 @@ func TestPrereqs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require.Equal(t, tt.want, preReqs(ctx, tt.cfg(cfg)).Unwrap())
+			require.Equal(t, tt.want, preReqs(ctx, tt.cfg(cfg), common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{})).Unwrap())
 		})
 	}
+}
+
+// testFlags resolves feature flags for a test that has no runtime spec to take a
+// creation date from, so date-gated flags resolve as for a brand-new task.
+func testFlags(t *testing.T, cfg config) map[string]bool {
+	t.Helper()
+
+	flags, err := boilerplate.ResolveFlags(cfg, &pf.MaterializationSpec{})
+	require.NoError(t, err)
+
+	return flags
 }

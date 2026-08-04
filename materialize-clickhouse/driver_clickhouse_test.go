@@ -80,7 +80,7 @@ func TestPrereqs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var actual = preReqs(t.Context(), tt.cfg(cfg)).Unwrap()
+			var actual = preReqs(t.Context(), tt.cfg(cfg), nil).Unwrap()
 
 			require.Equal(t, len(tt.want), len(actual))
 			for i := 0; i < len(tt.want); i++ {

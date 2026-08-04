@@ -301,9 +301,22 @@ func directFeatureFlags(t *testing.T, logs []byte) string {
 	return doc.Config.Advanced.FeatureFlags
 }
 
-func TestParseFlags(t *testing.T) {
-	// Without a spec to take a creation date from, date-gated flags resolve as
-	// they would for a brand-new task.
-	require.True(t, ParseFlags(flagsTestConfig{})["gated"])
-	require.False(t, ParseFlags(flagsTestConfig{raw: "no_gated"})["gated"])
+// TestResolveFlagsFromSpec covers the entry point used by connectors which
+// implement the materialization RPCs themselves: flags come from the spec's
+// creation date, and a date it cannot parse fails rather than resolving around.
+func TestResolveFlagsFromSpec(t *testing.T) {
+	before, err := ResolveFlags(flagsTestConfig{}, &pf.MaterializationSpec{CreatedAt: "2026-01-01"})
+	require.NoError(t, err)
+	require.False(t, before["gated"])
+
+	after, err := ResolveFlags(flagsTestConfig{}, &pf.MaterializationSpec{CreatedAt: "2026-07-01"})
+	require.NoError(t, err)
+	require.True(t, after["gated"])
+
+	override, err := ResolveFlags(flagsTestConfig{raw: "no_gated"}, &pf.MaterializationSpec{CreatedAt: "2026-07-01"})
+	require.NoError(t, err)
+	require.False(t, override["gated"])
+
+	_, err = ResolveFlags(flagsTestConfig{}, &pf.MaterializationSpec{CreatedAt: "6/10/2026"})
+	require.ErrorContains(t, err, `task creation date "6/10/2026"`)
 }
