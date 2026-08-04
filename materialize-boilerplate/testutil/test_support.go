@@ -605,28 +605,14 @@ func snapshotTestTable[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConf
 	snap.WriteString(schema)
 	snap.WriteString("\n")
 	if withTableData {
-		columnNames, rows, err := m.SnapshotTestResource(ctx, path)
+		data, err := SnapshotResource(ctx, m, path)
 		require.NoError(t, err)
 		snap.WriteString("Table Data:\n")
-		snap.WriteString(renderTestTableData(t, columnNames, rows))
+		snap.WriteString(data)
 		snap.WriteString("\n")
 	}
 
 	return snap.String()
-}
-
-func renderTestTableData(t *testing.T, columnNames []string, rows [][]any) string {
-	var data strings.Builder
-	enc := json.NewEncoder(&data)
-	for _, r := range rows {
-		doc := make(map[string]any, len(columnNames))
-		for i, col := range columnNames {
-			doc[col] = r[i]
-		}
-		require.NoError(t, enc.Encode(doc))
-	}
-
-	return data.String()
 }
 
 // decryptConfigRaw returns a task's endpoint config as raw JSON. If the config
@@ -1122,18 +1108,9 @@ func cleanupTestTasks[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfi
 ) {
 	t.Helper()
 
-	tasks, err := m.ListTestTasks(ctx)
+	outcomes, err := SweepTestTasks(ctx, m, tsSuffix)
 	require.NoError(t, err)
-	now := time.Now()
-	for _, task := range tasks {
-		if shouldCleanup(t, now, task, tsSuffix) {
-			if err := m.CleanupTestTask(ctx, task); err != nil {
-				t.Log("failed to clean up task", err)
-			} else {
-				t.Log("cleaned up task", task)
-			}
-		}
-	}
+	logSweep(t, "task", outcomes)
 }
 
 func CleanupTestResources[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
@@ -1145,52 +1122,54 @@ func CleanupTestResources[EC boilerplate.EndpointConfiger, FC boilerplate.FieldC
 ) {
 	t.Helper()
 
-	is := boilerplate.InitInfoSchema(m.Config())
-	require.NoError(t, m.PopulateInfoSchema(ctx, is, paths))
-	now := time.Now()
+	outcomes, err := SweepTestResources(ctx, m, paths, tsSuffix)
+	require.NoError(t, err)
+	logSweep(t, "resource", outcomes)
+}
 
-	for _, r := range is.Resources() {
-		if shouldCleanup(t, now, r.Location()[len(r.Location())-1], tsSuffix) {
-			_, fn, err := m.DeleteResource(ctx, r.Location())
-			require.NoError(t, err)
+func logSweep(t *testing.T, kind string, outcomes []SweepOutcome) {
+	t.Helper()
 
-			if err := fn(ctx); err != nil {
-				t.Log("failed to clean up resource", err)
-			} else {
-				t.Log("cleaned up resource", r.Location())
-			}
+	for _, o := range outcomes {
+		if o.Err != nil {
+			t.Logf("failed to clean up %s %s: %s", kind, o.Item, o.Err)
+		} else if o.Swept {
+			t.Logf("cleaned up %s %s (%s)", kind, o.Item, o.Reason)
+		} else {
+			t.Logf("did not clean up %s %s (%s)", kind, o.Item, o.Reason)
 		}
 	}
 }
 
-func shouldCleanup(t *testing.T, now time.Time, item string, suffix string) bool {
+// shouldCleanup reports whether a test resource or task should be removed, along
+// with the reason, which callers log.
+func shouldCleanup(now time.Time, item string, suffix string) (bool, string) {
 	if item == flowCheckpointsTableName {
 		// Never cleanup the meta checkpoints table: leaving it in place keeps
 		// it out of the next run's Apply action description (so snapshots stay
 		// stable), and prevents parallel test runs sharing a database from
 		// racing to delete each other's checkpoints table.
-		return false
+		return false, "is the meta checkpoints table"
 	}
 	if !strings.Contains(item, testItemIdentifier) {
-		// Not created for testing.
-		return false
-	} else if strings.HasSuffix(item, suffix) {
-		// Created specifically by this test run.
-		return true
+		return false, "not created for testing"
+	} else if suffix != "" && strings.HasSuffix(item, suffix) {
+		// An empty suffix must not match here: a caller with no run of its own
+		// passes one, and would otherwise sweep away every test item including
+		// those a concurrent run is still using.
+		return true, "created by this test run"
 	} else if parts := strings.Split(item, "_"); len(parts) < 2 {
-		t.Log("malformed test item name", item)
+		return false, "malformed test item name"
 	} else if seconds, err := strconv.Atoi(parts[len(parts)-1]); err != nil {
-		t.Log("failed to parse timestamp from test item name", item, err)
+		return false, fmt.Sprintf("failed to parse timestamp from test item name: %s", err)
 	} else if timestamp := time.Unix(int64(seconds), 0); now.Sub(timestamp) > 60*time.Minute {
 		// The threshold must comfortably exceed the longest single test run,
 		// since concurrent CI jobs sharing a database will otherwise drop each
 		// other's in-use tables mid-test.
-		t.Log("will cleanup old test item", item)
-		return true
+		return true, "left over from an old test run"
 	}
 
-	t.Log("will not cleanup recent test item", item)
-	return false
+	return false, "from a recent test run"
 }
 
 // RunFlowctl runs the flowctl command with the given arguments, and returns its
