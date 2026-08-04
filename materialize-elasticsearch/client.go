@@ -22,8 +22,8 @@ type createIndexParams struct {
 }
 
 type indexSettings struct {
-	Shards   *int `json:"number_of_shards,omitempty"`
-	Replicas *int `json:"number_of_replicas,omitempty"`
+	Shards   *int `json:"number_of_shards,omitempty" jsonschema_extras:"nonsensitive=true"`
+	Replicas *int `json:"number_of_replicas,omitempty" jsonschema_extras:"nonsensitive=true"`
 }
 
 type indexMappings struct {

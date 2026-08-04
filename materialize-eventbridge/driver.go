@@ -96,7 +96,7 @@ type config struct {
 
 type advancedConfig struct {
 	Endpoint     string `json:"endpoint,omitempty" jsonschema:"title=AWS Endpoint,description=Override the AWS endpoint URL. Used to direct requests at a compatible API such as LocalStack."`
-	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
 }
 
 func (c config) Validate() error {

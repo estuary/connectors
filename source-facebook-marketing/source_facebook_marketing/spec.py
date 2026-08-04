@@ -61,6 +61,7 @@ class InsightConfig(BaseModel):
         ),
         exclusiveMaximum=90,
         default=1,
+        nonsensitive=True,
     )
 
     start_date: Optional[datetime] = Field(
@@ -86,6 +87,7 @@ class InsightConfig(BaseModel):
         # maximum=28,
         # mininum=1,
         default=28,
+        nonsensitive=True,
     )
 
 class AccessToken(BaseModel):
@@ -175,6 +177,7 @@ class ConnectorConfig(BaseConfig):
         order=4,
         default=False,
         description="Set to active if you want to include data from deleted Campaigns, Ads, and AdSets.",
+        nonsensitive=True,
     )
 
     fetch_thumbnail_images: bool = Field(
@@ -182,6 +185,7 @@ class ConnectorConfig(BaseConfig):
         order=5,
         default=False,
         description="Set to active if you want to fetch the thumbnail_url and store the result in thumbnail_data_url for each Ad Creative.",
+        nonsensitive=True,
     )
 
     custom_insights: Optional[List[InsightConfig]] = Field(
@@ -201,6 +205,7 @@ class ConnectorConfig(BaseConfig):
             "Page size used when sending requests to Facebook API to specify number of records per page when response has pagination. "
             "Most users do not need to set this field unless they specifically need to tune the connector to address specific issues or use cases."
         ),
+        nonsensitive=True,
     )
 
     insights_lookback_window: Optional[PositiveInt] = Field(
@@ -215,6 +220,7 @@ class ConnectorConfig(BaseConfig):
         # maximum=28,
         # mininum=1,
         default=28,
+        nonsensitive=True,
     )
 
     max_batch_size: Optional[PositiveInt] = Field(
@@ -225,6 +231,7 @@ class ConnectorConfig(BaseConfig):
             "Most users do not need to set this field unless they specifically need to tune the connector to address specific issues or use cases."
         ),
         default=50,
+        nonsensitive=True,
     )
 
     credentials: OAuthCredentials# Annotated[Union[OAuthCredentials], Field(discriminator="auth_type")]
@@ -233,5 +240,6 @@ class ConnectorConfig(BaseConfig):
         description="Allows action_breakdowns to be an empty list",
         default=True,
         # airbyte_hidden=True,
+        nonsensitive=True,
     )
 
