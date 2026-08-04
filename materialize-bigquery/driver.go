@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -46,7 +45,11 @@ func (d *driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 	if err := json.Unmarshal(req.ConfigJson, &cfg); err != nil {
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
-	var dialect = bqDialect(common.ParseFeatureFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults))
+	flags, err := boilerplate.ResolveFlags(cfg, req.LastMaterialization)
+	if err != nil {
+		return nil, err
+	}
+	var dialect = bqDialect(flags)
 	var tpls = renderTemplates(dialect)
 
 	// Opened only if some binding needs a dry-run.

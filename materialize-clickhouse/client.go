@@ -36,7 +36,7 @@ func newClient(_ context.Context, materializationName string, ep *sql.Endpoint[c
 	return &client{db: db, ep: ep}, nil
 }
 
-func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
+func preReqs(ctx context.Context, cfg config, _ map[string]bool) *cerrors.PrereqErr {
 	var errs = &cerrors.PrereqErr{}
 
 	var db = clickhouse.OpenDB(cfg.newClickhouseOptions())
