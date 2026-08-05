@@ -873,7 +873,6 @@
         "ticket_redaction": false,
         "ticket_tag_editing": false,
         "twitter_search_access": false,
-        "update_api_settings": false,
         "update_user_own_alias": false,
         "update_user_own_name": false,
         "update_user_own_signature": false,
