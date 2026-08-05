@@ -364,6 +364,7 @@ func getConfigSchema(parserSchema json.RawMessage) json.RawMessage {
 								"type":        "string",
 								"title":       "Connection String",
 								"description": "The connection string used to authenticate with Azure Blob Storage.",
+								"secret":      true,
 								"order":       0,
 							},
 							"storageAccountName": map[string]any{
