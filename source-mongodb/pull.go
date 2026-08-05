@@ -198,8 +198,10 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		return fmt.Errorf("outputting prevState checkpoint: %w", err)
 	}
 
+	// Nothing to stream or poll, so exit rather than idle forever. This connector
+	// normally runs indefinitely, so report the reason for an otherwise silent exit.
 	if len(allBindings) == 0 {
-		// No bindings to capture.
+		log.Info("capture has no enabled bindings, shutting down")
 		return nil
 	}
 
