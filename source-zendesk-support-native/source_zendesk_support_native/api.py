@@ -295,7 +295,7 @@ async def fetch_incremental_cursor_paginated_resources(
 
 
         for resource in response.resources:
-            resource_dt = _str_to_dt(getattr(response.resources[0], cursor_field))
+            resource_dt = _str_to_dt(getattr(resource, cursor_field))
             if resource_dt > last_seen_dt:
                 last_seen_dt = resource_dt
 
