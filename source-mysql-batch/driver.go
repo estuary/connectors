@@ -304,6 +304,14 @@ func (s *captureState) Validate() error {
 }
 
 func (c *capture) Run(ctx context.Context) error {
+	// With no enabled bindings there are no polling workers, so we'd fall through the
+	// empty worker group and exit silently. This connector normally runs forever, so
+	// report the reason.
+	if len(c.Bindings) == 0 {
+		log.Info("capture has no enabled bindings, shutting down")
+		return nil
+	}
+
 	// Always discover and output SourcedSchemas once at startup.
 	if err := c.emitSourcedSchemas(ctx); err != nil {
 		return err
