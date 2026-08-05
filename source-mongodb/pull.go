@@ -99,7 +99,8 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		}
 
 		for _, coll := range collections {
-			if collectionType := mongoCollectionType(coll.Type); err != nil {
+			var collectionType = mongoCollectionType(coll.Type)
+			if err := collectionType.validate(); err != nil {
 				return fmt.Errorf("unsupported collection type: %w", err)
 			} else if collectionType == mongoCollectionTypeTimeseries {
 				timeseriesCollections[resourceId(db, coll.Name)] = true
