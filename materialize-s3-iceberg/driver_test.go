@@ -1208,7 +1208,7 @@ func createTestWarehouse(t *testing.T, cfg config) {
 			},
 			"storageConfigInfo": map[string]any{
 				"storageType":      "S3",
-				"allowedLocations": []string{"s3://" + cfg.Bucket + "/"},
+				"allowedLocations": []string{baseLocation + "/"},
 				"roleArn":          "arn:aws:iam::000000000000:role/dummy",
 				"region":           cfg.Region,
 				// Client-visible endpoint (host port mapped from rustfs).
