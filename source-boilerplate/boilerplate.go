@@ -167,7 +167,10 @@ func (s *ConnectorServer) Capture(stream pc.Connector_CaptureServer) error {
 			}
 		case request.Open != nil:
 			log.WithField("eventType", "connectorStatus").Info("Starting capture")
-			return s.Connector.Pull(request.Open, &PullOutput{Connector_CaptureServer: stream})
+			return s.Connector.Pull(request.Open, &PullOutput{
+				Connector_CaptureServer: stream,
+				NumBindings:             len(request.Open.Capture.Bindings),
+			})
 		default:
 			return fmt.Errorf("unexpected request %#v", request)
 		}
@@ -181,6 +184,11 @@ type PullOutput struct {
 	sync.Mutex
 	pc.Connector_CaptureServer
 
+	// NumBindings is the number of enabled bindings the capture was opened
+	// with. A capture with zero bindings will sit idle without producing any
+	// documents, which is worth mentioning in the startup status message.
+	NumBindings int
+
 	reused struct {
 		msg pc.Response          // Preallocated message to avoid allocations in Document()
 		doc pc.Response_Captured // Preallocated captured document to avoid allocations in Document()
@@ -193,7 +201,14 @@ type PullOutput struct {
 
 // Ready sends a PullResponse_Opened message to indicate that the capture has started.
 func (out *PullOutput) Ready(explicitAcknowledgements bool) error {
-	log.WithField("eventType", "connectorStatus").Info("Capture started")
+	if out.NumBindings == 0 {
+		log.WithField("eventType", "connectorStatus").Info("Capture started, no bindings are enabled")
+	} else {
+		log.WithFields(log.Fields{
+			"eventType": "connectorStatus",
+			"bindings":  out.NumBindings,
+		}).Info("Capture started")
+	}
 	out.Lock()
 	defer out.Unlock()
 	if err := out.Send(&pc.Response{
