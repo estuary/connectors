@@ -521,7 +521,6 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	// load table this round, for verification against an authoritative count
 	// before the join.
 	activeBindings := make(map[int]int64, len(t.bindings))
-	lastBinding := -1
 	batch := make([]batchItem, 0, maxBatchSize)
 	batchBytes := 0
 
@@ -579,18 +578,14 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}()
 
 	for it.Next() {
-		if it.Binding != lastBinding {
-			lastBinding = it.Binding
-
-			if _, found := activeBindings[it.Binding]; !found {
-				b := t.bindings[it.Binding]
-				// The load table exists (ensured at session start); truncate
-				// clears any keys left over from a previous round.
-				if err = t.load.conn.Exec(ctx, b.load.truncateSQL); err != nil {
-					return fmt.Errorf("truncating load stage table for %s: %w", b.target.Identifier, err)
-				}
-				activeBindings[it.Binding] = 0
+		if _, found := activeBindings[it.Binding]; !found {
+			b := t.bindings[it.Binding]
+			// The load table exists (ensured at session start); truncate
+			// clears any keys left over from a previous round.
+			if err = t.load.conn.Exec(ctx, b.load.truncateSQL); err != nil {
+				return fmt.Errorf("truncating load stage table for %s: %w", b.target.Identifier, err)
 			}
+			activeBindings[it.Binding] = 0
 		}
 
 		b := t.bindings[it.Binding]
