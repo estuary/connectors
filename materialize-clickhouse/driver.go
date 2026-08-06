@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	chproto "github.com/ClickHouse/ch-go/proto"
 	"github.com/ClickHouse/clickhouse-go/v2"
@@ -550,19 +549,10 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 				}
 			}
 
-			start := time.Now()
-			fields := log.Fields{
-				"target":     t.bindings[binding].target.Identifier,
-				"batch_size": len(records),
-			}
-
 			if err = chBatch.Send(); err != nil {
 				chBatch.Close()
 				return fmt.Errorf("flushing load batch for %s: %w", t.bindings[binding].target.Identifier, err)
 			}
-
-			fields["elapsed"] = fmt.Sprintf("%.3fs", time.Since(start).Seconds())
-			log.WithFields(fields).Debug("flushed load batch")
 			chBatch.Close()
 		}
 		batch = batch[:0]
