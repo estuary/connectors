@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-08-06
+### Changed
+- Load batches are sent once a full batch is collected, instead of when the
+  load binding changes.  On tasks with many active bindings, this should
+  generally result in larger batch sizes.
+
 ## 2026-07-29
 
 ### Fixed

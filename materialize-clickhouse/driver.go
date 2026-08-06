@@ -1,14 +1,15 @@
 package connector
 
 import (
+	"cmp"
 	"context"
 	"crypto/tls"
 	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
-	"time"
 
 	chproto "github.com/ClickHouse/ch-go/proto"
 	"github.com/ClickHouse/clickhouse-go/v2"
@@ -504,6 +505,11 @@ const (
 	batchBytesLimit = 10 * 1024 * 1024
 )
 
+type batchItem struct {
+	Binding int
+	Record  []any
+}
+
 func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) (err error) {
 	var ctx = it.Context()
 
@@ -517,45 +523,54 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	// load table this round, for verification against an authoritative count
 	// before the join.
 	activeBindings := make(map[int]int64, len(t.bindings))
-	lastBinding := -1
-	batch := make([][]any, 0, maxBatchSize)
+	batch := make([]batchItem, 0, maxBatchSize)
 	batchBytes := 0
 
-	flushLastBinding := func() error {
-		if len(batch) == 0 || lastBinding < 0 {
+	flushBindings := func() error {
+		if len(batch) == 0 {
 			return nil
 		}
-		// PrepareBatch fails before any rows have been sent, so retrying a
-		// transient connection drop is a clean no-op on the ClickHouse side.
-		var chBatch chdriver.Batch
-		if err := transientRetryPolicy.retry(ctx, "preparing load batch", isTransientErr, func() (err error) {
-			chBatch, err = t.load.conn.PrepareBatch(ctx, t.bindings[lastBinding].load.insertSQL)
-			return err
-		}); err != nil {
-			return fmt.Errorf("preparing load batch for %s: %w", t.bindings[lastBinding].target.Identifier, err)
-		}
-		defer chBatch.Close()
-		for _, record := range batch {
-			if err = chBatch.Append(record...); err != nil {
-				return fmt.Errorf("appending load batch for %s: %w", t.bindings[lastBinding].target.Identifier, err)
+
+		slices.SortFunc(batch, func(a, b batchItem) int {
+			return cmp.Compare(a.Binding, b.Binding)
+		})
+
+		begin := 0
+		for begin < len(batch) {
+			lastBinding := batch[begin].Binding
+			end := begin
+			for end < len(batch) && batch[end].Binding == lastBinding {
+				end++
 			}
-		}
+			items := batch[begin:end]
 
-		start := time.Now()
-		fields := log.Fields{
-			"target":           t.bindings[lastBinding].target.Identifier,
-			"batch_length":     len(batch),
-			"batch_size_bytes": batchBytes,
-		}
+			// PrepareBatch fails before any rows have been sent, so retrying a
+			// transient connection drop is a clean no-op on the ClickHouse side.
+			var chBatch chdriver.Batch
+			if err := transientRetryPolicy.retry(ctx, "preparing load batch", isTransientErr, func() (err error) {
+				chBatch, err = t.load.conn.PrepareBatch(ctx, t.bindings[lastBinding].load.insertSQL)
+				return err
+			}); err != nil {
+				return fmt.Errorf("preparing load batch for %s: %w", t.bindings[lastBinding].target.Identifier, err)
+			}
 
+			for _, item := range items {
+				if err = chBatch.Append(item.Record...); err != nil {
+					chBatch.Close()
+					return fmt.Errorf("appending load batch for %s: %w", t.bindings[lastBinding].target.Identifier, err)
+				}
+			}
+
+			if err = chBatch.Send(); err != nil {
+				chBatch.Close()
+				return fmt.Errorf("flushing load batch for %s: %w", t.bindings[lastBinding].target.Identifier, err)
+			}
+			chBatch.Close()
+
+			begin = end
+		}
 		batch = batch[:0]
 		batchBytes = 0
-		if err = chBatch.Send(); err != nil {
-			return fmt.Errorf("flushing load batch for %s: %w", t.bindings[lastBinding].target.Identifier, err)
-		}
-
-		fields["elapsed"] = fmt.Sprintf("%.3fs", time.Since(start).Seconds())
-		log.WithFields(fields).Info("flushed load batch")
 		return nil
 	}
 
@@ -578,21 +593,14 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}()
 
 	for it.Next() {
-		if it.Binding != lastBinding {
-			if err = flushLastBinding(); err != nil {
-				return err
+		if _, found := activeBindings[it.Binding]; !found {
+			b := t.bindings[it.Binding]
+			// The load table exists (ensured at session start); truncate
+			// clears any keys left over from a previous round.
+			if err = t.load.conn.Exec(ctx, b.load.truncateSQL); err != nil {
+				return fmt.Errorf("truncating load stage table for %s: %w", b.target.Identifier, err)
 			}
-			lastBinding = it.Binding
-
-			if _, found := activeBindings[it.Binding]; !found {
-				b := t.bindings[it.Binding]
-				// The load table exists (ensured at session start); truncate
-				// clears any keys left over from a previous round.
-				if err = t.load.conn.Exec(ctx, b.load.truncateSQL); err != nil {
-					return fmt.Errorf("truncating load stage table for %s: %w", b.target.Identifier, err)
-				}
-				activeBindings[it.Binding] = 0
-			}
+			activeBindings[it.Binding] = 0
 		}
 
 		b := t.bindings[it.Binding]
@@ -600,12 +608,12 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		if err != nil {
 			return fmt.Errorf("converting load key for %s: %w", b.target.Identifier, err)
 		}
-		batch = append(batch, converted)
+		batch = append(batch, batchItem{Binding: it.Binding, Record: converted})
 		batchBytes += len(it.PackedKey)
 		activeBindings[it.Binding]++
 
 		if len(batch) >= maxBatchSize || batchBytes >= batchBytesLimit {
-			if err = flushLastBinding(); err != nil {
+			if err = flushBindings(); err != nil {
 				return err
 			}
 		}
@@ -616,7 +624,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	if len(activeBindings) == 0 {
 		return nil
 	}
-	if err = flushLastBinding(); err != nil {
+	if err = flushBindings(); err != nil {
 		return err
 	}
 
