@@ -78,8 +78,99 @@ func runTests(m *testing.M) int {
 			log.WithField("err", err).Error("error building connector for tests")
 			return 1
 		}
+
+		stopScanner, err := startManualCDCScanner()
+		if err != nil {
+			log.WithField("err", err).Error("error taking over CDC log scanning")
+			return 1
+		}
+		defer stopScanner()
 	}
 	return m.Run()
+}
+
+// startManualCDCScanner stops the SQL Agent capture job and drives log scanning from the
+// test harness instead, returning a function which restores the job.
+//
+// Every stream-to-fence waits for a log scan session which completed after the fence
+// attempt began, so how often scans complete is a hard floor on how fast a capture reaches
+// a fence, and the suite pays that floor hundreds of times over. The capture job cannot
+// scan more than once a second, so drive the scans ourselves instead. This is invisible to
+// the connector, which only observes completed entries in sys.dm_cdc_log_scan_sessions and
+// the resulting maximum LSN.
+//
+// Only pays off alongside ${TEST_FENCE_RETRY_INTERVAL}, which blackboxTestSetup sets:
+// frequent scans make a fence available sooner, but the connector's default one second
+// poll still quantizes every fence to a one second boundary.
+func startManualCDCScanner() (func(), error) {
+	var controlURI = (&Config{
+		Address:  *dbControlAddress,
+		User:     *dbControlUser,
+		Password: *dbControlPass,
+		Database: *dbName,
+	}).ToURI()
+	conn, err := sql.Open("sqlserver", controlURI)
+	if err != nil {
+		return nil, fmt.Errorf("opening scanner connection: %w", err)
+	}
+
+	if _, err := conn.ExecContext(context.Background(), `EXEC sys.sp_cdc_stop_job @job_type = 'capture'`); err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("stopping capture job: %w", err)
+	}
+
+	// sp_cdc_stop_job only requests the stop, so wait for the job to actually leave the
+	// running state: sp_cdc_scan refuses to run alongside it.
+	const jobRunningQuery = `SELECT TOP 1 CASE WHEN ja.start_execution_date IS NOT NULL AND ja.stop_execution_date IS NULL THEN 1 ELSE 0 END ` +
+		`FROM msdb.dbo.sysjobs j JOIN msdb.dbo.sysjobactivity ja ON ja.job_id = j.job_id ` +
+		`WHERE j.name LIKE '%capture%' ORDER BY ja.session_id DESC`
+	var deadline = time.Now().Add(60 * time.Second)
+	for {
+		var running int
+		if err := conn.QueryRowContext(context.Background(), jobRunningQuery).Scan(&running); err != nil {
+			conn.Close()
+			return nil, fmt.Errorf("querying capture job state: %w", err)
+		}
+		if running == 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			conn.Close()
+			return nil, fmt.Errorf("capture job still running 60s after being asked to stop")
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+
+	var scannerCtx, cancelScanner = context.WithCancel(context.Background())
+	var scannerDone = make(chan struct{})
+	go func() {
+		defer close(scannerDone)
+		for scannerCtx.Err() == nil {
+			// The transaction limit has to match what msdb.dbo.cdc_jobs advertises, because
+			// the connector reads that value and treats a scan session which hit the limit
+			// as one which may not have caught up.
+			//
+			// Deliberately not tied to scannerCtx: cancelling mid-scan would abort a scan
+			// the connector may already be waiting on, and a scan only takes a moment.
+			if _, err := conn.ExecContext(context.Background(),
+				`EXEC sys.sp_cdc_scan @maxtrans = 500, @maxscans = 1, @continuous = 0`); err != nil && scannerCtx.Err() == nil {
+				log.WithField("err", err).Warn("manual CDC log scan failed")
+			}
+			select {
+			case <-scannerCtx.Done():
+			case <-time.After(50 * time.Millisecond):
+			}
+		}
+	}()
+
+	return func() {
+		cancelScanner()
+		<-scannerDone
+		if _, err := conn.ExecContext(context.Background(), `EXEC sys.sp_cdc_start_job @job_type = 'capture'`); err != nil {
+			log.WithField("err", err).Warn("error restarting capture job")
+		}
+		conn.Close()
+	}, nil
 }
 
 var documentSanitizers = []blackbox.JSONSanitizer{
@@ -131,6 +222,9 @@ func blackboxTestSetupSerial(t testing.TB) (*sqlserverTestDatabase, *blackbox.Tr
 	tc.Capture.Logger = t.Log
 	tc.Capture.DiscoveryFilter = regexp.MustCompile(uniqueID)
 	tc.Capture.Env["SHUTDOWN_AFTER_POLLING"] = "yes"
+	// Pointless without the manual scanner started in runTests, and vice versa: see the
+	// comment there for why both halves are needed to shorten a fence wait.
+	tc.Capture.Env["TEST_FENCE_RETRY_INTERVAL"] = "100ms"
 	require.NoError(t, tc.Capture.SetLocalCommand(connectorBinary))
 	tc.DocumentSanitizers = documentSanitizers
 	tc.CheckpointSanitizers = checkpointSanitizers
