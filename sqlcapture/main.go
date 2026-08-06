@@ -417,7 +417,7 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		Name:     string(open.Capture.Name),
 		Bindings: bindings,
 		State:    &state,
-		Output:   &boilerplate.PullOutput{Connector_CaptureServer: stream},
+		Output:   stream,
 		Database: db,
 	}
 

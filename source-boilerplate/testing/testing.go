@@ -191,6 +191,7 @@ func (cs *CaptureSpec) Capture(ctx context.Context, t testing.TB, callback func(
 
 	stream := &boilerplate.PullOutput{
 		Connector_CaptureServer: adapter,
+		NumBindings:             len(cs.Bindings),
 	}
 
 	if cs.CaptureDelay > 0 {
