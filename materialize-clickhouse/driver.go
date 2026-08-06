@@ -1,12 +1,14 @@
 package connector
 
 import (
+	"cmp"
 	"context"
 	"crypto/tls"
 	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	chproto "github.com/ClickHouse/ch-go/proto"
@@ -525,34 +527,47 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	batchBytes := 0
 
 	flushBindings := func() error {
-		// Group batch records by Binding.
-		bindingBatch := make(map[int][][]any, len(t.bindings))
-		for _, item := range batch {
-			bindingBatch[item.Binding] = append(bindingBatch[item.Binding], item.Record)
+		if len(batch) == 0 {
+			return nil
 		}
 
-		for binding, records := range bindingBatch {
+		slices.SortFunc(batch, func(a, b batchItem) int {
+			return cmp.Compare(a.Binding, b.Binding)
+		})
+
+		begin := 0
+		for begin < len(batch) {
+			lastBinding := batch[begin].Binding
+			end := begin
+			for end < len(batch) && batch[end].Binding == lastBinding {
+				end++
+			}
+			items := batch[begin:end]
+
 			// PrepareBatch fails before any rows have been sent, so retrying a
 			// transient connection drop is a clean no-op on the ClickHouse side.
 			var chBatch chdriver.Batch
 			if err := transientRetryPolicy.retry(ctx, "preparing load batch", isTransientErr, func() (err error) {
-				chBatch, err = t.load.conn.PrepareBatch(ctx, t.bindings[binding].load.insertSQL)
+				chBatch, err = t.load.conn.PrepareBatch(ctx, t.bindings[lastBinding].load.insertSQL)
 				return err
 			}); err != nil {
-				return fmt.Errorf("preparing load batch for %s: %w", t.bindings[binding].target.Identifier, err)
+				return fmt.Errorf("preparing load batch for %s: %w", t.bindings[lastBinding].target.Identifier, err)
 			}
-			for _, record := range records {
-				if err = chBatch.Append(record...); err != nil {
+
+			for _, item := range items {
+				if err = chBatch.Append(item.Record...); err != nil {
 					chBatch.Close()
-					return fmt.Errorf("appending load batch for %s: %w", t.bindings[binding].target.Identifier, err)
+					return fmt.Errorf("appending load batch for %s: %w", t.bindings[lastBinding].target.Identifier, err)
 				}
 			}
 
 			if err = chBatch.Send(); err != nil {
 				chBatch.Close()
-				return fmt.Errorf("flushing load batch for %s: %w", t.bindings[binding].target.Identifier, err)
+				return fmt.Errorf("flushing load batch for %s: %w", t.bindings[lastBinding].target.Identifier, err)
 			}
 			chBatch.Close()
+
+			begin = end
 		}
 		batch = batch[:0]
 		batchBytes = 0
