@@ -504,6 +504,11 @@ const (
 	batchBytesLimit = 10 * 1024 * 1024
 )
 
+type batchItem struct {
+	Binding int
+	Record  []any
+}
+
 func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) (err error) {
 	var ctx = it.Context()
 
@@ -518,44 +523,50 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	// before the join.
 	activeBindings := make(map[int]int64, len(t.bindings))
 	lastBinding := -1
-	batch := make([][]any, 0, maxBatchSize)
+	batch := make([]batchItem, 0, maxBatchSize)
 	batchBytes := 0
 
-	flushLastBinding := func() error {
-		if len(batch) == 0 || lastBinding < 0 {
-			return nil
+	flushBindings := func() error {
+		// Group batch records by Binding.
+		bindingBatch := make(map[int][][]any, len(t.bindings))
+		for _, item := range batch {
+			bindingBatch[item.Binding] = append(bindingBatch[item.Binding], item.Record)
 		}
-		// PrepareBatch fails before any rows have been sent, so retrying a
-		// transient connection drop is a clean no-op on the ClickHouse side.
-		var chBatch chdriver.Batch
-		if err := transientRetryPolicy.retry(ctx, "preparing load batch", isTransientErr, func() (err error) {
-			chBatch, err = t.load.conn.PrepareBatch(ctx, t.bindings[lastBinding].load.insertSQL)
-			return err
-		}); err != nil {
-			return fmt.Errorf("preparing load batch for %s: %w", t.bindings[lastBinding].target.Identifier, err)
-		}
-		defer chBatch.Close()
-		for _, record := range batch {
-			if err = chBatch.Append(record...); err != nil {
-				return fmt.Errorf("appending load batch for %s: %w", t.bindings[lastBinding].target.Identifier, err)
+
+		for binding, records := range bindingBatch {
+			// PrepareBatch fails before any rows have been sent, so retrying a
+			// transient connection drop is a clean no-op on the ClickHouse side.
+			var chBatch chdriver.Batch
+			if err := transientRetryPolicy.retry(ctx, "preparing load batch", isTransientErr, func() (err error) {
+				chBatch, err = t.load.conn.PrepareBatch(ctx, t.bindings[binding].load.insertSQL)
+				return err
+			}); err != nil {
+				return fmt.Errorf("preparing load batch for %s: %w", t.bindings[binding].target.Identifier, err)
 			}
-		}
+			for _, record := range records {
+				if err = chBatch.Append(record...); err != nil {
+					chBatch.Close()
+					return fmt.Errorf("appending load batch for %s: %w", t.bindings[binding].target.Identifier, err)
+				}
+			}
 
-		start := time.Now()
-		fields := log.Fields{
-			"target":           t.bindings[lastBinding].target.Identifier,
-			"batch_length":     len(batch),
-			"batch_size_bytes": batchBytes,
-		}
+			start := time.Now()
+			fields := log.Fields{
+				"target":     t.bindings[binding].target.Identifier,
+				"batch_size": len(records),
+			}
 
+			if err = chBatch.Send(); err != nil {
+				chBatch.Close()
+				return fmt.Errorf("flushing load batch for %s: %w", t.bindings[binding].target.Identifier, err)
+			}
+
+			fields["elapsed"] = fmt.Sprintf("%.3fs", time.Since(start).Seconds())
+			log.WithFields(fields).Debug("flushed load batch")
+			chBatch.Close()
+		}
 		batch = batch[:0]
 		batchBytes = 0
-		if err = chBatch.Send(); err != nil {
-			return fmt.Errorf("flushing load batch for %s: %w", t.bindings[lastBinding].target.Identifier, err)
-		}
-
-		fields["elapsed"] = fmt.Sprintf("%.3fs", time.Since(start).Seconds())
-		log.WithFields(fields).Info("flushed load batch")
 		return nil
 	}
 
@@ -579,9 +590,6 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 	for it.Next() {
 		if it.Binding != lastBinding {
-			if err = flushLastBinding(); err != nil {
-				return err
-			}
 			lastBinding = it.Binding
 
 			if _, found := activeBindings[it.Binding]; !found {
@@ -600,12 +608,12 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		if err != nil {
 			return fmt.Errorf("converting load key for %s: %w", b.target.Identifier, err)
 		}
-		batch = append(batch, converted)
+		batch = append(batch, batchItem{Binding: it.Binding, Record: converted})
 		batchBytes += len(it.PackedKey)
 		activeBindings[it.Binding]++
 
 		if len(batch) >= maxBatchSize || batchBytes >= batchBytesLimit {
-			if err = flushLastBinding(); err != nil {
+			if err = flushBindings(); err != nil {
 				return err
 			}
 		}
@@ -616,7 +624,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	if len(activeBindings) == 0 {
 		return nil
 	}
-	if err = flushLastBinding(); err != nil {
+	if err = flushBindings(); err != nil {
 		return err
 	}
 
