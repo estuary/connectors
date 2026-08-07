@@ -333,7 +333,7 @@ func TestPartitionByDataPath(t *testing.T) {
 		_, _ = db.ExecContext(context.Background(), fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
 	})
 
-	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}}
+	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}, ensured: make(chan struct{})}
 	loadConn, err := clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
 	tr.load.conn = loadConn
@@ -424,6 +424,7 @@ func TestRecoveryAfterPartitionChangingBackfill(t *testing.T) {
 		templates: tpls,
 		cfg:       cfg,
 		_range:    &pf.RangeSpec{},
+		ensured:   make(chan struct{}),
 		state:     make(connectorState),
 	}
 	storeConn, err := clickhouse.Open(cfg.newClickhouseOptions())
@@ -440,7 +441,6 @@ func TestRecoveryAfterPartitionChangingBackfill(t *testing.T) {
 	// A staged row of the pending pre-backfill commit.
 	stageTestRows(t, ctx, tr, b, []any{"k1", "v1", "c", testTime, `{"id":"k1"}`})
 
-	tr.ensured = false
 	tr.recovery = true
 	tr.state[b.target.StateKey] = &stateItem{StoredRows: 1}
 	_, err = tr.Acknowledge(ctx, nil, nil)
@@ -575,7 +575,7 @@ func TestStoreTablePartitionDrift(t *testing.T) {
 	_, err = db.ExecContext(ctx, staleSQL)
 	require.NoError(t, err)
 
-	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}}
+	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}, ensured: make(chan struct{})}
 	loadConn, err := clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
 	tr.load.conn = loadConn

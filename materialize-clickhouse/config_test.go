@@ -73,7 +73,7 @@ func TestResolvedAddress(t *testing.T) {
 }
 
 func TestAcknowledge(t *testing.T) {
-	var tr transactor
+	tr := transactor{ensured: make(chan struct{})}
 	state, err := tr.Acknowledge(t.Context(), nil, nil)
 	require.NoError(t, err)
 	require.Nil(t, state)
