@@ -59,26 +59,20 @@ as integer" is a good one.
 
 If a connector doesn't have a `CHANGELOG.md` yet, create the file with a
 single header (`# Changelog`) alongside your first user-visible change to
-it. The CI check below will prompt you when that's warranted.
+it. The PR template checklist below will prompt you when that's warranted.
 
-## Docs / CHANGELOG CI check
+## Docs / CHANGELOG checklist
 
-PRs that change connector code run an automated review
-(`.github/workflows/docs-changelog-check.yaml`). It uses Claude to judge
-whether the change is user-visible enough to warrant a documentation
-update and/or a `CHANGELOG.md` entry, then verifies the PR contains them.
-The check fails when it believes something is missing.
+The PR template carries a checklist item for `CHANGELOG.md` and one for
+documentation. There's no automated check: whether an entry is warranted
+is a judgment call for the author, backstopped by whoever reviews the PR.
 
-It's a model making a judgment call, so it will sometimes be wrong.
-To dismiss it, apply the **`docs-check-skip`** label to the PR — the
-check re-runs and passes. Use the label when:
-
-- The verdict is a false positive (the change isn't actually user-visible)
-- The docs update is tracked in a separate linked PR (e.g. the connector's
-  docs still live in `estuary/flow`)
-
-Fork PRs can't access the API key; the check passes with a notice and
-reviewers judge manually.
+An earlier version of this ran as an automated CI check (an LLM judging
+each diff, dismissable with a `docs-check-skip` label). Team consensus in
+#integrations (2026-08-06) was to drop it: "user-visible" isn't precise
+enough to automate well, and it duplicated what code review already
+covers. See that thread for the reasoning if you're wondering why this
+isn't enforced by CI.
 
 ### Claude Code skill
 
