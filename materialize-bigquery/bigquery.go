@@ -10,6 +10,7 @@ import (
 	"cloud.google.com/go/bigquery"
 	"github.com/estuary/connectors/go/auth/iam"
 	"github.com/estuary/connectors/go/blob"
+	"github.com/estuary/connectors/go/common"
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
@@ -22,14 +23,14 @@ import (
 	"google.golang.org/api/option"
 )
 
-var featureFlagDefaults = map[string]bool{
+var featureFlagDefaults = map[string]common.FlagDefault{
 	// When set, object and array field types will be materialized as JSON
 	// columns, instead of the historical behavior of strings.
-	"objects_and_arrays_as_json":       true,
-	"datetime_keys_as_string":          true,
-	"retain_existing_data_on_backfill": false,
-	"skip_cleanup":                     false,
-	"native_binary_column_type":        true,
+	"objects_and_arrays_as_json":       common.FlagEnabled,
+	"datetime_keys_as_string":          common.FlagEnabled,
+	"retain_existing_data_on_backfill": common.FlagDisabled,
+	"skip_cleanup":                     common.FlagDisabled,
+	"native_binary_column_type":        common.FlagEnabled,
 }
 
 type AuthType string
@@ -207,7 +208,7 @@ func (c config) DefaultNamespace() string {
 	return c.Dataset
 }
 
-func (c config) FeatureFlags() (string, map[string]bool) {
+func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
 	return c.Advanced.FeatureFlags, featureFlagDefaults
 }
 

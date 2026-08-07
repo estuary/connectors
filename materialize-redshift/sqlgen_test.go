@@ -1,22 +1,22 @@
 package connector
 
 import (
-	"maps"
 	"strings"
 	"testing"
 	"text/template"
 
 	"github.com/bradleyjkemp/cupaloy"
+	"github.com/estuary/connectors/go/common"
 	sql "github.com/estuary/connectors/materialize-sql"
 	sqlDriver "github.com/estuary/connectors/materialize-sql"
 	"github.com/stretchr/testify/require"
 )
 
-var testDialect = createRsDialect(false, featureFlagDefaults)
+var testDialect = createRsDialect(false, common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{}))
 var testTemplates = renderTemplates(testDialect)
 
 func flagsWithoutNativeBinary() map[string]bool {
-	out := maps.Clone(featureFlagDefaults)
+	out := common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{})
 	out["native_binary_column_type"] = false
 	return out
 }

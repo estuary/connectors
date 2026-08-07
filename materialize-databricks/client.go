@@ -236,7 +236,7 @@ func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, e
 	return fmt.Sprintf("CREATE SCHEMA %s;", schemaName), err
 }
 
-func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
+func preReqs(ctx context.Context, cfg config, _ map[string]bool) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
 
 	var wsConfig *databricks.Config

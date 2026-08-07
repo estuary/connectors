@@ -55,7 +55,11 @@ func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 		return nil, err
 	}
 
-	parsedFlags := boilerplate.ParseFlags(cfg)
+	parsedFlags, err := boilerplate.ResolveFlags(cfg, req.LastMaterialization)
+	if err != nil {
+		return nil, err
+	}
+
 	materializer, err := NewMaterializer(ctx, req.Name.String(), cfg, parsedFlags)
 	if err != nil {
 		return nil, err
@@ -117,7 +121,11 @@ func (*Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_A
 		return nil, err
 	}
 
-	parsedFlags := boilerplate.ParseFlags(cfg)
+	parsedFlags, err := boilerplate.ResolveFlags(cfg, req.Materialization)
+	if err != nil {
+		return nil, err
+	}
+
 	materializer, err := NewMaterializer(ctx, req.Materialization.Name.String(), cfg, parsedFlags)
 	if err != nil {
 		return nil, err
@@ -268,7 +276,11 @@ func (*Driver) NewTransactor(
 		return nil, nil, nil, err
 	}
 
-	featureFlags := boilerplate.ParseFlags(cfg)
+	featureFlags, err := boilerplate.ResolveFlags(cfg, req.Materialization)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
 	materializer, err := NewMaterializer(ctx, req.Materialization.Name.String(), cfg, featureFlags)
 	if err != nil {
 		return nil, nil, nil, err

@@ -37,7 +37,7 @@ func RunApplyDrainTest[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConf
 	ctx := context.Background()
 	configJson, resourceConfigJson := rawJson(t, cfg), rawJson(t, res)
 
-	materializer, err := newMaterializer(ctx, "apply-drain-test", cfg, boilerplate.ParseFlags(cfg))
+	materializer, err := newMaterializer(ctx, "apply-drain-test", cfg, harnessFlags(t, cfg))
 	require.NoError(t, err)
 
 	resourcePath, _, err := res.Parameters()

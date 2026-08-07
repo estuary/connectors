@@ -6,12 +6,19 @@ import (
 	"text/template"
 
 	"github.com/bradleyjkemp/cupaloy"
+	"github.com/estuary/connectors/go/common"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/stretchr/testify/require"
 )
 
-var testDialect = createPgDialect(featureFlagDefaults)
+// testFlagDefaults resolves flag defaults as they would be for a newly created
+// task, so that any date-gated flag is exercised in its enabled state.
+func testFlagDefaults() map[string]bool {
+	return common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{})
+}
+
+var testDialect = createPgDialect(testFlagDefaults())
 var testTemplates = renderTemplates(testDialect)
 
 func TestSQLGeneration(t *testing.T) {
@@ -166,10 +173,7 @@ func TestJSONBContentMediaType(t *testing.T) {
 // the contentMediaType is ignored entirely and every field collapses onto JSON,
 // preserving the pre-JSONB behavior.
 func TestJSONBFeatureFlagDisabled(t *testing.T) {
-	flags := map[string]bool{}
-	for k, v := range featureFlagDefaults {
-		flags[k] = v
-	}
+	flags := testFlagDefaults()
 	flags["jsonb"] = false
 	dialect := createPgDialect(flags)
 
