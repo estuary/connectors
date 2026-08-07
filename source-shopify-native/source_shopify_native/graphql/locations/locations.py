@@ -59,6 +59,10 @@ class Locations(ShopifyGraphQLResource):
             first=first,
             after=after,
             capabilities=capabilities,
+            # Both active and inactive locations are returned with `includeInactive: true`,
+            # and marking a location as inactive updates its updatedAt field, so fetching
+            # both in the same query works out fine.
+            extra_root_args="includeInactive: true",
         )
 
     @staticmethod
