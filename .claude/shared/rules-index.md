@@ -79,6 +79,7 @@ Invoke before writing or changing any `fetch_*` / `backfill_*` function.
 | `CONDUCT-STATE-CONVENTIONS` | conduct | Say when you follow a convention, and when you deviate |
 | `CONDUCT-CITE-SOURCE` | diff | Copied patterns cite `file:line` |
 | `CONDUCT-GREP-BEFORE-CITE` | conduct | Grep for remembered symbols before recommending them |
+| `CONDUCT-ESTABLISH-BASELINE` | conduct | Baseline suite in background at session start; gate the first edit on it |
 | `CONDUCT-VERIFY-FIRST` | conduct | Live behavior over docs over recall |
 
 ### Situational skills

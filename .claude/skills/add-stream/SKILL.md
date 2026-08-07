@@ -25,7 +25,7 @@ These apply in every phase. Re-read them before each phase boundary.
 
 Confirm the connector exists. Locate its `models.py`, `resources.py`, `api.py` (or equivalents — naming varies between Python connectors). Read streams in the same connector before designing anything.
 
-**Clean-room check.** Kick off the connector's existing test suite (typically `pytest` from the connector directory) in the background as soon as Phase 0 begins. Phases 1–3 are read-only / planning and may proceed in parallel while the suite runs — do **not** block on it. The clean-room result is a **gate on Phase 4**: before writing any code for the new stream, confirm the baseline passes so later failures are attributable to the new stream, not pre-existing drift.
+**Baseline check (`CONDUCT-ESTABLISH-BASELINE`).** Kick off the connector's existing test suite in the background as soon as Phase 0 begins. Phases 1–3 are read-only / planning and may proceed in parallel while the suite runs — do **not** block on it. The result is a **gate on Phase 4**: confirm the baseline passes before writing any code for the new stream. Failure handling — including the separate `<connector-name>: update tests` commit for stale snapshots — is in [session-conduct.md](../../shared/session-conduct.md).
 
 If the suite fails:
 
