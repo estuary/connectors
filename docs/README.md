@@ -9,6 +9,7 @@ Internal references for connector developers.
 - [Materializations](materialize/README.md) — materialization gRPC protocol reference
 - [Inbound networking](inbound_networking.md) — Dockerfile `LABEL`s for exposed ports
 - [Feature flags](feature_flags.md) — per-task feature-flag mechanism + bulk-publish workflow
+- [OAuth](oauth.md) — `OAuth2Spec` template fields and the authorize/token-exchange flow
 
 ## Customer-facing docs (`reference/Connectors/`)
 

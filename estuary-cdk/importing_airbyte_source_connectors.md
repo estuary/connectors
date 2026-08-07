@@ -66,10 +66,32 @@ why that is acceptable:
 
 ## Importing Airbyte Source Code
 
-See instructions
-[here](https://github.com/estuary/connectors/blob/main/python/README.md#pulling-an-open-source-connector-in-tree)
-for how to do the import commit. Import the latest commit from the Airbyte repository that has an
-MIT license (most common) or any SPDX license listed [here](https://spdx.org/licenses/).
+Import the latest commit from the Airbyte repository that has an MIT license (most common) or any
+SPDX license listed [here](https://spdx.org/licenses/).
+
+Before deciding to pull a connector in-tree, first make sure that the version of the connector
+you're going to pull is licensed to allow this usage, and that you have its location in the origin
+repository. Then, the connector can be imported like so:
+
+```bash
+$ git remote add -f --no-tags bigdata https://github.com/big/data.git
+$ ./estuary-cdk/pull_upstream.sh bigdata master upstream/path/to/source-foobar ./source-bigdata license_type path/to/LICENSE
+```
+
+> **Note:** `license_type` here corresponds to an SPDX license identifier. You can find the list of
+> valid licenses [here](https://spdx.org/licenses/).
+
+> **Note:** `pull_upstream.sh` supports refs and commit hashes. The following is equally valid:
+>  ```bash
+>  $ ./estuary-cdk/pull_upstream.sh bigdata b38c2a5f upstream/path ./source-bigdata license_type path/to/LICENSE
+>  ```
+
+This will create a special merge commit that indicates the SHA of the latest commit that is being
+imported, where it came from, where it's going, what the specified license type was, and where that
+license lived. This commit format serves two purposes. First, it acts as a record of the point in
+time that the open source connector was imported. This is important in order to verify that the
+imported connector was properly licensed at the time it was imported. Second, it allows for
+subsequent `pull_upstream.sh` invocations to cleanly merge in upstream changes, if desired.
 
 ## Comparing Snapshots
 
@@ -103,7 +125,7 @@ The originator of the connector import PR is responsible for setting up a suitab
 for the system to be captured from. The connector cannot be developed without suitable access for
 verifying that the integration is functional. If a test account cannot readily be set up, start a
 thread in Slack to discuss a plan for proceeding. See
-[here](https://github.com/estuary/connectors/blob/main/python/README.md#encrypting-test-credentials)
+[here](../CONTRIBUTING.md#encrypting-test-credentials)
 for a reference on how to encrypt test system credentials so that they can be committed.
 
 ## Migration Testing
