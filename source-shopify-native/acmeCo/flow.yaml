@@ -59,6 +59,11 @@ collections:
     key:
     - /_meta/store
     - /id
+  acmeCo/markets:
+    schema: markets.schema.yaml
+    key:
+    - /_meta/store
+    - /_meta/row_id
   acmeCo/order_agreements:
     schema: order_agreements.schema.yaml
     key:
