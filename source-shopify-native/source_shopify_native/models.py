@@ -45,6 +45,7 @@ scopes = [
     "read_orders",  # Orders, AbandonedCheckouts, Fulfillments, Transactions, Refunds, Risks
     "read_locations",  # Locations
     "read_inventory",  # InventoryItems, InventoryLevels, Locations
+    "read_markets",  # Markets
     "read_customers",  # Customers
     "read_own_subscription_contracts",  # SubscriptionContracts
     "read_users", # StaffMembers

@@ -6733,5 +6733,43 @@
       "metafields": [],
       "updatedAt": "redacted"
     }
+  ],
+  [
+    "acmeCo/markets",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "store": "estuary-alex-testing",
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "catalogs": [],
+      "catalogsCount": {
+        "count": 0,
+        "precision": "EXACT"
+      },
+      "conditions": {
+        "conditionTypes": [
+          "REGION"
+        ]
+      },
+      "currencySettings": {
+        "baseCurrency": {
+          "currencyCode": "USD",
+          "currencyName": "US Dollar",
+          "enabled": true,
+          "manualRate": null,
+          "rateUpdatedAt": null
+        },
+        "localCurrencies": false,
+        "roundingEnabled": true
+      },
+      "handle": "international",
+      "id": "gid://shopify/Market/45947256877",
+      "name": "International",
+      "priceInclusions": null,
+      "status": "ACTIVE",
+      "type": "REGION"
+    }
   ]
 ]
