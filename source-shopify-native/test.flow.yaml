@@ -142,3 +142,7 @@ captures:
         interval: PT5M
         schedule: 55 23 * * *
       target: acmeCo/disputes
+    - resource:
+        name: markets
+        interval: PT15M
+      target: acmeCo/markets
