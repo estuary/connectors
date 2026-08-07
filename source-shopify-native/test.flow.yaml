@@ -13,106 +13,132 @@ captures:
     - resource:
         name: abandoned_checkouts
         interval: PT5M
+        schedule: ''
       target: acmeCo/abandoned_checkouts
     - resource:
         name: customers
         interval: PT5M
+        schedule: ''
       target: acmeCo/customers
       disable: true
     - resource:
         name: customer_metafields
         interval: PT5M
+        schedule: ''
       target: acmeCo/customer_metafields
       disable: true
     - resource:
         name: products
         interval: PT5M
+        schedule: ''
       target: acmeCo/products
     - resource:
         name: product_media
         interval: PT5M
+        schedule: ''
       target: acmeCo/product_media
     - resource:
         name: product_metafields
         interval: PT5M
+        schedule: ''
       target: acmeCo/product_metafields
     - resource:
         name: product_variants
         interval: PT5M
+        schedule: ''
       target: acmeCo/product_variants
     - resource:
         name: product_variant_metafields
         interval: PT5M
+        schedule: ''
       target: acmeCo/product_variant_metafields
     - resource:
         name: fulfillment_orders
         interval: PT5M
+        schedule: ''
       target: acmeCo/fulfillment_orders
     - resource:
         name: fulfillments
         interval: PT5M
+        schedule: ''
       target: acmeCo/fulfillments
     - resource:
         name: orders
         interval: PT5M
+        schedule: ''
       target: acmeCo/orders
     - resource:
         name: order_agreements
         interval: PT5M
+        schedule: ''
       target: acmeCo/order_agreements
     - resource:
         name: order_metafields
         interval: PT5M
+        schedule: ''
       target: acmeCo/order_metafields
     - resource:
         name: order_transactions
         interval: PT5M
+        schedule: ''
       target: acmeCo/order_transactions
     - resource:
         name: order_refunds
         interval: PT5M
+        schedule: ''
       target: acmeCo/order_refunds
     - resource:
         name: order_returns
         interval: PT5M
+        schedule: ''
       target: acmeCo/order_returns
     - resource:
         name: order_risks
         interval: PT5M
+        schedule: ''
       target: acmeCo/order_risks
     - resource:
         name: inventory_items
         interval: PT5M
+        schedule: ''
       target: acmeCo/inventory_items
     - resource:
         name: inventory_levels
         interval: PT5M
+        schedule: ''
       target: acmeCo/inventory_levels
     - resource:
         name: custom_collections
         interval: PT5M
+        schedule: ''
       target: acmeCo/custom_collections
     - resource:
         name: smart_collections
         interval: PT5M
+        schedule: ''
       target: acmeCo/smart_collections
     - resource:
         name: custom_collection_metafields
         interval: PT5M
+        schedule: ''
       target: acmeCo/custom_collection_metafields
     - resource:
         name: smart_collection_metafields
         interval: PT5M
+        schedule: ''
       target: acmeCo/smart_collection_metafields
     - resource:
         name: locations
         interval: PT5M
+        schedule: ''
       target: acmeCo/locations
     - resource:
         name: location_metafields
         interval: PT5M
+        schedule: ''
       target: acmeCo/location_metafields
     - resource:
         name: disputes
         interval: PT5M
+        schedule: 55 23 * * *
       target: acmeCo/disputes
