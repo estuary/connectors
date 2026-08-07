@@ -695,6 +695,9 @@ class ShopifyGraphQLResource(BaseDocument):
         includeCreatedAt: bool = True,
         includeUpdatedAt: bool = True,
         capabilities: "StoreCapabilities | None" = None,
+        # Raw GraphQL spliced verbatim into the query root's argument list, for arguments
+        # that only one connection accepts (ex: `includeInactive` on `locations`).
+        extra_root_args: str = "",
     ) -> str:
         lower_bound = dt_to_str(start)
         upper_bound = dt_to_str(end)
@@ -721,6 +724,7 @@ class ShopifyGraphQLResource(BaseDocument):
                 {sort_key_clause}
                 {f"first: {first}" if first else ""}
                 {f'after: "{after}"' if after else ""}
+                {extra_root_args}
             ) {{
                 edges {{
                     node {{
