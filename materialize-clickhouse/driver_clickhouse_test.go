@@ -369,7 +369,7 @@ func TestDestroy(t *testing.T) {
 	ensureDockerUp(t)
 
 	var cfg = testConfig()
-	var tr = &transactor{}
+	var tr = &transactor{ensured: make(chan struct{})}
 	var err error
 	tr.store.conn, err = clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
@@ -407,7 +407,7 @@ func TestAddBinding(t *testing.T) {
 		_, _ = db.ExecContext(context.Background(), fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
 	})
 
-	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}}
+	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}, ensured: make(chan struct{})}
 	loadConn, err := clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
 	tr.load.conn = loadConn
@@ -517,7 +517,7 @@ func TestStoreAndLoadDataPath(t *testing.T) {
 	})
 
 	// Build the binding to get rendered SQL.
-	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}}
+	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}, ensured: make(chan struct{})}
 	loadConn, err := clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
 	tr.load.conn = loadConn
@@ -794,7 +794,7 @@ func TestHardDeleteTombstone(t *testing.T) {
 		_, _ = db.ExecContext(context.Background(), fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
 	})
 
-	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}}
+	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}, ensured: make(chan struct{})}
 	loadConn, err := clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
 	tr.load.conn = loadConn
@@ -839,7 +839,7 @@ func setupTable(t *testing.T, ctx context.Context, cfg config, dialect sql.Diale
 		_, _ = cleanDB.ExecContext(context.Background(), fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
 	})
 
-	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}}
+	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}, ensured: make(chan struct{})}
 	loadConn, err := clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
 	tr.load.conn = loadConn
@@ -1127,7 +1127,7 @@ func TestMultiBindingStoreAndLoad(t *testing.T) {
 	})
 
 	// Build transactor with 2 bindings.
-	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}}
+	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}, ensured: make(chan struct{})}
 	loadConn, err := clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
 	tr.load.conn = loadConn
@@ -1221,7 +1221,7 @@ func TestMovePartitionMissingTarget(t *testing.T) {
 	_, err = db.ExecContext(ctx, createSQL)
 	require.NoError(t, err)
 
-	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}}
+	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}, ensured: make(chan struct{})}
 	storeConn, err := clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
 	tr.store.conn = storeConn
@@ -1289,6 +1289,7 @@ func newTestTransactor(t *testing.T, ctx context.Context, tableName string) (*tr
 		templates: tpls,
 		cfg:       cfg,
 		_range:    &pf.RangeSpec{},
+		ensured:   make(chan struct{}),
 		state:     make(connectorState),
 	}
 	storeConn, err := clickhouse.Open(cfg.newClickhouseOptions())
@@ -1384,7 +1385,6 @@ func TestAcknowledgeRecoveryMatrix(t *testing.T) {
 		require.NoError(t, tr.ensureTempTables(ctx, b))
 		stageTestRows(t, ctx, tr, b, []any{"k1", "v1", "c", testTime, `{"id":"k1"}`})
 
-		tr.ensured = false
 		tr.recovery = true
 		tr.state[b.target.StateKey] = &stateItem{StoredRows: 1}
 		_, err := tr.Acknowledge(ctx, nil, nil)
@@ -1401,7 +1401,6 @@ func TestAcknowledgeRecoveryMatrix(t *testing.T) {
 		// StoredRows says 3, but only 1 row remains staged -- as if a prior
 		// process had moved part of the commit before crashing. Recovery must
 		// move the remainder rather than failing the equality check forever.
-		tr.ensured = false
 		tr.recovery = true
 		tr.state[b.target.StateKey] = &stateItem{StoredRows: 3}
 		_, err := tr.Acknowledge(ctx, nil, nil)
@@ -1419,7 +1418,6 @@ func TestAcknowledgeRecoveryMatrix(t *testing.T) {
 		// transaction can stage into it.
 		require.NoError(t, tr.store.conn.Exec(ctx, b.store.dropTableSQL))
 
-		tr.ensured = false
 		tr.recovery = true
 		tr.state[b.target.StateKey] = &stateItem{StoredRows: 1}
 		_, err := tr.Acknowledge(ctx, nil, nil)
@@ -1440,7 +1438,6 @@ func TestAcknowledgeRecoveryMatrix(t *testing.T) {
 
 		// No pending state for the binding: the staged row was never
 		// committed and must be discarded, not moved.
-		tr.ensured = false
 		_, err := tr.Acknowledge(ctx, nil, nil)
 		require.NoError(t, err)
 		require.EqualValues(t, 0, countTable(t, ctx, tr, tr.dialect.Identifier(storeTableName(b.target, 0))))
@@ -1451,7 +1448,6 @@ func TestAcknowledgeRecoveryMatrix(t *testing.T) {
 		tr, b := newTestTransactor(t, ctx, "test_recovery_fresh")
 		_ = tr.store.conn.Exec(ctx, b.store.dropTableSQL)
 
-		tr.ensured = false
 		_, err := tr.Acknowledge(ctx, nil, nil)
 		require.NoError(t, err)
 		require.EqualValues(t, 0, countTable(t, ctx, tr, tr.dialect.Identifier(storeTableName(b.target, 0))))
@@ -1466,7 +1462,6 @@ func TestAcknowledgeRecoveryMatrix(t *testing.T) {
 		require.NoError(t, tr.store.conn.Exec(ctx,
 			fmt.Sprintf("ALTER TABLE %s DROP COLUMN %s", stageName, tr.dialect.Identifier("value"))))
 
-		tr.ensured = false
 		_, err := tr.Acknowledge(ctx, nil, nil)
 		require.NoError(t, err)
 
@@ -1499,7 +1494,6 @@ func TestAcknowledgeRecoveryMatrix(t *testing.T) {
 
 		// Pending state with rows already moved (StoredRows > 0, empty stage):
 		// this is what drives Acknowledge through the trivial recovery move.
-		tr.ensured = false
 		tr.recovery = true
 		tr.state[b.target.StateKey] = &stateItem{StoredRows: 1}
 		_, err := tr.Acknowledge(ctx, nil, nil)
@@ -1531,7 +1525,6 @@ func TestAcknowledgeRecoveryMatrix(t *testing.T) {
 		require.NoError(t, tr.UnmarshalState([]byte(oldState)))
 		require.True(t, tr.recovery)
 
-		tr.ensured = false
 		_, err := tr.Acknowledge(ctx, nil, nil)
 		require.NoError(t, err)
 		require.EqualValues(t, 1, countTable(t, ctx, tr, tr.dialect.Identifier("test_recovery_upgrade")))
@@ -1584,7 +1577,6 @@ func TestAcknowledgeRecoveryMatrix(t *testing.T) {
 		stageTestRows(t, ctx, tr, b1, []any{"k1", "v1", "c", testTime, `{"id":"k1"}`})
 		stageTestRows(t, ctx, tr, b2, []any{"k2", "v2", "c", testTime, `{"id":"k2"}`})
 
-		tr.ensured = false
 		tr.recovery = true
 		tr.state[b1.target.StateKey] = &stateItem{StoredRows: 1}
 		tr.state[b2.target.StateKey] = &stateItem{StoredRows: 1}

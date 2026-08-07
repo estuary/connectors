@@ -278,14 +278,15 @@ type transactor struct {
 	// than were stored, and an empty stage table means the commit had fully
 	// completed. It is cleared after the first Acknowledge.
 	recovery bool
-	// ensured is set once the first Acknowledge of the session has run the
+	// ensured is closed once ensureTempTables is called to run the
 	// ensure pass: recovering any pending commits and creating / truncating /
 	// re-creating the persistent temp tables for every binding. It is
 	// deliberately independent of the recovery flag, which is only set when
 	// the Open request carried prior connector state -- a brand-new task has
 	// no state but still needs its temp tables ensured before the first
-	// transaction.
-	ensured           bool
+	// transaction.  A channel is used so that Load can wait for it before
+	// reading any Load requests.
+	ensured           chan struct{}
 	state             connectorState
 	runtimeCheckpoint m.RuntimeCheckpoint
 }
@@ -339,6 +340,7 @@ func newTransactor(
 		cfg:               cfg,
 		be:                be,
 		_range:            open.Range,
+		ensured:           make(chan struct{}),
 		state:             make(connectorState, len(bindings)),
 		runtimeCheckpoint: fence.Checkpoint,
 	}
@@ -516,8 +518,8 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	// Staging keys writes to the persistent load tables, which Acknowledge
 	// establishes via ensureTempTables. RunTransactions runs Acknowledge and
 	// Load in concurrent goroutines, so those tables are only guaranteed to
-	// exist once the acknowledgement has completed.
-	it.WaitForAcknowledged()
+	// exist once ensureTempTables has had a chance to run.
+	<-t.ensured
 
 	// activeBindings tracks the number of keys inserted into each binding's
 	// load table this round, for verification against an authoritative count
@@ -798,7 +800,8 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	shouldProcess := m.StateKeyFilter(stateKeys)
 	var drained []string
 
-	if !t.ensured {
+	select {
+	default: // ensured channel is not closed
 		// First Acknowledge of the session: recover pending commits and
 		// ensure every binding's persistent temp tables. This always runs
 		// before the first Store (the runtime serializes Acknowledge ahead
@@ -858,8 +861,8 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 				return nil, fmt.Errorf("ensuring temp tables of %s: %w", b.target.Identifier, err)
 			}
 		}
-		t.ensured = true
-	} else {
+		close(t.ensured)
+	case <-t.ensured: // ensured channel is closed
 		for stateKey, si := range t.state {
 			if !shouldProcess(stateKey) {
 				continue

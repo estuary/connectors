@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-08-06
+
+### Fixed
+- Load waited for the prior transaction's acknowledgment before it could begin
+  staging keys, which could force transactions to be smaller than necessary.
+  Load now only waits for its persistent staging tables to be established, so
+  staging can proceed concurrently with the prior transaction's acknowledgment.
+
 ### Changed
 - Load batches are sent once a full batch is collected, instead of when the
   load binding changes.  On tasks with many active bindings, this should
