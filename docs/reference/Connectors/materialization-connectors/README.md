@@ -88,7 +88,7 @@ In the future, other open-source materialization connectors from third parties c
   * [Configuration](./apache-iceberg/dremio.md)
   * Package - ghcr.io/estuary/materialize-dremio:v1
 * Elasticsearch
-  * [Configuration](./Elasticsearch.md)
+  * [Configuration](./Elasticsearch/Elasticsearch.md)
   * Package — ghcr.io/estuary/materialize-elasticsearch:v3
 * Google BigQuery
   * [Configuration](./BigQuery.md)
@@ -117,6 +117,9 @@ In the future, other open-source materialization connectors from third parties c
 * HTTP Webhook
   * [Configuration](./http-webhook.md)
   * Package - ghcr.io/estuary/materialize-webhook:v1
+* HubSpot
+  * [Configuration](./hubspot.md)
+  * Package - ghcr.io/estuary/materialize-hubspot:v1
 * Imply Polaris
   * [Configuration](./Dekaf/imply-polaris.md)
 * Materialize
@@ -133,6 +136,9 @@ In the future, other open-source materialization connectors from third parties c
 * MySQL Heatwave
   * [Configuration](./mysql-heatwave.md)
   * Package - ghcr.io/estuary/materialize-mysql-heatwave:v2
+* OpenSearch
+  * [Configuration](./Elasticsearch/opensearch.md)
+  * Package - ghcr.io/estuary/materialize-opensearch:v3
 * Pinecone
   * [Configuration](./pinecone.md)
   * Package — ghcr.io/estuary/materialize-pinecone:v1
