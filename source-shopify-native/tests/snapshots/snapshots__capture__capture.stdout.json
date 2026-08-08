@@ -6576,14 +6576,6 @@
             "name": "Point of Sale"
           },
           "publishDate": "2025-01-14T15:09:43Z"
-        },
-        {
-          "__parentId": "gid://shopify/Collection/295442513965",
-          "publication": {
-            "id": "gid://shopify/Publication/204831391789",
-            "name": "Microsoft Copilot"
-          },
-          "publishDate": "2026-06-26T04:37:46Z"
         }
       ],
       "sortOrder": "BEST_SELLING",
@@ -6658,14 +6650,6 @@
             "name": "Online Store"
           },
           "publishDate": "2025-01-14T15:10:14Z"
-        },
-        {
-          "__parentId": "gid://shopify/Collection/295442612269",
-          "publication": {
-            "id": "gid://shopify/Publication/204831391789",
-            "name": "Microsoft Copilot"
-          },
-          "publishDate": "2026-06-26T04:37:46Z"
         }
       ],
       "sortOrder": "BEST_SELLING",
@@ -6748,6 +6732,44 @@
       "legacyResourceId": "73871392813",
       "metafields": [],
       "updatedAt": "redacted"
+    }
+  ],
+  [
+    "acmeCo/markets",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "store": "estuary-alex-testing",
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "catalogs": [],
+      "catalogsCount": {
+        "count": 0,
+        "precision": "EXACT"
+      },
+      "conditions": {
+        "conditionTypes": [
+          "REGION"
+        ]
+      },
+      "currencySettings": {
+        "baseCurrency": {
+          "currencyCode": "USD",
+          "currencyName": "US Dollar",
+          "enabled": true,
+          "manualRate": null,
+          "rateUpdatedAt": null
+        },
+        "localCurrencies": false,
+        "roundingEnabled": true
+      },
+      "handle": "international",
+      "id": "gid://shopify/Market/45947256877",
+      "name": "International",
+      "priceInclusions": null,
+      "status": "ACTIVE",
+      "type": "REGION"
     }
   ]
 ]

@@ -27,12 +27,7 @@ properties:
   _meta:
     $ref: '#/$defs/Meta'
     description: Document metadata
-  id:
-    title: Id
-    type: string
-required:
-- id
-title: ShopifyGraphQLResource
+title: ShopifyDocument
 type: object
 x-infer-schema: true
 if:

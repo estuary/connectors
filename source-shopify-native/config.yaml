@@ -1,17 +1,23 @@
 stores:
     - store: estuary-alex-testing
       credentials:
-        credentials_title: Private App Credentials
-        access_token_sops: ENC[AES256_GCM,data:U4H9/+mC+YbmCzSeQOs77ikDHAFAl8flLkohlfLvIG4oR6O444s=,iv:RpboQbPOJnctlQeH2EEnns+xtBydFpD6TecqLiilFD4=,tag:zWOk5wMGZObyaLemX0bZ7w==,type:str]
+        credentials_title: Client Credentials
+        client_id_sops: ENC[AES256_GCM,data:iUmz7PRVpxjjVEw52GKxdJE4LuGK1fUvmyrFB02VFpk=,iv:Po49niFbYgBRcirzU+hOcx8b2sQuwPqJ9GL6hWULoec=,tag:bCrBOWegJHpJ8cZCy3lTrA==,type:str]
+        client_secret_sops: ENC[AES256_GCM,data:abPOlCVuar7MgiO2zkgl9+qGm60I+4NXRRgvAdskVqAaD70yGw4=,iv:tY8zHAscEVARDeQKAbxLYsaMm0ipeaS2gES/ljxSM5U=,tag:5vPcq7SmzUSbcXoeW3r3XA==,type:str]
 start_date: "2025-01-10T00:00:00Z"
 advanced:
     window_size: P50000D
 sops:
+    kms: []
     gcp_kms:
         - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
           created_at: "2026-02-10T14:31:14Z"
           enc: CiQAdmEdwsIlJneQ2fXL155ChSwlJWjSsbXJPov0rLvZ67BYKaISSQDNZIk6KsWXDUNAXjyc2C/5rNbt67SyOZRv+8m0bkmtWcHAkq7Qe2CdsqquG2FG5Mc0XPVvt7wmhb1N51XpxaGykrD79QbhWR4=
-    lastmodified: "2026-02-10T14:31:14Z"
-    mac: ENC[AES256_GCM,data:/pYcG5z75ME8I68UVj1whiJAHRTp/VOAoAa0elRQiPJCP93LvAFeNhekN4T23pdyiscL88prwVNjzS8dMvAPSTSxF0T/H2di7BYqDawAEKV4C42cup74wB1Gxl8QeUpTwmYIlOSq/13kuSF+mEruPrTvvnSddiwkYrGyUciEPJo=,iv:R2u0T3Nrsqbuin5HE9xkk9mlOXCOJEo6NVmvuftv2o0=,tag:IeX6GSZ+hF7n36fEilmFfw==,type:str]
+    azure_kv: []
+    hc_vault: []
+    age: []
+    lastmodified: "2026-08-08T00:02:45Z"
+    mac: ENC[AES256_GCM,data:koJ4s+nDo1y1P6ydz/IkXEgLQk0XsYZ5qp4GD083up6RrRI/s8lVAxkWc6zkgk1bXyzhdFzVHRvco28fWhguj+uAuGZM3EAkRAaWjpSf9L+RQ5ptIKe15aw/btyE24mwG0pyUjbJjzWKzYXhoduto7shWyZTMiFaiHHL0gzN67w=,iv:78G1MJIMM/5dZ+y45RHelnY5/FVLoaTsR+qxqkOLcr8=,tag:cGu1u+eV0DY+469HPTccxA==,type:str]
+    pgp: []
     encrypted_suffix: _sops
     version: 3.10.2

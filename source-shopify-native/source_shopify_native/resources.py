@@ -42,6 +42,7 @@ from .models import (
     PlanName,
     ShopDetails,
     ShopifyClientCredentials,
+    ShopifyDocument,
     ShopifyGraphQLResource,
     StoreCapabilities,
     StoreConfig,
@@ -172,6 +173,7 @@ PII_RESOURCES: set[type[ShopifyGraphQLResource]] = {
 
 FULL_REFRESH_RESOURCES: list[type[ShopifyGraphQLResource]] = [
     gql.StaffMembers,
+    gql.Markets,
 ]
 
 
@@ -726,9 +728,8 @@ async def all_resources(
                     # The tombstone must carry the /_meta/store discriminator so
                     # deletes target the correct [store, row_id] key. The CDK only
                     # fills in op/row_id.
-                    tombstones[store_id] = ShopifyGraphQLResource(
-                        id="",
-                        _meta=ShopifyGraphQLResource.Meta(op="d", store=store_id),
+                    tombstones[store_id] = ShopifyDocument(
+                        _meta=ShopifyDocument.Meta(op="d", store=store_id),
                     )
 
                 open_binding(
@@ -746,6 +747,9 @@ async def all_resources(
             SnapshotResource(
                 name=model.NAME,
                 key=snapshot_key,
+                # ShopifyDocument's discovered schema include /_meta/store, which is
+                # a necessary key component that the CDK's BaseDocument couldn't know about.
+                model=ShopifyDocument,
                 open=create_snapshot_open_fn(model, stores_with_access),
                 initial_config=ResourceConfigWithSchedule(
                     name=model.NAME,
