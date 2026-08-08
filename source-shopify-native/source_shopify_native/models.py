@@ -517,7 +517,51 @@ class NestedConnection:
         )
 
 
-class ShopifyGraphQLResource(BaseDocument):
+# BaseDocument plus the store discriminator that every Shopify collection keys on.
+#
+# Both incremental (`/_meta/store`, `/id`) and snapshot (`/_meta/store`, `/_meta/row_id`)
+# bindings put the store in their key, so the field has to be present in the schema the
+# connector discovers - Flow rejects a key pointing at a location its schema doesn't know.
+# The CDK's BaseDocument.Meta only carries op/row_id.
+#
+# Snapshot bindings use this model directly and leave every other field to schema inference.
+# ShopifyGraphQLResource extends it for the typed, query-backed streams.
+class ShopifyDocument(BaseDocument):
+    model_config = ConfigDict(extra="allow", validate_assignment=True)
+
+    class Meta(BaseDocument.Meta):
+        model_config = ConfigDict(validate_assignment=True)
+
+        store: str = Field(
+            default="",
+            description="The Shopify store this document belongs to",
+        )
+
+    meta_: Meta = Field(  # type: ignore[override]
+        default_factory=lambda: ShopifyDocument.Meta(op="u"),
+        alias="_meta",
+        description="Document metadata",
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _inject_store_from_context(cls, data: Any, info: ValidationInfo) -> Any:
+        """Inject store name from validation context into document metadata.
+
+        Uses mode="before" so the store is set on the raw dict before Pydantic constructs
+        the model. Combined with validate_assignment=True on Meta, this ensures the store
+        field is tracked in model_fields_set and survives model_dump(exclude_unset=True).
+        """
+        if not isinstance(data, dict):
+            return data
+        if info.context and isinstance(info.context, StoreValidationContext):
+            meta = data.get("_meta") or {}
+            meta["store"] = info.context.store
+            data["_meta"] = meta
+        return data
+
+
+class ShopifyGraphQLResource(ShopifyDocument):
     QUERY: ClassVar[str] = ""
     QUERY_ROOT: ClassVar[str] = ""
     FRAGMENTS: ClassVar[list[str]] = []
@@ -540,8 +584,6 @@ class ShopifyGraphQLResource(BaseDocument):
     # Outer-connection page size override. Streams that inline nested connections lower this to keep
     # the per-query cost comfortably under Shopify's ceiling (with headroom for more connections).
     OUTER_PAGE_SIZE: ClassVar[int | None] = None
-
-    model_config = ConfigDict(extra="allow", validate_assignment=True)
 
     @classmethod
     def __pydantic_init_subclass__(cls, **kwargs: Any) -> None:
@@ -567,37 +609,6 @@ class ShopifyGraphQLResource(BaseDocument):
                     f"another connection's node_selection). Embed the placeholder verbatim where the "
                     f"connection belongs."
                 )
-
-    class Meta(BaseDocument.Meta):
-        model_config = ConfigDict(validate_assignment=True)
-
-        store: str = Field(
-            default="",
-            description="The Shopify store this document belongs to",
-        )
-
-    meta_: Meta = Field(  # type: ignore[override]
-        default_factory=lambda: ShopifyGraphQLResource.Meta(op="u"),
-        alias="_meta",
-        description="Document metadata",
-    )
-
-    @model_validator(mode="before")
-    @classmethod
-    def _inject_store_from_context(cls, data: Any, info: ValidationInfo) -> Any:
-        """Inject store name from validation context into document metadata.
-
-        Uses mode="before" so the store is set on the raw dict before Pydantic constructs
-        the model. Combined with validate_assignment=True on Meta, this ensures the store
-        field is tracked in model_fields_set and survives model_dump(exclude_unset=True).
-        """
-        if not isinstance(data, dict):
-            return data
-        if info.context and isinstance(info.context, StoreValidationContext):
-            meta = data.get("_meta") or {}
-            meta["store"] = info.context.store
-            data["_meta"] = meta
-        return data
 
     id: str
 
