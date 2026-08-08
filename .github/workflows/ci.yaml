@@ -157,6 +157,27 @@ jobs:
           VARIANTS="${{ matrix.connector }} $(cat ${{ matrix.connector }}/VARIANTS 2>/dev/null || true)"
           echo ::set-output name=variants::${VARIANTS}
 
+      # Only the connectors which compile Go outside of Docker benefit from a module and
+      # build cache here; everything else builds inside its Dockerfile. Two steps below do
+      # that: the database tests step, for the source connectors named there, and the
+      # materialization integration tests, which build the shared Go packages as well as
+      # the connector itself. materialize-kafka is Rust, so it compiles no Go at all.
+      - name: Set up Go with module and build caching
+        if: |
+          (startsWith(matrix.connector, 'materialize-') && matrix.connector != 'materialize-kafka') ||
+          contains(fromJson('[
+            "source-ga4-bigquery",
+            "source-postgres",
+            "source-redshift-batch",
+            "source-sqlserver",
+            "source-sqlserver-ct",
+            "source-sqs"
+            ]'), matrix.connector)
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
       - name: Download latest Flow release binaries and add them to $PATH
         run: |
           ./fetch-flow.sh

@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -32,7 +31,10 @@ func TestCaptureInstanceCleanup(t *testing.T) {
 		{"WithoutDBO", false},
 	} {
 		t.Run(testCase.Name, func(t *testing.T) {
-			var db, tc = blackboxTestSetup(t)
+			// Serial: this test grants flow_capture the database-wide db_owner role, which
+			// would change what any concurrently-running capture is permitted to do, and
+			// the two cases here deliberately disagree about whether it is granted.
+			var db, tc = blackboxTestSetupSerial(t)
 
 			db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data TEXT)`)
 			require.NoError(t, tc.Capture.EditConfig("advanced.change_table_cleanup", true))
@@ -48,7 +50,7 @@ func TestCaptureInstanceCleanup(t *testing.T) {
 			tc.Run("Initial Backfill", -1)
 
 			// For the ongoing capture, we need to disable SHUTDOWN_AFTER_POLLING
-			os.Unsetenv("SHUTDOWN_AFTER_POLLING")
+			delete(tc.Capture.Env, "SHUTDOWN_AFTER_POLLING")
 
 			// Launch the ongoing capture in a background goroutine
 			var captureCtx, cancelCapture = context.WithCancel(context.Background())
@@ -108,7 +110,9 @@ func TestAlterationAddColumn(t *testing.T) {
 		{"Automatic", false, true},
 	} {
 		t.Run(testCase.Name, func(t *testing.T) {
-			var db, tc = blackboxTestSetup(t)
+			// Serial: grants flow_capture the database-wide db_owner role, which would
+			// change what any concurrently-running capture is permitted to do.
+			var db, tc = blackboxTestSetupSerial(t)
 
 			// Grant db_owner role required for capture instance automation
 			db.QuietExec(t, `ALTER ROLE db_owner ADD MEMBER flow_capture`)
@@ -185,7 +189,9 @@ func TestAlterationAddColumn(t *testing.T) {
 }
 
 func TestFilegroupAndRole(t *testing.T) {
-	var db, tc = blackboxTestSetup(t)
+	// Serial: grants flow_capture the database-wide db_owner role, which would change
+	// what any concurrently-running capture is permitted to do.
+	var db, tc = blackboxTestSetupSerial(t)
 
 	// Create table without CDC (connector will create CDC instance with specified config)
 	db.CreateTableWithoutCDC(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data TEXT)`)
