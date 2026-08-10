@@ -6,7 +6,9 @@ import (
 	"strings"
 	"testing"
 
+	testutil "github.com/estuary/connectors/materialize-boilerplate/testutil"
 	sql "github.com/estuary/connectors/materialize-sql"
+	"github.com/stretchr/testify/require"
 
 	_ "github.com/duckdb/duckdb-go/v2"
 )
@@ -20,8 +22,12 @@ import (
 type integrationVariant struct {
 	// name is the subtest namespace and the infix of this variant's snapshots.
 	name string
+	// duckLake is the format the variant's database is expected to have, asserted
+	// before the suite runs.
+	duckLake bool
 	// The flow specs for the variant differ from each other only in the
-	// endpoint config they reference.
+	// endpoint config they reference. fenceSpec is set only for the variant that
+	// runs the fencing suite.
 	materializeSpec string
 	applySpec       string
 	migrateSpec     string
@@ -33,6 +39,7 @@ var (
 	// TABLE support is that of plain DuckDB.
 	motherduckVariant = integrationVariant{
 		name:            "motherduck",
+		duckLake:        false,
 		materializeSpec: "testdata/materialize.flow.yaml",
 		applySpec:       "testdata/apply.flow.yaml",
 		migrateSpec:     "testdata/migrate.flow.yaml",
@@ -42,10 +49,10 @@ var (
 	// ducklakeVariant targets a MotherDuck-hosted DuckLake database.
 	ducklakeVariant = integrationVariant{
 		name:            "ducklake",
+		duckLake:        true,
 		materializeSpec: "testdata/materialize.ducklake.flow.yaml",
 		applySpec:       "testdata/apply.ducklake.flow.yaml",
 		migrateSpec:     "testdata/migrate.ducklake.flow.yaml",
-		fenceSpec:       "testdata/fence.ducklake.flow.yaml",
 	}
 )
 
@@ -84,6 +91,8 @@ func makeTestResource(table string, delta bool) tableConfig {
 }
 
 func runIntegrationSuite(t *testing.T, variant integrationVariant) {
+	requireDatabaseFormat(t, variant)
+
 	t.Run("materialize", func(t *testing.T) {
 		sql.RunMaterializationTest(t, NewDriver(), variant.materializeSpec, makeTestResource, nil)
 	})
@@ -94,6 +103,24 @@ func runIntegrationSuite(t *testing.T, variant integrationVariant) {
 
 	t.Run("migrate", func(t *testing.T) {
 		sql.RunMigrationTest(t, NewDriver(), variant.migrateSpec, makeTestResource, nil)
+	})
+}
+
+// requireDatabaseFormat fails the variant before it runs anything if its
+// destination is not the format it is meant to cover. Both test databases are
+// provisioned by hand and a DuckLake database is indistinguishable from a classic
+// one in the endpoint configuration, so a database recreated without
+// `TYPE ducklake` would leave these subtests passing while quietly exercising the
+// classic format twice.
+func requireDatabaseFormat(t *testing.T, variant integrationVariant) {
+	t.Helper()
+
+	testutil.RunTestAllTasks(t, variant.materializeSpec, func(t *testing.T, _ []byte, taskName string, cfg config) {
+		isDuckLake, err := cfg.isDuckLake(context.Background())
+		require.NoError(t, err)
+		require.Equalf(t, variant.duckLake, isDuckLake,
+			"database %q of task %q does not have the format the %q variant covers",
+			cfg.Database, taskName, variant.name)
 	})
 }
 
