@@ -5,6 +5,7 @@ import (
 	stdsql "database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"regexp"
@@ -224,7 +225,42 @@ type stagingBucketAzureConfig struct {
 	BucketPathAzure    string `json:"bucketPathAzure,omitempty" jsonschema:"title=Bucket Path,description=An optional prefix that will be used to store objects in the staging container." jsonschema_extras:"order=3"`
 }
 
-func (c *config) db(ctx context.Context) (*stdsql.DB, error) {
+// isDuckLake reports whether the destination is a DuckLake database rather than a
+// classic MotherDuck database.
+func (c *config) isDuckLake(ctx context.Context) (bool, error) {
+	db, err := c.bareOpen()
+	if err != nil {
+		return false, err
+	}
+	defer db.Close()
+
+	var databaseType string
+	err = db.QueryRowContext(ctx,
+		"SELECT type FROM md_information_schema.databases WHERE name = ?",
+		c.Database,
+	).Scan(&databaseType)
+
+	if errors.Is(err, stdsql.ErrNoRows) {
+		// Databases attached from outside the account are absent from this view.
+		// The rename migration path works on either format, so it is the safe
+		// assumption when the format is unknown.
+		log.WithField("database", c.Database).Info(
+			"database not listed in md_information_schema.databases, assuming DuckLake")
+		return true, nil
+	} else if err != nil {
+		return false, fmt.Errorf("querying database type: %w", err)
+	}
+
+	log.WithFields(log.Fields{
+		"database": c.Database,
+		"type":     databaseType,
+	}).Info("determined destination database format")
+
+	return databaseType == "DUCKLAKE", nil
+}
+
+// bareOpen connects to the configured database without any staging bucket setup.
+func (c *config) bareOpen() (*stdsql.DB, error) {
 	var userAgent = "Estuary"
 
 	db, err := stdsql.Open("duckdb", fmt.Sprintf("md:%s?motherduck_token=%s&custom_user_agent=%s", c.Database, c.Token, userAgent))
@@ -232,6 +268,15 @@ func (c *config) db(ctx context.Context) (*stdsql.DB, error) {
 		if strings.Contains(err.Error(), "Jwt header is an invalid JSON") {
 			return nil, fmt.Errorf("invalid token: unauthenticated")
 		}
+		return nil, err
+	}
+
+	return db, nil
+}
+
+func (c *config) db(ctx context.Context) (*stdsql.DB, error) {
+	db, err := c.bareOpen()
+	if err != nil {
 		return nil, err
 	}
 
