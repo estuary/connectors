@@ -7,13 +7,15 @@ from unittest.mock import Mock
 
 import pytest
 from airbyte_cdk.models import SyncMode
+from airbyte_cdk.sources.utils.slice_logger import DebugSliceLogger
 from google.ads.googleads.errors import GoogleAdsException
 from google.ads.googleads.v25.errors.types.errors import ErrorCode, GoogleAdsError, GoogleAdsFailure
 from google.ads.googleads.v25.errors.types.request_error import RequestErrorEnum
 from google.api_core.exceptions import DataLoss, InternalServerError, ResourceExhausted, TooManyRequests
 from grpc import RpcError
 from source_google_ads.google_ads import GoogleAds
-from source_google_ads.streams import ClickView, cyclic_sieve
+from source_google_ads.models import Customer
+from source_google_ads.streams import ClickView, GeoTargetConstant, cyclic_sieve
 
 from .common import MockGoogleAdsClient as MockGoogleAdsClient
 
@@ -219,6 +221,53 @@ def test_retry_transient_errors(mocker, config, customers, error_cls):
         records = list(stream.read_records(sync_mode=SyncMode.incremental, cursor_field=["segments.date"], stream_slice=stream_slice))
     assert mocked_search.call_count == 5
     assert records == []
+
+
+class MockGoogleAdsGeoTargetConstants(MockGoogleAds):
+    """Serves the geo_target_constant table, recording which customers it was asked for."""
+
+    def __init__(self, credentials):
+        super().__init__(credentials=credentials)
+        self.requested_customer_ids = []
+
+    def send_request(self, query: str, customer_id: str):
+        self.requested_customer_ids.append(customer_id)
+        return iter([[{"geo_target_constant.id": 1000002}, {"geo_target_constant.id": 1000003}]])
+
+
+def read_geo_target_constants(stream):
+    return list(
+        stream.read_full_refresh(
+            cursor_field=None,
+            logger=logging.getLogger("test"),
+            slice_logger=DebugSliceLogger(),
+        )
+    )
+
+
+def test_geo_target_constant_reads_the_table_once_for_all_customers(mock_ads_client, config):
+    """
+    geo_target_constant is a global table, so it must be read once no matter how many customers are
+    configured - reading it per customer means re-reading ~270k identical rows for each one.
+    """
+    customers = [Customer(id=str(customer_id)) for customer_id in range(1, 12)]
+    google_api = MockGoogleAdsGeoTargetConstants(credentials=config["credentials"])
+    stream = GeoTargetConstant(google_api, customers=customers)
+    stream.get_query = Mock(return_value="query")
+
+    records = read_geo_target_constants(stream)
+
+    assert google_api.requested_customer_ids == ["1"]
+    assert records == [{"geo_target_constant.id": 1000002}, {"geo_target_constant.id": 1000003}]
+
+
+def test_geo_target_constant_without_customers(mock_ads_client, config):
+    google_api = MockGoogleAdsGeoTargetConstants(credentials=config["credentials"])
+    stream = GeoTargetConstant(google_api, customers=[])
+    stream.get_query = Mock(return_value="query")
+
+    assert read_geo_target_constants(stream) == []
+    assert google_api.requested_customer_ids == []
 
 
 def test_cyclic_sieve(caplog):
