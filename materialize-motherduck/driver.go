@@ -36,7 +36,12 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 				"database": cfg.Database,
 			}).Info("opening database")
 
-			dialect := createDuckDialect(featureFlags)
+			isDuckLake, err := cfg.isDuckLake(ctx)
+			if err != nil {
+				return nil, err
+			}
+
+			dialect := createDuckDialect(featureFlags, isDuckLake)
 			templates := renderTemplates(dialect)
 
 			return &sql.Endpoint[config]{
