@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-08-10
+
+### Fixed
+- The load query joined the target table against the staging table of keys,
+  which read every row of the target -- including the whole `flow_document`
+  column -- for each transaction. On a large binding this could exceed the
+  ClickHouse driver's read deadline, failing the query and restarting the
+  transaction without it ever committing. The load query now restricts the
+  target to the staged keys directly, so ClickHouse resolves them through the
+  table's primary key index and reads only the rows being loaded.
+
 ## 2026-08-06
 
 ### Fixed

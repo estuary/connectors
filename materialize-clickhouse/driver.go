@@ -496,7 +496,7 @@ func (t *transactor) addBinding(_ context.Context, target sql.Table) error {
 const (
 	// ClickHouse recommends inserting batches of 100,000 rows.
 	// https://clickhouse.com/docs/optimize/bulk-inserts
-	// Load phase: insert keys to temporary tables for subsequent join on the target table.
+	// Load phase: insert keys to temporary tables for a subsequent lookup against the target table.
 	// Store phase: insert documents to stage tables for subsequent move to the target table.
 	maxBatchSize = 100_000
 
@@ -523,7 +523,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 	// activeBindings tracks the number of keys inserted into each binding's
 	// load table this round, for verification against an authoritative count
-	// before the join.
+	// before the load query runs.
 	activeBindings := make(map[int]int64, len(t.bindings))
 	batch := make([]batchItem, 0, maxBatchSize)
 	batchBytes := 0
@@ -581,7 +581,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			b := t.bindings[i]
 			// Free resources on the ClickHouse server. Truncate rather than
 			// drop: the load table's identity must stay stable so that key
-			// inserts and the join query resolve the same table from any
+			// inserts and the load query resolve the same table from any
 			// replica of a clustered deployment.
 			//
 			// A failure leaves this round's keys in the table, so it is
@@ -632,7 +632,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 	// Hard check: an authoritative count of each load table must account for
 	// every key inserted this round. A shortfall means the keys are not
-	// visible to the replica that will serve the join -- running it anyway
+	// visible to the replica that will serve the load query -- running it anyway
 	// would silently treat existing documents as absent, storing unreduced
 	// documents over them.
 	for i, inserted := range activeBindings {
@@ -648,7 +648,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		}
 	}
 
-	// Keys are now ready to be JOIN'd between the temporary and target tables.
+	// Keys are now staged and ready for the target table to be queried for them.
 	loadBinding := func(i int, b *binding) error {
 		// Documents already delivered via loaded() cannot be recalled, so the
 		// query may only be retried while nothing has been emitted: re-running
