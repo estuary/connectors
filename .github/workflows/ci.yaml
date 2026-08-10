@@ -212,6 +212,27 @@ jobs:
         run: |
           bash source-mongodb/docker-compose-init.sh
 
+      # Run the tests of every in-repo helper package which this connector
+      # transitively depends on. This list is computed on the fly so that we
+      # don't have to keep an explicit list up-to-date. Likewise instead of
+      # having an explicit `contains()` clause governing Go connectors we'll
+      # just identify them as connectors whose subdirectory contains Go files.
+      - name: Test Go helper packages for ${{ matrix.connector }}
+        if: hashFiles(format('{0}/*.go', matrix.connector)) != ''
+        env:
+          GIT_LFS_SKIP_SMUDGE: 1 # See 'Database Tests' step comment
+        run: |
+          set -euo pipefail
+          DEPS=$(go list -deps -test \
+            -f '{{if and (not .ForTest) .Module (eq .Module.Path "github.com/estuary/connectors")}}{{.ImportPath}}{{end}}' \
+            './${{ matrix.connector }}/...')
+          PKGS=$(echo "$DEPS" \
+            | grep -v '\.test$' \
+            | grep -Ev '^github.com/estuary/connectors/${{ matrix.connector }}(/|$)' \
+            | sort -u || true)
+          [ -n "$PKGS" ] || exit 0
+          go test -short -count=1 $PKGS
+
       # Go connector tests which aren't run as part of Dockerfile builds. Most Go connectors
       # run their tests as part of the Docker build, but running the tests outside of there
       # makes GCP credentials plumbing for encrypted configs significantly simpler.
