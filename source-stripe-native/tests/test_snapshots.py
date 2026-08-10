@@ -43,8 +43,15 @@ def test_capture(request, snapshot):
     for l in unique_stream_lines:
         typ, rec = l[0], l[1]
 
-        if typ == "acmeCo/Charges":
+        if typ == "acmeCo/Accounts":
+            rec["url"] = "redacted"
+        elif typ == "acmeCo/Charges":
             rec["receipt_url"] = "redacted"
+        elif typ == "acmeCo/Customers":
+            # Both move with any billing activity on the test account:
+            # `next_invoice_sequence` increments per invoice created.
+            rec["balance"] = "redacted"
+            rec["next_invoice_sequence"] = "redacted"
         elif typ == "acmeCo/Invoices":
             rec["hosted_invoice_url"] = "redacted"
             rec["invoice_pdf"] = "redacted"
