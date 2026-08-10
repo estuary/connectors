@@ -1,0 +1,8 @@
+materializations:
+  acmeCo/tests/materialize-motherduck/ducklake:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.ducklake.s3.yaml
+    bindings: []

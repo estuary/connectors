@@ -1,0 +1,35 @@
+import:
+  - ../../materialize-boilerplate/testdata/integration/collections.materialize.flow.yaml
+
+materializations:
+  # DuckLake is exercised with S3 staging only: the staging bucket type is
+  # orthogonal to the destination database format, and the GCS staging path is
+  # already covered by the classic MotherDuck variant.
+  acmeCo/tests/materialize-motherduck/ducklake:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.ducklake.s3.yaml
+    bindings:
+    - resource:
+        table: simple_standard
+      source: tests/simple
+      fields:
+        recommended: true
+    - resource:
+        table: simple_delta
+        delta_updates: true
+      source: tests/simple
+      fields:
+        recommended: true
+    - resource:
+        table: not_simple
+      source: tests/not-simple
+      fields:
+        recommended: true
+    - resource:
+        table: data_types
+      source: tests/data-types
+      fields:
+        recommended: 1
