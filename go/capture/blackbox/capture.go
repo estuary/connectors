@@ -458,6 +458,42 @@ func (c *Capture) EditBinding(index int, path string, val any) error {
 	return nil
 }
 
+// EditCapture modifies a property of the first capture in the catalog.
+// The path is relative to the capture, e.g. "shards.flags.indirect-specs".
+func (c *Capture) EditCapture(path string, val any) error {
+	var captureName = gjson.GetBytes(c.Catalog, "captures.@keys.0").String()
+	var fullPath = fmt.Sprintf("captures.%s.%s", captureName, path)
+	var result, err = sjson.SetBytes(c.Catalog, fullPath, val)
+	if err != nil {
+		return err
+	}
+	c.Catalog = result
+	return nil
+}
+
+// BindingTarget returns the target collection name of the indexed binding of
+// the first capture in the catalog.
+func (c *Capture) BindingTarget(index int) string {
+	var captureName = gjson.GetBytes(c.Catalog, "captures.@keys.0").String()
+	var fullPath = fmt.Sprintf("captures.%s.bindings.%d.target", captureName, index)
+	return gjson.GetBytes(c.Catalog, fullPath).String()
+}
+
+// DeleteCollection removes collections whose names contain the filter substring.
+func (c *Capture) DeleteCollection(filter string) error {
+	for _, name := range gjson.GetBytes(c.Catalog, "collections.@keys").Array() {
+		if !strings.Contains(name.String(), filter) {
+			continue
+		}
+		var result, err = sjson.DeleteBytes(c.Catalog, "collections."+name.String())
+		if err != nil {
+			return err
+		}
+		c.Catalog = result
+	}
+	return nil
+}
+
 // EditCheckpoint modifies a property of the checkpoint state.
 // The path is specified in sjson dot notation, e.g. "bindingStateV1.test%2Ffoobar.scanned"
 func (c *Capture) EditCheckpoint(path string, val any) error {
