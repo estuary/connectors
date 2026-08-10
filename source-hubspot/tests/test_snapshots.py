@@ -14,14 +14,18 @@ insta_format.FmtJson.dump = lambda _self, path, value: path.write_text(
 
 
 FIELDS_TO_REDACT = [
+    "hs_analytics_latest_source_timestamp",
+    "hs_lastmodifieddate",
+    "hubspot_owner_assigneddate",
+    "lastmodifieddate",
     "url",
     "updatedAt",
 ]
 
 PROPERTY_PATTERNS_TO_REDACT = [
-    re.compile(r"^hs_time_in_"),
-    re.compile(r"^hs_date_entered_"),
-    re.compile(r"^hs_date_exited_"),
+    re.compile(r"^hs_(v2_)?time_in_"),
+    re.compile(r"^hs_(v2_)?date_entered_"),
+    re.compile(r"^hs_(v2_)?date_exited_"),
 ]
 
 
