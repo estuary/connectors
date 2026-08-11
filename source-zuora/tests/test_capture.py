@@ -65,7 +65,7 @@ class FakeManager:
         self.too_large_over_rows = too_large_over_rows
         self.queries: list[str] = []
 
-    async def export_rows(self, query: str, object_name: str):
+    async def export_rows(self, query: str, model, context):
         self.queries.append(query)
         lo = re.search(rf"{self.cursor_field} >= '([^']+)'", query)
         hi = re.search(rf"{self.cursor_field} < '([^']+)'", query)
@@ -102,7 +102,11 @@ class FakeManager:
 
         out_fmt = "%Y-%m-%dT%H:%M:%S.%fZ" if self.emit_millis else _FMT
         for rid, dt in matching:
-            yield {"Id": rid, self.cursor_field: dt.astimezone(UTC).strftime(out_fmt)}
+            # Like the real manager, hand the row to the model with the caller's context.
+            yield model.model_validate(
+                {"Id": rid, self.cursor_field: dt.astimezone(UTC).strftime(out_fmt)},
+                context=context,
+            )
 
 
 async def _collect(agen) -> list:
@@ -415,9 +419,12 @@ async def test_fetch_page_id_engine_ordering_violation_raises():
     # `Id >` resume is only dupe-free if ORDER BY Id is a stable total order;
     # out-of-order rows must kill the backfill rather than risk skipped records.
     class UnorderedManager:
-        async def export_rows(self, query, object_name):
-            yield {"Id": "aa02", "UpdatedDate": "2020-01-02T00:00:00Z"}
-            yield {"Id": "aa01", "UpdatedDate": "2020-01-01T00:00:00Z"}
+        async def export_rows(self, query, model, context):
+            for row in (
+                {"Id": "aa02", "UpdatedDate": "2020-01-02T00:00:00Z"},
+                {"Id": "aa01", "UpdatedDate": "2020-01-01T00:00:00Z"},
+            ):
+                yield model.model_validate(row, context=context)
 
     start = datetime(2020, 1, 1, tzinfo=UTC)
     with pytest.raises(RuntimeError, match="ordering violation"):
@@ -495,7 +502,7 @@ async def test_fetch_snapshot_too_large_propagates():
     # A snapshot has no time cursor, so it can't be bisected — a too-large export
     # surfaces loudly rather than being silently truncated.
     class TooBig:
-        async def export_rows(self, query, object_name):
+        async def export_rows(self, query, model, context):
             raise ExportTooLargeError("too big")
             yield  # unreachable; makes this an async generator
 

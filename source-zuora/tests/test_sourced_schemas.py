@@ -7,8 +7,11 @@ from source_zuora.models import (
     DescribeField,
     DescribeObject,
     sourced_schema,
+    ValidationContext,
+    ZuoraRow,
     ZuoraType,
     UnknownZuoraTypeError,
+    _column_to_field,
 )
 
 
@@ -133,3 +136,32 @@ def test_a_field_with_no_declared_type_fails_the_object():
     )
     with pytest.raises(UnknownZuoraTypeError, match="Id"):
         described.query_field_types
+
+
+@pytest.mark.parametrize(
+    "column, object_name, expected",
+    [
+        # Own columns drop the prefix so they match their describe names.
+        ("Invoice.Id", "Invoice", "Id"),
+        ("Invoice.AccountId", "Invoice", "AccountId"),
+        # Joined columns keep the related object as a flattened name.
+        ("Account.Id", "Invoice", "AccountId"),
+        ("AccountReceivableAccountingCode.Id", "InvoiceItem",
+         "AccountReceivableAccountingCodeId"),
+        # An object whose name is a prefix of another's must not be confused for
+        # it: an InvoiceItem export's own columns say "InvoiceItem.", while
+        # "Invoice." is the join.
+        ("InvoiceItem.Id", "InvoiceItem", "Id"),
+        ("Invoice.Id", "InvoiceItem", "InvoiceId"),
+        # A header without a prefix is passed through rather than mangled.
+        ("Id", "Account", "Id"),
+    ],
+)
+def test_column_to_field(column, object_name, expected):
+    assert _column_to_field(column, object_name) == expected
+
+
+def test_renaming_is_idempotent_so_revalidation_is_safe():
+    # A document's own field names carry no prefix, so a second pass leaves them be.
+    assert _column_to_field("AccountId", "Invoice") == "AccountId"
+    assert _column_to_field("Id", "Invoice") == "Id"

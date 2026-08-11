@@ -1,8 +1,9 @@
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import ClassVar
+from typing import Any, ClassVar
 
-from pydantic import AwareDatetime, BaseModel, Field
+from pydantic import AwareDatetime, BaseModel, Field, ValidationInfo, model_validator
 
 from estuary_cdk.capture.common import (
     ResourceState,
@@ -122,7 +123,57 @@ def sourced_schema(field_types: dict[str, ZuoraType]) -> dict[str, object]:
     }
 
 
-class ZuoraDocument(BaseCSVRow):
+@dataclass(frozen=True)
+class ValidationContext:
+    """What a row needs to know about its object in order to validate.
+
+    Passed as the pydantic validation context. A model rather than a bare dict so the
+    validator reads a typed attribute instead of a string key it could misspell.
+    """
+    object_name: str
+
+
+def _column_to_field(column: str, object_name: str) -> str:
+    """Map an export CSV column header to the field name documents carry.
+
+    With useQueryLabels every header is "<Object>.<Field>", for both the exported
+    object's own columns and any joined related object's. An own column drops the
+    prefix so it matches its describe name ("Account.Id" of an Account export ->
+    "Id"), while a joined column keeps it as a flattened name ("Account.Id" of an
+    Invoice export -> "AccountId").
+    """
+    prefix, _, field = column.partition(".")
+    if not field:
+        return column
+    return field if prefix == object_name else f"{prefix}{field}"
+
+
+class ZuoraRow(BaseCSVRow):
+    """Every exported row, incremental or snapshot.
+
+    Renames each export column to the name documents carry.
+    """
+
+    @model_validator(mode="before")
+    @classmethod
+    def transform_cells(cls, data: Any, info: ValidationInfo) -> Any:
+        if not isinstance(info.context, ValidationContext):
+            # Without it the columns keep their "<Object>." prefixes and the document
+            # would have no Id. Fail rather than emit a mangled row.
+            raise RuntimeError(
+                f"Implementation error: {cls.__name__} must be validated with a "
+                f"ValidationContext, got {info.context!r}, so its columns would not "
+                f"be renamed."
+            )
+        if not isinstance(data, dict):
+            return data
+        return {
+            _column_to_field(column, info.context.object_name): value
+            for column, value in data.items()
+        }
+
+
+class ZuoraDocument(ZuoraRow):
     """Base for objects captured incrementally off a single date cursor.
     """
     CURSOR_FIELD: ClassVar[str]
@@ -274,7 +325,7 @@ class DescribeObject(BaseModel, extra="allow"):
     def query_field_types(self) -> dict[str, ZuoraType]:
         """Zuora's declared type for every column an export selects, keyed by the name
         the *document* carries rather than the name the query selects: a joined
-        `<Related>.Id` arrives as `<Related>Id` (see export_manager._column_to_field).
+        `<Related>.Id` arrives as `<Related>Id` (see _column_to_field).
 
         This is where raw describe strings become ZuoraType, so nothing downstream has
         to cope with an unrecognized one. Joined columns are always Zuora ids, hence
