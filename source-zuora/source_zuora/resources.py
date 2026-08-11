@@ -19,6 +19,7 @@ from .api import (
 )
 from .export_manager import ExportManager
 from .models import (
+    ConnectorState,
     EndpointConfig,
     TransactionDateDocument,
     UpdatedDateDocument,
@@ -26,6 +27,7 @@ from .models import (
     ZuoraDocument,
     ZuoraRow,
     ZuoraType,
+    sourced_schema,
 )
 
 
@@ -107,13 +109,16 @@ def _incremental_resource(
     start_date: datetime,
     cutoff: datetime,
 ) -> common.Resource:
-    def open(
+    async def open(
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
         state: ResourceState,
         task: Task,
         all_bindings,
     ) -> None:
+        task.sourced_schema(binding_index, sourced_schema(field_types))
+        await task.checkpoint(state=ConnectorState())
+
         common.open_binding(
             binding,
             binding_index,
@@ -158,13 +163,16 @@ def _snapshot_resource(
     field_types: dict[str, ZuoraType],
     manager: ExportManager,
 ) -> common.SnapshotResource:
-    def open(
+    async def open(
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
         state: ResourceState,
         task: Task,
         all_bindings,
     ) -> None:
+        task.sourced_schema(binding_index, sourced_schema(field_types))
+        await task.checkpoint(state=ConnectorState())
+
         common.open_binding(
             binding,
             binding_index,
@@ -250,6 +258,3 @@ async def enabled_resources(
     _attach_token_source(http, config)
     object_names = [binding.resourceConfig.name for binding in bindings]
     return await _build_resources(log, http, config, object_names)
-
-
-

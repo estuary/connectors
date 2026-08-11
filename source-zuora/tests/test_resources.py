@@ -138,9 +138,81 @@ def test_snapshot_resource_shape():
     assert isinstance(r, common.SnapshotResource)
     assert r.key == ["/_meta/row_id"]
     # ZuoraRow rather than BaseCSVRow: snapshots declare no fields either, but their
-    # boolean and datetime cells still need converting.
+    # boolean and datetime cells still need converting to match the sourced schema.
     assert r.model is ZuoraRow
     assert r.schema_inference is True
+
+
+# --- open() emits the sourced schema -------------------------------------------
+
+
+class _FakeTask:
+    def __init__(self):
+        self.schemas: list[tuple[int, dict]] = []
+        self.checkpoints = 0
+
+    def sourced_schema(self, binding_index: int, schema: dict) -> None:
+        self.schemas.append((binding_index, schema))
+
+    async def checkpoint(self, state, merge_patch: bool = True) -> None:
+        self.checkpoints += 1
+
+
+@pytest.mark.asyncio
+async def test_incremental_open_emits_a_sourced_schema_and_flushes_it():
+    types = {"Id": ZuoraType.TEXT, "UpdatedDate": ZuoraType.DATETIME, "AutoPay": ZuoraType.BOOLEAN}
+    r = resources._incremental_resource(
+        "Account",
+        list(types),
+        types,
+        UpdatedDateDocument,
+        object(),
+        datetime(2020, 1, 1, tzinfo=UTC),
+        datetime(2024, 1, 1, tzinfo=UTC),
+    )
+    task = _FakeTask()
+    with patch.object(resources.common, "open_binding") as open_binding:
+        await r.open(SimpleNamespace(), 7, SimpleNamespace(), task, [])
+
+    assert len(task.schemas) == 1
+    index, schema = task.schemas[0]
+    assert index == 7
+    properties = schema["properties"]
+    assert properties["AutoPay"] == {"type": "boolean"}
+    assert properties["UpdatedDate"] == {"type": "string", "format": "date-time"}
+    # A binding with no new data would never checkpoint on its own, so the schema has
+    # to be flushed here or it is never emitted.
+    assert task.checkpoints == 1
+    assert open_binding.called
+
+
+@pytest.mark.asyncio
+async def test_open_passes_the_type_map_to_both_fetch_paths():
+    types = {"Id": ZuoraType.TEXT, "UpdatedDate": ZuoraType.DATETIME}
+    r = resources._incremental_resource(
+        "Account", list(types), types, UpdatedDateDocument, object(),
+        datetime(2020, 1, 1, tzinfo=UTC), datetime(2024, 1, 1, tzinfo=UTC),
+    )
+    with patch.object(resources.common, "open_binding") as open_binding:
+        await r.open(SimpleNamespace(), 0, SimpleNamespace(), _FakeTask(), [])
+
+    kwargs = open_binding.call_args.kwargs
+    # Without the type map reaching the fetch functions, documents would keep their raw
+    # cells and contradict the schema just declared.
+    assert types in kwargs["fetch_changes"].args
+    assert types in kwargs["fetch_page"].args
+
+
+@pytest.mark.asyncio
+async def test_snapshot_open_emits_a_sourced_schema_too():
+    types = {"Id": ZuoraType.TEXT, "CreatedOn": ZuoraType.DATETIME}
+    r = resources._snapshot_resource("EmailHistory", list(types), types, object())
+    task = _FakeTask()
+    with patch.object(resources.common, "open_binding") as open_binding:
+        await r.open(SimpleNamespace(), 3, SimpleNamespace(), task, [])
+
+    assert [i for i, _ in task.schemas] == [3]
+    assert types in open_binding.call_args.kwargs["fetch_snapshot"].args
 
 
 # --- all_resources / enabled_resources dispatch --------------------------------
