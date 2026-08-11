@@ -128,15 +128,16 @@ def _parse_catalog(response_bytes: bytes) -> DescribeCatalog:
     return DescribeCatalog(objects=objects)
 
 
-async def fetch_object_fields(
+async def fetch_object_metadata(
     base_url: str,
     http: HTTPSession,
     log: Logger,
     object_name: str,
-) -> list[str]:
-    """Return every field name to select when exporting a Zuora object. This includes
-    its own exportable fields plus the `<RelatedObject>.Id` joins that carry its foreign
-    keys.
+) -> DescribeObject:
+    """Describe a Zuora object.
+
+    The caller takes the field names to select when exporting it: its own exportable
+    fields plus the `<RelatedObject>.Id` joins that carry its foreign keys.
     """
     url = f"{base_url}/v1/describe/{object_name}"
     described = _parse_describe_object(
@@ -166,7 +167,7 @@ async def fetch_object_fields(
             },
         },
     )
-    return described.query_field_names
+    return described
 
 
 def _parse_describe_object(response_bytes: bytes) -> DescribeObject:
