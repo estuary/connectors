@@ -245,7 +245,7 @@ func (d *Driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 
 		// When performing a keyed backfill, it's an error for the collection key to be the fallback key. It has to be one or more top-level properties.
 		if (res.Mode == BackfillModeAutomatic || res.Mode == BackfillModeNormal || res.Mode == BackfillModePrecise) && len(res.PrimaryKey) == 0 {
-			if slices.Equal(binding.Collection.Key, db.FallbackCollectionKey()) {
+			if slices.Equal(req.BindingCollection(binding).Key, db.FallbackCollectionKey()) {
 				var err = fmt.Errorf("output collection for stream %q has the fallback key, which can't be used for a backfill", streamID)
 				log.WithError(err).Debug("prerequisite error")
 				errs = append(errs, err)
@@ -380,13 +380,14 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		}
 		res.SetDefaults()
 		var streamID = JoinStreamID(res.Namespace, res.Stream)
+		var collection = open.Capture.BindingCollection(binding)
 
 		tables = append(tables, TableID{Schema: res.Namespace, Table: res.Stream})
 
 		// TODO: Remove the whole 'Enable TxIDs' thing and instead include them unconditionally
 		// at some point in the future once automatic schema updates are a thing and the
 		// number of captures which would be broken by the change is acceptably small.
-		for _, projection := range binding.Collection.Projections {
+		for _, projection := range collection.Projections {
 			if projection.Ptr == "/_meta/source/txid" {
 				db.RequestTxIDs(res.Namespace, res.Stream)
 			}
@@ -397,7 +398,7 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 			StreamID:      streamID,
 			StateKey:      boilerplate.StateKey(binding.StateKey),
 			Resource:      res,
-			CollectionKey: binding.Collection.Key,
+			CollectionKey: collection.Key,
 		}
 	}
 
@@ -417,7 +418,7 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		Name:     string(open.Capture.Name),
 		Bindings: bindings,
 		State:    &state,
-		Output:   &boilerplate.PullOutput{Connector_CaptureServer: stream},
+		Output:   stream,
 		Database: db,
 	}
 

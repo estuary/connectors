@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -43,7 +43,7 @@ type config struct {
 	InstanceID string `json:"instance_id" jsonschema:"title=Instance ID,description=Cloud Spanner Instance ID" jsonschema_extras:"order=1"`
 	Database   string `json:"database" jsonschema:"title=Database,description=Cloud Spanner Database name" jsonschema_extras:"order=2"`
 
-	HardDelete bool `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=3"`
+	HardDelete bool `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=3,nonsensitive=true"`
 
 	Credentials credentialConfig `json:"credentials" jsonschema:"title=Credentials,description=Google Cloud authentication credentials" jsonschema_extras:"order=4"`
 
@@ -51,9 +51,9 @@ type config struct {
 }
 
 type advancedConfig struct {
-	NoFlowDocument                     bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false"`
-	DisableKeyDistributionOptimization bool   `json:"disable_key_distribution_optimization,omitempty" jsonschema:"title=Disable Key Distribution Optimization,description=When enabled the hash prefix normally added to table keys will be omitted. The hash prefix distributes writes across Spanner splits and avoids hotspots.,default=false"`
-	FeatureFlags                       string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	NoFlowDocument                     bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false" jsonschema_extras:"nonsensitive=true"`
+	DisableKeyDistributionOptimization bool   `json:"disable_key_distribution_optimization,omitempty" jsonschema:"title=Disable Key Distribution Optimization,description=When enabled the hash prefix normally added to table keys will be omitted. The hash prefix distributes writes across Spanner splits and avoids hotspots.,default=false" jsonschema_extras:"nonsensitive=true"`
+	FeatureFlags                       string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
 }
 
 // Validate the configuration
@@ -173,6 +173,18 @@ var sqlDriver = &sql.Driver[config, tableConfig]{
 type driver struct{}
 
 var _ boilerplate.Connector = &driver{}
+
+// NewDriver builds the connector, and is its entry point: an importing
+// caller is handed the assembled connector rather than its pieces.
+func NewDriver() boilerplate.Connector { return &driver{} }
+
+// NewMaterializer opens a Materializer for the endpoint. Spanner wraps the
+// standard SQL driver to add its own validation, so this reaches through to the
+// wrapped driver's entry point, which is what establishes the initialization
+// order the driver's operations assume.
+func NewMaterializer(ctx context.Context, materializationName string, cfg config, featureFlags map[string]bool) (boilerplate.Materializer[config, sql.FieldConfig, tableConfig, sql.MappedType], error) {
+	return sqlDriver.NewMaterializer(ctx, materializationName, cfg, featureFlags)
+}
 
 func (driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
 	return sqlDriver.Spec(ctx, req)
@@ -1053,6 +1065,3 @@ func (t *transactor) Destroy() {
 	t.adminClient.Close()
 }
 
-func main() {
-	boilerplate.RunMain(&driver{})
-}

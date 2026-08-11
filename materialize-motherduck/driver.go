@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -27,7 +27,7 @@ import (
 	duckdb "github.com/duckdb/duckdb-go/v2"
 )
 
-func newDuckDriver() *sql.Driver[config, tableConfig] {
+func NewDriver() *sql.Driver[config, tableConfig] {
 	return &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-motherduck",
 		StartTunnel:      func(ctx context.Context, cfg config) error { return nil },
@@ -36,7 +36,12 @@ func newDuckDriver() *sql.Driver[config, tableConfig] {
 				"database": cfg.Database,
 			}).Info("opening database")
 
-			dialect := createDuckDialect(featureFlags)
+			isDuckLake, err := cfg.isDuckLake(ctx)
+			if err != nil {
+				return nil, err
+			}
+
+			dialect := createDuckDialect(featureFlags, isDuckLake)
 			templates := renderTemplates(dialect)
 
 			return &sql.Endpoint[config]{

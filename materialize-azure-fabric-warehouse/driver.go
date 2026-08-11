@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -19,8 +19,8 @@ var featureFlagDefaults = map[string]bool{
 }
 
 type advancedConfig struct {
-	NoFlowDocument bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false"`
-	FeatureFlags   string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	NoFlowDocument bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false" jsonschema_extras:"nonsensitive=true"`
+	FeatureFlags   string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
 }
 
 type config struct {
@@ -33,7 +33,7 @@ type config struct {
 	StorageAccountKey  string           `json:"storageAccountKey" jsonschema:"title=Storage Account Key,description=Storage account key for the storage account that temporary files will be written to." jsonschema_extras:"order=6,secret=true"`
 	ContainerName      string           `json:"containerName" jsonschema:"title=Storage Account Container Name,description=Name of the container in the storage account where temporary files will be written." jsonschema_extras:"order=7"`
 	Directory          string           `json:"directory,omitempty" jsonschema:"title=Directory,description=Optional prefix that will be used for temporary files." jsonschema_extras:"order=8"`
-	HardDelete         bool             `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=9"`
+	HardDelete         bool             `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=9,nonsensitive=true"`
 	Schedule           m.ScheduleConfig `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
 	DBTJobTrigger      dbt.JobConfig    `json:"dbt_job_trigger,omitempty" jsonschema:"title=dbt Cloud Job Trigger,description=Trigger a dbt job when new data is available"`
 
@@ -97,7 +97,7 @@ func (c config) FeatureFlags() (string, map[string]bool) {
 type tableConfig struct {
 	Table  string `json:"table" jsonschema:"title=Table,description=Name of the database table." jsonschema_extras:"x-collection-name=true"`
 	Schema string `json:"schema,omitempty" jsonschema:"title=Alternative Schema,description=Alternative schema for this table (optional)." jsonschema_extras:"x-schema-name=true"`
-	Delta  bool   `json:"delta_updates,omitempty" jsonschema:"title=Delta Update,description=Should updates to this table be done via delta updates." jsonschema_extras:"x-delta-updates=true"`
+	Delta  bool   `json:"delta_updates,omitempty" jsonschema:"title=Delta Update,description=Should updates to this table be done via delta updates." jsonschema_extras:"x-delta-updates=true,nonsensitive=true"`
 
 	warehouse string
 }
@@ -140,7 +140,7 @@ func isCaseInsensitiveDatabase(ctx context.Context, db *stdsql.DB, warehouse str
 	return strings.Contains(collation, "_CI_"), nil
 }
 
-func newDriver() *sql.Driver[config, tableConfig] {
+func NewDriver() *sql.Driver[config, tableConfig] {
 	return &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-azure-fabric-warehouse",
 		StartTunnel:      func(ctx context.Context, cfg config) error { return nil },

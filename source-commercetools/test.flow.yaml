@@ -1,0 +1,10 @@
+captures:
+  acmeCo/source-commercetools:
+    endpoint:
+      local:
+        command:
+        - python
+        - -m
+        - source_commercetools
+        config: config.yaml
+    bindings: []

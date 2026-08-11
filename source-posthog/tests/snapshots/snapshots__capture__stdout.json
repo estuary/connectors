@@ -45,6 +45,7 @@
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "cohort_type": null,
+      "condition_type": null,
       "count": 0,
       "created_at": "redacted",
       "created_by": {
@@ -132,6 +133,7 @@
       "default_experiment_stats_method": "bayesian",
       "default_role_id": null,
       "enforce_2fa": null,
+      "enforce_verified_domains": null,
       "id": "019c2351-c712-0000-8470-cf277880e65a",
       "is_active": true,
       "is_ai_data_processing_approved": false,
@@ -146,6 +148,7 @@
       "member_count": 1,
       "members_can_create_projects": false,
       "members_can_invite": true,
+      "members_can_see_org_members": true,
       "members_can_use_personal_api_keys": true,
       "membership_level": 15,
       "metadata": {

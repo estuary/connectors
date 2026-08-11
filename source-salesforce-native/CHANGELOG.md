@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-08-04
+
+### Fixed
+- Sourced schemas now mark every field they describe as required in addition to the `_meta` field.
+- Sourced schemas now declare length bounds on string fields and range bounds on numeric fields.
+
 ## 2026-07-22
 
 ### Changed

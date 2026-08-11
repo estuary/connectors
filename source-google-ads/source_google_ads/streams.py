@@ -598,3 +598,17 @@ class GeoTargetConstant(GoogleAdsStream):
     """
 
     primary_key = ["geo_target_constant.id"]
+
+    def stream_slices(
+        self, stream_state: Mapping[str, Any] = None, **kwargs
+    ) -> Iterable[Optional[Mapping[str, any]]]:
+        """
+        geo_target_constant is a global table rather than per-customer data. Slicing per customer
+        the way GoogleAdsStream does re-reads the entire table once per configured customer. That
+        ends up emitting a lot of duplicate data, so instead of that, a single slice is emitted
+        and the table is read from whichever customer comes first.
+        """
+        if not self.customers:
+            return
+
+        yield {"customer_id": self.customers[0].id}

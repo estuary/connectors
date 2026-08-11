@@ -1,9 +1,8 @@
-# source-mongodb
+# Changelog
 
-## v2, 2024-04-10
-- Support for incremental backfills. This version is backward compatible with v1 captures that have
-  completed their backfills, but will error if upgrading a v1 capture with a backfill that is still
-  in progress.
+## 2026-08-05
 
-## v1, 2023-02-14
-- Beginning of changelog.
+### Fixed
+- Captures now report an `unsupported collection type` error at startup when a
+  captured database contains a collection of a type the connector does not
+  recognize, instead of silently treating it as a standard collection.

@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"bytes"
@@ -35,7 +35,7 @@ const volumeName = "flow_staging"
 type tableConfig struct {
 	Table         string `json:"table" jsonschema:"title=Table,description=Name of the table" jsonschema_extras:"x-collection-name=true"`
 	Schema        string `json:"schema,omitempty" jsonschema:"title=Schema,description=Schema where the table resides" jsonschema_extras:"x-schema-name=true"`
-	Delta         bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false." jsonschema_extras:"x-delta-updates=true"`
+	Delta         bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false." jsonschema_extras:"x-delta-updates=true,nonsensitive=true"`
 	AdditionalSql string `json:"additional_table_create_sql,omitempty" jsonschema:"title=Additional Table Create SQL,description=Additional SQL statement(s) to be run after table is created." jsonschema_extras:"multiline=true"`
 }
 
@@ -68,8 +68,24 @@ func (c tableConfig) Parameters() ([]string, bool, error) {
 	return []string{c.Schema, tableSanitizerRegex.ReplaceAllString(c.Table, "_")}, c.Delta, nil
 }
 
-func newDatabricksDriver() *sql.Driver[config, tableConfig] {
+// NewDriver builds the Databricks materialization driver, and is the only entry
+// point into this package. The driver's operations assume an order of
+// initialization that it establishes itself — the endpoint configuration is
+// validated before a client is built, for instance — so callers are given the
+// assembled driver rather than its pieces.
+func NewDriver() *sql.Driver[config, tableConfig] {
 	useragent.WithProduct(productGlobalDescription.name, productGlobalDescription.version)
+
+	// The Databricks SQL driver logs copiously at INFO, which is noise in the
+	// connector's own logs. Both settings it needs are package-level globals of
+	// the SDK, so this is done here to apply to every user of the driver rather
+	// than only when running as a connector.
+	if log.GetLevel() != log.DebugLevel {
+		logger.DefaultLogger = &NoOpLogger{}
+		if err := dbsqllog.SetLogLevel("disabled"); err != nil {
+			panic(err)
+		}
+	}
 
 	return &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-databricks",
@@ -240,6 +256,31 @@ func (d *transactor) mergePeerStatePatches(patches []json.RawMessage) error {
 	return nil
 }
 
+// validateShardRange refuses to run a shard that covers only part of the
+// keyspace — i.e. one shard of a scaled-out task — unless the scale_out
+// feature flag is enabled. Without the flag every shard emits its checkpoint
+// as a full-document state replacement of top-level stateKeys, so under the
+// v2 runtime's single consolidated state document concurrent shards clobber
+// each other's staged-but-unacknowledged work (silent data loss on scale-down,
+// estuary/connectors#4987), and each shard executes its own staged queries, so
+// after a split both children re-run the parent's identical COPY INTO
+// concurrently and crash-loop on Databricks' duplicated-files guard
+// (estuary/connectors#4986). Only the scale_out mode partitions state into
+// disjoint per-range merge patches with a single executing shard, so failing
+// loudly here is the only safe response.
+func validateShardRange(scaleOut bool, keyBegin, keyEnd uint32) error {
+	if scaleOut || (keyBegin == 0 && keyEnd == math.MaxUint32) {
+		return nil
+	}
+
+	return fmt.Errorf(
+		"this shard covers key range %08x-%08x rather than the full keyspace, meaning the task has been scaled out to multiple shards, "+
+			"but the scale_out feature flag is not enabled: running multiple shards without it can clobber staged work and silently lose documents. "+
+			"Enable the scale_out feature flag (requires runtime v2), or scale the task back down to a single shard",
+		keyBegin, keyEnd,
+	)
+}
+
 func newTransactor(
 	ctx context.Context,
 	materializationName string,
@@ -266,6 +307,10 @@ func newTransactor(
 	var keyBegin, keyEnd uint32 = 0, math.MaxUint32
 	if open.Range != nil {
 		keyBegin, keyEnd = open.Range.KeyBegin, open.Range.KeyEnd
+	}
+
+	if err := validateShardRange(featureFlags["scale_out"], keyBegin, keyEnd); err != nil {
+		return nil, err
 	}
 
 	var d = &transactor{
@@ -851,16 +896,4 @@ func pathsWithRoot(root string, paths []string) []string {
 }
 
 func (d *transactor) Destroy() {
-}
-
-func main() {
-	// Disable databricks driver logging on INFO level, it can be quite noisy and confusing
-	if log.GetLevel() != log.DebugLevel {
-		logger.DefaultLogger = &NoOpLogger{}
-		if err := dbsqllog.SetLogLevel("disabled"); err != nil {
-			panic(err)
-		}
-	}
-
-	boilerplate.RunMain(newDatabricksDriver())
 }

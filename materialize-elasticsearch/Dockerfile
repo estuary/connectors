@@ -22,7 +22,7 @@ RUN go test -tags nozstd -v ./materialize-boilerplate/...
 RUN go test -tags nozstd -short -v ./materialize-elasticsearch/...
 
 # Build the connector.
-RUN go build -tags nozstd -v -o ./connector ./materialize-elasticsearch
+RUN go build -tags nozstd -v -o ./connector ./materialize-elasticsearch/cmd/connector
 
 # Runtime Stage
 ################################################################################

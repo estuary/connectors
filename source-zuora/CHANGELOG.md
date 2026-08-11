@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-08-04
+
+### Added
+- Exports now select each object's related-object ids, so documents carry the
+  foreign keys that let them be joined to the objects they belong to
+  (`InvoiceItem.InvoiceId`, `RatePlan.SubscriptionId`, `Invoice.AccountId`, ...).
+  Each joinable related object contributes one `<Name>.Id` to the query, landing in documents as `<Name>Id`.
+
 ## 2026-07-22
 
 ### Changed

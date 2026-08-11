@@ -9,6 +9,8 @@ Classify each API endpoint of `source-$ARGUMENTS` into the appropriate stream ty
 
 ## Decision flowchart
 
+This chart chooses a **strategy**. Once chosen, the implementation rules for fetch functions — window semantics, resume keys, checkpointing — are in the `fetch-function-rules` skill; the `created_at` and LogCursor criteria below appear there as `FETCH-CURSOR-MUST-BE-UPDATED` and `FETCH-LOGCURSOR-AFTER-DOCS`. Keep the two in sync if either changes.
+
 Evaluate each endpoint in order:
 
 1. **Does the provider push events via HTTP?** → **Webhook** stream (via `WebhookCaptureSpec`). See `/create-webhook-connector` for setup.
@@ -34,7 +36,7 @@ If none of those fit, ask the user for assessment.
 
 ### Code pattern
 
-Add the stream to whatever list the connector uses to opt streams into a scheduled cron, then wire that into the `ResourceConfigWithSchedule` (or equivalent) at binding-construction time. Reference: `source-stripe-native/source_stripe_native/models.py` — `SCHEDULED_BACKFILL_STREAMS` list and the `DEFAULT_SCHEDULE = "0 0 * * *"` constant in `resources.py`, applied via `ResourceConfigWithSchedule(...schedule=DEFAULT_SCHEDULE if needs_schedule else "")`.
+Add the stream to whatever list the connector uses to opt streams into a scheduled cron, then wire that into the `ResourceConfigWithSchedule` (or equivalent) at binding-construction time. Streams that need a scheduled rebackfill pass `schedule=DEFAULT_SCHEDULE`; streams that don't simply omit the field — it defaults to `""` (no schedule). Never pass `schedule=""` explicitly. Reference: `source-stripe-native/source_stripe_native/models.py` — `SCHEDULED_BACKFILL_STREAMS` list and the `DEFAULT_SCHEDULE = "0 0 * * *"` constant in `resources.py`.
 
 ## Code patterns
 
@@ -86,8 +88,9 @@ initial_state = ResourceState(
 
 ### Snapshot
 
-**Use `SnapshotResource`, not the generic `Resource`.**
-Reference: `source-ashby/source_ashby/resources.py`
+**Use `SnapshotResource`, not the generic `Resource`.** Reference: `source-ashby/source_ashby/resources.py`
+
+Rely on its defaults — don't pass `model`, `key`, `initial_state`, or `schema_inference`. The model's schema becomes the collection's write schema, and every field required by the write schema must be present on *every* document written to the collection — including the tombstones the CDK emits for rows that disappeared between snapshots. A tombstone missing a required field fails the capture with a JSON schema violation. `SnapshotResource` defaults both the model and the tombstone to `BaseDocument` so the two always agree; with the default `/_meta/row_id` key, that is sufficient.
 
 ```python
 from estuary_cdk.capture.common import (

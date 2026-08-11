@@ -28,12 +28,14 @@
         "type": "string",
         "title": "Timezone",
         "description": "Timezone to use when capturing datetime columns. Should normally be left blank to use the database's 'time_zone' system variable. Only required if the 'time_zone' system variable cannot be read and columns with type datetime are being captured. Must be a valid IANA time zone name or +HH:MM offset. Takes precedence over the 'time_zone' system variable if both are set (go.estuary.dev/80J6rX).",
+        "nonsensitive": true,
         "order": 3
       },
       "historyMode": {
         "type": "boolean",
         "description": "Capture change events without reducing them to a final state.",
         "default": false,
+        "nonsensitive": true,
         "order": 4
       },
       "discoveryFilters": {
@@ -44,7 +46,8 @@
             },
             "type": "array",
             "title": "Include Schemas",
-            "description": "If specified only tables in the listed schemas will be discovered. Combined as a union with the 'Discovery Schema Selection' setting under Advanced Options."
+            "description": "If specified only tables in the listed schemas will be discovered. Combined as a union with the 'Discovery Schema Selection' setting under Advanced Options.",
+            "nonsensitive": true
           },
           "exclude_schemas": {
             "items": {
@@ -52,7 +55,8 @@
             },
             "type": "array",
             "title": "Exclude Schemas",
-            "description": "Tables in the listed schemas will be excluded from discovery."
+            "description": "Tables in the listed schemas will be excluded from discovery.",
+            "nonsensitive": true
           },
           "table_patterns": {
             "items": {
@@ -60,7 +64,8 @@
             },
             "type": "array",
             "title": "Table Patterns",
-            "description": "If specified only tables matching at least one of these glob patterns will be discovered. A pattern containing a '.' matches against the qualified 'schema.table' name. A pattern without a '.' matches the unqualified table name in any schema. Use '*' or '?' as wildcards."
+            "description": "If specified only tables matching at least one of these glob patterns will be discovered. A pattern containing a '.' matches against the qualified 'schema.table' name. A pattern without a '.' matches the unqualified table name in any schema. Use '*' or '?' as wildcards.",
+            "nonsensitive": true
           }
         },
         "additionalProperties": false,
@@ -80,12 +85,14 @@
             "type": "boolean",
             "title": "Skip Binlog Retention Sanity Check",
             "description": "Bypasses the 'dangerously short binlog retention' sanity check at startup. Only do this if you understand the danger and have a specific need.",
-            "default": false
+            "default": false,
+            "nonsensitive": true
           },
           "node_id": {
             "type": "integer",
             "title": "Node ID",
-            "description": "Node ID for the capture. Each node in a replication cluster must have a unique 32-bit ID. The specific value doesn't matter so long as it is unique. If unset or zero the connector will pick a value."
+            "description": "Node ID for the capture. Each node in a replication cluster must have a unique 32-bit ID. The specific value doesn't matter so long as it is unique. If unset or zero the connector will pick a value.",
+            "nonsensitive": true
           },
           "skip_backfills": {
             "type": "string",
@@ -96,7 +103,8 @@
             "type": "integer",
             "title": "Backfill Chunk Size",
             "description": "The number of rows which should be fetched from the database in a single backfill query.",
-            "default": 50000
+            "default": 50000,
+            "nonsensitive": true
           },
           "discover_schemas": {
             "items": {
@@ -104,12 +112,14 @@
             },
             "type": "array",
             "title": "Discovery Schema Selection",
-            "description": "If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas."
+            "description": "If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas.",
+            "nonsensitive": true
           },
           "source_tag": {
             "type": "string",
             "title": "Source Tag",
-            "description": "When set the capture will add this value as the property 'tag' in the source metadata of each document."
+            "description": "When set the capture will add this value as the property 'tag' in the source metadata of each document.",
+            "nonsensitive": true
           },
           "rediscovery_interval": {
             "type": "string",
@@ -121,7 +131,8 @@
           "feature_flags": {
             "type": "string",
             "title": "Feature Flags",
-            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."
+            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.",
+            "nonsensitive": true
           },
           "statement_timeout": {
             "type": "string",
@@ -134,7 +145,8 @@
             ],
             "title": "Statement Timeout",
             "description": "Overrides the default statement timeout used by the connector. The default of zero disables statement timeouts entirely.",
-            "default": ""
+            "default": "",
+            "nonsensitive": true
           },
           "watermarks_table": {
             "type": "string",
@@ -147,6 +159,7 @@
             "title": "Heartbeat Interval",
             "description": "This property is deprecated and will be removed in the near future. Has no effect.",
             "default": "60s",
+            "nonsensitive": true,
             "pattern": "^[-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+$"
           }
         },

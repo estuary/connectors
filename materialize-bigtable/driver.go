@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -81,14 +81,14 @@ type config struct {
 	InstanceID  string             `json:"instance_id" jsonschema:"title=Instance ID,description=Bigtable instance ID for the materialized tables." jsonschema_extras:"order=1"`
 	AppProfile  string             `json:"app_profile,omitempty" jsonschema:"title=Application Profile,description=The Bigtable app profile ID to use for data operations. Leave blank to use the instance's default app profile." jsonschema_extras:"order=2"`
 	Credentials *CredentialsConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"x-iam-auth=true,order=3"`
-	HardDelete  bool               `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=4"`
+	HardDelete  bool               `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=4,nonsensitive=true"`
 
 	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 }
 
 type advancedConfig struct {
 	Endpoint     string `json:"endpoint,omitempty" jsonschema:"title=Bigtable Endpoint,description=The Bigtable endpoint URI to connect to. Use if you're materializing to a compatible API that isn't provided by Google."`
-	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
 }
 
 func (c config) Validate() error {
@@ -221,6 +221,10 @@ type driver struct{}
 
 var _ boilerplate.Connector = &driver{}
 
+// NewDriver builds the connector, and is its entry point: an importing
+// caller is handed the assembled connector rather than its pieces.
+func NewDriver() boilerplate.Connector { return driver{} }
+
 func (d driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
 	endpointSchema, err := schemagen.GenerateSchema("Materialize Bigtable Spec", &config{}).MarshalJSON()
 	if err != nil {
@@ -236,15 +240,15 @@ func (d driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Sp
 }
 
 func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
-	return boilerplate.RunValidate(ctx, req, newMaterialization)
+	return boilerplate.RunValidate(ctx, req, NewMaterializer)
 }
 
 func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
-	return boilerplate.RunApply(ctx, req, newMaterialization)
+	return boilerplate.RunApply(ctx, req, NewMaterializer)
 }
 
 func (d driver) NewTransactor(ctx context.Context, req pm.Request_Open, be *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
-	return boilerplate.RunNewTransactor(ctx, req, be, newMaterialization)
+	return boilerplate.RunNewTransactor(ctx, req, be, NewMaterializer)
 }
 
 type materialization struct {
@@ -255,7 +259,7 @@ type materialization struct {
 
 var _ boilerplate.Materializer[config, fieldConfig, resource, mappedType] = &materialization{}
 
-func newMaterialization(ctx context.Context, materializationName string, cfg config, featureFlags map[string]bool) (boilerplate.Materializer[config, fieldConfig, resource, mappedType], error) {
+func NewMaterializer(ctx context.Context, materializationName string, cfg config, featureFlags map[string]bool) (boilerplate.Materializer[config, fieldConfig, resource, mappedType], error) {
 	admin, err := cfg.adminClient(ctx)
 	if err != nil {
 		return nil, err

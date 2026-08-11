@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -1035,7 +1035,7 @@ func TestStreamV2CreateTableRecordsGeneration(t *testing.T) {
 	cleanup()
 	t.Cleanup(cleanup)
 
-	ep, err := newSnowflakeDriver().NewEndpoint(ctx, cfg, boilerplate.ParseFlags(cfg))
+	ep, err := NewDriver().NewEndpoint(ctx, cfg, boilerplate.ParseFlags(cfg))
 	require.NoError(t, err)
 	client, err := newClient(ctx, materialization, ep)
 	require.NoError(t, err)

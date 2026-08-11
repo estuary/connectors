@@ -83,13 +83,16 @@ All Estuary connectors capture data in real time, as it appears in the source sy
   - Package - ghcr.io/estuary/source-braintree-native:v1
 - Brevo
   - [Configuration](./brevo.md)
-  - Package - ghcr.io/estuary/source-brevo:v1
+  - Package - ghcr.io/estuary/source-brevo:v2
 - Calendly
   - [Configuration](./calendly.md)
   - Package - ghcr.io/estuary/source-calendly:v1
 - Chargebee
   - [Configuration](./chargebee-native.md)
   - Package - ghcr.io/estuary/source-chargebee-native:v1
+- Commercetools
+  - [Configuration](./commercetools.md)
+  - Package - ghcr.io/estuary/source-commercetools:v1
 - Criteo
   - [Configuration](./criteo.md)
   - Package - ghcr.io/estuary/source-criteo:v1
@@ -280,11 +283,11 @@ All Estuary connectors capture data in real time, as it appears in the source sy
   - [Configuration](./sharepoint.md)
   - Package - ghcr.io/estuary/source-sharepoint:v1
 - Shopify
-  - [Configuration](./shopify.md)
-  - Package - ghcr.io/estuary/source-shopify:v1
-- Shopify (GraphQL)
   - [Configuration](./shopify-native.md)
   - Package - ghcr.io/estuary/source-shopify-native:v2
+- Shopify (deprecated)
+  - [Configuration](./shopify.md)
+  - Package - ghcr.io/estuary/source-shopify:v1
 - Snowflake
   - [Configuration](./snowflake.md)
   - Package - ghcr.io/estuary/source-snowflake:v1

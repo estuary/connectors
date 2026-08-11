@@ -19,7 +19,7 @@ materializations:
   acmeCo/tests/materialize-bigquery:
     endpoint:
       local:
-        command: ["go", "run", "."]
+        command: ["go", "run", "./cmd/connector"]
         protobuf: true
         config: config.yaml
     bindings:

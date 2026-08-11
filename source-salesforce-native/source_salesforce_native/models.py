@@ -37,7 +37,8 @@ class SalesforceResourceConfigWithSchedule(ResourceConfigWithSchedule):
         default="",
         title="Formula Field Refresh Schedule",
         description="Schedule to automatically refresh formula fields. Accepts a cron expression.",
-        pattern=CRON_REGEX
+        pattern=CRON_REGEX,
+        json_schema_extra={"nonsensitive": True},
     )
 
 
@@ -50,7 +51,7 @@ class WindowSizeInDays(BaseModel):
 
     window_type: Literal["days"] = Field(
         default="days",
-        json_schema_extra={"type": "string", "order": 0},
+        json_schema_extra={"nonsensitive": True, "type": "string", "order": 0},
     )
     days: int = Field(
         title="Days",
@@ -69,13 +70,13 @@ class WindowSizeAsInterval(BaseModel):
 
     window_type: Literal["interval"] = Field(
         default="interval",
-        json_schema_extra={"type": "string", "order": 0},
+        json_schema_extra={"nonsensitive": True, "type": "string", "order": 0},
     )
     interval: timedelta = Field(
         title="Interval",
         description="Window size as an ISO 8601 duration, e.g. PT1H for one hour.",
         gt=MIN_INCREMENTAL_WINDOW_SIZE,
-        json_schema_extra={"order": 1},
+        json_schema_extra={"nonsensitive": True, "order": 1},
     )
 
     @property
@@ -131,6 +132,7 @@ class EndpointConfig(BaseModel):
             title="Window size",
             default_factory=lambda: WindowSizeInDays(days=18250),
             discriminator="window_type",
+            json_schema_extra={"nonsensitive": True},
         )
 
         @model_validator(mode="before")
@@ -339,6 +341,14 @@ class ValidationContext:
         self.data_source = data_source
 
 
+# Bounds that Salesforce's own semantics pin down more tightly than the defaults
+# the CDK injects for any unbounded string or number.
+# Salesforce IDs are always either 15 or 18 characters.
+ID_BOUNDS = {"minLength": 15, "maxLength": 18}
+LATITUDE_BOUNDS = {"minimum": -90, "maximum": 90}
+LONGITUDE_BOUNDS = {"minimum": -180, "maximum": 180}
+
+
 class SalesforceRecord(BaseDocument, extra="allow"):
     field_details: ClassVar[FieldDetailsDict]
 
@@ -513,36 +523,51 @@ class SalesforceRecord(BaseDocument, extra="allow"):
                 "field_details must be set on the SalesforceRecord subclass before generating a sourced schema."
             )
 
-        schema = {
+        schema: dict[str, Any] = {
             "additionalProperties": False,
             "type": "object",
-            "properties": {}
+            "properties": {},
         }
 
         for field, details in cls.field_details.items():
             field_schema: dict[str, Any] = {}
             match details.soapType:
-                case SoapTypes.ID | SoapTypes.BASE64 | SoapTypes.STRING:
+                case SoapTypes.ID:
+                    field_schema = {"type": "string", **ID_BOUNDS}
+                case SoapTypes.BASE64 | SoapTypes.STRING:
                     field_schema = {"type": "string"}
                 case SoapTypes.BOOLEAN:
                     if details.custom:
-                        field_schema = {"type": "string"}
+                        # Cast to the string "true" or "false".
+                        field_schema = {
+                            "type": "string",
+                            "minLength": 4,
+                            "maxLength": 5,
+                        }
                     else:
                         field_schema = {"type": "boolean"}
                 case SoapTypes.DATE:
                     field_schema = {
                         "type": "string",
-                        "format": "date"
+                        "format": "date",
+                        "minLength": 10,
+                        "maxLength": 10,
                     }
                 case SoapTypes.DATETIME:
+                    # Bulk API responses carry a +0000 offset (28 characters),
+                    # while REST values are normalized to .000Z (24).
                     field_schema = {
                         "type": "string",
                         "format": "date-time",
+                        "minLength": 24,
+                        "maxLength": 28,
                     }
                 case SoapTypes.TIME:
                     field_schema = {
                         "type": "string",
                         "format": "time",
+                        "minLength": 13,
+                        "maxLength": 13,
                     }
                 case SoapTypes.INTEGER:
                     if details.custom:
@@ -568,21 +593,21 @@ class SalesforceRecord(BaseDocument, extra="allow"):
                             "city": {"type": "string"},
                             "country": {"type": "string"},
                             "geocodeAccuracy": {"type": "string"},
-                            "latitude": {"type": "number"},
-                            "longitude": {"type": "number"},
+                            "latitude": {"type": "number", **LATITUDE_BOUNDS},
+                            "longitude": {"type": "number", **LONGITUDE_BOUNDS},
                             "postalCode": {"type": "string"},
                             "state": {"type": "string"},
                             "street": {"type": "string"},
-                        }
+                        },
                     }
                 case SoapTypes.LOCATION:
                     field_schema = {
                         "additionalProperties": False,
                         "type": "object",
                         "properties": {
-                            "latitude": {"type": "number"},
-                            "longitude": {"type": "number"},
-                        }
+                            "latitude": {"type": "number", **LATITUDE_BOUNDS},
+                            "longitude": {"type": "number", **LONGITUDE_BOUNDS},
+                        },
                     }
                 case SoapTypes.ANY_TYPE:
                     field_schema = {

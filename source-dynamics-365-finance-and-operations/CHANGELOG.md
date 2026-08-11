@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-08-04
+
+### Fixed
+- Sourced schemas now declare length bounds on string fields and range bounds on numeric fields.
+
 ## 2026-07-31
 
 ### Fixed

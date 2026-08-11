@@ -879,3 +879,38 @@ func TestBackfillPriority(t *testing.T) {
 	tc.Run("Backfill 3 (Low Priority)", transactionCountBaseline+1)  // Run until everything else is backfilled
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
+
+// TestLinkedCollections exercises the indirect "linked collections" form of the
+// capture protocol, in which every binding leaves its collection unset and
+// instead references an entry of the spec's linked_collections table by index.
+// Two tables with identical shapes are captured into a single shared output
+// collection, which is the fan-in pattern this protocol feature exists for.
+func TestLinkedCollections(t *testing.T) {
+	var db, tc = blackboxTestSetup(t)
+	db.CreateTable(t, `<NAME>_a`, `(id INTEGER PRIMARY KEY, data TEXT)`)
+	db.CreateTable(t, `<NAME>_b`, `(id INTEGER PRIMARY KEY, data TEXT)`)
+	db.Exec(t, `INSERT INTO <NAME>_a VALUES (1, 'one'), (2, 'two')`)
+	db.Exec(t, `INSERT INTO <NAME>_b VALUES (3, 'three'), (4, 'four')`)
+	tc.Discover("Discover Tables")
+
+	// Repoint the second binding at the first binding's collection so both
+	// tables feed into it, drop the now-unused second collection, and set the
+	// indirect-specs flag so the built spec and its Validate / Open requests
+	// carry the shared collection in a linked_collections table.
+	var unused = tc.Capture.BindingTarget(1)
+	require.NoError(t, tc.Capture.EditBinding(1, "target", tc.Capture.BindingTarget(0)))
+	require.NoError(t, tc.Capture.DeleteCollection(unused))
+	require.NoError(t, tc.Capture.EditCapture("shards.flags.indirect-specs", "true"))
+
+	// Since both tables feed the same collection the transcript can't group
+	// their documents by collection name, so give the first table a higher
+	// backfill priority to make the document ordering deterministic.
+	require.NoError(t, tc.Capture.EditBinding(0, "resource.priority", 10))
+
+	tc.Run("Initial Backfill", transactionCountBaseline+2)
+
+	db.Exec(t, `INSERT INTO <NAME>_a VALUES (5, 'five'), (6, 'six')`)
+	db.Exec(t, `INSERT INTO <NAME>_b VALUES (7, 'seven'), (8, 'eight')`)
+	tc.Run("Replication", transactionCountBaseline)
+	cupaloy.SnapshotT(t, tc.Transcript.String())
+}

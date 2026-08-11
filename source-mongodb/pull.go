@@ -99,7 +99,8 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		}
 
 		for _, coll := range collections {
-			if collectionType := mongoCollectionType(coll.Type); err != nil {
+			var collectionType = mongoCollectionType(coll.Type)
+			if err := collectionType.validate(); err != nil {
 				return fmt.Errorf("unsupported collection type: %w", err)
 			} else if collectionType == mongoCollectionTypeTimeseries {
 				timeseriesCollections[resourceId(db, coll.Name)] = true
@@ -198,8 +199,10 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		return fmt.Errorf("outputting prevState checkpoint: %w", err)
 	}
 
+	// Nothing to stream or poll, so exit rather than idle forever. This connector
+	// normally runs indefinitely, so report the reason for an otherwise silent exit.
 	if len(allBindings) == 0 {
-		// No bindings to capture.
+		log.Info("capture has no enabled bindings, shutting down")
 		return nil
 	}
 

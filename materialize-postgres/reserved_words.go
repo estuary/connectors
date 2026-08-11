@@ -1,4 +1,4 @@
-package main
+package connector
 
 // This list was obtained by filtering all fields in this table [0]
 // that were marked as being reserved in any version of SQL or PostgreSQL.

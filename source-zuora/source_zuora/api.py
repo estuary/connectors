@@ -134,7 +134,10 @@ async def fetch_object_fields(
     log: Logger,
     object_name: str,
 ) -> list[str]:
-    """Return the exportable field names for a Zuora object."""
+    """Return every field name to select when exporting a Zuora object. This includes
+    its own exportable fields plus the `<RelatedObject>.Id` joins that carry its foreign
+    keys.
+    """
     url = f"{base_url}/v1/describe/{object_name}"
     described = _parse_describe_object(
         await http.request(log, url, headers=VERSION_HEADERS)
@@ -148,6 +151,14 @@ async def fetch_object_fields(
         {
             "object": object_name,
             "exportable_fields": described.exportable_field_names,
+            "joined_id_fields": [
+                f"{name}.Id" for name in described.joinable_object_names
+            ],
+            "excluded_related_objects": [
+                name
+                for name in described.related_object_names
+                if name not in described.joinable_object_names
+            ],
             "excluded_fields": {
                 f.name: {"selectable": f.selectable, "contexts": f.contexts}
                 for f in described.fields
@@ -155,7 +166,7 @@ async def fetch_object_fields(
             },
         },
     )
-    return described.exportable_field_names
+    return described.query_field_names
 
 
 def _parse_describe_object(response_bytes: bytes) -> DescribeObject:
@@ -182,6 +193,13 @@ def _parse_describe_object(response_bytes: bytes) -> DescribeObject:
     return DescribeObject(
         name=name_el.text if name_el is not None and name_el.text else "",
         fields=fields,
+        # Relationships live in their own section rather than among <fields>, and
+        # each is joinable in an export query as `<name>.Id`.
+        related_object_names=[
+            related_name_el.text
+            for related_name_el in root.findall("./related-objects/object/name")
+            if related_name_el.text
+        ],
     )
 
 
@@ -229,7 +247,7 @@ async def _export_window(
             after=window_start, before=window_end,
         )
         try:
-            async for row in manager.export_rows(query):
+            async for row in manager.export_rows(query, object_name):
                 doc = model.model_validate(row)
                 cursor = doc.get_cursor()
                 if (
@@ -350,7 +368,7 @@ async def fetch_page(
         )
         count = 0
         try:
-            async for row in manager.export_rows(query):
+            async for row in manager.export_rows(query, object_name):
                 doc = model.model_validate(row)
                 if resume_id is not None and doc.Id <= resume_id:
                     # `Id >` resume is only correct if ORDER BY Id is a stable
@@ -412,5 +430,5 @@ async def fetch_snapshot(
     with Export ZOQL's LIMIT/OFFSET (first-N plus skip rows) to complete it in chunks.
     """
     query = build_query(object_name, fields)
-    async for row in manager.export_rows(query):
+    async for row in manager.export_rows(query, object_name):
         yield BaseCSVRow.model_validate(row)

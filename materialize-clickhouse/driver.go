@@ -1,12 +1,14 @@
-package main
+package connector
 
 import (
+	"cmp"
 	"context"
 	"crypto/tls"
 	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	chproto "github.com/ClickHouse/ch-go/proto"
@@ -71,7 +73,7 @@ func (credentialConfig) JSONSchema() *jsonschema.Schema {
 type config struct {
 	Address     string           `json:"address" jsonschema:"title=Address,description=Host and port of the database (in the form of host[:port]). Default is 9000 if SSL is disabled\\, 9440 if SSL is enabled." jsonschema_extras:"order=0"`
 	Database    string           `json:"database" jsonschema:"title=Database,description=Name of the ClickHouse database to materialize to." jsonschema_extras:"order=1"`
-	HardDelete  bool             `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default this is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=2"`
+	HardDelete  bool             `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default this is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=2,nonsensitive=true"`
 	Credentials credentialConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"order=3"`
 	Schedule    m.ScheduleConfig `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
 
@@ -80,8 +82,8 @@ type config struct {
 
 type advancedConfig struct {
 	SSLMode        string `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Controls the TLS connection behavior.,enum=disable,enum=require,enum=verify-full,default=verify-full"`
-	FeatureFlags   string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
-	NoFlowDocument bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false"`
+	FeatureFlags   string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
+	NoFlowDocument bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false" jsonschema_extras:"nonsensitive=true"`
 }
 
 func (c config) Validate() error {
@@ -165,12 +167,12 @@ func (c config) newClickhouseOptions() *clickhouse.Options {
 // tableConfig defines per-binding resource configuration.
 type tableConfig struct {
 	Table string `json:"table" jsonschema:"title=Table,description=Name of the database table." jsonschema_extras:"x-collection-name=true"`
-	Delta bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false." jsonschema_extras:"x-delta-updates=true"`
+	Delta bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false." jsonschema_extras:"x-delta-updates=true,nonsensitive=true"`
 	// PartitionBy is spliced verbatim into the table's PARTITION BY clause.
 	// It runs as DDL with the user's own credentials against their own
 	// database, so it is the same trust plane as the rest of the endpoint
 	// config; malformed input fails the dry-run CREATE TABLE at Validate time.
-	PartitionBy string `json:"partition_by,omitempty" jsonschema:"title=Partition By,description=Optional expression to use as the table's PARTITION BY clause\\, for example toYYYYMM(flow_published_at). Leave blank for ClickHouse's default single partition. Use a low-cardinality expression: ClickHouse recommends well under 1000 total partitions\\, and inserts spanning more than 100 partitions are rejected by default. Changing this value requires backfilling the binding\\, which drops and re-creates the table." jsonschema_extras:"advanced=true"`
+	PartitionBy string `json:"partition_by,omitempty" jsonschema:"title=Partition By,description=Optional expression to use as the table's PARTITION BY clause\\, for example toYYYYMM(flow_published_at). Leave blank for ClickHouse's default single partition. Use a low-cardinality expression: ClickHouse recommends well under 1000 total partitions\\, and inserts spanning more than 100 partitions are rejected by default. Changing this value requires backfilling the binding\\, which drops and re-creates the table." jsonschema_extras:"advanced=true,nonsensitive=true"`
 }
 
 func (r tableConfig) Validate() error {
@@ -195,7 +197,7 @@ type driver struct {
 
 var _ boilerplate.Connector = &driver{}
 
-func newClickHouseDriver() *driver {
+func NewDriver() *driver {
 	sqlDriver := &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-clickhouse",
 		StartTunnel: func(ctx context.Context, cfg config) error {
@@ -235,6 +237,14 @@ func newClickHouseDriver() *driver {
 	}
 }
 
+// NewMaterializer opens a Materializer for the endpoint. ClickHouse wraps the
+// standard SQL driver to add its own validation, so this reaches through to the
+// wrapped driver's entry point, which is what establishes the initialization
+// order the driver's operations assume.
+func NewMaterializer(ctx context.Context, materializationName string, cfg config, featureFlags map[string]bool) (boilerplate.Materializer[config, sql.FieldConfig, tableConfig, sql.MappedType], error) {
+	return NewDriver().sqlDriver.NewMaterializer(ctx, materializationName, cfg, featureFlags)
+}
+
 func (d *driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
 	return d.sqlDriver.Spec(ctx, req)
 }
@@ -268,14 +278,15 @@ type transactor struct {
 	// than were stored, and an empty stage table means the commit had fully
 	// completed. It is cleared after the first Acknowledge.
 	recovery bool
-	// ensured is set once the first Acknowledge of the session has run the
+	// ensured is closed once ensureTempTables is called to run the
 	// ensure pass: recovering any pending commits and creating / truncating /
 	// re-creating the persistent temp tables for every binding. It is
 	// deliberately independent of the recovery flag, which is only set when
 	// the Open request carried prior connector state -- a brand-new task has
 	// no state but still needs its temp tables ensured before the first
-	// transaction.
-	ensured           bool
+	// transaction.  A channel is used so that Load can wait for it before
+	// reading any Load requests.
+	ensured           chan struct{}
 	state             connectorState
 	runtimeCheckpoint m.RuntimeCheckpoint
 }
@@ -329,6 +340,7 @@ func newTransactor(
 		cfg:               cfg,
 		be:                be,
 		_range:            open.Range,
+		ensured:           make(chan struct{}),
 		state:             make(connectorState, len(bindings)),
 		runtimeCheckpoint: fence.Checkpoint,
 	}
@@ -484,7 +496,7 @@ func (t *transactor) addBinding(_ context.Context, target sql.Table) error {
 const (
 	// ClickHouse recommends inserting batches of 100,000 rows.
 	// https://clickhouse.com/docs/optimize/bulk-inserts
-	// Load phase: insert keys to temporary tables for subsequent join on the target table.
+	// Load phase: insert keys to temporary tables for a subsequent lookup against the target table.
 	// Store phase: insert documents to stage tables for subsequent move to the target table.
 	maxBatchSize = 100_000
 
@@ -495,47 +507,72 @@ const (
 	batchBytesLimit = 10 * 1024 * 1024
 )
 
+type batchItem struct {
+	Binding int
+	Record  []any
+}
+
 func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) (err error) {
 	var ctx = it.Context()
 
 	// Staging keys writes to the persistent load tables, which Acknowledge
 	// establishes via ensureTempTables. RunTransactions runs Acknowledge and
 	// Load in concurrent goroutines, so those tables are only guaranteed to
-	// exist once the acknowledgement has completed.
-	it.WaitForAcknowledged()
+	// exist once ensureTempTables has had a chance to run.
+	<-t.ensured
 
 	// activeBindings tracks the number of keys inserted into each binding's
 	// load table this round, for verification against an authoritative count
-	// before the join.
+	// before the load query runs.
 	activeBindings := make(map[int]int64, len(t.bindings))
-	lastBinding := -1
-	batch := make([][]any, 0, maxBatchSize)
+	batch := make([]batchItem, 0, maxBatchSize)
 	batchBytes := 0
 
-	flushLastBinding := func() error {
-		if len(batch) == 0 || lastBinding < 0 {
+	flushBindings := func() error {
+		if len(batch) == 0 {
 			return nil
 		}
-		// PrepareBatch fails before any rows have been sent, so retrying a
-		// transient connection drop is a clean no-op on the ClickHouse side.
-		var chBatch chdriver.Batch
-		if err := transientRetryPolicy.retry(ctx, "preparing load batch", isTransientErr, func() (err error) {
-			chBatch, err = t.load.conn.PrepareBatch(ctx, t.bindings[lastBinding].load.insertSQL)
-			return err
-		}); err != nil {
-			return fmt.Errorf("preparing load batch for %s: %w", t.bindings[lastBinding].target.Identifier, err)
-		}
-		defer chBatch.Close()
-		for _, record := range batch {
-			if err = chBatch.Append(record...); err != nil {
-				return fmt.Errorf("appending load batch for %s: %w", t.bindings[lastBinding].target.Identifier, err)
+
+		slices.SortFunc(batch, func(a, b batchItem) int {
+			return cmp.Compare(a.Binding, b.Binding)
+		})
+
+		begin := 0
+		for begin < len(batch) {
+			lastBinding := batch[begin].Binding
+			end := begin
+			for end < len(batch) && batch[end].Binding == lastBinding {
+				end++
 			}
+			items := batch[begin:end]
+
+			// PrepareBatch fails before any rows have been sent, so retrying a
+			// transient connection drop is a clean no-op on the ClickHouse side.
+			var chBatch chdriver.Batch
+			if err := transientRetryPolicy.retry(ctx, "preparing load batch", isTransientErr, func() (err error) {
+				chBatch, err = t.load.conn.PrepareBatch(ctx, t.bindings[lastBinding].load.insertSQL)
+				return err
+			}); err != nil {
+				return fmt.Errorf("preparing load batch for %s: %w", t.bindings[lastBinding].target.Identifier, err)
+			}
+
+			for _, item := range items {
+				if err = chBatch.Append(item.Record...); err != nil {
+					chBatch.Close()
+					return fmt.Errorf("appending load batch for %s: %w", t.bindings[lastBinding].target.Identifier, err)
+				}
+			}
+
+			if err = chBatch.Send(); err != nil {
+				chBatch.Close()
+				return fmt.Errorf("flushing load batch for %s: %w", t.bindings[lastBinding].target.Identifier, err)
+			}
+			chBatch.Close()
+
+			begin = end
 		}
 		batch = batch[:0]
 		batchBytes = 0
-		if err = chBatch.Send(); err != nil {
-			return fmt.Errorf("flushing load batch for %s: %w", t.bindings[lastBinding].target.Identifier, err)
-		}
 		return nil
 	}
 
@@ -544,7 +581,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			b := t.bindings[i]
 			// Free resources on the ClickHouse server. Truncate rather than
 			// drop: the load table's identity must stay stable so that key
-			// inserts and the join query resolve the same table from any
+			// inserts and the load query resolve the same table from any
 			// replica of a clustered deployment.
 			//
 			// A failure leaves this round's keys in the table, so it is
@@ -558,21 +595,14 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}()
 
 	for it.Next() {
-		if it.Binding != lastBinding {
-			if err = flushLastBinding(); err != nil {
-				return err
+		if _, found := activeBindings[it.Binding]; !found {
+			b := t.bindings[it.Binding]
+			// The load table exists (ensured at session start); truncate
+			// clears any keys left over from a previous round.
+			if err = t.load.conn.Exec(ctx, b.load.truncateSQL); err != nil {
+				return fmt.Errorf("truncating load stage table for %s: %w", b.target.Identifier, err)
 			}
-			lastBinding = it.Binding
-
-			if _, found := activeBindings[it.Binding]; !found {
-				b := t.bindings[it.Binding]
-				// The load table exists (ensured at session start); truncate
-				// clears any keys left over from a previous round.
-				if err = t.load.conn.Exec(ctx, b.load.truncateSQL); err != nil {
-					return fmt.Errorf("truncating load stage table for %s: %w", b.target.Identifier, err)
-				}
-				activeBindings[it.Binding] = 0
-			}
+			activeBindings[it.Binding] = 0
 		}
 
 		b := t.bindings[it.Binding]
@@ -580,12 +610,12 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		if err != nil {
 			return fmt.Errorf("converting load key for %s: %w", b.target.Identifier, err)
 		}
-		batch = append(batch, converted)
+		batch = append(batch, batchItem{Binding: it.Binding, Record: converted})
 		batchBytes += len(it.PackedKey)
 		activeBindings[it.Binding]++
 
 		if len(batch) >= maxBatchSize || batchBytes >= batchBytesLimit {
-			if err = flushLastBinding(); err != nil {
+			if err = flushBindings(); err != nil {
 				return err
 			}
 		}
@@ -596,13 +626,13 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	if len(activeBindings) == 0 {
 		return nil
 	}
-	if err = flushLastBinding(); err != nil {
+	if err = flushBindings(); err != nil {
 		return err
 	}
 
 	// Hard check: an authoritative count of each load table must account for
 	// every key inserted this round. A shortfall means the keys are not
-	// visible to the replica that will serve the join -- running it anyway
+	// visible to the replica that will serve the load query -- running it anyway
 	// would silently treat existing documents as absent, storing unreduced
 	// documents over them.
 	for i, inserted := range activeBindings {
@@ -618,7 +648,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		}
 	}
 
-	// Keys are now ready to be JOIN'd between the temporary and target tables.
+	// Keys are now staged and ready for the target table to be queried for them.
 	loadBinding := func(i int, b *binding) error {
 		// Documents already delivered via loaded() cannot be recalled, so the
 		// query may only be retried while nothing has been emitted: re-running
@@ -770,7 +800,8 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	shouldProcess := m.StateKeyFilter(stateKeys)
 	var drained []string
 
-	if !t.ensured {
+	select {
+	default: // ensured channel is not closed
 		// First Acknowledge of the session: recover pending commits and
 		// ensure every binding's persistent temp tables. This always runs
 		// before the first Store (the runtime serializes Acknowledge ahead
@@ -830,8 +861,8 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 				return nil, fmt.Errorf("ensuring temp tables of %s: %w", b.target.Identifier, err)
 			}
 		}
-		t.ensured = true
-	} else {
+		close(t.ensured)
+	case <-t.ensured: // ensured channel is closed
 		for stateKey, si := range t.state {
 			if !shouldProcess(stateKey) {
 				continue
@@ -1147,8 +1178,4 @@ func (t *transactor) Destroy() {
 	// their schema has drifted from the target's.
 	_ = t.store.conn.Close()
 	_ = t.load.conn.Close()
-}
-
-func main() {
-	boilerplate.RunMain(newClickHouseDriver())
 }

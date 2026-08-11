@@ -94,7 +94,19 @@ pub async fn run_connector(
                 &mut stdout,
             )?;
 
-            tracing::info!(eventType = "connectorStatus", "Starting capture");
+            let num_bindings = req.capture.as_ref().map_or(0, |spec| spec.bindings.len());
+            if num_bindings == 0 {
+                tracing::info!(
+                    eventType = "connectorStatus",
+                    "Starting capture, no bindings are enabled"
+                );
+            } else {
+                tracing::info!(
+                    eventType = "connectorStatus",
+                    bindings = num_bindings,
+                    "Starting capture"
+                );
+            }
 
             let eof = tokio::spawn(async move {
                 let mut line_string = String::new();

@@ -1,20 +1,25 @@
 [tool.poetry]
-name = "source_criteo"
 version = "0.1.0"
+name = "source_criteo"
 description = ""
-authors = []
+authors = [ "Alex Bair <alexb@estuary.dev>"]
 
 [tool.poetry.dependencies]
-python = "<3.12,>=3.11"
-singer-sdk = "^0.33.0"
-flow-sdk = {path="../python", develop=true}
-tap-criteo = { path = "source_criteo", develop=true }
-debugpy = "^1.8.0"
+async-lru = "^2.0.5"
+estuary-cdk = {path="../estuary-cdk", develop = true}
+python = "^3.11"
+pydantic = "^2"
 
 [tool.poetry.group.dev.dependencies]
+debugpy = "^1.8.0"
+mypy = "^1.8.0"
 pytest = "^7.4.3"
-pytest-insta = "^0.2.0"
+pytest-asyncio = "^0.23"
+pytest-insta = "^0.3.0"
+
+[tool.pytest.ini_options]
+asyncio_mode = "strict"
 
 [build-system]
-requires = ["poetry-core"]
+requires = [ "poetry-core>=1.0.0",]
 build-backend = "poetry.core.masonry.api"

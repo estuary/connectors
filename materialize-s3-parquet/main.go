@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -26,7 +26,7 @@ type config struct {
 }
 
 type advancedConfig struct {
-	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
 }
 
 func (c config) Validate() error {
@@ -83,6 +83,6 @@ var driver = filesink.FileDriver[*filesink.S3MultipartUpload, filesink.S3Resourc
 	},
 }
 
-func main() {
-	boilerplate.RunMain(driver)
-}
+// NewDriver builds the connector, and is its entry point: an importing
+// caller is handed the assembled connector rather than its pieces.
+func NewDriver() boilerplate.Connector { return driver }

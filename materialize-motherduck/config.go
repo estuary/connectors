@@ -1,10 +1,11 @@
-package main
+package connector
 
 import (
 	"context"
 	stdsql "database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"regexp"
@@ -30,7 +31,7 @@ type config struct {
 	Token         string              `json:"token" jsonschema:"title=Motherduck Service Token,description=Service token for authenticating with MotherDuck." jsonschema_extras:"secret=true,order=0"`
 	Database      string              `json:"database" jsonschema:"title=Database,description=The database to materialize to." jsonschema_extras:"order=1"`
 	Schema        string              `json:"schema" jsonschema:"title=Database Schema,default=main,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables." jsonschema_extras:"order=2"`
-	HardDelete    bool                `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=3"`
+	HardDelete    bool                `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=3,nonsensitive=true"`
 	StagingBucket stagingBucketConfig `json:"stagingBucket" jsonschema_extras:"order=4"`
 	Schedule      m.ScheduleConfig    `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
 
@@ -38,8 +39,8 @@ type config struct {
 }
 
 type advancedConfig struct {
-	NoFlowDocument bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false"`
-	FeatureFlags   string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	NoFlowDocument bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false" jsonschema_extras:"nonsensitive=true"`
+	FeatureFlags   string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
 }
 
 func (c config) Validate() error {
@@ -185,7 +186,7 @@ const (
 )
 
 type stagingBucketConfig struct {
-	StagingBucketType stagingBucketType `json:"stagingBucketType"`
+	StagingBucketType stagingBucketType `json:"stagingBucketType" jsonschema_extras:"nonsensitive=true"`
 
 	stagingBucketS3Config
 	stagingBucketGCSConfig
@@ -224,7 +225,42 @@ type stagingBucketAzureConfig struct {
 	BucketPathAzure    string `json:"bucketPathAzure,omitempty" jsonschema:"title=Bucket Path,description=An optional prefix that will be used to store objects in the staging container." jsonschema_extras:"order=3"`
 }
 
-func (c *config) db(ctx context.Context) (*stdsql.DB, error) {
+// isDuckLake reports whether the destination is a DuckLake database rather than a
+// classic MotherDuck database.
+func (c *config) isDuckLake(ctx context.Context) (bool, error) {
+	db, err := c.bareOpen()
+	if err != nil {
+		return false, err
+	}
+	defer db.Close()
+
+	var databaseType string
+	err = db.QueryRowContext(ctx,
+		"SELECT type FROM md_information_schema.databases WHERE name = ?",
+		c.Database,
+	).Scan(&databaseType)
+
+	if errors.Is(err, stdsql.ErrNoRows) {
+		// Databases attached from outside the account are absent from this view.
+		// The rename migration path works on either format, so it is the safe
+		// assumption when the format is unknown.
+		log.WithField("database", c.Database).Info(
+			"database not listed in md_information_schema.databases, assuming DuckLake")
+		return true, nil
+	} else if err != nil {
+		return false, fmt.Errorf("querying database type: %w", err)
+	}
+
+	log.WithFields(log.Fields{
+		"database": c.Database,
+		"type":     databaseType,
+	}).Info("determined destination database format")
+
+	return databaseType == "DUCKLAKE", nil
+}
+
+// bareOpen connects to the configured database without any staging bucket setup.
+func (c *config) bareOpen() (*stdsql.DB, error) {
 	var userAgent = "Estuary"
 
 	db, err := stdsql.Open("duckdb", fmt.Sprintf("md:%s?motherduck_token=%s&custom_user_agent=%s", c.Database, c.Token, userAgent))
@@ -232,6 +268,15 @@ func (c *config) db(ctx context.Context) (*stdsql.DB, error) {
 		if strings.Contains(err.Error(), "Jwt header is an invalid JSON") {
 			return nil, fmt.Errorf("invalid token: unauthenticated")
 		}
+		return nil, err
+	}
+
+	return db, nil
+}
+
+func (c *config) db(ctx context.Context) (*stdsql.DB, error) {
+	db, err := c.bareOpen()
+	if err != nil {
 		return nil, err
 	}
 
@@ -409,7 +454,7 @@ func (c *config) toBucketAndPath(ctx context.Context) (blob.Bucket, string, erro
 type tableConfig struct {
 	Table  string `json:"table" jsonschema:"title=Table,description=Name of the database table." jsonschema_extras:"x-collection-name=true"`
 	Schema string `json:"schema,omitempty" jsonschema:"title=Alternative Schema,description=Alternative schema for this table (optional)." jsonschema_extras:"x-schema-name=true"`
-	Delta  bool   `json:"delta_updates,omitempty" jsonschema:"title=Delta Update,description=Should updates to this table be done via delta updates." jsonschema_extras:"x-delta-updates=true"`
+	Delta  bool   `json:"delta_updates,omitempty" jsonschema:"title=Delta Update,description=Should updates to this table be done via delta updates." jsonschema_extras:"x-delta-updates=true,nonsensitive=true"`
 
 	database string
 }

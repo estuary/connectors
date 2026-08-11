@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -39,11 +39,11 @@ func TestIntegration(t *testing.T) {
 	}
 
 	t.Run("materialize", func(t *testing.T) {
-		sql.RunMaterializationTest(t, newBigQueryDriver(), "testdata/materialize.flow.yaml", makeResourceFn, actionDescSanitizers)
+		sql.RunMaterializationTest(t, NewDriver(), "testdata/materialize.flow.yaml", makeResourceFn, actionDescSanitizers)
 	})
 
 	t.Run("apply", func(t *testing.T) {
-		sql.RunApplyTest(t, newBigQueryDriver(), "testdata/apply.flow.yaml", makeResourceFn)
+		sql.RunApplyTest(t, NewDriver(), "testdata/apply.flow.yaml", makeResourceFn)
 	})
 
 	t.Run("apply-drain", func(t *testing.T) {
@@ -66,7 +66,7 @@ func TestIntegration(t *testing.T) {
 				fileKey := path.Join(cfg.effectiveBucketPath(), fmt.Sprintf("applydrain-%s.json", uuid.NewString()))
 				require.NoError(t, bucket.Upload(ctx, fileKey, strings.NewReader("")))
 
-				query := sql.DrainSeedInsertQuery(t, newBigQueryDriver(), cfg, appliedSpec, "JSON '{}'")
+				query := sql.DrainSeedInsertQuery(t, NewDriver(), cfg, appliedSpec, "JSON '{}'")
 				state, err := json.Marshal(map[string]any{
 					appliedSpec.Bindings[0].StateKey: map[string]any{
 						"Query":         query,
@@ -83,12 +83,12 @@ func TestIntegration(t *testing.T) {
 				require.Len(t, rows, 1, "the staged transaction's row must have been committed")
 			}
 
-			sql.RunApplyDrainTest(t, newBigQueryDriver(), cfg, res, seedPending, verifyDrained)
+			sql.RunApplyDrainTest(t, NewDriver(), cfg, res, seedPending, verifyDrained)
 		})
 	})
 
 	t.Run("migrate", func(t *testing.T) {
-		sql.RunMigrationTest(t, newBigQueryDriver(), "testdata/migrate.flow.yaml", makeResourceFn, nil)
+		sql.RunMigrationTest(t, NewDriver(), "testdata/migrate.flow.yaml", makeResourceFn, nil)
 	})
 
 	// Toggling objects_and_arrays_as_json migrates the object column and the
@@ -96,7 +96,7 @@ func TestIntegration(t *testing.T) {
 	// root document JSON<->text migration end-to-end, the scenario that requires
 	// the root document to be migratable (rather than needing a backfill).
 	t.Run("flow_document-migration", func(t *testing.T) {
-		sql.RunFeatureFlagMigrationTest(t, newBigQueryDriver(), "testdata/migrate-doc.flow.yaml", makeResourceFn, []sql.FeatureFlagMigrationPhase{
+		sql.RunFeatureFlagMigrationTest(t, NewDriver(), "testdata/migrate-doc.flow.yaml", makeResourceFn, []sql.FeatureFlagMigrationPhase{
 			{FeatureFlags: "objects_and_arrays_as_json", Fixture: "testdata/fixture.doc-migrate.json"},    // materialize as JSON
 			{FeatureFlags: "no_objects_and_arrays_as_json", Fixture: "testdata/fixture.doc-migrate.json"}, // migrate JSON -> STRING
 			{FeatureFlags: "objects_and_arrays_as_json", Fixture: "testdata/fixture.doc-migrate.json"},    // migrate STRING -> JSON

@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"bytes"
@@ -138,15 +138,15 @@ func TestIntegration(t *testing.T) {
 	}
 
 	t.Run("materialize", func(t *testing.T) {
-		boilerplate.RunMaterializationTest(t, newMaterialization, "testdata/materialize.flow.yaml", makeResourceFn, materializeSanitizers())
+		boilerplate.RunMaterializationTest(t, NewMaterializer, "testdata/materialize.flow.yaml", makeResourceFn, materializeSanitizers())
 	})
 
 	t.Run("materialize-ns", func(t *testing.T) {
-		boilerplate.RunMaterializationTest(t, newMaterialization, "testdata/materialize-ns.flow.yaml", makeResourceFn, materializeSanitizers())
+		boilerplate.RunMaterializationTest(t, NewMaterializer, "testdata/materialize-ns.flow.yaml", makeResourceFn, materializeSanitizers())
 	})
 
 	t.Run("apply", func(t *testing.T) {
-		boilerplate.RunApplyTest(t, &driver{}, newMaterialization, "testdata/apply.flow.yaml", makeResourceFn)
+		boilerplate.RunApplyTest(t, &driver{}, NewMaterializer, "testdata/apply.flow.yaml", makeResourceFn)
 	})
 
 	t.Run("apply-drain", func(t *testing.T) {
@@ -233,7 +233,7 @@ func TestIntegration(t *testing.T) {
 			require.Len(t, rows, 1, "the staged transaction's files must have been appended")
 		}
 
-		boilerplate.RunApplyDrainTest(t, &driver{}, newMaterialization, cfg, res, seedPending, verifyDrained)
+		boilerplate.RunApplyDrainTest(t, &driver{}, NewMaterializer, cfg, res, seedPending, verifyDrained)
 	})
 
 	t.Run("ts-overflow-regression", func(t *testing.T) {
@@ -267,7 +267,7 @@ func TestIntegration(t *testing.T) {
 	// Migration test is skipped because Iceberg does not support the type
 	// migrations exercised by the test (e.g. long→string).
 	//t.Run("migrate", func(t *testing.T) {
-	//	boilerplate.RunMigrationTest(t, newMaterialization, "testdata/migrate.flow.yaml", makeResourceFn, nil)
+	//	boilerplate.RunMigrationTest(t, NewMaterializer, "testdata/migrate.flow.yaml", makeResourceFn, nil)
 	//})
 }
 
@@ -299,15 +299,15 @@ func TestIntegrationGlue(t *testing.T) {
 	}
 
 	t.Run("materialize", func(t *testing.T) {
-		boilerplate.RunMaterializationTest(t, newMaterialization, "testdata/materialize-glue.flow.yaml", makeResourceFn, materializeSanitizers())
+		boilerplate.RunMaterializationTest(t, NewMaterializer, "testdata/materialize-glue.flow.yaml", makeResourceFn, materializeSanitizers())
 	})
 
 	t.Run("materialize-ns", func(t *testing.T) {
-		boilerplate.RunMaterializationTest(t, newMaterialization, "testdata/materialize-glue-ns.flow.yaml", makeResourceFn, materializeSanitizers())
+		boilerplate.RunMaterializationTest(t, NewMaterializer, "testdata/materialize-glue-ns.flow.yaml", makeResourceFn, materializeSanitizers())
 	})
 
 	t.Run("apply", func(t *testing.T) {
-		boilerplate.RunApplyTest(t, &driver{}, newMaterialization, "testdata/apply-glue.flow.yaml", makeResourceFn)
+		boilerplate.RunApplyTest(t, &driver{}, NewMaterializer, "testdata/apply-glue.flow.yaml", makeResourceFn)
 	})
 
 	t.Run("ts-overflow-regression", func(t *testing.T) {
@@ -1208,7 +1208,7 @@ func createTestWarehouse(t *testing.T, cfg config) {
 			},
 			"storageConfigInfo": map[string]any{
 				"storageType":      "S3",
-				"allowedLocations": []string{"s3://" + cfg.Bucket + "/"},
+				"allowedLocations": []string{baseLocation + "/"},
 				"roleArn":          "arn:aws:iam::000000000000:role/dummy",
 				"region":           cfg.Region,
 				// Client-visible endpoint (host port mapped from rustfs).

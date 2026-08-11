@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -194,7 +194,7 @@ func TestValidatePartitionBy(t *testing.T) {
 	var tableName = "test_validate_partition_by"
 
 	t.Run("dry-run accepts a valid expression", func(t *testing.T) {
-		resp, err := newClickHouseDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, "toYYYYMM(flow_published_at)", 0, nil))
+		resp, err := NewDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, "toYYYYMM(flow_published_at)", 0, nil))
 		require.NoError(t, err)
 		for _, pc := range resp.Bindings[0].ProjectionConstraints {
 			require.NotEqual(t, pm.Response_Validated_Constraint_INCOMPATIBLE, pc.Constraint.Type)
@@ -203,14 +203,14 @@ func TestValidatePartitionBy(t *testing.T) {
 	})
 
 	t.Run("dry-run rejects a bad expression", func(t *testing.T) {
-		_, err := newClickHouseDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, "toYYYYMM(no_such_column)", 0, nil))
+		_, err := NewDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, "toYYYYMM(no_such_column)", 0, nil))
 		require.ErrorContains(t, err, "no_such_column")
 		require.Zero(t, countDryRunTables(t, ctx, cfg), "dry-run scratch tables must be dropped even on failure")
 	})
 
 	t.Run("change without backfill is INCOMPATIBLE", func(t *testing.T) {
 		var lastSpec = specWithPartitionBy(t, cfg, tableName, "", 0)
-		resp, err := newClickHouseDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, "toYYYYMM(flow_published_at)", 0, lastSpec))
+		resp, err := NewDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, "toYYYYMM(flow_published_at)", 0, lastSpec))
 		require.NoError(t, err)
 
 		var incompatible []string
@@ -232,7 +232,7 @@ func TestValidatePartitionBy(t *testing.T) {
 
 	t.Run("change with a backfill bump is allowed", func(t *testing.T) {
 		var lastSpec = specWithPartitionBy(t, cfg, tableName, "", 0)
-		resp, err := newClickHouseDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, "toYYYYMM(flow_published_at)", 1, lastSpec))
+		resp, err := NewDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, "toYYYYMM(flow_published_at)", 1, lastSpec))
 		require.NoError(t, err)
 		for _, pc := range resp.Bindings[0].ProjectionConstraints {
 			require.NotEqual(t, pm.Response_Validated_Constraint_INCOMPATIBLE, pc.Constraint.Type)
@@ -246,7 +246,7 @@ func TestValidatePartitionBy(t *testing.T) {
 		// dry-run (which would fail on the missing column) for an expression
 		// identical to the last applied spec's.
 		var lastSpec = specWithPartitionBy(t, cfg, tableName, "toYYYYMM(no_such_column)", 0)
-		_, err := newClickHouseDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, "toYYYYMM(no_such_column)", 0, lastSpec))
+		_, err := NewDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, "toYYYYMM(no_such_column)", 0, lastSpec))
 		require.NoError(t, err)
 	})
 
@@ -254,7 +254,7 @@ func TestValidatePartitionBy(t *testing.T) {
 		var lastSpec = specWithPartitionBy(t, cfg, tableName, "toYYYYMM(flow_published_at)", 0)
 		lastSpec.InactiveBindings = lastSpec.Bindings
 		lastSpec.Bindings = nil
-		resp, err := newClickHouseDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, " toYYYYMM(flow_published_at) ", 0, lastSpec))
+		resp, err := NewDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, " toYYYYMM(flow_published_at) ", 0, lastSpec))
 		require.NoError(t, err)
 		for _, pc := range resp.Bindings[0].ProjectionConstraints {
 			require.NotEqual(t, pm.Response_Validated_Constraint_INCOMPATIBLE, pc.Constraint.Type)
@@ -289,12 +289,12 @@ func TestApplyPartitionByBackfillRecreates(t *testing.T) {
 	}
 
 	var specA = specWithPartitionBy(t, cfg, tableName, "toYYYYMM(flow_published_at)", 0)
-	_, err := newClickHouseDriver().Apply(ctx, &pm.Request_Apply{Materialization: specA, Version: "test"})
+	_, err := NewDriver().Apply(ctx, &pm.Request_Apply{Materialization: specA, Version: "test"})
 	require.NoError(t, err)
 	require.Equal(t, "toYYYYMM(flow_published_at)", partitionKey())
 
 	var specB = specWithPartitionBy(t, cfg, tableName, "toYYYYMMDD(flow_published_at)", 1)
-	_, err = newClickHouseDriver().Apply(ctx, &pm.Request_Apply{Materialization: specB, Version: "test", LastMaterialization: specA, LastVersion: "test"})
+	_, err = NewDriver().Apply(ctx, &pm.Request_Apply{Materialization: specB, Version: "test", LastMaterialization: specA, LastVersion: "test"})
 	require.NoError(t, err)
 	require.Equal(t, "toYYYYMMDD(flow_published_at)", partitionKey())
 }
@@ -333,7 +333,7 @@ func TestPartitionByDataPath(t *testing.T) {
 		_, _ = db.ExecContext(context.Background(), fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
 	})
 
-	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}}
+	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}, ensured: make(chan struct{})}
 	loadConn, err := clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
 	tr.load.conn = loadConn
@@ -424,6 +424,7 @@ func TestRecoveryAfterPartitionChangingBackfill(t *testing.T) {
 		templates: tpls,
 		cfg:       cfg,
 		_range:    &pf.RangeSpec{},
+		ensured:   make(chan struct{}),
 		state:     make(connectorState),
 	}
 	storeConn, err := clickhouse.Open(cfg.newClickhouseOptions())
@@ -440,7 +441,6 @@ func TestRecoveryAfterPartitionChangingBackfill(t *testing.T) {
 	// A staged row of the pending pre-backfill commit.
 	stageTestRows(t, ctx, tr, b, []any{"k1", "v1", "c", testTime, `{"id":"k1"}`})
 
-	tr.ensured = false
 	tr.recovery = true
 	tr.state[b.target.StateKey] = &stateItem{StoredRows: 1}
 	_, err = tr.Acknowledge(ctx, nil, nil)
@@ -575,7 +575,7 @@ func TestStoreTablePartitionDrift(t *testing.T) {
 	_, err = db.ExecContext(ctx, staleSQL)
 	require.NoError(t, err)
 
-	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}}
+	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}, ensured: make(chan struct{})}
 	loadConn, err := clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
 	tr.load.conn = loadConn

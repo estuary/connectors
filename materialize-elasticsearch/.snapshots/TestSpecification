@@ -15,7 +15,8 @@
         "title": "Hard Delete",
         "description": "If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).",
         "default": false,
-        "order": 1
+        "order": 1,
+        "nonsensitive": true
       },
       "credentials": {
         "type": "object",
@@ -64,12 +65,14 @@
           "number_of_replicas": {
             "type": "integer",
             "title": "Index Replicas",
-            "description": "The number of replicas to create new indexes with. Leave blank to use the cluster default."
+            "description": "The number of replicas to create new indexes with. Leave blank to use the cluster default.",
+            "nonsensitive": true
           },
           "feature_flags": {
             "type": "string",
             "title": "Feature Flags",
-            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."
+            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.",
+            "nonsensitive": true
           }
         },
         "type": "object",
@@ -130,11 +133,13 @@
         "type": "boolean",
         "description": "Should updates to this table be done via delta updates. Default is false.",
         "default": false,
+        "nonsensitive": true,
         "x-delta-updates": true
       },
       "number_of_shards": {
         "type": "integer",
-        "description": "The number of shards to create the index with. Leave blank to use the cluster default."
+        "description": "The number of shards to create the index with. Leave blank to use the cluster default.",
+        "nonsensitive": true
       }
     },
     "type": "object",

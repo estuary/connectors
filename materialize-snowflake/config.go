@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"crypto/x509"
@@ -90,8 +90,8 @@ type config struct {
 	Warehouse     string                           `json:"warehouse,omitempty" jsonschema:"title=Warehouse,description=The Snowflake virtual warehouse used to execute queries. Uses the default warehouse for the Snowflake user if left blank." jsonschema_extras:"order=5"`
 	Role          string                           `json:"role,omitempty" jsonschema:"title=Role,description=The user role used to perform actions." jsonschema_extras:"order=6"`
 	Account       string                           `json:"account,omitempty" jsonschema:"title=Account,description=Optional Snowflake account identifier." jsonschema_extras:"order=7,x-hidden-field=true"`
-	TimestampType snowflakeTimestampType           `json:"timestamp_type" jsonschema:"title=Snowflake Timestamp Type,description=Controls how timestamp columns are stored in Snowflake.,enum=TIMESTAMP_LTZ,enum=TIMESTAMP_NTZ (discard TZ),enum=TIMESTAMP_NTZ (normalize to UTC),enum=TIMESTAMP_TZ" jsonschema_extras:"order=8"`
-	HardDelete    bool                             `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=9"`
+	TimestampType snowflakeTimestampType           `json:"timestamp_type" jsonschema:"title=Snowflake Timestamp Type,description=Controls how timestamp columns are stored in Snowflake.,enum=TIMESTAMP_LTZ,enum=TIMESTAMP_NTZ (discard TZ),enum=TIMESTAMP_NTZ (normalize to UTC),enum=TIMESTAMP_TZ" jsonschema_extras:"order=8,nonsensitive=true"`
+	HardDelete    bool                             `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=9,nonsensitive=true"`
 	Credentials   *snowflake_auth.CredentialConfig `json:"credentials" jsonschema:"title=Authentication"`
 	Schedule      m.ScheduleConfig                 `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
 	DBTJobTrigger dbt.JobConfig                    `json:"dbt_job_trigger,omitempty" jsonschema:"title=dbt Cloud Job Trigger,description=Trigger a dbt Job when new data is available"`
@@ -99,9 +99,9 @@ type config struct {
 }
 
 type advancedConfig struct {
-	DisableFieldTruncation bool   `json:"disableFieldTruncation,omitempty" jsonschema:"title=Disable Field Truncation,description=Disables truncation of materialized fields. May result in errors for documents with extremely large values or complex nested structures."`
-	NoFlowDocument         bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false"`
-	FeatureFlags           string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	DisableFieldTruncation bool   `json:"disableFieldTruncation,omitempty" jsonschema:"title=Disable Field Truncation,description=Disables truncation of materialized fields. May result in errors for documents with extremely large values or complex nested structures." jsonschema_extras:"nonsensitive=true"`
+	NoFlowDocument         bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false" jsonschema_extras:"nonsensitive=true"`
+	FeatureFlags           string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
 }
 
 // toURI manually builds the DSN connection string. Most uses should set

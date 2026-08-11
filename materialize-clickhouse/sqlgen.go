@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"encoding/json"
@@ -458,17 +458,17 @@ SETTINGS mutations_sync = 1;
 
 -- Load tables stage the keys of documents the connector needs to look up during a
 -- transaction's load phase. The connector inserts keys into the staging load table,
--- then joins the target table (using FINAL for deduplication) against the staging
--- table to retrieve the current version of documents for those keys.
+-- then selects from the target table (using FINAL for deduplication) restricted to
+-- those keys, to retrieve the current version of their documents.
 --
 -- Load tables use the MergeTree engine so that large key sets are spilled to disk
 -- rather than held entirely in memory, avoiding server memory limit issues.
 --
 -- Like store tables, load tables are PERSISTENT: created once (IF NOT EXISTS) at
 -- session start and truncated -- never re-created -- between load rounds, keeping
--- the name->UUID mapping stable so that key inserts and the join query resolve the
--- same object from any replica of a clustered deployment. The join query and the
--- pre-join key-count check run with select_sequential_consistency = 1 so they
+-- the name->UUID mapping stable so that key inserts and the load query resolve the
+-- same object from any replica of a clustered deployment. The load query and the
+-- key-count check preceding it run with select_sequential_consistency = 1 so they
 -- observe both the keys just inserted and target-table rows committed by prior
 -- transactions' partition moves. Load tables hold nothing durable (only the current
 -- round's lookup keys), so they are safe to truncate at any time. Like store
@@ -521,6 +521,26 @@ INSERT INTO {{ template "loadTableName" . }} (
 {{ end }}
 
 {{/*
+Restricting the target to the staged keys with a tuple IN, rather than joining
+against the load table, is what keeps the load query affordable on a large
+target. The key tuple is exactly the target's ORDER BY (see createTargetTable),
+so ClickHouse resolves the set through the primary key index and reads only the
+mark ranges that can contain those keys. Joining instead makes the load table
+the build side and streams every row of the target -- including the whole
+flow_document column -- through the hash probe, at a cost that scales with the
+size of the table rather than with the number of keys being loaded.
+
+Keys are never null in a Flow collection, so the NULL-unsafe semantics of IN
+(transform_null_in = 0) cannot exclude a key that the target actually holds.
+*/}}
+{{ define "loadKeyPredicate" -}}
+({{ range $ind, $key := $.Keys }}{{ if $ind }}, {{ end }}r.{{ $key.Identifier }}{{ end }}) IN (
+		SELECT {{ range $ind, $key := $.Keys }}{{ if $ind }}, {{ end }}{{ $key.Identifier }}{{ end }}
+		FROM {{ template "loadTableName" . }}
+	)
+{{- end }}
+
+{{/*
 The load queries (queryLoadTable and queryLoadTableNoFlowDocument) each carry
 SETTINGS select_sequential_consistency = 1 so that a query observes both the
 just-inserted keys and target-table rows committed by prior transactions'
@@ -530,11 +550,7 @@ partition moves, from any replica.
 {{ if $.Document -}}
 SELECT r.{{$.Document.Identifier}}
 	FROM {{$.Identifier}} AS r FINAL
-	JOIN {{ template "loadTableName" . }} AS l
-	{{- range $ind, $key := $.Keys }}
-		{{ if $ind }} AND {{ else }} ON {{ end -}}
-		l.{{$key.Identifier}} = r.{{$key.Identifier}}
-	{{- end }}
+	WHERE {{ template "loadKeyPredicate" . }}
 SETTINGS select_sequential_consistency = 1;
 {{ end -}}
 {{ end }}
@@ -575,11 +591,7 @@ concat('{',
 {{- end }}
 , '}') AS flow_document
 	FROM {{$.Identifier}} AS r FINAL
-	JOIN {{ template "loadTableName" . }} AS l
-	{{- range $ind, $key := $.Keys }}
-		{{ if $ind }} AND {{ else }} ON {{ end -}}
-		l.{{$key.Identifier}} = r.{{$key.Identifier}}
-	{{- end }}
+	WHERE {{ template "loadKeyPredicate" . }}
 SETTINGS select_sequential_consistency = 1;
 {{ else -}}
 SELECT ''::String LIMIT 0

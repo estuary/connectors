@@ -137,13 +137,6 @@ jobs:
           - materialize-sqlite
           - materialize-sqlserver
           - materialize-webhook
-        include:
-          - connector: source-criteo
-            connector_type: capture
-            python: true
-          - connector: source-shopify
-            connector_type: capture
-            python: true
 
     steps:
       - uses: actions/checkout@v4
@@ -252,44 +245,12 @@ jobs:
 
       - name: Build ${{ matrix.connector }} Docker Image
         uses: docker/build-push-action@v6
-        if: ${{!matrix.python}}
         with:
           context: .
           file: ${{ matrix.connector }}/Dockerfile
           load: true
           build-args: BASE_IMAGE=ghcr.io/estuary/base-image:${{ steps.prep.outputs.tag }}
           tags: ghcr.io/estuary/${{ matrix.connector }}:local
-
-      - name: Build ${{ matrix.connector }} Python Docker Image
-        uses: docker/build-push-action@v6
-        if: ${{matrix.python}}
-        with:
-          context: .
-          file: python/Dockerfile
-          load: true
-          build-args: |
-            CONNECTOR_NAME=${{matrix.connector}}
-            CONNECTOR_TYPE=${{matrix.connector_type}}
-          tags: ghcr.io/estuary/${{ matrix.connector }}:local
-
-      - name: Setup Python for ${{ matrix.connector }}
-        uses: actions/setup-python@v5
-        if: ${{matrix.python}}
-        with:
-          python-version: '3.11'
-
-      - name: Install Poetry
-        if: ${{matrix.python}}
-        uses: snok/install-poetry@v1
-
-      - name: Python connector ${{ matrix.connector }} snapshot tests
-        if: ${{matrix.python}}
-        run: |
-          cd ${{matrix.connector}};
-          poetry install;
-          source $(poetry env info --path)/bin/activate
-          cd ..;
-          pytest ${{matrix.connector}}/tests;
 
       - name: Source connector ${{ matrix.connector }} integration tests
         if: |

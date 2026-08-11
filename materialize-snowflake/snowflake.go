@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -29,8 +29,8 @@ import (
 type tableConfig struct {
 	Table      string `json:"table" jsonschema_extras:"x-collection-name=true"`
 	Schema     string `json:"schema,omitempty" jsonschema:"title=Alternative Schema,description=Alternative schema for this table (optional)" jsonschema_extras:"x-schema-name=true"`
-	Delta      bool   `json:"delta_updates,omitempty" jsonschema:"title=Delta Updates,description=Use Private Key authentication to enable Snowpipe Streaming for Delta Update bindings" jsonschema_extras:"x-delta-updates=true"`
-	Clustering string `json:"clustering,omitempty" jsonschema:"title=Clustering Keys,description=Comma-separated list of column names to use as the clustering key for Snowflake Automatic Clustering. Leave empty to disable clustering. Recommended only for large tables queried with selective filters on the chosen columns. Consumes additional Snowflake credits." jsonschema_extras:"advanced=true"`
+	Delta      bool   `json:"delta_updates,omitempty" jsonschema:"title=Delta Updates,description=Use Private Key authentication to enable Snowpipe Streaming for Delta Update bindings" jsonschema_extras:"x-delta-updates=true,nonsensitive=true"`
+	Clustering string `json:"clustering,omitempty" jsonschema:"title=Clustering Keys,description=Comma-separated list of column names to use as the clustering key for Snowflake Automatic Clustering. Leave empty to disable clustering. Recommended only for large tables queried with selective filters on the chosen columns. Consumes additional Snowflake credits." jsonschema_extras:"advanced=true,nonsensitive=true"`
 
 	// If the endpoint schema is the same as the resource schema, the resource path will be only the
 	// table name. This is to provide compatibility for materializations that were created prior to
@@ -96,8 +96,18 @@ func (c tableConfig) Parameters() ([]string, bool, error) {
 	return path, c.Delta, nil
 }
 
-// newSnowflakeDriver creates a new Driver for Snowflake.
-func newSnowflakeDriver() *sql.Driver[config, tableConfig] {
+// NewDriver creates a new Driver for Snowflake, and is this connector's entry
+// point: an importing caller is handed the assembled driver rather than its
+// pieces.
+func NewDriver() *sql.Driver[config, tableConfig] {
+	// gosnowflake also uses logrus for logging and the logs it produces may be
+	// confusing when intermixed with our connector logs. We disable the
+	// gosnowflake logger here and log as needed when handling errors from the
+	// sql driver. Its logger is a package-level global of the SDK, so this is
+	// done here to apply to every user of the driver rather than only when
+	// running as a connector.
+	sf.GetLogger().SetLogLevel("OFF")
+
 	return &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-snowflake",
 		StartTunnel:      func(ctx context.Context, cfg config) error { return nil },
@@ -1533,12 +1543,4 @@ func (d *transactor) logAllClusteringInfo(ctx context.Context) {
 		}
 		logClusteringInfo(ctx, d.db, b.target.Identifier, b.clusteringExpr)
 	}
-}
-
-func main() {
-	// gosnowflake also uses logrus for logging and the logs it produces may be confusing when
-	// intermixed with our connector logs. We disable the gosnowflake logger here and log as needed
-	// when handling errors from the sql driver.
-	sf.GetLogger().SetLogLevel("OFF")
-	boilerplate.RunMain(gatedDriver{newSnowflakeDriver()})
 }

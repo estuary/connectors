@@ -51,8 +51,8 @@ type Config struct {
 	User        string `json:"user" jsonschema:"default=flow_capture,description=The database user to authenticate as." jsonschema_extras:"order=1"`
 	Password    string `json:"password" jsonschema:"description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
 	Database    string `json:"database" jsonschema:"description=Logical database name to capture from." jsonschema_extras:"order=3"`
-	Timezone    string `json:"timezone,omitempty" jsonschema:"title=Time Zone,default=UTC,description=The IANA timezone name in which datetime columns will be converted to RFC3339 timestamps. Defaults to UTC if left blank." jsonschema_extras:"order=4"`
-	HistoryMode bool   `json:"historyMode" jsonschema:"default=false,description=Capture change events without reducing them to a final state." jsonschema_extras:"order=5"`
+	Timezone    string `json:"timezone,omitempty" jsonschema:"title=Time Zone,default=UTC,description=The IANA timezone name in which datetime columns will be converted to RFC3339 timestamps. Defaults to UTC if left blank." jsonschema_extras:"order=4,nonsensitive=true"`
+	HistoryMode bool   `json:"historyMode" jsonschema:"default=false,description=Capture change events without reducing them to a final state." jsonschema_extras:"order=5,nonsensitive=true"`
 
 	DiscoveryFilters discoveryFilters `json:"discoveryFilters,omitempty" jsonschema:"title=Discovery Filters,description=Options that restrict which tables are visible to discovery."`
 	Advanced         advancedConfig   `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
@@ -61,13 +61,13 @@ type Config struct {
 }
 
 type advancedConfig struct {
-	DiscoverNonEnabled  bool   `json:"discover_tables_without_ct,omitempty" jsonschema:"title=Discover Tables Without Change Tracking,description=When set the connector will discover all tables even if they do not have Change Tracking enabled. By default only CT-enabled tables are discovered."`
+	DiscoverNonEnabled  bool   `json:"discover_tables_without_ct,omitempty" jsonschema:"title=Discover Tables Without Change Tracking,description=When set the connector will discover all tables even if they do not have Change Tracking enabled. By default only CT-enabled tables are discovered." jsonschema_extras:"nonsensitive=true"`
 	SkipBackfills       string `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled."`
-	BackfillChunkSize   int    `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=50000,description=The number of rows which should be fetched from the database in a single backfill query."`
-	PollingInterval     string `json:"polling_interval,omitempty" jsonschema:"title=Change Tracking Polling Interval,default=500ms,description=The interval at which the connector polls for Change Tracking changes. Accepts duration strings like '500ms' or '30s' or '1m'. Defaults to 500ms when unspecified." jsonschema_extras:"pattern=^[0-9]+(ms|s|m|h)$"`
-	SourceTag           string `json:"source_tag,omitempty" jsonschema:"title=Source Tag,description=When set the capture will add this value as the property 'tag' in the source metadata of each document."`
+	BackfillChunkSize   int    `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=50000,description=The number of rows which should be fetched from the database in a single backfill query." jsonschema_extras:"nonsensitive=true"`
+	PollingInterval     string `json:"polling_interval,omitempty" jsonschema:"title=Change Tracking Polling Interval,default=500ms,description=The interval at which the connector polls for Change Tracking changes. Accepts duration strings like '500ms' or '30s' or '1m'. Defaults to 500ms when unspecified." jsonschema_extras:"pattern=^[0-9]+(ms|s|m|h)$,nonsensitive=true"`
+	SourceTag           string `json:"source_tag,omitempty" jsonschema:"title=Source Tag,description=When set the capture will add this value as the property 'tag' in the source metadata of each document." jsonschema_extras:"nonsensitive=true"`
 	RediscoveryInterval string `json:"rediscovery_interval,omitempty" jsonschema:"title=Rediscovery Interval,default=15m,description=How often the connector re-runs discovery while a capture is running to notice schema changes and newly added tables. Accepts duration strings like '15m' or '1h'. Defaults to 15m when unspecified." jsonschema_extras:"pattern=^[0-9]+(ms|s|m|h)$"`
-	FeatureFlags        string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	FeatureFlags        string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
 }
 
 type tunnelConfig struct {
@@ -204,7 +204,7 @@ func configSchema() json.RawMessage {
 type CTResource struct {
 	Namespace string `json:"namespace" jsonschema:"title=Schema,description=The schema (namespace) in which the table resides.,readOnly=true"`
 	Stream    string `json:"stream" jsonschema:"title=Table Name,description=The name of the table to be captured.,readOnly=true"`
-	Priority  int    `json:"priority,omitempty" jsonschema:"title=Backfill Priority,description=An optional integer priority for this binding. The highest priority binding(s) will be backfilled completely before any others. The default priority is zero. Negative priorities are allowed and will cause a binding to be backfilled after others."`
+	Priority  int    `json:"priority,omitempty" jsonschema:"title=Backfill Priority,description=An optional integer priority for this binding. The highest priority binding(s) will be backfilled completely before any others. The default priority is zero. Negative priorities are allowed and will cause a binding to be backfilled after others." jsonschema_extras:"nonsensitive=true"`
 }
 
 func resourceSchema() json.RawMessage {
