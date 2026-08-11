@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
@@ -110,6 +111,16 @@ assert ZUORA_TYPE_SCHEMAS.keys() == set(ZuoraType), (
     f"every ZuoraType needs a schema; missing {set(ZuoraType) - ZUORA_TYPE_SCHEMAS.keys()}"
 )
 
+# Types whose values the connector rewrites before emitting them in
+# order to align with the emitted sourced schemas. Every member
+# here needs a branch in ZuoraRow.transform_cells.
+CONVERTED_TYPES: frozenset[ZuoraType] = frozenset(
+    {
+        ZuoraType.BOOLEAN,
+        ZuoraType.DATETIME,
+    }
+)
+
 
 def sourced_schema(field_types: dict[str, ZuoraType]) -> dict[str, object]:
     """Build a SourcedSchema value from an object's field name -> Zuora type map."""
@@ -123,14 +134,57 @@ def sourced_schema(field_types: dict[str, ZuoraType]) -> dict[str, object]:
     }
 
 
+_BOOLEAN_TOKENS: dict[str, bool] = {"true": True, "false": False}
+
+
+# Already-compliant: a colon-separated offset, or Z.
+_RFC3339_DATETIME = re.compile(
+    r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$"
+)
+# What AQuA actually emits. Almost RFC3339 compliant, but the offset's colon is missing.
+_BASIC_OFFSET_DATETIME = re.compile(
+    r"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?)([+-]\d{2})(\d{2})$"
+)
+
+
+def normalize_datetime(field_name: str, value: str) -> str:
+    """Rewrite an export's datetime cell as RFC3339.
+
+    AQuA renders datetimes with an ISO 8601 basic offset -- `+0000`, no colon -- which
+    RFC3339 rejects. Inserting the colon is the whole transformation. Values that
+    already comply pass through, so this is idempotent.
+    """
+    if _RFC3339_DATETIME.match(value):
+        return value
+    basic = _BASIC_OFFSET_DATETIME.match(value)
+    if basic is None:
+        raise ValueError(
+            f"{field_name}: expected an RFC3339-convertible datetime, got {value!r}. "
+            f"Zuora's describe types this field as datetime. Reach out to Estuary "
+            f"support to update this connector to convert this datetime format to "
+            f"be RFC3339 compliant."
+        )
+    stamp, offset_hours, offset_minutes = basic.groups()
+    return f"{stamp}{offset_hours}:{offset_minutes}"
+
+
+def parse_boolean(field_name: str, value: str) -> bool:
+    """Convert an export's boolean cell to a real bool."""
+    parsed = _BOOLEAN_TOKENS.get(value.strip().lower())
+    if parsed is None:
+        raise ValueError(
+            f"{field_name}: expected a boolean, got {value!r}. Zuora's describe types "
+            f"this field as boolean. Reach out to Estuary support for help resolving "
+            f"this error."
+        )
+    return parsed
+
+
 @dataclass(frozen=True)
 class ValidationContext:
-    """What a row needs to know about its object in order to validate.
-
-    Passed as the pydantic validation context. A model rather than a bare dict so the
-    validator reads a typed attribute instead of a string key it could misspell.
-    """
+    """What a row needs to know about its object in order to validate."""
     object_name: str
+    field_types: dict[str, ZuoraType]
 
 
 def _column_to_field(column: str, object_name: str) -> str:
@@ -151,26 +205,56 @@ def _column_to_field(column: str, object_name: str) -> str:
 class ZuoraRow(BaseCSVRow):
     """Every exported row, incremental or snapshot.
 
-    Renames each export column to the name documents carry.
+    Renames each export column to the name documents carry, and rewrites the cells whose
+    declared type the raw CSV text does not satisfy: a boolean column holds "true", and a
+    datetime column holds an offset RFC3339 rejects.
     """
 
     @model_validator(mode="before")
     @classmethod
     def transform_cells(cls, data: Any, info: ValidationInfo) -> Any:
         if not isinstance(info.context, ValidationContext):
-            # Without it the columns keep their "<Object>." prefixes and the document
-            # would have no Id. Fail rather than emit a mangled row.
+            # Every caller has the object's types to hand, and a row validated without
+            # them would keep its raw cells and contradict the schema the binding
+            # declares. Fail rather than convert nothing.
             raise RuntimeError(
                 f"Implementation error: {cls.__name__} must be validated with a "
-                f"ValidationContext, got {info.context!r}, so its columns would not "
-                f"be renamed."
+                f"ValidationContext, got {info.context!r}, so its cells would not "
+                f"be converted."
             )
         if not isinstance(data, dict):
             return data
-        return {
+
+        # Rename first: field_types is keyed by the name the document carries, not the
+        # header the export sent.
+        converted = {
             _column_to_field(column, info.context.object_name): value
             for column, value in data.items()
         }
+        field_types = info.context.field_types
+        for name, zuora_type in field_types.items():
+            if zuora_type not in CONVERTED_TYPES:
+                continue
+            value = converted.get(name)
+            # This validator runs ahead of BaseCSVRow's null handling -- pydantic runs a
+            # subclass's before-validator first -- so a raw export cell is still "" here.
+            # None turns up only when re-validating a document that has already been
+            # through it. Neither has anything to convert.
+            if value is None or value == "":
+                continue
+            if not isinstance(value, str):
+                continue  # already converted, e.g. a re-validated document
+            if zuora_type == ZuoraType.BOOLEAN:
+                converted[name] = parse_boolean(name, value)
+            elif zuora_type == ZuoraType.DATETIME:
+                converted[name] = normalize_datetime(name, value)
+            else:
+                raise RuntimeError(
+                    f"Implementation error: '{zuora_type}' is in CONVERTED_TYPES but "
+                    f"has no converter, so {name} would be declared as a type its "
+                    f"value does not satisfy."
+                )
+        return converted
 
 
 class ZuoraDocument(ZuoraRow):
@@ -340,8 +424,6 @@ class DescribeObject(BaseModel, extra="allow"):
         for related in self.joinable_object_names:
             types[f"{related}Id"] = ZuoraType.TEXT
         return types
-
-
 
 
 class CatalogObject(BaseModel, extra="allow"):

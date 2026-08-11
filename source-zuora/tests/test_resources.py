@@ -12,7 +12,6 @@ import pytest
 from estuary_cdk.capture import common
 from estuary_cdk.flow import ValidationError
 from estuary_cdk.http import HTTPError
-from estuary_cdk.incremental_csv_processor import BaseCSVRow
 
 from source_zuora import resources
 from source_zuora.models import (
@@ -22,6 +21,8 @@ from source_zuora.models import (
     TransactionDateDocument,
     UpdatedDateDocument,
     UpdatedOnDocument,
+    ZuoraRow,
+    ZuoraType,
 )
 
 _LOG = logging.getLogger(__name__)
@@ -46,7 +47,9 @@ def _described(name: str, field_names: list[str]) -> DescribeObject:
     return DescribeObject(
         name=name,
         fields=[
-            DescribeField(name=field, selectable=True, contexts=["soap", "export"])
+            DescribeField(
+                name=field, selectable=True, contexts=["soap", "export"], type="text"
+            )
             for field in field_names
         ],
     )
@@ -66,6 +69,8 @@ async def test_describe_one_success_returns_described_object():
         )
     assert result is not None
     assert result.name == "Account" and result.fields == ["Id", "UpdatedDate"]
+    # Each column's declared type comes along, for the binding's sourced schema.
+    assert result.field_types == {"Id": ZuoraType.TEXT, "UpdatedDate": ZuoraType.TEXT}
 
 
 @pytest.mark.asyncio
@@ -108,7 +113,13 @@ def test_incremental_resource_shape_and_boundary_ownership():
     start = datetime(2020, 1, 1, tzinfo=UTC)
     cutoff = datetime(2024, 1, 1, tzinfo=UTC)
     r = resources._incremental_resource(
-        "Account", ["Id", "UpdatedDate"], UpdatedDateDocument, object(), start, cutoff
+        "Account",
+        ["Id", "UpdatedDate"],
+        {"Id": ZuoraType.TEXT, "UpdatedDate": ZuoraType.DATETIME},
+        UpdatedDateDocument,
+        object(),
+        start,
+        cutoff,
     )
     assert r.key == ["/Id"]
     assert r.model is UpdatedDateDocument
@@ -121,10 +132,14 @@ def test_incremental_resource_shape_and_boundary_ownership():
 
 
 def test_snapshot_resource_shape():
-    r = resources._snapshot_resource("Product", ["Id", "Name"], object())
+    r = resources._snapshot_resource(
+        "Product", ["Id", "Name"], {"Id": ZuoraType.TEXT, "Name": ZuoraType.TEXT}, object()
+    )
     assert isinstance(r, common.SnapshotResource)
     assert r.key == ["/_meta/row_id"]
-    assert r.model is BaseCSVRow
+    # ZuoraRow rather than BaseCSVRow: snapshots declare no fields either, but their
+    # boolean and datetime cells still need converting.
+    assert r.model is ZuoraRow
     assert r.schema_inference is True
 
 
