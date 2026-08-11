@@ -153,7 +153,7 @@ class ChannelManager:
                 code = getattr(err, "error_code", None)
                 name = str(getattr(code, "name", code or ""))
                 if "RECEIVER_SATURATED" in name and time.monotonic() + delay < deadline:
-                    logger.warning(
+                    logger.info(
                         "streaming receiver saturated; backing off",
                         extra={"channel": channel, "delaySeconds": delay},
                     )
