@@ -10,7 +10,7 @@ materializations:
   acmeCo/tests/materialize-snowflake:
     endpoint:
       local:
-        command: ["go", "run", "."]
+        command: ["go", "run", "./cmd/connector"]
         protobuf: true
         config: config-v2.yaml
     bindings:
