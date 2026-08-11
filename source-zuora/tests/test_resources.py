@@ -16,6 +16,8 @@ from estuary_cdk.incremental_csv_processor import BaseCSVRow
 
 from source_zuora import resources
 from source_zuora.models import (
+    DescribeField,
+    DescribeObject,
     EndpointConfig,
     TransactionDateDocument,
     UpdatedDateDocument,
@@ -39,15 +41,26 @@ def _binding(name: str) -> SimpleNamespace:
     return SimpleNamespace(resourceConfig=SimpleNamespace(name=name))
 
 
+def _described(name: str, field_names: list[str]) -> DescribeObject:
+    """A describe response where every named field is exportable."""
+    return DescribeObject(
+        name=name,
+        fields=[
+            DescribeField(name=field, selectable=True, contexts=["soap", "export"])
+            for field in field_names
+        ],
+    )
+
+
 # --- _describe_one -------------------------------------------------------------
 
 
 @pytest.mark.asyncio
 async def test_describe_one_success_returns_described_object():
     async def fake(base_url, http, log, name):
-        return ["Id", "UpdatedDate"]
+        return _described(name, ["Id", "UpdatedDate"])
 
-    with patch("source_zuora.resources.fetch_object_fields", fake):
+    with patch("source_zuora.resources.fetch_object_metadata", fake):
         result = await resources._describe_object(
             "Account", "u", AsyncMock(), _LOG
         )
@@ -60,7 +73,7 @@ async def test_describe_one_http_error_is_skipped():
     async def fake(base_url, http, log, name):
         raise HTTPError("nope", 500)
 
-    with patch("source_zuora.resources.fetch_object_fields", fake):
+    with patch("source_zuora.resources.fetch_object_metadata", fake):
         assert await resources._describe_object(
             "Account", "u", AsyncMock(), _LOG
         ) is None
@@ -71,7 +84,7 @@ async def test_describe_one_generic_error_is_skipped():
     async def fake(base_url, http, log, name):
         raise ValueError("bad xml")
 
-    with patch("source_zuora.resources.fetch_object_fields", fake):
+    with patch("source_zuora.resources.fetch_object_metadata", fake):
         assert await resources._describe_object(
             "Account", "u", AsyncMock(), _LOG
         ) is None
@@ -80,9 +93,9 @@ async def test_describe_one_generic_error_is_skipped():
 @pytest.mark.asyncio
 async def test_describe_one_no_exportable_fields_is_skipped():
     async def fake(base_url, http, log, name):
-        return []
+        return _described(name, [])
 
-    with patch("source_zuora.resources.fetch_object_fields", fake):
+    with patch("source_zuora.resources.fetch_object_metadata", fake):
         assert await resources._describe_object(
             "Account", "u", AsyncMock(), _LOG
         ) is None
@@ -122,12 +135,12 @@ def test_snapshot_resource_shape():
 async def test_all_resources_enumerates_catalog_and_dispatches_by_updated_date():
     async def fake_describe(base_url, http, log, name):
         # Account is incremental (has UpdatedDate); Product is a snapshot.
-        return ["Id", "UpdatedDate"] if name == "Account" else ["Id"]
+        return _described(name, ["Id", "UpdatedDate"] if name == "Account" else ["Id"])
 
     async def fake_catalog(base_url, http, log):
         return ["Account", "Product"]
 
-    with patch("source_zuora.resources.fetch_object_fields", fake_describe), patch(
+    with patch("source_zuora.resources.fetch_object_metadata", fake_describe), patch(
         "source_zuora.resources.discover_object_names", fake_catalog
     ), patch.object(resources, "_attach_token_source"):
         res = await resources.all_resources(_LOG, AsyncMock(), _config())
@@ -153,12 +166,12 @@ async def test_all_resources_classifies_by_cursor_field_priority():
     }
 
     async def fake_describe(base_url, http, log, name):
-        return fields_by_object[name]
+        return _described(name, fields_by_object[name])
 
     async def fake_catalog(base_url, http, log):
         return list(fields_by_object)
 
-    with patch("source_zuora.resources.fetch_object_fields", fake_describe), patch(
+    with patch("source_zuora.resources.fetch_object_metadata", fake_describe), patch(
         "source_zuora.resources.discover_object_names", fake_catalog
     ), patch.object(resources, "_attach_token_source"):
         res = await resources.all_resources(_LOG, AsyncMock(), _config())
@@ -179,13 +192,13 @@ async def test_enabled_resources_describes_only_bound_objects():
 
     async def fake_describe(base_url, http, log, name):
         described.append(name)
-        return ["Id", "UpdatedDate"]
+        return _described(name, ["Id", "UpdatedDate"])
 
     async def fake_catalog(base_url, http, log):
         catalog_calls["n"] += 1
         return ["A", "B", "C"]
 
-    with patch("source_zuora.resources.fetch_object_fields", fake_describe), patch(
+    with patch("source_zuora.resources.fetch_object_metadata", fake_describe), patch(
         "source_zuora.resources.discover_object_names", fake_catalog
     ), patch.object(resources, "_attach_token_source"):
         await resources.enabled_resources(

@@ -15,7 +15,7 @@ from .api import (
     LAG,
     discover_object_names,
     fetch_changes,
-    fetch_object_fields,
+    fetch_object_metadata,
     fetch_page,
     fetch_snapshot,
 )
@@ -80,16 +80,16 @@ async def _describe_object(
 ) -> DescribedObject | None:
     async with _DISCOVER_SEM:
         try:
-            fields = await fetch_object_fields(base_url, http, log, object_name)
+            described = await fetch_object_metadata(base_url, http, log, object_name)
         except Exception as err:
             detail = {"http_code": err.code} if isinstance(err, HTTPError) else {"error": str(err)}
             log.warning("Skipping object: describe failed", {"object": object_name, **detail})
             return None
 
-    if not fields:
+    if not described.query_field_names:
         log.warning("Skipping object: no selectable fields", {"object": object_name})
         return None
-    return DescribedObject(name=object_name, fields=fields)
+    return DescribedObject(name=object_name, fields=described.query_field_names)
 
 
 def _incremental_resource(
