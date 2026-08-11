@@ -200,10 +200,18 @@ def test_build_id_page_query_resume_adds_strict_id_bound():
 # --- fetch_changes -------------------------------------------------------------
 
 
-async def _run_changes(manager, cursor, model=UpdatedDateDocument, object_name="Account"):
+async def _run_changes(
+    manager, cursor, model=UpdatedDateDocument, object_name="Account", field_types=None
+):
     return await _collect(
         api.fetch_changes(
-            object_name, ["Id", model.CURSOR_FIELD], model, manager, _LOG, cursor
+            object_name,
+            ["Id", model.CURSOR_FIELD],
+            field_types or {},
+            model,
+            manager,
+            _LOG,
+            cursor,
         )
     )
 
@@ -329,10 +337,20 @@ async def test_fetch_changes_transaction_date_cursor():
 # --- fetch_page ----------------------------------------------------------------
 
 
-async def _run_page(manager, start_date, page, cutoff, model=UpdatedDateDocument):
+async def _run_page(
+    manager, start_date, page, cutoff, model=UpdatedDateDocument, field_types=None
+):
     return await _collect(
         api.fetch_page(
-            "Account", ["Id", model.CURSOR_FIELD], model, manager, start_date, _LOG, page, cutoff
+            "Account",
+            ["Id", model.CURSOR_FIELD],
+            field_types or {},
+            model,
+            manager,
+            start_date,
+            _LOG,
+            page,
+            cutoff,
         )
     )
 
@@ -492,7 +510,7 @@ async def test_fetch_changes_bisects_too_large_window():
 @pytest.mark.asyncio
 async def test_fetch_snapshot_full_table_no_bounds():
     manager = FakeManager([("1", datetime(2020, 1, 1, tzinfo=UTC))])
-    out = await _collect(api.fetch_snapshot("Product", ["Id", "Name"], manager, _LOG))  # type: ignore[arg-type]
+    out = await _collect(api.fetch_snapshot("Product", ["Id", "Name"], {}, manager, _LOG))  # type: ignore[arg-type]
     assert all(isinstance(d, BaseCSVRow) for d in out)
     assert "WHERE" not in manager.queries[0]  # full table, unbounded
 
@@ -507,4 +525,4 @@ async def test_fetch_snapshot_too_large_propagates():
             yield  # unreachable; makes this an async generator
 
     with pytest.raises(ExportTooLargeError):
-        await _collect(api.fetch_snapshot("Product", ["Id"], TooBig(), _LOG))  # type: ignore[arg-type]
+        await _collect(api.fetch_snapshot("Product", ["Id"], {}, TooBig(), _LOG))  # type: ignore[arg-type]

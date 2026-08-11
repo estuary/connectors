@@ -9,8 +9,6 @@ from estuary_cdk.capture.common import CaptureBinding, ResourceConfig, ResourceS
 from estuary_cdk.flow import OAuth2TokenFlowSpec, ValidationError
 from estuary_cdk.http import HTTPError, HTTPMixin, TokenSource
 
-from estuary_cdk.incremental_csv_processor import BaseCSVRow
-
 from .api import (
     LAG,
     discover_object_names,
@@ -26,6 +24,8 @@ from .models import (
     UpdatedDateDocument,
     UpdatedOnDocument,
     ZuoraDocument,
+    ZuoraRow,
+    ZuoraType,
 )
 
 
@@ -51,9 +51,11 @@ def _attach_token_source(http: HTTPMixin, config: EndpointConfig) -> None:
 
 @dataclass(frozen=True)
 class DescribedObject:
-    """A queryable Zuora object and its exportable field names."""
+    """A queryable Zuora object, the field names its export selects, and the Zuora
+    type of each column those fields produce."""
     name: str
     fields: list[str]
+    field_types: dict[str, ZuoraType]
 
 
 async def validate_credentials(
@@ -89,12 +91,17 @@ async def _describe_object(
     if not described.query_field_names:
         log.warning("Skipping object: no selectable fields", {"object": object_name})
         return None
-    return DescribedObject(name=object_name, fields=described.query_field_names)
+    return DescribedObject(
+        name=object_name,
+        fields=described.query_field_names,
+        field_types=described.query_field_types,
+    )
 
 
 def _incremental_resource(
     object_name: str,
     fields: list[str],
+    field_types: dict[str, ZuoraType],
     model: type[ZuoraDocument],
     manager: ExportManager,
     start_date: datetime,
@@ -116,6 +123,7 @@ def _incremental_resource(
                 fetch_changes,
                 object_name,
                 fields,
+                field_types,
                 model,
                 manager,
             ),
@@ -123,6 +131,7 @@ def _incremental_resource(
                 fetch_page,
                 object_name,
                 fields,
+                field_types,
                 model,
                 manager,
                 start_date,
@@ -146,6 +155,7 @@ def _incremental_resource(
 def _snapshot_resource(
     object_name: str,
     fields: list[str],
+    field_types: dict[str, ZuoraType],
     manager: ExportManager,
 ) -> common.SnapshotResource:
     def open(
@@ -164,13 +174,14 @@ def _snapshot_resource(
                 fetch_snapshot,
                 object_name,
                 fields,
+                field_types,
                 manager,
             ),
         )
 
     return common.SnapshotResource(
         name=object_name,
-        model=BaseCSVRow,
+        model=ZuoraRow,
         open=open,
         initial_config=ResourceConfig(name=object_name, interval=timedelta(hours=4)),
     )
@@ -201,11 +212,21 @@ async def _build_resources(
         if model is not None:
             resources.append(
                 _incremental_resource(
-                    described.name, described.fields, model, manager, config.start_date, cutoff
+                    described.name,
+                    described.fields,
+                    described.field_types,
+                    model,
+                    manager,
+                    config.start_date,
+                    cutoff,
                 )
             )
         else:
-            resources.append(_snapshot_resource(described.name, described.fields, manager))
+            resources.append(
+                _snapshot_resource(
+                    described.name, described.fields, described.field_types, manager
+                )
+            )
 
     return resources
 

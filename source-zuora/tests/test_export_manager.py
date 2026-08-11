@@ -22,7 +22,7 @@ _BASE = "https://rest.zuora.com"
 
 
 def _ctx(object_name: str) -> ValidationContext:
-    return ValidationContext(object_name=object_name)
+    return ValidationContext(object_name=object_name, field_types={})
 
 
 @pytest.fixture(autouse=True)
