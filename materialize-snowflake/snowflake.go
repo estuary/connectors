@@ -424,7 +424,7 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, streaming
 		// opened, so there is no incompatibility signal to degrade on here.
 		// Failures surface from Store rather than causing a silent fall-through
 		// to a slower path.
-		loc := d.ep.Dialect.TableLocator(b.target.Path)
+		var loc = d.ep.Dialect.TableLocator(b.target.Path)
 		d.streamV2.addBinding(d.cfg.Database, loc.TableSchema, d.ep.Identifier(loc.TableName), target, d.priorStreamV2(target.StateKey))
 		b.streamingV2 = true
 		d.bindings = append(d.bindings, b)

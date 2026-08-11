@@ -807,7 +807,7 @@ func TestStreamV2Manager(t *testing.T) {
 			require.Eventually(t, func() bool {
 				refusal = restarted.writeRow(ctx, 0, []any{"k", 1, json.RawMessage(`{}`)})
 				require.Error(t, refusal)
-				if strings.Contains(refusal.Error(), "has lost committed data") {
+				if strings.Contains(refusal.Error(), "has committed nothing while this task's checkpoint records") {
 					return true
 				}
 				t.Logf("awaiting the reopen, which failed with: %s", refusal)

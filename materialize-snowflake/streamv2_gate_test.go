@@ -2,7 +2,12 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
+	"sync"
 	"testing"
 
 	snowflake_auth "github.com/estuary/connectors/go/auth/snowflake"
@@ -15,22 +20,51 @@ import (
 	pc "go.gazette.dev/core/consumer/protocol"
 )
 
+// testJWTPrivateKey is a throwaway key pair in the PKCS#8 PEM form credentials
+// carry, generated once for the whole package because the v2 write path is
+// refused outright without JWT credentials, and those only validate against a
+// key which really parses.
+var testJWTPrivateKey = sync.OnceValue(func() string {
+	var key, err = rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		panic(err)
+	}
+	der, err := x509.MarshalPKCS8PrivateKey(key)
+	if err != nil {
+		panic(err)
+	}
+	return string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der}))
+})
+
 func testStreamingConfig(t *testing.T, featureFlags string) config {
 	t.Helper()
 
+	return testStreamingConfigAuth(t, featureFlags, snowflake_auth.JWT)
+}
+
+// testStreamingConfigAuth builds a streaming endpoint configuration authenticating
+// the given way, so that the v2 path's requirement of a key pair can be exercised
+// from both sides.
+func testStreamingConfigAuth(t *testing.T, featureFlags string, authType string) config {
+	t.Helper()
+
+	var credentials = &snowflake_auth.CredentialConfig{
+		AuthType: authType,
+		User:     "will",
+	}
+	switch authType {
+	case snowflake_auth.JWT:
+		credentials.PrivateKey = testJWTPrivateKey()
+	default:
+		credentials.Password = "some+complex/password"
+	}
+
 	return config{
-		Host:     "orgname-accountname.snowflakecomputing.com",
-		Database: "mydb",
-		Schema:   "myschema",
-		// The write-path flags are independent of authentication, and JWT
-		// credentials would need a real PEM key to survive validation.
-		Credentials: &snowflake_auth.CredentialConfig{
-			AuthType:   snowflake_auth.UserPass,
-			User:       "will",
-			Password:   "some+complex/password",
-			PrivateKey: "non-existant-jwt",
-		},
-		Advanced: advancedConfig{FeatureFlags: featureFlags},
+		Host:        "orgname-accountname.snowflakecomputing.com",
+		Database:    "mydb",
+		Schema:      "myschema",
+		Credentials: credentials,
+		Advanced:    advancedConfig{FeatureFlags: featureFlags},
 	}
 }
 
@@ -103,6 +137,51 @@ func TestValidateStreamingFlags(t *testing.T) {
 			require.NotContains(t, err.Error(), boilerplate.RuntimeV2FlagName)
 		})
 	}
+}
+
+// TestValidateStreamingV2Auth covers the v2 write path's requirement of key-pair
+// credentials. Refusing the combination is what keeps the flag from being silently
+// ignored: streamsV2 would decline the path for want of a key pair while the
+// runtime gate went on holding the task to the v2 runtime for having named the
+// flag, leaving it on the staged path the operator asked it to leave.
+func TestValidateStreamingV2Auth(t *testing.T) {
+	t.Run("the v2 write path with key-pair credentials is allowed", func(t *testing.T) {
+		require.NoError(t, testStreamingConfigAuth(t, "snowpipe_streaming_v2", snowflake_auth.JWT).Validate())
+	})
+
+	t.Run("the v2 write path without key-pair credentials is refused", func(t *testing.T) {
+		var err = testStreamingConfigAuth(t, "snowpipe_streaming_v2", snowflake_auth.UserPass).Validate()
+		require.ErrorContains(t, err, flagSnowpipeStreamingV2)
+		// The operator's remedies are the authentication method and the flag, so
+		// the message must name both.
+		require.ErrorContains(t, err, "key-pair")
+	})
+
+	t.Run("user-password credentials are allowed without the v2 write path", func(t *testing.T) {
+		for _, flags := range []string{"", "snowpipe_streaming", "no_snowpipe_streaming_v2"} {
+			require.NoError(t, testStreamingConfigAuth(t, flags, snowflake_auth.UserPass).Validate())
+		}
+	})
+
+	t.Run("the gate refuses the same configuration", func(t *testing.T) {
+		configJson, err := json.Marshal(testStreamingConfigAuth(t, "snowpipe_streaming_v2", snowflake_auth.UserPass))
+		require.NoError(t, err)
+
+		// Reported ahead of the runtime mismatch, as the conflicting-flags refusal
+		// is: the operator is told about the configuration they wrote rather than
+		// the runtime it implies.
+		var spec = testStreamingSpec(t, "snowpipe_streaming_v2", false)
+		spec.ConfigJson = configJson
+		err = requireStreamingV2Runtime(spec)
+		require.ErrorContains(t, err, "key-pair")
+		require.NotContains(t, err.Error(), boilerplate.RuntimeV2FlagName)
+	})
+
+	t.Run("a configuration carrying no credentials at all is refused rather than panicking", func(t *testing.T) {
+		var spec = testStreamingSpec(t, "snowpipe_streaming_v2", true)
+		spec.ConfigJson = json.RawMessage(`{"host":"h.snowflakecomputing.com","advanced":{"feature_flags":"snowpipe_streaming_v2"}}`)
+		require.ErrorContains(t, requireStreamingV2Runtime(spec), "key-pair")
+	})
 }
 
 func testStreamingSpec(t *testing.T, featureFlags string, runtimeV2 bool) *pf.MaterializationSpec {

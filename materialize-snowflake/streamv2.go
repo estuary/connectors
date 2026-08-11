@@ -90,32 +90,32 @@ func streamV2Token(counter int64, keyBegin, keyEnd uint32) string {
 // carries and the shard key range which appended it, reporting false for a token
 // this write path could not have written.
 //
-// A bare document count is a token an earlier build of this path wrote, before
-// the range was in it. It parses, with no range to report, and is reconciled
-// against the range the checkpoint recorded instead.
-func parseStreamV2Token(token string) (int64, *streamV2Range, bool) {
+// Every token this path has ever written carries a range, so one without it is
+// not this path's: the write path and the range in its token shipped together.
+func parseStreamV2Token(token string) (int64, streamV2Range, bool) {
 	var count, spec, hasRange = strings.Cut(token, "@")
+	if !hasRange {
+		return 0, streamV2Range{}, false
+	}
 
 	counter, err := strconv.ParseInt(count, 10, 64)
 	if err != nil {
-		return 0, nil, false
-	} else if !hasRange {
-		return counter, nil, true
+		return 0, streamV2Range{}, false
 	}
 
 	begin, end, ok := strings.Cut(spec, "-")
 	if !ok {
-		return 0, nil, false
+		return 0, streamV2Range{}, false
 	}
 	keyBegin, err := strconv.ParseUint(begin, 16, 32)
 	if err != nil {
-		return 0, nil, false
+		return 0, streamV2Range{}, false
 	}
 	keyEnd, err := strconv.ParseUint(end, 16, 32)
 	if err != nil {
-		return 0, nil, false
+		return 0, streamV2Range{}, false
 	}
-	return counter, &streamV2Range{keyBegin: uint32(keyBegin), keyEnd: uint32(keyEnd)}, true
+	return counter, streamV2Range{keyBegin: uint32(keyBegin), keyEnd: uint32(keyEnd)}, true
 }
 
 // streamsV2 reports whether a binding's rows are written by the snowpipe
@@ -585,10 +585,16 @@ func reconcileStreamV2Channel(channel, table string, committedToken *string, pri
 	// appending into the table which has been re-materialized under it. The
 	// specification it is running is already being replaced, so the replacement
 	// settles the refusal rather than the backfill it asks for.
+	//
+	// Nothing this connector does retires a shard's own channel, so both readings
+	// are named: the operator who is looking at a backfill has lost nothing and
+	// wants to know it, and the one who is not needs to hear that Snowflake's
+	// account of this channel is gone. Neither bounds what the channel had
+	// committed beyond the counter, which is why the remedy is the same either way.
 	if committedToken == nil {
 		if counter > 0 {
 			return 0, fmt.Errorf(
-				"channel %q has committed nothing while this task's checkpoint records %d documents appended to it: the channel has lost committed data, so the missing rows cannot be identified. Backfill this binding",
+				"channel %q has committed nothing while this task's checkpoint records %d documents appended to it. Either the binding has been backfilled, which re-created the table and took every channel bound to it — in which case no rows were lost and the generation which now owns the table is re-materializing them — or Snowflake has lost this channel's committed offset token. This shard cannot tell those apart, and neither leaves it able to identify which of its documents Snowflake still holds. Backfill this binding",
 				channel, counter,
 			)
 		}
@@ -651,18 +657,10 @@ func reconcileStreamV2Channel(channel, table string, committedToken *string, pri
 	// range is read off the token rather than off the item.
 	var mine = streamV2Range{keyBegin: keyBegin, keyEnd: keyEnd}
 
-	if appendedBy != nil && *appendedBy != mine {
+	if appendedBy != mine {
 		return 0, fmt.Errorf(
 			"channel %q has %d documents Snowflake committed beyond the %d this task's checkpoint records, appended by a shard covering %s while this shard covers %s: a replay here carries a different set of documents, so those rows cannot be skipped safely. Backfill this binding, or restore the task's shard key ranges to the topology which appended them, so that the transaction those rows belong to can commit",
 			channel, committed, counter, appendedBy, mine,
-		)
-	} else if appendedBy == nil && own != nil && (own.KeyBegin != keyBegin || own.KeyEnd != keyEnd) {
-		// An earlier build's token accounts for no range, so the range recorded
-		// beside the counter is all there is to go on, and a change in it is read
-		// as the change of topology it may be.
-		return 0, fmt.Errorf(
-			"channel %q has %d documents Snowflake committed beyond the %d this task's checkpoint records, and the shard key range has changed from [%08x, %08x] to [%08x, %08x] since they were appended: the interrupted transaction cannot be replayed identically, so the uncommitted rows cannot be skipped safely. Backfill this binding",
-			channel, committed, counter, own.KeyBegin, own.KeyEnd, keyBegin, keyEnd,
 		)
 	}
 

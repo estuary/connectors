@@ -30,6 +30,11 @@ var sidecarStopTimeout = 10 * time.Second
 // to be observed. It is a var so tests can shorten it.
 var sidecarKillTimeout = 30 * time.Second
 
+// sidecarExitGrace bounds how long exitError waits for an imminent exit to be
+// observed before describing the failure without one. It is a var so tests can
+// shorten it.
+var sidecarExitGrace = 2 * time.Second
+
 const (
 
 	// stderrTailLines/Bytes bound the ring buffer of recent sidecar stderr
@@ -272,6 +277,21 @@ func (s *sidecarSupervisor) exitError(cause error) error {
 	var parts []string
 	if cause != nil {
 		parts = append(parts, cause.Error())
+	}
+
+	// Both the exit status and the stderr tail below become available only once
+	// cmd.Wait has been observed, which the close of died announces after the pipe
+	// relays have drained. A caller arriving here has just killed the process or
+	// watched it die, so that close is imminent rather than hypothetical — and it
+	// races this description: the process group can already be gone while died is
+	// still open, which is how a kill comes to report that it could not signal
+	// anything and leaves a fatal error naming neither the status nor the output
+	// which explains it. Waiting the moment out is what keeps the error
+	// diagnosable. A process which really is still running costs this grace and is
+	// then described without an exit, as before.
+	select {
+	case <-s.died:
+	case <-time.After(sidecarExitGrace):
 	}
 
 	select {

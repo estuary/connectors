@@ -427,9 +427,18 @@ func (c *client) MustRecreateResource(req *pm.Request_Apply, lastBinding, newBin
 	// ever to widen this answer, never to narrow it, because a request carries that
 	// configuration in whatever shape the control plane stored it rather than the
 	// shape this connector is handed for itself.
+	//
+	// A configuration which reads as neither shape fails the Apply. Answering false
+	// there is the one wrong answer available: it empties a table whose outgoing
+	// generation may hold channels on it, and those channels then append across the
+	// truncate into rows the incoming generation is re-materializing — the silent
+	// duplication this whole function exists to prevent. Failing the publication
+	// instead is loud and recoverable.
 	outgoingCfg, ok := endpointConfigOf(req.LastMaterialization.ConfigJson)
 	if !ok {
-		return false, nil
+		return false, fmt.Errorf(
+			"cannot read the endpoint configuration of the specification being replaced, so whether its generation streams into the table cannot be established: backfilling this binding requires knowing whether the table must be re-created rather than emptied",
+		)
 	}
 	return streamsV2(&outgoingCfg, true, boilerplate.ParseFlags(outgoingCfg)[flagSnowpipeStreamingV2]), nil
 }

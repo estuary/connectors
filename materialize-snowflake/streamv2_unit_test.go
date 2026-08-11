@@ -1086,7 +1086,7 @@ func TestReconcileStreamV2Channel(t *testing.T) {
 			name:      "nothing committed with a checkpointed counter is refused",
 			committed: nil,
 			prior:     prior(42, keyBegin, keyEnd),
-			wantErr:   "has lost committed data",
+			wantErr:   "has committed nothing while this task's checkpoint records",
 		},
 		{
 			name:      "clean boundary",
@@ -1168,26 +1168,13 @@ func TestReconcileStreamV2Channel(t *testing.T) {
 			},
 		},
 		{
-			// An older build of this write path wrote a bare document count, which
-			// accounts for no range at all. The range the checkpoint recorded is then
-			// the only account there is of who appended the documents outstanding
-			// beyond it, and it is read as it was before the token carried one.
-			name:      "an older build's token committed ahead is skipped",
+			// A bare document count accounts for no range, and this write path has
+			// never written one: the range in the token shipped with the path
+			// itself, so such a token is somebody else's.
+			name:      "a token accounting for no range is refused",
 			committed: token("50"),
 			prior:     prior(42, keyBegin, keyEnd),
-			wantSkip:  50,
-		},
-		{
-			name:      "an older build's token committed ahead after a key-begin change is refused",
-			committed: token("50"),
-			prior:     prior(42, keyBegin-1, keyEnd),
-			wantErr:   "shard key range has changed",
-		},
-		{
-			name:      "an older build's token committed ahead after a key-end change is refused",
-			committed: token("50"),
-			prior:     prior(42, keyBegin, keyEnd+1),
-			wantErr:   "shard key range has changed",
+			wantErr:   "which is not a document count",
 		},
 		{
 			// The range is consulted only when Snowflake is ahead, so an
@@ -1319,11 +1306,13 @@ func TestAbsorbedChannelSettled(t *testing.T) {
 			committed: token("42@80000000-ffffffff"),
 		},
 		{
-			// A bare document count is what an older build of this write path wrote.
-			// Retirement turns on the count alone, so it is settled by the same
-			// comparison.
-			name:      "an older build's token settled at the checkpointed counter",
-			committed: token("42"),
+			// Retirement turns on the count alone, but a token accounting for no
+			// range is still not one this write path wrote, and an absorbed channel
+			// holding somebody else's token is no safer to drop than to append to.
+			name:           "a token accounting for no range is refused",
+			committed:      token("42"),
+			wantErr:        "which is not a document count",
+			noBackfillHint: true,
 		},
 		{
 			name:      "interrupted beyond the checkpointed counter",
