@@ -24,6 +24,7 @@ from .models import (
     EndpointConfig,
     TransactionDateDocument,
     UpdatedDateDocument,
+    UpdatedOnDocument,
     ZuoraDocument,
 )
 
@@ -31,6 +32,7 @@ from .models import (
 DOCUMENT_MODELS: list[type[ZuoraDocument]] = [
     UpdatedDateDocument,
     TransactionDateDocument,
+    UpdatedOnDocument,
 ]
 
 

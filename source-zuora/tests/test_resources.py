@@ -19,6 +19,7 @@ from source_zuora.models import (
     EndpointConfig,
     TransactionDateDocument,
     UpdatedDateDocument,
+    UpdatedOnDocument,
 )
 
 _LOG = logging.getLogger(__name__)
@@ -145,6 +146,10 @@ async def test_all_resources_classifies_by_cursor_field_priority():
         "PaymentTransactionLog": ["Id", "TransactionDate"],
         "Product": ["Id", "Name"],
         "Invoice": ["Id", "UpdatedDate", "TransactionDate"],
+        # AchNocEventLog spells its timestamps UpdatedOn/CreatedOn. Its
+        # PaymentMethodUpdatedDate must not be mistaken for a cursor: matching is by
+        # exact field name, not by suffix.
+        "AchNocEventLog": ["Id", "UpdatedOn", "CreatedOn", "PaymentMethodUpdatedDate"],
     }
 
     async def fake_describe(base_url, http, log, name):
@@ -162,6 +167,9 @@ async def test_all_resources_classifies_by_cursor_field_priority():
     assert by_name["PaymentTransactionLog"].model is TransactionDateDocument
     assert by_name["Product"].key == ["/_meta/row_id"]  # snapshot
     assert by_name["Invoice"].model is UpdatedDateDocument  # UpdatedDate wins
+    # Incremental on UpdatedOn, keyed on /Id -- not a full-table snapshot.
+    assert by_name["AchNocEventLog"].model is UpdatedOnDocument
+    assert by_name["AchNocEventLog"].key == ["/Id"]
 
 
 @pytest.mark.asyncio
