@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-08-13
+
+### Added
+- `AchNocEventLog` is now captured incrementally. It is the only object whose change
+  timestamp is `UpdatedOn` rather than `UpdatedDate`, so it previously matched no cursor
+  and was re-exported in full on every poll.
+
+  The binding's key changes from `/_meta/row_id` to `/Id`, and a data flow reset for the binding is required as a result of the key change.
+
 ## 2026-08-04
 
 ### Added

@@ -70,6 +70,17 @@ class UpdatedDateDocument(ZuoraDocument):
         return self.UpdatedDate
 
 
+class UpdatedOnDocument(ZuoraDocument):
+    """AchNocEventLog names its timestamps UpdatedOn/CreatedOn rather than
+    UpdatedDate/CreatedDate, and exports no UpdatedDate at all.
+    """
+    CURSOR_FIELD: ClassVar[str] = "UpdatedOn"
+    UpdatedOn: AwareDatetime
+
+    def get_cursor(self) -> AwareDatetime:
+        return self.UpdatedOn
+
+
 class TransactionDateDocument(ZuoraDocument):
     """Append-only transaction logs (PaymentTransactionLog,
     PaymentMethodTransactionLog, ...) have no UpdatedDate. Their only date field
