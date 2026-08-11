@@ -52,6 +52,76 @@ class EndpointConfig(BaseModel):
 ConnectorState = GenericConnectorState[ResourceState]
 
 
+class UnknownZuoraTypeError(Exception):
+    """Zuora described a field with a type this connector does not recognize.
+
+    Raised rather than degrading the field to an untyped string: a string declaration
+    would claim the connector knows the field's shape when it does not, and would strip
+    whatever format inference had established for that column. Discovery fails instead,
+    naming the field, so the type can be classified deliberately.
+    """
+
+
+class ZuoraType(StrEnum):
+    """A field's declared type, as `<type>` in a GET /v1/describe/{object} response."""
+    TEXT = "text"
+    PICKLIST = "picklist"
+    LONGTEXT = "longtext"
+    ZOQL = "ZOQL"
+    BOOLEAN = "boolean"
+    INTEGER = "integer"
+    DECIMAL = "decimal"
+    NUMBER = "number"
+    DATE = "date"
+    DATETIME = "datetime"
+    TIMESTAMP = "timestamp"
+
+    @classmethod
+    def parse(cls, raw: str | None, field_name: str) -> "ZuoraType":
+        """Classify a describe `<type>`, or fail naming the field it came from."""
+        try:
+            return cls(raw)
+        except ValueError:
+            raise UnknownZuoraTypeError(
+                f"{field_name}: Zuora declared the type {raw!r}, which this connector "
+                f"does not recognize. It must be added to ZuoraType and "
+                f"ZUORA_TYPE_SCHEMAS before this object can be captured."
+            ) from None
+
+
+# Zuora's declared type -> the JSON schema a SourcedSchema declares for that field.
+ZUORA_TYPE_SCHEMAS: dict[ZuoraType, dict[str, str]] = {
+    ZuoraType.TEXT: {"type": "string"},
+    ZuoraType.PICKLIST: {"type": "string"},
+    ZuoraType.LONGTEXT: {"type": "string"},
+    ZuoraType.ZOQL: {"type": "string"},
+    ZuoraType.BOOLEAN: {"type": "boolean"},
+    ZuoraType.INTEGER: {"type": "string", "format": "integer"},
+    ZuoraType.DECIMAL: {"type": "string", "format": "number"},
+    ZuoraType.NUMBER: {"type": "string", "format": "number"},
+    ZuoraType.DATE: {"type": "string", "format": "date"},
+    ZuoraType.DATETIME: {"type": "string", "format": "date-time"},
+    ZuoraType.TIMESTAMP: {"type": "string"},
+}
+
+# Make sure that every ZuoraType has an entry in ZUORA_TYPE_SCHEMAS.
+assert ZUORA_TYPE_SCHEMAS.keys() == set(ZuoraType), (
+    f"every ZuoraType needs a schema; missing {set(ZuoraType) - ZUORA_TYPE_SCHEMAS.keys()}"
+)
+
+
+def sourced_schema(field_types: dict[str, ZuoraType]) -> dict[str, object]:
+    """Build a SourcedSchema value from an object's field name -> Zuora type map."""
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            name: ZUORA_TYPE_SCHEMAS[zuora_type]
+            for name, zuora_type in field_types.items()
+        },
+    }
+
+
 class ZuoraDocument(BaseCSVRow):
     """Base for objects captured incrementally off a single date cursor.
     """
@@ -138,6 +208,9 @@ class DescribeField(BaseModel, extra="allow"):
     name: str
     selectable: bool = False
     contexts: list[str] = Field(default_factory=list)
+    # Zuora's declared type, e.g. text/decimal/datetime/boolean. Absent in
+    # hand-written test fixtures, so optional.
+    type: str | None = None
 
     @property
     def is_exportable(self) -> bool:
@@ -196,6 +269,28 @@ class DescribeObject(BaseModel, extra="allow"):
         return self.exportable_field_names + [
             f"{name}.Id" for name in self.joinable_object_names
         ]
+
+    @property
+    def query_field_types(self) -> dict[str, ZuoraType]:
+        """Zuora's declared type for every column an export selects, keyed by the name
+        the *document* carries rather than the name the query selects: a joined
+        `<Related>.Id` arrives as `<Related>Id` (see export_manager._column_to_field).
+
+        This is where raw describe strings become ZuoraType, so nothing downstream has
+        to cope with an unrecognized one. Joined columns are always Zuora ids, hence
+        text; describe says nothing about them because they are relationships rather
+        than fields.
+        """
+        types = {
+            f.name: ZuoraType.parse(f.type, f.name)
+            for f in self.fields
+            if f.is_exportable
+        }
+        for related in self.joinable_object_names:
+            types[f"{related}Id"] = ZuoraType.TEXT
+        return types
+
+
 
 
 class CatalogObject(BaseModel, extra="allow"):

@@ -181,10 +181,12 @@ def _parse_describe_object(response_bytes: bytes) -> DescribeObject:
         if field_name_el is None or not field_name_el.text:
             continue
         selectable_el = field_el.find("selectable")
+        type_el = field_el.find("type")
         fields.append(
             DescribeField(
                 name=field_name_el.text,
                 selectable=selectable_el is not None and selectable_el.text == "true",
+                type=type_el.text if type_el is not None else None,
                 contexts=[
                     c.text for c in field_el.findall("./contexts/context") if c.text
                 ],
