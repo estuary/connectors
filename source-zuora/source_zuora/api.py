@@ -6,7 +6,6 @@ from typing import AsyncGenerator
 
 from estuary_cdk.capture.common import LogCursor, PageCursor
 from estuary_cdk.http import HTTPSession
-from estuary_cdk.incremental_csv_processor import BaseCSVRow
 
 from .export_manager import ExportManager, ExportTooLargeError
 from .models import (
@@ -14,7 +13,9 @@ from .models import (
     DescribeCatalog,
     DescribeField,
     DescribeObject,
+    ValidationContext,
     ZuoraDocument,
+    ZuoraRow,
 )
 from .shared import VERSION_HEADERS
 
@@ -239,6 +240,7 @@ async def _export_window(
     window still overflowing, raises ExportTooLargeError naming the object and
     window rather than the opaque Zuora file id.
     """
+    context = ValidationContext(object_name=object_name)
     max_cursor: datetime | None = None
     # count drives intermediate checkpoints and resets at each one; total is the
     # window's whole-lifetime document count, kept separately for the summary log.
@@ -250,8 +252,7 @@ async def _export_window(
             after=window_start, before=window_end,
         )
         try:
-            async for row in manager.export_rows(query, object_name):
-                doc = model.model_validate(row)
+            async for doc in manager.export_rows(query, model, context):
                 cursor = doc.get_cursor()
                 if (
                     max_cursor is not None
@@ -355,6 +356,7 @@ async def fetch_page(
     if page is not None:
         assert isinstance(page, str)
 
+    context = ValidationContext(object_name=object_name)
     resume_id: str | None = page
     limit = BACKFILL_PAGE_SIZE
     docs_since_checkpoint = 0
@@ -371,8 +373,7 @@ async def fetch_page(
         )
         count = 0
         try:
-            async for row in manager.export_rows(query, object_name):
-                doc = model.model_validate(row)
+            async for doc in manager.export_rows(query, model, context):
                 if resume_id is not None and doc.Id <= resume_id:
                     # `Id >` resume is only correct if ORDER BY Id is a stable
                     # total order. Fail loudly if a tenant violates that.
@@ -421,17 +422,18 @@ async def fetch_snapshot(
     fields: list[str],
     manager: ExportManager,
     log: Logger,
-) -> AsyncGenerator[BaseCSVRow, None]:
+) -> AsyncGenerator[ZuoraRow, None]:
     """Full table export for objects with no usable incremental cursor field.
 
-    Snapshot objects have no cursor, so they use BaseCSVRow (empty cells -> None,
-    all fields inferred) rather than an incremental ZuoraDocument subclass.
+    Snapshot objects have no cursor, so they use ZuoraRow (empty cells -> None, all
+    fields inferred) rather than an incremental ZuoraDocument subclass.
 
     Note: without a time cursor there's no window to bisect, so a snapshot that
     exceeds Zuora's export size limit raises ExportTooLargeError and fails the
     binding. If that happens for a real object, we should paginate the export
     with Export ZOQL's LIMIT/OFFSET (first-N plus skip rows) to complete it in chunks.
     """
+    context = ValidationContext(object_name=object_name)
     query = build_query(object_name, fields)
-    async for row in manager.export_rows(query, object_name):
-        yield BaseCSVRow.model_validate(row)
+    async for row in manager.export_rows(query, ZuoraRow, context):
+        yield row

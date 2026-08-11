@@ -1,12 +1,16 @@
 import asyncio
 from logging import Logger
-from typing import AsyncGenerator
+from typing import AsyncGenerator, TypeVar
 
 from estuary_cdk.http import HTTPError, HTTPSession
 from estuary_cdk.incremental_csv_processor import IncrementalCSVProcessor
 
-from .models import AquaJobResponse, AquaJobStatus
+from .models import AquaJobResponse, AquaJobStatus, ValidationContext, ZuoraRow
 from .shared import VERSION_HEADERS
+
+# The manager streams whichever row model the caller asks for, so callers keep the
+# precise type they passed in rather than a ZuoraRow they have to narrow.
+RowT = TypeVar("RowT", bound=ZuoraRow)
 
 # AQuA request schema version. With partner/project omitted the job runs in
 # stateless mode regardless, so this only selects the response semantics.
@@ -82,21 +86,6 @@ class ExportTooLargeError(Exception):
     """
 
 
-def _column_to_field(column: str, object_name: str) -> str:
-    """Map an export CSV column header to the field name documents carry.
-
-    With useQueryLabels every header is "<Object>.<Field>", for both the exported
-    object's own columns and any joined related object's. An own column drops the
-    prefix so it matches its describe name ("Account.Id" of an Account export ->
-    "Id"), while a joined column keeps it as a flattened name ("Account.Id" of an
-    Invoice export -> "AccountId").
-    """
-    prefix, _, field = column.partition(".")
-    if not field:
-        return column
-    return field if prefix == object_name else f"{prefix}{field}"
-
-
 class ExportManager:
     """Runs Zuora AQuA (Aggregate Query API) export jobs in stateless mode.
 
@@ -120,18 +109,14 @@ class ExportManager:
     async def export_rows(
         self,
         query: str,
-        object_name: str,
-    ) -> AsyncGenerator[dict, None]:
-        """Run `query` and stream its rows, keyed by field name.
-
-        object_name is the object `query` selects FROM. It's needed to tell an
-        own column apart from a joined one when naming fields (see
-        _column_to_field).
-        """
+        model: type[RowT],
+        context: ValidationContext,
+    ) -> AsyncGenerator[RowT, None]:
+        """Run `query` and stream its rows as validated `model` instances."""
         # Each segment file is a self-contained CSV with its own header row, so
         # streaming them back-to-back through per-file processors is seamless.
         for file_id in await self._run_job(query):
-            async for row in self._fetch_results(file_id, object_name):
+            async for row in self._fetch_results(file_id, model, context):
                 yield row
 
     async def _run_job(self, query: str) -> list[str]:
@@ -260,8 +245,9 @@ class ExportManager:
     async def _fetch_results(
         self,
         file_id: str,
-        object_name: str,
-    ) -> AsyncGenerator[dict, None]:
+        model: type[RowT],
+        context: ValidationContext,
+    ) -> AsyncGenerator[RowT, None]:
         url = f"{self.base_url}/v1/files/{file_id}"
         try:
             _resp_headers, body_factory = await self.http.request_stream(
@@ -275,5 +261,7 @@ class ExportManager:
             raise
         # Keyed by header name, never by position. Zuora does not return columns
         # in the order the query selected them.
-        async for row in IncrementalCSVProcessor(body_factory()):
-            yield {_column_to_field(k, object_name): v for k, v in row.items()}
+        async for row in IncrementalCSVProcessor(
+            body_factory(), model, validation_context=context
+        ):
+            yield row
