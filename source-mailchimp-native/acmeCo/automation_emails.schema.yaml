@@ -1,9 +1,5 @@
 $defs:
   Meta:
-    additionalProperties: true
-    description: |-
-      `extra="allow"` lets context-stamped parent IDs ride in `_meta`;
-      `BaseDocument.Meta` otherwise drops unknown keys.
     properties:
       op:
         default: u
@@ -22,24 +18,11 @@ $defs:
     title: Meta
     type: object
 additionalProperties: true
-description: |-
-  Email in a classic automation workflow. Like its `Automation` parent,
-  the endpoint is feature-gated and empty on the test account, so this shape
-  is docs-based; the required `id` fails loudly if a real payload disagrees.
-
-  The parent `workflow_id` is stamped into `_meta` (we can't live-verify
-  whether the response carries it), and the parent fan-out rejects an empty
-  `workflow_id` rather than build a malformed `automations//emails` path.
 properties:
   _meta:
     $ref: '#/$defs/Meta'
     description: Document metadata
-  id:
-    title: Id
-    type: string
-required:
-- id
-title: AutomationEmail
+title: BaseDocument
 type: object
 x-infer-schema: true
 if:
