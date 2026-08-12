@@ -1,0 +1,31 @@
+name: Fetch Flow binaries for this run
+description: >-
+  Downloads Flow release binaries once and uploads them as this run's `flow-bin`
+  artifact, for matrix jobs to restore via the restore-flow-binaries action.
+  Beyond sparing GitHub's release endpoint one request per matrix job, this pins
+  every job in a run to identical binaries.
+
+inputs:
+  paths:
+    description: >-
+      Which of the fetched binaries to upload. Callers which only run flowctl
+      upload just that, sparing their matrix jobs the other ~425MB.
+    default: flow-bin/
+
+runs:
+  using: "composite"
+  steps:
+
+    - name: Download Flow release binaries
+      shell: bash
+      run: ./fetch-flow.sh
+
+    - name: Upload them as this run's flow-bin artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: flow-bin
+        path: ${{ inputs.paths }}
+        # Only ever consumed by jobs of the run which produced it.
+        retention-days: 1
+        # Stripped release binaries barely compress; skip the CPU cost.
+        compression-level: 0

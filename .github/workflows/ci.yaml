@@ -11,6 +11,14 @@ on:
     branches: [main]
 
 jobs:
+  fetch_flow:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch Flow binaries
+        uses: ./.github/actions/fetch-flow-artifact
+
   build_base_image:
     runs-on: ubuntu-24.04
     steps:
@@ -66,7 +74,7 @@ jobs:
 
   build_connectors:
     runs-on: ubuntu-24.04
-    needs: build_base_image
+    needs: [build_base_image, fetch_flow]
     strategy:
       fail-fast: false
       matrix:
@@ -153,10 +161,8 @@ jobs:
           VARIANTS="${{ matrix.connector }} $(cat ${{ matrix.connector }}/VARIANTS 2>/dev/null || true)"
           echo ::set-output name=variants::${VARIANTS}
 
-      - name: Download latest Flow release binaries and add them to $PATH
-        run: |
-          ./fetch-flow.sh
-          echo "${PWD}/flow-bin" >> $GITHUB_PATH
+      - name: Restore Flow binaries
+        uses: ./.github/actions/restore-flow-binaries
 
       - name: Authenticate with GCloud
         uses: google-github-actions/auth@v2

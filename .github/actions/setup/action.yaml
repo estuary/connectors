@@ -28,12 +28,6 @@ runs:
         TAG=$(echo $GITHUB_SHA | head -c7)
         echo "tag=${TAG}" >> $GITHUB_OUTPUT
 
-    - name: Download latest Flow release binaries and add them to $PATH
-      shell: bash
-      run: |
-        ./fetch-flow.sh
-        echo "${PWD}/flow-bin" >> $GITHUB_PATH
-    
     - name: Login to GitHub package docker registry
       shell: bash
       run: |

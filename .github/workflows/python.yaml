@@ -147,8 +147,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  fetch_flow:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      # These tests only ever invoke flowctl, so it's the only binary uploaded.
+      - name: Fetch flowctl
+        uses: ./.github/actions/fetch-flow-artifact
+        with:
+          paths: flow-bin/flowctl
+
   py_connector:
     runs-on: ubuntu-24.04
+    needs: fetch_flow
     strategy:
       fail-fast: false
       matrix:
@@ -427,6 +439,9 @@ jobs:
           docker cp $(docker create --name temp ghcr.io/estuary/network-tunnel:dev sh):/flow-network-tunnel ./network-tunnel/flow-network-tunnel
           docker rm temp
           echo "${PWD}/network-tunnel" >> $GITHUB_PATH
+
+      - name: Restore Flow binaries
+        uses: ./.github/actions/restore-flow-binaries
 
       - name: Common Setup
         id: setup
