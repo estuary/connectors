@@ -87,7 +87,7 @@ so many of these properties aren't required.
 | **`/credentials/email`** | Admin Email | The email of your [Google Workspace administrator](https://support.google.com/a/answer/182076?hl=en). This is likely the account used during setup.  |
 | `/custom_reports` | Custom Reports (Optional) | A JSON array describing the [custom reports](#custom-reports) you want to sync from Google Search Console.  | string |  |
 | `/end_date` | End Date | UTC date in the format 2017-01-25. Any data after this date will not be replicated. Must be greater or equal to the start date field. | string |  |
-| **`/site_urls`** | Website URL | The [URLs of the website properties](https://support.google.com/webmasters/answer/34592?hl=en) attached to your GSC account: <ul><li>domain:example.com</li><li> https:<span></span>//example.com/</li></ul>  This connector supports both URL-prefix and domain property URLs.  | array | Required |
+| **`/site_urls`** | Website URL | The [URLs of the website properties](https://support.google.com/webmasters/answer/34592?hl=en) attached to your GSC account. Use `sc-domain:example.com` for a Domain property, or `https://example.com/` for a URL-prefix property.  | array | Required |
 | **`/start_date`** | Start Date | UTC date in the format 2017-01-25. Any data before this date will not be replicated. | string | Required |
 
 #### Bindings
@@ -112,7 +112,8 @@ captures:
               auth_type: Service
               service_account_info: <secret>
               email: admin@yourdomain.com
-            site_urls: https://yourdomain.com
+            site_urls:
+              - https://yourdomain.com/
             start_date: 2022-03-01
 
       bindings:
