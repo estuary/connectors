@@ -1,0 +1,21 @@
+name: Restore Flow binaries from this run
+description: >-
+  Restores the `flow-bin` artifact uploaded by this run's fetch-flow-artifact
+  step and adds it to $PATH. Requires an upstream job which produced it.
+
+runs:
+  using: "composite"
+  steps:
+
+    - name: Download this run's flow-bin artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: flow-bin
+        path: flow-bin/
+
+    - name: Restore the executable bit and add them to $PATH
+      shell: bash
+      run: |
+        # Artifacts do not preserve file modes.
+        chmod +x flow-bin/*
+        echo "${PWD}/flow-bin" >> $GITHUB_PATH
