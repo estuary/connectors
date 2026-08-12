@@ -82,6 +82,17 @@ class HTTPError(RuntimeError):
         self.message = message
 
 
+def format_error_body(body: bytes) -> str:
+    """
+    Decode a response body for an error message or log field.
+
+    Error bodies aren't guaranteed to be UTF-8, and raising here would destroy
+    the error being reported, so undecodable bytes are escaped rather than
+    dropped or replaced.
+    """
+    return body.decode("utf-8", errors="backslashreplace")
+
+
 class HTTPSession(abc.ABC):
     """
     HTTPSession is an abstract base class for an HTTP client implementation.
@@ -650,18 +661,19 @@ class HTTPMixin(Mixin, HTTPSession):
                             "server internal error (will retry)",
                             {
                                 "status_code": resp.status,
-                                "body": body.decode("utf-8"),
+                                "content_type": resp.content_type,
+                                "body": format_error_body(body),
                             },
                         )
                     else:
                         raise HTTPError(
-                            f"Encountered HTTP error status {resp.status}.\nURL: {resp.request_info.url}\nResponse:\n{body.decode('utf-8')}",
+                            f"Encountered HTTP error status {resp.status}.\nURL: {resp.request_info.url}\nContent-Type: {resp.content_type}\nResponse:\n{format_error_body(body)}",
                             resp.status,
                         )
                 elif resp.status >= 400 and resp.status < 500:
                     body = await resp.read()
                     raise HTTPError(
-                        f"Encountered HTTP error status {resp.status} which cannot be retried.\nURL: {resp.request_info.url}\nResponse:\n{body.decode('utf-8')}",
+                        f"Encountered HTTP error status {resp.status} which cannot be retried.\nURL: {resp.request_info.url}\nContent-Type: {resp.content_type}\nResponse:\n{format_error_body(body)}",
                         resp.status,
                     )
                 else:
