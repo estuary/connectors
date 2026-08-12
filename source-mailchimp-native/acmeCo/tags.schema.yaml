@@ -1,9 +1,5 @@
 $defs:
   Meta:
-    additionalProperties: true
-    description: |-
-      `extra="allow"` lets context-stamped parent IDs ride in `_meta`;
-      `BaseDocument.Meta` otherwise drops unknown keys.
     properties:
       op:
         default: u
@@ -22,30 +18,11 @@ $defs:
     title: Meta
     type: object
 additionalProperties: true
-description: |-
-  Tag-search items are bare `{id, name}`; the parent `list_id` is stamped
-  into `_meta` (the response omits it). Tags are Mailchimp static segments
-  under the hood — this stream is the `{id, name}` projection of the segments
-  stream's `type: static` subset.
-
-  Pagination rides offset/count, which tag-search honors but does not
-  document; if the provider ever drops it, the walker degrades to a single
-  page of up to 1000 tags (fallback enumeration exists via
-  `GET /lists/{list_id}/segments?type=static`).
 properties:
   _meta:
     $ref: '#/$defs/Meta'
     description: Document metadata
-  id:
-    title: Id
-    type: integer
-  name:
-    title: Name
-    type: string
-required:
-- id
-- name
-title: Tag
+title: BaseDocument
 type: object
 x-infer-schema: true
 if:

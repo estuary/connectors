@@ -1,9 +1,5 @@
 $defs:
   Meta:
-    additionalProperties: true
-    description: |-
-      `extra="allow"` lets context-stamped parent IDs ride in `_meta`;
-      `BaseDocument.Meta` otherwise drops unknown keys.
     properties:
       op:
         default: u
@@ -22,23 +18,11 @@ $defs:
     title: Meta
     type: object
 additionalProperties: true
-description: |-
-  Items carry `list_id` natively, so it stays a body field; the parent
-  `segment_id` is absent from the response and stamped into `_meta`.
 properties:
   _meta:
     $ref: '#/$defs/Meta'
     description: Document metadata
-  id:
-    title: Id
-    type: string
-  list_id:
-    title: List Id
-    type: string
-required:
-- id
-- list_id
-title: SegmentMember
+title: BaseDocument
 type: object
 x-infer-schema: true
 if:

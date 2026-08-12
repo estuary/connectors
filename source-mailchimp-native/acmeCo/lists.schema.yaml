@@ -22,12 +22,7 @@ properties:
   _meta:
     $ref: '#/$defs/Meta'
     description: Document metadata
-  id:
-    title: Id
-    type: string
-required:
-- id
-title: MailchimpList
+title: BaseDocument
 type: object
 x-infer-schema: true
 if:
