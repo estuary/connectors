@@ -601,6 +601,50 @@ func writeColumn[T parquetValue](
 	return nil
 }
 
+// encodeVariant encodes a value into the unshredded Variant V1 binary form.
+//
+// Scalars are appended to a variant builder directly rather than being marshaled to JSON that the
+// parse below would immediately undo — that round trip is what a multi-type field's scalar values
+// would otherwise pay for. Everything else is encoded from its JSON serialization, which is free
+// for the objects, arrays, and root documents that arrive as json.RawMessage, and is also the only
+// path that can represent a uint64 too large for the variant integer types.
+func encodeVariant(val any) (variant.Value, error) {
+	var b variant.Builder
+	var err error
+	var scalar = true
+
+	switch v := val.(type) {
+	case string:
+		err = b.AppendString(v)
+	case bool:
+		err = b.AppendBool(v)
+	case int64:
+		err = b.AppendInt(v)
+	case float64:
+		err = b.AppendFloat64(v)
+	case uint64:
+		if v <= math.MaxInt64 {
+			err = b.AppendInt(int64(v))
+		} else {
+			scalar = false
+		}
+	default:
+		scalar = false
+	}
+	if err != nil {
+		return variant.Value{}, err
+	} else if scalar {
+		return b.Build()
+	}
+
+	jsonVal, err := getJsonVal(val)
+	if err != nil {
+		return variant.Value{}, fmt.Errorf("getting JSON value: %w", err)
+	}
+
+	return variant.ParseJSONBytes(jsonVal, false)
+}
+
 // writeVariantColumn writes a variant schema element as its two leaf columns: each non-null value
 // is encoded from its JSON serialization to the unshredded Variant V1 binary form, and the
 // resulting metadata and value byte arrays are written as consecutive columns of the row group,
@@ -616,14 +660,9 @@ func writeVariantColumn(colIdx int, buf [][]any, rgWriter file.SerialRowGroupWri
 			continue
 		}
 
-		jsonVal, err := getJsonVal(row[colIdx])
+		encoded, err := encodeVariant(row[colIdx])
 		if err != nil {
-			return fmt.Errorf("getting JSON value: %w (type %T)", err, row[colIdx])
-		}
-
-		encoded, err := variant.ParseJSONBytes(jsonVal, false)
-		if err != nil {
-			return fmt.Errorf("encoding JSON value as variant: %w", err)
+			return fmt.Errorf("encoding value as variant: %w (type %T)", err, row[colIdx])
 		}
 
 		metaVals = append(metaVals, parquet.ByteArray(encoded.Metadata().Bytes()))
