@@ -2,13 +2,13 @@ package connector
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	"path"
 	"path/filepath"
 	"slices"
@@ -681,10 +681,10 @@ func (d *materialization) SnapshotTestResource(ctx context.Context, path []strin
 
 	sort.Strings(parquetKeys)
 
-	// Read parquet files using a pinned dockerized DuckDB rather than a host
-	// CLI: snapshot content must not depend on whichever duckdb version a
-	// contributor or CI happens to have installed, and variant columns are
-	// only readable from DuckDB 1.5.3 on.
+	// Read parquet files using the in-process DuckDB pinned in go.mod rather
+	// than a host CLI: snapshot content must not depend on whichever duckdb
+	// version a contributor or CI happens to have installed, and variant
+	// columns are only readable from DuckDB 1.5.3 on.
 	var allRows []map[string]any
 	for _, key := range parquetKeys {
 		getOut, err := s3client.GetObject(ctx, &s3.GetObjectInput{
@@ -750,10 +750,9 @@ func (d *materialization) SnapshotTestResource(ctx context.Context, path []strin
 	return columns, result, nil
 }
 
-// duckdbReadParquet runs the pinned dockerized DuckDB over a parquet file's
-// bytes and returns its rows. The file is staged in a temp directory bind
-// mounted into the container, which is removed before returning rather than
-// accumulating across a caller's loop.
+// duckdbReadParquet runs the in-process DuckDB over a parquet file's bytes and
+// returns its rows. The file is staged in a temp directory that is removed
+// before returning rather than accumulating across a caller's loop.
 func duckdbReadParquet(ctx context.Context, data []byte) ([]map[string]any, error) {
 	tmpDir, err := os.MkdirTemp("", "iceberg-test-*")
 	if err != nil {
@@ -765,20 +764,33 @@ func duckdbReadParquet(ctx context.Context, data []byte) ([]map[string]any, erro
 	if err := os.WriteFile(tmpPath, data, 0o644); err != nil {
 		return nil, fmt.Errorf("writing %s: %w", tmpPath, err)
 	}
-	// The file and its directory must be readable from inside the container
-	// regardless of the container's user.
-	if err := os.Chmod(tmpDir, 0o755); err != nil {
-		return nil, fmt.Errorf("making %s container-readable: %w", tmpDir, err)
+
+	db, err := sql.Open("duckdb", "") // opens an in-memory database
+	if err != nil {
+		return nil, fmt.Errorf("opening duckdb: %w", err)
+	}
+	defer db.Close()
+
+	if _, err := db.ExecContext(ctx, "SET timezone TO 'UTC'"); err != nil {
+		return nil, fmt.Errorf("setting duckdb timezone: %w", err)
 	}
 
-	out, err := exec.CommandContext(ctx, "docker", "run", "--rm",
-		"-v", tmpDir+":/data:ro",
-		writer.DuckDBDockerImage,
-		"duckdb", "-json", "-c",
-		"SET timezone TO 'UTC'; SELECT * FROM '/data/data.parquet' ORDER BY flow_published_at;",
-	).Output()
+	selectList, err := duckdbSelectList(ctx, db, tmpPath)
 	if err != nil {
-		return nil, fmt.Errorf("running duckdb: %w", err)
+		return nil, err
+	}
+
+	var outPath = filepath.Join(tmpDir, "out.json")
+	if _, err := db.ExecContext(ctx, fmt.Sprintf(
+		"COPY (SELECT %s FROM '%s' ORDER BY flow_published_at) TO '%s' (FORMAT JSON, ARRAY true)",
+		selectList, tmpPath, outPath,
+	)); err != nil {
+		return nil, fmt.Errorf("running duckdb copy: %w", err)
+	}
+
+	out, err := os.ReadFile(outPath)
+	if err != nil {
+		return nil, fmt.Errorf("reading duckdb output: %w", err)
 	}
 
 	var rows []map[string]any
@@ -787,6 +799,57 @@ func duckdbReadParquet(ctx context.Context, data []byte) ([]map[string]any, erro
 	}
 
 	return rows, nil
+}
+
+// duckdbSelectList builds the projection for reading a parquet file, casting
+// VARIANT columns to JSON. Without the cast a variant column is serialized
+// using DuckDB's display form (`{'k': v}`, values unquoted) rather than as
+// JSON, which is neither valid JSON nor comparable to the JSON string columns
+// the same field produces without variant_columns enabled.
+func duckdbSelectList(ctx context.Context, db *sql.DB, path string) (string, error) {
+	rows, err := db.QueryContext(ctx, fmt.Sprintf("DESCRIBE SELECT * FROM '%s'", path))
+	if err != nil {
+		return "", fmt.Errorf("describing %s: %w", path, err)
+	}
+	defer rows.Close()
+
+	cols, err := rows.Columns()
+	if err != nil {
+		return "", fmt.Errorf("getting DESCRIBE columns: %w", err)
+	}
+
+	var out []string
+	for rows.Next() {
+		var vals = make([]any, len(cols))
+		for i := range vals {
+			vals[i] = new(sql.NullString)
+		}
+		if err := rows.Scan(vals...); err != nil {
+			return "", fmt.Errorf("scanning DESCRIBE row: %w", err)
+		}
+
+		var name, typ string
+		for i, c := range cols {
+			switch c {
+			case "column_name":
+				name = vals[i].(*sql.NullString).String
+			case "column_type":
+				typ = vals[i].(*sql.NullString).String
+			}
+		}
+
+		var quoted = fmt.Sprintf(`"%s"`, strings.ReplaceAll(name, `"`, `""`))
+		if typ == "VARIANT" {
+			out = append(out, fmt.Sprintf("%s::JSON AS %s", quoted, quoted))
+		} else {
+			out = append(out, quoted)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return "", fmt.Errorf("iterating DESCRIBE rows: %w", err)
+	}
+
+	return strings.Join(out, ", "), nil
 }
 
 func (d *materialization) Close(ctx context.Context) {}

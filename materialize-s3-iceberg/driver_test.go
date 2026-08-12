@@ -3,6 +3,7 @@ package connector
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -1512,41 +1513,42 @@ func runVariantCreateResourceTest(t *testing.T, cfg config) {
 	}
 }
 
-// duckdbAttachQuery runs query against the test REST catalog using a pinned
-// dockerized DuckDB: an independent Iceberg v3 implementation whose version
-// isn't tied to anything in go.mod. The catalog is attached as `ice`, with
-// direct S3 credentials (the local rustfs has no STS, so credential vending is
-// disabled via ACCESS_DELEGATION_MODE none). The container uses host
-// networking so the catalog and S3 endpoints resolve at localhost.
+// duckdbAttachQuery runs query against the test REST catalog using DuckDB as
+// an Iceberg v3 implementation independent of iceberg-go, and returns the
+// result rows as JSON. The catalog is attached as `ice`, with direct S3
+// credentials (the local rustfs has no STS, so credential vending is disabled
+// via ACCESS_DELEGATION_MODE none).
 func duckdbAttachQuery(t *testing.T, cfg config, query string) string {
 	t.Helper()
 
 	clientID, clientSecret, ok := strings.Cut(cfg.Catalog.Credential, ":")
 	require.True(t, ok, "catalog credential must be client_id:client_secret")
 
-	script := fmt.Sprintf(`
-INSTALL iceberg; LOAD iceberg;
-CREATE SECRET s3sec (TYPE S3, KEY_ID '%s', SECRET '%s', REGION '%s', ENDPOINT '%s', URL_STYLE 'path', USE_SSL false);
-CREATE SECRET icesec (TYPE ICEBERG, CLIENT_ID '%s', CLIENT_SECRET '%s', OAUTH2_SERVER_URI '%s/v1/oauth/tokens', OAUTH2_SCOPE '%s');
-ATTACH '%s' AS ice (TYPE iceberg, SECRET icesec, ENDPOINT '%s', ACCESS_DELEGATION_MODE 'none');
-%s`,
-		cfg.Credentials.AWSAccessKeyID, cfg.Credentials.AWSSecretAccessKey, cfg.Region,
-		strings.TrimPrefix(cfg.S3Endpoint, "http://"),
-		clientID, clientSecret, cfg.Catalog.URI, cfg.Catalog.Scope,
-		cfg.Catalog.Warehouse, cfg.Catalog.URI,
-		query,
-	)
+	db, err := sql.Open("duckdb", "") // opens an in-memory database
+	require.NoError(t, err)
+	defer db.Close()
 
-	// Capture stdout only: docker writes image-pull progress to stderr when
-	// the pinned image isn't cached (as on a fresh CI runner), which must not
-	// pollute the query result that callers parse.
-	cmd := exec.Command("docker", "run", "--rm", "--network", "host",
-		writer.DuckDBDockerImage, "duckdb", "-json", "-c", script,
-	)
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	out, err := cmd.Output()
-	require.NoError(t, err, "dockerized duckdb query failed: %s", stderr.String())
+	for _, stmt := range []string{
+		"INSTALL iceberg",
+		"LOAD iceberg",
+		fmt.Sprintf("CREATE SECRET s3sec (TYPE S3, KEY_ID '%s', SECRET '%s', REGION '%s', ENDPOINT '%s', URL_STYLE 'path', USE_SSL false)",
+			cfg.Credentials.AWSAccessKeyID, cfg.Credentials.AWSSecretAccessKey, cfg.Region,
+			strings.TrimPrefix(cfg.S3Endpoint, "http://")),
+		fmt.Sprintf("CREATE SECRET icesec (TYPE ICEBERG, CLIENT_ID '%s', CLIENT_SECRET '%s', OAUTH2_SERVER_URI '%s/v1/oauth/tokens', OAUTH2_SCOPE '%s')",
+			clientID, clientSecret, cfg.Catalog.URI, cfg.Catalog.Scope),
+		fmt.Sprintf("ATTACH '%s' AS ice (TYPE iceberg, SECRET icesec, ENDPOINT '%s', ACCESS_DELEGATION_MODE 'none')",
+			cfg.Catalog.Warehouse, cfg.Catalog.URI),
+	} {
+		_, err := db.Exec(stmt)
+		require.NoError(t, err, "duckdb setup failed")
+	}
+
+	outFile := filepath.Join(t.TempDir(), "out")
+	_, err = db.Exec(fmt.Sprintf("COPY (%s) TO '%s' (FORMAT JSON, ARRAY true)", strings.TrimSuffix(strings.TrimSpace(query), ";"), outFile))
+	require.NoError(t, err, "duckdb query failed")
+
+	out, err := os.ReadFile(outFile)
+	require.NoError(t, err)
 
 	return string(out)
 }
@@ -1648,15 +1650,11 @@ func runVariantDuckDBRegression(t *testing.T, cfg config) {
 	out := duckdbAttachQuery(t, cfg, fmt.Sprintf(
 		`SELECT id, v::JSON AS v FROM ice.%s."%s" ORDER BY id;`, cfg.Namespace, table))
 
-	// The final -json result set is the last JSON array in the output (the
-	// preceding statements each emit a small success array).
-	start := strings.LastIndex(out, "[{")
-	require.NotEqual(t, -1, start, "no result rows in duckdb output: %s", out)
 	var got []struct {
 		ID int64           `json:"id"`
 		V  json.RawMessage `json:"v"`
 	}
-	require.NoError(t, json.Unmarshal([]byte(out[start:]), &got))
+	require.NoError(t, json.Unmarshal([]byte(out), &got))
 	require.Len(t, got, len(vals))
 
 	for i, want := range vals {

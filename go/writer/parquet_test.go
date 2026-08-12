@@ -2,8 +2,10 @@ package writer
 
 import (
 	"bytes"
+	"database/sql"
 	"fmt"
 	"os"
+	"path"
 	"testing"
 	"time"
 
@@ -13,6 +15,28 @@ import (
 	"github.com/bradleyjkemp/cupaloy"
 	"github.com/stretchr/testify/require"
 )
+
+// duckdbQueryFile runs query against the file f, substituting f's path for %s
+// in query, and returns the result rows as JSON.
+func duckdbQueryFile(t *testing.T, f string, query string) string {
+	db, err := sql.Open("duckdb", "") // opens an in-memory database
+	require.NoError(t, err)
+	defer db.Close()
+
+	for _, q := range []string{"INSTALL 'json'", "LOAD 'json'", "SET TimeZone = 'UTC'"} {
+		_, err := db.Exec(q)
+		require.NoError(t, err)
+	}
+
+	outFile := path.Join(t.TempDir(), "out")
+	_, err = db.Exec(fmt.Sprintf("COPY (%s) TO '%s' (FORMAT JSON)", fmt.Sprintf(query, f), outFile))
+	require.NoError(t, err)
+
+	sb, err := os.ReadFile(outFile)
+	require.NoError(t, err)
+
+	return string(sb)
+}
 
 func TestParquetWriter(t *testing.T) {
 	tests := []struct {
@@ -234,9 +258,9 @@ func TestParquetWriterVariant(t *testing.T) {
 		require.True(t, statsSet, "statistics must remain enabled for non-variant columns")
 	}
 
-	// Read the file back with an independent parquet variant reader to prove
-	// the encoding is accepted outside of arrow-go.
-	cupaloy.SnapshotT(t, duckdbDockerQueryFile(t, sink.Name(),
+	// Read the file back with a parquet variant reader outside of arrow-go to
+	// prove the encoding is accepted by other implementations.
+	cupaloy.SnapshotT(t, duckdbQueryFile(t, sink.Name(),
 		"SELECT idField, variantField::JSON AS variantField, reqVariantField::JSON AS reqVariantField, strField FROM read_parquet('%s') ORDER BY idField"))
 }
 
