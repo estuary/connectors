@@ -202,8 +202,19 @@ func RunTransactions(
 		options = &MaterializeOptions{}
 	}
 
+	// The runtime already holds transactions open until the scheduled instant, so
+	// an additional connector-side acknowledgement delay would only fight it.
+	opts := *options
+	if opts.AckSchedule != nil && runtimePacesCommits(open.Materialization) {
+		log.WithFields(log.Fields{
+			"syncSchedule":    string(open.Materialization.SyncScheduleJson),
+			"connectorConfig": opts.AckSchedule.Config,
+		}).Info("runtime sync schedule is in effect; ignoring connector acknowledgement schedule")
+		opts.AckSchedule = nil
+	}
+
 	// Wrap `stream` with additional logging and auxiliary capabilities.
-	stream, err = newTransactionsStream(ctx, stream, lvl, *options, be)
+	stream, err = newTransactionsStream(ctx, stream, lvl, opts, be)
 	if err != nil {
 		return fmt.Errorf("creating transactions stream: %w", err)
 	}

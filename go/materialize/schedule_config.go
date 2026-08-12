@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/estuary/connectors/go/schedule"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -46,6 +47,14 @@ func (c ScheduleConfig) Validate() error {
 		return fmt.Errorf("validating schedule configuration: %w", err)
 	}
 	return nil
+}
+
+// runtimePacesCommits reports whether the runtime is enforcing a sync schedule
+// for this materialization. It mirrors the runtime's predicate: any non-empty
+// sync_schedule_json is a schedule, including one that decodes to a zero
+// interval.
+func runtimePacesCommits(spec *pf.MaterializationSpec) bool {
+	return spec != nil && len(spec.SyncScheduleJson) > 0
 }
 
 func createSchedule(cfg ScheduleConfig, jitter []byte) (schedule.Schedule, error) {
