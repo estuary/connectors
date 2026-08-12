@@ -197,7 +197,15 @@ func TestParquetWriterVariant(t *testing.T) {
 		[]byte(`null`),
 		nil,
 		[]byte(`9223372036854775807`),
+		// Values arriving as native Go types rather than JSON text, as a
+		// multi-type field's scalars do.
 		map[string]any{"marshalled": true},
+		"a Go string",
+		int64(-42),
+		float64(3.5),
+		true,
+		uint64(18446744073709551615),
+		[]any{1, "two", nil},
 	}
 
 	// A small row group limit exercises the scratch file flush and transfer

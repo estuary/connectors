@@ -7,4 +7,10 @@
 {"idField":6,"variantField":null,"reqVariantField":{"seq":6},"strField":"str_6"}
 {"idField":7,"variantField":9223372036854775807,"reqVariantField":{"seq":7},"strField":"str_7"}
 {"idField":8,"variantField":{"marshalled":true},"reqVariantField":{"seq":8},"strField":"str_8"}
+{"idField":9,"variantField":"a Go string","reqVariantField":{"seq":9},"strField":"str_9"}
+{"idField":10,"variantField":-42,"reqVariantField":{"seq":10},"strField":"str_10"}
+{"idField":11,"variantField":3.5,"reqVariantField":{"seq":11},"strField":"str_11"}
+{"idField":12,"variantField":true,"reqVariantField":{"seq":12},"strField":"str_12"}
+{"idField":13,"variantField":18446744073709551615,"reqVariantField":{"seq":13},"strField":"str_13"}
+{"idField":14,"variantField":[1,"two",null],"reqVariantField":{"seq":14},"strField":"str_14"}
 
