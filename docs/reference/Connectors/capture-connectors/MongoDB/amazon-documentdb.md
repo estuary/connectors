@@ -81,6 +81,7 @@ Amazon DocumentDB source connector.
 | `/advanced/disablePreImages` | Disable Pre-Images | Disable requesting pre-images even if the MongoDB deployment supports them and they are enabled for collections. | boolean |  |
 | `/advanced/exclusiveCollectionFilter` | Change Stream Exclusive Collection Filter | Add a MongoDB pipeline filter to database change streams to exclusively match events having enabled capture bindings. Should only be used if a small number of bindings are enabled: the filter is evaluated against every oplog event with one clause per enabled binding, so with many bindings it can slow reads enough for change stream lag to grow; prefer `excludeCollections` in that case. | boolean |  |
 | `/advanced/excludeCollections` | Exclude Collections | Comma-separated list of collections to exclude from database change streams. Each one should be formatted as `database_name:collection`. Cannot be set if `exclusiveCollectionFilter` is enabled. | string |  |
+| `/advanced/skipBackfills` | Skip Backfills | Not applicable to Amazon DocumentDB. This option only affects bindings using the **Change Stream Incremental** capture mode, which DocumentDB does not support. | string |  |
 
 #### Bindings
 

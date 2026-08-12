@@ -131,6 +131,40 @@ type advancedConfig struct {
 	DisablePreImages          bool   `json:"disablePreImages,omitempty" jsonschema:"title=Disable Pre-Images,description=Disable requesting pre-images even if the MongoDB deployment supports them and they are enabled for collections." jsonschema_extras:"nonsensitive=true"`
 	ExclusiveCollectionFilter bool   `json:"exclusiveCollectionFilter,omitempty" jsonschema:"title=Change Stream Exclusive Collection Filter,description=Add a MongoDB pipeline filter to database change streams to exclusively match events having enabled capture bindings. Should only be used if a small number of bindings are enabled." jsonschema_extras:"nonsensitive=true"`
 	ExcludeCollections        string `json:"excludeCollections,omitempty" jsonschema:"title=Exclude Collections,description=Comma-separated list of collections to exclude from database change streams. Each one should be formatted as 'database_name:collection'. Cannot be set if exclusiveCollectionFilter is enabled."`
+	SkipBackfills             string `json:"skipBackfills,omitempty" jsonschema:"title=Skip Backfills,description=Comma-separated list of collections which should not be backfilled. Each one should be formatted as 'database_name:collection'. Use '*:*' to skip the backfill of every change stream collection."`
+}
+
+const skipAllBackfills = "*:*"
+
+func (c *config) skipsAllBackfills() bool {
+	return strings.TrimSpace(c.Advanced.SkipBackfills) == skipAllBackfills
+}
+
+func (c *config) skipBackfillsNamespaces() []string {
+	namespaces := strings.Split(c.Advanced.SkipBackfills, ",")
+	for idx, ns := range namespaces {
+		namespaces[idx] = strings.TrimSpace(ns)
+	}
+	return namespaces
+}
+
+func (c *config) shouldBackfill(database, collection string) bool {
+	if c.skipsAllBackfills() {
+		return false
+	}
+
+	var namespace = database + ":" + collection
+
+	// NOTE: MongoDB database and collection names are case-sensitive
+	//
+	// The whole namespace is compared as a single string, so a database or
+	// collection name which itself contains a ':' is matched correctly
+	// without needing to be parsed.
+	if slices.Contains(c.skipBackfillsNamespaces(), namespace) {
+		return false
+	}
+
+	return true
 }
 
 func parseExcludeCollections(excludeCollections string) (map[string][]string, error) {
@@ -191,6 +225,14 @@ func (c *config) Validate() error {
 
 	if _, err := parseExcludeCollections(c.Advanced.ExcludeCollections); err != nil {
 		return err
+	}
+
+	if strings.TrimSpace(c.Advanced.SkipBackfills) != "" && !c.skipsAllBackfills() {
+		for _, ns := range c.skipBackfillsNamespaces() {
+			if !strings.Contains(ns, ":") {
+				return fmt.Errorf("invalid 'skipBackfills' configuration: collection %q must be formatted as \"database_name:collection\"", ns)
+			}
+		}
 	}
 
 	return nil
@@ -500,6 +542,15 @@ func (d *driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 			return nil, fmt.Errorf("binding %q is configured with mode '%s', but the server does not support change streams", resourcePath, res.getMode())
 		} else if res.getMode() == captureModeChangeStream && !collectionType.canChangeStream() {
 			return nil, fmt.Errorf("binding %q is configured with mode '%s', but the collection type '%s' does not support change streams", resourcePath, res.getMode(), collectionType)
+		}
+
+		if !cfg.skipsAllBackfills() &&
+			res.getMode() != captureModeChangeStream &&
+			!cfg.shouldBackfill(res.Database, res.Collection) {
+			return nil, fmt.Errorf(
+				"binding %q is named by the 'skipBackfills' advanced option, which only applies to bindings with mode '%s', and this binding has mode '%s': disable the binding instead of skipping its backfill",
+				resourcePath, captureModeChangeStream, res.getMode(),
+			)
 		}
 
 		bindings = append(bindings, &pc.Response_Validated_Binding{

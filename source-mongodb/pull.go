@@ -167,6 +167,8 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		return fmt.Errorf("updating resource states: %w", err)
 	}
 
+	skipConfiguredBackfills(&prevState, changeStreamBindings, &cfg)
+
 	var c = capture{
 		client:                      client,
 		output:                      stream,
@@ -393,6 +395,44 @@ func updateResourceStates(prevState captureState, allBindings []bindingInfo) (ca
 	}
 
 	return newState, nil
+}
+
+func skipConfiguredBackfills(state *captureState, changeStreamBindings []bindingInfo, cfg *config) {
+	if cfg.Advanced.SkipBackfills == "" {
+		return
+	}
+
+	// Batch mode bindings are deliberately left alone: their backfill is the only
+	// way they capture anything, so marking one complete would capture nothing at
+	// all, and it would also leave `LastPollStart` unset for the polling loop.
+	// driver.Validate rejects a config which names a batch binding explicitly.
+	for _, b := range changeStreamBindings {
+		if cfg.shouldBackfill(b.resource.Database, b.resource.Collection) {
+			continue
+		}
+
+		resState := state.Resources[b.stateKey]
+		if resState.Backfill.done() {
+			continue
+		}
+
+		fields := log.Fields{
+			"database":       b.resource.Database,
+			"collection":     b.resource.Collection,
+			"backfilledDocs": resState.Backfill.BackfilledDocs,
+		}
+		if resState.Backfill.LastCursorValue != nil {
+			log.WithFields(fields).WithField(
+				"lastCursorValue", resState.Backfill.LastCursorValue,
+			).Warn("abandoning in-progress backfill for collection: documents after the last cursor position will not be captured")
+		} else {
+			log.WithFields(fields).Info("skipping backfill for collection")
+		}
+
+		resState.Backfill.Done = makePtr(true)
+		resState.Backfill.LastCursorValue = nil
+		state.Resources[b.stateKey] = resState
+	}
 }
 
 func (s *captureState) isChangeStreamBackfillComplete(changeStreamBindings []bindingInfo) bool {

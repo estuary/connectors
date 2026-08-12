@@ -100,6 +100,11 @@
             "type": "string",
             "title": "Exclude Collections",
             "description": "Comma-separated list of collections to exclude from database change streams. Each one should be formatted as 'database_name:collection'. Cannot be set if exclusiveCollectionFilter is enabled."
+          },
+          "skipBackfills": {
+            "type": "string",
+            "title": "Skip Backfills",
+            "description": "Comma-separated list of collections which should not be backfilled. Each one should be formatted as 'database_name:collection'. Use '*:*' to skip the backfill of every change stream collection."
           }
         },
         "additionalProperties": false,
