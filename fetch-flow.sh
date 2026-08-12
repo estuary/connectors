@@ -9,12 +9,16 @@ mkdir -p flow-bin &&
 rm -f flow-bin/* &&
 cd flow-bin &&
 
-# Get the older package for etcd and gazette.
-curl -L --proto '=https' --tlsv1.2 -sSf "https://github.com/estuary/flow/releases/download/dev/flow-x86-linux.tar.gz" | tar -zx &&
+# Get the older package for etcd and gazette. Downloaded to a file rather than
+# piped into tar: GitHub's release endpoint returns transient 503s under load,
+# and `--retry` restarts the transfer, which would corrupt an in-progress extract.
+curl -L --proto '=https' --tlsv1.2 -sSf --retry 5 "https://github.com/estuary/flow/releases/download/dev/flow-x86-linux.tar.gz" -o flow-x86-linux.tar.gz &&
+tar -zxf flow-x86-linux.tar.gz &&
+rm flow-x86-linux.tar.gz &&
 
 # Overwrite some of the binaries with the latest release.
-curl -L -sSf "https://github.com/estuary/flow/releases/download/${FLOW_RELEASE}/flowctl-linux-x86_64" -o flowctl &&
-curl -L -sSf "https://github.com/estuary/flow/releases/download/${FLOW_RELEASE}/flowctl-go-linux-x86_64" -o flowctl-go &&
-curl -L -sSf "https://github.com/estuary/flow/releases/download/${FLOW_RELEASE}/flow-parser-linux-x86_64" -o flow-parser &&
-curl -L -sSf "https://github.com/estuary/flow/releases/download/${FLOW_RELEASE}/flow-connector-init-linux-x86_64" -o flow-connector-init &&
+curl -L -sSf --retry 5 "https://github.com/estuary/flow/releases/download/${FLOW_RELEASE}/flowctl-linux-x86_64" -o flowctl &&
+curl -L -sSf --retry 5 "https://github.com/estuary/flow/releases/download/${FLOW_RELEASE}/flowctl-go-linux-x86_64" -o flowctl-go &&
+curl -L -sSf --retry 5 "https://github.com/estuary/flow/releases/download/${FLOW_RELEASE}/flow-parser-linux-x86_64" -o flow-parser &&
+curl -L -sSf --retry 5 "https://github.com/estuary/flow/releases/download/${FLOW_RELEASE}/flow-connector-init-linux-x86_64" -o flow-connector-init &&
 chmod +x flowctl flowctl-go flow-parser flow-connector-init

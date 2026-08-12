@@ -296,6 +296,7 @@ jobs:
             docker build --build-arg BASE_CONNECTOR=ghcr.io/estuary/${{ matrix.connector }}:local \
                          --build-arg DOCS_URL=https://go.estuary.dev/${VARIANT} \
                          --tag ghcr.io/estuary/${VARIANT}:${{ steps.prep.outputs.tag }} \
+                         --label org.opencontainers.image.revision=$GITHUB_SHA \
                          --file connector-variant.Dockerfile .;
             docker image push ghcr.io/estuary/${VARIANT}:${{ steps.prep.outputs.tag }};
           done
