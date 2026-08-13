@@ -273,19 +273,6 @@ class TestOpenBindingSnapshotDict:
                 tombstone={"A": _doc("A", "")},
             )
 
-    def test_requires_row_id_in_key(self):
-        output = io.BytesIO()
-        task = _task(output, Task.Stopping())
-        with pytest.raises(AssertionError, match="compound collection key"):
-            open_binding(
-                _binding(["/_meta/store", "/id"]),
-                0,
-                self._state(),
-                task,
-                fetch_snapshot={"A": self._noop},
-                tombstone={"A": _doc("A", "")},
-            )
-
     def test_requires_matching_tombstone_dict(self):
         output = io.BytesIO()
         task = _task(output, Task.Stopping())
@@ -391,3 +378,73 @@ class TestResolveBindingsSnapshotKey:
         )
         resolved = resolve_bindings([_binding(["/id"], name="issues")], [resource])
         assert len(resolved) == 1
+
+
+class TestOpenBindingSnapshotSingle:
+    """A single (non-dict) fetch_snapshot is subject to the same key/tombstone
+    rules as a subtask. These went unchecked until a snapshot binding keyed on
+    `/id` shipped and only failed once its source count first shrank."""
+
+    async def _noop(self, log: logging.Logger) -> AsyncGenerator[StoreDoc, None]:
+        if False:
+            yield  # pragma: no cover
+
+    def test_accepts_row_id_key_with_default_tombstone(self):
+        task = _task(io.BytesIO(), Task.Stopping())
+        task.spawn_child = MagicMock()  # type: ignore[method-assign]
+
+        # The canonical shape: keyed solely on row_id, so the CDK's own default
+        # tombstone suffices and no caller-supplied fields are needed.
+        open_binding(
+            _binding(["/_meta/row_id"]),
+            0,
+            ResourceState(),
+            task,
+            fetch_snapshot=self._noop,
+        )
+
+        assert task.spawn_child.call_count == 1
+        assert task.spawn_child.call_args.args[0] == "staff_members.snapshot"
+
+    def test_accepts_compound_key_when_tombstone_carries_discriminator(self):
+        task = _task(io.BytesIO(), Task.Stopping())
+        task.spawn_child = MagicMock()  # type: ignore[method-assign]
+
+        open_binding(
+            _binding(COMPOUND_KEY),
+            0,
+            ResourceState(),
+            task,
+            fetch_snapshot=self._noop,
+            tombstone=_doc("A", ""),
+        )
+
+        assert task.spawn_child.call_count == 1
+
+    def test_rejects_tombstone_missing_a_key_field(self):
+        # row_id is in the key, but the CDK cannot populate `store`, so this
+        # tombstone would delete whatever sits at store="" instead.
+        with pytest.raises(AssertionError, match="/_meta/store is unset"):
+            open_binding(
+                _binding(COMPOUND_KEY),
+                0,
+                ResourceState(),
+                _task(io.BytesIO(), Task.Stopping()),
+                fetch_snapshot=self._noop,
+                tombstone=BaseDocument(_meta=BaseDocument.Meta(op="d")),
+            )
+
+    def test_rejects_tombstone_relying_on_a_default_for_a_key_field(self):
+        # StoreDoc.Meta declares `store` with a default, so it resolves on the
+        # model -- but documents serialize with exclude_unset, so a value the
+        # caller never set is absent from the captured document and would key
+        # the deletion to the default instead.
+        with pytest.raises(AssertionError, match="/_meta/store is unset"):
+            open_binding(
+                _binding(COMPOUND_KEY),
+                0,
+                ResourceState(),
+                _task(io.BytesIO(), Task.Stopping()),
+                fetch_snapshot=self._noop,
+                tombstone=StoreDoc(id="", _meta=StoreDoc.Meta(op="d")),
+            )
