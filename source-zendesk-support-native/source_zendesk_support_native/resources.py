@@ -300,16 +300,13 @@ def full_refresh_resources(
         )
 
     resources = [
-        common.Resource(
+        common.SnapshotResource(
             name=name,
-            key=["/_meta/row_id"],
             model=FullRefreshResource,
             open=functools.partial(open, path, response_model),
-            initial_state=ResourceState(),
             initial_config=ResourceConfig(
                 name=name, interval=timedelta(minutes=60)
             ),
-            schema_inference=True,
         )
         for (name, path, response_model) in FULL_REFRESH_RESOURCES
     ]
@@ -346,16 +343,13 @@ def full_refresh_offset_paginated_resources(
         )
 
     resources = [
-        common.Resource(
+        common.SnapshotResource(
             name=name,
-            key=["/_meta/row_id"],
             model=FullRefreshResource,
             open=functools.partial(open, path, response_model),
-            initial_state=ResourceState(),
             initial_config=ResourceConfig(
                 name=name, interval=timedelta(minutes=60)
             ),
-            schema_inference=True,
         )
         for (name, path, response_model) in FULL_REFRESH_OFFSET_PAGINATED_RESOURCES
     ]
@@ -392,16 +386,13 @@ def full_refresh_cursor_paginated_resources(
         )
 
     resources = [
-        common.Resource(
+        common.SnapshotResource(
             name=name,
-            key=["/_meta/row_id"],
             model=FullRefreshResource,
             open=functools.partial(open, path, response_model),
-            initial_state=ResourceState(),
             initial_config=ResourceConfig(
                 name=name, interval=timedelta(minutes=60)
             ),
-            schema_inference=True,
         )
         for (name, path, response_model) in FULL_REFRESH_CURSOR_PAGINATED_RESOURCES
     ]
