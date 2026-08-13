@@ -30,8 +30,13 @@ properties:
   id:
     title: Id
     type: integer
+  modifiedAt:
+    format: date-time
+    title: Modifiedat
+    type: string
 required:
 - id
+- modifiedAt
 title: SheetRow
 type: object
 x-infer-schema: true

@@ -2,12 +2,11 @@ collections:
   acmeCo/report_rows:
     schema: report_rows.schema.yaml
     key:
-    - /_meta/report_id
-    - /id
+    - /_meta/row_id
   acmeCo/reports:
     schema: reports.schema.yaml
     key:
-    - /id
+    - /_meta/row_id
   acmeCo/sheet_rows:
     schema: sheet_rows.schema.yaml
     key:
