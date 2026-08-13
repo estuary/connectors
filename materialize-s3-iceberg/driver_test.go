@@ -2129,6 +2129,80 @@ func TestParquetSchemaCastToStringOnJSONField(t *testing.T) {
 	require.ErrorContains(t, err, "cannot set ignoreStringFormat on non-string field")
 }
 
+// A multi-type field that carries a format annotation becomes a variant
+// column, and its string values are stored with the variant type the field
+// would have had as a column of its own. The connector's schema options apply
+// to that resolution too, so formats it lowers to string stay strings.
+func TestParquetSchemaVariantStringTypes(t *testing.T) {
+	mkProj := func(field, format string) pf.Projection {
+		return pf.Projection{
+			Field: field,
+			Ptr:   "/" + field,
+			Inference: pf.Inference{
+				Exists:  pf.Inference_MUST,
+				Types:   []string{"integer", "string"},
+				String_: &pf.Inference_String{Format: format},
+			},
+		}
+	}
+
+	collection := pf.CollectionSpec{
+		Name: "acmeCo/tests/variantStrings",
+		// GetProjection binary-searches, so these must be sorted by field.
+		Projections: []pf.Projection{
+			mkProj("dateField", "date"),
+			mkProj("dateTimeField", "date-time"),
+			mkProj("plainField", ""),
+			mkProj("timeField", "time"),
+			mkProj("uuidField", "uuid"),
+		},
+	}
+	fields := []string{"dateField", "dateTimeField", "plainField", "timeField", "uuidField"}
+
+	var variantCfg = withAdvanced(config{}, func(a *advancedConfig) { a.VariantColumns = true })
+
+	for _, tc := range []struct {
+		name string
+		cfg  config
+		want map[string]writer.ParquetDataType
+	}{
+		{
+			name: "microsecond timestamps",
+			cfg:  variantCfg,
+			want: map[string]writer.ParquetDataType{
+				"dateTimeField": writer.LogicalTypeTimestamp,
+				"dateField":     writer.LogicalTypeDate,
+				// Iceberg has no UUID or TIME column type that Spark reads
+				// reliably, so these are strings as standalone columns too.
+				"uuidField":  writer.LogicalTypeString,
+				"timeField":  writer.LogicalTypeString,
+				"plainField": writer.LogicalTypeString,
+			},
+		},
+		{
+			name: "nanosecond timestamps",
+			cfg:  withAdvanced(variantCfg, func(a *advancedConfig) { a.NanosecondTimestamps = true }),
+			want: map[string]writer.ParquetDataType{
+				"dateTimeField": writer.LogicalTypeTimestampNanos,
+				"dateField":     writer.LogicalTypeDate,
+				"uuidField":     writer.LogicalTypeString,
+				"timeField":     writer.LogicalTypeString,
+				"plainField":    writer.LogicalTypeString,
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := parquetSchema(fields, collection, nil, tc.cfg)
+			require.NoError(t, err)
+
+			for _, el := range got {
+				require.Equalf(t, writer.LogicalTypeVariant, el.DataType, "field %s", el.Name)
+				require.Equalf(t, tc.want[el.Name], el.VariantStringType, "field %s", el.Name)
+			}
+		})
+	}
+}
+
 // TestCanMigrate pins the migratable set: the microsecond↔nanosecond
 // timestamp pair in both directions, any non-variant type to variant (the
 // variant_columns flip, including column types that had previously evolved),
