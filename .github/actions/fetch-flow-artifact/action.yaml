@@ -8,8 +8,9 @@ description: >-
 inputs:
   paths:
     description: >-
-      Which of the fetched binaries to upload. Callers which only run flowctl
-      upload just that, sparing their matrix jobs the other ~425MB.
+      Which of the fetched binaries to upload. Narrowing this spares matrix jobs
+      the other ~360MB, but account for what the binaries shell out to and not
+      just what the jobs invoke: flowctl needs sops beside it to decrypt configs.
     default: flow-bin/
 
 runs:
