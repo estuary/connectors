@@ -483,6 +483,12 @@ class SnapshotResource(Resource[_BaseDocument, _BaseResourceConfig, ResourceStat
     model: type[BaseDocument] | Resource.FixedSchema = BaseDocument
     schema_inference: bool = True
 
+    def __post_init__(self):
+        assert "/_meta/row_id" in self.key, (
+            f"A SnapshotResource must be keyed on /_meta/row_id, which is how "
+            f"the CDK addresses the document a deletion removes. Got: {self.key}"
+        )
+
 
 def discovered(
     resources: list["Resource[_BaseDocument, _BaseResourceConfig, _BaseResourceState]"],
