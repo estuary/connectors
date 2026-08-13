@@ -5,6 +5,7 @@ from copy import deepcopy
 from typing import Callable
 
 from estuary_cdk.capture.common import (
+    SnapshotResource,
     BaseDocument,
     Resource,
     ResourceState,
@@ -302,10 +303,8 @@ def full_refresh_resource(
             tombstone=BaseDocument(_meta=BaseDocument.Meta(op="d")),
         )
 
-    return Resource(
+    return SnapshotResource(
         name=model.name,
-        key=["/_meta/row_id"],
-        model=BaseDocument,
         open=functools.partial(
             open,
             snapshot_fn=functools.partial(
@@ -316,12 +315,10 @@ def full_refresh_resource(
             ),
             use_sourced_schemas=use_sourced_schemas,
         ),
-        initial_state=ResourceState(),
         initial_config=ResourceConfig(
             name=model.name,
             interval=timedelta(hours=1),
         ),
-        schema_inference=True,
     )
 
 
