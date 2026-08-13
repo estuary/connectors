@@ -93,16 +93,12 @@ def full_refresh_resources(
         )
 
     resources = [
-        common.Resource(
+        common.SnapshotResource(
             name=model.name,
-            key=["/_meta/row_id"],
-            model=common.BaseDocument,
             open=functools.partial(open, model),
-            initial_state=ResourceState(),
             initial_config=ResourceConfig(
                 name=model.name, interval=timedelta(minutes=60)
             ),
-            schema_inference=True,
         )
         for model in FULL_REFRESH_STREAMS
     ]
