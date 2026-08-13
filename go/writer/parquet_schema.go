@@ -20,6 +20,13 @@ type ParquetSchemaElement struct {
 	Required bool
 	FieldId  *int32
 	Scale    int32 // only applicable to LogicalTypeDecimal
+
+	// VariantStringType is the type given to string values of a
+	// LogicalTypeVariant column, so that a string carrying a format annotation
+	// is stored with the variant type it would have had as a column of its own.
+	// Types with no variant counterpart, and the zero value, store the string
+	// as a variant string.
+	VariantStringType ParquetDataType
 }
 
 // ParquetDataType provides a mapping for the JSON types we support to an appropriate parquet data

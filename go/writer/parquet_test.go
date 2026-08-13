@@ -12,6 +12,7 @@ import (
 	"github.com/apache/arrow-go/v18/parquet"
 	"github.com/apache/arrow-go/v18/parquet/file"
 	"github.com/apache/arrow-go/v18/parquet/schema"
+	"github.com/apache/arrow-go/v18/parquet/variant"
 	"github.com/bradleyjkemp/cupaloy"
 	"github.com/stretchr/testify/require"
 )
@@ -270,6 +271,137 @@ func TestParquetWriterVariant(t *testing.T) {
 	// prove the encoding is accepted by other implementations.
 	cupaloy.SnapshotT(t, duckdbQueryFile(t, sink.Name(),
 		"SELECT idField, variantField::JSON AS variantField, reqVariantField::JSON AS reqVariantField, strField FROM read_parquet('%s') ORDER BY idField"))
+}
+
+// A string written to a variant column is stored with the variant type its
+// format annotation implies, which is the type it would have had as a column of
+// its own. Strings that don't parse as that type are stored as variant strings,
+// and values that aren't strings are unaffected.
+func TestParquetWriterVariantStringTypes(t *testing.T) {
+	cols := []struct {
+		name       string
+		stringType ParquetDataType
+		vals       []any
+		want       []variant.Type
+	}{
+		{
+			name:       "timestampField",
+			stringType: LogicalTypeTimestamp,
+			vals:       []any{"2023-01-15T10:30:45Z", "2023-01-15T10:30:45z", "not a timestamp", int64(5)},
+			want:       []variant.Type{variant.TimestampMicros, variant.TimestampMicros, variant.String, variant.Int8},
+		},
+		{
+			name:       "timestampNanosField",
+			stringType: LogicalTypeTimestampNanos,
+			vals:       []any{"2023-01-15T10:30:45Z", "1999-12-31T23:59:59.123456789Z", "not a timestamp", true},
+			want:       []variant.Type{variant.TimestampNanos, variant.TimestampNanos, variant.String, variant.Bool},
+		},
+		{
+			name:       "dateField",
+			stringType: LogicalTypeDate,
+			vals:       []any{"2023-01-15", "1999-12-31", "2023-01-15T10:30:45Z", "not a date"},
+			want:       []variant.Type{variant.Date, variant.Date, variant.String, variant.String},
+		},
+		{
+			name:       "timeField",
+			stringType: LogicalTypeTime,
+			vals:       []any{"14:30:00Z", "14:30:00z", "23:59:59.999-01:15", "not a time"},
+			want:       []variant.Type{variant.Time, variant.Time, variant.Time, variant.String},
+		},
+		{
+			name:       "uuidField",
+			stringType: LogicalTypeUuid,
+			vals:       []any{"550e8400-e29b-41d4-a716-446655440000", "00000000-0000-0000-0000-000000000000", "not a uuid", "f47ac10b-58cc-4372-a567-0e02b2c3d479"},
+			want:       []variant.Type{variant.UUID, variant.UUID, variant.String, variant.UUID},
+		},
+		{
+			name:       "binaryField",
+			stringType: PrimitiveTypeBinary,
+			vals:       []any{"aGVsbG8=", "AAAA", "!!! not base64", ""},
+			want:       []variant.Type{variant.Binary, variant.Binary, variant.String, variant.Binary},
+		},
+		{
+			// Without a format annotation every string stays a variant string.
+			name: "plainField",
+			vals: []any{"2023-01-15T10:30:45Z", "2023-01-15", "14:30:00Z", "aGVsbG8="},
+			want: []variant.Type{variant.String, variant.String, variant.String, variant.String},
+		},
+	}
+
+	sch := make(ParquetSchema, 0, len(cols))
+	for _, c := range cols {
+		sch = append(sch, ParquetSchemaElement{
+			Name:              c.name,
+			DataType:          LogicalTypeVariant,
+			VariantStringType: c.stringType,
+		})
+	}
+
+	dir := t.TempDir()
+	sink, err := os.CreateTemp(dir, "*.parquet")
+	require.NoError(t, err)
+
+	w, err := NewParquetWriter(sink, sch)
+	require.NoError(t, err)
+	for rowIdx := range cols[0].vals {
+		row := make([]any, 0, len(cols))
+		for _, c := range cols {
+			row = append(row, c.vals[rowIdx])
+		}
+		require.NoError(t, w.Write(row))
+	}
+	require.NoError(t, w.Close())
+
+	f, err := file.OpenParquetFile(sink.Name(), false)
+	require.NoError(t, err)
+	defer f.Close()
+
+	for colIdx, c := range cols {
+		var got []variant.Type
+		for _, v := range readVariantValues(t, f, colIdx*2) {
+			got = append(got, v.Type())
+		}
+		require.Equal(t, c.want, got, "column %q", c.name)
+	}
+}
+
+// readVariantValues decodes the values of the variant column whose metadata
+// leaf column is at metaColIdx and whose value leaf column follows it.
+func readVariantValues(t *testing.T, f *file.Reader, metaColIdx int) []variant.Value {
+	t.Helper()
+
+	readLeaf := func(colIdx int) [][]byte {
+		var out [][]byte
+		for rgIdx := 0; rgIdx < f.NumRowGroups(); rgIdx++ {
+			cr, err := f.RowGroup(rgIdx).Column(colIdx)
+			require.NoError(t, err)
+
+			r, ok := cr.(*file.ByteArrayColumnChunkReader)
+			require.True(t, ok, "expected *file.ByteArrayColumnChunkReader, got %T", cr)
+
+			for r.HasNext() {
+				var vals = make([]parquet.ByteArray, 64)
+				_, read, err := r.ReadBatch(int64(len(vals)), vals, nil, nil)
+				require.NoError(t, err)
+				for _, v := range vals[:read] {
+					out = append(out, []byte(v))
+				}
+			}
+		}
+		return out
+	}
+
+	var meta, vals = readLeaf(metaColIdx), readLeaf(metaColIdx + 1)
+	require.Equal(t, len(meta), len(vals))
+
+	var out []variant.Value
+	for idx := range meta {
+		v, err := variant.New(meta[idx], vals[idx])
+		require.NoError(t, err)
+		out = append(out, v)
+	}
+
+	return out
 }
 
 func TestParquetWriterVariantInvalidJSON(t *testing.T) {
