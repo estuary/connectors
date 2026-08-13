@@ -11,7 +11,6 @@ from estuary_cdk.capture.common import (
     SnapshotResource,
     open_binding,  # pyright: ignore[reportUnknownVariableType]
 )
-from estuary_cdk.capture.document import BaseDocument
 from estuary_cdk.flow import CaptureBinding, ValidationError
 from estuary_cdk.http import HTTPError, HTTPMixin, TokenSource
 
@@ -224,19 +223,15 @@ async def reports(http: HTTPMixin, config: EndpointConfig) -> SmartsheetResource
             state,
             task,
             fetch_snapshot=functools.partial(snapshot_reports, http, config.region),
-            tombstone=BaseDocument(_meta=BaseDocument.Meta(op="d")),
         )
 
     return SnapshotResource(
         name=Report.resource_name,
-        key=["/id"],
-        model=Report,
         open=open,  # pyright: ignore[reportUnknownArgumentType]
         initial_config=common.ResourceConfig(
             name=Report.resource_name,
             interval=REPORTS_INTERVAL,
         ),
-        schema_inference=True,
     )
 
 
@@ -254,19 +249,15 @@ async def report_rows(http: HTTPMixin, config: EndpointConfig) -> SmartsheetReso
             state,
             task,
             fetch_snapshot=functools.partial(snapshot_report_rows, http, config.region),
-            tombstone=BaseDocument(_meta=BaseDocument.Meta(op="d")),
         )
 
     return SnapshotResource(
         name=ReportRow.resource_name,
-        key=["/_meta/report_id", "/id"],
-        model=ReportRow,
         open=open,  # pyright: ignore[reportUnknownArgumentType]
         initial_config=common.ResourceConfig(
             name=ReportRow.resource_name,
             interval=REPORTS_INTERVAL,
         ),
-        schema_inference=True,
     )
 
 
