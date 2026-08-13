@@ -331,29 +331,7 @@ func ProjectionToParquetSchemaElement(p pf.Projection, castToString bool, opts .
 		case "number":
 			out.DataType = PrimitiveTypeNumber
 		case "string":
-			if p.Inference.String_.ContentEncoding == "base64" {
-				out.DataType = PrimitiveTypeBinary
-				continue
-			}
-
-			switch p.Inference.String_.Format {
-			case "date":
-				out.DataType = LogicalTypeDate
-			case "date-time":
-				if cfg.timestampAsNanos {
-					out.DataType = LogicalTypeTimestampNanos
-				} else {
-					out.DataType = LogicalTypeTimestamp
-				}
-			case "duration":
-				out.DataType = typeOrString(LogicalTypeInterval, cfg.durationAsString)
-			case "time":
-				out.DataType = typeOrString(LogicalTypeTime, cfg.timeAsString)
-			case "uuid":
-				out.DataType = typeOrString(LogicalTypeUuid, cfg.uuidAsString)
-			default:
-				out.DataType = LogicalTypeString
-			}
+			out.DataType = cfg.stringDataType(p.Inference.String_)
 		}
 	}
 
@@ -361,7 +339,40 @@ func ProjectionToParquetSchemaElement(p pf.Projection, castToString bool, opts .
 		out.DataType = LogicalTypeUnknown
 	}
 
+	// A variant column stores its string values with the type they would have
+	// had as a column of their own, which is the same resolution applied here
+	// so that the connector's as-string options apply equally to both.
+	if out.DataType == LogicalTypeVariant && p.Inference.String_ != nil {
+		out.VariantStringType = cfg.stringDataType(p.Inference.String_)
+	}
+
 	return out
+}
+
+// stringDataType resolves the data type of a string location from its content
+// encoding and format annotations.
+func (cfg parquetSchemaConfig) stringDataType(s *pf.Inference_String) ParquetDataType {
+	if s.ContentEncoding == "base64" {
+		return PrimitiveTypeBinary
+	}
+
+	switch s.Format {
+	case "date":
+		return LogicalTypeDate
+	case "date-time":
+		if cfg.timestampAsNanos {
+			return LogicalTypeTimestampNanos
+		}
+		return LogicalTypeTimestamp
+	case "duration":
+		return typeOrString(LogicalTypeInterval, cfg.durationAsString)
+	case "time":
+		return typeOrString(LogicalTypeTime, cfg.timeAsString)
+	case "uuid":
+		return typeOrString(LogicalTypeUuid, cfg.uuidAsString)
+	default:
+		return LogicalTypeString
+	}
 }
 
 func typeOrString[T ParquetDataType](base T, shouldString bool) T {

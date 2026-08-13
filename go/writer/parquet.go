@@ -14,6 +14,7 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/decimal128"
 	"github.com/apache/arrow-go/v18/parquet"
 	"github.com/apache/arrow-go/v18/parquet/compress"
@@ -444,7 +445,7 @@ func (w *ParquetWriter) flushBuffer() error {
 		// A variant element is a group of two leaf columns and so consumes two
 		// of the row group's columns, unlike every other element.
 		if f.DataType == LogicalTypeVariant {
-			if err := writeVariantColumn(colIdx, w.buffer, rgWriter); err != nil {
+			if err := writeVariantColumn(f, colIdx, w.buffer, rgWriter); err != nil {
 				return fmt.Errorf("writing variant column '%s': %w", f.Name, err)
 			}
 			continue
@@ -608,14 +609,14 @@ func writeColumn[T parquetValue](
 // would otherwise pay for. Everything else is encoded from its JSON serialization, which is free
 // for the objects, arrays, and root documents that arrive as json.RawMessage, and is also the only
 // path that can represent a uint64 too large for the variant integer types.
-func encodeVariant(val any) (variant.Value, error) {
+func encodeVariant(val any, stringType ParquetDataType) (variant.Value, error) {
 	var b variant.Builder
 	var err error
 	var scalar = true
 
 	switch v := val.(type) {
 	case string:
-		err = b.AppendString(v)
+		err = appendVariantString(&b, v, stringType)
 	case bool:
 		err = b.AppendBool(v)
 	case int64:
@@ -645,11 +646,49 @@ func encodeVariant(val any) (variant.Value, error) {
 	return variant.ParseJSONBytes(jsonVal, false)
 }
 
+// appendVariantString appends v as the variant type implied by its format
+// annotation, so that a formatted string is stored the same way it would be as
+// a column of its own.
+//
+// A string that does not parse is appended as a variant string. A variant holds
+// values of any type, so keeping the value costs nothing here, unlike the typed
+// columns whose converters have nowhere but an error to put it.
+func appendVariantString(b *variant.Builder, v string, stringType ParquetDataType) error {
+	switch stringType {
+	case LogicalTypeDate:
+		if d, err := getDateVal(v); err == nil {
+			return b.AppendDate(arrow.Date32(d))
+		}
+	case LogicalTypeTimestamp:
+		if ts, err := getTimestampVal(v); err == nil {
+			return b.AppendTimestamp(arrow.Timestamp(ts), true, true)
+		}
+	case LogicalTypeTimestampNanos:
+		if ts, err := getTimestampNanosVal(v); err == nil {
+			return b.AppendTimestamp(arrow.Timestamp(ts), false, true)
+		}
+	case LogicalTypeTime:
+		if t, err := getTimeVal(v); err == nil {
+			return b.AppendTimeMicro(arrow.Time64(t))
+		}
+	case LogicalTypeUuid:
+		if u, err := uuid.Parse(v); err == nil {
+			return b.AppendUUID(u)
+		}
+	case PrimitiveTypeBinary:
+		if bs, err := getBinaryVal(v); err == nil {
+			return b.AppendBinary(bs)
+		}
+	}
+
+	return b.AppendString(v)
+}
+
 // writeVariantColumn writes a variant schema element as its two leaf columns: each non-null value
 // is encoded from its JSON serialization to the unshredded Variant V1 binary form, and the
 // resulting metadata and value byte arrays are written as consecutive columns of the row group,
 // sharing the definition levels of the enclosing variant group.
-func writeVariantColumn(colIdx int, buf [][]any, rgWriter file.SerialRowGroupWriter) error {
+func writeVariantColumn(e ParquetSchemaElement, colIdx int, buf [][]any, rgWriter file.SerialRowGroupWriter) error {
 	var metaVals = make([]parquet.ByteArray, 0, len(buf))
 	var valueVals = make([]parquet.ByteArray, 0, len(buf))
 	var defLevels = make([]int16, 0, len(buf))
@@ -660,7 +699,7 @@ func writeVariantColumn(colIdx int, buf [][]any, rgWriter file.SerialRowGroupWri
 			continue
 		}
 
-		encoded, err := encodeVariant(row[colIdx])
+		encoded, err := encodeVariant(row[colIdx], e.VariantStringType)
 		if err != nil {
 			return fmt.Errorf("encoding value as variant: %w (type %T)", err, row[colIdx])
 		}

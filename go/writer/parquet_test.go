@@ -187,6 +187,8 @@ func TestParquetWriterVariant(t *testing.T) {
 		{Name: "variantField", DataType: LogicalTypeVariant, Required: false, FieldId: ptrTo(int32(2))},
 		{Name: "reqVariantField", DataType: LogicalTypeVariant, Required: true, FieldId: ptrTo(int32(3))},
 		{Name: "strField", DataType: LogicalTypeString, Required: false, FieldId: ptrTo(int32(4))},
+		{Name: "tsVariantField", DataType: LogicalTypeVariant, Required: false, FieldId: ptrTo(int32(5)), VariantStringType: LogicalTypeTimestamp},
+		{Name: "tsNanosVariantField", DataType: LogicalTypeVariant, Required: false, FieldId: ptrTo(int32(6)), VariantStringType: LogicalTypeTimestampNanos},
 	}
 
 	variantVals := []any{
@@ -214,7 +216,7 @@ func TestParquetWriterVariant(t *testing.T) {
 	w, err := NewParquetWriter(sink, sch, WithParquetRowGroupRowLimit(4))
 	require.NoError(t, err)
 	for i, v := range variantVals {
-		row := []any{i, v, fmt.Appendf(nil, `{"seq": %d}`, i), fmt.Sprintf("str_%d", i)}
+		row := []any{i, v, fmt.Appendf(nil, `{"seq": %d}`, i), fmt.Sprintf("str_%d", i), fmt.Sprintf("2023-01-15T10:30:%02dZ", i), fmt.Sprintf("2023-01-15T10:30:%02d.123456789Z", i)}
 		require.NoError(t, w.Write(row))
 	}
 	require.NoError(t, w.Close())
@@ -224,8 +226,8 @@ func TestParquetWriterVariant(t *testing.T) {
 	defer f.Close()
 
 	fileSchema := f.MetaData().Schema
-	require.Equal(t, 4, fileSchema.Root().NumFields())
-	require.Equal(t, 6, fileSchema.NumColumns())
+	require.Equal(t, 6, fileSchema.Root().NumFields())
+	require.Equal(t, 10, fileSchema.NumColumns())
 
 	for idx, want := range []struct {
 		name    string
@@ -270,7 +272,7 @@ func TestParquetWriterVariant(t *testing.T) {
 	// Read the file back with a parquet variant reader outside of arrow-go to
 	// prove the encoding is accepted by other implementations.
 	cupaloy.SnapshotT(t, duckdbQueryFile(t, sink.Name(),
-		"SELECT idField, variantField::JSON AS variantField, reqVariantField::JSON AS reqVariantField, strField FROM read_parquet('%s') ORDER BY idField"))
+		"SELECT idField, variantField::JSON AS variantField, reqVariantField::JSON AS reqVariantField, strField, tsVariantField::JSON AS tsVariantField, tsNanosVariantField::JSON AS tsNanosVariantField FROM read_parquet('%s') ORDER BY idField"))
 }
 
 // A string written to a variant column is stored with the variant type its
