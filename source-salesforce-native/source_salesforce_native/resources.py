@@ -110,16 +110,13 @@ def full_refresh_resource(
             tombstone=FullRefreshResource(_meta=FullRefreshResource.Meta(op="d"))
         )
 
-    resource = common.Resource(
+    resource = common.SnapshotResource(
         name=name,
-        key=["/_meta/row_id"],
         model=FullRefreshResource,
         open=open,
-        initial_state=ResourceState(),
         initial_config=SalesforceResourceConfigWithSchedule(
             name=name, interval=timedelta(minutes=5)
         ),
-        schema_inference=True,
         disable=not enable
     )
 
