@@ -616,24 +616,28 @@ class Messages(IncrementalTwilioStreamWithLookbackWindow, TwilioNestedStream):
         stream_slice: Mapping[str, Any] = None,
         stream_state: Mapping[str, Any] = None,
     ) -> Iterable[Mapping[str, Any]]:
-        unsorted_records = []
-        initial_cursor = self.state.get(self.cursor_field, self._start_date)
-
-        # Skip the IncrementalTwilioStream's read_records method since it filters only based on date_sent instead of 
-        # both date_sent and date_updated.
+        # Skip the IncrementalTwilioStream's read_records method since it filters records based on the
+        # cursor before yielding them.
+        #
+        # Every record returned within the requested DateSent window is yielded unconditionally. The
+        # Twilio API cannot filter on date_updated, so the lookback window re-reads a trailing DateSent
+        # range to pick up in-place updates (e.g. price being populated shortly after a message is sent).
+        # Records must NOT be filtered against the cursor here: a re-fetched record typically has both
+        # date_sent and date_updated older than the max date_sent observed in the previous sweep, and
+        # filtering on the cursor silently discards exactly the updates the lookback window exists to
+        # capture. Re-emitting previously seen documents is safe since collections reduce on the key.
         for record in super(IncrementalTwilioStream, self).read_records(sync_mode, cursor_field, stream_slice, stream_state):
-            record[self.cursor_field] = pendulum.parse(record[self.cursor_field], strict=False).to_iso8601_string()
-            record["date_updated"] = pendulum.parse(record["date_updated"], strict=False).to_iso8601_string()
-            unsorted_records.append(record)
-        sorted_records = sorted(unsorted_records, key=lambda x: x[self.cursor_field])
-        for record in sorted_records:
-            # If this is a new record, yield it and update the cursor.
-            if record[self.cursor_field] >= initial_cursor:
-                self._cursor_value = record[self.cursor_field]
-                yield record
-            # Otherwise if it's an update to a record we've seen before, yield it.
-            elif record["date_updated"] >= initial_cursor:
-                yield record
+            # A message that has not been sent yet (or failed to send) can have a null date_sent.
+            # Normalize timestamps when present, yield the record regardless, and only advance the
+            # cursor from non-null date_sent values so a single anomalous record can't fail the
+            # entire sweep (this connector only checkpoints after reading every stream).
+            if record.get(self.cursor_field):
+                record[self.cursor_field] = pendulum.parse(record[self.cursor_field], strict=False).to_iso8601_string()
+                if self._cursor_value is None or record[self.cursor_field] > self._cursor_value:
+                    self._cursor_value = record[self.cursor_field]
+            if record.get("date_updated"):
+                record["date_updated"] = pendulum.parse(record["date_updated"], strict=False).to_iso8601_string()
+            yield record
 
 
 class MessageMedia(IncrementalTwilioStream, TwilioNestedStream):
