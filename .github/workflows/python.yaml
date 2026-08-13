@@ -4,6 +4,15 @@ on:
   push:
     branches: [main]
     paths:
+      # This workflow and the plumbing it runs, so a change to either verifies
+      # itself rather than waiting on an unrelated connector edit to trigger.
+      - ".github/workflows/python.yaml"
+      - ".github/actions/fetch-flow-artifact/**"
+      - ".github/actions/restore-flow-binaries/**"
+      - ".github/actions/setup/**"
+      - ".github/actions/deploy/**"
+      - "fetch-flow.sh"
+
       - "estuary-cdk/**"
       - "source-airtable/**"
       - "source-asana/**"
@@ -74,6 +83,15 @@ on:
   pull_request:
     branches: [main]
     paths:
+      # This workflow and the plumbing it runs, so a change to either verifies
+      # itself rather than waiting on an unrelated connector edit to trigger.
+      - ".github/workflows/python.yaml"
+      - ".github/actions/fetch-flow-artifact/**"
+      - ".github/actions/restore-flow-binaries/**"
+      - ".github/actions/setup/**"
+      - ".github/actions/deploy/**"
+      - "fetch-flow.sh"
+
       - "estuary-cdk/**"
       - "source-airtable/**"
       - "source-asana/**"
