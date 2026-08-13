@@ -15,11 +15,6 @@ $defs:
         description: Row ID of the Document, counting up from zero, or -1 if not known
         title: Row Id
         type: integer
-      report_id:
-        default: -1
-        description: The Smartsheet report this row belongs to
-        title: Report Id
-        type: integer
     title: Meta
     type: object
 additionalProperties: true
@@ -27,12 +22,7 @@ properties:
   _meta:
     $ref: '#/$defs/Meta'
     description: Document metadata
-  id:
-    title: Id
-    type: integer
-required:
-- id
-title: ReportRow
+title: BaseDocument
 type: object
 x-infer-schema: true
 if:

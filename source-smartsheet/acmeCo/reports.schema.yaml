@@ -18,25 +18,11 @@ $defs:
     title: Meta
     type: object
 additionalProperties: true
-description: |-
-  One document per report, mirroring a `GET /reports` list item verbatim:
-  id/name/accessLevel/permalink/isSummaryReport (the passthrough fields ride
-  on `BaseDocument`'s `extra="allow"`). Catalog/metadata only, never row data.
-
-  Unlike `Sheet`, this is *not* refetched from the detail endpoint, so the
-  richer detail-only fields (effectiveAttachmentOptions, totalRowCount,
-  timestamps) are absent by design. The `report_rows` walk also enumerates
-  report ids from this same list, so there's no separate list-summary type.
 properties:
   _meta:
     $ref: '#/$defs/Meta'
     description: Document metadata
-  id:
-    title: Id
-    type: integer
-required:
-- id
-title: Report
+title: BaseDocument
 type: object
 x-infer-schema: true
 if:

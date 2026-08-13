@@ -126,37 +126,36 @@
       "_meta": {
         "op": "c",
         "report_id": 3852843205396356,
-        "row_id": 2,
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "accessLevel": "OWNER",
       "cells": [
         {
           "columnId": 4975488054986628,
-          "displayValue": "Retro",
-          "value": "Retro",
+          "displayValue": "Design mockups",
+          "value": "Design mockups",
           "virtualColumnId": 8811664796944260
         },
         {
           "columnId": 2723688241301380,
-          "displayValue": "Complete",
-          "value": "Complete",
+          "displayValue": "In Progress",
+          "value": "In Progress",
           "virtualColumnId": 226678007269252
         },
         {
           "columnId": 7227287868671876,
-          "value": "2026-06-30",
+          "value": "2026-07-15",
           "virtualColumnId": 4730277634639748
         }
       ],
       "createdAt": "2026-07-21T13:51:41Z",
       "dataModifiedAt": "2026-07-21T13:51:41Z",
       "expanded": true,
-      "id": 1103848113047428,
+      "id": 3918597880153988,
       "modifiedAt": "2026-07-21T13:51:41Z",
-      "rowNumber": 3,
-      "sheetId": 858366236821380,
-      "siblingId": 8422197507524484
+      "rowNumber": 1,
+      "sheetId": 858366236821380
     }
   ]
 ]
