@@ -7,7 +7,6 @@ from typing import AsyncGenerator, Iterable
 
 from estuary_cdk.capture import Task
 from estuary_cdk.capture.common import (
-    BaseDocument,
     Resource,
     SnapshotResource,
     open_binding,
@@ -493,16 +492,13 @@ def properties(http: HTTPSession, object_names: Iterable[str]) -> Resource:
             tombstone=Property(_meta=Property.Meta(op="d"), type=""),
         )
 
-    return Resource(
+    return SnapshotResource(
         name=Names.properties,
-        key=["/_meta/row_id"],
         model=Property,
         open=open,
-        initial_state=ResourceState(),
         initial_config=ResourceConfig(
             name=Names.properties, interval=timedelta(days=1)
         ),
-        schema_inference=True,
     )
 
 
@@ -531,16 +527,13 @@ def deal_pipelines(http: HTTPSession) -> Resource:
             ),
         )
 
-    return Resource(
+    return SnapshotResource(
         name=Names.deal_pipelines,
-        key=["/_meta/row_id"],
         model=DealPipeline,
         open=open,
-        initial_state=ResourceState(),
         initial_config=ResourceConfig(
             name=Names.deal_pipelines, interval=timedelta(minutes=5)
         ),
-        schema_inference=True,
     )
 
 
@@ -562,14 +555,11 @@ def owners(http: HTTPSession) -> Resource:
             tombstone=Owner(_meta=Owner.Meta(op="d"), createdAt=None, updatedAt=None),
         )
 
-    return Resource(
+    return SnapshotResource(
         name=Names.owners,
-        key=["/_meta/row_id"],
         model=Owner,
         open=open,
-        initial_state=ResourceState(),
         initial_config=ResourceConfig(name=Names.owners, interval=timedelta(minutes=5)),
-        schema_inference=True,
     )
 
 
@@ -651,14 +641,11 @@ def forms(http: HTTPSession) -> Resource:
             ),
         )
 
-    return Resource(
+    return SnapshotResource(
         name=Names.forms,
-        key=["/_meta/row_id"],
         model=Form,
         open=open,
-        initial_state=ResourceState(),
         initial_config=ResourceConfig(name=Names.forms, interval=timedelta(minutes=5)),
-        schema_inference=True,
     )
 
 
