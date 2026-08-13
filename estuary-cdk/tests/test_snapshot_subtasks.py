@@ -10,16 +10,18 @@ import pytest
 from pydantic import Field
 
 from estuary_cdk.capture.common import (
+    Resource,
     ResourceConfig,
     ResourceState,
     SnapshotResource,
     _binding_snapshot_task,  # pyright: ignore[reportPrivateUsage]
     open_binding,
+    resolve_bindings,
 )
 from estuary_cdk.capture.document import BaseDocument
 from estuary_cdk.capture.task import Task
 from estuary_cdk.capture.transactor import Transactor
-from estuary_cdk.flow import CaptureBinding, CollectionSpec
+from estuary_cdk.flow import CaptureBinding, CollectionSpec, ValidationError
 
 COMPOUND_KEY = ["/_meta/store", "/_meta/row_id"]
 
@@ -343,3 +345,49 @@ class TestSnapshotResourceKey:
     def test_rejects_compound_key_without_row_id(self):
         with pytest.raises(AssertionError, match="must be keyed on /_meta/row_id"):
             _ = self._resource(key=["/_meta/store", "/id"])
+
+
+class TestResolveBindingsSnapshotKey:
+    """The collection's key belongs to the user, so a mismatch is reported as a
+    ValidationError during Validate -- failing the publish -- rather than
+    asserted once a task is already running."""
+
+    def _resource(self, name: str = "staff_members") -> SnapshotResource:
+        return SnapshotResource(
+            name=name,
+            open=lambda *args: None,
+            initial_config=ResourceConfig(name=name, interval=timedelta()),
+        )
+
+    def test_accepts_row_id_key(self):
+        resolved = resolve_bindings([_binding(["/_meta/row_id"])], [self._resource()])
+        assert len(resolved) == 1
+
+    def test_accepts_compound_key_containing_row_id(self):
+        resolved = resolve_bindings([_binding(COMPOUND_KEY)], [self._resource()])
+        assert len(resolved) == 1
+
+    def test_rejects_key_without_row_id(self):
+        with pytest.raises(ValidationError) as excinfo:
+            _ = resolve_bindings([_binding(["/id"])], [self._resource()])
+
+        (error,) = excinfo.value.errors
+        assert "c/staff_members" in error
+        assert "must be keyed on /_meta/row_id" in error
+        assert "['/id']" in error
+
+    def test_ignores_non_snapshot_resources(self):
+        # A snapshot binding declared as a plain Resource is invisible here --
+        # only its `open` callback knows it passes fetch_snapshot -- so Validate
+        # must not reject it.
+        resource = Resource(
+            name="issues",
+            key=["/id"],
+            model=BaseDocument,
+            open=lambda *args: None,
+            initial_state=ResourceState(),
+            initial_config=ResourceConfig(name="issues", interval=timedelta()),
+            schema_inference=True,
+        )
+        resolved = resolve_bindings([_binding(["/id"], name="issues")], [resource])
+        assert len(resolved) == 1
