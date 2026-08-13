@@ -89,14 +89,12 @@ async def full_refresh_resources(
         )
 
     return [
-        common.Resource(
+        common.SnapshotResource(
             name=cls.NAME,
             key=cls.KEY,
             model=cls,
             open=functools.partial(open, cls),
-            initial_state=common.ResourceState(),
             initial_config=ResourceConfigWithSchedule(name=cls.NAME, interval=timedelta(hours=1)),
-            schema_inference=True,
         )
         for cls in FULL_REFRESH_MODELS
     ]
