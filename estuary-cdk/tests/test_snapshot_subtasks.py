@@ -12,6 +12,7 @@ from pydantic import Field
 from estuary_cdk.capture.common import (
     ResourceConfig,
     ResourceState,
+    SnapshotResource,
     _binding_snapshot_task,  # pyright: ignore[reportPrivateUsage]
     open_binding,
 )
@@ -310,3 +311,35 @@ class TestOpenBindingSnapshotDict:
                 # keyspaces would overlap and clobber each other.
                 tombstone={"A": _doc("A", ""), "B": _doc("A", "")},
             )
+
+
+class TestSnapshotResourceKey:
+    """SnapshotResource's key is an invariant of the type, not of a particular
+    binding, so it is enforced at construction. That covers every path which
+    builds resources -- Discover, Validate and Open -- and validates only what
+    the connector itself declares."""
+
+    def _resource(self, **overrides) -> SnapshotResource:
+        return SnapshotResource(
+            name="staff_members",
+            open=lambda *args: None,
+            initial_config=ResourceConfig(name="staff_members", interval=timedelta()),
+            **overrides,
+        )
+
+    def test_defaults_to_row_id(self):
+        assert self._resource().key == ["/_meta/row_id"]
+
+    def test_accepts_compound_key_containing_row_id(self):
+        # A snapshot may key on a subtask discriminator as well, as long as
+        # row_id is still there to address the removed row.
+        assert self._resource(key=COMPOUND_KEY).key == COMPOUND_KEY
+
+    def test_rejects_key_without_row_id(self):
+        # The issue #5051 shape, caught before any collection exists.
+        with pytest.raises(AssertionError, match="must be keyed on /_meta/row_id"):
+            _ = self._resource(key=["/id"])
+
+    def test_rejects_compound_key_without_row_id(self):
+        with pytest.raises(AssertionError, match="must be keyed on /_meta/row_id"):
+            _ = self._resource(key=["/_meta/store", "/id"])
