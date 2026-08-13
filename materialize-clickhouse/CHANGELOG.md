@@ -15,6 +15,15 @@
   with extra fields also still works but is reported as a warning: no rows are
   lost, but the table keeps superseded versions of a key, so reads that do not use
   `FINAL` can return more than one row per key.
+- A transaction that could not account for all of the rows it wrote failed after
+  the fact and then committed anyway on the next restart, silently losing the rows
+  that were missing. Such a transaction is now failed before it is committed and is
+  retried in full.
+- Recovering an interrupted transaction that is missing rows for no discoverable
+  reason now fails with an error naming the table and both row counts, instead of
+  committing what remains. Backfill the binding if its table is missing rows.
+  This only affects transactions interrupted while running a version of the
+  connector released before this one.
 
 ## 2026-08-10
 
