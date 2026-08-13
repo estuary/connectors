@@ -1,0 +1,17 @@
+# Placeholder — generate real schemas via:
+# flowctl raw discover --source test.flow.yaml -o json --emit-raw
+
+type: object
+properties:
+  _meta:
+    type: object
+    properties:
+      op:
+        type: string
+        enum: [c, u, d]
+    additionalProperties: true
+  gid:
+    type: string
+required:
+  - gid
+additionalProperties: true
