@@ -25,6 +25,13 @@ const (
 )
 
 // loggerAtLevel wraps a logrus logger to always log at the configured level.
+//
+// Every write here takes logrus's process-global mutex and blocks until the sink
+// accepts it, so a stdout pipe that stops draining halts every goroutine that
+// logs, the data path included. A task in that state presents only as slow, and
+// its logs go quiet at the same time, which makes the cause hard to see from the
+// outside. Log sites on this path must therefore stay bounded: per-transaction or
+// periodic, never per-document or per-batch.
 type loggerAtLevel struct {
 	lvl log.Level
 }
