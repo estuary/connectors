@@ -253,18 +253,25 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	// column (code 524), so such a column cannot be widened to Nullable. It
 	// doesn't need to be: inserts name their columns explicitly, and a
 	// non-nullable column omitted from an insert receives the type's zero value.
+	// Writes keep working and the sorting key cannot be altered, so there is
+	// nothing here for a user to act on -- which is why this is a debug line and
+	// not surfaced through validation like a key that destroys rows.
 	var dropNotNulls []boilerplate.ExistingField
+	var skippedKeyColumns []string
 	for _, col := range ta.DropNotNulls {
 		if meta, ok := col.Meta.(existingFieldMeta); ok && meta.isKeyColumn {
-			log.WithFields(log.Fields{
-				"table":  ta.Identifier,
-				"column": col.Name,
-			}).Warn("not making key column nullable because ClickHouse forbids ALTER of sorting-key and partition-key columns")
+			skippedKeyColumns = append(skippedKeyColumns, col.Name)
 			continue
 		}
 		dropNotNulls = append(dropNotNulls, col)
 	}
 	ta.DropNotNulls = dropNotNulls
+	if len(skippedKeyColumns) > 0 {
+		log.WithFields(log.Fields{
+			"table":   ta.Identifier,
+			"columns": skippedKeyColumns,
+		}).Debug("not making key columns nullable because ClickHouse forbids ALTER of sorting-key and partition-key columns")
+	}
 
 	if len(ta.AddColumns) > 0 || len(ta.DropNotNulls) > 0 {
 		var alterStmtBuilder strings.Builder
