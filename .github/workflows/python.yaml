@@ -152,11 +152,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # These tests only ever invoke flowctl, so it's the only binary uploaded.
-      - name: Fetch flowctl
+      # These tests only invoke flowctl, but flowctl shells out to sops to
+      # decrypt each test.flow.yaml's encrypted config, so both are uploaded.
+      - name: Fetch flowctl and sops
         uses: ./.github/actions/fetch-flow-artifact
         with:
-          paths: flow-bin/flowctl
+          paths: |
+            flow-bin/flowctl
+            flow-bin/sops
 
   py_connector:
     runs-on: ubuntu-24.04
