@@ -6,6 +6,7 @@ import (
 	stdsql "database/sql"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
@@ -30,12 +31,13 @@ func (d *driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 	var dialect = clickHouseDialect(cfg.Database)
 	var tpls = renderTemplates(dialect, cfg.HardDelete)
 
-	var db *stdsql.DB
-	defer func() {
-		if db != nil {
-			db.Close()
-		}
-	}()
+	var db = clickhouse.OpenDB(cfg.newClickhouseOptions())
+	defer db.Close()
+
+	tableMetas, err := readTableKeyMeta(ctx, db, dialect, cfg.Database)
+	if err != nil {
+		return nil, err
+	}
 
 	for i, rb := range req.Bindings {
 		var rc tableConfig
@@ -43,6 +45,24 @@ func (d *driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 		var newExpr = strings.TrimSpace(rc.PartitionBy)
+
+		// Surface an unusable sorting key while the materialization is being
+		// published, so it is seen before the task runs. This is a hard error
+		// because a sorting key survives everything a user can do from the
+		// catalog: a backfill truncates the table and keeps its DDL, so there is
+		// no republication that would make the binding valid.
+		var meta, exists = tableMetas[rc.Table]
+		// Deduplicated because synthesizeFieldSelection approximates the eventual
+		// key selection, and a collection projecting one location under several
+		// names can name it more than once. The sorting key holds each column
+		// once, so a repeat would read as a mismatch.
+		var keys = slices.Compact(slices.Sorted(slices.Values(
+			synthesizeFieldSelection(rb, resp.Bindings[i], rc.Delta || cfg.Advanced.NoFlowDocument).Keys)))
+		if warning, err := checkSortingKey(dialect.Identifier(rc.Table), keys, meta, exists); err != nil {
+			return nil, err
+		} else if warning != "" {
+			log.WithField("table", rc.Table).Warn(warning)
+		}
 
 		var last = boilerplate.FindLastBinding([]string{rc.Table}, req.LastMaterialization)
 		var lastExpr string
@@ -86,9 +106,6 @@ func (d *driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 		// every publication touching this materialization.
 		if newExpr == "" || (last != nil && newExpr == lastExpr) {
 			continue
-		}
-		if db == nil {
-			db = clickhouse.OpenDB(cfg.newClickhouseOptions())
 		}
 		if err := dryRunPartitionBy(ctx, db, dialect, tpls, cfg, req.Name.String(), i, rb, resp.Bindings[i], rc); err != nil {
 			return nil, cerrors.NewUserError(err, fmt.Sprintf("'partition_by' expression %q is not valid for table %q", rc.PartitionBy, rc.Table))

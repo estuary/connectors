@@ -362,6 +362,10 @@ func newTransactor(
 		}
 	}
 
+	if err = t.requireSortingKeysMatchBindings(ctx); err != nil {
+		return nil, err
+	}
+
 	if cfg.HardDelete {
 		for _, b := range t.bindings {
 			if b.target.DeltaUpdates {
@@ -374,6 +378,46 @@ func newTransactor(
 	}
 
 	return t, nil
+}
+
+// requireSortingKeysMatchBindings fails with a clear, actionable error when a
+// target table's sorting key does not cover its binding's key fields. Such a
+// table cannot be written to without destroying rows -- see checkSortingKey --
+// and the damage is silent, so this refuses at session start rather than letting
+// a running task shrink its own data.
+//
+// The check runs regardless of the allow_existing_tables_for_new_bindings feature
+// flag that most often produces such a table: the flag waives whether a table may
+// already exist, not whether it is usable. A table can also reach this state from
+// a restore, a hand edit, or another tool writing at the same name.
+func (t *transactor) requireSortingKeysMatchBindings(ctx context.Context) error {
+	rows, err := t.store.conn.Query(ctx, fmt.Sprintf(tableKeyMetaSQL, "currentDatabase()"))
+	if err != nil {
+		return fmt.Errorf("querying table sorting keys: %w", err)
+	}
+	metas, err := scanTableKeyMeta(rows)
+	if err != nil {
+		return err
+	}
+
+	for _, b := range t.bindings {
+		var meta, exists = metas[b.target.Path[0]]
+		var keys = b.target.KeyNames()
+		warning, err := checkSortingKey(b.target.Identifier, keys, meta, exists)
+		var ll = log.WithFields(log.Fields{
+			"table":           b.target.Identifier,
+			"want_keys":       strings.Join(keys, ", "),
+			"got_sorting_key": meta.sortingKey,
+			"engine":          meta.engine,
+		})
+		if err != nil {
+			ll.Error("target table sorting key does not match the binding's key fields")
+			return err
+		} else if warning != "" {
+			ll.Warn(warning)
+		}
+	}
+	return nil
 }
 
 // requireIsDeletedColumn fails with a clear, actionable error when a
@@ -1138,30 +1182,32 @@ func (t *transactor) tempTableMatchesTarget(ctx context.Context, tempTable strin
 		}
 	}
 
-	// Store tables must also share the target's partition key: commits move
-	// whole partitions between them, and MOVE PARTITION requires it. A drifted
-	// key arises when a backfill re-creates the target with a different
-	// partition_by while the persistent store table keeps the old one. Load
-	// tables are never moved, so their partition key is irrelevant.
+	// Store tables must also share the target's partition key, because commits
+	// move whole partitions between them and MOVE PARTITION requires it, and its
+	// sorting key, because a stage table created AS a target with a bad sorting
+	// key destroys rows as they are staged even after the target itself has been
+	// repaired. Both drift when the target is re-created -- by a backfill with a
+	// different partition_by, or by an operator fixing its ORDER BY -- while the
+	// persistent store table keeps the old definition. Load tables are never
+	// moved and hold only lookup keys, so neither key matters for them.
 	if tempTable == storeTableName(b.target, t._range.KeyBegin) {
-		readPartitionKey := func(table string) (string, error) {
-			var pk string
+		readKeys := func(table string) (partitionKey, sortingKey string, err error) {
 			if err := t.store.conn.QueryRow(ctx,
-				"SELECT partition_key FROM system.tables WHERE database = currentDatabase() AND name = ?", table,
-			).Scan(&pk); err != nil {
-				return "", fmt.Errorf("querying partition key of %q: %w", table, err)
+				"SELECT partition_key, sorting_key FROM system.tables WHERE database = currentDatabase() AND name = ?", table,
+			).Scan(&partitionKey, &sortingKey); err != nil {
+				return "", "", fmt.Errorf("querying partition and sorting keys of %q: %w", table, err)
 			}
-			return pk, nil
+			return partitionKey, sortingKey, nil
 		}
-		tempKey, err := readPartitionKey(tempTable)
+		tempPartitionKey, tempSortingKey, err := readKeys(tempTable)
 		if err != nil {
 			return false, err
 		}
-		targetKey, err := readPartitionKey(b.target.Path[0])
+		targetPartitionKey, targetSortingKey, err := readKeys(b.target.Path[0])
 		if err != nil {
 			return false, err
 		}
-		if tempKey != targetKey {
+		if tempPartitionKey != targetPartitionKey || tempSortingKey != targetSortingKey {
 			return false, nil
 		}
 	}

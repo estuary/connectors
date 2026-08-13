@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-08-11
+
+### Fixed
+- Materializing into an existing table whose `ORDER BY` does not cover the
+  binding's key fields destroyed rows: ClickHouse combines rows that share a
+  sorting key, so a table keyed on fewer columns than the collection discarded
+  rows that were not duplicates. A table like this is now rejected when the
+  materialization is published and when the task starts, naming the table's
+  `ORDER BY`, the binding's key fields, and how to resolve it. To resolve it, drop
+  or rename the table and backfill the binding, or point the binding at a
+  different table; ClickHouse cannot change a table's sorting key in place. A
+  sorting key that lists the same fields in a different order still works. One
+  with extra fields also still works but is reported as a warning: no rows are
+  lost, but the table keeps superseded versions of a key, so reads that do not use
+  `FINAL` can return more than one row per key.
+
 ## 2026-08-10
 
 ### Fixed
