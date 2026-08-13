@@ -782,6 +782,26 @@ def open(
     return (response.Opened(explicitAcknowledgements=requires_explicit_acks), _run)
 
 
+def _assert_tombstone_covers_key(tombstone: BaseDocument, key: list[str]) -> None:
+    """Assert every collection-key field other than the CDK-managed
+    /_meta/row_id is set on the tombstone.
+
+    A tombstone is sparse by design, but the CDK only fills in /_meta/row_id, so
+    every other key field has to be pre-set by the caller."""
+    dump = tombstone.model_dump(by_alias=True, exclude_unset=True)
+    for key_pointer in key:
+        if key_pointer == "/_meta/row_id":
+            continue
+        node: Any = dump
+        for field in key_pointer.strip("/").split("/"):
+            assert isinstance(node, dict) and field in node, (
+                f"A snapshot tombstone must have every collection key field "
+                f"other than /_meta/row_id pre-set, but {key_pointer} is unset. "
+                f"Key: {key}, tombstone: {dump}"
+            )
+            node = node[field]
+
+
 def _tombstone_discriminator_values(
     tombstone: BaseDocument, key: list[str]
 ) -> tuple[object, ...]:
@@ -789,7 +809,7 @@ def _tombstone_discriminator_values(
     /_meta/row_id, in key order. These are what must differ between snapshot
     subtasks: two subtasks sharing them would emit tombstones into the same
     (discriminator, row_id) keyspace."""
-    dump = tombstone.model_dump(by_alias=True)
+    dump = tombstone.model_dump(by_alias=True, exclude_unset=True)
     values: list[object] = []
     for key_pointer in key:
         # row_id is assigned per-pass by the CDK and is identical across
@@ -798,7 +818,6 @@ def _tombstone_discriminator_values(
             continue
         node: Any = dump
         for field in key_pointer.strip("/").split("/"):
-            # A KeyError here means the tombstone is missing a key field.
             node = node[field]
         values.append(node)
     return tuple(values)
@@ -931,6 +950,20 @@ def open_binding(
             )
 
     if fetch_snapshot:
+        key = binding.collection.key
+
+        if tombstone is None:
+            # Default tombstone for snapshot bindings so callers don't need to
+            # provide one. The cast satisfies the _BaseDocument TypeVar since
+            # BaseDocument is its bound.
+            tombstone = cast(
+                _BaseDocument, BaseDocument(_meta=BaseDocument.Meta(op="d"))
+            )
+
+        for snapshot_tombstone in (
+            tombstone.values() if isinstance(tombstone, dict) else [tombstone]
+        ):
+            _assert_tombstone_covers_key(snapshot_tombstone, key)
 
         async def snapshot_closure(
             task: Task,
@@ -950,8 +983,7 @@ def open_binding(
             )
 
         if isinstance(fetch_snapshot, dict):
-            key = binding.collection.key
-            assert "/_meta/row_id" in key and len(key) > 1, (
+            assert len(key) > 1, (
                 f"A fetch_snapshot subtask requires a compound collection "
                 f"key containing /_meta/row_id plus a subtask discriminator. "
                 f"Got: {key}"
@@ -997,13 +1029,6 @@ def open_binding(
                     ),
                 )
         else:
-            if tombstone is None:
-                # Default tombstone for snapshot bindings so callers don't need to
-                # provide one. The cast satisfies the _BaseDocument TypeVar since
-                # BaseDocument is its bound.
-                tombstone = cast(
-                    _BaseDocument, BaseDocument(_meta=BaseDocument.Meta(op="d"))
-                )
             assert not isinstance(tombstone, dict)
             assert not isinstance(resource_state.snapshot, dict)
 
