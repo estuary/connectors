@@ -70,16 +70,13 @@ def full_refresh_resources(
         )
 
     resources = [
-        common.Resource(
+        common.SnapshotResource(
             name=name,
-            key=["/_meta/row_id"],
             model=FullRefreshResource,
             open=functools.partial(open, snapshot_fn),
-            initial_state=ResourceState(),
             initial_config=ResourceConfig(
                 name=name, interval=timedelta(minutes=5)
             ),
-            schema_inference=True,
         )
         for (name, snapshot_fn) in FULL_REFRESH_RESOURCES
     ]
