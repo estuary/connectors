@@ -4,6 +4,7 @@ from logging import Logger
 
 from estuary_cdk.capture import Task
 from estuary_cdk.capture.common import (
+    SnapshotResource,
     BaseDocument,
     Resource,
     open_binding,
@@ -134,16 +135,12 @@ def full_refresh_resources(
         )
 
     resources = [
-        Resource(
+        SnapshotResource(
             name=stream.name,
-            key=["/_meta/row_id"],
-            model=BaseDocument,
             open=functools.partial(open, stream),
-            initial_state=ResourceState(),
             initial_config=ResourceConfigWithSchedule(
                 name=stream.name, interval=stream.interval
             ),
-            schema_inference=True,
             disable=stream.disable
         )
         for stream in FULL_REFRESH_RESOURCES
