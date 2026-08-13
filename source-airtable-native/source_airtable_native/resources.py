@@ -99,16 +99,12 @@ def full_refresh_resources(
         )
 
     return [
-        common.Resource(
+        common.SnapshotResource(
             name=name,
-            key=["/_meta/row_id"],
-            model=BaseDocument,
             open=functools.partial(open, snapshot_fn),
-            initial_state=ResourceState(),
             initial_config=ResourceConfig(
                 name=name, interval=timedelta(minutes=15)
             ),
-            schema_inference=True,
         ) for (name, snapshot_fn) in FULL_REFRESH_RESOURCES
     ]
 
@@ -220,16 +216,12 @@ def full_refresh_table(
 
     name = _resolve_resource_name(base, table)
 
-    return common.Resource(
+    return common.SnapshotResource(
         name=name,
-        key=["/_meta/row_id"],
-        model=BaseDocument,
         open=open,
-        initial_state=ResourceState(),
         initial_config=ResourceConfig(
             name=name, interval=timedelta(minutes=15)
         ),
-        schema_inference=True,
     )
 
 
