@@ -121,16 +121,13 @@ def full_refresh_resource(
         )
 
 
-    return common.Resource(
+    return common.SnapshotResource(
         name=stream.name,
-        key=["/_meta/row_id"],
         model=FullRefreshResource,
         open=open,
-        initial_state=ResourceState(),
         initial_config=ResourceConfig(
             name=stream.name, interval=timedelta(minutes=30)
         ),
-        schema_inference=True,
     )
 
 
@@ -168,16 +165,13 @@ def full_refresh_child_resource(
             tombstone=FullRefreshResource(_meta=FullRefreshResource.Meta(op="d"))
         )
 
-    return common.Resource(
+    return common.SnapshotResource(
         name=stream.name,
-        key=["/_meta/row_id"],
         model=FullRefreshResource,
         open=open,
-        initial_state=ResourceState(),
         initial_config=ResourceConfig(
             name=stream.name, interval=timedelta(minutes=30)
         ),
-        schema_inference=True,
     )
 
 
