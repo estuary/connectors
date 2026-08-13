@@ -1368,6 +1368,292 @@ func TestMoveRefusesOnStoredRowsMismatch(t *testing.T) {
 	require.NoError(t, tr.moveStorePartitionsToTarget(ctx, b, si, true))
 }
 
+// TestVerifyStagedRows covers the pre-checkpoint accounting: a stage table that
+// does not hold every stored row fails the transaction, and one that does has
+// its partitions recorded for the commit to move.
+func TestVerifyStagedRows(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	ensureDockerUp(t)
+
+	var ctx = t.Context()
+	var tableName = "test_verify_staged_rows"
+	tr, b := newTestTransactor(t, ctx, tableName)
+	require.NoError(t, tr.ensureTempTables(ctx, b))
+	stageTestRows(t, ctx, tr, b,
+		[]any{"k1", "v1", "c", testTime, `{"id":"k1"}`},
+		[]any{"k2", "v2", "c", testTime, `{"id":"k2"}`})
+
+	var stateKeys = []string{b.target.StateKey}
+	tr.state[b.target.StateKey] = &stateItem{StoredRows: 3}
+
+	err := tr.verifyStagedRows(ctx, stateKeys)
+	require.Error(t, err)
+	require.ErrorContains(t, err, tableName)
+	require.ErrorContains(t, err, "contains 2 staged rows")
+	require.ErrorContains(t, err, "3 rows were stored")
+	require.False(t, tr.state[b.target.StateKey].Verified)
+
+	// The failure discarded the staged rows, so the retried transaction stages
+	// its documents afresh.
+	stageTestRows(t, ctx, tr, b,
+		[]any{"k1", "v1", "c", testTime, `{"id":"k1"}`},
+		[]any{"k2", "v2", "c", testTime, `{"id":"k2"}`})
+	tr.state[b.target.StateKey].StoredRows = 2
+	require.NoError(t, tr.verifyStagedRows(ctx, stateKeys))
+
+	var si = tr.state[b.target.StateKey]
+	require.True(t, si.Verified)
+	require.Len(t, si.MovePartitions, 1)
+	require.EqualValues(t, 2, si.MovePartitions[0].Rows)
+}
+
+// TestFailedVerificationLeavesNoStagedRows covers what happens to the staged rows
+// of a transaction abandoned by the accounting check. They cannot be left behind:
+// the pending state a later process recovers describes the *previous*
+// transaction, whose state-clearing patch was still in flight, so leftover rows
+// would be reconciled against a plan they do not match -- and the pending state
+// stops ensureTempTables from clearing them, wedging every subsequent session.
+func TestFailedVerificationLeavesNoStagedRows(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	ensureDockerUp(t)
+
+	var ctx = t.Context()
+	var tableName = "test_failed_verify_discards"
+	tr, b := newTestTransactor(t, ctx, tableName)
+	require.NoError(t, tr.ensureTempTables(ctx, b))
+	var stageName = tr.dialect.Identifier(storeTableName(b.target, 0))
+
+	// A transaction stored three rows, only one of which is staged.
+	stageTestRows(t, ctx, tr, b, []any{"k1", "v1", "c", testTime, `{"id":"k1"}`})
+	tr.state[b.target.StateKey] = &stateItem{StoredRows: 3}
+
+	require.Error(t, tr.verifyStagedRows(ctx, []string{b.target.StateKey}))
+	require.EqualValues(t, 0, countTable(t, ctx, tr, stageName),
+		"the abandoned transaction's rows must not be left staged")
+	require.EqualValues(t, 0, countTable(t, ctx, tr, tr.dialect.Identifier(tableName)))
+
+	// With the stage table empty, a later process recovering the previous
+	// transaction's plan sees its partitions already moved and makes progress
+	// rather than refusing forever.
+	require.NoError(t, tr.UnmarshalState([]byte(fmt.Sprintf(
+		`{%q: {"StoredRows": 2, "Verified": true, "MovePartitions": [{"id":"all","rows":2}]}}`,
+		b.target.StateKey))))
+	_, err := tr.Acknowledge(ctx, nil, nil)
+	require.NoError(t, err)
+	require.Empty(t, tr.state)
+
+	// And the next transaction stages and commits normally.
+	stageTestRows(t, ctx, tr, b, []any{"k2", "v2", "c", testTime, `{"id":"k2"}`})
+	tr.state[b.target.StateKey] = &stateItem{StoredRows: 1}
+	require.NoError(t, tr.verifyStagedRows(ctx, []string{b.target.StateKey}))
+	require.NoError(t, tr.moveStorePartitionsToTarget(ctx, b, tr.state[b.target.StateKey], false))
+	require.EqualValues(t, 1, countTable(t, ctx, tr, tr.dialect.Identifier(tableName)))
+}
+
+// TestCommitRefusesVanishedPartition covers a verified partition disappearing
+// between the verification and the commit that moves it. On the recovery path
+// that means a previous process already moved it, but within one process nothing
+// stages into a store table between those two points, so it can only mean the
+// rows were lost -- and moving the remainder would commit a short transaction.
+func TestCommitRefusesVanishedPartition(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	ensureDockerUp(t)
+
+	var ctx = t.Context()
+	var tableName = "test_commit_vanished_partition"
+	tr, b := newTestTransactor(t, ctx, tableName)
+	require.NoError(t, tr.ensureTempTables(ctx, b))
+
+	stageTestRows(t, ctx, tr, b, []any{"k1", "v1", "c", testTime, `{"id":"k1"}`})
+	tr.state[b.target.StateKey] = &stateItem{StoredRows: 1}
+	require.NoError(t, tr.verifyStagedRows(ctx, []string{b.target.StateKey}))
+
+	// The staged rows go away out of band, as a stray truncate or a replica that
+	// cannot see them would present.
+	require.NoError(t, tr.store.conn.Exec(ctx, b.store.truncateSQL))
+
+	var si = tr.state[b.target.StateKey]
+	err := tr.moveStorePartitionsToTarget(ctx, b, si, false)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "is now gone from the store table")
+	require.EqualValues(t, 0, countTable(t, ctx, tr, tr.dialect.Identifier(tableName)))
+
+	// The same state recovered by a later process is the benign case: that
+	// process moved the partition before exiting.
+	require.NoError(t, tr.moveStorePartitionsToTarget(ctx, b, si, true))
+}
+
+// TestRecoveryCompletesPartialMove covers the case the recovery path exists for:
+// a prior process moved some of the commit's partitions and died before the
+// rest. The verified plan tells the difference between those already-moved
+// partitions and rows that were never staged, so the remainder is committed.
+func TestRecoveryCompletesPartialMove(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	ensureDockerUp(t)
+
+	var cfg = testConfig()
+	var ctx = t.Context()
+	var dialect = clickHouseDialect(cfg.Database)
+	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tableName = "test_recovery_partial_move"
+	var table = partitionedTestTable(t, dialect, tableName, "toYYYYMM(flow_published_at)")
+	var storeName = storeTableName(table, 0)
+
+	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
+	defer db.Close()
+	for _, name := range []string{tableName, storeName} {
+		_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(name)))
+	}
+	t.Cleanup(func() {
+		for _, name := range []string{tableName, storeName} {
+			_, _ = db.ExecContext(context.Background(), fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(name)))
+		}
+	})
+	createSQL, err := sql.RenderTableTemplate(table, tpls.createTargetTable)
+	require.NoError(t, err)
+	_, err = db.ExecContext(ctx, createSQL)
+	require.NoError(t, err)
+
+	var tr = &transactor{
+		dialect:   dialect,
+		templates: tpls,
+		cfg:       cfg,
+		_range:    &pf.RangeSpec{},
+		ensured:   make(chan struct{}),
+		state:     make(connectorState),
+	}
+	storeConn, err := clickhouse.Open(cfg.newClickhouseOptions())
+	require.NoError(t, err)
+	tr.store.conn = storeConn
+	t.Cleanup(func() { _ = storeConn.Close() })
+	require.NoError(t, tr.addBinding(ctx, table))
+	var b = tr.bindings[0]
+
+	require.NoError(t, tr.ensureTempTables(ctx, b))
+	stageTestRows(t, ctx, tr, b,
+		[]any{"k1", "v1", "c", testTime, `{"id":"k1"}`},
+		[]any{"k2", "v2", "c", testTime.AddDate(0, 1, 0), `{"id":"k2"}`})
+
+	// The plan the prior process verified and checkpointed.
+	plan, total, err := tr.queryStoreParts(ctx, b)
+	require.NoError(t, err)
+	require.Len(t, plan, 2)
+	require.EqualValues(t, 2, total)
+
+	// That process moved the first partition, then exited.
+	require.NoError(t, tr.store.conn.Exec(ctx, b.store.movePartitionSQL, plan[0].ID))
+
+	require.NoError(t, tr.UnmarshalState([]byte(fmt.Sprintf(
+		`{%q: {"StoredRows": 2, "Verified": true, "MovePartitions": %s}}`,
+		b.target.StateKey, mustMarshal(t, plan)))))
+	_, err = tr.Acknowledge(ctx, nil, nil)
+	require.NoError(t, err)
+
+	require.EqualValues(t, 2, countTable(t, ctx, tr, dialect.Identifier(tableName)))
+	require.EqualValues(t, 0, countTable(t, ctx, tr, dialect.Identifier(storeName)))
+	require.Empty(t, tr.state)
+}
+
+// TestRecoveryRefusesTruncatedCommit reproduces the 2026-08-11 data loss end to
+// end. A target adopted with ORDER BY tuple() makes every row share a sorting
+// key, so the ReplacingMergeTree stage table cloned from it collapses each
+// inserted block to a single row. The row-accounting guard catches that and
+// fails the commit -- but the connector then exits, and the next process
+// recovers the same pending state with the accounting check skipped, moving the
+// surviving row into the target and clearing the checkpoint. Recovery must
+// refuse instead of committing a transaction that is known to be short.
+func TestRecoveryRefusesTruncatedCommit(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	ensureDockerUp(t)
+
+	var cfg = testConfig()
+	var ctx = t.Context()
+	var dialect = clickHouseDialect(cfg.Database)
+	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tableName = "test_recovery_truncated_commit"
+	var table = buildTestTable(t, dialect, tableName)
+	var storeName = storeTableName(table, 0)
+
+	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
+	defer db.Close()
+	for _, name := range []string{tableName, storeName} {
+		_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(name)))
+	}
+	t.Cleanup(func() {
+		for _, name := range []string{tableName, storeName} {
+			_, _ = db.ExecContext(context.Background(), fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(name)))
+		}
+	})
+
+	// The target as it was adopted via allow_existing_tables_for_new_bindings:
+	// the connector's columns and engine, but a sorting key that covers none of
+	// the binding's keys.
+	_, err := db.ExecContext(ctx, fmt.Sprintf(`
+		CREATE TABLE %s (
+			id String,
+			value Nullable(String),
+			`+"`_meta/op`"+` String,
+			flow_published_at DateTime64(6, 'UTC'),
+			flow_document String
+		) ENGINE = ReplacingMergeTree(flow_published_at)
+		ORDER BY tuple()`,
+		dialect.Identifier(tableName),
+	))
+	require.NoError(t, err)
+
+	var tr = &transactor{
+		dialect:   dialect,
+		templates: tpls,
+		cfg:       cfg,
+		_range:    &pf.RangeSpec{},
+		ensured:   make(chan struct{}),
+		state:     make(connectorState),
+	}
+	storeConn, err := clickhouse.Open(cfg.newClickhouseOptions())
+	require.NoError(t, err)
+	tr.store.conn = storeConn
+	t.Cleanup(func() { _ = storeConn.Close() })
+	require.NoError(t, tr.addBinding(ctx, table))
+	var b = tr.bindings[0]
+
+	require.NoError(t, tr.ensureTempTables(ctx, b))
+	stageTestRows(t, ctx, tr, b,
+		[]any{"k1", "v1", "c", testTime, `{"id":"k1"}`},
+		[]any{"k2", "v2", "c", testTime, `{"id":"k2"}`},
+		[]any{"k3", "v3", "c", testTime, `{"id":"k3"}`})
+
+	// The mechanism itself: three distinct keys were sent, one row exists.
+	stageIdentifier := dialect.Identifier(storeName)
+	require.EqualValues(t, 1, countTable(t, ctx, tr, stageIdentifier),
+		"an empty sorting key collapses the whole inserted block")
+
+	// A new process opens with the checkpoint state that the failed commit left
+	// behind, exactly as the shard restart did.
+	require.NoError(t, tr.UnmarshalState([]byte(fmt.Sprintf(
+		`{%q: {"StoredRows": 3}}`, b.target.StateKey))))
+	require.True(t, tr.recovery)
+
+	_, err = tr.Acknowledge(ctx, nil, nil)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "refusing")
+	require.ErrorContains(t, err, tableName)
+
+	// Nothing may have been committed, and the staged row must survive so an
+	// operator can inspect it.
+	require.EqualValues(t, 0, countTable(t, ctx, tr, dialect.Identifier(tableName)))
+	require.EqualValues(t, 1, countTable(t, ctx, tr, stageIdentifier))
+}
+
 // TestAcknowledgeRecoveryMatrix exercises the first-Acknowledge ensure pass
 // across the recovery matrix: pending commits are recovered (fully or
 // partially applied), leftover rows of uncommitted transactions are
@@ -1393,19 +1679,23 @@ func TestAcknowledgeRecoveryMatrix(t *testing.T) {
 		require.Empty(t, tr.state)
 	})
 
-	t.Run("pending state with partial rows is recovered without the equality guard", func(t *testing.T) {
+	t.Run("legacy pending state with unaccounted rows refuses", func(t *testing.T) {
 		tr, b := newTestTransactor(t, ctx, "test_recovery_partial")
 		require.NoError(t, tr.ensureTempTables(ctx, b))
 		stageTestRows(t, ctx, tr, b, []any{"k1", "v1", "c", testTime, `{"id":"k1"}`})
 
-		// StoredRows says 3, but only 1 row remains staged -- as if a prior
-		// process had moved part of the commit before crashing. Recovery must
-		// move the remainder rather than failing the equality check forever.
+		// StoredRows says 3 but only 1 row is staged, and this state carries no
+		// verified partition plan (it was written by a connector version
+		// predating one). The missing rows are unexplained: either a prior
+		// process moved part of the commit, or they were never staged at all.
+		// Recovery cannot tell those apart, so it must refuse rather than
+		// commit what could be a truncated transaction.
 		tr.recovery = true
 		tr.state[b.target.StateKey] = &stateItem{StoredRows: 3}
 		_, err := tr.Acknowledge(ctx, nil, nil)
-		require.NoError(t, err)
-		require.EqualValues(t, 1, countTable(t, ctx, tr, tr.dialect.Identifier("test_recovery_partial")))
+		require.Error(t, err)
+		require.ErrorContains(t, err, "refusing")
+		require.EqualValues(t, 0, countTable(t, ctx, tr, tr.dialect.Identifier("test_recovery_partial")))
 	})
 
 	t.Run("pending state with a missing store table recovers as a no-op", func(t *testing.T) {

@@ -1,5 +1,30 @@
 # Changelog
 
+## 2026-08-11
+
+### Fixed
+- Materializing into an existing table whose `ORDER BY` does not cover the
+  binding's key fields destroyed rows: ClickHouse combines rows that share a
+  sorting key, so a table keyed on fewer columns than the collection discarded
+  rows that were not duplicates. A table like this is now rejected when the
+  materialization is published and when the task starts, naming the table's
+  `ORDER BY`, the binding's key fields, and how to resolve it. To resolve it, drop
+  or rename the table and backfill the binding, or point the binding at a
+  different table; ClickHouse cannot change a table's sorting key in place. A
+  sorting key that lists the same fields in a different order still works. One
+  with extra fields also still works but is reported as a warning: no rows are
+  lost, but the table keeps superseded versions of a key, so reads that do not use
+  `FINAL` can return more than one row per key.
+- A transaction that could not account for all of the rows it wrote failed after
+  the fact and then committed anyway on the next restart, silently losing the rows
+  that were missing. Such a transaction is now failed before it is committed and is
+  retried in full.
+- Recovering an interrupted transaction that is missing rows for no discoverable
+  reason now fails with an error naming the table and both row counts, instead of
+  committing what remains. Backfill the binding if its table is missing rows.
+  This only affects transactions interrupted while running a version of the
+  connector released before this one.
+
 ## 2026-08-10
 
 ### Fixed
