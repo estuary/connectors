@@ -323,6 +323,14 @@ func TestParquetWriterVariantStringTypes(t *testing.T) {
 			want:       []variant.Type{variant.Binary, variant.Binary, variant.String, variant.Binary},
 		},
 		{
+			// Variant has no interval type, so a duration is stored as a
+			// string even where the standalone column would be an interval.
+			name:       "durationField",
+			stringType: LogicalTypeInterval,
+			vals:       []any{"P1Y2M3DT4H5M6S", "PT30M", "P0D", "not a duration"},
+			want:       []variant.Type{variant.String, variant.String, variant.String, variant.String},
+		},
+		{
 			// Without a format annotation every string stays a variant string.
 			name: "plainField",
 			vals: []any{"2023-01-15T10:30:45Z", "2023-01-15", "14:30:00Z", "aGVsbG8="},
@@ -365,6 +373,55 @@ func TestParquetWriterVariantStringTypes(t *testing.T) {
 		}
 		require.Equal(t, c.want, got, "column %q", c.name)
 	}
+}
+
+// Only a column's own values carry a format annotation, so a date-time nested
+// inside an object or an array is stored as a variant string even when the
+// column's top-level strings are stored as timestamps.
+func TestParquetWriterVariantNestedStringsUntyped(t *testing.T) {
+	const ts = "2023-01-15T10:30:45Z"
+
+	sch := ParquetSchema{
+		{Name: "variantField", DataType: LogicalTypeVariant, VariantStringType: LogicalTypeTimestamp},
+	}
+
+	dir := t.TempDir()
+	sink, err := os.CreateTemp(dir, "*.parquet")
+	require.NoError(t, err)
+
+	w, err := NewParquetWriter(sink, sch)
+	require.NoError(t, err)
+	for _, v := range []any{
+		ts,
+		fmt.Appendf(nil, `{"nested": %q}`, ts),
+		fmt.Appendf(nil, `[%q]`, ts),
+	} {
+		require.NoError(t, w.Write([]any{v}))
+	}
+	require.NoError(t, w.Close())
+
+	f, err := file.OpenParquetFile(sink.Name(), false)
+	require.NoError(t, err)
+	defer f.Close()
+
+	var got = readVariantValues(t, f, 0)
+	require.Len(t, got, 3)
+
+	require.Equal(t, variant.TimestampMicros, got[0].Type(), "a top-level string is typed")
+
+	require.Equal(t, variant.Object, got[1].Type())
+	obj, ok := got[1].Value().(variant.ObjectValue)
+	require.True(t, ok, "expected variant.ObjectValue, got %T", got[1].Value())
+	field, err := obj.ValueByKey("nested")
+	require.NoError(t, err)
+	require.Equal(t, variant.String, field.Value.Type(), "an object's values are not typed")
+
+	require.Equal(t, variant.Array, got[2].Type())
+	arr, ok := got[2].Value().(variant.ArrayValue)
+	require.True(t, ok, "expected variant.ArrayValue, got %T", got[2].Value())
+	elem, err := arr.Value(0)
+	require.NoError(t, err)
+	require.Equal(t, variant.String, elem.Type(), "an array's elements are not typed")
 }
 
 // readVariantValues decodes the values of the variant column whose metadata
