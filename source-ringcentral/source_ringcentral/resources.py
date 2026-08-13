@@ -5,6 +5,7 @@ from typing import Type
 
 from estuary_cdk.capture import Task, common
 from estuary_cdk.capture.common import (
+    SnapshotResource,
     Resource,
     ResourceConfig,
     ResourceState,
@@ -69,16 +70,14 @@ def full_refresh_resources(
         )
 
     return [
-        Resource(
+        SnapshotResource(
             name=model.NAME,
             key=[model.KEY],
             model=model,
             open=functools.partial(open, model),
-            initial_state=ResourceState(),
             initial_config=ResourceConfig(
                 name=model.NAME, interval=timedelta(minutes=5)
             ),
-            schema_inference=True,
         )
         for model in FULL_REFRESH_RESOURCES
     ]
