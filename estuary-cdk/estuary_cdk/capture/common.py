@@ -602,6 +602,17 @@ def resolve_bindings(
         if not found:
             errors.append(f"{resource_term} '{'.'.join(path)}' was not found.")
 
+    for binding, resource in resolved:
+        if isinstance(resource, SnapshotResource) and (
+            "/_meta/row_id" not in binding.collection.key
+        ):
+            errors.append(
+                f"Collection '{binding.collection.name}' is bound to snapshot "
+                f"{resource_term.lower()} '{'.'.join(binding.resourceConfig.path())}' "
+                f"and so must be keyed on /_meta/row_id, but its key is "
+                f"{binding.collection.key}."
+            )
+
     if errors:
         raise ValidationError(errors)
 
