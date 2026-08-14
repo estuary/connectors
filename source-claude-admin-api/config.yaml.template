@@ -1,0 +1,5 @@
+# Copy to config.yaml (gitignored) and fill in your Admin API key.
+admin_api_key: sk-ant-admin01-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+# advanced:
+#   base_url: https://api.anthropic.com
+#   start_date: "2026-05-25T00:00:00Z"   # Claude Code usage report backfill start; defaults to 7 days ago
