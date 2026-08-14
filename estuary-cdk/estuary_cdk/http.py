@@ -662,18 +662,21 @@ class HTTPMixin(Mixin, HTTPSession):
                             {
                                 "status_code": resp.status,
                                 "content_type": resp.content_type,
+                                "content_encoding": resp.headers.getall(
+                                    "Content-Encoding", []
+                                ),
                                 "body": format_error_body(body),
                             },
                         )
                     else:
                         raise HTTPError(
-                            f"Encountered HTTP error status {resp.status}.\nURL: {resp.request_info.url}\nContent-Type: {resp.content_type}\nResponse:\n{format_error_body(body)}",
+                            f"Encountered HTTP error status {resp.status}.\nURL: {resp.request_info.url}\nContent-Type: {resp.content_type}\nContent-Encoding: {resp.headers.getall('Content-Encoding', [])}\nResponse:\n{format_error_body(body)}",
                             resp.status,
                         )
                 elif resp.status >= 400 and resp.status < 500:
                     body = await resp.read()
                     raise HTTPError(
-                        f"Encountered HTTP error status {resp.status} which cannot be retried.\nURL: {resp.request_info.url}\nContent-Type: {resp.content_type}\nResponse:\n{format_error_body(body)}",
+                        f"Encountered HTTP error status {resp.status} which cannot be retried.\nURL: {resp.request_info.url}\nContent-Type: {resp.content_type}\nContent-Encoding: {resp.headers.getall('Content-Encoding', [])}\nResponse:\n{format_error_body(body)}",
                         resp.status,
                     )
                 else:
