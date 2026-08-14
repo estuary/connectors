@@ -626,18 +626,33 @@ class Messages(IncrementalTwilioStreamWithLookbackWindow, TwilioNestedStream):
         # date_sent and date_updated older than the max date_sent observed in the previous sweep, and
         # filtering on the cursor silently discards exactly the updates the lookback window exists to
         # capture. Re-emitting previously seen documents is safe since collections reduce on the key.
+        #
+        # The API returns messages in reverse chronological order, and IncrementalTwilioStream
+        # checkpoints intra-slice every `state_checkpoint_interval` records. The cursor therefore
+        # must not advance while records are still streaming: the first record seen carries the
+        # newest date_sent in the slice, and an intra-slice checkpoint taken after it would persist
+        # a cursor beyond the older records still being processed, permanently skipping them if the
+        # connector crashes or restarts mid-slice. Instead, track the max date_sent locally and only
+        # advance the cursor once the slice has been read to completion. Checkpoints taken mid-slice
+        # carry the prior cursor, so a restart re-reads the slice from the beginning, which is safe
+        # (at-least-once) since collections reduce on the key.
+        max_cursor_value = None
         for record in super(IncrementalTwilioStream, self).read_records(sync_mode, cursor_field, stream_slice, stream_state):
             # A message that has not been sent yet (or failed to send) can have a null date_sent.
-            # Normalize timestamps when present, yield the record regardless, and only advance the
-            # cursor from non-null date_sent values so a single anomalous record can't fail the
-            # entire sweep (this connector only checkpoints after reading every stream).
+            # Normalize timestamps when present, yield the record regardless, and only consider
+            # non-null date_sent values for cursor advancement so a single anomalous record can't
+            # fail the entire sweep.
             if record.get(self.cursor_field):
                 record[self.cursor_field] = pendulum.parse(record[self.cursor_field], strict=False).to_iso8601_string()
-                if self._cursor_value is None or record[self.cursor_field] > self._cursor_value:
-                    self._cursor_value = record[self.cursor_field]
+                if max_cursor_value is None or record[self.cursor_field] > max_cursor_value:
+                    max_cursor_value = record[self.cursor_field]
             if record.get("date_updated"):
                 record["date_updated"] = pendulum.parse(record["date_updated"], strict=False).to_iso8601_string()
             yield record
+
+        # The slice was read to completion; it is now safe to advance the cursor.
+        if max_cursor_value is not None and (self._cursor_value is None or max_cursor_value > self._cursor_value):
+            self._cursor_value = max_cursor_value
 
 
 class MessageMedia(IncrementalTwilioStream, TwilioNestedStream):
