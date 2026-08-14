@@ -67,13 +67,6 @@ The PR template carries a checklist item for `CHANGELOG.md` and one for
 documentation. There's no automated check: whether an entry is warranted
 is a judgment call for the author, backstopped by whoever reviews the PR.
 
-An earlier version of this ran as an automated CI check (an LLM judging
-each diff, dismissable with a `docs-check-skip` label). Team consensus in
-#integrations (2026-08-06) was to drop it: "user-visible" isn't precise
-enough to automate well, and it duplicated what code review already
-covers. See that thread for the reasoning if you're wondering why this
-isn't enforced by CI.
-
 ### Claude Code skill
 
 If you use Claude Code, run `/changelog` in a session that has your PR

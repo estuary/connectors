@@ -12,6 +12,6 @@
 
 **Checklist:**
 
-- [ ] This does not fix a regression from an earlier PR — or if it does, that PR is linked here:
-- [ ] `CHANGELOG.md` updated for any user-visible change (see [CONTRIBUTING.md](../CONTRIBUTING.md#changelog-entries))
-- [ ] Documentation updated for any user-facing behavior change — or the docs PR is linked here: (see [documentation conventions](https://docs.google.com/document/d/1SRC9VS9zyCzWl3n4HXHbc4wPB1eLxJHkA2rtu9ZNokM/edit?usp=sharing))
+- [ ] If fixing a regression, I have linked the PR that introduced the regression: [insert link]
+- [ ] If there are user-visible changes, `CHANGELOG.md` has been updated (see [CONTRIBUTING.md](../CONTRIBUTING.md#changelog-entries))
+- [ ] If there are user-facing behavior changes, documentation has been updated (see [documentation conventions](https://docs.google.com/document/d/1SRC9VS9zyCzWl3n4HXHbc4wPB1eLxJHkA2rtu9ZNokM/edit?usp=sharing)), or the docs PR is linked here: [insert link]
