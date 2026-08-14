@@ -1,0 +1,130 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$defs": {
+        "Advanced": {
+          "properties": {
+            "max_messages_per_sweep": {
+              "default": 5000,
+              "description": "Upper bound on messages drained in a single invocation.",
+              "title": "Max Messages Per Sweep",
+              "type": "integer"
+            },
+            "max_wait_seconds": {
+              "default": 5,
+              "description": "Seconds to wait for a batch before treating the entity as drained.",
+              "title": "Max Wait Seconds",
+              "type": "integer"
+            },
+            "prefetch_count": {
+              "default": 250,
+              "description": "Messages requested per receive call.",
+              "title": "Prefetch / Batch Size",
+              "type": "integer"
+            }
+          },
+          "title": "Advanced",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "connection_string": {
+          "description": "Namespace-level connection string (NO ';EntityPath=' suffix).",
+          "secret": true,
+          "title": "Service Bus Connection String",
+          "type": "string"
+        },
+        "queue_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Queue to read from. Set this OR topic_name + subscription_name.",
+          "title": "Queue Name"
+        },
+        "topic_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Topic to read from (requires subscription_name).",
+          "title": "Topic Name"
+        },
+        "subscription_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Subscription on the topic to read from.",
+          "title": "Subscription Name"
+        },
+        "advanced": {
+          "$ref": "#/$defs/Advanced",
+          "advanced": true,
+          "title": "Advanced Config"
+        }
+      },
+      "required": [
+        "connection_string"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "description": "ResourceConfig is a common resource configuration shape.",
+      "properties": {
+        "_meta": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Meta"
+        },
+        "name": {
+          "description": "Name of this resource",
+          "title": "Name",
+          "type": "string"
+        },
+        "interval": {
+          "default": "PT0S",
+          "description": "Interval between updates for this resource",
+          "format": "duration",
+          "title": "Interval",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ResourceConfig",
+      "type": "object"
+    },
+    "documentationUrl": "https://docs.estuary.dev",
+    "resourcePathPointers": [
+      "/name"
+    ]
+  }
+]
