@@ -757,72 +757,73 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 // back to back, so outside of recovery each state key's entries coalesce into
 // a single set of commit queries.
 func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB, shouldProcess func(string) bool) (*pf.ConnectorState, error) {
-	// A bucket of pending entries: the checkpoint map holding them, and the
-	// state-document key under which its entries clear — nested under a range
-	// key, or top-level (legacyRangeKey) for entries predating scale_out.
-	type bucket struct {
-		clearKey string
-		cp       checkpoint
-	}
-	var ownClearKey = legacyRangeKey
-	if d.scaleOut {
-		ownClearKey = d.rangeKey
-	}
-	var buckets = []bucket{{ownClearKey, d.cp}}
-	for _, rk := range slices.Sorted(maps.Keys(d.peerShardsCheckpoints)) {
-		buckets = append(buckets, bucket{rk, d.peerShardsCheckpoints[rk]})
-	}
-
-	// Gather the entries to process, grouped by state key with buckets in
-	// execution order: this shard's own, then legacy and peer ranges. Entries
-	// of other state keys are left untouched, remaining pending in the
-	// persisted state, as are entries of tables which no longer have a
-	// binding, since those tables might be deleted already.
-	var groups = make(map[string][]bucket)
-	for _, bkt := range buckets {
-		for sk := range bkt.cp {
-			if shouldProcess(sk) && d.bindingForStateKey(sk) != nil {
-				groups[sk] = append(groups[sk], bkt)
-			}
-		}
-	}
-
-	// Execute each state key's entries, and clear them: from the in-memory
-	// buckets, and in the returned state update so that a restart does not run
-	// the same queries again. The state clearing is a best-effort attempt —
+	// The clearing state update, nulling each executed entry at the state-
+	// document path it occupies: nested under a range key, or top-level
+	// (legacyRangeKey) for entries predating scale_out. Clearing is a best-
+	// effort attempt to spare a restart from running the same queries again —
 	// there is no guarantee this checkpoint update can actually be committed.
 	var clear = make(map[string]interface{})
-	for _, sk := range slices.Sorted(maps.Keys(groups)) {
-		var items = make([]*checkpointItem, len(groups[sk]))
-		for i, bkt := range groups[sk] {
-			items[i] = bkt.cp[sk]
+	var clearEntry = func(rangeKey, stateKey string) {
+		if rangeKey == legacyRangeKey {
+			clear[stateKey] = nil
+		} else {
+			if clear[rangeKey] == nil {
+				clear[rangeKey] = make(map[string]interface{})
+			}
+			clear[rangeKey].(map[string]interface{})[stateKey] = nil
 		}
-		if err := d.executeStateKeyItems(ctx, db, sk, items); err != nil {
+	}
+	var ownRangeKey = legacyRangeKey
+	if d.scaleOut {
+		ownRangeKey = d.rangeKey
+	}
+
+	// Everything else pending — entries of other state keys, and entries whose
+	// table no longer has a binding (it might be deleted already) — is left
+	// untouched, remaining pending in the persisted state.
+	for _, b := range d.bindings {
+		var sk = b.target.StateKey
+		if !shouldProcess(sk) {
+			continue
+		}
+
+		// The binding's pending entries: this shard's own, then those of
+		// legacy sessions and peer shards.
+		var items []*checkpointItem
+		if item := d.cp[sk]; item != nil {
+			items = append(items, item)
+		}
+		for _, rk := range slices.Sorted(maps.Keys(d.peerShardsCheckpoints)) {
+			if item := d.peerShardsCheckpoints[rk][sk]; item != nil {
+				items = append(items, item)
+			}
+		}
+		if len(items) == 0 {
+			continue
+		}
+
+		if err := d.executeStateKeyItems(ctx, db, b, items); err != nil {
 			return nil, err
 		}
 
-		for _, bkt := range groups[sk] {
-			delete(bkt.cp, sk)
-			if bkt.clearKey == legacyRangeKey {
-				clear[sk] = nil
-			} else {
-				if clear[bkt.clearKey] == nil {
-					clear[bkt.clearKey] = make(map[string]interface{})
-				}
-				clear[bkt.clearKey].(map[string]interface{})[sk] = nil
-			}
+		if d.cp[sk] != nil {
+			delete(d.cp, sk)
+			clearEntry(ownRangeKey, sk)
 		}
-	}
-
-	for rk, cp := range d.peerShardsCheckpoints {
-		if len(cp) == 0 {
-			delete(d.peerShardsCheckpoints, rk)
+		for rk, cp := range d.peerShardsCheckpoints {
+			if cp[sk] != nil {
+				delete(cp, sk)
+				clearEntry(rk, sk)
+			}
+			if len(cp) == 0 {
+				delete(d.peerShardsCheckpoints, rk)
+			}
 		}
 	}
 
 	d.cpRecovery = false
 
-	if len(groups) == 0 {
+	if len(clear) == 0 {
 		return nil, nil
 	}
 
@@ -849,9 +850,7 @@ func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB, should
 // group's commit queries succeed), or every entry is still pending with its
 // files intact. A missing file during recovery therefore means the whole
 // group needs only clearing, never re-execution.
-func (d *transactor) executeStateKeyItems(ctx context.Context, db *stdsql.DB, stateKey string, items []*checkpointItem) error {
-	var b = d.bindingForStateKey(stateKey)
-
+func (d *transactor) executeStateKeyItems(ctx context.Context, db *stdsql.DB, b *binding, items []*checkpointItem) error {
 	var coalesce []*checkpointItem
 	d.be.StartedResourceCommit(b.target.Path)
 	for _, item := range items {
@@ -997,15 +996,6 @@ func extremumExpr(fn string, literals []string, key sql.Column) string {
 		cast[i] = fmt.Sprintf("%s::%s", l, key.BareDDL)
 	}
 	return fmt.Sprintf("%s(%s)", fn, strings.Join(cast, ", "))
-}
-
-func (d *transactor) bindingForStateKey(stateKey string) *binding {
-	for _, b := range d.bindings {
-		if b.target.StateKey == stateKey {
-			return b
-		}
-	}
-	return nil
 }
 
 func pathsWithRoot(root string, paths []string) []string {
