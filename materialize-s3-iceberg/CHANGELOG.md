@@ -1,20 +1,5 @@
 # Changelog
 
-## 2026-08-17
-
-### Changed
-- With `variant_columns` enabled, a string stored in a variant column now uses
-  the type implied by its format annotation instead of always being stored as
-  a variant string, matching how the same value is typed as a column of its
-  own: `{format: date-time}` becomes a variant timestamp (nanosecond precision
-  when `nanosecond_timestamps` is also enabled), `{format: date}` a variant
-  date, and `{contentEncoding: base64}` variant binary. Formats with no variant
-  equivalent — `uuid`, `time`, and `duration` — are stored as strings, as they
-  are in a column of their own, and a value that fails to parse as its
-  annotated type is stored as a string. Only top-level fields carry format
-  annotations, so values nested inside an object, an array, or the root
-  document are stored as strings.
-
 ## 2026-07-23
 
 ### Changed
@@ -42,6 +27,16 @@
   annotation) keep their numeric column. Reading variant
   columns requires an Iceberg v3-capable query engine (for example Spark 4.0,
   Snowflake, or DuckDB 1.5.3 and later).
+- Strings in a variant column are stored with the type implied by their format
+  annotation, matching how the same value is typed as a column of its own:
+  `{format: date-time}` is stored as a variant timestamp (nanosecond precision
+  when `nanosecond_timestamps` is also enabled), `{format: date}` as a variant
+  date, and `{contentEncoding: base64}` as variant binary. Formats with no
+  variant equivalent — `uuid`, `time`, and `duration` — are stored as strings,
+  as they are in a column of their own, and a value that fails to parse as its
+  annotated type is stored as a string. Only top-level fields carry format
+  annotations, so values nested inside an object, an array, or the root
+  document are stored as strings.
 - Enabling `variant_columns` on an existing materialization converts its
   tables in place: each table upgrades to Iceberg format v3 and every affected
   column is re-created under the same name as a variant column (Iceberg has no
