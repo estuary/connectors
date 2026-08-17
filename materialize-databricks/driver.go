@@ -673,13 +673,11 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		// given that COPY INTO is idempotent by default: files that have already been loaded into a table will
 		// not be loaded again
 		// see https://docs.databricks.com/en/sql/language-manual/delta-copy-into.html
-		var needsMerge = !b.target.DeltaUpdates && b.needsMerge
-
 		d.cp[b.target.StateKey] = &checkpointItem{
 			ToDelete:    pathsWithRoot(b.rootStagingPath, toCopy),
 			StagedFiles: toCopy,
 			Bounds:      boundsLiterals(b.storeMergeBounds.Build()),
-			NeedsMerge:  needsMerge,
+			NeedsMerge:  !b.target.DeltaUpdates && b.needsMerge,
 		}
 		b.needsMerge = false // reset for next round
 	}
@@ -777,6 +775,7 @@ func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB, should
 	if d.scaleOut {
 		ownRangeKey = d.rangeKey
 	}
+	var peerRangeKeys = slices.Sorted(maps.Keys(d.peerShardsCheckpoints))
 
 	// Everything else pending — entries of other state keys, and entries whose
 	// table no longer has a binding (it might be deleted already) — is left
@@ -793,7 +792,7 @@ func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB, should
 		if item := d.cp[sk]; item != nil {
 			items = append(items, item)
 		}
-		for _, rk := range slices.Sorted(maps.Keys(d.peerShardsCheckpoints)) {
+		for _, rk := range peerRangeKeys {
 			if item := d.peerShardsCheckpoints[rk][sk]; item != nil {
 				items = append(items, item)
 			}
@@ -911,20 +910,13 @@ func itemQueries(item *checkpointItem) ([]string, error) {
 func (d *transactor) execQueries(ctx context.Context, db *stdsql.DB, queries []string, tolerateMissing bool) error {
 	for _, query := range queries {
 		if _, err := db.ExecContext(ctx, query); err != nil {
-			if tolerateMissing && isMissingObjectErr(err) {
+			if tolerateMissing && (strings.Contains(err.Error(), "PATH_NOT_FOUND") || strings.Contains(err.Error(), "Path does not exist") || strings.Contains(err.Error(), "Table doesn't exist") || strings.Contains(err.Error(), "TABLE_OR_VIEW_NOT_FOUND")) {
 				continue
 			}
 			return fmt.Errorf("query %q failed: %w", query, err)
 		}
 	}
 	return nil
-}
-
-// isMissingObjectErr reports whether err indicates a staged file or target
-// table which no longer exists.
-func isMissingObjectErr(err error) bool {
-	var s = err.Error()
-	return strings.Contains(s, "PATH_NOT_FOUND") || strings.Contains(s, "Path does not exist") || strings.Contains(s, "Table doesn't exist") || strings.Contains(s, "TABLE_OR_VIEW_NOT_FOUND")
 }
 
 // renderCommitQueries renders the queries which commit a set of staged files
