@@ -522,15 +522,8 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 // uploaded to the staging volume and everything needed to commit them into the
 // target table.
 type checkpointItem struct {
-	Query string `json:",omitempty"` // deprecated, kept for backward compatibility
-	// Queries are the entry's commit queries, pre-rendered by the shard which
-	// staged it. Recovery executes these (their text was rendered against the
-	// binding's schema as of staging time), and so does the primary for
-	// entries staged by peers running older connector versions. Outside of
-	// recovery, entries carrying StagedFiles are instead coalesced per state
-	// key and re-rendered over the combined file set, so that a scaled-out
-	// task commits each table with a single MERGE rather than one per shard.
-	Queries  []string `json:",omitempty"`
+	Query    string   `json:",omitempty"` // deprecated, kept for backward compatibility
+	Queries  []string `json:",omitempty"` // deprecated, kept for backward compatibility
 	ToDelete []string
 
 	// StagedFiles are the staged file names, relative to the binding's staging
@@ -656,11 +649,11 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	}
 
 	// Upload the staged files and record in the checkpoint everything needed to commit them into
-	// the destination tables, including pre-rendered commit queries: if the connector is restarted
-	// in the middle of a commit it can run the same queries on the next startup. This is the
-	// pattern for recovery log being authoritative and the connector idempotently applies a
-	// commit. These are keyed on the binding stateKey so that in case of a recovery being necessary
-	// we don't run queries belonging to bindings that have been removed.
+	// the destination tables: if the connector is restarted in the middle of a commit it can run
+	// the same commit on the next startup. This is the pattern for recovery log being
+	// authoritative and the connector idempotently applies a commit. These are keyed on the
+	// binding stateKey so that in case of a recovery being necessary we don't run queries
+	// belonging to bindings that have been removed.
 	for idx, b := range d.bindings {
 		if !b.storeFile.started {
 			continue
@@ -671,8 +664,6 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			return nil, fmt.Errorf("flushing store file for binding[%d]: %w", idx, err)
 		}
 
-		var bounds = b.storeMergeBounds.Build()
-
 		// In case of delta updates or if there are no existing keys being stored
 		// we directly copy from staged files into the target table. Note that this is retriable
 		// given that COPY INTO is idempotent by default: files that have already been loaded into a table will
@@ -680,16 +671,10 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		// see https://docs.databricks.com/en/sql/language-manual/delta-copy-into.html
 		var needsMerge = !b.target.DeltaUpdates && b.needsMerge
 
-		queries, err := d.renderCommitQueries(b, toCopy, bounds, needsMerge)
-		if err != nil {
-			return nil, err
-		}
-
 		d.cp[b.target.StateKey] = &checkpointItem{
-			Queries:     queries,
 			ToDelete:    pathsWithRoot(b.rootStagingPath, toCopy),
 			StagedFiles: toCopy,
-			Bounds:      boundsLiterals(bounds),
+			Bounds:      boundsLiterals(b.storeMergeBounds.Build()),
 			NeedsMerge:  needsMerge,
 		}
 		b.needsMerge = false // reset for next round
@@ -872,21 +857,27 @@ func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB, should
 }
 
 // executeStateKeyItems runs the pending queries of a single state key's
-// checkpoint entries and deletes their staged files. During recovery every
-// entry's pre-rendered queries run individually, keeping the tolerance for
-// already-executed entries — whose staged files are deleted — at its per-entry
-// granularity: a coalesced query would fail on the first missing file and skip
-// peers' unapplied work along with it. Otherwise entries carrying structured
-// staging metadata coalesce into a single set of commit queries over every
-// shard's staged files, and only entries written by older connector versions
-// fall back to their pre-rendered queries.
+// checkpoint entries and deletes their staged files. Entries carrying
+// structured staging metadata — everything staged by current connector
+// versions — coalesce into a single set of commit queries over every shard's
+// staged files, in recovery and steady state alike. Entries written by older
+// connector versions run their pre-rendered queries individually.
+//
+// Recovery tolerates queries failing on deleted staged files or tables: the
+// v2 runtime persists the state clearing of an Acknowledge before any shard
+// may start committing the next transaction, so a recovered group is
+// homogeneous — either every entry was already applied by a previous session
+// whose clearing didn't commit (staged files are deleted only after all of a
+// group's commit queries succeed), or every entry is still pending with its
+// files intact. A missing file during recovery therefore means the whole
+// group needs only clearing, never re-execution.
 func (d *transactor) executeStateKeyItems(ctx context.Context, db *stdsql.DB, stateKey string, items []*checkpointItem) error {
 	var b = d.bindingForStateKey(stateKey)
 
 	var coalesce []*checkpointItem
 	d.be.StartedResourceCommit(b.target.Path)
 	for _, item := range items {
-		if !d.cpRecovery && len(item.StagedFiles) > 0 {
+		if len(item.StagedFiles) > 0 {
 			coalesce = append(coalesce, item)
 			continue
 		}
@@ -895,7 +886,7 @@ func (d *transactor) executeStateKeyItems(ctx context.Context, db *stdsql.DB, st
 		if err != nil {
 			return err
 		}
-		if err := d.execQueries(ctx, db, queries); err != nil {
+		if err := d.execQueries(ctx, db, queries, d.cpRecovery); err != nil {
 			return err
 		}
 	}
@@ -912,7 +903,7 @@ func (d *transactor) executeStateKeyItems(ctx context.Context, db *stdsql.DB, st
 		if err != nil {
 			return err
 		}
-		if err := d.execQueries(ctx, db, queries); err != nil {
+		if err := d.execQueries(ctx, db, queries, d.cpRecovery); err != nil {
 			return err
 		}
 	}
@@ -935,20 +926,28 @@ func itemQueries(item *checkpointItem) ([]string, error) {
 	return item.Queries, nil
 }
 
-func (d *transactor) execQueries(ctx context.Context, db *stdsql.DB, queries []string) error {
+// execQueries runs the given queries in order. tolerateMissing is set when
+// recovering entries which may already have been applied by a previous
+// session whose state clearing didn't commit: their staged files (and
+// possibly their target table) were already deleted, and it is okay to skip
+// them in this case.
+func (d *transactor) execQueries(ctx context.Context, db *stdsql.DB, queries []string, tolerateMissing bool) error {
 	for _, query := range queries {
 		if _, err := db.ExecContext(ctx, query); err != nil {
-			// When doing a recovery apply, it may be the case that some tables & files have already been deleted after being applied
-			// it is okay to skip them in this case
-			if d.cpRecovery {
-				if strings.Contains(err.Error(), "PATH_NOT_FOUND") || strings.Contains(err.Error(), "Path does not exist") || strings.Contains(err.Error(), "Table doesn't exist") || strings.Contains(err.Error(), "TABLE_OR_VIEW_NOT_FOUND") {
-					continue
-				}
+			if tolerateMissing && isMissingObjectErr(err) {
+				continue
 			}
 			return fmt.Errorf("query %q failed: %w", query, err)
 		}
 	}
 	return nil
+}
+
+// isMissingObjectErr reports whether err indicates a staged file or target
+// table which no longer exists.
+func isMissingObjectErr(err error) bool {
+	var s = err.Error()
+	return strings.Contains(s, "PATH_NOT_FOUND") || strings.Contains(s, "Path does not exist") || strings.Contains(s, "Table doesn't exist") || strings.Contains(s, "TABLE_OR_VIEW_NOT_FOUND")
 }
 
 // renderCommitQueries renders the queries which commit a set of staged files

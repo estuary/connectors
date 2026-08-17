@@ -83,7 +83,7 @@ var registerRecordingDriver = sync.OnceFunc(func() {
 })
 
 // recordingDB resets the recorder and returns a *sql.DB whose statements it
-// captures.
+// captures. A non-nil failWith fails every statement.
 func recordingDB(t *testing.T, failWith error) *stdsql.DB {
 	t.Helper()
 	registerRecordingDriver()
@@ -371,7 +371,6 @@ func bound(lower, upper string) mergeBoundLiterals {
 
 func structuredItem(needsMerge bool, bounds []mergeBoundLiterals, files ...string) *checkpointItem {
 	return &checkpointItem{
-		Queries:     []string{"PRERENDERED " + files[0]},
 		ToDelete:    nil, // deleteFiles requires a workspace client
 		StagedFiles: files,
 		Bounds:      bounds,
@@ -440,7 +439,7 @@ func TestAcknowledgeCoalescesShardEntries(t *testing.T) {
 		require.Contains(t, query, "FILES = ('own.json','peer.json')")
 	})
 
-	t.Run("recovery executes each entry's pre-rendered queries", func(t *testing.T) {
+	t.Run("recovery coalesces exactly like steady state", func(t *testing.T) {
 		var d = renderingTransactor(true, lowerRangeKey)
 		d.cp["a_table.v1"] = structuredItem(true, nil, "own.json")
 		d.peerShardsCheckpoints[upperRangeKey] = checkpoint{
@@ -450,7 +449,43 @@ func TestAcknowledgeCoalescesShardEntries(t *testing.T) {
 
 		_, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
 		require.NoError(t, err)
-		require.Equal(t, []string{"PRERENDERED own.json", "PRERENDERED peer.json"}, recording.executed)
+		require.Len(t, recording.executed, 1)
+		require.Contains(t, recording.executed[0], "MERGE INTO `schema`.`a_table`")
+		require.Contains(t, recording.executed[0], "own.json")
+		require.Contains(t, recording.executed[0], "peer.json")
+		require.False(t, d.cpRecovery)
+	})
+
+	t.Run("recovery tolerates an already-applied group whose files are gone", func(t *testing.T) {
+		var d = renderingTransactor(true, lowerRangeKey)
+		d.cp["a_table.v1"] = structuredItem(true, nil, "own.json")
+		d.peerShardsCheckpoints[upperRangeKey] = checkpoint{
+			"a_table.v1": structuredItem(true, nil, "peer.json"),
+		}
+		d.cpRecovery = true
+
+		// The coalesced query fails on deleted staged files, which during
+		// recovery means the whole group was applied by a previous session
+		// whose state clearing didn't commit: it is skipped and cleared.
+		state, err := d.acknowledgeApply(context.Background(),
+			recordingDB(t, fmt.Errorf("some PATH_NOT_FOUND error")), allKeys)
+		require.NoError(t, err)
+		require.Empty(t, recording.executed)
+		require.JSONEq(t, `{
+			"00000000-7fffffff": {"a_table.v1": null},
+			"80000000-ffffffff": {"a_table.v1": null}
+		}`, string(state.UpdatedJson))
+		require.Empty(t, d.cp)
+		require.Empty(t, d.peerShardsCheckpoints)
+	})
+
+	t.Run("non-recovery missing objects are fatal", func(t *testing.T) {
+		var d = renderingTransactor(true, lowerRangeKey)
+		d.cp["a_table.v1"] = structuredItem(true, nil, "own.json")
+
+		_, err := d.acknowledgeApply(context.Background(),
+			recordingDB(t, fmt.Errorf("some PATH_NOT_FOUND error")), allKeys)
+		require.Error(t, err)
 	})
 
 	t.Run("entries of older versions run pre-rendered alongside the coalesced query", func(t *testing.T) {

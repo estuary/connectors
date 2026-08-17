@@ -7,9 +7,9 @@
   `MERGE` (or `COPY INTO`) query covering every shard's staged files, instead
   of running one query per shard back to back. Single-shard tasks are
   unaffected. Note for downgrades: the connector checkpoint now records the
-  staged files alongside the pre-rendered queries, and versions predating this
-  change refuse to parse the new fields — drain the task (let it idle at an
-  acknowledged commit) before pinning an older image.
+  staged files and key bounds instead of pre-rendered queries, and versions
+  predating this change refuse to parse the new fields — drain the task (let
+  it idle at an acknowledged commit) before pinning an older image.
 
 ## 2026-08-04
 
