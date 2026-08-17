@@ -95,7 +95,7 @@ Refer to the [Postgres docs](https://www.postgresql.org/docs/current/sql-alterpu
 
 Upon start-up, the Estuary connector for Postgres will automatically create the [replication slot](https://www.postgresql.org/docs/current/logicaldecoding-explanation.html#LOGICALDECODING-REPLICATION-SLOTS) required for ingesting data change events from Postgres. The slot's name will be prefixed with `estuary_`, followed by a unique identifier.
 
-To prevent storage bloat, **Neon automatically removes _inactive_ replication slots after a period of time if there are other _active_ replication slots**. If you have or intend on having more than one replication slot, please see [Unused replication slots](https://docs.neon.tech/docs/logical-replication-neon#unused-replication-slots) to learn more.
+To prevent storage bloat, **Neon automatically removes _inactive_ replication slots after a period of time if there are other _active_ replication slots**. If you have or intend on having more than one replication slot, please see [Unused replication slots](https://neon.tech/docs/guides/logical-replication-neon#unused-replication-slots) to learn more.
 
 ## Connection Pooling
 
@@ -217,6 +217,7 @@ these filters exclude will be deactivated the next time discovery runs.
 | `/advanced/discover_unpublished_tables` | Discover Unpublished Tables | If `true`, the capture discovers all tables, even ones not currently in the publication. | boolean |  |
 | `/advanced/source_tag` | Source Tag | This value is added as the property 'tag' in the source metadata of each document. | string |  |
 | `/advanced/statement_timeout` | Statement Timeout | Overrides the statement timeout used by the connector. Leave blank to use the default of 2 minutes. Set to `0` to disable statement timeouts entirely. Options include `""`, `0`, `30s`, `1m`, `2m`, `5m`, and `30m`. | string | `""` |
+| `/advanced/rediscovery_interval` | Rediscovery Interval | How often the connector re-runs discovery while a capture is running, in order to notice schema changes and newly added tables. Accepts duration strings like `15m` or `1h`, from `1m` up to `8760h`. | string | `"15m"` |
 
 #### Bindings
 
