@@ -29,8 +29,11 @@
   path, it fails rather than risk duplicating or dropping rows. Backfilling the
   affected binding recovers from any such failure. Changing how a task's shards
   are split does not itself require a backfill; what fails is a change made
-  while rows are still in flight, and restoring the previous shard ranges lets
-  the interrupted transaction commit.
+  while rows are still in flight. Where the shard which appended those rows
+  still exists, restoring the previous shard ranges lets its interrupted
+  transaction commit; where the split created a shard which did not, that shard
+  cannot attribute what Snowflake already holds, and the binding stays failed
+  until it is backfilled.
 
 ### Fixed
 - A row Snowflake's ingestion rejects on this path now fails the transaction,
