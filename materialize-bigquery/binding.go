@@ -33,7 +33,7 @@ type binding struct {
 // its reconstruction yields an explicit null for any root-level column that is
 // NULL, which only matters for collections that reduce the root document rather
 // than replacing it.
-var errNullFlowDocument = errors.New("value[1] is NULL: this row has no flow_document value, " +
+var errNullFlowDocument = errors.New("row has no flow_document value, " +
 	"typically because the binding adopted a table that already held data: see https://go.estuary.dev/matff. " +
 	"The 'Exclude Flow Document' advanced option makes loads reconstruct the document " +
 	"from the table's own columns instead")
