@@ -7,11 +7,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
-	"sort"
 	"strings"
 
 	"github.com/databricks/databricks-sdk-go"
@@ -757,11 +757,9 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 // back to back, so outside of recovery each state key's entries coalesce into
 // a single set of commit queries.
 func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB, shouldProcess func(string) bool) (*pf.ConnectorState, error) {
-	// Buckets of pending entries in execution order: this shard's own bucket,
-	// then the legacy and peer-range buckets sorted by range key. clearKey is
-	// where a bucket's executed entries clear in the emitted state — nested
-	// under its range key, or top-level (legacyRangeKey) for entries predating
-	// scale_out.
+	// A bucket of pending entries: the checkpoint map holding them, and the
+	// state-document key under which its entries clear — nested under a range
+	// key, or top-level (legacyRangeKey) for entries predating scale_out.
 	type bucket struct {
 		clearKey string
 		cp       checkpoint
@@ -771,63 +769,40 @@ func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB, should
 		ownClearKey = d.rangeKey
 	}
 	var buckets = []bucket{{ownClearKey, d.cp}}
-
-	var peerRangeKeys = make([]string, 0, len(d.peerShardsCheckpoints))
-	for rk := range d.peerShardsCheckpoints {
-		peerRangeKeys = append(peerRangeKeys, rk)
-	}
-	sort.Strings(peerRangeKeys)
-	for _, rk := range peerRangeKeys {
+	for _, rk := range slices.Sorted(maps.Keys(d.peerShardsCheckpoints)) {
 		buckets = append(buckets, bucket{rk, d.peerShardsCheckpoints[rk]})
 	}
 
-	// Group the entries to process by state key, preserving bucket order
-	// within each group. Entries staged under other state keys are left
-	// untouched, remaining pending in the persisted state, as are entries of
-	// tables which no longer have a binding, since those tables might be
-	// deleted already.
-	type pendingEntry struct {
-		bucketIdx int
-		item      *checkpointItem
-	}
-	var groups = make(map[string][]pendingEntry)
-	var stateKeys []string
-	for bi, bkt := range buckets {
-		for sk, item := range bkt.cp {
-			if !shouldProcess(sk) || d.bindingForStateKey(sk) == nil {
-				continue
+	// Gather the entries to process, grouped by state key with buckets in
+	// execution order: this shard's own, then legacy and peer ranges. Entries
+	// of other state keys are left untouched, remaining pending in the
+	// persisted state, as are entries of tables which no longer have a
+	// binding, since those tables might be deleted already.
+	var groups = make(map[string][]bucket)
+	for _, bkt := range buckets {
+		for sk := range bkt.cp {
+			if shouldProcess(sk) && d.bindingForStateKey(sk) != nil {
+				groups[sk] = append(groups[sk], bkt)
 			}
-			if _, ok := groups[sk]; !ok {
-				stateKeys = append(stateKeys, sk)
-			}
-			groups[sk] = append(groups[sk], pendingEntry{bi, item})
 		}
 	}
-	sort.Strings(stateKeys)
 
-	// After having applied the checkpoint, we try to clean up the checkpoint in the ack response
-	// so that a restart of the connector does not need to run the same queries again
-	// Note that this is an best-effort "attempt" and there is no guarantee that this checkpoint update
-	// can actually be committed
-	// Important to note that in this case we do not reset the checkpoint for all bindings, but only the ones
-	// that have been committed in this transaction. The reason is that it may be the case that a binding
-	// which has been disabled right after a failed attempt to run its queries, must be able to recover by enabling
-	// the binding and running the queries that are pending for its last transaction.
-	var executedCount int
+	// Execute each state key's entries, and clear them: from the in-memory
+	// buckets, and in the returned state update so that a restart does not run
+	// the same queries again. The state clearing is a best-effort attempt —
+	// there is no guarantee this checkpoint update can actually be committed.
 	var clear = make(map[string]interface{})
-	for _, sk := range stateKeys {
-		var entries = groups[sk]
-		var items = make([]*checkpointItem, len(entries))
-		for i, e := range entries {
-			items[i] = e.item
+	for _, sk := range slices.Sorted(maps.Keys(groups)) {
+		var items = make([]*checkpointItem, len(groups[sk]))
+		for i, bkt := range groups[sk] {
+			items[i] = bkt.cp[sk]
 		}
 		if err := d.executeStateKeyItems(ctx, db, sk, items); err != nil {
 			return nil, err
 		}
-		executedCount += len(entries)
 
-		for _, e := range entries {
-			var bkt = buckets[e.bucketIdx]
+		for _, bkt := range groups[sk] {
+			delete(bkt.cp, sk)
 			if bkt.clearKey == legacyRangeKey {
 				clear[sk] = nil
 			} else {
@@ -836,19 +811,18 @@ func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB, should
 				}
 				clear[bkt.clearKey].(map[string]interface{})[sk] = nil
 			}
-			delete(bkt.cp, sk)
 		}
 	}
 
-	for _, rk := range peerRangeKeys {
-		if len(d.peerShardsCheckpoints[rk]) == 0 {
+	for rk, cp := range d.peerShardsCheckpoints {
+		if len(cp) == 0 {
 			delete(d.peerShardsCheckpoints, rk)
 		}
 	}
 
 	d.cpRecovery = false
 
-	if executedCount == 0 {
+	if len(groups) == 0 {
 		return nil, nil
 	}
 
