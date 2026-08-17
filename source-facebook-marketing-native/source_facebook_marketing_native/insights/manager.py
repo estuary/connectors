@@ -86,14 +86,23 @@ class FacebookInsightsJobManager:
         Examples:
             - "ACCOUNT job [depth=0]"
             - "campaigns job (2 entities) [depth=1, from ACCOUNT]"
-            - "adsets job (1 entities) [depth=2, from campaigns]"
+            - "adsets job (1 entities, ids=[123]) [depth=2, from campaigns]"
+
+        Small jobs name their entities, since those are the ones that fail
+        unsplittably and a bare count doesn't say which entity to go look at.
         """
         if job.scope == JobScope.ACCOUNT:
             return f"ACCOUNT job [depth={job.depth}]"
 
         count = len(job.entity_ids) if job.entity_ids else 0
+        ids_info = (
+            f", ids={job.entity_ids}" if job.entity_ids and count <= 3 else ""
+        )
         parent_info = f", from {job.parent_scope.value}" if job.parent_scope else ""
-        return f"{job.scope.value} job ({count} entities) [depth={job.depth}{parent_info}]"
+        return (
+            f"{job.scope.value} job ({count} entities{ids_info}) "
+            f"[depth={job.depth}{parent_info}]"
+        )
 
     def _build_filter(self, job: InsightsJob) -> InsightsFilter | None:
         """Build InsightsFilter from job scope and entity IDs."""
@@ -145,6 +154,7 @@ class FacebookInsightsJobManager:
                     action_breakdowns=model.action_breakdowns,
                     action_attribution_windows=model.action_attribution_windows,
                     filtering=filtering,
+                    job_desc=job_desc,
                 )
 
                 await self._wait_for_completion(log, job_id, job_desc)
@@ -205,6 +215,7 @@ class FacebookInsightsJobManager:
         action_breakdowns: list[ActionBreakdown] | None = None,
         action_attribution_windows: list[AttributionWindow] | None = None,
         filtering: InsightsFilter | None = None,
+        job_desc: str | None = None,
     ) -> str:
         url = f"{self._base_url}/act_{account_id}/insights"
 
@@ -235,7 +246,12 @@ class FacebookInsightsJobManager:
         if response.error:
             raise FacebookAPIError(error=response.error)
 
-        log.info(f"Submitted async insights job: {response.report_run_id}")
+        # Name the job alongside its id: with MAX_CONCURRENT_JOBS in flight,
+        # a bare id can't be tied back to the scope that produced it.
+        log.info(
+            f"Submitted async insights job for {job_desc or 'job'}: "
+            f"{response.report_run_id}"
+        )
         return response.report_run_id
 
     async def _check_job_status(
@@ -672,19 +688,40 @@ class FacebookInsightsJobManager:
                     return
 
                 elif status.async_status == AsyncJobStatus.JOB_FAILED:
-                    parts = [f"{desc}: job failed at {status.async_percent_completion}% (job_id={job_id})"]
+                    # No "%" in this message: it becomes the FacebookError message,
+                    # which is interpolated into log calls that carry structured
+                    # fields, where logging would read it as a format placeholder.
+                    parts = [
+                        f"{desc}: job failed at {status.async_percent_completion} percent "
+                        f"(job_id={job_id})"
+                    ]
+                    if status.error_code is not None:
+                        code_desc = f"code={status.error_code}"
+                        if status.error_subcode is not None:
+                            code_desc += f", subcode={status.error_subcode}"
+                        parts.append(code_desc)
+                    if status.error_message:
+                        parts.append(status.error_message)
                     if status.error_user_title:
                         parts.append(f"reason: {status.error_user_title}")
                     if status.error_user_msg:
                         parts.append(status.error_user_msg)
                     error_msg = " — ".join(parts)
-                    log.error(error_msg)
+                    log.error(
+                        error_msg,
+                        extra={
+                            "job_id": job_id,
+                            "error_code": status.error_code,
+                            "error_subcode": status.error_subcode,
+                            "async_percent_completion": status.async_percent_completion,
+                        },
+                    )
 
                     raise FacebookAPIError(
                         error=FacebookError(
                             message=error_msg,
                             type=InternalJobErrorType.JOB_FAILURE,
-                            code=status.error_code or 100,
+                            code=status.error_code if status.error_code is not None else 100,
                             error_subcode=status.error_subcode,
                         )
                     )
