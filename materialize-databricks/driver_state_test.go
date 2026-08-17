@@ -329,6 +329,224 @@ func TestAcknowledge(t *testing.T) {
 	})
 }
 
+// renderableTable builds a table realistic enough for the commit query
+// templates to render: quoted identifiers and mapped types on every column.
+func renderableTable() sql.Table {
+	var col = func(identifier, ddl, bareDDL string) sql.Column {
+		return sql.Column{
+			Identifier: identifier,
+			MappedType: sql.MappedType{DDL: ddl, BareDDL: bareDDL},
+		}
+	}
+	var doc = col("flow_document", "STRING", "STRING")
+
+	return sql.Table{
+		TableShape: sql.TableShape{Path: sql.TablePath{"schema", "a_table"}},
+		Identifier: "`schema`.`a_table`",
+		Keys: []sql.Column{
+			col("id", "LONG NOT NULL", "LONG"),
+			col("ts", "TIMESTAMP NOT NULL", "TIMESTAMP"),
+		},
+		Values:   []sql.Column{col("val", "STRING", "STRING")},
+		Document: &doc,
+		StateKey: "a_table.v1",
+	}
+}
+
+// renderingTransactor is a primary-shard transactor whose single binding can
+// render coalesced commit queries.
+func renderingTransactor(scaleOut bool, rangeKey string) *transactor {
+	var d = testTransactor(scaleOut, rangeKey)
+	d.templates = testTemplates
+	d.bindings = append(d.bindings, &binding{
+		target:          renderableTable(),
+		rootStagingPath: "/Volumes/cat/schema/flow_staging/flow_temp_tables",
+	})
+	return d
+}
+
+func bound(lower, upper string) mergeBoundLiterals {
+	return mergeBoundLiterals{Lower: lower, Upper: upper}
+}
+
+func structuredItem(needsMerge bool, bounds []mergeBoundLiterals, files ...string) *checkpointItem {
+	return &checkpointItem{
+		Queries:     []string{"PRERENDERED " + files[0]},
+		ToDelete:    nil, // deleteFiles requires a workspace client
+		StagedFiles: files,
+		Bounds:      bounds,
+		NeedsMerge:  needsMerge,
+	}
+}
+
+func TestAcknowledgeCoalescesShardEntries(t *testing.T) {
+	t.Run("entries of all shards coalesce into a single merge", func(t *testing.T) {
+		var d = renderingTransactor(true, lowerRangeKey)
+		d.cp["a_table.v1"] = structuredItem(true,
+			[]mergeBoundLiterals{bound("1", "10"), bound("'2024-01-01T00:00:00Z'", "'2024-01-02T00:00:00Z'")},
+			"own.json")
+		d.peerShardsCheckpoints[upperRangeKey] = checkpoint{
+			"a_table.v1": structuredItem(false,
+				[]mergeBoundLiterals{bound("5", "50"), bound("'2024-01-01T12:00:00Z'", "'2024-01-03T00:00:00Z'")},
+				"peer.json"),
+		}
+
+		state, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
+		require.NoError(t, err)
+
+		require.Len(t, recording.executed, 1)
+		var query = recording.executed[0]
+		require.Contains(t, query, "MERGE INTO `schema`.`a_table`")
+		require.Contains(t, query, "/Volumes/cat/schema/flow_staging/flow_temp_tables/own.json")
+		require.Contains(t, query, "/Volumes/cat/schema/flow_staging/flow_temp_tables/peer.json")
+		require.Contains(t, query, "l.id >= LEAST(1::LONG, 5::LONG)")
+		require.Contains(t, query, "l.id <= GREATEST(10::LONG, 50::LONG)")
+		require.Contains(t, query, "l.ts >= LEAST('2024-01-01T00:00:00Z'::TIMESTAMP, '2024-01-01T12:00:00Z'::TIMESTAMP)")
+		require.Contains(t, query, "l.ts <= GREATEST('2024-01-02T00:00:00Z'::TIMESTAMP, '2024-01-03T00:00:00Z'::TIMESTAMP)")
+
+		require.JSONEq(t, `{
+			"00000000-7fffffff": {"a_table.v1": null},
+			"80000000-ffffffff": {"a_table.v1": null}
+		}`, string(state.UpdatedJson))
+		require.Empty(t, d.cp)
+		require.Empty(t, d.peerShardsCheckpoints)
+	})
+
+	t.Run("one merging entry is enough to merge the coalesced files", func(t *testing.T) {
+		var d = renderingTransactor(true, lowerRangeKey)
+		d.cp["a_table.v1"] = structuredItem(false, nil, "own.json")
+		d.peerShardsCheckpoints[upperRangeKey] = checkpoint{
+			"a_table.v1": structuredItem(true, nil, "peer.json"),
+		}
+
+		_, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
+		require.NoError(t, err)
+		require.Len(t, recording.executed, 1)
+		require.Contains(t, recording.executed[0], "MERGE INTO `schema`.`a_table`")
+	})
+
+	t.Run("entries with no merging coalesce into a single copy", func(t *testing.T) {
+		var d = renderingTransactor(true, lowerRangeKey)
+		d.cp["a_table.v1"] = structuredItem(false, nil, "own.json")
+		d.peerShardsCheckpoints[upperRangeKey] = checkpoint{
+			"a_table.v1": structuredItem(false, nil, "peer.json"),
+		}
+
+		_, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
+		require.NoError(t, err)
+		require.Len(t, recording.executed, 1)
+		var query = recording.executed[0]
+		require.Contains(t, query, "COPY INTO `schema`.`a_table`")
+		require.Contains(t, query, "FILES = ('own.json','peer.json')")
+	})
+
+	t.Run("recovery executes each entry's pre-rendered queries", func(t *testing.T) {
+		var d = renderingTransactor(true, lowerRangeKey)
+		d.cp["a_table.v1"] = structuredItem(true, nil, "own.json")
+		d.peerShardsCheckpoints[upperRangeKey] = checkpoint{
+			"a_table.v1": structuredItem(true, nil, "peer.json"),
+		}
+		d.cpRecovery = true
+
+		_, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
+		require.NoError(t, err)
+		require.Equal(t, []string{"PRERENDERED own.json", "PRERENDERED peer.json"}, recording.executed)
+	})
+
+	t.Run("entries of older versions run pre-rendered alongside the coalesced query", func(t *testing.T) {
+		var d = renderingTransactor(true, lowerRangeKey)
+		d.cp["a_table.v1"] = structuredItem(true, nil, "own.json")
+		d.peerShardsCheckpoints[upperRangeKey] = checkpoint{
+			"a_table.v1": item("OLD-PEER"),
+		}
+
+		state, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
+		require.NoError(t, err)
+		require.Len(t, recording.executed, 2)
+		require.Equal(t, "OLD-PEER", recording.executed[0])
+		require.Contains(t, recording.executed[1], "MERGE INTO `schema`.`a_table`")
+		require.JSONEq(t, `{
+			"00000000-7fffffff": {"a_table.v1": null},
+			"80000000-ffffffff": {"a_table.v1": null}
+		}`, string(state.UpdatedJson))
+	})
+
+	t.Run("a single entry renders its bounds verbatim", func(t *testing.T) {
+		var d = renderingTransactor(false, fullRangeKey)
+		d.cp["a_table.v1"] = structuredItem(true,
+			[]mergeBoundLiterals{bound("1", "10"), bound("'2024-01-01T00:00:00Z'", "'2024-01-02T00:00:00Z'")},
+			"own.json")
+
+		_, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
+		require.NoError(t, err)
+		require.Len(t, recording.executed, 1)
+		require.Contains(t, recording.executed[0], "l.id >= 1 AND l.id <= 10")
+		require.Contains(t, recording.executed[0], "l.ts >= '2024-01-01T00:00:00Z' AND l.ts <= '2024-01-02T00:00:00Z'")
+	})
+
+	t.Run("coalesced files chunk into batched queries", func(t *testing.T) {
+		var d = renderingTransactor(true, lowerRangeKey)
+		var files []string
+		for i := 0; i < queryBatchSize+1; i++ {
+			files = append(files, fmt.Sprintf("f%d.json", i))
+		}
+		d.cp["a_table.v1"] = structuredItem(true, nil, files...)
+
+		_, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
+		require.NoError(t, err)
+		require.Len(t, recording.executed, 2)
+	})
+}
+
+func TestCombineBounds(t *testing.T) {
+	var keys = renderableTable().Keys
+
+	t.Run("identical bounds pass through", func(t *testing.T) {
+		var items = []*checkpointItem{
+			{Bounds: []mergeBoundLiterals{bound("1", "10"), bound("'a'", "'b'")}},
+			{Bounds: []mergeBoundLiterals{bound("1", "10"), bound("'a'", "'b'")}},
+		}
+		var out = combineBounds(keys, items)
+		require.Equal(t, "1", out[0].LiteralLower)
+		require.Equal(t, "10", out[0].LiteralUpper)
+		require.Equal(t, "'a'", out[1].LiteralLower)
+	})
+
+	t.Run("differing bounds combine with casts", func(t *testing.T) {
+		var items = []*checkpointItem{
+			{Bounds: []mergeBoundLiterals{bound("1", "10"), bound("'a'", "'b'")}},
+			{Bounds: []mergeBoundLiterals{bound("5", "50"), bound("'a'", "'c'")}},
+		}
+		var out = combineBounds(keys, items)
+		require.Equal(t, "LEAST(1::LONG, 5::LONG)", out[0].LiteralLower)
+		require.Equal(t, "GREATEST(10::LONG, 50::LONG)", out[0].LiteralUpper)
+		require.Equal(t, "'a'", out[1].LiteralLower)
+		require.Equal(t, "GREATEST('b'::TIMESTAMP, 'c'::TIMESTAMP)", out[1].LiteralUpper)
+	})
+
+	t.Run("a missing bound drops that column's bound", func(t *testing.T) {
+		var items = []*checkpointItem{
+			{Bounds: []mergeBoundLiterals{bound("1", "10"), bound("", "")}},
+			{Bounds: []mergeBoundLiterals{bound("5", "50"), bound("'a'", "'b'")}},
+		}
+		var out = combineBounds(keys, items)
+		require.Equal(t, "LEAST(1::LONG, 5::LONG)", out[0].LiteralLower)
+		require.Empty(t, out[1].LiteralLower)
+		require.Empty(t, out[1].LiteralUpper)
+	})
+
+	t.Run("a length mismatch drops all bounds of that entry's columns", func(t *testing.T) {
+		var items = []*checkpointItem{
+			{Bounds: []mergeBoundLiterals{bound("1", "10"), bound("'a'", "'b'")}},
+			{Bounds: nil},
+		}
+		var out = combineBounds(keys, items)
+		require.Empty(t, out[0].LiteralLower)
+		require.Empty(t, out[1].LiteralLower)
+		require.Equal(t, keys[0].Identifier, out[0].Identifier)
+	})
+}
+
 func TestValidateShardRange(t *testing.T) {
 	// A shard covering the full keyspace is a single-shard task and is fine in
 	// either mode; a partial-range shard requires scale_out.

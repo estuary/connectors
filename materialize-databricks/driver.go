@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
@@ -517,10 +518,48 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	return nil
 }
 
+// checkpointItem is one binding's staged-but-not-yet-committed work: the files
+// uploaded to the staging volume and everything needed to commit them into the
+// target table.
+//
+// The commit queries are represented twice. Queries carries them pre-rendered,
+// one set per shard: recovery executes these (their text was rendered against
+// the binding's schema as of staging time), and so does the primary for
+// entries staged by peers running older connector versions. Outside of
+// recovery, entries carrying StagedFiles are coalesced per state key and
+// re-rendered over the combined file set, so that a scaled-out task commits
+// each table with a single MERGE rather than one per shard.
 type checkpointItem struct {
 	Query    string   `json:",omitempty"` // deprecated, kept for backward compatibility
 	Queries  []string `json:",omitempty"`
 	ToDelete []string
+
+	// StagedFiles are the staged file names, relative to the binding's staging
+	// root.
+	StagedFiles []string `json:",omitempty"`
+	// Bounds are the rendered merge-bound literals of the observed key range,
+	// positional with the target table's key columns.
+	Bounds []mergeBoundLiterals `json:",omitempty"`
+	// NeedsMerge marks entries whose files must MERGE into the target table;
+	// otherwise a direct COPY INTO suffices.
+	NeedsMerge bool `json:",omitempty"`
+}
+
+// mergeBoundLiterals is the serialized form of a key column's sql.MergeBound:
+// the rendered literals of the minimum and maximum key values observed for a
+// transaction. Empty literals mean the column carries no bound, as is the case
+// for boolean keys.
+type mergeBoundLiterals struct {
+	Lower string `json:",omitempty"`
+	Upper string `json:",omitempty"`
+}
+
+func boundsLiterals(bounds []sql.MergeBound) []mergeBoundLiterals {
+	var out = make([]mergeBoundLiterals, len(bounds))
+	for i, b := range bounds {
+		out[i] = mergeBoundLiterals{Lower: b.LiteralLower, Upper: b.LiteralUpper}
+	}
+	return out
 }
 
 type checkpoint map[string]*checkpointItem
@@ -617,13 +656,12 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		}
 	}
 
-	// Upload the staged files and build a list of merge and truncate queries that need to be run to
-	// effectively commit the files into destination tables. These queries are stored in the
-	// checkpoint so that if the connector is restarted in middle of a commit it can run the same
-	// queries on the next startup. This is the pattern for recovery log being authoritative and the
-	// connector idempotently applies a commit. These are keyed on the binding stateKey so that in
-	// case of a recovery being necessary we don't run queries belonging to bindings that have been
-	// removed.
+	// Upload the staged files and record in the checkpoint everything needed to commit them into
+	// the destination tables, including pre-rendered commit queries: if the connector is restarted
+	// in the middle of a commit it can run the same queries on the next startup. This is the
+	// pattern for recovery log being authoritative and the connector idempotently applies a
+	// commit. These are keyed on the binding stateKey so that in case of a recovery being necessary
+	// we don't run queries belonging to bindings that have been removed.
 	for idx, b := range d.bindings {
 		if !b.storeFile.started {
 			continue
@@ -633,48 +671,27 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		if err != nil {
 			return nil, fmt.Errorf("flushing store file for binding[%d]: %w", idx, err)
 		}
-		var fullPaths = pathsWithRoot(b.rootStagingPath, toCopy)
 
 		var bounds = b.storeMergeBounds.Build()
 
-		var queries []string
 		// In case of delta updates or if there are no existing keys being stored
 		// we directly copy from staged files into the target table. Note that this is retriable
 		// given that COPY INTO is idempotent by default: files that have already been loaded into a table will
 		// not be loaded again
 		// see https://docs.databricks.com/en/sql/language-manual/delta-copy-into.html
+		var needsMerge = !b.target.DeltaUpdates && b.needsMerge
 
-		if b.target.DeltaUpdates || !b.needsMerge {
-			// TODO: switch to slices.Chunk once we switch to go1.23
-			for i := 0; i < len(toCopy); i += queryBatchSize {
-				end := i + queryBatchSize
-				if end > len(toCopy) {
-					end = len(toCopy)
-				}
-
-				if query, err := RenderTableWithFiles(b.target, toCopy[i:end], b.rootStagingPath, d.templates.copyIntoDirect, bounds); err != nil {
-					return nil, fmt.Errorf("copyIntoDirect template: %w", err)
-				} else {
-					queries = append(queries, query)
-				}
-			}
-		} else {
-			for i := 0; i < len(toCopy); i += queryBatchSize {
-				end := i + queryBatchSize
-				if end > len(toCopy) {
-					end = len(toCopy)
-				}
-				if query, err := RenderTableWithFiles(b.target, fullPaths[i:end], b.rootStagingPath, d.templates.mergeInto, bounds); err != nil {
-					return nil, fmt.Errorf("mergeInto template: %w", err)
-				} else {
-					queries = append(queries, query)
-				}
-			}
+		queries, err := d.renderCommitQueries(b, toCopy, bounds, needsMerge)
+		if err != nil {
+			return nil, err
 		}
 
 		d.cp[b.target.StateKey] = &checkpointItem{
-			Queries:  queries,
-			ToDelete: fullPaths,
+			Queries:     queries,
+			ToDelete:    pathsWithRoot(b.rootStagingPath, toCopy),
+			StagedFiles: toCopy,
+			Bounds:      boundsLiterals(bounds),
+			NeedsMerge:  needsMerge,
 		}
 		b.needsMerge = false // reset for next round
 	}
@@ -746,34 +763,59 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 // state keys — this shard's own, and (as the primary) those of peer shards
 // and of prior sessions — and builds the state update which clears the
 // executed entries. It returns a nil state when no entry was executed.
+//
+// Entries are processed grouped by state key: one query over all shards'
+// staged files runs in a fraction of the time of the per-shard queries run
+// back to back, so outside of recovery each state key's entries coalesce into
+// a single set of commit queries.
 func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB, shouldProcess func(string) bool) (*pf.ConnectorState, error) {
-	executedOwn, err := d.applyCheckpoint(ctx, db, d.cp, shouldProcess)
-	if err != nil {
-		return nil, err
+	// Buckets of pending entries in execution order: this shard's own bucket,
+	// then the legacy and peer-range buckets sorted by range key. clearKey is
+	// where a bucket's executed entries clear in the emitted state — nested
+	// under its range key, or top-level (legacyRangeKey) for entries predating
+	// scale_out.
+	type bucket struct {
+		clearKey string
+		cp       checkpoint
 	}
+	var ownClearKey = legacyRangeKey
+	if d.scaleOut {
+		ownClearKey = d.rangeKey
+	}
+	var buckets = []bucket{{ownClearKey, d.cp}}
 
 	var peerRangeKeys = make([]string, 0, len(d.peerShardsCheckpoints))
 	for rk := range d.peerShardsCheckpoints {
 		peerRangeKeys = append(peerRangeKeys, rk)
 	}
 	sort.Strings(peerRangeKeys)
-
-	var executedPeers = make(map[string][]string)
-	var executedPeersCount int
 	for _, rk := range peerRangeKeys {
-		executed, err := d.applyCheckpoint(ctx, db, d.peerShardsCheckpoints[rk], shouldProcess)
-		if err != nil {
-			return nil, err
+		buckets = append(buckets, bucket{rk, d.peerShardsCheckpoints[rk]})
+	}
+
+	// Group the entries to process by state key, preserving bucket order
+	// within each group. Entries staged under other state keys are left
+	// untouched, remaining pending in the persisted state, as are entries of
+	// tables which no longer have a binding, since those tables might be
+	// deleted already.
+	type pendingEntry struct {
+		bucketIdx int
+		item      *checkpointItem
+	}
+	var groups = make(map[string][]pendingEntry)
+	var stateKeys []string
+	for bi, bkt := range buckets {
+		for sk, item := range bkt.cp {
+			if !shouldProcess(sk) || d.bindingForStateKey(sk) == nil {
+				continue
+			}
+			if _, ok := groups[sk]; !ok {
+				stateKeys = append(stateKeys, sk)
+			}
+			groups[sk] = append(groups[sk], pendingEntry{bi, item})
 		}
-		executedPeers[rk] = executed
-		executedPeersCount += len(executed)
 	}
-
-	d.cpRecovery = false
-
-	if len(executedOwn)+executedPeersCount == 0 {
-		return nil, nil
-	}
+	sort.Strings(stateKeys)
 
 	// After having applied the checkpoint, we try to clean up the checkpoint in the ack response
 	// so that a restart of the connector does not need to run the same queries again
@@ -783,40 +825,43 @@ func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB, should
 	// that have been committed in this transaction. The reason is that it may be the case that a binding
 	// which has been disabled right after a failed attempt to run its queries, must be able to recover by enabling
 	// the binding and running the queries that are pending for its last transaction.
+	var executedCount int
 	var clear = make(map[string]interface{})
-
-	if d.scaleOut {
-		if len(executedOwn) > 0 {
-			var ownClear = make(map[string]interface{})
-			for _, sk := range executedOwn {
-				ownClear[sk] = nil
-				delete(d.cp, sk)
-			}
-			clear[d.rangeKey] = ownClear
+	for _, sk := range stateKeys {
+		var entries = groups[sk]
+		var items = make([]*checkpointItem, len(entries))
+		for i, e := range entries {
+			items[i] = e.item
 		}
-	} else {
-		for _, sk := range executedOwn {
-			clear[sk] = nil
-			delete(d.cp, sk)
+		if err := d.executeStateKeyItems(ctx, db, sk, items); err != nil {
+			return nil, err
+		}
+		executedCount += len(entries)
+
+		for _, e := range entries {
+			var bkt = buckets[e.bucketIdx]
+			if bkt.clearKey == legacyRangeKey {
+				clear[sk] = nil
+			} else {
+				if clear[bkt.clearKey] == nil {
+					clear[bkt.clearKey] = make(map[string]interface{})
+				}
+				clear[bkt.clearKey].(map[string]interface{})[sk] = nil
+			}
+			delete(bkt.cp, sk)
 		}
 	}
 
-	for rk, executed := range executedPeers {
-		var bucket = d.peerShardsCheckpoints[rk]
-		for _, stateKey := range executed {
-			if rk == legacyRangeKey {
-				clear[stateKey] = nil
-			} else {
-				if clear[rk] == nil {
-					clear[rk] = make(map[string]interface{})
-				}
-				clear[rk].(map[string]interface{})[stateKey] = nil
-			}
-			delete(bucket, stateKey)
-		}
-		if len(bucket) == 0 {
+	for _, rk := range peerRangeKeys {
+		if len(d.peerShardsCheckpoints[rk]) == 0 {
 			delete(d.peerShardsCheckpoints, rk)
 		}
+	}
+
+	d.cpRecovery = false
+
+	if executedCount == 0 {
+		return nil, nil
 	}
 
 	checkpointJSON, err := json.Marshal(clear)
@@ -827,60 +872,161 @@ func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB, should
 	return &pf.ConnectorState{UpdatedJson: json.RawMessage(checkpointJSON), MergePatch: true}, nil
 }
 
-// applyCheckpoint executes the staged queries of every entry in cp whose
-// stateKey passes shouldProcess and still has an active binding, deleting
-// the staged files afterwards. It returns the stateKeys which were executed.
-// TODO: run these queries concurrently for improved performance
-func (d *transactor) applyCheckpoint(ctx context.Context, db *stdsql.DB, cp checkpoint, shouldProcess func(string) bool) ([]string, error) {
-	var executed []string
-	for stateKey, item := range cp {
-		// entries staged under other state keys are left untouched, remaining
-		// pending in the persisted state
-		if !shouldProcess(stateKey) {
+// executeStateKeyItems runs the pending queries of a single state key's
+// checkpoint entries and deletes their staged files. During recovery every
+// entry's pre-rendered queries run individually, keeping the tolerance for
+// already-executed entries — whose staged files are deleted — at its per-entry
+// granularity: a coalesced query would fail on the first missing file and skip
+// peers' unapplied work along with it. Otherwise entries carrying structured
+// staging metadata coalesce into a single set of commit queries over every
+// shard's staged files, and only entries written by older connector versions
+// fall back to their pre-rendered queries.
+func (d *transactor) executeStateKeyItems(ctx context.Context, db *stdsql.DB, stateKey string, items []*checkpointItem) error {
+	var b = d.bindingForStateKey(stateKey)
+
+	var coalesce []*checkpointItem
+	d.be.StartedResourceCommit(b.target.Path)
+	for _, item := range items {
+		if !d.cpRecovery && len(item.StagedFiles) > 0 {
+			coalesce = append(coalesce, item)
 			continue
 		}
 
-		path := d.pathForStateKey(stateKey)
-		// we skip queries that belong to tables which do not have a binding anymore
-		// since these tables might be deleted already
-		if len(path) == 0 {
-			continue
+		queries, err := itemQueries(item)
+		if err != nil {
+			return err
 		}
-
-		var queries = item.Queries
-		if item.Query != "" {
-			if len(queries) != 0 {
-				return nil, fmt.Errorf("checkpoint has both query and queries, this is unexpected")
-			}
-			queries = []string{item.Query}
+		if err := d.execQueries(ctx, db, queries); err != nil {
+			return err
 		}
-		d.be.StartedResourceCommit(path)
-		for _, query := range queries {
-			if _, err := db.ExecContext(ctx, query); err != nil {
-				// When doing a recovery apply, it may be the case that some tables & files have already been deleted after being applied
-				// it is okay to skip them in this case
-				if d.cpRecovery {
-					if strings.Contains(err.Error(), "PATH_NOT_FOUND") || strings.Contains(err.Error(), "Path does not exist") || strings.Contains(err.Error(), "Table doesn't exist") || strings.Contains(err.Error(), "TABLE_OR_VIEW_NOT_FOUND") {
-						continue
-					}
-				}
-				return nil, fmt.Errorf("query %q failed: %w", query, err)
-			}
-		}
-		d.be.FinishedResourceCommit(path)
-
-		// Cleanup files.
-		d.deleteFiles(ctx, item.ToDelete)
-		executed = append(executed, stateKey)
 	}
 
-	return executed, nil
+	if len(coalesce) > 0 {
+		var files []string
+		var needsMerge bool
+		for _, item := range coalesce {
+			files = append(files, item.StagedFiles...)
+			needsMerge = needsMerge || item.NeedsMerge
+		}
+
+		queries, err := d.renderCommitQueries(b, files, combineBounds(b.target.Keys, coalesce), needsMerge)
+		if err != nil {
+			return err
+		}
+		if err := d.execQueries(ctx, db, queries); err != nil {
+			return err
+		}
+	}
+	d.be.FinishedResourceCommit(b.target.Path)
+
+	for _, item := range items {
+		d.deleteFiles(ctx, item.ToDelete)
+	}
+
+	return nil
 }
 
-func (d *transactor) pathForStateKey(stateKey string) []string {
+func itemQueries(item *checkpointItem) ([]string, error) {
+	if item.Query != "" {
+		if len(item.Queries) != 0 {
+			return nil, fmt.Errorf("checkpoint has both query and queries, this is unexpected")
+		}
+		return []string{item.Query}, nil
+	}
+	return item.Queries, nil
+}
+
+func (d *transactor) execQueries(ctx context.Context, db *stdsql.DB, queries []string) error {
+	for _, query := range queries {
+		if _, err := db.ExecContext(ctx, query); err != nil {
+			// When doing a recovery apply, it may be the case that some tables & files have already been deleted after being applied
+			// it is okay to skip them in this case
+			if d.cpRecovery {
+				if strings.Contains(err.Error(), "PATH_NOT_FOUND") || strings.Contains(err.Error(), "Path does not exist") || strings.Contains(err.Error(), "Table doesn't exist") || strings.Contains(err.Error(), "TABLE_OR_VIEW_NOT_FOUND") {
+					continue
+				}
+			}
+			return fmt.Errorf("query %q failed: %w", query, err)
+		}
+	}
+	return nil
+}
+
+// renderCommitQueries renders the queries which commit a set of staged files
+// (named relative to the binding's staging root) into the binding's target
+// table: MERGE when any of the staged rows update existing documents, and a
+// direct COPY INTO otherwise, chunked to bound the size of any single query.
+func (d *transactor) renderCommitQueries(b *binding, files []string, bounds []sql.MergeBound, needsMerge bool) ([]string, error) {
+	var queries []string
+	for chunk := range slices.Chunk(files, queryBatchSize) {
+		if needsMerge {
+			if query, err := RenderTableWithFiles(b.target, pathsWithRoot(b.rootStagingPath, chunk), b.rootStagingPath, d.templates.mergeInto, bounds); err != nil {
+				return nil, fmt.Errorf("mergeInto template: %w", err)
+			} else {
+				queries = append(queries, query)
+			}
+		} else {
+			if query, err := RenderTableWithFiles(b.target, chunk, b.rootStagingPath, d.templates.copyIntoDirect, bounds); err != nil {
+				return nil, fmt.Errorf("copyIntoDirect template: %w", err)
+			} else {
+				queries = append(queries, query)
+			}
+		}
+	}
+	return queries, nil
+}
+
+// combineBounds unions the per-key-column merge bounds of coalesced checkpoint
+// entries. A column keeps a bound only when every entry carries one, and
+// differing literals combine with LEAST/GREATEST cast to the column's type:
+// those functions compare in their operands' type, and comparing e.g.
+// timestamp literals as strings can pick the wrong extremum.
+func combineBounds(keys []sql.Column, items []*checkpointItem) []sql.MergeBound {
+	var out = make([]sql.MergeBound, len(keys))
+	for i, key := range keys {
+		out[i] = sql.MergeBound{Column: key}
+
+		var valid = true
+		var lowers, uppers []string
+		for _, item := range items {
+			if len(item.Bounds) != len(keys) || item.Bounds[i].Lower == "" || item.Bounds[i].Upper == "" {
+				valid = false
+				break
+			}
+			if !slices.Contains(lowers, item.Bounds[i].Lower) {
+				lowers = append(lowers, item.Bounds[i].Lower)
+			}
+			if !slices.Contains(uppers, item.Bounds[i].Upper) {
+				uppers = append(uppers, item.Bounds[i].Upper)
+			}
+		}
+		if !valid {
+			continue
+		}
+
+		out[i].LiteralLower = extremumExpr("LEAST", lowers, key)
+		out[i].LiteralUpper = extremumExpr("GREATEST", uppers, key)
+	}
+	return out
+}
+
+// extremumExpr renders the SQL expression selecting fn (LEAST or GREATEST) of
+// the given literals, or the literal itself when they all agree.
+func extremumExpr(fn string, literals []string, key sql.Column) string {
+	if len(literals) == 1 {
+		return literals[0]
+	}
+	var cast = make([]string, len(literals))
+	for i, l := range literals {
+		cast[i] = fmt.Sprintf("%s::%s", l, key.BareDDL)
+	}
+	return fmt.Sprintf("%s(%s)", fn, strings.Join(cast, ", "))
+}
+
+func (d *transactor) bindingForStateKey(stateKey string) *binding {
 	for _, b := range d.bindings {
 		if b.target.StateKey == stateKey {
-			return b.target.Path
+			return b
 		}
 	}
 	return nil
