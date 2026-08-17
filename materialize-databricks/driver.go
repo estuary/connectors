@@ -522,8 +522,12 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 // uploaded to the staging volume and everything needed to commit them into the
 // target table.
 type checkpointItem struct {
-	Query    string   `json:",omitempty"` // deprecated, kept for backward compatibility
-	Queries  []string `json:",omitempty"` // deprecated, kept for backward compatibility
+	Query   string   `json:",omitempty"` // deprecated, kept for backward compatibility
+	Queries []string `json:",omitempty"` // deprecated, kept for backward compatibility
+	// TODO: consolidate ToDelete into StagedFiles, which records the same
+	// files relative to the binding's staging root. Kept for simplicity for
+	// now, and still read from checkpoints written by older versions whose
+	// entries carry only ToDelete.
 	ToDelete []string
 
 	// StagedFiles are the staged file names, relative to the binding's staging
