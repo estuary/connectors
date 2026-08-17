@@ -35,6 +35,12 @@ class JobMetrics:
     records: int = 0
     max_depth: int = 0
 
+    # Jobs that could only be completed by dropping fields Facebook refused to
+    # report on. Nothing marks the resulting records, so these counters are the
+    # only signal that a document is missing data it should have had.
+    degraded: int = 0
+    unfetched_fields: set[str] = field(default_factory=set)
+
     submitted_by_scope: dict[JobScope, int] = field(default_factory=_scope_counter)
     completed_by_scope: dict[JobScope, int] = field(default_factory=_scope_counter)
     pending_by_scope: dict[JobScope, int] = field(default_factory=_scope_counter)
@@ -56,6 +62,19 @@ class JobMetrics:
         """Track a job split (remove from pending, don't count as completed)."""
         self.split += 1
         self.pending_by_scope[job.scope] -= 1
+
+    def track_degraded(self, unfetched: list[str]) -> None:
+        """Track a job completed only by dropping fields Facebook refused."""
+        self.degraded += 1
+        self.unfetched_fields.update(unfetched)
+
+    def degradation_summary(self) -> str:
+        """Human-readable summary of data dropped during this fetch."""
+        if not self.degraded:
+            return "none"
+
+        fields = ", ".join(sorted(self.unfetched_fields))
+        return f"{self.degraded} jobs degraded, fields dropped: {fields}"
 
     def tree_progress_summary(self) -> str:
         """Generate tree progress summary string."""
