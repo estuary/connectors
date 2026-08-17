@@ -352,6 +352,12 @@ func TestStreamV2WritePathSwitch(t *testing.T) {
 	t.Run("a binding moved off this write path with rows in flight duplicates them", func(t *testing.T) {
 		truncate(t)
 
+		// Cutting a batch per document is what puts documents in flight without
+		// a flush, which is the state an interruption has to find.
+		var restore = streamV2BatchRows
+		t.Cleanup(func() { streamV2BatchRows = restore })
+		streamV2BatchRows = 1
+
 		// An interrupted transaction: Snowflake commits three documents and the
 		// session dies before any checkpoint records them.
 		var tgt = target("inflight.v1")
