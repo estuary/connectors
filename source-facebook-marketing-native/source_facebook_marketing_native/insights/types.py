@@ -150,6 +150,20 @@ class InsightsJob:
 
 
 @dataclass
+class FieldSplitPart:
+    """
+    One chunk of a field-split job: what it asked for and what came back.
+
+    The requested fields have to travel with the rows, because an empty chunk
+    is only interpretable next to its field set - without it there is no way to
+    say which fields a chunk that returned nothing failed to produce.
+    """
+
+    fields: list[str]
+    records: list[InsightRecord]
+
+
+@dataclass
 class JobOutcome:
     """Base class for job execution outcomes."""
 
