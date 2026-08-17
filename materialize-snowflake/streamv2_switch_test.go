@@ -13,6 +13,7 @@ import (
 	snowflake_auth "github.com/estuary/connectors/go/auth/snowflake"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	pm "github.com/estuary/flow/go/protocols/materialize"
 	jsonpatch "github.com/evanphx/json-patch/v5"
 	"github.com/stretchr/testify/require"
 )
@@ -217,6 +218,75 @@ func TestStreamV2SwitchOffTheWritePathIsRefused(t *testing.T) {
 		}))
 
 		require.NoError(t, d.addBinding(ctx, target(stateKey, true), false, true))
+	})
+}
+
+// TestStreamV2SwitchIsRefusedAtPublication covers the same switch one step
+// earlier, where the operator is still making it.
+//
+// Apply is the first RPC of a publication which carries both the specification
+// being published and the connector state the task has accumulated, so it is the
+// first point at which a binding's departure from this write path can be seen at
+// all. Refusing here fails the publication rather than the task it would leave
+// behind, which is the difference between an operator reading this message and
+// an operator reading it from a task that has already stopped.
+func TestStreamV2SwitchIsRefusedAtPublication(t *testing.T) {
+	var ctx = context.Background()
+	const stateKey, channel = "publish.v1", "task_00000000_publish_v1"
+
+	var state, err = json.Marshal(checkpoint{stateKey: &checkpointItem{
+		StreamV2: map[string]*streamV2Item{channel: {Channel: channel, Counter: 3, KeyEnd: math.MaxUint32}},
+	}})
+	require.NoError(t, err)
+
+	var specOf = func(t *testing.T, featureFlags string, delta bool) *pf.MaterializationSpec {
+		var spec = testStreamingSpec(t, featureFlags, true)
+		spec.Bindings = []*pf.MaterializationSpec_Binding{{
+			ResourcePath: []string{"mydb", "myschema", "TBL"},
+			StateKey:     stateKey,
+			DeltaUpdates: delta,
+		}}
+		return spec
+	}
+
+	t.Run("a publication which keeps the binding on the path is allowed", func(t *testing.T) {
+		require.NoError(t, refuseAbandonedStreamV2Bindings(specOf(t, "snowpipe_streaming_v2", true), state))
+	})
+
+	t.Run("a publication which turns the feature flag off is refused", func(t *testing.T) {
+		var err = refuseAbandonedStreamV2Bindings(specOf(t, "", true), state)
+		require.ErrorContains(t, err, channel)
+		require.ErrorContains(t, err, "backfill")
+	})
+
+	t.Run("a publication which moves the binding to standard updates is refused", func(t *testing.T) {
+		require.Error(t, refuseAbandonedStreamV2Bindings(specOf(t, "snowpipe_streaming_v2", false), state))
+	})
+
+	t.Run("a binding the state records nothing for is allowed", func(t *testing.T) {
+		var spec = specOf(t, "", true)
+		spec.Bindings[0].StateKey = "other.v1"
+		require.NoError(t, refuseAbandonedStreamV2Bindings(spec, state))
+	})
+
+	t.Run("a publication carrying no connector state is allowed", func(t *testing.T) {
+		require.NoError(t, refuseAbandonedStreamV2Bindings(specOf(t, "", true), nil))
+	})
+
+	t.Run("a binding dropped from the specification is allowed", func(t *testing.T) {
+		var spec = specOf(t, "", true)
+		spec.Bindings = nil
+		require.NoError(t, refuseAbandonedStreamV2Bindings(spec, state))
+	})
+
+	// The gate is what puts this ahead of the wrapped driver, so the refusal
+	// reaches the operator without Snowflake being touched at all.
+	t.Run("publishing is refused", func(t *testing.T) {
+		_, err := NewConnector().Apply(ctx, &pm.Request_Apply{
+			Materialization: specOf(t, "", true),
+			StateJson:       state,
+		})
+		require.ErrorContains(t, err, channel)
 	})
 }
 

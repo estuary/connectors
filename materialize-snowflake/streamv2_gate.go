@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -56,6 +57,8 @@ func (d gatedDriver) Validate(ctx context.Context, req *pm.Request_Validate) (*p
 func (d gatedDriver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
 	if err := requireStreamingV2Runtime(req.Materialization); err != nil {
 		return nil, err
+	} else if err := refuseAbandonedStreamV2Bindings(req.Materialization, req.StateJson); err != nil {
+		return nil, err
 	}
 
 	return d.Driver.Apply(ctx, req)
@@ -102,6 +105,52 @@ func missingRuntimeV2Warning(configJson json.RawMessage, last *pf.Materializatio
 		"this task's last published specification did not run the v2 materialization runtime, which the %q feature flag requires: unless this publication also adds %q to the task's shards.flags, the task will refuse to start",
 		flagSnowpipeStreamingV2, boilerplate.RuntimeV2FlagName,
 	)
+}
+
+// refuseAbandonedStreamV2Bindings refuses a publication which moves a binding
+// off the snowpipe_streaming_v2 write path — see streamV2PathAbandoned for what
+// that costs the binding.
+//
+// The transactor refuses the same thing, and has to: the connector state a task
+// runs on is its own, and a specification published before this check existed
+// may already have made the move. But a task which refuses is a task an operator
+// has to notice, while a publication which refuses is one they are already
+// watching. Apply is the earliest RPC that can tell: it is the first to carry
+// both the specification being published and the connector state the task has
+// accumulated, which Validate does not.
+//
+// A state document this connector cannot read reports nothing rather than
+// refusing. The runtime owns that document's shape, and a binding whose write
+// path cannot be established from it is one the transactor will establish for
+// itself.
+func refuseAbandonedStreamV2Bindings(spec *pf.MaterializationSpec, stateJson json.RawMessage) error {
+	if spec == nil || len(stateJson) == 0 {
+		return nil
+	}
+
+	var cfg config
+	if err := json.Unmarshal(spec.ConfigJson, &cfg); err != nil {
+		return fmt.Errorf("parsing endpoint config: %w", err)
+	} else if cfg.Credentials == nil {
+		// Which the boilerplate's own validation reports, and better.
+		return nil
+	}
+
+	var cp checkpoint
+	if err := json.Unmarshal(stateJson, &cp); err != nil {
+		return nil
+	}
+
+	var flagEnabled = boilerplate.ParseFlags(cfg)[flagSnowpipeStreamingV2]
+	for _, binding := range spec.Bindings {
+		var item = cp[binding.StateKey]
+		if item == nil || streamsV2(&cfg, binding.DeltaUpdates, flagEnabled) {
+			continue
+		} else if err := streamV2PathAbandoned(strings.Join(binding.ResourcePath, "."), item.StreamV2); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // requireStreamingV2Runtime reports whether the given task spec may run the
