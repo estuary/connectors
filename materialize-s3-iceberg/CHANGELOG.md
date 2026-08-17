@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-08-17
+
+### Changed
+- With `variant_columns` enabled, a string stored in a variant column now uses
+  the type implied by its format annotation instead of always being stored as
+  a variant string, matching how the same value is typed as a column of its
+  own: `{format: date-time}` becomes a variant timestamp (nanosecond precision
+  when `nanosecond_timestamps` is also enabled), `{format: date}` a variant
+  date, and `{contentEncoding: base64}` variant binary. Formats with no variant
+  equivalent — `uuid`, `time`, and `duration` — are stored as strings, as they
+  are in a column of their own, and a value that fails to parse as its
+  annotated type is stored as a string. Only top-level fields carry format
+  annotations, so values nested inside an object, an array, or the root
+  document are stored as strings.
+
 ## 2026-07-23
 
 ### Changed
