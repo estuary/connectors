@@ -23,13 +23,13 @@ catalog:
     # Set to 076183946664 if the credentials belong to a different account.
 advanced:
     feature_flags: allow_existing_tables_for_new_bindings
-    nanosecond_timestamps: true
+    variant_columns: true
 sops:
     gcp_kms:
         - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
           created_at: "2026-07-17T23:12:34Z"
           enc: CiUAdmEdwqV0pPxTTaGNVcoC9OWfwhlSJ0eAu+5JAgk0nzt4HnroEkkApbezqgPNJP4KubS8KXEg6K0Cz9dsuJD/A8ntGW7dLX7QXGB8FsRdRPZObtcqwCnIgqQo3bEkCnnGlpu0qeZba59DIvQRCqJ3
-    lastmodified: "2026-07-17T23:12:34Z"
-    mac: ENC[AES256_GCM,data:prhAMeSpQRbpKNOU+eQmtQzO2NdfVjci/jX/um4H+44Mh+obFJXczDJk3tLa9R3utvjcvQNbvGVu1C+WNndg/uDW4ctGuZt9fpq8pps3Ha+LKkpmsXQKrokWx6jJwIISr7/ZYddEFF816Zf2iQPlneG4KWItZEPAUrFxS3YnVgI=,iv:L1P+mq2hJh99lrAYCOh0u6YVBPC/goWiotcuBe2qurc=,tag:i0KFfpyNqtoLtFaUJhXR8w==,type:str]
+    lastmodified: "2026-07-22T02:49:47Z"
+    mac: ENC[AES256_GCM,data:cq2LiMw/W58oJngf65sHYO2S0JT1Nbw5+oHnCbOh4APL3ax21aDPk8eMY0zJkVn7RKDWmFHf4tAbQebc6W49sthucDvTtUjL52EFC+UI9hVgGYY5jpP0W//f+b2gTjDy8jSDvB+sC5OIVdQTbsMAC0tsDPkrmP8g/GlhkCzadTc=,iv:JNCEu/2nYJbeRKJJwdRPLqDXq040cTQN0vNCkxhHwWw=,tag:no1IXFEbqdN/gs8c7rcAww==,type:str]
     encrypted_suffix: _sops
     version: 3.12.1

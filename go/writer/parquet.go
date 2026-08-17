@@ -14,12 +14,14 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/decimal128"
 	"github.com/apache/arrow-go/v18/parquet"
 	"github.com/apache/arrow-go/v18/parquet/compress"
 	"github.com/apache/arrow-go/v18/parquet/file"
 	"github.com/apache/arrow-go/v18/parquet/metadata"
 	"github.com/apache/arrow-go/v18/parquet/schema"
+	"github.com/apache/arrow-go/v18/parquet/variant"
 	"github.com/google/uuid"
 	"github.com/segmentio/encoding/json"
 	iso8601 "github.com/senseyeio/duration"
@@ -82,7 +84,7 @@ func newRowSizing(sch ParquetSchema) rowSize {
 			rs.fixed += 8
 		case PrimitiveTypeBoolean:
 			rs.fixed += 1
-		case PrimitiveTypeBinary, LogicalTypeJson, LogicalTypeDecimal:
+		case PrimitiveTypeBinary, LogicalTypeJson, LogicalTypeDecimal, LogicalTypeVariant:
 			rs.fixed += 24 // slice header
 			rs.calcLen = append(rs.calcLen, idx)
 		case LogicalTypeString, LogicalTypeUuid, LogicalTypeDate, LogicalTypeTime, LogicalTypeTimestamp, LogicalTypeTimestampNanos, LogicalTypeInterval:
@@ -141,12 +143,13 @@ type parquetConfig struct {
 type ParquetWriter struct {
 	cfg parquetConfig
 
-	schema        ParquetSchema
-	schemaRoot    *schema.GroupNode
-	sinkWriter    *file.Writer
-	cwc           *countingWriteCloser
-	rs            rowSize
-	rowGroupCount int
+	schema         ParquetSchema
+	schemaRoot     *schema.GroupNode
+	sinkWriter     *file.Writer
+	cwc            *countingWriteCloser
+	rs             rowSize
+	rowGroupCount  int
+	numLeafColumns int
 
 	// Scratch values are re-initialized as scratch files are transposed into the output stream.
 	scratch struct {
@@ -225,22 +228,23 @@ func NewParquetWriter(w io.WriteCloser, sch ParquetSchema, opts ...ParquetOption
 	// streaming to a cloud-storage upload, and its very first write (the parquet magic header)
 	// can fail transiently (e.g. a broken pipe). The legacy file.NewParquetWriter panics in that
 	// case; returning the error instead lets the caller surface it as a normal, retryable failure.
-	sinkWriter, err := file.NewParquetWriterWithError(cwc, schemaRoot, writerOpts(cfg)...)
+	sinkWriter, err := file.NewParquetWriterWithError(cwc, schemaRoot, writerOpts(cfg, sch)...)
 	if err != nil {
 		return nil, fmt.Errorf("initializing parquet sink writer: %w", err)
 	}
 
 	return &ParquetWriter{
-		cfg:        cfg,
-		schema:     sch,
-		schemaRoot: schemaRoot,
-		sinkWriter: sinkWriter,
-		cwc:        cwc,
-		rs:         newRowSizing(sch),
+		cfg:            cfg,
+		schema:         sch,
+		schemaRoot:     schemaRoot,
+		sinkWriter:     sinkWriter,
+		cwc:            cwc,
+		rs:             newRowSizing(sch),
+		numLeafColumns: schema.NewSchema(schemaRoot).NumColumns(),
 	}, nil
 }
 
-func writerOpts(cfg parquetConfig) []file.WriteOption {
+func writerOpts(cfg parquetConfig, sch ParquetSchema) []file.WriteOption {
 	propOpts := []parquet.WriterProperty{}
 
 	switch cfg.compression {
@@ -256,6 +260,18 @@ func writerOpts(cfg parquetConfig) []file.WriteOption {
 
 	if cfg.disableDictionaryEncoding {
 		propOpts = append(propOpts, parquet.WithDictionaryDefault(false))
+	}
+
+	// Byte-wise min/max values of the variant binary encoding are meaningless
+	// for readers and potentially very large, so statistics are disabled for
+	// the leaf columns of variant groups.
+	for _, e := range sch {
+		if e.DataType == LogicalTypeVariant {
+			propOpts = append(propOpts,
+				parquet.WithStatsPath(parquet.ColumnPath{e.Name, "metadata"}, false),
+				parquet.WithStatsPath(parquet.ColumnPath{e.Name, "value"}, false),
+			)
+		}
 	}
 
 	out := []file.WriteOption{file.WithWriterProps(parquet.NewWriterProperties(propOpts...))}
@@ -426,6 +442,15 @@ func (w *ParquetWriter) flushBuffer() error {
 
 	// Transpose the buffered rows into the scratch file row group by writing them column-by-column.
 	for colIdx, f := range w.schema {
+		// A variant element is a group of two leaf columns and so consumes two
+		// of the row group's columns, unlike every other element.
+		if f.DataType == LogicalTypeVariant {
+			if err := writeVariantColumn(f, colIdx, w.buffer, rgWriter); err != nil {
+				return fmt.Errorf("writing variant column '%s': %w", f.Name, err)
+			}
+			continue
+		}
+
 		cw, err := rgWriter.NextColumn()
 		if err != nil {
 			return fmt.Errorf("getting next column: %w", err)
@@ -498,7 +523,7 @@ func (w *ParquetWriter) flushBuffer() error {
 	}
 
 	w.scratch.sizeBytes += int(rgWriter.TotalBytesWritten())
-	w.scratch.columnChunkCount += len(w.schema)
+	w.scratch.columnChunkCount += w.numLeafColumns
 	w.buffer = w.buffer[:0]
 	w.bufferSizeBytes = 0
 
@@ -572,6 +597,133 @@ func writeColumn[T parquetValue](
 		return fmt.Errorf("writing batch of values: %w", err)
 	} else if int(valuesWritten) != len(vals) {
 		return fmt.Errorf("written %d values vs. %d values in vals", valuesWritten, len(vals))
+	}
+
+	return nil
+}
+
+// encodeVariant encodes a value into the unshredded Variant V1 binary form.
+//
+// Scalars are appended to a variant builder directly rather than being marshaled to JSON that the
+// parse below would immediately undo — that round trip is what a multi-type field's scalar values
+// would otherwise pay for. Everything else is encoded from its JSON serialization, which is free
+// for the objects, arrays, and root documents that arrive as json.RawMessage, and is also the only
+// path that can represent a uint64 too large for the variant integer types.
+func encodeVariant(val any, stringType ParquetDataType) (variant.Value, error) {
+	var b variant.Builder
+	var err error
+	var scalar = true
+
+	switch v := val.(type) {
+	case string:
+		err = appendVariantString(&b, v, stringType)
+	case bool:
+		err = b.AppendBool(v)
+	case int64:
+		err = b.AppendInt(v)
+	case float64:
+		err = b.AppendFloat64(v)
+	case uint64:
+		if v <= math.MaxInt64 {
+			err = b.AppendInt(int64(v))
+		} else {
+			scalar = false
+		}
+	default:
+		scalar = false
+	}
+	if err != nil {
+		return variant.Value{}, err
+	} else if scalar {
+		return b.Build()
+	}
+
+	jsonVal, err := getJsonVal(val)
+	if err != nil {
+		return variant.Value{}, fmt.Errorf("getting JSON value: %w", err)
+	}
+
+	return variant.ParseJSONBytes(jsonVal, false)
+}
+
+// appendVariantString appends v as the variant type implied by its format
+// annotation, so that a formatted string is stored the same way it would be as
+// a column of its own.
+//
+// A string that does not parse is appended as a variant string. A variant holds
+// values of any type, so keeping the value costs nothing here, unlike the typed
+// columns whose converters have nowhere but an error to put it.
+func appendVariantString(b *variant.Builder, v string, stringType ParquetDataType) error {
+	switch stringType {
+	case LogicalTypeDate:
+		if d, err := getDateVal(v); err == nil {
+			return b.AppendDate(arrow.Date32(d))
+		}
+	case LogicalTypeTimestamp:
+		if ts, err := getTimestampVal(v); err == nil {
+			return b.AppendTimestamp(arrow.Timestamp(ts), true, true)
+		}
+	case LogicalTypeTimestampNanos:
+		if ts, err := getTimestampNanosVal(v); err == nil {
+			return b.AppendTimestamp(arrow.Timestamp(ts), false, true)
+		}
+	case LogicalTypeTime:
+		if t, err := getTimeVal(v); err == nil {
+			return b.AppendTimeMicro(arrow.Time64(t))
+		}
+	case LogicalTypeUuid:
+		if u, err := uuid.Parse(v); err == nil {
+			return b.AppendUUID(u)
+		}
+	case PrimitiveTypeBinary:
+		if bs, err := getBinaryVal(v); err == nil {
+			return b.AppendBinary(bs)
+		}
+	}
+
+	return b.AppendString(v)
+}
+
+// writeVariantColumn writes a variant schema element as its two leaf columns: each non-null value
+// is encoded from its JSON serialization to the unshredded Variant V1 binary form, and the
+// resulting metadata and value byte arrays are written as consecutive columns of the row group,
+// sharing the definition levels of the enclosing variant group.
+func writeVariantColumn(e ParquetSchemaElement, colIdx int, buf [][]any, rgWriter file.SerialRowGroupWriter) error {
+	var metaVals = make([]parquet.ByteArray, 0, len(buf))
+	var valueVals = make([]parquet.ByteArray, 0, len(buf))
+	var defLevels = make([]int16, 0, len(buf))
+
+	for _, row := range buf {
+		if row[colIdx] == nil {
+			defLevels = append(defLevels, 0)
+			continue
+		}
+
+		encoded, err := encodeVariant(row[colIdx], e.VariantStringType)
+		if err != nil {
+			return fmt.Errorf("encoding value as variant: %w (type %T)", err, row[colIdx])
+		}
+
+		metaVals = append(metaVals, parquet.ByteArray(encoded.Metadata().Bytes()))
+		valueVals = append(valueVals, parquet.ByteArray(encoded.Bytes()))
+		defLevels = append(defLevels, 1)
+	}
+
+	for _, vals := range [][]parquet.ByteArray{metaVals, valueVals} {
+		cw, err := rgWriter.NextColumn()
+		if err != nil {
+			return fmt.Errorf("getting next column: %w", err)
+		}
+
+		if valuesWritten, err := cw.(*file.ByteArrayColumnChunkWriter).WriteBatch(vals, defLevels, nil); err != nil {
+			return fmt.Errorf("writing batch of values: %w", err)
+		} else if int(valuesWritten) != len(vals) {
+			return fmt.Errorf("written %d values vs. %d values in vals", valuesWritten, len(vals))
+		}
+
+		if err := cw.Close(); err != nil {
+			return fmt.Errorf("closing column writer: %w", err)
+		}
 	}
 
 	return nil

@@ -2,14 +2,15 @@ package connector
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	"path"
+	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
@@ -129,6 +130,7 @@ func (catalogConfig) JSONSchema() *jsonschema.Schema {
 type advancedConfig struct {
 	FeatureFlags         *string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.,nullable" jsonschema_extras:"nonsensitive=true"`
 	NanosecondTimestamps bool    `json:"nanosecond_timestamps,omitempty" jsonschema:"title=Nanosecond Timestamps,description=Use nanosecond precision (Iceberg format v3) for date-time columns instead of microsecond precision (format v2). Toggling this on an existing materialization applies to data going forward: existing rows read as null for converted columns unless the binding is explicitly backfilled.,default=false" jsonschema_extras:"nonsensitive=true"`
+	VariantColumns       bool    `json:"variant_columns,omitempty" jsonschema:"title=Variant Columns,description=Use the Iceberg variant column type (format v3) for object/array/multi-type fields and the root document instead of JSON strings. Toggling this on an existing materialization applies to data going forward: existing rows read as null for converted columns unless the binding is explicitly backfilled.,default=false" jsonschema_extras:"nonsensitive=true"`
 }
 
 func (c config) s3StoreConfig() filesink.S3StoreConfig {
@@ -256,6 +258,10 @@ func (c config) FeatureFlags() (string, map[string]bool) {
 
 func (c config) nanosecondTimestamps() bool {
 	return c.Advanced != nil && c.Advanced.NanosecondTimestamps
+}
+
+func (c config) variantColumns() bool {
+	return c.Advanced != nil && c.Advanced.VariantColumns
 }
 
 func parse8601(in string) (time.Duration, error) {
@@ -499,14 +505,14 @@ func (d *materialization) NewConstraint(p pf.Projection, deltaUpdates bool, fc f
 }
 
 func (d *materialization) MapType(p boilerplate.Projection, fc fieldConfig) (mappedType, boilerplate.ElementConverter) {
-	s, err := projectionToParquetSchemaElement(p.Projection, fc, d.cfg.nanosecondTimestamps())
+	s, err := projectionToParquetSchemaElement(p.Projection, fc, d.cfg)
 	if err != nil {
 		// The only error here is ignoreStringFormat being set on a non-string
 		// field, where it is a no-op. Map by the field's native type rather
 		// than returning a zero mappedType, whose nil iceberg.Type would panic
 		// in String/Compatible. The misconfiguration still surfaces with a
 		// clear error at table creation (parquetSchema).
-		s, _ = projectionToParquetSchemaElement(p.Projection, fieldConfig{}, d.cfg.nanosecondTimestamps())
+		s, _ = projectionToParquetSchemaElement(p.Projection, fieldConfig{}, d.cfg)
 	}
 
 	// Clamp date and timestamp values before they reach the writer: microsecond
@@ -571,7 +577,7 @@ func (d *materialization) NewTransactor(
 
 	for i := range mappedBindings {
 		b := &mappedBindings[i]
-		pqSchema, err := parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap, d.cfg.nanosecondTimestamps())
+		pqSchema, err := parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap, d.cfg)
 		if err != nil {
 			return nil, err
 		}
@@ -675,7 +681,10 @@ func (d *materialization) SnapshotTestResource(ctx context.Context, path []strin
 
 	sort.Strings(parquetKeys)
 
-	// Read parquet files using duckdb.
+	// Read parquet files using the in-process DuckDB pinned in go.mod rather
+	// than a host CLI: snapshot content must not depend on whichever duckdb
+	// version a contributor or CI happens to have installed, and variant
+	// columns are only readable from DuckDB 1.5.3 on.
 	var allRows []map[string]any
 	for _, key := range parquetKeys {
 		getOut, err := s3client.GetObject(ctx, &s3.GetObjectInput{
@@ -692,29 +701,9 @@ func (d *materialization) SnapshotTestResource(ctx context.Context, path []strin
 			return nil, nil, fmt.Errorf("reading object %s: %w", key, err)
 		}
 
-		tmpFile, err := os.CreateTemp("", "iceberg-test-*.parquet")
+		rows, err := duckdbReadParquet(ctx, data)
 		if err != nil {
-			return nil, nil, err
-		}
-		tmpPath := tmpFile.Name()
-		if _, err := tmpFile.Write(data); err != nil {
-			tmpFile.Close()
-			os.Remove(tmpPath)
-			return nil, nil, err
-		}
-		tmpFile.Close()
-
-		out, err := exec.CommandContext(ctx, "duckdb", "-json", ":memory:",
-			fmt.Sprintf("SET timezone TO 'UTC'; SELECT * FROM '%s' ORDER BY flow_published_at;", tmpPath),
-		).Output()
-		os.Remove(tmpPath)
-		if err != nil {
-			return nil, nil, fmt.Errorf("running duckdb on %s: %w", key, err)
-		}
-
-		var rows []map[string]any
-		if err := json.Unmarshal(out, &rows); err != nil {
-			return nil, nil, fmt.Errorf("parsing duckdb output: %w", err)
+			return nil, nil, fmt.Errorf("reading %s with duckdb: %w", key, err)
 		}
 		allRows = append(allRows, rows...)
 	}
@@ -759,6 +748,108 @@ func (d *materialization) SnapshotTestResource(ctx context.Context, path []strin
 	})
 
 	return columns, result, nil
+}
+
+// duckdbReadParquet runs the in-process DuckDB over a parquet file's bytes and
+// returns its rows. The file is staged in a temp directory that is removed
+// before returning rather than accumulating across a caller's loop.
+func duckdbReadParquet(ctx context.Context, data []byte) ([]map[string]any, error) {
+	tmpDir, err := os.MkdirTemp("", "iceberg-test-*")
+	if err != nil {
+		return nil, fmt.Errorf("creating temporary directory: %w", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	var tmpPath = filepath.Join(tmpDir, "data.parquet")
+	if err := os.WriteFile(tmpPath, data, 0o644); err != nil {
+		return nil, fmt.Errorf("writing %s: %w", tmpPath, err)
+	}
+
+	db, err := sql.Open("duckdb", "") // opens an in-memory database
+	if err != nil {
+		return nil, fmt.Errorf("opening duckdb: %w", err)
+	}
+	defer db.Close()
+
+	if _, err := db.ExecContext(ctx, "SET timezone TO 'UTC'"); err != nil {
+		return nil, fmt.Errorf("setting duckdb timezone: %w", err)
+	}
+
+	selectList, err := duckdbSelectList(ctx, db, tmpPath)
+	if err != nil {
+		return nil, err
+	}
+
+	var outPath = filepath.Join(tmpDir, "out.json")
+	if _, err := db.ExecContext(ctx, fmt.Sprintf(
+		"COPY (SELECT %s FROM '%s' ORDER BY flow_published_at) TO '%s' (FORMAT JSON, ARRAY true)",
+		selectList, tmpPath, outPath,
+	)); err != nil {
+		return nil, fmt.Errorf("running duckdb copy: %w", err)
+	}
+
+	out, err := os.ReadFile(outPath)
+	if err != nil {
+		return nil, fmt.Errorf("reading duckdb output: %w", err)
+	}
+
+	var rows []map[string]any
+	if err := json.Unmarshal(out, &rows); err != nil {
+		return nil, fmt.Errorf("parsing duckdb output: %w", err)
+	}
+
+	return rows, nil
+}
+
+// duckdbSelectList builds the projection for reading a parquet file, casting
+// VARIANT columns to JSON. Without the cast a variant column is serialized
+// using DuckDB's display form (`{'k': v}`, values unquoted) rather than as
+// JSON, which is neither valid JSON nor comparable to the JSON string columns
+// the same field produces without variant_columns enabled.
+func duckdbSelectList(ctx context.Context, db *sql.DB, path string) (string, error) {
+	rows, err := db.QueryContext(ctx, fmt.Sprintf("DESCRIBE SELECT * FROM '%s'", path))
+	if err != nil {
+		return "", fmt.Errorf("describing %s: %w", path, err)
+	}
+	defer rows.Close()
+
+	cols, err := rows.Columns()
+	if err != nil {
+		return "", fmt.Errorf("getting DESCRIBE columns: %w", err)
+	}
+
+	var out []string
+	for rows.Next() {
+		var vals = make([]any, len(cols))
+		for i := range vals {
+			vals[i] = new(sql.NullString)
+		}
+		if err := rows.Scan(vals...); err != nil {
+			return "", fmt.Errorf("scanning DESCRIBE row: %w", err)
+		}
+
+		var name, typ string
+		for i, c := range cols {
+			switch c {
+			case "column_name":
+				name = vals[i].(*sql.NullString).String
+			case "column_type":
+				typ = vals[i].(*sql.NullString).String
+			}
+		}
+
+		var quoted = fmt.Sprintf(`"%s"`, strings.ReplaceAll(name, `"`, `""`))
+		if typ == "VARIANT" {
+			out = append(out, fmt.Sprintf("%s::JSON AS %s", quoted, quoted))
+		} else {
+			out = append(out, quoted)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return "", fmt.Errorf("iterating DESCRIBE rows: %w", err)
+	}
+
+	return strings.Join(out, ", "), nil
 }
 
 func (d *materialization) Close(ctx context.Context) {}

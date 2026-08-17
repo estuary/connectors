@@ -186,6 +186,40 @@ func TestMakeNode(t *testing.T) {
 	}
 }
 
+func TestMakeNodeVariant(t *testing.T) {
+	const fid = int32(42)
+
+	for _, required := range []bool{true, false} {
+		t.Run(fmt.Sprintf("required=%v", required), func(t *testing.T) {
+			node := makeNode(ParquetSchemaElement{Name: "variantField", DataType: LogicalTypeVariant, Required: required, FieldId: ptrTo(fid)})
+
+			require.Equal(t, "variantField", node.Name())
+			require.Equal(t, fid, node.FieldID(), "FieldId must be propagated to the variant group node")
+
+			wantRep := parquet.Repetitions.Optional
+			if required {
+				wantRep = parquet.Repetitions.Required
+			}
+			require.Equal(t, wantRep, node.RepetitionType())
+
+			gn, ok := node.(*schema.GroupNode)
+			require.True(t, ok, "expected *schema.GroupNode, got %T", node)
+			_, ok = gn.LogicalType().(schema.VariantLogicalType)
+			require.True(t, ok, "expected VariantLogicalType, got %T", gn.LogicalType())
+
+			require.Equal(t, 2, gn.NumFields())
+			for idx, name := range []string{"metadata", "value"} {
+				leaf, ok := gn.Field(idx).(*schema.PrimitiveNode)
+				require.True(t, ok, "expected *schema.PrimitiveNode for %q, got %T", name, gn.Field(idx))
+				require.Equal(t, name, leaf.Name())
+				require.Equal(t, parquet.Repetitions.Required, leaf.RepetitionType())
+				require.Equal(t, parquet.Types.ByteArray, leaf.PhysicalType())
+				require.EqualValues(t, -1, leaf.FieldID(), "variant sub-fields are not columns of the table schema and must not carry field IDs")
+			}
+		})
+	}
+}
+
 func TestMakeNodeNilFieldId(t *testing.T) {
 	// Every supported data type must produce a node with FieldID() == -1
 	// when the schema element does not specify a FieldId.
@@ -203,6 +237,7 @@ func TestMakeNodeNilFieldId(t *testing.T) {
 		LogicalTypeUuid,
 		LogicalTypeDecimal,
 		LogicalTypeInterval,
+		LogicalTypeVariant,
 		LogicalTypeUnknown,
 	}
 	for _, dt := range dataTypes {
@@ -227,6 +262,7 @@ func TestProjectionToParquetSchemaElement(t *testing.T) {
 		opts         []ParquetSchemaOption
 		wantType     ParquetDataType
 		wantRequired bool
+		wantVariant  ParquetDataType
 	}{
 		{
 			name: "castToString short-circuits all inference",
@@ -625,6 +661,155 @@ func TestProjectionToParquetSchemaElement(t *testing.T) {
 			wantType:     LogicalTypeTimestampNanos,
 			wantRequired: true,
 		},
+		{
+			name: "WithParquetSchemaJSONAsVariant flips object to variant",
+			projection: pf.Projection{
+				Field: "f",
+				Inference: pf.Inference{
+					Exists: pf.Inference_MUST,
+					Types:  []string{"object"},
+				},
+			},
+			opts:         []ParquetSchemaOption{WithParquetSchemaJSONAsVariant()},
+			wantType:     LogicalTypeVariant,
+			wantRequired: true,
+		},
+		{
+			name: "WithParquetSchemaJSONAsVariant flips array to variant",
+			projection: pf.Projection{
+				Field: "f",
+				Inference: pf.Inference{
+					Exists: pf.Inference_MUST,
+					Types:  []string{"array"},
+				},
+			},
+			opts:         []ParquetSchemaOption{WithParquetSchemaJSONAsVariant()},
+			wantType:     LogicalTypeVariant,
+			wantRequired: true,
+		},
+		{
+			name: "WithParquetSchemaJSONAsVariant flips multi-type fallback to variant",
+			projection: pf.Projection{
+				Field: "f",
+				Inference: pf.Inference{
+					Exists: pf.Inference_MUST,
+					Types:  []string{"integer", "boolean"},
+				},
+			},
+			opts:         []ParquetSchemaOption{WithParquetSchemaJSONAsVariant()},
+			wantType:     LogicalTypeVariant,
+			wantRequired: true,
+		},
+		{
+			name: "WithParquetSchemaJSONAsVariant takes precedence over as-string options",
+			projection: pf.Projection{
+				Field: "f",
+				Inference: pf.Inference{
+					Exists: pf.Inference_MUST,
+					Types:  []string{"object"},
+				},
+			},
+			opts: []ParquetSchemaOption{
+				WithParquetSchemaArrayAsString(),
+				WithParquetSchemaObjectAsString(),
+				WithParquetSchemaJSONAsVariant(),
+			},
+			wantType:     LogicalTypeVariant,
+			wantRequired: true,
+		},
+		{
+			name: "castToString overrides WithParquetSchemaJSONAsVariant",
+			projection: pf.Projection{
+				Field: "f",
+				Inference: pf.Inference{
+					Exists: pf.Inference_MUST,
+					Types:  []string{"object"},
+				},
+			},
+			castToString: true,
+			opts:         []ParquetSchemaOption{WithParquetSchemaJSONAsVariant()},
+			wantType:     LogicalTypeString,
+			wantRequired: true,
+		},
+		{
+			name: "multiple types with date-time format resolves the variant string type",
+			projection: pf.Projection{
+				Field: "f",
+				Inference: pf.Inference{
+					Exists:  pf.Inference_MUST,
+					Types:   []string{"integer", "string"},
+					String_: &pf.Inference_String{Format: "date-time"},
+				},
+			},
+			opts:         []ParquetSchemaOption{WithParquetSchemaJSONAsVariant()},
+			wantType:     LogicalTypeVariant,
+			wantRequired: true,
+			wantVariant:  LogicalTypeTimestamp,
+		},
+		{
+			name: "the variant string type honors WithParquetTimestampAsNanoseconds",
+			projection: pf.Projection{
+				Field: "f",
+				Inference: pf.Inference{
+					Exists:  pf.Inference_MUST,
+					Types:   []string{"integer", "string"},
+					String_: &pf.Inference_String{Format: "date-time"},
+				},
+			},
+			opts: []ParquetSchemaOption{
+				WithParquetSchemaJSONAsVariant(),
+				WithParquetTimestampAsNanoseconds(),
+			},
+			wantType:     LogicalTypeVariant,
+			wantRequired: true,
+			wantVariant:  LogicalTypeTimestampNanos,
+		},
+		{
+			name: "the variant string type honors as-string options",
+			projection: pf.Projection{
+				Field: "f",
+				Inference: pf.Inference{
+					Exists:  pf.Inference_MUST,
+					Types:   []string{"integer", "string"},
+					String_: &pf.Inference_String{Format: "uuid"},
+				},
+			},
+			opts: []ParquetSchemaOption{
+				WithParquetSchemaJSONAsVariant(),
+				WithParquetUUIDAsString(),
+			},
+			wantType:     LogicalTypeVariant,
+			wantRequired: true,
+			wantVariant:  LogicalTypeString,
+		},
+		{
+			name: "multiple types with base64 content encoding resolves to binary",
+			projection: pf.Projection{
+				Field: "f",
+				Inference: pf.Inference{
+					Exists:  pf.Inference_MUST,
+					Types:   []string{"integer", "string"},
+					String_: &pf.Inference_String{ContentEncoding: "base64"},
+				},
+			},
+			opts:         []ParquetSchemaOption{WithParquetSchemaJSONAsVariant()},
+			wantType:     LogicalTypeVariant,
+			wantRequired: true,
+			wantVariant:  PrimitiveTypeBinary,
+		},
+		{
+			name: "an object variant has no string type to resolve",
+			projection: pf.Projection{
+				Field: "f",
+				Inference: pf.Inference{
+					Exists: pf.Inference_MUST,
+					Types:  []string{"object"},
+				},
+			},
+			opts:         []ParquetSchemaOption{WithParquetSchemaJSONAsVariant()},
+			wantType:     LogicalTypeVariant,
+			wantRequired: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -633,6 +818,7 @@ func TestProjectionToParquetSchemaElement(t *testing.T) {
 			require.Equal(t, tt.projection.Field, got.Name)
 			require.Equal(t, tt.wantType, got.DataType)
 			require.Equal(t, tt.wantRequired, got.Required)
+			require.Equal(t, tt.wantVariant, got.VariantStringType)
 		})
 	}
 }
