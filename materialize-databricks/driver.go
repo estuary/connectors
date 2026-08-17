@@ -521,16 +521,15 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 // checkpointItem is one binding's staged-but-not-yet-committed work: the files
 // uploaded to the staging volume and everything needed to commit them into the
 // target table.
-//
-// The commit queries are represented twice. Queries carries them pre-rendered,
-// one set per shard: recovery executes these (their text was rendered against
-// the binding's schema as of staging time), and so does the primary for
-// entries staged by peers running older connector versions. Outside of
-// recovery, entries carrying StagedFiles are coalesced per state key and
-// re-rendered over the combined file set, so that a scaled-out task commits
-// each table with a single MERGE rather than one per shard.
 type checkpointItem struct {
-	Query    string   `json:",omitempty"` // deprecated, kept for backward compatibility
+	Query string `json:",omitempty"` // deprecated, kept for backward compatibility
+	// Queries are the entry's commit queries, pre-rendered by the shard which
+	// staged it. Recovery executes these (their text was rendered against the
+	// binding's schema as of staging time), and so does the primary for
+	// entries staged by peers running older connector versions. Outside of
+	// recovery, entries carrying StagedFiles are instead coalesced per state
+	// key and re-rendered over the combined file set, so that a scaled-out
+	// task commits each table with a single MERGE rather than one per shard.
 	Queries  []string `json:",omitempty"`
 	ToDelete []string
 
