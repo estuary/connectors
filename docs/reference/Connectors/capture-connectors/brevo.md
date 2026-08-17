@@ -4,7 +4,7 @@ description: Capture Brevo contact data with Estuary's connector, including attr
 
 # Brevo
 
-This connector captures data from [Brevo's REST API](https://developers.brevo.com/reference) into Flow collections.
+This connector captures data from [Brevo's REST API](https://developers.brevo.com/reference) into Estuary collections.
 
 ## Supported data resources
 
