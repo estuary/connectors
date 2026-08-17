@@ -1,5 +1,35 @@
 # Changelog
 
+## 2026-08-17
+
+### Added
+- New advanced option `variant_columns` materializes object, array, and
+  multi-type fields — and the root document — as Iceberg `variant` columns
+  instead of JSON strings, and creates new tables with Iceberg format v3.
+  Collection key fields keep their string mapping, the per-field
+  `castToString` option still forces a JSON string column, and string-encoded
+  numbers (`string` plus `integer`/`number` with a matching `format`
+  annotation) keep their numeric column. Reading variant
+  columns requires an Iceberg v3-capable query engine (for example Spark 4.0,
+  Snowflake, or DuckDB 1.5.3 and later).
+- Strings in a variant column are stored with the type implied by their format
+  annotation, matching how the same value is typed as a column of its own:
+  `{format: date-time}` is stored as a variant timestamp (nanosecond precision
+  when `nanosecond_timestamps` is also enabled), `{format: date}` as a variant
+  date, and `{contentEncoding: base64}` as variant binary. Formats with no
+  variant equivalent — `uuid`, `time`, and `duration` — are stored as strings,
+  as they are in a column of their own, and a value that fails to parse as its
+  annotated type is stored as a string. Only top-level fields carry format
+  annotations, so values nested inside an object, an array, or the root
+  document are stored as strings.
+- Enabling `variant_columns` on an existing materialization converts its
+  tables in place: each table upgrades to Iceberg format v3 and every affected
+  column is re-created under the same name as a variant column (Iceberg has no
+  in-place conversion), applying to data going forward. Existing rows read as
+  null for converted columns unless the binding is explicitly backfilled;
+  prior snapshots remain readable in full via time travel. Key fields and
+  `castToString` fields are untouched.
+
 ## 2026-07-23
 
 ### Changed
@@ -14,26 +44,6 @@
   a binding no longer risks losing the rows of a transaction that was committed
   but not yet fully applied to the destination: the pending transaction is now
   applied before the backfill takes effect.
-
-## 2026-07-22
-
-### Added
-- New advanced option `variant_columns` materializes object, array, and
-  multi-type fields — and the root document — as Iceberg `variant` columns
-  instead of JSON strings, and creates new tables with Iceberg format v3.
-  Collection key fields keep their string mapping, the per-field
-  `castToString` option still forces a JSON string column, and string-encoded
-  numbers (`string` plus `integer`/`number` with a matching `format`
-  annotation) keep their numeric column. Reading variant
-  columns requires an Iceberg v3-capable query engine (for example Spark 4.0,
-  Snowflake, or DuckDB 1.5.3 and later).
-- Enabling `variant_columns` on an existing materialization converts its
-  tables in place: each table upgrades to Iceberg format v3 and every affected
-  column is re-created under the same name as a variant column (Iceberg has no
-  in-place conversion), applying to data going forward. Existing rows read as
-  null for converted columns unless the binding is explicitly backfilled;
-  prior snapshots remain readable in full via time travel. Key fields and
-  `castToString` fields are untouched.
 
 ## 2026-07-20
 

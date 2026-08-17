@@ -153,9 +153,19 @@ Variant preserves the semi-structured shape of the data natively, so query engin
 nested paths without parsing JSON text. Collection key fields keep their string mapping, and the
 per-field `castToString` option still forces a JSON string column. String-encoded numbers — a
 field typed as both `string` and `integer` or `number` with a matching `format` annotation — also
-keep their numeric column, since their values are already pinned to a single type. Make sure your
-query engine supports reading format v3 variant columns (for example Spark 4.0, Snowflake, or
-DuckDB 1.5.3 and later) before enabling this option.
+keep their numeric column, since their values are already pinned to a single type.
+
+Within a variant column, a string is stored using the type implied by its format annotation,
+matching how the same value is typed as a column of its own: `{format: date-time}` becomes a
+variant timestamp (nanosecond precision when `nanosecond_timestamps` is also enabled),
+`{format: date}` a variant date, and a base64-encoded string variant binary. Formats with no
+variant equivalent — `uuid`, `time`, and `duration` — are stored as strings, as they are in a
+column of their own, and a value that fails to parse as its annotated type is stored as a string.
+Only top-level fields carry format annotations, so values nested inside an object, an array, or the
+root document are stored as strings.
+
+Make sure your query engine supports reading format v3 variant columns (for example Spark 4.0,
+Snowflake, or DuckDB 1.5.3 and later) before enabling this option.
 
 ## Table Maintenance
 
