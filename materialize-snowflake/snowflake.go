@@ -422,6 +422,15 @@ type binding struct {
 }
 
 func (d *transactor) addBinding(ctx context.Context, target sql.Table, streamingEnabled bool, streamingV2Enabled bool) error {
+	// Ahead of everything else, so that a binding which may not leave the
+	// streaming v2 write path is refused before another path opens anything of
+	// its own against the same table.
+	if !streamsV2(&d.cfg, target.DeltaUpdates, streamingV2Enabled) {
+		if err := streamV2PathAbandoned(target.Identifier, d.priorStreamV2(target.StateKey)); err != nil {
+			return err
+		}
+	}
+
 	var b = new(binding)
 	b.target = target
 	b.nullFieldsToStrip = target.NullableFieldsToStrip()

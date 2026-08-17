@@ -25,6 +25,11 @@
   table rather than deleting the table's rows, so grants on that table do not
   survive the backfill, and the `retain_existing_data_on_backfill` feature flag
   cannot be used for those bindings. A task's other bindings are unaffected.
+- A binding which has materialized on this path may not be moved off it, whether
+  by disabling the feature flag, by changing the binding away from delta updates,
+  or by changing the task's authentication: the task fails, naming the binding,
+  rather than silently dropping rows on a later return to this path. Backfilling
+  the binding is the way off, and moving a binding onto this path is unaffected.
 - If the connector cannot establish which rows Snowflake already holds on this
   path, it fails rather than risk duplicating or dropping rows. Backfilling the
   affected binding recovers from any such failure. Changing how a task's shards

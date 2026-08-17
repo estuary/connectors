@@ -833,6 +833,51 @@ func absorbedChannelSettled(item *streamV2Item, committedToken *string, keyBegin
 	return nil
 }
 
+// streamV2PathAbandoned refuses a binding which has materialized through this
+// write path and no longer does, naming the channels it would leave behind.
+//
+// Only this write path maintains the counters in prior, and only they can say
+// which of a channel's documents Snowflake holds. Every other path treats a
+// binding's checkpoint item as pending work and clears the whole of it once that
+// work is applied, which takes those counters — while the channels themselves,
+// named for the binding's state key, remain in Snowflake reporting the committed
+// offset tokens they ended on. A later return to this path derives those same
+// names, meets a token no counter is left to account for, and reads it as an
+// interrupted first transaction of a fresh channel, since a checkpoint holding
+// nothing for the binding is otherwise what only a backfill produces. It then
+// skips that many of the documents it was about to materialize.
+//
+// Leaving while rows are in flight costs more than the return: the documents of
+// an interrupted transaction are skipped by the committed offset token alone,
+// which no other path reads, so the replay this shard is about to be given is
+// materialized a second time — permanently, this path serving delta-updates
+// bindings. Refusing the departure is what rules both out, and it is refused
+// whatever moved the binding off the path, since a binding leaves it by ceasing
+// to meet any one of the conditions in streamsV2.
+//
+// A backfill is the way off: it rotates the binding's state key, which rotates
+// both its channels and its checkpoint item, leaving nothing for another path to
+// discard and no channel for a later session to find.
+func streamV2PathAbandoned(table string, prior map[string]*streamV2Item) error {
+	var channels []string
+	for channel, item := range prior {
+		// A nil item is a channel this task has already retired, whose deletion
+		// the runtime has not yet reduced away. It records nothing.
+		if item != nil {
+			channels = append(channels, channel)
+		}
+	}
+	if len(channels) == 0 {
+		return nil
+	}
+	slices.Sort(channels)
+
+	return fmt.Errorf(
+		"this binding materializes into %s through the snowpipe_streaming_v2 write path, which this task's specification no longer selects for it, while the task's checkpoint still records the channel(s) %s it has appended to. Those counters are the only account of which documents Snowflake's channels already hold, no other write path maintains them, and the first transaction on another path discards them — after which returning to this write path would skip that many of the documents it materializes. Restore this binding to the snowpipe_streaming_v2 write path — it needs the feature flag, delta updates, and key-pair authentication — or backfill it, which rotates its channels and its checkpoint together",
+		table, strings.Join(channels, ", "),
+	)
+}
+
 // writeRow counts one converted document and buffers it for append, sending the
 // batch as soon as it reaches either cap. A document Snowflake already committed
 // during an interrupted attempt of this transaction is counted but dropped.
