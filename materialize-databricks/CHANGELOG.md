@@ -6,10 +6,12 @@
 - A task scaled out to multiple shards now commits each table with a single
   `MERGE` (or `COPY INTO`) query covering every shard's staged files, instead
   of running one query per shard back to back. Single-shard tasks are
-  unaffected. Note for downgrades: the connector checkpoint now records the
-  staged files and key bounds instead of pre-rendered queries, and versions
-  predating this change refuse to parse the new fields — drain the task (let
-  it idle at an acknowledged commit) before pinning an older image.
+  unaffected. The connector checkpoint now uses the range-scoped format for
+  all tasks — a single-shard task's entries nest under its full key range —
+  and records the staged files and key bounds instead of pre-rendered
+  queries. Note for downgrades: versions predating this change refuse to
+  parse the new format — drain the task (let it idle at an acknowledged
+  commit) before pinning an older image.
 
 ## 2026-08-04
 

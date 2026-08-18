@@ -132,9 +132,9 @@ type transactor struct {
 	runtimeCheckpoint m.RuntimeCheckpoint
 	cfg               config
 	cp                checkpoint
-	// Pending entries of other shards, of sessions predating the scale_out
-	// flag (legacyRangeKey), and of stale ranges from previous shard
-	// topologies. Only the primary shard tracks and executes these.
+	// Pending entries of other shards, of sessions predating the range-scoped
+	// checkpoint format (legacyRangeKey), and of stale ranges from previous
+	// shard topologies. Only the primary shard tracks and executes these.
 	peerShardsCheckpoints rangeCheckpoints
 	cpRecovery            bool // is this checkpoint a recovered checkpoint?
 	scaleOut              bool // the "scale_out" feature flag
@@ -154,7 +154,7 @@ func (d *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSp
 }
 
 func (d *transactor) UnmarshalState(state json.RawMessage) error {
-	if d.scaleOut && !d.primary {
+	if !d.primary {
 		// Non-primary shards recover nothing: the primary replays the entire
 		// consolidated state document. If a non-primary shard retained and
 		// later re-emitted recovered entries, the primary would re-execute
@@ -170,17 +170,15 @@ func (d *transactor) UnmarshalState(state json.RawMessage) error {
 
 	for key, val := range raw {
 		if bucket, ok := parseRangeBucket(key, val); ok {
-			if d.scaleOut && key == d.rangeKey {
+			if key == d.rangeKey {
 				d.cp = bucket
 			} else {
 				d.peerShardsCheckpoints[key] = bucket
 			}
 		} else if item, err := parseCheckpointItem(val); err != nil {
 			return fmt.Errorf("parsing checkpoint entry %q: %w", key, err)
-		} else if d.scaleOut {
-			d.legacyBucket()[key] = item
 		} else {
-			d.cp[key] = item
+			d.legacyBucket()[key] = item
 		}
 	}
 	d.cpRecovery = true
@@ -572,8 +570,8 @@ func (c *checkpoint) Validate() error {
 type rangeCheckpoints map[string]checkpoint
 
 // legacyRangeKey is the in-memory bucket holding top-level per-stateKey
-// entries written before the scale_out flag was enabled. Its entries clear
-// with top-level nulls rather than nested ones.
+// entries written by connector versions predating the range-scoped checkpoint
+// format. Its entries clear with top-level nulls rather than nested ones.
 const legacyRangeKey = ""
 
 var rangeKeyRe = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{8}$`)
@@ -693,18 +691,10 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 }
 
 func (d *transactor) startCommitState() (*pf.ConnectorState, error) {
-	if !d.scaleOut {
-		var checkpointJSON, err = json.Marshal(d.cp)
-		if err != nil {
-			return nil, fmt.Errorf("creating checkpoint json: %w", err)
-		}
-
-		return &pf.ConnectorState{UpdatedJson: checkpointJSON}, nil
-	}
-
 	// Emit only this shard's range bucket as a merge patch: range keys are
 	// disjoint across shards, so concurrent patches never clobber when the
-	// runtime consolidates connector state.
+	// runtime consolidates connector state. A single-shard task uses the same
+	// format, with one bucket covering the full key range.
 	var patch, err = json.Marshal(rangeCheckpoints{d.rangeKey: d.cp})
 	if err != nil {
 		return nil, fmt.Errorf("creating checkpoint patch json: %w", err)
@@ -721,7 +711,7 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 
 	shouldProcess := m.StateKeyFilter(stateKeys)
 
-	if d.scaleOut && !d.primary {
+	if !d.primary {
 		// Non-primary shards only stage files: their committed entries are
 		// executed by the primary, which observed them via the aggregated
 		// state patches. Drop them from local bookkeeping, mirroring the
@@ -772,10 +762,6 @@ func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB, should
 			clear[rangeKey].(map[string]interface{})[stateKey] = nil
 		}
 	}
-	var ownRangeKey = legacyRangeKey
-	if d.scaleOut {
-		ownRangeKey = d.rangeKey
-	}
 	var peerRangeKeys = slices.Sorted(maps.Keys(d.peerShardsCheckpoints))
 
 	// Everything else pending — entries of other state keys, and entries whose
@@ -808,7 +794,7 @@ func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB, should
 
 		if d.cp[sk] != nil {
 			delete(d.cp, sk)
-			clearEntry(ownRangeKey, sk)
+			clearEntry(d.rangeKey, sk)
 		}
 		for rk, cp := range d.peerShardsCheckpoints {
 			if cp[sk] != nil {

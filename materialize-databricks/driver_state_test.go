@@ -106,22 +106,26 @@ func TestUnmarshalStateRouting(t *testing.T) {
 		"a_table.v1": {"Queries": ["Q0"], "ToDelete": []}
 	}`)
 
-	t.Run("flag off legacy document", func(t *testing.T) {
+	t.Run("legacy top-level entries route to the legacy bucket", func(t *testing.T) {
 		var d = testTransactor(false, fullRangeKey, "a_table.v1", "b_table.v1")
 		require.NoError(t, d.UnmarshalState(legacyState))
 		require.True(t, d.cpRecovery)
-		require.Len(t, d.cp, 2)
-		require.Equal(t, []string{"Q1"}, d.cp["a_table.v1"].Queries)
-		require.Empty(t, d.peerShardsCheckpoints)
+		require.Empty(t, d.cp)
+		require.Len(t, d.peerShardsCheckpoints[legacyRangeKey], 2)
+		require.Equal(t, []string{"Q1"}, d.peerShardsCheckpoints[legacyRangeKey]["a_table.v1"].Queries)
 	})
 
-	t.Run("flag off routes range buckets after downgrade", func(t *testing.T) {
+	t.Run("single shard routes own range to cp, others to peers", func(t *testing.T) {
 		var d = testTransactor(false, fullRangeKey, "a_table.v1")
-		require.NoError(t, d.UnmarshalState(mixedState))
+		require.NoError(t, d.UnmarshalState(json.RawMessage(`{
+			"00000000-ffffffff": {"a_table.v1": {"Queries": ["OWN"], "ToDelete": []}},
+			"00000000-7fffffff": {"a_table.v1": {"Queries": ["QL"], "ToDelete": []}},
+			"a_table.v1": {"Queries": ["Q0"], "ToDelete": []}
+		}`)))
 		require.True(t, d.cpRecovery)
-		require.Equal(t, []string{"Q0"}, d.cp["a_table.v1"].Queries)
-		require.Len(t, d.peerShardsCheckpoints, 2)
+		require.Equal(t, []string{"OWN"}, d.cp["a_table.v1"].Queries)
 		require.Equal(t, []string{"QL"}, d.peerShardsCheckpoints[lowerRangeKey]["a_table.v1"].Queries)
+		require.Equal(t, []string{"Q0"}, d.peerShardsCheckpoints[legacyRangeKey]["a_table.v1"].Queries)
 	})
 
 	t.Run("flag on primary routes own range to cp", func(t *testing.T) {
@@ -148,14 +152,14 @@ func TestUnmarshalStateRouting(t *testing.T) {
 }
 
 func TestStartCommitState(t *testing.T) {
-	t.Run("flag off is a full state replacement", func(t *testing.T) {
+	t.Run("single shard emits a full-range merge patch", func(t *testing.T) {
 		var d = testTransactor(false, fullRangeKey, "a_table.v1")
 		d.cp["a_table.v1"] = item("Q1", "f1")
 
 		state, err := d.startCommitState()
 		require.NoError(t, err)
-		require.False(t, state.MergePatch)
-		require.JSONEq(t, `{"a_table.v1": {"Queries": ["Q1"], "ToDelete": ["f1"]}}`, string(state.UpdatedJson))
+		require.True(t, state.MergePatch)
+		require.JSONEq(t, `{"00000000-ffffffff": {"a_table.v1": {"Queries": ["Q1"], "ToDelete": ["f1"]}}}`, string(state.UpdatedJson))
 	})
 
 	t.Run("flag on is a range-scoped merge patch", func(t *testing.T) {
@@ -211,16 +215,21 @@ func TestMergePeerStatePatches(t *testing.T) {
 }
 
 func TestAcknowledge(t *testing.T) {
-	t.Run("flag off clearing patch matches legacy shape", func(t *testing.T) {
+	t.Run("single shard clears own entries nested, legacy entries top-level", func(t *testing.T) {
 		var d = testTransactor(false, fullRangeKey, "a_table.v1", "b_table.v1")
 		d.cp["a_table.v1"] = item("Q1")
+		d.peerShardsCheckpoints[legacyRangeKey] = checkpoint{"b_table.v1": item("Q2")}
 
 		state, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
 		require.NoError(t, err)
-		require.Equal(t, []string{"Q1"}, recording.executed)
+		require.Equal(t, []string{"Q1", "Q2"}, recording.executed)
 		require.True(t, state.MergePatch)
-		require.Equal(t, `{"a_table.v1":null}`, string(state.UpdatedJson))
+		require.JSONEq(t, `{
+			"00000000-ffffffff": {"a_table.v1": null},
+			"b_table.v1": null
+		}`, string(state.UpdatedJson))
 		require.Empty(t, d.cp)
+		require.Empty(t, d.peerShardsCheckpoints)
 	})
 
 	t.Run("flag on primary executes own and peer entries", func(t *testing.T) {
@@ -266,7 +275,7 @@ func TestAcknowledge(t *testing.T) {
 		state, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), keys("a_table.v1"))
 		require.NoError(t, err)
 		require.Equal(t, []string{"QA"}, recording.executed)
-		require.Equal(t, `{"a_table.v1":null}`, string(state.UpdatedJson))
+		require.JSONEq(t, `{"00000000-ffffffff": {"a_table.v1": null}}`, string(state.UpdatedJson))
 		require.NotNil(t, d.cp["b_table.v1"]) // untouched, still pending
 	})
 
