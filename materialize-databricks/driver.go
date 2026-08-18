@@ -792,10 +792,10 @@ func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB, should
 // metadata coalesce into a single set of queries; those written by older connector versions
 // have only their pre-rendered queries, so they run individually.
 //
-// A recovered group is homogeneous — the runtime persists an Acknowledge's state clearing
-// before any shard commits the next transaction, and staged files are deleted only once every
-// commit query succeeded — so a missing file means the group was already applied and needs
-// only clearing. That is why recovery may skip rather than re-execute.
+// Acknowledge fans-in by the runtime: the runtime waits for all Acknowledged responses from all
+// shards before a new transaction begins, and files are already cleaned up once all queries have
+// run. Thus a missing file means the whole query has already run, and during recovery that is
+// acceptable: we may have run the query but not have been able to clear the checkpoint.
 func (d *transactor) executeStateKeyItems(ctx context.Context, db *stdsql.DB, b *binding, items []*checkpointItem) error {
 	var coalesce []*checkpointItem
 	d.be.StartedResourceCommit(b.target.Path)
