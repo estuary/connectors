@@ -41,6 +41,17 @@ func TestResourceValidate(t *testing.T) {
 			name: "precise_mode_with_empty_advanced_options",
 			res:  Resource{Namespace: "public", Stream: "foo", Mode: BackfillModePrecise, Advanced: &AdvancedResourceOptions{}},
 		},
+		{
+			name: "whitespace_only_filter",
+			res: Resource{Namespace: "public", Stream: "foo",
+				Advanced: &AdvancedResourceOptions{AdditionalBackfillFilter: "  "}},
+			wantErr: true,
+		},
+		{
+			name: "filter_with_surrounding_whitespace",
+			res: Resource{Namespace: "public", Stream: "foo",
+				Advanced: &AdvancedResourceOptions{AdditionalBackfillFilter: " id > 123 "}},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var err = tc.res.Validate()
