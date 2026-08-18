@@ -705,15 +705,12 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	return d.acknowledgeApply(ctx, db, shouldProcess)
 }
 
-// acknowledgeApply executes the pending checkpoint entries of the requested
-// state keys — this shard's own, and (as the primary) those of peer shards
-// and of prior sessions — and builds the state update which clears the
-// executed entries. It returns a nil state when no entry was executed.
+// acknowledgeApply executes pending checkpoint entries — this shard's own, and as the primary
+// those of peers and prior sessions — and returns the state update clearing them, or nil if
+// nothing was executed.
 //
-// Entries are processed grouped by state key: one query over all shards'
-// staged files runs in a fraction of the time of the per-shard queries run
-// back to back, so outside of recovery each state key's entries coalesce into
-// a single set of commit queries.
+// Grouped by state key, because one query over every shard's staged files takes a fraction of
+// the time those per-shard queries take back to back.
 func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB, shouldProcess func(string) bool) (*pf.ConnectorState, error) {
 	// The clearing state update, nulling each executed entry at the state-
 	// document path it occupies: nested under a range key, or top-level
@@ -791,21 +788,14 @@ func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB, should
 	return &pf.ConnectorState{UpdatedJson: json.RawMessage(checkpointJSON), MergePatch: true}, nil
 }
 
-// executeStateKeyItems runs the pending queries of a single state key's
-// checkpoint entries and deletes their staged files. Entries carrying
-// structured staging metadata — everything staged by current connector
-// versions — coalesce into a single set of commit queries over every shard's
-// staged files, in recovery and steady state alike. Entries written by older
-// connector versions run their pre-rendered queries individually.
+// executeStateKeyItems commits one state key's entries. Entries with structured staging
+// metadata coalesce into a single set of queries; those written by older connector versions
+// have only their pre-rendered queries, so they run individually.
 //
-// Recovery tolerates queries failing on deleted staged files or tables: the
-// v2 runtime persists the state clearing of an Acknowledge before any shard
-// may start committing the next transaction, so a recovered group is
-// homogeneous — either every entry was already applied by a previous session
-// whose clearing didn't commit (staged files are deleted only after all of a
-// group's commit queries succeed), or every entry is still pending with its
-// files intact. A missing file during recovery therefore means the whole
-// group needs only clearing, never re-execution.
+// A recovered group is homogeneous — the runtime persists an Acknowledge's state clearing
+// before any shard commits the next transaction, and staged files are deleted only once every
+// commit query succeeded — so a missing file means the group was already applied and needs
+// only clearing. That is why recovery may skip rather than re-execute.
 func (d *transactor) executeStateKeyItems(ctx context.Context, db *stdsql.DB, b *binding, items []*checkpointItem) error {
 	var coalesce []*checkpointItem
 	d.be.StartedResourceCommit(b.target.Path)
