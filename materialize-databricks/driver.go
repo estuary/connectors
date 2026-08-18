@@ -137,7 +137,6 @@ type transactor struct {
 	// shard topologies. Only the primary shard tracks and executes these.
 	peerShardsCheckpoints rangeCheckpoints
 	cpRecovery            bool // is this checkpoint a recovered checkpoint?
-	scaleOut              bool // the "scale_out" feature flag
 	primary               bool // does this shard's range begin at key 0?
 	rangeKey              string
 	wsClient              *databricks.WorkspaceClient
@@ -198,7 +197,7 @@ func (d *transactor) legacyBucket() checkpoint {
 // executes the queries staged by every shard of the just-committed
 // transaction. Under the v1 runtime `patches` is always empty.
 func (d *transactor) mergePeerStatePatches(patches []json.RawMessage) error {
-	if !d.scaleOut || !d.primary {
+	if !d.primary {
 		return nil
 	}
 
@@ -206,10 +205,10 @@ func (d *transactor) mergePeerStatePatches(patches []json.RawMessage) error {
 		if isJSONNull(patch) {
 			// The runtime encodes a full-replace (non-merge-patch) state
 			// update as a literal null reset patch followed by the new state
-			// document. No shard emits full replacements with scale_out
-			// enabled, so a reset means a peer (e.g. one running an older
-			// connector image) just clobbered the consolidated state.
-			return fmt.Errorf("unexpected state reset patch under scale_out")
+			// document. No shard emits full replacements in the range-scoped
+			// checkpoint format, so a reset means a peer (e.g. one running an
+			// older connector image) just clobbered the consolidated state.
+			return fmt.Errorf("unexpected state reset patch in aggregated shard state")
 		}
 
 		var raw map[string]json.RawMessage
@@ -225,7 +224,7 @@ func (d *transactor) mergePeerStatePatches(patches []json.RawMessage) error {
 			}
 
 			if !rangeKeyRe.MatchString(key) {
-				// Top-level stateKeys are never emitted by scale_out peers,
+				// Top-level stateKeys are never emitted by range-scoped peers,
 				// but route them as legacy entries rather than dropping them.
 				if item, err := parseCheckpointItem(val); err != nil {
 					return fmt.Errorf("parsing aggregated state patch entry %q: %w", key, err)
@@ -253,31 +252,6 @@ func (d *transactor) mergePeerStatePatches(patches []json.RawMessage) error {
 	}
 
 	return nil
-}
-
-// validateShardRange refuses to run a shard that covers only part of the
-// keyspace — i.e. one shard of a scaled-out task — unless the scale_out
-// feature flag is enabled. Without the flag every shard emits its checkpoint
-// as a full-document state replacement of top-level stateKeys, so under the
-// v2 runtime's single consolidated state document concurrent shards clobber
-// each other's staged-but-unacknowledged work (silent data loss on scale-down,
-// estuary/connectors#4987), and each shard executes its own staged queries, so
-// after a split both children re-run the parent's identical COPY INTO
-// concurrently and crash-loop on Databricks' duplicated-files guard
-// (estuary/connectors#4986). Only the scale_out mode partitions state into
-// disjoint per-range merge patches with a single executing shard, so failing
-// loudly here is the only safe response.
-func validateShardRange(scaleOut bool, keyBegin, keyEnd uint32) error {
-	if scaleOut || (keyBegin == 0 && keyEnd == math.MaxUint32) {
-		return nil
-	}
-
-	return fmt.Errorf(
-		"this shard covers key range %08x-%08x rather than the full keyspace, meaning the task has been scaled out to multiple shards, "+
-			"but the scale_out feature flag is not enabled: running multiple shards without it can clobber staged work and silently lose documents. "+
-			"Enable the scale_out feature flag (requires runtime v2), or scale the task back down to a single shard",
-		keyBegin, keyEnd,
-	)
 }
 
 func newTransactor(
@@ -308,16 +282,11 @@ func newTransactor(
 		keyBegin, keyEnd = open.Range.KeyBegin, open.Range.KeyEnd
 	}
 
-	if err := validateShardRange(featureFlags["scale_out"], keyBegin, keyEnd); err != nil {
-		return nil, err
-	}
-
 	var d = &transactor{
 		runtimeCheckpoint:     fence.Checkpoint,
 		cfg:                   cfg,
 		cp:                    make(checkpoint),
 		peerShardsCheckpoints: make(rangeCheckpoints),
-		scaleOut:              featureFlags["scale_out"],
 		primary:               keyBegin == 0,
 		rangeKey:              fmt.Sprintf("%08x-%08x", keyBegin, keyEnd),
 		wsClient:              wsClient,
@@ -748,7 +717,8 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB, shouldProcess func(string) bool) (*pf.ConnectorState, error) {
 	// The clearing state update, nulling each executed entry at the state-
 	// document path it occupies: nested under a range key, or top-level
-	// (legacyRangeKey) for entries predating scale_out. Clearing is a best-
+	// (legacyRangeKey) for entries predating the range-scoped checkpoint
+	// format. Clearing is a best-
 	// effort attempt to spare a restart from running the same queries again —
 	// there is no guarantee this checkpoint update can actually be committed.
 	var clear = make(map[string]interface{})

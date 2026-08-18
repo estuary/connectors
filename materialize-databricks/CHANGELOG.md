@@ -3,6 +3,9 @@
 ## 2026-08-17
 
 ### Changed
+- The `scale_out` feature flag is removed: multi-shard operation is always
+  enabled, since scaled-out tasks only ever run under the v2 runtime. A
+  `scale_out` flag still present in a task's configuration is ignored.
 - A task scaled out to multiple shards now commits each table with a single
   `MERGE` (or `COPY INTO`) query covering every shard's staged files, instead
   of running one query per shard back to back. Single-shard tasks are
