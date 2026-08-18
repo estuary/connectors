@@ -84,6 +84,13 @@ func (r Resource) Validate() error {
 	if !slices.Contains([]BackfillMode{BackfillModeAutomatic, BackfillModeNormal, BackfillModePrecise, BackfillModeOnlyChanges, BackfillModeWithoutKey}, r.Mode) {
 		return fmt.Errorf("invalid backfill mode %q", r.Mode)
 	}
+	// Forbid backfill filters which are non-empty but contain only whitespace. This is
+	// always a mistake (typically a failed attempt to clear the field), and if it counted
+	// as a set filter the resulting errors would guide the user into an unnecessary and
+	// irreversible backfill.
+	if filter := r.BackfillFilter(); filter != "" && strings.TrimSpace(filter) == "" {
+		return fmt.Errorf("invalid backfill filter %q: must be empty or contain a filter expression", filter)
+	}
 	// Precise backfills drop replication events for rows beyond the backfill cursor, on
 	// the assumption that the backfill will observe those rows later. A backfill filter
 	// could violate that assumption for the rows it excludes, in which case changes to
