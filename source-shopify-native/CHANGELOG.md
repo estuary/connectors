@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-08-19
+
+### Fixed
+- `products`, `custom_collections`, and `smart_collections` no longer fail
+  entirely for stores whose access token doesn't grant `read_publications`.
+  The connector now omits publication data instead of failing the whole
+  export when that scope is missing.
+
 ## 2026-08-18
 
 ### Added
