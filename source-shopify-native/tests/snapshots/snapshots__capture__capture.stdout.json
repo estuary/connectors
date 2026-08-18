@@ -1078,7 +1078,7 @@
       "cancelReason": null,
       "cancelledAt": null,
       "clientIp": "76.182.0.22",
-      "closedAt": "2026-06-15T13:21:57Z",
+      "closedAt": "2026-08-18T17:51:39Z",
       "confirmationNumber": "ULEG58LMN",
       "confirmed": true,
       "createdAt": "2026-06-11T17:33:51Z",
@@ -6220,6 +6220,12 @@
             {
               "__parentId": "gid://shopify/Return/18804736045",
               "customerNote": null,
+              "fulfillmentLineItem": {
+                "id": "gid://shopify/FulfillmentLineItem/18166932996141",
+                "lineItem": {
+                  "id": "gid://shopify/LineItem/50297223512109"
+                }
+              },
               "id": "gid://shopify/ReturnLineItem/27743977517",
               "quantity": 5,
               "refundedQuantity": 5,
@@ -6234,6 +6240,12 @@
             {
               "__parentId": "gid://shopify/Return/18804736045",
               "customerNote": null,
+              "fulfillmentLineItem": {
+                "id": "gid://shopify/FulfillmentLineItem/18166933028909",
+                "lineItem": {
+                  "id": "gid://shopify/LineItem/50297223544877"
+                }
+              },
               "id": "gid://shopify/ReturnLineItem/27744010285",
               "quantity": 5,
               "refundedQuantity": 5,
@@ -6248,6 +6260,12 @@
             {
               "__parentId": "gid://shopify/Return/18804736045",
               "customerNote": null,
+              "fulfillmentLineItem": {
+                "id": "gid://shopify/FulfillmentLineItem/18166933061677",
+                "lineItem": {
+                  "id": "gid://shopify/LineItem/50297223577645"
+                }
+              },
               "id": "gid://shopify/ReturnLineItem/27744043053",
               "quantity": 5,
               "refundedQuantity": 5,
@@ -6262,6 +6280,12 @@
             {
               "__parentId": "gid://shopify/Return/18804736045",
               "customerNote": null,
+              "fulfillmentLineItem": {
+                "id": "gid://shopify/FulfillmentLineItem/18166933094445",
+                "lineItem": {
+                  "id": "gid://shopify/LineItem/50297223610413"
+                }
+              },
               "id": "gid://shopify/ReturnLineItem/27744075821",
               "quantity": 5,
               "refundedQuantity": 5,
@@ -6276,6 +6300,12 @@
             {
               "__parentId": "gid://shopify/Return/18804736045",
               "customerNote": null,
+              "fulfillmentLineItem": {
+                "id": "gid://shopify/FulfillmentLineItem/18166933127213",
+                "lineItem": {
+                  "id": "gid://shopify/LineItem/50297223643181"
+                }
+              },
               "id": "gid://shopify/ReturnLineItem/27744108589",
               "quantity": 5,
               "refundedQuantity": 5,
@@ -6290,6 +6320,12 @@
             {
               "__parentId": "gid://shopify/Return/18804736045",
               "customerNote": null,
+              "fulfillmentLineItem": {
+                "id": "gid://shopify/FulfillmentLineItem/18166933159981",
+                "lineItem": {
+                  "id": "gid://shopify/LineItem/50297223675949"
+                }
+              },
               "id": "gid://shopify/ReturnLineItem/27744141357",
               "quantity": 5,
               "refundedQuantity": 5,
@@ -6304,6 +6340,12 @@
             {
               "__parentId": "gid://shopify/Return/18804736045",
               "customerNote": null,
+              "fulfillmentLineItem": {
+                "id": "gid://shopify/FulfillmentLineItem/18166933192749",
+                "lineItem": {
+                  "id": "gid://shopify/LineItem/50297223708717"
+                }
+              },
               "id": "gid://shopify/ReturnLineItem/27744174125",
               "quantity": 5,
               "refundedQuantity": 5,
@@ -6318,6 +6360,12 @@
             {
               "__parentId": "gid://shopify/Return/18804736045",
               "customerNote": null,
+              "fulfillmentLineItem": {
+                "id": "gid://shopify/FulfillmentLineItem/18166933225517",
+                "lineItem": {
+                  "id": "gid://shopify/LineItem/50297223741485"
+                }
+              },
               "id": "gid://shopify/ReturnLineItem/27744206893",
               "quantity": 5,
               "refundedQuantity": 5,
@@ -6332,6 +6380,12 @@
             {
               "__parentId": "gid://shopify/Return/18804736045",
               "customerNote": null,
+              "fulfillmentLineItem": {
+                "id": "gid://shopify/FulfillmentLineItem/18166933258285",
+                "lineItem": {
+                  "id": "gid://shopify/LineItem/50297223774253"
+                }
+              },
               "id": "gid://shopify/ReturnLineItem/27744239661",
               "quantity": 5,
               "refundedQuantity": 5,
@@ -6346,6 +6400,12 @@
             {
               "__parentId": "gid://shopify/Return/18804736045",
               "customerNote": null,
+              "fulfillmentLineItem": {
+                "id": "gid://shopify/FulfillmentLineItem/18166933291053",
+                "lineItem": {
+                  "id": "gid://shopify/LineItem/50297223807021"
+                }
+              },
               "id": "gid://shopify/ReturnLineItem/27744272429",
               "quantity": 5,
               "refundedQuantity": 5,
@@ -6358,6 +6418,7 @@
               "returnReasonNote": "test reason"
             }
           ],
+          "returnShippingFees": [],
           "status": "CLOSED",
           "totalQuantity": 50
         }
