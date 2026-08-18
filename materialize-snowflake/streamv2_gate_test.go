@@ -302,7 +302,7 @@ func TestMissingRuntimeV2Warning(t *testing.T) {
 // before the wrapped driver runs, so neither reaches Snowflake.
 func TestGatedDriverRefusals(t *testing.T) {
 	var ctx = context.Background()
-	var driver = NewConnector()
+	var driver = NewGatedDriver()
 	var spec = testStreamingSpec(t, "snowpipe_streaming_v2", false)
 
 	t.Run("publishing is refused", func(t *testing.T) {

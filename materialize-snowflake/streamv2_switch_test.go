@@ -282,7 +282,7 @@ func TestStreamV2SwitchIsRefusedAtPublication(t *testing.T) {
 	// The gate is what puts this ahead of the wrapped driver, so the refusal
 	// reaches the operator without Snowflake being touched at all.
 	t.Run("publishing is refused", func(t *testing.T) {
-		_, err := NewConnector().Apply(ctx, &pm.Request_Apply{
+		_, err := NewGatedDriver().Apply(ctx, &pm.Request_Apply{
 			Materialization: specOf(t, "", true),
 			StateJson:       state,
 		})

@@ -28,14 +28,14 @@ type gatedDriver struct {
 
 var _ boilerplate.Connector = gatedDriver{}
 
-// NewConnector assembles the connector as it runs: the driver NewDriver builds,
+// NewGatedDriver assembles the connector as it runs: the driver NewDriver builds,
 // behind the runtime gate.
 //
 // The gate is applied here rather than in cmd/connector so that it cannot be lost
 // by a caller which builds the connector for itself, and NewDriver goes on
 // returning the driver rather than this wrapper because the test helpers of
 // materialize-sql take the concrete driver.
-func NewConnector() boilerplate.Connector {
+func NewGatedDriver() boilerplate.Connector {
 	return gatedDriver{NewDriver()}
 }
 
