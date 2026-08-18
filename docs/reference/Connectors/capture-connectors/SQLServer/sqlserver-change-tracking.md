@@ -178,6 +178,7 @@ See [connectors](/concepts/connectors.md#using-connectors) to learn more about u
 | **`/namespace`** | Table Schema      | The schema in which the table resides.                                                                                                                                                                                    | string  | Required         |
 | **`/stream`**    | Table Name        | The name of the table to be captured.                                                                                                                                                                                     | string  | Required         |
 | `/priority`      | Backfill Priority | An optional integer priority for this binding. The highest priority binding(s) will be backfilled completely before any others. The default priority is zero. Negative priorities will cause a binding to be backfilled after others. | integer |                  |
+| `/advanced/additional_backfill_filter` | Additional Backfill Filter | Optional filter clause which will be applied to all backfill queries for this binding. Contact Estuary support for assistance before using this option. | string | |
 
 ### Sample
 
