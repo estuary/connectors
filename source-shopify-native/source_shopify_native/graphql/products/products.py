@@ -3,7 +3,13 @@ from logging import Logger
 import json
 from typing import Any, AsyncGenerator
 
-from source_shopify_native.models import ShopifyGraphQLResource, SortKey, StoreCapabilities
+from source_shopify_native.models import (
+    ConditionalField,
+    ShopifyGraphQLResource,
+    SortKey,
+    StoreCapabilities,
+    requires_any_scope,
+)
 
 
 class Products(ShopifyGraphQLResource):
@@ -57,22 +63,7 @@ class Products(ShopifyGraphQLResource):
         position
         values
     }
-    resourcePublications {
-        edges {
-            node {
-                isPublished
-                publication {
-                    id
-                    name
-                    catalog {
-                        id
-                        title
-                        status
-                    }
-                }
-            }
-        }
-    }
+    # {{ resourcePublications }}
     featuredMedia {
         id
         alt
@@ -123,6 +114,28 @@ class Products(ShopifyGraphQLResource):
         precision
     }
     """
+    CONDITIONAL_FIELDS = [
+        ConditionalField(
+            placeholder="# {{ resourcePublications }}",
+            fields="""resourcePublications {
+        edges {
+            node {
+                isPublished
+                publication {
+                    id
+                    name
+                    catalog {
+                        id
+                        title
+                        status
+                    }
+                }
+            }
+        }
+    }""",
+            is_available=requires_any_scope("read_publications"),
+        ),
+    ]
 
     @staticmethod
     def build_query(
