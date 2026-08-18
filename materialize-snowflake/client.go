@@ -34,14 +34,11 @@ const (
 var _ sql.SchemaManager = (*client)(nil)
 
 type client struct {
-	db         *stdsql.DB
-	dbNoSchema *stdsql.DB // for metadata operations performed before the endpoint-level schema is created
-	xdb        *sqlx.DB   // used to easily read the results of SHOW queries
-	cfg        config
-	ep         *sql.Endpoint[config]
-	// materializationName is the task this client acts for, which a table it
-	// creates for a streaming v2 binding records as part of the generation it
-	// belongs to.
+	db                  *stdsql.DB
+	dbNoSchema          *stdsql.DB // for metadata operations performed before the endpoint-level schema is created
+	xdb                 *sqlx.DB   // used to easily read the results of SHOW queries
+	cfg                 config
+	ep                  *sql.Endpoint[config]
 	materializationName string
 }
 
