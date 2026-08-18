@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-08-18
+
+### Added
+- New `additional_backfill_filter` advanced option on each binding. When set,
+  the filter clause is applied to all backfill queries for that table, so rows
+  which the filter excludes are never backfilled. Setting or changing the
+  filter requires re-backfilling the binding, while clearing it does not.
+  Filters cannot be combined with the `Precise` backfill mode. The filter
+  combines with the `min_backfill_xid` setting when both are in use.
+
 ## 2026-07-30
 
 ### Added
