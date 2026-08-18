@@ -3,6 +3,7 @@ from datetime import datetime
 from logging import Logger
 from typing import AsyncGenerator, Any
 
+from ..common import money_bag_fragment
 from ...models import (
     ConditionalField,
     ShopifyGraphQLResource,
@@ -30,6 +31,12 @@ class OrderReturns(ShopifyGraphQLResource):
                     note
                     reason
                 }
+                returnShippingFees {
+                    id
+                    amountSet {
+                        ..._MoneyBagFields
+                    }
+                }
                 # {{ staffMember }}
                 returnLineItems {
                     edges {
@@ -44,6 +51,14 @@ class OrderReturns(ShopifyGraphQLResource):
                                 deleted
                                 handle
                                 name
+                            }
+                            ... on ReturnLineItem {
+                                fulfillmentLineItem {
+                                    id
+                                    lineItem {
+                                        id
+                                    }
+                                }
                             }
                         }
                     }
@@ -70,6 +85,7 @@ class OrderReturns(ShopifyGraphQLResource):
         }
     }
     """
+    FRAGMENTS = [money_bag_fragment]
     CONDITIONAL_FIELDS = [
         # staffMember requires the read_users scope, which is only grantable on
         # Shopify Plus / Advanced stores or finance embedded apps.
