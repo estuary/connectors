@@ -200,6 +200,20 @@
         "title": "Backfill Priority",
         "description": "An optional integer priority for this binding. The highest priority binding(s) will be backfilled completely before any others. The default priority is zero. Negative priorities are allowed and will cause a binding to be backfilled after others.",
         "nonsensitive": true
+      },
+      "advanced": {
+        "properties": {
+          "additional_backfill_filter": {
+            "type": "string",
+            "title": "Additional Backfill Filter",
+            "description": "Optional filter clause which will be applied to all backfill queries for this binding. Contact Estuary support for assistance before using this option."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Advanced Options",
+        "description": "Options for advanced users. You should not typically need to modify these.",
+        "advanced": true
       }
     },
     "type": "object",
