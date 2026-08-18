@@ -27,6 +27,8 @@ type Resource struct {
 
 	Priority int `json:"priority,omitempty" jsonschema:"title=Backfill Priority,description=An optional integer priority for this binding. The highest priority binding(s) will be backfilled completely before any others. The default priority is zero. Negative priorities are allowed and will cause a binding to be backfilled after others."`
 
+	Advanced *AdvancedResourceOptions `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
+
 	// PrimaryKey allows the user to override the "scan key" columns which will be used
 	// to perform backfill queries and merge replicated changes. If left unset we default
 	// to the collection's key, which is basically always what the user wants, so we omit
@@ -35,6 +37,20 @@ type Resource struct {
 	PrimaryKey []string `json:"primary_key,omitempty" jsonschema:"-"`
 
 	DeprecatedSyncMode string `json:"syncMode,omitempty" jsonschema:"-"` // Unused, only supported to avoid breaking existing captures
+}
+
+// AdvancedResourceOptions holds the rarely-used per-binding settings.
+type AdvancedResourceOptions struct {
+	AdditionalBackfillFilter string `json:"additional_backfill_filter,omitempty" jsonschema:"title=Additional Backfill Filter,description=Optional filter clause which will be applied to all backfill queries for this binding. Contact Estuary support for assistance before using this option."`
+}
+
+// BackfillFilter returns the user-configured backfill filter expression, or an
+// empty string when no filter is set.
+func (r Resource) BackfillFilter() string {
+	if r.Advanced == nil {
+		return ""
+	}
+	return r.Advanced.AdditionalBackfillFilter
 }
 
 // BackfillMode represents different ways we might want to backfill the preexisting contents of a table.
@@ -67,6 +83,13 @@ const (
 func (r Resource) Validate() error {
 	if !slices.Contains([]BackfillMode{BackfillModeAutomatic, BackfillModeNormal, BackfillModePrecise, BackfillModeOnlyChanges, BackfillModeWithoutKey}, r.Mode) {
 		return fmt.Errorf("invalid backfill mode %q", r.Mode)
+	}
+	// Precise backfills drop replication events for rows beyond the backfill cursor, on
+	// the assumption that the backfill will observe those rows later. A backfill filter
+	// could violate that assumption for the rows it excludes, in which case changes to
+	// those rows might be lost entirely. Better to require unfiltered mode instead.
+	if r.Mode == BackfillModePrecise && r.BackfillFilter() != "" {
+		return fmt.Errorf("backfill filters cannot be used in the %q backfill mode", BackfillModePrecise)
 	}
 	if r.Namespace == "" {
 		return fmt.Errorf("table namespace unspecified")
@@ -256,6 +279,16 @@ func (d *Driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 		// a corresponding backfill counter increment, that's an error.
 		if prevBinding, ok := previousBindings[streamID]; ok && res.Mode != prevBinding.Resource.Mode && binding.Backfill <= prevBinding.Backfill {
 			var err = fmt.Errorf("must re-backfill when changing backfill mode: table %q changed from %q to %q", streamID, prevBinding.Resource.Mode, res.Mode)
+			log.WithError(err).Debug("prerequisite error")
+			errs = append(errs, err)
+		}
+
+		// Setting or changing the backfill filter requires a corresponding backfill
+		// counter increment, while clearing it doesn't (so a stale filter can be removed
+		// after a backfill completes). It's not entirely clear that changes need to be
+		// forbidden here, but doing so removes one source of possible user error.
+		if prevBinding, ok := previousBindings[streamID]; ok && res.BackfillFilter() != prevBinding.Resource.BackfillFilter() && res.BackfillFilter() != "" && binding.Backfill <= prevBinding.Backfill {
+			var err = fmt.Errorf("must re-backfill when changing the backfill filter: table %q changed from %q to %q", streamID, prevBinding.Resource.BackfillFilter(), res.BackfillFilter())
 			log.WithError(err).Debug("prerequisite error")
 			errs = append(errs, err)
 		}
