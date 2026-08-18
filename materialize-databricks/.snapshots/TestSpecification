@@ -219,6 +219,13 @@
             "default": false,
             "nonsensitive": true
           },
+          "compress_staged_files": {
+            "type": "boolean",
+            "title": "Compress Staged Files",
+            "description": "Compress files staged to the Unity Catalog volume with gzip. This reduces the volume of data uploaded at the cost of additional CPU usage.",
+            "default": false,
+            "nonsensitive": true
+          },
           "feature_flags": {
             "type": "string",
             "title": "Feature Flags",

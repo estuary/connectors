@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-08-18
+
+### Added
+- New advanced option `compress_staged_files`. When enabled, files staged to
+  the Unity Catalog volume are gzip-compressed, which reduces the amount of
+  data uploaded at the cost of additional CPU usage. Disabled by default.
+
 ## 2026-08-04
 
 ### Changed
