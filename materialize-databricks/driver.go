@@ -858,9 +858,12 @@ func (d *transactor) executeStateKeyItems(ctx context.Context, db *stdsql.DB, b 
 			continue
 		}
 
-		queries, err := itemQueries(item)
-		if err != nil {
-			return err
+		var queries = item.Queries
+		if item.Query != "" {
+			if len(queries) != 0 {
+				return fmt.Errorf("checkpoint has both query and queries, this is unexpected")
+			}
+			queries = []string{item.Query}
 		}
 		if err := d.execQueries(ctx, db, queries, d.cpRecovery); err != nil {
 			return err
@@ -890,16 +893,6 @@ func (d *transactor) executeStateKeyItems(ctx context.Context, db *stdsql.DB, b 
 	}
 
 	return nil
-}
-
-func itemQueries(item *checkpointItem) ([]string, error) {
-	if item.Query != "" {
-		if len(item.Queries) != 0 {
-			return nil, fmt.Errorf("checkpoint has both query and queries, this is unexpected")
-		}
-		return []string{item.Query}, nil
-	}
-	return item.Queries, nil
 }
 
 // execQueries runs the given queries in order. tolerateMissing is set when
