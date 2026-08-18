@@ -208,7 +208,10 @@ See [connectors](/concepts/connectors.md#using-connectors) to learn more about u
 | ---------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- | ---------------- |
 | **`/namespace`** | Namespace           | The [namespace/schema](https://learn.microsoft.com/en-us/sql/relational-databases/databases/databases?view=sql-server-ver16#basic-information-about-databases) of the table. | string                                                        | Required         |
 | **`/stream`**    | Stream              | Table name.                                                                                                                                                                  | string                                                        | Required         |
-| `/primary_key`   | Primary Key Columns | array                                                                                                                                                                        | The columns which together form the primary key of the table. |                  |
+| `/primary_key`   | Primary Key Columns | The columns which together form the primary key of the table.                                                                                                                | array                                                          |                  |
+| `/mode` | [Backfill Mode](/reference/backfilling-data/#resource-configuration-backfill-modes) | How the preexisting contents of the table should be backfilled. This should generally not be changed. | string | `""` |
+| `/priority` | Backfill Priority | Optional priority for this binding. The highest priority binding(s) will be backfilled completely before any others. Negative priorities are allowed and will cause a binding to be backfilled after others. | integer | `0` |
+| `/advanced/additional_backfill_filter` | Additional Backfill Filter | Optional filter clause which will be applied to all backfill queries for this binding. Contact Estuary support for assistance before using this option. | string | |
 
 ### Sample
 

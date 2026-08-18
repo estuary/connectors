@@ -138,6 +138,9 @@ See [connectors](/concepts/connectors.md#using-connectors) to learn more about u
 | ---------------- | --------- | ------------------------------------------------------------------------------------------------------------------- | ------ | ---------------- |
 | **`/namespace`** | Namespace | The [database](https://mariadb.com/kb/en/understanding-mariadb-architecture/#databases) in which the table resides. | string | Required         |
 | **`/stream`**    | Stream    | Name of the table to be captured from the database.                                                                 | string | Required         |
+| `/mode` | [Backfill Mode](/reference/backfilling-data/#resource-configuration-backfill-modes) | How the preexisting contents of the table should be backfilled. This should generally not be changed. | string | `""` |
+| `/priority` | Backfill Priority | Optional priority for this binding. The highest priority binding(s) will be backfilled completely before any others. Negative priorities are allowed and will cause a binding to be backfilled after others. | integer | `0` |
+| `/advanced/additional_backfill_filter` | Additional Backfill Filter | Optional filter clause which will be applied to all backfill queries for this binding. Contact Estuary support for assistance before using this option. | string | |
 
 :::info
 When you configure this connector in the web application, the automatic **discovery** process sets up a binding for _most_ tables it finds in your database, but there are exceptions.
