@@ -544,6 +544,12 @@ func (c *Capture) activatePendingStreams(ctx context.Context, discovery map[Stre
 			state.KeyColumns = binding.Resource.PrimaryKey
 		}
 
+		// Log when a user-provided backfill filter is set, since it's an expert
+		// feature whose presence is important context when anything goes wrong.
+		if filter := binding.Resource.BackfillFilter(); filter != "" {
+			log.WithFields(log.Fields{"stream": streamID, "filter": filter}).Info("user-provided backfill filter is set")
+		}
+
 		// Select the appropriate state transition depending on the backfill mode in the resource config.
 		log.WithFields(log.Fields{
 			"stream":   streamID,
@@ -554,6 +560,12 @@ func (c *Capture) activatePendingStreams(ctx context.Context, discovery map[Stre
 		case BackfillModeAutomatic:
 			if discoveryInfo.UnpredictableKeyOrdering {
 				log.WithField("stream", streamID).Info("autoselected unfiltered (normal) backfill mode (database key ordering is unpredictable)")
+				state.Mode = TableStateUnfilteredBackfill
+			} else if binding.Resource.BackfillFilter() != "" {
+				// Precise backfills could lose changes to filter-excluded rows beyond the
+				// backfill cursor, since those replication events are dropped on the
+				// assumption that the backfill will observe the row later.
+				log.WithField("stream", streamID).Info("autoselected unfiltered (normal) backfill mode (backfill filter is set)")
 				state.Mode = TableStateUnfilteredBackfill
 			} else {
 				log.WithField("stream", streamID).Info("autoselected precise backfill mode")
@@ -905,7 +917,7 @@ func (c *Capture) backfillStream(ctx context.Context, streamID StreamID, discove
 	var eventCount int
 	var backfillDocumentBytes = 0
 	var backfillChunkStarted = time.Now()
-	backfillComplete, resumeCursor, err := c.Database.ScanTableChunk(ctx, discoveryInfo, streamState, func(event ChangeEvent) error {
+	backfillComplete, resumeCursor, err := c.Database.ScanTableChunk(ctx, discoveryInfo, streamState, binding.Resource.BackfillFilter(), func(event ChangeEvent) error {
 		if streamState.Mode == TableStatePreciseBackfill {
 			// Sanity check that when performing a "precise" backfill the DB's ordering of
 			// result rows must match our own bytewise lexicographic ordering of serialized
