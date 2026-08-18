@@ -522,6 +522,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 // uploaded to the staging volume and everything needed to commit them into the
 // target table.
 type checkpointItem struct {
+	// TODO: Remove these deprecated state keys
 	Query   string   `json:",omitempty"` // deprecated, kept for backward compatibility
 	Queries []string `json:",omitempty"` // deprecated, kept for backward compatibility
 	// TODO: consolidate ToDelete into StagedFiles, which records the same
