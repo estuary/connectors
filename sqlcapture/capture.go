@@ -70,7 +70,7 @@ func (c *Capture) BindingsInState(modes ...BackfillMode) []*Binding {
 			bindings = append(bindings, binding)
 		}
 	}
-	slices.SortFunc(bindings, func(a, b *Binding) int { return strings.Compare(a.StreamID.String(), b.StreamID.String()) })
+	slices.SortFunc(bindings, func(a, b *Binding) int { return a.StreamID.Compare(b.StreamID) })
 	return bindings
 }
 

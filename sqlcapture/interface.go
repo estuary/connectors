@@ -20,6 +20,14 @@ func (s StreamID) String() string {
 	return fmt.Sprintf("%s.%s", s.Schema, s.Table)
 }
 
+// Compare orders StreamIDs by schema and then by table name.
+func (s StreamID) Compare(other StreamID) int {
+	if n := strings.Compare(s.Schema, other.Schema); n != 0 {
+		return n
+	}
+	return strings.Compare(s.Table, other.Table)
+}
+
 // EncodeKey returns an unambiguous string representation of the StreamID
 // suitable for use as a map key in serialized cursors. The schema and table
 // components are encoded so that periods can be used as the separator.
