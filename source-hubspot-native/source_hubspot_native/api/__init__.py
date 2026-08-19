@@ -69,6 +69,7 @@ from .leads import (
     fetch_recent_leads,
 )
 from .line_items import (
+    check_line_items_access,
     fetch_delayed_line_items,
     fetch_recent_line_items,
 )
@@ -91,6 +92,7 @@ from .orders import (
 )
 from .owners import fetch_owners
 from .products import (
+    check_products_access,
     fetch_delayed_products,
     fetch_recent_products,
 )
@@ -115,6 +117,8 @@ __all__ = [
     "check_campaigns_access",
     "check_contact_list_memberships_access",
     "check_contact_lists_access",
+    "check_line_items_access",
+    "check_products_access",
     "check_tickets_access",
     "dt_to_ms",
     "fetch_campaigns",

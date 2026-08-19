@@ -42,7 +42,6 @@ scopes = [
     "crm.schemas.companies.read",
     "crm.schemas.contacts.read",
     "crm.schemas.deals.read",
-    "e-commerce",
 ]
 
 optional_scopes = [
@@ -55,6 +54,7 @@ optional_scopes = [
     "crm.objects.marketing_events.read",
     "crm.objects.orders.read",
     "crm.schemas.custom.read",
+    "e-commerce",
     "forms",
     "marketing.campaigns.read",
     "tickets",
