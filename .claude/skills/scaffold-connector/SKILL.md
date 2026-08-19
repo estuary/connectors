@@ -27,7 +27,7 @@ source-$1/
 ├── VERSION
 ├── config.yaml                 # plaintext placeholder (Phase 3)
 ├── test.flow.yaml              # Flow catalog for testing
-├── acmeCo/                     # generated schemas + bindings (regenerate-flow-discovery)
+├── acmeCo/                     # generated schemas — only if the connector has a capture test (regenerate-flow-discovery)
 ├── tests/
 │   ├── __init__.py
 │   └── test_snapshots.py       # the test harness (Phase 3)
@@ -157,6 +157,8 @@ captures:
 **`tests/__init__.py`** — empty file.
 
 **`tests/test_snapshots.py`** — copy `source-front/tests/test_snapshots.py` verbatim (the three `test_spec` / `test_discover` / `test_capture` functions are connector-agnostic).
+
+`test_capture` is **opt-in**. It drives `flowctl preview`, the only command that needs generated target collections. If the connector won't have one, leave it out — and then `acmeCo/`, the `import:` line, and populated `bindings:` all stay absent, so the `bindings: []` shape above is the finished state, not a placeholder. `source-ashby` is the reference shape (rule `REVIEW-ACMECO-NEEDS-CAPTURE-TEST`).
 
 **`config.yaml`** — plaintext placeholder, enough for `EndpointConfig` to parse. Don't fabricate credentials: the placeholder is shaped to match the scheme, and real sops-encrypted values are the user's to supply (`configure-auth`, Guiding rules):
 
