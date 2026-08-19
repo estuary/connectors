@@ -464,16 +464,12 @@ func (c *Capture) reconcileStateWithBindings(_ context.Context) error {
 	// flag update logic works makes a JSON-patch deletion of the whole thing tricky, but
 	// we could theoretically change this someday if "excessive size of state checkpoints
 	// due to deleted bindings" ever becomes an actual issue in practice.
-	streamExistsInCatalog := func(sk boilerplate.StateKey) bool {
-		for _, b := range c.Bindings {
-			if b.StateKey == sk {
-				return true
-			}
-		}
-		return false
+	var stateKeysInCatalog = make(map[boilerplate.StateKey]bool, len(c.Bindings))
+	for _, b := range c.Bindings {
+		stateKeysInCatalog[b.StateKey] = true
 	}
 	for stateKey, state := range c.State.Streams {
-		if state.Mode != TableStateIgnore && !streamExistsInCatalog(stateKey) {
+		if state.Mode != TableStateIgnore && !stateKeysInCatalog[stateKey] {
 			log.WithField("stateKey", stateKey).Info("binding removed from capture")
 			c.State.Streams[stateKey] = &TableState{
 				Mode:     TableStateIgnore,
