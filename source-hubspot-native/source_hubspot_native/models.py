@@ -495,7 +495,6 @@ class Engagement(BaseCRMObject):
         Names.notes,
         Names.tasks,
         Names.content,
-        Names.orders,
         Names.carts,
         Names.partner_clients,
         Names.marketing_events,
@@ -512,8 +511,6 @@ class Engagement(BaseCRMObject):
     meetings: list[int] = []
     notes: list[int] = []
     tasks: list[int] = []
-    content: list[int] = []
-    orders: list[int] = []
     carts: list[int] = []
     partner_clients: list[int] = []
     marketing_events: list[int] = []
