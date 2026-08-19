@@ -96,8 +96,10 @@ fn topic_schema_to_collection_spec(
     let doc_schema_json = json!({
         "x-infer-schema": true,
         "if": {
+            "required": ["_meta"],
             "properties": {
               "_meta": {
+                "required": ["op"],
                 "properties": {
                   "op": {
                     "const": "d"

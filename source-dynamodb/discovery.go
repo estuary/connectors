@@ -175,9 +175,11 @@ func (driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Respo
 					},
 					Required: []string{"_meta"},
 					If: &jsonschema.Schema{
+						Required: []string{"_meta"},
 						Extras: map[string]interface{}{
 							"properties": map[string]*jsonschema.Schema{
 								"_meta": {
+									Required: []string{"op"},
 									Extras: map[string]interface{}{
 										"properties": map[string]*jsonschema.Schema{
 											"op": {

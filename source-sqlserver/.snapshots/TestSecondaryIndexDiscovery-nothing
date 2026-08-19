@@ -41,8 +41,14 @@ sql> CREATE TABLE dbo.SecondaryIndexDiscovery_nothing_237250 (k1 INTEGER, k2 INT
     "allOf": [
       {
         "if": {
+          "required": [
+            "_meta"
+          ],
           "properties": {
             "_meta": {
+              "required": [
+                "op"
+              ],
               "properties": {
                 "op": {
                   "const": "d"
