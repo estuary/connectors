@@ -755,7 +755,7 @@ func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB, should
 			continue
 		}
 
-		if err := d.executeStateKeyItems(ctx, db, b, items); err != nil {
+		if err := d.commitBindingCheckpointItems(ctx, db, b, items); err != nil {
 			return nil, err
 		}
 
@@ -788,7 +788,7 @@ func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB, should
 	return &pf.ConnectorState{UpdatedJson: json.RawMessage(checkpointJSON), MergePatch: true}, nil
 }
 
-// executeStateKeyItems commits one state key's entries. Entries with structured staging
+// commitBindingCheckpointItems commits one binding's entries. Entries with structured staging
 // metadata coalesce into a single set of queries; those written by older connector versions
 // have only their pre-rendered queries, so they run individually.
 //
@@ -796,7 +796,7 @@ func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB, should
 // shards before a new transaction begins, and files are already cleaned up once all queries have
 // run. Thus a missing file means the whole query has already run, and during recovery that is
 // acceptable: we may have run the query but not have been able to clear the checkpoint.
-func (d *transactor) executeStateKeyItems(ctx context.Context, db *stdsql.DB, b *binding, items []*checkpointItem) error {
+func (d *transactor) commitBindingCheckpointItems(ctx context.Context, db *stdsql.DB, b *binding, items []*checkpointItem) error {
 	var coalesce []*checkpointItem
 	d.be.StartedResourceCommit(b.target.Path)
 	for _, item := range items {
