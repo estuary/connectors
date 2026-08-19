@@ -103,6 +103,20 @@ func (c *Capture) BindingsCurrentlyBackfilling() []*Binding {
 	return c.BindingsInState(TableStatePreciseBackfill, TableStateUnfilteredBackfill, TableStateKeylessBackfill)
 }
 
+// AnyBindingsCurrentlyBackfilling reports whether any binding is undergoing some sort of
+// backfill. It answers the same question as len(BindingsCurrentlyBackfilling()) > 0 without
+// building and sorting the full list, which dominates the cost when a capture has many
+// bindings.
+func (c *Capture) AnyBindingsCurrentlyBackfilling() bool {
+	for _, binding := range c.Bindings {
+		switch c.State.Streams[binding.StateKey].Mode {
+		case TableStatePreciseBackfill, TableStateUnfilteredBackfill, TableStateKeylessBackfill:
+			return true
+		}
+	}
+	return false
+}
+
 // TableState represents the serializable/resumable state of a particular table's capture.
 // It is mostly concerned with the "backfill" scanning process and the transition from that
 // to logical replication.
@@ -369,7 +383,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 		}
 
 		// If any tables are currently backfilling, go perform another backfill iteration.
-		if c.BindingsCurrentlyBackfilling() != nil {
+		if c.AnyBindingsCurrentlyBackfilling() {
 			c.statusUpdate("Backfilling Tables")
 			if err := c.backfillStreams(ctx, discovery); err != nil {
 				return fmt.Errorf("error performing backfill: %w", err)
