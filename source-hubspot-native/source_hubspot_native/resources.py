@@ -29,6 +29,7 @@ from .api import (
     check_contact_list_memberships_access,
     check_contact_lists_access,
     dt_to_ms,
+    probe_associations,
     is_missing_scope_error,
     fetch_contact_list_memberships_page,
     fetch_contact_lists,
@@ -377,6 +378,10 @@ def crm_object_with_associations(
         task: Task,
         all_bindings,
     ):
+        # Warm the probe here so its cost and its log land at open rather than
+        # midway through a page.
+        await probe_associations(task.log, cls, http, path_component)
+
         # Emit a sourced schema to increase the inferred schema's complexity limit.
         properties = await fetch_properties(task.log, http, path_component)
         task.sourced_schema(binding_index, cls.sourced_schema(properties.results))
