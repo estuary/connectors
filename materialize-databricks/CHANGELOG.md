@@ -5,8 +5,7 @@
 ### Changed
 - Files staged to the Unity Catalog volume are now gzip-compressed, which
   reduces the amount of data uploaded to Databricks at the cost of additional
-  CPU usage. Set the new advanced option `disable_staged_file_compression` to
-  keep writing them uncompressed.
+  CPU usage.
 
 ## 2026-08-04
 

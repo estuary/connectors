@@ -51,7 +51,6 @@ hardDelete
 hard_delete
 delta_updates
 no_flow_document
-disable_staged_file_compression
 disableFieldTruncation
 disable_key_distribution_optimization
 lowercase_column_names

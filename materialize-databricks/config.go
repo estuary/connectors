@@ -35,9 +35,8 @@ type config struct {
 }
 
 type advancedConfig struct {
-	NoFlowDocument               bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false" jsonschema_extras:"nonsensitive=true"`
-	DisableStagedFileCompression bool   `json:"disable_staged_file_compression,omitempty" jsonschema:"title=Disable Staged File Compression,description=Write files staged to the Unity Catalog volume without gzip compression. This uses less CPU at the cost of uploading more data to Databricks.,default=false" jsonschema_extras:"nonsensitive=true"`
-	FeatureFlags                 string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
+	NoFlowDocument bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false" jsonschema_extras:"nonsensitive=true"`
+	FeatureFlags   string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
 }
 
 const (

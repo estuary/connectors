@@ -219,13 +219,6 @@
             "default": false,
             "nonsensitive": true
           },
-          "disable_staged_file_compression": {
-            "type": "boolean",
-            "title": "Disable Staged File Compression",
-            "description": "Write files staged to the Unity Catalog volume without gzip compression. This uses less CPU at the cost of uploading more data to Databricks.",
-            "default": false,
-            "nonsensitive": true
-          },
           "feature_flags": {
             "type": "string",
             "title": "Feature Flags",
