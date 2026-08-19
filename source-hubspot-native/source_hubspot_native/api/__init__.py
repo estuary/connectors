@@ -81,7 +81,10 @@ from .marketing_events import (
     fetch_marketing_event_participants,
     fetch_marketing_events,
 )
-from .object_with_associations import fetch_page_with_associations
+from .object_with_associations import (
+    fetch_page_with_associations,
+    probe_associations,
+)
 from .orders import (
     fetch_delayed_orders,
     fetch_recent_orders,
@@ -161,6 +164,7 @@ __all__ = [
     "fetch_recent_workflows",
     "fetch_workflows_page",
     "is_missing_scope_error",
+    "probe_associations",
     "fetch_delayed_changes",
     "fetch_realtime_changes",
     "list_custom_objects",
