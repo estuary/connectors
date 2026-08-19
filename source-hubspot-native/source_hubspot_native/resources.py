@@ -28,6 +28,8 @@ from .api import (
     fetch_contact_lists_page,
     check_contact_list_memberships_access,
     check_contact_lists_access,
+    check_line_items_access,
+    check_products_access,
     check_tickets_access,
     dt_to_ms,
     probe_associations,
@@ -235,6 +237,14 @@ async def _remove_permission_blocked_resources(
         (
             Names.tickets,
             check_tickets_access(http, log),
+        ),
+        (
+            Names.products,
+            check_products_access(http, log),
+        ),
+        (
+            Names.line_items,
+            check_line_items_access(http, log),
         ),
     ]
 
