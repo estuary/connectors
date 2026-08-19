@@ -223,11 +223,11 @@ func (f *stagedFile) putWorker(ctx context.Context, db *stdsql.DB, filePaths <-c
 func (f *stagedFile) newFile() error {
 	var fName = fmt.Sprintf("%s.json", uuid.NewString())
 	var writerOpts []writer.JsonOption
-	if f.cfg.Advanced.CompressStagedFiles {
+	if f.cfg.Advanced.DisableStagedFileCompression {
+		writerOpts = append(writerOpts, writer.WithJsonDisableCompression())
+	} else {
 		// Databricks infers the codec of a staged file from its extension when reading it back.
 		fName += ".gz"
-	} else {
-		writerOpts = append(writerOpts, writer.WithJsonDisableCompression())
 	}
 
 	filePath := filepath.Join(f.dir, fName)
