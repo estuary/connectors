@@ -1,4 +1,5 @@
 import asyncio
+import re
 from datetime import UTC, datetime, timedelta
 from logging import Logger
 from typing import (
@@ -9,7 +10,7 @@ from typing import (
 
 import estuary_cdk.emitted_changes_cache as cache
 from estuary_cdk.capture.common import LogCursor
-from estuary_cdk.http import HTTPSession
+from estuary_cdk.http import HTTPError, HTTPSession
 
 from ..models import TimestampedObject
 
@@ -30,6 +31,42 @@ MAX_DELAYED_WINDOW = timedelta(hours=1)
 # Minimum time window required before polling the delayed stream.
 # Prevents excessive API calls when Resource.interval is small.
 MIN_DELAYED_WINDOW = timedelta(minutes=5)
+
+# HubSpot words this differently per endpoint and per authentication method, so
+# the list grows as new wordings turn up.
+MISSING_SCOPE_REGEX = (
+    # "This app hasn't been granted all required scopes to make this call. Read
+    # more about required scopes here: ..."
+    r"This app hasn't been granted all required scopes to make this call.|"
+    # "EXTERNAL auth request is missing required 'workflows-access-public-api' scope."
+    r"auth request is missing required '.+' scope|"
+    # "This oauth-token (...) does not have proper permissions!" and "You do not
+    # have permissions to view_schema object type ... (requires one of [leads-read])"
+    r"do(es)? not have (proper )?permissions|"
+    # '"category": "MISSING_SCOPES"', the one part of a refusal HubSpot is
+    # unlikely to reword -- but only some responses carry it.
+    r'"category": "MISSING_SCOPES"'
+)
+
+
+def is_missing_scope_error(log: Logger, err: HTTPError) -> bool:
+    """
+    Reports whether err is HubSpot refusing a call because the token wasn't
+    granted a scope, as opposed to any other flavor of 403.
+
+    Callers treat an unrecognized 403 as fatal, so log the message: it's the
+    only signal that HubSpot has a wording MISSING_SCOPE_REGEX doesn't cover.
+    """
+    if err.code != 403:
+        return False
+
+    if re.search(MISSING_SCOPE_REGEX, err.message):
+        return True
+
+    log.warning("Unrecognized 403 response; treating it as fatal.", {
+        "message": err.message,
+    })
+    return False
 
 
 FetchRecentFn = Callable[
