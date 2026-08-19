@@ -28,6 +28,7 @@ from .api import (
     fetch_contact_lists_page,
     check_contact_list_memberships_access,
     check_contact_lists_access,
+    check_tickets_access,
     dt_to_ms,
     probe_associations,
     is_missing_scope_error,
@@ -230,6 +231,10 @@ async def _remove_permission_blocked_resources(
         (
             Names.campaigns,
             check_campaigns_access(http, log),
+        ),
+        (
+            Names.tickets,
+            check_tickets_access(http, log),
         ),
     ]
 

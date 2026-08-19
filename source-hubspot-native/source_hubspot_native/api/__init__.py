@@ -96,6 +96,7 @@ from .products import (
 )
 from .properties import fetch_properties
 from .tickets import (
+    check_tickets_access,
     fetch_delayed_tickets,
     fetch_recent_tickets,
 )
@@ -114,6 +115,7 @@ __all__ = [
     "check_campaigns_access",
     "check_contact_list_memberships_access",
     "check_contact_lists_access",
+    "check_tickets_access",
     "dt_to_ms",
     "fetch_campaigns",
     "fetch_campaigns_page",
