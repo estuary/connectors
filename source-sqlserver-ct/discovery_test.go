@@ -10,12 +10,14 @@ import (
 
 func TestSchemaWhitelist(t *testing.T) {
 	t.Run("Default", func(t *testing.T) {
+		t.Parallel()
 		var db, tc = blackboxTestSetup(t)
 		db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data TEXT)`)
 		tc.Discover("Discover Tables")
 		cupaloy.SnapshotT(t, tc.Transcript.String())
 	})
 	t.Run("IncludeMatching", func(t *testing.T) {
+		t.Parallel()
 		var db, tc = blackboxTestSetup(t)
 		db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data TEXT)`)
 		require.NoError(t, tc.Capture.EditConfig("discoveryFilters.include_schemas", []string{*testSchemaName}))
@@ -23,6 +25,7 @@ func TestSchemaWhitelist(t *testing.T) {
 		cupaloy.SnapshotT(t, tc.Transcript.String())
 	})
 	t.Run("IncludeNonmatching", func(t *testing.T) {
+		t.Parallel()
 		var db, tc = blackboxTestSetup(t)
 		db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data TEXT)`)
 		require.NoError(t, tc.Capture.EditConfig("discoveryFilters.include_schemas", []string{"nonexistent_schema"}))
@@ -30,6 +33,7 @@ func TestSchemaWhitelist(t *testing.T) {
 		cupaloy.SnapshotT(t, tc.Transcript.String())
 	})
 	t.Run("Excluded", func(t *testing.T) {
+		t.Parallel()
 		var db, tc = blackboxTestSetup(t)
 		db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data TEXT)`)
 		require.NoError(t, tc.Capture.EditConfig("discoveryFilters.exclude_schemas", []string{*testSchemaName}))
@@ -40,6 +44,7 @@ func TestSchemaWhitelist(t *testing.T) {
 
 func TestTablePatterns(t *testing.T) {
 	var runSubcase = func(t *testing.T, patterns []string) {
+		t.Parallel()
 		var db, tc = blackboxTestSetup(t)
 		var id = uniqueTableID(t)
 		db.CreateTable(t, fmt.Sprintf("%s.tp_%s_alpha_evt", *testSchemaName, id), `(id INTEGER PRIMARY KEY, data TEXT)`)

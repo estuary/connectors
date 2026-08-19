@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -32,6 +31,9 @@ func TestCaptureInstanceCleanup(t *testing.T) {
 		{"WithoutDBO", false},
 	} {
 		t.Run(testCase.Name, func(t *testing.T) {
+			// Serial: this test grants flow_capture the database-wide db_owner role, which
+			// would change what any concurrently-running capture is permitted to do, and
+			// the two cases here deliberately disagree about whether it is granted.
 			var db, tc = blackboxTestSetup(t)
 
 			db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data TEXT)`)
@@ -48,7 +50,7 @@ func TestCaptureInstanceCleanup(t *testing.T) {
 			tc.Run("Initial Backfill", -1)
 
 			// For the ongoing capture, we need to disable SHUTDOWN_AFTER_POLLING
-			os.Unsetenv("SHUTDOWN_AFTER_POLLING")
+			delete(tc.Capture.Env, "SHUTDOWN_AFTER_POLLING")
 
 			// Launch the ongoing capture in a background goroutine
 			var captureCtx, cancelCapture = context.WithCancel(context.Background())
@@ -108,6 +110,8 @@ func TestAlterationAddColumn(t *testing.T) {
 		{"Automatic", false, true},
 	} {
 		t.Run(testCase.Name, func(t *testing.T) {
+			// Serial: grants flow_capture the database-wide db_owner role, which would
+			// change what any concurrently-running capture is permitted to do.
 			var db, tc = blackboxTestSetup(t)
 
 			// Grant db_owner role required for capture instance automation
@@ -185,6 +189,8 @@ func TestAlterationAddColumn(t *testing.T) {
 }
 
 func TestFilegroupAndRole(t *testing.T) {
+	// Serial: grants flow_capture the database-wide db_owner role, which would change
+	// what any concurrently-running capture is permitted to do.
 	var db, tc = blackboxTestSetup(t)
 
 	// Create table without CDC (connector will create CDC instance with specified config)
@@ -216,6 +222,7 @@ func TestFeatureFlagEmitSourcedSchemas(t *testing.T) {
 		{"Disabled", "no_emit_sourced_schemas"},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			var db, tc = blackboxTestSetup(t)
 			db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data VARCHAR(32))`)
 			db.Exec(t, `INSERT INTO <NAME> VALUES (1, 'hello'), (2, 'world')`)
@@ -231,6 +238,7 @@ func TestFeatureFlagEmitSourcedSchemas(t *testing.T) {
 
 func TestSecondaryIndexDiscovery(t *testing.T) {
 	t.Run("pk_and_index", func(t *testing.T) {
+		t.Parallel()
 		var db, tc = blackboxTestSetup(t)
 		db.CreateTable(t, `<NAME>`, `(k1 INTEGER PRIMARY KEY, k2 INTEGER NOT NULL, k3 INTEGER NOT NULL, data TEXT)`)
 		db.Exec(t, `CREATE UNIQUE INDEX UX_<ID>_k23 ON <NAME> (k2, k3)`)
@@ -238,6 +246,7 @@ func TestSecondaryIndexDiscovery(t *testing.T) {
 		cupaloy.SnapshotT(t, tc.Transcript.String())
 	})
 	t.Run("index_only", func(t *testing.T) {
+		t.Parallel()
 		var db, tc = blackboxTestSetup(t)
 		db.CreateTable(t, `<NAME>`, `(k1 INTEGER, k2 INTEGER NOT NULL, k3 INTEGER NOT NULL, data TEXT)`)
 		db.Exec(t, `CREATE UNIQUE INDEX UX_<ID>_k23 ON <NAME> (k2, k3)`)
@@ -245,6 +254,7 @@ func TestSecondaryIndexDiscovery(t *testing.T) {
 		cupaloy.SnapshotT(t, tc.Transcript.String())
 	})
 	t.Run("nullable_index", func(t *testing.T) {
+		t.Parallel()
 		var db, tc = blackboxTestSetup(t)
 		db.CreateTable(t, `<NAME>`, `(k1 INTEGER, k2 INTEGER, k3 INTEGER, data TEXT)`)
 		db.Exec(t, `CREATE UNIQUE INDEX UX_<ID>_k23 ON <NAME> (k2, k3)`)
@@ -252,6 +262,7 @@ func TestSecondaryIndexDiscovery(t *testing.T) {
 		cupaloy.SnapshotT(t, tc.Transcript.String())
 	})
 	t.Run("nonunique_index", func(t *testing.T) {
+		t.Parallel()
 		var db, tc = blackboxTestSetup(t)
 		db.CreateTable(t, `<NAME>`, `(k1 INTEGER, k2 INTEGER NOT NULL, k3 INTEGER NOT NULL, data TEXT)`)
 		db.Exec(t, `CREATE INDEX UX_<ID>_k23 ON <NAME> (k2, k3)`)
@@ -259,6 +270,7 @@ func TestSecondaryIndexDiscovery(t *testing.T) {
 		cupaloy.SnapshotT(t, tc.Transcript.String())
 	})
 	t.Run("nothing", func(t *testing.T) {
+		t.Parallel()
 		var db, tc = blackboxTestSetup(t)
 		db.CreateTable(t, `<NAME>`, `(k1 INTEGER, k2 INTEGER NOT NULL, k3 INTEGER NOT NULL, data TEXT)`)
 		tc.DiscoverFull("Discover Tables")
@@ -269,6 +281,7 @@ func TestSecondaryIndexDiscovery(t *testing.T) {
 // TestIndexIncludedDiscovery tests discovery when a secondary unique index contains
 // some included non-key columns.
 func TestIndexIncludedDiscovery(t *testing.T) {
+	t.Parallel()
 	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(k1 INTEGER, k2 INTEGER NOT NULL, k3 INTEGER NOT NULL, data TEXT)`)
 	db.Exec(t, `CREATE UNIQUE INDEX UX_<ID>_k23 ON <NAME> (k2, k3) INCLUDE (k1)`)
@@ -279,6 +292,7 @@ func TestIndexIncludedDiscovery(t *testing.T) {
 // TestDiscoverOnlyEnabled tests discovery table filtering when only CDC-enabled tables should be discovered.
 func TestDiscoverOnlyEnabled(t *testing.T) {
 	t.Run("Disabled", func(t *testing.T) {
+		t.Parallel()
 		var db, tc = blackboxTestSetup(t)
 		// Create three tables
 		db.CreateTable(t, `<NAME>_a`, `(id INTEGER PRIMARY KEY, data TEXT)`)
@@ -295,6 +309,7 @@ func TestDiscoverOnlyEnabled(t *testing.T) {
 		cupaloy.SnapshotT(t, tc.Transcript.String())
 	})
 	t.Run("Enabled", func(t *testing.T) {
+		t.Parallel()
 		var db, tc = blackboxTestSetup(t)
 		// Create three tables
 		db.CreateTable(t, `<NAME>_a`, `(id INTEGER PRIMARY KEY, data TEXT)`)
@@ -317,6 +332,7 @@ func TestDiscoverOnlyEnabled(t *testing.T) {
 // the collection key shouldn't impact correctness of the capture even if multiple
 // rows have the same collection key value.
 func TestDuplicatedScanKey(t *testing.T) {
+	t.Parallel()
 	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(id VARCHAR(8), data VARCHAR(2000))`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES ('AAA', '1'), ('BBB', '2'), ('BBB', '3'), ('CCC', '4')`)
@@ -328,6 +344,7 @@ func TestDuplicatedScanKey(t *testing.T) {
 }
 
 func TestReplicationOnly(t *testing.T) {
+	t.Parallel()
 	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER, data TEXT)`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (1, 'one'), (2, 'two'), (3, 'three'), (4, 'four')`)
@@ -341,6 +358,7 @@ func TestReplicationOnly(t *testing.T) {
 }
 
 func TestKeylessDiscovery(t *testing.T) {
+	t.Parallel()
 	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(a INTEGER, b VARCHAR(2000), c REAL NOT NULL, d VARCHAR(255))`)
 	tc.DiscoverFull("Discover Tables")
@@ -348,6 +366,7 @@ func TestKeylessDiscovery(t *testing.T) {
 }
 
 func TestKeylessCapture(t *testing.T) {
+	t.Parallel()
 	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER, data TEXT)`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (1, 'one'), (2, 'two')`)
@@ -362,6 +381,7 @@ func TestKeylessCapture(t *testing.T) {
 // TestCatalogPrimaryKey sets up a table with no primary key in the database
 // and instead specifies one in the catalog configuration.
 func TestCatalogPrimaryKey(t *testing.T) {
+	t.Parallel()
 	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER, name TEXT, value INTEGER)`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (1, 'alice', 100), (2, 'bob', 200)`)

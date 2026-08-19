@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-08-19
+
+### Fixed
+- `products`, `custom_collections`, and `smart_collections` no longer fail
+  entirely for stores whose access token doesn't grant `read_publications`.
+  The connector now omits publication data instead of failing the whole
+  export when that scope is missing.
+
+## 2026-08-18
+
+### Added
+- `order_returns` now captures each return's `returnShippingFees` (the shipping
+  fee charged on the return) and each return line item's `fulfillmentLineItem`
+  (tying it back to the order's original line item).
+
 ## 2026-08-08
 
 ### Added

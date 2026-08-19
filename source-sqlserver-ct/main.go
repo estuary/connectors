@@ -205,6 +205,8 @@ type CTResource struct {
 	Namespace string `json:"namespace" jsonschema:"title=Schema,description=The schema (namespace) in which the table resides.,readOnly=true"`
 	Stream    string `json:"stream" jsonschema:"title=Table Name,description=The name of the table to be captured.,readOnly=true"`
 	Priority  int    `json:"priority,omitempty" jsonschema:"title=Backfill Priority,description=An optional integer priority for this binding. The highest priority binding(s) will be backfilled completely before any others. The default priority is zero. Negative priorities are allowed and will cause a binding to be backfilled after others." jsonschema_extras:"nonsensitive=true"`
+
+	Advanced *sqlcapture.AdvancedResourceOptions `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 }
 
 func resourceSchema() json.RawMessage {

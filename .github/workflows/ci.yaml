@@ -161,6 +161,16 @@ jobs:
           VARIANTS="${{ matrix.connector }} $(cat ${{ matrix.connector }}/VARIANTS 2>/dev/null || true)"
           echo ::set-output name=variants::${VARIANTS}
 
+      # Several steps below run `go test` on the runner instead of inside a Dockerfile, and
+      # without this they fetch the module graph and compile it cold. Gate on the same
+      # condition as the helper package test step.
+      - name: Set up Go with module and build caching
+        if: hashFiles(format('{0}/*.go', matrix.connector)) != ''
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
       - name: Restore Flow binaries
         uses: ./.github/actions/restore-flow-binaries
 

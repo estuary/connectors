@@ -10,15 +10,18 @@ import pytest
 from pydantic import Field
 
 from estuary_cdk.capture.common import (
+    Resource,
     ResourceConfig,
     ResourceState,
+    SnapshotResource,
     _binding_snapshot_task,  # pyright: ignore[reportPrivateUsage]
     open_binding,
+    resolve_bindings,
 )
 from estuary_cdk.capture.document import BaseDocument
 from estuary_cdk.capture.task import Task
 from estuary_cdk.capture.transactor import Transactor
-from estuary_cdk.flow import CaptureBinding, CollectionSpec
+from estuary_cdk.flow import CaptureBinding, CollectionSpec, ValidationError
 
 COMPOUND_KEY = ["/_meta/store", "/_meta/row_id"]
 
@@ -270,19 +273,6 @@ class TestOpenBindingSnapshotDict:
                 tombstone={"A": _doc("A", "")},
             )
 
-    def test_requires_row_id_in_key(self):
-        output = io.BytesIO()
-        task = _task(output, Task.Stopping())
-        with pytest.raises(AssertionError, match="compound collection key"):
-            open_binding(
-                _binding(["/_meta/store", "/id"]),
-                0,
-                self._state(),
-                task,
-                fetch_snapshot={"A": self._noop},
-                tombstone={"A": _doc("A", "")},
-            )
-
     def test_requires_matching_tombstone_dict(self):
         output = io.BytesIO()
         task = _task(output, Task.Stopping())
@@ -309,4 +299,152 @@ class TestOpenBindingSnapshotDict:
                 # Both tombstones carry store "A": their (store, row_id)
                 # keyspaces would overlap and clobber each other.
                 tombstone={"A": _doc("A", ""), "B": _doc("A", "")},
+            )
+
+
+class TestSnapshotResourceKey:
+    """SnapshotResource's key is an invariant of the type, not of a particular
+    binding, so it is enforced at construction. That covers every path which
+    builds resources -- Discover, Validate and Open -- and validates only what
+    the connector itself declares."""
+
+    def _resource(self, **overrides) -> SnapshotResource:
+        return SnapshotResource(
+            name="staff_members",
+            open=lambda *args: None,
+            initial_config=ResourceConfig(name="staff_members", interval=timedelta()),
+            **overrides,
+        )
+
+    def test_defaults_to_row_id(self):
+        assert self._resource().key == ["/_meta/row_id"]
+
+    def test_accepts_compound_key_containing_row_id(self):
+        # A snapshot may key on a subtask discriminator as well, as long as
+        # row_id is still there to address the removed row.
+        assert self._resource(key=COMPOUND_KEY).key == COMPOUND_KEY
+
+    def test_rejects_key_without_row_id(self):
+        # The issue #5051 shape, caught before any collection exists.
+        with pytest.raises(AssertionError, match="must be keyed on /_meta/row_id"):
+            _ = self._resource(key=["/id"])
+
+    def test_rejects_compound_key_without_row_id(self):
+        with pytest.raises(AssertionError, match="must be keyed on /_meta/row_id"):
+            _ = self._resource(key=["/_meta/store", "/id"])
+
+
+class TestResolveBindingsSnapshotKey:
+    """The collection's key belongs to the user, so a mismatch is reported as a
+    ValidationError during Validate -- failing the publish -- rather than
+    asserted once a task is already running."""
+
+    def _resource(self, name: str = "staff_members") -> SnapshotResource:
+        return SnapshotResource(
+            name=name,
+            open=lambda *args: None,
+            initial_config=ResourceConfig(name=name, interval=timedelta()),
+        )
+
+    def test_accepts_row_id_key(self):
+        resolved = resolve_bindings([_binding(["/_meta/row_id"])], [self._resource()])
+        assert len(resolved) == 1
+
+    def test_accepts_compound_key_containing_row_id(self):
+        resolved = resolve_bindings([_binding(COMPOUND_KEY)], [self._resource()])
+        assert len(resolved) == 1
+
+    def test_rejects_key_without_row_id(self):
+        with pytest.raises(ValidationError) as excinfo:
+            _ = resolve_bindings([_binding(["/id"])], [self._resource()])
+
+        (error,) = excinfo.value.errors
+        assert "c/staff_members" in error
+        assert "must be keyed on /_meta/row_id" in error
+        assert "['/id']" in error
+
+    def test_ignores_non_snapshot_resources(self):
+        # A snapshot binding declared as a plain Resource is invisible here --
+        # only its `open` callback knows it passes fetch_snapshot -- so Validate
+        # must not reject it.
+        resource = Resource(
+            name="issues",
+            key=["/id"],
+            model=BaseDocument,
+            open=lambda *args: None,
+            initial_state=ResourceState(),
+            initial_config=ResourceConfig(name="issues", interval=timedelta()),
+            schema_inference=True,
+        )
+        resolved = resolve_bindings([_binding(["/id"], name="issues")], [resource])
+        assert len(resolved) == 1
+
+
+class TestOpenBindingSnapshotSingle:
+    """A single (non-dict) fetch_snapshot is subject to the same key/tombstone
+    rules as a subtask. These went unchecked until a snapshot binding keyed on
+    `/id` shipped and only failed once its source count first shrank."""
+
+    async def _noop(self, log: logging.Logger) -> AsyncGenerator[StoreDoc, None]:
+        if False:
+            yield  # pragma: no cover
+
+    def test_accepts_row_id_key_with_default_tombstone(self):
+        task = _task(io.BytesIO(), Task.Stopping())
+        task.spawn_child = MagicMock()  # type: ignore[method-assign]
+
+        # The canonical shape: keyed solely on row_id, so the CDK's own default
+        # tombstone suffices and no caller-supplied fields are needed.
+        open_binding(
+            _binding(["/_meta/row_id"]),
+            0,
+            ResourceState(),
+            task,
+            fetch_snapshot=self._noop,
+        )
+
+        assert task.spawn_child.call_count == 1
+        assert task.spawn_child.call_args.args[0] == "staff_members.snapshot"
+
+    def test_accepts_compound_key_when_tombstone_carries_discriminator(self):
+        task = _task(io.BytesIO(), Task.Stopping())
+        task.spawn_child = MagicMock()  # type: ignore[method-assign]
+
+        open_binding(
+            _binding(COMPOUND_KEY),
+            0,
+            ResourceState(),
+            task,
+            fetch_snapshot=self._noop,
+            tombstone=_doc("A", ""),
+        )
+
+        assert task.spawn_child.call_count == 1
+
+    def test_rejects_tombstone_missing_a_key_field(self):
+        # row_id is in the key, but the CDK cannot populate `store`, so this
+        # tombstone would delete whatever sits at store="" instead.
+        with pytest.raises(AssertionError, match="/_meta/store is unset"):
+            open_binding(
+                _binding(COMPOUND_KEY),
+                0,
+                ResourceState(),
+                _task(io.BytesIO(), Task.Stopping()),
+                fetch_snapshot=self._noop,
+                tombstone=BaseDocument(_meta=BaseDocument.Meta(op="d")),
+            )
+
+    def test_rejects_tombstone_relying_on_a_default_for_a_key_field(self):
+        # StoreDoc.Meta declares `store` with a default, so it resolves on the
+        # model -- but documents serialize with exclude_unset, so a value the
+        # caller never set is absent from the captured document and would key
+        # the deletion to the default instead.
+        with pytest.raises(AssertionError, match="/_meta/store is unset"):
+            open_binding(
+                _binding(COMPOUND_KEY),
+                0,
+                ResourceState(),
+                _task(io.BytesIO(), Task.Stopping()),
+                fetch_snapshot=self._noop,
+                tombstone=StoreDoc(id="", _meta=StoreDoc.Meta(op="d")),
             )

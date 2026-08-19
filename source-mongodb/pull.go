@@ -649,12 +649,13 @@ func supportsPreImages(ctx context.Context, client *mongo.Client, database strin
 	// pipeline stage.
 	cs, err := client.Database(database).Watch(ctx, mongo.Pipeline{bson.D{{Key: "$changeStreamSplitLargeEvent", Value: bson.D{}}}})
 	if err != nil {
+		// Servers reject the stage with varying wording. Treat any command
+		// error naming the stage as meaning the server won't run it, and
+		// capture without pre-images.
 		var commandError mongo.CommandError
-		if errors.As(err, &commandError) {
-			if commandError.Name == "AtlasError" && strings.HasPrefix(commandError.Message, "$changeStreamSplitLargeEvent is not allowed") {
-				ll.WithField("atlasError", err).Info("not requesting pre-images because this MongoDB Atlas instance does not support the $changeStreamSplitLargeEvent stage")
-				return false, nil
-			}
+		if errors.As(err, &commandError) && strings.Contains(commandError.Message, "$changeStreamSplitLargeEvent") {
+			ll.WithField("error", err).Info("not requesting pre-images because this server does not support the $changeStreamSplitLargeEvent stage")
+			return false, nil
 		}
 		return false, fmt.Errorf("opening change stream to test for $changeStreamSplitLargeEvent support: %w", err)
 	}

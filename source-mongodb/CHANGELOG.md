@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-08-17
+
+### Fixed
+
+- Servers that report a recent version but reject the
+  `$changeStreamSplitLargeEvent` pipeline stage, such as Amazon DocumentDB 8, no
+  longer fail the capture at startup. They are now captured without pre-images,
+  matching the existing behavior for MongoDB Atlas deployments that reject the
+  stage.
+
 ## 2026-08-12
 
 ### Added

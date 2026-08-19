@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/crc32"
+	"os"
 	"slices"
 	"strings"
 	"sync"
@@ -122,6 +123,15 @@ type sqlserverReplicationStream struct {
 	// interval as a reasonable heuristic.
 	establishFenceTimeout time.Duration
 
+	// establishFenceRetryInterval is how long to wait before re-checking whether the CDC
+	// worker has completed a new log scan session, which is what a fence position is
+	// established from. There is no notification when a scan completes, so this is a poll,
+	// and because the first check always fails the interval quantizes every fence to a
+	// multiple of itself. One second is the right default against a CDC worker which scans
+	// no more often than once per second, and tests which drive scanning themselves lower it
+	// via ${TEST_FENCE_RETRY_INTERVAL}.
+	establishFenceRetryInterval time.Duration
+
 	tables struct {
 		sync.RWMutex
 		info map[sqlcapture.StreamID]*tableReplicationInfo
@@ -169,6 +179,19 @@ func (rs *sqlserverReplicationStream) open(ctx context.Context) error {
 	rs.cdcPollingInterval = pollingInterval
 	rs.streamToFenceWatchdogTimeout = max(15*time.Minute, 3*pollingInterval)
 	rs.establishFenceTimeout = max(15*time.Minute, 3*pollingInterval)
+
+	// Test-only override, in the same spirit as ${SHUTDOWN_AFTER_POLLING}: the black-box
+	// tests run the connector as a subprocess, so an in-process test flag can't reach it.
+	// Unset, which is every production capture, this is one second.
+	rs.establishFenceRetryInterval = 1 * time.Second
+	if override := os.Getenv("TEST_FENCE_RETRY_INTERVAL"); override != "" {
+		if parsed, err := time.ParseDuration(override); err != nil {
+			log.WithFields(log.Fields{"value": override, "err": err}).Warn("ignoring unparseable ${TEST_FENCE_RETRY_INTERVAL}")
+		} else {
+			log.WithField("interval", parsed.String()).Info("overriding fence retry interval from ${TEST_FENCE_RETRY_INTERVAL}")
+			rs.establishFenceRetryInterval = parsed
+		}
+	}
 
 	rs.errCh = make(chan error)
 	rs.events = make(chan sqlcapture.DatabaseEvent)
@@ -412,7 +435,7 @@ func (rs *sqlserverReplicationStream) streamToPositionalFence(ctx context.Contex
 	// The behavior of 'establishFenceTimer' is a little bit complicated here. Initially it's
 	// set to the 'fenceAfter' duration so we'll run for at least that long before checking if
 	// we can establish a new fence position. After that initial duration is reached, we reset
-	// it to one second for each retry.
+	// it to 'establishFenceRetryInterval' for each retry.
 	var timedEventsSinceFlush int
 	var latestFlushLSN = rs.fenceLSN
 	var nextFenceLSN LSN
@@ -440,7 +463,7 @@ loop:
 				nextFenceLSN = lsn
 				break loop
 			} else {
-				establishFenceTimer.Reset(1 * time.Second)
+				establishFenceTimer.Reset(rs.establishFenceRetryInterval)
 				continue
 			}
 		case event, ok := <-rs.events:

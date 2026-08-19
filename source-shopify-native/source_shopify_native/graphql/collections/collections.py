@@ -3,7 +3,13 @@ from logging import Logger
 import json
 from typing import Any, AsyncGenerator, ClassVar, Literal
 
-from ...models import ShopifyGraphQLResource, SortKey, StoreCapabilities
+from ...models import (
+    ConditionalField,
+    ShopifyGraphQLResource,
+    SortKey,
+    StoreCapabilities,
+    requires_any_scope,
+)
 
 
 class _Collections(ShopifyGraphQLResource):
@@ -30,7 +36,12 @@ class _Collections(ShopifyGraphQLResource):
             }
         }
     }
-    publications {
+    # {{ publications }}
+    """
+    CONDITIONAL_FIELDS = [
+        ConditionalField(
+            placeholder="# {{ publications }}",
+            fields="""publications {
         edges {
             node {
                 __typename
@@ -41,8 +52,10 @@ class _Collections(ShopifyGraphQLResource):
                 }
             }
         }
-    }
-    """
+    }""",
+            is_available=requires_any_scope("read_publications"),
+        ),
+    ]
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)

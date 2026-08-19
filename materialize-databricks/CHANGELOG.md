@@ -1,6 +1,6 @@
 # Changelog
 
-## 2026-08-17
+## 2026-08-20
 
 ### Changed
 - The `scale_out` feature flag is removed: multi-shard operation is always
@@ -15,6 +15,14 @@
   queries. Note for downgrades: versions predating this change refuse to
   parse the new format — drain the task (let it idle at an acknowledged
   commit) before pinning an older image.
+
+## 2026-08-18
+
+### Changed
+- Files staged to the Unity Catalog volume are now gzip-compressed, which
+  reduces the amount of data uploaded to Databricks at the cost of additional
+  CPU usage.
+
 
 ## 2026-08-04
 

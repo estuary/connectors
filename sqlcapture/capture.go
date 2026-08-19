@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"math"
 	"math/rand"
 	"os"
@@ -61,17 +62,29 @@ func (ps *PersistentState) Validate() error {
 	return nil
 }
 
-// BindingsInState returns all the bindings having a particular persisted state, in sorted order for
-// reproducibility.
-func (c *Capture) BindingsInState(modes ...BackfillMode) []*Binding {
-	var bindings []*Binding
-	for _, binding := range c.Bindings {
-		if slices.Contains(modes, BackfillMode(c.State.Streams[binding.StateKey].Mode)) {
-			bindings = append(bindings, binding)
+// bindingsInState yields every binding whose persisted state is one of the given modes, in
+// map iteration order. It exists so that the state predicate lives in exactly one place:
+// callers compose it with slices.SortedFunc when they need a reproducible order, with
+// slices.AppendSeq when the order doesn't matter, or range over it with an early return
+// to test for existence without building a list at all.
+func (c *Capture) bindingsInState(modes ...BackfillMode) iter.Seq[*Binding] {
+	return func(yield func(*Binding) bool) {
+		for _, binding := range c.Bindings {
+			if slices.Contains(modes, BackfillMode(c.State.Streams[binding.StateKey].Mode)) {
+				if !yield(binding) {
+					return
+				}
+			}
 		}
 	}
-	slices.SortFunc(bindings, func(a, b *Binding) int { return strings.Compare(a.StreamID.String(), b.StreamID.String()) })
-	return bindings
+}
+
+// BindingsInState returns all the bindings having a particular persisted state in sorted order for
+// reproducibility.
+func (c *Capture) BindingsInState(modes ...BackfillMode) []*Binding {
+	return slices.SortedFunc(c.bindingsInState(modes...), func(a, b *Binding) int {
+		return a.StreamID.Compare(b.StreamID)
+	})
 }
 
 // BindingsCurrentlyActive returns all the bindings currently being captured.
@@ -101,6 +114,24 @@ func (c *Capture) bindingTableIDs() []TableID {
 // BindingsCurrentlyBackfilling returns all the bindings undergoing some sort of backfill.
 func (c *Capture) BindingsCurrentlyBackfilling() []*Binding {
 	return c.BindingsInState(TableStatePreciseBackfill, TableStateUnfilteredBackfill, TableStateKeylessBackfill)
+}
+
+// bindingsCurrentlyBackfillingUnsorted is the unordered equivalent of
+// BindingsCurrentlyBackfilling for callers which don't depend on the ordering.
+func (c *Capture) bindingsCurrentlyBackfillingUnsorted() []*Binding {
+	var bindings = make([]*Binding, 0, len(c.Bindings))
+	return slices.AppendSeq(bindings, c.bindingsInState(TableStatePreciseBackfill, TableStateUnfilteredBackfill, TableStateKeylessBackfill))
+}
+
+// AnyBindingsCurrentlyBackfilling reports whether any binding is undergoing some sort of
+// backfill. It answers the same question as len(BindingsCurrentlyBackfilling()) > 0 without
+// building and sorting the full list, which dominates the cost when a capture has many
+// bindings.
+func (c *Capture) AnyBindingsCurrentlyBackfilling() bool {
+	for range c.bindingsInState(TableStatePreciseBackfill, TableStateUnfilteredBackfill, TableStateKeylessBackfill) {
+		return true
+	}
+	return false
 }
 
 // TableState represents the serializable/resumable state of a particular table's capture.
@@ -369,7 +400,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 		}
 
 		// If any tables are currently backfilling, go perform another backfill iteration.
-		if c.BindingsCurrentlyBackfilling() != nil {
+		if c.AnyBindingsCurrentlyBackfilling() {
 			c.statusUpdate("Backfilling Tables")
 			if err := c.backfillStreams(ctx, discovery); err != nil {
 				return fmt.Errorf("error performing backfill: %w", err)
@@ -433,16 +464,12 @@ func (c *Capture) reconcileStateWithBindings(_ context.Context) error {
 	// flag update logic works makes a JSON-patch deletion of the whole thing tricky, but
 	// we could theoretically change this someday if "excessive size of state checkpoints
 	// due to deleted bindings" ever becomes an actual issue in practice.
-	streamExistsInCatalog := func(sk boilerplate.StateKey) bool {
-		for _, b := range c.Bindings {
-			if b.StateKey == sk {
-				return true
-			}
-		}
-		return false
+	var stateKeysInCatalog = make(map[boilerplate.StateKey]bool, len(c.Bindings))
+	for _, b := range c.Bindings {
+		stateKeysInCatalog[b.StateKey] = true
 	}
 	for stateKey, state := range c.State.Streams {
-		if state.Mode != TableStateIgnore && !streamExistsInCatalog(stateKey) {
+		if state.Mode != TableStateIgnore && !stateKeysInCatalog[stateKey] {
 			log.WithField("stateKey", stateKey).Info("binding removed from capture")
 			c.State.Streams[stateKey] = &TableState{
 				Mode:     TableStateIgnore,
@@ -544,6 +571,12 @@ func (c *Capture) activatePendingStreams(ctx context.Context, discovery map[Stre
 			state.KeyColumns = binding.Resource.PrimaryKey
 		}
 
+		// Log when a user-provided backfill filter is set, since it's an expert
+		// feature whose presence is important context when anything goes wrong.
+		if filter := binding.Resource.BackfillFilter(); filter != "" {
+			log.WithFields(log.Fields{"stream": streamID, "filter": filter}).Info("user-provided backfill filter is set")
+		}
+
 		// Select the appropriate state transition depending on the backfill mode in the resource config.
 		log.WithFields(log.Fields{
 			"stream":   streamID,
@@ -554,6 +587,12 @@ func (c *Capture) activatePendingStreams(ctx context.Context, discovery map[Stre
 		case BackfillModeAutomatic:
 			if discoveryInfo.UnpredictableKeyOrdering {
 				log.WithField("stream", streamID).Info("autoselected unfiltered (normal) backfill mode (database key ordering is unpredictable)")
+				state.Mode = TableStateUnfilteredBackfill
+			} else if binding.Resource.BackfillFilter() != "" {
+				// Precise backfills could lose changes to filter-excluded rows beyond the
+				// backfill cursor, since those replication events are dropped on the
+				// assumption that the backfill will observe the row later.
+				log.WithField("stream", streamID).Info("autoselected unfiltered (normal) backfill mode (backfill filter is set)")
 				state.Mode = TableStateUnfilteredBackfill
 			} else {
 				log.WithField("stream", streamID).Info("autoselected precise backfill mode")
@@ -858,7 +897,7 @@ func (c *Capture) handleReplicationEvent(event DatabaseEvent) (int, error) {
 }
 
 func (c *Capture) backfillStreams(ctx context.Context, discovery map[StreamID]*DiscoveryInfo) error {
-	var bindings = c.BindingsCurrentlyBackfilling()
+	var bindings = c.bindingsCurrentlyBackfillingUnsorted()
 	if len(bindings) == 0 {
 		return nil
 	}
@@ -905,7 +944,7 @@ func (c *Capture) backfillStream(ctx context.Context, streamID StreamID, discove
 	var eventCount int
 	var backfillDocumentBytes = 0
 	var backfillChunkStarted = time.Now()
-	backfillComplete, resumeCursor, err := c.Database.ScanTableChunk(ctx, discoveryInfo, streamState, func(event ChangeEvent) error {
+	backfillComplete, resumeCursor, err := c.Database.ScanTableChunk(ctx, discoveryInfo, streamState, binding.Resource.BackfillFilter(), func(event ChangeEvent) error {
 		if streamState.Mode == TableStatePreciseBackfill {
 			// Sanity check that when performing a "precise" backfill the DB's ordering of
 			// result rows must match our own bytewise lexicographic ordering of serialized
@@ -1077,7 +1116,7 @@ func (c *Capture) handleAcknowledgement(ctx context.Context, count int, replStre
 
 func (c *Capture) statusUpdate(status string) {
 	// Add backfill information with percentage progress
-	var backfillingBindings = c.BindingsCurrentlyBackfilling()
+	var backfillingBindings = c.bindingsCurrentlyBackfillingUnsorted()
 	if len(backfillingBindings) > 0 {
 		// Build list of tables to query for estimated row counts
 		var tables []TableID
