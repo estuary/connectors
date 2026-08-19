@@ -221,7 +221,8 @@ func (f *stagedFile) putWorker(ctx context.Context, db *stdsql.DB, filePaths <-c
 }
 
 func (f *stagedFile) newFile() error {
-	var fName = fmt.Sprintf("%s.json", uuid.NewString())
+	// Databricks infers the codec of a staged file from its extension when reading it back.
+	var fName = fmt.Sprintf("%s.json.gz", uuid.NewString())
 	filePath := filepath.Join(f.dir, fName)
 
 	file, err := os.Create(filePath)
@@ -233,7 +234,7 @@ func (f *stagedFile) newFile() error {
 		buf:  bufio.NewWriter(file),
 		file: file,
 	}
-	f.writer = writer.NewJsonWriter(f.buf, f.fields, writer.WithJsonDisableCompression())
+	f.writer = writer.NewJsonWriter(f.buf, f.fields)
 	f.uploaded = append(f.uploaded, fName)
 
 	return nil

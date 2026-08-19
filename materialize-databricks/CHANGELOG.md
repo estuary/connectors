@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-08-18
+
+### Changed
+- Files staged to the Unity Catalog volume are now gzip-compressed, which
+  reduces the amount of data uploaded to Databricks at the cost of additional
+  CPU usage.
+
 ## 2026-08-04
 
 ### Changed
