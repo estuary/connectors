@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"math"
 	"math/rand"
 	"os"
@@ -61,17 +62,29 @@ func (ps *PersistentState) Validate() error {
 	return nil
 }
 
-// BindingsInState returns all the bindings having a particular persisted state, in sorted order for
-// reproducibility.
-func (c *Capture) BindingsInState(modes ...BackfillMode) []*Binding {
-	var bindings []*Binding
-	for _, binding := range c.Bindings {
-		if slices.Contains(modes, BackfillMode(c.State.Streams[binding.StateKey].Mode)) {
-			bindings = append(bindings, binding)
+// bindingsInState yields every binding whose persisted state is one of the given modes, in
+// map iteration order. It exists so that the state predicate lives in exactly one place:
+// callers compose it with slices.SortedFunc when they need a reproducible order, with
+// slices.AppendSeq when the order doesn't matter, or range over it with an early return
+// to test for existence without building a list at all.
+func (c *Capture) bindingsInState(modes ...BackfillMode) iter.Seq[*Binding] {
+	return func(yield func(*Binding) bool) {
+		for _, binding := range c.Bindings {
+			if slices.Contains(modes, BackfillMode(c.State.Streams[binding.StateKey].Mode)) {
+				if !yield(binding) {
+					return
+				}
+			}
 		}
 	}
-	slices.SortFunc(bindings, func(a, b *Binding) int { return a.StreamID.Compare(b.StreamID) })
-	return bindings
+}
+
+// BindingsInState returns all the bindings having a particular persisted state in sorted order for
+// reproducibility.
+func (c *Capture) BindingsInState(modes ...BackfillMode) []*Binding {
+	return slices.SortedFunc(c.bindingsInState(modes...), func(a, b *Binding) int {
+		return a.StreamID.Compare(b.StreamID)
+	})
 }
 
 // BindingsCurrentlyActive returns all the bindings currently being captured.
@@ -103,16 +116,20 @@ func (c *Capture) BindingsCurrentlyBackfilling() []*Binding {
 	return c.BindingsInState(TableStatePreciseBackfill, TableStateUnfilteredBackfill, TableStateKeylessBackfill)
 }
 
+// bindingsCurrentlyBackfillingUnsorted is the unordered equivalent of
+// BindingsCurrentlyBackfilling for callers which don't depend on the ordering.
+func (c *Capture) bindingsCurrentlyBackfillingUnsorted() []*Binding {
+	var bindings = make([]*Binding, 0, len(c.Bindings))
+	return slices.AppendSeq(bindings, c.bindingsInState(TableStatePreciseBackfill, TableStateUnfilteredBackfill, TableStateKeylessBackfill))
+}
+
 // AnyBindingsCurrentlyBackfilling reports whether any binding is undergoing some sort of
 // backfill. It answers the same question as len(BindingsCurrentlyBackfilling()) > 0 without
 // building and sorting the full list, which dominates the cost when a capture has many
 // bindings.
 func (c *Capture) AnyBindingsCurrentlyBackfilling() bool {
-	for _, binding := range c.Bindings {
-		switch c.State.Streams[binding.StateKey].Mode {
-		case TableStatePreciseBackfill, TableStateUnfilteredBackfill, TableStateKeylessBackfill:
-			return true
-		}
+	for range c.bindingsInState(TableStatePreciseBackfill, TableStateUnfilteredBackfill, TableStateKeylessBackfill) {
+		return true
 	}
 	return false
 }
@@ -884,7 +901,7 @@ func (c *Capture) handleReplicationEvent(event DatabaseEvent) (int, error) {
 }
 
 func (c *Capture) backfillStreams(ctx context.Context, discovery map[StreamID]*DiscoveryInfo) error {
-	var bindings = c.BindingsCurrentlyBackfilling()
+	var bindings = c.bindingsCurrentlyBackfillingUnsorted()
 	if len(bindings) == 0 {
 		return nil
 	}
@@ -1103,7 +1120,7 @@ func (c *Capture) handleAcknowledgement(ctx context.Context, count int, replStre
 
 func (c *Capture) statusUpdate(status string) {
 	// Add backfill information with percentage progress
-	var backfillingBindings = c.BindingsCurrentlyBackfilling()
+	var backfillingBindings = c.bindingsCurrentlyBackfillingUnsorted()
 	if len(backfillingBindings) > 0 {
 		// Build list of tables to query for estimated row counts
 		var tables []TableID
