@@ -2,7 +2,6 @@ import functools
 import itertools
 from datetime import UTC, datetime, timedelta
 from logging import Logger
-import re
 from typing import AsyncGenerator, Iterable
 
 from estuary_cdk.capture import Task
@@ -30,6 +29,7 @@ from .api import (
     check_contact_list_memberships_access,
     check_contact_lists_access,
     dt_to_ms,
+    is_missing_scope_error,
     fetch_contact_list_memberships_page,
     fetch_contact_lists,
     fetch_deal_pipelines,
@@ -119,14 +119,8 @@ REALTIME = "realtime"
 DELAYED = "delayed"
 
 
-MISSING_SCOPE_REGEX = (
-    r"This app hasn't been granted all required scopes to make this call.|"
-    r"auth request is missing required '.+' scope|"
-    r"does not have proper permissions"
-)
-
-
 async def _can_access_endpoint(
+    log: Logger,
     gen: AsyncGenerator,
 ) -> bool:
     try:
@@ -135,11 +129,7 @@ async def _can_access_endpoint(
 
         return True
     except HTTPError as err:
-        is_missing_scope = err.code == 403 and bool(
-            re.search(MISSING_SCOPE_REGEX, err.message)
-        )
-
-        if is_missing_scope:
+        if is_missing_scope_error(log, err):
             return False
         else:
             raise
@@ -215,7 +205,7 @@ async def _remove_permission_blocked_resources(
     ]
 
     for resource, gen in PERMISSION_BLOCKED_RESOURCES:
-        if not await _can_access_endpoint(gen):
+        if not await _can_access_endpoint(log, gen):
             resources = [r for r in resources if r.name != resource.name]
 
     return resources
@@ -494,7 +484,19 @@ def properties(http: HTTPSession, object_names: Iterable[str]) -> Resource:
 
     async def snapshot(log: Logger) -> AsyncGenerator[Property, None]:
         for obj in object_names:
-            properties = await fetch_properties(log, http, obj)
+            try:
+                properties = await fetch_properties(log, http, obj)
+            except HTTPError as err:
+                # This snapshot covers every object type at once, so an object the
+                # token can't read must not take down the other objects' properties.
+                if not is_missing_scope_error(log, err):
+                    raise
+
+                log.debug("Omitting properties for an object the token cannot access.", {
+                    "object": obj,
+                })
+                continue
+
             for prop in properties.results:
                 yield prop
 
