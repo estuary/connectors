@@ -1,0 +1,182 @@
+name: Docs / build check
+
+# PR check: builds docs.estuary.dev with this PR's connector docs substituted
+# in, so a change that breaks the site fails here instead of after it merges.
+#
+# Why this is needed. estuary/docs owns the Docusaurus site and pulls this
+# repo's docs in through a git submodule, so 215 of the 322 live pages (67%)
+# come from here. That build sets `onBrokenLinks: 'throw'` and
+# `onBrokenMarkdownLinks: 'throw'`. A broken relative link merged here
+# therefore fails the production deploy, the deploy step never runs, the site
+# keeps serving its previous version, and every later run fails the same way.
+# The site looks healthy and is frozen. Nothing in this repo caught that until
+# now.
+#
+# How it reproduces production. `npm run build` in estuary/docs fires
+# `prebuild` -> `scripts/aggregate-docs.sh`, which `rsync -a --delete`s
+# `external/connectors/docs/reference/Connectors/` into
+# `content/reference/Connectors/`, and `docusaurus.config.js` reads
+# `external/connectors/docs/redirects.yaml` to build the connector redirect
+# table. Overwriting the submodule's `docs/` tree with this PR's is exactly the
+# substitution the production deploy makes when it advances the submodule pin.
+#
+# Requires the "estuary-docs-previews" GitHub App (PREVIEW_APP_ID repo variable
+# + PREVIEW_APP_PRIVATE_KEY secret, installed on both estuary/docs and
+# estuary/connectors). Without them the check passes with a notice rather than
+# failing on configuration.
+
+on:
+  pull_request:
+    paths:
+      # Only what the site actually publishes. docs/ also holds internal
+      # engineering notes (agents/, feature_flags.md, inbound_networking.md,
+      # materialize/) that no page is built from, so they should not spend a
+      # build.
+      - docs/reference/Connectors/**
+      # Not a page, but docusaurus.config.js reads it out of the submodule to
+      # build the connector redirect table, and a bad entry there fails the
+      # build. Excluding it would leave one of the two files that can break the
+      # site without a check.
+      - docs/redirects.yaml
+
+concurrency:
+  group: docs-build-check-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+# The build only ever uses the App-minted token, scoped to estuary/docs, so it
+# needs none of the ambient GITHUB_TOKEN's scope. Nothing is written back to
+# this repo.
+permissions: {}
+
+jobs:
+  build:
+    name: Docs / build check
+    runs-on: ubuntu-24.04
+    steps:
+      # Gate inside the job rather than with a job-level `if:`, so the check
+      # always reports a conclusion under a stable name and can be made a
+      # required check without a skipped job muddying the result.
+      - name: Decide whether this PR can build the docs
+        id: gate
+        env:
+          IS_FORK: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
+          APP_ID: ${{ vars.PREVIEW_APP_ID }}
+        run: |
+          set -euo pipefail
+
+          if [ "$IS_FORK" = "true" ]; then
+            # A `pull_request` event from a fork gets no secrets, so the App
+            # token cannot be minted and the docs checkout is impossible.
+            # `pull_request_target` would fix that by running with secrets in
+            # the base repo's context against the fork's code, which is the
+            # standard way to ship a token-exfiltration hole. Not doing that.
+            echo "build=false" >> "$GITHUB_OUTPUT"
+            echo "reason=fork" >> "$GITHUB_OUTPUT"
+          elif [ -z "$APP_ID" ]; then
+            echo "build=false" >> "$GITHUB_OUTPUT"
+            echo "reason=no-app" >> "$GITHUB_OUTPUT"
+          else
+            echo "build=true" >> "$GITHUB_OUTPUT"
+            echo "reason=ok" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check out this PR
+        if: steps.gate.outputs.build == 'true'
+        uses: actions/checkout@v4
+        with:
+          path: connectors
+
+      - name: Mint token for estuary/docs
+        id: app-token
+        if: steps.gate.outputs.build == 'true'
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.PREVIEW_APP_ID }}
+          private-key: ${{ secrets.PREVIEW_APP_PRIVATE_KEY }}
+          owner: estuary
+          repositories: docs
+
+      - name: Check out estuary/docs at main
+        if: steps.gate.outputs.build == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: estuary/docs
+          ref: main
+          token: ${{ steps.app-token.outputs.token }}
+          path: docs
+          # Deliberately no `submodules`. The submodule's doc tree is replaced
+          # by this PR's in the next step, and those two files are the only
+          # thing the build reads out of it.
+
+      - name: Substitute this PR's docs for the submodule's
+        if: steps.gate.outputs.build == 'true'
+        run: |
+          set -euo pipefail
+
+          # Copy the PR's working tree rather than pointing the submodule at
+          # the PR head SHA. A fork's head commit is not fetchable with an
+          # estuary-scoped token, so the submodule approach would work for
+          # branches and break for forks. Copying behaves identically for both,
+          # which keeps one code path here.
+          #
+          # aggregate-docs.sh only runs `submodule update --init` when its
+          # source directory is missing, so pre-populating this path also stops
+          # the build from reaching for the submodule at all.
+          mkdir -p docs/external/connectors/docs
+          rsync -a --delete connectors/docs/ docs/external/connectors/docs/
+
+          COUNT=$(find docs/external/connectors/docs/reference/Connectors -type f | wc -l | tr -d ' ')
+          echo "Substituted $COUNT files under docs/reference/Connectors from this PR."
+
+      - name: Setup Node
+        if: steps.gate.outputs.build == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: docs/package-lock.json
+
+      - name: Install
+        if: steps.gate.outputs.build == 'true'
+        working-directory: docs
+        run: npm ci
+
+      - name: Build
+        if: steps.gate.outputs.build == 'true'
+        working-directory: docs
+        env:
+          # Same values the production deploy uses, so this build exercises the
+          # same canonical, og:url and sitemap generation. Nothing is published
+          # from here.
+          URL: https://docs.estuary.dev
+          BASE_URL: /
+        run: npm run build
+
+      - name: Explain a skipped build
+        if: steps.gate.outputs.build != 'true'
+        env:
+          REASON: ${{ steps.gate.outputs.reason }}
+        run: |
+          set -euo pipefail
+
+          {
+            echo "### Docs build check not run"
+            echo
+            if [ "$REASON" = "fork" ]; then
+              echo "This PR comes from a fork. GitHub gives fork pull requests no"
+              echo "access to secrets, so the token needed to check out"
+              echo "\`estuary/docs\` and build the site cannot be minted here."
+              echo
+              echo "**Reviewers:** two thirds of \`docs.estuary.dev\` is built from"
+              echo "this repo and the site build throws on a broken link, so please"
+              echo "verify the docs build before merging. Pushing this branch to"
+              echo "\`estuary/connectors\` and opening a PR from there runs the check"
+              echo "for real."
+            else
+              echo "The \`estuary-docs-previews\` App is not configured on this repo"
+              echo "(\`PREVIEW_APP_ID\` is empty), so the docs build cannot run."
+              echo "Passing rather than blocking on configuration."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          cat "$GITHUB_STEP_SUMMARY"

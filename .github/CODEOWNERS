@@ -1,0 +1,10 @@
+# Scoped to docs only. Review routing for connector code is unchanged.
+#
+# Docs under docs/reference/Connectors/ are aggregated into docs.estuary.dev at
+# build time through a git submodule in estuary/docs, so a change here
+# publishes straight to production without passing through a docs repo. 215 of
+# the 322 live pages come from this directory.
+#
+# @jwhartley  James, solutions. Owns the docs build and hosting.
+# @aeluce     Emily, docs. Owns content. (Not Alex.)
+/docs/ @jwhartley @aeluce
