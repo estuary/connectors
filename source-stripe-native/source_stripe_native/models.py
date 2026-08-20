@@ -94,8 +94,8 @@ Item = TypeVar("Item")
 
 
 class EventResult(BaseModel, Generic[Item], extra="forbid"):
-    class Data(BaseModel):
-        class CLSDATA(BaseModel):
+    class Data(BaseModel, extra="allow"):
+        class CLSDATA(BaseModel, extra="allow"):
             object: Item  # type: ignore
             previous_attributes: Dict | None = None
 
