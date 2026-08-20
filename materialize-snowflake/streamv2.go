@@ -211,7 +211,25 @@ func streamV2QueryTableComment(ctx context.Context, db *stdsql.DB, dialect sql.D
 // them created the table last.
 func streamV2CheckGenerationConflict(comment string, mine streamV2Generation, table string) error {
 	owner, ok := streamV2GenerationFromTableComment(comment)
-	if !ok || owner.materialization != mine.materialization || owner.stateKey == mine.stateKey {
+	if !ok {
+		// A table created before this connector recorded generations, or by a write
+		// path which records none. Apply records this generation on such a table
+		// (adoptStreamV2Generations), so what reaches here is a table Apply could
+		// not reach, and it says nothing about which generation may append.
+		return nil
+	}
+
+	// Two tasks are not generations of each other, and neither one's account covers
+	// what the other appended. A backfill of either drops the table, and with it
+	// every channel appending to it, including the other task's.
+	if owner.materialization != mine.materialization {
+		return fmt.Errorf(
+			"table %s records materialization %q as the one materializing into it, while this task is %q: each task's channels account only for the documents it appended itself, and a backfill of either task drops the table along with every channel appending to it, so two tasks may not stream into one table. Materialize this binding into a table of its own, or take the other task off this one. If this task was renamed, backfill the binding, which re-creates the table and records the new name",
+			table, owner.materialization, mine.materialization,
+		)
+	}
+
+	if owner.stateKey == mine.stateKey {
 		return nil
 	}
 

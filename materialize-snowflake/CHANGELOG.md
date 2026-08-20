@@ -12,6 +12,12 @@
 - Rows on this path become visible in the destination table slightly before the
   Flow transaction which produced them commits. Every transaction which does
   commit is still materialized exactly once, including across restarts.
+- Two tasks may not stream into one table on this path. A task whose table records
+  another materialization fails rather than append to it, because each task's
+  channels account only for the documents it appended itself, and a backfill of
+  either task drops the table and every channel appending to it. A task that was
+  renamed reaches the same refusal, and a backfill of the binding clears it by
+  re-creating the table under the new name.
 
 ### Changed
 - A task which enables `snowpipe_streaming_v2` without the `enable-runtime-v2`
