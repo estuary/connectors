@@ -96,6 +96,44 @@ func streamsV2(cfg *config, deltaUpdates bool, flagEnabled bool) bool {
 	return deltaUpdates && cfg.Credentials.AuthType == snowflake_auth.JWT && flagEnabled
 }
 
+// streamV2PathEnteredWithPendingWork refuses a binding which is entering the
+// streaming v2 write path while its checkpoint still holds work that another path
+// staged and did not finish.
+//
+// Acknowledge drains such an item through the manager of the path which staged it.
+// This binding no longer has one: its rows now go to the streaming v2 manager, so
+// the manager which staged the item holds no channel for the table, and the drain
+// fails for as long as the item remains. The item is the only record of documents
+// which Snowflake does not hold yet, so it is not discarded here.
+//
+// The task drains the item if the operator restores the write path it belongs to,
+// which loses nothing. A backfill also clears it, at the cost of materializing the
+// binding again.
+func streamV2PathEnteredWithPendingWork(table string, prior *checkpointItem) error {
+	if prior == nil {
+		return nil
+	}
+
+	var pending []string
+	if len(prior.StreamBlobs) > 0 {
+		pending = append(pending, fmt.Sprintf("%d Snowpipe Streaming blob(s)", len(prior.StreamBlobs)))
+	}
+	if len(prior.PipeFiles) > 0 {
+		pending = append(pending, fmt.Sprintf("%d file(s) staged for a Snowpipe pipe", len(prior.PipeFiles)))
+	}
+	if prior.Query != "" {
+		pending = append(pending, "a staged-file query")
+	}
+	if len(pending) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf(
+		"this binding is moving onto the snowpipe_streaming_v2 write path while the task's checkpoint still records work that its previous write path staged into %s and did not finish: %s. That work is the only record of documents which Snowflake does not hold yet, so this write path may not drop it, and it cannot finish it either — the previous path's channels belong to a manager this binding no longer uses. Restore the write path this task was running, which lets the next transaction finish that work before you move the binding onto snowpipe_streaming_v2, or backfill the binding, which discards the work and materializes it again",
+		table, strings.Join(pending, ", "),
+	)
+}
+
 // streamV2GenerationPrefix starts the line in the comment of a streaming v2 table.
 // That line names the generation of the binding that the table belongs to.
 const streamV2GenerationPrefix = "flow_generation: "

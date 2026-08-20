@@ -434,6 +434,13 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, streaming
 	b.store.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
 
 	if streamingV2 {
+		// Ahead of registering the binding, so that a checkpoint item this path can
+		// neither finish nor drop is reported once rather than failing every
+		// transaction that tries to drain it.
+		if err := streamV2PathEnteredWithPendingWork(target.Identifier, d.cp[target.StateKey]); err != nil {
+			return err
+		}
+
 		var loc = d.ep.Dialect.TableLocator(b.target.Path)
 		d.streamV2.addBinding(d.cfg.Database, loc.TableSchema, d.ep.Identifier(loc.TableName), target, d.priorStreamV2(target.StateKey))
 		b.streamingV2 = true
