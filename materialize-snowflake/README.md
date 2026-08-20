@@ -130,7 +130,15 @@ skips those documents as the runtime replays them.
   table that it appends to. Grants on the old table do not survive.
 - `retain_existing_data_on_backfill` does not work on this path, for the same
   reason.
-- A binding cannot move off this write path. To take a binding off it, backfill
-  the binding, which starts it on the new path with an empty checkpoint.
+- A binding cannot move off this write path. The publication succeeds, and the
+  task then refuses to start, naming the binding. To take a binding off the path,
+  backfill it, which starts it on the new path with an empty checkpoint.
+- A binding can move onto this write path at any time, with one condition. If the
+  checkpoint still holds work that the previous path staged and did not finish,
+  the task refuses to start. Restore the previous path and let one transaction
+  finish that work, then move the binding again. A backfill also clears it.
+- The path adopts a table that another path created. Apply records this generation
+  in the comment of a table that records none. The guard against a replaced
+  generation then works for that table too.
 - The sidecar is crash-only. The connector never restarts it. The runtime restarts
   the connector, and recovery replays through the offset token.
