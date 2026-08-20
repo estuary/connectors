@@ -459,3 +459,96 @@ func TestStreamV2WritePathSwitch(t *testing.T) {
 		require.Equal(t, 6, countRows())
 	})
 }
+
+// TestStreamV2SwitchOntoTheWritePathWithPendingWorkIsRefused covers the other
+// direction of a write path switch: a binding which moves onto streaming v2 while
+// its checkpoint still holds work that another path staged and did not finish.
+//
+// Acknowledge drains such an item through the manager of the path which staged it.
+// A binding routed to streaming v2 has no such manager, so the drain cannot find a
+// channel and fails, and the item is never cleared. Every restart repeats it.
+func TestStreamV2SwitchOntoTheWritePathWithPendingWorkIsRefused(t *testing.T) {
+	var ctx = context.Background()
+
+	var target = sql.Table{
+		TableShape: sql.TableShape{Binding: 0, DeltaUpdates: true, Path: []string{"DB", "SCH", "TBL"}},
+		Identifier: "TBL",
+		Keys:       []sql.Column{{Identifier: `KEY`}},
+		Values:     []sql.Column{{Identifier: `VAL`}},
+		StateKey:   "sk.v1",
+	}
+
+	var newTransactor = func(t *testing.T, item *checkpointItem) *transactor {
+		var cfg = config{
+			Database:    "DB",
+			Schema:      "SCH",
+			Credentials: &snowflake_auth.CredentialConfig{AuthType: snowflake_auth.JWT},
+		}
+		var rng = &pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32}
+		var d = &transactor{
+			cfg:      cfg,
+			ep:       &sql.Endpoint[config]{Dialect: snowflakeDialect("SCH", timestampTypeLTZ, nil)},
+			_range:   rng,
+			version:  "v1",
+			cp:       checkpoint{target.StateKey: item},
+			streamV2: newStreamV2Manager(ctx, &cfg, "test/onto", "acct", rng),
+		}
+		t.Cleanup(d.streamV2.stop)
+		return d
+	}
+
+	// addBinding is called with the streaming v2 flag enabled throughout, which is
+	// what routes the binding to the streaming v2 manager.
+	var addBinding = func(d *transactor) error {
+		return d.addBinding(ctx, target, true, true)
+	}
+
+	t.Run("pending Snowpipe Streaming blobs are refused", func(t *testing.T) {
+		var d = newTransactor(t, &checkpointItem{
+			Table:       "TBL",
+			StreamBlobs: []*blobMetadata{{Path: "one.bdec"}, {Path: "two.bdec"}},
+		})
+
+		var err = addBinding(d)
+		require.ErrorContains(t, err, "TBL")
+		require.ErrorContains(t, err, "snowpipe_streaming_v2")
+		require.ErrorContains(t, err, "backfill")
+	})
+
+	t.Run("pending pipe files are refused", func(t *testing.T) {
+		var d = newTransactor(t, &checkpointItem{
+			Table:     "TBL",
+			PipeName:  "PIPE",
+			PipeFiles: []fileRecord{{Path: "one.json"}},
+		})
+
+		require.ErrorContains(t, addBinding(d), "TBL")
+	})
+
+	t.Run("a pending staged-file query is refused", func(t *testing.T) {
+		var d = newTransactor(t, &checkpointItem{
+			Table: "TBL",
+			Query: "\nMERGE INTO TBL",
+		})
+
+		require.ErrorContains(t, addBinding(d), "TBL")
+	})
+
+	t.Run("a checkpoint holding only streaming v2 state is added as usual", func(t *testing.T) {
+		var d = newTransactor(t, &checkpointItem{StreamV2: map[string]*streamV2Item{
+			"task_00000000_sk_v1": {Channel: "task_00000000_sk_v1", Counter: 7, KeyEnd: math.MaxUint32},
+		}})
+
+		require.NoError(t, addBinding(d))
+	})
+
+	t.Run("an empty checkpoint item is added as usual", func(t *testing.T) {
+		require.NoError(t, addBinding(newTransactor(t, &checkpointItem{})))
+	})
+
+	t.Run("no checkpoint item at all is added as usual", func(t *testing.T) {
+		var d = newTransactor(t, nil)
+		delete(d.cp, target.StateKey)
+		require.NoError(t, addBinding(d))
+	})
+}
