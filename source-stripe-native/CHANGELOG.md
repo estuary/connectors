@@ -2,6 +2,10 @@
 
 ## 2026-08-20
 
+### Changed
+- Backfilled `Events` documents are now marked as creations (`_meta/op: c`) instead of
+  updates (`u`).
+
 ### Fixed
 - `Events` documents captured by incremental replication now include every field Stripe
   returns. `request`, `livemode`, `pending_webhooks`, `account`, and `context` were

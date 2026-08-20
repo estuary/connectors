@@ -277,6 +277,9 @@ async def fetch_backfill(
             if account_id:
                 doc.account_id = account_id
 
+            if cls == Events:
+                doc.meta_ = cls.Meta(op="c")
+
             if doc_ts == start_date:
                 # Yield final document for reference
                 yield doc
