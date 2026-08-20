@@ -1,0 +1,87 @@
+name: Classify Changed Paths
+description: >
+  Decide which connector CI lanes a change affects.
+  Python connectors are recognised by a top-level
+  pyproject.toml rather than by name.
+
+outputs:
+  python:
+    description: Whether the Python connector workflow needs to run.
+    value: ${{ steps.classify.outputs.python }}
+  go_rust:
+    description: Whether the Go & Rust connector workflow needs to run.
+    value: ${{ steps.classify.outputs.go_rust }}
+
+runs:
+  using: "composite"
+  steps:
+
+    - name: Classify the changed paths
+      id: classify
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        set -uo pipefail
+
+        # Every failure path below runs both lanes.
+        fallback() {
+          echo "$1; running both lanes to be safe"
+          printf 'python=true\ngo_rust=true\n' >> "$GITHUB_OUTPUT"
+          exit 0
+        }
+
+        # Which paths changed comes from the API rather than from git history
+        # for various reasons, mostly to avoid re-engineering the "which paths
+        # have changed?" logic ourselves.
+        #
+        # The catch is that neither endpoint promises the full list - they cap
+        # out at 300 or 3000 files and truncate silently. A missing path can only
+        # turn a lane off, so each branch proves its list is complete before a
+        # "false" is believed.
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          # Paginated but capped at 3000 files. A list sitting at the 3000
+          # path cap cannot be assumed complete.
+          gh api --paginate "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" \
+            --jq '.[].filename' > changed.txt ||
+            fallback "could not list pull request files"
+
+          COUNT=$(wc -l < changed.txt)
+          [ "$COUNT" -lt 3000 ] ||
+            fallback "listed ${COUNT} files at the API's 3000-file cap"
+        else
+          # The compare endpoint reports at most 300 files and does not paginate
+          # them. They appear only on the first page, so a diff sitting at
+          # the 300 path cap cannot be assumed complete.
+          gh api "repos/${{ github.repository }}/compare/${{ github.event.before }}...${{ github.sha }}" \
+            --jq '.files[].filename' > changed.txt ||
+            fallback "could not compare ${{ github.event.before }}...${{ github.sha }}"
+
+          COUNT=$(wc -l < changed.txt)
+          [ "$COUNT" -lt 300 ] ||
+            fallback "compare returned ${COUNT} files at the API's 300-file cap"
+        fi
+
+        echo "${COUNT} changed path(s)"
+
+        # An empty list contradicts the workflow having triggered at all, so read
+        # it as a broken enumeration rather than as "nothing to do".
+        if [ "$COUNT" -eq 0 ]; then
+          fallback "no paths enumerated"
+        fi
+
+        SCRIPT="${{ github.workspace }}/.github/scripts/classify-changed-paths.sh"
+        if ! VERDICT=$("$SCRIPT" < changed.txt); then
+          fallback "classifier exited non-zero"
+        fi
+
+        # Guard the shape of the verdict too: an empty or malformed value would
+        # compare unequal to 'true' in the callers' `if:` and skip everything.
+        if ! grep -Eq '^python=(true|false)$' <<< "$VERDICT" ||
+           ! grep -Eq '^go_rust=(true|false)$' <<< "$VERDICT"; then
+          fallback "classifier gave '${VERDICT}'"
+        fi
+
+        echo "verdict:"
+        echo "$VERDICT"
+        echo "$VERDICT" >> "$GITHUB_OUTPUT"
