@@ -1016,6 +1016,10 @@ func TestStreamV2GenerationConflict(t *testing.T) {
 		name    string
 		comment string
 		wantErr bool
+		// wantContains names what the error must say. It is empty for the conflict
+		// between generations of one binding, which every such error reports the
+		// same way.
+		wantContains []string
 	}{
 		{
 			name:    "the table records this generation",
@@ -1031,9 +1035,12 @@ func TestStreamV2GenerationConflict(t *testing.T) {
 		},
 		{
 			// Two tasks materializing into one table are not generations of each
-			// other, and whichever created the table last is the one it names.
-			name:    "the table records another task",
-			comment: commentOf(streamV2Generation{materialization: "acmeCo/other", stateKey: "widgets.v4"}),
+			// other, and a backfill of either drops the table and every channel
+			// appending to it. Neither task can account for what the other holds.
+			name:         "the table records another task",
+			comment:      commentOf(streamV2Generation{materialization: "acmeCo/other", stateKey: "widgets.v4"}),
+			wantErr:      true,
+			wantContains: []string{"WIDGETS", "acmeCo/other", task, "renamed"},
 		},
 		{
 			// A table created before this connector recorded generations, or by a
@@ -1050,6 +1057,12 @@ func TestStreamV2GenerationConflict(t *testing.T) {
 			var err = streamV2CheckGenerationConflict(tt.comment, mine, "WIDGETS")
 			if !tt.wantErr {
 				require.NoError(t, err)
+				return
+			}
+			if len(tt.wantContains) > 0 {
+				for _, want := range tt.wantContains {
+					require.ErrorContains(t, err, want)
+				}
 				return
 			}
 			require.ErrorContains(t, err, "WIDGETS")
