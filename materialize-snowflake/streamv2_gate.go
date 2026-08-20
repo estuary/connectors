@@ -212,15 +212,17 @@ func adoptStreamV2Generations(ctx context.Context, spec *pf.MaterializationSpec)
 	var dialect = snowflakeDialect(cfg.Schema, cfg.TimestampType, flags)
 
 	for _, binding := range streaming {
-		var schema, table = cfg.Schema, ""
-		switch path := binding.ResourcePath; len(path) {
-		case 1:
-			table = path[0]
-		case 2:
-			schema, table = path[0], path[1]
-		default:
+		if n := len(binding.ResourcePath); n != 1 && n != 2 {
 			return fmt.Errorf("cannot record the streaming v2 generation of resource path %q: expected a table, or a schema and a table", strings.Join(binding.ResourcePath, "."))
 		}
+
+		// Through the locator, which folds an identifier the way the DDL that created
+		// the table folded it: Snowflake stores an unquoted name in upper case, and a
+		// resource names its table in whatever case its author wrote. A lookup by the
+		// name as written matches nothing, and this function would then take its
+		// "no such table" branch and skip a table it ought to adopt.
+		var loc = dialect.TableLocator(binding.ResourcePath)
+		var schema, table = loc.TableSchema, loc.TableName
 
 		// Read directly rather than through streamV2QueryTableComment, which reports
 		// a table that does not exist and a table with no comment as the same empty
