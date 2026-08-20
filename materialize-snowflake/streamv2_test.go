@@ -1324,11 +1324,30 @@ func TestStreamV2AdoptsATableWithNoGeneration(t *testing.T) {
 	_, ok := streamV2GenerationFromTableComment(before)
 	require.False(t, ok, "the table must start with no generation recorded, or this test proves nothing")
 
+	// Apply is what adopts the table, as it does for a task whose publication moves
+	// this binding onto the write path without creating anything.
+	// The spec Apply receives is one whose configuration selects this write path.
+	var v2Cfg = cfg
+	v2Cfg.Advanced.FeatureFlags = flagSnowpipeStreamingV2
+	configJson, err := json.Marshal(v2Cfg)
+	require.NoError(t, err)
+	require.True(t, streamsV2(&v2Cfg, true, true), "the test config must select the streaming v2 write path")
+	require.NoError(t, adoptStreamV2Generations(ctx, &pf.MaterializationSpec{
+		Name:       pf.Materialization(materialization),
+		ConfigJson: configJson,
+		Bindings: []*pf.MaterializationSpec_Binding{{
+			ResourcePath: []string{cfg.Schema, tableName},
+			DeltaUpdates: true,
+			StateKey:     stateKey,
+		}},
+	}))
+
 	var m = newStreamV2Manager(ctx, &cfg, materialization, accountName,
 		&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
 	t.Cleanup(m.stop)
 
-	// The manager reads the comment exactly as the transactor wires it to.
+	// The manager reads the comment exactly as the transactor wires it to, so the
+	// generation Apply recorded is the one the guard checks each append against.
 	m.tableComment = func(ctx context.Context, database, schema, table string) (string, error) {
 		return streamV2QueryTableComment(ctx, db, testDialect, database, schema, table)
 	}

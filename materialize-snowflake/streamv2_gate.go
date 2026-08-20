@@ -2,7 +2,9 @@ package connector
 
 import (
 	"context"
+	stdsql "database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -58,6 +60,8 @@ func (d gatedDriver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Resp
 	if err := requireStreamingV2Runtime(req.Materialization); err != nil {
 		return nil, err
 	} else if err := refuseAbandonedStreamV2Bindings(req.Materialization, req.StateJson); err != nil {
+		return nil, err
+	} else if err := adoptStreamV2Generations(ctx, req.Materialization); err != nil {
 		return nil, err
 	}
 
@@ -150,6 +154,114 @@ func refuseAbandonedStreamV2Bindings(spec *pf.MaterializationSpec, stateJson jso
 			return err
 		}
 	}
+	return nil
+}
+
+// adoptStreamV2Generations records this task's generation in the comment of every
+// table that a streaming v2 binding appends to and that records no generation of
+// its own.
+//
+// Only CreateTable stamps that comment, and a publication which moves a binding
+// onto this write path creates no table: it adopts the table the binding has been
+// materializing into all along. streamV2CheckGenerationConflict reads a table with
+// no generation as one that says nothing about which generation may append, so the
+// backfill race that the comment guards runs unguarded on exactly those tables
+// which were carried onto this write path in place.
+//
+// Apply is where this belongs. It runs once for the task, on the leader, before any
+// shard opens a channel, so the comment is in place ahead of the first append
+// rather than racing it. The write path itself issues no DDL.
+//
+// A comment which already records a generation is left exactly as it stands,
+// whether it names this task or another one. That comment is the account the guard
+// reads, and overwriting it would erase the very conflict the guard reports.
+func adoptStreamV2Generations(ctx context.Context, spec *pf.MaterializationSpec) error {
+	if spec == nil {
+		return nil
+	}
+
+	var cfg config
+	if err := json.Unmarshal(spec.ConfigJson, &cfg); err != nil {
+		return fmt.Errorf("parsing endpoint config: %w", err)
+	} else if cfg.Credentials == nil {
+		// Which the boilerplate's own validation reports, and better.
+		return nil
+	}
+
+	var flags = boilerplate.ParseFlags(cfg)
+	var streaming []*pf.MaterializationSpec_Binding
+	for _, binding := range spec.Bindings {
+		if streamsV2(&cfg, binding.DeltaUpdates, flags[flagSnowpipeStreamingV2]) {
+			streaming = append(streaming, binding)
+		}
+	}
+	if len(streaming) == 0 {
+		return nil
+	}
+
+	dsn, err := cfg.toURI(true, spec.TaskName())
+	if err != nil {
+		return err
+	}
+	db, err := stdsql.Open("snowflake", dsn)
+	if err != nil {
+		return fmt.Errorf("opening connection to record streaming v2 generations: %w", err)
+	}
+	defer db.Close()
+
+	var dialect = snowflakeDialect(cfg.Schema, cfg.TimestampType, flags)
+
+	for _, binding := range streaming {
+		var schema, table = cfg.Schema, ""
+		switch path := binding.ResourcePath; len(path) {
+		case 1:
+			table = path[0]
+		case 2:
+			schema, table = path[0], path[1]
+		default:
+			return fmt.Errorf("cannot record the streaming v2 generation of resource path %q: expected a table, or a schema and a table", strings.Join(binding.ResourcePath, "."))
+		}
+
+		// Read directly rather than through streamV2QueryTableComment, which reports
+		// a table that does not exist and a table with no comment as the same empty
+		// string. They are not the same here: the first is a table CreateTable is
+		// about to stamp, and the second is a table to adopt.
+		var query = fmt.Sprintf(
+			"SELECT COMMENT FROM %s.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?;",
+			dialect.Identifier(cfg.Database),
+		)
+		var comment *string
+		if err := db.QueryRowContext(ctx, query, schema, table).Scan(&comment); errors.Is(err, stdsql.ErrNoRows) {
+			continue
+		} else if err != nil {
+			return fmt.Errorf("querying the comment of table %s.%s: %w", schema, table, err)
+		}
+
+		var existing string
+		if comment != nil {
+			existing = *comment
+		}
+		if _, ok := streamV2GenerationFromTableComment(existing); ok {
+			continue
+		}
+
+		var adopted = streamV2EmbedGenerationInTableComment(existing, streamV2Generation{
+			materialization: spec.TaskName(),
+			stateKey:        binding.StateKey,
+		})
+		var identifier = dialect.Identifier(schema, table)
+		if _, err := db.ExecContext(ctx, fmt.Sprintf(
+			"COMMENT ON TABLE %s IS %s;", identifier, dialect.Literal(adopted),
+		)); err != nil {
+			return fmt.Errorf("recording the generation of table %s: %w", identifier, err)
+		}
+
+		log.WithFields(log.Fields{
+			"table":    identifier,
+			"stateKey": binding.StateKey,
+		}).Info("recorded the streaming v2 generation of a table this task adopted")
+	}
+
 	return nil
 }
 
