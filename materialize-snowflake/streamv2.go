@@ -96,42 +96,27 @@ func streamsV2(cfg *config, deltaUpdates bool, flagEnabled bool) bool {
 	return deltaUpdates && cfg.Credentials.AuthType == snowflake_auth.JWT && flagEnabled
 }
 
-// streamV2PathEnteredWithPendingWork refuses a binding which is entering the
-// streaming v2 write path while its checkpoint still holds work that another path
-// staged and did not finish.
+// streamV2CannotDrainPendingBlobs reports that a binding moving onto the streaming
+// v2 write path carries Snowpipe Streaming blobs which no manager can register.
 //
-// Acknowledge drains such an item through the manager of the path which staged it.
-// This binding no longer has one: its rows now go to the streaming v2 manager, so
-// the manager which staged the item holds no channel for the table, and the drain
-// fails for as long as the item remains. The item is the only record of documents
-// which Snowflake does not hold yet, so it is not discarded here.
+// Acknowledge drains a pending item through the manager of the write path which
+// staged it. A binding whose rows now go to streaming v2 still registers with the
+// bdec manager for that drain, so this is reached only where the registration is
+// impossible: a table whose columns that path does not support, or one it may not
+// stream into at all.
 //
-// The task drains the item if the operator restores the write path it belongs to,
-// which loses nothing. A backfill also clears it, at the cost of materializing the
-// binding again.
-func streamV2PathEnteredWithPendingWork(table string, prior *checkpointItem) error {
-	if prior == nil {
-		return nil
-	}
-
-	var pending []string
-	if len(prior.StreamBlobs) > 0 {
-		pending = append(pending, fmt.Sprintf("%d Snowpipe Streaming blob(s)", len(prior.StreamBlobs)))
-	}
-	if len(prior.PipeFiles) > 0 {
-		pending = append(pending, fmt.Sprintf("%d file(s) staged for a Snowpipe pipe", len(prior.PipeFiles)))
-	}
-	if prior.Query != "" {
-		pending = append(pending, "a staged-file query")
-	}
-	if len(pending) == 0 {
-		return nil
-	}
-
-	return fmt.Errorf(
-		"this binding is moving onto the snowpipe_streaming_v2 write path while the task's checkpoint still records work that its previous write path staged into %s and did not finish: %s. That work is the only record of documents which Snowflake does not hold yet, so this write path may not drop it, and it cannot finish it either — the previous path's channels belong to a manager this binding no longer uses. Restore the write path this task was running, which lets the next transaction finish that work before you move the binding onto snowpipe_streaming_v2, or backfill the binding, which discards the work and materializes it again",
-		table, strings.Join(pending, ", "),
+// The blobs are the only record of documents which Snowflake does not hold yet, so
+// they are neither dropped nor left to fail every transaction that tries to drain
+// them.
+func streamV2CannotDrainPendingBlobs(table string, blobs int, cause error) error {
+	var err = fmt.Errorf(
+		"this binding is moving onto the snowpipe_streaming_v2 write path while the task's checkpoint still records %d Snowpipe Streaming blob(s) that its previous write path staged into %s and did not finish. Those blobs are the only record of documents which Snowflake does not hold yet, and they can only be finished by the write path that staged them. Restore the write path this task was running, which lets the next transaction finish them before you move the binding onto snowpipe_streaming_v2, or backfill the binding, which discards them and materializes those documents again",
+		blobs, table,
 	)
+	if cause != nil {
+		return fmt.Errorf("%w: the previous write path cannot reopen its channel on the table: %w", err, cause)
+	}
+	return err
 }
 
 // streamV2GenerationPrefix starts the line in the comment of a streaming v2 table.

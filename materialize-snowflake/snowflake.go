@@ -434,11 +434,25 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, streaming
 	b.store.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
 
 	if streamingV2 {
-		// Ahead of registering the binding, so that a checkpoint item this path can
-		// neither finish nor drop is reported once rather than failing every
-		// transaction that tries to drain it.
-		if err := streamV2PathEnteredWithPendingWork(target.Identifier, d.cp[target.StateKey]); err != nil {
-			return err
+		// Work that the previous write path staged and did not finish is drained by
+		// Acknowledge through the manager which staged it. Of the three kinds, only
+		// Snowpipe Streaming blobs need anything of this binding: a staged-file query
+		// runs on the transactor's connection, and pipe files go through its pipe
+		// client, while blobs are registered against a channel the bdec manager holds
+		// per table. So the binding is registered there for the drain, and its rows
+		// still go to streaming v2.
+		if prior := d.cp[target.StateKey]; prior != nil && len(prior.StreamBlobs) > 0 {
+			var loc = d.ep.Dialect.TableLocator(target.Path)
+			if d.streamManager == nil {
+				return streamV2CannotDrainPendingBlobs(target.Identifier, len(prior.StreamBlobs), nil)
+			} else if err := d.streamManager.addBinding(ctx, loc.TableSchema, d.ep.Identifier(loc.TableName), target); err != nil {
+				return streamV2CannotDrainPendingBlobs(target.Identifier, len(prior.StreamBlobs), err)
+			}
+
+			log.WithFields(log.Fields{
+				"table": target.Identifier,
+				"blobs": len(prior.StreamBlobs),
+			}).Info("opened a channel of the previous write path to finish the blobs it staged")
 		}
 
 		var loc = d.ep.Dialect.TableLocator(b.target.Path)

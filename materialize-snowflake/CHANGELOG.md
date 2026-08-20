@@ -12,6 +12,12 @@
 - Rows on this path become visible in the destination table slightly before the
   Flow transaction which produced them commits. Every transaction which does
   commit is still materialized exactly once, including across restarts.
+- A binding moving onto this path finishes the work its previous write path staged
+  and did not finish, rather than refusing until an operator drains it. The binding
+  registers with the previous path's manager for that one drain, while its rows go
+  to this path. Where that registration is impossible — a table the previous path
+  cannot stream into — the binding is still refused, naming the table and the count
+  outstanding.
 - Two tasks may not stream into one table on this path. A task whose table records
   another materialization fails rather than append to it, because each task's
   channels account only for the documents it appended itself, and a backfill of
