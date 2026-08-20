@@ -1249,3 +1249,111 @@ func TestStreamV2Datatypes(t *testing.T) {
 		})
 	}
 }
+
+// TestStreamV2AdoptsATableWithNoGeneration covers a table that the streaming v2
+// path did not create: one an older build of this connector created, or one a
+// bdec generation of the same binding created, carries no generation marker in
+// its comment.
+//
+// streamV2CheckGenerationConflict reads a marker-less table as a table that says
+// nothing about which generation may append to it, and so allows every generation
+// to. The backfill race that the marker guards is therefore unguarded on exactly
+// those tables which were carried onto this write path in place — and it stays
+// that way, because only CreateTable stamps the marker and a change of write path
+// creates no table.
+//
+// The write path must adopt such a table by recording its own generation in the
+// comment, after which the guard holds for it as it does for a table this path
+// created itself.
+func TestStreamV2AdoptsATableWithNoGeneration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode")
+	}
+
+	var ctx = context.Background()
+	var cfg = mustGetCfg(t)
+	t.Setenv("SNOWPIPE_SIDECAR_PYTHON", testSidecarPython(t))
+
+	dsn, err := cfg.toURI(true, "")
+	require.NoError(t, err)
+	db, err := stdsql.Open("snowflake", dsn)
+	require.NoError(t, err)
+	defer db.Close()
+
+	var accountName string
+	require.NoError(t, db.QueryRowContext(ctx, "SELECT CURRENT_ACCOUNT()").Scan(&accountName))
+
+	const materialization = "test/streamV2Adopt"
+	// Upper case throughout: an unquoted identifier is what CREATE TABLE and COMMENT
+	// ON TABLE both fold to, and so is what INFORMATION_SCHEMA records.
+	var tableName = fmt.Sprintf("STREAMV2_ADOPT_FLOW_TEST_%d", time.Now().Unix())
+	var stateKey = "adopt.v1"
+
+	var tbl = sql.Table{
+		TableShape: sql.TableShape{
+			Path:         []string{cfg.Schema, tableName},
+			Binding:      0,
+			DeltaUpdates: true,
+			Comment:      "Generated for materialization " + materialization + " of collection test/adopt",
+		},
+		Identifier: tableName,
+		Keys:       []sql.Column{{Identifier: `KEY`, MappedType: sql.MappedType{DDL: "TEXT"}}},
+		Values:     []sql.Column{{Identifier: `VAL`, MappedType: sql.MappedType{DDL: "VARIANT"}}},
+		StateKey:   stateKey,
+	}
+
+	// The table is created the way a generation that does not record generations
+	// creates it: the comment it would carry anyway, and no marker. Going through
+	// the templates rather than client.CreateTable is what leaves the marker off.
+	var createQuery strings.Builder
+	require.NoError(t, renderTemplates(testDialect).createTargetTable.Execute(&createQuery, &tbl))
+	_, err = db.ExecContext(ctx, createQuery.String())
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s;", tbl.Identifier))
+	})
+
+	// The comment such a generation leaves: what the table is for, and nothing
+	// about which generation may stream into it.
+	_, err = db.ExecContext(ctx, fmt.Sprintf(
+		"COMMENT ON TABLE %s IS %s;", tbl.Identifier, testDialect.Literal(tbl.Comment)))
+	require.NoError(t, err)
+
+	before, err := streamV2QueryTableComment(ctx, db, testDialect, cfg.Database, cfg.Schema, tableName)
+	require.NoError(t, err)
+	_, ok := streamV2GenerationFromTableComment(before)
+	require.False(t, ok, "the table must start with no generation recorded, or this test proves nothing")
+
+	var m = newStreamV2Manager(ctx, &cfg, materialization, accountName,
+		&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
+	t.Cleanup(m.stop)
+
+	// The manager reads the comment exactly as the transactor wires it to.
+	m.tableComment = func(ctx context.Context, database, schema, table string) (string, error) {
+		return streamV2QueryTableComment(ctx, db, testDialect, database, schema, table)
+	}
+
+	m.addBinding(cfg.Database, cfg.Schema, tbl.Identifier, tbl, nil)
+	require.NoError(t, m.writeRow(ctx, 0, []any{"one", "1"}))
+	items, err := m.flush(ctx)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), items[0].Counter)
+
+	// Having appended to the table, this generation owns it, and the comment must
+	// say so — otherwise a generation this one has already been replaced by can
+	// append to the same table without the guard noticing.
+	after, err := streamV2QueryTableComment(ctx, db, testDialect, cfg.Database, cfg.Schema, tableName)
+	require.NoError(t, err)
+	require.Contains(t, after, tbl.Comment, "the comment the table carried anyway must survive")
+
+	gen, ok := streamV2GenerationFromTableComment(after)
+	require.True(t, ok, "the streaming v2 path must record its generation on a table it adopts")
+	require.Equal(t, streamV2Generation{materialization: materialization, stateKey: stateKey}, gen)
+
+	// And the guard must now do its work: the generation a backfill of this
+	// binding would replace this one with may not append to the same table.
+	require.ErrorContains(t,
+		streamV2CheckGenerationConflict(after, streamV2Generation{materialization: materialization, stateKey: "adopt.v2"}, tableName),
+		"has been backfilled",
+	)
+}
