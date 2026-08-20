@@ -1,10 +1,32 @@
 import json
 import subprocess
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 from estuary_cdk.utils import compare_capture_records
+
+
+FIELDS_TO_REDACT = [
+    "updated_at",
+    "last_login_at",
+    "assignee_updated_at",
+    "generated_timestamp",
+    "fields",
+    "custom_fields",
+]
+
+def _redact_fields(rec: list | dict[str, Any]) -> None:
+    if isinstance(rec, list):
+        for element in rec:
+            _redact_fields(element)
+    elif isinstance(rec, dict):
+        for key, value in rec.items():
+            if key in FIELDS_TO_REDACT:
+                rec[key] = "redacted"
+            else:
+                _redact_fields(value)
 
 
 def test_capture(request, snapshot):
@@ -46,10 +68,7 @@ def test_capture(request, snapshot):
         stream, rec = l[0], l[1]
 
         rec['_meta']['row_id'] = 0
-        if "updated_at" in rec:
-            rec["updated_at"] = "redacted"
-        if "last_login_at" in rec:
-            rec["last_login_at"] = "redacted"
+        _redact_fields(rec)
 
     # Sort lines to keep a consistent ordering of captured bindings.
     sorted_unique_lines = sorted(unique_stream_lines, key=lambda l: l[0])

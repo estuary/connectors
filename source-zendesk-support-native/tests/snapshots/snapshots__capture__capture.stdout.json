@@ -316,6 +316,7 @@
         "update_user_own_alias": false,
         "update_user_own_name": false,
         "update_user_own_signature": false,
+        "use_conversational_assistance": false,
         "user_view_access": "none",
         "view_access": "readonly",
         "view_audit_logs": false,
@@ -979,7 +980,7 @@
       },
       "assigned_at": "2024-07-26T15:41:04Z",
       "assignee_stations": 1,
-      "assignee_updated_at": "2026-05-08T14:08:43Z",
+      "assignee_updated_at": "redacted",
       "created_at": "2024-07-26T15:41:04Z",
       "custom_status_updated_at": "2024-07-26T15:41:04Z",
       "first_resolution_time_in_minutes": {
@@ -1033,36 +1034,7 @@
         "brand_id": 28835714705684,
         "collaborator_ids": [],
         "created_at": "2024-07-26T15:41:04Z",
-        "custom_fields": [
-          {
-            "id": 28835767646868,
-            "value": null
-          },
-          {
-            "id": 39405384709780,
-            "value": null
-          },
-          {
-            "id": 43010621832468,
-            "value": null
-          },
-          {
-            "id": 48494958189844,
-            "value": null
-          },
-          {
-            "id": 49220324710292,
-            "value": null
-          },
-          {
-            "id": 49220324714132,
-            "value": null
-          },
-          {
-            "id": 50154664352788,
-            "value": null
-          }
-        ],
+        "custom_fields": "redacted",
         "custom_status_id": 28835714727188,
         "deleted_ticket_form_id": null,
         "description": "Hi there,\n\nI\u2019m sending an email because I\u2019m having a problem setting up your new product. Can you help me troubleshoot?\n\nThanks,\n The Customer\n\n",
@@ -1070,41 +1042,12 @@
         "email_cc_ids": [],
         "encoded_id": "Y4NVZV-M3XM2",
         "external_id": null,
-        "fields": [
-          {
-            "id": 28835767646868,
-            "value": null
-          },
-          {
-            "id": 39405384709780,
-            "value": null
-          },
-          {
-            "id": 43010621832468,
-            "value": null
-          },
-          {
-            "id": 48494958189844,
-            "value": null
-          },
-          {
-            "id": 49220324710292,
-            "value": null
-          },
-          {
-            "id": 49220324714132,
-            "value": null
-          },
-          {
-            "id": 50154664352788,
-            "value": null
-          }
-        ],
+        "fields": "redacted",
         "follower_ids": [],
         "followup_ids": [],
         "forum_topic_id": null,
         "from_messaging_channel": false,
-        "generated_timestamp": 1778249324,
+        "generated_timestamp": "redacted",
         "group_id": 28835740822676,
         "has_incidents": false,
         "id": 1,
@@ -1130,7 +1073,7 @@
         ],
         "ticket_form_id": 28835740693908,
         "type": "incident",
-        "updated_at": "2026-05-08T14:08:44Z",
+        "updated_at": "redacted",
         "url": "https://d3v-estuary.zendesk.com/api/v2/tickets/1.json",
         "via": {
           "channel": "sample_ticket",
@@ -1159,77 +1102,19 @@
       "brand_id": 28835714705684,
       "collaborator_ids": [],
       "created_at": "2024-07-26T15:41:04Z",
-      "custom_fields": [
-        {
-          "id": 28835767646868,
-          "value": null
-        },
-        {
-          "id": 39405384709780,
-          "value": null
-        },
-        {
-          "id": 43010621832468,
-          "value": null
-        },
-        {
-          "id": 48494958189844,
-          "value": null
-        },
-        {
-          "id": 49220324710292,
-          "value": null
-        },
-        {
-          "id": 49220324714132,
-          "value": null
-        },
-        {
-          "id": 50154664352788,
-          "value": null
-        }
-      ],
+      "custom_fields": "redacted",
       "custom_status_id": 28835714727188,
       "description": "Hi there,\n\nI\u2019m sending an email because I\u2019m having a problem setting up your new product. Can you help me troubleshoot?\n\nThanks,\n The Customer\n\n",
       "due_at": null,
       "email_cc_ids": [],
       "encoded_id": "Y4NVZV-M3XM2",
       "external_id": null,
-      "fields": [
-        {
-          "id": 28835767646868,
-          "value": null
-        },
-        {
-          "id": 39405384709780,
-          "value": null
-        },
-        {
-          "id": 43010621832468,
-          "value": null
-        },
-        {
-          "id": 48494958189844,
-          "value": null
-        },
-        {
-          "id": 49220324710292,
-          "value": null
-        },
-        {
-          "id": 49220324714132,
-          "value": null
-        },
-        {
-          "id": 50154664352788,
-          "value": null
-        }
-      ],
+      "fields": "redacted",
       "follower_ids": [],
       "followup_ids": [],
       "forum_topic_id": null,
       "from_messaging_channel": false,
-      "generated_timestamp": 1778249324,
+      "generated_timestamp": "redacted",
       "group_id": 28835740822676,
       "has_incidents": false,
       "id": 1,
