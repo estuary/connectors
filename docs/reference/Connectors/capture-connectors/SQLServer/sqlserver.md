@@ -259,3 +259,5 @@ you can manually add it to the collection definition during the [capture creatio
 3. Repeat with other missing collection keys, if necessary.
 
 4. Save and publish the capture as usual.
+
+See [a deliberately broken link](/reference/no-such-page-here/), a temporary negative control for the docs build check. This branch is throwaway.
