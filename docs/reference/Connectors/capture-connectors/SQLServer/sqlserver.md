@@ -260,4 +260,4 @@ you can manually add it to the collection definition during the [capture creatio
 
 4. Save and publish the capture as usual.
 
-See [a deliberately broken link](/reference/no-such-page-here/), a temporary negative control for the docs build check. This branch is throwaway.
+See [backfilling data](/reference/backfilling-data/), a temporary valid link for the docs build check. This branch is throwaway.
