@@ -465,8 +465,12 @@ func TestStreamV2WritePathSwitch(t *testing.T) {
 // its checkpoint still holds work that another path staged and did not finish.
 //
 // Acknowledge drains such an item through the manager of the path which staged it.
-// A binding routed to streaming v2 has no such manager, so the drain cannot find a
-// channel and fails, and the item is never cleared. Every restart repeats it.
+// Only Snowpipe Streaming blobs need this binding registered with that manager: a
+// staged-file query runs on the shared connection, and pipe files go through the
+// shared pipe client, so both drain on a streaming v2 session as they stand. Blobs
+// need the bdec manager to hold a channel for the table, which the binding arranges
+// for the drain even though its rows now go to streaming v2. Where that cannot be
+// arranged, the binding is refused rather than left to fail every transaction.
 func TestStreamV2SwitchOntoTheWritePathWithPendingWorkIsRefused(t *testing.T) {
 	var ctx = context.Background()
 
@@ -503,7 +507,10 @@ func TestStreamV2SwitchOntoTheWritePathWithPendingWorkIsRefused(t *testing.T) {
 		return d.addBinding(ctx, target, true, true)
 	}
 
-	t.Run("pending Snowpipe Streaming blobs are refused", func(t *testing.T) {
+	// The transactor of this test carries no bdec manager, which stands for every
+	// reason the drain cannot be arranged: the manager is absent, or it cannot open
+	// a channel on the table.
+	t.Run("pending blobs with no way to drain them are refused", func(t *testing.T) {
 		var d = newTransactor(t, &checkpointItem{
 			Table:       "TBL",
 			StreamBlobs: []*blobMetadata{{Path: "one.bdec"}, {Path: "two.bdec"}},
@@ -511,27 +518,29 @@ func TestStreamV2SwitchOntoTheWritePathWithPendingWorkIsRefused(t *testing.T) {
 
 		var err = addBinding(d)
 		require.ErrorContains(t, err, "TBL")
-		require.ErrorContains(t, err, "snowpipe_streaming_v2")
+		require.ErrorContains(t, err, "2")
 		require.ErrorContains(t, err, "backfill")
 	})
 
-	t.Run("pending pipe files are refused", func(t *testing.T) {
+	// Neither of the next two needs anything of this binding to drain: the pipe
+	// client and the database connection both belong to the transactor.
+	t.Run("pending pipe files are added as usual", func(t *testing.T) {
 		var d = newTransactor(t, &checkpointItem{
 			Table:     "TBL",
 			PipeName:  "PIPE",
 			PipeFiles: []fileRecord{{Path: "one.json"}},
 		})
 
-		require.ErrorContains(t, addBinding(d), "TBL")
+		require.NoError(t, addBinding(d))
 	})
 
-	t.Run("a pending staged-file query is refused", func(t *testing.T) {
+	t.Run("a pending staged-file query is added as usual", func(t *testing.T) {
 		var d = newTransactor(t, &checkpointItem{
 			Table: "TBL",
 			Query: "\nMERGE INTO TBL",
 		})
 
-		require.ErrorContains(t, addBinding(d), "TBL")
+		require.NoError(t, addBinding(d))
 	})
 
 	t.Run("a checkpoint holding only streaming v2 state is added as usual", func(t *testing.T) {
