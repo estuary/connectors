@@ -1284,9 +1284,11 @@ func TestStreamV2AdoptsATableWithNoGeneration(t *testing.T) {
 	require.NoError(t, db.QueryRowContext(ctx, "SELECT CURRENT_ACCOUNT()").Scan(&accountName))
 
 	const materialization = "test/streamV2Adopt"
-	// Upper case throughout: an unquoted identifier is what CREATE TABLE and COMMENT
-	// ON TABLE both fold to, and so is what INFORMATION_SCHEMA records.
-	var tableName = fmt.Sprintf("STREAMV2_ADOPT_FLOW_TEST_%d", time.Now().Unix())
+	// Lower case, as a resource configuration names a table. Snowflake folds an
+	// unquoted identifier to upper case, so this is not the name it records, and a
+	// lookup has to fold the name the same way the DDL did.
+	var tableName = fmt.Sprintf("streamv2_adopt_flow_test_%d", time.Now().Unix())
+	var storedName = strings.ToUpper(tableName)
 	var stateKey = "adopt.v1"
 
 	var tbl = sql.Table{
@@ -1319,7 +1321,7 @@ func TestStreamV2AdoptsATableWithNoGeneration(t *testing.T) {
 		"COMMENT ON TABLE %s IS %s;", tbl.Identifier, testDialect.Literal(tbl.Comment)))
 	require.NoError(t, err)
 
-	before, err := streamV2QueryTableComment(ctx, db, testDialect, cfg.Database, cfg.Schema, tableName)
+	before, err := streamV2QueryTableComment(ctx, db, testDialect, cfg.Database, cfg.Schema, storedName)
 	require.NoError(t, err)
 	_, ok := streamV2GenerationFromTableComment(before)
 	require.False(t, ok, "the table must start with no generation recorded, or this test proves nothing")
@@ -1361,7 +1363,7 @@ func TestStreamV2AdoptsATableWithNoGeneration(t *testing.T) {
 	// Having appended to the table, this generation owns it, and the comment must
 	// say so — otherwise a generation this one has already been replaced by can
 	// append to the same table without the guard noticing.
-	after, err := streamV2QueryTableComment(ctx, db, testDialect, cfg.Database, cfg.Schema, tableName)
+	after, err := streamV2QueryTableComment(ctx, db, testDialect, cfg.Database, cfg.Schema, storedName)
 	require.NoError(t, err)
 	require.Contains(t, after, tbl.Comment, "the comment the table carried anyway must survive")
 
