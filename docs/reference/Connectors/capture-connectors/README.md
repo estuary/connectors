@@ -105,9 +105,6 @@ All Estuary connectors capture data in real time, as it appears in the source sy
 - Dropbox
   - [Configuration](./dropbox.md)
   - Package - ghcr.io/estuary/source-dropbox:v1
-- Facebook Marketing (deprecated)
-  - [Configuration](./facebook-marketing.md)
-  - Package - ghcr.io/estuary/source-facebook-marketing:v4
 - Facebook Marketing
   - [Configuration](./facebook-marketing-native.md)
   - Package - ghcr.io/estuary/source-facebook-marketing-native:v1
