@@ -7377,6 +7377,12 @@
                 "string"
               ]
             },
+            "hs_calls_follow_ups_dismissed": {
+              "type": [
+                "null",
+                "boolean"
+              ]
+            },
             "hs_calls_service_call_id": {
               "type": [
                 "null",
@@ -7384,6 +7390,12 @@
               ]
             },
             "hs_campaign_guid": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_campaign_guids": {
               "type": [
                 "null",
                 "string"
@@ -7866,6 +7878,12 @@
               ]
             },
             "hs_campaign_guid": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_campaign_guids": {
               "type": [
                 "null",
                 "string"
@@ -9019,6 +9037,12 @@
                 "string"
               ]
             },
+            "hs_meetings_follow_ups_dismissed": {
+              "type": [
+                "null",
+                "boolean"
+              ]
+            },
             "hs_merged_object_ids": {
               "type": [
                 "null",
@@ -9155,6 +9179,30 @@
               "type": [
                 "null",
                 "boolean"
+              ]
+            },
+            "hs_recurring_event_schedule": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_recurring_event_series_id": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_recurring_event_type": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_recurring_event_unique_lookup": {
+              "type": [
+                "null",
+                "string"
               ]
             },
             "hs_roster_object_coordinates": {
@@ -11789,6 +11837,12 @@
               ]
             },
             "hs_ramp_key": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_ramp_phase_key": {
               "type": [
                 "null",
                 "string"
