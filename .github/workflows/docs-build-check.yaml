@@ -59,7 +59,7 @@ jobs:
       - name: Decide whether this PR can build the docs
         id: gate
         env:
-          IS_FORK: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
+          IS_FORK: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
           APP_ID: ${{ vars.PREVIEW_APP_ID }}
         run: |
           set -euo pipefail
