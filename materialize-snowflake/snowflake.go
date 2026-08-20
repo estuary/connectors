@@ -180,10 +180,12 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 			}
 
 			return &sql.Endpoint[config]{
-				Config:              cfg,
-				Dialect:             dialect,
-				SerPolicy:           serPolicy,
-				NewClient:           newClient,
+				Config:    cfg,
+				Dialect:   dialect,
+				SerPolicy: serPolicy,
+				NewClient: func(ctx context.Context, materializationName string, ep *sql.Endpoint[config]) (sql.Client, error) {
+					return newClient(ctx, materializationName, ep, featureFlags[flagSnowpipeStreamingV2])
+				},
 				CreateTableTemplate: templates.createTargetTable,
 				NewTransactor:       newTransactor,
 				ConcurrentApply:     true,
@@ -324,6 +326,11 @@ func newTransactor(
 		}
 
 		sv2 = newStreamV2Manager(ctx, &cfg, open.Materialization.TaskName(), accountName, open.Range)
+		// A streaming v2 binding's table records which generation of the binding
+		// it belongs to.
+		sv2.tableComment = func(ctx context.Context, database, schema, table string) (string, error) {
+			return streamV2QueryTableComment(ctx, db, ep.Dialect, database, schema, table)
+		}
 	}
 
 	var d = &transactor{
@@ -341,10 +348,7 @@ func newTransactor(
 		cp:                make(checkpoint),
 	}
 
-	// The checkpoint is normally delivered by UnmarshalState, which the runtime
-	// calls only once Open has returned. Streaming v2 needs its part of it
-	// sooner: addBinding reconciles each channel's committed offset token
-	// against the counter recorded here.
+	// Streaming v2 needs its part of the checkpoint state sooner than usual.
 	if len(open.StateJson) > 0 {
 		if err := d.UnmarshalState(open.StateJson); err != nil {
 			return nil, fmt.Errorf("unmarshalling connector state: %w", err)
@@ -366,16 +370,6 @@ func newTransactor(
 	// Create stage for file-based transfers.
 	if _, err = d.load.conn.ExecContext(ctx, createStageSQL); err != nil {
 		return nil, fmt.Errorf("creating transfer stage: %w", err)
-	}
-
-	// A streaming v2 binding's table records which generation of the binding it
-	// belongs to, and a channel may only be opened against a table which names this
-	// session's own. The manager reads it as it opens each channel, through this
-	// connection.
-	if sv2 != nil {
-		sv2.tableComment = func(ctx context.Context, database, schema, table string) (string, error) {
-			return streamV2TableComment(ctx, db, ep.Dialect, database, schema, table)
-		}
 	}
 
 	for _, binding := range bindings {
@@ -422,10 +416,12 @@ type binding struct {
 }
 
 func (d *transactor) addBinding(ctx context.Context, target sql.Table, streamingEnabled bool, streamingV2Enabled bool) error {
+	var streamingV2 = streamsV2(&d.cfg, target.DeltaUpdates, streamingV2Enabled)
+
 	// Ahead of everything else, so that a binding which may not leave the
 	// streaming v2 write path is refused before another path opens anything of
 	// its own against the same table.
-	if !streamsV2(&d.cfg, target.DeltaUpdates, streamingV2Enabled) {
+	if !streamingV2 {
 		if err := streamV2PathAbandoned(target.Identifier, d.priorStreamV2(target.StateKey)); err != nil {
 			return err
 		}
@@ -437,12 +433,7 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, streaming
 	b.load.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
 	b.store.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
 
-	if streamsV2(&d.cfg, b.target.DeltaUpdates, streamingV2Enabled) {
-		// This path is an explicit opt-in, and the SDK validates table/column
-		// compatibility lazily at ingestion rather than when the channel is
-		// opened, so there is no incompatibility signal to degrade on here.
-		// Failures surface from Store rather than causing a silent fall-through
-		// to a slower path.
+	if streamingV2 {
 		var loc = d.ep.Dialect.TableLocator(b.target.Path)
 		d.streamV2.addBinding(d.cfg.Database, loc.TableSchema, d.ep.Identifier(loc.TableName), target, d.priorStreamV2(target.StateKey))
 		b.streamingV2 = true
@@ -525,11 +516,13 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	var subqueries = make(map[int]string)
 	var filesToCleanup []string
 	for i, b := range d.bindings {
-		// Streaming bindings have no load stage at all, so they must be
-		// excluded before the stage is dereferenced.
 		if b.streaming || b.streamingV2 || !b.load.stage.started {
-			// Pass.
-		} else if dir, err := b.load.stage.flush(); err != nil {
+			// Streaming bindings have no load stage at all, so they must be
+			// excluded before the stage is dereferenced.
+			continue
+		}
+
+		if dir, err := b.load.stage.flush(); err != nil {
 			return fmt.Errorf("load.stage(): %w", err)
 		} else {
 			// Choose appropriate load query template based on configuration
@@ -675,13 +668,11 @@ func (d *transactor) pipeExists(ctx context.Context, pipeName string) (bool, err
 }
 
 type checkpointItem struct {
-	Table       string
-	Query       string
-	StagedDir   string
-	StreamBlobs []*blobMetadata
-	// StreamV2 is keyed by channel name, so that each shard of the task patches
-	// an entry of its own into the one connector-state document they share.
-	StreamV2      map[string]*streamV2Item `json:",omitempty"`
+	Table         string
+	Query         string
+	StagedDir     string
+	StreamBlobs   []*blobMetadata
+	StreamV2      map[string]*streamV2Item `json:",omitempty"` // keyed by channel name
 	PipeName      string
 	PipeFiles     []fileRecord
 	Version       string

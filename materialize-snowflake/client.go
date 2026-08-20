@@ -40,9 +40,13 @@ type client struct {
 	cfg                 config
 	ep                  *sql.Endpoint[config]
 	materializationName string
+	// streamingV2Enabled is this task's snowpipe_streaming_v2 feature flag as the
+	// boilerplate parsed it for the endpoint, so that every decision this client
+	// makes about the write path reads one resolution of the configuration.
+	streamingV2Enabled bool
 }
 
-func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint[config]) (sql.Client, error) {
+func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint[config], streamingV2Enabled bool) (sql.Client, error) {
 	dsnWithSchema, err := ep.Config.toURI(true, materializationName)
 	if err != nil {
 		return nil, err
@@ -70,6 +74,7 @@ func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint
 		cfg:                 ep.Config,
 		ep:                  ep,
 		materializationName: materializationName,
+		streamingV2Enabled:  streamingV2Enabled,
 	}, nil
 }
 
@@ -190,11 +195,13 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 var errInsufficientPrivileges = regexp.MustCompile(`Insufficient privileges to operate on schema '([^']+)'`)
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
-	// A table a streaming v2 binding appends to records the generation of the
-	// binding it belongs to, and a generation naming no state key is one every
-	// shard of the task would read as another's. Settled before the table exists,
-	// since a table carrying that is worse than no table at all.
-	var recordGeneration = streamsV2(&c.cfg, tc.Table.DeltaUpdates, boilerplate.ParseFlags(c.cfg)[flagSnowpipeStreamingV2])
+	// The generation this table belongs to is recorded in its comment. A missing
+	// state key parses as no generation at all — which streamV2GenerationConflict
+	// reads as permission for any generation to append, leaving the backfill race
+	// it guards unchecked. Refused ahead of the CREATE, so such a binding leaves
+	// no table, instead of a table whose generation cannot be parsed from the
+	// table comment.
+	var recordGeneration = streamsV2(&c.cfg, tc.Table.DeltaUpdates, c.streamingV2Enabled)
 	if recordGeneration && tc.StateKey == "" {
 		return fmt.Errorf("cannot record the generation of table %s: the binding resolved for it carries no state key", tc.Identifier)
 	}
@@ -206,11 +213,11 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 		return err
 	}
 
-	// The generation is recorded here, on the create, because a backfill of a
-	// streaming v2 binding re-creates the table rather than emptying it
-	// (MustRecreateResource), so every generation of the table passes through here.
+	// The generation is recorded here, right after table creation, because a
+	// backfill of a streaming v2 binding re-creates the table rather than emptying
+	// it (MustRecreateResource), so every generation of the table passes through here.
 	if recordGeneration {
-		var comment = streamV2GenerationComment(tc.Comment, streamV2Generation{
+		var comment = streamV2EmbedGenerationInTableComment(tc.Comment, streamV2Generation{
 			materialization: c.materializationName,
 			stateKey:        tc.StateKey,
 		})
@@ -377,33 +384,26 @@ func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence 
 	return sql.Fence{}, nil
 }
 
-// MustRecreateResource reports whether a binding's backfill must drop and
-// re-create its table rather than emptying it in place.
-//
-// A backfill of a streaming v2 binding must. Apply runs while the outgoing
-// generation's shards are still storing — nothing stops them first — and their
-// channels are bound to the very table the new generation is about to
-// re-materialize. A truncate empties that table and leaves those channels valid
-// and pointed at it, so the rows they append next land after the truncate, survive
-// it, and are re-materialized a second time. Nothing about a channel says which
-// generation opened it, so the duplication is silent.
-//
-// Dropping the table is what takes those channels with it, and it takes all of
-// them: including the channel of a shard which has committed nothing for this
-// binding and so has no checkpoint item to name it by, which is what a retirement
-// of the channels the checkpoint does name could not reach. What the outgoing
-// generation may not then do is reopen one, which reconcileStreamV2Channel
-// refuses.
 func (c *client) MustRecreateResource(req *pm.Request_Apply, lastBinding, newBinding *pf.MaterializationSpec_Binding) (bool, error) {
-	// What decides this is whether the generation being replaced could hold
-	// channels on the table: a delta-updates binding, on an endpoint configured for
-	// the streaming path.
+	// A backfill of a streaming v2 binding must recreate the table because Apply
+	// runs while the outgoing generation's shards are still storing - nothing
+	// stops them first - and their channels are bound to the very table the new
+	// generation is about to re-materialize. A truncate empties that table and
+	// leaves those channels valid and pointed at it, so the rows they append
+	// next land after the truncate, survive it, and are re-materialized a second
+	// time. Nothing about a channel says which generation opened it, so the
+	// duplication is silent.
 	//
-	// Its binding is read from the specification being replaced, which carries it.
-	// With no last-applied binding there is nothing to say what has been writing to
-	// the table, so it is re-created rather than assumed safe to empty: dropping a
-	// table which did not need it costs the table object, and emptying one which
-	// did costs duplicated rows.
+	// Dropping the table is what drops those channels with it, and it takes all of
+	// them: including the channel of a shard which has committed nothing for this
+	// binding and so has no checkpoint item to name it by, which is what a retirement
+	// of the channels the checkpoint does name could not reach. What the outgoing
+	// generation may not then do is reopen one, which reconcileStreamV2Channel
+	// refuses.
+
+	// Decide whether the generation being replaced could hold channels on the
+	// table: a delta-updates binding, on an endpoint configured for the
+	// streaming path.
 	var outgoingDeltaUpdates = lastBinding == nil || lastBinding.DeltaUpdates
 	if !outgoingDeltaUpdates {
 		return false, nil
@@ -412,7 +412,7 @@ func (c *client) MustRecreateResource(req *pm.Request_Apply, lastBinding, newBin
 	// The endpoint configuration is read from the one in hand, which is the
 	// configuration that generation was running unless this same publication also
 	// changes the write path.
-	if streamsV2(&c.cfg, true, boilerplate.ParseFlags(c.cfg)[flagSnowpipeStreamingV2]) {
+	if streamsV2(&c.cfg, true, c.streamingV2Enabled) {
 		return true, nil
 	} else if req.LastMaterialization == nil {
 		return false, nil
@@ -424,13 +424,6 @@ func (c *client) MustRecreateResource(req *pm.Request_Apply, lastBinding, newBin
 	// ever to widen this answer, never to narrow it, because a request carries that
 	// configuration in whatever shape the control plane stored it rather than the
 	// shape this connector is handed for itself.
-	//
-	// A configuration which reads as neither shape fails the Apply. Answering false
-	// there is the one wrong answer available: it empties a table whose outgoing
-	// generation may hold channels on it, and those channels then append across the
-	// truncate into rows the incoming generation is re-materializing — the silent
-	// duplication this whole function exists to prevent. Failing the publication
-	// instead is loud and recoverable.
 	outgoingCfg, ok := endpointConfigOf(req.LastMaterialization.ConfigJson)
 	if !ok {
 		return false, fmt.Errorf(
@@ -443,7 +436,7 @@ func (c *client) MustRecreateResource(req *pm.Request_Apply, lastBinding, newBin
 // endpointConfigOf parses the endpoint configuration out of a materialization
 // specification's configuration, which comes in either of two shapes.
 //
-// The runtime hands this connector its own configuration directly, decrypted. The
+// The runtime hands this connector its configuration directly, decrypted. The
 // last-applied specification of an Apply request is not given that treatment: it
 // arrives as the control plane stores it, which is the endpoint spec — the
 // connector image alongside a configuration whose secrets are still sops

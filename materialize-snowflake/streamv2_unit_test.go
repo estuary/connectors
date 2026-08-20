@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	snowflake_auth "github.com/estuary/connectors/go/auth/snowflake"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
@@ -103,9 +104,10 @@ func TestStreamV2RejectedRows(t *testing.T) {
 		// The fake sidecar rejects a row which carries the REJECT column, as
 		// Snowflake rejects one it cannot store: the append and the commit both
 		// succeed, and only the channel's row-error count moves.
+		var channel = fmt.Sprintf("%s_%s", m.channelBase, sanitizeAndAppendHash("rejected.v1"))
 		var priorByChannel map[string]*streamV2Item
 		if prior != nil {
-			priorByChannel = map[string]*streamV2Item{m.channelFor("rejected.v1"): prior}
+			priorByChannel = map[string]*streamV2Item{channel: prior}
 		}
 
 		m.addBinding("DB", "SCH", "TBL", sql.Table{
@@ -918,7 +920,7 @@ func TestStreamV2BackfillRecreatesTheTable(t *testing.T) {
 				req.LastMaterialization = &pf.MaterializationSpec{ConfigJson: configJson}
 			}
 
-			var c = &client{cfg: tt.incoming}
+			var c = &client{cfg: tt.incoming, streamingV2Enabled: boilerplate.ParseFlags(tt.incoming)[flagSnowpipeStreamingV2]}
 			got, err := c.MustRecreateResource(req, tt.last, tt.next)
 			require.NoError(t, err)
 			require.Equal(t, tt.want, got)
@@ -931,9 +933,9 @@ func TestStreamV2BackfillRecreatesTheTable(t *testing.T) {
 // through a comment which also carries prose meant for whoever reads the table.
 func TestStreamV2GenerationComment(t *testing.T) {
 	var gen = streamV2Generation{materialization: "acmeCo/materialize-snowflake", stateKey: "public%2Fwidgets.v3"}
-	var comment = streamV2GenerationComment("Generated for materialization acmeCo/materialize-snowflake of collection acmeCo/widgets", gen)
+	var comment = streamV2EmbedGenerationInTableComment("Generated for materialization acmeCo/materialize-snowflake of collection acmeCo/widgets", gen)
 
-	readBack, ok := streamV2GenerationOf(comment)
+	readBack, ok := streamV2GenerationFromTableComment(comment)
 	require.True(t, ok)
 	require.Equal(t, gen, readBack)
 
@@ -965,7 +967,7 @@ func TestStreamV2GenerationComment(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			_, ok := streamV2GenerationOf(tt.comment)
+			_, ok := streamV2GenerationFromTableComment(tt.comment)
 			require.False(t, ok)
 		})
 	}
@@ -980,10 +982,10 @@ func TestStreamV2GenerationComment(t *testing.T) {
 // create the table at all is the only safe reading, and it has to happen before
 // any statement runs — which is what lets this drive a client with no connection.
 func TestStreamV2CreateTableNeedsAStateKey(t *testing.T) {
-	var c = &client{cfg: config{
-		Credentials: &snowflake_auth.CredentialConfig{AuthType: snowflake_auth.JWT},
-		Advanced:    advancedConfig{FeatureFlags: flagSnowpipeStreamingV2},
-	}}
+	var c = &client{
+		cfg:                config{Credentials: &snowflake_auth.CredentialConfig{AuthType: snowflake_auth.JWT}},
+		streamingV2Enabled: true,
+	}
 
 	var tc = sql.TableCreate{
 		Table: sql.Table{
@@ -1007,7 +1009,7 @@ func TestStreamV2GenerationConflict(t *testing.T) {
 	const task = "acmeCo/materialize-snowflake"
 	var mine = streamV2Generation{materialization: task, stateKey: "widgets.v3"}
 	var commentOf = func(gen streamV2Generation) string {
-		return streamV2GenerationComment("Generated for materialization "+gen.materialization, gen)
+		return streamV2EmbedGenerationInTableComment("Generated for materialization "+gen.materialization, gen)
 	}
 
 	for _, tt := range []struct {
@@ -1045,7 +1047,7 @@ func TestStreamV2GenerationConflict(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			var err = streamV2GenerationConflict(tt.comment, mine, "WIDGETS")
+			var err = streamV2CheckGenerationConflict(tt.comment, mine, "WIDGETS")
 			if !tt.wantErr {
 				require.NoError(t, err)
 				return

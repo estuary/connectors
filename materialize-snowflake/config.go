@@ -266,15 +266,8 @@ func (c config) validateStreamingFlags() error {
 		)
 	}
 
-	// The v2 sidecar authenticates to Snowflake with the key pair JWT credentials
-	// carry, so an endpoint authenticating any other way cannot run this write
-	// path. Refused here rather than left to streamsV2 so that the flag is never
-	// silently ignored: the runtime gate applies to the flag alone, and would
-	// otherwise hold such a task to the v2 runtime while it went on writing by the
-	// staged path the operator asked it to stop using.
-	//
-	// Credentials are nil-checked because the gate reads a configuration out of a
-	// task specification, ahead of the validation that would require them.
+	// The v2 sidecar authenticates to Snowflake with JWT credentials carry, so
+	// an endpoint authenticating any other way cannot run this write path.
 	if configured[flagSnowpipeStreamingV2] && (c.Credentials == nil || c.Credentials.AuthType != snowflake_auth.JWT) {
 		return fmt.Errorf(
 			"the %q feature flag requires key-pair (JWT) authentication, which this endpoint is not configured for: switch the endpoint's authentication to a key pair, or remove %q from the endpoint configuration's feature_flags",

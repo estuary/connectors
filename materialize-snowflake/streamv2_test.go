@@ -708,7 +708,7 @@ func TestStreamV2Manager(t *testing.T) {
 			if owner == "" {
 				return
 			}
-			var comment = streamV2GenerationComment(
+			var comment = streamV2EmbedGenerationInTableComment(
 				"Generated for materialization "+testMaterialization,
 				streamV2Generation{materialization: testMaterialization, stateKey: owner})
 			_, err = db.ExecContext(ctx, fmt.Sprintf("COMMENT ON TABLE %s IS %s;",
@@ -727,7 +727,7 @@ func TestStreamV2Manager(t *testing.T) {
 		// readComment is what the transactor hands the manager: the comment of the
 		// binding's table as Snowflake reports it, read as each channel is opened.
 		var readComment = func(ctx context.Context, database, schema, table string) (string, error) {
-			return streamV2TableComment(ctx, db, testDialect, database, schema, table)
+			return streamV2QueryTableComment(ctx, db, testDialect, database, schema, table)
 		}
 
 		// outgoingGeneration is a shard of the generation being replaced, holding
@@ -1037,7 +1037,7 @@ func TestStreamV2CreateTableRecordsGeneration(t *testing.T) {
 
 	ep, err := NewDriver().NewEndpoint(ctx, cfg, boilerplate.ParseFlags(cfg))
 	require.NoError(t, err)
-	client, err := newClient(ctx, materialization, ep)
+	client, err := ep.NewClient(ctx, materialization, ep)
 	require.NoError(t, err)
 	t.Cleanup(client.Close)
 
@@ -1062,7 +1062,7 @@ func TestStreamV2CreateTableRecordsGeneration(t *testing.T) {
 		Resource:       tableConfig{Table: tableName, Schema: cfg.Schema, Delta: true},
 	}))
 
-	comment, err := streamV2TableComment(ctx, db, ep.Dialect, cfg.Database, cfg.Schema, tableName)
+	comment, err := streamV2QueryTableComment(ctx, db, ep.Dialect, cfg.Database, cfg.Schema, tableName)
 	require.NoError(t, err)
 	t.Logf("created %s with comment: %s", tableName, comment)
 
@@ -1070,15 +1070,15 @@ func TestStreamV2CreateTableRecordsGeneration(t *testing.T) {
 	// reads the table, and the generation is recorded alongside it.
 	require.Contains(t, comment, tbl.Comment)
 
-	gen, ok := streamV2GenerationOf(comment)
+	gen, ok := streamV2GenerationFromTableComment(comment)
 	require.True(t, ok)
 	require.Equal(t, streamV2Generation{materialization: materialization, stateKey: stateKey}, gen)
 
 	// The generation this table was created for may append to it; the one a
 	// backfill of the same binding replaced may not.
-	require.NoError(t, streamV2GenerationConflict(comment, gen, tableName))
+	require.NoError(t, streamV2CheckGenerationConflict(comment, gen, tableName))
 	require.ErrorContains(t,
-		streamV2GenerationConflict(comment, streamV2Generation{materialization: materialization, stateKey: "generation%2Frecorded.v1"}, tableName),
+		streamV2CheckGenerationConflict(comment, streamV2Generation{materialization: materialization, stateKey: "generation%2Frecorded.v1"}, tableName),
 		"has been backfilled")
 }
 
