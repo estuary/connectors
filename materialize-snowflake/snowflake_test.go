@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
+	"github.com/estuary/connectors/materialize-boilerplate/testutil"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/google/uuid"
@@ -130,6 +132,22 @@ func TestIntegration(t *testing.T) {
 
 	t.Run("materialize", func(t *testing.T) {
 		sql.RunMaterializationTest(t, NewDriver(), "testdata/materialize.flow.yaml", makeResourceFn, actionDescSanitizers)
+	})
+
+	// This harness drives materializations through the V1 runtime, so the
+	// snowpipe_streaming_v2 write path is out of its reach: that path resumes
+	// from Snowflake's committed offset token and is correct only when an
+	// interrupted transaction is replayed identically, which the V2 runtime
+	// guarantees and the V1 runtime does not. What this fixture proves is the
+	// refusal. See the fixture for the rest.
+	t.Run("materialize-v2-refused", func(t *testing.T) {
+		testutil.RunMaterializationRefusalTest(
+			t,
+			"testdata/materialize-v2.flow.yaml",
+			makeResourceFn,
+			flagSnowpipeStreamingV2,
+			boilerplate.RuntimeV2FlagName,
+		)
 	})
 
 	t.Run("apply", func(t *testing.T) {

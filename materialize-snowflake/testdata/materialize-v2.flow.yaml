@@ -1,0 +1,38 @@
+# This fixture enables the snowpipe_streaming_v2 feature flag on a task that is
+# NOT on the V2 materialization runtime, because `flowctl preview` drives
+# materializations through the V1 runtime and cannot do otherwise. The connector
+# must refuse it, and that refusal is all this fixture proves. The V2 write path
+# itself is exercised by the streaming manager tests against live Snowflake.
+import:
+  - ../../materialize-boilerplate/testdata/integration/collections.materialize.flow.yaml
+
+materializations:
+  acmeCo/tests/materialize-snowflake:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config-v2.yaml
+    bindings:
+    # A mix of standard-updates and delta-updates bindings, so the refusal is
+    # shown to apply to the task rather than to an individual binding.
+    - resource:
+        table: simple_standard_v2
+        schema: PUBLIC
+      source: tests/simple
+      fields:
+        recommended: true
+    - resource:
+        table: simple_delta_v2
+        schema: PUBLIC
+        delta_updates: true
+      source: tests/simple
+      fields:
+        recommended: true
+    - resource:
+        table: data_types_v2
+        schema: PUBLIC
+        delta_updates: true
+      source: tests/data-types
+      fields:
+        recommended: true
