@@ -1,0 +1,82 @@
+name: "Trigger connector docs preview"
+
+# estuary/docs owns the Docusaurus site and pulls this repo's published docs in
+# through a git submodule, so a PR here cannot build its own preview. This
+# dispatches the build to estuary/docs, which builds the site with the submodule
+# pinned to this PR's head commit and reports back with a comment and a
+# `docs/build` commit status. See estuary/docs
+# .github/workflows/connector-docs-preview.yaml for the receiving side.
+#
+# The commit status is the part worth protecting: two thirds of the pages on
+# docs.estuary.dev come from this repo, the docs build sets
+# onBrokenLinks: 'throw', and the production deploy is an unattended hourly
+# cron with no failure alerting. A broken relative link merged here therefore
+# fails every subsequent deploy and freezes docs.estuary.dev at its last good
+# build, with nothing to say so. Making `docs/build` a required check on this
+# repo closes that.
+#
+# Requires the "estuary-docs-previews" GitHub App (PREVIEW_APP_ID repo variable
+# + PREVIEW_APP_PRIVATE_KEY secret, installed on both estuary/docs and
+# estuary/connectors). Without them the job skips rather than failing.
+
+on:
+  pull_request:
+    paths:
+      # Only what the site actually publishes. docs/ also holds internal
+      # engineering notes (agents/, feature_flags.md, inbound_networking.md,
+      # materialize/) that no page is built from, so they should not spend a
+      # build.
+      - docs/reference/Connectors/**
+      # Not a page, but docusaurus.config.js reads it out of the submodule to
+      # build the connector redirect table, and a bad entry there fails the
+      # build. Excluding it would leave the one file that can break the site
+      # without a check.
+      - docs/redirects.yaml
+    # No `closed`: a preview is a Cloudflare Workers version, and versions
+    # cannot be deleted, so there is nothing to tear down when a PR closes.
+    # Cloudflare ages old versions out on its own. (The earlier gh-pages design
+    # did need `closed`, to delete the published preview directory.)
+    types: [opened, reopened, synchronize]
+
+concurrency:
+  group: connector-docs-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+# The job only ever uses the App-minted token, scoped to estuary/docs, so it
+# needs none of the ambient GITHUB_TOKEN's scope.
+permissions: {}
+
+jobs:
+  dispatch:
+    # Forks cannot read secrets, so the token cannot be minted and the dispatch
+    # would fail rather than skip. Connector docs are contributed from branches
+    # in this repo, so this costs nothing today.
+    if: >-
+      vars.PREVIEW_APP_ID != '' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Mint token for estuary/docs
+        uses: actions/create-github-app-token@v2
+        id: app-token
+        with:
+          app-id: ${{ vars.PREVIEW_APP_ID }}
+          private-key: ${{ secrets.PREVIEW_APP_PRIVATE_KEY }}
+          owner: estuary
+          repositories: docs
+
+      - name: Dispatch preview build to estuary/docs
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          gh api repos/estuary/docs/dispatches --input - <<EOF
+          {
+            "event_type": "connector-docs-preview",
+            "client_payload": {
+              "pr_number": ${PR_NUMBER},
+              "head_sha": "${HEAD_SHA}"
+            }
+          }
+          EOF
