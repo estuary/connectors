@@ -2,6 +2,7 @@ package connector
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"cloud.google.com/go/bigquery"
@@ -33,28 +34,203 @@ func TestAcknowledgeSubsetLeavesOtherKeysPending(t *testing.T) {
 	require.NotNil(t, tr.cp["b_table.v1"])
 }
 
-func TestGroupByBinding(t *testing.T) {
+func TestGroupCheckpointsByBinding(t *testing.T) {
 	cp := checkpoint{
-		NewCheckpointKey("a_table.v1", "00000000-7fffffff"): {Query: "MERGE INTO a"},
-		NewCheckpointKey("a_table.v1", "80000000-ffffffff"): {Query: "MERGE INTO a"},
-		NewCheckpointKey("b_table.v1", "00000000-ffffffff"): {Query: "MERGE INTO b"},
+		NewCheckpointKey("a.v1", "00000000-7fffffff"): {Query: "MERGE INTO a"},
+		NewCheckpointKey("a.v1", "80000000-ffffffff"): {Query: "MERGE INTO a"},
+		NewCheckpointKey("b.v1", "00000000-7fffffff"): {Query: "MERGE INTO b"},
+		NewCheckpointKey("b.v1", "80000000-ffffffff"): {Query: "MERGE INTO b"},
 	}
 
-	groups := groupByBinding(cp)
-	require.Len(t, groups, 2)
-
-	byStateKey := make(map[string][]CheckpointKey)
-	for _, g := range groups {
-		byStateKey[g[0].StateKey()] = g
+	i := 0
+	for group := range groupCheckpointsByBinding(cp) {
+		switch i {
+		case 0:
+			require.Equal(t, group, []CheckpointKey{
+				"a.v1:00000000-7fffffff",
+				"a.v1:80000000-ffffffff",
+			})
+		case 1:
+			require.Equal(t, group, []CheckpointKey{
+				"b.v1:00000000-7fffffff",
+				"b.v1:80000000-ffffffff",
+			})
+		default:
+			t.FailNow()
+		}
+		i++
 	}
+}
 
-	require.ElementsMatch(t, []CheckpointKey{
-		NewCheckpointKey("a_table.v1", "00000000-7fffffff"),
-		NewCheckpointKey("a_table.v1", "80000000-ffffffff"),
-	}, byStateKey["a_table.v1"])
-	require.ElementsMatch(t, []CheckpointKey{
-		NewCheckpointKey("b_table.v1", "00000000-ffffffff"),
-	}, byStateKey["b_table.v1"])
+func TestMergeStatePatches(t *testing.T) {
+	tests := []struct {
+		name        string
+		target      checkpoint
+		patches     []json.RawMessage
+		expected    checkpoint
+		expectedErr error
+	}{
+		{
+			name:   "single shard two bindings",
+			target: map[CheckpointKey]*checkpointItem{},
+			patches: []json.RawMessage{
+				json.RawMessage(`
+					{
+					  "a.v1:00000000-ffffffff": {
+						"JobPrefix": "1",
+						"Query": "query1",
+						"SourceURIs": [
+						  "gs://1"
+						],
+						"TempTableName": "flow_temp_table_0"
+					  },
+					  "b.v1:00000000-ffffffff": {
+						"JobPrefix": "2",
+						"Query": "query2",
+						"SourceURIs": [
+						  "gs://2"
+						],
+						"TempTableName": "flow_temp_table_1"
+					  }
+					}
+				`),
+			},
+			expected: map[CheckpointKey]*checkpointItem{
+				NewCheckpointKey("a.v1", "00000000-ffffffff"): &checkpointItem{
+					Query:         "query1",
+					SourceURIs:    []string{"gs://1"},
+					JobPrefix:     "1",
+					TempTableName: "flow_temp_table_0",
+				},
+				NewCheckpointKey("b.v1", "00000000-ffffffff"): &checkpointItem{
+					Query:         "query2",
+					SourceURIs:    []string{"gs://2"},
+					JobPrefix:     "2",
+					TempTableName: "flow_temp_table_1",
+				},
+			},
+		},
+		{
+			name:   "split shard two bindings",
+			target: map[CheckpointKey]*checkpointItem{},
+			patches: []json.RawMessage{
+				json.RawMessage(`
+					{
+					  "a.v1:00000000-7fffffff": {
+						"JobPrefix": "1",
+						"Query": "query1",
+						"SourceURIs": [
+						  "gs://1"
+						],
+						"TempTableName": "flow_temp_table_0"
+					  },
+					  "b.v1:00000000-7fffffff": {
+						"JobPrefix": "2",
+						"Query": "query2",
+						"SourceURIs": [
+						  "gs://2"
+						],
+						"TempTableName": "flow_temp_table_1"
+					  }
+					}
+				`),
+				json.RawMessage(`
+					{
+					  "a.v1:80000000-ffffffff": {
+						"JobPrefix": "3",
+						"Query": "query3",
+						"SourceURIs": [
+						  "gs://3"
+						],
+						"TempTableName": "flow_temp_table_0"
+					  },
+					  "b.v1:80000000-ffffffff": {
+						"JobPrefix": "4",
+						"Query": "query4",
+						"SourceURIs": [
+						  "gs://4"
+						],
+						"TempTableName": "flow_temp_table_1"
+					  }
+					}
+				`),
+			},
+			expected: map[CheckpointKey]*checkpointItem{
+				NewCheckpointKey("a.v1", "00000000-7fffffff"): &checkpointItem{
+					Query:         "query1",
+					SourceURIs:    []string{"gs://1"},
+					JobPrefix:     "1",
+					TempTableName: "flow_temp_table_0",
+				},
+				NewCheckpointKey("b.v1", "00000000-7fffffff"): &checkpointItem{
+					Query:         "query2",
+					SourceURIs:    []string{"gs://2"},
+					JobPrefix:     "2",
+					TempTableName: "flow_temp_table_1",
+				},
+				NewCheckpointKey("a.v1", "80000000-ffffffff"): &checkpointItem{
+					Query:         "query3",
+					SourceURIs:    []string{"gs://3"},
+					JobPrefix:     "3",
+					TempTableName: "flow_temp_table_0",
+				},
+				NewCheckpointKey("b.v1", "80000000-ffffffff"): &checkpointItem{
+					Query:         "query4",
+					SourceURIs:    []string{"gs://4"},
+					JobPrefix:     "4",
+					TempTableName: "flow_temp_table_1",
+				},
+			},
+		},
+		{
+			name:   "split shard two bindings merge patch",
+			target: map[CheckpointKey]*checkpointItem{},
+			patches: []json.RawMessage{
+				json.RawMessage(`null`),
+				json.RawMessage(`
+					{
+					  "a.v1:00000000-7fffffff": {
+						"JobPrefix": "1",
+						"Query": "query1",
+						"SourceURIs": [
+						  "gs://1"
+						],
+						"TempTableName": "flow_temp_table_0"
+					  },
+					  "b.v1:00000000-7fffffff": {
+						"JobPrefix": "2",
+						"Query": "query2",
+						"SourceURIs": [
+						  "gs://2"
+						],
+						"TempTableName": "flow_temp_table_1"
+					  }
+					}
+				`),
+			},
+			expected: map[CheckpointKey]*checkpointItem{
+				NewCheckpointKey("a.v1", "00000000-7fffffff"): &checkpointItem{
+					Query:         "query1",
+					SourceURIs:    []string{"gs://1"},
+					JobPrefix:     "1",
+					TempTableName: "flow_temp_table_0",
+				},
+				NewCheckpointKey("b.v1", "00000000-7fffffff"): &checkpointItem{
+					Query:         "query2",
+					SourceURIs:    []string{"gs://2"},
+					JobPrefix:     "2",
+					TempTableName: "flow_temp_table_1",
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actual, err := mergeStatePatches(tt.target, tt.patches)
+			require.Equal(t, tt.expectedErr, err)
+			require.Equal(t, tt.expected, actual)
+		})
+	}
 }
 
 func TestSchemaForColsStripsPolicyTags(t *testing.T) {

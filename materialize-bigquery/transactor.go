@@ -5,7 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"iter"
+	"maps"
 	"math"
+	"slices"
 	"strings"
 	"text/template"
 
@@ -17,6 +20,7 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	jsonpatch "github.com/evanphx/json-patch/v5"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
@@ -453,54 +457,76 @@ func isJSONNull(data json.RawMessage) bool {
 	return bytes.Equal(bytes.TrimSpace(data), []byte("null"))
 }
 
-func mergeStatePatches(cp checkpoint, patches []json.RawMessage) error {
+func mergeStatePatches(target checkpoint, patches []json.RawMessage) (checkpoint, error) {
+	checkpointJSON, err := json.Marshal(target)
+	if err != nil {
+		return nil, err
+	}
+
 	for _, patch := range patches {
-		if isJSONNull(patch) {
-			clear(cp)
+		// The jsonpatch library returns an error if the target is "null", so
+		// we set it back to {} to better match RFC 7396.
+		if isJSONNull(checkpointJSON) {
+			checkpointJSON = []byte("{}")
 		}
 
-		var raw map[string]json.RawMessage
-		if err := json.Unmarshal(patch, &raw); err != nil {
-			return fmt.Errorf("parsing state patch: %w", err)
-		}
-
-		for key, val := range raw {
-			var item checkpointItem
-			if err := json.Unmarshal(val, &item); err != nil {
-				return fmt.Errorf("parsing state patch checkpoint item %q: %w", key, err)
-			}
-
-			cp[CheckpointKey(key)] = &item
+		checkpointJSON, err = jsonpatch.MergePatch(checkpointJSON, []byte(patch))
+		if err != nil {
+			return nil, fmt.Errorf("applying state merge patch: %w", err)
 		}
 	}
-	return nil
+
+	var merged checkpoint
+	err = json.Unmarshal(checkpointJSON, &merged)
+	if err != nil {
+		return nil, err
+	}
+
+	return merged, nil
 }
 
-// groupByBinding groups cp's keys sharing a StateKey (destination table)
-// together, so callers can serialize same-table work while still processing
-// different tables concurrently.
-func groupByBinding(cp checkpoint) [][]CheckpointKey {
-	grouped := make(map[string][]CheckpointKey)
-	for cpKey := range cp {
-		grouped[cpKey.StateKey()] = append(grouped[cpKey.StateKey()], cpKey)
-	}
+func groupCheckpointsByBinding(cp checkpoint) iter.Seq[[]CheckpointKey] {
+	return func(yield func([]CheckpointKey) bool) {
+		keys := slices.Sorted(maps.Keys(cp))
 
-	groups := make([][]CheckpointKey, 0, len(grouped))
-	for _, g := range grouped {
-		groups = append(groups, g)
+		var currentKey string
+		bindingKeys := []CheckpointKey{}
+		for _, key := range keys {
+			sk := key.StateKey()
+			if len(bindingKeys) != 0 && sk != currentKey {
+				if !yield(bindingKeys) {
+					return
+				}
+				bindingKeys = bindingKeys[:0]
+			}
+
+			bindingKeys = append(bindingKeys, key)
+			currentKey = sk
+		}
+
+		if len(bindingKeys) != 0 {
+			yield(bindingKeys)
+		}
 	}
-	return groups
 }
 
 func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
+	log.WithFields(log.Fields{"patches": statePatches, "primary_shard": t.primaryShard, "range_key": t.rangeKey}).Info("statePatches")
+
+	shouldProcess := m.StateKeyFilter(stateKeys)
+
 	if !t.primaryShard {
-		for k := range t.cp {
-			delete(t.cp, k)
+		for _, b := range t.bindings {
+			if shouldProcess(b.target.StateKey) {
+				cpKey := NewCheckpointKey(b.target.StateKey, t.rangeKey)
+				delete(t.cp, cpKey)
+			}
 		}
 		return nil, nil
 	}
 
-	err := mergeStatePatches(t.cp, statePatches)
+	var err error
+	t.cp, err = mergeStatePatches(t.cp, statePatches)
 	if err != nil {
 		return nil, err
 	}
@@ -513,36 +539,35 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	// items sharing a table are run sequentially within a single goroutine,
 	// since BigQuery does not support concurrent queries against the same
 	// table.
-	group.SetLimit(100)
-
-	shouldProcess := m.StateKeyFilter(stateKeys)
+	group.SetLimit(1)
 
 	var drained []CheckpointKey
-	for _, cpKeys := range groupByBinding(t.cp) {
-		sk := cpKeys[0].StateKey()
-		if !shouldProcess(sk) {
-			// This state key's pending work was not requested to be
-			// processed, so it remains staged in the persisted state.
-			continue
-		}
-
-		var b *binding
-		for _, binding := range t.bindings {
-			if binding.target.StateKey == sk {
-				b = binding
-				break
+	for cpKeys := range groupCheckpointsByBinding(t.cp) {
+		for _, cpKey := range cpKeys {
+			sk := cpKey.StateKey()
+			if !shouldProcess(sk) {
+				// This state key's pending work was not requested to be
+				// processed, so it remains staged in the persisted state.
+				continue
 			}
-		}
 
-		if b == nil {
-			// No binding is enabled for this state key.
-			continue
-		}
+			var b *binding
+			for _, binding := range t.bindings {
+				if binding.target.StateKey == sk {
+					b = binding
+					break
+				}
+			}
 
-		drained = append(drained, cpKeys...)
-		group.Go(func() error {
-			t.be.StartedResourceCommit(b.target.Path)
-			for _, cpKey := range cpKeys {
+			if b == nil {
+				// No binding is enabled for this state key.
+				continue
+			}
+
+			drained = append(drained, cpKeys...)
+			group.Go(func() error {
+				t.be.StartedResourceCommit(b.target.Path)
+
 				item := t.cp[cpKey]
 				if err := t.client.queryIdempotent(groupCtx, b.storeSchema, item.Query, item.JobPrefix, item.SourceURIs, item.TempTableName); err != nil {
 					return fmt.Errorf("acknowledge query for %q: %w", b.target.Path, err)
@@ -560,11 +585,12 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 					// that query will never be attempted again.
 					return fmt.Errorf("cleaning up staged files for %q: %w", b.target.Path, err)
 				}
-			}
-			t.be.FinishedResourceCommit(b.target.Path)
 
-			return nil
-		})
+				t.be.FinishedResourceCommit(b.target.Path)
+
+				return nil
+			})
+		}
 	}
 
 	if err := group.Wait(); err != nil {
