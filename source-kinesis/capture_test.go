@@ -572,6 +572,14 @@ func buildGlueHeader(t *testing.T, schemaVersionId string) []byte {
 }
 
 func advanceCapture(t testing.TB, cs *st.CaptureSpec) {
+	// 100ms is enough for the LocalStack emulator, but not for real Kinesis.
+	// The harness counts the checkpoint that pruneShards always emits as data
+	// received, so the shutdown countdown starts before any records have been
+	// read.
+	if useRealAWS() {
+		advanceCaptureWithTimeout(t, cs, 10*time.Second)
+		return
+	}
 	advanceCaptureWithTimeout(t, cs, 100*time.Millisecond)
 }
 
