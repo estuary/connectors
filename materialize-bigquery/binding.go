@@ -2,6 +2,7 @@ package connector
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"cloud.google.com/go/bigquery"
@@ -21,6 +22,22 @@ type binding struct {
 	storeMergeBounds *sql.MergeBoundsBuilder
 }
 
+// errNullFlowDocument is returned when a load query reads a row whose
+// flow_document column is NULL. The column is added as nullable when a binding
+// adopts a table that already held rows, and nothing backfills it for them.
+//
+// A sentinel so this stays distinguishable from a type mismatch without matching
+// on message text. Two caveats not worth putting in front of operators: enabling
+// no_flow_document takes effect on the next transaction of an existing binding
+// (transactor.go selects the load template from the endpoint config alone), and
+// its reconstruction yields an explicit null for any root-level column that is
+// NULL, which only matters for collections that reduce the root document rather
+// than replacing it.
+var errNullFlowDocument = errors.New("row has no flow_document value, " +
+	"typically because the binding adopted a table that already held data: see https://go.estuary.dev/matff. " +
+	"The 'Exclude Flow Document' advanced option makes loads reconstruct the document " +
+	"from the table's own columns instead")
+
 // bindingDocument is used by the load operation to fetch binding flow_document values
 type bindingDocument struct {
 	Binding  int
@@ -38,8 +55,10 @@ func (bd *bindingDocument) Load(v []bigquery.Value, s bigquery.Schema) error {
 	} else {
 		bd.Binding = int(binding)
 	}
-	if document, ok := v[1].(string); !ok {
-		return fmt.Errorf("value[1] wrong type %T expecting string", v[0])
+	if v[1] == nil {
+		return errNullFlowDocument
+	} else if document, ok := v[1].(string); !ok {
+		return fmt.Errorf("value[1] wrong type %T expecting string", v[1])
 	} else {
 		bd.Document = json.RawMessage(document)
 	}
