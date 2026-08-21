@@ -134,6 +134,8 @@ func (d driver) Apply(ctx context.Context, req *pc.Request_Apply) (*pc.Response_
 func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error {
 	log.Debug("connector started")
 
+	log.WithField("observable", true).Info("a pass-through connector log")
+
 	var cfg config
 	if err := pf.UnmarshalStrict(open.Capture.ConfigJson, &cfg); err != nil {
 		return fmt.Errorf("parsing endpoint config: %w", err)
