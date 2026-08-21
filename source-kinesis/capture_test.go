@@ -75,6 +75,11 @@ func TestDiscover(t *testing.T) {
 	cleanup()
 	t.Cleanup(cleanup)
 
+	// Wait for the streams to be fully deleted if they existed
+	for _, s := range testStreams {
+		awaitStreamDeleted(t, ctx, client, s)
+	}
+
 	for _, s := range testStreams {
 		s := s
 		_, err = client.CreateStream(ctx, &kinesis.CreateStreamInput{
@@ -109,6 +114,11 @@ func TestCapture(t *testing.T) {
 	}
 	cleanup()
 	t.Cleanup(cleanup)
+
+	// Wait for the streams to be fully deleted if they existed
+	for _, s := range testStreams {
+		awaitStreamDeleted(t, ctx, client, s)
+	}
 
 	for _, s := range testStreams {
 		s := s
@@ -200,6 +210,9 @@ func TestCaptureParsing(t *testing.T) {
 	}
 	cleanup()
 	t.Cleanup(cleanup)
+
+	// Wait for stream to be fully deleted if it existed
+	awaitStreamDeleted(t, ctx, client, testStream)
 
 	_, err = client.CreateStream(ctx, &kinesis.CreateStreamInput{
 		StreamName: aws.String(testStream),
