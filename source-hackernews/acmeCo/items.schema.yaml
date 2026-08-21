@@ -1,0 +1,127 @@
+---
+$defs:
+  Meta:
+    properties:
+      op:
+        default: u
+        description: "Operation type (c: Create, u: Update, d: Delete)"
+        enum:
+          - c
+          - u
+          - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        title: Row Id
+        type: integer
+    title: Meta
+    type: object
+description: Hackernews Item
+properties:
+  _meta:
+    allOf:
+      - $ref: "#/$defs/Meta"
+    default:
+      op: u
+      row_id: -1
+    description: Document metadata
+  id:
+    title: Id
+    type: integer
+  deleted:
+    default: false
+    title: Deleted
+    type: boolean
+  type:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    description: "One of \"job\", \"story\", \"comment\", \"poll\", or \"pollopt\""
+    title: Type
+  by:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: By
+  time:
+    anyOf:
+      - format: date-time
+        type: string
+      - type: "null"
+    default: ~
+    description: Unix Time
+    title: Time
+  text:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    description: HTML
+    title: Text
+  dead:
+    default: false
+    title: Dead
+    type: boolean
+  parent:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    description: ID of the parent item
+    title: Parent
+  poll:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    description: ID of the associated poll for pollopt
+    title: Poll
+  kids:
+    description: List of IDs of comments
+    items:
+      type: integer
+    title: Kids
+    type: array
+  url:
+    anyOf:
+      - format: uri
+        maxLength: 2083
+        minLength: 1
+        type: string
+      - type: "null"
+    default: ~
+    title: Url
+  score:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    title: Score
+  title:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    description: HTML
+    title: Title
+  parts:
+    description: List of related pollopts
+    items:
+      type: integer
+    title: Parts
+    type: array
+  descendants:
+    anyOf:
+      - type: integer
+      - type: "null"
+    default: ~
+    description: Total comment count for stories or polls
+    title: Descendants
+required:
+  - id
+title: Item
+type: object
