@@ -749,22 +749,16 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 }
 
 func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (json.RawMessage, error) {
-	// The "base token" only really needs to be sufficiently random that it
-	// doesn't collide with the prior or next transaction's value. Deriving
-	// it from the runtime checkpoint is not absolutely necessary, but it's
-	// convenient to make testing outputs consistent.
-	var baseToken string
-	if mcp, err := runtimeCheckpoint.Marshal(); err != nil {
-		return nil, fmt.Errorf("marshalling checkpoint: %w", err)
-	} else {
-		baseToken = fmt.Sprintf("%016x", xxhash.Sum64(mcp))
-	}
-
 	streamBlobs := make(map[int][]*blobMetadata)
 	keys := make(map[int]string)
 	if d.streamManager != nil {
-		var err error
-		if streamBlobs, keys, err = d.streamManager.flush(baseToken); err != nil {
+		// The "base token" only really needs to be sufficiently random that it
+		// doesn't collide with the prior or next transaction's value. Deriving
+		// it from the runtime checkpoint is not absolutely necessary, but it's
+		// convenient to make testing outputs consistent.
+		if mcp, err := runtimeCheckpoint.Marshal(); err != nil {
+			return nil, fmt.Errorf("marshalling checkpoint: %w", err)
+		} else if streamBlobs, keys, err = d.streamManager.flush(fmt.Sprintf("%016x", xxhash.Sum64(mcp))); err != nil {
 			return nil, fmt.Errorf("flushing stream manager: %w", err)
 		}
 	}
