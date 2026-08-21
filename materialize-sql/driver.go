@@ -454,9 +454,6 @@ func getTable[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]]
 	if err != nil {
 		return Table{}, err
 	}
-	// Carried here rather than by each caller, so that a table resolved for an
-	// Apply action names the binding's generation as one resolved for a
-	// transactor does.
 	table.StateKey = binding.StateKey
 
 	return table, nil
