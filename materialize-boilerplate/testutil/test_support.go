@@ -165,6 +165,41 @@ func RunMaterializationTest[EC boilerplate.EndpointConfiger, FC boilerplate.Fiel
 	cupaloy.SnapshotT(t, snap.String())
 }
 
+// RunMaterializationRefusalTest drives each task of the fixture through
+// `flowctl preview` and requires the connector to refuse it, with a message
+// containing every string in wantErrContains.
+//
+// The refusal is asserted by substring rather than snapshotted, because
+// flowctl's failure output carries timestamps and temporary paths.
+func RunMaterializationRefusalTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](
+	t *testing.T,
+	sourcePath string,
+	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
+	wantErrContains ...string,
+) {
+	require.NotEmpty(t, wantErrContains, "a refusal test must assert something about the refusal")
+
+	tsSuffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
+
+	RunTestAllTasks(t, sourcePath, func(t *testing.T, bundled []byte, taskName string, cfg EC) {
+		rt := rewriteTaskForTest[EC, RC](t, bundled, taskName, tsSuffix, cfg, makeResourceFn)
+
+		output, err := flowctlCommand(
+			"preview",
+			"--name", rt.workingTaskName,
+			"--source", rt.sourcePath,
+			"--fixture", relativePath(t, "testdata/integration/fixture.materialize.json"),
+			"--network", "flow-test",
+		).CombinedOutput()
+		t.Log(string(output))
+		require.Error(t, err, "flowctl was expected to fail")
+
+		for _, want := range wantErrContains {
+			require.Contains(t, string(output), want)
+		}
+	})
+}
+
 // RunMaterializationTestParallel is like RunMaterializationTest but runs tasks
 // concurrently (up to maxParallelTasks at a time). Use this for connectors
 // where parallel task execution is safe and beneficial.
@@ -1172,16 +1207,14 @@ func shouldCleanup(now time.Time, item string, suffix string) (bool, string) {
 	return false, "from a recent test run"
 }
 
-// RunFlowctl runs the flowctl command with the given arguments, and returns its
-// stdout output. The command is expected to succeed, and any stderr output is
-// logged to the test log.
-func RunFlowctl(t *testing.T, args ...string) []byte {
-	t.Helper()
-
+// flowctlCommand builds a flowctl invocation whose behavior does not vary with
+// the machine running it.
+func flowctlCommand(args ...string) *exec.Cmd {
 	// Set TZ=UTC to make tests always run as if the machine
 	// has UTC timezone, consisent across contributors' machines
 	// and the CI
 	os.Setenv("TZ", "UTC")
+
 	cmd := exec.Command("flowctl", args...)
 	cmd.Env = append(cmd.Environ(),
 		// Set the LOG_FORMAT to text instead of color for better to avoid
@@ -1189,6 +1222,17 @@ func RunFlowctl(t *testing.T, args ...string) []byte {
 		// dumb terminals.
 		"LOG_FORMAT=text",
 	)
+
+	return cmd
+}
+
+// RunFlowctl runs the flowctl command with the given arguments, and returns its
+// stdout output. The command is expected to succeed, and any stderr output is
+// logged to the test log.
+func RunFlowctl(t *testing.T, args ...string) []byte {
+	t.Helper()
+
+	cmd := flowctlCommand(args...)
 
 	stdout, err := cmd.StdoutPipe()
 	require.NoError(t, err)
