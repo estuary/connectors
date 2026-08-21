@@ -169,10 +169,7 @@ func RunMaterializationTest[EC boilerplate.EndpointConfiger, FC boilerplate.Fiel
 // `flowctl preview` and requires the connector to refuse it, with a message
 // containing every string in wantErrContains.
 //
-// It exists for a fixture whose purpose is to prove that a configuration is
-// rejected. The connector fails during Apply, before the destination system is
-// touched, so no resources are created and there is nothing to clean up. The
-// refusal message is asserted by substring rather than snapshotted because
+// The refusal is asserted by substring rather than snapshotted, because
 // flowctl's failure output carries timestamps and temporary paths.
 func RunMaterializationRefusalTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](
 	t *testing.T,
@@ -187,17 +184,18 @@ func RunMaterializationRefusalTest[EC boilerplate.EndpointConfiger, RC boilerpla
 	RunTestAllTasks(t, sourcePath, func(t *testing.T, bundled []byte, taskName string, cfg EC) {
 		rt := rewriteTaskForTest[EC, RC](t, bundled, taskName, tsSuffix, cfg, makeResourceFn)
 
-		output := RunFlowctlExpectErr(
-			t,
+		output, err := flowctlCommand(
 			"preview",
 			"--name", rt.workingTaskName,
 			"--source", rt.sourcePath,
 			"--fixture", relativePath(t, "testdata/integration/fixture.materialize.json"),
 			"--network", "flow-test",
-		)
+		).CombinedOutput()
+		t.Log(string(output))
+		require.Error(t, err, "flowctl was expected to fail")
 
 		for _, want := range wantErrContains {
-			require.Contains(t, output, want)
+			require.Contains(t, string(output), want)
 		}
 	})
 }
@@ -1260,21 +1258,6 @@ func RunFlowctl(t *testing.T, args ...string) []byte {
 	wg.Wait()
 
 	return stdoutBuf.Bytes()
-}
-
-// RunFlowctlExpectErr runs the flowctl command with the given arguments and
-// requires it to fail, returning its combined output so the caller can assert
-// against the failure. Output is also logged to the test log, since a test that
-// expects a failure still needs the diagnostics when the failure is the wrong
-// one.
-func RunFlowctlExpectErr(t *testing.T, args ...string) string {
-	t.Helper()
-
-	output, err := flowctlCommand(args...).CombinedOutput()
-	t.Log(string(output))
-	require.Error(t, err, "flowctl was expected to fail")
-
-	return string(output)
 }
 
 func dumpSchema[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
