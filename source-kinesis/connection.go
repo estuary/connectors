@@ -14,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/glue"
 	"github.com/aws/aws-sdk-go-v2/service/kinesis"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/time/rate"
 
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
@@ -118,8 +119,8 @@ type kinesisStream struct {
 }
 
 func listStreams(ctx context.Context, client *kinesis.Client) ([]kinesisStream, error) {
-	var out []kinesisStream
 	var streamNames []string
+	var streamARNs = make(map[string]string)
 
 	input := &kinesis.ListStreamsInput{}
 	for {
@@ -130,36 +131,65 @@ func listStreams(ctx context.Context, client *kinesis.Client) ([]kinesisStream, 
 
 		streamNames = append(streamNames, res.StreamNames...)
 
-		if !*res.HasMoreStreams {
+		// ListStreams reports a summary for each stream which includes its ARN.
+		// StreamSummaries is not a required field of the response
+		// though, so any stream that doesn't have one is described via
+		// DescribeStreamSummary
+		for _, s := range res.StreamSummaries {
+			if s.StreamName != nil && s.StreamARN != nil {
+				streamARNs[*s.StreamName] = *s.StreamARN
+			}
+		}
+
+		if !aws.ToBool(res.HasMoreStreams) {
+			break
+		} else if res.NextToken != nil {
+			input.NextToken = res.NextToken
+		} else if len(streamNames) > 0 {
+			// Older versions of the API paginate by asking for streams
+			// following the last one that was returned.
+			lastName := streamNames[len(streamNames)-1]
+			input.NextToken = nil
+			input.ExclusiveStartStreamName = &lastName
+		} else {
+			// There's no way to ask for the next page, so stop
+			// here rather than requesting the same page forever.
 			break
 		}
-		input.NextToken = res.NextToken
 	}
 
-	// ListStreams only includes stream names and no ARNs, so the
-	// DescribeStreamSummary API is used to get the ARN for each individual
-	// stream.
+	// DescribeStreamSummary is limited to 20 transactions per second for the
+	// entire AWS account, and that budget is shared with everything else the
+	// account is doing, so these requests are rate limited to well under it.
+	// They are also usually not needed at all since ListStreams almost always
+	// reports the ARN of every stream it returns.
 	var mu sync.Mutex
+	limiter := rate.NewLimiter(10, 10)
 	group, groupCtx := errgroup.WithContext(ctx)
 	group.SetLimit(5)
 
 	for _, n := range streamNames {
-		n := n
+		if _, ok := streamARNs[n]; ok {
+			continue
+		}
+
 		group.Go(func() error {
+			if err := limiter.Wait(groupCtx); err != nil {
+				return fmt.Errorf("waiting for rate limiter: %w", err)
+			}
+
 			desc, err := client.DescribeStreamSummary(groupCtx, &kinesis.DescribeStreamSummaryInput{
 				StreamName: &n,
 			})
 			if err != nil {
-				return err
+				return fmt.Errorf("describing stream %q: %w", n, err)
+			} else if desc.StreamDescriptionSummary == nil || desc.StreamDescriptionSummary.StreamARN == nil {
+				return fmt.Errorf("stream %q was described without an ARN", n)
 			}
 
 			mu.Lock()
 			defer mu.Unlock()
-
-			out = append(out, kinesisStream{
-				name: n,
-				arn:  *desc.StreamDescriptionSummary.StreamARN,
-			})
+			streamARNs[n] = *desc.StreamDescriptionSummary.StreamARN
 
 			return nil
 		})
@@ -167,6 +197,11 @@ func listStreams(ctx context.Context, client *kinesis.Client) ([]kinesisStream, 
 
 	if err := group.Wait(); err != nil {
 		return nil, err
+	}
+
+	var out = make([]kinesisStream, 0, len(streamNames))
+	for _, n := range streamNames {
+		out = append(out, kinesisStream{name: n, arn: streamARNs[n]})
 	}
 
 	slices.SortFunc(out, func(a, b kinesisStream) int { return cmp.Compare(a.name, b.name) })
