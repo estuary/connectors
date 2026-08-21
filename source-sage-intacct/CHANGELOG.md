@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-08-21
+
+## Fixed
+- Bindings' default polling intervals increased from 5 minutes to 6 hours to reduce the frequency of API calls.
+  This change only affects newly discovered bindings. Existing captures should update their resource configs
+  if they want to poll for changes less frequently.
+
+
 ## 2026-08-04
 
 ### Fixed

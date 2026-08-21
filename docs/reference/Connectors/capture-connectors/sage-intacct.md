@@ -69,7 +69,7 @@ configuration details specific to the Sage Intacct source connector.
 | Property    | Title    | Description                 | Type   | Required/Default |
 |-------------|----------|-----------------------------|--------|------------------|
 | **`/name`** | Name     | Name of this resource       | string | Required         |
-| `/interval` | Interval | Interval between data syncs | string | PT5M             |
+| `/interval` | Interval | Interval between data syncs | string | PT6H             |
 
 ### Sample
 
@@ -88,7 +88,7 @@ captures:
     bindings:
       - resource:
           name: CUSTOMER
-          interval: PT5M
+          interval: PT6H
         target: ${PREFIX}/CUSTOMER
       {...}
 ```
