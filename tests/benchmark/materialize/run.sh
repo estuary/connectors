@@ -110,6 +110,15 @@ if (( DOCKER )); then echo "mode:      docker"; else echo "mode:      local"; fi
 echo "seed:      $SEED"
 echo "out-dir:   $OUT_DIR"
 
+# Every run gets its own task name. A task's stored checkpoint otherwise
+# carries over between runs, and a resumed task skips the prefix of the fixture
+# it has already read through, so the run would silently measure part of its
+# scenario. The _flow_test_<timestamp> shape is what `testctl -mode sweep`
+# recognises, so a run killed outright can still be cleaned up afterwards.
+RUN_SUFFIX="_flow_test_$(date +%s)"
+TASK="bench/${CONNECTOR}${RUN_SUFFIX}"
+echo "task:      $TASK"
+
 # Bring up the connector's docker-compose stack (DB only). Some connectors
 # keep it under tests/materialize/<connector>/ (the integration-test convention),
 # others keep it at the connector root. Try both.
@@ -123,20 +132,69 @@ done
 if [[ -n "$COMPOSE_FILE" ]]; then
   echo "starting docker-compose: $COMPOSE_FILE"
   docker compose -f "$COMPOSE_FILE" up --wait
-  cleanup() {
-    if (( ! KEEP )); then
-      echo "tearing down docker-compose"
-      docker compose -f "$COMPOSE_FILE" down -v || true
-    else
-      echo "--keep set; leaving docker-compose running"
-    fi
-  }
-  trap cleanup EXIT
   # Same grace period as tests/materialize/<connector>/setup.sh.
   sleep 5
 else
   echo "no docker-compose for $CONNECTOR; assuming endpoint is reachable"
 fi
+
+# Removing the destination is what keeps a scenario measuring what it
+# describes: the fixture is deterministic in its seed, so a table left behind by
+# an earlier run turns this run's inserts into merges. It also keeps a shared
+# warehouse from accumulating what benchmarks leave behind.
+#
+# Both go through testctl, which drives the connector's own DeleteResource, so
+# this works for every connector rather than only the SQL ones, and needs no
+# per-connector script here.
+TESTCTL="$OUT_DIR/testctl"
+echo "building testctl"
+(cd "$ROOT_DIR" && go build -tags nozstd -o "$TESTCTL" ./tests/materialize/testctl)
+
+# drop_destination removes each binding's resource. Dropping one that is not
+# there fails, which is the ordinary case before a run, so a failure is
+# reported rather than fatal.
+drop_destination() {
+  local when="$1" res
+  for res in "$OUT_DIR"/resource-*.json; do
+    [[ -f "$res" ]] || continue
+    if "$TESTCTL" -connector "$CONNECTOR" -config "$CONFIG" -resource "$res" \
+         -task "$TASK" -mode drop >>"$OUT_DIR/cleanup.log" 2>&1; then
+      echo "  dropped $(basename "$res" .json) ($when)"
+    else
+      echo "  no $(basename "$res" .json) to drop ($when)"
+    fi
+  done
+}
+
+# sweep_run removes this run's task metadata, which for a SQL connector is its
+# row in the checkpoints table, along with test items an older run left behind.
+sweep_run() {
+  local res
+  for res in "$OUT_DIR"/resource-*.json; do
+    [[ -f "$res" ]] || continue
+    "$TESTCTL" -connector "$CONNECTOR" -config "$CONFIG" -resource "$res" \
+      -task "$TASK" -mode sweep -run-suffix "$RUN_SUFFIX" \
+      >>"$OUT_DIR/cleanup.log" 2>&1 || echo "  sweep reported errors (see cleanup.log)"
+    return
+  done
+}
+
+cleanup() {
+  local status=$?
+  if (( KEEP )); then
+    echo "--keep set; leaving the destination and docker-compose in place"
+  else
+    echo "cleaning up"
+    drop_destination "teardown"
+    sweep_run
+    if [[ -n "$COMPOSE_FILE" ]]; then
+      echo "tearing down docker-compose"
+      docker compose -f "$COMPOSE_FILE" down -v || true
+    fi
+  fi
+  return $status
+}
+trap cleanup EXIT INT TERM
 
 # Per-connector setup hook. Runs after docker-compose is up but before the
 # preview. Used for steps like creating an S3 bucket that the connector
@@ -154,6 +212,7 @@ SPEC_ARGS=(
   --connector "$CONNECTOR"
   --config    "$CONFIG"
   --output    "$SPEC"
+  --task      "$TASK"
 )
 if (( DOCKER )); then
   SPEC_ARGS+=(--docker)
@@ -161,7 +220,23 @@ fi
 echo "rendering spec: $SPEC"
 python3 "$BENCH_DIR/generate_spec.py" "${SPEC_ARGS[@]}"
 
-TASK="bench/$CONNECTOR"
+# One resource configuration file per binding, for testctl.
+python3 - "$SPEC" "$OUT_DIR" <<'RESOURCES'
+import json, sys, yaml
+
+spec_path, out_dir = sys.argv[1], sys.argv[2]
+with open(spec_path) as f:
+    spec = yaml.safe_load(f)
+materialization = next(iter(spec["materializations"].values()))
+for index, binding in enumerate(materialization["bindings"]):
+    with open(f"{out_dir}/resource-{index}.json", "w") as f:
+        json.dump(binding["resource"], f)
+RESOURCES
+
+# Drop whatever an earlier run left behind, so this run starts against an empty
+# destination however that run ended.
+echo "preparing destination"
+drop_destination "before run"
 
 # Set up FIFO + background generator.
 FIFO="$OUT_DIR/fixture.fifo"

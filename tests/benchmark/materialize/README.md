@@ -148,6 +148,36 @@ Each run produces:
 | `preview.log`      | flowctl preview stderr (per-tx commit boundaries live here). |
 | `results.json`     | Aggregate `{ wall_seconds, total_docs, total_bytes, mb_per_sec, transactions: [...] }`. |
 
+## Cleanup
+
+A run names its task `bench/<connector>_flow_test_<timestamp>` and removes what
+it created, so a benchmark neither inherits state nor leaves any behind.
+
+Both matter for the measurement, not just for tidiness. A task's checkpoint is
+stored by the destination for connectors whose destination is authoritative, and
+a resumed task skips the prefix of the fixture it has already read through, so a
+second run of a scenario would silently measure part of it. The fixture is also
+deterministic in its seed, so a table left behind by an earlier run turns the
+next run's inserts into merges.
+
+Each binding's resource is dropped before the run as well as after it, so a run
+starts against an empty destination however the previous one ended, and the
+teardown runs on failure and on Ctrl-C as well as on success. Dropping goes
+through `tests/materialize/testctl`, which drives the connector's own
+`DeleteResource`. Pass `--keep` to leave the destination in place for
+inspection.
+
+If a run is killed outright, its table survives until the next run of that
+scenario drops it, and its task metadata until swept:
+
+```bash
+go run ./tests/materialize/testctl \
+    -connector materialize-redshift \
+    -config materialize-redshift/testdata/config.local.yaml \
+    -resource <a resource config from a run directory> \
+    -mode sweep
+```
+
 ## Verifying overlap correctness
 
 The fixture is fully deterministic given `--seed`. To sanity-check that a
