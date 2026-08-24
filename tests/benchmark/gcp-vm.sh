@@ -148,8 +148,16 @@ do_sync() {
   _rsync_transport
 
   info "syncing codebase to ${VM_NAME}"
+  # .gitignore excludes binaries named "connector" and re-includes the
+  # cmd/connector source directories with "!*/cmd/connector". rsync's
+  # gitignore merge does not honour git's negation, so without these two
+  # rules every connector's main package is silently dropped and nothing
+  # can be built on the VM. First matching rule wins, so they precede the
+  # merge.
   rsync -az \
     --exclude='.git' \
+    --filter='+ /*/cmd/connector/' \
+    --filter='+ /*/cmd/connector/**' \
     --filter=':- .gitignore' \
     -e "$RSYNC_TRANSPORT" \
     "${ROOT_DIR}/" \
