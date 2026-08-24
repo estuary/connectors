@@ -32,6 +32,12 @@
 #     [--shard-log-level L]  # task shards.logLevel, e.g. debug. The runtime
 #                            #   forces the connector's LOG_LEVEL from this, so
 #                            #   exporting LOG_LEVEL has no effect.
+#     [--shards N]           # default: 1. Above 1, the run switches from
+#                            #   `flowctl preview` to `flowctl raw preview-next
+#                            #   --shards N`, which drives N synthetic shards in
+#                            #   one process over the V2 runtime. Fixture
+#                            #   documents hash-route by collection key, so each
+#                            #   document lands on exactly one shard.
 
 set -o errexit
 set -o pipefail
@@ -50,6 +56,7 @@ DOCKER=0
 SHARD_FLAGS=()
 TABLE_SUFFIX=""
 SHARD_LOG_LEVEL=""
+SHARDS=1
 
 while (($#)); do
   case "$1" in
@@ -63,8 +70,9 @@ while (($#)); do
     --shard-flag)   SHARD_FLAGS+=("$2"); shift 2 ;;
     --table-suffix) TABLE_SUFFIX="$2";   shift 2 ;;
     --shard-log-level) SHARD_LOG_LEVEL="$2"; shift 2 ;;
+    --shards)    SHARDS="$2";    shift 2 ;;
     -h|--help)
-      sed -n '2,35p' "$0"; exit 0 ;;
+      sed -n '2,39p' "$0"; exit 0 ;;
     *) echo "unknown flag: $1" >&2; exit 2 ;;
   esac
 done
@@ -132,6 +140,7 @@ if (( DOCKER )); then echo "mode:      docker"; else echo "mode:      local"; fi
 echo "seed:      $SEED"
 if (( ${#SHARD_FLAGS[@]} )); then echo "shard flags: ${SHARD_FLAGS[*]}"; fi
 if [[ -n "$TABLE_SUFFIX" ]]; then echo "table suffix: $TABLE_SUFFIX"; fi
+echo "shards:    $SHARDS"
 echo "out-dir:   $OUT_DIR"
 
 # Every run gets its own task name. A task's stored checkpoint otherwise
@@ -274,14 +283,40 @@ GEN_PID=$!
 
 # Run flowctl preview, timing the whole thing.
 PREVIEW_LOG="$OUT_DIR/preview.log"
-echo "running flowctl preview (logs: $PREVIEW_LOG)"
 
 PREVIEW_ARGS=(
   --source  "$SPEC"
   --name    "$TASK"
   --fixture "$FIFO"
-  --output-state
 )
+# The runtime is chosen by the shard flag, not by the shard count. The
+# materialize-snowflake streaming-v2 gate reads enable-runtime-v2 off the spec
+# and cannot see which runtime actually drives it, so a spec carrying that flag
+# must run on preview-next at every shard count. Selecting by shard count
+# instead let a single-shard run take the connector's v2 path under the V1
+# runtime, which measures a combination that cannot occur in production.
+RUNTIME_V2=0
+for flag in "${SHARD_FLAGS[@]+"${SHARD_FLAGS[@]}"}"; do
+  if [[ "$flag" == "enable-runtime-v2=true" ]]; then RUNTIME_V2=1; fi
+done
+
+if (( RUNTIME_V2 || SHARDS > 1 )); then
+  # The V2 runtime has no ["connectorState",...] output and none of V1's
+  # `round=` log lines. Its per-transaction boundaries are logged by the leader
+  # actor at debug. Only the leader emits them, once per transaction, whatever
+  # the shard count -- so they never collide across shards. Scoping RUST_LOG to
+  # that one target keeps the rest of the runtime quiet.
+  # Keep the default warn level, which is what forwards the connector's own
+  # logs as `ops:` lines -- the 429s are counted from those. Only the leader
+  # actor is raised to debug.
+  export RUST_LOG="info,runtime_next::leader::materialize::actor=debug"
+  PREVIEW_CMD=(flowctl raw preview-next --shards "$SHARDS")
+  echo "running flowctl raw preview-next --shards $SHARDS (logs: $PREVIEW_LOG)"
+else
+  PREVIEW_CMD=(flowctl preview)
+  PREVIEW_ARGS+=(--output-state)
+  echo "running flowctl preview (logs: $PREVIEW_LOG)"
+fi
 # Docker mode needs --network so the connector container can reach the DB.
 if (( DOCKER )); then
   PREVIEW_ARGS+=(--network flow-test)
@@ -294,7 +329,7 @@ fi
 # exclude Apply from the data throughput measurement.
 TIMESTAMPS="$OUT_DIR/timestamps.json"
 set +e
-flowctl preview "${PREVIEW_ARGS[@]}" 2>"$PREVIEW_LOG" \
+"${PREVIEW_CMD[@]}" "${PREVIEW_ARGS[@]}" 2>"$PREVIEW_LOG" \
   | python3 -c "
 import sys, time, json
 ts = [time.monotonic_ns()]  # ts[0] = start (before any data)
@@ -373,10 +408,9 @@ def boundaries_from_log(path):
             st = stamp_re.search(line)
             if st:
                 # Not every stamp carries a fraction: the Snowpipe sidecar
-                # relays its core's logs as whole seconds. Padding one of those
-                # to 26 characters appends zeros after the "Z", strptime fails
-                # with a ValueError, and the whole results block dies with it --
-                # losing every number from a run that may have taken hours.
+                # relays its core's logs as whole seconds. Padding those to 26
+                # characters appends zeros after the "Z" and strptime raises,
+                # which would abort the whole results block and lose the run.
                 stamp = st.group(1).rstrip("Z")
                 if "." not in stamp:
                     stamp += ".0"
@@ -407,6 +441,52 @@ def boundaries_from_log(path):
     return apply_s, bounds, len(rounds)
 
 
+def boundaries_from_log_v2(path):
+    """Derive per-transaction boundaries from the V2 runtime's leader log.
+
+    `raw preview-next` emits neither the ["connectorState",...] lines nor V1's
+    `round=` lines. Its leader actor logs "completed ACK intents write" once as
+    each transaction commits, at debug. The leader logs it once per transaction
+    however many shards run, so it is safe to read under --shards N.
+
+    Consecutive commits bound a transaction, which is what the connectorState
+    method does under V1. Pairing a transaction-open line with a commit line
+    would misalign instead: the leader pipelines, and receives the next
+    Frontier before finishing the previous commit.
+
+    A connectors-repo fixture leads with a bare {"commit": true}, so the first
+    commit closes that empty cycle -- the position Apply holds under V1. It
+    becomes apply_seconds, and the commits after it bound the data.
+
+    Returns (apply_seconds, [(start_ns, end_ns)], transactions_observed).
+    """
+    ansi = re.compile("\x1b\\[[0-9;]*m")
+    stamp_re = re.compile(r"(\d{4}-\d{2}-\d{2}T[\d:.]+Z)")
+    commits = []
+    first_ts = None
+    with open(path, errors="replace") as f:
+        for line in f:
+            line = ansi.sub("", line)
+            st = stamp_re.search(line)
+            if not st:
+                continue
+            stamp = st.group(1).rstrip("Z")
+            if "." not in stamp:
+                stamp += ".0"
+            cur = int(datetime.strptime(
+                stamp[:26], "%Y-%m-%dT%H:%M:%S.%f").timestamp() * 1e9)
+            if first_ts is None:
+                first_ts = cur
+            if "completed ACK intents write" in line:
+                commits.append(cur)
+
+    if len(commits) < 2:
+        return None, [], 0
+    apply_s = (commits[0] - first_ts) / 1e9
+    bounds = [(commits[i - 1], commits[i]) for i in range(1, len(commits))]
+    return apply_s, bounds, len(bounds)
+
+
 rounds_observed = len(tx_boundaries)
 timing_source = "connector-state"
 if preview_log and os.path.exists(preview_log):
@@ -414,6 +494,11 @@ if preview_log and os.path.exists(preview_log):
     if log_bounds:
         apply_seconds, tx_boundaries = log_apply, log_bounds
         rounds_observed, timing_source = log_rounds, "flowctl-log"
+    else:
+        v2_apply, v2_bounds, v2_rounds = boundaries_from_log_v2(preview_log)
+        if v2_bounds:
+            apply_seconds, tx_boundaries = v2_apply, v2_bounds
+            rounds_observed, timing_source = v2_rounds, "runtime-v2-log"
 
 txs = []
 total_docs = 0
@@ -447,7 +532,7 @@ for i, tx in enumerate(state["transactions"]):
     txs.append(entry)
 
 # Data wall = end of Apply to end of last data tx (excludes Apply).
-if timing_source == "flowctl-log" and tx_boundaries:
+if timing_source in ("flowctl-log", "runtime-v2-log") and tx_boundaries:
     data_wall = (tx_boundaries[-1][1] - tx_boundaries[0][0]) / 1e9
 elif len(timestamps) >= 3:
     data_wall = (timestamps[-1] - timestamps[1]) / 1e9
