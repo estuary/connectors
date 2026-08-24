@@ -23,6 +23,15 @@
 #     [--seed N]             # default: 0
 #     [--keep]               # don't tear down docker-compose on exit
 #     [--out-dir DIR]        # default: tests/benchmark/materialize/runs/<ts>
+#     [--shard-flag K=V]     # task shard flag, repeatable. Needed where a
+#                            #   connector gates a write path on the runtime,
+#                            #   e.g. enable-runtime-v2=true.
+#     [--table-suffix S]     # appended to every binding's table name, so two
+#                            #   arms of one comparison can run the same
+#                            #   scenario against separate tables.
+#     [--shard-log-level L]  # task shards.logLevel, e.g. debug. The runtime
+#                            #   forces the connector's LOG_LEVEL from this, so
+#                            #   exporting LOG_LEVEL has no effect.
 
 set -o errexit
 set -o pipefail
@@ -38,6 +47,9 @@ SEED=0
 KEEP=0
 OUT_DIR=""
 DOCKER=0
+SHARD_FLAGS=()
+TABLE_SUFFIX=""
+SHARD_LOG_LEVEL=""
 
 while (($#)); do
   case "$1" in
@@ -48,8 +60,11 @@ while (($#)); do
     --keep)      KEEP=1;         shift   ;;
     --docker)    DOCKER=1;       shift   ;;
     --out-dir)   OUT_DIR="$2";   shift 2 ;;
+    --shard-flag)   SHARD_FLAGS+=("$2"); shift 2 ;;
+    --table-suffix) TABLE_SUFFIX="$2";   shift 2 ;;
+    --shard-log-level) SHARD_LOG_LEVEL="$2"; shift 2 ;;
     -h|--help)
-      sed -n '2,26p' "$0"; exit 0 ;;
+      sed -n '2,35p' "$0"; exit 0 ;;
     *) echo "unknown flag: $1" >&2; exit 2 ;;
   esac
 done
@@ -115,6 +130,8 @@ echo "scenario:  $SCENARIO"
 echo "config:    $CONFIG"
 if (( DOCKER )); then echo "mode:      docker"; else echo "mode:      local"; fi
 echo "seed:      $SEED"
+if (( ${#SHARD_FLAGS[@]} )); then echo "shard flags: ${SHARD_FLAGS[*]}"; fi
+if [[ -n "$TABLE_SUFFIX" ]]; then echo "table suffix: $TABLE_SUFFIX"; fi
 echo "out-dir:   $OUT_DIR"
 
 # Every run gets its own task name. A task's stored checkpoint otherwise
@@ -210,6 +227,15 @@ SPEC_ARGS=(
 )
 if (( DOCKER )); then
   SPEC_ARGS+=(--docker)
+fi
+for flag in "${SHARD_FLAGS[@]+"${SHARD_FLAGS[@]}"}"; do
+  SPEC_ARGS+=(--shard-flag "$flag")
+done
+if [[ -n "$TABLE_SUFFIX" ]]; then
+  SPEC_ARGS+=(--table-suffix "$TABLE_SUFFIX")
+fi
+if [[ -n "$SHARD_LOG_LEVEL" ]]; then
+  SPEC_ARGS+=(--shard-log-level "$SHARD_LOG_LEVEL")
 fi
 echo "rendering spec: $SPEC"
 python3 "$BENCH_DIR/generate_spec.py" "${SPEC_ARGS[@]}"
