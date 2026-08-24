@@ -1,0 +1,35 @@
+# Smallest delta-updates scenario: three transactions of 10,000 documents
+# at 256 B, about 7.3 MB in total. The delta counterpart to small-smoke.yaml.
+#
+# Use it to prove a delta write path works end to end before spending an
+# hour on 50gb-delta-1kb.yaml or 50gb-delta-1mb.yaml.
+collections:
+  - name: bench/delta_smoke
+    schema:
+      type: object
+      properties:
+        id:      { type: integer }
+        val:     { type: integer }
+        payload: { type: string }
+        _meta:
+          type: object
+          properties: { op: { type: string } }
+          required: [op]
+      required: [id, _meta]
+    key: [/id]
+    resource:
+      table: delta_smoke
+      delta_updates: true
+
+transactions:
+  - doc_count: 10000
+    doc_size:  256
+    op: c
+
+  - doc_count: 10000
+    doc_size:  256
+    op: c
+
+  - doc_count: 10000
+    doc_size:  256
+    op: c
