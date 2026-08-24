@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"iter"
 	"math"
 	"math/rand"
 	"os"
@@ -62,29 +61,19 @@ func (ps *PersistentState) Validate() error {
 	return nil
 }
 
-// bindingsInState yields every binding whose persisted state is one of the given modes, in
-// map iteration order. It exists so that the state predicate lives in exactly one place:
-// callers compose it with slices.SortedFunc when they need a reproducible order, with
-// slices.AppendSeq when the order doesn't matter, or range over it with an early return
-// to test for existence without building a list at all.
-func (c *Capture) bindingsInState(modes ...BackfillMode) iter.Seq[*Binding] {
-	return func(yield func(*Binding) bool) {
-		for _, binding := range c.Bindings {
-			if slices.Contains(modes, BackfillMode(c.State.Streams[binding.StateKey].Mode)) {
-				if !yield(binding) {
-					return
-				}
-			}
-		}
-	}
-}
-
 // BindingsInState returns all the bindings having a particular persisted state in sorted order for
 // reproducibility.
 func (c *Capture) BindingsInState(modes ...BackfillMode) []*Binding {
-	return slices.SortedFunc(c.bindingsInState(modes...), func(a, b *Binding) int {
+	var bindings []*Binding
+	for _, binding := range c.Bindings {
+		if slices.Contains(modes, BackfillMode(c.State.Streams[binding.StateKey].Mode)) {
+			bindings = append(bindings, binding)
+		}
+	}
+	slices.SortFunc(bindings, func(a, b *Binding) int {
 		return a.StreamID.Compare(b.StreamID)
 	})
+	return bindings
 }
 
 // BindingsCurrentlyActive returns all the bindings currently being captured.
@@ -111,27 +100,32 @@ func (c *Capture) bindingTableIDs() []TableID {
 	return ids
 }
 
-// BindingsCurrentlyBackfilling returns all the bindings undergoing some sort of backfill.
-func (c *Capture) BindingsCurrentlyBackfilling() []*Binding {
-	return c.BindingsInState(TableStatePreciseBackfill, TableStateUnfilteredBackfill, TableStateKeylessBackfill)
-}
-
-// bindingsCurrentlyBackfillingUnsorted is the unordered equivalent of
-// BindingsCurrentlyBackfilling for callers which don't depend on the ordering.
-func (c *Capture) bindingsCurrentlyBackfillingUnsorted() []*Binding {
-	var bindings = make([]*Binding, 0, len(c.Bindings))
-	return slices.AppendSeq(bindings, c.bindingsInState(TableStatePreciseBackfill, TableStateUnfilteredBackfill, TableStateKeylessBackfill))
-}
-
-// AnyBindingsCurrentlyBackfilling reports whether any binding is undergoing some sort of
-// backfill. It answers the same question as len(BindingsCurrentlyBackfilling()) > 0 without
-// building and sorting the full list, which dominates the cost when a capture has many
-// bindings.
-func (c *Capture) AnyBindingsCurrentlyBackfilling() bool {
-	for range c.bindingsInState(TableStatePreciseBackfill, TableStateUnfilteredBackfill, TableStateKeylessBackfill) {
-		return true
+// bindingsCurrentlyBackfilling returns all the bindings undergoing some sort
+// of backfill, in no particular order.
+func (c *Capture) bindingsCurrentlyBackfilling() []*Binding {
+	var bindings = make([]*Binding, 0, len(c.backfillingStreams))
+	for stateKey := range c.backfillingStreams {
+		bindings = append(bindings, c.bindingForStateKey(stateKey))
 	}
-	return false
+	return bindings
+}
+
+// AnyBindingsCurrentlyBackfilling reports whether any binding is undergoing
+// some sort of backfill.
+func (c *Capture) AnyBindingsCurrentlyBackfilling() bool {
+	return len(c.backfillingStreams) > 0
+}
+
+// bindingForStateKey returns the binding with the given state key, building the
+// state key index on first use.
+func (c *Capture) bindingForStateKey(stateKey boilerplate.StateKey) *Binding {
+	if c.bindingsByStateKey == nil {
+		c.bindingsByStateKey = make(map[boilerplate.StateKey]*Binding, len(c.Bindings))
+		for _, binding := range c.Bindings {
+			c.bindingsByStateKey[binding.StateKey] = binding
+		}
+	}
+	return c.bindingsByStateKey[stateKey]
 }
 
 // TableState represents the serializable/resumable state of a particular table's capture.
@@ -200,11 +194,21 @@ type Capture struct {
 	lastDiscovery       map[StreamID]*DiscoveryInfo // The most recent table discovery results, refreshed on every rediscovery
 	rediscoverAfter     time.Time                   // When the next table rediscovery should occur
 	periodicChecksAfter time.Time                   // When the next periodic database checks should occur
+	statusUpdateAfter   time.Time                   // When the next backfilling status update should occur
 
 	lastStatus string // Last connectorStatus update. Used to suppress exact duplicates to reduce log noise.
 
 	// dirtyStreams is the set of stream state keys changed since the last checkpoint.
 	dirtyStreams map[boilerplate.StateKey]struct{}
+
+	// backfillingStreams is the set of stream state keys currently in one of the backfill
+	// modes. It is seeded from the persisted state during startup and maintained by
+	// setStreamState after that, so per-chunk logic can avoid scanning every binding.
+	backfillingStreams map[boilerplate.StateKey]struct{}
+
+	// bindingsByStateKey indexes the capture's bindings by state key. It is built on
+	// first use, which is safe because bindings never change during a capture run.
+	bindingsByStateKey map[boilerplate.StateKey]*Binding
 
 	reused struct {
 		emitChangeBuf []byte               // A reusable buffer used for serialized JSON documents in emitChange(). Note that this is not thread-safe, but since the capture is single-threaded we're okay for now.
@@ -225,6 +229,7 @@ const (
 	rediscoverInterval        = 15 * time.Minute // The capture will re-run discovery and reinitialize missing/pending tables this frequently.
 	periodicChecksInterval    = 10 * time.Minute // The capture may run some database-specific sanity checks periodically at this interval.
 	streamingProgressInterval = 5 * time.Minute  // How often to log progress and diagnostics during a long-running streaming cycle.
+	statusUpdateInterval      = 10 * time.Second // How often the backfilling status update may be recomputed, since it can be expensive on large captures.
 )
 
 var (
@@ -421,7 +426,14 @@ func (c *Capture) mainLoopIteration(ctx context.Context) (done bool, err error) 
 
 	// If any tables are currently backfilling, go perform another backfill iteration.
 	if c.AnyBindingsCurrentlyBackfilling() {
-		c.statusUpdate("Backfilling Tables")
+		// Computing backfill progress is expensive on captures with many bindings
+		// and this runs once per backfill chunk, so it's throttled to at most once
+		// per interval. The other status updates are already amortized over whole
+		// streaming cycles and don't need this.
+		if time.Now().After(c.statusUpdateAfter) {
+			c.statusUpdate("Backfilling Tables")
+			c.statusUpdateAfter = time.Now().Add(statusUpdateInterval)
+		}
 		if err := c.backfillStreams(ctx); err != nil {
 			return false, fmt.Errorf("error performing backfill: %w", err)
 		} else if err := c.streamToFence(ctx, 0, false); err != nil {
@@ -530,6 +542,13 @@ func (c *Capture) reconcileStateWithBindings(_ context.Context) error {
 		c.State.Cursor = nil
 	}
 
+	// Seed the backfilling-streams set from the reconciled state. Stream states
+	// loaded from a persisted checkpoint don't pass through setStreamState, which
+	// maintains the set for all changes after this point.
+	for stateKey, state := range c.State.Streams {
+		c.updateBackfillSet(stateKey, state.Mode)
+	}
+
 	// Emit the new state to stdout. This isn't strictly necessary but it helps to make
 	// the emitted sequence of state updates a lot more readable.
 	return c.emitState()
@@ -549,9 +568,10 @@ func (c *Capture) activatePendingStreams(ctx context.Context) error {
 		var streamID = binding.StreamID
 		var stateKey = binding.StateKey
 
-		// Look up the stream state and mark it dirty since we intend to update it immediately.
-		var state = c.State.Streams[stateKey]
-		c.setStreamState(stateKey, state)
+		// Copy the stream state. The rest of this loop body updates the copy and
+		// writes it back via setStreamState once its final mode is decided, so the
+		// stored state never holds an intermediate value.
+		var state = *c.State.Streams[stateKey]
 
 		var discoveryInfo = c.lastDiscovery[streamID]
 		if discoveryInfo == nil {
@@ -570,6 +590,7 @@ func (c *Capture) activatePendingStreams(ctx context.Context) error {
 		if !discoveryInfo.BaseTable {
 			log.WithField("stream", streamID).Warn("automatically ignoring a binding whose type is not `BASE TABLE`")
 			state.Mode = TableStateIgnore
+			c.setStreamState(stateKey, &state)
 			continue
 		}
 
@@ -665,6 +686,7 @@ func (c *Capture) activatePendingStreams(ctx context.Context) error {
 		if err := c.replStream.ActivateTable(ctx, streamID, state.KeyColumns, discoveryInfo, state.Metadata); err != nil {
 			return fmt.Errorf("error activating replication for table %q: %w", streamID, err)
 		}
+		c.setStreamState(stateKey, &state)
 	}
 
 	// Transition streams from "Backfill" to "Active" if we're supposed to skip
@@ -681,16 +703,18 @@ func (c *Capture) activatePendingStreams(ctx context.Context) error {
 	// configuration logic, but that would make that logic more complex and I would like
 	// to deprecate the whole 'SkipBackfills' configuration property in the near future
 	// so I have left this little blob of logic nicely self-contained here.
-	for _, binding := range c.BindingsCurrentlyBackfilling() {
+	// This iterates a materialized list rather than the backfilling-streams set
+	// itself, because setStreamState removes entries from the set mid-loop.
+	for _, binding := range c.bindingsCurrentlyBackfilling() {
 		if !c.Database.ShouldBackfill(binding.StreamID) {
-			var state = c.State.Streams[binding.StateKey]
+			var state = *c.State.Streams[binding.StateKey]
 			log.WithFields(log.Fields{
 				"stream":  binding.StreamID,
 				"scanned": state.Scanned,
 			}).Info("skipping backfill for stream")
 			state.Mode = TableStateActive
 			state.Scanned = nil
-			c.setStreamState(binding.StateKey, state)
+			c.setStreamState(binding.StateKey, &state)
 		}
 	}
 	return nil
@@ -912,12 +936,12 @@ func (c *Capture) handleReplicationEvent(event DatabaseEvent) (int, error) {
 }
 
 func (c *Capture) backfillStreams(ctx context.Context) error {
-	var bindings = c.bindingsCurrentlyBackfillingUnsorted()
-	if len(bindings) == 0 {
+	if !c.AnyBindingsCurrentlyBackfilling() {
 		return nil
 	}
 
-	// Make a list of stream IDs for the highest-priority active bindings.
+	// Make a list of stream IDs for the highest-priority backfilling bindings.
+	var bindings = c.bindingsCurrentlyBackfilling()
 	var streams = make([]StreamID, 0, len(bindings))
 	var priority = math.MinInt
 	for _, b := range bindings {
@@ -935,9 +959,9 @@ func (c *Capture) backfillStreams(ctx context.Context) error {
 	var streamID = streams[rand.Intn(len(streams))]
 
 	log.WithFields(log.Fields{
-		"total":      len(bindings), // Total number of active bindings
-		"atPriority": len(streams),  // Number of active bindings in the current priority band
-		"priority":   priority,      // Current priority band
+		"total":      len(c.backfillingStreams), // Total number of backfilling bindings
+		"atPriority": len(streams),              // Number of backfilling bindings in the current priority band
+		"priority":   priority,                  // Current priority band
 		"selected":   streamID,
 	}).Debug("backfilling streams")
 
@@ -1042,6 +1066,20 @@ func (c *Capture) setStreamState(stateKey boilerplate.StateKey, state *TableStat
 		c.dirtyStreams = make(map[boilerplate.StateKey]struct{})
 	}
 	c.dirtyStreams[stateKey] = struct{}{}
+	c.updateBackfillSet(stateKey, state.Mode)
+}
+
+// updateBackfillSet updates the backfilling-streams set to match a stream's current mode.
+func (c *Capture) updateBackfillSet(stateKey boilerplate.StateKey, mode string) {
+	switch mode {
+	case TableStatePreciseBackfill, TableStateUnfilteredBackfill, TableStateKeylessBackfill:
+		if c.backfillingStreams == nil {
+			c.backfillingStreams = make(map[boilerplate.StateKey]struct{})
+		}
+		c.backfillingStreams[stateKey] = struct{}{}
+	default:
+		delete(c.backfillingStreams, stateKey)
+	}
 }
 
 func (c *Capture) emitState() error {
@@ -1146,7 +1184,7 @@ func (c *Capture) handleAcknowledgement(ctx context.Context, count int, replStre
 
 func (c *Capture) statusUpdate(status string) {
 	// Add backfill information with percentage progress
-	var backfillingBindings = c.bindingsCurrentlyBackfillingUnsorted()
+	var backfillingBindings = c.bindingsCurrentlyBackfilling()
 	if len(backfillingBindings) > 0 {
 		// Build list of tables to query for estimated row counts
 		var tables []TableID

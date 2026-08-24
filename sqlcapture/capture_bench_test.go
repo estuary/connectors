@@ -90,6 +90,9 @@ func newBenchmarkCapture(b *testing.B, numBindings int, mode string) *Capture {
 		Database: db,
 	}
 	capture.dirtyStreams = make(map[boilerplate.StateKey]struct{})
+	for stateKey, state := range streams {
+		capture.updateBackfillSet(stateKey, state.Mode)
+	}
 	capture.replStream = &mockReplicationStream{}
 	capture.lastDiscovery = discovery
 	capture.rediscoverAfter = time.Now().Add(time.Hour)
@@ -98,9 +101,8 @@ func newBenchmarkCapture(b *testing.B, numBindings int, mode string) *Capture {
 }
 
 // BenchmarkMainLoopBackfill measures one backfill iteration of the main loop
-// with a mock database and a discarded output stream: status update, chunk
-// selection, a zero-row chunk scan, a fence cycle with one commit event, and
-// a checkpoint. All real work is free, so this measures pure framework overhead.
+// with a mock database and a discarded output stream. All real work is free,
+// so this measures pure framework overhead.
 func BenchmarkMainLoopBackfill(b *testing.B) {
 	quietLogging(b)
 	var ctx = context.Background()
@@ -213,33 +215,20 @@ func BenchmarkBackfillStreams(b *testing.B) {
 	}
 }
 
-// BenchmarkStatusUpdate measures the status update done on each main loop
-// iteration. The backfilling case includes a row-count lookup for each
-// backfilling table, with the statistics already cached.
+// BenchmarkStatusUpdate measures the backfill progress computation, which the
+// main loop periodically during backfills. Since it involves calculating stats
+// across all ongoing backfills it can be a bit expensive.
 func BenchmarkStatusUpdate(b *testing.B) {
 	quietLogging(b)
-	b.Run("backfilling", func(b *testing.B) {
-		for _, numBindings := range benchmarkBindingCounts {
-			b.Run(fmt.Sprintf("bindings=%d", numBindings), func(b *testing.B) {
-				var c = newBenchmarkCapture(b, numBindings, TableStatePreciseBackfill)
-				b.ReportAllocs()
-				for b.Loop() {
-					c.statusUpdate("Backfilling Tables")
-				}
-			})
-		}
-	})
-	b.Run("streaming", func(b *testing.B) {
-		for _, numBindings := range benchmarkBindingCounts {
-			b.Run(fmt.Sprintf("bindings=%d", numBindings), func(b *testing.B) {
-				var c = newBenchmarkCapture(b, numBindings, TableStateActive)
-				b.ReportAllocs()
-				for b.Loop() {
-					c.statusUpdate("Streaming CDC Events")
-				}
-			})
-		}
-	})
+	for _, numBindings := range benchmarkBindingCounts {
+		b.Run(fmt.Sprintf("bindings=%d", numBindings), func(b *testing.B) {
+			var c = newBenchmarkCapture(b, numBindings, TableStatePreciseBackfill)
+			b.ReportAllocs()
+			for b.Loop() {
+				c.statusUpdate("Backfilling Tables")
+			}
+		})
+	}
 }
 
 // BenchmarkActivatePendingStreams measures the activation pass which runs
@@ -281,23 +270,6 @@ func BenchmarkBindingTableIDs(b *testing.B) {
 			b.ReportAllocs()
 			for b.Loop() {
 				c.bindingTableIDs()
-			}
-		})
-	}
-}
-
-// BenchmarkAnyBindingsCurrentlyBackfilling measures the backfill guard check
-// in its worst case, where all bindings are active and the scan finds no match.
-func BenchmarkAnyBindingsCurrentlyBackfilling(b *testing.B) {
-	quietLogging(b)
-	for _, numBindings := range benchmarkBindingCounts {
-		b.Run(fmt.Sprintf("bindings=%d", numBindings), func(b *testing.B) {
-			var c = newBenchmarkCapture(b, numBindings, TableStateActive)
-			b.ReportAllocs()
-			for b.Loop() {
-				if c.AnyBindingsCurrentlyBackfilling() {
-					b.Fatal("expected no backfilling bindings")
-				}
 			}
 		})
 	}
