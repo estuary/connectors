@@ -878,6 +878,13 @@ func getNumberVal(val any) (got float64, err error) {
 		got = float64(v)
 	case int64:
 		got = float64(v)
+	case uint64:
+		got = float64(v)
+	case *big.Int:
+		got, _ = v.Float64()
+		if math.IsInf(got, 0) {
+			err = fmt.Errorf("big.Int value %q outside of float64 range", v.String())
+		}
 	case string:
 		if p, parseErr := strconv.ParseFloat(v, 64); parseErr != nil {
 			err = fmt.Errorf("unable to parse string %q as float64: %w", v, parseErr)

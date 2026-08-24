@@ -799,6 +799,13 @@ func getNum(val any) (got float64, err error) {
 		got = float64(v)
 	case int64:
 		got = float64(v)
+	case uint64:
+		got = float64(v)
+	case *big.Int:
+		got, _ = v.Float64()
+		if math.IsInf(got, 0) {
+			err = fmt.Errorf("big.Int value %q outside of float64 range", v.String())
+		}
 	case string:
 		// The sqlgen element converter converts these to strings for JSON
 		// serialization. It's kind of silly to have to convert them back again
