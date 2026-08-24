@@ -28,13 +28,20 @@ import (
 	"google.golang.org/api/iterator"
 )
 
+const (
+	maxBatchSize = 100
+)
+
 type checkpointItem struct {
-	Query      string
-	SourceURIs []string
-	JobPrefix  string
+	// Query contains the rendered query string.  Deprecated.
+	Query      string               `json:",omitempty"`
+	NeedsMerge bool                 `json:",omitempty"`
+	Bounds     []mergeBoundLiterals `json:",omitempty"`
+	SourceURIs []string             `json:",omitempty"`
+	JobPrefix  string               `json:",omitempty"`
 	// TempTableName is referenced in the persisted query. We need to persist it
 	// separately to specify the external data connector table definition.
-	TempTableName string
+	TempTableName string `json:",omitempty"`
 }
 
 type checkpoint = map[CheckpointKey]*checkpointItem
@@ -49,6 +56,23 @@ func NewCheckpointKey(stateKey string, rangeKey string) CheckpointKey {
 // Return the StateKey portion of the key which identifies only the binding.
 func (k CheckpointKey) StateKey() string {
 	return strings.SplitN(string(k), ":", 2)[0]
+}
+
+// mergeBoundLiterals is the serialized form of a key column's sql.MergeBound:
+// the rendered literals of the minimum and maximum key values observed for a
+// transaction. Empty literals mean the column carries no bound, as is the case
+// for boolean keys.
+type mergeBoundLiterals struct {
+	Lower string `json:",omitempty"`
+	Upper string `json:",omitempty"`
+}
+
+func boundsLiterals(bounds []sql.MergeBound) []mergeBoundLiterals {
+	var out = make([]mergeBoundLiterals, len(bounds))
+	for i, b := range bounds {
+		out[i] = mergeBoundLiterals{Lower: b.LiteralLower, Upper: b.LiteralUpper}
+	}
+	return out
 }
 
 var _ m.Transactor = (*transactor)(nil)
@@ -416,19 +440,6 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			continue
 		}
 
-		var query string
-		if b.mustMerge {
-			mergeQuery, err := renderQueryTemplate(b.target, t.templates.storeUpdate, b.storeMergeBounds.Build(), t.objAndArrayAsJson)
-			if err != nil {
-				return nil, fmt.Errorf("rendering merge query template: %w", err)
-			}
-			query = mergeQuery
-		} else {
-			query = b.storeInsertSQL
-			b.storeMergeBounds.Reset()
-		}
-		b.mustMerge = false
-
 		uris, err := t.storeFiles.Flush(idx)
 		if err != nil {
 			return nil, fmt.Errorf("flushing store file for %s: %w", b.target.Path, err)
@@ -436,11 +447,15 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 		cpKey := NewCheckpointKey(b.target.StateKey, t.rangeKey)
 		t.cp[cpKey] = &checkpointItem{
-			Query:         query,
+			Bounds:        boundsLiterals(b.storeMergeBounds.Build()),
+			NeedsMerge:    b.mustMerge,
 			SourceURIs:    uris,
 			JobPrefix:     uuid.NewString(),
 			TempTableName: b.tempTableName,
 		}
+
+		b.mustMerge = false
+		b.storeMergeBounds.Reset()
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
@@ -457,6 +472,8 @@ func isJSONNull(data json.RawMessage) bool {
 	return bytes.Equal(bytes.TrimSpace(data), []byte("null"))
 }
 
+// mergeStatePatches merges the RFC 7396 JSON Merge Patch in patches into the
+// target checkpoint, and returns the merged checkpoint.
 func mergeStatePatches(target checkpoint, patches []json.RawMessage) (checkpoint, error) {
 	checkpointJSON, err := json.Marshal(target)
 	if err != nil {
@@ -485,6 +502,8 @@ func mergeStatePatches(target checkpoint, patches []json.RawMessage) (checkpoint
 	return merged, nil
 }
 
+// groupCheckpointsByBinding yields the checkpoint keys that belong to each
+// individual binding.
 func groupCheckpointsByBinding(cp checkpoint) iter.Seq[[]CheckpointKey] {
 	return func(yield func([]CheckpointKey) bool) {
 		keys := slices.Sorted(maps.Keys(cp))
@@ -497,7 +516,7 @@ func groupCheckpointsByBinding(cp checkpoint) iter.Seq[[]CheckpointKey] {
 				if !yield(bindingKeys) {
 					return
 				}
-				bindingKeys = bindingKeys[:0]
+				bindingKeys = []CheckpointKey{}
 			}
 
 			bindingKeys = append(bindingKeys, key)
@@ -511,8 +530,6 @@ func groupCheckpointsByBinding(cp checkpoint) iter.Seq[[]CheckpointKey] {
 }
 
 func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
-	log.WithFields(log.Fields{"patches": statePatches, "primary_shard": t.primaryShard, "range_key": t.rangeKey}).Info("statePatches")
-
 	shouldProcess := m.StateKeyFilter(stateKeys)
 
 	if !t.primaryShard {
@@ -534,63 +551,92 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	group, groupCtx := errgroup.WithContext(ctx)
 	// You can run up to 1,000 concurrent multi-statement queries, so we use a
 	// generous concurrency limit here, while not leaving it completely
-	// unlimited just to maintain some sense of decorum. This bounds the
-	// number of tables processed concurrently, not the number of queries:
-	// items sharing a table are run sequentially within a single goroutine,
-	// since BigQuery does not support concurrent queries against the same
-	// table.
-	group.SetLimit(1)
+	// unlimited just to maintain some sense of decorum.
+	group.SetLimit(100)
 
 	var drained []CheckpointKey
 	for cpKeys := range groupCheckpointsByBinding(t.cp) {
-		for _, cpKey := range cpKeys {
-			sk := cpKey.StateKey()
-			if !shouldProcess(sk) {
-				// This state key's pending work was not requested to be
-				// processed, so it remains staged in the persisted state.
-				continue
-			}
+		sk := cpKeys[0].StateKey()
+		if !shouldProcess(sk) {
+			// This state key's pending work was not requested to be
+			// processed, so it remains staged in the persisted state.
+			continue
+		}
 
-			var b *binding
-			for _, binding := range t.bindings {
-				if binding.target.StateKey == sk {
-					b = binding
-					break
-				}
+		var b *binding
+		for _, binding := range t.bindings {
+			if binding.target.StateKey == sk {
+				b = binding
+				break
 			}
+		}
 
-			if b == nil {
-				// No binding is enabled for this state key.
-				continue
-			}
+		if b == nil {
+			// No binding is enabled for this state key.
+			continue
+		}
+
+		group.Go(func() error {
+			t.be.StartedResourceCommit(b.target.Path)
 
 			drained = append(drained, cpKeys...)
-			group.Go(func() error {
-				t.be.StartedResourceCommit(b.target.Path)
 
-				item := t.cp[cpKey]
-				if err := t.client.queryIdempotent(groupCtx, b.storeSchema, item.Query, item.JobPrefix, item.SourceURIs, item.TempTableName); err != nil {
-					return fmt.Errorf("acknowledge query for %q: %w", b.target.Path, err)
-				}
-				log.WithFields(log.Fields{
-					"query":         item.Query,
-					"external_data": map[string][]string{item.TempTableName: item.SourceURIs},
-				}).Debug("acknowledge query executed")
+			needsMerge := false
+			items := make([]*checkpointItem, 0, len(cpKeys))
+			sourceURIs := make([]string, 0, len(items))
+			for _, key := range cpKeys {
+				item := t.cp[key]
 
-				if t.skipCleanup {
-					log.Warn("cleanup disabled; staged files retained")
-				} else if err := t.storeFiles.CleanupCheckpoint(ctx, item.SourceURIs); err != nil {
-					// Queries will fail if the source files have been deleted, but
-					// if queryIdempotent has returned without error then a job for
-					// that query will never be attempted again.
-					return fmt.Errorf("cleaning up staged files for %q: %w", b.target.Path, err)
+				// If the checkpoint is using the deprecated Query field, there
+				// can be only one query per binding.  This check should be
+				// unreachable.
+				if item.Query != "" && len(cpKeys) != 1 {
+					return fmt.Errorf("invalid checkpoint: contains multiple queries for a binding")
 				}
 
-				t.be.FinishedResourceCommit(b.target.Path)
+				if item.NeedsMerge {
+					needsMerge = true
+				}
+				items = append(items, item)
+				sourceURIs = append(sourceURIs, item.SourceURIs...)
+			}
 
-				return nil
-			})
-		}
+			var err error
+			var query string
+			if items[0].Query != "" {
+				query = items[0].Query
+			} else {
+				if needsMerge {
+					bounds := combineBounds(b.target.Keys, items)
+					query, err = renderQueryTemplate(b.target, t.templates.storeUpdate, bounds, t.objAndArrayAsJson)
+					if err != nil {
+						return fmt.Errorf("rendering merge query template: %w", err)
+					}
+				} else {
+					query = b.storeInsertSQL
+				}
+			}
+			if err := t.client.queryIdempotent(groupCtx, b.storeSchema, query, items[0].JobPrefix, sourceURIs, items[0].TempTableName); err != nil {
+				return fmt.Errorf("acknowledge query for %q: %w", b.target.Path, err)
+			}
+			log.WithFields(log.Fields{
+				"query":         query,
+				"external_data": map[string][]string{items[0].TempTableName: sourceURIs},
+			}).Debug("acknowledge query executed")
+
+			if t.skipCleanup {
+				log.Warn("cleanup disabled; staged files retained")
+			} else if err := t.storeFiles.CleanupCheckpoint(ctx, sourceURIs); err != nil {
+				// Queries will fail if the source files have been deleted, but
+				// if queryIdempotent has returned without error then a job for
+				// that query will never be attempted again.
+				return fmt.Errorf("cleaning up staged files for %q: %w", b.target.Path, err)
+			}
+
+			t.be.FinishedResourceCommit(b.target.Path)
+			return nil
+		})
+
 	}
 
 	if err := group.Wait(); err != nil {
@@ -616,4 +662,51 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 
 func (t *transactor) Destroy() {
 	_ = t.client.bigqueryClient.Close()
+}
+
+// combineBounds unions the per-key-column merge bounds of coalesced checkpoint
+// entries. A column keeps a bound only when every entry carries one, and
+// differing literals combine with LEAST/GREATEST cast to the column's type:
+// those functions compare in their operands' type, and comparing e.g.
+// timestamp literals as strings can pick the wrong extremum.
+func combineBounds(keys []sql.Column, items []*checkpointItem) []sql.MergeBound {
+	var out = make([]sql.MergeBound, len(keys))
+	for i, key := range keys {
+		out[i] = sql.MergeBound{Column: key}
+
+		var valid = true
+		var lowers, uppers []string
+		for _, item := range items {
+			if len(item.Bounds) != len(keys) || item.Bounds[i].Lower == "" || item.Bounds[i].Upper == "" {
+				valid = false
+				break
+			}
+			if !slices.Contains(lowers, item.Bounds[i].Lower) {
+				lowers = append(lowers, item.Bounds[i].Lower)
+			}
+			if !slices.Contains(uppers, item.Bounds[i].Upper) {
+				uppers = append(uppers, item.Bounds[i].Upper)
+			}
+		}
+		if !valid {
+			continue
+		}
+
+		out[i].LiteralLower = extremumExpr("LEAST", lowers, key)
+		out[i].LiteralUpper = extremumExpr("GREATEST", uppers, key)
+	}
+	return out
+}
+
+// extremumExpr renders the SQL expression selecting fn (LEAST or GREATEST) of
+// the given literals, or the literal itself when they all agree.
+func extremumExpr(fn string, literals []string, key sql.Column) string {
+	if len(literals) == 1 {
+		return literals[0]
+	}
+	var cast = make([]string, len(literals))
+	for i, l := range literals {
+		cast[i] = fmt.Sprintf("CAST(%s AS %s)", l, key.BareDDL)
+	}
+	return fmt.Sprintf("%s(%s)", fn, strings.Join(cast, ", "))
 }
