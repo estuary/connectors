@@ -209,9 +209,9 @@ func run(ctx context.Context, connector, configPath, resourcePath, mode, taskNam
 // The resource path only locates the namespace to sweep: what goes is decided by
 // what is actually present, which is the point of sweeping rather than dropping
 // by name. An empty run suffix says this program has no items of its own to
-// clean up, so only leftovers are considered; a caller that names its items with
-// a run suffix passes it to sweep them whatever their age, which is how a run
-// cleans up after itself rather than waiting to age into a later sweep.
+// clean up, so only leftovers are considered; when the run suffix is provided
+// explicitly, the cleanup ignores the age check and cleans up everything under
+// that suffix
 func sweep(ctx context.Context, m materializer, path []string, runSuffix string, dryRun bool) error {
 	resources, resourcesErr := testutil.SweepTestResources(ctx, m, [][]string{path}, runSuffix, dryRun)
 	tasks, tasksErr := testutil.SweepTestTasks(ctx, m, runSuffix, dryRun)

@@ -111,10 +111,9 @@ echo "seed:      $SEED"
 echo "out-dir:   $OUT_DIR"
 
 # Every run gets its own task name. A task's stored checkpoint otherwise
-# carries over between runs, and a resumed task skips the prefix of the fixture
-# it has already read through, so the run would silently measure part of its
-# scenario. The _flow_test_<timestamp> shape is what `testctl -mode sweep`
-# recognises, so a run killed outright can still be cleaned up afterwards.
+# carries over between runs. The _flow_test_<timestamp> shape is what
+# `testctl -mode sweep` recognises, so a run that has been killed can still
+# be cleaned up afterwards.
 RUN_SUFFIX="_flow_test_$(date +%s)"
 TASK="bench/${CONNECTOR}${RUN_SUFFIX}"
 echo "task:      $TASK"
@@ -138,21 +137,11 @@ else
   echo "no docker-compose for $CONNECTOR; assuming endpoint is reachable"
 fi
 
-# Removing the destination is what keeps a scenario measuring what it
-# describes: the fixture is deterministic in its seed, so a table left behind by
-# an earlier run turns this run's inserts into merges. It also keeps a shared
-# warehouse from accumulating what benchmarks leave behind.
-#
-# Both go through testctl, which drives the connector's own DeleteResource, so
-# this works for every connector rather than only the SQL ones, and needs no
-# per-connector script here.
+# clean up the destination resources using testctl
 TESTCTL="$OUT_DIR/testctl"
 echo "building testctl"
 (cd "$ROOT_DIR" && go build -tags nozstd -o "$TESTCTL" ./tests/materialize/testctl)
 
-# drop_destination removes each binding's resource. Dropping one that is not
-# there fails, which is the ordinary case before a run, so a failure is
-# reported rather than fatal.
 drop_destination() {
   local when="$1" res
   for res in "$OUT_DIR"/resource-*.json; do
@@ -166,8 +155,6 @@ drop_destination() {
   done
 }
 
-# sweep_run removes this run's task metadata, which for a SQL connector is its
-# row in the checkpoints table, along with test items an older run left behind.
 sweep_run() {
   local res
   for res in "$OUT_DIR"/resource-*.json; do
