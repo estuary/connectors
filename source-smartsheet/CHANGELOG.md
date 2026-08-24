@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-08-24
+
+### Fixed
+
+- Responses are now requested with `Accept-Encoding: identity` instead of gzip.
+  Smartsheet can gzip a response twice while a single layer of encoding is
+  expected, so the body left after the client's one decompression pass is still
+  compressed and fails to parse as JSON.
+
 ## 2026-08-13
 
 ### Fixed
