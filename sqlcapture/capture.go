@@ -196,6 +196,11 @@ type Capture struct {
 	Output   *boilerplate.PullOutput // The encoder to which records and state updates are written
 	Database Database                // The database-specific interface which is operated by the generic Capture logic
 
+	replStream          ReplicationStream           // The replication stream from which the main capture loop reads change events
+	lastDiscovery       map[StreamID]*DiscoveryInfo // The most recent table discovery results, refreshed on every rediscovery
+	rediscoverAfter     time.Time                   // When the next table rediscovery should occur
+	periodicChecksAfter time.Time                   // When the next periodic database checks should occur
+
 	lastStatus string // Last connectorStatus update. Used to suppress exact duplicates to reduce log noise.
 
 	// dirtyStreams is the set of stream state keys changed since the last checkpoint.
@@ -302,15 +307,15 @@ func (c *Capture) streamingDiagnosticsThreshold() time.Duration {
 func (c *Capture) Run(ctx context.Context) (err error) {
 	// Fetch detailed schema info for the tables that this capture's bindings
 	// reference. We don't need details for every table in the database here.
-	discovery, err := c.Database.DiscoverTableDetails(ctx, c.bindingTableIDs())
+	c.lastDiscovery, err = c.Database.DiscoverTableDetails(ctx, c.bindingTableIDs())
 	if err != nil {
 		return fmt.Errorf("error discovering database tables: %w", err)
-	} else if err := c.emitSourcedSchemas(discovery); err != nil {
+	} else if err := c.emitSourcedSchemas(); err != nil {
 		return err
 	} else if err := c.emitState(); err != nil { // Emit state so any SourcedSchema changes commit immediately.
 		return err
 	}
-	for streamID, discoveryInfo := range discovery {
+	for streamID, discoveryInfo := range c.lastDiscovery {
 		log.WithFields(log.Fields{
 			"table":     streamID,
 			"discovery": discoveryInfo,
@@ -321,22 +326,22 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 		return fmt.Errorf("error reconciling capture state with bindings: %w", err)
 	}
 
-	replStream, err := c.Database.ReplicationStream(ctx, c.State.Cursor)
+	c.replStream, err = c.Database.ReplicationStream(ctx, c.State.Cursor)
 	if err != nil {
 		return fmt.Errorf("error creating replication stream: %w", err)
 	}
 	for _, binding := range c.BindingsCurrentlyActive() {
 		var state = c.State.Streams[binding.StateKey]
 		var streamID = binding.StreamID
-		if err := replStream.ActivateTable(ctx, streamID, state.KeyColumns, discovery[streamID], state.Metadata); err != nil {
+		if err := c.replStream.ActivateTable(ctx, streamID, state.KeyColumns, c.lastDiscovery[streamID], state.Metadata); err != nil {
 			return fmt.Errorf("error activating table %q: %w", streamID, err)
 		}
 	}
-	if err := replStream.StartReplication(ctx, discovery); err != nil {
+	if err := c.replStream.StartReplication(ctx, c.lastDiscovery); err != nil {
 		return fmt.Errorf("error starting replication: %w", err)
 	}
 	defer func() {
-		if streamErr := replStream.Close(ctx); streamErr != nil && errors.Is(err, ErrFenceNotReached) {
+		if streamErr := c.replStream.Close(ctx); streamErr != nil && errors.Is(err, ErrFenceNotReached) {
 			err = streamErr
 		}
 	}()
@@ -345,7 +350,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	// and relay them to the replication stream acknowledgement.
 	var acknowledgeWorkerCtx, cancelAcknowledgeWorkerCtx = context.WithCancel(ctx)
 	go func() {
-		if err := c.acknowledgeWorker(acknowledgeWorkerCtx, c.Output, replStream); err != nil {
+		if err := c.acknowledgeWorker(acknowledgeWorkerCtx, c.Output, c.replStream); err != nil {
 			log.WithField("err", err).Fatal("error relaying acknowledgements from stdin")
 		}
 	}()
@@ -358,83 +363,97 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	// making it easier to know exactly how many transactions are expected from a capture.
 	c.statusUpdate("Catching up on CDC history")
 	if TestShutdownAfterCaughtUp || os.Getenv("SHUTDOWN_AFTER_POLLING") == "yes" {
-		if err := c.streamToFence(ctx, replStream, 0, false); err != nil {
+		if err := c.streamToFence(ctx, 0, false); err != nil {
 			return fmt.Errorf("error streaming until fence: %w", err)
 		} else if err := c.emitState(); err != nil {
 			return fmt.Errorf("error emitting state after catch-up: %w", err)
 		}
-	} else if err := c.streamToFence(ctx, replStream, 0, true); err != nil {
+	} else if err := c.streamToFence(ctx, 0, true); err != nil {
 		return fmt.Errorf("error streaming until fence: %w", err)
 	}
 
 	// Activate any pending streams using the schema information already fetched during
 	// startup, then schedule the first rediscovery a full interval out.
-	if err := c.activatePendingStreams(ctx, discovery, replStream); err != nil {
+	if err := c.activatePendingStreams(ctx); err != nil {
 		return fmt.Errorf("error initializing pending streams: %w", err)
 	}
-	var rediscoverAfter = c.nextRediscovery()
-	var periodicChecksAfter time.Time
+	c.rediscoverAfter = c.nextRediscovery()
 	for ctx.Err() == nil {
-		if time.Now().After(rediscoverAfter) {
-			log.Debug("rediscovering database tables")
-			discovery, err = c.Database.DiscoverTableDetails(ctx, c.bindingTableIDs())
-			if err != nil {
-				return fmt.Errorf("error discovering database tables: %w", err)
-			} else if err := c.emitSourcedSchemas(discovery); err != nil {
-				return err
-			} else if err := c.emitState(); err != nil { // Emit state so any SourcedSchema changes commit immediately.
-				return err
-			}
-			// If any streams are currently pending, initialize them so they can start backfilling.
-			if err := c.activatePendingStreams(ctx, discovery, replStream); err != nil {
-				return fmt.Errorf("error initializing pending streams: %w", err)
-			}
-			rediscoverAfter = c.nextRediscovery()
-		}
-
-		if time.Now().After(periodicChecksAfter) {
-			if err := c.Database.PeriodicChecks(ctx); err != nil {
-				log.WithError(err).Warn("error running periodic checks")
-			}
-			periodicChecksAfter = time.Now().Add(periodicChecksInterval)
-		}
-
-		// If any tables are currently backfilling, go perform another backfill iteration.
-		if c.AnyBindingsCurrentlyBackfilling() {
-			c.statusUpdate("Backfilling Tables")
-			if err := c.backfillStreams(ctx, discovery); err != nil {
-				return fmt.Errorf("error performing backfill: %w", err)
-			} else if err := c.streamToFence(ctx, replStream, 0, false); err != nil {
-				return fmt.Errorf("error streaming until fence: %w", err)
-			} else if err := c.emitState(); err != nil {
-				return err
-			}
-
-			if TestShutdownAfterBackfill {
-				log.Info("Shutting down after backfill due to TestShutdownAfterBackfill")
-				return nil // In tests we sometimes want to shut down here
-			}
-			continue // Repeat the main loop from the top
-		}
-
-		// We often want to shut down at this point in tests. Before doing so, we emit
-		// a state checkpoint to ensure that streams reliably transition into the Active
-		// state during tests even if there is no backfill work to do.
-		if TestShutdownAfterCaughtUp || os.Getenv("SHUTDOWN_AFTER_POLLING") == "yes" {
-			log.Info("Shutting down due to SHUTDOWN_AFTER_POLLING=yes")
-			if bs, err := json.Marshal(c.State); err == nil {
-				FinalStateCheckpoint = bs // Set final state checkpoint
-			}
-			return c.emitState()
-		}
-
-		// Finally, since there's no other work to do right now, we just stream changes for a period of time.
-		c.statusUpdate("Streaming CDC Events")
-		if err := c.streamToFence(ctx, replStream, StreamingFenceInterval, true); err != nil {
+		if done, err := c.mainLoopIteration(ctx); err != nil {
 			return err
+		} else if done {
+			return nil
 		}
 	}
 	return ctx.Err()
+}
+
+// mainLoopIteration executes a single iteration of the capture's main loop:
+// rediscovery and periodic checks when their next scheduled time has arrived,
+// then either one backfill iteration or one streaming cycle. It returns done
+// as true when the capture should shut down cleanly, which currently happens
+// only via the test/polling shutdown behavior flags.
+func (c *Capture) mainLoopIteration(ctx context.Context) (done bool, err error) {
+	if time.Now().After(c.rediscoverAfter) {
+		log.Debug("rediscovering database tables")
+		c.lastDiscovery, err = c.Database.DiscoverTableDetails(ctx, c.bindingTableIDs())
+		if err != nil {
+			return false, fmt.Errorf("error discovering database tables: %w", err)
+		}
+		if err := c.emitSourcedSchemas(); err != nil {
+			return false, err
+		} else if err := c.emitState(); err != nil { // Emit state so any SourcedSchema changes commit immediately.
+			return false, err
+		}
+		// If any streams are currently pending, initialize them so they can start backfilling.
+		if err := c.activatePendingStreams(ctx); err != nil {
+			return false, fmt.Errorf("error initializing pending streams: %w", err)
+		}
+		c.rediscoverAfter = c.nextRediscovery()
+	}
+
+	if time.Now().After(c.periodicChecksAfter) {
+		if err := c.Database.PeriodicChecks(ctx); err != nil {
+			log.WithError(err).Warn("error running periodic checks")
+		}
+		c.periodicChecksAfter = time.Now().Add(periodicChecksInterval)
+	}
+
+	// If any tables are currently backfilling, go perform another backfill iteration.
+	if c.AnyBindingsCurrentlyBackfilling() {
+		c.statusUpdate("Backfilling Tables")
+		if err := c.backfillStreams(ctx); err != nil {
+			return false, fmt.Errorf("error performing backfill: %w", err)
+		} else if err := c.streamToFence(ctx, 0, false); err != nil {
+			return false, fmt.Errorf("error streaming until fence: %w", err)
+		} else if err := c.emitState(); err != nil {
+			return false, err
+		}
+
+		if TestShutdownAfterBackfill {
+			log.Info("Shutting down after backfill due to TestShutdownAfterBackfill")
+			return true, nil // In tests we sometimes want to shut down here
+		}
+		return false, nil // Repeat the main loop from the top
+	}
+
+	// We often want to shut down at this point in tests. Before doing so, we emit
+	// a state checkpoint to ensure that streams reliably transition into the Active
+	// state during tests even if there is no backfill work to do.
+	if TestShutdownAfterCaughtUp || os.Getenv("SHUTDOWN_AFTER_POLLING") == "yes" {
+		log.Info("Shutting down due to SHUTDOWN_AFTER_POLLING=yes")
+		if bs, err := json.Marshal(c.State); err == nil {
+			FinalStateCheckpoint = bs // Set final state checkpoint
+		}
+		return true, c.emitState()
+	}
+
+	// Finally, since there's no other work to do right now, we just stream changes for a period of time.
+	c.statusUpdate("Streaming CDC Events")
+	if err := c.streamToFence(ctx, StreamingFenceInterval, true); err != nil {
+		return false, err
+	}
+	return false, nil
 }
 
 // reconcileStateWithBindings updates the capture's state to reflect any added or removed bindings.
@@ -517,10 +536,10 @@ func (c *Capture) reconcileStateWithBindings(_ context.Context) error {
 }
 
 // activatePendingStreams transitions streams from a "Pending" state to being captured once they're eligible.
-func (c *Capture) activatePendingStreams(ctx context.Context, discovery map[StreamID]*DiscoveryInfo, replStream ReplicationStream) error {
+func (c *Capture) activatePendingStreams(ctx context.Context) error {
 	// See if any missing tables have since reappeared, and if so mark them as pending again.
 	for _, binding := range c.BindingsInState(TableStateMissing) {
-		if _, ok := discovery[binding.StreamID]; ok {
+		if _, ok := c.lastDiscovery[binding.StreamID]; ok {
 			c.setStreamState(binding.StateKey, &TableState{Mode: TableStatePending})
 		}
 	}
@@ -534,7 +553,7 @@ func (c *Capture) activatePendingStreams(ctx context.Context, discovery map[Stre
 		var state = c.State.Streams[stateKey]
 		c.setStreamState(stateKey, state)
 
-		var discoveryInfo = discovery[streamID]
+		var discoveryInfo = c.lastDiscovery[streamID]
 		if discoveryInfo == nil {
 			return fmt.Errorf("stream %q is a configured binding of this capture, but doesn't exist or isn't visible with current permissions", streamID)
 		}
@@ -643,7 +662,7 @@ func (c *Capture) activatePendingStreams(ctx context.Context, discovery map[Stre
 			}
 		}
 
-		if err := replStream.ActivateTable(ctx, streamID, state.KeyColumns, discoveryInfo, state.Metadata); err != nil {
+		if err := c.replStream.ActivateTable(ctx, streamID, state.KeyColumns, discoveryInfo, state.Metadata); err != nil {
 			return fmt.Errorf("error activating replication for table %q: %w", streamID, err)
 		}
 	}
@@ -686,7 +705,7 @@ func (c *Capture) activatePendingStreams(ctx context.Context, discovery map[Stre
 //
 // The fenceAfter argument is passed to the underlying replication stream, so that
 // it can make sure to stream changes for at least that length of time.
-func (c *Capture) streamToFence(ctx context.Context, replStream ReplicationStream, fenceAfter time.Duration, reportFlush bool) error {
+func (c *Capture) streamToFence(ctx context.Context, fenceAfter time.Duration, reportFlush bool) error {
 	log.WithField("fenceAfter", fenceAfter.String()).Debug("streaming to fence")
 
 	// Counters and an interval-start timestamp shared between the deferred final
@@ -760,7 +779,7 @@ func (c *Capture) streamToFence(ctx context.Context, replStream ReplicationStrea
 		logProgress("processed replication events")
 	}()
 
-	if err := replStream.StreamToFence(ctx, fenceAfter, func(event DatabaseEvent) error {
+	if err := c.replStream.StreamToFence(ctx, fenceAfter, func(event DatabaseEvent) error {
 		// Commit events update the checkpoint cursor and may trigger a state update.
 		if event, ok := event.(CommitEvent); ok {
 			flushCount.Add(1)
@@ -892,7 +911,7 @@ func (c *Capture) handleReplicationEvent(event DatabaseEvent) (int, error) {
 	return 0, fmt.Errorf("table %q in invalid mode %q", streamID, tableState.Mode)
 }
 
-func (c *Capture) backfillStreams(ctx context.Context, discovery map[StreamID]*DiscoveryInfo) error {
+func (c *Capture) backfillStreams(ctx context.Context) error {
 	var bindings = c.bindingsCurrentlyBackfillingUnsorted()
 	if len(bindings) == 0 {
 		return nil
@@ -922,7 +941,7 @@ func (c *Capture) backfillStreams(ctx context.Context, discovery map[StreamID]*D
 		"selected":   streamID,
 	}).Debug("backfilling streams")
 
-	var discoveryInfo, ok = discovery[streamID]
+	var discoveryInfo, ok = c.lastDiscovery[streamID]
 	if !ok {
 		return fmt.Errorf("table %q missing from latest autodiscovery", streamID)
 	}
@@ -1059,10 +1078,10 @@ func (c *Capture) emitState() error {
 }
 
 // emitSourcedSchemas outputs a SourcedSchema update for every capture binding
-// with corresponding discovery info in the provided map.
-func (c *Capture) emitSourcedSchemas(discovery map[StreamID]*DiscoveryInfo) error {
+// with corresponding discovery info in the latest discovery results.
+func (c *Capture) emitSourcedSchemas() error {
 	for _, binding := range c.Bindings {
-		var info, ok = discovery[binding.StreamID]
+		var info, ok = c.lastDiscovery[binding.StreamID]
 		if !ok {
 			continue // Only emit SourcedSchema updates for bindings present in discovery results
 		}
