@@ -137,6 +137,7 @@ func main() {
 		taskName  = flag.String("task", "materialize-testctl", "materialization name to connect as, which only labels the connection")
 		logLevel  = flag.String("log-level", "info", "logging verbosity; debug reports the items a sweep left in place")
 		dryRun    = flag.Bool("dry-run", false, "for sweep, report what would be removed without removing it")
+		runSuffix = flag.String("run-suffix", "", "for sweep, the name suffix of the calling run's own items, which are swept regardless of age")
 	)
 	flag.Parse()
 
@@ -151,12 +152,12 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()
 
-	if err := run(ctx, *connector, *config, *resource, *mode, *taskName, *dryRun); err != nil {
+	if err := run(ctx, *connector, *config, *resource, *mode, *taskName, *runSuffix, *dryRun); err != nil {
 		log.WithFields(log.Fields{"mode": *mode, "error": err}).Fatal("materialize-testctl failed")
 	}
 }
 
-func run(ctx context.Context, connector, configPath, resourcePath, mode, taskName string, dryRun bool) error {
+func run(ctx context.Context, connector, configPath, resourcePath, mode, taskName, runSuffix string, dryRun bool) error {
 	openConnector, ok := connectors[connector]
 	if !ok {
 		return fmt.Errorf("unknown connector %q: expected one of %s", connector, strings.Join(slices.Sorted(maps.Keys(connectors)), ", "))
@@ -197,7 +198,7 @@ func run(ctx context.Context, connector, configPath, resourcePath, mode, taskNam
 		log.WithField("action", description).Info("dropped the resource")
 		return nil
 	default:
-		return sweep(ctx, m, path, dryRun)
+		return sweep(ctx, m, path, runSuffix, dryRun)
 	}
 }
 
@@ -207,11 +208,13 @@ func run(ctx context.Context, connector, configPath, resourcePath, mode, taskNam
 //
 // The resource path only locates the namespace to sweep: what goes is decided by
 // what is actually present, which is the point of sweeping rather than dropping
-// by name. An empty run suffix says this program has no resources of its own to
-// clean up, so only leftovers are considered.
-func sweep(ctx context.Context, m materializer, path []string, dryRun bool) error {
-	resources, resourcesErr := testutil.SweepTestResources(ctx, m, [][]string{path}, "", dryRun)
-	tasks, tasksErr := testutil.SweepTestTasks(ctx, m, "", dryRun)
+// by name. An empty run suffix says this program has no items of its own to
+// clean up, so only leftovers are considered; a caller that names its items with
+// a run suffix passes it to sweep them whatever their age, which is how a run
+// cleans up after itself rather than waiting to age into a later sweep.
+func sweep(ctx context.Context, m materializer, path []string, runSuffix string, dryRun bool) error {
+	resources, resourcesErr := testutil.SweepTestResources(ctx, m, [][]string{path}, runSuffix, dryRun)
+	tasks, tasksErr := testutil.SweepTestTasks(ctx, m, runSuffix, dryRun)
 
 	var errs = []error{resourcesErr, tasksErr}
 	for _, swept := range []struct {
