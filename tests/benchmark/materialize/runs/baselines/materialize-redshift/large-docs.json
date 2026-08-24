@@ -3,8 +3,8 @@
   "scenario": "large-docs.yaml",
   "seed": 0,
   "preview_exit_code": 0,
-  "apply_seconds": 3.345326848,
-  "wall_seconds": 108.980493056,
+  "apply_seconds": 3.916447744,
+  "wall_seconds": 94.767565056,
   "timing_source": "flowctl-log",
   "rounds_observed": 2,
   "scenario_transactions": 2,
@@ -12,8 +12,8 @@
   "total_bytes": 10485760000,
   "observed_docs": 10000,
   "observed_bytes": 10485760000,
-  "docs_per_sec": 91.7595408093948,
-  "mb_per_sec": 91.7595408093948,
+  "docs_per_sec": 105.52133521728459,
+  "mb_per_sec": 105.52133521728459,
   "transactions": [
     {
       "index": 0,
@@ -27,9 +27,9 @@
         "op": "c"
       },
       "overlaps": [],
-      "wall_seconds": 54.49479424,
-      "mb_per_sec": 91.75188327126345,
-      "docs_per_sec": 91.75188327126345
+      "wall_seconds": 44.2570432,
+      "mb_per_sec": 112.9763680190908,
+      "docs_per_sec": 112.9763680190908
     },
     {
       "index": 1,
@@ -49,9 +49,9 @@
           "count": 2000
         }
       ],
-      "wall_seconds": 54.485698816,
-      "mb_per_sec": 91.76719962581676,
-      "docs_per_sec": 91.76719962581676
+      "wall_seconds": 50.510958848,
+      "mb_per_sec": 98.98841982085986,
+      "docs_per_sec": 98.98841982085986
     }
   ]
 }
