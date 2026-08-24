@@ -18,9 +18,11 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-const (
-	manifestFile = "files.manifest"
-)
+// manifestSuffix names the COPY manifest of a staged transaction. The
+// manifest key is generated fresh for every transaction so that it uniquely
+// identifies that transaction's staged data, which is what lets an entry
+// recorded in the connector state reference it.
+const manifestSuffix = ".manifest"
 
 // stagedFile is a wrapper around an s3 upload manager & client for streaming file uploads to s3.
 // The same stagedFile should not be used concurrently across multiple goroutines, but multiple
@@ -37,8 +39,8 @@ const (
 // writeRow is called.
 //
 // - flush: Closes out the last file that was started (if any) and writes a manifest file that can
-// be used by Redshift to load all of the files stored for the current transaction. Returns a
-// function that will delete all stored files, including the manifest file.
+// be used by Redshift to load all of the files stored for the current transaction. Returns the
+// object key of that manifest, and the keys of every object it wrote.
 type stagedFile struct {
 	fields   []string
 	client   *s3.Client
@@ -171,78 +173,88 @@ type manifestEntry struct {
 	Mandatory bool `json:"mandatory"`
 }
 
+func objectURI(bucket, key string) string {
+	return "s3://" + path.Join(bucket, key)
+}
+
 func (f *stagedFile) fileURI(file string) string {
-	return "s3://" + path.Join(f.bucket, f.fileKey(file))
+	return objectURI(f.bucket, f.fileKey(file))
 }
 
 func (f *stagedFile) fileKey(file string) string {
 	return path.Join(f.prefix, file)
 }
 
-func (f *stagedFile) flush(ctx context.Context) (func(context.Context), error) {
+func (f *stagedFile) flush(ctx context.Context) (string, []string, error) {
 	if err := f.flushFile(); err != nil {
-		return nil, err
+		return "", nil, err
 	}
 
+	manifestKey := f.fileKey(uuid.NewString() + manifestSuffix)
 	manifest := copyManifest{}
-	toDelete := []types.ObjectIdentifier{{
-		Key: aws.String(f.fileKey(manifestFile)),
-	}}
+	keys := []string{manifestKey}
 
 	for _, u := range f.uploaded {
 		manifest.Entries = append(manifest.Entries, manifestEntry{
 			URL:       f.fileURI(u),
 			Mandatory: true, // Always true
 		})
-		toDelete = append(toDelete, types.ObjectIdentifier{
-			Key: aws.String(f.fileKey(u)),
-		})
+		keys = append(keys, f.fileKey(u))
 	}
 
 	// A single DeleteObjects call can delete up to 1000 objects. At 250 MB per file, that would be
 	// 250 GB of compressed data. We do not currently expect a single transaction to be nearly that
 	// large, but will sanity check here just in case.
-	if len(toDelete) > 1000 {
-		return nil, fmt.Errorf("cannot process transaction having more than 1000 files: had %d files", len(toDelete))
+	if len(keys) > 1000 {
+		return "", nil, fmt.Errorf("cannot process transaction having more than 1000 files: had %d files", len(keys))
 	}
 
 	manifestBytes, err := json.Marshal(manifest)
 	if err != nil {
-		return nil, fmt.Errorf("marshalling manifest file: %w", err)
+		return "", nil, fmt.Errorf("marshalling manifest file: %w", err)
 	}
 
 	if _, err := f.client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(f.bucket),
-		Key:    aws.String(path.Join(f.prefix, manifestFile)),
+		Key:    aws.String(manifestKey),
 		Body:   bytes.NewReader(manifestBytes),
 	}); err != nil {
-		return nil, fmt.Errorf("putting manifest file: %w", err)
+		return "", nil, fmt.Errorf("putting manifest file: %w", err)
 	}
 
 	// Reset for next round.
 	f.started = false
 
-	return func(ctx context.Context) {
-		d, err := f.client.DeleteObjects(ctx, &s3.DeleteObjectsInput{
-			Bucket: aws.String(f.bucket),
-			Delete: &types.Delete{
-				Objects: toDelete,
-			},
-		})
-		if err != nil {
-			log.WithFields(log.Fields{
-				"err": err,
-			}).Warn("deleteObjects failed")
-			return
-		}
+	return manifestKey, keys, nil
+}
 
-		for _, err := range d.Errors {
-			log.WithFields(log.Fields{
-				"key":     err.Key,
-				"code":    err.Code,
-				"message": err.Message,
-				"err":     err,
-			}).Warn("failed to delete staged object file")
-		}
-	}, nil
+func deleteStagedFiles(ctx context.Context, client *s3.Client, bucket string, keys []string) {
+	if len(keys) == 0 {
+		return
+	}
+
+	objects := make([]types.ObjectIdentifier, 0, len(keys))
+	for _, k := range keys {
+		objects = append(objects, types.ObjectIdentifier{Key: aws.String(k)})
+	}
+
+	d, err := client.DeleteObjects(ctx, &s3.DeleteObjectsInput{
+		Bucket: aws.String(bucket),
+		Delete: &types.Delete{Objects: objects},
+	})
+	if err != nil {
+		log.WithFields(log.Fields{
+			"err": err,
+		}).Warn("deleteObjects failed")
+		return
+	}
+
+	for _, err := range d.Errors {
+		log.WithFields(log.Fields{
+			"key":     err.Key,
+			"code":    err.Code,
+			"message": err.Message,
+			"err":     err,
+		}).Warn("failed to delete staged object file")
+	}
 }

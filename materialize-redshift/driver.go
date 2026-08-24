@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"slices"
 	"strings"
 	"text/template"
 
@@ -311,6 +312,12 @@ type transactor struct {
 	bindings  []*binding
 	be        *m.BindingEvents
 	cfg       config
+	s3client  *s3.Client
+
+	// caseSensitiveIdentifierEnabled reflects the cluster's
+	// enable_case_sensitive_identifier setting, which selects the JSON option
+	// of rendered COPY statements.
+	caseSensitiveIdentifierEnabled bool
 }
 
 var _ m.Transactor = (*transactor)(nil)
@@ -337,26 +344,22 @@ func prepareNewTransactor(
 		var cfg = ep.Config
 
 		var d = &transactor{
-			templates: templates,
-			dialect:   ep.Dialect,
-			fence:     fence,
-			cfg:       cfg,
-			be:        be,
+			templates:                      templates,
+			dialect:                        ep.Dialect,
+			fence:                          fence,
+			cfg:                            cfg,
+			be:                             be,
+			caseSensitiveIdentifierEnabled: caseSensitiveIdentifierEnabled,
 		}
 
 		s3client, err := d.cfg.toS3Client(ctx, featureFlags)
 		if err != nil {
 			return nil, err
 		}
+		d.s3client = s3client
 
 		for idx, target := range bindings {
-			if err = d.addBinding(
-				idx,
-				target,
-				s3client,
-				is,
-				caseSensitiveIdentifierEnabled,
-			); err != nil {
+			if err = d.addBinding(idx, target, is); err != nil {
 				return nil, fmt.Errorf("addBinding of %s: %w", target.Path, err)
 			}
 		}
@@ -378,15 +381,20 @@ type binding struct {
 	mergeIntoSQL              string
 	deleteQuerySQL            string
 	loadQuerySQL              string
-	copyIntoLoadTableSQL      string
-	copyIntoMergeTableSQL     string
-	copyIntoDeleteTableSQL    string
-	copyIntoTargetTableSQL    string
 
-	// A reference of all staged file cleanup operations that should be run once
-	// the commit has completed. Will be empty if not data was processed for
-	// this binding. Applies to the Store phase only.
-	cleanupFiles []func(context.Context)
+	// Names of the temporary tables staging this binding's stored documents
+	// and hard-deleted keys.
+	tempTable       string
+	deleteTempTable string
+
+	// The manifest and object keys of the store and delete files staged for
+	// the current transaction, set by flushing them at the end of the Store
+	// phase. Empty when the binding staged nothing of that kind.
+	storeManifest  string
+	storeKeys      []string
+	deleteManifest string
+	deleteKeys     []string
+
 	// If any deletions must be done for the Store data processed by this binding.
 	hasDeletes bool
 	// If any non-deletion Store requests were received for this binding.
@@ -407,46 +415,19 @@ type VarcharColumnMeta struct {
 func (t *transactor) addBinding(
 	bindingIdx int,
 	target sql.Table,
-	client *s3.Client,
 	is *boilerplate.InfoSchema,
-	caseSensitiveIdentifierEnabled bool,
 ) error {
 	var b = &binding{
-		target:     target,
-		loadFile:   newStagedFile(client, t.cfg.Bucket, t.cfg.effectiveBucketPath(), target.KeyNames()),
-		storeFile:  newStagedFile(client, t.cfg.Bucket, t.cfg.effectiveBucketPath(), target.ColumnNames()),
-		deleteFile: newStagedFile(client, t.cfg.Bucket, t.cfg.effectiveBucketPath(), target.KeyNames()),
+		target:          target,
+		loadFile:        newStagedFile(t.s3client, t.cfg.Bucket, t.cfg.effectiveBucketPath(), target.KeyNames()),
+		storeFile:       newStagedFile(t.s3client, t.cfg.Bucket, t.cfg.effectiveBucketPath(), target.ColumnNames()),
+		deleteFile:      newStagedFile(t.s3client, t.cfg.Bucket, t.cfg.effectiveBucketPath(), target.KeyNames()),
+		tempTable:       fmt.Sprintf("flow_temp_table_%d", bindingIdx),
+		deleteTempTable: fmt.Sprintf("flow_temp_table_%d_deleted", bindingIdx),
 	}
 
 	if t.cfg.Advanced.NoFlowDocument {
 		b.nullFieldsToStrip = target.NullableFieldsToStrip()
-	}
-
-	// Render templates that require specific S3 "COPY INTO" parameters.
-	for _, m := range []struct {
-		sql             *string
-		target          string
-		columns         []*sql.Column
-		truncateColumns bool
-		stagedFile      *stagedFile
-	}{
-		{&b.copyIntoLoadTableSQL, fmt.Sprintf("flow_temp_table_%d", bindingIdx), target.KeyPtrs(), false, b.loadFile},
-		{&b.copyIntoMergeTableSQL, fmt.Sprintf("flow_temp_table_%d", bindingIdx), target.Columns(), true, b.storeFile},
-		{&b.copyIntoDeleteTableSQL, fmt.Sprintf("flow_temp_table_%d_deleted", bindingIdx), target.KeyPtrs(), false, b.deleteFile},
-		{&b.copyIntoTargetTableSQL, target.Identifier, target.Columns(), true, b.storeFile},
-	} {
-		var sql strings.Builder
-		if err := t.templates.copyFromS3.Execute(&sql, copyFromS3Params{
-			Target:                         m.target,
-			Columns:                        m.columns,
-			ManifestURL:                    m.stagedFile.fileURI(manifestFile),
-			Config:                         t.cfg,
-			CaseSensitiveIdentifierEnabled: caseSensitiveIdentifierEnabled,
-			TruncateColumns:                m.truncateColumns,
-		}); err != nil {
-			return err
-		}
-		*m.sql = sql.String()
 	}
 
 	// Choose appropriate templates based on configuration
@@ -506,8 +487,30 @@ func (t *transactor) addBinding(
 	return nil
 }
 
-func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
-func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) { return nil, nil }
+func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
+	return nil, nil
+}
+
+// copyIntoSQL renders the COPY statement loading the objects named by the
+// manifest at manifestKey into target. It is rendered per transaction rather
+// than at startup because each transaction stages its data under a manifest
+// key of its own.
+func (t *transactor) copyIntoSQL(target string, columns []*sql.Column, manifestKey string, truncateColumns bool) (string, error) {
+	var out strings.Builder
+	if err := t.templates.copyFromS3.Execute(&out, copyFromS3Params{
+		Target:                         target,
+		Columns:                        columns,
+		ManifestURL:                    objectURI(t.cfg.Bucket, manifestKey),
+		Config:                         t.cfg,
+		CaseSensitiveIdentifierEnabled: t.caseSensitiveIdentifierEnabled,
+		TruncateColumns:                truncateColumns,
+	}); err != nil {
+		return "", err
+	}
+
+	return out.String(), nil
+}
 
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
@@ -594,13 +597,15 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			return fmt.Errorf("creating load table for target table '%s': %w", b.target.Identifier, err)
 		}
 
-		delete, err := b.loadFile.flush(ctx)
+		manifest, keys, err := b.loadFile.flush(ctx)
 		if err != nil {
 			return fmt.Errorf("flushing load file for binding[%d]: %w", idx, err)
 		}
-		defer delete(ctx)
+		defer deleteStagedFiles(ctx, d.s3client, d.cfg.Bucket, keys)
 
-		if _, err := txn.Exec(ctx, b.copyIntoLoadTableSQL); err != nil {
+		if copySQL, err := d.copyIntoSQL(b.tempTable, b.target.KeyPtrs(), manifest, false); err != nil {
+			return fmt.Errorf("rendering load table COPY: %w", err)
+		} else if _, err := txn.Exec(ctx, copySQL); err != nil {
 			return handleCopyIntoErr(ctx, txn, d.cfg.Bucket, b.loadFile.prefix, b.target.Identifier, err)
 		}
 	}
@@ -654,19 +659,16 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	varcharColumnUpdates := make(map[string][]string)
 
 	flushStagedFile := func(ctx context.Context, b *binding) error {
+		var err error
 		if b.storeFile.started {
-			cleanup, err := b.storeFile.flush(ctx)
-			if err != nil {
+			if b.storeManifest, b.storeKeys, err = b.storeFile.flush(ctx); err != nil {
 				return fmt.Errorf("flushing store file: %w", err)
 			}
-			b.cleanupFiles = append(b.cleanupFiles, cleanup)
 		}
 		if b.deleteFile.started {
-			cleanup, err := b.deleteFile.flush(ctx)
-			if err != nil {
+			if b.deleteManifest, b.deleteKeys, err = b.deleteFile.flush(ctx); err != nil {
 				return fmt.Errorf("flushing delete file: %w", err)
 			}
-			b.cleanupFiles = append(b.cleanupFiles, cleanup)
 		}
 		return nil
 	}
@@ -786,12 +788,11 @@ func (d *transactor) commit(ctx context.Context, varcharColumnUpdates map[string
 		for _, b := range d.bindings {
 			// Arrange to clean up any staged files once this commit attempt is
 			// done.
-			for _, cleanupFn := range b.cleanupFiles {
-				cleanupFn(ctx)
-			}
+			deleteStagedFiles(ctx, d.s3client, d.cfg.Bucket, slices.Concat(b.storeKeys, b.deleteKeys))
 
 			// Reset per-transaction properties for the next round.
-			b.cleanupFiles = nil
+			b.storeManifest, b.storeKeys = "", nil
+			b.deleteManifest, b.deleteKeys = "", nil
 			b.hasDeletes = false
 			b.hasStores = false
 			b.mustMerge = false
@@ -880,7 +881,9 @@ func (d *transactor) commit(ctx context.Context, varcharColumnUpdates map[string
 				return fmt.Errorf("creating delete table: %w", err)
 			}
 
-			if _, err := txn.Exec(ctx, b.copyIntoDeleteTableSQL); err != nil {
+			if copySQL, err := d.copyIntoSQL(b.deleteTempTable, b.target.KeyPtrs(), b.deleteManifest, false); err != nil {
+				return fmt.Errorf("rendering delete table COPY: %w", err)
+			} else if _, err := txn.Exec(ctx, copySQL); err != nil {
 				return handleCopyIntoErr(ctx, txn, d.cfg.Bucket, b.deleteFile.prefix, b.target.Identifier, err)
 			} else if _, err := txn.Exec(ctx, b.deleteQuerySQL); err != nil {
 				return fmt.Errorf("deleting from table '%s': %w", b.target.Identifier, err)
@@ -903,14 +906,18 @@ func (d *transactor) commit(ctx context.Context, varcharColumnUpdates map[string
 				return fmt.Errorf("creating store table: %w", err)
 			}
 
-			if _, err := txn.Exec(ctx, b.copyIntoMergeTableSQL); err != nil {
+			if copySQL, err := d.copyIntoSQL(b.tempTable, b.target.Columns(), b.storeManifest, true); err != nil {
+				return fmt.Errorf("rendering store table COPY: %w", err)
+			} else if _, err := txn.Exec(ctx, copySQL); err != nil {
 				return handleCopyIntoErr(ctx, txn, d.cfg.Bucket, b.storeFile.prefix, b.target.Identifier, err)
 			} else if _, err := txn.Exec(ctx, b.mergeIntoSQL); err != nil {
 				return fmt.Errorf("merging to table '%s': %w", b.target.Identifier, err)
 			}
 		} else {
 			// Can copy directly into the target table since all values are new.
-			if _, err := txn.Exec(ctx, b.copyIntoTargetTableSQL); err != nil {
+			if copySQL, err := d.copyIntoSQL(b.target.Identifier, b.target.Columns(), b.storeManifest, true); err != nil {
+				return fmt.Errorf("rendering target table COPY: %w", err)
+			} else if _, err := txn.Exec(ctx, copySQL); err != nil {
 				return handleCopyIntoErr(ctx, txn, d.cfg.Bucket, b.storeFile.prefix, b.target.Identifier, err)
 			}
 		}
