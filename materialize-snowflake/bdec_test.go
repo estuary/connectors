@@ -287,3 +287,29 @@ func decrypt(t *testing.T, enc []byte, key []byte, iv uint64) []byte {
 
 	return dec
 }
+
+func TestGetNum(t *testing.T) {
+	bigVal, _ := new(big.Int).SetString("184467440737095516160", 10)
+	tooBig, _ := new(big.Int).SetString("1"+strings.Repeat("0", 400), 10)
+
+	for _, tt := range []struct {
+		name  string
+		input any
+		want  float64
+	}{
+		{name: "float64", input: float64(1.5), want: 1.5},
+		{name: "float32", input: float32(1.5), want: 1.5},
+		{name: "int64", input: int64(-5), want: -5},
+		{name: "uint64", input: uint64(18446744073709551615), want: 18446744073709551615},
+		{name: "big.Int", input: bigVal, want: 184467440737095516160},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := getNum(tt.input)
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
+		})
+	}
+
+	_, err := getNum(tooBig)
+	require.Error(t, err)
+}
