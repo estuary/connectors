@@ -149,9 +149,6 @@ def build_spec(
     else:
         endpoint = {
             "local": {
-                # Absolute, because flowctl resolves a relative command
-                # against the spec file's directory and the spec is written
-                # into the run's output directory, not the repo root.
                 "command": [
                     os.path.join(
                         os.environ.get("ROOT_DIR", "."), connector, "connector"
