@@ -1,5 +1,12 @@
 # materialize-snowflake
 
+## 2026-08-24
+
+### Fixed
+- A `number` column no longer fails the transaction when it receives a whole
+  number larger than the `int64` maximum. These values arrive as `uint64` or
+  `big.Int`, and the connector now converts them to a float.
+
 ## 2026-07-23
 
 ### Changed
