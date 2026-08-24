@@ -153,9 +153,6 @@ type TableState struct {
 	Metadata json.RawMessage `json:"metadata,omitempty"`
 	// BackfilledCount is a counter of the number of rows backfilled.
 	BackfilledCount int `json:"backfilled"`
-	// dirty is set whenever the table state changes, and cleared whenever
-	// a state update is emitted. It should never be serialized itself.
-	dirty bool
 }
 
 const (
@@ -200,6 +197,9 @@ type Capture struct {
 	Database Database                // The database-specific interface which is operated by the generic Capture logic
 
 	lastStatus string // Last connectorStatus update. Used to suppress exact duplicates to reduce log noise.
+
+	// dirtyStreams is the set of stream state keys changed since the last checkpoint.
+	dirtyStreams map[boilerplate.StateKey]struct{}
 
 	reused struct {
 		emitChangeBuf []byte               // A reusable buffer used for serialized JSON documents in emitChange(). Note that this is not thread-safe, but since the capture is single-threaded we're okay for now.
@@ -457,7 +457,7 @@ func (c *Capture) reconcileStateWithBindings(_ context.Context) error {
 		}
 
 		log.WithField("stateKey", stateKey).Info("binding added to capture")
-		c.State.Streams[stateKey] = &TableState{Mode: TableStatePending, dirty: true}
+		c.setStreamState(stateKey, &TableState{Mode: TableStatePending})
 	}
 
 	// When a binding is removed we change the table state to "Ignore". The way our dirty-
@@ -471,11 +471,10 @@ func (c *Capture) reconcileStateWithBindings(_ context.Context) error {
 	for stateKey, state := range c.State.Streams {
 		if state.Mode != TableStateIgnore && !stateKeysInCatalog[stateKey] {
 			log.WithField("stateKey", stateKey).Info("binding removed from capture")
-			c.State.Streams[stateKey] = &TableState{
+			c.setStreamState(stateKey, &TableState{
 				Mode:     TableStateIgnore,
 				Metadata: json.RawMessage("null"), // Explicit null to clear out old metadata
-				dirty:    true,
-			}
+			})
 		}
 	}
 
@@ -495,7 +494,7 @@ func (c *Capture) reconcileStateWithBindings(_ context.Context) error {
 				state.KeyColumns = binding.Resource.PrimaryKey
 			}
 			log.WithField("stateKey", binding.StateKey).WithField("key", state.KeyColumns).Info("initialized missing KeyColumns state for only-changes binding")
-			state.dirty = true
+			c.setStreamState(binding.StateKey, state)
 		}
 	}
 
@@ -522,7 +521,7 @@ func (c *Capture) activatePendingStreams(ctx context.Context, discovery map[Stre
 	// See if any missing tables have since reappeared, and if so mark them as pending again.
 	for _, binding := range c.BindingsInState(TableStateMissing) {
 		if _, ok := discovery[binding.StreamID]; ok {
-			c.State.Streams[binding.StateKey] = &TableState{Mode: TableStatePending, dirty: true}
+			c.setStreamState(binding.StateKey, &TableState{Mode: TableStatePending})
 		}
 	}
 
@@ -533,7 +532,7 @@ func (c *Capture) activatePendingStreams(ctx context.Context, discovery map[Stre
 
 		// Look up the stream state and mark it dirty since we intend to update it immediately.
 		var state = c.State.Streams[stateKey]
-		state.dirty = true
+		c.setStreamState(stateKey, state)
 
 		var discoveryInfo = discovery[streamID]
 		if discoveryInfo == nil {
@@ -672,8 +671,7 @@ func (c *Capture) activatePendingStreams(ctx context.Context, discovery map[Stre
 			}).Info("skipping backfill for stream")
 			state.Mode = TableStateActive
 			state.Scanned = nil
-			state.dirty = true
-			c.State.Streams[binding.StateKey] = state
+			c.setStreamState(binding.StateKey, state)
 		}
 	}
 	return nil
@@ -827,17 +825,16 @@ func (c *Capture) handleReplicationEvent(event DatabaseEvent) (int, error) {
 			return 0, nil // Should be impossible, but safe to ignore
 		}
 		log.WithFields(log.Fields{"stream": event.StreamID, "cause": event.Cause}).Info("marking table as missing")
-		c.State.Streams[binding.StateKey] = &TableState{
+		c.setStreamState(binding.StateKey, &TableState{
 			Mode:     TableStateMissing,
 			Metadata: json.RawMessage("null"), // Explicit null to clear out old metadata
-			dirty:    true,
-		}
+		})
 		return 0, nil
 	}
 
-	// Metadata events update the per-table metadata and dirty flag.
-	// They have no other effect, the new metadata will only be written
-	// as part of a subsequent state checkpoint.
+	// Metadata events update the per-table metadata and add the table to the
+	// dirty set. They have no other effect, the new metadata will only be
+	// written as part of a subsequent state checkpoint.
 	if event, ok := event.(*MetadataEvent); ok {
 		var binding = c.Bindings[event.StreamID]
 		if binding == nil {
@@ -849,8 +846,7 @@ func (c *Capture) handleReplicationEvent(event DatabaseEvent) (int, error) {
 		if state, ok := c.State.Streams[stateKey]; ok {
 			log.WithField("stateKey", stateKey).Trace("stream metadata updated")
 			state.Metadata = event.Metadata
-			state.dirty = true
-			c.State.Streams[stateKey] = state
+			c.setStreamState(stateKey, state)
 		}
 		return 0, nil
 	}
@@ -999,8 +995,7 @@ func (c *Capture) backfillStream(ctx context.Context, streamID StreamID, discove
 	} else {
 		state.Scanned = resumeCursor
 	}
-	state.dirty = true
-	c.State.Streams[stateKey] = state
+	c.setStreamState(stateKey, state)
 	return nil
 }
 
@@ -1020,16 +1015,32 @@ func (c *Capture) emitChange(binding *Binding, event ChangeEvent) (int, error) {
 	return len(buf), c.Output.Send(&c.reused.emitChangeMsg)
 }
 
+// setStreamState records a stream's capture state and marks it for the next checkpoint.
+// Every change to a TableState must be followed by a call to this.
+func (c *Capture) setStreamState(stateKey boilerplate.StateKey, state *TableState) {
+	c.State.Streams[stateKey] = state
+	if c.dirtyStreams == nil {
+		c.dirtyStreams = make(map[boilerplate.StateKey]struct{})
+	}
+	c.dirtyStreams[stateKey] = struct{}{}
+}
+
 func (c *Capture) emitState() error {
 	// Put together an update which includes only those streams which have changed
-	// since the last state output. At the same time, clear the dirty flags on all
-	// those tables.
-	var streams = make(map[boilerplate.StateKey]*TableState)
-	for stateKey, state := range c.State.Streams {
-		if state.dirty {
-			state.dirty = false
+	// since the last state output. At the same time, empty out the dirty set.
+	var streams map[boilerplate.StateKey]*TableState
+	if len(c.dirtyStreams) > 0 {
+		streams = make(map[boilerplate.StateKey]*TableState, len(c.dirtyStreams))
+		for stateKey := range c.dirtyStreams {
+			// A dirty stream must always have state, since setStreamState is the only
+			// thing which marks one and it writes both maps.
+			var state, ok = c.State.Streams[stateKey]
+			if !ok {
+				return fmt.Errorf("error emitting state: stream %q is dirty but has no capture state", stateKey)
+			}
 			streams[stateKey] = state
 		}
+		clear(c.dirtyStreams)
 	}
 	var msg = &PersistentState{
 		Cursor:  c.State.Cursor,
