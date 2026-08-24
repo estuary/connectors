@@ -95,6 +95,13 @@ else
   fi
   echo "building connector binary: $CONNECTOR_BIN (from $BUILD_PKG)"
   (cd "$ROOT_DIR" && go build -v -tags nozstd -o "$CONNECTOR_BIN" "$BUILD_PKG")
+  # "go build -o" against a pattern that matches no main package compiles the
+  # libraries and exits 0 without writing anything, which surfaces much later
+  # as a preview that cannot start the connector.
+  [[ -x "$CONNECTOR_BIN" ]] || {
+    echo "build produced no binary at $CONNECTOR_BIN ($BUILD_PKG matched no main package)" >&2
+    exit 1
+  }
 fi
 
 # Output directory.
@@ -339,9 +346,17 @@ def boundaries_from_log(path):
             line = ansi.sub("", line)
             st = stamp_re.search(line)
             if st:
+                # Not every stamp carries a fraction: the Snowpipe sidecar
+                # relays its core's logs as whole seconds. Padding one of those
+                # to 26 characters appends zeros after the "Z", strptime fails
+                # with a ValueError, and the whole results block dies with it --
+                # losing every number from a run that may have taken hours.
+                stamp = st.group(1).rstrip("Z")
+                if "." not in stamp:
+                    stamp += ".0"
                 cur = int(
                     datetime.strptime(
-                        st.group(1)[:26].ljust(26, "0"), "%Y-%m-%dT%H:%M:%S.%f"
+                        stamp[:26], "%Y-%m-%dT%H:%M:%S.%f"
                     ).timestamp() * 1e9
                 )
                 if first_ts is None:
