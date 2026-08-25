@@ -28,10 +28,6 @@ import (
 	"google.golang.org/api/iterator"
 )
 
-const (
-	maxBatchSize = 100
-)
-
 type checkpointItem struct {
 	// Query contains the rendered query string.  Deprecated.
 	Query      string               `json:",omitempty"`
