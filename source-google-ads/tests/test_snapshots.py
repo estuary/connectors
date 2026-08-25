@@ -8,7 +8,8 @@ import subprocess
 #     result = subprocess.run(
 #         [
 #             "flowctl",
-#             "preview",
+#             "raw",
+#             "preview-next",
 #             "--source",
 #             request.config.rootdir + "/source-google-ads/test.flow.yaml",
 #             "--sessions",

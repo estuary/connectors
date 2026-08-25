@@ -21,8 +21,8 @@ These apply in every phase. Re-read them before each phase boundary.
 1. Activate the connector's Python venv before invoking `flowctl`. A fresh Bash invocation will not have it active; the connector subprocess will fail with `ModuleNotFoundError: No module named '<package>'`. Use `source "$(poetry env info --path)/bin/activate"` from the connector dir.
 2. When emptying `bindings:` in `test.flow.yaml`, use `Write` (full file rewrite), **not** `Edit`. A partial Edit can leave orphaned `- resource:` entries dangling under an empty list, which produces invalid YAML that's hard to spot.
 3. After discover, audit `git diff --stat`. If the diff includes schema changes unrelated to the new stream (uniform per-file deltas across many existing schemas), recommend the user split the schema sweep into its own commit so the new-stream PR diff stays scoped.
-4. **`flowctl preview` and the pytest snapshot tests that drive it do hit the provider's API**. If the caller confirmed every required endpoint allows > 20 requests/hour, run them freely. Otherwise: ask before each run (via AskUserQuestion), and use `disable: true` on unrelated bindings in `test.flow.yaml` to cut the request count to just what's needed.
-5. **`flowctl raw discover` follows the same budget as `flowctl preview` unless this connector's discovery is static** — see `API-DISCOVER-STATIC-IS-FREE` in `provider-api-consent.md` for the static/dynamic test and examples.
+4. **`flowctl raw preview-next` and the pytest snapshot tests that drive it do hit the provider's API**. If the caller confirmed every required endpoint allows > 20 requests/hour, run them freely. Otherwise: ask before each run (via AskUserQuestion), and use `disable: true` on unrelated bindings in `test.flow.yaml` to cut the request count to just what's needed.
+5. **`flowctl raw discover` follows the same budget as `flowctl raw preview-next` unless this connector's discovery is static** — see `API-DISCOVER-STATIC-IS-FREE` in `provider-api-consent.md` for the static/dynamic test and examples.
 6. Pipe long test output to a file and Read it (per top-level `CLAUDE.md`). Don't `tail` / `head` pytest output — important lines often live in the middle.
 7. **A connector with no capture test has no `acmeCo/`** — see `REVIEW-ACMECO-NEEDS-CAPTURE-TEST` in `rules-index.md` for why. Grep `tests/test_snapshots.py` for `test_capture` before Phase 3. If there is none, **skip Phases 3 and 4 and go straight to Phase 5**: `acmeCo/` stays deleted and `bindings:` stays `[]`, but the discover and spec snapshots still need refreshing. That works because Phase 5 drives `flowctl raw discover --emit-raw`, which prints to stdout and writes no files — unlike Phase 3's plain `discover`, which is what generates the directory. Don't stop after Phase 2; that would leave the discover snapshot stale.
 
@@ -99,7 +99,7 @@ Re-run `poetry run pytest` to confirm all tests now pass and the snapshot file(s
 Verify post-refresh:
 
 - The new stream appears in the discover snapshot.
-- The capture snapshot may or may not contain the new stream. Snapshot tests that drive `flowctl preview` are typically capped at a fixed document count (often 50); a low-traffic stream can lose the race for those 50 slots. That matches existing comments in many connector tests for similarly-quiet streams (e.g. event streams) — don't panic, just note it.
+- The capture snapshot may or may not contain the new stream. Snapshot tests that drive `flowctl raw preview-next` are typically capped at a fixed document count (often 50); a low-traffic stream can lose the race for those 50 slots. That matches existing comments in many connector tests for similarly-quiet streams (e.g. event streams) — don't panic, just note it.
 
 ## Output
 

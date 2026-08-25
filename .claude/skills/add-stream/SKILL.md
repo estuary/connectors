@@ -49,7 +49,7 @@ Then **record the findings in the collection** so the next stream addition doesn
 
 **Set the budget for the rest of the skill** (`API-BUDGET-20RPH`, `API-DISCOVER-STATIC-IS-FREE`, `API-COST-SAVER-DISABLE` in [`.claude/shared/provider-api-consent.md`](../../shared/provider-api-consent.md)):
 
-- **All required endpoints > 20 req/hr:** run `flowctl preview` / `flowctl raw discover` / `pytest` / captures freely.
+- **All required endpoints > 20 req/hr:** run `flowctl raw preview-next` / `flowctl raw discover` / `pytest` / captures freely.
 - **Any required endpoint ≤ 20 req/hr:** ask before each run — `flowctl raw discover` included, unless this connector's discovery is static (see `API-DISCOVER-STATIC-IS-FREE` above); plan to disable unrelated bindings in `test.flow.yaml` (`disable: true`) before testing.
 
 ## Phase 2 — Endpoint Survey

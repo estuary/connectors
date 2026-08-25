@@ -71,7 +71,8 @@ def test_capture(request, snapshot):
     result = subprocess.run(
         [
             "flowctl",
-            "preview",
+            "raw",
+            "preview-next",
             "--source",
             request.fspath.dirname + "/../test.flow.yaml",
         ],

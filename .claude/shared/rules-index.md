@@ -100,4 +100,4 @@ Not rule lists — invoke when the situation applies, and audit against them whe
 | `REVIEW-SIBLING-STREAMS` | diff | A fix to one stream's fetch/parse/cursor logic probably applies to its siblings — streams in a connector share polling, pagination, and cursor patterns. Check every sibling and report the ones that look affected. |
 | `REVIEW-SNAPSHOT-SCOPE` | diff | `git diff --stat` on regenerated snapshots should be scoped to the change. Uniform per-file deltas across many files are a CDK schema sweep and belong in their own commit. |
 | `REVIEW-CHANGELOG-ENTRY` | diff | A user-visible connector change needs a `CHANGELOG.md` entry (`changelog` skill). |
-| `REVIEW-ACMECO-NEEDS-CAPTURE-TEST` | diff | `acmeCo/` exists only to serve the capture snapshot test — `flowctl preview` needs concrete target collections to write into; `raw spec` and `raw discover` do not. No `test_capture` → no `acmeCo/`. |
+| `REVIEW-ACMECO-NEEDS-CAPTURE-TEST` | diff | `acmeCo/` exists only to serve the capture snapshot test — `flowctl raw preview-next` needs concrete target collections to write into; `raw spec` and `raw discover` do not. No `test_capture` → no `acmeCo/`. |
