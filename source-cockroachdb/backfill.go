@@ -16,7 +16,7 @@ import (
 // reported, so a chunk can never observe row state older than an already-emitted change event —
 // this is what lets chunked backfill and unfiltered streaming converge. Each row is fetched as
 // `to_jsonb(row)`, matching the changefeed's `after` encoding byte-for-byte.
-func (db *cockroachdbDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, callback func(event sqlcapture.ChangeEvent) error) (bool, []byte, error) {
+func (db *cockroachdbDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, backfillFilter string, callback func(event sqlcapture.ChangeEvent) error) (bool, []byte, error) {
 	var keyColumns = state.KeyColumns
 	var schema, table = info.Schema, info.Name
 	var streamID = sqlcapture.JoinStreamID(schema, table)
@@ -45,9 +45,9 @@ func (db *cockroachdbDatabase) ScanTableChunk(ctx context.Context, info *sqlcapt
 				return false, nil, fmt.Errorf("expected %d resume-key values but got %d", len(keyColumns), len(resumeKey))
 			}
 			args = resumeKey
-			query = db.buildScanQuery(anchor, false, keyColumns, docMergeColumns, schema, table)
+			query = db.buildScanQuery(anchor, false, keyColumns, docMergeColumns, schema, table, backfillFilter)
 		} else {
-			query = db.buildScanQuery(anchor, true, keyColumns, docMergeColumns, schema, table)
+			query = db.buildScanQuery(anchor, true, keyColumns, docMergeColumns, schema, table, backfillFilter)
 		}
 	default:
 		return false, nil, fmt.Errorf("invalid backfill mode %q", state.Mode)
@@ -113,7 +113,7 @@ func (db *cockroachdbDatabase) ScanTableChunk(ctx context.Context, info *sqlcapt
 // comparison predicate `(k1, k2, ...) > ($1, $2, ...)` to resume after the previous chunk;
 // CockroachDB supports this composite comparison directly, which is simpler than the expanded
 // per-column OR form needed by some other databases.
-func (db *cockroachdbDatabase) buildScanQuery(anchor string, start bool, keyColumns, docMergeColumns []string, schema, table string) string {
+func (db *cockroachdbDatabase) buildScanQuery(anchor string, start bool, keyColumns, docMergeColumns []string, schema, table, backfillFilter string) string {
 	// Key columns are projected `::STRING` so the resume key round-trips exactly as a text bind
 	// argument (unlike the Go values pgx would otherwise decode). The projection is aliased to
 	// `__key<N>` so ORDER BY still resolves to the raw column rather than the STRING rendering.
@@ -132,16 +132,25 @@ func (db *cockroachdbDatabase) buildScanQuery(anchor string, start bool, keyColu
 		docExpr = fmt.Sprintf("(%s || jsonb_build_object('%s', t.%s))", docExpr, strings.ReplaceAll(col, "'", "''"), quoteIdentifier(col))
 	}
 
-	var query = new(strings.Builder)
-	fmt.Fprintf(query, "SELECT %s, %s::STRING AS __doc", strings.Join(castKeys, ", "), docExpr)
-	fmt.Fprintf(query, " FROM %s.%s AS t", quoteIdentifier(schema), quoteIdentifier(table))
-	fmt.Fprintf(query, " AS OF SYSTEM TIME '%s'", anchor)
+	// Generate a list of individual WHERE clauses which should be ANDed together.
+	var whereClauses []string
 	if !start {
 		var placeholders = make([]string, len(keyColumns))
 		for i := range keyColumns {
 			placeholders[i] = fmt.Sprintf("$%d", i+1)
 		}
-		fmt.Fprintf(query, " WHERE (%s) > (%s)", strings.Join(quotedKeys, ", "), strings.Join(placeholders, ", "))
+		whereClauses = append(whereClauses, fmt.Sprintf("(%s) > (%s)", strings.Join(quotedKeys, ", "), strings.Join(placeholders, ", ")))
+	}
+	if backfillFilter != "" {
+		whereClauses = append(whereClauses, fmt.Sprintf("(%s)", backfillFilter))
+	}
+
+	var query = new(strings.Builder)
+	fmt.Fprintf(query, "SELECT %s, %s::STRING AS __doc", strings.Join(castKeys, ", "), docExpr)
+	fmt.Fprintf(query, " FROM %s.%s AS t", quoteIdentifier(schema), quoteIdentifier(table))
+	fmt.Fprintf(query, " AS OF SYSTEM TIME '%s'", anchor)
+	if len(whereClauses) > 0 {
+		fmt.Fprintf(query, " WHERE %s", strings.Join(whereClauses, " AND "))
 	}
 	fmt.Fprintf(query, " ORDER BY %s", strings.Join(quotedKeys, ", "))
 	fmt.Fprintf(query, " LIMIT %d", db.config.Advanced.BackfillChunkSize)
