@@ -1,0 +1,120 @@
+sql> CREATE TABLE test.schemanamecollision_396304 (id INTEGER PRIMARY KEY, v TEXT)
+sql> CREATE TABLE test2.schemanamecollision_396304 (id INTEGER PRIMARY KEY, v TEXT)
+=== Discover: Discover ===
+acmeCo/test_capture/test/schemanamecollision_396304
+acmeCo/test_capture/test2/schemanamecollision_396304
+sql> INSERT INTO test.schemanamecollision_396304 VALUES (1, 'backfill-test')
+sql> INSERT INTO test2.schemanamecollision_396304 VALUES (100, 'backfill-test2')
+=== Run: Backfill ===
+[
+  "acmeCo/test_capture/test/schemanamecollision_396304",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "schemanamecollision_396304"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 1,
+    "v": "backfill-test"
+  }
+]
+[
+  "acmeCo/test_capture/test2/schemanamecollision_396304",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test2",
+        "snapshot": true,
+        "table": "schemanamecollision_396304"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 100,
+    "v": "backfill-test2"
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fschemanamecollision_396304": {
+      "backfilled": 1,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "test2%2Fschemanamecollision_396304": {
+      "backfilled": 1,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO test.schemanamecollision_396304 VALUES (2, 'streamed-into-test')
+sql> INSERT INTO test2.schemanamecollision_396304 VALUES (200, 'streamed-into-test2')
+=== Run: Replication ===
+[
+  "acmeCo/test_capture/test/schemanamecollision_396304",
+  {
+    "_meta": {
+      "op": "u",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "schemanamecollision_396304",
+        "ts_ms": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 2,
+    "v": "streamed-into-test"
+  }
+]
+[
+  "acmeCo/test_capture/test2/schemanamecollision_396304",
+  {
+    "_meta": {
+      "op": "u",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test2",
+        "table": "schemanamecollision_396304",
+        "ts_ms": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 200,
+    "v": "streamed-into-test2"
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fschemanamecollision_396304": {
+      "backfilled": 1,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "test2%2Fschemanamecollision_396304": {
+      "backfilled": 1,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

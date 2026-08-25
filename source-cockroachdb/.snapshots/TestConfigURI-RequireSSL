@@ -1,0 +1,2 @@
+postgres://flow_capture:secret1234@example.com:26257/defaultdb?application_name=estuary_flow&sslmode=verify-full
+config valid
