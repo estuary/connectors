@@ -11,6 +11,7 @@ import (
 	"github.com/invopop/jsonschema"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 )
 
 // System schemas which should never be discovered. In addition to the PostgreSQL system schemas,
@@ -31,9 +32,9 @@ func systemSchemaList() string {
 // of the visible key columns, so a primary key remains unique with the shard column removed.
 var hashShardColumnRegexp = regexp.MustCompile(`^crdb_internal_.+_shard_[0-9]+$`)
 
-// cockroachdbTableDetails carries connector-specific facts about a table from discovery to the
+// cockroachdbTableDiscoveryDetails carries connector-specific facts about a table from discovery to the
 // backfill and replication logic, via DiscoveryInfo.ExtraDetails.
-type cockroachdbTableDetails struct {
+type cockroachdbTableDiscoveryDetails struct {
 	// fullPrimaryKey is the complete primary key including hidden columns, in primary-key column
 	// order. Changefeed key arrays always contain the values of these columns in this order,
 	// regardless of what the collection is keyed on.
@@ -65,17 +66,26 @@ func (db *cockroachdbDatabase) ListTables(ctx context.Context) ([]sqlcapture.Tab
 // DiscoverTableDetails queries the database for detailed schema information about the
 // specified tables.
 func (db *cockroachdbDatabase) DiscoverTableDetails(ctx context.Context, requested []sqlcapture.TableID) (map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, error) {
-	tables, err := getTables(ctx, db.conn, db.config.Advanced.DiscoverSchemas)
-	if err != nil {
-		return nil, fmt.Errorf("unable to list database tables: %w", err)
-	}
-	columns, err := getColumns(ctx, db.conn)
-	if err != nil {
-		return nil, fmt.Errorf("unable to list database columns: %w", err)
-	}
-	primaryKeys, err := getPrimaryKeys(ctx, db.conn)
-	if err != nil {
-		return nil, fmt.Errorf("unable to list database primary keys: %w", err)
+	// These three queries are independent full scans of pg_catalog/information_schema, so they're
+	// issued concurrently rather than one after another.
+	var tables []*sqlcapture.DiscoveryInfo
+	var columns []cockroachdbColumn
+	var primaryKeys map[sqlcapture.StreamID][]string
+	var group, groupCtx = errgroup.WithContext(ctx)
+	group.Go(func() (err error) {
+		tables, err = getTables(groupCtx, db.conn, db.config.Advanced.DiscoverSchemas)
+		return err
+	})
+	group.Go(func() (err error) {
+		columns, err = getColumns(groupCtx, db.conn)
+		return err
+	})
+	group.Go(func() (err error) {
+		primaryKeys, err = getPrimaryKeys(groupCtx, db.conn)
+		return err
+	})
+	if err := group.Wait(); err != nil {
+		return nil, fmt.Errorf("unable to discover table details: %w", err)
 	}
 
 	var tableDetails = make(map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, len(tables))
@@ -88,7 +98,7 @@ func (db *cockroachdbDatabase) DiscoverTableDetails(ctx context.Context, request
 		if table, ok := tableDetails[streamID]; ok {
 			table.UseSchemaInference = db.featureFlags["use_schema_inference"]
 			table.EmitSourcedSchemas = db.featureFlags["emit_sourced_schemas"]
-			table.ExtraDetails = &cockroachdbTableDetails{}
+			table.ExtraDetails = &cockroachdbTableDiscoveryDetails{}
 			tableMap[streamID] = table
 		}
 	}
@@ -116,30 +126,17 @@ func (db *cockroachdbDatabase) DiscoverTableDetails(ctx context.Context, request
 		info.ColumnNames = append(info.ColumnNames, column.Name)
 	}
 
-	// Work out the collection key for each table. The changefeed's key array always holds the
-	// full primary key (hidden columns included), but the collection key can only use columns
-	// which actually appear in captured documents, and Flow keys can't be floating-point:
-	//
-	//   - Hash-shard columns are hidden virtual columns computed from the visible key columns,
-	//     so they're dropped and the visible remainder is used as the key.
-	//   - The synthesized `rowid` of a table with no user-defined key is a hidden stored column
-	//     which the changefeed emits in `after`; it's adopted as a real discovered column and
-	//     becomes the key, with the backfill merging it into its documents to match.
-	//   - FLOAT and DECIMAL key columns are unusable: their document values are raw JSON numbers,
-	//     which Flow collections can't be keyed on.
-	//   - Any other hidden key column (e.g. `crdb_region` of a REGIONAL BY ROW table) makes the
-	//     key unusable.
-	//
-	// Tables without a usable key are still discovered (so they show up with a clear error at
-	// validation time, via SetupTablePrerequisites) but can't be captured. A unique secondary
-	// index is NOT used as a fallback key: changefeed delete events carry only the primary key,
-	// so a collection keyed on other columns could never process deletes.
+	// Work out the collection key for each table: hash-shard columns are dropped (derived from the
+	// visible key), a lone `rowid` is adopted as a real discovered column, and FLOAT/DECIMAL or
+	// other hidden key columns (e.g. `crdb_region`) make the key unusable. Tables with no usable
+	// key are still discovered, so validation can report a clear per-table error, but a unique
+	// secondary index is never used as a fallback: delete events carry only the primary key.
 	for streamID, key := range primaryKeys {
 		var info, ok = tableMap[streamID]
 		if !ok {
 			continue
 		}
-		var details = info.ExtraDetails.(*cockroachdbTableDetails)
+		var details = info.ExtraDetails.(*cockroachdbTableDiscoveryDetails)
 		details.fullPrimaryKey = key
 
 		var visibleKey []string
@@ -151,6 +148,9 @@ func (db *cockroachdbDatabase) DiscoverTableDetails(ctx context.Context, request
 					case "float4", "float8", "numeric":
 						unusableReason = fmt.Sprintf("primary key column %q has floating-point type %q, which cannot be used as a collection key", col, typeDesc.TypeName())
 					}
+				}
+				if unusableReason != "" {
+					break
 				}
 				visibleKey = append(visibleKey, col)
 			} else if hashShardColumnRegexp.MatchString(col) {
@@ -167,8 +167,6 @@ func (db *cockroachdbDatabase) DiscoverTableDetails(ctx context.Context, request
 				visibleKey = append(visibleKey, col)
 			} else {
 				unusableReason = fmt.Sprintf("primary key column %q is a hidden column which cannot be captured", col)
-			}
-			if unusableReason != "" {
 				break
 			}
 		}
@@ -183,13 +181,10 @@ func (db *cockroachdbDatabase) DiscoverTableDetails(ctx context.Context, request
 		info.PrimaryKey = visibleKey
 	}
 
-	// This connector always uses unfiltered backfill streaming rather than the "precise" mode
-	// in which replication events for not-yet-scanned rows are filtered out by row key. Precise
-	// filtering is incompatible with our snapshot/stream handoff: backfill chunks read `AS OF
-	// SYSTEM TIME` the latest resolved timestamp, so a filtered-out change to a not-yet-scanned
-	// row would be lost if the row's chunk was read before the change committed. Setting
-	// UnpredictableKeyOrdering makes the generic backfill logic select the unfiltered strategy
-	// by default. See backfill.go and replication.go.
+	// This connector always uses unfiltered backfill streaming: the AS-OF-SYSTEM-TIME snapshot
+	// handoff means a "precise" backfill's row-key filtering could drop a change to a not-yet-
+	// scanned row committed before its chunk was read. Setting UnpredictableKeyOrdering makes the
+	// generic backfill logic select the unfiltered strategy. See backfill.go and replication.go.
 	for _, info := range tableMap {
 		info.UnpredictableKeyOrdering = true
 	}
@@ -252,12 +247,10 @@ func getTables(ctx context.Context, conn *pgxpool.Pool, selectedSchemas []string
 	return tables, rows.Err()
 }
 
-// getColumns lists the columns of every table. The `END::text` cast (rather than PostgreSQL's
-// `::information_schema.character_data`) is required because CockroachDB doesn't implement that
-// internal domain type. Hidden columns (the synthesized `rowid`, hash-shard columns, and
-// `crdb_region`) are included but flagged, because primary keys may contain them and the key
-// logic in DiscoverTableDetails has to reason about which ones it can capture; they are never
-// added to the discovered column set directly.
+// getColumns lists the columns of every table. Hidden columns (the synthesized `rowid`,
+// hash-shard columns, and `crdb_region`) are included but flagged rather than discovered
+// directly, since primary keys may contain them and DiscoverTableDetails' key logic needs to
+// reason about which ones it can capture.
 const queryDiscoverColumns = `
   SELECT nc.nspname as table_schema,
          c.relname as table_name,

@@ -15,6 +15,13 @@ import (
 // up, so any value at least as large as the real transaction count yields identical output.
 const runSessions = 16
 
+// TestSpec verifies the connector's spec output against a snapshot.
+func TestSpec(t *testing.T) {
+	var _, tc = blackboxTestSetup(t)
+	tc.Spec("Get Connector Spec")
+	cupaloy.SnapshotT(t, tc.Transcript.String())
+}
+
 func TestConfigURI(t *testing.T) {
 	for name, cfg := range map[string]Config{
 		"Basic": {

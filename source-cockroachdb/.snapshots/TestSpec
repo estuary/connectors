@@ -1,0 +1,216 @@
+=== Spec: Get Connector Spec ===
+{
+  "protocol": 3032023,
+  "configSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "address": {
+        "type": "string",
+        "title": "Server Address",
+        "description": "The host or host:port at which the database can be reached.",
+        "order": 0
+      },
+      "user": {
+        "type": "string",
+        "title": "User",
+        "description": "The database user to authenticate as.",
+        "default": "flow_capture",
+        "order": 1
+      },
+      "password": {
+        "type": "string",
+        "title": "Password",
+        "description": "Password for the specified database user.",
+        "order": 2,
+        "secret": true
+      },
+      "database": {
+        "type": "string",
+        "title": "Database",
+        "description": "Logical database name to capture from.",
+        "default": "defaultdb",
+        "order": 3
+      },
+      "historyMode": {
+        "type": "boolean",
+        "description": "Capture change events without reducing them to a final state.",
+        "default": false,
+        "nonsensitive": true,
+        "order": 4
+      },
+      "advanced": {
+        "properties": {
+          "sslmode": {
+            "type": "string",
+            "enum": [
+              "disable",
+              "allow",
+              "prefer",
+              "require",
+              "verify-ca",
+              "verify-full"
+            ],
+            "title": "SSL Mode",
+            "description": "Overrides SSL connection behavior by setting the 'sslmode' parameter."
+          },
+          "resolved_interval": {
+            "type": "string",
+            "title": "Changefeed Resolved Interval",
+            "description": "How frequently the changefeed should emit resolved-timestamp checkpoints. Smaller values reduce end-to-end latency at the cost of slightly more overhead.",
+            "default": "1s",
+            "nonsensitive": true
+          },
+          "backfill_chunk_size": {
+            "type": "integer",
+            "title": "Backfill Chunk Size",
+            "description": "The number of rows which should be fetched from the database in a single backfill query.",
+            "default": 250000,
+            "nonsensitive": true
+          },
+          "skip_backfills": {
+            "type": "string",
+            "title": "Skip Backfills",
+            "description": "A comma-separated list of fully-qualified table names which should not be backfilled."
+          },
+          "discover_schemas": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Discovery Schema Selection",
+            "description": "If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas.",
+            "nonsensitive": true
+          },
+          "source_tag": {
+            "type": "string",
+            "title": "Source Tag",
+            "description": "When set the capture will add this value as the property 'tag' in the source metadata of each document.",
+            "nonsensitive": true
+          },
+          "feature_flags": {
+            "type": "string",
+            "title": "Feature Flags",
+            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.",
+            "nonsensitive": true
+          },
+          "statement_timeout": {
+            "type": "string",
+            "enum": [
+              "",
+              "30s",
+              "1m",
+              "5m",
+              "30m"
+            ],
+            "title": "Statement Timeout",
+            "description": "Overrides the default statement timeout used by the connector. The default of zero disables statement timeouts entirely.",
+            "default": "",
+            "nonsensitive": true
+          },
+          "rediscovery_interval": {
+            "type": "string",
+            "title": "Rediscovery Interval",
+            "description": "How often the connector re-runs discovery while a capture is running to notice schema changes and newly added tables. Accepts duration strings like '15m' or '1h'. Defaults to 15m when unspecified.",
+            "default": "15m",
+            "pattern": "^[0-9]+(ms|s|m|h)$"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Advanced Options",
+        "description": "Options for advanced users. You should not typically need to modify these.",
+        "advanced": true
+      },
+      "networkTunnel": {
+        "properties": {
+          "sshForwarding": {
+            "properties": {
+              "sshEndpoint": {
+                "type": "string",
+                "title": "SSH Endpoint",
+                "description": "Endpoint of the remote SSH server that supports tunneling (in the form of ssh://user@hostname[:port])",
+                "pattern": "^ssh://.+@.+$"
+              },
+              "privateKey": {
+                "type": "string",
+                "title": "SSH Private Key",
+                "description": "Private key to connect to the remote SSH server.",
+                "multiline": true,
+                "secret": true
+              }
+            },
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "sshEndpoint",
+              "privateKey"
+            ],
+            "title": "SSH Forwarding"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Network Tunnel",
+        "description": "Connect to your system through an SSH server that acts as a bastion host for your network."
+      }
+    },
+    "type": "object",
+    "required": [
+      "address",
+      "user",
+      "password",
+      "database",
+      "historyMode"
+    ],
+    "title": "CockroachDB Connection"
+  },
+  "resourceConfigSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/sqlcapture/resource",
+    "properties": {
+      "mode": {
+        "type": "string",
+        "enum": [
+          "",
+          "Normal",
+          "Precise",
+          "Only Changes",
+          "Without Primary Key"
+        ],
+        "title": "Backfill Mode",
+        "description": "How the preexisting contents of the table should be backfilled. This should generally not be changed.",
+        "default": ""
+      },
+      "namespace": {
+        "type": "string",
+        "title": "Schema",
+        "description": "The schema (namespace) in which the table resides.",
+        "readOnly": true
+      },
+      "stream": {
+        "type": "string",
+        "title": "Table Name",
+        "description": "The name of the table to be captured.",
+        "readOnly": true
+      },
+      "priority": {
+        "type": "integer",
+        "title": "Backfill Priority",
+        "description": "An optional integer priority for this binding. The highest priority binding(s) will be backfilled completely before any others. The default priority is zero. Negative priorities are allowed and will cause a binding to be backfilled after others."
+      }
+    },
+    "type": "object",
+    "required": [
+      "namespace",
+      "stream"
+    ],
+    "title": "SQL Database Resource Spec"
+  },
+  "documentationUrl": "https://go.estuary.dev/source-cockroachdb",
+  "resourcePathPointers": [
+    "/namespace",
+    "/stream"
+  ]
+}
+
+

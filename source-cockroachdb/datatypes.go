@@ -8,10 +8,9 @@ import (
 )
 
 // CockroachDB reports column types through pg_catalog using PostgreSQL type names (INT8 →
-// "int8", STRING → "text", DECIMAL → "numeric", BYTES → "bytea", etc.), so the type-name → JSON
-// schema mapping is shared with the PostgreSQL connector. We only need the mapping for discovery:
-// captured values are never decoded by the connector because the changefeed and `to_jsonb` both
-// deliver CockroachDB-native JSON directly (see change.go).
+// "int8", STRING → "text", DECIMAL → "numeric", etc.). This mapping is only used for discovery:
+// captured values are never decoded, since the changefeed and `to_jsonb` both deliver
+// CockroachDB-native JSON directly (see change.go).
 
 type columnSchema struct {
 	contentEncoding string
@@ -42,10 +41,8 @@ func (s columnSchema) toType() *jsonschema.Schema {
 	return out
 }
 
-// lookupColumnSchema maps a type name to its JSON schema. Unlike the PostgreSQL connector there
-// is no primary-key-specific stringification: captured values are raw CockroachDB JSON, so the
-// schema must describe the value as emitted. FLOAT and DECIMAL columns (raw JSON numbers) are
-// instead excluded from usable collection keys during discovery.
+// lookupColumnSchema maps a type name to its JSON schema, describing the value as CockroachDB
+// actually emits it (no primary-key-specific stringification, unlike the PostgreSQL connector).
 func lookupColumnSchema(typeName string) (columnSchema, error) {
 	if s, ok := cockroachdbTypeToJSON[typeName]; ok {
 		return s, nil
@@ -78,12 +75,9 @@ var cockroachdbTypeToJSON = map[string]columnSchema{
 	"json":  {},
 	"jsonb": {},
 
-	// TIMESTAMP and TIME (without time zone) are deliberately not given "date-time"/"time"
-	// formats: those formats require a timezone offset, and CockroachDB's JSON rendering of the
-	// naive types has none (e.g. "2026-01-01T00:00:00", "23:59:59.999999"), so every value would
-	// fail collection-schema validation. The timezone-aware types render with an offset and keep
-	// their formats. (Caveat: 'BC' and five-plus-digit-year values don't conform to the date /
-	// date-time formats either, but such values are vanishingly rare in real data.)
+	// TIMESTAMP and TIME (without time zone) deliberately skip the "date-time"/"time" formats:
+	// those require a timezone offset, and CockroachDB's naive-type JSON rendering has none
+	// (e.g. "2026-01-01T00:00:00"), which would fail collection-schema validation.
 	"date":        {jsonTypes: []string{"string"}, format: "date"},
 	"timestamp":   {jsonTypes: []string{"string"}},
 	"timestamptz": {jsonTypes: []string{"string"}, format: "date-time"},
@@ -147,13 +141,11 @@ func (t cockroachdbArrayType) JSONSchema(isColumnNullable, isPrimaryKey bool) (*
 	return jsonType, nil
 }
 
-// encodeKeyFDB lowers a backfill key-column value into an FDB tuple element. Because the scan
-// query projects key columns as `::STRING` (see buildScanQuery), values arrive as CockroachDB's
-// canonical text rendering (or nil), which round-trips losslessly and is accepted back as a bind
-// argument for the resume predicate. Because this connector always uses unfiltered backfill
-// streaming, the encoded key only needs to round-trip; its byte ordering never has to reproduce
-// the database's sort order. Anything other than a string is unexpected and must fail loudly
-// rather than be lowered to a lossy representation.
+// encodeKeyFDB lowers a backfill key-column value into an FDB tuple element. Values arrive as
+// CockroachDB's canonical text rendering (or nil), per the `::STRING` projection in
+// buildScanQuery, which round-trips losslessly as a resume-predicate bind argument. Because this
+// connector always uses unfiltered backfill streaming, the encoded key only needs to round-trip;
+// its byte ordering never has to reproduce the database's sort order.
 func encodeKeyFDB(v any) (tuple.TupleElement, error) {
 	switch x := v.(type) {
 	case nil, string:

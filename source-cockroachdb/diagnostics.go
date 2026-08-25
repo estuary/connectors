@@ -10,37 +10,46 @@ import (
 // the most useful things to surface are the current cluster timestamp (to compare against the
 // connector's cursor) and the state of any changefeed jobs the connector might be running.
 func (db *cockroachdbDatabase) ReplicationDiagnostics(ctx context.Context) error {
-	var hlc string
-	if err := db.conn.QueryRow(ctx, "SELECT cluster_logical_timestamp()").Scan(&hlc); err != nil {
-		logrus.WithField("err", err).Warn("diagnostics: unable to query cluster logical timestamp")
-	} else {
-		logrus.WithField("clusterTimestamp", hlc).Info("replication diagnostics: current cluster timestamp")
+	var query = func(q string) {
+		logrus.WithField("query", q).Info("running diagnostics query")
+		var result, err = db.conn.Query(ctx, q)
+		if err != nil {
+			logrus.WithFields(logrus.Fields{
+				"query": q,
+				"err":   err,
+			}).Error("unable to execute diagnostics query")
+			return
+		}
+		defer result.Close()
+
+		var numResults int
+		var keys = result.FieldDescriptions()
+		for result.Next() {
+			numResults++
+			var row, err = result.Values()
+			if err != nil {
+				logrus.WithField("err", err).Error("unable to process result row")
+				continue
+			}
+
+			var logFields = logrus.Fields{}
+			for idx, val := range row {
+				logFields[string(keys[idx].Name)] = val
+			}
+			logrus.WithFields(logFields).Info("got diagnostic row")
+		}
+		if numResults == 0 {
+			logrus.WithField("query", q).Info("no results")
+		}
 	}
 
-	var rows, err = db.conn.Query(ctx, "SELECT job_id, status, running_status FROM [SHOW CHANGEFEED JOBS] WHERE status = 'running' LIMIT 20")
-	if err != nil {
-		logrus.WithField("err", err).Debug("diagnostics: unable to list changefeed jobs")
-		return nil
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var jobID int64
-		var status, runningStatus *string
-		if err := rows.Scan(&jobID, &status, &runningStatus); err != nil {
-			return nil
-		}
-		logrus.WithFields(logrus.Fields{
-			"jobID":         jobID,
-			"status":        derefString(status),
-			"runningStatus": derefString(runningStatus),
-		}).Info("replication diagnostics: changefeed job")
-	}
+	query("SELECT cluster_logical_timestamp();")
+	query("SELECT job_id, status, running_status FROM [SHOW CHANGEFEED JOBS] WHERE status = 'running' LIMIT 20;")
 	return nil
 }
 
-func derefString(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
+// PeriodicChecks has nothing to do for CockroachDB. Unlike PostgreSQL there's no replication slot
+// whose disk usage we need to keep an eye on.
+func (db *cockroachdbDatabase) PeriodicChecks(ctx context.Context) error {
+	return nil
 }

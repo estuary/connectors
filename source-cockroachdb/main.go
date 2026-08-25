@@ -95,7 +95,7 @@ type Config struct {
 	User        string         `json:"user" jsonschema:"title=User,description=The database user to authenticate as.,default=flow_capture" jsonschema_extras:"order=1"`
 	Password    string         `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
 	Database    string         `json:"database" jsonschema:"title=Database,default=defaultdb,description=Logical database name to capture from." jsonschema_extras:"order=3"`
-	HistoryMode bool           `json:"historyMode" jsonschema:"default=false,description=Capture change events without reducing them to a final state." jsonschema_extras:"order=4"`
+	HistoryMode bool           `json:"historyMode" jsonschema:"default=false,description=Capture change events without reducing them to a final state." jsonschema_extras:"order=4,nonsensitive=true"`
 	Advanced    advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 
 	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
@@ -103,13 +103,13 @@ type Config struct {
 
 type advancedConfig struct {
 	SSLMode           string   `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Overrides SSL connection behavior by setting the 'sslmode' parameter.,enum=disable,enum=allow,enum=prefer,enum=require,enum=verify-ca,enum=verify-full"`
-	ResolvedInterval  string   `json:"resolved_interval,omitempty" jsonschema:"title=Changefeed Resolved Interval,description=How frequently the changefeed should emit resolved-timestamp checkpoints. Smaller values reduce end-to-end latency at the cost of slightly more overhead.,default=1s"`
-	BackfillChunkSize int      `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=250000,description=The number of rows which should be fetched from the database in a single backfill query."`
+	ResolvedInterval  string   `json:"resolved_interval,omitempty" jsonschema:"title=Changefeed Resolved Interval,description=How frequently the changefeed should emit resolved-timestamp checkpoints. Smaller values reduce end-to-end latency at the cost of slightly more overhead.,default=1s" jsonschema_extras:"nonsensitive=true"`
+	BackfillChunkSize int      `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=250000,description=The number of rows which should be fetched from the database in a single backfill query." jsonschema_extras:"nonsensitive=true"`
 	SkipBackfills     string   `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled."`
-	DiscoverSchemas   []string `json:"discover_schemas,omitempty" jsonschema:"title=Discovery Schema Selection,description=If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas."`
-	SourceTag         string   `json:"source_tag,omitempty" jsonschema:"title=Source Tag,description=When set the capture will add this value as the property 'tag' in the source metadata of each document."`
-	FeatureFlags      string   `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
-	StatementTimeout  string   `json:"statement_timeout,omitempty" jsonschema:"title=Statement Timeout,description=Overrides the default statement timeout used by the connector. The default of zero disables statement timeouts entirely.,enum=,enum=30s,enum=1m,enum=5m,enum=30m,default="`
+	DiscoverSchemas   []string `json:"discover_schemas,omitempty" jsonschema:"title=Discovery Schema Selection,description=If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas." jsonschema_extras:"nonsensitive=true"`
+	SourceTag         string   `json:"source_tag,omitempty" jsonschema:"title=Source Tag,description=When set the capture will add this value as the property 'tag' in the source metadata of each document." jsonschema_extras:"nonsensitive=true"`
+	FeatureFlags      string   `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
+	StatementTimeout  string   `json:"statement_timeout,omitempty" jsonschema:"title=Statement Timeout,description=Overrides the default statement timeout used by the connector. The default of zero disables statement timeouts entirely.,enum=,enum=30s,enum=1m,enum=5m,enum=30m,default=" jsonschema_extras:"nonsensitive=true"`
 
 	RediscoveryInterval string `json:"rediscovery_interval,omitempty" jsonschema:"title=Rediscovery Interval,default=15m,description=How often the connector re-runs discovery while a capture is running to notice schema changes and newly added tables. Accepts duration strings like '15m' or '1h'. Defaults to 15m when unspecified." jsonschema_extras:"pattern=^[0-9]+(ms|s|m|h)$"`
 }
@@ -177,11 +177,10 @@ func (c *Config) Validate() error {
 // SetDefaults fills in the default values for unset optional parameters.
 func (c *Config) SetDefaults() {
 	if c.Advanced.BackfillChunkSize <= 0 {
-		// Larger than the PostgreSQL connector's 50k default on purpose: each backfill chunk is
-		// followed by a fence, and a CockroachDB changefeed fence costs several seconds (it can
-		// only advance on the cluster's closed-timestamp cadence) versus sub-millisecond for a
-		// PostgreSQL watermark write. Fewer, larger chunks therefore dramatically reduce backfill
-		// wall-clock time on CockroachDB without affecting correctness.
+		// Larger than the PostgreSQL connector's 50k default on purpose: a CockroachDB changefeed
+		// fence costs several seconds (bound to the cluster's closed-timestamp cadence) versus
+		// sub-millisecond for a PostgreSQL watermark write, so fewer/larger chunks cut backfill
+		// wall-clock time without affecting correctness.
 		c.Advanced.BackfillChunkSize = 250000
 	}
 	if c.Advanced.ResolvedInterval == "" {

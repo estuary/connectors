@@ -31,11 +31,10 @@ func (evt *cockroachdbCommitEvent) AppendJSON(buf []byte) ([]byte, error) {
 type cockroachdbSource struct {
 	sqlcapture.SourceCommon
 
-	// Cursor is the CockroachDB HLC (hybrid logical clock) MVCC timestamp at which this change
-	// became visible (the changefeed's `updated` timestamp), or the snapshot timestamp for
-	// backfilled rows. It is the CockroachDB analogue of a PostgreSQL LSN: a monotonic position
-	// in the change history. It's emitted under the property name "loc" to mirror the other SQL
-	// CDC connectors, and is the basis of the fallback collection key for keyless tables.
+	// Cursor is the CockroachDB HLC timestamp at which this change became visible (the
+	// changefeed's `updated` timestamp), or the snapshot timestamp for backfilled rows — the
+	// CockroachDB analogue of a PostgreSQL LSN, emitted as "loc" to mirror the other SQL CDC
+	// connectors.
 	Cursor string `json:"loc,omitempty" jsonschema:"description=The HLC timestamp at which this change occurred, or the snapshot timestamp for backfilled rows."`
 
 	Tag string `json:"tag,omitempty" jsonschema:"description=Optional 'Source Tag' property as defined in the endpoint configuration."`
@@ -43,14 +42,11 @@ type cockroachdbSource struct {
 
 func (s *cockroachdbSource) Common() sqlcapture.SourceCommon { return s.SourceCommon }
 
-// cockroachdbChangeEvent is the sqlcapture.ChangeEvent implementation for CockroachDB.
-//
-// Unlike the PostgreSQL and MySQL connectors we don't decode individual column values: both the
-// backfill (`to_jsonb(row)`) and the changefeed (`format=json` `after` value) hand us the row
-// already encoded as CockroachDB-native JSON, and those two encodings are byte-for-byte identical.
-// So `Document` holds the row as a raw JSON object and we splice in the `_meta` property when
-// serializing. Splicing (rather than unmarshalling into a map) preserves exact numeric values,
-// which matters for INT8 columns whose magnitude exceeds what a float64 can represent.
+// cockroachdbChangeEvent is the sqlcapture.ChangeEvent implementation for CockroachDB. Unlike
+// PostgreSQL and MySQL, column values are never decoded: both the backfill (`to_jsonb(row)`) and
+// the changefeed (`after` value) hand us byte-for-byte identical CockroachDB-native JSON, so
+// `document` is spliced directly rather than unmarshalled, preserving INT8 values too large for
+// a float64.
 type cockroachdbChangeEvent struct {
 	stream   sqlcapture.StreamID
 	op       sqlcapture.ChangeOp
@@ -78,10 +74,9 @@ func (e *cockroachdbChangeEvent) StreamID() sqlcapture.StreamID { return e.strea
 
 func (e *cockroachdbChangeEvent) GetRowKey() []byte { return e.rowKey }
 
-// AppendJSON serializes the change event as the row document with an added `_meta` property,
-// appending directly to the caller's (reused) buffer. We hand-roll the metadata and splice the row
-// document rather than round-tripping through a map or json.Marshal, both to preserve exact numeric
-// values and to avoid a per-event allocation on the hot streaming path.
+// AppendJSON serializes the change event as the row document with an added `_meta` property. We
+// splice the row document and hand-roll the metadata rather than round-tripping through
+// json.Marshal, to avoid a per-event allocation on the hot streaming path.
 func (e *cockroachdbChangeEvent) AppendJSON(buf []byte) ([]byte, error) {
 	var doc = bytes.TrimSpace(e.document)
 	if len(doc) < 2 || doc[0] != '{' || doc[len(doc)-1] != '}' {

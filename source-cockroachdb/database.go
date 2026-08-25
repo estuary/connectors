@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -10,7 +9,6 @@ import (
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/invopop/jsonschema"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/sirupsen/logrus"
 )
 
 type cockroachdbDatabase struct {
@@ -19,11 +17,8 @@ type cockroachdbDatabase struct {
 	featureFlags map[string]bool // Parsed feature flag settings with defaults applied.
 
 	// snapshot.timestamp is the HLC at which backfills read (`AS OF SYSTEM TIME`) and from which
-	// the changefeed (re)starts. It begins at the capture's start position and is advanced to each
-	// resolved timestamp the changefeed reports. Advancing it is what makes unfiltered streaming
-	// safe: a resolved timestamp means every change up to it has already been emitted, so a chunk
-	// read at that timestamp can never publish row state older than an already-emitted change
-	// event, while changes after it are still streamed afterwards and supersede the chunk.
+	// the changefeed (re)starts. It advances to each resolved timestamp the changefeed reports,
+	// which is what keeps unfiltered streaming safe (see ScanTableChunk in backfill.go).
 	snapshot struct {
 		sync.Mutex
 		timestamp string
@@ -103,40 +98,5 @@ func (db *cockroachdbDatabase) ShouldBackfill(streamID sqlcapture.StreamID) bool
 	return true
 }
 
-// RequestTxIDs is a no-op for CockroachDB. The transaction-ID plumbing exists for connectors which
-// can cheaply attach a transaction identifier to replication events; sinkless changefeeds don't
-// surface one, so there's nothing to enable.
+// RequestTxIDs is a no-op: sinkless changefeeds don't surface a transaction identifier to attach.
 func (db *cockroachdbDatabase) RequestTxIDs(schema, table string) {}
-
-func (db *cockroachdbDatabase) EstimatedRowCounts(ctx context.Context, tables []sqlcapture.TableID) (map[sqlcapture.TableID]int, error) {
-	db.tableStatistics.Lock()
-	defer db.tableStatistics.Unlock()
-	if db.tableStatistics.counts == nil {
-		db.tableStatistics.counts = make(map[sqlcapture.StreamID]int)
-	}
-
-	var result = make(map[sqlcapture.TableID]int, len(tables))
-	for _, table := range tables {
-		var streamID = sqlcapture.JoinStreamID(table.Schema, table.Table)
-		if count, ok := db.tableStatistics.counts[streamID]; ok {
-			result[table] = count
-			continue
-		}
-		// `SHOW TABLES` exposes CockroachDB's optimizer row-count estimate without a full scan.
-		var count int
-		var query = fmt.Sprintf("SELECT estimated_row_count FROM [SHOW TABLES FROM %q] WHERE table_name = $1", table.Schema)
-		if err := db.conn.QueryRow(ctx, query, table.Table).Scan(&count); err != nil {
-			logrus.WithFields(logrus.Fields{"table": streamID, "err": err}).Debug("error querying estimated row count")
-			count = 0
-		}
-		db.tableStatistics.counts[streamID] = count
-		result[table] = count
-	}
-	return result, nil
-}
-
-// PeriodicChecks has nothing to do for CockroachDB. Unlike PostgreSQL there's no replication slot
-// whose disk usage we need to keep an eye on.
-func (db *cockroachdbDatabase) PeriodicChecks(ctx context.Context) error {
-	return nil
-}

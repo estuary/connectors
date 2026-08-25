@@ -12,13 +12,10 @@ import (
 
 // ScanTableChunk reads a chunk of rows from a table as part of the initial backfill.
 //
-// The chunk is read `AS OF SYSTEM TIME <anchor>`, where the anchor is the latest resolved
-// timestamp the changefeed has reported (or the capture's start position before any). Reading at
-// the latest resolved timestamp means a chunk can never observe row state older than a change
-// event which has already been emitted, while all changes after it are still streamed afterwards
-// and supersede the chunk — this is what makes chunked backfill and unfiltered streaming converge.
-// Each row is fetched as `to_jsonb(row)`, which produces exactly the same JSON encoding as the
-// changefeed's `after` value, so backfilled and streamed documents are byte-for-byte consistent.
+// Rows are read `AS OF SYSTEM TIME <anchor>`, the latest resolved timestamp the changefeed has
+// reported, so a chunk can never observe row state older than an already-emitted change event —
+// this is what lets chunked backfill and unfiltered streaming converge. Each row is fetched as
+// `to_jsonb(row)`, matching the changefeed's `after` encoding byte-for-byte.
 func (db *cockroachdbDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, callback func(event sqlcapture.ChangeEvent) error) (bool, []byte, error) {
 	var keyColumns = state.KeyColumns
 	var schema, table = info.Schema, info.Name
@@ -26,7 +23,7 @@ func (db *cockroachdbDatabase) ScanTableChunk(ctx context.Context, info *sqlcapt
 	var anchor = db.snapshotTimestamp() // One consistent read timestamp for this whole chunk.
 
 	var docMergeColumns []string
-	if details, ok := info.ExtraDetails.(*cockroachdbTableDetails); ok {
+	if details, ok := info.ExtraDetails.(*cockroachdbTableDiscoveryDetails); ok {
 		docMergeColumns = details.docMergeColumns
 	}
 
@@ -34,10 +31,9 @@ func (db *cockroachdbDatabase) ScanTableChunk(ctx context.Context, info *sqlcapt
 	var args []any
 	switch state.Mode {
 	case sqlcapture.TableStateKeylessBackfill:
-		// Tables always have a primary key or a synthesized rowid (which discovery adopts as the
-		// collection key), so keyless mode is never suggested and cannot be captured correctly:
-		// keyless collections fall back to a key on the HLC cursor value, which is shared by every
-		// backfill row and by all rows in a transaction, collapsing them to a single document.
+		// Every table has a primary key or a synthesized rowid, so keyless mode is never
+		// suggested; a keyless collection would key on the shared HLC cursor value instead,
+		// collapsing every row in a chunk into one document.
 		return false, nil, fmt.Errorf("keyless backfill mode is not supported for %q: capture the table with its primary key (or synthesized rowid) instead", streamID)
 	case sqlcapture.TableStatePreciseBackfill, sqlcapture.TableStateUnfilteredBackfill:
 		if state.Scanned != nil {
@@ -68,7 +64,6 @@ func (db *cockroachdbDatabase) ScanTableChunk(ctx context.Context, info *sqlcapt
 
 	var resultRows int
 	var nextRowKey []byte
-	var rowOffset = state.BackfilledCount
 	for rows.Next() {
 		values, err := rows.Values()
 		if err != nil {
@@ -81,15 +76,9 @@ func (db *cockroachdbDatabase) ScanTableChunk(ctx context.Context, info *sqlcapt
 			return false, nil, fmt.Errorf("expected string document for %q but got %T", streamID, values[len(values)-1])
 		}
 
-		var rowKey []byte
-		if state.Mode == sqlcapture.TableStateKeylessBackfill {
-			// A 19-digit decimal is sufficient to hold any 63-bit row offset.
-			rowKey = []byte(fmt.Sprintf("B%019d", rowOffset))
-		} else {
-			rowKey, err = encodeRowKey(values[:len(keyColumns)])
-			if err != nil {
-				return false, nil, fmt.Errorf("error encoding row key for %q: %w", streamID, err)
-			}
+		rowKey, err := encodeRowKey(values[:len(keyColumns)])
+		if err != nil {
+			return false, nil, fmt.Errorf("error encoding row key for %q: %w", streamID, err)
 		}
 		nextRowKey = rowKey
 
@@ -111,7 +100,6 @@ func (db *cockroachdbDatabase) ScanTableChunk(ctx context.Context, info *sqlcapt
 			return false, nil, fmt.Errorf("error processing backfill row for %q: %w", streamID, err)
 		}
 		resultRows++
-		rowOffset++
 	}
 	if err := rows.Err(); err != nil {
 		return false, nil, fmt.Errorf("error reading backfill results for %q: %w", streamID, err)
@@ -126,9 +114,14 @@ func (db *cockroachdbDatabase) ScanTableChunk(ctx context.Context, info *sqlcapt
 // CockroachDB supports this composite comparison directly, which is simpler than the expanded
 // per-column OR form needed by some other databases.
 func (db *cockroachdbDatabase) buildScanQuery(anchor string, start bool, keyColumns, docMergeColumns []string, schema, table string) string {
+	// Key columns are projected `::STRING` so the resume key round-trips exactly as a text bind
+	// argument (unlike the Go values pgx would otherwise decode). The projection is aliased to
+	// `__key<N>` so ORDER BY still resolves to the raw column rather than the STRING rendering.
 	var quotedKeys = make([]string, len(keyColumns))
+	var castKeys = make([]string, len(keyColumns))
 	for i, col := range keyColumns {
 		quotedKeys[i] = quoteIdentifier(col)
+		castKeys[i] = fmt.Sprintf("%s::STRING AS __key%d", quotedKeys[i], i)
 	}
 
 	// Hidden stored key columns (the synthesized rowid) appear in changefeed `after` documents
@@ -137,21 +130,6 @@ func (db *cockroachdbDatabase) buildScanQuery(anchor string, start bool, keyColu
 	var docExpr = "to_jsonb(t.*)"
 	for _, col := range docMergeColumns {
 		docExpr = fmt.Sprintf("(%s || jsonb_build_object('%s', t.%s))", docExpr, strings.ReplaceAll(col, "'", "''"), quoteIdentifier(col))
-	}
-
-	// Key columns are projected as `::STRING` so that the resume key round-trips exactly:
-	// CockroachDB's canonical text rendering of a value is always accepted back as a text bind
-	// argument compared against the native column, whereas the Go values pgx would otherwise
-	// decode ([16]byte UUIDs, time.Time, pgtype.Numeric) have no such guarantee. The WHERE and
-	// ORDER BY clauses keep the raw column references so the primary-key index is still used.
-	//
-	// The aliases are load-bearing: an unaliased `"id"::STRING` output column is still named
-	// "id", which `ORDER BY "id"` then resolves to — silently sorting by the STRING rendering
-	// (an unindexed top-k sort, and an ordering inconsistent with the raw-column resume
-	// predicate). Aliasing the projection keeps ORDER BY bound to the table column.
-	var castKeys = make([]string, len(keyColumns))
-	for i, col := range quotedKeys {
-		castKeys[i] = fmt.Sprintf("%s::STRING AS __key%d", col, i)
 	}
 
 	var query = new(strings.Builder)
@@ -187,7 +165,52 @@ func quoteIdentifier(name string) string {
 	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
 }
 
+func (db *cockroachdbDatabase) EstimatedRowCounts(ctx context.Context, tables []sqlcapture.TableID) (map[sqlcapture.TableID]int, error) {
+	db.tableStatistics.Lock()
+	defer db.tableStatistics.Unlock()
+	if db.tableStatistics.counts == nil {
+		db.tableStatistics.counts = make(map[sqlcapture.StreamID]int)
+	}
+
+	var result = make(map[sqlcapture.TableID]int, len(tables))
+	var queriedSchemas = make(map[string]bool)
+	for _, table := range tables {
+		var streamID = sqlcapture.JoinStreamID(table.Schema, table.Table)
+		if _, ok := db.tableStatistics.counts[streamID]; !ok && !queriedSchemas[table.Schema] {
+			queriedSchemas[table.Schema] = true
+			db.queryEstimatedRowCounts(ctx, table.Schema)
+		}
+		result[table] = db.tableStatistics.counts[streamID]
+	}
+	return result, nil
+}
+
+// queryEstimatedRowCounts fetches and caches the optimizer's row-count estimate (via `SHOW
+// TABLES`, which exposes it without a full scan) for every table in schema in a single query,
+// rather than issuing one query per requested table.
+func (db *cockroachdbDatabase) queryEstimatedRowCounts(ctx context.Context, schema string) {
+	var query = fmt.Sprintf("SELECT table_name, estimated_row_count FROM [SHOW TABLES FROM %q]", schema)
+	var rows, err = db.conn.Query(ctx, query)
+	if err != nil {
+		logrus.WithFields(logrus.Fields{"schema": schema, "err": err}).Debug("error querying estimated row counts")
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var tableName string
+		var count int
+		if err := rows.Scan(&tableName, &count); err != nil {
+			logrus.WithFields(logrus.Fields{"schema": schema, "err": err}).Debug("error scanning estimated row count")
+			continue
+		}
+		db.tableStatistics.counts[sqlcapture.JoinStreamID(schema, tableName)] = count
+	}
+}
+
 func (db *cockroachdbDatabase) explainQuery(ctx context.Context, streamID sqlcapture.StreamID, query string, args []any) {
+	if !logrus.IsLevelEnabled(logrus.DebugLevel) {
+		return
+	}
 	if db.explained == nil {
 		db.explained = make(map[sqlcapture.StreamID]struct{})
 	}

@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"regexp"
 
-	cerrors "github.com/estuary/connectors/go/connector-errors"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 )
 
 func (db *cockroachdbDatabase) SetupPrerequisites(ctx context.Context) []error {
@@ -39,10 +39,10 @@ func (db *cockroachdbDatabase) logVersion(ctx context.Context) {
 func (db *cockroachdbDatabase) prerequisiteRangefeed(ctx context.Context) error {
 	var enabled bool
 	if err := db.conn.QueryRow(ctx, "SHOW CLUSTER SETTING kv.rangefeed.enabled").Scan(&enabled); err != nil {
-		return cerrors.NewUserError(err, "unable to query the 'kv.rangefeed.enabled' cluster setting; the capture user may lack the necessary privileges")
+		return fmt.Errorf("unable to query the 'kv.rangefeed.enabled' cluster setting; the capture user may lack the necessary privileges: %w", err)
 	}
 	if !enabled {
-		return cerrors.NewUserError(nil, "changefeeds require rangefeeds to be enabled: run `SET CLUSTER SETTING kv.rangefeed.enabled = true;` as an admin user")
+		return fmt.Errorf("changefeeds require rangefeeds to be enabled: run `SET CLUSTER SETTING kv.rangefeed.enabled = true;` as an admin user")
 	}
 	return nil
 }
@@ -61,26 +61,40 @@ func (db *cockroachdbDatabase) SetupTablePrerequisites(ctx context.Context, tabl
 		logrus.WithField("err", err).Warn("unable to discover table details for prerequisite checks")
 	}
 
-	for _, table := range tables {
+	// The read-access and column-family checks below are independent per table, so they're run
+	// concurrently rather than one table at a time.
+	var results = make([]error, len(tables))
+	var group, groupCtx = errgroup.WithContext(ctx)
+	for i, table := range tables {
 		var streamID = sqlcapture.JoinStreamID(table.Schema, table.Table)
 		if info, ok := discovered[streamID]; ok {
-			if details, ok := info.ExtraDetails.(*cockroachdbTableDetails); ok && details.unusableKeyReason != "" {
-				errs[table] = fmt.Errorf("cannot capture table %q: %s", streamID, details.unusableKeyReason)
+			if details, ok := info.ExtraDetails.(*cockroachdbTableDiscoveryDetails); ok && details.unusableKeyReason != "" {
+				results[i] = fmt.Errorf("cannot capture table %q: %s", streamID, details.unusableKeyReason)
 				continue
 			}
 		}
 
-		// Verify that the capture user can read from the table. CHANGEFEED also requires the
-		// CHANGEFEED privilege on the table, but that's awkward to probe portably; if it's missing
-		// the changefeed statement will surface a clear permission error when streaming begins.
-		var query = fmt.Sprintf("SELECT 1 FROM %s.%s LIMIT 0", quoteIdentifier(table.Schema), quoteIdentifier(table.Table))
-		if _, err := db.conn.Exec(ctx, query); err != nil {
-			errs[table] = fmt.Errorf("user %q cannot read from table %q: %w", db.config.User, streamID, err)
-			continue
-		}
+		group.Go(func() error {
+			// Verify that the capture user can read from the table. CHANGEFEED also requires the
+			// CHANGEFEED privilege on the table, but that's awkward to probe portably; if it's
+			// missing the changefeed statement will surface a clear permission error when
+			// streaming begins.
+			var query = fmt.Sprintf("SELECT 1 FROM %s.%s LIMIT 0", quoteIdentifier(table.Schema), quoteIdentifier(table.Table))
+			if _, err := db.conn.Exec(groupCtx, query); err != nil {
+				results[i] = fmt.Errorf("user %q cannot read from table %q: %w", db.config.User, streamID, err)
+				return nil
+			}
+			if err := db.prerequisiteSingleColumnFamily(groupCtx, table); err != nil {
+				results[i] = err
+			}
+			return nil
+		})
+	}
+	group.Wait()
 
-		if err := db.prerequisiteSingleColumnFamily(ctx, table); err != nil {
-			errs[table] = err
+	for i, table := range tables {
+		if results[i] != nil {
+			errs[table] = results[i]
 		}
 	}
 	return errs
@@ -91,12 +105,10 @@ func (db *cockroachdbDatabase) SetupTablePrerequisites(ctx context.Context, tabl
 // column name rather than the bare keyword.
 var familyLineRegexp = regexp.MustCompile(`(?m)^\s*FAMILY\s`)
 
-// prerequisiteSingleColumnFamily rejects tables with multiple column families at validation time.
-// A changefeed on such a table requires the `split_column_families` option and then emits partial
-// per-family rows under `<table>.<family>` names, neither of which this connector supports; the
-// check surfaces that clearly instead of an opaque changefeed error mid-capture. The check parses
-// SHOW CREATE TABLE (there's no supported catalog view for families), so if the statement fails
-// we skip the check rather than block the capture.
+// prerequisiteSingleColumnFamily rejects tables with multiple column families at validation time,
+// since a changefeed on such a table requires `split_column_families` and emits partial per-family
+// rows this connector doesn't support. It parses SHOW CREATE TABLE (there's no catalog view for
+// families), skipping the check rather than blocking the capture if that statement fails.
 func (db *cockroachdbDatabase) prerequisiteSingleColumnFamily(ctx context.Context, table sqlcapture.TableID) error {
 	var streamID = sqlcapture.JoinStreamID(table.Schema, table.Table)
 	var createStatement string

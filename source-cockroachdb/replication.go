@@ -16,33 +16,21 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// replicationStream consumes a CockroachDB sinkless ("core") changefeed and presents it as a
-// sqlcapture.ReplicationStream.
+// replicationStream consumes a CockroachDB sinkless ("core") changefeed — `CREATE CHANGEFEED
+// FOR TABLE ... WITH ...` with no sink URI, which streams `(table, key, value)` rows back over
+// the SQL connection — and presents it as a sqlcapture.ReplicationStream.
 //
-// A sinkless changefeed (`CREATE CHANGEFEED FOR TABLE ... WITH ...` with no sink URI) streams its
-// output rows back over the SQL connection. Each row is `(table, key, value)`:
+// `resolved` rows arrive on a fixed interval regardless of write activity, serving both as
+// transaction-commit/fence points and as a liveness signal, so unlike the PostgreSQL connector
+// there's no need to write watermarks to force progress on an idle database. The changefeed
+// starts `WITH cursor='<anchor>', no_initial_scan` from the same HLC the backfill reads `AS OF
+// SYSTEM TIME`, streams unfiltered, and relies on the collection key's reduction to collapse the
+// snapshot/stream overlap and at-least-once duplicates.
 //
-//   - upsert:   ("orders", "[1]", `{"after":{...},"updated":"<hlc>"}`)
-//   - delete:   ("orders", "[1]", `{"after":null,"updated":"<hlc>"}`)
-//   - resolved: (NULL,    NULL,  `{"resolved":"<hlc>"}`)
-//
-// `resolved` rows are emitted on a fixed interval regardless of write activity, which we use both
-// as transaction-commit/fence points and as a liveness signal, so unlike the PostgreSQL connector
-// there's no need to write watermarks to force progress on an idle database.
-//
-// Handoff with the backfill: the changefeed is started `WITH cursor='<anchor>', no_initial_scan`,
-// where the anchor is the same HLC the backfill reads `AS OF SYSTEM TIME`. Streaming is always
-// unfiltered (every change event is emitted regardless of backfill progress), with the
-// snapshot/stream overlap and at-least-once duplicates collapsed by the collection key's reduction.
-// Precise (filtered) backfill is deliberately not used because it would drop post-anchor changes
-// to rows the backfill hasn't scanned yet.
-//
-// The anchor is not fixed: each resolved timestamp advances it (see
-// cockroachdbDatabase.advanceSnapshotTimestamp). That ordering constraint is load-bearing. If
-// chunks kept reading at the capture's start position, a row in a not-yet-scanned chunk that was
-// updated or deleted after that position would first have its change event emitted (in an earlier
-// Flow transaction) and then have its older snapshot state published by the later chunk,
-// resurrecting stale or deleted rows in the reduced collection.
+// The anchor advances with every resolved timestamp (advanceSnapshotTimestamp) rather than
+// staying fixed: otherwise a row in a not-yet-scanned chunk that changed after the anchor would
+// have its change event emitted first and then its older snapshot state published by a later
+// chunk, resurrecting stale or deleted rows in the reduced collection.
 type replicationStream struct {
 	db           *cockroachdbDatabase
 	conn         *pgx.Conn          // Dedicated connection over which the changefeed streams.
@@ -120,7 +108,7 @@ func (db *cockroachdbDatabase) ReplicationStream(ctx context.Context, startCurso
 
 func (s *replicationStream) ActivateTable(ctx context.Context, streamID sqlcapture.StreamID, keyColumns []string, info *sqlcapture.DiscoveryInfo, metadata json.RawMessage) error {
 	var fullPrimaryKey = keyColumns
-	if details, ok := info.ExtraDetails.(*cockroachdbTableDetails); ok && len(details.fullPrimaryKey) > 0 {
+	if details, ok := info.ExtraDetails.(*cockroachdbTableDiscoveryDetails); ok && len(details.fullPrimaryKey) > 0 {
 		fullPrimaryKey = details.fullPrimaryKey
 	}
 	var emitKeyColumns = make([]bool, len(fullPrimaryKey))
@@ -185,15 +173,10 @@ func (s *replicationStream) ensureChangefeed(ctx context.Context) error {
 		activeByName[fmt.Sprintf("%s.%s.%s", s.db.config.Database, info.schema, info.table)] = id
 	}
 
-	// The changefeed always (re)starts from the current anchor timestamp: the capture's start
-	// position at first, and the latest resolved timestamp thereafter. Newly-activated tables are
-	// therefore covered from the same point their backfill reads, with any overlap collapsed by
-	// reduction, and a changefeed restart never has to re-stream more than the current
-	// resolved-interval's worth of changes.
-	//
-	// `min_checkpoint_frequency` must be set alongside `resolved`: the resolved interval is clamped
-	// to be no more frequent than min_checkpoint_frequency, whose default is 30s. Without this the
-	// connector would only be able to establish a fence (and thus emit a checkpoint) every 30s.
+	// The changefeed always (re)starts from the current anchor timestamp, so newly-activated
+	// tables are covered from the same point their backfill reads (overlap collapsed by
+	// reduction). `min_checkpoint_frequency` must be set alongside `resolved`, since the resolved
+	// interval is otherwise clamped to its 30s default, capping how often a fence can be established.
 	var anchor = s.db.snapshotTimestamp()
 	var sql = fmt.Sprintf(
 		"CREATE CHANGEFEED FOR TABLE %s WITH updated, resolved='%s', min_checkpoint_frequency='%s', cursor='%s', no_initial_scan, format=json, full_table_name",
