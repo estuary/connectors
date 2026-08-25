@@ -22,6 +22,9 @@
 #
 # Create flags:
 #   --machine-type TYPE   Machine type (default: e2-standard-2)
+#   --boot-disk-size SIZE Boot disk size (default: 100GB). `preview-next` writes
+#                         the whole fixture to an on-disk log, so a scenario
+#                         needs a disk larger than the bytes it moves.
 #
 # Destroy flags:
 #   --yes                 Skip confirmation prompt
@@ -38,6 +41,7 @@ USER_LABEL="$(echo "${USER:-unknown}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-
 VM_NAME="bench-${USER_LABEL}"
 ZONE="us-central1-a"
 MACHINE_TYPE="c3-standard-4-lssd"
+BOOT_DISK_SIZE="100GB"
 PROJECT=""
 YES=0
 COMMAND=""
@@ -181,14 +185,14 @@ cmd_create() {
     die "VM '$VM_NAME' already exists in $ZONE. Use 'sync' to update code, or 'destroy' first."
   fi
 
-  info "creating VM: $VM_NAME (zone=$ZONE, type=$MACHINE_TYPE)"
+  info "creating VM: $VM_NAME (zone=$ZONE, type=$MACHINE_TYPE, disk=$BOOT_DISK_SIZE)"
   gcloud compute instances create "$VM_NAME" \
     --zone="$ZONE" \
     --project="$PROJECT" \
     --machine-type="$MACHINE_TYPE" \
     --image-family=ubuntu-2404-lts-amd64 \
     --image-project=ubuntu-os-cloud \
-    --boot-disk-size=100GB \
+    --boot-disk-size="$BOOT_DISK_SIZE" \
     --boot-disk-type=pd-ssd \
     --labels="purpose=bench,owner=${USER_LABEL}" \
     --tags=bench \
@@ -298,6 +302,7 @@ while (( $# )); do
     --zone)    ZONE="$2";         shift 2 ;;
     --project) PROJECT="$2";      shift 2 ;;
     --machine-type) MACHINE_TYPE="$2"; shift 2 ;;
+    --boot-disk-size) BOOT_DISK_SIZE="$2"; shift 2 ;;
     --yes)     YES=1;             shift   ;;
     -h|--help) usage 0 ;;
     --)        shift; SSH_EXTRA_ARGS=("$@"); break ;;
