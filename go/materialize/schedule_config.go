@@ -17,7 +17,7 @@ const (
 // schedule. Providing only a SyncFrequency will result in a fixed schedule;
 // otherwise an alternating schedule will be used.
 type ScheduleConfig struct {
-	SyncFrequency       string `json:"syncFrequency,omitempty" jsonschema:"title=Sync Frequency,enum=0s,enum=30s,enum=5m,enum=15m,enum=30m,enum=1h,enum=2h,enum=4h" jsonschema_extras:"order=0,nonsensitive=true"`
+	SyncFrequency       string `json:"syncFrequency,omitempty" jsonschema:"title=Sync Frequency,enum=0s,enum=30s,enum=1m,enum=2m30s,enum=5m,enum=15m,enum=20m,enum=30m,enum=1h,enum=2h,enum=4h" jsonschema_extras:"order=0,nonsensitive=true"`
 	Timezone            string `json:"timezone,omitempty" jsonschema:"title=Timezone" jsonschema_extras:"order=1,nonsensitive=true"`
 	FastSyncStartTime   string `json:"fastSyncStartTime,omitempty" jsonschema:"title=Fast Sync Start Time" jsonschema_extras:"pattern=^(0?[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$,order=2,nonsensitive=true"`
 	FastSyncStopTime    string `json:"fastSyncStopTime,omitempty" jsonschema:"title=Fast Sync Stop Time" jsonschema_extras:"pattern=^(0?[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$,order=3,nonsensitive=true"`
