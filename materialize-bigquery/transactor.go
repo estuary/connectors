@@ -572,10 +572,9 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 			continue
 		}
 
+		drained = append(drained, cpKeys...)
 		group.Go(func() error {
 			t.be.StartedResourceCommit(b.target.Path)
-
-			drained = append(drained, cpKeys...)
 
 			needsMerge := false
 			items := make([]*checkpointItem, 0, len(cpKeys))
