@@ -578,7 +578,7 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 
 			needsMerge := false
 			items := make([]*checkpointItem, 0, len(cpKeys))
-			sourceURIs := make([]string, 0, len(items))
+			sourceURIs := make([]string, 0, len(cpKeys))
 			for _, key := range cpKeys {
 				item := t.cp[key]
 
