@@ -1358,6 +1358,7 @@ type ddlHistoryEntry struct {
 func cdcGetDDLHistory(ctx context.Context, conn *sql.DB) (map[sqlcapture.StreamID][]*ddlHistoryEntry, error) {
 	const query = `SELECT sch.name, tbl.name, hist.required_column_update, hist.ddl_command, hist.ddl_lsn, hist.ddl_time
 				     FROM cdc.ddl_history AS hist
+					 JOIN cdc.change_tables AS ct ON hist.object_id = ct.object_id
 					 JOIN sys.tables AS tbl ON hist.source_object_id = tbl.object_id
 					 JOIN sys.schemas AS sch ON tbl.schema_id = sch.schema_id
 					 ORDER BY hist.ddl_lsn;`

@@ -6,6 +6,11 @@
 - Azure IAM authentication as a new branch of the `credentials` union, using an
   Entra access token obtained through an Azure App Registration.
 
+### Fixed
+- Automatic capture instance management no longer rotates a table's capture
+  instance indefinitely when there are rows in `cdc.ddl_history` naming
+  a change table which no longer exists.
+
 ## 2026-08-25
 
 ### Added
