@@ -106,15 +106,17 @@ gcloud_ssh() {
 # Wait for SSH to become available on a newly-created VM.
 wait_for_ssh() {
   info "waiting for SSH to become available"
+  # IAP has needed 160-180s to admit a connection on freshly-created VMs, so a
+  # 120s budget failed every time and left a running, unprovisioned VM behind.
   local attempts=0
-  while (( attempts < 40 )); do
+  while (( attempts < 100 )); do
     if gcloud_ssh --command="true" --quiet 2>/dev/null; then
       return 0
     fi
     sleep 3
     (( ++attempts ))
   done
-  die "SSH not available after 120s — check VM status with: gcloud compute instances describe $VM_NAME --zone=$ZONE"
+  die "SSH not available after 300s — check VM status with: gcloud compute instances describe $VM_NAME --zone=$ZONE"
 }
 
 # Build rsync-over-IAP transport strings. Sets RSYNC_TRANSPORT and
