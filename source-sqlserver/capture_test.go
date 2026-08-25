@@ -395,3 +395,65 @@ func TestCatalogPrimaryKey(t *testing.T) {
 	tc.Run("Replication", -1)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
+
+// TestDDLHistoryFiltering verifies that cdcGetDDLHistory reports an alteration only while
+// the change table which recorded it still exists.
+//
+// A row in `cdc.ddl_history` names the change table it concerns, and is cleared by
+// dropping that capture instance. A row naming a change table which is already gone is
+// therefore cleared by nothing. Automatic capture instance management treats any row for a
+// table as evidence that the table just changed, so while those rows were reported it
+// rotated the capture instance every management interval forever: each rotation left the
+// row which provoked it untouched, and the next pass read it again.
+func TestDDLHistoryFiltering(t *testing.T) {
+	t.Parallel()
+	var db, _ = blackboxTestSetup(t)
+
+	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data TEXT)`)
+
+	var schemaName = *testSchemaName
+	var tableName = db.Expand(`<NAME>`)
+	var shortName = tableName[len(schemaName)+1:]
+	var streamID = sqlcapture.JoinStreamID(schemaName, shortName)
+
+	// Plant a row naming a change table which does not exist. Object IDs are positive, so
+	// a negative one cannot collide with any change table, now or later.
+	const strandedObjectID = -1
+	db.QuietExec(t, fmt.Sprintf(`INSERT INTO cdc.ddl_history (source_object_id, object_id, required_column_update, ddl_command, ddl_lsn, ddl_time) `+
+		`VALUES (OBJECT_ID('%s'), %d, 0, 'ALTER TABLE %s ADD stranded INTEGER', 0x00000000000000000000, GETDATE())`,
+		tableName, strandedObjectID, tableName))
+
+	// Dropping the table clears the rows naming its own change table, but by construction
+	// never this one, so it has to go explicitly. Cleanups run in reverse order of
+	// registration, so this one runs while the table still exists.
+	t.Cleanup(func() {
+		db.QuietExec(t, fmt.Sprintf(`DELETE FROM cdc.ddl_history WHERE source_object_id = OBJECT_ID('%s') AND object_id = %d`,
+			tableName, strandedObjectID))
+	})
+
+	ddlHistory, err := cdcGetDDLHistory(context.Background(), db.conn)
+	require.NoError(t, err)
+	require.Empty(t, ddlHistory[streamID], "a DDL history row whose change table no longer exists must not be reported as an alteration")
+
+	// A real alteration of the same table still has to be reported. The capture job records
+	// it asynchronously, so wait for it rather than assuming it has already happened.
+	db.Exec(t, `ALTER TABLE <NAME> ADD extra TEXT`)
+	db.Exec(t, `INSERT INTO <NAME> (id, data) VALUES (1, 'one')`)
+
+	var deadline = time.Now().Add(60 * time.Second)
+	for {
+		ddlHistory, err = cdcGetDDLHistory(context.Background(), db.conn)
+		require.NoError(t, err)
+		if len(ddlHistory[streamID]) > 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for the alteration of %q to be reported", tableName)
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+
+	for _, event := range ddlHistory[streamID] {
+		require.NotContains(t, event.Command, "stranded", "the stranded row must not be reported alongside the real alteration")
+	}
+}
