@@ -1,7 +1,7 @@
 """Unit tests for the parts of the Brevo fetch layer the snapshot tests cannot
 reach.
 
-`tests/test_snapshots.py` drives `flowctl preview` against a live account, so it
+`tests/test_snapshots.py` drives `flowctl raw preview-next` against a live account, so it
 only exercises whatever that account happens to contain and can never provoke a
 particular cursor or error state. These cover the contracts the CDK imposes:
 

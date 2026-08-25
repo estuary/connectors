@@ -31,7 +31,7 @@ Run the connector's test suite in the background now, as a baseline (`CONDUCT-ES
 Prefer the cheapest reproduction that shows the defect:
 
 1. **A test** — if the bug is in parsing, cursor arithmetic, or model validation, it reproduces in `pytest` without touching the provider.
-2. **`flowctl preview`** on the affected binding, per the budget rule. Use `disable: true` on unrelated bindings (`API-COST-SAVER-DISABLE`) to keep it cheap — and restore them before committing.
+2. **`flowctl raw preview-next`** on the affected binding, per the budget rule. Use `disable: true` on unrelated bindings (`API-COST-SAVER-DISABLE`) to keep it cheap — and restore them before committing.
 3. **A Bruno probe** — when the question is what the provider actually returns, use `bruno-probe-endpoint`. Live behavior settles doc-vs-reality disputes.
 
 Record what you observed. That's the before-state the fix has to change.
@@ -75,7 +75,7 @@ Report the sweep result either way. "Checked all six streams, only `campaigns` w
 - **Self-review:** invoke `review-connector-change` on the working diff before handing off.
 - Commit scoped to the fix. Snapshot regeneration unrelated to the bug goes in its own `source-$1: update tests` commit, ordered before the fix (see the Phase 3 baseline gate).
 - **Documentation:** if the fix changes user-visible behavior described in the connector's docs, update them (connector docs are mirrored into the flow repo's `site/docs` via a sibling PR).
-- **PR body:** follow [.github/pull_request_template.md](../../../.github/pull_request_template.md). Fill every section — drop **Regression?** only when the fix isn't one; list created or affected docs under **Documentation links affected:**; and state under **Notes for reviewers:** how the change was tested (unit tests, snapshot tests, `flowctl preview`, local stack tests, or another method — name what actually ran).
+- **PR body:** follow [.github/pull_request_template.md](../../../.github/pull_request_template.md). Fill every section — drop **Regression?** only when the fix isn't one; list created or affected docs under **Documentation links affected:**; and state under **Notes for reviewers:** how the change was tested (unit tests, snapshot tests, `flowctl raw preview-next`, local stack tests, or another method — name what actually ran).
 - **Never push or open a PR without asking.** Always stop and confirm with the user before `git push` or `gh pr create` — even when the fix is verified and the user asked for the fix in the first place.
 
 ## Out of scope

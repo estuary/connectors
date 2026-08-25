@@ -46,7 +46,7 @@ Don't read the encrypted credentials file directly, even just to check its struc
 
 Survey the provider's rate limits before running anything repeatedly, and set the session budget from the result:
 
-- **All required endpoints > 20 req/hr:** run `flowctl preview`, `flowctl raw discover` (whenever it hits the API — see `API-DISCOVER-STATIC-IS-FREE`), `pytest` (including snapshot tests that drive `flowctl preview` underneath), and capture-running commands as often as needed, without further consent.
+- **All required endpoints > 20 req/hr:** run `flowctl raw preview-next`, `flowctl raw discover` (whenever it hits the API — see `API-DISCOVER-STATIC-IS-FREE`), `pytest` (including snapshot tests that drive `flowctl raw preview-next` underneath), and capture-running commands as often as needed, without further consent.
 - **Any required endpoint ≤ 20 req/hr:** ask before each run — `flowctl raw discover` included, whenever it hits the API — and apply `API-COST-SAVER-DISABLE`.
 
 Verified limits live in `<connector>/bruno/opencollection.yml`'s `docs:` block under `## API constraints (account-wide)`. Check there before re-deriving anything; record newly-established limits there so the next session doesn't repeat the work.
