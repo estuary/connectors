@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
+	"regexp"
 	"testing"
 
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/require"
 )
 
@@ -41,8 +41,17 @@ func TestIntegration(t *testing.T) {
 		}
 	}
 
+	// A staged transaction is named in the connector state by its manifest
+	// key, which is a fresh UUID per transaction.
+	sanitizers := []func(string) string{
+		func(s string) string {
+			return regexp.MustCompile(`[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}`).
+				ReplaceAllString(s, "<uuid>")
+		},
+	}
+
 	t.Run("materialize", func(t *testing.T) {
-		sql.RunMaterializationTest(t, NewDriver(), "testdata/materialize.flow.yaml", makeResourceFn, nil)
+		sql.RunMaterializationTest(t, NewDriver(), "testdata/materialize.flow.yaml", makeResourceFn, sanitizers)
 	})
 
 	t.Run("apply", func(t *testing.T) {
@@ -51,39 +60,6 @@ func TestIntegration(t *testing.T) {
 
 	t.Run("migrate", func(t *testing.T) {
 		sql.RunMigrationTest(t, NewDriver(), "testdata/migrate.flow.yaml", makeResourceFn, nil)
-	})
-
-	t.Run("fence", func(t *testing.T) {
-		cfg := mustGetCfg(t)
-		var testDialect = createRsDialect(false, featureFlagDefaults)
-		var testTemplates = renderTemplates(testDialect)
-
-		sql.RunFencingTest(
-			t,
-			NewDriver(),
-			"testdata/fence.flow.yaml",
-			makeResourceFn,
-			testTemplates.createTargetTable,
-			func(ctx context.Context, client sql.Client, fence sql.Fence) error {
-				conn, err := pgx.Connect(ctx, cfg.toURI())
-				if err != nil {
-					return fmt.Errorf("store pgx.Connect: %w", err)
-				}
-				defer conn.Close(ctx)
-
-				txn, err := conn.BeginTx(ctx, pgx.TxOptions{})
-				if err != nil {
-					return err
-				}
-				defer txn.Rollback(ctx)
-
-				if err := updateFence(ctx, txn, testDialect, fence); err != nil {
-					return err
-				}
-
-				return txn.Commit(ctx)
-			},
-		)
 	})
 }
 

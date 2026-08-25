@@ -1,12 +1,32 @@
 package connector
 
 import (
+	"bytes"
+	"compress/gzip"
+	"encoding/base64"
 	"encoding/json"
 	"testing"
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/stretchr/testify/require"
 )
+
+// compressBytes produces the gzipped form the fenced connector this one
+// replaces wrote its runtime checkpoint in. Only the reading half of that
+// format is still production code, so its counterpart lives here.
+//
+// TODO: remove after a deployment.
+func compressBytes(t *testing.T, b []byte) []byte {
+	t.Helper()
+
+	var gzb bytes.Buffer
+	w := gzip.NewWriter(&gzb)
+	_, err := w.Write(b)
+	require.NoError(t, err)
+	require.NoError(t, w.Close())
+
+	return gzb.Bytes()
+}
 
 func TestParseConnectorState(t *testing.T) {
 	for _, tt := range []struct {
@@ -105,4 +125,47 @@ func TestStagedTransactionToken(t *testing.T) {
 	require.Equal(t, "data/d1.manifest", (&stagedTransaction{
 		DeleteManifest: "data/d1.manifest",
 	}).token())
+}
+
+func TestTokenStoreParseCheckpoint(t *testing.T) {
+	t.Run("no row content", func(t *testing.T) {
+		tokens, legacy, err := tokenStore{}.parseCheckpoint(nil)
+		require.NoError(t, err)
+		require.Empty(t, tokens)
+		require.Nil(t, legacy)
+	})
+
+	t.Run("applied tokens", func(t *testing.T) {
+		tokens, legacy, err := tokenStore{}.parseCheckpoint([]byte(`{"00000000-ffffffff":{"sk1":"data/a.manifest"}}`))
+		require.NoError(t, err)
+		require.Equal(t, appliedTokens{"00000000-ffffffff": {"sk1": "data/a.manifest"}}, tokens)
+		require.Nil(t, legacy)
+	})
+
+	// TODO: remove the two fenced-format cases after a deployment.
+	t.Run("a row still in the fenced format", func(t *testing.T) {
+		// The fenced connector stored base64(gzip(checkpoint)), which cannot
+		// begin with '{'.
+		want := []byte("a runtime checkpoint")
+		raw := []byte(base64.StdEncoding.EncodeToString(compressBytes(t, want)))
+		require.NotEqual(t, byte('{'), raw[0])
+
+		tokens, legacy, err := tokenStore{}.parseCheckpoint(raw)
+		require.NoError(t, err)
+		require.Empty(t, tokens)
+		require.Equal(t, want, legacy)
+	})
+
+	t.Run("an uncompressed row in the fenced format", func(t *testing.T) {
+		want := []byte("a runtime checkpoint")
+		tokens, legacy, err := tokenStore{}.parseCheckpoint([]byte(base64.StdEncoding.EncodeToString(want)))
+		require.NoError(t, err)
+		require.Empty(t, tokens)
+		require.Equal(t, want, legacy)
+	})
+
+	t.Run("an unparseable token payload fails loudly", func(t *testing.T) {
+		_, _, err := tokenStore{}.parseCheckpoint([]byte(`{"00000000-ffffffff":`))
+		require.ErrorContains(t, err, "parsing applied tokens")
+	})
 }

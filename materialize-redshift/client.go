@@ -7,6 +7,7 @@ import (
 	stdsql "database/sql"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -246,17 +247,6 @@ func (c *client) ExecStatements(ctx context.Context, statements []string) error 
 }
 
 func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence sql.Fence) (sql.Fence, error) {
-	if err := c.withDB(func(db *stdsql.DB) error {
-		var err error
-		fence, err = installFence(ctx, db, checkpoints, fence)
-		if err != nil {
-			return fmt.Errorf("installing fence: %w", err)
-		}
-		return nil
-	}); err != nil {
-		return sql.Fence{}, err
-	}
-
 	return fence, nil
 }
 
@@ -301,6 +291,8 @@ func (c *client) SnapshotTestTable(ctx context.Context, path []string) (columnNa
 	}
 
 	// Checkpoint data is stored as base64(gzip(bytes)) in a VARBYTE column.
+	//
+	// TODO: remove after a deployment.
 	// snapshotTestTable queries VARBYTE values via FROM_VARBYTE(col, 'base64'),
 	// so the value already comes back as base64(utf8(base64(gzip(bytes)))).
 	// Unwrap that extra layer and the gzip wrapper to produce plain
@@ -409,19 +401,9 @@ func (c *client) withDB(fn func(*stdsql.DB) error) error {
 	return fn(db)
 }
 
-func compressBytes(b []byte) ([]byte, error) {
-	var gzb bytes.Buffer
-	w := gzip.NewWriter(&gzb)
-	if _, err := w.Write(b); err != nil {
-		return nil, fmt.Errorf("compressing bytes: %w", err)
-	} else if err := w.Close(); err != nil {
-		return nil, fmt.Errorf("closing gzip writer: %w", err)
-	}
-	return gzb.Bytes(), nil
-}
-
+// TODO: remove after a deployment.
 func maybeDecompressBytes(b []byte) ([]byte, error) {
-	if b[0] == 0x1f && b[1] == 0x8b { // Valid gzip header bytes
+	if len(b) >= 2 && b[0] == 0x1f && b[1] == 0x8b { // Valid gzip header bytes
 		var out bytes.Buffer
 		if r, err := gzip.NewReader(bytes.NewReader(b)); err != nil {
 			return nil, fmt.Errorf("decompressing bytes: %w", err)
@@ -437,136 +419,105 @@ func maybeDecompressBytes(b []byte) ([]byte, error) {
 	}
 }
 
-// installFence is a modified version of sql.StdInstallFence that handles
-// compression of the checkpoint and reading varbyte values from Redshift.
-func installFence(ctx context.Context, db *stdsql.DB, checkpoints sql.Table, fence sql.Fence) (sql.Fence, error) {
-	// TODO(whb): With the historical usage of sql.StdInstallFence, we were actually
-	// base64 encoding the checkpoint bytes and then sending that UTF8 string to
-	// Redshift, which stores those characters as bytes in the VARBYTE column. A
-	// slightly more direct & efficient way to handle this would be to store the
-	// bytes directly using TO_VARBYTE(checkpoint, 'base64'). This would require
-	// handling for the pre-existing checkpoints that were encoded in the previous
-	// way, and is not being implemented right now.
-	var txn, err = db.BeginTx(ctx, nil)
-	if err != nil {
-		return sql.Fence{}, fmt.Errorf("db.BeginTx: %w", err)
-	}
-	defer func() {
-		if txn != nil {
-			_ = txn.Rollback()
-		}
-	}()
-
-	// Increment the fence value of _any_ checkpoint which overlaps our key range.
-	if _, err = txn.Exec(
-		fmt.Sprintf(`
-			UPDATE %s
-				SET fence=fence+1
-				WHERE materialization=%s
-				AND key_end>=%s
-				AND key_begin<=%s
-			;
-			`,
-			checkpoints.Identifier,
-			checkpoints.Keys[0].Placeholder,
-			checkpoints.Keys[1].Placeholder,
-			checkpoints.Keys[2].Placeholder,
-		),
-		fence.Materialization,
-		fence.KeyBegin,
-		fence.KeyEnd,
-	); err != nil {
-		return sql.Fence{}, fmt.Errorf("incrementing fence: %w", err)
-	}
-
-	// Read the checkpoint with the narrowest [key_begin, key_end] which fully overlaps our range.
-	var readBegin, readEnd uint32
-	var checkpoint string
-
-	if err = txn.QueryRow(
-		fmt.Sprintf(`
-			SELECT fence, key_begin, key_end, checkpoint
-				FROM %s
-				WHERE materialization=%s
-				AND key_begin<=%s
-				AND key_end>=%s
-				ORDER BY key_end - key_begin ASC
-				LIMIT 1
-			;
-			`,
-			checkpoints.Identifier,
-			checkpoints.Keys[0].Placeholder,
-			checkpoints.Keys[1].Placeholder,
-			checkpoints.Keys[2].Placeholder,
-		),
-		fence.Materialization,
-		fence.KeyBegin,
-		fence.KeyEnd,
-	).Scan(&fence.Fence, &readBegin, &readEnd, &checkpoint); err == stdsql.ErrNoRows {
-		// Set an invalid range, which compares as unequal to trigger an insertion below.
-		readBegin, readEnd = 1, 0
-	} else if err != nil {
-		return sql.Fence{}, fmt.Errorf("scanning fence and checkpoint: %w", err)
-	} else if hexBytes, err := hex.DecodeString(checkpoint); err != nil {
-		return sql.Fence{}, fmt.Errorf("hex.DecodeString(checkpoint): %w", err)
-	} else if base64Bytes, err := base64.StdEncoding.DecodeString(string(hexBytes)); err != nil {
-		return sql.Fence{}, fmt.Errorf("base64.Decode(string(decompressed)): %w", err)
-	} else if fence.Checkpoint, err = maybeDecompressBytes(base64Bytes); err != nil {
-		return sql.Fence{}, fmt.Errorf("maybeDecompressBytes(fenceHexBytes): %w", err)
-	}
-
-	// If a checkpoint for this exact range doesn't exist then insert it now.
-	if readBegin == fence.KeyBegin && readEnd == fence.KeyEnd {
-		// Exists; no-op.
-	} else if compressedCheckpoint, err := compressBytes(fence.Checkpoint); err != nil {
-		return sql.Fence{}, fmt.Errorf("compressing checkpoint: %w", err)
-	} else if _, err = txn.Exec(
-		fmt.Sprintf(
-			"INSERT INTO %s (materialization, key_begin, key_end, fence, checkpoint) VALUES (%s, %s, %s, %s, %s);",
-			checkpoints.Identifier,
-			checkpoints.Keys[0].Placeholder,
-			checkpoints.Keys[1].Placeholder,
-			checkpoints.Keys[2].Placeholder,
-			checkpoints.Values[0].Placeholder,
-			checkpoints.Values[1].Placeholder,
-		),
-		fence.Materialization,
-		fence.KeyBegin,
-		fence.KeyEnd,
-		fence.Fence,
-		base64.StdEncoding.EncodeToString(compressedCheckpoint),
-	); err != nil {
-		return sql.Fence{}, fmt.Errorf("inserting fence: %w", err)
-	}
-
-	err = txn.Commit()
-	txn = nil // Disable deferred rollback.
-
-	if err != nil {
-		return sql.Fence{}, fmt.Errorf("txn.Commit: %w", err)
-	}
-	return fence, nil
+// tokenStore is a materialization's row in the checkpoints table, which holds
+// the tokens of the transactions it has applied.
+type tokenStore struct {
+	// identifier is the quoted checkpoints table.
+	identifier string
+	// The row's key: this materialization, over the key range of its shard.
+	materialization string
+	keyBegin        uint32
+	keyEnd          uint32
 }
 
-// updateFence updates a fence and reports if the materialization instance was
-// fenced off. It handles compression of the checkpoint, and is used instead of
-// the typical templated fence update query because of that.
-func updateFence(ctx context.Context, txn pgx.Tx, dialect sql.Dialect, fence sql.Fence) error {
-	if compressedCheckpoint, err := compressBytes(fence.Checkpoint); err != nil {
-		return fmt.Errorf("compressing checkpoint: %w", err)
-	} else if res, err := txn.Exec(ctx, fmt.Sprintf(
-		"UPDATE %s SET checkpoint = $1 WHERE materialization = $2 AND key_begin = $3 AND key_end = $4 AND fence = $5;",
-		dialect.Identifier(fence.TablePath...),
-	),
-		base64.StdEncoding.EncodeToString(compressedCheckpoint),
-		fence.Materialization,
-		fence.KeyBegin,
-		fence.KeyEnd,
-		fence.Fence,
-	); err != nil {
-		return fmt.Errorf("fetching fence update rows: %w", err)
-	} else if res.RowsAffected() != 1 {
-		return fmt.Errorf("this instance was fenced off by another")
+// read returns the applied-transaction tokens the row holds, or — for a row
+// still in the format written by the fenced connector this one replaces — the
+// runtime checkpoint it holds instead. A materialization with no row yet is
+// new rather than crossing over, and has neither.
+//
+// The checkpoint column is a VARBYTE, which Redshift renders as hex in the
+// text protocol both pgx and database/sql read it with.
+func (s tokenStore) read(ctx context.Context, conn *pgx.Conn) (appliedTokens, []byte, error) {
+	var encoded string
+
+	if err := conn.QueryRow(ctx, fmt.Sprintf(
+		"SELECT checkpoint FROM %s WHERE materialization = $1 AND key_begin = $2 AND key_end = $3;",
+		s.identifier,
+	), s.materialization, s.keyBegin, s.keyEnd).Scan(&encoded); errors.Is(err, pgx.ErrNoRows) {
+		return make(appliedTokens), nil, nil
+	} else if err != nil {
+		return nil, nil, fmt.Errorf("querying checkpoints row: %w", err)
+	}
+
+	raw, err := hex.DecodeString(encoded)
+	if err != nil {
+		return nil, nil, fmt.Errorf("hex decoding the checkpoint column: %w", err)
+	}
+
+	return s.parseCheckpoint(raw)
+}
+
+// parseCheckpoint decodes the `checkpoint` column of the row.
+//
+// A payload beginning with '{' is the applied-token store this connector
+// writes. Anything else is the base64-encoded runtime checkpoint kept there by
+// the fenced connector this one replaces, which is returned as the legacy
+// checkpoint: base64 cannot produce a leading '{', so the row is its own
+// marker of which format it is in.
+func (s tokenStore) parseCheckpoint(raw []byte) (appliedTokens, []byte, error) {
+	if len(raw) == 0 {
+		return make(appliedTokens), nil, nil
+	}
+
+	if raw[0] == '{' {
+		var tokens = make(appliedTokens)
+		if err := json.Unmarshal(raw, &tokens); err != nil {
+			return nil, nil, fmt.Errorf("parsing applied tokens: %w", err)
+		}
+		return tokens, nil, nil
+	}
+
+	// TODO: remove after a deployment.
+	decoded, err := base64.StdEncoding.DecodeString(string(raw))
+	if err != nil {
+		return nil, nil, fmt.Errorf("base64 decoding legacy checkpoint: %w", err)
+	}
+	legacy, err := maybeDecompressBytes(decoded)
+	if err != nil {
+		return nil, nil, fmt.Errorf("decompressing legacy checkpoint: %w", err)
+	}
+
+	return make(appliedTokens), legacy, nil
+}
+
+// write records the applied-transaction tokens in the row, inserting it when
+// the materialization does not have one yet.
+func (s tokenStore) write(ctx context.Context, txn pgx.Tx, tokens appliedTokens) error {
+	payload, err := json.Marshal(tokens)
+	if err != nil {
+		return fmt.Errorf("marshalling applied tokens: %w", err)
+	}
+
+	if _, err := txn.Exec(ctx, fmt.Sprintf("lock %s;", s.identifier)); err != nil {
+		return fmt.Errorf("obtaining checkpoints table lock: %w", err)
+	}
+
+	if res, err := txn.Exec(ctx, fmt.Sprintf(
+		"UPDATE %s SET checkpoint = $1 WHERE materialization = $2 AND key_begin = $3 AND key_end = $4;",
+		s.identifier,
+	), string(payload), s.materialization, s.keyBegin, s.keyEnd); err != nil {
+		return fmt.Errorf("updating applied tokens: %w", err)
+	} else if n := res.RowsAffected(); n == 1 {
+		return nil
+	} else if n > 1 {
+		return fmt.Errorf("expected to update one checkpoints row of materialization %q, updated %d", s.materialization, n)
+	}
+
+	if _, err := txn.Exec(ctx, fmt.Sprintf(
+		"INSERT INTO %s (materialization, key_begin, key_end, fence, checkpoint) VALUES ($1, $2, $3, 0, $4);",
+		s.identifier,
+	), s.materialization, s.keyBegin, s.keyEnd, string(payload)); err != nil {
+		return fmt.Errorf("inserting applied tokens: %w", err)
 	}
 
 	return nil
