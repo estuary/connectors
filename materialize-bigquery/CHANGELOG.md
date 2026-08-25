@@ -1,5 +1,10 @@
 # materialize-bigquery
 
+## 2026-08-31
+
+### Added
+- Support for tasks scaled out to multiple shards.
+
 ## 2026-08-25
 
 ### Added
