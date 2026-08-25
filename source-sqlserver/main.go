@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/feature/rds/auth"
+	"github.com/estuary/connectors/go/auth/iam"
 	"github.com/estuary/connectors/go/capture/sqlserver/datatypes"
 	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
@@ -67,14 +69,60 @@ var featureFlagDefaults = map[string]bool{
 	"discover_rowversion_as_bytes": false,
 }
 
+type AuthType string
+
+const (
+	UserPassword AuthType = "UserPassword"
+	AWSIAM       AuthType = "AWSIAM"
+)
+
+type UserPasswordConfig struct {
+	Password string `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=1"`
+}
+
+// CredentialsConfig is a flat union of the supported authentication methods,
+// discriminated by AuthType. The JSON Schema presents it as a oneOf with one
+// branch per method.
+type CredentialsConfig struct {
+	AuthType AuthType `json:"auth_type"`
+
+	UserPasswordConfig
+	iam.IAMConfig
+}
+
+func (CredentialsConfig) JSONSchema() *jsonschema.Schema {
+	return schemagen.OneOfSchema("Authentication", "", "auth_type", string(UserPassword),
+		schemagen.OneOfSubSchema("Password", UserPasswordConfig{}, string(UserPassword)),
+		schemagen.OneOfSubSchema("AWS IAM", iam.AWSConfig{}, string(AWSIAM)),
+	)
+}
+
+func (c *CredentialsConfig) Validate() error {
+	switch c.AuthType {
+	case UserPassword:
+		if c.Password == "" {
+			return errors.New("missing 'password'")
+		}
+		return nil
+	case AWSIAM:
+		// The embedded IAMConfig has its own auth_type field which JSON decoding
+		// leaves empty (the outer field shadows it), so sync it before ValidateIAM
+		// switches on it.
+		c.IAMConfig.AuthType = iam.AuthType(c.AuthType)
+		return c.ValidateIAM()
+	}
+	return fmt.Errorf("unknown 'auth_type' %q", c.AuthType)
+}
+
 // Config tells the connector how to connect to and interact with the source database.
 type Config struct {
-	Address     string `json:"address" jsonschema:"title=Server Address,description=The host or host:port at which the database can be reached." jsonschema_extras:"order=0"`
-	User        string `json:"user" jsonschema:"default=flow_capture,description=The database user to authenticate as." jsonschema_extras:"order=1"`
-	Password    string `json:"password" jsonschema:"description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
-	Database    string `json:"database" jsonschema:"description=Logical database name to capture from." jsonschema_extras:"order=3"`
-	Timezone    string `json:"timezone,omitempty" jsonschema:"title=Time Zone,default=UTC,description=The IANA timezone name in which datetime columns will be converted to RFC3339 timestamps. Defaults to UTC if left blank." jsonschema_extras:"order=4,nonsensitive=true"`
-	HistoryMode bool   `json:"historyMode" jsonschema:"default=false,description=Capture change events without reducing them to a final state." jsonschema_extras:"order=5,nonsensitive=true"`
+	Address     string             `json:"address" jsonschema:"title=Server Address,description=The host or host:port at which the database can be reached." jsonschema_extras:"order=0"`
+	User        string             `json:"user" jsonschema:"default=flow_capture,description=The database user to authenticate as." jsonschema_extras:"order=1"`
+	Password    string             `json:"password,omitempty" jsonschema:"-"`
+	Credentials *CredentialsConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"order=2,x-iam-auth=true"`
+	Database    string             `json:"database" jsonschema:"description=Logical database name to capture from." jsonschema_extras:"order=3"`
+	Timezone    string             `json:"timezone,omitempty" jsonschema:"title=Time Zone,default=UTC,description=The IANA timezone name in which datetime columns will be converted to RFC3339 timestamps. Defaults to UTC if left blank." jsonschema_extras:"order=4,nonsensitive=true"`
+	HistoryMode bool               `json:"historyMode" jsonschema:"default=false,description=Capture change events without reducing them to a final state." jsonschema_extras:"order=5,nonsensitive=true"`
 
 	DiscoveryFilters discoveryFilters `json:"discoveryFilters,omitempty" jsonschema:"title=Discovery Filters,description=Options that restrict which tables are visible to discovery."`
 	Advanced         advancedConfig   `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
@@ -111,13 +159,22 @@ func (c *Config) Validate() error {
 	var requiredProperties = [][]string{
 		{"address", c.Address},
 		{"user", c.User},
-		{"password", c.Password},
 		{"database", c.Database},
 	}
 	for _, req := range requiredProperties {
 		if req[1] == "" {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
+	}
+
+	// Validation runs before normalizeCredentials, so both the legacy flat
+	// password and the credentials union must be accepted here.
+	if c.Credentials == nil {
+		if c.Password == "" {
+			return errors.New("missing 'credentials'")
+		}
+	} else if err := c.Credentials.Validate(); err != nil {
+		return err
 	}
 
 	if c.Timezone != "" {
@@ -178,24 +235,84 @@ func (c *Config) SetDefaults() {
 	}
 }
 
-// ToURI converts the Config to a DSN string.
+// normalizeCredentials folds a legacy top-level password into c.Credentials as a
+// UserPassword credential, so that code downstream of it only ever reads one
+// credentials shape. When both are supplied the explicit credentials win.
+func (c *Config) normalizeCredentials() {
+	var legacyPassword = c.Password
+	c.Password = ""
+
+	if c.Credentials != nil {
+		if legacyPassword != "" {
+			log.Warn("both legacy 'password' and 'credentials' are set; the former will be ignored in favour of the latter")
+		}
+		return
+	}
+	c.Credentials = &CredentialsConfig{
+		AuthType:           UserPassword,
+		UserPasswordConfig: UserPasswordConfig{Password: legacyPassword},
+	}
+}
+
+// ToURI converts the Config to a DSN string. It requires normalizeCredentials
+// to have run, and only reads the credentials union.
 //
 // The DSN host is always the real server address, even when tunneling. We dial localhost (the
 // tunnel) via tunnelDialer, but advertise the real server address as the LOGIN7 ServerName and
 // TLS SNI for SQL Server instances that rely on those being accurate.
-func (c *Config) ToURI() string {
+func (c *Config) ToURI() (string, error) {
 	var params = make(url.Values)
 	params.Add("app name", "Flow CDC Connector")
 	params.Add("encrypt", "true")
 	params.Add("TrustServerCertificate", "true")
 	params.Add("database", c.Database)
+
+	var userInfo *url.Userinfo
+	switch c.Credentials.AuthType {
+	case UserPassword:
+		userInfo = url.UserPassword(c.User, c.Credentials.Password)
+	case AWSIAM:
+		userInfo = url.User(c.User)
+	default:
+		return "", fmt.Errorf("unsupported 'auth_type' %q", c.Credentials.AuthType)
+	}
+
 	var connectURL = &url.URL{
 		Scheme:   "sqlserver",
-		User:     url.UserPassword(c.User, c.Password),
+		User:     userInfo,
 		Host:     c.Address,
 		RawQuery: params.Encode(),
 	}
-	return connectURL.String()
+	return connectURL.String(), nil
+}
+
+// buildConnector constructs a driver connector for the configured authentication
+// method. AWS IAM connections fetch a fresh RDS auth token for each new connection
+// the pool opens, so long-running captures outlive the token's 15-minute validity.
+func (c *Config) buildConnector() (*mssqldb.Connector, error) {
+	var uri, err = c.ToURI()
+	if err != nil {
+		return nil, err
+	}
+
+	switch c.Credentials.AuthType {
+	case UserPassword:
+		return mssqldb.NewConnector(uri)
+	case AWSIAM:
+		credProvider, err := c.Credentials.AWSCredentialsProvider()
+		if err != nil {
+			return nil, err
+		}
+		// Tokens are built against the configured address (which SetDefaults has
+		// already given a port), so with a network tunnel the token matches the
+		// real server endpoint just like the DSN host does.
+		var tokenProvider = func(ctx context.Context) (string, error) {
+			return auth.BuildAuthToken(ctx, c.Address, c.Credentials.AWSRegion, c.User, credProvider)
+		}
+		return mssqldb.NewConnectorWithAccessTokenProvider(uri, tokenProvider)
+	default:
+		return nil, fmt.Errorf("unsupported 'auth_type' %q", c.Credentials.AuthType)
+	}
 }
 
 // tunnelDialer redirects connections to the local end of the SSH tunnel while the driver keeps
@@ -236,6 +353,7 @@ func connectSQLServer(ctx context.Context, name string, cfg json.RawMessage) (sq
 		return nil, fmt.Errorf("error parsing config json: %w", err)
 	}
 	config.SetDefaults()
+	config.normalizeCredentials()
 
 	var featureFlags = common.ParseFeatureFlags(config.Advanced.FeatureFlags, featureFlagDefaults)
 	if config.Advanced.FeatureFlags != "" {
@@ -316,7 +434,7 @@ func (db *sqlserverDatabase) connect(ctx context.Context) error {
 		"user":    db.config.User,
 	}).Info("connecting to database")
 
-	connector, err := mssqldb.NewConnector(db.config.ToURI())
+	connector, err := db.config.buildConnector()
 	if err != nil {
 		return fmt.Errorf("error creating connector: %w", err)
 	}
