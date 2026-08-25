@@ -20,6 +20,14 @@ func (s StreamID) String() string {
 	return fmt.Sprintf("%s.%s", s.Schema, s.Table)
 }
 
+// Compare orders StreamIDs by schema and then by table name.
+func (s StreamID) Compare(other StreamID) int {
+	if n := strings.Compare(s.Schema, other.Schema); n != 0 {
+		return n
+	}
+	return strings.Compare(s.Table, other.Table)
+}
+
 // EncodeKey returns an unambiguous string representation of the StreamID
 // suitable for use as a map key in serialized cursors. The schema and table
 // components are encoded so that periods can be used as the separator.
@@ -278,8 +286,10 @@ type Database interface {
 
 	// ScanTableChunk fetches a chunk of rows from the specified table, resuming from the `state.Scanned` cursor
 	// position if non-nil.
+	// The `backfillFilter` string, when non-empty, is a user-provided SQL expression which must be
+	// ANDed into the WHERE clause of the backfill query (parenthesized, so disjunctions work).
 	// The `backfillComplete` boolean will be true after scanning the final chunk of the table.
-	ScanTableChunk(ctx context.Context, info *DiscoveryInfo, state *TableState, callback func(event ChangeEvent) error) (backfillComplete bool, nextResumeCursor []byte, err error)
+	ScanTableChunk(ctx context.Context, info *DiscoveryInfo, state *TableState, backfillFilter string, callback func(event ChangeEvent) error) (backfillComplete bool, nextResumeCursor []byte, err error)
 	// ListTables returns all tables visible for capture after the connector's
 	// configured discovery filters are applied.
 	ListTables(ctx context.Context) ([]TableID, error)

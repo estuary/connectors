@@ -23,7 +23,15 @@ from .api import (
     snapshot_report_rows,
     snapshot_reports,
 )
-from .models import EndpointConfig, Report, ReportRow, Sheet, SheetRow, base_url
+from .models import (
+    SENTINEL_ACCESS_TOKEN,
+    EndpointConfig,
+    Report,
+    ReportRow,
+    Sheet,
+    SheetRow,
+    base_url,
+)
 
 # Daily reconciliation schedule for `sheet_rows` — its `rowsModifiedSince`
 # cursor has confirmed gaps (blank/never-cell-written rows are invisible to
@@ -157,10 +165,20 @@ async def sheets(http: HTTPMixin, config: EndpointConfig) -> SmartsheetResource:
     )
 
 
+async def _list_sheet_ids_for_discovery(
+    log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> list[int]:
+    if config.credentials.access_token == SENTINEL_ACCESS_TOKEN:
+        log.warning("Sentinel access token configured: skipping sheet enumeration.")
+        return []
+
+    return await list_all_sheet_ids(http, config.region, log)
+
+
 async def sheet_rows(
     log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> SmartsheetResource:
-    sheet_ids = await list_all_sheet_ids(http, config.region, log)
+    sheet_ids = await _list_sheet_ids_for_discovery(log, http, config)
     cutoff = _whole_second_cutoff()
 
     incremental_fetchers: dict[str, common.FetchChangesFn[SheetRow]] = {

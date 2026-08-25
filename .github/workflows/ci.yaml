@@ -7,11 +7,37 @@ concurrency:
 on:
   push:
     branches: [main]
+    paths-ignore: &non_code_paths
+      - "**.md"
+      - "docs/**"
+      - ".claude/**"
+      - ".github/workflows/python.yaml"
+      - ".github/workflows/estuary-cdk.yaml"
+
   pull_request:
     branches: [main]
+    paths-ignore: *non_code_paths
 
 jobs:
+  # Which connectors did this change touch? This job classifies every changed
+  # path, and the build jobs below gate on its answer.
+  #
+  # It can't be a `paths` filter because dynamically telling a Python connector
+  # from a Go or Rust one means looking for a pyproject.toml, which needs the
+  # checked out tree & nothing is checked out when `paths` filters are evaluated.
+  classify_changes:
+    runs-on: ubuntu-24.04
+    outputs:
+      run: ${{ steps.classify.outputs.go_rust }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: classify
+        uses: ./.github/actions/classify-changes
+
   fetch_flow:
+    needs: classify_changes
+    if: needs.classify_changes.outputs.run == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -20,6 +46,8 @@ jobs:
         uses: ./.github/actions/fetch-flow-artifact
 
   build_base_image:
+    needs: classify_changes
+    if: needs.classify_changes.outputs.run == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -74,7 +102,8 @@ jobs:
 
   build_connectors:
     runs-on: ubuntu-24.04
-    needs: [build_base_image, fetch_flow]
+    needs: [classify_changes, build_base_image, fetch_flow]
+    if: needs.classify_changes.outputs.run == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -161,6 +190,16 @@ jobs:
           echo ::set-output name=version::${VERSION}
           VARIANTS="${{ matrix.connector }} $(cat ${{ matrix.connector }}/VARIANTS 2>/dev/null || true)"
           echo ::set-output name=variants::${VARIANTS}
+
+      # Several steps below run `go test` on the runner instead of inside a Dockerfile, and
+      # without this they fetch the module graph and compile it cold. Gate on the same
+      # condition as the helper package test step.
+      - name: Set up Go with module and build caching
+        if: hashFiles(format('{0}/*.go', matrix.connector)) != ''
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
 
       - name: Restore Flow binaries
         uses: ./.github/actions/restore-flow-binaries

@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"database/sql"
 	"fmt"
+	"math/big"
 	"os"
 	"path"
+	"strings"
 	"testing"
 	"time"
 
@@ -531,4 +533,31 @@ func TestParquetEOFReadingByteArrayRegression(t *testing.T) {
 	defLvls := make([]int16, numRows)
 	_, _, err = cr.(*file.ByteArrayColumnChunkReader).ReadBatch(int64(numRows), vals, defLvls, nil)
 	require.NoError(t, err)
+}
+
+func TestGetNumberVal(t *testing.T) {
+	bigVal, _ := new(big.Int).SetString("184467440737095516160", 10)
+	tooBig, _ := new(big.Int).SetString("1"+strings.Repeat("0", 400), 10)
+
+	for _, tt := range []struct {
+		name  string
+		input any
+		want  float64
+	}{
+		{name: "float64", input: float64(1.5), want: 1.5},
+		{name: "float32", input: float32(1.5), want: 1.5},
+		{name: "int64", input: int64(-5), want: -5},
+		{name: "uint64", input: uint64(18446744073709551615), want: 18446744073709551615},
+		{name: "big.Int", input: bigVal, want: 184467440737095516160},
+		{name: "string", input: "1.5", want: 1.5},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := getNumberVal(tt.input)
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
+		})
+	}
+
+	_, err := getNumberVal(tooBig)
+	require.Error(t, err)
 }

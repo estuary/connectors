@@ -27,6 +27,13 @@ type Capture struct {
 	Checkpoint      json.RawMessage // Persistent checkpoint state between captures
 	DiscoveryFilter *regexp.Regexp  // Filter for discovered bindings (nil = no filtering)
 	Logger          func(...any)    // Log function (defaults to stderr, set to t.Log in tests)
+
+	// Env holds environment variables applied to each flowctl invocation, and so inherited
+	// by the connector process flowctl spawns. Settings which alter connector behavior have
+	// to live here rather than in the test process' own environment, because a test which
+	// mutated os.Environ() would alter the behavior of every other test running at the
+	// same time.
+	Env map[string]string
 }
 
 func New(baseYAML string) (*Capture, error) {
@@ -67,6 +74,7 @@ func New(baseYAML string) (*Capture, error) {
 		Catalog:    catalog,
 		Checkpoint: json.RawMessage(`{}`),
 		Logger:     defaultLogger,
+		Env:        make(map[string]string),
 	}, nil
 }
 
@@ -92,6 +100,9 @@ func (c *Capture) startFlowctl(ctx context.Context, args ...string) (*flowctlCmd
 	cmd := exec.CommandContext(ctx, "flowctl", append([]string{"--profile=testing"}, args...)...)
 	cmd.Dir = c.runRoot
 	cmd.Env = append(os.Environ(), "NO_COLOR=1", "LOG_FORMAT=json")
+	for name, value := range c.Env {
+		cmd.Env = append(cmd.Env, name+"="+value)
+	}
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -405,6 +416,24 @@ func (c *Capture) RunWithContext(ctx context.Context, sessions int) ([]byte, err
 	}
 
 	return documents, nil
+}
+
+// SetLocalCommand replaces the command used to invoke local-endpoint captures in the
+// catalog. Tests use this to run a connector binary built once up front, rather than
+// having each of the hundreds of flowctl invocations in a suite re-link it via `go run`.
+func (c *Capture) SetLocalCommand(argv ...string) error {
+	for _, captureName := range gjson.GetBytes(c.Catalog, "captures.@keys").Array() {
+		var fullPath = `captures.` + captureName.String() + `.endpoint.local`
+		if !gjson.GetBytes(c.Catalog, fullPath).Exists() {
+			continue // Not a local endpoint, nothing to override
+		}
+		var result, err = sjson.SetBytes(c.Catalog, fullPath+`.command`, argv)
+		if err != nil {
+			return err
+		}
+		c.Catalog = result
+	}
+	return nil
 }
 
 // EditConfig modifies a property of the endpoint config(s) of all captures in the catalog.

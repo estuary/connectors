@@ -1,5 +1,14 @@
 # materialize-bigquery
 
+## 2026-08-07
+
+### Fixed
+- A load query that reads a NULL `flow_document` now says so, and names the
+  `Exclude Flow Document` option that addresses it. It previously reported
+  `value[1] wrong type int64 expecting string`, giving the type of the binding
+  index rather than of the document, which made it the same message regardless
+  of cause.
+
 ## 2026-07-23
 
 ### Changed

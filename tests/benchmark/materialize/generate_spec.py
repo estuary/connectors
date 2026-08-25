@@ -149,7 +149,11 @@ def build_spec(
     else:
         endpoint = {
             "local": {
-                "command": [f"./{connector}/connector"],
+                "command": [
+                    os.path.join(
+                        os.environ.get("ROOT_DIR", "."), connector, "connector"
+                    )
+                ],
                 "protobuf": True,
                 "config": config,
             }

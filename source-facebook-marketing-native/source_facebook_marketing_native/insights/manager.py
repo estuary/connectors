@@ -24,6 +24,7 @@ from .types import (
     AsyncJobStatusResponse,
     AsyncJobSubmissionResponse,
     FacebookPaginatedInsightsResponse,
+    FieldSplitPart,
     FilterField,
     InsightRecord,
     InsightsFilter,
@@ -41,6 +42,11 @@ from .metrics import JobMetrics
 
 # Job retry configuration - each split job gets a fresh retry budget
 MAX_RETRIES: int = 3
+
+# Retries for a single-field job before the field is declared unfetchable.
+# Only the leaf retries: an internal node failing just means "split further",
+# which is cheap and self-correcting, while dropping a field is irreversible.
+MAX_FIELD_LEAF_RETRIES: int = 2
 
 # Per-account concurrency limit for actually-executing jobs (via semaphore)
 # Facebook rate limits are per ad account
@@ -86,14 +92,23 @@ class FacebookInsightsJobManager:
         Examples:
             - "ACCOUNT job [depth=0]"
             - "campaigns job (2 entities) [depth=1, from ACCOUNT]"
-            - "adsets job (1 entities) [depth=2, from campaigns]"
+            - "adsets job (1 entities, ids=[123]) [depth=2, from campaigns]"
+
+        Small jobs name their entities, since those are the ones that fail
+        unsplittably and a bare count doesn't say which entity to go look at.
         """
         if job.scope == JobScope.ACCOUNT:
             return f"ACCOUNT job [depth={job.depth}]"
 
         count = len(job.entity_ids) if job.entity_ids else 0
+        ids_info = (
+            f", ids={job.entity_ids}" if job.entity_ids and count <= 3 else ""
+        )
         parent_info = f", from {job.parent_scope.value}" if job.parent_scope else ""
-        return f"{job.scope.value} job ({count} entities) [depth={job.depth}{parent_info}]"
+        return (
+            f"{job.scope.value} job ({count} entities{ids_info}) "
+            f"[depth={job.depth}{parent_info}]"
+        )
 
     def _build_filter(self, job: InsightsJob) -> InsightsFilter | None:
         """Build InsightsFilter from job scope and entity IDs."""
@@ -119,13 +134,14 @@ class FacebookInsightsJobManager:
         account_id: str,
         time_range: TimeRange,
         result_queue: asyncio.Queue[InsightRecord],
+        metrics: JobMetrics,
     ) -> JobOutcome:
         """
         Execute a single insights job with retry logic.
 
         Returns JobSuccess if records were streamed to the queue, or JobSplit
-        if the job was split into child jobs. Raises CannotSplitFurtherError
-        if a single-ad job fails and cannot be split further.
+        if the job was split into child jobs. A job that cannot be split by
+        entity falls back to splitting its field set.
         """
         job_desc = self._describe_job(job)
         last_error: Exception | None = None
@@ -145,6 +161,7 @@ class FacebookInsightsJobManager:
                     action_breakdowns=model.action_breakdowns,
                     action_attribution_windows=model.action_attribution_windows,
                     filtering=filtering,
+                    job_desc=job_desc,
                 )
 
                 await self._wait_for_completion(log, job_id, job_desc)
@@ -163,13 +180,19 @@ class FacebookInsightsJobManager:
                     raise
                 if isinstance(converted, DataLimitExceededError):
                     log.info(f"{job_desc} hit data limits, splitting immediately")
-                    return await self._split_or_raise(log, job, account_id, time_range, job_desc)
+                    return await self._split_or_degrade(
+                        log, job, model, account_id, time_range, job_desc,
+                        result_queue, metrics, converted,
+                    )
                 last_error = converted
                 log.warning(f"{job_desc} failed (attempt {attempt}/{MAX_RETRIES}): {converted}")
 
-            except DataLimitExceededError:
+            except DataLimitExceededError as e:
                 log.info(f"{job_desc} hit data limits, splitting immediately")
-                return await self._split_or_raise(log, job, account_id, time_range, job_desc)
+                return await self._split_or_degrade(
+                    log, job, model, account_id, time_range, job_desc,
+                    result_queue, metrics, e,
+                )
 
             except FacebookAPIError as e:
                 last_error = e
@@ -177,22 +200,318 @@ class FacebookInsightsJobManager:
 
         # All retries exhausted
         log.warning(f"{job_desc} failed after {MAX_RETRIES} attempts: {last_error}")
-        return await self._split_or_raise(log, job, account_id, time_range, job_desc, last_error)
+        return await self._split_or_degrade(
+            log, job, model, account_id, time_range, job_desc,
+            result_queue, metrics, last_error,
+        )
 
-    async def _split_or_raise(
+    async def _split_or_degrade(
         self,
         log: Logger,
         job: InsightsJob,
+        model: type[FacebookInsightsResource],
         account_id: str,
         time_range: TimeRange,
         job_desc: str,
+        result_queue: asyncio.Queue[InsightRecord],
+        metrics: JobMetrics,
         error: Exception | None = None,
-    ) -> JobSplit:
-        """Split a job into children or raise CannotSplitFurtherError if atomic."""
+    ) -> JobOutcome:
+        """
+        Split a job into children, or split it by field if it is already atomic.
+
+        A single-ad job cannot be narrowed any further by entity, but the failure
+        may live inside one field rather than in the breadth of the request - a
+        single ad whose `actions` array explodes across the action breakdowns
+        will fail no matter how few ads are asked for. Splitting the field set
+        recovers everything except the offending field.
+        """
         if not job.can_split():
-            raise CannotSplitFurtherError(f"{job_desc} cannot be split: {error}")
+            return await self._execute_field_split(
+                log, job, model, account_id, time_range, job_desc,
+                result_queue, metrics, error,
+            )
         children = await self._split_job(log, job, account_id, time_range)
         return JobSplit(children=children)
+
+    def _join_key(self, model: type[FacebookInsightsResource]) -> list[str]:
+        """
+        Every column that identifies a row, used to re-join field-split parts.
+
+        This is the model's full primary key, which is not the same thing as
+        the key columns that have to be requested: a breakdown stream is keyed
+        on its breakdown columns, and those arrive because `breakdowns` is set,
+        not because they were asked for as fields. Joining on the requestable
+        subset alone would collapse every breakdown row of an entity-day into
+        one record.
+
+        Which columns Facebook returns unasked is not knowable from the model:
+        breakdown columns come from `breakdowns`, `date_start` and `date_stop`
+        from the unconditional `time_increment=1`, and `account_id` is stamped
+        on by `_fetch_results`. Custom insights models rely on that - they key
+        on `/date_start` without listing it in `fields`. `_verify_join_key`
+        checks the returned rows instead of trying to predict them.
+        """
+        pointers = [key.lstrip("/") for key in model.primary_keys]
+        assert all("/" not in p for p in pointers), (
+            f"{model.name} has a nested primary key; the field-split join key "
+            f"assumes top-level pointers: {model.primary_keys}"
+        )
+        return pointers
+
+    def _requested_key_fields(
+        self, model: type[FacebookInsightsResource]
+    ) -> list[str]:
+        """
+        The key columns that are requestable fields, so ride along in every part.
+
+        Breakdown columns are deliberately excluded: Facebook rejects them as
+        fields, and every part gets them anyway from the unchanged `breakdowns`
+        parameter.
+        """
+        return [p for p in self._join_key(model) if p in model.fields]
+
+    def _verify_join_key(
+        self,
+        records: list[InsightRecord],
+        join_key: list[str],
+        fields: list[str],
+        job_desc: str,
+    ) -> None:
+        """
+        Refuse a chunk whose rows do not all carry the whole join key.
+
+        A key column missing from a row makes that row indistinguishable from
+        every other row missing it, so merging would silently collapse unrelated
+        rows and still report success. Nothing downstream catches it either:
+        custom insights models make their breakdown columns optional, so the
+        collapsed record validates cleanly. Fail the day and leave the cursor
+        where it is instead.
+        """
+        missing: set[str] = set()
+        for record in records:
+            missing.update(key for key in join_key if key not in record)
+
+        if missing:
+            raise CannotSplitFurtherError(
+                f"{job_desc}: Facebook returned rows without the key "
+                f"column(s) {sorted(missing)} while {len(fields)} fields were "
+                f"requested, so the field-split parts cannot be re-joined"
+            )
+
+    async def _run_with_fields(
+        self,
+        log: Logger,
+        job: InsightsJob,
+        model: type[FacebookInsightsResource],
+        account_id: str,
+        time_range: TimeRange,
+        fields: list[str],
+        job_desc: str,
+    ) -> list[InsightRecord]:
+        """Run one field subset to completion, returning its verified rows."""
+        job_id = await self._submit_job(
+            log=log,
+            account_id=account_id,
+            level=model.level,
+            fields=fields,
+            time_range=time_range,
+            breakdowns=model.breakdowns,
+            action_breakdowns=model.action_breakdowns,
+            action_attribution_windows=model.action_attribution_windows,
+            filtering=self._build_filter(job),
+            job_desc=job_desc,
+        )
+
+        await self._wait_for_completion(log, job_id, job_desc)
+
+        records = [
+            record
+            async for record in self._fetch_results(
+                log, job_id, account_id, model.level
+            )
+        ]
+
+        # Checked per chunk rather than on the merged output: this fails before
+        # the remaining chunks are run, and before a bad key can collapse rows
+        # into a record that no longer shows what went wrong.
+        self._verify_join_key(records, self._join_key(model), fields, job_desc)
+
+        return records
+
+    async def _bisect_fields(
+        self,
+        log: Logger,
+        job: InsightsJob,
+        model: type[FacebookInsightsResource],
+        account_id: str,
+        time_range: TimeRange,
+        job_desc: str,
+        fields: list[str],
+        pk_fields: list[str],
+        unfetched: list[str],
+        depth: int,
+    ) -> list[FieldSplitPart]:
+        """
+        Halve the field set until each part succeeds, dropping what never succeeds.
+
+        Primary keys ride along in both halves so the parts can be re-joined.
+        Returns one part per successful chunk; fields that fail even alone are
+        appended to `unfetched` and contribute no part at all.
+        """
+        part_desc = f"{job_desc} fields[{len(fields)}] d={depth}"
+        non_pk = [f for f in fields if f not in pk_fields]
+        last_error: Exception | None = None
+
+        attempts = MAX_FIELD_LEAF_RETRIES if len(non_pk) <= 1 else 1
+        for attempt in range(1, attempts + 1):
+            try:
+                return [
+                    FieldSplitPart(
+                        fields=fields,
+                        records=await self._run_with_fields(
+                            log, job, model, account_id, time_range, fields, part_desc
+                        ),
+                    )
+                ]
+            except HTTPError as e:
+                # Only Facebook's own rejections mean "this request is too big".
+                # A transport failure must propagate, or a network blip would be
+                # silently recorded as a field Facebook cannot report on.
+                converted = try_parse_facebook_api_error(e)
+                if converted is None:
+                    raise
+                last_error = converted
+            except (FacebookAPIError, DataLimitExceededError) as e:
+                last_error = e
+
+            if attempt < attempts:
+                log.warning(
+                    f"{part_desc} failed (attempt {attempt}/{attempts}), retrying",
+                    extra={"fields": fields, "depth": depth},
+                )
+
+        if not non_pk:
+            raise CannotSplitFurtherError(
+                f"{job_desc} cannot be reduced below its primary keys "
+                f"({pk_fields}): {last_error}"
+            )
+
+        if len(non_pk) == 1:
+            dropped = str(non_pk[0])
+            log.warning(
+                f"{job_desc}: Facebook cannot report on field '{dropped}' for "
+                f"this entity; dropping it.",
+                extra={
+                    "unfetched_field": dropped,
+                    "entity_ids": job.entity_ids,
+                    "since": time_range["since"],
+                    "until": time_range["until"],
+                },
+            )
+            unfetched.append(dropped)
+            return []
+
+        mid = len(non_pk) // 2
+        halves = (pk_fields + non_pk[:mid], pk_fields + non_pk[mid:])
+        log.info(
+            f"Field split {part_desc}: {len(non_pk)} fields -> "
+            f"{mid} + {len(non_pk) - mid}"
+        )
+
+        results: list[FieldSplitPart] = []
+        for half in halves:
+            results.extend(
+                await self._bisect_fields(
+                    log, job, model, account_id, time_range, job_desc,
+                    half, pk_fields, unfetched, depth + 1,
+                )
+            )
+        return results
+
+    def _merge_by_primary_key(
+        self, parts: list[FieldSplitPart], pk_fields: list[str]
+    ) -> list[InsightRecord]:
+        """
+        Re-join field-split parts into whole records, keyed on the primary key.
+
+        `pk_fields` must be the model's whole key (see `_join_key`), not just
+        the part of it that was requested as fields.
+        """
+        merged: dict[tuple, InsightRecord] = {}
+
+        for part in parts:
+            for record in part.records:
+                key = tuple(record.get(f) for f in pk_fields)
+                merged.setdefault(key, {}).update(record)
+
+        return list(merged.values())
+
+    async def _execute_field_split(
+        self,
+        log: Logger,
+        job: InsightsJob,
+        model: type[FacebookInsightsResource],
+        account_id: str,
+        time_range: TimeRange,
+        job_desc: str,
+        result_queue: asyncio.Queue[InsightRecord],
+        metrics: JobMetrics,
+        error: Exception | None = None,
+    ) -> JobOutcome:
+        """
+        Recover an atomic job by splitting its field set instead of its entities.
+
+        Losing some fields is the point of this fallback, but losing every one of
+        them is not degradation - it means Facebook will not report on this
+        entity at all, which no amount of splitting explains. Raise rather than
+        let the cursor advance past data we never obtained.
+        """
+        pk_fields = self._requested_key_fields(model)
+        splittable = [f for f in model.fields if f not in pk_fields]
+        unfetched: list[str] = []
+
+        log.info(
+            f"{job_desc} cannot be split by entity; splitting its "
+            f"{len(model.fields)} fields instead. Triggered by: {error}"
+        )
+
+        parts = await self._bisect_fields(
+            log, job, model, account_id, time_range, job_desc,
+            list(model.fields), pk_fields, unfetched, depth=0,
+        )
+
+        # A chunk that succeeded with no rows while a sibling returned rows
+        # yielded no values for its fields, which is the same loss as a field
+        # Facebook refused - only reached by a different route, and otherwise
+        # invisible, since the records simply come out without those columns.
+        # Gated on a sibling having rows: an entity with no activity in the
+        # window empties every chunk, and that is not degradation.
+        if any(part.records for part in parts):
+            for part in parts:
+                if not part.records:
+                    unfetched.extend(f for f in part.fields if f not in pk_fields)
+
+        if len(unfetched) == len(splittable):
+            raise CannotSplitFurtherError(
+                f"{job_desc}: Facebook would not report on any of its "
+                f"{len(splittable)} fields, even one at a time. Last error: {error}"
+            )
+
+        records = self._merge_by_primary_key(parts, self._join_key(model))
+        for record in records:
+            await result_queue.put(record)
+
+        if unfetched:
+            metrics.track_degraded(unfetched)
+
+        log.info(
+            f"Completed {job_desc} by field splitting: {len(records)} records "
+            f"from {len(parts)} parts, "
+            f"{len(model.fields) - len(unfetched)}/{len(model.fields)} fields",
+            extra={"unfetched_fields": unfetched},
+        )
+        return JobSuccess(records_count=len(records))
 
     async def _submit_job(
         self,
@@ -205,6 +524,7 @@ class FacebookInsightsJobManager:
         action_breakdowns: list[ActionBreakdown] | None = None,
         action_attribution_windows: list[AttributionWindow] | None = None,
         filtering: InsightsFilter | None = None,
+        job_desc: str | None = None,
     ) -> str:
         url = f"{self._base_url}/act_{account_id}/insights"
 
@@ -235,7 +555,12 @@ class FacebookInsightsJobManager:
         if response.error:
             raise FacebookAPIError(error=response.error)
 
-        log.info(f"Submitted async insights job: {response.report_run_id}")
+        # Name the job alongside its id: with MAX_CONCURRENT_JOBS in flight,
+        # a bare id can't be tied back to the scope that produced it.
+        log.info(
+            f"Submitted async insights job for {job_desc or 'job'}: "
+            f"{response.report_run_id}"
+        )
         return response.report_run_id
 
     async def _check_job_status(
@@ -550,7 +875,7 @@ class FacebookInsightsJobManager:
             """Wrapper to acquire semaphore before execution."""
             async with self._semaphore:
                 return await self._execute_job(
-                    log, job, model, account_id, time_range, result_queue
+                    log, job, model, account_id, time_range, result_queue, metrics
                 )
 
         try:
@@ -647,6 +972,21 @@ class FacebookInsightsJobManager:
             )
             log.info(f"Final tree breakdown: {metrics.tree_progress_summary()}")
 
+            if metrics.degraded:
+                # Records carry no marker, so this line is the only record that
+                # documents for this window are missing data they should have had.
+                log.warning(
+                    f"Incomplete data for {time_range['since']} to "
+                    f"{time_range['until']}: {metrics.degradation_summary()}",
+                    extra={
+                        "account_id": account_id,
+                        "degraded_jobs": metrics.degraded,
+                        "unfetched_fields": sorted(metrics.unfetched_fields),
+                        "since": time_range["since"],
+                        "until": time_range["until"],
+                    },
+                )
+
     async def _wait_for_completion(
         self,
         log: Logger,
@@ -672,19 +1012,40 @@ class FacebookInsightsJobManager:
                     return
 
                 elif status.async_status == AsyncJobStatus.JOB_FAILED:
-                    parts = [f"{desc}: job failed at {status.async_percent_completion}% (job_id={job_id})"]
+                    # No "%" in this message: it becomes the FacebookError message,
+                    # which is interpolated into log calls that carry structured
+                    # fields, where logging would read it as a format placeholder.
+                    parts = [
+                        f"{desc}: job failed at {status.async_percent_completion} percent "
+                        f"(job_id={job_id})"
+                    ]
+                    if status.error_code is not None:
+                        code_desc = f"code={status.error_code}"
+                        if status.error_subcode is not None:
+                            code_desc += f", subcode={status.error_subcode}"
+                        parts.append(code_desc)
+                    if status.error_message:
+                        parts.append(status.error_message)
                     if status.error_user_title:
                         parts.append(f"reason: {status.error_user_title}")
                     if status.error_user_msg:
                         parts.append(status.error_user_msg)
                     error_msg = " — ".join(parts)
-                    log.error(error_msg)
+                    log.error(
+                        error_msg,
+                        extra={
+                            "job_id": job_id,
+                            "error_code": status.error_code,
+                            "error_subcode": status.error_subcode,
+                            "async_percent_completion": status.async_percent_completion,
+                        },
+                    )
 
                     raise FacebookAPIError(
                         error=FacebookError(
                             message=error_msg,
                             type=InternalJobErrorType.JOB_FAILURE,
-                            code=status.error_code or 100,
+                            code=status.error_code if status.error_code is not None else 100,
                             error_subcode=status.error_subcode,
                         )
                     )

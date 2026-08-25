@@ -5,17 +5,21 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/binary"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"regexp"
 	"runtime/debug"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
 	"github.com/estuary/connectors/go/capture/blackbox"
 	"github.com/estuary/connectors/go/capture/sqlserver/tests"
+	mssqldb "github.com/microsoft/go-mssqldb"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
@@ -45,7 +49,36 @@ func TestMain(m *testing.M) {
 	// Set a 900MiB memory limit, same as we use in production.
 	debug.SetMemoryLimit(900 * 1024 * 1024)
 
-	os.Exit(m.Run())
+	os.Exit(runTests(m))
+}
+
+// connectorBinary is the path to the connector built by runTests, which every capture in
+// this package is pointed at. Empty when tests are skipped for lack of a database.
+var connectorBinary string
+
+// runTests builds the connector once and runs the suite against that binary. Each test
+// performs many flowctl invocations and each one spawns the connector, so building here
+// avoids paying `go run`'s link step hundreds of times over.
+//
+// Split out from TestMain because os.Exit would skip deferred cleanup of the build.
+func runTests(m *testing.M) int {
+	if os.Getenv("TEST_DATABASE") == "yes" {
+		buildDir, err := os.MkdirTemp("", "source-sqlserver-ct-build-*")
+		if err != nil {
+			log.WithField("err", err).Error("error creating build directory")
+			return 1
+		}
+		defer os.RemoveAll(buildDir)
+
+		connectorBinary = buildDir + "/connector"
+		var build = exec.Command("go", "build", "-o", connectorBinary, ".")
+		build.Stderr = os.Stderr
+		if err := build.Run(); err != nil {
+			log.WithField("err", err).Error("error building connector for tests")
+			return 1
+		}
+	}
+	return m.Run()
 }
 
 var documentSanitizers = []blackbox.JSONSanitizer{
@@ -57,6 +90,15 @@ var checkpointSanitizers = []blackbox.JSONSanitizer{
 	{Matcher: regexp.MustCompile(`"cursor":{[^}]*}`), Replacement: `"cursor":"REDACTED"`},
 }
 
+// blackboxTestSetup prepares an isolated capture for a test. Isolation comes from the
+// table names and discovery filter both deriving from the test's own name, so tests
+// neither collide on tables nor observe each other's, which is what lets a test declare
+// itself parallel by calling t.Parallel().
+//
+// The minority of tests which alter database-wide state, such as role membership or
+// server configuration, must not overlap with anything else and so omit that call. Go
+// defers every parallel test until the sequential ones have finished, so these get the
+// database to themselves.
 func blackboxTestSetup(t testing.TB) (*sqlserverTestDatabase, *blackbox.TranscriptCapture) {
 	t.Helper()
 
@@ -64,10 +106,6 @@ func blackboxTestSetup(t testing.TB) (*sqlserverTestDatabase, *blackbox.Transcri
 		t.Skipf("skipping %q: ${TEST_DATABASE} != \"yes\"", t.Name())
 		return nil, nil
 	}
-
-	// TODO(wgd): Probably scoping this to just flowctl invocations would be cleaner, but this works
-	os.Setenv("SHUTDOWN_AFTER_POLLING", "yes")
-	t.Cleanup(func() { os.Unsetenv("SHUTDOWN_AFTER_POLLING") })
 
 	// Setup: Unique filter ID and full table name
 	var uniqueID = uniqueTableID(t)
@@ -82,6 +120,8 @@ func blackboxTestSetup(t testing.TB) (*sqlserverTestDatabase, *blackbox.Transcri
 	require.NoError(t, err)
 	tc.Capture.Logger = t.Log
 	tc.Capture.DiscoveryFilter = regexp.MustCompile(uniqueID)
+	tc.Capture.Env["SHUTDOWN_AFTER_POLLING"] = "yes"
+	require.NoError(t, tc.Capture.SetLocalCommand(connectorBinary))
 	tc.DocumentSanitizers = documentSanitizers
 	tc.CheckpointSanitizers = checkpointSanitizers
 
@@ -93,8 +133,17 @@ func blackboxTestSetup(t testing.TB) (*sqlserverTestDatabase, *blackbox.Transcri
 		Database: *dbName,
 	}).ToURI()
 	t.Logf("opening control connection: addr=%q, user=%q", *dbControlAddress, *dbControlUser)
-	conn, err := sql.Open("sqlserver", controlURI)
+	connector, err := mssqldb.NewConnector(controlURI)
 	require.NoError(t, err)
+
+	// Lose deadlocks deliberately. Tests run concurrently, so one test setting up its
+	// tables can deadlock against another test's capture reading that same metadata. The
+	// connector under test does not retry those reads, and should not have to for the sake
+	// of our test harness, whereas this control connection retries cheaply. Volunteering as
+	// the victim keeps the contention on the side which can recover from it.
+	connector.SessionInitSQL = "SET DEADLOCK_PRIORITY LOW"
+
+	var conn = sql.OpenDB(connector)
 	t.Cleanup(func() { conn.Close() })
 
 	// Setup: Create database interface with <NAME> templating
@@ -130,16 +179,57 @@ func (db *sqlserverTestDatabase) Exec(t testing.TB, query string) {
 	if db.transcript != nil {
 		fmt.Fprintf(db.transcript, "sql> %s\n", query)
 	}
-	if _, err := db.conn.ExecContext(context.Background(), query); err != nil {
-		t.Fatalf("error executing control query %q: %v", query, err)
-	}
+	db.execWithDeadlockRetry(t, query)
 }
 
 func (db *sqlserverTestDatabase) QuietExec(t testing.TB, query string) {
 	t.Helper()
 	query = db.Expand(query)
-	if _, err := db.conn.ExecContext(context.Background(), query); err != nil {
-		t.Fatalf("error executing control query %q: %v", query, err)
+	db.execWithDeadlockRetry(t, query)
+}
+
+// sqlserverDeadlockVictim is the error number SQL Server reports to the session it kills
+// to break a deadlock. The victim's work is rolled back, so it just tries again.
+const sqlserverDeadlockVictim = 1205
+
+const (
+	maxDeadlockRetries = 10
+	deadlockRetryDelay = 250 * time.Millisecond
+)
+
+// isDeadlockError reports whether err is, or merely reports, SQL Server's deadlock-victim
+// error. The error number alone is not enough, because the stored procedures which
+// manipulate change tracking metadata catch a deadlock hit during their own work and
+// re-raise it under their own error number, quoting the original 1205 in the message.
+func isDeadlockError(err error) bool {
+	var mssqlErr mssqldb.Error
+	if errors.As(err, &mssqlErr) && mssqlErr.Number == sqlserverDeadlockVictim {
+		return true
+	}
+	return strings.Contains(err.Error(), "was deadlocked on lock resources")
+}
+
+// execWithDeadlockRetry executes a control query, retrying if this session is chosen as
+// the victim of a deadlock. Any other failure is fatal to the test.
+//
+// Retrying is safe even for statements which aren't idempotent, such as INSERT, because
+// being chosen as the deadlock victim rolls the statement back in its entirety.
+func (db *sqlserverTestDatabase) execWithDeadlockRetry(t testing.TB, query string) {
+	t.Helper()
+	for attempt := 1; ; attempt++ {
+		var _, err = db.conn.ExecContext(context.Background(), query)
+		if err == nil {
+			return
+		}
+		if !isDeadlockError(err) {
+			t.Fatalf("error executing control query %q: %v", query, err)
+		}
+		if attempt >= maxDeadlockRetries {
+			t.Fatalf("error executing control query %q: still deadlocking after %d attempts: %v", query, attempt, err)
+		}
+		// Back off proportionally to the attempt so that a pile-up of contending tests
+		// spreads out rather than retrying in lockstep.
+		time.Sleep(time.Duration(attempt) * deadlockRetryDelay)
 	}
 }
 
@@ -160,11 +250,18 @@ func (db *sqlserverTestDatabase) CreateTable(t testing.TB, name, defs string) {
 	db.QuietExec(t, `IF OBJECT_ID('`+tableName+`', 'U') IS NOT NULL DROP TABLE `+tableName)
 	db.Exec(t, `CREATE TABLE `+tableName+` `+defs)
 
-	// Enable Change Tracking for the table
-	var ctQuery = fmt.Sprintf(`ALTER TABLE %s ENABLE CHANGE_TRACKING`, tableName)
-	db.QuietExec(t, ctQuery)
+	// Enable Change Tracking for the table. Guarded so that it stays idempotent under the
+	// deadlock retry, which can run after an attempt already took effect.
+	var ctQuery = fmt.Sprintf(
+		`IF NOT EXISTS (SELECT 1 FROM sys.change_tracking_tables WHERE object_id = OBJECT_ID('%s')) ALTER TABLE %s ENABLE CHANGE_TRACKING`,
+		tableName, tableName)
+	db.execWithDeadlockRetry(t, ctQuery)
 
-	t.Cleanup(func() { db.QuietExec(t, `IF OBJECT_ID('`+tableName+`', 'U') IS NOT NULL DROP TABLE `+tableName) })
+	// Dropping a change-tracked table implicitly disables change tracking for it, so this
+	// contends for the same metadata as enabling does.
+	t.Cleanup(func() {
+		db.execWithDeadlockRetry(t, `IF OBJECT_ID('`+tableName+`', 'U') IS NOT NULL DROP TABLE `+tableName)
+	})
 }
 
 // CreateTableWithoutCT creates a table without enabling Change Tracking, for tests that need manual control.
@@ -190,6 +287,7 @@ func uniqueTableID(t testing.TB, extra ...string) string {
 
 // TestSpec verifies the connector's spec output against a snapshot.
 func TestSpec(t *testing.T) {
+	t.Parallel()
 	var _, tc = blackboxTestSetup(t)
 	tc.Spec("Get Connector Spec")
 	cupaloy.SnapshotT(t, tc.Transcript.String())

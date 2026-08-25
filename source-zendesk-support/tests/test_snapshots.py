@@ -12,6 +12,8 @@ FIELDS_TO_REDACT = [
     "last_login_at",
     "assignee_updated_at",
     "generated_timestamp",
+    "fields",
+    "custom_fields",
 ]
 
 

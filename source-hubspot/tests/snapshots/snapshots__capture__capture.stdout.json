@@ -826,15 +826,15 @@
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "archived": false,
-      "createdAt": "2025-09-30T12:48:28.771Z",
-      "email": "nicolas@estuary.dev",
-      "firstName": "Nicolas",
-      "id": "83700335",
-      "lastName": "Lazo",
+      "createdAt": "2026-08-17T22:37:32.256Z",
+      "email": "dave@estuary.dev",
+      "firstName": "David",
+      "id": "12236123",
+      "lastName": "Yaffe",
       "type": "PERSON",
       "updatedAt": "redacted",
-      "userId": 83700335,
-      "userIdIncludingInactive": 83700335
+      "userId": 12236123,
+      "userIdIncludingInactive": 12236123
     }
   ],
   [

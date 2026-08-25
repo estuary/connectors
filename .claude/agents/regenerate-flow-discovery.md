@@ -24,6 +24,7 @@ These apply in every phase. Re-read them before each phase boundary.
 4. **`flowctl preview` and the pytest snapshot tests that drive it do hit the provider's API**. If the caller confirmed every required endpoint allows > 20 requests/hour, run them freely. Otherwise: ask before each run (via AskUserQuestion), and use `disable: true` on unrelated bindings in `test.flow.yaml` to cut the request count to just what's needed.
 5. **`flowctl raw discover` follows the same budget as `flowctl preview` unless this connector's discovery is static** — see `API-DISCOVER-STATIC-IS-FREE` in `provider-api-consent.md` for the static/dynamic test and examples.
 6. Pipe long test output to a file and Read it (per top-level `CLAUDE.md`). Don't `tail` / `head` pytest output — important lines often live in the middle.
+7. **A connector with no capture test has no `acmeCo/`** — see `REVIEW-ACMECO-NEEDS-CAPTURE-TEST` in `rules-index.md` for why. Grep `tests/test_snapshots.py` for `test_capture` before Phase 3. If there is none, **skip Phases 3 and 4 and go straight to Phase 5**: `acmeCo/` stays deleted and `bindings:` stays `[]`, but the discover and spec snapshots still need refreshing. That works because Phase 5 drives `flowctl raw discover --emit-raw`, which prints to stdout and writes no files — unlike Phase 3's plain `discover`, which is what generates the directory. Don't stop after Phase 2; that would leave the discover snapshot stale.
 
 ## Phase 1 — Wipe
 
@@ -53,6 +54,8 @@ Drop the `import:` line for the generated directory — it points to a file we j
 Preserve whatever endpoint configuration the original `test.flow.yaml` had — read it first if you're unsure of the shape.
 
 ## Phase 3 — Discover
+
+Gated by Law 7: if `tests/test_snapshots.py` has no `test_capture`, skip this phase and Phase 4, and go to Phase 5 — Phase 2's output is the finished layout, but the snapshots still need a refresh.
 
 Run from the connector dir:
 

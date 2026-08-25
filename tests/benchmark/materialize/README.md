@@ -148,6 +148,22 @@ Each run produces:
 | `preview.log`      | flowctl preview stderr (per-tx commit boundaries live here). |
 | `results.json`     | Aggregate `{ wall_seconds, total_docs, total_bytes, mb_per_sec, transactions: [...] }`. |
 
+## Cleanup
+
+A run names its task `bench/<connector>_flow_test_<timestamp>` and removes what
+it created.
+
+If a run is killed outright, its table survives until the next run of that
+scenario drops it, and its task metadata until swept:
+
+```bash
+go run ./tests/materialize/testctl \
+    -connector materialize-redshift \
+    -config materialize-redshift/testdata/config.local.yaml \
+    -resource <a resource config from a run directory> \
+    -mode sweep
+```
+
 ## Verifying overlap correctness
 
 The fixture is fully deterministic given `--seed`. To sanity-check that a

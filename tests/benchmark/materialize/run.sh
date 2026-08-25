@@ -85,8 +85,16 @@ if (( DOCKER )); then
   (cd "$ROOT_DIR" && ./build-local.sh "$CONNECTOR")
 else
   CONNECTOR_BIN="$ROOT_DIR/$CONNECTOR/connector"
-  echo "building connector binary: $CONNECTOR_BIN"
-  (cd "$ROOT_DIR" && go build -v -tags nozstd -o "$CONNECTOR_BIN" ./$CONNECTOR/...)
+  # Connectors structured as a library plus a cmd/ main (all the SQL ones)
+  # match more than one package under ./<connector>/..., which `go build -o
+  # <file>` refuses. Prefer the cmd package when there is one.
+  if [[ -d "$ROOT_DIR/$CONNECTOR/cmd" ]]; then
+    BUILD_PKG="./$CONNECTOR/cmd/..."
+  else
+    BUILD_PKG="./$CONNECTOR/..."
+  fi
+  echo "building connector binary: $CONNECTOR_BIN (from $BUILD_PKG)"
+  (cd "$ROOT_DIR" && go build -v -tags nozstd -o "$CONNECTOR_BIN" "$BUILD_PKG")
 fi
 
 # Output directory.
@@ -102,6 +110,14 @@ if (( DOCKER )); then echo "mode:      docker"; else echo "mode:      local"; fi
 echo "seed:      $SEED"
 echo "out-dir:   $OUT_DIR"
 
+# Every run gets its own task name. A task's stored checkpoint otherwise
+# carries over between runs. The _flow_test_<timestamp> shape is what
+# `testctl -mode sweep` recognises, so a run that has been killed can still
+# be cleaned up afterwards.
+RUN_SUFFIX="_flow_test_$(date +%s)"
+TASK="bench/${CONNECTOR}${RUN_SUFFIX}"
+echo "task:      $TASK"
+
 # Bring up the connector's docker-compose stack (DB only). Some connectors
 # keep it under tests/materialize/<connector>/ (the integration-test convention),
 # others keep it at the connector root. Try both.
@@ -115,20 +131,57 @@ done
 if [[ -n "$COMPOSE_FILE" ]]; then
   echo "starting docker-compose: $COMPOSE_FILE"
   docker compose -f "$COMPOSE_FILE" up --wait
-  cleanup() {
-    if (( ! KEEP )); then
-      echo "tearing down docker-compose"
-      docker compose -f "$COMPOSE_FILE" down -v || true
-    else
-      echo "--keep set; leaving docker-compose running"
-    fi
-  }
-  trap cleanup EXIT
   # Same grace period as tests/materialize/<connector>/setup.sh.
   sleep 5
 else
   echo "no docker-compose for $CONNECTOR; assuming endpoint is reachable"
 fi
+
+# clean up the destination resources using testctl
+TESTCTL="$OUT_DIR/testctl"
+echo "building testctl"
+(cd "$ROOT_DIR" && go build -tags nozstd -o "$TESTCTL" ./tests/materialize/testctl)
+
+drop_destination() {
+  local when="$1" res
+  for res in "$OUT_DIR"/resource-*.json; do
+    [[ -f "$res" ]] || continue
+    if "$TESTCTL" -connector "$CONNECTOR" -config "$CONFIG" -resource "$res" \
+         -task "$TASK" -mode drop >>"$OUT_DIR/cleanup.log" 2>&1; then
+      echo "  dropped $(basename "$res" .json) ($when)"
+    else
+      echo "  no $(basename "$res" .json) to drop ($when)"
+    fi
+  done
+}
+
+sweep_run() {
+  local res
+  for res in "$OUT_DIR"/resource-*.json; do
+    [[ -f "$res" ]] || continue
+    "$TESTCTL" -connector "$CONNECTOR" -config "$CONFIG" -resource "$res" \
+      -task "$TASK" -mode sweep -run-suffix "$RUN_SUFFIX" \
+      >>"$OUT_DIR/cleanup.log" 2>&1 || echo "  sweep reported errors (see cleanup.log)"
+    return
+  done
+}
+
+cleanup() {
+  local status=$?
+  if (( KEEP )); then
+    echo "--keep set; leaving the destination and docker-compose in place"
+  else
+    echo "cleaning up"
+    drop_destination "teardown"
+    sweep_run
+    if [[ -n "$COMPOSE_FILE" ]]; then
+      echo "tearing down docker-compose"
+      docker compose -f "$COMPOSE_FILE" down -v || true
+    fi
+  fi
+  return $status
+}
+trap cleanup EXIT INT TERM
 
 # Per-connector setup hook. Runs after docker-compose is up but before the
 # preview. Used for steps like creating an S3 bucket that the connector
@@ -146,6 +199,7 @@ SPEC_ARGS=(
   --connector "$CONNECTOR"
   --config    "$CONFIG"
   --output    "$SPEC"
+  --task      "$TASK"
 )
 if (( DOCKER )); then
   SPEC_ARGS+=(--docker)
@@ -153,7 +207,23 @@ fi
 echo "rendering spec: $SPEC"
 python3 "$BENCH_DIR/generate_spec.py" "${SPEC_ARGS[@]}"
 
-TASK="bench/$CONNECTOR"
+# One resource configuration file per binding, for testctl.
+python3 - "$SPEC" "$OUT_DIR" <<'RESOURCES'
+import json, sys, yaml
+
+spec_path, out_dir = sys.argv[1], sys.argv[2]
+with open(spec_path) as f:
+    spec = yaml.safe_load(f)
+materialization = next(iter(spec["materializations"].values()))
+for index, binding in enumerate(materialization["bindings"]):
+    with open(f"{out_dir}/resource-{index}.json", "w") as f:
+        json.dump(binding["resource"], f)
+RESOURCES
+
+# Drop whatever an earlier run left behind, so this run starts against an empty
+# destination however that run ended.
+echo "preparing destination"
+drop_destination "before run"
 
 # Set up FIFO + background generator.
 FIFO="$OUT_DIR/fixture.fifo"
@@ -218,9 +288,11 @@ echo "preview exit: $PREVIEW_RC"
 # Build results.json from state log + per-commit timestamps.
 # timestamps.json has one entry per connectorState line: the first is Apply
 # (DDL), the rest are data transactions.
-python3 - "$STATE_LOG" "$TIMESTAMPS" "$PREVIEW_RC" "$CONNECTOR" "$SCENARIO" "$SEED" >"$OUT_DIR/results.json" <<'PY'
-import json, sys, os
+python3 - "$STATE_LOG" "$TIMESTAMPS" "$PREVIEW_RC" "$CONNECTOR" "$SCENARIO" "$SEED" "$PREVIEW_LOG" >"$OUT_DIR/results.json" <<'PY'
+import json, sys, os, re
+from datetime import datetime
 state_path, ts_path, rc, connector, scenario, seed = sys.argv[1:7]
+preview_log = sys.argv[7] if len(sys.argv) > 7 else None
 with open(state_path) as f:
     state = json.load(f)
 try:
@@ -238,9 +310,78 @@ if len(timestamps) >= 2:
     for i in range(2, len(timestamps)):
         tx_boundaries.append((timestamps[i - 1], timestamps[i]))
 
+
+def boundaries_from_log(path):
+    """Derive per-round boundaries from flowctl's own log.
+
+    The connectorState-line method assumes one state line for Apply and one
+    per transaction. That holds only for connectors that emit a state document
+    at Apply; a connector whose destination is authoritative emits none, so
+    every boundary shifts by one and Apply absorbs the first transaction.
+
+    Each data round is bracketed by "started reading load requests" and
+    "finished materialization commit", both emitted once per round. Some
+    records arrive interleaved into another line and without their own
+    timestamp, so the most recent timestamp seen is used; the error is far
+    below the resolution that matters here.
+
+    Returns (apply_seconds, [(start_ns, end_ns)], rounds_observed).
+    """
+    ansi = re.compile("\x1b\\[[0-9;]*m|\\\\x1b\\[[0-9;]*m")
+    stamp_re = re.compile(r"(\d{4}-\d{2}-\d{2}T[\d:.]+Z)")
+    start_re = re.compile(r"started reading load requests\s+round=(-?\d+)")
+    end_re = re.compile(r"finished materialization commit\s+round=(-?\d+)")
+
+    starts, ends = {}, {}
+    first_ts = last_ts = cur = None
+    with open(path, errors="replace") as f:
+        for line in f:
+            line = ansi.sub("", line)
+            st = stamp_re.search(line)
+            if st:
+                cur = int(
+                    datetime.strptime(
+                        st.group(1)[:26].ljust(26, "0"), "%Y-%m-%dT%H:%M:%S.%f"
+                    ).timestamp() * 1e9
+                )
+                if first_ts is None:
+                    first_ts = cur
+                last_ts = cur
+            if cur is None:
+                continue
+            for m in start_re.finditer(line):
+                rnd = int(m.group(1))
+                if rnd >= 0:
+                    starts.setdefault(rnd, cur)
+            for m in end_re.finditer(line):
+                rnd = int(m.group(1))
+                if rnd >= 0:
+                    ends[rnd] = cur
+
+    if not starts or first_ts is None:
+        return None, [], 0
+    rounds = sorted(starts)
+    apply_s = (starts[rounds[0]] - first_ts) / 1e9
+    bounds = [(starts[r], ends.get(r, last_ts)) for r in rounds]
+    return apply_s, bounds, len(rounds)
+
+
+rounds_observed = len(tx_boundaries)
+timing_source = "connector-state"
+if preview_log and os.path.exists(preview_log):
+    log_apply, log_bounds, log_rounds = boundaries_from_log(preview_log)
+    if log_bounds:
+        apply_seconds, tx_boundaries = log_apply, log_bounds
+        rounds_observed, timing_source = log_rounds, "flowctl-log"
+
 txs = []
 total_docs = 0
 total_bytes = 0
+# Throughput must divide by what actually ran. A run can cover fewer
+# transactions than the scenario describes, and dividing the scenario's
+# totals by the observed wall overstates the result.
+observed_docs = 0
+observed_bytes = 0
 for i, tx in enumerate(state["transactions"]):
     bytes_ = tx["doc_count"] * tx["doc_size"]
     total_docs  += tx["doc_count"]
@@ -255,6 +396,8 @@ for i, tx in enumerate(state["transactions"]):
         "overlaps":  tx["overlaps"],
     }
     if i < len(tx_boundaries):
+        observed_docs += tx["doc_count"]
+        observed_bytes += bytes_
         start_ns, end_ns = tx_boundaries[i]
         wall_s = (end_ns - start_ns) / 1e9
         entry["wall_seconds"] = wall_s
@@ -263,7 +406,9 @@ for i, tx in enumerate(state["transactions"]):
     txs.append(entry)
 
 # Data wall = end of Apply to end of last data tx (excludes Apply).
-if len(timestamps) >= 3:
+if timing_source == "flowctl-log" and tx_boundaries:
+    data_wall = (tx_boundaries[-1][1] - tx_boundaries[0][0]) / 1e9
+elif len(timestamps) >= 3:
     data_wall = (timestamps[-1] - timestamps[1]) / 1e9
 else:
     data_wall = 0.0
@@ -275,10 +420,15 @@ print(json.dumps({
     "preview_exit_code": int(rc),
     "apply_seconds": apply_seconds,
     "wall_seconds": data_wall,
+    "timing_source": timing_source,
+    "rounds_observed": rounds_observed,
+    "scenario_transactions": len(state["transactions"]),
     "total_docs":   total_docs,
     "total_bytes":  total_bytes,
-    "docs_per_sec": (total_docs  / data_wall) if data_wall > 0 else None,
-    "mb_per_sec":   (total_bytes / data_wall / (1024*1024)) if data_wall > 0 else None,
+    "observed_docs":  observed_docs,
+    "observed_bytes": observed_bytes,
+    "docs_per_sec": (observed_docs  / data_wall) if data_wall > 0 else None,
+    "mb_per_sec":   (observed_bytes / data_wall / (1024*1024)) if data_wall > 0 else None,
     "transactions": txs,
 }, indent=2))
 PY

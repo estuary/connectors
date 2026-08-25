@@ -3,8 +3,10 @@ package testutil
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -256,6 +258,20 @@ func ReadConfigFile(path string) (json.RawMessage, error) {
 		return nil, fmt.Errorf("reading %s: %w", path, err)
 	}
 
+	if encrypted, err := isSopsEncrypted(raw); err != nil {
+		return nil, fmt.Errorf("parsing %s: %w", path, err)
+	} else if encrypted {
+		out, err := exec.Command("sops", "--decrypt", "--output-type", "json", path).Output()
+		if err != nil {
+			var exitErr *exec.ExitError
+			if errors.As(err, &exitErr) {
+				return nil, fmt.Errorf("decrypting %s with sops: %s", path, strings.TrimSpace(string(exitErr.Stderr)))
+			}
+			return nil, fmt.Errorf("decrypting %s with sops (is it installed?): %w", path, err)
+		}
+		return json.RawMessage(out), nil
+	}
+
 	var intermediate any
 	if err := yaml.Unmarshal(raw, &intermediate); err != nil {
 		return nil, fmt.Errorf("parsing %s: %w", path, err)
@@ -266,4 +282,14 @@ func ReadConfigFile(path string) (json.RawMessage, error) {
 	}
 
 	return out, nil
+}
+
+func isSopsEncrypted(raw []byte) (bool, error) {
+	var doc struct {
+		Sops any `yaml:"sops"`
+	}
+	if err := yaml.Unmarshal(raw, &doc); err != nil {
+		return false, err
+	}
+	return doc.Sops != nil, nil
 }

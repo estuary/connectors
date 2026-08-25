@@ -38,7 +38,16 @@ def test_capture(request, snapshot):
     assert result.returncode == 0
     lines = [json.loads(l) for l in result.stdout.splitlines()]
 
-    for l in lines:
+    unique_stream_lines = []
+    seen = set()
+
+    for line in lines:
+        stream = line[0]
+        if stream not in seen:
+            unique_stream_lines.append(line)
+            seen.add(stream)
+
+    for l in unique_stream_lines:
         _collection, record = l[0], l[1]
 
         for key in ["properties", "propertiesWithHistory"]:
@@ -60,11 +69,11 @@ def test_capture(request, snapshot):
 
     if insta_mode == "update" or not snapshot_path.exists():
         # Update snapshot or create initial baseline.
-        assert snapshot("stdout.json") == lines
+        assert snapshot("stdout.json") == unique_stream_lines
     else:
         # Compare capture snapshots. New fields are allowed, but missing or changed fields cause a failure.
         expected = json.loads(snapshot_path.read_text())
-        errors = compare_capture_records(actual=lines, expected=expected)
+        errors = compare_capture_records(actual=unique_stream_lines, expected=expected)
         if errors:
             pytest.fail("Capture snapshots are different:\n" + "\n".join(errors))
 

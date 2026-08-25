@@ -4,4 +4,4 @@ CONNECTOR=$(basename "$DIR")
 
 export TEST_DATABASE="${TEST_DATABASE:-yes}"
 
-cd $DIR/.. && go test -short -failfast -timeout=0 -v ./$CONNECTOR/... "$@"
+cd $DIR/.. && go test -short -failfast -timeout=1h -v ./$CONNECTOR/... "$@"
