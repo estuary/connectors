@@ -145,6 +145,13 @@ EXEC sys.sp_cdc_enable_table @source_schema = 'dbo', @source_name = 'foobar', @r
 
    - Find the instance's host under Server Name. The port is always `1433`. Together, you'll use the host:port as the `address` property when you configure the connector.
 
+### IAM Authentication
+
+For databases hosted on Amazon RDS, you can authenticate with an AWS IAM role
+instead of a password. This requires an RDS Proxy in front of the database; see
+[Amazon RDS for SQL Server](./amazon-rds-sqlserver/#iam-authentication) for
+setup instructions.
+
 ### Handling DDL Alterations to Source Tables
 
 In SQL Server, adding a column to the source table will not automatically cause it to be added to the CDC change table. Instead [Microsoft's recommended approach](https://learn.microsoft.com/en-us/sql/relational-databases/track-changes/about-change-data-capture-sql-server?view=sql-server-ver17#handling-changes-to-source-table) is to create a second capture instance which reflects the new state of the source table, transition over to the new instance, and then delete the old one.
@@ -189,13 +196,36 @@ See [connectors](/concepts/connectors.md#using-connectors) to learn more about u
 | **`/address`**                  | Server Address      | The host or host:port at which the database can be reached.                                                                                 | string  | Required                   |
 | **`/database`**                 | Database            | Logical database name to capture from.                                                                                                      | string  | Required                   |
 | **`/user`**                     | User                | The database user to authenticate as.                                                                                                       | string  | Required, `"flow_capture"` |
-| **`/password`**                 | Password            | Password for the specified database user.                                                                                                   | string  | Required                   |
 | `/historyMode` | History Mode | Capture each change event, without merging. | boolean | `false` |
+
+##### Authentication
+
+| Property | Title | Description | Type | Required/Default |
+| --- | --- | --- | --- | --- |
+| **`/credentials`** | Authentication | Authentication method and credentials that provide access to the database. | object | Required |
+| `/credentials/auth_type` | Auth Type | The authentication method to use. One of `UserPassword` or `AWSIAM`. | string |  |
+| `/credentials/password` | Password | Password for the specified database user. | string | Required for `UserPassword` auth |
+| `/credentials/aws_region` | AWS Region | AWS region of your resource. | string | Required for `AWSIAM` auth |
+| `/credentials/aws_role_arn` | AWS Role ARN | AWS role for Estuary to use that has access to the resource. | string | Required for `AWSIAM` auth |
+
+##### Discovery Filters
+
+Options that restrict which tables are surfaced by discovery. These take effect
+when discovery runs. If your capture has automatic discovery enabled, a table
+these filters exclude will be deactivated the next time discovery runs.
+
+| Property | Title | Description | Type | Required/Default |
+| --- | --- | --- | --- | --- |
 | `/discoveryFilters` | Discovery Filters | Options that restrict which tables are visible to discovery. | object |  |
 | `/discoveryFilters/include_schemas` | Include Schemas | If specified, only tables in the listed schemas are discovered. | string array |  |
 | `/discoveryFilters/exclude_schemas` | Exclude Schemas | Tables in the listed schemas are excluded from discovery. | string array |  |
 | `/discoveryFilters/table_patterns` | Table Patterns | If specified, only tables matching at least one of these glob patterns are discovered. A pattern containing a `.` matches against the qualified `schema.table` name. A pattern without a `.` matches the unqualified table name in any schema. Use `*` or `?` as wildcards. | string array |  |
 | `/discoveryFilters/discover_only_enabled` | Discover Only CDC-Enabled Tables | When set, the connector only discovers tables which already have CDC capture instances enabled. Combined as a union with the equivalent setting under Advanced Options. | boolean |  |
+
+##### Advanced options
+
+| Property | Title | Description | Type | Required/Default |
+| --- | --- | --- | --- | --- |
 | `/advanced`                     | Advanced Options    | Options for advanced users. You should not typically need to modify these.                                                                  | object  |                            |
 | `/advanced/backfill_chunk_size` | Backfill Chunk Size | The number of rows which should be fetched from the database in a single backfill query.                                                    | integer | `4096`                     |
 | `/advanced/skip_backfills`      | Skip Backfills      | A comma-separated list of fully-qualified table names which should not be backfilled.                                                       | string  |                            |
@@ -225,7 +255,9 @@ captures:
           address: "<host>:1433"
           database: "my_db"
           user: "flow_capture"
-          password: "secret"
+          credentials:
+            auth_type: UserPassword
+            password: "secret"
     bindings:
       - resource:
           stream: ${TABLE_NAME}

@@ -1,6 +1,6 @@
 ---
 sidebar_position: 3
-description: Capture Amazon RDS SQL Server changes with Estuary’s CDC connector. Setup guide includes database/table CDC setup, permissions, SSH tunneling, and DDL handling.
+description: Capture Amazon RDS SQL Server changes with Estuary’s CDC connector. Setup guide includes database/table CDC setup, permissions, IAM authentication, SSH tunneling, and DDL handling.
 ---
 
 # Amazon RDS for SQL Server
@@ -27,6 +27,8 @@ To capture change events from SQL Server tables using this connector, you need:
   - `SELECT` permissions on the CDC schema and the schemas that contain tables to be captured.
   - Access to the change tables created as part of the SQL Server CDC process.
   - The `VIEW DATABASE STATE` or (in newer versions of SQL Server) `VIEW DATABASE PERFORMANCE STATE` permission.
+
+- When using [IAM authentication](#iam-authentication), an RDS Proxy with the database as a target.
 
 ## Setup
 
@@ -63,6 +65,35 @@ EXEC sys.sp_cdc_enable_table @source_schema = 'dbo', @source_name = 'foobar', @r
 ```
 
 6. In the [RDS console](https://console.aws.amazon.com/rds/), note the instance's Endpoint and Port. You'll need these for the `address` property when you configure the connector.
+
+### IAM Authentication
+
+Instead of username/password authentication, you can optionally use an AWS IAM
+role with this connector.
+
+To do this, you will need to use [Amazon RDS Proxy](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/rds-proxy.html).
+This proxy accepts IAM connections from the connector and connects to the
+database using a password stored in AWS Secrets Manager.
+
+RDS Proxy cannot typically be accessed from the internet, so it is recommended
+to configure [SSH tunneling](/guides/connect-network/). Ensure the security
+group for the proxy allows MSSQL connections from the security group of the EC2
+instance.
+
+The proxy must be configured with IAM authentication set to `Allowed` or
+`Required`. Add a Secrets Manager secret to the RDS Proxy corresponding to the
+`flow_capture` user you created above. You can do this in the AWS Console by
+selecting the RDS Proxy, and clicking on `Actions -> Modify` followed by "create
+a new secret". Add the username and password for that user and select the
+correct database instance. Make sure that the proxy's authentication role allows
+the proxy access to read this secret.
+
+Instead of connecting directly to the database endpoint, you will set the
+connector's `address` to one of the proxy endpoints listed on the proxy. Then
+set `credentials.auth_type` to `AWSIAM` and provide the `aws_region` and the
+`aws_role_arn` for Estuary to assume. The connector fetches a fresh RDS auth
+token for every connection it opens, so long-running captures are unaffected by
+the token's limited lifetime.
 
 ### Handling DDL Alterations to Source Tables
 
@@ -108,13 +139,36 @@ See [connectors](/concepts/connectors.md#using-connectors) to learn more about u
 | **`/address`**                  | Server Address      | The host or host:port at which the database can be reached.                                                                                 | string  | Required                   |
 | **`/database`**                 | Database            | Logical database name to capture from.                                                                                                      | string  | Required                   |
 | **`/user`**                     | User                | The database user to authenticate as.                                                                                                       | string  | Required, `"flow_capture"` |
-| **`/password`**                 | Password            | Password for the specified database user.                                                                                                   | string  | Required                   |
 | `/historyMode` | History Mode | Capture each change event, without merging. | boolean | `false` |
+
+##### Authentication
+
+| Property | Title | Description | Type | Required/Default |
+| --- | --- | --- | --- | --- |
+| **`/credentials`** | Authentication | Authentication method and credentials that provide access to the database. | object | Required |
+| `/credentials/auth_type` | Auth Type | The authentication method to use. One of `UserPassword` or `AWSIAM`. | string |  |
+| `/credentials/password` | Password | Password for the specified database user. | string | Required for `UserPassword` auth |
+| `/credentials/aws_region` | AWS Region | AWS region of your resource. | string | Required for `AWSIAM` auth |
+| `/credentials/aws_role_arn` | AWS Role ARN | AWS role for Estuary to use that has access to the resource. | string | Required for `AWSIAM` auth |
+
+##### Discovery Filters
+
+Options that restrict which tables are surfaced by discovery. These take effect
+when discovery runs. If your capture has automatic discovery enabled, a table
+these filters exclude will be deactivated the next time discovery runs.
+
+| Property | Title | Description | Type | Required/Default |
+| --- | --- | --- | --- | --- |
 | `/discoveryFilters` | Discovery Filters | Options that restrict which tables are visible to discovery. | object |  |
 | `/discoveryFilters/include_schemas` | Include Schemas | If specified, only tables in the listed schemas are discovered. | string array |  |
 | `/discoveryFilters/exclude_schemas` | Exclude Schemas | Tables in the listed schemas are excluded from discovery. | string array |  |
 | `/discoveryFilters/table_patterns` | Table Patterns | If specified, only tables matching at least one of these glob patterns are discovered. A pattern containing a `.` matches against the qualified `schema.table` name. A pattern without a `.` matches the unqualified table name in any schema. Use `*` or `?` as wildcards. | string array |  |
 | `/discoveryFilters/discover_only_enabled` | Discover Only CDC-Enabled Tables | When set, the connector only discovers tables which already have CDC capture instances enabled. Combined as a union with the equivalent setting under Advanced Options. | boolean |  |
+
+##### Advanced options
+
+| Property | Title | Description | Type | Required/Default |
+| --- | --- | --- | --- | --- |
 | `/advanced`                     | Advanced Options    | Options for advanced users. You should not typically need to modify these.                                                                  | object  |                            |
 | `/advanced/backfill_chunk_size` | Backfill Chunk Size | The number of rows which should be fetched from the database in a single backfill query.                                                    | integer | `4096`                     |
 | `/advanced/skip_backfills`      | Skip Backfills      | A comma-separated list of fully-qualified table names which should not be backfilled.                                                       | string  |                            |
@@ -144,13 +198,25 @@ captures:
           address: "<host>:1433"
           database: "my_db"
           user: "flow_capture"
-          password: "secret"
+          credentials:
+            auth_type: UserPassword
+            password: "secret"
     bindings:
       - resource:
           stream: ${TABLE_NAME}
           namespace: dbo
           primary_key: ["id"]
         target: ${PREFIX}/${COLLECTION_NAME}
+```
+
+To authenticate with [IAM](#iam-authentication) instead, point `address` at your
+RDS Proxy endpoint and replace the credentials block:
+
+```yaml
+          credentials:
+            auth_type: AWSIAM
+            aws_region: "us-east-1"
+            aws_role_arn: "arn:aws:iam::123456789012:role/estuary-sqlserver-capture"
 ```
 
 Your capture definition will likely be more complex, with additional bindings for each table in the source database.

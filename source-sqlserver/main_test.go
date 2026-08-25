@@ -89,6 +89,21 @@ func runTests(m *testing.M) int {
 	return m.Run()
 }
 
+// controlConfigURI builds a DSN for a test control connection to the database.
+func controlConfigURI() (string, error) {
+	var credentials = &CredentialsConfig{
+		AuthType:           UserPassword,
+		UserPasswordConfig: UserPasswordConfig{Password: *dbControlPass},
+	}
+	var cfg = Config{
+		Address:     *dbControlAddress,
+		User:        *dbControlUser,
+		Credentials: credentials,
+		Database:    *dbName,
+	}
+	return cfg.ToURI()
+}
+
 // startManualCDCScanner stops the SQL Agent capture job and drives log scanning from the
 // test harness instead, returning a function which restores the job.
 //
@@ -103,12 +118,10 @@ func runTests(m *testing.M) int {
 // frequent scans make a fence available sooner, but the connector's default one second
 // poll still quantizes every fence to a one second boundary.
 func startManualCDCScanner() (func(), error) {
-	var controlURI = (&Config{
-		Address:  *dbControlAddress,
-		User:     *dbControlUser,
-		Password: *dbControlPass,
-		Database: *dbName,
-	}).ToURI()
+	controlURI, err := controlConfigURI()
+	if err != nil {
+		return nil, fmt.Errorf("building scanner connection DSN: %w", err)
+	}
 	conn, err := sql.Open("sqlserver", controlURI)
 	if err != nil {
 		return nil, fmt.Errorf("opening scanner connection: %w", err)
@@ -223,13 +236,9 @@ func blackboxTestSetup(t testing.TB) (*sqlserverTestDatabase, *blackbox.Transcri
 	tc.CheckpointSanitizers = checkpointSanitizers
 
 	// Setup: Connect to target database
-	var controlURI = (&Config{
-		Address:  *dbControlAddress,
-		User:     *dbControlUser,
-		Password: *dbControlPass,
-		Database: *dbName,
-	}).ToURI()
 	t.Logf("opening control connection: addr=%q, user=%q", *dbControlAddress, *dbControlUser)
+	controlURI, err := controlConfigURI()
+	require.NoError(t, err)
 	connector, err := mssqldb.NewConnector(controlURI)
 	require.NoError(t, err)
 

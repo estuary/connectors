@@ -108,13 +108,34 @@ See [connectors](/concepts/connectors.md#using-connectors) to learn more about u
 | **`/address`**                  | Server Address      | The host or host:port at which the database can be reached.                                                                                 | string  | Required                   |
 | **`/database`**                 | Database            | Logical database name to capture from.                                                                                                      | string  | Required                   |
 | **`/user`**                     | User                | The database user to authenticate as.                                                                                                       | string  | Required, `"flow_capture"` |
-| **`/password`**                 | Password            | Password for the specified database user.                                                                                                   | string  | Required                   |
 | `/historyMode` | History Mode | Capture each change event, without merging. | boolean | `false` |
+
+##### Authentication
+
+| Property | Title | Description | Type | Required/Default |
+| --- | --- | --- | --- | --- |
+| **`/credentials`** | Authentication | Authentication method and credentials that provide access to the database. | object | Required |
+| `/credentials/auth_type` | Auth Type | The authentication method to use. Google Cloud SQL for SQL Server supports `UserPassword`. | string |  |
+| `/credentials/password` | Password | Password for the specified database user. | string | Required for `UserPassword` auth |
+
+##### Discovery Filters
+
+Options that restrict which tables are surfaced by discovery. These take effect
+when discovery runs. If your capture has automatic discovery enabled, a table
+these filters exclude will be deactivated the next time discovery runs.
+
+| Property | Title | Description | Type | Required/Default |
+| --- | --- | --- | --- | --- |
 | `/discoveryFilters` | Discovery Filters | Options that restrict which tables are visible to discovery. | object |  |
 | `/discoveryFilters/include_schemas` | Include Schemas | If specified, only tables in the listed schemas are discovered. | string array |  |
 | `/discoveryFilters/exclude_schemas` | Exclude Schemas | Tables in the listed schemas are excluded from discovery. | string array |  |
 | `/discoveryFilters/table_patterns` | Table Patterns | If specified, only tables matching at least one of these glob patterns are discovered. A pattern containing a `.` matches against the qualified `schema.table` name. A pattern without a `.` matches the unqualified table name in any schema. Use `*` or `?` as wildcards. | string array |  |
 | `/discoveryFilters/discover_only_enabled` | Discover Only CDC-Enabled Tables | When set, the connector only discovers tables which already have CDC capture instances enabled. Combined as a union with the equivalent setting under Advanced Options. | boolean |  |
+
+##### Advanced options
+
+| Property | Title | Description | Type | Required/Default |
+| --- | --- | --- | --- | --- |
 | `/advanced`                     | Advanced Options    | Options for advanced users. You should not typically need to modify these.                                                                  | object  |                            |
 | `/advanced/backfill_chunk_size` | Backfill Chunk Size | The number of rows which should be fetched from the database in a single backfill query.                                                    | integer | `4096`                     |
 | `/advanced/skip_backfills`      | Skip Backfills      | A comma-separated list of fully-qualified table names which should not be backfilled.                                                       | string  |                            |
@@ -144,7 +165,9 @@ captures:
           address: "<host>:1433"
           database: "my_db"
           user: "flow_capture"
-          password: "secret"
+          credentials:
+            auth_type: UserPassword
+            password: "secret"
     bindings:
       - resource:
           stream: ${TABLE_NAME}

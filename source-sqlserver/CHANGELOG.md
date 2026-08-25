@@ -1,5 +1,13 @@
 # source-sqlserver
 
+## 2026-08-25
+
+### Added
+- New `credentials` configuration union supporting username/password and AWS IAM
+  authentication (RDS auth tokens, refreshed per connection). Existing configs
+  with the legacy top-level `password` field keep working and are folded into
+  the new shape automatically.
+
 ## 2026-08-18
 
 ### Added
