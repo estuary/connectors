@@ -1,5 +1,11 @@
 # materialize-motherduck
 
+## 2026-08-25
+
+### Added
+- `1m`, `2m30s`, and `20m` are now valid `Sync Frequency` values, filling the
+  gaps between `30s`-`5m` and `15m`-`30m`.
+
 ## 2026-08-10
 
 ### Fixed
