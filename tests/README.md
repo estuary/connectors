@@ -20,3 +20,18 @@ must contain the following files:
 Each test will have intermediate data written to `.build/tests/<connector>/`. This will contain the
 Flow catalog that was run and the actual results from querying the materialization.
 
+## Go connector tests
+
+The materialization connectors' Go tests (`go test ./materialize-<name>`) snapshot the rows they
+materialize, timestamps included. A database driver commonly hands back a `TIMESTAMPTZ` as a
+`time.Time` in the test process's own zone — pgx does, since it decodes the binary format through
+`time.Unix` — and the snapshot then records that zone's offset. The committed snapshots were
+generated under UTC, so run these tests with `TZ=UTC`:
+
+```bash
+TZ=UTC go test -v ./materialize-<name>
+```
+
+Without it, a machine set to any other zone fails every snapshot that contains a timestamp, showing
+the same instant written with a different offset (`1970-01-01T03:00:09Z` against
+`1970-01-01T06:30:09+03:30`).
