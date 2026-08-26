@@ -112,7 +112,7 @@ wait_for_ssh() {
       return 0
     fi
     sleep 3
-    (( attempts++ ))
+    (( ++attempts ))
   done
   die "SSH not available after 120s — check VM status with: gcloud compute instances describe $VM_NAME --zone=$ZONE"
 }
