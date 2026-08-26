@@ -63,7 +63,7 @@ All five were run during development.
 |---|---|---|
 | 1. Go test suite (CI) | connector code, LocalStack SQS | correctness, FIFO semantics |
 | 2. Local stress tests | full `Pull` pipeline, LocalStack | relative regressions, CPU profiles |
-| 3. `flowctl preview` | runtime protocol machinery | protocol correctness end-to-end |
+| 3. `flowctl raw preview-next` | runtime protocol machinery | protocol correctness end-to-end |
 | 4. mise stack + LocalStack | real recovery log + journals | commit+ack latency, per-shard ingest |
 | 5. EC2 + real AWS SQS | real SQS | absolute receive+delete rate |
 
@@ -205,7 +205,7 @@ high-throughput mode enabled, since the default FIFO quota caps at 3,000
 msg/sec, and `STRESS_GROUPS` in the hundreds, or the run measures group
 locking rather than capacity. Expected ceiling ≈ `groups × 10 / round-trip`.
 
-### flowctl preview smoke test (tier 3)
+### flowctl raw preview-next smoke test (tier 3)
 
 Cheap to re-run after connector changes:
 
@@ -217,7 +217,7 @@ STRESS_TEST=yes TEST_DATABASE=yes STRESS_MESSAGES=50000 \
   STRESS_QUEUE_URL=http://localhost.localstack.cloud:4566/000000000000/preview-stress \
   go test ./source-sqs/ -v -run TestStressSeed
 
-flowctl preview --source sqs-preview.flow.yaml --network flow-test --log-json \
+flowctl raw preview-next --source sqs-preview.flow.yaml --network flow-test --log-json \
   > preview-docs.jsonl 2> preview-logs.jsonl
 ```
 
