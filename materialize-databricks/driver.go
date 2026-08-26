@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/databricks/databricks-sdk-go"
 	dbConfig "github.com/databricks/databricks-sdk-go/config"
@@ -849,7 +850,7 @@ func (d *transactor) commitBindingCheckpointItems(ctx context.Context, db *stdsq
 // them in this case.
 func (d *transactor) execQueries(ctx context.Context, db *stdsql.DB, queries []string, tolerateMissing bool) error {
 	for _, query := range queries {
-		if _, err := db.ExecContext(ctx, query); err != nil {
+		if err := d.execQuery(ctx, db, query); err != nil {
 			if tolerateMissing && (strings.Contains(err.Error(), "PATH_NOT_FOUND") || strings.Contains(err.Error(), "Path does not exist") || strings.Contains(err.Error(), "Table doesn't exist") || strings.Contains(err.Error(), "TABLE_OR_VIEW_NOT_FOUND")) {
 				continue
 			}
@@ -857,6 +858,53 @@ func (d *transactor) execQueries(ctx context.Context, db *stdsql.DB, queries []s
 		}
 	}
 	return nil
+}
+
+// retriableErrorClasses are the Databricks error classes of a commit query
+// which succeeds when re-run once the conflicting activity has finished.
+//
+// COPY_INTO_DUPLICATED_FILES_COPY_NOT_ALLOWED: another COPY INTO into the same
+// table committed some of the same files, which usually means a previous
+// primary shard was killed mid-Acknowledge. We retry until that orphaned query
+// has finished, at which point our query skips the already-copied files.
+var retriableErrorClasses = []string{
+	"COPY_INTO_DUPLICATED_FILES_COPY_NOT_ALLOWED",
+}
+
+const maxQueryRetries = 5
+
+// queryRetryDelay is the wait before retry number attempt+1: 15s, 30s, 1m,
+// 2m, 4m.
+var queryRetryDelay = func(attempt int) time.Duration {
+	return time.Duration(1<<attempt) * 15 * time.Second
+}
+
+func isRetriableError(err error) bool {
+	return slices.ContainsFunc(retriableErrorClasses, func(class string) bool {
+		return strings.Contains(err.Error(), class)
+	})
+}
+
+func (d *transactor) execQuery(ctx context.Context, db *stdsql.DB, query string) error {
+	for attempt := 0; ; attempt++ {
+		var _, err = db.ExecContext(ctx, query)
+		if err == nil || !isRetriableError(err) || attempt >= maxQueryRetries {
+			return err
+		}
+
+		var delay = queryRetryDelay(attempt)
+		log.WithFields(log.Fields{
+			"attempt": attempt + 1,
+			"delay":   delay.String(),
+			"err":     err,
+		}).Warn("query failed with a retriable error; retrying")
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(delay):
+		}
+	}
 }
 
 // renderCommitQueries renders the queries which commit a set of staged files

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+	"time"
 
 	m "github.com/estuary/connectors/go/materialize"
 	sql "github.com/estuary/connectors/materialize-sql"
@@ -59,6 +60,10 @@ type recordingConn struct{}
 var recording struct {
 	executed []string
 	failWith error
+	// failFirst limits failWith to the first failFirst statements when
+	// non-zero; otherwise failWith fails every statement.
+	failFirst int
+	attempts  int
 }
 
 func (recordingDriver) Open(string) (driver.Conn, error) { return recordingConn{}, nil }
@@ -70,7 +75,8 @@ func (recordingConn) Close() error              { return nil }
 func (recordingConn) Begin() (driver.Tx, error) { return nil, fmt.Errorf("begin is not implemented") }
 
 func (recordingConn) ExecContext(_ context.Context, query string, _ []driver.NamedValue) (driver.Result, error) {
-	if recording.failWith != nil {
+	recording.attempts++
+	if recording.failWith != nil && (recording.failFirst == 0 || recording.attempts <= recording.failFirst) {
 		return nil, recording.failWith
 	}
 	recording.executed = append(recording.executed, query)
@@ -87,7 +93,7 @@ func recordingDB(t *testing.T, failWith error) *stdsql.DB {
 	t.Helper()
 	registerRecordingDriver()
 
-	recording.executed, recording.failWith = nil, failWith
+	recording.executed, recording.failWith, recording.failFirst, recording.attempts = nil, failWith, 0, 0
 	db, err := stdsql.Open("recording", "")
 	require.NoError(t, err)
 	t.Cleanup(func() { db.Close() })
@@ -206,6 +212,51 @@ func TestMergePeerStatePatches(t *testing.T) {
 	t.Run("empty patches are a no-op", func(t *testing.T) {
 		var d = testTransactor(lowerRangeKey, "a_table.v1")
 		require.NoError(t, d.mergePeerStatePatches(nil))
+	})
+}
+
+func TestExecQueriesRetriesRetriableErrors(t *testing.T) {
+	var origDelay = queryRetryDelay
+	queryRetryDelay = func(int) time.Duration { return 0 }
+	t.Cleanup(func() { queryRetryDelay = origDelay })
+
+	var conflict = fmt.Errorf("databricks: execution error: [%s] Duplicated files were committed in a concurrent COPY INTO operation. Please try again later.", retriableErrorClasses[0])
+	var d = testTransactor(fullRangeKey)
+
+	t.Run("succeeds once the concurrent copy has finished", func(t *testing.T) {
+		var db = recordingDB(t, conflict)
+		recording.failFirst = 2
+
+		require.NoError(t, d.execQueries(context.Background(), db, []string{"COPY"}, false))
+		require.Equal(t, 3, recording.attempts)
+		require.Equal(t, []string{"COPY"}, recording.executed)
+	})
+
+	t.Run("gives up after the retry budget", func(t *testing.T) {
+		var db = recordingDB(t, conflict)
+
+		var err = d.execQueries(context.Background(), db, []string{"COPY"}, false)
+		require.ErrorIs(t, err, conflict)
+		require.Equal(t, maxQueryRetries+1, recording.attempts)
+	})
+
+	t.Run("other errors are not retried", func(t *testing.T) {
+		var db = recordingDB(t, fmt.Errorf("[DELTA_CONCURRENT_APPEND] something else"))
+
+		require.Error(t, d.execQueries(context.Background(), db, []string{"COPY"}, false))
+		require.Equal(t, 1, recording.attempts)
+	})
+
+	t.Run("cancellation ends the wait", func(t *testing.T) {
+		queryRetryDelay = func(int) time.Duration { return time.Hour }
+		t.Cleanup(func() { queryRetryDelay = func(int) time.Duration { return 0 } })
+		var db = recordingDB(t, conflict)
+		var ctx, cancel = context.WithTimeout(context.Background(), 50*time.Millisecond)
+		defer cancel()
+
+		var err = d.execQueries(ctx, db, []string{"COPY"}, false)
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+		require.Equal(t, 1, recording.attempts)
 	})
 }
 
