@@ -61,11 +61,14 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 	var database = c.ep.Config.Database
 
 	// Query tables from system.tables.
-	var tableRows, err = c.db.QueryContext(ctx, fmt.Sprintf(
-		"SELECT database, name FROM system.tables WHERE database = %s",
-		c.ep.Dialect.Literal(database),
-	))
-	if err != nil {
+	var tableRows *stdsql.Rows
+	if err := transientRetryPolicy.retry(ctx, "querying system.tables", isTransientErr, func() (err error) {
+		tableRows, err = c.db.QueryContext(ctx, fmt.Sprintf(
+			"SELECT database, name FROM system.tables WHERE database = %s",
+			c.ep.Dialect.Literal(database),
+		))
+		return err
+	}); err != nil {
 		return fmt.Errorf("querying system.tables: %w", err)
 	}
 	defer tableRows.Close()
@@ -82,8 +85,7 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 	}
 
 	// Query columns from system.columns.
-	var colRows *stdsql.Rows
-	colRows, err = c.db.QueryContext(ctx, fmt.Sprintf(
+	var colRows, err = c.db.QueryContext(ctx, fmt.Sprintf(
 		"SELECT database, table, name, type, default_expression, is_in_sorting_key, is_in_partition_key FROM system.columns WHERE database = %s",
 		c.ep.Dialect.Literal(database),
 	))
