@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, UTC
 from logging import Logger
 import time
-from typing import AsyncGenerator, TypeVar
+from typing import Any, AsyncGenerator, TypeVar
 
 from estuary_cdk.capture.common import BaseDocument, LogCursor, PageCursor
 import estuary_cdk.emitted_changes_cache as cache
@@ -16,8 +16,10 @@ from .models import (
     TableValidationContext,
     AirtableField,
     AirtableRecord,
+    FieldPresenceContext,
     IncrementalAirtableRecord,
     RecordsResponse,
+    expected_field_defaults,
 )
 
 RecordT = TypeVar("RecordT", bound=AirtableRecord)
@@ -122,6 +124,7 @@ async def _paginate_through_records(
     path: str,
     additionalParams: dict[str, str | list[str]] | None,
     record_cls: type[RecordT],
+    field_defaults: dict[str, Any],
     log: Logger,
 ) -> AsyncGenerator[RecordT, None]:
     url = f"{BASE_URL}/v0/{path}"
@@ -138,6 +141,7 @@ async def _paginate_through_records(
             f"records.item",
             record_cls,
             RecordsResponse,
+            validation_context=FieldPresenceContext(field_defaults),
         )
 
         async for resource in processor:
@@ -156,11 +160,19 @@ async def snapshot_records(
     path: str,
     log: Logger,
 ) -> AsyncGenerator[BaseDocument, None]:
+    # full_refresh_table's SnapshotResource has no reduction_strategy and
+    # registers no model (BaseDocument by default), so its write schema
+    # carries no field-level merge annotation - every poll fully replaces the
+    # prior document regardless of which fields are present. There's no
+    # omission-vs-clear ambiguity to resolve here, so no field defaults are
+    # computed or filled; {} still satisfies normalize_fields' required
+    # context while leaving its fill step a no-op.
     async for record in _paginate_through_records(
         http,
         path,
         None,
         AirtableRecord,
+        {},
         log,
     ):
         yield record
@@ -170,6 +182,7 @@ async def fetch_incremental_records(
     http: HTTPSession,
     path: str,
     record_cls: type[IncrementalAirtableRecord],
+    fields: list[AirtableField],
     horizon: timedelta,
     log: Logger,
     log_cursor: LogCursor,
@@ -183,6 +196,7 @@ async def fetch_incremental_records(
         return
 
     params = _build_incremental_params(record_cls.cursor_field_name, lower_bound, upper_bound)
+    field_defaults = expected_field_defaults(fields, exclude=record_cls.cursor_field_name)
 
     most_recent_dt = log_cursor
 
@@ -191,6 +205,7 @@ async def fetch_incremental_records(
         path,
         params,
         record_cls,
+        field_defaults,
         log,
     ):
         # A record's cursor_value could change mid-pagination. When we start paginating through
@@ -247,15 +262,17 @@ async def backfill_incremental_records(
     params = _build_incremental_params(record_cls.cursor_field_name, lower_bound, upper_bound)
 
     if is_connector_initiated:
-        fields_to_refresh = [f.name for f in fields if f.type == 'formula']
+        formula_fields = [f for f in fields if f.type == 'formula']
 
         # If there are no formula fields in this table, don't perform
         # a formula field refresh.
-        if not fields_to_refresh:
+        if not formula_fields:
             return
 
-        fields_to_refresh.append(record_cls.cursor_field_name)
-        params["fields"] = fields_to_refresh
+        field_defaults = expected_field_defaults(formula_fields)
+        params["fields"] = [f.name for f in formula_fields] + [record_cls.cursor_field_name]
+    else:
+        field_defaults = expected_field_defaults(fields, exclude=record_cls.cursor_field_name)
 
     most_recent_dt = lower_bound
     count = 0
@@ -266,6 +283,7 @@ async def backfill_incremental_records(
         path,
         params,
         record_cls,
+        field_defaults,
         log,
     ):
         # If a document is updated after the cutoff, skip it. It has been updated since we started
