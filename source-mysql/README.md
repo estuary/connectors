@@ -73,7 +73,7 @@ captures:
     bindings: []
 EOF
 $ flowctl raw discover --source acmeCo/flow.yaml
-$ flowctl preview --source acmeCo/flow.yaml
+$ flowctl raw preview-next --source acmeCo/flow.yaml
 ```
 
 It's usually not necessary to build a Docker image locally, but you can with:

@@ -17,7 +17,7 @@ catalog and `source_stripe_native/resources.py` for binding wiring.
   for lock timeouts.
 
 All buckets are well above the 20 req/hr threshold that triggers the add-stream
-skill's budget rule, so `flowctl preview`, `pytest`, and live captures can run
+skill's budget rule, so `flowctl raw preview-next`, `pytest`, and live captures can run
 freely without per-call consent (subject to `config.yaml` being clean — Law #4).
 
 ## Silent-default-filter audit (as of 2026-06-01)
