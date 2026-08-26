@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-08-26
+
+### Fixed
+- A commit query failing with `COPY_INTO_DUPLICATED_FILES_COPY_NOT_ALLOWED`
+  is now retried with backoff instead of restarting the connector. The
+  conflicting query is one of a previous connector process that was killed
+  while it was still running, and the retry succeeds once it has finished.
+
 ## 2026-08-25
 
 ### Added
