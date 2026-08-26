@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 
 	jsonpatch "github.com/evanphx/json-patch/v5"
 	"github.com/tidwall/gjson"
@@ -27,6 +28,10 @@ type Capture struct {
 	Checkpoint      json.RawMessage // Persistent checkpoint state between captures
 	DiscoveryFilter *regexp.Regexp  // Filter for discovered bindings (nil = no filtering)
 	Logger          func(...any)    // Log function (defaults to stderr, set to t.Log in tests)
+
+	// Timeout bounds a single capture run, and is enforced by the harness rather
+	// than by flowctl. Exceeding it is an error. Zero means the default.
+	Timeout time.Duration
 
 	// Env holds environment variables applied to each flowctl invocation, and so inherited
 	// by the connector process flowctl spawns. Settings which alter connector behavior have
@@ -170,12 +175,54 @@ func (c *Capture) writeCatalog() (catalogFile, catalogDir string, err error) {
 	if err != nil {
 		return "", "", fmt.Errorf("creating temp directory: %w", err)
 	}
+	catalog, err := withLockstepTransactions(c.Catalog)
+	if err != nil {
+		os.RemoveAll(catalogDir)
+		return "", "", err
+	}
 	catalogFile = catalogDir + "/flow.json"
-	if err := os.WriteFile(catalogFile, c.Catalog, 0644); err != nil {
+	if err := os.WriteFile(catalogFile, catalog, 0644); err != nil {
 		os.RemoveAll(catalogDir)
 		return "", "", fmt.Errorf("writing catalog: %w", err)
 	}
 	return catalogFile, catalogDir, nil
+}
+
+// withLockstepTransactions returns the catalog with every capture's transaction
+// duration window collapsed, so that each connector checkpoint sequence commits
+// as exactly one runtime transaction.
+//
+// The runtime otherwise batches checkpoints into larger transactions, which
+// emits documents in collection-key order rather than connector-emission order,
+// and reduces repeated changes to a key into a single document.
+func withLockstepTransactions(catalog json.RawMessage) (json.RawMessage, error) {
+	var parsed map[string]any
+	if err := json.Unmarshal(catalog, &parsed); err != nil {
+		return nil, fmt.Errorf("parsing catalog: %w", err)
+	}
+	captures, ok := parsed["captures"].(map[string]any)
+	if !ok {
+		return catalog, nil // No captures to pin, so nothing to do.
+	}
+	for name, spec := range captures {
+		capture, ok := spec.(map[string]any)
+		if !ok {
+			continue
+		}
+		shards, ok := capture["shards"].(map[string]any)
+		if !ok {
+			shards = make(map[string]any)
+			capture["shards"] = shards
+		}
+		shards["minTxnDuration"] = "0s"
+		shards["maxTxnDuration"] = "1ns"
+		captures[name] = capture
+	}
+	result, err := json.Marshal(parsed)
+	if err != nil {
+		return nil, fmt.Errorf("encoding catalog: %w", err)
+	}
+	return result, nil
 }
 
 func (c *Capture) Spec() (json.RawMessage, error) {
@@ -292,7 +339,7 @@ func (c *Capture) Discover() (json.RawMessage, error) {
 					}
 					// Sort filtered bindings by target name. Sometimes `flowctl raw discover`
 					// will yield bindings in different orders, and that seems to influence the
-					// ordering of `flowctl preview` documents within a single transaction, so
+					// ordering of `flowctl raw preview-next` documents within a single transaction, so
 					// sorting by name here improves test stability.
 					sort.Slice(filtered, func(i, j int) bool {
 						return filtered[i]["target"].(string) < filtered[j]["target"].(string)
@@ -328,6 +375,18 @@ func (c *Capture) Discover() (json.RawMessage, error) {
 	return c.Catalog, nil
 }
 
+// defaultRunTimeout bounds a capture run which never ends on its own. A deadline
+// can only truncate a capture mid-stream, so it's set far longer than any test's
+// expected runtime.
+const defaultRunTimeout = 2 * time.Minute
+
+func (c *Capture) timeout() time.Duration {
+	if c.Timeout != 0 {
+		return c.Timeout
+	}
+	return defaultRunTimeout
+}
+
 func (c *Capture) Run(sessions int) ([]byte, error) {
 	return c.RunWithContext(context.Background(), sessions)
 }
@@ -342,11 +401,16 @@ func (c *Capture) RunWithContext(ctx context.Context, sessions int) ([]byte, err
 	}
 	defer os.RemoveAll(tempdir)
 
-	fc, err := c.startFlowctl(ctx, "preview",
+	// The run is bounded here rather than with preview-next's --timeout, which
+	// stops the capture gracefully: flowctl would exit zero having dropped
+	// whatever it hadn't reached.
+	runCtx, cancelRun := context.WithTimeout(ctx, c.timeout())
+	defer cancelRun()
+
+	fc, err := c.startFlowctl(runCtx, "raw", "preview-next",
 		"--log-json",
 		"--source", path,
 		fmt.Sprintf("--sessions=%d", sessions),
-		"--timeout=30s",
 		"--output-state",
 		"--initial-state", string(c.Checkpoint),
 	)
@@ -409,10 +473,13 @@ func (c *Capture) RunWithContext(ctx context.Context, sessions int) ([]byte, err
 		return nil, fmt.Errorf("scanning output: %w", err)
 	}
 	if err := fc.Wait(); err != nil {
-		if fc.lastError != "" {
-			return nil, fmt.Errorf("flowctl preview failed:\n%s", fc.lastError)
+		if runCtx.Err() == context.DeadlineExceeded {
+			return nil, fmt.Errorf("capture did not finish within %s", c.timeout())
 		}
-		return nil, fmt.Errorf("flowctl preview failed: %w", err)
+		if fc.lastError != "" {
+			return nil, fmt.Errorf("flowctl raw preview-next failed:\n%s", fc.lastError)
+		}
+		return nil, fmt.Errorf("flowctl raw preview-next failed: %w", err)
 	}
 
 	return documents, nil
