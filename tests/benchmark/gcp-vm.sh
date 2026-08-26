@@ -22,9 +22,13 @@
 #
 # Create flags:
 #   --machine-type TYPE   Machine type (default: e2-standard-2)
-#   --boot-disk-size SIZE Boot disk size (default: 100GB). `preview-next` writes
-#                         the whole fixture to an on-disk log, so a scenario
-#                         needs a disk larger than the bytes it moves.
+#   --boot-disk-size SIZE Boot disk size (default: 100GB). `preview-next` streams
+#                         the fixture through an on-disk shuffle log, and its
+#                         fixture writer does not honor the log's disk-backlog
+#                         gate, so the generator runs ahead of the connector and
+#                         sealed segments accumulate: roughly 4 GiB of log per
+#                         5 GiB round. Size the disk to the bytes the scenario
+#                         moves.
 #
 # Destroy flags:
 #   --yes                 Skip confirmation prompt
