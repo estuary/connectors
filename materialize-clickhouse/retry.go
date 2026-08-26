@@ -23,13 +23,14 @@ type retryPolicy struct {
 	maxElapsed     time.Duration
 }
 
-// transientRetryPolicy rides out a ClickHouse Cloud replica recycle, which
-// typically resolves within seconds to a couple of minutes.
+// transientRetryPolicy rides out a ClickHouse Cloud replica recycle, or an
+// idle-scaled service waking back up, either of which can take several
+// minutes to resolve.
 var transientRetryPolicy = retryPolicy{
-	maxAttempts:    8,
+	maxAttempts:    16,
 	initialBackoff: time.Second,
 	maxBackoff:     30 * time.Second,
-	maxElapsed:     5 * time.Minute,
+	maxElapsed:     10 * time.Minute,
 }
 
 // retry invokes op, retrying with exponential backoff while retryable reports

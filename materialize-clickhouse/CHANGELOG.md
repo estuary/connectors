@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-08-26
+
+### Fixed
+- A ClickHouse Cloud service waking up from idle scaling could take longer to
+  respond than the connector's retry budget allowed, failing the shard with a
+  handshake timeout instead of waiting it out. The retry budget is now wider
+  (16 attempts over up to 10 minutes, up from 8 over 5). A separate query run
+  while recovering from a restart was not retried at all and has the same
+  protection now.
+
 ## 2026-08-25
 
 ### Added
