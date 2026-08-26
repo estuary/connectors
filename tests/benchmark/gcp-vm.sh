@@ -22,13 +22,11 @@
 #
 # Create flags:
 #   --machine-type TYPE   Machine type (default: e2-standard-2)
-#   --boot-disk-size SIZE Boot disk size (default: 100GB). `preview-next` streams
-#                         the fixture through an on-disk shuffle log, and its
-#                         fixture writer does not honor the log's disk-backlog
-#                         gate, so the generator runs ahead of the connector and
-#                         sealed segments accumulate: roughly 4 GiB of log per
-#                         5 GiB round. Size the disk to the bytes the scenario
-#                         moves.
+#   --boot-disk-size SIZE Boot disk size (default: 100GB). `preview-next` stages
+#                         the fixture in an on-disk shuffle log, bounded since
+#                         estuary/flow#3408 to 512 MiB plus the transaction in
+#                         flight, so 100GB covers every scenario here. Raise it
+#                         for transactions much larger than these.
 #
 # Destroy flags:
 #   --yes                 Skip confirmation prompt
