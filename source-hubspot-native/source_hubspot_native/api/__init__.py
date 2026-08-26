@@ -57,6 +57,10 @@ from .goals import (
     fetch_delayed_goals,
     fetch_recent_goals,
 )
+from .leads import (
+    fetch_delayed_leads,
+    fetch_recent_leads,
+)
 from .line_items import (
     fetch_delayed_line_items,
     fetch_recent_line_items,
@@ -113,6 +117,7 @@ __all__ = [
     "fetch_delayed_engagements",
     "fetch_delayed_feedback_submissions",
     "fetch_delayed_goals",
+    "fetch_delayed_leads",
     "fetch_delayed_line_items",
     "fetch_delayed_marketing_emails",
     "fetch_delayed_orders",
@@ -136,6 +141,7 @@ __all__ = [
     "fetch_recent_engagements",
     "fetch_recent_feedback_submissions",
     "fetch_recent_goals",
+    "fetch_recent_leads",
     "fetch_recent_line_items",
     "fetch_recent_marketing_emails",
     "fetch_recent_orders",

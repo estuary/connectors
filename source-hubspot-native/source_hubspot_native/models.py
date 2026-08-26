@@ -52,6 +52,7 @@ optional_scopes = [
     "crm.objects.custom.read",
     "crm.objects.feedback_submissions.read",
     "crm.objects.goals.read",
+    "crm.objects.leads.read",
     "crm.objects.marketing_events.read",
     "crm.objects.orders.read",
     "crm.schemas.custom.read",
@@ -189,6 +190,7 @@ class Names(StrEnum):
     contact_list_memberships = auto()
     feedback_submissions = auto()
     goals = auto()
+    leads = auto()
     workflows = auto()
     campaigns = auto()
 
@@ -553,6 +555,18 @@ class FeedbackSubmission(BaseCRMObject):
 
 class Goals(BaseCRMObject):
     ASSOCIATED_ENTITIES = []
+
+
+class Lead(BaseCRMObject):
+    ASSOCIATED_ENTITIES = [
+        Names.contacts,
+        Names.companies,
+        Names.deals,
+    ]
+
+    contacts: list[int] = []
+    companies: list[int] = []
+    deals: list[int] = []
 
 
 # An Association, as returned by the v4 associations API.

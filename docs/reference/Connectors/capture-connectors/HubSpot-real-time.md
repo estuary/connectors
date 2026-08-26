@@ -24,6 +24,7 @@ The connector automatically discovers bindings for the following HubSpot resourc
 * [Form Submissions](https://developers.hubspot.com/docs/reference/api/marketing/forms/v1)
 * [Forms](https://developers.hubspot.com/docs/reference/api/marketing/forms/v3)
 * [Goals](https://developers.hubspot.com/docs/api-reference/crm-goal-targets-v3/guide)
+* [Leads](https://developers.hubspot.com/docs/api-reference/legacy/crm/objects/leads/guide)
 * [Line Items](https://developers.hubspot.com/beta-docs/guides/api/crm/objects/line-items)
 * [Marketing Emails](https://developers.hubspot.com/docs/api-reference/marketing-marketing-emails-v3/marketing-emails/get-marketing-v3-emails-)
 * [Marketing Event Participants](https://developers.hubspot.com/docs/api-reference/legacy/marketing/marketing-events/participant-state/get-breakdown)
