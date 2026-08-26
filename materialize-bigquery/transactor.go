@@ -30,14 +30,14 @@ import (
 
 type checkpointItem struct {
 	// Query contains the rendered query string.  Deprecated.
-	Query      string               `json:",omitempty"`
+	Query string `json:",omitempty"`
+	// TempTableName is the table referenced in string queries.  Deprecated.
+	TempTableName string `json:",omitempty"`
+
 	NeedsMerge bool                 `json:",omitempty"`
 	Bounds     []mergeBoundLiterals `json:",omitempty"`
 	SourceURIs []string             `json:",omitempty"`
 	JobPrefix  string               `json:",omitempty"`
-	// TempTableName is referenced in the persisted query. We need to persist it
-	// separately to specify the external data connector table definition.
-	TempTableName string `json:",omitempty"`
 }
 
 type checkpoint = map[CheckpointKey]*checkpointItem
@@ -443,11 +443,10 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 		cpKey := NewCheckpointKey(b.target.StateKey, t.rangeKey)
 		t.cp[cpKey] = &checkpointItem{
-			Bounds:        boundsLiterals(b.storeMergeBounds.Build()),
-			NeedsMerge:    b.mustMerge,
-			SourceURIs:    uris,
-			JobPrefix:     uuid.NewString(),
-			TempTableName: b.tempTableName,
+			Bounds:     boundsLiterals(b.storeMergeBounds.Build()),
+			NeedsMerge: b.mustMerge,
+			SourceURIs: uris,
+			JobPrefix:  uuid.NewString(),
 		}
 
 		b.mustMerge = false
@@ -598,8 +597,10 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 
 			var err error
 			var query string
+			var tempTableName string
 			if items[0].Query != "" {
 				query = items[0].Query
+				tempTableName = items[0].TempTableName
 			} else {
 				if needsMerge {
 					bounds := combineBounds(b.target.Keys, items)
@@ -610,8 +611,9 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 				} else {
 					query = b.storeInsertSQL
 				}
+				tempTableName = b.tempTableName
 			}
-			if err := t.client.queryIdempotent(groupCtx, b.storeSchema, query, items[0].JobPrefix, sourceURIs, items[0].TempTableName); err != nil {
+			if err := t.client.queryIdempotent(groupCtx, b.storeSchema, query, items[0].JobPrefix, sourceURIs, tempTableName); err != nil {
 				return fmt.Errorf("acknowledge query for %q: %w", b.target.Path, err)
 			}
 			log.WithFields(log.Fields{
