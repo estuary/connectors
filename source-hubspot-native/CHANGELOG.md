@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-08-27
+### Added
+- New `leads` binding for the HubSpot Leads object. Leads requires a Sales Hub
+  Professional or Enterprise subscription, and the binding is only discovered for accounts
+  that grant the `crm.objects.leads.read` scope. Because HubSpot grants optional scopes at
+  install time, existing OAuth captures must re-authorize before `leads` is discovered.
+
 ## 2026-08-04
 ### Fixed
 - Sourced schemas now describe the `_meta` field.
