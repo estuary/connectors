@@ -197,27 +197,147 @@ def _is_formula_error(value: Any) -> bool:
     return False
 
 
+# Field types whose "empty" state, per Airtable's own cell format for the
+# type, can only ever be the single falsy value below - so injecting it back
+# in place of an omitted field is lossless, unlike e.g. injecting 0 for a
+# cleared number field (a real, distinguishable value that just happens to
+# also be falsy). See https://airtable.com/developers/web/api/field-model
+# for each type's documented cell format.
+_UNAMBIGUOUS_EMPTY_BOOLEAN_TYPES = frozenset({
+    "checkbox",  # cell format is "boolean (true only)" - never explicitly false
+})
+_UNAMBIGUOUS_EMPTY_STRING_TYPES = frozenset({
+    "singleLineText", "multilineText", "richText", "email", "url", "phoneNumber",
+})
+_UNAMBIGUOUS_EMPTY_ARRAY_TYPES = frozenset({
+    "multipleSelects", "multipleRecordLinks", "multipleAttachments", "multipleCollaborators",
+    # multipleLookupValues' cell format is unconditionally "array<...>" (V1)
+    # regardless of what the linked field's own type is - the outer shape
+    # never varies, only the element type does, so an omitted field is still
+    # safely "no values to show" as [].
+    "multipleLookupValues",
+})
+# Deliberately NOT included, even though they look plausible at a glance.
+# Every type below still gets covered by this fix - it's just via the
+# `None` fallback in _empty_value_for_field_type, not a type-specific value:
+# - singleSelect: cell format is a string, but it's one of a constrained set
+#   of configured option names, not free text - "" isn't a documented "no
+#   selection" convention the way it is for free-text fields.
+# - formula, rollup: cell format varies per-record based on a nested `result`
+#   type (Airtable's own docs note `result` "can be null if invalid"), so
+#   there's no single static shape to assume from the field's own type.
+# - number-like (number, currency, percent, duration, rating, count,
+#   autoNumber) and date-like (date, dateTime) types: Airtable's docs give no
+#   empty-value convention for these at all, unlike the explicit "", [],
+#   false examples for other types - there's no safe non-null empty value.
+
+assert not (
+    _UNAMBIGUOUS_EMPTY_BOOLEAN_TYPES & _UNAMBIGUOUS_EMPTY_STRING_TYPES
+    | _UNAMBIGUOUS_EMPTY_BOOLEAN_TYPES & _UNAMBIGUOUS_EMPTY_ARRAY_TYPES
+    | _UNAMBIGUOUS_EMPTY_STRING_TYPES & _UNAMBIGUOUS_EMPTY_ARRAY_TYPES
+), "a field type must not appear in more than one _UNAMBIGUOUS_EMPTY_*_TYPES set"
+
+
+def _empty_value_for_field_type(field_type: str) -> Any:
+    """The value to inject when Airtable omits a field of this type because
+    it's empty, per _UNAMBIGUOUS_EMPTY_*_TYPES above. Every other type falls
+    back to `None` here, including field types not yet known to this
+    connector - `None` is always a safe, if less precise, choice.
+    """
+    if field_type in _UNAMBIGUOUS_EMPTY_BOOLEAN_TYPES:
+        return False
+    if field_type in _UNAMBIGUOUS_EMPTY_STRING_TYPES:
+        return ""
+    if field_type in _UNAMBIGUOUS_EMPTY_ARRAY_TYPES:
+        return []
+    return None
+
+
+def expected_field_defaults(
+    fields: list[AirtableField],
+    exclude: str | None = None,
+) -> dict[str, Any]:
+    """Maps each field name Airtable returns by default for a request with no
+    `fields` query param to the value that should be injected if Airtable
+    omits that field from a given record. `exclude` is a record model's
+    cursor field name, when one exists — the cursor is tracked through its
+    own aliased pydantic field, never through this fill, so its literal name
+    must never appear here.
+    """
+    return {
+        f.name: _empty_value_for_field_type(f.type)
+        for f in fields
+        if f.name != exclude
+    }
+
+
+class FieldPresenceContext:
+    def __init__(self, expected_field_defaults: dict[str, Any]):
+        self.expected_field_defaults = expected_field_defaults
+
+
 class AirtableRecordFields(BaseModel, extra="allow"):
-    # When the formula for a formula field results in an error (circular reference, NaN, divide by zero, etc),
-    # Airtable returns an object like {"error": "#ERROR!"} or {"specialValue": "NaN"}.
-    #
-    # Allowing these errors in documents would mangle collections' inferred schemas, and the
-    # inferred schema would end up saying these formula fields could be either the type of the normally calculated value
-    # (like a string or number) or it could be an object. I doubt users will want their inferred schemas to
-    # get widened when these errors occur, so I'm filtering them out before emitting any documents.
     @model_validator(mode='before')
     @classmethod
-    def remove_formula_errors(cls, data: Any) -> Any:
-        """Remove fields that contain formula errors.
+    def normalize_fields(cls, data: Any, info: ValidationInfo) -> Any:
+        """Clean up the raw `fields` object Airtable returns before construction.
 
-        See: https://support.airtable.com/docs/common-formula-errors-and-how-to-fix-them
+        Two things happen here, both hinging on whether a field name is present
+        in the raw response, so they're done together in a single pass instead
+        of as separate validators (a separate "fill missing fields" validator
+        would need to run after this one to see the right picture of what's
+        missing, and Pydantic runs multiple `mode='before'` validators on the
+        same model in reverse declaration order, which is easy to get backwards).
+
+        1. When the formula for a formula field results in an error (circular
+           reference, NaN, divide by zero, etc), Airtable returns an object like
+           {"error": "#ERROR!"} or {"specialValue": "NaN"} instead of the usual
+           scalar result. Allowing these into documents would widen the inferred
+           schema to say these fields could be either their normal scalar type
+           or an object, which likely isn't what users want, so they're removed
+           here. Unlike step 2 below, an error'd field is deliberately left
+           OMITTED rather than filled with a default: the error is Airtable's
+           formula engine transiently choking (a dependent field mid-edit,
+           recompute lag), not evidence the field's real value is now empty, so
+           under `merge` it should read as "no change" and keep whatever value
+           was last known-good - not get overwritten to null.
+           See: https://support.airtable.com/docs/common-formula-errors-and-how-to-fix-them
+
+        2. Airtable omits a field from `fields` entirely once its value becomes
+           empty/falsy - it never sends an explicit null. Under this
+           connector's `merge` reduction strategy, an omitted key means "no
+           change" while an explicit null means "clear it", so a field that's
+           actually been cleared in Airtable would otherwise stay frozen at its
+           last non-empty value forever. `FieldPresenceContext` carries the
+           field names this fetch actually requested from Airtable (excluding
+           a record model's cursor field, which is tracked through its own
+           aliased pydantic field, never through this fill), mapped to the
+           value to inject if still missing - `None` for most field types, or
+           a type-specific falsy value (`""`, `[]`, `False`) for the handful
+           of types where that's the type's only possible empty representation
+           (see _empty_value_for_field_type above). Fields omitted because of
+           step 1's error-stripping are excluded from this fill (see above).
         """
-        if isinstance(data, dict):
-            return {
-                k: v for k, v in data.items()
-                if not _is_formula_error(v)
-            }
-        return data
+        if not info.context or not isinstance(info.context, FieldPresenceContext):
+            raise RuntimeError(f"Validation context must be of type FieldPresenceContext: {info.context}")
+
+        if not isinstance(data, dict):
+            return data
+
+        error_field_names = {
+            k for k, v in data.items()
+            if _is_formula_error(v)
+        }
+        cleaned = {
+            k: v for k, v in data.items()
+            if k not in error_field_names
+        }
+
+        for name, default in info.context.expected_field_defaults.items():
+            if name not in error_field_names:
+                cleaned.setdefault(name, default)
+
+        return cleaned
 
 
 class AirtableRecord(BaseDocument, extra="allow"):
