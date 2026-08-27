@@ -114,19 +114,23 @@ jobs:
           set -euo pipefail
 
           # Copy the PR's working tree rather than pointing the submodule at
-          # the PR head SHA. A fork's head commit is not fetchable with an
-          # estuary-scoped token, so the submodule approach would work for
-          # branches and break for forks. Copying behaves identically for both,
-          # which keeps one code path here.
+          # the PR head SHA. aggregate-docs.sh only runs `submodule update
+          # --init` when its source directory is missing, so pre-populating the
+          # path means the submodule is never initialized and the build never
+          # fetches estuary/connectors a second time.
           #
-          # aggregate-docs.sh only runs `submodule update --init` when its
-          # source directory is missing, so pre-populating this path also stops
-          # the build from reaching for the submodule at all.
+          # An earlier version of this comment justified the copy by fork
+          # support. That reason does not hold: the gate above skips forks
+          # outright, so both approaches would be equally unreachable there.
+          # The reason above is the one that stands.
           mkdir -p docs/external/connectors/docs
           rsync -a --delete connectors/docs/ docs/external/connectors/docs/
 
+          # The whole tree is copied, not just this PR's changed files, because
+          # the build needs every page to resolve links between them. So this
+          # count is the size of the tree being built, not the size of the diff.
           COUNT=$(find docs/external/connectors/docs/reference/Connectors -type f | wc -l | tr -d ' ')
-          echo "Substituted $COUNT files under docs/reference/Connectors from this PR."
+          echo "Built against $COUNT connector doc files (whole tree at this PR's head, not the diff)."
 
       - name: Setup Node
         if: steps.gate.outputs.build == 'true'
@@ -144,12 +148,6 @@ jobs:
       - name: Build
         if: steps.gate.outputs.build == 'true'
         working-directory: docs
-        env:
-          # Same values the production deploy uses, so this build exercises the
-          # same canonical, og:url and sitemap generation. Nothing is published
-          # from here.
-          URL: https://docs.estuary.dev
-          BASE_URL: /
         run: npm run build
 
       - name: Explain a skipped build
