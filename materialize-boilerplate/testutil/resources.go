@@ -1,6 +1,7 @@
 package testutil
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -261,11 +262,28 @@ func ReadConfigFile(path string) (json.RawMessage, error) {
 	if encrypted, err := isSopsEncrypted(raw); err != nil {
 		return nil, fmt.Errorf("parsing %s: %w", path, err)
 	} else if encrypted {
-		out, err := exec.Command("sops", "--decrypt", "--output-type", "json", path).Output()
+		var sopsStderr bytes.Buffer
+		sopsCmd := exec.Command("sops", "--decrypt", "--output-type", "json", path)
+		sopsCmd.Stderr = &sopsStderr
+
+		jqCmd := exec.Command("jq", `walk( if type == "object" then with_entries(.key |= rtrimstr("_sops")) else . end)`)
+
+		jqCmd.Stdin, err = sopsCmd.StdoutPipe()
 		if err != nil {
+			return nil, err
+		}
+		if err := sopsCmd.Start(); err != nil {
+			return nil, err
+		}
+		out, err := jqCmd.Output()
+		if err != nil {
+			return nil, err
+		}
+
+		if err := sopsCmd.Wait(); err != nil {
 			var exitErr *exec.ExitError
 			if errors.As(err, &exitErr) {
-				return nil, fmt.Errorf("decrypting %s with sops: %s", path, strings.TrimSpace(string(exitErr.Stderr)))
+				return nil, fmt.Errorf("decrypting %s with sops: %s", path, strings.TrimSpace(sopsStderr.String()))
 			}
 			return nil, fmt.Errorf("decrypting %s with sops (is it installed?): %w", path, err)
 		}
