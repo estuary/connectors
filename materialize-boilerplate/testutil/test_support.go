@@ -257,7 +257,7 @@ func RunApplyTest[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger,
 
 	for _, taskName := range taskNames(bundled) {
 		cfg := decryptConfig[EC](t, bundled, taskName)
-		materializer, err := newMaterializer(ctx, taskName, cfg, boilerplate.ParseFlags(cfg))
+		materializer, err := newMaterializer(ctx, taskName, cfg, harnessFlags(t, cfg))
 		require.NoError(t, err)
 
 		var testResourcePaths [][]string
@@ -314,7 +314,7 @@ func RunApplyTestParallel[EC boilerplate.EndpointConfiger, FC boilerplate.FieldC
 	tsSuffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
 
 	names, results := RunTestAllTasksParallel(t, sourcePath, func(t *testing.T, bundled []byte, taskName string, cfg EC) string {
-		materializer, err := newMaterializer(ctx, taskName, cfg, boilerplate.ParseFlags(cfg))
+		materializer, err := newMaterializer(ctx, taskName, cfg, harnessFlags(t, cfg))
 		require.NoError(t, err)
 
 		var testResourcePaths [][]string
@@ -463,7 +463,7 @@ func runFeatureFlagMigrationForTask[EC boilerplate.EndpointConfiger, FC boilerpl
 	workingTaskName := taskName + rndSuffix
 
 	cfg := decryptConfig[EC](t, bundled, taskName)
-	materializer, err := newMaterializer(ctx, taskName, cfg, boilerplate.ParseFlags(cfg))
+	materializer, err := newMaterializer(ctx, taskName, cfg, harnessFlags(t, cfg))
 	require.NoError(t, err)
 
 	res := makeResourceFn(workingTableName, false).WithDefaults(cfg)
@@ -582,7 +582,7 @@ func runMaterializationTestForTask[EC boilerplate.EndpointConfiger, FC boilerpla
 	cfg := decryptConfig[EC](t, bundled, taskName)
 	rt := rewriteTaskForTest[EC, RC](t, bundled, taskName, tsSuffix, cfg, makeResourceFn)
 
-	materializer, err := newMaterializer(ctx, taskName, cfg, boilerplate.ParseFlags(cfg))
+	materializer, err := newMaterializer(ctx, taskName, cfg, harnessFlags(t, cfg))
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
@@ -869,7 +869,7 @@ func runMigrationTestForTask[EC boilerplate.EndpointConfiger, FC boilerplate.Fie
 	bundledMigratedCollection := RunFlowctl(t, "raw", "bundle", "--source", relativePath(t, "testdata/integration/collections.migrate-migrated.flow.yaml"))
 
 	cfg := decryptConfig[EC](t, bundled, taskName)
-	materializer, err := newMaterializer(ctx, taskName, cfg, boilerplate.ParseFlags(cfg))
+	materializer, err := newMaterializer(ctx, taskName, cfg, harnessFlags(t, cfg))
 	require.NoError(t, err)
 
 	bindings := gjson.GetBytes(bundled, fmt.Sprintf("materializations.%s.bindings", taskName)).Array()
@@ -1305,4 +1305,17 @@ func rawJson(t *testing.T, v any) json.RawMessage {
 	require.NoError(t, err)
 
 	return b
+}
+
+// harnessFlags resolves feature flags for a harness that has no runtime spec to
+// take a creation date from. Date-gated flags therefore resolve as they do for a
+// brand-new task; a harness which needs a specific era must resolve against a
+// spec carrying that CreatedAt itself.
+func harnessFlags[EC boilerplate.EndpointConfiger](t *testing.T, cfg EC) map[string]bool {
+	t.Helper()
+
+	flags, err := boilerplate.ResolveFlags(cfg, &pf.MaterializationSpec{})
+	require.NoError(t, err)
+
+	return flags
 }

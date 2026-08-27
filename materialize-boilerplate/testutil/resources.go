@@ -11,6 +11,7 @@ import (
 	"time"
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	"gopkg.in/yaml.v3"
 )
 
@@ -145,7 +146,15 @@ func OpenResource[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger,
 		return nil, nil, fmt.Errorf("getting resource parameters: %w", err)
 	}
 
-	m, err := newMaterializer(ctx, taskName, cfg, boilerplate.ParseFlags(cfg))
+	// These helpers read a destination back rather than run a task, so there is
+	// no runtime spec to take a creation date from and date-gated flags resolve
+	// as they do for a brand-new task.
+	flags, err := boilerplate.ResolveFlags(cfg, &pf.MaterializationSpec{})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	m, err := newMaterializer(ctx, taskName, cfg, flags)
 	if err != nil {
 		return nil, nil, fmt.Errorf("creating materializer: %w", err)
 	}

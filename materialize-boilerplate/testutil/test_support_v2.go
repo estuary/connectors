@@ -173,7 +173,7 @@ func runMaterializationTestForTaskV2[EC boilerplate.EndpointConfiger, FC boilerp
 	cfg := decryptConfig[EC](t, bundled, taskName)
 	rt := rewriteTaskForTest[EC, RC](t, bundled, taskName, tsSuffix, cfg, makeResourceFn)
 
-	materializer, err := newMaterializer(ctx, taskName, cfg, boilerplate.ParseFlags(cfg))
+	materializer, err := newMaterializer(ctx, taskName, cfg, harnessFlags(t, cfg))
 	require.NoError(t, err)
 
 	t.Cleanup(func() {

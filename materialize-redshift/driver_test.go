@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"testing"
 
+	"github.com/estuary/connectors/go/common"
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -55,7 +56,7 @@ func TestIntegration(t *testing.T) {
 
 	t.Run("fence", func(t *testing.T) {
 		cfg := mustGetCfg(t)
-		var testDialect = createRsDialect(false, featureFlagDefaults)
+		var testDialect = createRsDialect(false, common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{}))
 		var testTemplates = renderTemplates(testDialect)
 
 		sql.RunFencingTest(
@@ -172,7 +173,7 @@ func TestPrereqs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require.Equal(t, tt.want, preReqs(ctx, tt.cfg(cfg)).Unwrap())
+			require.Equal(t, tt.want, preReqs(ctx, tt.cfg(cfg), common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{})).Unwrap())
 		})
 	}
 }

@@ -1,23 +1,23 @@
 package connector
 
 import (
-	"maps"
 	"testing"
 	"text/template"
 
 	"github.com/bradleyjkemp/cupaloy"
+	"github.com/estuary/connectors/go/common"
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/stretchr/testify/require"
 )
 
-var testDialect = snowflakeDialect("PUBLIC", timestampTypeLTZ, featureFlagDefaults)
+var testDialect = snowflakeDialect("PUBLIC", timestampTypeLTZ, common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{}))
 var testTemplates = renderTemplates(testDialect)
 
 // flagsWithoutNativeBinary returns a copy of featureFlagDefaults with
 // native_binary_column_type forced off, for snapshot tests that exercise the
 // flag-disabled code path.
 func flagsWithoutNativeBinary() map[string]bool {
-	out := maps.Clone(featureFlagDefaults)
+	out := common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{})
 	out["native_binary_column_type"] = false
 	return out
 }

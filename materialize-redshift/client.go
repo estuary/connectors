@@ -18,7 +18,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	awsHttp "github.com/aws/smithy-go/transport/http"
-	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
@@ -153,7 +152,7 @@ func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, e
 	return sql.StdCreateSchema(ctx, c.db, c.ep.Dialect, schemaName)
 }
 
-func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
+func preReqs(ctx context.Context, cfg config, featureFlags map[string]bool) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
 
 	db, err := stdsql.Open("pgx", cfg.toURI())
@@ -191,9 +190,7 @@ func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
 		errs.Err(err)
 	}
 
-	parsedFlags := common.ParseFeatureFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults)
-
-	s3client, err := cfg.toS3Client(ctx, parsedFlags)
+	s3client, err := cfg.toS3Client(ctx, featureFlags)
 	if err != nil {
 		// This is not caused by invalid S3 credentials, and would most likely be a logic error in
 		// the connector code.
