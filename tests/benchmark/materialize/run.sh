@@ -292,9 +292,8 @@ PREVIEW_ARGS=(
 # The runtime is chosen by the shard flag, not by the shard count. The
 # materialize-snowflake streaming-v2 gate reads enable-runtime-v2 off the spec
 # and cannot see which runtime actually drives it, so a spec carrying that flag
-# must run on preview-next at every shard count. Selecting by shard count
-# instead let a single-shard run take the connector's v2 path under the V1
-# runtime, which measures a combination that cannot occur in production.
+# must run on preview-next at every shard count. Under V1 the connector takes
+# its v2 path against a runtime that cannot pair with it in production.
 RUNTIME_V2=0
 for flag in "${SHARD_FLAGS[@]+"${SHARD_FLAGS[@]}"}"; do
   if [[ "$flag" == "enable-runtime-v2=true" ]]; then RUNTIME_V2=1; fi
@@ -408,9 +407,9 @@ def boundaries_from_log(path):
             st = stamp_re.search(line)
             if st:
                 # Not every stamp carries a fraction: the Snowpipe sidecar
-                # relays its core's logs as whole seconds. Padding those to 26
-                # characters appends zeros after the "Z" and strptime raises,
-                # which would abort the whole results block and lose the run.
+                # relays its core's logs as whole seconds. Those need a ".0"
+                # appended, not right-padding to 26 characters, which would put
+                # zeros after the "Z" and raise in strptime.
                 stamp = st.group(1).rstrip("Z")
                 if "." not in stamp:
                     stamp += ".0"

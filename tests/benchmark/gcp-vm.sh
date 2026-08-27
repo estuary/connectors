@@ -23,10 +23,9 @@
 # Create flags:
 #   --machine-type TYPE   Machine type (default: e2-standard-2)
 #   --boot-disk-size SIZE Boot disk size (default: 100GB). `preview-next` stages
-#                         the fixture in an on-disk shuffle log, bounded since
-#                         estuary/flow#3408 to 512 MiB plus the transaction in
-#                         flight, so 100GB covers every scenario here. Raise it
-#                         for transactions much larger than these.
+#                         the fixture in an on-disk shuffle log holding 512 MiB
+#                         plus the transaction in flight, which 100GB covers.
+#                         Raise it for much larger transactions.
 #
 # Destroy flags:
 #   --yes                 Skip confirmation prompt
@@ -112,8 +111,8 @@ gcloud_ssh() {
 # Wait for SSH to become available on a newly-created VM.
 wait_for_ssh() {
   info "waiting for SSH to become available"
-  # IAP has needed 160-180s to admit a connection on freshly-created VMs, so a
-  # 120s budget failed every time and left a running, unprovisioned VM behind.
+  # IAP needs 160-180s to admit a connection on a freshly-created VM. A shorter
+  # budget aborts create and leaves a running, unprovisioned VM behind.
   local attempts=0
   while (( attempts < 100 )); do
     if gcloud_ssh --command="true" --quiet 2>/dev/null; then
