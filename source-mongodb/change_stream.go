@@ -577,3 +577,26 @@ func extractTimestamp(token bson.Raw) (primitive.Timestamp, error) {
 
 	return primitive.Timestamp{T: timestampSeconds, I: increment}, nil
 }
+
+// isMidSplitEvent reports whether a change event is a non-final fragment of an
+// event split by $changeStreamSplitLargeEvent. A resume token for such an event
+// must never be checkpointed: resuming from a fragment's token delivers the
+// *next* fragment, and the fragments already consumed live only in the
+// transcoder's memory, which does not survive a restart.
+//
+// An event carrying a splitEvent which cannot be read is reported as mid-split.
+// The two outcomes are not symmetric: suppressing a checkpoint costs nothing
+// more than a delayed resume token, while checkpointing a fragment position
+// wedges the capture in a way it cannot recover from on its own.
+func isMidSplitEvent(raw bson.Raw) bool {
+	if _, err := raw.LookupErr("splitEvent"); err != nil {
+		return false
+	}
+
+	fragment, fragmentOk := raw.Lookup("splitEvent", "fragment").Int32OK()
+	of, ofOk := raw.Lookup("splitEvent", "of").Int32OK()
+	if !fragmentOk || !ofOk {
+		return true
+	}
+	return fragment < of
+}
