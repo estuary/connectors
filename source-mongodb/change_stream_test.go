@@ -334,3 +334,62 @@ func filterDocs(sent []string) []string {
 	}
 	return docs
 }
+
+func TestIsMidSplitEvent(t *testing.T) {
+	splitEvent := func(v any) bson.D {
+		return bson.D{
+			{Key: "operationType", Value: "update"},
+			{Key: "splitEvent", Value: v},
+		}
+	}
+
+	tests := []struct {
+		name  string
+		event bson.D
+		want  bool
+	}{
+		{
+			name:  "not a split event",
+			event: bson.D{{Key: "operationType", Value: "insert"}},
+			want:  false,
+		},
+		{
+			name:  "first fragment of three",
+			event: splitEvent(bson.D{{Key: "fragment", Value: int32(1)}, {Key: "of", Value: int32(3)}}),
+			want:  true,
+		},
+		{
+			name:  "middle fragment of three",
+			event: splitEvent(bson.D{{Key: "fragment", Value: int32(2)}, {Key: "of", Value: int32(3)}}),
+			want:  true,
+		},
+		{
+			name:  "final fragment of three",
+			event: splitEvent(bson.D{{Key: "fragment", Value: int32(3)}, {Key: "of", Value: int32(3)}}),
+			want:  false,
+		},
+		{
+			name:  "single fragment is complete",
+			event: splitEvent(bson.D{{Key: "fragment", Value: int32(1)}, {Key: "of", Value: int32(1)}}),
+			want:  false,
+		},
+		{
+			name:  "unreadable splitEvent is treated as mid-split",
+			event: splitEvent("nonsense"),
+			want:  true,
+		},
+		{
+			name:  "splitEvent missing 'of' is treated as mid-split",
+			event: splitEvent(bson.D{{Key: "fragment", Value: int32(1)}}),
+			want:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			raw, err := bson.Marshal(tt.event)
+			require.NoError(t, err)
+			require.Equal(t, tt.want, isMidSplitEvent(bson.Raw(raw)))
+		})
+	}
+}
