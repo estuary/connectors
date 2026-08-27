@@ -23,6 +23,21 @@
 #     [--seed N]             # default: 0
 #     [--keep]               # don't tear down docker-compose on exit
 #     [--out-dir DIR]        # default: tests/benchmark/materialize/runs/<ts>
+#     [--shard-flag K=V]     # task shard flag, repeatable. Needed where a
+#                            #   connector gates a write path on the runtime,
+#                            #   e.g. enable-runtime-v2=true.
+#     [--table-suffix S]     # appended to every binding's table name, so two
+#                            #   arms of one comparison can run the same
+#                            #   scenario against separate tables.
+#     [--shard-log-level L]  # task shards.logLevel, e.g. debug. The runtime
+#                            #   forces the connector's LOG_LEVEL from this, so
+#                            #   exporting LOG_LEVEL has no effect.
+#     [--shards N]           # default: 1. Above 1, the run switches from
+#                            #   `flowctl preview` to `flowctl raw preview-next
+#                            #   --shards N`, which drives N synthetic shards in
+#                            #   one process over the V2 runtime. Fixture
+#                            #   documents hash-route by collection key, so each
+#                            #   document lands on exactly one shard.
 
 set -o errexit
 set -o pipefail
@@ -38,6 +53,10 @@ SEED=0
 KEEP=0
 OUT_DIR=""
 DOCKER=0
+SHARD_FLAGS=()
+TABLE_SUFFIX=""
+SHARD_LOG_LEVEL=""
+SHARDS=1
 
 while (($#)); do
   case "$1" in
@@ -48,8 +67,12 @@ while (($#)); do
     --keep)      KEEP=1;         shift   ;;
     --docker)    DOCKER=1;       shift   ;;
     --out-dir)   OUT_DIR="$2";   shift 2 ;;
+    --shard-flag)   SHARD_FLAGS+=("$2"); shift 2 ;;
+    --table-suffix) TABLE_SUFFIX="$2";   shift 2 ;;
+    --shard-log-level) SHARD_LOG_LEVEL="$2"; shift 2 ;;
+    --shards)    SHARDS="$2";    shift 2 ;;
     -h|--help)
-      sed -n '2,26p' "$0"; exit 0 ;;
+      sed -n '2,39p' "$0"; exit 0 ;;
     *) echo "unknown flag: $1" >&2; exit 2 ;;
   esac
 done
@@ -95,6 +118,13 @@ else
   fi
   echo "building connector binary: $CONNECTOR_BIN (from $BUILD_PKG)"
   (cd "$ROOT_DIR" && go build -v -tags nozstd -o "$CONNECTOR_BIN" "$BUILD_PKG")
+  # "go build -o" against a pattern that matches no main package compiles the
+  # libraries and exits 0 without writing anything, which surfaces much later
+  # as a preview that cannot start the connector.
+  [[ -x "$CONNECTOR_BIN" ]] || {
+    echo "build produced no binary at $CONNECTOR_BIN ($BUILD_PKG matched no main package)" >&2
+    exit 1
+  }
 fi
 
 # Output directory.
@@ -108,6 +138,9 @@ echo "scenario:  $SCENARIO"
 echo "config:    $CONFIG"
 if (( DOCKER )); then echo "mode:      docker"; else echo "mode:      local"; fi
 echo "seed:      $SEED"
+if (( ${#SHARD_FLAGS[@]} )); then echo "shard flags: ${SHARD_FLAGS[*]}"; fi
+if [[ -n "$TABLE_SUFFIX" ]]; then echo "table suffix: $TABLE_SUFFIX"; fi
+echo "shards:    $SHARDS"
 echo "out-dir:   $OUT_DIR"
 
 # Every run gets its own task name. A task's stored checkpoint otherwise
@@ -204,6 +237,15 @@ SPEC_ARGS=(
 if (( DOCKER )); then
   SPEC_ARGS+=(--docker)
 fi
+for flag in "${SHARD_FLAGS[@]+"${SHARD_FLAGS[@]}"}"; do
+  SPEC_ARGS+=(--shard-flag "$flag")
+done
+if [[ -n "$TABLE_SUFFIX" ]]; then
+  SPEC_ARGS+=(--table-suffix "$TABLE_SUFFIX")
+fi
+if [[ -n "$SHARD_LOG_LEVEL" ]]; then
+  SPEC_ARGS+=(--shard-log-level "$SHARD_LOG_LEVEL")
+fi
 echo "rendering spec: $SPEC"
 python3 "$BENCH_DIR/generate_spec.py" "${SPEC_ARGS[@]}"
 
@@ -241,14 +283,36 @@ GEN_PID=$!
 
 # Run flowctl preview, timing the whole thing.
 PREVIEW_LOG="$OUT_DIR/preview.log"
-echo "running flowctl preview (logs: $PREVIEW_LOG)"
 
 PREVIEW_ARGS=(
   --source  "$SPEC"
   --name    "$TASK"
   --fixture "$FIFO"
-  --output-state
 )
+# The runtime is chosen by the shard flag, not by the shard count. The
+# materialize-snowflake streaming-v2 gate reads enable-runtime-v2 off the spec
+# and cannot see which runtime actually drives it, so a spec carrying that flag
+# must run on preview-next at every shard count. Under V1 the connector takes
+# its v2 path against a runtime that cannot pair with it in production.
+RUNTIME_V2=0
+for flag in "${SHARD_FLAGS[@]+"${SHARD_FLAGS[@]}"}"; do
+  if [[ "$flag" == "enable-runtime-v2=true" ]]; then RUNTIME_V2=1; fi
+done
+
+if (( RUNTIME_V2 || SHARDS > 1 )); then
+  # The V2 runtime has no ["connectorState",...] output and none of V1's
+  # `round=` log lines. flowctl publishes one `transaction stats` line per
+  # round at info, which is what results.py times the transactions by, so info
+  # is all this needs. The task keeps its default warn level, which still
+  # forwards the connector's own warnings as `ops:` lines.
+  export RUST_LOG="info"
+  PREVIEW_CMD=(flowctl raw preview-next --shards "$SHARDS")
+  echo "running flowctl raw preview-next --shards $SHARDS (logs: $PREVIEW_LOG)"
+else
+  PREVIEW_CMD=(flowctl preview)
+  PREVIEW_ARGS+=(--output-state)
+  echo "running flowctl preview (logs: $PREVIEW_LOG)"
+fi
 # Docker mode needs --network so the connector container can reach the DB.
 if (( DOCKER )); then
   PREVIEW_ARGS+=(--network flow-test)
@@ -261,7 +325,7 @@ fi
 # exclude Apply from the data throughput measurement.
 TIMESTAMPS="$OUT_DIR/timestamps.json"
 set +e
-flowctl preview "${PREVIEW_ARGS[@]}" 2>"$PREVIEW_LOG" \
+"${PREVIEW_CMD[@]}" "${PREVIEW_ARGS[@]}" 2>"$PREVIEW_LOG" \
   | python3 -c "
 import sys, time, json
 ts = [time.monotonic_ns()]  # ts[0] = start (before any data)
@@ -288,150 +352,7 @@ echo "preview exit: $PREVIEW_RC"
 # Build results.json from state log + per-commit timestamps.
 # timestamps.json has one entry per connectorState line: the first is Apply
 # (DDL), the rest are data transactions.
-python3 - "$STATE_LOG" "$TIMESTAMPS" "$PREVIEW_RC" "$CONNECTOR" "$SCENARIO" "$SEED" "$PREVIEW_LOG" >"$OUT_DIR/results.json" <<'PY'
-import json, sys, os, re
-from datetime import datetime
-state_path, ts_path, rc, connector, scenario, seed = sys.argv[1:7]
-preview_log = sys.argv[7] if len(sys.argv) > 7 else None
-with open(state_path) as f:
-    state = json.load(f)
-try:
-    with open(ts_path) as f:
-        timestamps = json.load(f)
-except (FileNotFoundError, json.JSONDecodeError):
-    timestamps = []
-
-# timestamps[0] = preview start, timestamps[1] = end of Apply (DDL),
-# timestamps[2..N] = end of each data transaction.
-apply_seconds = None
-tx_boundaries = []  # (start_ns, end_ns) per data transaction
-if len(timestamps) >= 2:
-    apply_seconds = (timestamps[1] - timestamps[0]) / 1e9
-    for i in range(2, len(timestamps)):
-        tx_boundaries.append((timestamps[i - 1], timestamps[i]))
-
-
-def boundaries_from_log(path):
-    """Derive per-round boundaries from flowctl's own log.
-
-    The connectorState-line method assumes one state line for Apply and one
-    per transaction. That holds only for connectors that emit a state document
-    at Apply; a connector whose destination is authoritative emits none, so
-    every boundary shifts by one and Apply absorbs the first transaction.
-
-    Each data round is bracketed by "started reading load requests" and
-    "finished materialization commit", both emitted once per round. Some
-    records arrive interleaved into another line and without their own
-    timestamp, so the most recent timestamp seen is used; the error is far
-    below the resolution that matters here.
-
-    Returns (apply_seconds, [(start_ns, end_ns)], rounds_observed).
-    """
-    ansi = re.compile("\x1b\\[[0-9;]*m|\\\\x1b\\[[0-9;]*m")
-    stamp_re = re.compile(r"(\d{4}-\d{2}-\d{2}T[\d:.]+Z)")
-    start_re = re.compile(r"started reading load requests\s+round=(-?\d+)")
-    end_re = re.compile(r"finished materialization commit\s+round=(-?\d+)")
-
-    starts, ends = {}, {}
-    first_ts = last_ts = cur = None
-    with open(path, errors="replace") as f:
-        for line in f:
-            line = ansi.sub("", line)
-            st = stamp_re.search(line)
-            if st:
-                cur = int(
-                    datetime.strptime(
-                        st.group(1)[:26].ljust(26, "0"), "%Y-%m-%dT%H:%M:%S.%f"
-                    ).timestamp() * 1e9
-                )
-                if first_ts is None:
-                    first_ts = cur
-                last_ts = cur
-            if cur is None:
-                continue
-            for m in start_re.finditer(line):
-                rnd = int(m.group(1))
-                if rnd >= 0:
-                    starts.setdefault(rnd, cur)
-            for m in end_re.finditer(line):
-                rnd = int(m.group(1))
-                if rnd >= 0:
-                    ends[rnd] = cur
-
-    if not starts or first_ts is None:
-        return None, [], 0
-    rounds = sorted(starts)
-    apply_s = (starts[rounds[0]] - first_ts) / 1e9
-    bounds = [(starts[r], ends.get(r, last_ts)) for r in rounds]
-    return apply_s, bounds, len(rounds)
-
-
-rounds_observed = len(tx_boundaries)
-timing_source = "connector-state"
-if preview_log and os.path.exists(preview_log):
-    log_apply, log_bounds, log_rounds = boundaries_from_log(preview_log)
-    if log_bounds:
-        apply_seconds, tx_boundaries = log_apply, log_bounds
-        rounds_observed, timing_source = log_rounds, "flowctl-log"
-
-txs = []
-total_docs = 0
-total_bytes = 0
-# Throughput must divide by what actually ran. A run can cover fewer
-# transactions than the scenario describes, and dividing the scenario's
-# totals by the observed wall overstates the result.
-observed_docs = 0
-observed_bytes = 0
-for i, tx in enumerate(state["transactions"]):
-    bytes_ = tx["doc_count"] * tx["doc_size"]
-    total_docs  += tx["doc_count"]
-    total_bytes += bytes_
-    entry = {
-        "index": tx["index"],
-        "collection": tx["collection"],
-        "doc_count": tx["doc_count"],
-        "doc_size":  tx["doc_size"],
-        "bytes":     bytes_,
-        "fresh":     tx["fresh"],
-        "overlaps":  tx["overlaps"],
-    }
-    if i < len(tx_boundaries):
-        observed_docs += tx["doc_count"]
-        observed_bytes += bytes_
-        start_ns, end_ns = tx_boundaries[i]
-        wall_s = (end_ns - start_ns) / 1e9
-        entry["wall_seconds"] = wall_s
-        entry["mb_per_sec"] = (bytes_ / wall_s / (1024*1024)) if wall_s > 0 else None
-        entry["docs_per_sec"] = (tx["doc_count"] / wall_s) if wall_s > 0 else None
-    txs.append(entry)
-
-# Data wall = end of Apply to end of last data tx (excludes Apply).
-if timing_source == "flowctl-log" and tx_boundaries:
-    data_wall = (tx_boundaries[-1][1] - tx_boundaries[0][0]) / 1e9
-elif len(timestamps) >= 3:
-    data_wall = (timestamps[-1] - timestamps[1]) / 1e9
-else:
-    data_wall = 0.0
-
-print(json.dumps({
-    "connector": connector,
-    "scenario":  os.path.basename(scenario),
-    "seed":      int(seed),
-    "preview_exit_code": int(rc),
-    "apply_seconds": apply_seconds,
-    "wall_seconds": data_wall,
-    "timing_source": timing_source,
-    "rounds_observed": rounds_observed,
-    "scenario_transactions": len(state["transactions"]),
-    "total_docs":   total_docs,
-    "total_bytes":  total_bytes,
-    "observed_docs":  observed_docs,
-    "observed_bytes": observed_bytes,
-    "docs_per_sec": (observed_docs  / data_wall) if data_wall > 0 else None,
-    "mb_per_sec":   (observed_bytes / data_wall / (1024*1024)) if data_wall > 0 else None,
-    "transactions": txs,
-}, indent=2))
-PY
+python3 "$BENCH_DIR/results.py" "$STATE_LOG" "$TIMESTAMPS" "$PREVIEW_RC" "$CONNECTOR" "$SCENARIO" "$SEED" "$PREVIEW_LOG" >"$OUT_DIR/results.json"
 
 echo "results: $OUT_DIR/results.json"
 

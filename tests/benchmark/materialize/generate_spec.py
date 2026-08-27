@@ -21,6 +21,17 @@ out of the box. Pass --docker to run the connector as a Docker image instead
 
 The scenario's `collections[].resource` (if present) is passed through to the
 binding; otherwise we derive `{table: <basename>}` from the collection name.
+
+  --shard-flag K=V   task shard flag, repeatable. Needed by connectors that
+                     gate a write path on a runtime flag, e.g.
+                     --shard-flag enable-runtime-v2=true for the v2 runtime.
+  --table-suffix S   appended to every binding's table name.
+  --shard-log-level L  task shards.logLevel. The runtime forces the connector's
+                     LOG_LEVEL from this (flow crates/runtime/src/local_connector.rs),
+                     so a shell export cannot raise it -- this is the only way. Lets two arms of
+                     one comparison write to separate tables from a single
+                     scenario file, which matters where the destination keeps
+                     per-table state (Snowpipe Streaming channel offsets).
 """
 
 import argparse
@@ -117,6 +128,9 @@ def build_spec(
     task: str | None = None,
     compose_file: str | None = None,
     collection_name_field: str = "table",
+    shard_flags: dict[str, str] | None = None,
+    table_suffix: str = "",
+    shard_log_level: str | None = None,
 ) -> dict:
     scenario = _load_yaml(scenario_path)
 
@@ -132,7 +146,11 @@ def build_spec(
             "schema": c["schema"],
             "key": c["key"],
         }
-        resource = c.get("resource") or {collection_name_field: _table_name(name)}
+        resource = dict(c.get("resource") or {collection_name_field: _table_name(name)})
+        if table_suffix:
+            resource[collection_name_field] = (
+                f"{resource[collection_name_field]}{table_suffix}"
+            )
         bindings_out.append({"source": name, "resource": resource})
 
     config = _load_yaml(config_path)
@@ -159,14 +177,21 @@ def build_spec(
             }
         }
 
+    materialization: dict[str, Any] = {
+        "endpoint": endpoint,
+        "bindings": bindings_out,
+    }
+    shards: dict[str, Any] = {}
+    if shard_flags:
+        shards["flags"] = shard_flags
+    if shard_log_level:
+        shards["logLevel"] = shard_log_level
+    if shards:
+        materialization["shards"] = shards
+
     return {
         "collections": collections_out,
-        "materializations": {
-            task: {
-                "endpoint": endpoint,
-                "bindings": bindings_out,
-            }
-        },
+        "materializations": {task: materialization},
     }
 
 
@@ -181,6 +206,13 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--tag", default=None)
     p.add_argument("--task", default=None)
     p.add_argument("--output", default="-")
+    p.add_argument("--shard-flag", action="append", default=[], metavar="K=V",
+                   help="Task shard flag, repeatable (e.g. enable-runtime-v2=true)")
+    p.add_argument("--table-suffix", default="",
+                   help="Suffix appended to every binding's table name")
+    p.add_argument("--shard-log-level", default=None,
+                   help="Task shards.logLevel (e.g. debug); the runtime derives the "
+                        "connector's LOG_LEVEL from it")
     args = p.parse_args(argv)
 
     # Auto-discover the compose file for localhost rewriting in --docker mode.
@@ -195,6 +227,13 @@ def main(argv: list[str] | None = None) -> int:
                 compose_file = cand
                 break
 
+    shard_flags = {}
+    for flag in args.shard_flag:
+        if "=" not in flag:
+            p.error(f"--shard-flag wants K=V, got: {flag}")
+        k, v = flag.split("=", 1)
+        shard_flags[k] = v
+
     collection_name_field = _get_collection_name_field(args.connector)
 
     spec = build_spec(
@@ -207,6 +246,9 @@ def main(argv: list[str] | None = None) -> int:
         task=args.task,
         compose_file=compose_file,
         collection_name_field=collection_name_field,
+        shard_flags=shard_flags,
+        table_suffix=args.table_suffix,
+        shard_log_level=args.shard_log_level,
     )
 
     text = yaml.safe_dump(spec, sort_keys=False, default_flow_style=False)

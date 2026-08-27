@@ -22,6 +22,10 @@
 #
 # Create flags:
 #   --machine-type TYPE   Machine type (default: e2-standard-2)
+#   --boot-disk-size SIZE Boot disk size (default: 100GB). `preview-next` stages
+#                         the fixture in an on-disk shuffle log holding 512 MiB
+#                         plus the transaction in flight, which 100GB covers.
+#                         Raise it for much larger transactions.
 #
 # Destroy flags:
 #   --yes                 Skip confirmation prompt
@@ -38,6 +42,7 @@ USER_LABEL="$(echo "${USER:-unknown}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-
 VM_NAME="bench-${USER_LABEL}"
 ZONE="us-central1-a"
 MACHINE_TYPE="c3-standard-4-lssd"
+BOOT_DISK_SIZE="100GB"
 PROJECT=""
 YES=0
 COMMAND=""
@@ -106,15 +111,17 @@ gcloud_ssh() {
 # Wait for SSH to become available on a newly-created VM.
 wait_for_ssh() {
   info "waiting for SSH to become available"
+  # IAP needs 160-180s to admit a connection on a freshly-created VM. A shorter
+  # budget aborts create and leaves a running, unprovisioned VM behind.
   local attempts=0
-  while (( attempts < 40 )); do
+  while (( attempts < 100 )); do
     if gcloud_ssh --command="true" --quiet 2>/dev/null; then
       return 0
     fi
     sleep 3
     (( ++attempts ))
   done
-  die "SSH not available after 120s — check VM status with: gcloud compute instances describe $VM_NAME --zone=$ZONE"
+  die "SSH not available after 300s — check VM status with: gcloud compute instances describe $VM_NAME --zone=$ZONE"
 }
 
 # Build rsync-over-IAP transport strings. Sets RSYNC_TRANSPORT and
@@ -179,14 +186,14 @@ cmd_create() {
     die "VM '$VM_NAME' already exists in $ZONE. Use 'sync' to update code, or 'destroy' first."
   fi
 
-  info "creating VM: $VM_NAME (zone=$ZONE, type=$MACHINE_TYPE)"
+  info "creating VM: $VM_NAME (zone=$ZONE, type=$MACHINE_TYPE, disk=$BOOT_DISK_SIZE)"
   gcloud compute instances create "$VM_NAME" \
     --zone="$ZONE" \
     --project="$PROJECT" \
     --machine-type="$MACHINE_TYPE" \
     --image-family=ubuntu-2404-lts-amd64 \
     --image-project=ubuntu-os-cloud \
-    --boot-disk-size=100GB \
+    --boot-disk-size="$BOOT_DISK_SIZE" \
     --boot-disk-type=pd-ssd \
     --labels="purpose=bench,owner=${USER_LABEL}" \
     --tags=bench \
@@ -296,6 +303,7 @@ while (( $# )); do
     --zone)    ZONE="$2";         shift 2 ;;
     --project) PROJECT="$2";      shift 2 ;;
     --machine-type) MACHINE_TYPE="$2"; shift 2 ;;
+    --boot-disk-size) BOOT_DISK_SIZE="$2"; shift 2 ;;
     --yes)     YES=1;             shift   ;;
     -h|--help) usage 0 ;;
     --)        shift; SSH_EXTRA_ARGS=("$@"); break ;;

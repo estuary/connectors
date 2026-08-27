@@ -3,7 +3,11 @@
 # On-VM setup script for benchmark VMs.
 # Run by gcp-vm.sh during "create" — not intended to be called directly.
 #
-# Installs: Go 1.25, Python 3 + PyYAML, Docker, AWS CLI, build tools.
+# Installs: Go 1.25, Python 3 + PyYAML + venv, Docker, AWS CLI, build tools.
+#
+# python3-venv is here for connectors whose local-binary mode needs a Python
+# sidecar built from source, e.g. materialize-snowflake's Snowpipe Streaming
+# v2 path.
 
 set -o errexit
 set -o pipefail
@@ -17,7 +21,7 @@ sudo apt-get update -qq
 echo "==> installing system packages"
 sudo apt-get install -y -qq \
   build-essential git curl rsync jq \
-  python3 python3-pip \
+  python3 python3-pip python3-venv \
   docker.io docker-compose-v2 docker-buildx \
   >/dev/null
 
