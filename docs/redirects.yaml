@@ -15,3 +15,5 @@
 # Point `to` at the best surviving destination: a replacement connector if
 # one exists, otherwise the connector category index. Avoid case-only renames
 # (e.g. foo -> Foo); they collide on case-insensitive filesystems.
+- from: /reference/Connectors/capture-connectors/facebook-marketing/
+  to: /reference/Connectors/capture-connectors/facebook-marketing-native/
