@@ -10,6 +10,9 @@ collections:
 
 captures:
   tests/${CONNECTOR}/from-source:
+    shards:
+      flags:
+        enable-runtime-v2: "false"
     endpoint:
       connector:
         image: "${CONNECTOR_IMAGE}"
