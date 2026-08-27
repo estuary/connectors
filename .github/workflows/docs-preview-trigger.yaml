@@ -1,0 +1,99 @@
+name: "Trigger connector docs preview"
+
+# estuary/docs owns the Docusaurus site and pulls this repo's published docs in
+# through a git submodule, so a PR here cannot build its own preview. This
+# dispatches the build to estuary/docs, which builds the site with the submodule
+# pinned to this PR's head commit and reports back with a comment and a
+# `docs/build` commit status. See estuary/docs
+# .github/workflows/connector-docs-preview.yaml for the receiving side.
+#
+# The `docs/build` status this posts is advisory, and must not be made a
+# required check. It is a commit status written from another repository, not an
+# Actions check run in this one, so it is never created at all for a PR that
+# touches no published docs: this workflow does not run, nothing dispatches,
+# and branch protection waits for a status that will never arrive. The
+# auto-skip that rescues path-filtered Actions jobs does not apply. Since
+# ci.yaml and python.yaml both `paths-ignore: docs/**`, the code and docs
+# halves are disjoint by design and every code PR would hang. The same gap
+# applies to fork PRs, to PREVIEW_APP_ID being unset, and to the receiver's
+# status step being gated on a minted token.
+#
+# The protection that gap would have bought is already in place from a
+# different direction: docs-build-check.yaml (#5090) runs the same docs build
+# as a native Actions job in this repo, so it path-filters and auto-skips
+# correctly and is the one safe to require. This workflow's job is the preview
+# link, not the gate.
+#
+# Known cost of that split: the two workflows share this `paths:` filter, so a
+# published-docs PR builds the site twice, once here for the preview and once
+# there for the check, at about three minutes each. Left alone deliberately.
+# Collapsing them would mean either the check waiting on a cross-repo dispatch
+# to report, which is the fragility described above, or the preview being built
+# by a job that cannot publish it. Two independent builds is the cheaper
+# failure mode.
+#
+# Requires the "estuary-docs-previews" GitHub App (PREVIEW_APP_ID repo variable
+# + PREVIEW_APP_PRIVATE_KEY secret, installed on both estuary/docs and
+# estuary/connectors). Without them the job skips rather than failing.
+
+on:
+  pull_request:
+    paths:
+      # Only what the site actually publishes. docs/ also holds internal
+      # engineering notes (agents/, feature_flags.md, inbound_networking.md,
+      # materialize/) that no page is built from, so they should not spend a
+      # build.
+      - docs/reference/Connectors/**
+      # Not a page, but docusaurus.config.js reads it out of the submodule to
+      # build the connector redirect table, and a bad entry there fails the
+      # build. Excluding it would leave the one file that can break the site
+      # without a check.
+      - docs/redirects.yaml
+    # No `closed`: a preview is a Cloudflare Workers version, and versions
+    # cannot be deleted, so there is nothing to tear down when a PR closes.
+    # Cloudflare ages old versions out on its own. (The earlier gh-pages design
+    # did need `closed`, to delete the published preview directory.)
+    types: [opened, reopened, synchronize]
+
+concurrency:
+  group: connector-docs-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+# The job only ever uses the App-minted token, scoped to estuary/docs, so it
+# needs none of the ambient GITHUB_TOKEN's scope.
+permissions: {}
+
+jobs:
+  dispatch:
+    # Forks cannot read secrets, so the token cannot be minted and the dispatch
+    # would fail rather than skip. Connector docs are contributed from branches
+    # in this repo, so this costs nothing today.
+    if: >-
+      vars.PREVIEW_APP_ID != '' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Mint token for estuary/docs
+        uses: actions/create-github-app-token@v2
+        id: app-token
+        with:
+          app-id: ${{ vars.PREVIEW_APP_ID }}
+          private-key: ${{ secrets.PREVIEW_APP_PRIVATE_KEY }}
+          owner: estuary
+          repositories: docs
+
+      - name: Dispatch preview build to estuary/docs
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          gh api repos/estuary/docs/dispatches --input - <<EOF
+          {
+            "event_type": "connector-docs-preview",
+            "client_payload": {
+              "pr_number": ${PR_NUMBER},
+              "head_sha": "${HEAD_SHA}"
+            }
+          }
+          EOF
