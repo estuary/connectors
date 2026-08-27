@@ -29,6 +29,10 @@ type changeStream struct {
 	ms                 *mongo.ChangeStream
 	db                 string
 	lastPbrtCheckpoint time.Time
+	// midSplit is true when the last event consumed from this stream was a
+	// non-final fragment of a split event, meaning the stream's current
+	// position is not a safe place to checkpoint.
+	midSplit bool
 }
 
 type streamEvent struct {
@@ -370,9 +374,10 @@ type processedEvent struct {
 }
 
 // handleIdleBatch processes an empty batch (idle signal), emitting a PBRT checkpoint
-// if enough time has passed. Returns the opTime extracted from the resume token.
+// if enough time has passed and the stream is not parked mid-split. Returns the
+// opTime extracted from the resume token.
 func (c *capture) handleIdleBatch(s *changeStream, token bson.Raw) (primitive.Timestamp, error) {
-	if time.Since(s.lastPbrtCheckpoint) > pbrtCheckpointInterval {
+	if !s.midSplit && time.Since(s.lastPbrtCheckpoint) > pbrtCheckpointInterval {
 		if err := c.emitPbrtCheckpoint(s, token); err != nil {
 			return primitive.Timestamp{}, err
 		}
@@ -421,6 +426,8 @@ func (c *capture) processBatch(
 
 	for i, resp := range responses {
 		ev := batch.events[i]
+
+		s.midSplit = isMidSplitEvent(ev.raw)
 
 		c.mu.Lock()
 		c.processedStreamEvents++
@@ -502,7 +509,7 @@ func (c *capture) processBatch(
 			c.lastEventClusterTime[s.db] = lastOpTime
 		}
 		c.mu.Unlock()
-	} else if time.Since(s.lastPbrtCheckpoint) > pbrtCheckpointInterval {
+	} else if !s.midSplit && time.Since(s.lastPbrtCheckpoint) > pbrtCheckpointInterval {
 		// No documents emitted, but we can still emit a PBRT checkpoint
 		lastEvent := batch.events[len(batch.events)-1]
 		if err := c.emitPbrtCheckpoint(s, lastEvent.resumeToken); err != nil {

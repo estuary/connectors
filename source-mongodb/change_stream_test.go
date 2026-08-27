@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
@@ -391,5 +392,156 @@ func TestIsMidSplitEvent(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, tt.want, isMidSplitEvent(bson.Raw(raw)))
 		})
+	}
+}
+
+// TestSplitEventCheckpointSafety asserts the invariant that a resume token is
+// never checkpointed for a non-final fragment of a split event. Resuming from
+// such a token makes MongoDB deliver the *next* fragment, and the fragments
+// already consumed live only in the transcoder's memory, so a restart from that
+// position leaves the transcoder unable to reassemble the event.
+func TestSplitEventCheckpointSafety(t *testing.T) {
+	ctx := context.Background()
+	client, _ := testClient(t)
+
+	testDb := "testDb"
+	testColl1 := "testColl1"
+
+	// Force the PBRT checkpoint branch to be eligible on every batch, which is
+	// the path that used to checkpoint a mid-split token.
+	prevInterval := pbrtCheckpointInterval
+	pbrtCheckpointInterval = 0
+	t.Cleanup(func() { pbrtCheckpointInterval = prevInterval })
+
+	require.NoError(t, client.Database(testDb).Drop(ctx))
+	t.Cleanup(func() { require.NoError(t, client.Database(testDb).Drop(ctx)) })
+
+	bindings := []bindingInfo{
+		{resource: resource{Database: testDb, Collection: testColl1}, index: 0},
+	}
+
+	transcoder, err := NewTranscoder(ctx)
+	require.NoError(t, err)
+	t.Cleanup(func() { transcoder.Stop() })
+
+	c := capture{
+		client:     client,
+		output:     &boilerplate.PullOutput{Connector_CaptureServer: &testServer{}},
+		transcoder: transcoder,
+		trackedChangeStreamBindings: map[string]bindingInfo{
+			resourceId(testDb, testColl1): bindings[0],
+		},
+		fullDocRequired:      map[string]bool{},
+		state:                captureState{DatabaseResumeTokens: map[string]bson.Raw{}},
+		lastEventClusterTime: map[string]primitive.Timestamp{},
+	}
+
+	require.NoError(t, client.Database(testDb).CreateCollection(ctx, testColl1,
+		&options.CreateCollectionOptions{ChangeStreamPreAndPostImages: bson.D{{Key: "enabled", Value: true}}}))
+
+	streams, err := c.initializeStreams(ctx, bindings, nil, true, true, false, map[string][]string{}, map[string]bool{})
+	require.NoError(t, err)
+	require.Equal(t, 1, len(streams))
+	stream := streams[0]
+
+	batches := make(chan streamBatch, 4)
+	producerCtx, cancelProducer := context.WithCancel(ctx)
+	defer cancelProducer()
+
+	producerDone := make(chan struct{})
+	go func() {
+		defer close(producerDone)
+		c.produceStreamBatches(producerCtx, stream, batches)
+	}()
+	defer func() {
+		cancelProducer()
+		<-producerDone
+	}()
+
+	// First batch establishes the resume token.
+	for batch := range batches {
+		require.NoError(t, batch.err)
+		_, err := c.processBatch(ctx, stream, batch)
+		require.NoError(t, err)
+		break
+	}
+
+	// A document large enough that an update carrying both fullDocument and
+	// fullDocumentBeforeChange exceeds the 16MB event limit and is split.
+	val := map[string]string{"_id": "hugeDocument"}
+	for i := 1; i <= 9; i++ {
+		val[fmt.Sprintf("key%d", i)] = strings.Repeat(fmt.Sprintf("value%d", i), 200000)
+	}
+	_, err = client.Database(testDb).Collection(testColl1).InsertOne(ctx, val)
+	require.NoError(t, err)
+
+	val["key1"] = "updated"
+	res, err := client.Database(testDb).Collection(testColl1).UpdateOne(ctx,
+		bson.D{{Key: "_id", Value: val["_id"]}}, bson.D{{Key: "$set", Value: val}})
+	require.NoError(t, err)
+	require.Equal(t, 1, int(res.ModifiedCount))
+
+	// Resume tokens which must never be checkpointed, and every token which
+	// actually was. The fragment position is deliberately re-derived from the
+	// raw event here rather than by calling isMidSplitEvent, so that a wrong
+	// predicate cannot make this assertion agree with it.
+	unsafeTokens := make(map[string]bool)
+	checkpointedTokens := make(map[string]bool)
+	var sawCompletedSplit bool
+	var batchesAfterSplit int
+
+	// produceStreamBatches never closes its channel, so the loop needs its own
+	// deadline: without one, a change stream which never splits would block here
+	// until the package-wide test timeout took down every test in the package.
+	loopCtx, cancelLoop := context.WithTimeout(ctx, 60*time.Second)
+	defer cancelLoop()
+
+collect:
+	for {
+		var batch streamBatch
+		select {
+		case batch = <-batches:
+		case <-loopCtx.Done():
+			break collect
+		}
+
+		require.NoError(t, batch.err)
+
+		for _, ev := range batch.events {
+			fragment, fragmentOk := ev.raw.Lookup("splitEvent", "fragment").Int32OK()
+			of, ofOk := ev.raw.Lookup("splitEvent", "of").Int32OK()
+			if !fragmentOk || !ofOk {
+				continue
+			}
+			if fragment < of {
+				unsafeTokens[string(ev.resumeToken)] = true
+			} else {
+				sawCompletedSplit = true
+			}
+		}
+
+		_, err := c.processBatch(ctx, stream, batch)
+		require.NoError(t, err)
+
+		if tok, ok := c.state.DatabaseResumeTokens[testDb]; ok {
+			checkpointedTokens[string(tok)] = true
+		}
+
+		// Keep going past the split so that the checkpoints taken once the
+		// event completes are collected too.
+		if sawCompletedSplit {
+			batchesAfterSplit++
+			if batchesAfterSplit >= 3 {
+				break collect
+			}
+		}
+	}
+
+	require.True(t, sawCompletedSplit, "change stream never delivered a complete split event")
+	require.NotEmpty(t, unsafeTokens, "change stream never delivered a non-final fragment")
+
+	for tok := range unsafeTokens {
+		require.False(t, checkpointedTokens[tok],
+			"checkpointed a resume token for a non-final fragment of a split event")
 	}
 }
