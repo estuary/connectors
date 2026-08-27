@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"google.golang.org/grpc/metadata"
 )
@@ -296,6 +297,7 @@ var _ pc.Connector_CaptureServer = (*testServer)(nil)
 
 type testServer struct {
 	sent []string
+	docs []json.RawMessage
 }
 
 func (t *testServer) Send(m *pc.Response) error {
@@ -311,6 +313,7 @@ func (t *testServer) Send(m *pc.Response) error {
 			return err
 		}
 		t.sent = append(t.sent, c.Id)
+		t.docs = append(t.docs, m.Captured.DocJson)
 	} else {
 		panic(fmt.Sprintf("unhandled message: %v", m))
 	}
@@ -544,4 +547,207 @@ collect:
 		require.False(t, checkpointedTokens[tok],
 			"checkpointed a resume token for a non-final fragment of a split event")
 	}
+}
+
+// TestSplitEventResumedPartway reproduces a capture resuming from a checkpoint
+// taken partway through a split event, which is the state a capture wedged
+// itself in before mid-split positions stopped being checkpointed. The event's
+// remaining fragments cannot be reassembled by a transcoder which never saw the
+// first one, so the stream is repositioned to the event itself and captures it
+// whole. A reopen which fails, for any reason, fails the capture rather than
+// skipping the event.
+func TestSplitEventResumedPartway(t *testing.T) {
+	ctx := context.Background()
+	client, _ := testClient(t)
+
+	testDb := "testDb"
+	testColl1 := "testColl1"
+
+	prevInterval := pbrtCheckpointInterval
+	pbrtCheckpointInterval = 0
+	t.Cleanup(func() { pbrtCheckpointInterval = prevInterval })
+
+	require.NoError(t, client.Database(testDb).Drop(ctx))
+	t.Cleanup(func() { require.NoError(t, client.Database(testDb).Drop(ctx)) })
+
+	bindings := []bindingInfo{
+		{resource: resource{Database: testDb, Collection: testColl1}, index: 0},
+	}
+
+	newCapture := func(srv *testServer, tokens map[string]bson.Raw) capture {
+		transcoder, err := NewTranscoder(ctx)
+		require.NoError(t, err)
+		t.Cleanup(func() { transcoder.Stop() })
+
+		return capture{
+			client:     client,
+			output:     &boilerplate.PullOutput{Connector_CaptureServer: srv},
+			transcoder: transcoder,
+			trackedChangeStreamBindings: map[string]bindingInfo{
+				resourceId(testDb, testColl1): bindings[0],
+			},
+			fullDocRequired:      map[string]bool{},
+			state:                captureState{DatabaseResumeTokens: tokens},
+			lastEventClusterTime: map[string]primitive.Timestamp{},
+		}
+	}
+
+	// Collects batches from a stream until stop says to finish, or the deadline
+	// passes. produceStreamBatches never closes its channel, so a deadline is
+	// what keeps a stream which does not split from hanging the package.
+	collect := func(c *capture, stream *changeStream, stop func(streamBatch) bool) error {
+		batches := make(chan streamBatch, 4)
+		producerCtx, cancelProducer := context.WithCancel(ctx)
+		producerDone := make(chan struct{})
+		go func() {
+			defer close(producerDone)
+			c.produceStreamBatches(producerCtx, stream, batches)
+		}()
+		defer func() {
+			cancelProducer()
+			<-producerDone
+		}()
+
+		deadline, cancelDeadline := context.WithTimeout(ctx, 60*time.Second)
+		defer cancelDeadline()
+
+		for {
+			select {
+			case batch := <-batches:
+				if batch.err != nil {
+					return batch.err
+				}
+				if stop(batch) {
+					return nil
+				}
+			case <-deadline.Done():
+				return nil
+			}
+		}
+	}
+
+	require.NoError(t, client.Database(testDb).CreateCollection(ctx, testColl1,
+		&options.CreateCollectionOptions{ChangeStreamPreAndPostImages: bson.D{{Key: "enabled", Value: true}}}))
+
+	// Observe a split event, and remember the resume token of its first
+	// fragment: that is the poisoned position a capture could previously
+	// persist. Events are only inspected here, never transcoded.
+	observer := newCapture(&testServer{}, map[string]bson.Raw{})
+	streams, err := observer.initializeStreams(ctx, bindings, nil, true, true, false, map[string][]string{}, map[string]bool{})
+	require.NoError(t, err)
+	require.Equal(t, 1, len(streams))
+
+	val := map[string]string{"_id": "hugeDocument"}
+	for i := 1; i <= 9; i++ {
+		val[fmt.Sprintf("key%d", i)] = strings.Repeat(fmt.Sprintf("value%d", i), 200000)
+	}
+	_, err = client.Database(testDb).Collection(testColl1).InsertOne(ctx, val)
+	require.NoError(t, err)
+
+	val["key1"] = "updated"
+	_, err = client.Database(testDb).Collection(testColl1).UpdateOne(ctx,
+		bson.D{{Key: "_id", Value: val["_id"]}}, bson.D{{Key: "$set", Value: val}})
+	require.NoError(t, err)
+
+	// Captured after the split event, and expected to survive either outcome.
+	_, err = client.Database(testDb).Collection(testColl1).InsertOne(ctx, bson.D{{Key: "_id", Value: "afterTheSplit"}})
+	require.NoError(t, err)
+
+	var firstFragmentToken bson.Raw
+	require.NoError(t, collect(&observer, streams[0], func(batch streamBatch) bool {
+		for _, ev := range batch.events {
+			fragment, of, ok := splitEventFragment(ev.raw)
+			if ok && fragment == 1 && of > 1 {
+				firstFragmentToken = ev.resumeToken
+				return true
+			}
+		}
+		return false
+	}))
+	require.NotNil(t, firstFragmentToken, "change stream never delivered a split event")
+
+	// resumePartway resumes from partway through that split event with a
+	// transcoder which has never seen its first fragment. A non-nil reopen
+	// replaces the stream's own, standing in for a reopen which fails.
+	resumePartway := func(t *testing.T, reopen func(context.Context, primitive.Timestamp) (*mongo.ChangeStream, error)) (*testServer, error) {
+		srv := &testServer{}
+		c := newCapture(srv, map[string]bson.Raw{testDb: firstFragmentToken})
+		resumed, err := c.initializeStreams(ctx, bindings, nil, true, true, false, map[string][]string{}, map[string]bool{})
+		require.NoError(t, err)
+		if reopen != nil {
+			resumed[0].reopenAt = reopen
+		}
+
+		collectErr := collect(&c, resumed[0], func(batch streamBatch) bool {
+			_, err := c.processBatch(ctx, resumed[0], batch)
+			require.NoError(t, err, "capture failed on a split event it could not reassemble")
+			return slices.Contains(srv.sent, "afterTheSplit")
+		})
+
+		return srv, collectErr
+	}
+
+	t.Run("repositioned to recover the event", func(t *testing.T) {
+		srv, err := resumePartway(t, nil)
+		require.NoError(t, err)
+		require.Contains(t, srv.sent, "hugeDocument", "the split event was not recovered")
+		require.Contains(t, srv.sent, "afterTheSplit", "capture did not carry on past the split event")
+
+		// The event must be recovered whole, not merely present. Its post-image
+		// carries the updated value, and its pre-image arrives in a later
+		// fragment, so finding both proves every fragment was reassembled.
+		type capturedDoc struct {
+			ID   string `json:"_id"`
+			Key1 string `json:"key1"`
+			Meta struct {
+				Op     string          `json:"op"`
+				Before json.RawMessage `json:"before"`
+			} `json:"_meta"`
+		}
+		var recovered capturedDoc
+		var found bool
+		for _, doc := range srv.docs {
+			// Declared per iteration: encoding/json leaves fields absent from
+			// the payload untouched, so a reused value could assert against a
+			// previous document.
+			var candidate capturedDoc
+			require.NoError(t, json.Unmarshal(doc, &candidate))
+			if candidate.ID == "hugeDocument" {
+				recovered, found = candidate, true
+				break
+			}
+		}
+		require.True(t, found, "no recovered document for the split event")
+		require.Equal(t, "u", recovered.Meta.Op)
+		require.Equal(t, "updated", recovered.Key1, "recovered document does not carry the post-image of the event")
+		require.NotEmpty(t, recovered.Meta.Before, "recovered document is missing the pre-image, which arrives in a later fragment")
+	})
+
+	t.Run("fails when the oplog no longer reaches the event", func(t *testing.T) {
+		// Skipping the event would be silent data loss. Failing is consistent
+		// with how any other position the oplog no longer reaches is handled.
+		historyLost := func(context.Context, primitive.Timestamp) (*mongo.ChangeStream, error) {
+			return nil, mongo.CommandError{Code: 286, Name: "ChangeStreamHistoryLost", Message: "Resume of change stream was not possible"}
+		}
+
+		srv, err := resumePartway(t, historyLost)
+		require.Error(t, err, "expected the capture to fail rather than skip the event")
+		require.Contains(t, err.Error(), "repositioning change stream")
+		require.NotContains(t, srv.sent, "hugeDocument")
+	})
+
+	t.Run("fails on a transient reopen error", func(t *testing.T) {
+		// Anything which is not the oplog having moved on is retryable, and a
+		// restart re-runs this recovery from the same checkpoint. Skipping here
+		// would discard a real change event over an election or a dropped
+		// connection.
+		notPrimary := func(context.Context, primitive.Timestamp) (*mongo.ChangeStream, error) {
+			return nil, mongo.CommandError{Code: 189, Message: "PrimarySteppedDown"}
+		}
+
+		srv, err := resumePartway(t, notPrimary)
+		require.Error(t, err, "expected the capture to fail rather than skip the event")
+		require.Contains(t, err.Error(), "repositioning change stream")
+		require.NotContains(t, srv.sent, "hugeDocument")
+	})
 }
