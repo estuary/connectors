@@ -222,6 +222,7 @@ class Orders(ShopifyGraphQLResource):
             node {
                 # identifiers
                 id
+                name
                 sku
                 vendor
                 image {
