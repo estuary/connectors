@@ -31,7 +31,9 @@ type changeStream struct {
 	lastPbrtCheckpoint time.Time
 	// midSplit is true when the last event consumed from this stream was a
 	// non-final fragment of a split event, meaning the stream's current
-	// position is not a safe place to checkpoint.
+	// position is not a safe place to checkpoint. Checkpoints are suppressed
+	// for as long as it is set. The fragments of one event are delivered back
+	// to back, so that is only ever briefly.
 	midSplit bool
 }
 
@@ -202,7 +204,7 @@ func (c *capture) streamChanges(
 					return fmt.Errorf("processing batch for %q: %w", s.db, err)
 				}
 
-				if coordinator.gotCaughtUp(s.db, opTime) && catchup {
+				if !s.midSplit && coordinator.gotCaughtUp(s.db, opTime) && catchup {
 					cancelProducer()
 					<-producerDone
 					return nil
