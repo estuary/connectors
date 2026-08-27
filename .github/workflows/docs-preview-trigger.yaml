@@ -7,13 +7,30 @@ name: "Trigger connector docs preview"
 # `docs/build` commit status. See estuary/docs
 # .github/workflows/connector-docs-preview.yaml for the receiving side.
 #
-# The commit status is the part worth protecting: two thirds of the pages on
-# docs.estuary.dev come from this repo, the docs build sets
-# onBrokenLinks: 'throw', and the production deploy is an unattended hourly
-# cron with no failure alerting. A broken relative link merged here therefore
-# fails every subsequent deploy and freezes docs.estuary.dev at its last good
-# build, with nothing to say so. Making `docs/build` a required check on this
-# repo closes that.
+# The `docs/build` status this posts is advisory, and must not be made a
+# required check. It is a commit status written from another repository, not an
+# Actions check run in this one, so it is never created at all for a PR that
+# touches no published docs: this workflow does not run, nothing dispatches,
+# and branch protection waits for a status that will never arrive. The
+# auto-skip that rescues path-filtered Actions jobs does not apply. Since
+# ci.yaml and python.yaml both `paths-ignore: docs/**`, the code and docs
+# halves are disjoint by design and every code PR would hang. The same gap
+# applies to fork PRs, to PREVIEW_APP_ID being unset, and to the receiver's
+# status step being gated on a minted token.
+#
+# The protection that gap would have bought is already in place from a
+# different direction: docs-build-check.yaml (#5090) runs the same docs build
+# as a native Actions job in this repo, so it path-filters and auto-skips
+# correctly and is the one safe to require. This workflow's job is the preview
+# link, not the gate.
+#
+# Known cost of that split: the two workflows share this `paths:` filter, so a
+# published-docs PR builds the site twice, once here for the preview and once
+# there for the check, at about three minutes each. Left alone deliberately.
+# Collapsing them would mean either the check waiting on a cross-repo dispatch
+# to report, which is the fragility described above, or the preview being built
+# by a job that cannot publish it. Two independent builds is the cheaper
+# failure mode.
 #
 # Requires the "estuary-docs-previews" GitHub App (PREVIEW_APP_ID repo variable
 # + PREVIEW_APP_PRIVATE_KEY secret, installed on both estuary/docs and
