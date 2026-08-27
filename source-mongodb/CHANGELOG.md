@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-08-26
+
+### Fixed
+
+- Captures of databases with pre-images enabled no longer fail permanently with
+  `received fragment N without first fragment`. MongoDB delivers change events
+  larger than 16MB as a series of fragments, and the connector could checkpoint
+  a resume token pointing partway through one of them. Restarting from that
+  position delivers only the remaining fragments, which cannot be reassembled
+  into the original event, so every subsequent restart failed the same way.
+  Resume tokens are now only checkpointed at a position between whole events.
+
 ## 2026-08-17
 
 ### Fixed
