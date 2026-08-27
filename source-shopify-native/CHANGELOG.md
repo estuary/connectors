@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-08-27
+
+### Added
+- `orders` line items now include `name`, the line item's title as it appears
+  on the order (the product title, with the variant title appended when the
+  variant has one). This identifies what sold on orders whose line items were
+  entered without a `sku`.
+
 ## 2026-08-19
 
 ### Fixed
