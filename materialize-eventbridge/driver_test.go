@@ -14,7 +14,7 @@ package connector
 // rule + target are all provisioned up front by `provisionLocalStackInfra` since
 // `Setup()` is never invoked on the test-process materializer instance —
 // the boilerplate test rig drives the actual transactions through a
-// `flowctl preview` subprocess.
+// `flowctl raw preview-next` subprocess.
 //
 // Per project convention this file starts and stops docker compose itself;
 // callers should NOT run docker compose externally before invoking
@@ -111,7 +111,8 @@ func TestIntegration(t *testing.T) {
 	}
 
 	t.Run("materialize", func(t *testing.T) {
-		bptest.RunMaterializationTestParallel(t, newMaterializerUnderTest, materializeSpec, makeResourceFn, nil)
+		bptest.RunMaterializationTestParallel(t, newMaterializerUnderTest, materializeSpec, makeResourceFn, nil,
+			bptest.RuntimeConfig{Shards: 1})
 	})
 
 	t.Run("apply", func(t *testing.T) {

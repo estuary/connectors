@@ -53,7 +53,8 @@ func TestIntegration(t *testing.T) {
 	}
 
 	t.Run("materialize", func(t *testing.T) {
-		boilerplate.RunMaterializationTest(t, NewMaterializer, materializeSpec, makeResourceFn, nil)
+		boilerplate.RunMaterializationTest(t, NewMaterializer, materializeSpec, makeResourceFn, nil,
+			boilerplate.RuntimeConfig{Shards: 1})
 	})
 
 	t.Run("apply", func(t *testing.T) {

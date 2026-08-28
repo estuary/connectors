@@ -126,10 +126,15 @@ func TestIntegration(t *testing.T) {
 		func(s string) string {
 			return regexp.MustCompile(`"upload_duration_ms":\s*\d+`).ReplaceAllString(s, `"upload_duration_ms": "<upload_duration_ms>"`)
 		},
+		// The stream offset tokens are prefixed with a hash of the runtime
+		// checkpoint (see buildDriverCheckpoint), so they differ per transaction
+		// and per run. Their deterministic ":N" suffix is left intact.
+		sql.SanitizeCheckpointHashes(`"offset_token":"([0-9a-f]{16}):\d+"`, "offset-token"),
 	}
 
 	t.Run("materialize", func(t *testing.T) {
-		sql.RunMaterializationTest(t, NewDriver(), "testdata/materialize.flow.yaml", makeResourceFn, actionDescSanitizers)
+		sql.RunMaterializationTest(t, NewDriver(), "testdata/materialize.flow.yaml", makeResourceFn, actionDescSanitizers,
+			sql.RuntimeConfig{Shards: 1})
 	})
 
 	t.Run("apply", func(t *testing.T) {

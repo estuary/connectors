@@ -684,7 +684,7 @@ func runMaterializationTestForTask(
 
 	actionDescription := testutil.RunFlowctl(
 		t,
-		"preview",
+		"raw", "preview-next",
 		"--name", task.Name,
 		"--source", task.Source,
 		"--fixture", "testdata/fixture.materialize.json",

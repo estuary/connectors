@@ -53,7 +53,8 @@ async fn test_materialization() {
     ] {
         let output = std::process::Command::new("flowctl")
             .args([
-                "preview",
+                "raw",
+                "preview-next",
                 "--source",
                 "tests/test.flow.yaml",
                 "--fixture",

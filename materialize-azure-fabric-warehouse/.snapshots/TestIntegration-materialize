@@ -6,6 +6,7 @@ Resource: whb_warehouse.estuary_test_schema.simple_standard
 ["connectorState",{}]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"Name":"_meta/op","Nullable":true,"Type":"varchar"}
@@ -32,6 +33,7 @@ Resource: whb_warehouse.estuary_test_schema.simple_delta
 ["connectorState",{}]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"Name":"_meta/op","Nullable":true,"Type":"varchar"}
@@ -64,6 +66,7 @@ Resource: whb_warehouse.estuary_test_schema.not_simple
 ["connectorState",{}]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"Name":" ,;{}().- problematicField � 𐀀 嶲 ","Nullable":true,"Type":"varchar"}
@@ -97,6 +100,7 @@ Resource: whb_warehouse.estuary_test_schema.data_types
 ["connectorState",{}]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"Name":"arrayField","Nullable":true,"Type":"varchar"}

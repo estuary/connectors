@@ -6,6 +6,7 @@ Resource: flow-test-bus.flow.test.simple_standard
 ["connectorState",{}]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 
@@ -33,6 +34,7 @@ Resource: flow-test-bus.flow.test.data_types
 ["connectorState",{}]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 

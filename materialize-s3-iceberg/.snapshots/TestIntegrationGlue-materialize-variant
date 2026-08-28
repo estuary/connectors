@@ -2,11 +2,14 @@ Task: acmeCo/tests/materialize-s3-iceberg
 
 Resource: tests.data_types_delta
 ["applied.actionDescription", "create table \"tests.data_types_delta\"\ncreate table \"tests.cast_to_string_delta\""]
-["connectorState",{"updated":{"bindingStates":{"tests%2Fcast_to_string_delta":{"fileKeys":null},"tests%2Fdata_types_delta":{"fileKeys":null}}}}]
-["connectorState",{"updated":{"bindingStates":{"tests%2Fcast_to_string_delta":{"currentCheckpoint":"7a60ee931eb4057c","fileKeys":["s3://<bucket>/<prefix>/tests/cast_to_string_delta_<hash>/data/<uuid>.parquet"]},"tests%2Fdata_types_delta":{"currentCheckpoint":"7a60ee931eb4057c","fileKeys":["s3://<bucket>/<prefix>/tests/data_types_delta_<hash>/data/<uuid>.parquet"]}}}}]
-["connectorState",{"updated":{"bindingStates":{"tests%2Fcast_to_string_delta":{"currentCheckpoint":"7a60ee931eb4057c","fileKeys":null},"tests%2Fdata_types_delta":{"currentCheckpoint":"7a60ee931eb4057c","fileKeys":null}}}}]
-["connectorState",{"updated":{"bindingStates":{"tests%2Fcast_to_string_delta":{"previousCheckpoint":"7a60ee931eb4057c","currentCheckpoint":"d075ceace3972e7f","fileKeys":["s3://<bucket>/<prefix>/tests/cast_to_string_delta_<hash>/data/<uuid>.parquet"]},"tests%2Fdata_types_delta":{"previousCheckpoint":"7a60ee931eb4057c","currentCheckpoint":"d075ceace3972e7f","fileKeys":["s3://<bucket>/<prefix>/tests/data_types_delta_<hash>/data/<uuid>.parquet"]}}}}]
-["connectorState",{"updated":{"bindingStates":{"tests%2Fcast_to_string_delta":{"previousCheckpoint":"7a60ee931eb4057c","currentCheckpoint":"d075ceace3972e7f","fileKeys":["s3://<bucket>/<prefix>/tests/cast_to_string_delta_<hash>/data/<uuid>.parquet"]},"tests%2Fdata_types_delta":{"previousCheckpoint":"7a60ee931eb4057c","currentCheckpoint":"d075ceace3972e7f","fileKeys":["s3://<bucket>/<prefix>/tests/data_types_delta_<hash>/data/<uuid>.parquet"]}}}}]
+["connectorState",{"updated":{"bindingStates":{"tests%2Fcast_to_string_delta":{},"tests%2Fdata_types_delta":{}}}}]
+["connectorState",{"updated":{"bindingStates":{"tests%2Fcast_to_string_delta":{"currentCheckpoint":"<checkpoint-1>","fileKeys":["s3://<bucket>/<prefix>/tests/cast_to_string_delta_<hash>/data/<uuid>.parquet"]},"tests%2Fdata_types_delta":{"currentCheckpoint":"<checkpoint-1>","fileKeys":["s3://<bucket>/<prefix>/tests/data_types_delta_<hash>/data/<uuid>.parquet"]}}}}]
+["connectorState",{"updated":{"bindingStates":{"tests%2Fcast_to_string_delta":{"currentCheckpoint":"<checkpoint-1>"},"tests%2Fdata_types_delta":{"currentCheckpoint":"<checkpoint-1>"}}}}]
+["connectorState",{"updated":{"bindingStates":{"tests%2Fcast_to_string_delta":{"currentCheckpoint":"<checkpoint-1>"},"tests%2Fdata_types_delta":{"currentCheckpoint":"<checkpoint-1>"}}}}]
+["connectorState",{"updated":{"bindingStates":{"tests%2Fcast_to_string_delta":{"currentCheckpoint":"<checkpoint-2>","fileKeys":["s3://<bucket>/<prefix>/tests/cast_to_string_delta_<hash>/data/<uuid>.parquet"],"previousCheckpoint":"<checkpoint-1>"},"tests%2Fdata_types_delta":{"currentCheckpoint":"<checkpoint-2>","fileKeys":["s3://<bucket>/<prefix>/tests/data_types_delta_<hash>/data/<uuid>.parquet"],"previousCheckpoint":"<checkpoint-1>"}}}}]
+["applied.actionDescription", ""]
+["connectorState",{"updated":{"bindingStates":{"tests%2Fcast_to_string_delta":{"currentCheckpoint":"<checkpoint-2>","previousCheckpoint":"<checkpoint-1>"},"tests%2Fdata_types_delta":{"currentCheckpoint":"<checkpoint-2>","previousCheckpoint":"<checkpoint-1>"}}}}]
+["connectorState",{"updated":{"bindingStates":{"tests%2Fcast_to_string_delta":{"currentCheckpoint":"<checkpoint-2>","previousCheckpoint":"<checkpoint-1>"},"tests%2Fdata_types_delta":{"currentCheckpoint":"<checkpoint-2>","previousCheckpoint":"<checkpoint-1>"}}}}]
 
 {"Name":"arrayField","Nullable":true,"Type":"variant"}
 {"Name":"boolField","Nullable":true,"Type":"boolean"}
@@ -55,11 +58,14 @@ Table Data:
 
 Resource: tests.cast_to_string_delta
 ["applied.actionDescription", "create table \"tests.data_types_delta\"\ncreate table \"tests.cast_to_string_delta\""]
-["connectorState",{"updated":{"bindingStates":{"tests%2Fcast_to_string_delta":{"fileKeys":null},"tests%2Fdata_types_delta":{"fileKeys":null}}}}]
-["connectorState",{"updated":{"bindingStates":{"tests%2Fcast_to_string_delta":{"currentCheckpoint":"7a60ee931eb4057c","fileKeys":["s3://<bucket>/<prefix>/tests/cast_to_string_delta_<hash>/data/<uuid>.parquet"]},"tests%2Fdata_types_delta":{"currentCheckpoint":"7a60ee931eb4057c","fileKeys":["s3://<bucket>/<prefix>/tests/data_types_delta_<hash>/data/<uuid>.parquet"]}}}}]
-["connectorState",{"updated":{"bindingStates":{"tests%2Fcast_to_string_delta":{"currentCheckpoint":"7a60ee931eb4057c","fileKeys":null},"tests%2Fdata_types_delta":{"currentCheckpoint":"7a60ee931eb4057c","fileKeys":null}}}}]
-["connectorState",{"updated":{"bindingStates":{"tests%2Fcast_to_string_delta":{"previousCheckpoint":"7a60ee931eb4057c","currentCheckpoint":"d075ceace3972e7f","fileKeys":["s3://<bucket>/<prefix>/tests/cast_to_string_delta_<hash>/data/<uuid>.parquet"]},"tests%2Fdata_types_delta":{"previousCheckpoint":"7a60ee931eb4057c","currentCheckpoint":"d075ceace3972e7f","fileKeys":["s3://<bucket>/<prefix>/tests/data_types_delta_<hash>/data/<uuid>.parquet"]}}}}]
-["connectorState",{"updated":{"bindingStates":{"tests%2Fcast_to_string_delta":{"previousCheckpoint":"7a60ee931eb4057c","currentCheckpoint":"d075ceace3972e7f","fileKeys":["s3://<bucket>/<prefix>/tests/cast_to_string_delta_<hash>/data/<uuid>.parquet"]},"tests%2Fdata_types_delta":{"previousCheckpoint":"7a60ee931eb4057c","currentCheckpoint":"d075ceace3972e7f","fileKeys":["s3://<bucket>/<prefix>/tests/data_types_delta_<hash>/data/<uuid>.parquet"]}}}}]
+["connectorState",{"updated":{"bindingStates":{"tests%2Fcast_to_string_delta":{},"tests%2Fdata_types_delta":{}}}}]
+["connectorState",{"updated":{"bindingStates":{"tests%2Fcast_to_string_delta":{"currentCheckpoint":"<checkpoint-1>","fileKeys":["s3://<bucket>/<prefix>/tests/cast_to_string_delta_<hash>/data/<uuid>.parquet"]},"tests%2Fdata_types_delta":{"currentCheckpoint":"<checkpoint-1>","fileKeys":["s3://<bucket>/<prefix>/tests/data_types_delta_<hash>/data/<uuid>.parquet"]}}}}]
+["connectorState",{"updated":{"bindingStates":{"tests%2Fcast_to_string_delta":{"currentCheckpoint":"<checkpoint-1>"},"tests%2Fdata_types_delta":{"currentCheckpoint":"<checkpoint-1>"}}}}]
+["connectorState",{"updated":{"bindingStates":{"tests%2Fcast_to_string_delta":{"currentCheckpoint":"<checkpoint-1>"},"tests%2Fdata_types_delta":{"currentCheckpoint":"<checkpoint-1>"}}}}]
+["connectorState",{"updated":{"bindingStates":{"tests%2Fcast_to_string_delta":{"currentCheckpoint":"<checkpoint-2>","fileKeys":["s3://<bucket>/<prefix>/tests/cast_to_string_delta_<hash>/data/<uuid>.parquet"],"previousCheckpoint":"<checkpoint-1>"},"tests%2Fdata_types_delta":{"currentCheckpoint":"<checkpoint-2>","fileKeys":["s3://<bucket>/<prefix>/tests/data_types_delta_<hash>/data/<uuid>.parquet"],"previousCheckpoint":"<checkpoint-1>"}}}}]
+["applied.actionDescription", ""]
+["connectorState",{"updated":{"bindingStates":{"tests%2Fcast_to_string_delta":{"currentCheckpoint":"<checkpoint-2>","previousCheckpoint":"<checkpoint-1>"},"tests%2Fdata_types_delta":{"currentCheckpoint":"<checkpoint-2>","previousCheckpoint":"<checkpoint-1>"}}}}]
+["connectorState",{"updated":{"bindingStates":{"tests%2Fcast_to_string_delta":{"currentCheckpoint":"<checkpoint-2>","previousCheckpoint":"<checkpoint-1>"},"tests%2Fdata_types_delta":{"currentCheckpoint":"<checkpoint-2>","previousCheckpoint":"<checkpoint-1>"}}}}]
 
 {"Name":"arrayField","Nullable":true,"Type":"variant"}
 {"Name":"boolField","Nullable":true,"Type":"boolean"}

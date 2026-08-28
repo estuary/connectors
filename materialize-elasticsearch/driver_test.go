@@ -23,7 +23,8 @@ func TestIntegration(t *testing.T) {
 	})
 
 	t.Run("materialize", func(t *testing.T) {
-		boilerplate.RunMaterializationTest(t, NewMaterializer, "testdata/materialize.flow.yaml", makeResourceFn, nil)
+		boilerplate.RunMaterializationTest(t, NewMaterializer, "testdata/materialize.flow.yaml", makeResourceFn, nil,
+			boilerplate.RuntimeConfig{Shards: 1})
 	})
 
 	t.Run("apply", func(t *testing.T) {
@@ -37,7 +38,8 @@ func TestIntegration(t *testing.T) {
 	// which differ from the Elasticsearch ones in the affected mapping types.
 	t.Run("opensearch", func(t *testing.T) {
 		t.Run("materialize", func(t *testing.T) {
-			boilerplate.RunMaterializationTest(t, NewMaterializer, "testdata/materialize.opensearch.flow.yaml", makeResourceFn, nil)
+			boilerplate.RunMaterializationTest(t, NewMaterializer, "testdata/materialize.opensearch.flow.yaml", makeResourceFn, nil,
+				boilerplate.RuntimeConfig{Shards: 1})
 		})
 
 		t.Run("apply", func(t *testing.T) {
