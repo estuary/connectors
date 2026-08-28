@@ -9,16 +9,27 @@ import (
 	"strings"
 
 	snowflake_auth "github.com/estuary/connectors/go/auth/snowflake"
+	"github.com/estuary/connectors/go/common"
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
 	log "github.com/sirupsen/logrus"
 	sf "github.com/snowflakedb/gosnowflake/v2"
 )
 
+const (
+	// flagSnowpipeStreaming enables Snowpipe streaming for delta-updates
+	// bindings that use JWT authentication.
+	flagSnowpipeStreaming = "snowpipe_streaming"
+	// flagSnowpipeStreamingV2 enables the high-performance Snowpipe Streaming
+	// architecture, via the Python SDK sidecar, for delta-updates bindings that
+	// use JWT authentication. It requires the v2 materialization runtime; see
+	// requireStreamingV2Runtime.
+	flagSnowpipeStreamingV2 = "snowpipe_streaming_v2"
+)
+
 var featureFlagDefaults = map[string]bool{
-	// Use Snowpipe streaming for delta-updates bindings that use JWT
-	// authentication.
-	"snowpipe_streaming":               true,
+	flagSnowpipeStreaming:              true,
+	flagSnowpipeStreamingV2:            false,
 	"datetime_keys_as_string":          true,
 	"retain_existing_data_on_backfill": false,
 	"native_binary_column_type":        true,
@@ -229,5 +240,40 @@ func (c config) Validate() error {
 		return err
 	}
 
+	if err := c.validateStreamingFlags(); err != nil {
+		return err
+	}
+
 	return validHost(c.Host)
+}
+
+// validateStreamingFlags rejects a configuration that asks for both Snowpipe
+// Streaming write paths, or that asks for the v2 path without the credentials it
+// authenticates its sidecar with.
+//
+// Only the flags the configuration sets are consulted, because
+// flagSnowpipeStreaming is enabled by default: an operator opting into v2
+// selects it by naming v2 alone, and that is the ordinary v2 configuration.
+func (c config) validateStreamingFlags() error {
+	// Nil defaults make the result contain exactly the flags this configuration
+	// sets, with the values it sets them to.
+	var configured = common.ParseFeatureFlags(c.Advanced.FeatureFlags, nil)
+
+	if configured[flagSnowpipeStreaming] && configured[flagSnowpipeStreamingV2] {
+		return fmt.Errorf(
+			"the %q and %q feature flags select different write paths for the same rows and cannot both be enabled: keep whichever one you intend and remove the other from the endpoint configuration's feature_flags",
+			flagSnowpipeStreaming, flagSnowpipeStreamingV2,
+		)
+	}
+
+	// The v2 sidecar authenticates to Snowflake with JWT credentials carry, so
+	// an endpoint authenticating any other way cannot run this write path.
+	if configured[flagSnowpipeStreamingV2] && (c.Credentials == nil || c.Credentials.AuthType != snowflake_auth.JWT) {
+		return fmt.Errorf(
+			"the %q feature flag requires key-pair (JWT) authentication, which this endpoint is not configured for: switch the endpoint's authentication to a key pair, or remove %q from the endpoint configuration's feature_flags",
+			flagSnowpipeStreamingV2, flagSnowpipeStreamingV2,
+		)
+	}
+
+	return nil
 }
