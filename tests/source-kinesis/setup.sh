@@ -6,7 +6,7 @@ export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:=test}"
 export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:=test}"
 export KINESIS_ENDPOINT="${KINESIS_ENDPOINT:=http://source-kinesis-db-1.flow-test:4566}"
 
-export TEST_STREAM="estuary-test-$(shuf -zer -n6 {a..z} | tr -d '\0')"
+export TEST_STREAM="estuary-test-stream"
 export RESOURCE="{ \"stream\": \"${TEST_STREAM}\" }"
 
 export KINESIS_LOCAL_ENDPOINT="http://localhost:4566"
@@ -29,10 +29,16 @@ echo "waiting for stream: $TEST_STREAM to exist"
 aws kinesis wait stream-exists --stream-name "$TEST_STREAM" --endpoint-url "${KINESIS_LOCAL_ENDPOINT}"
 echo "created stream: $TEST_STREAM"
 
+# The partition key is the record's line number rather than something random:
+# Kinesis hashes it to choose a shard, so a random key would scatter records
+# across shards differently on every run and the captured /_meta/source/shard
+# would never match the snapshot.
+line=0
 while IFS="" read -r doc || [ -n "$doc" ]; do
+    line=$((line + 1))
     aws --cli-binary-format base64 kinesis put-record \
         --stream-name "$TEST_STREAM" \
-        --partition-key "$(head -c 12 /dev/urandom | base64)" \
+        --partition-key "record-${line}" \
         --data "$(echo "$doc" | base64)" \
         --endpoint-url "${KINESIS_LOCAL_ENDPOINT}"
 done <tests/files/d.jsonl

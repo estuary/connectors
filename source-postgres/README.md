@@ -26,8 +26,8 @@ integration test which runs it as part of a Flow catalog as well:
 ## Build a local version of the connector image
 $ docker build --network=host -t ghcr.io/estuary/source-postgres:local -f source-postgres/Dockerfile .
 
-## Run the integration test
-$ CONNECTOR=source-postgres VERSION=local ./tests/run.sh
+## Smoke test the image
+$ CONNECTOR=source-postgres VERSION=local ./tests/smoke.sh
 ```
 
 ## Connector Usage
