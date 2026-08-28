@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -207,4 +208,48 @@ func runMaterializationTestForTaskV2[EC boilerplate.EndpointConfiger, FC boilerp
 	}
 
 	return snap.String()
+}
+
+// SanitizeCheckpointHashes returns an actionDescription sanitizer which rewrites
+// each distinct value of pattern's first capture group to `<placeholder-N>`,
+// numbered by order of first appearance.
+//
+// Some connectors derive a token by hashing the runtime checkpoint -- see
+// materialize-s3-iceberg's binding checkpoints and materialize-snowflake's
+// stream offset tokens. The checkpoint advances per transaction and covers the
+// randomized per-run task name, so these tokens are unique to both the
+// transaction and the run and cannot be snapshotted verbatim. Numbering by first
+// appearance keeps what they are there to demonstrate -- each transaction's
+// token is distinct, and a "previous" token equals the prior transaction's
+// "current" -- without the run-specific bytes.
+func SanitizeCheckpointHashes(pattern, placeholder string) func(string) string {
+	re := regexp.MustCompile(pattern)
+
+	return func(s string) string {
+		var (
+			seen = make(map[string]string)
+			out  strings.Builder
+			last int
+		)
+
+		for _, m := range re.FindAllStringSubmatchIndex(s, -1) {
+			if len(m) < 4 || m[2] < 0 {
+				continue // pattern matched, but its capture group did not
+			}
+
+			hash := s[m[2]:m[3]]
+			repl, ok := seen[hash]
+			if !ok {
+				repl = fmt.Sprintf("<%s-%d>", placeholder, len(seen)+1)
+				seen[hash] = repl
+			}
+
+			out.WriteString(s[last:m[2]])
+			out.WriteString(repl)
+			last = m[3]
+		}
+		out.WriteString(s[last:])
+
+		return out.String()
+	}
 }
