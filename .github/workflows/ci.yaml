@@ -102,6 +102,9 @@ jobs:
 
   build_connectors:
     runs-on: ubuntu-24.04
+    # Without this a wedged job runs to GitHub's six-hour default. The slowest
+    # connector observed is ~25m.
+    timeout-minutes: 60
     needs: [classify_changes, build_base_image, fetch_flow]
     if: needs.classify_changes.outputs.run == 'true'
     strategy:
@@ -309,6 +312,25 @@ jobs:
           # even when using a commit pseudo-version.
           GIT_LFS_SKIP_SMUDGE: 1
 
+      - name: Install system dependencies for Rust connectors
+        if: |
+          contains(fromJson('[
+            "materialize-kafka",
+            "source-kafka"
+            ]'), matrix.connector)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config cmake libssl-dev libsasl2-dev libclang-dev
+
+      # source-kafka's integration tests drive the connector as a local command
+      # against the broker and schema registry started above. They cover seven
+      # topic encodings and capture resumption, and are not run by the Docker
+      # build (which copies only src/).
+      - name: Rust Connector ${{ matrix.connector }} tests
+        if: matrix.connector == 'source-kafka'
+        timeout-minutes: 20
+        run: cargo test --locked --manifest-path source-kafka/Cargo.toml
+
       - name: Build ${{ matrix.connector }} Docker Image
         uses: docker/build-push-action@v6
         with:
@@ -360,12 +382,6 @@ jobs:
         uses: opt-nc/setup-duckdb-action@v1.2.9
         with:
           version: v1.3.1
-
-      - name: Install system dependencies for Rust connectors
-        if: matrix.connector == 'materialize-kafka'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y pkg-config cmake libssl-dev libsasl2-dev libclang-dev
 
       - name: Materialization connector ${{ matrix.connector }} integration tests
         if: startsWith(matrix.connector, 'materialize-')
