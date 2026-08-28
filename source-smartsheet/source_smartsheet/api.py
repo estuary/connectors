@@ -1,9 +1,10 @@
+import re
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime, timedelta
 from logging import Logger
 
 from estuary_cdk.capture.common import LogCursor, PageCursor
-from estuary_cdk.http import HTTPSession
+from estuary_cdk.http import HTTPError, HTTPSession
 from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
 from pydantic import BaseModel, JsonValue
 
@@ -25,6 +26,15 @@ def _format_rfc3339(dt: datetime) -> str:
     return dt.isoformat().replace("+00:00", "Z")
 
 
+LIST_PAGE_SIZE = 100
+
+# `GET /reports/{id}` intermittently rejects a well-formed request with
+# 400 / errorCode 1008 ("Unable to parse request."). Sometimes it clears on a
+# later attempt, sometimes the report is irretrievable — either way there is
+# nothing to fix on our side. Only ever observed on the first page.
+_UNFETCHABLE_REPORT_ATTEMPTS = 3
+
+
 # =============================================================================
 # List endpoints — `GET /sheets` and `GET /reports` share one envelope shape,
 # one page size, and one completion signal, so a single parametrized
@@ -33,8 +43,6 @@ def _format_rfc3339(dt: datetime) -> str:
 # remainder (`ListPageMeta`, which documents the per-endpoint pagination
 # quirks).
 # =============================================================================
-
-LIST_PAGE_SIZE = 100
 
 
 async def _stream_list_page[ItemT: BaseModel](
@@ -371,6 +379,10 @@ async def snapshot_reports(
         yield report
 
 
+def _is_unfetchable_report_error(err: HTTPError) -> bool:
+    return err.code == 400 and bool(re.search(r'"errorCode"\s*:\s*1008\b', err.message))
+
+
 async def snapshot_report_rows(
     http: HTTPSession, region: str, log: Logger
 ) -> AsyncGenerator[ReportRow, None]:
@@ -383,12 +395,40 @@ async def snapshot_report_rows(
 
     for report_id in report_ids:
         ctx = ReportIdValidationContext(report_id=report_id)
-        async for row in _iter_detail_rows(
-            http,
-            log,
-            ReportRow.build_url(region, report_id),
-            ReportRow,
-            DETAIL_PAGE_SIZE,
-            validation_context=ctx,
-        ):
-            yield row
+
+        for attempt in range(1, _UNFETCHABLE_REPORT_ATTEMPTS + 1):
+            emitted = False
+
+            try:
+                async for row in _iter_detail_rows(
+                    http,
+                    log,
+                    ReportRow.build_url(region, report_id),
+                    ReportRow,
+                    DETAIL_PAGE_SIZE,
+                    validation_context=ctx,
+                ):
+                    emitted = True
+                    yield row
+
+            except HTTPError as err:
+                # The `emitted` flag narrows our error tolerance to page-1
+                # fetches to match the observed failure scenario
+                if emitted or not _is_unfetchable_report_error(err):
+                    raise
+                if attempt == _UNFETCHABLE_REPORT_ATTEMPTS:
+                    log.warning(
+                        (
+                            "skipping report whose first page repeatedly failed "
+                            "with errorCode 1008: resource is unavailable"
+                        ),
+                        {
+                            "report_id": report_id,
+                            "attempts": attempt,
+                            "error": err.message,
+                        },
+                    )
+                    break
+                continue
+
+            break
