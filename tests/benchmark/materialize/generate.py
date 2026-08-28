@@ -3,7 +3,7 @@
 Materialization benchmark fixture generator.
 
 Reads a scenario YAML and emits newline-delimited JSON suitable for
-`flowctl preview --fixture`. Each transaction in the scenario is
+`flowctl raw preview-next --fixture`. Each transaction in the scenario is
 emitted as a sequence of [collection, document] lines terminated by
 {"commit": true}.
 

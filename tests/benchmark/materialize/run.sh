@@ -32,12 +32,10 @@
 #     [--shard-log-level L]  # task shards.logLevel, e.g. debug. The runtime
 #                            #   forces the connector's LOG_LEVEL from this, so
 #                            #   exporting LOG_LEVEL has no effect.
-#     [--shards N]           # default: 1. Above 1, the run switches from
-#                            #   `flowctl preview` to `flowctl raw preview-next
-#                            #   --shards N`, which drives N synthetic shards in
-#                            #   one process over the V2 runtime. Fixture
-#                            #   documents hash-route by collection key, so each
-#                            #   document lands on exactly one shard.
+#     [--shards N]           # default: 1. Drives N synthetic shards in one
+#                            #   process. Fixture documents hash-route by
+#                            #   collection key, so each document lands on
+#                            #   exactly one shard.
 
 set -o errexit
 set -o pipefail
@@ -72,7 +70,7 @@ while (($#)); do
     --shard-log-level) SHARD_LOG_LEVEL="$2"; shift 2 ;;
     --shards)    SHARDS="$2";    shift 2 ;;
     -h|--help)
-      sed -n '2,39p' "$0"; exit 0 ;;
+      sed -n '2,38p' "$0"; exit 0 ;;
     *) echo "unknown flag: $1" >&2; exit 2 ;;
   esac
 done
@@ -281,63 +279,31 @@ python3 "$BENCH_DIR/generate.py" \
   >"$OUT_DIR/generator.stderr" 2>&1 &
 GEN_PID=$!
 
-# Run flowctl preview, timing the whole thing.
+# Run the preview, timing the whole thing.
 PREVIEW_LOG="$OUT_DIR/preview.log"
 
 PREVIEW_ARGS=(
   --source  "$SPEC"
   --name    "$TASK"
   --fixture "$FIFO"
+  --shards  "$SHARDS"
 )
-# The runtime is chosen by the shard flag, not by the shard count. The
-# materialize-snowflake streaming-v2 gate reads enable-runtime-v2 off the spec
-# and cannot see which runtime actually drives it, so a spec carrying that flag
-# must run on preview-next at every shard count. Under V1 the connector takes
-# its v2 path against a runtime that cannot pair with it in production.
-RUNTIME_V2=0
-for flag in "${SHARD_FLAGS[@]+"${SHARD_FLAGS[@]}"}"; do
-  if [[ "$flag" == "enable-runtime-v2=true" ]]; then RUNTIME_V2=1; fi
-done
-
-if (( RUNTIME_V2 || SHARDS > 1 )); then
-  # The V2 runtime has no ["connectorState",...] output and none of V1's
-  # `round=` log lines. flowctl publishes one `transaction stats` line per
-  # round at info, which is what results.py times the transactions by, so info
-  # is all this needs. The task keeps its default warn level, which still
-  # forwards the connector's own warnings as `ops:` lines.
-  export RUST_LOG="info"
-  PREVIEW_CMD=(flowctl raw preview-next --shards "$SHARDS")
-  echo "running flowctl raw preview-next --shards $SHARDS (logs: $PREVIEW_LOG)"
-else
-  PREVIEW_CMD=(flowctl preview)
-  PREVIEW_ARGS+=(--output-state)
-  echo "running flowctl preview (logs: $PREVIEW_LOG)"
-fi
 # Docker mode needs --network so the connector container can reach the DB.
 if (( DOCKER )); then
   PREVIEW_ARGS+=(--network flow-test)
 fi
 
-# Pipe preview stdout through a timestamper. Each connectorState line from
-# flowctl marks a commit boundary. The first is Apply (DDL/table creation),
-# subsequent ones are data transactions. The timestamper records monotonic
-# nanosecond timestamps so we can compute per-transaction wall times and
-# exclude Apply from the data throughput measurement.
-TIMESTAMPS="$OUT_DIR/timestamps.json"
+# flowctl publishes one `transaction stats` line per round at info, which is
+# what results.py derives the transaction boundaries from. The task keeps its
+# default warn level, which still forwards the connector's own warnings as
+# `ops:` lines.
+export RUST_LOG="info"
+
+echo "running flowctl raw preview-next --shards $SHARDS (logs: $PREVIEW_LOG)"
 set +e
-"${PREVIEW_CMD[@]}" "${PREVIEW_ARGS[@]}" 2>"$PREVIEW_LOG" \
-  | python3 -c "
-import sys, time, json
-ts = [time.monotonic_ns()]  # ts[0] = start (before any data)
-for line in sys.stdin:
-    sys.stdout.write(line)
-    sys.stdout.flush()
-    if '\"connectorState\"' in line:
-        ts.append(time.monotonic_ns())
-with open('$TIMESTAMPS', 'w') as f:
-    json.dump(ts, f)
-" >"$OUT_DIR/preview.stdout"
-PREVIEW_RC=${PIPESTATUS[0]}
+flowctl raw preview-next "${PREVIEW_ARGS[@]}" \
+  >"$OUT_DIR/preview.stdout" 2>"$PREVIEW_LOG"
+PREVIEW_RC=$?
 set -e
 
 # If the generator is still alive (e.g., preview died early), it's blocked
@@ -349,10 +315,8 @@ wait $GEN_PID 2>/dev/null || true
 
 echo "preview exit: $PREVIEW_RC"
 
-# Build results.json from state log + per-commit timestamps.
-# timestamps.json has one entry per connectorState line: the first is Apply
-# (DDL), the rest are data transactions.
-python3 "$BENCH_DIR/results.py" "$STATE_LOG" "$TIMESTAMPS" "$PREVIEW_RC" "$CONNECTOR" "$SCENARIO" "$SEED" "$PREVIEW_LOG" >"$OUT_DIR/results.json"
+# Build results.json from the state log and the preview log's own timings.
+python3 "$BENCH_DIR/results.py" "$STATE_LOG" "$PREVIEW_RC" "$CONNECTOR" "$SCENARIO" "$SEED" "$PREVIEW_LOG" >"$OUT_DIR/results.json"
 
 echo "results: $OUT_DIR/results.json"
 
