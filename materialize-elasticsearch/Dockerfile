@@ -16,7 +16,6 @@ COPY flow-bin/flowctl-go /usr/local/bin/flowctl-go
 COPY go                        ./go
 COPY materialize-boilerplate   ./materialize-boilerplate
 COPY materialize-elasticsearch ./materialize-elasticsearch
-COPY testsupport               ./testsupport
 
 RUN go test -tags nozstd -v ./materialize-boilerplate/...
 RUN go test -tags nozstd -short -v ./materialize-elasticsearch/...
