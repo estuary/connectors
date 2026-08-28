@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::io::Write;
 use std::process::{Command, Stdio};
 use std::time::Duration;
@@ -6,6 +7,8 @@ use anyhow::Result;
 use apache_avro::types::{Record, Value};
 use apache_avro::Schema;
 use rdkafka::admin::{AdminClient, AdminOptions, NewTopic, TopicReplication};
+use rdkafka::client::DefaultClientContext;
+use rdkafka::consumer::{BaseConsumer, Consumer};
 use rdkafka::message::{Header, OwnedHeaders, ToBytes};
 use rdkafka::producer::{FutureProducer, FutureRecord};
 use rdkafka::ClientConfig;
@@ -35,35 +38,57 @@ fn http_client() -> reqwest::Client {
         .unwrap()
 }
 
-/// tests/test.flow.yaml, with the connector command rewritten to the binary
-/// cargo built for this run.
+/// A test catalog with the connector command rewritten to the binary cargo
+/// built for this run. `catalog()` is tests/test.flow.yaml; `catalog_for` takes
+/// any of the fixtures.
 ///
 /// The checked-in `cargo run` would nest a second cargo inside `cargo test`,
 /// which resolves features differently and so rebuilds what the other just
 /// built, while holding target/debug/.cargo-lock. Generating beside the
 /// original keeps its relative `import:` valid.
 fn catalog() -> &'static str {
-    static PATH: std::sync::OnceLock<String> = std::sync::OnceLock::new();
-    PATH.get_or_init(|| {
-        const GENERATED: &str = "tests/test.generated.flow.yaml";
-        let source = std::fs::read_to_string("tests/test.flow.yaml").unwrap();
+    catalog_for("tests/test.flow.yaml")
+}
 
-        let anchor = "        command:\n          - cargo\n          - run\n";
-        assert!(
-            source.contains(anchor),
-            "tests/test.flow.yaml no longer declares `cargo run` as the connector \
-             command; update catalog() to match",
-        );
-        let rewritten = source.replace(
-            anchor,
-            &format!(
-                "        command:\n          - {}\n",
-                env!("CARGO_BIN_EXE_source-kafka")
-            ),
-        );
-        std::fs::write(GENERATED, rewritten).unwrap();
-        GENERATED.to_string()
-    })
+/// Memoized per source path, so a fixture is rewritten once per test binary
+/// however many tests ask for it.
+fn catalog_for(source_path: &str) -> &'static str {
+    static PATHS: std::sync::OnceLock<std::sync::Mutex<HashMap<String, &'static str>>> =
+        std::sync::OnceLock::new();
+    let paths = PATHS.get_or_init(|| std::sync::Mutex::new(HashMap::new()));
+
+    let mut paths = paths.lock().unwrap();
+    if let Some(generated) = paths.get(source_path) {
+        return generated;
+    }
+
+    let generated = source_path.replace(".flow.yaml", ".generated.flow.yaml");
+    assert_ne!(
+        generated, source_path,
+        "expected a fixture named *.flow.yaml, got {source_path}",
+    );
+    let source = std::fs::read_to_string(source_path).unwrap();
+
+    let anchor = "        command:\n          - cargo\n          - run\n";
+    assert!(
+        source.contains(anchor),
+        "{source_path} no longer declares `cargo run` as the connector command; \
+         update catalog_for() to match",
+    );
+    let rewritten = source.replace(
+        anchor,
+        &format!(
+            "        command:\n          - {}\n",
+            env!("CARGO_BIN_EXE_source-kafka")
+        ),
+    );
+    std::fs::write(&generated, rewritten).unwrap();
+
+    // Leaked so the path can outlive this lock and be handed out as &'static.
+    // One leak per fixture per test binary.
+    let generated: &'static str = Box::leak(generated.into_boxed_str());
+    paths.insert(source_path.to_string(), generated);
+    generated
 }
 
 /// Run `program` under coreutils `timeout`, capturing output to files.
@@ -108,6 +133,117 @@ fn bounded_command(what: &str, secs: u64, program: &str, args: &[&str]) -> std::
 
     std::process::Output { status, stdout, stderr }
 }
+
+/// A child spawned by `spawn_bounded`, with its output going to files.
+///
+/// Files rather than pipes for the same reason `bounded_command` uses them: a
+/// grandchild holding the pipe blocks the read, and flowctl always spawns the
+/// connector as one.
+struct BoundedChild {
+    child: std::process::Child,
+    out_path: std::path::PathBuf,
+    err_path: std::path::PathBuf,
+    what: String,
+}
+
+impl BoundedChild {
+    fn stderr(&self) -> String {
+        std::fs::read_to_string(&self.err_path).unwrap_or_default()
+    }
+
+    /// Waits for exit and returns stdout, panicking if `timeout` had to fire.
+    fn wait(mut self) -> String {
+        let status = self
+            .child
+            .wait()
+            .unwrap_or_else(|e| panic!("failed to wait for {}: {e}", self.what));
+
+        let stdout = std::fs::read_to_string(&self.out_path).unwrap_or_default();
+        let stderr = self.stderr();
+        let _ = std::fs::remove_file(&self.out_path);
+        let _ = std::fs::remove_file(&self.err_path);
+
+        // `timeout` exits 124 when it had to fire.
+        if status.code() == Some(124) {
+            panic!("{} exceeded its timeout\n--- stderr ---\n{}", self.what, stderr);
+        }
+        assert!(status.success(), "{} exited {}:\n{}", self.what, status, stderr);
+        stdout
+    }
+}
+
+/// Spawn `program` under coreutils `timeout` without blocking, so the test can
+/// act while it runs. The blocking counterpart is `bounded_command`.
+fn spawn_bounded(what: &str, secs: u64, program: &str, args: &[&str]) -> BoundedChild {
+    let dir = std::env::temp_dir();
+    let stem = uuid::Uuid::new_v4();
+    let (out_path, err_path) = (
+        dir.join(format!("kafka-test-{stem}.out")),
+        dir.join(format!("kafka-test-{stem}.err")),
+    );
+    let out_file = std::fs::File::create(&out_path).unwrap();
+    let err_file = std::fs::File::create(&err_path).unwrap();
+
+    let child = Command::new("timeout")
+        .args(["--signal=TERM", "--kill-after=10", &secs.to_string(), program])
+        .args(args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::from(out_file))
+        .stderr(Stdio::from(err_file))
+        .spawn()
+        .unwrap_or_else(|e| panic!("failed to spawn {program} for {what}: {e}"));
+
+    BoundedChild { child, out_path, err_path, what: what.to_string() }
+}
+
+const JSON_RAW_DOC_PREFIX: &str = r#"["acmeCo/json-raw-topic","#;
+const ONLY_CHANGES_DOC_PREFIX: &str = r#"["acmeCo/only-changes-topic","#;
+const ONLY_CHANGES_TOPIC: &str = "only-changes-topic";
+
+fn kafka_clients() -> (AdminClient<DefaultClientContext>, FutureProducer, BaseConsumer) {
+    let config = || {
+        let mut c = ClientConfig::new();
+        c.set("bootstrap.servers", "localhost:9092")
+            .set("group.id", "source-kafka-tests");
+        c
+    };
+    (
+        config().create().unwrap(),
+        config().create().unwrap(),
+        config().create().unwrap(),
+    )
+}
+
+/// Deletion is asynchronous, so a recreate issued immediately can be serviced
+/// first and inherit the old messages. Hence the sleep.
+async fn recreate_topic(admin: &AdminClient<DefaultClientContext>, topic: &str, partitions: i32) {
+    let opts = AdminOptions::default().request_timeout(Some(Duration::from_secs(5)));
+
+    admin.delete_topics(&[topic], &opts).await.unwrap();
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    admin
+        .create_topics(
+            &[NewTopic::new(topic, partitions, TopicReplication::Fixed(1))],
+            &opts,
+        )
+        .await
+        .unwrap()
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+}
+
+fn end_offsets(consumer: &BaseConsumer, topic: &str, partitions: i32) -> HashMap<i32, i64> {
+    (0..partitions)
+        .map(|p| {
+            let (_low, high) = consumer
+                .fetch_watermarks(topic, p, Duration::from_secs(10))
+                .unwrap();
+            (p, high)
+        })
+        .collect()
+}
+
 
 #[test]
 #[serial_test::serial]
@@ -274,6 +410,232 @@ async fn test_capture_resume() {
         .join("\n");
 
     insta::assert_snapshot!(snap);
+}
+
+/// A binding with no saved state must skip everything already retained in the
+/// topic and capture only what arrives after it starts.
+///
+/// The other capture tests block on `.output()`, which cannot express this: a
+/// capture starting at the end of the partition has nothing to read from the
+/// fixture, so a run-to-completion invocation snapshots an empty document set
+/// whether or not the feature works. This spawns preview, produces while it
+/// runs, and asserts that exactly those messages come back.
+///
+/// It owns its topic rather than borrowing a shared fixture one, because the
+/// messages it produces would otherwise change what the other snapshot tests
+/// see depending on test order.
+#[tokio::test]
+#[serial_test::serial]
+async fn test_capture_only_changes() {
+    let topic = ONLY_CHANGES_TOPIC;
+    let partitions = 3;
+
+    let (admin, producer, consumer) = kafka_clients();
+    recreate_topic(&admin, topic, partitions).await;
+
+    // The retained history this capture must skip.
+    let enc = JsonRawTestDataEncoder::new();
+    for idx in 0..9 {
+        let (key, payload) = (
+            enc.key_for_idx(idx, topic).await,
+            enc.payload_for_idx(idx, topic).await,
+        );
+        send_message(topic, &key, Some(&payload), idx, partitions, &producer).await;
+    }
+
+    // Every emitted document must sit at or beyond its partition's end offset
+    // here. That is what "skipped the retained history" means, and it holds
+    // however long assignment takes.
+    let fixture_end = end_offsets(&consumer, topic, partitions);
+    assert!(
+        fixture_end.values().all(|&o| o > 0),
+        "the fixture was not produced, so this test could not detect a binding \
+         that failed to skip it: {:?}",
+        fixture_end
+    );
+
+    let child = spawn_bounded(
+        "test_capture_only_changes: flowctl raw preview-next",
+        180,
+        "flowctl",
+        &[
+            "--profile",
+            "local",
+            "raw",
+            "preview-next",
+            "--source",
+            catalog_for("tests/test.only-changes.flow.yaml"),
+            "--sessions",
+            "1",
+            "--delay",
+            "10s",
+            "--output-state",
+        ],
+    );
+
+    // A message produced before the assignment lands would sit behind the end
+    // offset and be skipped, leaving nothing to capture.
+    tokio::time::sleep(Duration::from_secs(5)).await;
+
+    for partition in 0..partitions {
+        let doc = json!({ "id": format!("post-start-{}", partition) }).to_string();
+        send_message(
+            topic,
+            doc.as_bytes(),
+            Some(doc.as_bytes()),
+            partition as usize,
+            partitions,
+            &producer,
+        )
+        .await;
+    }
+
+    // These messages are what ends the capture's single session, so a lost
+    // produce would hang the suite. Fail with a name instead.
+    let after = end_offsets(&consumer, topic, partitions);
+    assert!(
+        (0..partitions).all(|p| after[&p] > fixture_end[&p]),
+        "the post-start messages never reached the broker, so the capture has \
+         nothing to read and would not finish its session: {:?} then {:?}",
+        fixture_end,
+        after
+    );
+
+    let stdout = child.wait();
+    let stdout = stdout.as_str();
+
+    let docs: Vec<serde_json::Value> = stdout
+        .lines()
+        .filter(|l| l.starts_with(ONLY_CHANGES_DOC_PREFIX))
+        .map(|l| serde_json::from_str(l).unwrap())
+        .collect();
+
+    assert_eq!(
+        docs.len(),
+        partitions as usize,
+        "expected one document per partition:\n{}",
+        stdout
+    );
+
+    for doc in &docs {
+        let meta = &doc[1]["_meta"];
+        let (partition, offset) = (
+            meta["partition"].as_i64().unwrap() as i32,
+            meta["offset"].as_i64().unwrap(),
+        );
+        assert!(
+            offset >= fixture_end[&partition],
+            "captured partition {} at offset {}, behind its pre-capture end \
+             offset of {}, so retained history was not skipped:\n{}",
+            partition,
+            offset,
+            fixture_end[&partition],
+            doc
+        );
+    }
+
+    // The final state must also sit past the fixture, so a resumed task does
+    // not re-read the history this run skipped.
+    let state: serde_json::Value = stdout
+        .lines()
+        .filter(|l| l.starts_with(r#"["connectorState","#))
+        .last()
+        .map(|l| serde_json::from_str(l).unwrap())
+        .expect("preview must emit a connectorState line");
+
+    let saved = &state[1]["updated"]["bindingStateV1"][topic]["partitions"];
+    for partition in 0..partitions {
+        let offset = saved[partition.to_string()].as_i64().unwrap();
+        assert!(
+            offset >= fixture_end[&partition],
+            "saved offset {} for partition {} is behind the fixture end of {}:\n{}",
+            offset,
+            partition,
+            fixture_end[&partition],
+            state
+        );
+    }
+}
+
+/// Saved state takes precedence over the mode. A binding that has already run
+/// resumes from its stored offsets, which is what makes the setting safe to add
+/// to a running capture.
+#[tokio::test]
+#[serial_test::serial]
+async fn test_capture_only_changes_respects_saved_state() {
+    setup_test().await;
+
+    // Mid-fixture offsets, in the manner of test_capture_resume. If the mode
+    // were consulted here the connector would jump to the end of each partition
+    // and capture nothing.
+    let initial_state = json!({
+      "bindingStateV1": {
+        "json-raw-topic": {
+          "partitions": {
+            "0": 1,
+            "1": 1,
+            "2": 1
+          }
+        }
+      }
+    });
+
+    let output = bounded_command(
+        "test_capture_only_changes_respects_saved_state: flowctl raw preview-next",
+        180,
+        "flowctl",
+        &[
+            "--profile",
+            "local",
+            "raw",
+            "preview-next",
+            "--source",
+            catalog_for("tests/test.only-changes-saved-state.flow.yaml"),
+            "--sessions",
+            "1",
+            "--delay",
+            "2s",
+            "--output-state",
+            "--initial-state",
+            &initial_state.to_string(),
+        ],
+    );
+
+    assert!(
+        output.status.success(),
+        "the capture exited {}:
+{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    // The supplied state stops at offset 1 of each partition, so resuming reads
+    // offsets 2 and 3. Under the mode the binding would have jumped to the end
+    // and captured nothing at all.
+    let offsets: Vec<i64> = stdout
+        .lines()
+        .filter(|l| l.starts_with(JSON_RAW_DOC_PREFIX))
+        .map(|l| {
+            serde_json::from_str::<serde_json::Value>(l).unwrap()[1]["_meta"]["offset"]
+                .as_i64()
+                .unwrap()
+        })
+        .collect();
+
+    assert_eq!(
+        offsets.len(),
+        6,
+        "expected the remaining two messages from each of the three partitions, \
+         so the mode was ignored once state existed:\n{}",
+        stdout
+    );
+    assert!(
+        offsets.iter().all(|&o| o > 1),
+        "every resumed document must sit past the supplied offset of 1: {:?}",
+        offsets
+    );
 }
 
 async fn setup_test() {

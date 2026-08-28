@@ -186,6 +186,16 @@ expression: "serde_json::to_string_pretty(&got).unwrap()"
   "resourceConfigSchema": {
     "$schema": "https://json-schema.org/draft/2019-09/schema",
     "properties": {
+      "mode": {
+        "default": "",
+        "description": "Choose where this binding starts reading. Leave this empty to read the topic from its earliest retained message. Choose \"Only Changes\" to skip the retained history and capture only messages produced after the capture starts. If the binding has already run it resumes from where it left off and ignores this setting; increment its backfill counter to apply your choice again.",
+        "enum": [
+          "",
+          "Only Changes"
+        ],
+        "title": "Backfill Mode",
+        "type": "string"
+      },
       "topic": {
         "description": "Kafka topic to capture messages from.",
         "title": "Topic",

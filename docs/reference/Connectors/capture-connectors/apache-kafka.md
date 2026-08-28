@@ -143,6 +143,34 @@ See [connectors](../../../concepts/connectors.md#using-connectors) to learn more
 | Property        | Title     | Description                                    | Type   | Required/Default |
 | --------------- | --------- | ---------------------------------------------- | ------ | ---------------- |
 | **`/topic`**   | Stream    | Kafka topic name.                              | string | Required         |
+| `/mode`        | Backfill Mode | Where the binding starts reading. See [Starting position](#starting-position). | string | Default: `""` |
+
+### Starting position
+
+By default a binding reads every message still retained in the topic. For a
+topic with a long retention this can mean moving a large amount of history you
+do not need. To capture only new messages, set the binding's **Backfill Mode**
+to `Only Changes`, and each partition starts at its end offset instead.
+
+The mode applies only to a partition with no saved offset, so:
+
+- A binding that has already run resumes from its stored offsets and ignores the
+  mode. You can add the setting to a running capture without skipping
+  unprocessed data.
+- To apply the mode to a binding that has already run, increment that binding's
+  backfill counter. This gives the binding a new state key, so the connector
+  treats it as new.
+- A partition added after the capture starts follows the mode, so under
+  `Only Changes` it starts at its end offset rather than reading what it holds.
+
+Two Kafka settings that look like they should control this do not affect this
+connector. `auto.offset.reset` is only consulted for an unset or invalid offset
+under a consumer-group subscription, and this connector assigns partitions
+explicitly. Setting the consumer group's offset on the broker also does nothing,
+because the connector tracks offsets in Estuary's task state and never commits
+them to the broker. The `group.id` it sets exists only to satisfy the Kafka
+client library, which is why Kafka admin tooling shows that group with no
+committed offsets.
 
 ### Sample
 

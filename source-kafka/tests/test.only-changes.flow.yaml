@@ -1,0 +1,38 @@
+---
+# This test produces messages into its topic while the capture is running, so it
+# uses a topic of its own. Appending to a shared fixture topic would change what
+# the other capture tests snapshot, depending on test order.
+collections:
+  acmeCo/only-changes-topic:
+    schema:
+      type: object
+      required: [_meta]
+      properties:
+        _meta:
+          type: object
+          required: [partition, offset]
+          properties:
+            partition: { type: integer }
+            offset: { type: integer }
+      x-infer-schema: true
+    key:
+      - /_meta/partition
+      - /_meta/offset
+
+captures:
+  acmeCo/source-kafka:
+    endpoint:
+      local:
+        command:
+          - cargo
+          - run
+        config:
+          bootstrap_servers: "localhost:9092"
+          schema_registry:
+            schema_registry_type: no_schema_registry
+            enable_json_only: true
+    bindings:
+      - resource:
+          topic: only-changes-topic
+          mode: Only Changes
+        target: acmeCo/only-changes-topic

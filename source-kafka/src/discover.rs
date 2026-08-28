@@ -13,7 +13,7 @@ use schemars::schema::RootSchema;
 use serde_json::json;
 
 use crate::{
-    configuration::{EndpointConfig, Resource, SchemaRegistryConfig},
+    configuration::{BackfillMode, EndpointConfig, Resource, SchemaRegistryConfig},
     protobuf::protobuf_key_schema_to_shape,
     schema_registry::{RegisteredSchema, SchemaRegistryClient, TopicSchema},
     KAFKA_METADATA_TIMEOUT,
@@ -77,6 +77,7 @@ pub async fn do_discover(req: Discover) -> Result<Vec<discovered::Binding>> {
                 recommended_name: topic.to_owned(),
                 resource_config_json: serde_json::to_string(&Resource {
                     topic: topic.to_owned(),
+                    mode: BackfillMode::default(),
                 })
                 .expect("resource config must serialize").into(),
                 document_schema_json: serde_json::to_string(&collection_schema)

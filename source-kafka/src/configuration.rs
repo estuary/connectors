@@ -474,14 +474,91 @@ impl EndpointConfig {
     }
 }
 
+/// Where a binding begins reading when a partition has no saved offset. Named
+/// and valued to match the `mode` field of the SQL CDC captures, so "Only
+/// Changes" carries the same meaning across connectors.
+#[derive(Serialize, Clone, Copy, Default, PartialEq, Debug, JsonSchema)]
+pub enum BackfillMode {
+    #[serde(rename = "")]
+    #[default]
+    Automatic,
+    #[serde(rename = "Only Changes")]
+    OnlyChanges,
+}
+
+// Derived deserialization reports an unknown value as `unknown variant`, which
+// renders the empty default as an unhelpful pair of backticks. Spell out the
+// accepted values instead, so a typo fails at publish with a message that says
+// what to write.
+fn deserialize_mode<'de, D>(deserializer: D) -> Result<BackfillMode, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    match String::deserialize(deserializer)?.as_str() {
+        "" => Ok(BackfillMode::Automatic),
+        "Only Changes" => Ok(BackfillMode::OnlyChanges),
+        other => Err(de::Error::custom(format!(
+            "invalid backfill mode {:?}: expected \"\" (read the topic from the beginning) \
+             or \"Only Changes\" (capture only new messages)",
+            other
+        ))),
+    }
+}
+
 #[derive(Serialize, Deserialize, JsonSchema)]
 pub struct Resource {
     #[schemars(title = "Topic", description = "Kafka topic to capture messages from.")]
     pub topic: String,
+
+    #[serde(default, deserialize_with = "deserialize_mode")]
+    #[schemars(
+        title = "Backfill Mode",
+        description = "Choose where this binding starts reading. Leave this empty to read the \
+                       topic from its earliest retained message. Choose \"Only Changes\" to skip \
+                       the retained history and capture only messages produced after the capture \
+                       starts. If the binding has already run it resumes from where it left off \
+                       and ignores this setting; increment its backfill counter to apply your \
+                       choice again."
+    )]
+    pub mode: BackfillMode,
 }
 
 pub fn schema_for<T: JsonSchema>() -> RootSchema {
     schemars::gen::SchemaSettings::draft2019_09()
+        .with(|s| s.inline_subschemas = true)
         .into_generator()
         .into_root_schema_for::<T>()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse_mode(mode: &str) -> Result<BackfillMode, serde_json::Error> {
+        serde_json::from_value::<Resource>(serde_json::json!({"topic": "t", "mode": mode}))
+            .map(|r| r.mode)
+    }
+
+    #[test]
+    fn backfill_mode_accepts_the_documented_values() {
+        assert_eq!(parse_mode("").unwrap(), BackfillMode::Automatic);
+        assert_eq!(parse_mode("Only Changes").unwrap(), BackfillMode::OnlyChanges);
+
+        // An absent field is the default, so adding the property does not change
+        // how an already-published binding deserializes.
+        let res: Resource = serde_json::from_value(serde_json::json!({"topic": "t"})).unwrap();
+        assert_eq!(res.mode, BackfillMode::Automatic);
+    }
+
+    #[test]
+    fn backfill_mode_rejects_anything_else() {
+        // Deserialization is what `do_validate` runs, so a typo fails the
+        // Validate RPC at publish rather than falling through to a full read.
+        let err = parse_mode("only changes").unwrap_err().to_string();
+        assert!(
+            err.contains("invalid backfill mode") && err.contains("Only Changes"),
+            "the error must name the accepted values, got: {}",
+            err
+        );
+    }
 }

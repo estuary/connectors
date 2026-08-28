@@ -1,5 +1,7 @@
 use crate::{
-    configuration::{EndpointConfig, FlowConsumerContext, Resource, SchemaRegistryConfig},
+    configuration::{
+        BackfillMode, EndpointConfig, FlowConsumerContext, Resource, SchemaRegistryConfig,
+    },
     document::MergeSerializer,
     schema_registry::{RegisteredSchema, SchemaRegistryClient},
     write_capture_response,
@@ -307,10 +309,20 @@ async fn setup_consumer(
                 continue;
             }
 
+            // A saved offset always wins, which is what makes `mode` inert for a
+            // binding that has already run.
             let offset = match resource_state.partitions.get(&partition) {
                 Some(o) => Offset::Offset(*o + 1), // Don't read the same offset again.
-                None => Offset::Beginning,
+                None => match res.mode {
+                    BackfillMode::Automatic => Offset::Beginning,
+                    BackfillMode::OnlyChanges => Offset::End,
+                },
             };
+            // The broker resolves `Beginning` and `End` at fetch time, so this
+            // logs the requested position rather than a number. The mode is
+            // logged with it because that is the question support has when a
+            // binding read history it should have skipped.
+            tracing::info!(topic, partition, start = ?offset, mode = ?res.mode, "assigned partition");
             topic_partition_list.add_partition_offset(topic, partition, offset)?;
         }
 

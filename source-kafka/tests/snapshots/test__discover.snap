@@ -66,6 +66,7 @@ expression: snap
   ],
   "recommendedName": "avro-ref-topic",
   "resourceConfig": {
+    "mode": "",
     "topic": "avro-ref-topic"
   },
   "resourcePath": [
@@ -152,6 +153,7 @@ expression: snap
   ],
   "recommendedName": "avro-topic",
   "resourceConfig": {
+    "mode": "",
     "topic": "avro-topic"
   },
   "resourcePath": [
@@ -222,6 +224,7 @@ expression: snap
   ],
   "recommendedName": "json-raw-topic",
   "resourceConfig": {
+    "mode": "",
     "topic": "json-raw-topic"
   },
   "resourcePath": [
@@ -309,6 +312,7 @@ expression: snap
   ],
   "recommendedName": "json-schema-topic",
   "resourceConfig": {
+    "mode": "",
     "topic": "json-schema-topic"
   },
   "resourcePath": [
@@ -382,6 +386,7 @@ expression: snap
   ],
   "recommendedName": "protobuf-ref-topic",
   "resourceConfig": {
+    "mode": "",
     "topic": "protobuf-ref-topic"
   },
   "resourcePath": [
@@ -468,6 +473,7 @@ expression: snap
   ],
   "recommendedName": "protobuf-topic",
   "resourceConfig": {
+    "mode": "",
     "topic": "protobuf-topic"
   },
   "resourcePath": [
@@ -541,6 +547,7 @@ expression: snap
   ],
   "recommendedName": "protobuf-wkt-topic",
   "resourceConfig": {
+    "mode": "",
     "topic": "protobuf-wkt-topic"
   },
   "resourcePath": [
