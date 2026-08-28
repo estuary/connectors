@@ -318,7 +318,16 @@ jobs:
           build-args: BASE_IMAGE=ghcr.io/estuary/base-image:${{ steps.prep.outputs.tag }}
           tags: ghcr.io/estuary/${{ matrix.connector }}:local
 
-      - name: Source connector ${{ matrix.connector }} integration tests
+      # Fetch the spec from the built image, to catch images which are entirely
+      # broken. This is the only image-level coverage for connectors whose real
+      # tests drive the connector as a local command or in-process driver.
+      #
+      # TODO(johnny): ungate this step so it runs for every connector in the
+      # matrix. The gate below is conservatism to keep the scope of the
+      # preview-next test migration small, not a statement that other
+      # connectors' images don't merit a smoke test -- they do, and the check
+      # costs about a second.
+      - name: Source connector ${{ matrix.connector }} image smoke test
         if: |
           contains(fromJson('[
             "source-dynamodb",
@@ -331,9 +340,18 @@ jobs:
             "source-sftp",
             "source-sqlserver"
             ]'), matrix.connector)
+        run: CONNECTOR=${{ matrix.connector }} VERSION=local ./tests/smoke.sh;
+
+      - name: Source connector ${{ matrix.connector }} integration tests
+        if: |
+          contains(fromJson('[
+            "source-gcs",
+            "source-kinesis",
+            "source-s3",
+            "source-sftp"
+            ]'), matrix.connector)
         env:
           GCP_SERVICE_ACCOUNT_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
-          MYSQL_DATABASE: test
 
         run: CONNECTOR=${{ matrix.connector }} VERSION=local ./tests/run.sh;
 

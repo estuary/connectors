@@ -82,9 +82,10 @@ It's usually not necessary to build a Docker image locally, but you can with:
 $ docker build --network=host -f source-mysql/Dockerfile -t ghcr.io/estuary/source-mysql:local .
 ```
 
-There's also an integration test which runs automatically as part of a CI build,
-and which can be run locally by first building the Docker image and then running:
+There's also a smoke test of the built image which runs automatically as part of
+a CI build, and which can be run locally by first building the Docker image and
+then running:
 
 ```bash
-$ CONNECTOR=source-mysql VERSION=local ./tests/run.sh
+$ CONNECTOR=source-mysql VERSION=local ./tests/smoke.sh
 ```
