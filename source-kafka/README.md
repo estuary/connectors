@@ -85,44 +85,33 @@ It supports two [estuary.dev](estuary.dev) extensions to the spec:
 
 #### Local Kafka
 
-You'll need to make sure you have a local Kafka cluster running. This is most
-easily done by using the `infra` tools from the top level of the
-`estuary/connectors` repo.
+The `docker-compose.yaml` in this directory launches a Kafka broker on port 9092
+and a Confluent schema registry on port 8081. Both are needed by the integration
+tests.
+
+The compose file joins an external network named `flow-test`, so create it first
+if it does not already exist:
 
 ```bash
-make start_local_infra
+docker network create flow-test
 ```
 
-This will launch a dockerized Kafka + Zookeeper instance and expose a client listener on port 9092.
-
-#### Mac M1
-
-In order to build this connector on an M1 Mac, you will need to install the
-following packages and make sure their libraries are linked:
-
-```
-brew install openssl
-brew link openssl --force
-brew install librdkafka
+```bash
+docker compose up -d
 ```
 
-You will then need to change the `Cargo.toml` file to use `dynamic-linking` for
-`rdkafka` instead of `cmake-build`:
+#### Build dependencies
 
-```
-#rdkafka = { version = "0.26", features = ["cmake-build", "gssapi", "libz", "sasl", "ssl"], default-features = false }
-rdkafka = { version = "0.29", features = ["dynamic-linking", "gssapi", "libz", "sasl", "ssl"], default-features = false }
-```
+`rdkafka` is built from source via its `cmake-build` feature, so you need
+`cmake` on your PATH:
 
-Moreover, you need to switch to a `vendored` installation of `sasl2-sys`, so add
-the following to `Cargo.toml`:
-
-```
-sasl2-sys = { version = "0.1.14", features = ["vendored" ] }
+```bash
+brew install cmake
 ```
 
-You should now be able to build this connector locally. Note that you should not
-commit these changes to your pull-request.
+No other setup is required, on Apple Silicon included. Do not switch `rdkafka`
+to `dynamic-linking` or vendor `sasl2-sys`; the committed `Cargo.toml` builds as
+it stands.
 
 #### Install `kafkactl`
 
@@ -164,8 +153,11 @@ cargo test --lib
 
 To run the integration tests which connect to Kafka:
 
+These need the broker and schema registry from [Local Kafka](#local-kafka)
+running, and `flowctl` on your PATH. The tests create their own topics and
+fixtures.
+
 ```bash
 cd path/to/estuary/connectors/source-kafka
-make test_setup
 cargo test
 ```
