@@ -113,6 +113,23 @@ func TestConfigValidate(t *testing.T) {
 		require.ErrorContains(t, cfg.Validate(), "missing 'aws_region'")
 	})
 
+	t.Run("AzureIAMValid", func(t *testing.T) {
+		var cfg = valid()
+		cfg.Credentials = &CredentialsConfig{AuthType: AzureIAM}
+		cfg.Credentials.AzureClientID = "11111111-2222-3333-4444-555555555555"
+		cfg.Credentials.AzureTenantID = "66666666-7777-8888-9999-000000000000"
+
+		require.NoError(t, cfg.Validate())
+	})
+
+	t.Run("AzureIAMMissingClientID", func(t *testing.T) {
+		var cfg = valid()
+		cfg.Credentials = &CredentialsConfig{AuthType: AzureIAM}
+		cfg.Credentials.AzureTenantID = "66666666-7777-8888-9999-000000000000"
+
+		require.ErrorContains(t, cfg.Validate(), "missing 'azure_client_id'")
+	})
+
 	t.Run("UnknownAuthType", func(t *testing.T) {
 		var cfg = valid()
 		cfg.Credentials = &CredentialsConfig{AuthType: "Bogus"}
@@ -142,6 +159,33 @@ func TestAWSIAMConfigURI(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t,
 		"sqlserver://flow_capture@example.rds.amazonaws.com:1433?TrustServerCertificate=true&app+name=Flow+CDC+Connector&database=flow&encrypt=true",
+		uri)
+}
+
+func TestAzureIAMConfigURI(t *testing.T) {
+	var cfg = Config{
+		Address:  "example.database.windows.net",
+		User:     "flow_capture",
+		Database: "flow",
+		Credentials: &CredentialsConfig{
+			AuthType: AzureIAM,
+			IAMConfig: iam.IAMConfig{
+				AzureConfig: iam.AzureConfig{
+					AzureClientID: "11111111-2222-3333-4444-555555555555",
+					AzureTenantID: "66666666-7777-8888-9999-000000000000",
+				},
+			},
+		},
+	}
+	cfg.SetDefaults()
+	cfg.normalizeCredentials()
+
+	// The DSN carries no user info at all: the Entra access token supplied
+	// out-of-band identifies the principal.
+	uri, err := cfg.ToURI()
+	require.NoError(t, err)
+	require.Equal(t,
+		"sqlserver://example.database.windows.net:1433?TrustServerCertificate=true&app+name=Flow+CDC+Connector&database=flow&encrypt=true",
 		uri)
 }
 
