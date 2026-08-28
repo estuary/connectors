@@ -1,0 +1,16 @@
+sql> CREATE TABLE test.unusabletables_515223_float (f FLOAT8 PRIMARY KEY, v TEXT)
+sql> CREATE TABLE test.unusabletables_515223_decimal (d DECIMAL(10,2) PRIMARY KEY, v TEXT)
+sql> CREATE TABLE test.unusabletables_515223_multifam (id INTEGER PRIMARY KEY, a TEXT, b TEXT, FAMILY f1 (id, a), FAMILY f2 (b))
+=== Discover: Discover ===
+acmeCo/test_capture/test/unusabletables_515223_decimal
+acmeCo/test_capture/test/unusabletables_515223_float
+acmeCo/test_capture/test/unusabletables_515223_multifam
+sql> INSERT INTO test.unusabletables_515223_float VALUES (1.5, 'a')
+=== Run: Attempt Capture ===
+error: flowctl preview failed:
+the capture cannot run due to the following error(s):
+ - cannot capture table "test.unusabletables_515223_decimal": primary key column "d" has floating-point type "numeric", which cannot be used as a collection key
+ - cannot capture table "test.unusabletables_515223_float": primary key column "f" has floating-point type "float8", which cannot be used as a collection key
+ - cannot capture table "test.unusabletables_515223_multifam": it has 2 column families and changefeeds on multi-column-family tables are not supported
+
+

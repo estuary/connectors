@@ -171,3 +171,4 @@ skip_state
 fail_after
 exit_after
 rediscovery_interval
+resolved_interval

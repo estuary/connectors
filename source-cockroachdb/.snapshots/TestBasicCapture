@@ -1,0 +1,124 @@
+sql> CREATE TABLE test.basiccapture_884124 (id INTEGER PRIMARY KEY, name TEXT, value INTEGER)
+=== Discover: Discover ===
+acmeCo/test_capture/test/basiccapture_884124
+sql> INSERT INTO test.basiccapture_884124 VALUES (1, 'alice', 10), (2, 'bob', 20)
+=== Run: Initial Backfill ===
+[
+  "acmeCo/test_capture/test/basiccapture_884124",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "basiccapture_884124"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 1,
+    "name": "alice",
+    "value": 10
+  }
+]
+[
+  "acmeCo/test_capture/test/basiccapture_884124",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "basiccapture_884124"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 2,
+    "name": "bob",
+    "value": 20
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fbasiccapture_884124": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO test.basiccapture_884124 VALUES (3, 'carol', 30)
+sql> UPDATE test.basiccapture_884124 SET value = 99 WHERE id = 1
+sql> DELETE FROM test.basiccapture_884124 WHERE id = 2
+=== Run: Replication ===
+[
+  "acmeCo/test_capture/test/basiccapture_884124",
+  {
+    "_meta": {
+      "op": "u",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "basiccapture_884124",
+        "ts_ms": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 1,
+    "name": "alice",
+    "value": 99
+  }
+]
+[
+  "acmeCo/test_capture/test/basiccapture_884124",
+  {
+    "_meta": {
+      "op": "d",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "basiccapture_884124",
+        "ts_ms": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/test/basiccapture_884124",
+  {
+    "_meta": {
+      "op": "u",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "basiccapture_884124",
+        "ts_ms": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 3,
+    "name": "carol",
+    "value": 30
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fbasiccapture_884124": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

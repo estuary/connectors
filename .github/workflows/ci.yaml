@@ -113,6 +113,7 @@ jobs:
         connector:
           - source-alpaca
           - source-bigquery-batch
+          - source-cockroachdb
           - source-db2-batch
           - source-dropbox
           - source-dynamodb
@@ -235,6 +236,7 @@ jobs:
       - name: Start Dockerized test infrastructure
         if: |
           contains(fromJson('[
+            "source-cockroachdb",
             "source-db2-batch",
             "source-dynamodb",
             "source-kafka",
@@ -290,6 +292,7 @@ jobs:
       - name: Go Connector ${{ matrix.connector }} Database Tests
         if: |
           contains(fromJson('[
+            "source-cockroachdb",
             "source-ga4-bigquery",
             "source-postgres",
             "source-redshift-batch",

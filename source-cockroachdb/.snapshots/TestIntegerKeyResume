@@ -1,0 +1,87 @@
+sql> CREATE TABLE test.integerkeyresume_277393 (id INTEGER PRIMARY KEY, v TEXT)
+=== Discover: Discover ===
+acmeCo/test_capture/test/integerkeyresume_277393
+sql> INSERT INTO test.integerkeyresume_277393 VALUES (-5,'neg'), (0,'zero'), (7,'seven'), (9223372036854775807,'max')
+=== Run: Backfill Chunked ===
+[
+  "acmeCo/test_capture/test/integerkeyresume_277393",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "integerkeyresume_277393"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": -5,
+    "v": "neg"
+  }
+]
+[
+  "acmeCo/test_capture/test/integerkeyresume_277393",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "integerkeyresume_277393"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 0,
+    "v": "zero"
+  }
+]
+[
+  "acmeCo/test_capture/test/integerkeyresume_277393",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "integerkeyresume_277393"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 7,
+    "v": "seven"
+  }
+]
+[
+  "acmeCo/test_capture/test/integerkeyresume_277393",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "integerkeyresume_277393"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 9223372036854775807,
+    "v": "max"
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fintegerkeyresume_277393": {
+      "backfilled": 4,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+
