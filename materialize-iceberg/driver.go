@@ -177,7 +177,7 @@ func (d *materialization) Config() boilerplate.MaterializeCfg {
 			ExtendedLogging: true,
 			AckSchedule: &m.AckScheduleOption{
 				Config: d.cfg.Schedule,
-				Jitter: []byte(d.cfg.Compute.ApplicationId),
+				Jitter: []byte(d.materializationName),
 			},
 			DBTJobTrigger: &d.cfg.DBTJobTrigger,
 		},
