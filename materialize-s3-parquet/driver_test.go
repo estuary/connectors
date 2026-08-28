@@ -44,7 +44,7 @@ func TestIntegration(t *testing.T) {
 	// Drive the connector with test data.
 	boilerplate.RunFlowctl(
 		t,
-		"preview",
+		"raw", "preview-next",
 		"--source", "testdata/test.flow.yaml",
 		"--fixture", "testdata/fixture.json",
 		"--name", "acmeCo/tests/materialize-s3-parquet",

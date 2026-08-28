@@ -169,7 +169,8 @@ func TestIntegration(t *testing.T) {
 	}
 
 	t.Run("materialize", func(t *testing.T) {
-		boilerplate.RunMaterializationTestParallel(t, NewMaterializer, materializeSpec, makeResourceFn, actionDescSanitizers)
+		boilerplate.RunMaterializationTestParallel(t, NewMaterializer, materializeSpec, makeResourceFn, actionDescSanitizers,
+			boilerplate.RuntimeConfig{Shards: 1})
 	})
 
 	t.Run("apply", func(t *testing.T) {

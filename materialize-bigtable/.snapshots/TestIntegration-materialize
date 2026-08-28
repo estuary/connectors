@@ -6,6 +6,7 @@ Resource: simple_standard
 ["connectorState",{"updated":{"committed_timestamp":2000}}]
 ["connectorState",{"updated":{"committed_timestamp":3000}}]
 ["connectorState",{"updated":{"committed_timestamp":4000}}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{"committed_timestamp":4000}}]
 
 
@@ -29,6 +30,7 @@ Resource: not_simple
 ["connectorState",{"updated":{"committed_timestamp":2000}}]
 ["connectorState",{"updated":{"committed_timestamp":3000}}]
 ["connectorState",{"updated":{"committed_timestamp":4000}}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{"committed_timestamp":4000}}]
 
 
@@ -43,6 +45,7 @@ Resource: data_types
 ["connectorState",{"updated":{"committed_timestamp":2000}}]
 ["connectorState",{"updated":{"committed_timestamp":3000}}]
 ["connectorState",{"updated":{"committed_timestamp":4000}}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{"committed_timestamp":4000}}]
 
 
@@ -60,6 +63,7 @@ Resource: simple_standard
 ["connectorState",{"updated":{"committed_timestamp":2000}}]
 ["connectorState",{"updated":{"committed_timestamp":3000}}]
 ["connectorState",{"updated":{"committed_timestamp":4000}}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{"committed_timestamp":4000}}]
 
 
@@ -80,6 +84,7 @@ Resource: not_simple
 ["connectorState",{"updated":{"committed_timestamp":2000}}]
 ["connectorState",{"updated":{"committed_timestamp":3000}}]
 ["connectorState",{"updated":{"committed_timestamp":4000}}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{"committed_timestamp":4000}}]
 
 
@@ -94,6 +99,7 @@ Resource: data_types
 ["connectorState",{"updated":{"committed_timestamp":2000}}]
 ["connectorState",{"updated":{"committed_timestamp":3000}}]
 ["connectorState",{"updated":{"committed_timestamp":4000}}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{"committed_timestamp":4000}}]
 
 

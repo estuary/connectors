@@ -20,7 +20,8 @@ func TestIntegration(t *testing.T) {
 	}
 
 	t.Run("materialize", func(t *testing.T) {
-		sql.RunMaterializationTest(t, sqlDriver, "testdata/materialize.flow.yaml", makeResourceFn, nil)
+		sql.RunMaterializationTest(t, sqlDriver, "testdata/materialize.flow.yaml", makeResourceFn, nil,
+			sql.RuntimeConfig{Shards: 1})
 	})
 
 	t.Run("apply", func(t *testing.T) {

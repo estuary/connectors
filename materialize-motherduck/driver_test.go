@@ -94,7 +94,8 @@ func runIntegrationSuite(t *testing.T, variant integrationVariant) {
 	requireDatabaseFormat(t, variant)
 
 	t.Run("materialize", func(t *testing.T) {
-		sql.RunMaterializationTest(t, NewDriver(), variant.materializeSpec, makeTestResource, nil)
+		sql.RunMaterializationTest(t, NewDriver(), variant.materializeSpec, makeTestResource, nil,
+			sql.RuntimeConfig{Shards: 1})
 	})
 
 	t.Run("apply", func(t *testing.T) {

@@ -6,6 +6,7 @@ Resource: ci_testing.main.simple_standard
 ["connectorState",{}]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"Name":"_meta/op","Nullable":false,"Type":"VARCHAR"}
@@ -32,6 +33,7 @@ Resource: ci_testing.main.simple_delta
 ["connectorState",{}]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"Name":"_meta/op","Nullable":false,"Type":"VARCHAR"}
@@ -64,6 +66,7 @@ Resource: ci_testing.main.not_simple
 ["connectorState",{}]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"Name":" ,;{}().- problematicField � 𐀀 嶲 ","Nullable":true,"Type":"VARCHAR"}
@@ -97,6 +100,7 @@ Resource: ci_testing.main.data_types
 ["connectorState",{}]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"Name":"arrayField","Nullable":true,"Type":"JSON"}
@@ -151,6 +155,7 @@ Resource: ci_testing.main.simple_standard
 ["connectorState",{}]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"Name":"_meta/op","Nullable":false,"Type":"VARCHAR"}
@@ -177,6 +182,7 @@ Resource: ci_testing.main.simple_delta
 ["connectorState",{}]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"Name":"_meta/op","Nullable":false,"Type":"VARCHAR"}
@@ -209,6 +215,7 @@ Resource: ci_testing.main.not_simple
 ["connectorState",{}]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"Name":" ,;{}().- problematicField � 𐀀 嶲 ","Nullable":true,"Type":"VARCHAR"}
@@ -242,6 +249,7 @@ Resource: ci_testing.main.data_types
 ["connectorState",{}]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"Name":"arrayField","Nullable":true,"Type":"JSON"}

@@ -50,7 +50,8 @@ func TestIntegration(t *testing.T) {
 	})
 
 	t.Run("materialize", func(t *testing.T) {
-		sql.RunMaterializationTest(t, NewDriver(), "testdata/materialize.flow.yaml", makeResourceFn, nil)
+		sql.RunMaterializationTest(t, NewDriver(), "testdata/materialize.flow.yaml", makeResourceFn, nil,
+			sql.RuntimeConfig{Shards: 1})
 	})
 
 	t.Run("apply", func(t *testing.T) {
@@ -177,7 +178,7 @@ func TestIntegration(t *testing.T) {
 				// none of the fields are in the materialized collection.
 				boilerplate.RunFlowctl(
 					t,
-					"preview",
+					"raw", "preview-next",
 					"--name", taskName,
 					"--source", "testdata/apply-changes.flow.yaml",
 					"--fixture", "testdata/fixture.empty.json",

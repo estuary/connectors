@@ -171,7 +171,7 @@ func RunMaterializationTest[EC boilerplate.EndpointConfiger, FC boilerplate.Fiel
 	sourcePath string,
 	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
 	actionDescSanitizers []func(string) string,
-	v2 ...RuntimeV2Config,
+	runtime RuntimeConfig,
 ) {
 	ctx := context.Background()
 	var snap strings.Builder
@@ -179,49 +179,10 @@ func RunMaterializationTest[EC boilerplate.EndpointConfiger, FC boilerplate.Fiel
 
 	RunTestAllTasks(t, sourcePath, func(t *testing.T, bundled []byte, taskName string, cfg EC) {
 		snap.WriteString(fmt.Sprintf("Task: %s\n\n", taskName))
-		if len(v2) > 0 {
-			snap.WriteString(runMaterializationTestForTaskV2(t, ctx, newMaterializer, taskName, bundled, tsSuffix, makeResourceFn, actionDescSanitizers, v2[0]))
-		} else {
-			snap.WriteString(runMaterializationTestForTask(t, ctx, newMaterializer, taskName, bundled, tsSuffix, makeResourceFn, actionDescSanitizers))
-		}
+		snap.WriteString(runMaterializationTestForTask(t, ctx, newMaterializer, taskName, bundled, tsSuffix, makeResourceFn, actionDescSanitizers, runtime))
 	})
 
 	snapshotT(t, snap.String())
-}
-
-// RunMaterializationRefusalTest drives each task of the fixture through
-// `flowctl preview` and requires the connector to refuse it, with a message
-// containing every string in wantErrContains.
-//
-// The refusal is asserted by substring rather than snapshotted, because
-// flowctl's failure output carries timestamps and temporary paths.
-func RunMaterializationRefusalTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](
-	t *testing.T,
-	sourcePath string,
-	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
-	wantErrContains ...string,
-) {
-	require.NotEmpty(t, wantErrContains, "a refusal test must assert something about the refusal")
-
-	tsSuffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
-
-	RunTestAllTasks(t, sourcePath, func(t *testing.T, bundled []byte, taskName string, cfg EC) {
-		rt := rewriteTaskForTest[EC, RC](t, bundled, taskName, tsSuffix, cfg, makeResourceFn)
-
-		output, err := flowctlCommand(
-			"preview",
-			"--name", rt.workingTaskName,
-			"--source", rt.sourcePath,
-			"--fixture", relativePath(t, "testdata/integration/fixture.materialize.json"),
-			"--network", "flow-test",
-		).CombinedOutput()
-		t.Log(string(output))
-		require.Error(t, err, "flowctl was expected to fail")
-
-		for _, want := range wantErrContains {
-			require.Contains(t, string(output), want)
-		}
-	})
 }
 
 // RunMaterializationTestParallel is like RunMaterializationTest but runs tasks
@@ -233,16 +194,13 @@ func RunMaterializationTestParallel[EC boilerplate.EndpointConfiger, FC boilerpl
 	sourcePath string,
 	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
 	actionDescSanitizers []func(string) string,
-	v2 ...RuntimeV2Config,
+	runtime RuntimeConfig,
 ) {
 	ctx := context.Background()
 	tsSuffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
 
 	names, results := RunTestAllTasksParallel(t, sourcePath, func(t *testing.T, bundled []byte, taskName string, cfg EC) string {
-		if len(v2) > 0 {
-			return runMaterializationTestForTaskV2(t, ctx, newMaterializer, taskName, bundled, tsSuffix, makeResourceFn, actionDescSanitizers, v2[0])
-		}
-		return runMaterializationTestForTask(t, ctx, newMaterializer, taskName, bundled, tsSuffix, makeResourceFn, actionDescSanitizers)
+		return runMaterializationTestForTask(t, ctx, newMaterializer, taskName, bundled, tsSuffix, makeResourceFn, actionDescSanitizers, runtime)
 	})
 
 	var snap strings.Builder
@@ -265,7 +223,7 @@ func RunMaterializationTestParallel[EC boilerplate.EndpointConfiger, FC boilerpl
 // `testdata/validate_apply_test_cases/generated_specs`. Ideally we'd figure out
 // a way to use `flowctl` commands instead of generating the binary spec files -
 // the main blocker for this is that there is not a way to simulate a previously
-// applied materialization spec via `flowctl preview` etc.
+// applied materialization spec via `flowctl raw preview-next` etc.
 func RunApplyTest[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
 	t *testing.T,
 	driver boilerplate.Connector,
@@ -527,7 +485,11 @@ func runFeatureFlagMigrationForTask[EC boilerplate.EndpointConfiger, FC boilerpl
 		cleanupTestTasks(t, ctx, materializer, suffix)
 	})
 
-	for _, phase := range phases {
+	for idx, phase := range phases {
+		if idx > 0 {
+			clearTaskCheckpointBetweenPhases(t, ctx, materializer, workingTaskName)
+		}
+
 		phaseFlags := phase.FeatureFlags
 		if baseFlags != "" {
 			phaseFlags = baseFlags + "," + phaseFlags
@@ -547,7 +509,7 @@ func runFeatureFlagMigrationForTask[EC boilerplate.EndpointConfiger, FC boilerpl
 
 		actionDescription := RunFlowctl(
 			t,
-			"preview",
+			"raw", "preview-next",
 			"--name", workingTaskName,
 			"--source", source,
 			"--fixture", phase.Fixture,
@@ -589,51 +551,6 @@ func RunMigrationTestParallel[EC boilerplate.EndpointConfiger, FC boilerplate.Fi
 	}
 
 	snapshotT(t, snap.String())
-}
-
-func runMaterializationTestForTask[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
-	t *testing.T,
-	ctx context.Context,
-	newMaterializer boilerplate.NewMaterializerFn[EC, FC, RC, MT],
-	taskName string,
-	bundled []byte,
-	tsSuffix string,
-	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
-	actionDescSanitizers []func(string) string,
-) string {
-	var snap strings.Builder
-
-	cfg := decryptConfig[EC](t, bundled, taskName)
-	rt := rewriteTaskForTest[EC, RC](t, bundled, taskName, tsSuffix, cfg, makeResourceFn)
-
-	materializer, err := newMaterializer(ctx, taskName, cfg, boilerplate.ParseFlags(cfg))
-	require.NoError(t, err)
-
-	t.Cleanup(func() {
-		CleanupTestResources(t, ctx, materializer, rt.resourcePaths, tsSuffix)
-		cleanupTestTasks(t, ctx, materializer, tsSuffix)
-	})
-
-	// Drive task with the data from the fixture.
-	actionDescription := RunFlowctl(
-		t,
-		"preview",
-		"--name", rt.workingTaskName,
-		"--source", rt.sourcePath,
-		"--fixture", relativePath(t, "testdata/integration/fixture.materialize.json"),
-		"--network", "flow-test",
-		"--output-apply",
-		"--output-state",
-	)
-	for _, sanitize := range actionDescSanitizers {
-		actionDescription = []byte(sanitize(string(actionDescription)))
-	}
-
-	for _, res := range rt.resources {
-		snap.WriteString(snapshotTestTable(t, ctx, materializer, res, actionDescription, rt.rndSuffix, true))
-	}
-
-	return snap.String()
 }
 
 func snapshotTestTable[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
@@ -874,6 +791,25 @@ func runChallengingNamesApplyTests[EC boilerplate.EndpointConfiger, FC boilerpla
 	snap.WriteString(dumpSchema(t, ctx, m, res))
 }
 
+// clearTaskCheckpointBetweenPhases drops the connector's persisted checkpoint
+// for a task between two preview runs of it.
+//
+// Each phase is a separate `flowctl raw preview-next` invocation starting from
+// an empty recovery log, so a connector reporting back a checkpoint of its own
+// -- every materialization with a fenced checkpoints table -- makes the runtime
+// refuse to open. Clearing it makes each phase start as the fresh task run it
+// actually is, which costs the migration tests nothing: Apply migrates columns
+// by comparing the spec against the live table, not from the checkpoint.
+func clearTaskCheckpointBetweenPhases[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
+	t *testing.T,
+	ctx context.Context,
+	m boilerplate.Materializer[EC, FC, RC, MT],
+	workingTaskName string,
+) {
+	t.Helper()
+	require.NoError(t, m.CleanupTestTask(ctx, workingTaskName))
+}
+
 func runMigrationTestForTask[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
 	t *testing.T,
 	ctx context.Context,
@@ -943,14 +879,17 @@ func runMigrationTestForTask[EC boilerplate.EndpointConfiger, FC boilerplate.Fie
 	// state. The second one will both cause the columns to be migrated, as well
 	// as put some more data in the new form into the table to make sure it
 	// works.
-	for _, tc := range []struct{ source, fixture string }{
+	for idx, tc := range []struct{ source, fixture string }{
 		{source: initialSource, fixture: relativePath(t, "testdata/integration/fixture.migrate-base.json")},
 		{source: migratedSource, fixture: relativePath(t, "testdata/integration/fixture.migrate-migrated.json")},
 	} {
+		if idx > 0 {
+			clearTaskCheckpointBetweenPhases(t, ctx, materializer, workingTaskName)
+		}
 
 		actionDescription := RunFlowctl(
 			t,
-			"preview",
+			"raw", "preview-next",
 			"--name", workingTaskName,
 			"--source", tc.source,
 			"--fixture", tc.fixture,

@@ -90,6 +90,9 @@ func materializeSanitizers() []func(string) string {
 		regexpReplace(`[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.parquet`, `<uuid>.parquet`),
 		// Per-run table-name hashes.
 		regexpReplace(`_([\dA-F]{16})/data/`, `_<hash>/data/`),
+		// Per-binding checkpoint tokens, which hash the runtime checkpoint and
+		// so differ per transaction and per run.
+		boilerplate.SanitizeCheckpointHashes(`"(?:previous|current)Checkpoint":"([0-9a-f]{16})"`, "checkpoint"),
 	}
 }
 
@@ -140,15 +143,18 @@ func TestIntegration(t *testing.T) {
 	}
 
 	t.Run("materialize", func(t *testing.T) {
-		boilerplate.RunMaterializationTest(t, NewMaterializer, "testdata/materialize.flow.yaml", makeResourceFn, materializeSanitizers())
+		boilerplate.RunMaterializationTest(t, NewMaterializer, "testdata/materialize.flow.yaml", makeResourceFn, materializeSanitizers(),
+			boilerplate.RuntimeConfig{Shards: 1})
 	})
 
 	t.Run("materialize-ns", func(t *testing.T) {
-		boilerplate.RunMaterializationTest(t, NewMaterializer, "testdata/materialize-ns.flow.yaml", makeResourceFn, materializeSanitizers())
+		boilerplate.RunMaterializationTest(t, NewMaterializer, "testdata/materialize-ns.flow.yaml", makeResourceFn, materializeSanitizers(),
+			boilerplate.RuntimeConfig{Shards: 1})
 	})
 
 	t.Run("materialize-variant", func(t *testing.T) {
-		boilerplate.RunMaterializationTest(t, NewMaterializer, "testdata/materialize-variant.flow.yaml", makeResourceFn, materializeSanitizers())
+		boilerplate.RunMaterializationTest(t, NewMaterializer, "testdata/materialize-variant.flow.yaml", makeResourceFn, materializeSanitizers(),
+			boilerplate.RuntimeConfig{Shards: 1})
 	})
 
 	t.Run("apply", func(t *testing.T) {
@@ -321,15 +327,18 @@ func TestIntegrationGlue(t *testing.T) {
 	}
 
 	t.Run("materialize", func(t *testing.T) {
-		boilerplate.RunMaterializationTest(t, NewMaterializer, "testdata/materialize-glue.flow.yaml", makeResourceFn, materializeSanitizers())
+		boilerplate.RunMaterializationTest(t, NewMaterializer, "testdata/materialize-glue.flow.yaml", makeResourceFn, materializeSanitizers(),
+			boilerplate.RuntimeConfig{Shards: 1})
 	})
 
 	t.Run("materialize-ns", func(t *testing.T) {
-		boilerplate.RunMaterializationTest(t, NewMaterializer, "testdata/materialize-glue-ns.flow.yaml", makeResourceFn, materializeSanitizers())
+		boilerplate.RunMaterializationTest(t, NewMaterializer, "testdata/materialize-glue-ns.flow.yaml", makeResourceFn, materializeSanitizers(),
+			boilerplate.RuntimeConfig{Shards: 1})
 	})
 
 	t.Run("materialize-variant", func(t *testing.T) {
-		boilerplate.RunMaterializationTest(t, NewMaterializer, "testdata/materialize-glue-variant.flow.yaml", makeResourceFn, materializeSanitizers())
+		boilerplate.RunMaterializationTest(t, NewMaterializer, "testdata/materialize-glue-variant.flow.yaml", makeResourceFn, materializeSanitizers(),
+			boilerplate.RuntimeConfig{Shards: 1})
 	})
 
 	t.Run("apply", func(t *testing.T) {

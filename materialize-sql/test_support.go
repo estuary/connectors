@@ -30,10 +30,9 @@ import (
 // that produce standard snapshots.
 var snapshotPath = "../materialize-sql/.snapshots"
 
-// RuntimeV2Config opts a materialization integration test into running on
-// the v2 runtime, with a configured shard count. See the testutil type of
-// the same name.
-type RuntimeV2Config = testutil.RuntimeV2Config
+// RuntimeConfig configures how a materialization integration test drives the
+// runtime, notably its shard count. See the testutil type of the same name.
+type RuntimeConfig = testutil.RuntimeConfig
 
 // SanitizeCheckpointHashes returns a sanitizer for connector values derived by
 // hashing the runtime checkpoint. See the testutil function of the same name.
@@ -47,9 +46,9 @@ func RunMaterializationTest[EC boilerplate.EndpointConfiger, RC boilerplate.Reso
 	source string,
 	makeResourceFn func(string, bool) RC,
 	actionDescSanitizers []func(string) string,
-	v2 ...RuntimeV2Config,
+	runtime RuntimeConfig,
 ) {
-	testutil.RunMaterializationTest(t, driver.NewMaterializer, source, makeResourceFn, actionDescSanitizers, v2...)
+	testutil.RunMaterializationTest(t, driver.NewMaterializer, source, makeResourceFn, actionDescSanitizers, runtime)
 }
 
 func RunApplyTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](

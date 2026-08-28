@@ -6,6 +6,7 @@ Resource: simple_standard
 ["connectorState",{}]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"Name":"id","Nullable":false,"Type":"N"}
@@ -30,6 +31,7 @@ Resource: simple_delta
 ["connectorState",{}]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"Name":"id","Nullable":false,"Type":"N"}
@@ -54,6 +56,7 @@ Resource: data_types
 ["connectorState",{}]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"Name":"id","Nullable":false,"Type":"N"}

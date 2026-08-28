@@ -37,7 +37,7 @@ func TestIntegration(t *testing.T) {
 	// runs with two shards.
 	t.Run("materialize", func(t *testing.T) {
 		sql.RunMaterializationTest(t, NewDriver(), "testdata/materialize.flow.yaml", makeResourceFn, sanitizers,
-			sql.RuntimeV2Config{Shards: 2})
+			sql.RuntimeConfig{Shards: 2})
 	})
 	t.Run("apply", func(t *testing.T) {
 		sql.RunApplyTest(t, NewDriver(), "testdata/apply.flow.yaml", makeResourceFn)

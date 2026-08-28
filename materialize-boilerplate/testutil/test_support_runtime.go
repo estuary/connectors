@@ -97,24 +97,16 @@ func rewriteTaskForTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resource
 	}
 }
 
-// RuntimeV2Config opts a materialization integration test into running on
-// the v2 runtime, via `flowctl raw preview-next --fixture --shards N`,
-// feeding the same fixture as the legacy runner. Multi-shard runs hash-route
-// fixture documents across shards exactly as live shuffled reads would, and
-// require the connector to implement the scale-out contract (range-scoped
-// state, shard-zero-executes).
+// RuntimeConfig configures how a materialization integration test drives the
+// runtime, via `flowctl raw preview-next --fixture --shards N`. Multi-shard
+// runs hash-route fixture documents across shards exactly as live shuffled
+// reads would, and require the connector to implement the scale-out contract
+// (range-scoped state, shard-zero-executes).
 //
-// The run spans two sessions: the v2 runtime halts a session after its final
-// commit without running its post-commit Acknowledge, so a second session
-// recovers the consolidated connector state and applies the outstanding
-// staged transaction before destination tables are snapshotted. The second
-// session's budget is one trailing empty transaction appended to a copy of
-// the fixture, so both sessions end deterministically by transaction count.
-//
-// Single-shard runs also capture `--output-apply` / `--output-state` lines
-// into the snapshot, exactly as the legacy runner does; those flags don't
-// yet support multiple shards, so sharded snapshots omit them.
-type RuntimeV2Config struct {
+// Single-shard runs also capture `--output-apply` / `--output-state` lines into
+// the snapshot; those flags don't yet support multiple shards, so sharded
+// snapshots omit them.
+type RuntimeConfig struct {
 	// Shards to run the task with. Zero defaults to one.
 	Shards int
 	// ExtraFeatureFlags are appended to the endpoint config's existing
@@ -126,7 +118,7 @@ type RuntimeV2Config struct {
 	Timeout time.Duration
 }
 
-func runMaterializationTestForTaskV2[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
+func runMaterializationTestForTask[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
 	t *testing.T,
 	ctx context.Context,
 	newMaterializer boilerplate.NewMaterializerFn[EC, FC, RC, MT],
@@ -135,12 +127,12 @@ func runMaterializationTestForTaskV2[EC boilerplate.EndpointConfiger, FC boilerp
 	tsSuffix string,
 	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
 	actionDescSanitizers []func(string) string,
-	v2 RuntimeV2Config,
+	runtime RuntimeConfig,
 ) string {
 	var snap strings.Builder
 
-	shards := max(v2.Shards, 1)
-	timeout := v2.Timeout
+	shards := max(runtime.Shards, 1)
+	timeout := runtime.Timeout
 	if timeout == 0 {
 		timeout = 10 * time.Minute
 	}
@@ -159,9 +151,9 @@ func runMaterializationTestForTaskV2[EC boilerplate.EndpointConfiger, FC boilerp
 	// sets (later entries win in ParseFeatureFlags). flowctl passes a
 	// plaintext (non-sops) config to the connector unchanged, so writing the
 	// decrypted config back inline is sufficient.
-	if len(v2.ExtraFeatureFlags) > 0 {
+	if len(runtime.ExtraFeatureFlags) > 0 {
 		rawCfg := decryptConfigRaw(t, bundled, taskName)
-		flags := strings.Join(v2.ExtraFeatureFlags, ",")
+		flags := strings.Join(runtime.ExtraFeatureFlags, ",")
 		if baseFlags := gjson.GetBytes(rawCfg, "advanced.feature_flags").String(); baseFlags != "" {
 			flags = baseFlags + "," + flags
 		}
@@ -182,9 +174,10 @@ func runMaterializationTestForTaskV2[EC boilerplate.EndpointConfiger, FC boilerp
 		cleanupTestTasks(t, ctx, materializer, tsSuffix)
 	})
 
-	// Drive the task on the v2 runtime: one session runs every fixture
-	// transaction, and flowctl's final drain session recovery-applies the
-	// last (committed but not yet acknowledged) one.
+	// One session runs every fixture transaction. A session halts after its
+	// final commit without running the post-commit Acknowledge, so flowctl
+	// appends an empty drain session which recovery-applies that last
+	// transaction before the destination tables are snapshotted.
 	args := []string{
 		"raw", "preview-next",
 		"--name", rt.workingTaskName,

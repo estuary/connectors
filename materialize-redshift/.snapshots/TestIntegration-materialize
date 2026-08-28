@@ -6,6 +6,7 @@ Resource: simple_standard
 ["connectorState",{}]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"Name":"_meta","Nullable":true,"Type":"super"}
@@ -32,6 +33,7 @@ Resource: simple_delta
 ["connectorState",{}]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"Name":"_meta/op","Nullable":true,"Type":"character varying"}
@@ -64,6 +66,7 @@ Resource: not_simple
 ["connectorState",{}]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"Name":" ,;{}().- problematicfield � 𐀀 嶲 ","Nullable":true,"Type":"character varying"}
@@ -96,6 +99,7 @@ Resource: data_types
 ["connectorState",{}]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"Name":"arrayfield","Nullable":true,"Type":"super"}
