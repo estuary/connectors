@@ -18,7 +18,6 @@ COPY go                      ./go
 COPY materialize-boilerplate ./materialize-boilerplate
 COPY materialize-snowflake   ./materialize-snowflake
 COPY materialize-sql         ./materialize-sql
-COPY testsupport             ./testsupport
 
 # Test and build the connector.
 RUN go test  -tags nozstd -v ./materialize-sql/...
