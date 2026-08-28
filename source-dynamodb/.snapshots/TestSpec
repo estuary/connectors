@@ -96,6 +96,14 @@
             "description": "Limit the number of items to evaluate for each table backfill scan request.",
             "nonsensitive": true
           },
+          "idleBackoffMax": {
+            "type": "string",
+            "title": "Idle Poll Backoff Maximum",
+            "description": "Maximum wait between polls of an open stream shard whose reads keep returning no records. Polling returns to once per second as soon as records appear. Accepts Go duration strings between '1s' and '10m'. Defaults to '1s'. Higher values reduce billed DynamoDB Streams requests on idle shards but delay capture of new records by up to the configured wait.",
+            "default": "1s",
+            "nonsensitive": true,
+            "pattern": "^[0-9]+(ms|s|m|h)$"
+          },
           "endpoint": {
             "type": "string",
             "title": "AWS Endpoint",

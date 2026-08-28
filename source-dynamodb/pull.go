@@ -84,6 +84,11 @@ func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error 
 		checkpoint.Tables = make(map[boilerplate.StateKey]tableState)
 	}
 
+	idleBackoffMax, err := cfg.parseIdleBackoffMax()
+	if err != nil {
+		return fmt.Errorf("parsing idleBackoffMax: %w", err)
+	}
+
 	c := capture{
 		client:            client,
 		stream:            stream,
@@ -91,6 +96,7 @@ func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error 
 		state:             checkpoint,
 		listShardsLimiter: rate.NewLimiter(rate.Limit(listShardsPerSecond), 1),
 		sem:               semaphore.NewWeighted(globalConcurrencyLimit),
+		idleBackoffMax:    idleBackoffMax,
 	}
 
 	if err := stream.Ready(false); err != nil {
