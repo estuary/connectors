@@ -119,14 +119,20 @@ func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursorJSON 
 		flavor = mysql.MariaDBFlavor
 	}
 
+	password, err := db.config.EffectivePassword()
+	if err != nil {
+		return nil, err
+	}
+
 	var syncConfig = replication.BinlogSyncerConfig{
 		ServerID: uint32(db.config.Advanced.NodeID),
 		Flavor:   flavor,
 		Host:     host,
 		Port:     uint16(port),
 		User:     db.config.User,
-		Password: db.config.Password,
+		Password: password,
 		// TODO(wgd): Maybe add 'serverName' checking as described over in Connect()
+		// Must stay non-nil: under IAM auth the Password above is a bearer token.
 		TLSConfig: &tls.Config{InsecureSkipVerify: true},
 		// Request that timestamp values coming via replication be interpreted as UTC.
 		TimestampStringLocation: time.UTC,
@@ -156,19 +162,26 @@ func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursorJSON 
 	logrus.WithFields(logrus.Fields{"pos": pos}).Info("starting replication")
 	var streamer *replication.BinlogStreamer
 	var syncer = replication.NewBinlogSyncer(syncConfig)
-	if streamer, err = syncer.StartSync(pos); err == nil {
+	var errWithTLS error
+	if streamer, errWithTLS = syncer.StartSync(pos); errWithTLS == nil {
 		logrus.Debug("replication connected with TLS")
+	} else if db.config.requiresTLS() {
+		syncer.Close()
+		if userErr := wrapMySQLReplicationError(errWithTLS); userErr != nil {
+			return nil, userErr
+		}
+		return nil, fmt.Errorf("error starting binlog sync over TLS: %w", errWithTLS)
 	} else {
 		syncer.Close()
 		syncConfig.TLSConfig = nil
 		syncer = replication.NewBinlogSyncer(syncConfig)
 		if streamer, err = syncer.StartSync(pos); err == nil {
-			logrus.Info("replication connected without TLS")
+			logrus.WithField("errWithTLS", errWithTLS).Info("replication connected without TLS")
 		} else {
 			if userErr := wrapMySQLReplicationError(err); userErr != nil {
 				return nil, userErr
 			}
-			return nil, fmt.Errorf("error starting binlog sync: %w", err)
+			return nil, fmt.Errorf("error starting binlog sync: failed both with TLS (%w) and without TLS (%w)", errWithTLS, err)
 		}
 	}
 

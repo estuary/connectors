@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/estuary/connectors/go/auth/iam"
 	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
@@ -85,6 +86,7 @@ func connectMySQL(ctx context.Context, name string, cfg json.RawMessage) (sqlcap
 		return nil, fmt.Errorf("error parsing config json: %w", err)
 	}
 	config.SetDefaults(name)
+	config.normalizeCredentials()
 
 	// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
 	if config.NetworkTunnel != nil && config.NetworkTunnel.SSHForwarding != nil && config.NetworkTunnel.SSHForwarding.SSHEndpoint != "" {
@@ -144,14 +146,60 @@ func connectMySQL(ctx context.Context, name string, cfg json.RawMessage) (sqlcap
 	return db, nil
 }
 
+type AuthType string
+
+const (
+	UserPassword AuthType = "UserPassword"
+	AzureIAM     AuthType = "AzureIAM"
+)
+
+type UserPasswordConfig struct {
+	Password string `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=1"`
+}
+
+// CredentialsConfig is a flat union of the supported authentication methods,
+// discriminated by AuthType. The JSON Schema presents it as a oneOf with one
+// branch per method.
+type CredentialsConfig struct {
+	AuthType AuthType `json:"auth_type"`
+
+	UserPasswordConfig
+	iam.IAMConfig
+}
+
+func (CredentialsConfig) JSONSchema() *jsonschema.Schema {
+	return schemagen.OneOfSchema("Authentication", "", "auth_type", string(UserPassword),
+		schemagen.OneOfSubSchema("Password", UserPasswordConfig{}, string(UserPassword)),
+		schemagen.OneOfSubSchema("Azure IAM", iam.AzureConfig{}, string(AzureIAM)),
+	)
+}
+
+func (c *CredentialsConfig) Validate() error {
+	switch c.AuthType {
+	case UserPassword:
+		if c.Password == "" {
+			return errors.New("missing 'password'")
+		}
+		return nil
+	case AzureIAM:
+		// The embedded IAMConfig has its own auth_type field which JSON decoding
+		// leaves empty (the outer field shadows it), so sync it before ValidateIAM
+		// switches on it.
+		c.IAMConfig.AuthType = iam.AuthType(c.AuthType)
+		return c.ValidateIAM()
+	}
+	return fmt.Errorf("unknown 'auth_type' %q", c.AuthType)
+}
+
 // Config tells the connector how to connect to the source database and
 // capture changes from it.
 type Config struct {
-	Address     string `json:"address" jsonschema:"title=Server Address,description=The host or host:port at which the database can be reached." jsonschema_extras:"order=0"`
-	User        string `json:"user" jsonschema:"title=Login Username,default=flow_capture,description=The database user to authenticate as." jsonschema_extras:"order=1"`
-	Password    string `json:"password" jsonschema:"title=Login Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
-	Timezone    string `json:"timezone,omitempty" jsonschema:"title=Timezone,description=Timezone to use when capturing datetime columns. Should normally be left blank to use the database's 'time_zone' system variable. Only required if the 'time_zone' system variable cannot be read and columns with type datetime are being captured. Must be a valid IANA time zone name or +HH:MM offset. Takes precedence over the 'time_zone' system variable if both are set (go.estuary.dev/80J6rX)." jsonschema_extras:"order=3,nonsensitive=true"`
-	HistoryMode bool   `json:"historyMode" jsonschema:"default=false,description=Capture change events without reducing them to a final state." jsonschema_extras:"order=4,nonsensitive=true"`
+	Address     string             `json:"address" jsonschema:"title=Server Address,description=The host or host:port at which the database can be reached." jsonschema_extras:"order=0"`
+	User        string             `json:"user" jsonschema:"title=Login Username,default=flow_capture,description=The database user to authenticate as." jsonschema_extras:"order=1"`
+	Password    string             `json:"password,omitempty" jsonschema:"-"`
+	Credentials *CredentialsConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"order=2,x-iam-auth=true,x-iam-azure-scope=https://ossrdbms-aad.database.windows.net/.default"`
+	Timezone    string             `json:"timezone,omitempty" jsonschema:"title=Timezone,description=Timezone to use when capturing datetime columns. Should normally be left blank to use the database's 'time_zone' system variable. Only required if the 'time_zone' system variable cannot be read and columns with type datetime are being captured. Must be a valid IANA time zone name or +HH:MM offset. Takes precedence over the 'time_zone' system variable if both are set (go.estuary.dev/80J6rX)." jsonschema_extras:"order=3,nonsensitive=true"`
+	HistoryMode bool               `json:"historyMode" jsonschema:"default=false,description=Capture change events without reducing them to a final state." jsonschema_extras:"order=4,nonsensitive=true"`
 
 	DiscoveryFilters discoveryFilters `json:"discoveryFilters,omitempty" jsonschema:"title=Discovery Filters,description=Options that restrict which tables are visible to discovery."`
 	Advanced         advancedConfig   `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
@@ -181,15 +229,29 @@ func (c *Config) Validate() error {
 	var requiredProperties = [][]string{
 		{"address", c.Address},
 		{"user", c.User},
-		{"password", c.Password},
 	}
 	for _, req := range requiredProperties {
 		if req[1] == "" {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
 	}
-	if len(c.Password) > 32 {
-		return fmt.Errorf("passwords used as part of replication cannot exceed 32 characters in length due to an internal limitation in MySQL: password length of %d characters is too long, please use a shorter password", len(c.Password))
+
+	// Validation runs before normalizeCredentials, so both the legacy flat
+	// password and the credentials union must be accepted here.
+	var passwordInUse string
+	if c.Credentials == nil {
+		if c.Password == "" {
+			return errors.New("missing 'credentials'")
+		}
+		passwordInUse = c.Password
+	} else {
+		if err := c.Credentials.Validate(); err != nil {
+			return err
+		}
+		passwordInUse = c.Credentials.Password
+	}
+	if len(passwordInUse) > 32 {
+		return fmt.Errorf("passwords used as part of replication cannot exceed 32 characters in length due to an internal limitation in MySQL: password length of %d characters is too long, please use a shorter password", len(passwordInUse))
 	}
 	if c.Timezone != "" {
 		if _, err := schedule.ParseTimezone(c.Timezone); err != nil {
@@ -246,6 +308,55 @@ func (c *Config) SetDefaults(name string) {
 	}
 }
 
+// normalizeCredentials folds a legacy top-level password into c.Credentials as a
+// UserPassword credential, so that code downstream of it only ever reads one
+// credentials shape. When both are supplied the explicit credentials win.
+func (c *Config) normalizeCredentials() {
+	var legacyPassword = c.Password
+	c.Password = ""
+
+	if c.Credentials != nil {
+		if legacyPassword != "" {
+			logrus.Warn("both legacy 'password' and 'credentials' are set; the former will be ignored in favour of the latter")
+		}
+		return
+	}
+	c.Credentials = &CredentialsConfig{
+		AuthType:           UserPassword,
+		UserPasswordConfig: UserPasswordConfig{Password: legacyPassword},
+	}
+}
+
+// EffectivePassword returns the secret to present as the MySQL password for the
+// configured authentication method. It requires normalizeCredentials to have run,
+// and only reads the credentials union. For Azure IAM the password is the Entra
+// access token injected into the config by the control plane, which restarts the
+// connector with a fresh token before expiry.
+func (c *Config) EffectivePassword() (string, error) {
+	switch c.Credentials.AuthType {
+	case UserPassword:
+		return c.Credentials.Password, nil
+	case AzureIAM:
+		var token = c.Credentials.AzureToken()
+		if token == "" {
+			return "", errors.New("missing 'azure_access_token'")
+		}
+		return token, nil
+	}
+	return "", fmt.Errorf("unsupported 'auth_type' %q", c.Credentials.AuthType)
+}
+
+// requiresTLS reports whether the configured authentication method forbids falling
+// back to an unencrypted connection.
+func (c *Config) requiresTLS() bool {
+	switch c.Credentials.AuthType {
+	case UserPassword:
+		return false
+	default:
+		return true
+	}
+}
+
 func configSchema() json.RawMessage {
 	var schema = schemagen.GenerateSchema("MySQL Connection", &Config{})
 	var configSchema, err = schema.MarshalJSON()
@@ -253,6 +364,63 @@ func configSchema() json.RawMessage {
 		panic(err)
 	}
 	return json.RawMessage(configSchema)
+}
+
+// From https://dev.mysql.com/doc/mysql-errors/8.4/en/server-error-reference.html
+const mysqlErrorCodeSecureTransportRequired = 3159
+
+func withTLS(c *client.Conn) error {
+	c.SetTLSConfig(&tls.Config{InsecureSkipVerify: true})
+	return nil
+}
+
+func withAttrs(c *client.Conn) error {
+	c.SetAttributes(map[string]string{"program_name": "Estuary source-mysql"})
+	return nil
+}
+
+// connectTLSOnly establishes a TLS connection and never falls back to an
+// unencrypted one. This is the IAM path.
+func (db *mysqlDatabase) connectTLSOnly(address, password string) (*client.Conn, error) {
+	var conn, err = client.Connect(address, db.config.User, password, db.config.Advanced.DBName, withTLS, withAttrs)
+	if err == nil {
+		logrus.WithField("addr", address).Info("connected with TLS")
+		return conn, nil
+	}
+	var mysqlErr *mysql.MyError
+	if errors.As(err, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
+		return nil, cerrors.NewUserError(mysqlErr, "incorrect username or password")
+	}
+	return nil, fmt.Errorf("unable to connect to database with TLS: %w", err)
+}
+
+// connectPreferringTLS tries TLS first and falls back to an unencrypted connection,
+// which is acceptable for password authentication.
+func (db *mysqlDatabase) connectPreferringTLS(address, password string) (*client.Conn, error) {
+	// The following if-else chain looks somewhat complicated but it's really very simple.
+	// * We'd prefer to use TLS, so we first try to connect with TLS, and then if that fails
+	//   we try again without.
+	// * If either error is an incorrect username/password then we just report that.
+	// * Otherwise we report both errors because it's better to be clear what failed and how.
+	// * Except if the non-TLS connection specifically failed because TLS is required then
+	//   we don't need to mention that and just return the with-TLS error.
+	var mysqlErr *mysql.MyError
+	if connWithTLS, errWithTLS := client.Connect(address, db.config.User, password, db.config.Advanced.DBName, withTLS, withAttrs); errWithTLS == nil {
+		logrus.WithField("addr", address).Info("connected with TLS")
+		return connWithTLS, nil
+	} else if errors.As(errWithTLS, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
+		return nil, cerrors.NewUserError(mysqlErr, "incorrect username or password")
+	} else if connWithoutTLS, errWithoutTLS := client.Connect(address, db.config.User, password, db.config.Advanced.DBName, withAttrs); errWithoutTLS == nil {
+		logrus.WithField("addr", address).Info("connected without TLS")
+		return connWithoutTLS, nil
+	} else if errors.As(errWithoutTLS, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
+		logrus.WithFields(logrus.Fields{"withTLS": errWithTLS, "nonTLS": errWithoutTLS}).Error("unable to connect to database")
+		return nil, cerrors.NewUserError(mysqlErr, "incorrect username or password")
+	} else if errors.As(errWithoutTLS, &mysqlErr) && mysqlErr.Code == mysqlErrorCodeSecureTransportRequired {
+		return nil, fmt.Errorf("unable to connect to database: %w", errWithTLS)
+	} else {
+		return nil, fmt.Errorf("unable to connect to database: failed both with TLS (%w) and without TLS (%w)", errWithTLS, errWithoutTLS)
+	}
 }
 
 func (db *mysqlDatabase) connect(_ context.Context) error {
@@ -280,40 +448,21 @@ func (db *mysqlDatabase) connect(_ context.Context) error {
 	})
 	defer connectionTimer.Stop()
 
-	const mysqlErrorCodeSecureTransportRequired = 3159 // From https://dev.mysql.com/doc/mysql-errors/8.4/en/server-error-reference.html
-	var mysqlErr *mysql.MyError
-	var withTLS = func(c *client.Conn) error {
-		c.SetTLSConfig(&tls.Config{InsecureSkipVerify: true})
-		return nil
-	}
-	var withAttrs = func(c *client.Conn) error {
-		c.SetAttributes(map[string]string{"program_name": "Estuary source-mysql"})
-		return nil
+	var password, err = db.config.EffectivePassword()
+	if err != nil {
+		return err
 	}
 
-	// The following if-else chain looks somewhat complicated but it's really very simple.
-	// * We'd prefer to use TLS, so we first try to connect with TLS, and then if that fails
-	//   we try again without.
-	// * If either error is an incorrect username/password then we just report that.
-	// * Otherwise we report both errors because it's better to be clear what failed and how.
-	// * Except if the non-TLS connection specifically failed because TLS is required then
-	//   we don't need to mention that and just return the with-TLS error.
-	if connWithTLS, errWithTLS := client.Connect(address, db.config.User, db.config.Password, db.config.Advanced.DBName, withTLS, withAttrs); errWithTLS == nil {
-		logrus.WithField("addr", address).Info("connected with TLS")
-		db.conn = &mysqlConnection{inner: connWithTLS, queryTimeout: DefaultQueryTimeout}
-	} else if errors.As(errWithTLS, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
-		return cerrors.NewUserError(mysqlErr, "incorrect username or password")
-	} else if connWithoutTLS, errWithoutTLS := client.Connect(address, db.config.User, db.config.Password, db.config.Advanced.DBName, withAttrs); errWithoutTLS == nil {
-		logrus.WithField("addr", address).Info("connected without TLS")
-		db.conn = &mysqlConnection{inner: connWithoutTLS, queryTimeout: DefaultQueryTimeout}
-	} else if errors.As(errWithoutTLS, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
-		logrus.WithFields(logrus.Fields{"withTLS": errWithTLS, "nonTLS": errWithoutTLS}).Error("unable to connect to database")
-		return cerrors.NewUserError(mysqlErr, "incorrect username or password")
-	} else if errors.As(errWithoutTLS, &mysqlErr) && mysqlErr.Code == mysqlErrorCodeSecureTransportRequired {
-		return fmt.Errorf("unable to connect to database: %w", errWithTLS)
+	var conn *client.Conn
+	if db.config.requiresTLS() {
+		conn, err = db.connectTLSOnly(address, password)
 	} else {
-		return fmt.Errorf("unable to connect to database: failed both with TLS (%w) and without TLS (%w)", errWithTLS, errWithoutTLS)
+		conn, err = db.connectPreferringTLS(address, password)
 	}
+	if err != nil {
+		return err
+	}
+	db.conn = &mysqlConnection{inner: conn, queryTimeout: DefaultQueryTimeout}
 	connectionTimer.Stop() // Connection successful, cancel the timeout
 
 	// Debug logging hook so we can get the server config variables when needed
