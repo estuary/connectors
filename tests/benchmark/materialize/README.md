@@ -1,10 +1,10 @@
 # Materialization benchmarks
 
 Drive any `materialize-*` connector with a configured-size workload and
-record throughput. Built on top of `flowctl preview --fixture`, mirroring
-the integration-test framework under `tests/materialize/` but designed
-for many-GB workloads with fine-grained control over transaction sizes,
-document sizes, and overlap (updates / deletes against earlier
+record throughput. Built on `flowctl raw preview-next --fixture`,
+mirroring the integration-test framework under `tests/materialize/` but
+designed for many-GB workloads with fine-grained control over transaction
+sizes, document sizes, and overlap (updates / deletes against earlier
 transactions).
 
 ## Quick start
@@ -23,7 +23,7 @@ This brings up the connector's existing
 `tests/materialize/<connector>/docker-compose.yaml`, generates a
 materialization spec from the connector's existing
 `<connector>/testdata/config.local.yaml`, streams a synthetic fixture
-through a FIFO into `flowctl preview`, and writes per-run artifacts
+through a FIFO into `flowctl raw preview-next`, and writes per-run artifacts
 (spec, generator state, preview log, `results.json`) to
 `tests/benchmark/materialize/runs/<timestamp>-<connector>/`.
 
@@ -144,8 +144,8 @@ Each run produces:
 | `flow.yaml`        | The materialization spec rendered from the scenario. |
 | `state.json`       | Per-tx fresh-key range and overlap counts (from the generator). |
 | `generator.stderr` | Generator stderr / errors. |
-| `preview.stdout`   | flowctl preview stdout (apply actions, connector state). |
-| `preview.log`      | flowctl preview stderr (per-tx commit boundaries live here). |
+| `preview.stdout`   | Preview stdout. |
+| `preview.log`      | Preview stderr (the per-tx timings are derived from here). |
 | `results.json`     | Aggregate `{ wall_seconds, total_docs, total_bytes, mb_per_sec, transactions: [...] }`. |
 
 ## Cleanup

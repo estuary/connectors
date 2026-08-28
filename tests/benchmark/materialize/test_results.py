@@ -14,8 +14,8 @@ sys.path.insert(0, os.path.dirname(__file__))
 import results  # noqa: E402
 
 
-def v2_log(transaction_seconds):
-    """Render a `raw preview-next` log covering len(transaction_seconds) rounds.
+def preview_log(transaction_seconds):
+    """Render a preview log covering len(transaction_seconds) rounds.
 
     The shape mirrors a real run, which matters because every quirk below is
     one the parser has to survive:
@@ -63,13 +63,13 @@ def v2_log(transaction_seconds):
     return "\n".join(out) + "\n"
 
 
-class TestBoundariesFromLogV2(unittest.TestCase):
+class TestBoundariesFromLog(unittest.TestCase):
     def bounds_for(self, transaction_seconds):
         with tempfile.NamedTemporaryFile("w", suffix=".log", delete=False) as f:
-            f.write(v2_log(transaction_seconds))
+            f.write(preview_log(transaction_seconds))
             path = f.name
         try:
-            return results.boundaries_from_log_v2(path)
+            return results.boundaries_from_log(path)
         finally:
             os.unlink(path)
 
