@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
+	m "github.com/estuary/connectors/go/materialize"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
@@ -28,6 +29,32 @@ func TestAcknowledgeSubsetLeavesOtherKeysPending(t *testing.T) {
 	require.Nil(t, state)
 	require.NotNil(t, d.cp["a_table.v1"])
 	require.True(t, d.didRecovery)
+}
+
+// The streaming v2 counter is durable per-binding state, not a staged
+// transaction: the checkpoint-clearing pass of Acknowledge - which is also what
+// the Apply-time pending-transaction drain relies on - must leave it in place,
+// and must report no state update on its account, since an update which changes
+// nothing would burn an iteration of the runtime's bounded Apply loop.
+func TestAcknowledgeKeepsStreamV2Counter(t *testing.T) {
+	d := &transactor{
+		cp: checkpoint{
+			"a_table.v1": {Table: "a_table", StreamV2: map[string]*streamV2Item{
+				"00000000-ffffffff": {Channel: "chan", Counter: 42, KeyEnd: 0xffffffff},
+			}},
+		},
+		bindings: []*binding{{target: sql.Table{StateKey: "a_table.v1"}, streamingV2: true}},
+		be:       m.NewBindingEvents(),
+		// The rows the counter accounts for were committed as the checkpoint was
+		// produced, so Acknowledge needs nothing from the manager and no sidecar
+		// is started.
+		streamV2: &streamV2Manager{},
+	}
+
+	state, err := d.Acknowledge(context.Background(), nil, []string{"a_table.v1"})
+	require.NoError(t, err)
+	require.Nil(t, state)
+	require.Equal(t, int64(42), d.cp["a_table.v1"].StreamV2["00000000-ffffffff"].Counter)
 }
 
 func TestSpecification(t *testing.T) {
