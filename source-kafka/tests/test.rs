@@ -151,6 +151,40 @@ impl BoundedChild {
         std::fs::read_to_string(&self.err_path).unwrap_or_default()
     }
 
+    /// Blocks until the stderr file holds an assignment line per partition.
+    ///
+    /// A fixed sleep is not enough: producing before the assignment lands puts
+    /// the messages behind the end offset, where the capture correctly skips
+    /// them and then has nothing to read.
+    fn wait_for_assignment(&self, partitions: i32, timeout: Duration) {
+        let deadline = std::time::Instant::now() + timeout;
+        loop {
+            // `--log-json` is what forwards the connector's own logs here. Match
+            // the parsed message rather than a substring, so a topic or error
+            // that happens to contain the phrase cannot trip the count.
+            let seen = self
+                .stderr()
+                .lines()
+                .filter(|l| {
+                    serde_json::from_str::<serde_json::Value>(l)
+                        .is_ok_and(|v| v["message"] == "assigned partition")
+                })
+                .count();
+            if seen >= partitions as usize {
+                return;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "{} did not assign all {} partitions within {:?}:\n{}",
+                self.what,
+                partitions,
+                timeout,
+                self.stderr()
+            );
+            std::thread::sleep(Duration::from_millis(250));
+        }
+    }
+
     /// Waits for exit and returns stdout, panicking if `timeout` had to fire.
     fn wait(mut self) -> String {
         let status = self
@@ -213,6 +247,7 @@ fn kafka_clients() -> (AdminClient<DefaultClientContext>, FutureProducer, BaseCo
         config().create().unwrap(),
     )
 }
+
 
 /// Deletion is asynchronous, so a recreate issued immediately can be serviced
 /// first and inherit the old messages. Hence the sleep.
@@ -470,12 +505,13 @@ async fn test_capture_only_changes() {
             "--delay",
             "10s",
             "--output-state",
+            // Without this the connector's own logs never reach stderr, so there
+            // is no assignment to wait on and nothing to assert about.
+            "--log-json",
         ],
     );
 
-    // A message produced before the assignment lands would sit behind the end
-    // offset and be skipped, leaving nothing to capture.
-    tokio::time::sleep(Duration::from_secs(5)).await;
+    child.wait_for_assignment(partitions, Duration::from_secs(60));
 
     for partition in 0..partitions {
         let doc = json!({ "id": format!("post-start-{}", partition) }).to_string();
@@ -501,6 +537,7 @@ async fn test_capture_only_changes() {
         after
     );
 
+    let log = child.stderr();
     let stdout = child.wait();
     let stdout = stdout.as_str();
 
@@ -534,6 +571,42 @@ async fn test_capture_only_changes() {
         );
     }
 
+    // Support reads these lines to confirm where a capture actually started, so
+    // the resolved number has to be in them, not just the symbolic end.
+    let assignments: HashMap<i32, serde_json::Value> = log
+        .lines()
+        .filter_map(|l| serde_json::from_str::<serde_json::Value>(l).ok())
+        .filter(|v| v["message"] == "assigned partition")
+        .map(|v| (v["fields"]["partition"].as_i64().unwrap() as i32, v))
+        .collect();
+
+    for partition in 0..partitions {
+        let fields = &assignments
+            .get(&partition)
+            .unwrap_or_else(|| {
+                panic!(
+                    "no assignment log for partition {}, so support cannot confirm \
+                     where this capture started:\n{}",
+                    partition, log
+                )
+            })["fields"];
+        assert_eq!(
+            fields["start_offset"].as_i64(),
+            Some(fixture_end[&partition]),
+            "partition {} logged start_offset {} rather than its resolved end offset \
+             of {}: {}",
+            partition,
+            fields["start_offset"],
+            fixture_end[&partition],
+            fields
+        );
+        assert_eq!(
+            fields["mode"], "OnlyChanges",
+            "the mode belongs in the assignment log: {}",
+            fields
+        );
+    }
+
     // The final state must also sit past the fixture, so a resumed task does
     // not re-read the history this run skipped.
     let state: serde_json::Value = stdout
@@ -555,6 +628,213 @@ async fn test_capture_only_changes() {
             state
         );
     }
+}
+
+/// Runs a preview of the only-changes source, optionally from a supplied state,
+/// and returns its stdout. Used by the tests that care about the state a run
+/// emits rather than the documents it captures.
+fn preview_only_changes(initial_state: Option<&str>, delay: &str) -> String {
+    let mut cmd = Command::new("flowctl");
+    cmd.args([
+        "--profile",
+        "local",
+        "preview",
+        "--source",
+        "tests/test.only-changes.flow.yaml",
+        "--sessions",
+        "1",
+        "--delay",
+        delay,
+        "--output-state",
+    ]);
+    if let Some(state) = initial_state {
+        cmd.args(["--initial-state", state]);
+    }
+
+    let output = cmd.output().unwrap();
+    assert!(
+        output.status.success(),
+        "the capture exited {}:\n{}",
+        output.status,
+        std::str::from_utf8(&output.stderr).unwrap()
+    );
+    std::str::from_utf8(&output.stdout).unwrap().to_string()
+}
+
+/// The last connector state a preview emitted, as a map of partition to offset.
+fn saved_partitions(stdout: &str, topic: &str) -> HashMap<i32, i64> {
+    let state: serde_json::Value = stdout
+        .lines()
+        .filter(|l| l.starts_with(r#"["connectorState","#))
+        .last()
+        .map(|l| serde_json::from_str(l).unwrap())
+        .unwrap_or_else(|| panic!("preview emitted no connectorState line:\n{}", stdout));
+
+    match &state[1]["updated"]["bindingStateV1"][topic]["partitions"] {
+        serde_json::Value::Object(map) => map
+            .iter()
+            .map(|(p, o)| (p.parse().unwrap(), o.as_i64().unwrap()))
+            .collect(),
+        other => panic!("expected a partitions map, got {}:\n{}", other, stdout),
+    }
+}
+
+/// A restart before the first message must not skip it. `Offset::End` is
+/// re-resolved by the broker on every startup, so a run that checkpoints nothing
+/// leaves the next run free to jump past whatever arrived in between.
+#[tokio::test]
+#[serial_test::serial]
+async fn test_capture_only_changes_checkpoints_before_first_message() {
+    let topic = ONLY_CHANGES_TOPIC;
+    let partitions = 3;
+
+    let (admin, producer, consumer) = kafka_clients();
+    recreate_topic(&admin, topic, partitions).await;
+
+    // The history this capture must skip, and must also not resume from.
+    let enc = JsonRawTestDataEncoder::new();
+    for idx in 0..9 {
+        let (key, payload) = (
+            enc.key_for_idx(idx, topic).await,
+            enc.payload_for_idx(idx, topic).await,
+        );
+        send_message(topic, &key, Some(&payload), idx, partitions, &producer).await;
+    }
+    let fixture_end = end_offsets(&consumer, topic, partitions);
+
+    // No message arrives during this run, so the only state it can emit is the
+    // one written at assignment.
+    let first = preview_only_changes(None, "1s");
+    assert!(
+        !first
+            .lines()
+            .any(|l| l.starts_with(ONLY_CHANGES_DOC_PREFIX)),
+        "the idle run captured a document, so it did not skip the history:\n{}",
+        first
+    );
+
+    let saved = saved_partitions(&first, topic);
+    for partition in 0..partitions {
+        let offset = *saved.get(&partition).unwrap_or_else(|| {
+            panic!(
+                "the idle run saved no offset for partition {}, so a restart would \
+                 re-resolve the end of the partition and skip whatever arrived first:\n{}",
+                partition, first
+            )
+        });
+        // One less than the end offset, because state records the last message
+        // read and the next startup adds one to it.
+        assert_eq!(
+            offset,
+            fixture_end[&partition] - 1,
+            "partition {} saved {}, which does not resume at its end offset of {}",
+            partition,
+            offset,
+            fixture_end[&partition]
+        );
+    }
+
+    // Now the restart. These messages landed while nothing was running, which is
+    // exactly the window in which they used to be lost.
+    for partition in 0..partitions {
+        let doc = json!({ "id": format!("after-restart-{}", partition) }).to_string();
+        send_message(
+            topic,
+            doc.as_bytes(),
+            Some(doc.as_bytes()),
+            partition as usize,
+            partitions,
+            &producer,
+        )
+        .await;
+    }
+
+    let state = json!({ "bindingStateV1": { topic: { "partitions": saved } } });
+    let second = preview_only_changes(Some(&state.to_string()), "10s");
+
+    let offsets: Vec<i64> = second
+        .lines()
+        .filter(|l| l.starts_with(ONLY_CHANGES_DOC_PREFIX))
+        .map(|l| {
+            serde_json::from_str::<serde_json::Value>(l).unwrap()[1]["_meta"]["offset"]
+                .as_i64()
+                .unwrap()
+        })
+        .collect();
+
+    assert_eq!(
+        offsets.len(),
+        partitions as usize,
+        "expected the message produced to each partition across the restart:\n{}",
+        second
+    );
+    for partition in 0..partitions {
+        assert!(
+            offsets.contains(&fixture_end[&partition]),
+            "the message at offset {} of partition {} was produced while nothing was \
+             running and was never captured: {:?}",
+            fixture_end[&partition],
+            partition,
+            offsets
+        );
+    }
+}
+
+/// The empty-partition boundary. A partition with no messages has a watermark of
+/// 0, so the saved offset is -1, and the first message ever produced to it must
+/// still be captured.
+#[tokio::test]
+#[serial_test::serial]
+async fn test_capture_only_changes_on_empty_topic() {
+    let topic = ONLY_CHANGES_TOPIC;
+    let partitions = 3;
+
+    let (admin, producer, _consumer) = kafka_clients();
+    recreate_topic(&admin, topic, partitions).await;
+
+    let first = preview_only_changes(None, "1s");
+    let saved = saved_partitions(&first, topic);
+    for partition in 0..partitions {
+        assert_eq!(
+            saved.get(&partition),
+            Some(&-1),
+            "an empty partition must save -1 so that it resumes at offset 0:\n{}",
+            first
+        );
+    }
+
+    for partition in 0..partitions {
+        let doc = json!({ "id": format!("first-ever-{}", partition) }).to_string();
+        send_message(
+            topic,
+            doc.as_bytes(),
+            Some(doc.as_bytes()),
+            partition as usize,
+            partitions,
+            &producer,
+        )
+        .await;
+    }
+
+    let state = json!({ "bindingStateV1": { topic: { "partitions": saved } } });
+    let second = preview_only_changes(Some(&state.to_string()), "10s");
+
+    let offsets: Vec<i64> = second
+        .lines()
+        .filter(|l| l.starts_with(ONLY_CHANGES_DOC_PREFIX))
+        .map(|l| {
+            serde_json::from_str::<serde_json::Value>(l).unwrap()[1]["_meta"]["offset"]
+                .as_i64()
+                .unwrap()
+        })
+        .collect();
+
+    assert_eq!(
+        offsets,
+        vec![0, 0, 0],
+        "every partition's first message sits at offset 0 and must be captured:\n{}",
+        second
+    );
 }
 
 /// Saved state takes precedence over the mode. A binding that has already run
@@ -665,6 +945,11 @@ async fn setup_test() {
         .unwrap();
 
     let opts = AdminOptions::default().request_timeout(Some(Duration::from_secs(1)));
+
+    // test_capture_only_changes owns this topic and produces into it while
+    // running. Drop it here rather than at the end of that test, so a panicking
+    // run cannot leave it behind for test_discover to enumerate.
+    let _ = admin.delete_topics(&[ONLY_CHANGES_TOPIC], &opts).await;
 
     for (enc, topic) in test_cases {
         admin.delete_topics(&[topic], &opts).await.unwrap();

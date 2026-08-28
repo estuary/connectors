@@ -163,6 +163,11 @@ The mode applies only to a partition with no saved offset, so:
 - A partition added after the capture starts follows the mode, so under
   `Only Changes` it starts at its end offset rather than reading what it holds.
 
+Under `Only Changes` the connector records each partition's starting offset when
+it starts, before it reads anything. A capture on an idle topic therefore holds
+its position across a restart and still captures the first message that arrives,
+rather than skipping forward to the end again.
+
 Two Kafka settings that look like they should control this do not affect this
 connector. `auto.offset.reset` is only consulted for an unset or invalid offset
 under a consumer-group subscription, and this connector assigns partitions

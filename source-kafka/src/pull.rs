@@ -107,8 +107,29 @@ pub async fn do_pull(req: Open, mut stdout: BufWriter<Stdout>) -> Result<()> {
     };
     let mut schema_cache: HashMap<u32, RegisteredSchema> = HashMap::new();
 
-    let topics_to_bindings =
+    let (topics_to_bindings, start_offsets) =
         setup_consumer(&mut consumer, state, &spec.bindings, &req.range).await?;
+
+    // Persist where the `Only Changes` bindings start before reading anything.
+    // Without this a restart before the first message re-resolves the end of
+    // the partition and skips whatever arrived in the meantime.
+    if !start_offsets.is_empty() {
+        write_capture_response(
+            Response {
+                checkpoint: Some(Checkpoint {
+                    state: Some(ConnectorState {
+                        updated_json: serde_json::to_string(&CaptureState {
+                            resources: start_offsets,
+                        })?
+                        .into(),
+                        merge_patch: true,
+                    }),
+                }),
+                ..Default::default()
+            },
+            &mut stdout,
+        )?;
+    }
 
     loop {
         let msg = consumer
@@ -273,13 +294,23 @@ fn unix_millis_to_rfc3339(millis: i64) -> Result<String> {
     Ok(time.format(&format_description::well_known::Rfc3339)?)
 }
 
+/// Bindings starting past their retained history, and the offsets they start
+/// from. `do_pull` checkpoints these before polling so the position survives a
+/// restart that receives no message.
+type StartOffsets = HashMap<String, ResourceState>;
+
+/// A broker that will not answer must fail the task rather than fall through to
+/// reading the history the binding asked to skip, so this is bounded.
+const WATERMARK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+
 async fn setup_consumer(
     consumer: &mut BaseConsumer<FlowConsumerContext>,
     state: CaptureState,
     bindings: &[Binding],
     range: &Option<RangeSpec>,
-) -> Result<HashMap<String, BindingInfo>> {
+) -> Result<(HashMap<String, BindingInfo>, StartOffsets)> {
     let meta = consumer.fetch_metadata(None, None)?;
+    let mut start_offsets = StartOffsets::new();
 
     let extant_partitions: HashMap<String, &[MetadataPartition]> = meta
         .topics()
@@ -315,14 +346,48 @@ async fn setup_consumer(
                 Some(o) => Offset::Offset(*o + 1), // Don't read the same offset again.
                 None => match res.mode {
                     BackfillMode::Automatic => Offset::Beginning,
-                    BackfillMode::OnlyChanges => Offset::End,
+                    // `Offset::End` is re-resolved by the broker on every
+                    // startup, so a task that stops before its first message
+                    // would resolve it again and skip whatever arrived in
+                    // between. Pin it to a number now and checkpoint it below.
+                    BackfillMode::OnlyChanges => {
+                        let (_low, high) = consumer
+                            .fetch_watermarks(topic, partition, WATERMARK_TIMEOUT)
+                            .with_context(|| {
+                                format!(
+                                    "fetching the end offset of topic {} partition {} to start \
+                                     past its retained history",
+                                    topic, partition
+                                )
+                            })?;
+                        // Offsets are stored as the last message read, and the
+                        // watermark is where the next message will land. An
+                        // empty partition stores -1 and so reads from 0.
+                        start_offsets
+                            .entry(state_key.to_string())
+                            .or_default()
+                            .partitions
+                            .insert(partition, high - 1);
+                        Offset::Offset(high)
+                    }
                 },
             };
-            // The broker resolves `Beginning` and `End` at fetch time, so this
-            // logs the requested position rather than a number. The mode is
-            // logged with it because that is the question support has when a
-            // binding read history it should have skipped.
-            tracing::info!(topic, partition, start = ?offset, mode = ?res.mode, "assigned partition");
+            // `Beginning` is the one position the broker still resolves at fetch
+            // time, so it logs no number. `to_raw` is not used for this because
+            // it maps `Beginning` to the sentinel -2, which reads as a real
+            // offset in a field named for one.
+            let start_offset = match offset {
+                Offset::Offset(n) => Some(n),
+                _ => None,
+            };
+            tracing::info!(
+                topic,
+                partition,
+                mode = ?res.mode,
+                start_offset,
+                start = ?offset,
+                "assigned partition"
+            );
             topic_partition_list.add_partition_offset(topic, partition, offset)?;
         }
 
@@ -339,7 +404,7 @@ async fn setup_consumer(
         .assign(&topic_partition_list)
         .context("could not assign consumer to topic_partition_list")?;
 
-    Ok(topics_to_bindings)
+    Ok((topics_to_bindings, start_offsets))
 }
 
 lazy_static! {
