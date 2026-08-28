@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-08-28
+
+### Changed
+- The commit schedule is now offset per materialization rather than per EMR
+  application. Previously every materialization sharing an EMR Serverless
+  application committed at the same instant, so its `maximumCapacity` had to
+  cover the resulting spike rather than the average. Tasks are now spread across
+  the sync interval. Commit cadence is unchanged; each task shifts to its own
+  offset once, on upgrade.
+
 ## 2026-08-25
 
 ### Added
