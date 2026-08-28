@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-08-28
+
+### Fixed
+
+- The `report_rows` capture no longer fails when Smartsheet rejects a report with
+  `{"errorCode": 1008, "message": "Unable to parse request."}`. The request is retried
+  three times, and the report is then skipped with a warning naming its id. Because
+  `report_rows` is a snapshot stream, a report skipped this way is captured again on a
+  later cycle if the error clears.
+
 ## 2026-08-24
 
 ### Fixed
