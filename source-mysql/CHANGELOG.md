@@ -1,5 +1,14 @@
 # source-mysql
 
+## 2026-08-28
+
+### Added
+- New `credentials` configuration union supporting username/password and Azure
+  IAM authentication, the latter using an Entra access token obtained through
+  an Azure App Registration. Existing configs with the legacy top-level
+  `password` field keep working and are folded into the new shape
+  automatically.
+
 ## 2026-08-18
 
 ### Added

@@ -172,6 +172,25 @@ GRANT SELECT ON *.* TO 'flow_capture';
 4. Note the instance's host under Server name, and the port under Connection Strings (usually `3306`).
    Together, you'll use the host:port as the `address` property when you configure the connector.
 
+### IAM Authentication
+
+For Azure Database for MySQL flexible servers, you can authenticate with an Azure App Registration instead of a password.
+
+Follow the steps in the [Azure IAM guide][azure-iam] to create an App Registration and make note of the Application ID and Tenant ID to use when configuring the connector's authentication options.
+
+Ensure that the flexible server has [Microsoft Entra authentication](https://learn.microsoft.com/en-us/azure/mysql/flexible-server/how-to-azure-ad) enabled and connect to it as the Entra admin. Run the following commands to create a database user for the App Registration, granting it the same permissions as the `flow_capture` user in the [Azure Database for MySQL](#azure-database-for-mysql) setup instructions above:
+
+```sql
+SET aad_auth_validate_oids_in_tenant = OFF;
+CREATE AADUSER 'flow_capture' IDENTIFIED BY 'application-id-of-app-registration';
+GRANT REPLICATION CLIENT, REPLICATION SLAVE ON *.* TO 'flow_capture';
+GRANT SELECT ON *.* TO 'flow_capture';
+```
+
+Use the name given in the `CREATE AADUSER` statement as the connector's `user` property.
+
+[azure-iam]: /guides/iam-auth/azure/
+
 ## Capturing from Read Replicas
 
 This connector supports capturing from a read replica of your database, provided that
@@ -232,7 +251,6 @@ See [connectors](/concepts/connectors.md#using-connectors) to learn more about u
 | --------------------------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | -------------------------- |
 | **`/address`**                          | Server Address                     | The host or host:port at which the database can be reached.                                                                                                                                                                                                                                                                                                                             | string  | Required                   |
 | **`/user`**                             | Login User                         | The database user to authenticate as.                                                                                                                                                                                                                                                                                                                                                   | string  | Required, `"flow_capture"` |
-| **`/password`**                         | Login Password                     | Password for the specified database user.                                                                                                                                                                                                                                                                                                                                               | string  | Required                   |
 | `/timezone`                             | Timezone                           | Timezone to use when capturing datetime columns. Should normally be left blank to use the database's `'time_zone'` system variable. Only required if the `'time_zone'` system variable cannot be read and columns with type datetime are being captured. Must be a valid IANA time zone name or +HH:MM offset. Takes precedence over the `'time_zone'` system variable if both are set. | string  |                            |
 | `/historyMode` | History Mode | Capture each change event, without merging. | boolean | `false` |
 | `/advanced/dbname`                      | Database Name                      | The name of the database to connect to. In general this shouldn't matter. The connector can discover and capture from all databases it's authorized to access.                                                                                                                                                                                                                    | string  | `"mysql"`                  |
@@ -244,6 +262,16 @@ See [connectors](/concepts/connectors.md#using-connectors) to learn more about u
 | `/advanced/source_tag` | Source Tag | This value is added as the property 'tag' in the source metadata of each document. | string |  |
 | `/advanced/statement_timeout` | Statement Timeout | Overrides the default statement timeout used by the connector. Allowed values: `30s`, `1m`, `5m`, `30m`, or empty to disable. | string |  |
 | `/advanced/rediscovery_interval` | Rediscovery Interval | How often the connector re-runs discovery while a capture is running, in order to notice schema changes and newly added tables. Accepts duration strings like `15m` or `1h`, from `1m` up to `8760h`. | string | `"15m"` |
+
+##### Authentication
+
+| Property | Title | Description | Type | Required/Default |
+| --- | --- | --- | --- | --- |
+| **`/credentials`** | Authentication | Authentication method and credentials that provide access to the database. | object | Required |
+| `/credentials/auth_type` | Auth Type | The authentication method to use. One of `UserPassword` or `AzureIAM`. | string |  |
+| `/credentials/password` | Password | Password for the specified database user. | string | Required for `UserPassword` auth |
+| `/credentials/azure_client_id` | Azure Client ID | Application (client) ID of the App Registration. | string | Required for `AzureIAM` auth |
+| `/credentials/azure_tenant_id` | Azure Tenant ID | Directory (tenant) ID of the App Registration. | string | Required for `AzureIAM` auth |
 
 ##### Discovery Filters
 
@@ -288,12 +316,23 @@ captures:
         config:
           address: "127.0.0.1:3306"
           user: "flow_capture"
-          password: "secret"
+          credentials:
+            auth_type: UserPassword
+            password: "secret"
     bindings:
       - resource:
           namespace: ${TABLE_NAMESPACE}
           stream: ${TABLE_NAME}
         target: ${PREFIX}/${COLLECTION_NAME}
+```
+
+To authenticate to an Azure Database for MySQL flexible server with [Azure IAM](#iam-authentication) instead, replace the credentials block:
+
+```yaml
+          credentials:
+            auth_type: AzureIAM
+            azure_client_id: "11111111-2222-3333-4444-555555555555"
+            azure_tenant_id: "66666666-7777-8888-9999-000000000000"
 ```
 
 Your capture definition will likely be more complex, with additional bindings for each table in the source database.
