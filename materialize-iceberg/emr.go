@@ -22,6 +22,9 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// maxJobRunDuration is the limit for EMR job runtime.
+const maxJobRunDuration = 4 * time.Hour
+
 type emrClient struct {
 	cfg                 emrConfig
 	catalogAuth         catalogAuthConfig
@@ -180,6 +183,9 @@ func (e *emrClient) runJob(ctx context.Context, input any, entryPointUri, pyFile
 		}
 	}
 
+	jobCtx, cancelJobCtx := context.WithTimeout(ctx, maxJobRunDuration)
+	defer cancelJobCtx()
+
 	var runDetails string
 	for {
 		gotRun, err := e.c.GetJobRun(ctx, &emr.GetJobRunInput{
@@ -209,8 +215,23 @@ func (e *emrClient) runJob(ctx context.Context, input any, entryPointUri, pyFile
 			}
 		default:
 			select {
-			case <-ctx.Done():
-				return ctx.Err()
+			case <-jobCtx.Done():
+				cancelCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Minute)
+				defer cancel()
+
+				if _, err := e.c.CancelJobRun(cancelCtx, &emr.CancelJobRunInput{
+					ApplicationId: aws.String(e.cfg.ApplicationId),
+					JobRunId:      start.JobRunId,
+				}); err != nil {
+					log.WithError(err).WithField("runDetails", runDetails).Warn("failed to cancel EMR job run")
+				}
+
+				// If the parent context was cancelled we are stopping the job
+				// due to that, not due to the total job runtime limit.
+				if err := ctx.Err(); err != nil {
+					return err
+				}
+				return fmt.Errorf("job %s exceeded the maximum allowed duration of %s and was cancelled", *start.JobRunId, maxJobRunDuration)
 			case <-time.After(5 * time.Second):
 				continue
 			}
