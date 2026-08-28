@@ -6,8 +6,5 @@ captures:
         - python
         - -m
         - source_airtable_native
-        config: 
-          credentials:
-            access_token_sops: placeholder
-            credentials_title: Private App Credentials
+        config: config.yaml
     bindings: []
