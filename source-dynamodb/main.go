@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/aws/retry"
@@ -99,6 +100,7 @@ type config struct {
 type advancedConfig struct {
 	BackfillSegments int    `json:"backfillSegments,omitempty" jsonschema:"title=Backfill Table Segments,description=Number of segments to use for backfill table scans. Has no effect if changed after the backfill has started." jsonschema_extras:"nonsensitive=true"`
 	ScanLimit        int    `json:"scanLimit,omitempty" jsonschema:"title=Scan Limit,description=Limit the number of items to evaluate for each table backfill scan request." jsonschema_extras:"nonsensitive=true"`
+	IdleBackoffMax   string `json:"idleBackoffMax,omitempty" jsonschema:"title=Idle Poll Backoff Maximum,default=1s,description=Maximum wait between polls of an open stream shard whose reads keep returning no records. Polling returns to once per second as soon as records appear. Accepts Go duration strings between '1s' and '10m'. Defaults to '1s'. Higher values reduce billed DynamoDB Streams requests on idle shards but delay capture of new records by up to the configured wait." jsonschema_extras:"pattern=^[0-9]+(ms|s|m|h)$,nonsensitive=true"`
 	Endpoint         string `json:"endpoint,omitempty" jsonschema:"title=AWS Endpoint,description=The AWS endpoint URI to connect to. Use if you're capturing from a compatible API that isn't provided by AWS."`
 }
 
@@ -129,8 +131,31 @@ func (c *config) Validate() error {
 	if c.Advanced.ScanLimit < 0 {
 		return fmt.Errorf("scanLimit cannot be negative")
 	}
+	if _, err := c.parseIdleBackoffMax(); err != nil {
+		return err
+	}
 
 	return nil
+}
+
+// parseIdleBackoffMax returns the configured maximum wait between polls of an idle open stream
+// shard, or defaultIdleBackoffMax when unset. The upper bound keeps waits well below the 15
+// minute expiry of DynamoDB Streams shard iterators, which the connector holds across the wait.
+func (c *config) parseIdleBackoffMax() (time.Duration, error) {
+	if c.Advanced.IdleBackoffMax == "" {
+		return defaultIdleBackoffMax, nil
+	}
+	d, err := time.ParseDuration(c.Advanced.IdleBackoffMax)
+	if err != nil {
+		return 0, fmt.Errorf("invalid idleBackoffMax %q: %w", c.Advanced.IdleBackoffMax, err)
+	}
+	if d < time.Second {
+		return 0, fmt.Errorf("idleBackoffMax %q must be at least 1s", c.Advanced.IdleBackoffMax)
+	}
+	if d > 10*time.Minute {
+		return 0, fmt.Errorf("idleBackoffMax %q must not exceed 10m", c.Advanced.IdleBackoffMax)
+	}
+	return d, nil
 }
 
 func (c *config) CredentialsProvider(ctx context.Context) (aws.CredentialsProvider, error) {

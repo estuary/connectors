@@ -207,6 +207,30 @@ func (c *capture) readShardTree(
 	}
 }
 
+// DynamoDB Streams bills every GetRecords request, so continuously polling an idle open shard
+// wastes money. If idleBackoffMax is raised above its 1 second default, a shard whose reads have
+// come back empty idleGraceEmpties times in a row waits longer between polls, doubling from
+// idleBackoffMin up to idleBackoffMax. A read that returns records resets the wait.
+//
+// The grace period exists because an empty read does not prove the shard is caught up (see the
+// note in captureTable): holding full speed for the first minute should help keep catch-up reads fast.
+const (
+	idleGraceEmpties      = 60
+	idleBackoffMin        = 2 * time.Second
+	defaultIdleBackoffMax = time.Second
+)
+
+// idleBackoff returns the extra wait to apply after the consecutiveEmpties'th consecutive empty
+// read of an open shard, given the wait that was applied after the previous one and the maximum
+// wait configured for the endpoint. A maximum of one second or less means no extra wait at all,
+// because the base limiter already spaces polls one second apart.
+func idleBackoff(consecutiveEmpties int, prev, maxWait time.Duration) time.Duration {
+	if maxWait <= time.Second || consecutiveEmpties <= idleGraceEmpties {
+		return 0
+	}
+	return min(max(2*prev, idleBackoffMin), maxWait)
+}
+
 func (c *capture) readShard(
 	ctx context.Context,
 	t *table,
@@ -237,11 +261,17 @@ func (c *capture) readShard(
 	// DynamoDB streams are billed per GetRecords request, and GetRecords returns immediately if
 	// there is no data. Limit GetRecords requests to once per second to avoid excessively frequent
 	// calls to GetRecords when tailing an open shard where there may be minimal new data available.
+	// An open shard whose reads keep coming back empty is paced down further by an additional,
+	// growing wait; see idleBackoff.
 	limiter := rate.NewLimiter(rate.Every(time.Second), 1)
-	if shard.SequenceNumberRange.EndingSequenceNumber != nil {
+	isOpen := shard.SequenceNumberRange.EndingSequenceNumber == nil
+	if !isOpen {
 		// If this shard is closed, read it to the end as fast as possible.
 		limiter.SetLimit(rate.Inf)
 	}
+
+	var consecutiveEmpties int
+	var backoff time.Duration
 
 	for iter != nil {
 		select {
@@ -314,6 +344,42 @@ func (c *capture) readShard(
 		// Advance for the next round. A nil NextShardIterator from the GetRecords response
 		// indicates that the shard is closed and will yield no additional records.
 		iter = recs.NextShardIterator
+
+		if isOpen && iter != nil {
+			if len(recs.Records) == 0 {
+				consecutiveEmpties++
+				backoff = idleBackoff(consecutiveEmpties, backoff, c.idleBackoffMax)
+			} else {
+				if backoff > 0 {
+					// The age of the first record distinguishes a fresh write to an idle shard
+					// from a stretch of the shard that had to be stepped through to reach
+					// older records.
+					var firstRecordAge time.Duration
+					if ts := recs.Records[0].Dynamodb.ApproximateCreationDateTime; ts != nil {
+						firstRecordAge = time.Since(*ts)
+					}
+					log.WithFields(log.Fields{
+						"table":              t.tableName,
+						"shardId":            *shard.ShardId,
+						"consecutiveEmpties": consecutiveEmpties,
+						"backoff":            backoff.String(),
+						"firstRecordAge":     firstRecordAge.String(),
+					}).Debug("open shard returned records after idle backoff")
+				}
+				consecutiveEmpties = 0
+				backoff = 0
+			}
+
+			if backoff > 0 {
+				select {
+				case <-time.After(backoff):
+				case <-workersStop:
+					return nil
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+			}
+		}
 	}
 
 	log.WithFields(log.Fields{
