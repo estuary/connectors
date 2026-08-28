@@ -10,6 +10,9 @@
   the sync interval. Commit cadence is unchanged; each task shifts to its own
   offset once, on upgrade.
 
+### Added
+- Add 4 hour limit to EMR job run time after which the job will be cancelled.
+
 ## 2026-08-25
 
 ### Added
