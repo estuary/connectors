@@ -35,6 +35,12 @@ var snapshotPath = "../materialize-sql/.snapshots"
 // the same name.
 type RuntimeV2Config = testutil.RuntimeV2Config
 
+// SanitizeCheckpointHashes returns a sanitizer for connector values derived by
+// hashing the runtime checkpoint. See the testutil function of the same name.
+func SanitizeCheckpointHashes(pattern, placeholder string) func(string) string {
+	return testutil.SanitizeCheckpointHashes(pattern, placeholder)
+}
+
 func RunMaterializationTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](
 	t *testing.T,
 	driver *Driver[EC, RC],
