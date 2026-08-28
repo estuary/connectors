@@ -19,6 +19,15 @@ COPY materialize-boilerplate ./materialize-boilerplate
 COPY materialize-snowflake   ./materialize-snowflake
 COPY materialize-sql         ./materialize-sql
 
+# The supervisor tests drive a stdlib-only python fake sidecar, so python3 is a
+# real dependency of this stage rather than one inherited incidentally from the
+# base image. Without it those tests skip instead of failing, so the build would
+# stay green while silently covering less.
+RUN apt-get update -y \
+     && apt-get install --no-install-recommends -y \
+     python3 \
+     && rm -rf /var/lib/apt/lists/*
+
 # Test and build the connector.
 RUN go test  -tags nozstd -v ./materialize-sql/...
 RUN go test  -tags nozstd -short -v ./materialize-snowflake/...
