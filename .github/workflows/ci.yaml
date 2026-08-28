@@ -252,7 +252,10 @@ jobs:
             ]'), matrix.connector)
         run: |
           set +e # Show logs even if startup fails
-          docker compose --file ${{ matrix.connector }}/docker-compose.yaml up --wait
+          # --wait blocks until every service's healthcheck passes. Bound it:
+          # without a timeout a healthcheck which never goes green hangs the
+          # job until the workflow-level limit rather than failing here.
+          docker compose --file ${{ matrix.connector }}/docker-compose.yaml up --wait --wait-timeout 300
           docker logs ${{ matrix.connector }}-db-1
 
       - name: Test setup
