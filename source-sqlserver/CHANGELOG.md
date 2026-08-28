@@ -1,5 +1,11 @@
 # source-sqlserver
 
+## 2026-08-28
+
+### Added
+- Azure IAM authentication as a new branch of the `credentials` union, using an
+  Entra access token obtained through an Azure App Registration.
+
 ## 2026-08-25
 
 ### Added

@@ -152,6 +152,32 @@ instead of a password. This requires an RDS Proxy in front of the database; see
 [Amazon RDS for SQL Server](./amazon-rds-sqlserver/#iam-authentication) for
 setup instructions.
 
+For Azure SQL Database, you can authenticate with an Azure App Registration
+instead of a password.
+
+Follow the steps in the [Azure IAM guide][azure-iam] to create an App
+Registration and make note of the Application ID and Tenant ID to use when
+configuring the connector's authentication options.
+
+Ensure that the SQL logical server has Entra authentication enabled and connect
+to the Azure SQL Database as the Entra admin. This can be done from the
+Database Query Editor. Run the following commands to create a user for the App
+Registration, granting it the same permissions as the `flow_capture` user in
+the [Azure SQL Database](#azure-sql-database) setup instructions above:
+
+```sql
+CREATE USER [my-app-registration-name] FROM EXTERNAL PROVIDER;
+GRANT SELECT ON SCHEMA :: dbo TO [my-app-registration-name];
+GRANT SELECT ON SCHEMA :: cdc TO [my-app-registration-name];
+GRANT VIEW DATABASE STATE TO [my-app-registration-name];
+```
+
+When enabling CDC on tables, use the App Registration name as the gating
+`role_name` argument, or grant the App Registration membership in whichever
+gating role your capture instances already use.
+
+[azure-iam]: /guides/iam-auth/azure/
+
 ### Handling DDL Alterations to Source Tables
 
 In SQL Server, adding a column to the source table will not automatically cause it to be added to the CDC change table. Instead [Microsoft's recommended approach](https://learn.microsoft.com/en-us/sql/relational-databases/track-changes/about-change-data-capture-sql-server?view=sql-server-ver17#handling-changes-to-source-table) is to create a second capture instance which reflects the new state of the source table, transition over to the new instance, and then delete the old one.
@@ -203,10 +229,12 @@ See [connectors](/concepts/connectors.md#using-connectors) to learn more about u
 | Property | Title | Description | Type | Required/Default |
 | --- | --- | --- | --- | --- |
 | **`/credentials`** | Authentication | Authentication method and credentials that provide access to the database. | object | Required |
-| `/credentials/auth_type` | Auth Type | The authentication method to use. One of `UserPassword` or `AWSIAM`. | string |  |
+| `/credentials/auth_type` | Auth Type | The authentication method to use. One of `UserPassword`, `AWSIAM`, or `AzureIAM`. | string |  |
 | `/credentials/password` | Password | Password for the specified database user. | string | Required for `UserPassword` auth |
 | `/credentials/aws_region` | AWS Region | AWS region of your resource. | string | Required for `AWSIAM` auth |
 | `/credentials/aws_role_arn` | AWS Role ARN | AWS role for Estuary to use that has access to the resource. | string | Required for `AWSIAM` auth |
+| `/credentials/azure_client_id` | Azure Client ID | Application (client) ID of the App Registration. | string | Required for `AzureIAM` auth |
+| `/credentials/azure_tenant_id` | Azure Tenant ID | Directory (tenant) ID of the App Registration. | string | Required for `AzureIAM` auth |
 
 ##### Discovery Filters
 
@@ -264,6 +292,16 @@ captures:
           namespace: dbo
           primary_key: ["id"]
         target: ${PREFIX}/${COLLECTION_NAME}
+```
+
+To authenticate to an Azure SQL Database with [Azure IAM](#iam-authentication)
+instead, replace the credentials block:
+
+```yaml
+          credentials:
+            auth_type: AzureIAM
+            azure_client_id: "11111111-2222-3333-4444-555555555555"
+            azure_tenant_id: "66666666-7777-8888-9999-000000000000"
 ```
 
 Your capture definition will likely be more complex, with additional bindings for each table in the source database.

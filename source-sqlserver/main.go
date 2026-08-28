@@ -74,6 +74,7 @@ type AuthType string
 const (
 	UserPassword AuthType = "UserPassword"
 	AWSIAM       AuthType = "AWSIAM"
+	AzureIAM     AuthType = "AzureIAM"
 )
 
 type UserPasswordConfig struct {
@@ -94,6 +95,7 @@ func (CredentialsConfig) JSONSchema() *jsonschema.Schema {
 	return schemagen.OneOfSchema("Authentication", "", "auth_type", string(UserPassword),
 		schemagen.OneOfSubSchema("Password", UserPasswordConfig{}, string(UserPassword)),
 		schemagen.OneOfSubSchema("AWS IAM", iam.AWSConfig{}, string(AWSIAM)),
+		schemagen.OneOfSubSchema("Azure IAM", iam.AzureConfig{}, string(AzureIAM)),
 	)
 }
 
@@ -104,7 +106,7 @@ func (c *CredentialsConfig) Validate() error {
 			return errors.New("missing 'password'")
 		}
 		return nil
-	case AWSIAM:
+	case AWSIAM, AzureIAM:
 		// The embedded IAMConfig has its own auth_type field which JSON decoding
 		// leaves empty (the outer field shadows it), so sync it before ValidateIAM
 		// switches on it.
@@ -119,7 +121,7 @@ type Config struct {
 	Address     string             `json:"address" jsonschema:"title=Server Address,description=The host or host:port at which the database can be reached." jsonschema_extras:"order=0"`
 	User        string             `json:"user" jsonschema:"default=flow_capture,description=The database user to authenticate as." jsonschema_extras:"order=1"`
 	Password    string             `json:"password,omitempty" jsonschema:"-"`
-	Credentials *CredentialsConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"order=2,x-iam-auth=true"`
+	Credentials *CredentialsConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"order=2,x-iam-auth=true,x-iam-azure-scope=https://database.windows.net/.default"`
 	Database    string             `json:"database" jsonschema:"description=Logical database name to capture from." jsonschema_extras:"order=3"`
 	Timezone    string             `json:"timezone,omitempty" jsonschema:"title=Time Zone,default=UTC,description=The IANA timezone name in which datetime columns will be converted to RFC3339 timestamps. Defaults to UTC if left blank." jsonschema_extras:"order=4,nonsensitive=true"`
 	HistoryMode bool               `json:"historyMode" jsonschema:"default=false,description=Capture change events without reducing them to a final state." jsonschema_extras:"order=5,nonsensitive=true"`
@@ -273,6 +275,10 @@ func (c *Config) ToURI() (string, error) {
 		userInfo = url.UserPassword(c.User, c.Credentials.Password)
 	case AWSIAM:
 		userInfo = url.User(c.User)
+	case AzureIAM:
+		// The Entra identity is carried entirely by the access token, so the DSN
+		// has no user info at all.
+		userInfo = nil
 	default:
 		return "", fmt.Errorf("unsupported 'auth_type' %q", c.Credentials.AuthType)
 	}
@@ -286,9 +292,12 @@ func (c *Config) ToURI() (string, error) {
 	return connectURL.String(), nil
 }
 
-// buildConnector constructs a driver connector for the configured authentication
-// method. AWS IAM connections fetch a fresh RDS auth token for each new connection
-// the pool opens, so long-running captures outlive the token's 15-minute validity.
+// buildConnector constructs a driver connector for the configured
+// authentication method. AWS IAM connections fetch a fresh RDS auth token for
+// each new connection the pool opens, so long-running captures outlive the
+// token's 15-minute validity. Azure IAM connections use the Entra access token
+// injected into the config by the control plane, which restarts the connector
+// with a fresh token before expiry.
 func (c *Config) buildConnector() (*mssqldb.Connector, error) {
 	var uri, err = c.ToURI()
 	if err != nil {
@@ -310,6 +319,11 @@ func (c *Config) buildConnector() (*mssqldb.Connector, error) {
 			return auth.BuildAuthToken(ctx, c.Address, c.Credentials.AWSRegion, c.User, credProvider)
 		}
 		return mssqldb.NewConnectorWithAccessTokenProvider(uri, tokenProvider)
+	case AzureIAM:
+		var token = c.Credentials.AzureToken()
+		return mssqldb.NewConnectorWithAccessTokenProvider(uri, func(ctx context.Context) (string, error) {
+			return token, nil
+		})
 	default:
 		return nil, fmt.Errorf("unsupported 'auth_type' %q", c.Credentials.AuthType)
 	}
