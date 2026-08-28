@@ -18,10 +18,17 @@ COPY source-kafka/Cargo.* /connector/
 
 # Avoid having to install/build all dependencies by copying the Cargo files and
 # making a dummy src/main.rs and empty lib.rs files.
+#
+# Keep these the same invocations, in the same profile, as the build below:
+# cargo keys artifacts on both, so priming anything else just compiles every
+# dependency twice. Release is the cheaper profile to share -- `cargo test
+# --release` reuses all but the dev-dependencies of the release build, and
+# clippy then compiles nothing.
 RUN mkdir src \
     && echo "fn main() {}" > src/main.rs \
     && touch src/lib.rs \
-    && cargo test --locked \
+    && cargo test --release --locked --no-run \
+    && cargo clippy --release --locked --no-deps \
     && cargo build --release --locked \
     && rm -r src
 
@@ -31,7 +38,7 @@ COPY source-kafka/src ./src
 RUN touch src/main.rs \
     && touch src/lib.rs \
     && cargo test --release --locked --offline \
-    && cargo clippy --locked --offline --no-deps \
+    && cargo clippy --release --locked --offline --no-deps \
     && cargo build --release --locked --offline
 
 # Runtime Stage
