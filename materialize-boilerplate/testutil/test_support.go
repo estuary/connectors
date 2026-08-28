@@ -75,6 +75,30 @@ func taskNames(bundled []byte) []string {
 	return names
 }
 
+// snapshotT is cupaloy.SnapshotT which, on a mismatch, also writes this run's
+// value beside the snapshot as `<name>.actual`. CI uploads that file: a
+// cloud-credentialed connector's snapshot can only be regenerated where its
+// endpoint is reachable, and the job log is no substitute, since GitHub's secret
+// redaction rewrites the connector state these snapshots embed.
+func snapshotT(t *testing.T, got string) {
+	t.Helper()
+
+	name := strings.ReplaceAll(t.Name(), "/", "-")
+	path := filepath.Join(".snapshots", name)
+
+	// cupaloy writes a lone string verbatim with a trailing newline, so this
+	// reproduces exactly what it would compare against.
+	if prev, err := os.ReadFile(path); err == nil && string(prev) != got+"\n" {
+		if err := os.WriteFile(path+".actual", []byte(got+"\n"), 0o644); err != nil {
+			t.Logf("failed to write %s.actual: %s", path, err)
+		} else {
+			t.Logf("wrote %s.actual with this run's value", path)
+		}
+	}
+
+	cupaloy.SnapshotT(t, got)
+}
+
 // RunTestAllTasks calls testFn for each materialization task found in the spec
 // at sourcePath. The endpoint configuration for the task is decrypted and
 // unmarshalled into EC.
@@ -162,7 +186,7 @@ func RunMaterializationTest[EC boilerplate.EndpointConfiger, FC boilerplate.Fiel
 		}
 	})
 
-	cupaloy.SnapshotT(t, snap.String())
+	snapshotT(t, snap.String())
 }
 
 // RunMaterializationRefusalTest drives each task of the fixture through
@@ -227,7 +251,7 @@ func RunMaterializationTestParallel[EC boilerplate.EndpointConfiger, FC boilerpl
 		snap.WriteString(results[name])
 	}
 
-	cupaloy.SnapshotT(t, snap.String())
+	snapshotT(t, snap.String())
 }
 
 // RunApplyTest tests a variety of scenarios involving changes to materialized
@@ -297,7 +321,7 @@ func RunApplyTest[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger,
 		}
 	}
 
-	cupaloy.SnapshotT(t, snap.String())
+	snapshotT(t, snap.String())
 }
 
 // RunApplyTestParallel is like RunApplyTest but runs tasks concurrently (up to
@@ -362,7 +386,7 @@ func RunApplyTestParallel[EC boilerplate.EndpointConfiger, FC boilerplate.FieldC
 		snap.WriteString(results[name])
 	}
 
-	cupaloy.SnapshotT(t, snap.String())
+	snapshotT(t, snap.String())
 }
 
 // RunMigrationTest tests migrations of all known schema widening scenarios.
@@ -397,7 +421,7 @@ func RunMigrationTest[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfi
 		snap.WriteString(runMigrationTestForTask(t, ctx, newMaterializer, taskName, bundled, suffix, makeResourceFn, actionDescSanitizers))
 	}
 
-	cupaloy.SnapshotT(t, snap.String())
+	snapshotT(t, snap.String())
 }
 
 // FeatureFlagMigrationPhase is a single apply within a
@@ -442,7 +466,7 @@ func RunFeatureFlagMigrationTest[EC boilerplate.EndpointConfiger, FC boilerplate
 		snap.WriteString(runFeatureFlagMigrationForTask(t, ctx, newMaterializer, taskName, bundled, suffix, makeResourceFn, phases, actionDescSanitizers))
 	}
 
-	cupaloy.SnapshotT(t, snap.String())
+	snapshotT(t, snap.String())
 }
 
 func runFeatureFlagMigrationForTask[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
@@ -564,7 +588,7 @@ func RunMigrationTestParallel[EC boilerplate.EndpointConfiger, FC boilerplate.Fi
 		snap.WriteString(results[name])
 	}
 
-	cupaloy.SnapshotT(t, snap.String())
+	snapshotT(t, snap.String())
 }
 
 func runMaterializationTestForTask[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](

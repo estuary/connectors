@@ -419,6 +419,23 @@ jobs:
         run: |
           CONNECTOR=${{ matrix.connector }} VERSION=local tests/materialize/run.sh;
 
+      # On a snapshot mismatch the harness writes this run's value beside the
+      # snapshot as `<name>.actual`. Hand it back: a cloud-credentialed
+      # connector's snapshot can only be regenerated where its endpoint is
+      # reachable, and the job log is no substitute, since secret redaction
+      # rewrites the connector state these snapshots embed. The files hold
+      # destination schemas and fixture rows, never endpoint configuration.
+      - name: Upload ${{ matrix.connector }} snapshot mismatches
+        if: failure() && startsWith(matrix.connector, 'materialize-')
+        uses: actions/upload-artifact@v4
+        with:
+          name: snapshot-mismatch-${{ matrix.connector }}
+          path: ${{ matrix.connector }}/.snapshots/*.actual
+          # `.snapshots` is hidden, and upload-artifact skips hidden files.
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: ignore
+
       - name: Push ${{ matrix.connector }} image(s) with commit SHA tag
         run: |
           for VARIANT in ${{ steps.prep.outputs.variants }}; do
