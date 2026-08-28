@@ -58,3 +58,12 @@ Test resource names are pinned to constants so snapshots are stable. `source-gcs
 its bucket lives in a real, shared GCP project where names are globally unique, so it keeps a random
 suffix and `run.sh` rewrites the bucket component of `/_meta/file` before comparing. Giving it a
 stable fixture bucket would remove that special case.
+
+### Generating a snapshot from CI
+
+Three of these fixtures are local docker-compose stacks, but `source-gcs` needs a real GCS bucket,
+and all of them need the connector's image built. If you can't run the test locally, let CI run it:
+a failing integration test uploads the capture output as a `capture-output-<connector>` artifact.
+Download it, review `actual.jsonl`, and commit it as `tests/<connector>/snapshot.jsonl`.
+
+Review it rather than committing it blind — see the truncation caveat above.

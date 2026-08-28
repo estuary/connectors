@@ -377,6 +377,33 @@ jobs:
 
         run: CONNECTOR=${{ matrix.connector }} VERSION=local ./tests/run.sh;
 
+      # On failure, hand back what the capture actually produced. A snapshot
+      # mismatch isn't actionable without it, and these fixtures -- localstack,
+      # rustfs, a real GCS bucket -- aren't reachable from a developer's
+      # machine, so CI is the only place that output exists. It's also how a
+      # snapshot gets generated in the first place: let the test fail, then
+      # review the uploaded actual.jsonl and commit it as the snapshot.
+      #
+      # Uploads the documents only, never the generated catalog: that embeds
+      # CONNECTOR_CONFIG, which for source-gcs is a live service account key,
+      # and artifacts on a public repo are world-downloadable.
+      - name: Upload ${{ matrix.connector }} capture output
+        if: |
+          failure() && contains(fromJson('[
+            "source-gcs",
+            "source-kinesis",
+            "source-s3",
+            "source-sftp"
+            ]'), matrix.connector)
+        uses: actions/upload-artifact@v4
+        with:
+          name: capture-output-${{ matrix.connector }}
+          path: |
+            .build/tests/${{ matrix.connector }}/actual.jsonl
+            .build/tests/${{ matrix.connector }}/raw.jsonl
+          retention-days: 7
+          if-no-files-found: warn
+
       - name: Install duckdb
         if: matrix.connector == 'materialize-motherduck'
         uses: opt-nc/setup-duckdb-action@v1.2.9
