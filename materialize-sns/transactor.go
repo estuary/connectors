@@ -9,9 +9,9 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
+	"github.com/estuary/connectors/go/keyhash"
 	"github.com/estuary/connectors/go/materialize"
 	pf "github.com/estuary/flow/go/protocols/flow"
-	"github.com/minio/highwayhash"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -44,14 +44,6 @@ func (t *transactor) Load(it *materialize.LoadIterator, _ func(int, json.RawMess
 	}
 	return nil
 }
-
-// PackedKeyHash_HH64 and highwayHashKey are copied verbatim from materialize-google-pubsub so SNS
-// FIFO MessageGroupId values match Flow's internal key-hash ordering scheme.
-func PackedKeyHash_HH64(packedKey []byte) uint32 {
-	return uint32(highwayhash.Sum64(packedKey, highwayHashKey) >> 32)
-}
-
-var highwayHashKey, _ = hex.DecodeString("ba737e89155238d47d8067c35aad4d25ecdd1c3488227e011ffa480c022bd3ba")
 
 func (t *transactor) Store(it *materialize.StoreIterator) (materialize.StartCommitFunc, error) {
 	errGroup, ctx := errgroup.WithContext(it.Context())
@@ -89,7 +81,7 @@ func (t *transactor) publishOne(ctx context.Context, errGroup *errgroup.Group, b
 		Message:  aws.String(string(doc)),
 	}
 	if binding.isFifo {
-		input.MessageGroupId = aws.String(fmt.Sprintf("%08x", PackedKeyHash_HH64(packedKey)))
+		input.MessageGroupId = aws.String(fmt.Sprintf("%08x", keyhash.PackedKeyHash_HH64(packedKey)))
 		sum := sha256.Sum256(append(append([]byte{}, packedKey...), doc...))
 		input.MessageDeduplicationId = aws.String(hex.EncodeToString(sum[:]))
 	}
