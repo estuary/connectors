@@ -1,0 +1,19 @@
+# Secrets — never commit
+config.yaml
+.env
+test.sh
+*.local
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+dist/
+*.egg-info/
+
+# OMC / agent state
+.omc/
