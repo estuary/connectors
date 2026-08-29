@@ -1,0 +1,88 @@
+# Collection definitions for Asana connector
+# Schema files are generated via: flowctl raw discover --source test.flow.yaml -o json --emit-raw
+
+collections:
+  acmeCo/Workspaces:
+    schema: Workspaces.schema.yaml
+    key:
+      - /gid
+
+  acmeCo/Users:
+    schema: Users.schema.yaml
+    key:
+      - /gid
+
+  acmeCo/Teams:
+    schema: Teams.schema.yaml
+    key:
+      - /gid
+
+  acmeCo/Projects:
+    schema: Projects.schema.yaml
+    key:
+      - /gid
+
+  acmeCo/Tasks:
+    schema: Tasks.schema.yaml
+    key:
+      - /gid
+
+  acmeCo/Sections:
+    schema: Sections.schema.yaml
+    key:
+      - /gid
+
+  acmeCo/Tags:
+    schema: Tags.schema.yaml
+    key:
+      - /gid
+
+  acmeCo/Portfolios:
+    schema: Portfolios.schema.yaml
+    key:
+      - /gid
+
+  acmeCo/Goals:
+    schema: Goals.schema.yaml
+    key:
+      - /gid
+
+  acmeCo/CustomFields:
+    schema: CustomFields.schema.yaml
+    key:
+      - /gid
+
+  acmeCo/TimePeriods:
+    schema: TimePeriods.schema.yaml
+    key:
+      - /gid
+
+  acmeCo/ProjectTemplates:
+    schema: ProjectTemplates.schema.yaml
+    key:
+      - /gid
+
+  acmeCo/StatusUpdates:
+    schema: StatusUpdates.schema.yaml
+    key:
+      - /gid
+
+  acmeCo/Attachments:
+    schema: Attachments.schema.yaml
+    key:
+      - /gid
+
+  acmeCo/Stories:
+    schema: Stories.schema.yaml
+    key:
+      - /gid
+
+  acmeCo/Memberships:
+    schema: Memberships.schema.yaml
+    key:
+      - /gid
+
+  acmeCo/TeamMemberships:
+    schema: TeamMemberships.schema.yaml
+    key:
+      - /gid
