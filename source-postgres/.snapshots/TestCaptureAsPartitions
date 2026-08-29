@@ -37,8 +37,14 @@ sql> CREATE TABLE test.captureaspartitions_274513_2023q4 PARTITION OF test.captu
     "allOf": [
       {
         "if": {
+          "required": [
+            "_meta"
+          ],
           "properties": {
             "_meta": {
+              "required": [
+                "op"
+              ],
               "properties": {
                 "op": {
                   "const": "d"
@@ -173,8 +179,14 @@ sql> CREATE TABLE test.captureaspartitions_274513_2023q4 PARTITION OF test.captu
     "allOf": [
       {
         "if": {
+          "required": [
+            "_meta"
+          ],
           "properties": {
             "_meta": {
+              "required": [
+                "op"
+              ],
               "properties": {
                 "op": {
                   "const": "d"
@@ -309,8 +321,14 @@ sql> CREATE TABLE test.captureaspartitions_274513_2023q4 PARTITION OF test.captu
     "allOf": [
       {
         "if": {
+          "required": [
+            "_meta"
+          ],
           "properties": {
             "_meta": {
+              "required": [
+                "op"
+              ],
               "properties": {
                 "op": {
                   "const": "d"
@@ -445,8 +463,14 @@ sql> CREATE TABLE test.captureaspartitions_274513_2023q4 PARTITION OF test.captu
     "allOf": [
       {
         "if": {
+          "required": [
+            "_meta"
+          ],
           "properties": {
             "_meta": {
+              "required": [
+                "op"
+              ],
               "properties": {
                 "op": {
                   "const": "d"
