@@ -5,7 +5,6 @@ import (
 	"compress/gzip"
 	"context"
 	stdsql "database/sql"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -287,32 +286,6 @@ func (c *client) SnapshotTestTable(ctx context.Context, path []string) (columnNa
 		return err
 	}); err != nil {
 		return nil, nil, err
-	}
-
-	// The checkpoint column arrives as base64 of its raw bytes: a JSON token
-	// payload, or for a row in the old format base64(gzip(bytes)), which is
-	// unwrapped to plain base64(bytes) for snapshot comparison.
-	for i, col := range columnNames {
-		if col != "checkpoint" {
-			continue
-		}
-		for _, row := range rows {
-			s, ok := row[i].(string)
-			if !ok || s == "" {
-				continue
-			}
-			utf8Bytes, err := base64.StdEncoding.DecodeString(s)
-			if err != nil {
-				continue
-			}
-			if tokens, legacy, err := parseCheckpointsRow(utf8Bytes); err != nil {
-				continue
-			} else if tokens != nil {
-				row[i] = string(utf8Bytes)
-			} else {
-				row[i] = base64.StdEncoding.EncodeToString(legacy)
-			}
-		}
 	}
 
 	return columnNames, rows, nil
