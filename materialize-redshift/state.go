@@ -6,53 +6,30 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"regexp"
 
 	"github.com/jackc/pgx/v5"
 )
 
-// stagedTransaction is one binding's staged-but-not-yet-applied work: the S3
-// objects it staged and what the apply needs to know to commit them. Every
-// field is written even when empty so that an entry's merge patch replaces
-// the previous entry outright rather than inheriting its fields.
+// stagedTransaction is one binding's staged-but-not-yet-applied work. Every
+// field is written even when empty, so an entry's merge patch replaces the
+// previous entry outright.
 type stagedTransaction struct {
-	StoreManifest  string   `json:"storeManifest"`
-	DeleteManifest string   `json:"deleteManifest"`
-	StoreFiles     []string `json:"storeFiles"`
-	DeleteFiles    []string `json:"deleteFiles"`
-	MustMerge      bool     `json:"mustMerge"`
-	Widen          []string `json:"widen"`
-}
-
-func newStagedTransaction() *stagedTransaction {
-	return &stagedTransaction{StoreFiles: []string{}, DeleteFiles: []string{}, Widen: []string{}}
-}
-
-// token identifies the transaction in the checkpoints table once applied.
-func (e *stagedTransaction) token() string {
-	if e.StoreManifest != "" {
-		return e.StoreManifest
-	}
-	return e.DeleteManifest
+	// ID is the transaction's token in the checkpoints table once applied.
+	ID          string   `json:"id"`
+	StoreFiles  []string `json:"storeFiles"`
+	DeleteFiles []string `json:"deleteFiles"`
+	MustMerge   bool     `json:"mustMerge"`
+	Widen       []string `json:"widen"`
 }
 
 // objects is every S3 object the transaction staged.
 func (e *stagedTransaction) objects() []string {
-	var out []string
-	for _, m := range []string{e.StoreManifest, e.DeleteManifest} {
-		if m != "" {
-			out = append(out, m)
-		}
-	}
-	out = append(out, e.StoreFiles...)
-	return append(out, e.DeleteFiles...)
+	return append(append([]string{}, e.StoreFiles...), e.DeleteFiles...)
 }
 
-// pendingState is the connector state: staged transactions keyed by the
-// staging shard's key range, then by binding state key. Ranges are disjoint
-// across the shards of a task, so their merge patches never clobber each other.
+// pendingState is the connector state: staged transactions by the staging
+// shard's key range, then by binding state key.
 type pendingState map[string]map[string]*stagedTransaction
 
 func (p pendingState) add(rangeKey, stateKey string, e *stagedTransaction) {
@@ -61,8 +38,6 @@ func (p pendingState) add(rangeKey, stateKey string, e *stagedTransaction) {
 	}
 	p[rangeKey][stateKey] = e
 }
-
-var rangeKeyRe = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{8}$`)
 
 func rangeKeyOf(keyBegin, keyEnd uint32) string {
 	return fmt.Sprintf("%08x-%08x", keyBegin, keyEnd)
@@ -80,11 +55,10 @@ func parseState(raw json.RawMessage) (pendingState, error) {
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&state); err != nil {
 		return nil, fmt.Errorf("parsing connector state: %w", err)
+	} else if state == nil {
+		return nil, fmt.Errorf("parsing connector state: unexpected null")
 	}
 	for rk, bucket := range state {
-		if !rangeKeyRe.MatchString(rk) {
-			return nil, fmt.Errorf("parsing connector state: %q is not a shard key range", rk)
-		}
 		for sk, e := range bucket {
 			if e == nil {
 				delete(bucket, sk)
@@ -98,9 +72,8 @@ func parseState(raw json.RawMessage) (pendingState, error) {
 	return state, nil
 }
 
-// tokenPayload is what the checkpoints row holds once a task has crossed
-// over: the manifest key of the last applied transaction of each state key,
-// scoped by the key range of the shard that staged it.
+// tokenPayload is what the checkpoints row holds once a task has crossed over:
+// the last applied transaction's ID by staging key range and state key.
 type tokenPayload map[string]map[string]string
 
 func (p tokenPayload) add(rangeKey, stateKey, token string) {
@@ -135,32 +108,13 @@ func parseCheckpointsRow(raw []byte) (tokenPayload, []byte, error) {
 	return nil, checkpoint, nil
 }
 
-var errAppliedConcurrently = errors.New("transaction was already applied by another instance of this materialization; restarting will skip it")
-
-// tokenStore reaches one materialization's checkpoints row for one key range.
+// tokenStore reaches one materialization's checkpoints row for one key range,
+// and mirrors that row's payload.
 type tokenStore struct {
 	table            string // quoted identifier
 	materialization  string
 	keyBegin, keyEnd uint32
-}
-
-type pgxQuerier interface {
-	QueryRow(context.Context, string, ...any) pgx.Row
-}
-
-// read returns the row's tokens and, for a row still in the old format, its
-// runtime checkpoint. Both are nil when there is no row.
-func (s *tokenStore) read(ctx context.Context, q pgxQuerier) (tokenPayload, []byte, error) {
-	var raw string
-	if err := q.QueryRow(ctx, fmt.Sprintf(
-		"SELECT checkpoint FROM %s WHERE materialization = $1 AND key_begin = $2 AND key_end = $3;", s.table),
-		s.materialization, s.keyBegin, s.keyEnd,
-	).Scan(&raw); errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil, nil
-	} else if err != nil {
-		return nil, nil, fmt.Errorf("reading checkpoints row: %w", err)
-	}
-	return decodeCheckpointsRow(raw)
+	payload          tokenPayload
 }
 
 // readAll returns the tokens committed by every row of the materialization,
@@ -194,7 +148,7 @@ func (s *tokenStore) readAll(ctx context.Context, conn *pgx.Conn) (map[string]bo
 			}
 		}
 		if keyBegin == s.keyBegin && keyEnd == s.keyEnd {
-			legacyCheckpoint = legacy
+			s.payload, legacyCheckpoint = tokens, legacy
 		}
 	}
 	if err := rows.Err(); err != nil {
@@ -213,8 +167,7 @@ func decodeCheckpointsRow(raw string) (tokenPayload, []byte, error) {
 	return parseCheckpointsRow(decoded)
 }
 
-// write records the tokens of just-applied transactions in the row, within
-// txn, which must roll back if another instance already committed one of them.
+// write records the tokens of just-applied transactions in the row, within txn.
 func (s *tokenStore) write(ctx context.Context, txn pgx.Tx, applied tokenPayload) error {
 	// Materializations sharing a metadata schema update the same table
 	// concurrently, which raises serializable isolation violations even for
@@ -223,23 +176,16 @@ func (s *tokenStore) write(ctx context.Context, txn pgx.Tx, applied tokenPayload
 		return fmt.Errorf("obtaining checkpoints table lock: %w", err)
 	}
 
-	tokens, _, err := s.read(ctx, txn)
-	if err != nil {
-		return err
-	}
-	if tokens == nil {
-		tokens = make(tokenPayload)
+	if s.payload == nil {
+		s.payload = make(tokenPayload)
 	}
 	for rk, bucket := range applied {
 		for sk, token := range bucket {
-			if tokens[rk][sk] == token {
-				return errAppliedConcurrently
-			}
-			tokens.add(rk, sk, token)
+			s.payload.add(rk, sk, token)
 		}
 	}
 
-	payload, err := json.Marshal(tokens)
+	payload, err := json.Marshal(s.payload)
 	if err != nil {
 		return fmt.Errorf("marshalling applied tokens: %w", err)
 	}

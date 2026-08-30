@@ -148,13 +148,10 @@ func stageRows(t *testing.T, cfg config, fields []string, rows [][]any) *stagedT
 	for _, row := range rows {
 		require.NoError(t, f.writeRow(ctx, row))
 	}
-	manifest, files, err := f.flush(ctx)
+	files, err := f.flush()
 	require.NoError(t, err)
 
-	entry := newStagedTransaction()
-	entry.StoreManifest = manifest
-	entry.StoreFiles = files
-	return entry
+	return &stagedTransaction{ID: uuid.NewString(), StoreFiles: files}
 }
 
 // runIdempotencyTest covers what the runtime-driven tests cannot, because they

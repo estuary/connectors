@@ -1,13 +1,11 @@
 package connector
 
 import (
-	"bytes"
 	"context"
 	stdsql "database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"iter"
 	"maps"
 	"net"
 	"net/url"
@@ -399,13 +397,11 @@ func prepareNewTransactor(
 		defer conn.Close(ctx)
 
 		var legacyCheckpoint []byte
+		if d.applied, legacyCheckpoint, err = d.tokens.readAll(ctx, conn); err != nil {
+			return nil, err
+		}
 		if d.primary {
 			d.pending = state
-			if d.applied, legacyCheckpoint, err = d.tokens.readAll(ctx, conn); err != nil {
-				return nil, err
-			}
-		} else if _, legacyCheckpoint, err = d.tokens.read(ctx, conn); err != nil {
-			return nil, err
 		}
 
 		// A shard's row is authoritative only until it has staged a
@@ -549,10 +545,6 @@ func (t *transactor) mergePeerStatePatches(patches []json.RawMessage) error {
 		return nil
 	}
 	for _, patch := range patches {
-		if bytes.Equal(bytes.TrimSpace(patch), []byte("null")) {
-			// A full state replacement; no shard emits one.
-			return fmt.Errorf("unexpected state reset patch in aggregated shard state")
-		}
 		state, err := parseState(patch)
 		if err != nil {
 			return fmt.Errorf("parsing aggregated state patch: %w", err)
@@ -659,11 +651,16 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			return fmt.Errorf("creating load table for target table '%s': %w", b.target.Identifier, err)
 		}
 
-		manifest, files, err := b.loadFile.flush(ctx)
+		files, err := b.loadFile.flush()
 		if err != nil {
 			return fmt.Errorf("flushing load file for binding[%d]: %w", idx, err)
 		}
-		defer deleteObjects(ctx, d.s3client, d.cfg.Bucket, append(slices.Clone(files), manifest))
+		var objects = slices.Clone(files)
+		defer deleteObjects(ctx, d.s3client, d.cfg.Bucket, objects)
+		manifest, err := d.putManifest(ctx, files, &objects)
+		if err != nil {
+			return err
+		}
 
 		if copySQL, err := d.copyFromS3(fmt.Sprintf("flow_temp_table_%d", b.target.Binding), manifest, false); err != nil {
 			return err
@@ -716,21 +713,16 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	ctx := it.Context()
 
 	flushStagedFile := func(ctx context.Context, b *binding) error {
+		var err error
 		if b.storeFile.started {
-			manifest, files, err := b.storeFile.flush(ctx)
-			if err != nil {
+			if b.staged.StoreFiles, err = b.storeFile.flush(); err != nil {
 				return fmt.Errorf("flushing store file: %w", err)
 			}
-			b.staged.StoreManifest = manifest
-			b.staged.StoreFiles = files
 		}
 		if b.deleteFile.started {
-			manifest, files, err := b.deleteFile.flush(ctx)
-			if err != nil {
+			if b.staged.DeleteFiles, err = b.deleteFile.flush(); err != nil {
 				return fmt.Errorf("flushing delete file: %w", err)
 			}
-			b.staged.DeleteManifest = manifest
-			b.staged.DeleteFiles = files
 		}
 		return nil
 	}
@@ -754,7 +746,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 		var b = d.bindings[it.Binding]
 		if b.staged == nil {
-			b.staged = newStagedTransaction()
+			b.staged = &stagedTransaction{ID: uuid.NewString()}
 		}
 		var file *stagedFile
 
@@ -868,28 +860,33 @@ type pendingEntry struct {
 	entry    *stagedTransaction
 }
 
-// stagedWork yields, for each binding that shouldProcess selects and that has
-// staged transactions pending from any shard, those transactions. Pending
-// entries with no live binding are never yielded, and so are left pending.
-func (d *transactor) stagedWork(shouldProcess func(string) bool) iter.Seq2[*binding, []pendingEntry] {
-	return func(yield func(*binding, []pendingEntry) bool) {
-		var rangeKeys = slices.Sorted(maps.Keys(d.pending))
-		for _, b := range d.bindings {
-			var sk = b.target.StateKey
-			if !shouldProcess(sk) {
-				continue
-			}
-			var entries []pendingEntry
-			for _, rk := range rangeKeys {
-				if e := d.pending[rk][sk]; e != nil {
-					entries = append(entries, pendingEntry{rk, e})
-				}
-			}
-			if len(entries) > 0 && !yield(b, entries) {
-				return
+// bindingWork is a binding's pending transactions from every shard.
+type bindingWork struct {
+	binding *binding
+	entries []pendingEntry
+}
+
+// stagedWork returns the pending transactions of each binding that
+// shouldProcess selects. Entries with no live binding are left pending.
+func (d *transactor) stagedWork(shouldProcess func(string) bool) []bindingWork {
+	var rangeKeys = slices.Sorted(maps.Keys(d.pending))
+	var work []bindingWork
+	for _, b := range d.bindings {
+		var sk = b.target.StateKey
+		if !shouldProcess(sk) {
+			continue
+		}
+		var entries []pendingEntry
+		for _, rk := range rangeKeys {
+			if e := d.pending[rk][sk]; e != nil {
+				entries = append(entries, pendingEntry{rk, e})
 			}
 		}
+		if len(entries) > 0 {
+			work = append(work, bindingWork{b, entries})
+		}
 	}
+	return work
 }
 
 func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
@@ -902,16 +899,10 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 
 	var work = d.stagedWork(m.StateKeyFilter(stateKeys))
 
-	// The processed entries, and the patch clearing them from the state.
 	var processed = make(pendingState)
-	var clear = make(map[string]map[string]any)
-	for b, entries := range work {
-		for _, pe := range entries {
-			processed.add(pe.rangeKey, b.target.StateKey, pe.entry)
-			if clear[pe.rangeKey] == nil {
-				clear[pe.rangeKey] = make(map[string]any)
-			}
-			clear[pe.rangeKey][b.target.StateKey] = nil
+	for _, w := range work {
+		for _, pe := range w.entries {
+			processed.add(pe.rangeKey, w.binding.target.StateKey, pe.entry)
 		}
 	}
 	if len(processed) == 0 {
@@ -922,10 +913,13 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 		return nil, err
 	}
 
+	// Clearing an entry from the state is a null at its place.
+	var clear = make(pendingState)
 	for rk, bucket := range processed {
 		for sk, e := range bucket {
 			deleteObjects(ctx, d.s3client, d.cfg.Bucket, e.objects())
 			delete(d.pending[rk], sk)
+			clear.add(rk, sk, nil)
 		}
 		if len(d.pending[rk]) == 0 {
 			delete(d.pending, rk)
@@ -939,32 +933,31 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	return &pf.ConnectorState{UpdatedJson: patch, MergePatch: true}, nil
 }
 
-// applyGroup is one binding's pending transactions from every shard, applied
-// as one unit: merged holds their files together and the manifests that list
-// them.
+// applyGroup is one binding's pending transactions from every shard, merged
+// into one, with manifests written for the apply.
 type applyGroup struct {
-	binding *binding
-	entries []pendingEntry
-	merged  stagedTransaction
+	binding                       *binding
+	merged                        stagedTransaction
+	storeManifest, deleteManifest string
 }
 
 // apply commits the staged transactions of work in one Redshift transaction,
 // skipping any whose token is already committed.
-func (d *transactor) apply(ctx context.Context, work iter.Seq2[*binding, []pendingEntry]) error {
+func (d *transactor) apply(ctx context.Context, work []bindingWork) error {
 	var groups []*applyGroup
 	var applying = make(tokenPayload)
-	for b, entries := range work {
+	for _, w := range work {
+		var b = w.binding
 		var g = &applyGroup{binding: b}
-		for _, pe := range entries {
-			if d.applied[pe.entry.token()] {
+		for _, pe := range w.entries {
+			if d.applied[pe.entry.ID] {
 				log.WithFields(log.Fields{
 					"table": b.target.Identifier,
 					"range": pe.rangeKey,
-					"token": pe.entry.token(),
+					"id":    pe.entry.ID,
 				}).Info("skipping staged transaction that was already applied")
 				continue
 			}
-			g.entries = append(g.entries, pe)
 			g.merged.StoreFiles = append(g.merged.StoreFiles, pe.entry.StoreFiles...)
 			g.merged.DeleteFiles = append(g.merged.DeleteFiles, pe.entry.DeleteFiles...)
 			g.merged.MustMerge = g.merged.MustMerge || pe.entry.MustMerge
@@ -973,36 +966,25 @@ func (d *transactor) apply(ctx context.Context, work iter.Seq2[*binding, []pendi
 					g.merged.Widen = append(g.merged.Widen, column)
 				}
 			}
-			applying.add(pe.rangeKey, b.target.StateKey, pe.entry.token())
+			applying.add(pe.rangeKey, b.target.StateKey, pe.entry.ID)
 		}
-		if len(g.entries) == 0 {
-			continue
+		if len(g.merged.StoreFiles) > 0 || len(g.merged.DeleteFiles) > 0 {
+			groups = append(groups, g)
 		}
-		groups = append(groups, g)
 	}
 	if len(groups) == 0 {
 		return nil
 	}
 
-	var combined []string
-	defer func() { deleteObjects(ctx, d.s3client, d.cfg.Bucket, combined) }()
+	var manifests []string
+	defer func() { deleteObjects(ctx, d.s3client, d.cfg.Bucket, manifests) }()
 	for _, g := range groups {
-		for _, m := range []struct {
-			target    *string
-			manifests []string
-			files     []string
-		}{
-			{&g.merged.StoreManifest, storeManifestsOf(g.entries), g.merged.StoreFiles},
-			{&g.merged.DeleteManifest, deleteManifestsOf(g.entries), g.merged.DeleteFiles},
-		} {
-			manifest, created, err := d.manifestFor(ctx, m.manifests, m.files)
-			if err != nil {
-				return err
-			}
-			if created {
-				combined = append(combined, manifest)
-			}
-			*m.target = manifest
+		var err error
+		if g.storeManifest, err = d.putManifest(ctx, g.merged.StoreFiles, &manifests); err != nil {
+			return err
+		}
+		if g.deleteManifest, err = d.putManifest(ctx, g.merged.DeleteFiles, &manifests); err != nil {
+			return err
 		}
 	}
 
@@ -1068,7 +1050,7 @@ func (d *transactor) apply(ctx context.Context, work iter.Seq2[*binding, []pendi
 		var b = g.binding
 		d.be.StartedResourceCommit(b.target.Path)
 
-		if g.merged.DeleteManifest != "" {
+		if g.deleteManifest != "" {
 			// Create the temporary table for staging values to delete from the target table.
 			// Redshift actually supports transactional DDL for creating tables, so this can be
 			// executed within the transaction.
@@ -1082,7 +1064,7 @@ func (d *transactor) apply(ctx context.Context, work iter.Seq2[*binding, []pendi
 				return fmt.Errorf("creating delete table: %w", err)
 			}
 
-			if copySQL, err := d.copyFromS3(fmt.Sprintf("flow_temp_table_%d_deleted", b.target.Binding), g.merged.DeleteManifest, false); err != nil {
+			if copySQL, err := d.copyFromS3(fmt.Sprintf("flow_temp_table_%d_deleted", b.target.Binding), g.deleteManifest, false); err != nil {
 				return err
 			} else if _, err := txn.Exec(ctx, copySQL); err != nil {
 				return handleCopyIntoErr(ctx, txn, d.cfg.Bucket, g.merged.DeleteFiles, b.target.Identifier, err)
@@ -1091,7 +1073,7 @@ func (d *transactor) apply(ctx context.Context, work iter.Seq2[*binding, []pendi
 			}
 		}
 
-		if g.merged.StoreManifest == "" {
+		if g.storeManifest == "" {
 			// Pass.
 		} else if g.merged.MustMerge {
 			// Create the temporary table for staging values to merge into the target table.
@@ -1107,7 +1089,7 @@ func (d *transactor) apply(ctx context.Context, work iter.Seq2[*binding, []pendi
 				return fmt.Errorf("creating store table: %w", err)
 			}
 
-			if copySQL, err := d.copyFromS3(fmt.Sprintf("flow_temp_table_%d", b.target.Binding), g.merged.StoreManifest, true); err != nil {
+			if copySQL, err := d.copyFromS3(fmt.Sprintf("flow_temp_table_%d", b.target.Binding), g.storeManifest, true); err != nil {
 				return err
 			} else if _, err := txn.Exec(ctx, copySQL); err != nil {
 				return handleCopyIntoErr(ctx, txn, d.cfg.Bucket, g.merged.StoreFiles, b.target.Identifier, err)
@@ -1116,7 +1098,7 @@ func (d *transactor) apply(ctx context.Context, work iter.Seq2[*binding, []pendi
 			}
 		} else {
 			// Can copy directly into the target table since all values are new.
-			if copySQL, err := d.copyFromS3(b.target.Identifier, g.merged.StoreManifest, true); err != nil {
+			if copySQL, err := d.copyFromS3(b.target.Identifier, g.storeManifest, true); err != nil {
 				return err
 			} else if _, err := txn.Exec(ctx, copySQL); err != nil {
 				return handleCopyIntoErr(ctx, txn, d.cfg.Bucket, g.merged.StoreFiles, b.target.Identifier, err)
@@ -1142,41 +1124,18 @@ func (d *transactor) apply(ctx context.Context, work iter.Seq2[*binding, []pendi
 	return nil
 }
 
-// manifestFor returns the manifest to COPY files from: the only one there is,
-// or a new one listing all of them, reported as created for cleanup.
-func (d *transactor) manifestFor(ctx context.Context, manifests, files []string) (string, bool, error) {
-	switch len(manifests) {
-	case 0:
-		return "", false, nil
-	case 1:
-		return manifests[0], false, nil
+// putManifest writes a manifest listing files under a fresh key, appended to
+// objects for cleanup, or returns "" when there are none.
+func (d *transactor) putManifest(ctx context.Context, files []string, objects *[]string) (string, error) {
+	if len(files) == 0 {
+		return "", nil
 	}
-
 	var key = path.Join(d.cfg.effectiveBucketPath(), uuid.NewString(), manifestFile)
 	if err := putManifest(ctx, d.s3client, d.cfg.Bucket, key, files); err != nil {
-		return "", false, err
+		return "", err
 	}
-	return key, true, nil
-}
-
-func storeManifestsOf(entries []pendingEntry) []string {
-	var out []string
-	for _, pe := range entries {
-		if len(pe.entry.StoreFiles) > 0 {
-			out = append(out, pe.entry.StoreManifest)
-		}
-	}
-	return out
-}
-
-func deleteManifestsOf(entries []pendingEntry) []string {
-	var out []string
-	for _, pe := range entries {
-		if len(pe.entry.DeleteFiles) > 0 {
-			out = append(out, pe.entry.DeleteManifest)
-		}
-	}
-	return out
+	*objects = append(*objects, key)
+	return key, nil
 }
 
 // handleCopyIntoErr queries the `sys_load_error_detail` table for relevant COPY INTO error details
