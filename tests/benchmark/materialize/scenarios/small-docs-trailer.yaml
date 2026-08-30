@@ -1,0 +1,38 @@
+# small-docs plus a trailing tiny transaction. A post-commit apply connector
+# commits transaction N's data during the Acknowledge that transaction N+1
+# waits on, and the timed window ends at the last commit, so without the
+# trailer the final transaction's destination work is never measured.
+collections:
+  - name: bench/tiny
+    schema:
+      type: object
+      if:
+        properties:
+          _meta:
+            properties: { op: { const: d } }
+      then:
+        reduce: { delete: true, strategy: lastWriteWins }
+      properties:
+        id:      { type: integer }
+        payload: { type: string }
+        _meta:
+          type: object
+          properties: { op: { type: string } }
+          required: [op]
+      required: [id, _meta]
+    key: [/id]
+
+transactions:
+  - doc_count: 25_000_000
+    doc_size:  128
+    op: c
+
+  - doc_count: 25_000_000
+    doc_size:  128
+    overlaps:
+      - { with: 0, fraction: 0.10, op: u }
+      - { with: 0, fraction: 0.05, op: d }
+
+  - doc_count: 1_000
+    doc_size:  128
+    op: c
