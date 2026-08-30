@@ -12,6 +12,11 @@
   it first and would need a backfill, since the checkpoints row no longer
   advances the runtime checkpoint.
 
+### Added
+- Scale-out on the v2 runtime: every shard stages its own files to S3, and the
+  shard whose key range begins at zero commits all shards' staged files for a
+  table with a single COPY and MERGE per transaction.
+
 ## 2026-08-25
 
 ### Added

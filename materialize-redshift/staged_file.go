@@ -39,7 +39,7 @@ const (
 //
 // - flush: Closes out the last file that was started (if any) and writes a manifest file that can
 // be used by Redshift to load all of the files stored for the current transaction. Returns the
-// manifest key and the keys of every object written, the manifest included.
+// manifest key and the keys of the files it lists.
 type stagedFile struct {
 	fields   []string
 	client   *s3.Client
@@ -189,42 +189,52 @@ func (f *stagedFile) fileKey(file string) string {
 	return path.Join(f.prefix, file)
 }
 
-// flush writes the manifest of this transaction's files and returns its key, along with the keys
-// of every object written for the transaction, the manifest first.
+// flush writes the manifest of this transaction's files and returns its key
+// along with the keys of the files it lists.
 func (f *stagedFile) flush(ctx context.Context) (string, []string, error) {
 	if err := f.flushFile(); err != nil {
 		return "", nil, err
 	}
 
-	manifest := copyManifest{}
 	manifestKey := f.fileKey(manifestFile)
-	objects := []string{manifestKey}
-
+	files := make([]string, 0, len(f.uploaded))
 	for _, u := range f.uploaded {
-		manifest.Entries = append(manifest.Entries, manifestEntry{
-			URL:       f.fileURI(u),
-			Mandatory: true, // Always true
-		})
-		objects = append(objects, f.fileKey(u))
+		files = append(files, f.fileKey(u))
 	}
 
-	manifestBytes, err := json.Marshal(manifest)
-	if err != nil {
-		return "", nil, fmt.Errorf("marshalling manifest file: %w", err)
-	}
-
-	if _, err := f.client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket: aws.String(f.bucket),
-		Key:    aws.String(manifestKey),
-		Body:   bytes.NewReader(manifestBytes),
-	}); err != nil {
-		return "", nil, fmt.Errorf("putting manifest file: %w", err)
+	if err := putManifest(ctx, f.client, f.bucket, manifestKey, files); err != nil {
+		return "", nil, err
 	}
 
 	// Reset for next round.
 	f.started = false
 
-	return manifestKey, objects, nil
+	return manifestKey, files, nil
+}
+
+// putManifest writes a COPY manifest at key listing the given data files.
+func putManifest(ctx context.Context, client *s3.Client, bucket, key string, files []string) error {
+	manifest := copyManifest{Entries: make([]manifestEntry, 0, len(files))}
+	for _, file := range files {
+		manifest.Entries = append(manifest.Entries, manifestEntry{
+			URL:       objectURI(bucket, file),
+			Mandatory: true, // Always true
+		})
+	}
+
+	manifestBytes, err := json.Marshal(manifest)
+	if err != nil {
+		return fmt.Errorf("marshalling manifest file: %w", err)
+	}
+
+	if _, err := client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+		Body:   bytes.NewReader(manifestBytes),
+	}); err != nil {
+		return fmt.Errorf("putting manifest file: %w", err)
+	}
+	return nil
 }
 
 // deleteObjects deletes staged objects, in the 1000 per call that S3 allows. Failures are logged:
