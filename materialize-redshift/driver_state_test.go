@@ -20,8 +20,8 @@ const (
 	upperRange = "80000000-ffffffff"
 )
 
-func entry(id string, files ...string) *checkpointItem {
-	return &checkpointItem{ID: id, StoreFiles: files}
+func entry(id string, files ...string) *stateItem {
+	return &stateItem{ID: id, StoreFiles: files}
 }
 
 // testTransactor builds a transactor of the given range with bindings for
@@ -68,7 +68,7 @@ func TestParseState(t *testing.T) {
 			}
 		}`))
 		require.NoError(t, err)
-		require.Equal(t, connectorState{"a_table.v1": {fullRange: &checkpointItem{
+		require.Equal(t, connectorState{"a_table.v1": {fullRange: &stateItem{
 			ID:          "p/x/files.manifest",
 			StoreFiles:  []string{"p/x/f1"},
 			DeleteFiles: []string{},
@@ -88,8 +88,8 @@ func TestParseState(t *testing.T) {
 	})
 }
 
-func TestCheckpointItemObjects(t *testing.T) {
-	e := &checkpointItem{ID: "t1", StoreFiles: []string{"p/s/f1", "p/s/f2"}, DeleteFiles: []string{"p/d/f1"}}
+func TestStateItemObjects(t *testing.T) {
+	e := &stateItem{ID: "t1", StoreFiles: []string{"p/s/f1", "p/s/f2"}, DeleteFiles: []string{"p/d/f1"}}
 	require.Equal(t, []string{"p/s/f1", "p/s/f2", "p/d/f1"}, e.objects())
 }
 
@@ -124,7 +124,7 @@ func TestParseCheckpointsRow(t *testing.T) {
 }
 
 func TestEntryPatchReplacesPrevious(t *testing.T) {
-	previous := &checkpointItem{
+	previous := &stateItem{
 		ID:          "t1",
 		StoreFiles:  []string{"p/1/f1"},
 		DeleteFiles: []string{"p/1d/f1"},
@@ -197,7 +197,7 @@ func TestStateRouting(t *testing.T) {
 	t.Run("acknowledge leaves unrequested and unbound state keys pending", func(t *testing.T) {
 		d := testTransactor(lowerRange, "a_table.v1")
 		require.NoError(t, d.UnmarshalState(state))
-		d.cp["gone_table.v1"] = map[string]*checkpointItem{upperRange: entry("g/files.manifest", "g/f")}
+		d.cp["gone_table.v1"] = map[string]*stateItem{upperRange: entry("g/files.manifest", "g/f")}
 
 		patch, err := d.Acknowledge(t.Context(), nil, []string{"other.v1"})
 		require.NoError(t, err)

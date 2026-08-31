@@ -323,7 +323,7 @@ type transactor struct {
 	// work; the others only stage.
 	primary          bool
 	checkpointsTable *checkpointsTable
-	// IDs of every checkpointItem already committed, across the materialization.
+	// IDs of every stateItem already committed, across the materialization.
 	committedTokens map[string]bool
 	// The whole state: staged transactions not yet applied, from every shard.
 	cp connectorState
@@ -432,7 +432,7 @@ type binding struct {
 	loadQuerySQL              string
 
 	// The transaction being staged, if any.
-	staged *checkpointItem
+	staged *stateItem
 }
 
 // VarcharColumnMeta contains metadata about Redshift varchar columns. Currently this is just the
@@ -750,7 +750,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 		var b = d.bindings[it.Binding]
 		if b.staged == nil {
-			b.staged = &checkpointItem{ID: uuid.NewString()}
+			b.staged = &stateItem{ID: uuid.NewString()}
 		}
 		var file *stagedFile
 
@@ -858,9 +858,12 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 		return nil, nil
 	}
 
-	// Entries of a binding with no live table are left pending.
+	// Entries of a binding with no live table are left pending. Clearing an
+	// entry from the state is a null at its place.
 	var shouldProcess = m.StateKeyFilter(stateKeys)
 	var pending = make(connectorState)
+	var clear = make(connectorState)
+	var toDelete []string
 	for _, b := range d.bindings {
 		var sk = b.target.StateKey
 		if !shouldProcess(sk) {
@@ -868,6 +871,8 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 		}
 		for rk, e := range d.cp[sk] {
 			pending.add(sk, rk, e)
+			clear.add(sk, rk, nil)
+			toDelete = append(toDelete, e.objects()...)
 		}
 	}
 	if len(pending) == 0 {
@@ -878,13 +883,10 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 		return nil, err
 	}
 
-	// Clearing an entry from the state is a null at its place.
-	var clear = make(connectorState)
+	d.store.deleteObjects(ctx, toDelete)
 	for sk, bucket := range pending {
-		for rk, e := range bucket {
-			d.store.deleteObjects(ctx, e.objects())
+		for rk := range bucket {
 			delete(d.cp[sk], rk)
-			clear.add(sk, rk, nil)
 		}
 		if len(d.cp[sk]) == 0 {
 			delete(d.cp, sk)
@@ -905,7 +907,7 @@ func (d *transactor) commit(ctx context.Context, pending connectorState) error {
 	// into one, with manifests written for the commit.
 	type group struct {
 		binding                       *binding
-		merged                        checkpointItem
+		merged                        stateItem
 		storeManifest, deleteManifest string
 	}
 	var groups []*group
