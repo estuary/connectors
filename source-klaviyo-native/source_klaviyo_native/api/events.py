@@ -103,11 +103,8 @@ class QueueManager:
         except asyncio.TimeoutError:
             return None
 
-    def are_all_queues_empty(self) -> bool:
-        return (
-            self.work_queue.empty() and
-            self.subdivision_request_queue.empty()
-        )
+    def mark_work_chunk_done(self) -> None:
+        self.work_queue.task_done()
 
 
 class WorkManager:
@@ -127,7 +124,7 @@ class WorkManager:
 
         self.worker_tasks: list[asyncio.Task] = []
         self.subdivision_task: Optional[asyncio.Task] = None
-        self.shutdown_monitor_task: Optional[asyncio.Task] = None
+        self.completion_watcher_task: Optional[asyncio.Task] = None
 
         self._active_worker_count = 0
         self.first_worker_error: str | None = None
@@ -141,9 +138,6 @@ class WorkManager:
         if self._active_worker_count <= 0:
             raise Exception(f"A worker attempted to mark itself inactive when the active worker count is {self._active_worker_count}.")
         self._active_worker_count -= 1
-
-    def are_active_workers(self) -> bool:
-        return self._active_worker_count > 0
 
     async def fetch_events_between(
         self,
@@ -209,13 +203,22 @@ class WorkManager:
             )
             self.subdivision_task.add_done_callback(callback)
 
-            self.shutdown_monitor_task = tg.create_task(
-                self._shutdown_monitor(),
-                name="shutdown_monitor"
+            self.completion_watcher_task = tg.create_task(
+                self._completion_watcher(),
+                name="completion_watcher"
             )
-            self.shutdown_monitor_task.add_done_callback(callback)
+            self.completion_watcher_task.add_done_callback(callback)
 
         self.log.debug("Exiting TaskGroup.")
+
+        # A clean shutdown must leave both queues drained.
+        if (
+            not self.queue_manager.work_queue.empty() or
+            not self.queue_manager.subdivision_request_queue.empty()
+        ):
+            raise RuntimeError(
+                "Events backfill worker pool shut down with unprocessed date chunks still queued."
+            )
 
     def _create_initial_chunks(self, start: datetime, end: datetime) -> list[DateChunk]:
         return [
@@ -228,16 +231,17 @@ class WorkManager:
             )
         ]
 
-    async def _shutdown_monitor(self) -> None:
-        self.log.debug("Shutdown monitor started.")
-        while not self.shutdown_event.is_set():
-            if not self.are_active_workers() and self.queue_manager.are_all_queues_empty():
-                self.log.debug("All work complete - shutdown monitor initiating shutdown")
-                self.shutdown_event.set()
-                break
-
-            await asyncio.sleep(1)
-        self.log.debug("Shutdown monitor exited.")
+    async def _completion_watcher(self) -> None:
+        self.log.debug("Completion watcher started.")
+        # Every chunk put on the work queue increments its unfinished-task
+        # count, and a chunk is only marked done after it's fully processed
+        # (or, for a chunk handed off for subdivision, after its replacement
+        # chunks have been enqueued). join() therefore returns only once no
+        # chunk is queued.
+        await self.queue_manager.work_queue.join()
+        self.log.debug("All work complete - completion watcher initiating shutdown")
+        self.shutdown_event.set()
+        self.log.debug("Completion watcher exited.")
 
 
 # chunk_worker pulls a date chunk from the queue and fetches events created in
@@ -277,6 +281,7 @@ async def chunk_worker(
             last_cursor = chunk.start
             is_divisible = chunk.end - chunk.start >= (SMALLEST_KLAVIYO_DATETIME_GRAIN * 3)
             is_dense_date_window = False
+            did_hand_off_chunk = False
 
             events_gen = _fetch_events_updated_between(http, log, chunk.start, chunk.end)
 
@@ -296,6 +301,7 @@ async def chunk_worker(
                         end=chunk.end
                     )
                     queue_manager.put_subdivision_chunk(subdivision_chunk)
+                    did_hand_off_chunk = True
                     break
 
                 last_cursor = event_cursor
@@ -319,6 +325,11 @@ async def chunk_worker(
 
             log.debug(f"Event worker {worker_id} is marking itself inactive.")
             work_manager.mark_worker_inactive()
+
+            # A handed-off chunk stays unfinished until the subdivision worker
+            # enqueues its replacement chunks and marks it done.
+            if not did_hand_off_chunk:
+                queue_manager.mark_work_chunk_done()
 
         log.debug(f"Event worker {worker_id} exited.")
     except CancelledError as e:
@@ -376,6 +387,11 @@ async def subdivision_worker(
         ]
 
         await queue_manager.put_work_chunks(divided_chunks)
+
+        # The parent chunk stays unfinished until its replacements are
+        # enqueued above, so the work queue's unfinished-task count can
+        # never touch zero while a subdivision is in flight.
+        queue_manager.mark_work_chunk_done()
 
     log.debug("Subdivision worker exited.")
 
