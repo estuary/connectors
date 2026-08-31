@@ -363,6 +363,18 @@ func (c *client) withDB(fn func(*stdsql.DB) error) error {
 	return fn(db)
 }
 
+// compressBytes gzips b, matching the format decodeLegacyCheckpoint expects.
+func compressBytes(b []byte) ([]byte, error) {
+	var gzb bytes.Buffer
+	w := gzip.NewWriter(&gzb)
+	if _, err := w.Write(b); err != nil {
+		return nil, fmt.Errorf("compressing bytes: %w", err)
+	} else if err := w.Close(); err != nil {
+		return nil, fmt.Errorf("closing gzip writer: %w", err)
+	}
+	return gzb.Bytes(), nil
+}
+
 func maybeDecompressBytes(b []byte) ([]byte, error) {
 	if len(b) >= 2 && b[0] == 0x1f && b[1] == 0x8b { // Valid gzip header bytes
 		var out bytes.Buffer
