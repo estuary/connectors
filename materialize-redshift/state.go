@@ -11,10 +11,10 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// stagedTransaction is one binding's staged-but-not-yet-applied work. Every
+// checkpointItem is one binding's staged-but-not-yet-applied work. Every
 // field is written even when empty, so an entry's merge patch replaces the
 // previous entry outright.
-type stagedTransaction struct {
+type checkpointItem struct {
 	// ID is the transaction's token in the checkpoints table once applied.
 	ID          string   `json:"id"`
 	StoreFiles  []string `json:"storeFiles"`
@@ -24,17 +24,17 @@ type stagedTransaction struct {
 }
 
 // objects is every S3 object the transaction staged.
-func (e *stagedTransaction) objects() []string {
+func (e *checkpointItem) objects() []string {
 	return append(append([]string{}, e.StoreFiles...), e.DeleteFiles...)
 }
 
 // pendingState is the connector state: staged transactions by binding state
 // key, then by the staging shard's key range.
-type pendingState map[string]map[string]*stagedTransaction
+type pendingState map[string]map[string]*checkpointItem
 
-func (p pendingState) add(stateKey, rangeKey string, e *stagedTransaction) {
+func (p pendingState) add(stateKey, rangeKey string, e *checkpointItem) {
 	if p[stateKey] == nil {
-		p[stateKey] = make(map[string]*stagedTransaction)
+		p[stateKey] = make(map[string]*checkpointItem)
 	}
 	p[stateKey][rangeKey] = e
 }
@@ -54,7 +54,7 @@ func rangeKeyOf(keyBegin, keyEnd uint32) string {
 }
 
 // parseState decodes a state document or a StartedCommit patch of the same
-// shape. A null entry (a cleared one) is dropped.
+// shape.
 func parseState(raw json.RawMessage) (pendingState, error) {
 	var state = make(pendingState)
 	if len(bytes.TrimSpace(raw)) == 0 {
@@ -66,67 +66,59 @@ func parseState(raw json.RawMessage) (pendingState, error) {
 	if err := dec.Decode(&state); err != nil {
 		return nil, fmt.Errorf("parsing connector state: %w", err)
 	}
-	if state == nil {
-		// A null document or patch is empty, per RFC 7396.
-		state = make(pendingState)
-	}
-	for sk, bucket := range state {
-		for rk, e := range bucket {
-			if e == nil {
-				delete(bucket, rk)
-			}
-		}
-		if len(bucket) == 0 {
-			delete(state, sk)
-		}
-	}
 
 	return state, nil
 }
 
-// tokenPayload is what the checkpoints row holds once a task has crossed over:
+// checkpoints is what the checkpoints row holds once a task has crossed over:
 // the last applied transaction's ID by state key and staging key range.
-type tokenPayload map[string]map[string]string
+type checkpoints map[string]map[string]string
 
-func (p tokenPayload) add(stateKey, rangeKey, token string) {
+func (p checkpoints) add(stateKey, rangeKey, token string) {
 	if p[stateKey] == nil {
 		p[stateKey] = make(map[string]string)
 	}
 	p[stateKey][rangeKey] = token
 }
 
-// parseCheckpointsRow tells a token payload from a row still in the old
-// format, which held a base64 (possibly gzipped) runtime checkpoint. Base64
-// cannot produce a leading `{`.
-func parseCheckpointsRow(raw []byte) (tokenPayload, []byte, error) {
-	if len(raw) > 0 && raw[0] == '{' {
-		var tokens tokenPayload
-		if err := json.Unmarshal(raw, &tokens); err != nil {
+// parseCheckpointsRow decodes a checkpoints row's checkpoint column, which
+// reads back as hex text because the column is VARBYTE. Its decoded bytes are
+// either a token payload or, for a row still in the old format, a base64
+// (possibly gzipped) runtime checkpoint. Base64 cannot produce a leading `{`.
+func (s *checkpointsTable) parseCheckpointsRow(raw string) (checkpoints, []byte, error) {
+	decoded, err := hex.DecodeString(raw)
+	if err != nil {
+		return nil, nil, fmt.Errorf("decoding checkpoints row: %w", err)
+	}
+
+	if len(decoded) > 0 && decoded[0] == '{' {
+		var tokens checkpoints
+		if err := json.Unmarshal(decoded, &tokens); err != nil {
 			return nil, nil, fmt.Errorf("parsing applied tokens: %w", err)
 		}
 		return tokens, nil, nil
 	}
 
-	decoded, err := base64.StdEncoding.DecodeString(string(raw))
+	b64decoded, err := base64.StdEncoding.DecodeString(string(decoded))
 	if err != nil {
 		return nil, nil, fmt.Errorf("decoding checkpoint: %w", err)
-	} else if len(decoded) == 0 {
+	} else if len(b64decoded) == 0 {
 		return nil, nil, nil
 	}
-	checkpoint, err := maybeDecompressBytes(decoded)
+	checkpoint, err := maybeDecompressBytes(b64decoded)
 	if err != nil {
 		return nil, nil, err
 	}
 	return nil, checkpoint, nil
 }
 
-// tokenStore reaches one materialization's checkpoints row for one key range,
+// checkpointsTable reaches one materialization's checkpoints row for one key range,
 // and mirrors that row's payload.
-type tokenStore struct {
+type checkpointsTable struct {
 	table            string // quoted identifier
 	materialization  string
 	keyBegin, keyEnd uint32
-	payload          tokenPayload
+	payload          checkpoints
 }
 
 // readAll returns the tokens committed by every row of the materialization,
@@ -134,7 +126,7 @@ type tokenStore struct {
 // row when that row is still in the old format. A primary of a previous
 // shard topology committed into a different row, and its tokens must still
 // settle the entries it applied.
-func (s *tokenStore) readAll(ctx context.Context, conn *pgx.Conn) (map[string]bool, []byte, error) {
+func (s *checkpointsTable) readAll(ctx context.Context, conn *pgx.Conn) (map[string]bool, []byte, error) {
 	rows, err := conn.Query(ctx, fmt.Sprintf(
 		"SELECT key_begin, key_end, checkpoint FROM %s WHERE materialization = $1;", s.table), s.materialization)
 	if err != nil {
@@ -150,7 +142,7 @@ func (s *tokenStore) readAll(ctx context.Context, conn *pgx.Conn) (map[string]bo
 		if err := rows.Scan(&keyBegin, &keyEnd, &raw); err != nil {
 			return nil, nil, fmt.Errorf("scanning checkpoints row: %w", err)
 		}
-		tokens, legacy, err := decodeCheckpointsRow(raw)
+		tokens, legacy, err := s.parseCheckpointsRow(raw)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -169,18 +161,8 @@ func (s *tokenStore) readAll(ctx context.Context, conn *pgx.Conn) (map[string]bo
 	return applied, legacyCheckpoint, nil
 }
 
-// decodeCheckpointsRow parses a checkpoint column value, which reads back as
-// hex text because the column is VARBYTE.
-func decodeCheckpointsRow(raw string) (tokenPayload, []byte, error) {
-	decoded, err := hex.DecodeString(raw)
-	if err != nil {
-		return nil, nil, fmt.Errorf("decoding checkpoints row: %w", err)
-	}
-	return parseCheckpointsRow(decoded)
-}
-
 // write records the tokens of just-applied transactions in the row, within txn.
-func (s *tokenStore) write(ctx context.Context, txn pgx.Tx, applied tokenPayload) error {
+func (s *checkpointsTable) write(ctx context.Context, txn pgx.Tx, applied checkpoints) error {
 	// Materializations sharing a metadata schema update the same table
 	// concurrently, which raises serializable isolation violations even for
 	// different rows. All applies take this one lock in the same order.
@@ -189,7 +171,7 @@ func (s *tokenStore) write(ctx context.Context, txn pgx.Tx, applied tokenPayload
 	}
 
 	if s.payload == nil {
-		s.payload = make(tokenPayload)
+		s.payload = make(checkpoints)
 	}
 	for sk, bucket := range applied {
 		for rk, token := range bucket {
