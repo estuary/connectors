@@ -171,16 +171,15 @@ func TestStateRouting(t *testing.T) {
 		require.Nil(t, patch)
 	})
 
-	t.Run("the primary folds peers' patches and skips its own echo", func(t *testing.T) {
+	t.Run("the primary folds every shard's patches, including its own echo", func(t *testing.T) {
 		d := testTransactor(lowerRange, "a_table.v1")
-		d.pending["a_table.v1"] = map[string]*checkpointItem{lowerRange: entry("own/files.manifest", "own/f")}
 		require.NoError(t, d.mergePeerStatePatches([]json.RawMessage{state}))
-		require.Equal(t, "own/files.manifest", d.pending["a_table.v1"][lowerRange].ID)
+		require.Equal(t, "l/files.manifest", d.pending["a_table.v1"][lowerRange].ID)
 		require.Equal(t, "u/files.manifest", d.pending["a_table.v1"][upperRange].ID)
 
 		require.Error(t, d.mergePeerStatePatches([]json.RawMessage{json.RawMessage(`null`)}))
 
-		// The peer's previous transaction is still pending: its work would be lost.
+		// The previous transaction is still pending: its work would be lost.
 		require.Error(t, d.mergePeerStatePatches([]json.RawMessage{state}))
 	})
 
