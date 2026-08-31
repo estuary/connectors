@@ -6,10 +6,17 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
+
+// checkpointTokensColumn holds checkpointTokensMap. A NULL value means this
+// row has never been written by this connector: its legacy checkpoint is
+// still authoritative.
+const checkpointTokensColumn = "checkpoint_tokens"
 
 // stateItem is one binding's staged-but-not-yet-applied work. Every
 // field is written even when empty, so an entry's merge patch replaces the
@@ -49,6 +56,15 @@ func (p connectorState) hasRange(rangeKey string) bool {
 	return false
 }
 
+// entryCount is the total number of entries across every state key.
+func (p connectorState) entryCount() int {
+	var n int
+	for _, bucket := range p {
+		n += len(bucket)
+	}
+	return n
+}
+
 func rangeKeyOf(keyBegin, keyEnd uint32) string {
 	return fmt.Sprintf("%08x-%08x", keyBegin, keyEnd)
 }
@@ -82,35 +98,40 @@ func (p checkpointTokensMap) add(stateKey, rangeKey, token string) {
 	p[stateKey][rangeKey] = token
 }
 
-// parseCheckpointsRow decodes a checkpoints row's checkpoint column, which
-// reads back as hex text because the column is VARBYTE. Its decoded bytes are
-// either a token payload or, for a row still in the old format, a base64
-// (possibly gzipped) runtime checkpoint. Base64 cannot produce a leading `{`.
-func (s *checkpointsTable) parseCheckpointsRow(raw string) (checkpointTokensMap, []byte, error) {
+// decodeLegacyCheckpoint decodes a checkpoints row's checkpoint column: a
+// base64 (possibly gzipped) runtime checkpoint, the format written by
+// pre-migration versions of this connector and mirrored by this one. It
+// reads back as hex text because the column is VARBYTE.
+func decodeLegacyCheckpoint(raw string) ([]byte, error) {
 	decoded, err := hex.DecodeString(raw)
 	if err != nil {
-		return nil, nil, fmt.Errorf("decoding checkpoints row: %w", err)
+		return nil, fmt.Errorf("decoding checkpoints row: %w", err)
 	}
-
-	if len(decoded) > 0 && decoded[0] == '{' {
-		var tokens checkpointTokensMap
-		if err := json.Unmarshal(decoded, &tokens); err != nil {
-			return nil, nil, fmt.Errorf("parsing applied tokens: %w", err)
-		}
-		return tokens, nil, nil
-	}
-
 	b64decoded, err := base64.StdEncoding.DecodeString(string(decoded))
 	if err != nil {
-		return nil, nil, fmt.Errorf("decoding checkpoint: %w", err)
+		return nil, fmt.Errorf("decoding checkpoint: %w", err)
 	} else if len(b64decoded) == 0 {
-		return nil, nil, nil
+		return nil, nil
 	}
-	checkpoint, err := maybeDecompressBytes(b64decoded)
+	return maybeDecompressBytes(b64decoded)
+}
+
+// decodeTokensColumn decodes a checkpoints row's checkpoint_tokens column,
+// nil when raw is the column's NULL. It reads back as hex text because the
+// column is VARBYTE.
+func decodeTokensColumn(raw *string) (checkpointTokensMap, error) {
+	if raw == nil {
+		return nil, nil
+	}
+	decoded, err := hex.DecodeString(*raw)
 	if err != nil {
-		return nil, nil, err
+		return nil, fmt.Errorf("decoding checkpoint tokens row: %w", err)
 	}
-	return nil, checkpoint, nil
+	var tokens checkpointTokensMap
+	if err := json.Unmarshal(decoded, &tokens); err != nil {
+		return nil, fmt.Errorf("parsing applied tokens: %w", err)
+	}
+	return tokens, nil
 }
 
 // checkpointsTable reaches one materialization's checkpoints row for one key range,
@@ -122,30 +143,49 @@ type checkpointsTable struct {
 	payload          checkpointTokensMap
 }
 
+// ensureTokensColumn adds the checkpoint_tokens column to a checkpoints
+// table predating it, ignoring Redshift's "column already exists" error
+// once it's there.
+func (s *checkpointsTable) ensureTokensColumn(ctx context.Context, conn *pgx.Conn) error {
+	if _, err := conn.Exec(ctx, fmt.Sprintf(
+		"ALTER TABLE %s ADD COLUMN %s VARBYTE(1024000);", s.table, checkpointTokensColumn)); err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "42701" {
+			return nil
+		}
+		return fmt.Errorf("adding %s column: %w", checkpointTokensColumn, err)
+	}
+	return nil
+}
+
 // readAll returns the tokens committed by every row of the materialization,
-// whatever key range wrote them, and the runtime checkpoint of this range's
-// row when that row is still in the old format. A primary of a previous
-// shard topology committed into a different row, and its tokens must still
-// settle the entries it applied.
-func (s *checkpointsTable) readAll(ctx context.Context, conn *pgx.Conn) (map[string]bool, []byte, error) {
+// whatever key range wrote them; this range's row's mirrored legacy runtime
+// checkpoint; and whether this row's checkpoint_tokens have ever been
+// written by this connector, in which case the legacy checkpoint is no
+// longer authoritative. A primary of a previous shard topology committed
+// into a different row, and its tokens must still settle the entries it
+// applied.
+func (s *checkpointsTable) readAll(ctx context.Context, conn *pgx.Conn) (map[string]bool, []byte, bool, error) {
 	rows, err := conn.Query(ctx, fmt.Sprintf(
-		"SELECT key_begin, key_end, checkpoint FROM %s WHERE materialization = $1;", s.table), s.materialization)
+		"SELECT key_begin, key_end, checkpoint, %s FROM %s WHERE materialization = $1;", checkpointTokensColumn, s.table), s.materialization)
 	if err != nil {
-		return nil, nil, fmt.Errorf("reading checkpoints rows: %w", err)
+		return nil, nil, false, fmt.Errorf("reading checkpoints rows: %w", err)
 	}
 	defer rows.Close()
 
 	var applied = make(map[string]bool)
 	var legacyCheckpoint []byte
+	var crossedOver bool
 	for rows.Next() {
 		var keyBegin, keyEnd uint32
-		var raw string
-		if err := rows.Scan(&keyBegin, &keyEnd, &raw); err != nil {
-			return nil, nil, fmt.Errorf("scanning checkpoints row: %w", err)
+		var checkpointRaw string
+		var tokensRaw *string
+		if err := rows.Scan(&keyBegin, &keyEnd, &checkpointRaw, &tokensRaw); err != nil {
+			return nil, nil, false, fmt.Errorf("scanning checkpoints row: %w", err)
 		}
-		tokens, legacy, err := s.parseCheckpointsRow(raw)
+		tokens, err := decodeTokensColumn(tokensRaw)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, false, err
 		}
 		for _, bucket := range tokens {
 			for _, token := range bucket {
@@ -153,17 +193,25 @@ func (s *checkpointsTable) readAll(ctx context.Context, conn *pgx.Conn) (map[str
 			}
 		}
 		if keyBegin == s.keyBegin && keyEnd == s.keyEnd {
-			s.payload, legacyCheckpoint = tokens, legacy
+			s.payload, crossedOver = tokens, tokensRaw != nil
+			if legacyCheckpoint, err = decodeLegacyCheckpoint(checkpointRaw); err != nil {
+				return nil, nil, false, err
+			}
 		}
 	}
 	if err := rows.Err(); err != nil {
-		return nil, nil, fmt.Errorf("reading checkpoints rows: %w", err)
+		return nil, nil, false, fmt.Errorf("reading checkpoints rows: %w", err)
 	}
-	return applied, legacyCheckpoint, nil
+	return applied, legacyCheckpoint, crossedOver, nil
 }
 
-// write records the tokens of just-applied transactions in the row, within txn.
-func (s *checkpointsTable) write(ctx context.Context, txn pgx.Tx, applied checkpointTokensMap) error {
+// write records the tokens of just-applied transactions in the row, within
+// txn. When legacyCheckpoint is non-nil, it's mirrored into the legacy
+// checkpoint column too, so a downgraded connector can resume from it; the
+// caller passes one only once every entry that was pending is settled by
+// this call, so the mirror never claims a checkpoint whose data is only
+// partially applied.
+func (s *checkpointsTable) write(ctx context.Context, txn pgx.Tx, applied checkpointTokensMap, legacyCheckpoint []byte) error {
 	// Materializations sharing a metadata schema update the same table
 	// concurrently, which raises serializable isolation violations even for
 	// different rows. All applies take this one lock in the same order.
@@ -180,27 +228,58 @@ func (s *checkpointsTable) write(ctx context.Context, txn pgx.Tx, applied checkp
 		}
 	}
 
-	payload, err := json.Marshal(s.payload)
+	tokensPayload, err := json.Marshal(s.payload)
 	if err != nil {
 		return fmt.Errorf("marshalling applied tokens: %w", err)
 	}
 
-	res, err := txn.Exec(ctx, fmt.Sprintf(
-		"UPDATE %s SET checkpoint = $1 WHERE materialization = $2 AND key_begin = $3 AND key_end = $4;", s.table),
-		string(payload), s.materialization, s.keyBegin, s.keyEnd,
-	)
-	if err != nil {
-		return fmt.Errorf("writing applied tokens: %w", err)
-	} else if res.RowsAffected() > 1 {
-		return fmt.Errorf("checkpoints table has %d rows for materialization %q and key range %s", res.RowsAffected(), s.materialization, rangeKeyOf(s.keyBegin, s.keyEnd))
-	} else if res.RowsAffected() == 1 {
+	var legacyPayload *string
+	if legacyCheckpoint != nil {
+		compressed, err := compressBytes(legacyCheckpoint)
+		if err != nil {
+			return fmt.Errorf("compressing runtime checkpoint: %w", err)
+		}
+		var encoded = base64.StdEncoding.EncodeToString(compressed)
+		legacyPayload = &encoded
+	}
+
+	var rowsAffected int64
+	if legacyPayload == nil {
+		res, err := txn.Exec(ctx, fmt.Sprintf(
+			"UPDATE %s SET %s = $1 WHERE materialization = $2 AND key_begin = $3 AND key_end = $4;", s.table, checkpointTokensColumn),
+			string(tokensPayload), s.materialization, s.keyBegin, s.keyEnd,
+		)
+		if err != nil {
+			return fmt.Errorf("writing applied tokens: %w", err)
+		}
+		rowsAffected = res.RowsAffected()
+	} else {
+		res, err := txn.Exec(ctx, fmt.Sprintf(
+			"UPDATE %s SET %s = $1, checkpoint = $2 WHERE materialization = $3 AND key_begin = $4 AND key_end = $5;", s.table, checkpointTokensColumn),
+			string(tokensPayload), *legacyPayload, s.materialization, s.keyBegin, s.keyEnd,
+		)
+		if err != nil {
+			return fmt.Errorf("writing applied tokens: %w", err)
+		}
+		rowsAffected = res.RowsAffected()
+	}
+	if rowsAffected > 1 {
+		return fmt.Errorf("checkpoints table has %d rows for materialization %q and key range %s", rowsAffected, s.materialization, rangeKeyOf(s.keyBegin, s.keyEnd))
+	} else if rowsAffected == 1 {
 		return nil
 	}
 
 	// The fence column is NOT NULL; nothing reads it anymore.
-	if _, err := txn.Exec(ctx, fmt.Sprintf(
-		"INSERT INTO %s (materialization, key_begin, key_end, fence, checkpoint) VALUES ($1, $2, $3, 0, $4);", s.table),
-		s.materialization, s.keyBegin, s.keyEnd, string(payload),
+	if legacyPayload == nil {
+		if _, err := txn.Exec(ctx, fmt.Sprintf(
+			"INSERT INTO %s (materialization, key_begin, key_end, fence, %s) VALUES ($1, $2, $3, 0, $4);", s.table, checkpointTokensColumn),
+			s.materialization, s.keyBegin, s.keyEnd, string(tokensPayload),
+		); err != nil {
+			return fmt.Errorf("inserting applied tokens: %w", err)
+		}
+	} else if _, err := txn.Exec(ctx, fmt.Sprintf(
+		"INSERT INTO %s (materialization, key_begin, key_end, fence, checkpoint, %s) VALUES ($1, $2, $3, 0, $4, $5);", s.table, checkpointTokensColumn),
+		s.materialization, s.keyBegin, s.keyEnd, *legacyPayload, string(tokensPayload),
 	); err != nil {
 		return fmt.Errorf("inserting applied tokens: %w", err)
 	}

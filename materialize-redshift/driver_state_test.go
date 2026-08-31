@@ -1,8 +1,6 @@
 package connector
 
 import (
-	"bytes"
-	"compress/gzip"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -35,7 +33,7 @@ func testTransactor(rangeKey string, stateKeys ...string) *transactor {
 		rangeKey:        rangeKey,
 		primary:         keyBegin == 0,
 		committedTokens: make(map[string]bool),
-		cp:              make(connectorState),
+		state:           make(connectorState),
 	}
 	for _, sk := range stateKeys {
 		d.bindings = append(d.bindings, &binding{target: sql.Table{
@@ -93,32 +91,32 @@ func TestStateItemObjects(t *testing.T) {
 	require.Equal(t, []string{"p/s/f1", "p/s/f2", "p/d/f1"}, e.objects())
 }
 
-func TestParseCheckpointsRow(t *testing.T) {
-	var s = &checkpointsTable{}
-
-	t.Run("a token payload", func(t *testing.T) {
-		tokens, legacy, err := s.parseCheckpointsRow(hex.EncodeToString([]byte(`{"a_table.v1":{"00000000-ffffffff":"p/x/files.manifest"}}`)))
+func TestDecodeCheckpointsColumns(t *testing.T) {
+	t.Run("the tokens column", func(t *testing.T) {
+		tokens, err := decodeTokensColumn(nil)
 		require.NoError(t, err)
-		require.Nil(t, legacy)
+		require.Nil(t, tokens)
+
+		raw := hex.EncodeToString([]byte(`{"a_table.v1":{"00000000-ffffffff":"p/x/files.manifest"}}`))
+		tokens, err = decodeTokensColumn(&raw)
+		require.NoError(t, err)
 		require.Equal(t, checkpointTokensMap{"a_table.v1": {fullRange: "p/x/files.manifest"}}, tokens)
 	})
 
-	t.Run("a row in the old format", func(t *testing.T) {
+	t.Run("the legacy checkpoint column, compressed", func(t *testing.T) {
 		checkpoint := []byte("some-runtime-checkpoint")
 		compressed, err := compressBytes(checkpoint)
 		require.NoError(t, err)
 
-		tokens, legacy, err := s.parseCheckpointsRow(hex.EncodeToString([]byte(base64.StdEncoding.EncodeToString(compressed))))
+		legacy, err := decodeLegacyCheckpoint(hex.EncodeToString([]byte(base64.StdEncoding.EncodeToString(compressed))))
 		require.NoError(t, err)
-		require.Nil(t, tokens)
 		require.Equal(t, checkpoint, legacy)
 	})
 
-	t.Run("a row in the old format that was never compressed", func(t *testing.T) {
+	t.Run("the legacy checkpoint column, never compressed", func(t *testing.T) {
 		checkpoint := []byte("some-runtime-checkpoint")
-		tokens, legacy, err := s.parseCheckpointsRow(hex.EncodeToString([]byte(base64.StdEncoding.EncodeToString(checkpoint))))
+		legacy, err := decodeLegacyCheckpoint(hex.EncodeToString([]byte(base64.StdEncoding.EncodeToString(checkpoint))))
 		require.NoError(t, err)
-		require.Nil(t, tokens)
 		require.Equal(t, checkpoint, legacy)
 	})
 }
@@ -156,16 +154,16 @@ func TestStateRouting(t *testing.T) {
 	t.Run("the primary recovers every range", func(t *testing.T) {
 		d := testTransactor(lowerRange, "a_table.v1")
 		require.NoError(t, d.UnmarshalState(state))
-		require.Len(t, d.cp, 1)
-		require.Len(t, d.cp["a_table.v1"], 2)
-		require.Equal(t, "l/files.manifest", d.cp["a_table.v1"][lowerRange].ID)
-		require.Equal(t, "u/files.manifest", d.cp["a_table.v1"][upperRange].ID)
+		require.Len(t, d.state, 1)
+		require.Len(t, d.state["a_table.v1"], 2)
+		require.Equal(t, "l/files.manifest", d.state["a_table.v1"][lowerRange].ID)
+		require.Equal(t, "u/files.manifest", d.state["a_table.v1"][upperRange].ID)
 	})
 
 	t.Run("a non-primary shard recovers nothing and acknowledges nothing", func(t *testing.T) {
 		d := testTransactor(upperRange, "a_table.v1")
 		require.NoError(t, d.UnmarshalState(state))
-		require.Empty(t, d.cp)
+		require.Empty(t, d.state)
 		patch, err := d.Acknowledge(t.Context(), []json.RawMessage{state}, nil)
 		require.NoError(t, err)
 		require.Nil(t, patch)
@@ -174,8 +172,8 @@ func TestStateRouting(t *testing.T) {
 	t.Run("the primary folds every shard's patches, including its own echo", func(t *testing.T) {
 		d := testTransactor(lowerRange, "a_table.v1")
 		require.NoError(t, d.mergePeerStatePatches([]json.RawMessage{state}))
-		require.Equal(t, "l/files.manifest", d.cp["a_table.v1"][lowerRange].ID)
-		require.Equal(t, "u/files.manifest", d.cp["a_table.v1"][upperRange].ID)
+		require.Equal(t, "l/files.manifest", d.state["a_table.v1"][lowerRange].ID)
+		require.Equal(t, "u/files.manifest", d.state["a_table.v1"][upperRange].ID)
 
 		require.Error(t, d.mergePeerStatePatches([]json.RawMessage{json.RawMessage(`null`)}))
 
@@ -191,19 +189,19 @@ func TestStateRouting(t *testing.T) {
 		patch, err := d.Acknowledge(t.Context(), nil, nil)
 		require.NoError(t, err)
 		require.Nil(t, patch)
-		require.NotNil(t, d.cp["gone_table.v1"][fullRange])
+		require.NotNil(t, d.state["gone_table.v1"][fullRange])
 	})
 
 	t.Run("acknowledge leaves unrequested and unbound state keys pending", func(t *testing.T) {
 		d := testTransactor(lowerRange, "a_table.v1")
 		require.NoError(t, d.UnmarshalState(state))
-		d.cp["gone_table.v1"] = map[string]*stateItem{upperRange: entry("g/files.manifest", "g/f")}
+		d.state["gone_table.v1"] = map[string]*stateItem{upperRange: entry("g/files.manifest", "g/f")}
 
 		patch, err := d.Acknowledge(t.Context(), nil, []string{"other.v1"})
 		require.NoError(t, err)
 		require.Nil(t, patch)
-		require.Len(t, d.cp["a_table.v1"], 2)
-		require.NotNil(t, d.cp["gone_table.v1"][upperRange])
+		require.Len(t, d.state["a_table.v1"], 2)
+		require.NotNil(t, d.state["gone_table.v1"][upperRange])
 	})
 }
 
@@ -212,16 +210,4 @@ func mustMarshal(t *testing.T, v any) json.RawMessage {
 	b, err := json.Marshal(v)
 	require.NoError(t, err)
 	return b
-}
-
-// compressBytes encodes a checkpoint the way rows in the old format hold it.
-func compressBytes(b []byte) ([]byte, error) {
-	var gzb bytes.Buffer
-	w := gzip.NewWriter(&gzb)
-	if _, err := w.Write(b); err != nil {
-		return nil, err
-	} else if err := w.Close(); err != nil {
-		return nil, err
-	}
-	return gzb.Bytes(), nil
 }
