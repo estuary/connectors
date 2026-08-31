@@ -322,10 +322,10 @@ type transactor struct {
 	rangeKey string
 	// The shard whose key range begins at 0 applies every shard's staged
 	// work; the others only stage.
-	primary bool
-	tokens  *tokenStore
-	// Tokens of every applied transaction of the materialization.
-	applied map[string]bool
+	primary     bool
+	checkpoints *checkpointsTable
+	// IDs of every checkpointItem already committed, across the materialization.
+	committedTokens map[string]bool
 	// Staged transactions not yet applied, from every shard.
 	pending pendingState
 	// Set only for a task crossing over from the old format, whose row still
@@ -363,14 +363,14 @@ func prepareNewTransactor(
 			caseSensitiveIdentifierEnabled: caseSensitiveIdentifierEnabled,
 			rangeKey:                       rangeKeyOf(fence.KeyBegin, fence.KeyEnd),
 			primary:                        fence.KeyBegin == 0,
-			tokens: &tokenStore{
+			checkpoints: &checkpointsTable{
 				table:           ep.Dialect.Identifier(fence.TablePath...),
 				materialization: fence.Materialization.String(),
 				keyBegin:        fence.KeyBegin,
 				keyEnd:          fence.KeyEnd,
 			},
-			applied: make(map[string]bool),
-			pending: make(pendingState),
+			committedTokens: make(map[string]bool),
+			pending:         make(pendingState),
 		}
 
 		client, err := d.cfg.toS3Client(ctx, featureFlags)
@@ -399,7 +399,7 @@ func prepareNewTransactor(
 		defer conn.Close(ctx)
 
 		var legacyCheckpoint []byte
-		if d.applied, legacyCheckpoint, err = d.tokens.readAll(ctx, conn); err != nil {
+		if d.committedTokens, legacyCheckpoint, err = d.checkpoints.readAll(ctx, conn); err != nil {
 			return nil, err
 		}
 		if d.primary {
@@ -433,7 +433,7 @@ type binding struct {
 	loadQuerySQL              string
 
 	// The transaction being staged, if any.
-	staged *stagedTransaction
+	staged *checkpointItem
 }
 
 // VarcharColumnMeta contains metadata about Redshift varchar columns. Currently this is just the
@@ -753,7 +753,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 		var b = d.bindings[it.Binding]
 		if b.staged == nil {
-			b.staged = &stagedTransaction{ID: uuid.NewString()}
+			b.staged = &checkpointItem{ID: uuid.NewString()}
 		}
 		var file *stagedFile
 
@@ -834,7 +834,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	return func(ctx context.Context, _ *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
 		// Only this transaction's entries: an entry whose state key no longer
 		// has a binding stays pending forever and must not be re-sent.
-		var staged = make(map[string]*stagedTransaction)
+		var staged = make(map[string]*checkpointItem)
 		for _, b := range d.bindings {
 			if b.staged == nil {
 				continue
@@ -864,7 +864,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 // shard that staged it.
 type pendingEntry struct {
 	rangeKey string
-	entry    *stagedTransaction
+	entry    *checkpointItem
 }
 
 // bindingWork is a binding's pending transactions from every shard.
@@ -915,7 +915,7 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 		return nil, nil
 	}
 
-	if err := d.apply(ctx, work); err != nil {
+	if err := d.commit(ctx, work); err != nil {
 		return nil, err
 	}
 
@@ -939,24 +939,24 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	return &pf.ConnectorState{UpdatedJson: patch, MergePatch: true}, nil
 }
 
-// applyGroup is one binding's pending transactions from every shard, merged
-// into one, with manifests written for the apply.
-type applyGroup struct {
+// commitGroup is one binding's pending transactions from every shard, merged
+// into one, with manifests written for the commit.
+type commitGroup struct {
 	binding                       *binding
-	merged                        stagedTransaction
+	merged                        checkpointItem
 	storeManifest, deleteManifest string
 }
 
-// apply commits the staged transactions of work in one Redshift transaction,
+// commit runs the staged transactions of work as one Redshift transaction,
 // skipping any whose token is already committed.
-func (d *transactor) apply(ctx context.Context, work []bindingWork) error {
-	var groups []*applyGroup
-	var applying = make(tokenPayload)
+func (d *transactor) commit(ctx context.Context, work []bindingWork) error {
+	var groups []*commitGroup
+	var cp = make(checkpoints)
 	for _, w := range work {
 		var b = w.binding
-		var g = &applyGroup{binding: b}
+		var g = &commitGroup{binding: b}
 		for _, pe := range w.entries {
-			if d.applied[pe.entry.ID] {
+			if d.committedTokens[pe.entry.ID] {
 				log.WithFields(log.Fields{
 					"table": b.target.Identifier,
 					"range": pe.rangeKey,
@@ -972,7 +972,7 @@ func (d *transactor) apply(ctx context.Context, work []bindingWork) error {
 					g.merged.Widen = append(g.merged.Widen, column)
 				}
 			}
-			applying.add(b.target.StateKey, pe.rangeKey, pe.entry.ID)
+			cp.add(b.target.StateKey, pe.rangeKey, pe.entry.ID)
 		}
 		if len(g.merged.StoreFiles) > 0 || len(g.merged.DeleteFiles) > 0 {
 			groups = append(groups, g)
@@ -1115,15 +1115,15 @@ func (d *transactor) apply(ctx context.Context, work []bindingWork) error {
 	}
 
 	// Written in the same transaction as the data: a committed token proves
-	// the data committed, and a rolled-back apply leaves no token.
-	if err := d.tokens.write(ctx, txn, applying); err != nil {
+	// the data committed, and a rolled-back commit leaves no token.
+	if err := d.checkpoints.write(ctx, txn, cp); err != nil {
 		return err
 	} else if err := txn.Commit(ctx); err != nil {
 		return fmt.Errorf("committing store transaction: %w", err)
 	}
-	for _, bucket := range applying {
+	for _, bucket := range cp {
 		for _, token := range bucket {
-			d.applied[token] = true
+			d.committedTokens[token] = true
 		}
 	}
 

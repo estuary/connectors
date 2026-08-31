@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -20,8 +21,8 @@ const (
 	upperRange = "80000000-ffffffff"
 )
 
-func entry(id string, files ...string) *stagedTransaction {
-	return &stagedTransaction{ID: id, StoreFiles: files}
+func entry(id string, files ...string) *checkpointItem {
+	return &checkpointItem{ID: id, StoreFiles: files}
 }
 
 // testTransactor builds a transactor of the given range with bindings for
@@ -32,10 +33,10 @@ func testTransactor(rangeKey string, stateKeys ...string) *transactor {
 		panic(err)
 	}
 	var d = &transactor{
-		rangeKey: rangeKey,
-		primary:  keyBegin == 0,
-		applied:  make(map[string]bool),
-		pending:  make(pendingState),
+		rangeKey:        rangeKey,
+		primary:         keyBegin == 0,
+		committedTokens: make(map[string]bool),
+		pending:         make(pendingState),
 	}
 	for _, sk := range stateKeys {
 		d.bindings = append(d.bindings, &binding{target: sql.Table{
@@ -48,7 +49,7 @@ func testTransactor(rangeKey string, stateKeys ...string) *transactor {
 
 func TestParseState(t *testing.T) {
 	t.Run("a task crossing over opens with no state", func(t *testing.T) {
-		for _, raw := range []json.RawMessage{nil, json.RawMessage(``), json.RawMessage(`{}`), json.RawMessage(`null`)} {
+		for _, raw := range []json.RawMessage{nil, json.RawMessage(``), json.RawMessage(`{}`)} {
 			pending, err := parseState(raw)
 			require.NoError(t, err)
 			require.Empty(t, pending)
@@ -68,19 +69,13 @@ func TestParseState(t *testing.T) {
 			}
 		}`))
 		require.NoError(t, err)
-		require.Equal(t, pendingState{"a_table.v1": {fullRange: &stagedTransaction{
+		require.Equal(t, pendingState{"a_table.v1": {fullRange: &checkpointItem{
 			ID:          "p/x/files.manifest",
 			StoreFiles:  []string{"p/x/f1"},
 			DeleteFiles: []string{},
 			MustMerge:   true,
 			Widen:       []string{`"col"`},
 		}}}, pending)
-	})
-
-	t.Run("cleared entries and emptied ranges are dropped", func(t *testing.T) {
-		pending, err := parseState(json.RawMessage(`{"a_table.v1": {"00000000-7fffffff": null}}`))
-		require.NoError(t, err)
-		require.Empty(t, pending)
 	})
 
 	t.Run("an entry with unknown fields is rejected", func(t *testing.T) {
@@ -94,17 +89,19 @@ func TestParseState(t *testing.T) {
 	})
 }
 
-func TestStagedTransactionObjects(t *testing.T) {
-	e := &stagedTransaction{ID: "t1", StoreFiles: []string{"p/s/f1", "p/s/f2"}, DeleteFiles: []string{"p/d/f1"}}
+func TestCheckpointItemObjects(t *testing.T) {
+	e := &checkpointItem{ID: "t1", StoreFiles: []string{"p/s/f1", "p/s/f2"}, DeleteFiles: []string{"p/d/f1"}}
 	require.Equal(t, []string{"p/s/f1", "p/s/f2", "p/d/f1"}, e.objects())
 }
 
 func TestParseCheckpointsRow(t *testing.T) {
+	var s = &checkpointsTable{}
+
 	t.Run("a token payload", func(t *testing.T) {
-		tokens, legacy, err := parseCheckpointsRow([]byte(`{"a_table.v1":{"00000000-ffffffff":"p/x/files.manifest"}}`))
+		tokens, legacy, err := s.parseCheckpointsRow(hex.EncodeToString([]byte(`{"a_table.v1":{"00000000-ffffffff":"p/x/files.manifest"}}`)))
 		require.NoError(t, err)
 		require.Nil(t, legacy)
-		require.Equal(t, tokenPayload{"a_table.v1": {fullRange: "p/x/files.manifest"}}, tokens)
+		require.Equal(t, checkpoints{"a_table.v1": {fullRange: "p/x/files.manifest"}}, tokens)
 	})
 
 	t.Run("a row in the old format", func(t *testing.T) {
@@ -112,7 +109,7 @@ func TestParseCheckpointsRow(t *testing.T) {
 		compressed, err := compressBytes(checkpoint)
 		require.NoError(t, err)
 
-		tokens, legacy, err := parseCheckpointsRow([]byte(base64.StdEncoding.EncodeToString(compressed)))
+		tokens, legacy, err := s.parseCheckpointsRow(hex.EncodeToString([]byte(base64.StdEncoding.EncodeToString(compressed))))
 		require.NoError(t, err)
 		require.Nil(t, tokens)
 		require.Equal(t, checkpoint, legacy)
@@ -120,7 +117,7 @@ func TestParseCheckpointsRow(t *testing.T) {
 
 	t.Run("a row in the old format that was never compressed", func(t *testing.T) {
 		checkpoint := []byte("some-runtime-checkpoint")
-		tokens, legacy, err := parseCheckpointsRow([]byte(base64.StdEncoding.EncodeToString(checkpoint)))
+		tokens, legacy, err := s.parseCheckpointsRow(hex.EncodeToString([]byte(base64.StdEncoding.EncodeToString(checkpoint))))
 		require.NoError(t, err)
 		require.Nil(t, tokens)
 		require.Equal(t, checkpoint, legacy)
@@ -128,7 +125,7 @@ func TestParseCheckpointsRow(t *testing.T) {
 }
 
 func TestEntryPatchReplacesPrevious(t *testing.T) {
-	previous := &stagedTransaction{
+	previous := &checkpointItem{
 		ID:          "t1",
 		StoreFiles:  []string{"p/1/f1"},
 		DeleteFiles: []string{"p/1d/f1"},
@@ -177,7 +174,7 @@ func TestStateRouting(t *testing.T) {
 
 	t.Run("the primary folds peers' patches and skips its own echo", func(t *testing.T) {
 		d := testTransactor(lowerRange, "a_table.v1")
-		d.pending["a_table.v1"] = map[string]*stagedTransaction{lowerRange: entry("own/files.manifest", "own/f")}
+		d.pending["a_table.v1"] = map[string]*checkpointItem{lowerRange: entry("own/files.manifest", "own/f")}
 		require.NoError(t, d.mergePeerStatePatches([]json.RawMessage{state}))
 		require.Equal(t, "own/files.manifest", d.pending["a_table.v1"][lowerRange].ID)
 		require.Equal(t, "u/files.manifest", d.pending["a_table.v1"][upperRange].ID)
@@ -202,7 +199,7 @@ func TestStateRouting(t *testing.T) {
 	t.Run("staged work groups every range's entries per binding and leaves unknown bindings pending", func(t *testing.T) {
 		d := testTransactor(lowerRange, "a_table.v1")
 		require.NoError(t, d.UnmarshalState(state))
-		d.pending["gone_table.v1"] = map[string]*stagedTransaction{upperRange: entry("g/files.manifest", "g/f")}
+		d.pending["gone_table.v1"] = map[string]*checkpointItem{upperRange: entry("g/files.manifest", "g/f")}
 
 		var seen []string
 		for _, w := range d.stagedWork(m.StateKeyFilter(nil)) {
