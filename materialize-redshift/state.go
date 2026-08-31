@@ -11,10 +11,10 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// checkpointItem is one binding's staged-but-not-yet-applied work. Every
+// stateItem is one binding's staged-but-not-yet-applied work. Every
 // field is written even when empty, so an entry's merge patch replaces the
 // previous entry outright.
-type checkpointItem struct {
+type stateItem struct {
 	// ID is the transaction's token in the checkpoints table once applied.
 	ID          string   `json:"id"`
 	StoreFiles  []string `json:"storeFiles"`
@@ -24,17 +24,17 @@ type checkpointItem struct {
 }
 
 // objects is every S3 object the transaction staged.
-func (e *checkpointItem) objects() []string {
+func (e *stateItem) objects() []string {
 	return append(append([]string{}, e.StoreFiles...), e.DeleteFiles...)
 }
 
 // connectorState is staged transactions by binding state key, then by the
 // staging shard's key range.
-type connectorState map[string]map[string]*checkpointItem
+type connectorState map[string]map[string]*stateItem
 
-func (p connectorState) add(stateKey, rangeKey string, e *checkpointItem) {
+func (p connectorState) add(stateKey, rangeKey string, e *stateItem) {
 	if p[stateKey] == nil {
-		p[stateKey] = make(map[string]*checkpointItem)
+		p[stateKey] = make(map[string]*stateItem)
 	}
 	p[stateKey][rangeKey] = e
 }
