@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"maps"
 	"net"
 	"net/url"
 	"path"
@@ -662,12 +661,12 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		if err != nil {
 			return fmt.Errorf("flushing load file for binding[%d]: %w", idx, err)
 		}
-		var objects = slices.Clone(files)
-		defer d.store.deleteObjects(ctx, objects)
-		manifest, err := d.putManifest(ctx, files, &objects)
+		manifest, err := d.putManifest(ctx, files)
 		if err != nil {
 			return err
 		}
+		var objects = append(slices.Clone(files), manifest)
+		defer d.store.deleteObjects(ctx, objects)
 
 		if copySQL, err := d.copyFromS3(fmt.Sprintf("flow_temp_table_%d", b.target.Binding), manifest, false); err != nil {
 			return err
@@ -860,41 +859,6 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}, nil
 }
 
-// pendingEntry is a staged transaction together with the key range of the
-// shard that staged it.
-type pendingEntry struct {
-	rangeKey string
-	entry    *checkpointItem
-}
-
-// bindingWork is a binding's pending transactions from every shard.
-type bindingWork struct {
-	binding *binding
-	entries []pendingEntry
-}
-
-// stagedWork returns the pending transactions of each binding that
-// shouldProcess selects. Entries with no live binding are left pending.
-func (d *transactor) stagedWork(shouldProcess func(string) bool) []bindingWork {
-	var work []bindingWork
-	for _, b := range d.bindings {
-		var sk = b.target.StateKey
-		if !shouldProcess(sk) {
-			continue
-		}
-		var bucket = d.pending[sk]
-		if len(bucket) == 0 {
-			continue
-		}
-		var entries = make([]pendingEntry, 0, len(bucket))
-		for _, rk := range slices.Sorted(maps.Keys(bucket)) {
-			entries = append(entries, pendingEntry{rk, bucket[rk]})
-		}
-		work = append(work, bindingWork{b, entries})
-	}
-	return work
-}
-
 func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
 	if err := d.mergePeerStatePatches(statePatches); err != nil {
 		return nil, err
@@ -903,25 +867,29 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 		return nil, nil
 	}
 
-	var work = d.stagedWork(m.StateKeyFilter(stateKeys))
-
-	var processed = make(pendingState)
-	for _, w := range work {
-		for _, pe := range w.entries {
-			processed.add(w.binding.target.StateKey, pe.rangeKey, pe.entry)
+	// Entries of a binding with no live table are left pending.
+	var shouldProcess = m.StateKeyFilter(stateKeys)
+	var pending = make(pendingState)
+	for _, b := range d.bindings {
+		var sk = b.target.StateKey
+		if !shouldProcess(sk) {
+			continue
+		}
+		for rk, e := range d.pending[sk] {
+			pending.add(sk, rk, e)
 		}
 	}
-	if len(processed) == 0 {
+	if len(pending) == 0 {
 		return nil, nil
 	}
 
-	if err := d.commit(ctx, work); err != nil {
+	if err := d.commit(ctx, pending); err != nil {
 		return nil, err
 	}
 
 	// Clearing an entry from the state is a null at its place.
 	var clear = make(pendingState)
-	for sk, bucket := range processed {
+	for sk, bucket := range pending {
 		for rk, e := range bucket {
 			d.store.deleteObjects(ctx, e.objects())
 			delete(d.pending[sk], rk)
@@ -939,40 +907,42 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	return &pf.ConnectorState{UpdatedJson: patch, MergePatch: true}, nil
 }
 
-// commitGroup is one binding's pending transactions from every shard, merged
-// into one, with manifests written for the commit.
-type commitGroup struct {
-	binding                       *binding
-	merged                        checkpointItem
-	storeManifest, deleteManifest string
-}
-
-// commit runs the staged transactions of work as one Redshift transaction,
-// skipping any whose token is already committed.
-func (d *transactor) commit(ctx context.Context, work []bindingWork) error {
-	var groups []*commitGroup
+// commit runs the staged transactions of pending as one Redshift
+// transaction, skipping any whose token is already committed.
+func (d *transactor) commit(ctx context.Context, pending pendingState) error {
+	// group is one binding's pending transactions from every shard, merged
+	// into one, with manifests written for the commit.
+	type group struct {
+		binding                       *binding
+		merged                        checkpointItem
+		storeManifest, deleteManifest string
+	}
+	var groups []*group
 	var cp = make(checkpoints)
-	for _, w := range work {
-		var b = w.binding
-		var g = &commitGroup{binding: b}
-		for _, pe := range w.entries {
-			if d.committedTokens[pe.entry.ID] {
+	for _, b := range d.bindings {
+		var bucket = pending[b.target.StateKey]
+		if len(bucket) == 0 {
+			continue
+		}
+		var g = &group{binding: b}
+		for rk, e := range bucket {
+			if d.committedTokens[e.ID] {
 				log.WithFields(log.Fields{
 					"table": b.target.Identifier,
-					"range": pe.rangeKey,
-					"id":    pe.entry.ID,
+					"range": rk,
+					"id":    e.ID,
 				}).Info("skipping staged transaction that was already applied")
 				continue
 			}
-			g.merged.StoreFiles = append(g.merged.StoreFiles, pe.entry.StoreFiles...)
-			g.merged.DeleteFiles = append(g.merged.DeleteFiles, pe.entry.DeleteFiles...)
-			g.merged.MustMerge = g.merged.MustMerge || pe.entry.MustMerge
-			for _, column := range pe.entry.Widen {
+			g.merged.StoreFiles = append(g.merged.StoreFiles, e.StoreFiles...)
+			g.merged.DeleteFiles = append(g.merged.DeleteFiles, e.DeleteFiles...)
+			g.merged.MustMerge = g.merged.MustMerge || e.MustMerge
+			for _, column := range e.Widen {
 				if !slices.Contains(g.merged.Widen, column) {
 					g.merged.Widen = append(g.merged.Widen, column)
 				}
 			}
-			cp.add(b.target.StateKey, pe.rangeKey, pe.entry.ID)
+			cp.add(b.target.StateKey, rk, e.ID)
 		}
 		if len(g.merged.StoreFiles) > 0 || len(g.merged.DeleteFiles) > 0 {
 			groups = append(groups, g)
@@ -986,11 +956,15 @@ func (d *transactor) commit(ctx context.Context, work []bindingWork) error {
 	defer func() { d.store.deleteObjects(ctx, manifests) }()
 	for _, g := range groups {
 		var err error
-		if g.storeManifest, err = d.putManifest(ctx, g.merged.StoreFiles, &manifests); err != nil {
+		if g.storeManifest, err = d.putManifest(ctx, g.merged.StoreFiles); err != nil {
 			return err
+		} else if g.storeManifest != "" {
+			manifests = append(manifests, g.storeManifest)
 		}
-		if g.deleteManifest, err = d.putManifest(ctx, g.merged.DeleteFiles, &manifests); err != nil {
+		if g.deleteManifest, err = d.putManifest(ctx, g.merged.DeleteFiles); err != nil {
 			return err
+		} else if g.deleteManifest != "" {
+			manifests = append(manifests, g.deleteManifest)
 		}
 	}
 
@@ -1130,9 +1104,9 @@ func (d *transactor) commit(ctx context.Context, work []bindingWork) error {
 	return nil
 }
 
-// putManifest writes a manifest listing files under a fresh key, appended to
-// objects for cleanup, or returns "" when there are none.
-func (d *transactor) putManifest(ctx context.Context, files []string, objects *[]string) (string, error) {
+// putManifest writes a manifest listing files under a fresh key, or returns
+// "" when there are none.
+func (d *transactor) putManifest(ctx context.Context, files []string) (string, error) {
 	if len(files) == 0 {
 		return "", nil
 	}
@@ -1140,7 +1114,6 @@ func (d *transactor) putManifest(ctx context.Context, files []string, objects *[
 	if err := d.store.putManifest(ctx, key, files); err != nil {
 		return "", err
 	}
-	*objects = append(*objects, key)
 	return key, nil
 }
 

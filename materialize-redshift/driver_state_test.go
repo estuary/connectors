@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"testing"
 
-	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/stretchr/testify/require"
@@ -196,24 +195,16 @@ func TestStateRouting(t *testing.T) {
 		require.NotNil(t, d.pending["gone_table.v1"][fullRange])
 	})
 
-	t.Run("staged work groups every range's entries per binding and leaves unknown bindings pending", func(t *testing.T) {
+	t.Run("acknowledge leaves unrequested and unbound state keys pending", func(t *testing.T) {
 		d := testTransactor(lowerRange, "a_table.v1")
 		require.NoError(t, d.UnmarshalState(state))
 		d.pending["gone_table.v1"] = map[string]*checkpointItem{upperRange: entry("g/files.manifest", "g/f")}
 
-		var seen []string
-		for _, w := range d.stagedWork(m.StateKeyFilter(nil)) {
-			for _, pe := range w.entries {
-				seen = append(seen, w.binding.target.StateKey+"@"+pe.rangeKey)
-			}
-		}
-		require.Equal(t, []string{"a_table.v1@" + lowerRange, "a_table.v1@" + upperRange}, seen)
-
-		seen = nil
-		for _, w := range d.stagedWork(m.StateKeyFilter([]string{"other.v1"})) {
-			seen = append(seen, w.binding.target.StateKey)
-		}
-		require.Empty(t, seen)
+		patch, err := d.Acknowledge(t.Context(), nil, []string{"other.v1"})
+		require.NoError(t, err)
+		require.Nil(t, patch)
+		require.Len(t, d.pending["a_table.v1"], 2)
+		require.NotNil(t, d.pending["gone_table.v1"][upperRange])
 	})
 }
 
