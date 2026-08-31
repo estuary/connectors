@@ -325,8 +325,8 @@ type transactor struct {
 	checkpoints *checkpointsTable
 	// IDs of every checkpointItem already committed, across the materialization.
 	committedTokens map[string]bool
-	// Staged transactions not yet applied, from every shard.
-	pending pendingState
+	// The whole checkpoint: staged transactions not yet applied, from every shard.
+	cp connectorState
 	// Set only for a task crossing over from the old format, whose row still
 	// holds the runtime checkpoint and whose state has nothing staged.
 	runtimeCheckpoint m.RuntimeCheckpoint
@@ -369,7 +369,7 @@ func prepareNewTransactor(
 				keyEnd:          fence.KeyEnd,
 			},
 			committedTokens: make(map[string]bool),
-			pending:         make(pendingState),
+			cp:              make(connectorState),
 		}
 
 		client, err := d.cfg.toS3Client(ctx, featureFlags)
@@ -402,7 +402,7 @@ func prepareNewTransactor(
 			return nil, err
 		}
 		if d.primary {
-			d.pending = state
+			d.cp = state
 		}
 
 		// A shard's row is authoritative only until it has staged a
@@ -535,7 +535,7 @@ func (t *transactor) UnmarshalState(state json.RawMessage) error {
 	if err != nil {
 		return err
 	}
-	t.pending = pending
+	t.cp = pending
 	return nil
 }
 
@@ -560,10 +560,10 @@ func (t *transactor) mergePeerStatePatches(patches []json.RawMessage) error {
 			for rk, e := range bucket {
 				// The previous transaction's entry is applied before the next
 				// one's patch arrives, so a collision would lose staged work.
-				if t.pending[sk][rk] != nil {
+				if t.cp[sk][rk] != nil {
 					return fmt.Errorf("shard %s staged a new transaction for %s while its previous one is still pending", rk, sk)
 				}
-				t.pending.add(sk, rk, e)
+				t.cp.add(sk, rk, e)
 			}
 		}
 	}
@@ -833,7 +833,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		// has a binding stays pending forever and must not be re-sent. The
 		// primary picks its own entries back up from Acknowledge's statePatches,
 		// same as its peers'.
-		var update = make(pendingState)
+		var update = make(connectorState)
 		for _, b := range d.bindings {
 			if b.staged == nil {
 				continue
@@ -860,13 +860,13 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 
 	// Entries of a binding with no live table are left pending.
 	var shouldProcess = m.StateKeyFilter(stateKeys)
-	var pending = make(pendingState)
+	var pending = make(connectorState)
 	for _, b := range d.bindings {
 		var sk = b.target.StateKey
 		if !shouldProcess(sk) {
 			continue
 		}
-		for rk, e := range d.pending[sk] {
+		for rk, e := range d.cp[sk] {
 			pending.add(sk, rk, e)
 		}
 	}
@@ -879,15 +879,15 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	}
 
 	// Clearing an entry from the state is a null at its place.
-	var clear = make(pendingState)
+	var clear = make(connectorState)
 	for sk, bucket := range pending {
 		for rk, e := range bucket {
 			d.store.deleteObjects(ctx, e.objects())
-			delete(d.pending[sk], rk)
+			delete(d.cp[sk], rk)
 			clear.add(sk, rk, nil)
 		}
-		if len(d.pending[sk]) == 0 {
-			delete(d.pending, sk)
+		if len(d.cp[sk]) == 0 {
+			delete(d.cp, sk)
 		}
 	}
 
@@ -900,7 +900,7 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 
 // commit runs the staged transactions of pending as one Redshift
 // transaction, skipping any whose token is already committed.
-func (d *transactor) commit(ctx context.Context, pending pendingState) error {
+func (d *transactor) commit(ctx context.Context, pending connectorState) error {
 	// group is one binding's pending transactions from every shard, merged
 	// into one, with manifests written for the commit.
 	type group struct {

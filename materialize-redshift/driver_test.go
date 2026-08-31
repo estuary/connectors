@@ -105,7 +105,7 @@ func TestIntegration(t *testing.T) {
 				}
 
 				entry := stageRows(t, cfg, fields, [][]any{row})
-				return mustMarshal(t, pendingState{b.StateKey: {rangeKeyOf(0, math.MaxUint32): entry}})
+				return mustMarshal(t, connectorState{b.StateKey: {rangeKeyOf(0, math.MaxUint32): entry}})
 			}
 
 			verifyDrained := func(t *testing.T, _ *pf.MaterializationSpec, _ []string, rows [][]any) {
@@ -242,7 +242,7 @@ func runIdempotencyTest(t *testing.T, makeResourceFn func(string, bool) tableCon
 		return len(rows)
 	}
 	stateWith := func(t *testing.T, entry *checkpointItem) json.RawMessage {
-		return mustMarshal(t, pendingState{table.StateKey: {rangeKeyOf(0, math.MaxUint32): entry}})
+		return mustMarshal(t, connectorState{table.StateKey: {rangeKeyOf(0, math.MaxUint32): entry}})
 	}
 
 	t.Run("a committed token settles a recovered entry", func(t *testing.T) {
