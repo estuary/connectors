@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-08-31
+
+### Changed
+- Raised the events lookback horizon from 4 days to 7 days. On upgrade, existing tasks' lookback subtask idles for ~3 days while `now - horizon` catches back up to its cursor; this is expected and no data is skipped.
+
 ## 2026-07-30
 
 ### Fixed
