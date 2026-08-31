@@ -1,6 +1,7 @@
 package connector
 
 import (
+	"bytes"
 	"context"
 	stdsql "database/sql"
 	"encoding/json"
@@ -409,7 +410,7 @@ func prepareNewTransactor(
 		// transaction: after that the recovery log is, and returning the
 		// row's checkpoint would rewind the runtime and stage that
 		// transaction twice.
-		if legacyCheckpoint != nil && len(state[d.rangeKey]) == 0 {
+		if legacyCheckpoint != nil && !state.hasRange(d.rangeKey) {
 			d.runtimeCheckpoint = legacyCheckpoint
 		}
 
@@ -546,21 +547,26 @@ func (t *transactor) mergePeerStatePatches(patches []json.RawMessage) error {
 		return nil
 	}
 	for _, patch := range patches {
+		if bytes.Equal(bytes.TrimSpace(patch), []byte("null")) {
+			// The runtime's encoding of a peer's full (non-merge-patch) state
+			// replacement, which no shard here ever produces.
+			return fmt.Errorf("unexpected state reset patch in aggregated shard state")
+		}
 		state, err := parseState(patch)
 		if err != nil {
 			return fmt.Errorf("parsing aggregated state patch: %w", err)
 		}
-		for rk, bucket := range state {
-			if rk == t.rangeKey {
-				continue // Own range: already pending.
-			}
-			for sk, e := range bucket {
+		for sk, bucket := range state {
+			for rk, e := range bucket {
+				if rk == t.rangeKey {
+					continue // Own range: already pending.
+				}
 				// The previous transaction's entry is applied before the next
 				// one's patch arrives, so a collision would lose staged work.
-				if t.pending[rk][sk] != nil {
+				if t.pending[sk][rk] != nil {
 					return fmt.Errorf("shard %s staged a new transaction for %s while its previous one is still pending", rk, sk)
 				}
-				t.pending.add(rk, sk, e)
+				t.pending.add(sk, rk, e)
 			}
 		}
 	}
@@ -836,16 +842,16 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			staged[b.target.StateKey] = b.staged
 			b.staged = nil
 		}
+		var update = make(pendingState)
+		for sk, e := range staged {
+			update.add(sk, d.rangeKey, e)
+		}
 		if d.primary {
 			for sk, e := range staged {
-				d.pending.add(d.rangeKey, sk, e)
+				d.pending.add(sk, d.rangeKey, e)
 			}
 		}
 
-		var update = pendingState{}
-		if len(staged) > 0 {
-			update[d.rangeKey] = staged
-		}
 		patch, err := json.Marshal(update)
 		if err != nil {
 			return nil, m.FinishedOperation(fmt.Errorf("marshalling staged transactions: %w", err))
@@ -870,22 +876,21 @@ type bindingWork struct {
 // stagedWork returns the pending transactions of each binding that
 // shouldProcess selects. Entries with no live binding are left pending.
 func (d *transactor) stagedWork(shouldProcess func(string) bool) []bindingWork {
-	var rangeKeys = slices.Sorted(maps.Keys(d.pending))
 	var work []bindingWork
 	for _, b := range d.bindings {
 		var sk = b.target.StateKey
 		if !shouldProcess(sk) {
 			continue
 		}
-		var entries []pendingEntry
-		for _, rk := range rangeKeys {
-			if e := d.pending[rk][sk]; e != nil {
-				entries = append(entries, pendingEntry{rk, e})
-			}
+		var bucket = d.pending[sk]
+		if len(bucket) == 0 {
+			continue
 		}
-		if len(entries) > 0 {
-			work = append(work, bindingWork{b, entries})
+		var entries = make([]pendingEntry, 0, len(bucket))
+		for _, rk := range slices.Sorted(maps.Keys(bucket)) {
+			entries = append(entries, pendingEntry{rk, bucket[rk]})
 		}
+		work = append(work, bindingWork{b, entries})
 	}
 	return work
 }
@@ -903,7 +908,7 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	var processed = make(pendingState)
 	for _, w := range work {
 		for _, pe := range w.entries {
-			processed.add(pe.rangeKey, w.binding.target.StateKey, pe.entry)
+			processed.add(w.binding.target.StateKey, pe.rangeKey, pe.entry)
 		}
 	}
 	if len(processed) == 0 {
@@ -916,14 +921,14 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 
 	// Clearing an entry from the state is a null at its place.
 	var clear = make(pendingState)
-	for rk, bucket := range processed {
-		for sk, e := range bucket {
+	for sk, bucket := range processed {
+		for rk, e := range bucket {
 			d.store.deleteObjects(ctx, e.objects())
-			delete(d.pending[rk], sk)
-			clear.add(rk, sk, nil)
+			delete(d.pending[sk], rk)
+			clear.add(sk, rk, nil)
 		}
-		if len(d.pending[rk]) == 0 {
-			delete(d.pending, rk)
+		if len(d.pending[sk]) == 0 {
+			delete(d.pending, sk)
 		}
 	}
 
@@ -967,7 +972,7 @@ func (d *transactor) apply(ctx context.Context, work []bindingWork) error {
 					g.merged.Widen = append(g.merged.Widen, column)
 				}
 			}
-			applying.add(pe.rangeKey, b.target.StateKey, pe.entry.ID)
+			applying.add(b.target.StateKey, pe.rangeKey, pe.entry.ID)
 		}
 		if len(g.merged.StoreFiles) > 0 || len(g.merged.DeleteFiles) > 0 {
 			groups = append(groups, g)

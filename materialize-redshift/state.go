@@ -28,15 +28,25 @@ func (e *stagedTransaction) objects() []string {
 	return append(append([]string{}, e.StoreFiles...), e.DeleteFiles...)
 }
 
-// pendingState is the connector state: staged transactions by the staging
-// shard's key range, then by binding state key.
+// pendingState is the connector state: staged transactions by binding state
+// key, then by the staging shard's key range.
 type pendingState map[string]map[string]*stagedTransaction
 
-func (p pendingState) add(rangeKey, stateKey string, e *stagedTransaction) {
-	if p[rangeKey] == nil {
-		p[rangeKey] = make(map[string]*stagedTransaction)
+func (p pendingState) add(stateKey, rangeKey string, e *stagedTransaction) {
+	if p[stateKey] == nil {
+		p[stateKey] = make(map[string]*stagedTransaction)
 	}
-	p[rangeKey][stateKey] = e
+	p[stateKey][rangeKey] = e
+}
+
+// hasRange reports whether any state key has an entry staged under rangeKey.
+func (p pendingState) hasRange(rangeKey string) bool {
+	for _, bucket := range p {
+		if _, ok := bucket[rangeKey]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 func rangeKeyOf(keyBegin, keyEnd uint32) string {
@@ -55,17 +65,19 @@ func parseState(raw json.RawMessage) (pendingState, error) {
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&state); err != nil {
 		return nil, fmt.Errorf("parsing connector state: %w", err)
-	} else if state == nil {
-		return nil, fmt.Errorf("parsing connector state: unexpected null")
 	}
-	for rk, bucket := range state {
-		for sk, e := range bucket {
+	if state == nil {
+		// A null document or patch is empty, per RFC 7396.
+		state = make(pendingState)
+	}
+	for sk, bucket := range state {
+		for rk, e := range bucket {
 			if e == nil {
-				delete(bucket, sk)
+				delete(bucket, rk)
 			}
 		}
 		if len(bucket) == 0 {
-			delete(state, rk)
+			delete(state, sk)
 		}
 	}
 
@@ -73,14 +85,14 @@ func parseState(raw json.RawMessage) (pendingState, error) {
 }
 
 // tokenPayload is what the checkpoints row holds once a task has crossed over:
-// the last applied transaction's ID by staging key range and state key.
+// the last applied transaction's ID by state key and staging key range.
 type tokenPayload map[string]map[string]string
 
-func (p tokenPayload) add(rangeKey, stateKey, token string) {
-	if p[rangeKey] == nil {
-		p[rangeKey] = make(map[string]string)
+func (p tokenPayload) add(stateKey, rangeKey, token string) {
+	if p[stateKey] == nil {
+		p[stateKey] = make(map[string]string)
 	}
-	p[rangeKey][stateKey] = token
+	p[stateKey][rangeKey] = token
 }
 
 // parseCheckpointsRow tells a token payload from a row still in the old
@@ -179,9 +191,9 @@ func (s *tokenStore) write(ctx context.Context, txn pgx.Tx, applied tokenPayload
 	if s.payload == nil {
 		s.payload = make(tokenPayload)
 	}
-	for rk, bucket := range applied {
-		for sk, token := range bucket {
-			s.payload.add(rk, sk, token)
+	for sk, bucket := range applied {
+		for rk, token := range bucket {
+			s.payload.add(sk, rk, token)
 		}
 	}
 
