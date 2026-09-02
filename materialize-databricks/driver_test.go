@@ -49,12 +49,15 @@ func TestIntegration(t *testing.T) {
 
 			seedPending := func(t *testing.T, appliedSpec *pf.MaterializationSpec) json.RawMessage {
 				// A staged transaction is a set of queries persisted in the
-				// connector state, keyed by the binding's state key.
+				// connector state under the binding's state key and the
+				// staging shard's key range.
 				query := sql.DrainSeedInsertQuery(t, NewDriver(), cfg, appliedSpec, "'{}'")
 				state, err := json.Marshal(map[string]any{
 					appliedSpec.Bindings[0].StateKey: map[string]any{
-						"Queries":  []string{query},
-						"ToDelete": []string{},
+						"00000000-ffffffff": map[string]any{
+							"Queries":  []string{query},
+							"ToDelete": []string{},
+						},
 					},
 				})
 				require.NoError(t, err)

@@ -11,7 +11,9 @@ import (
 	"time"
 
 	m "github.com/estuary/connectors/go/materialize"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/stretchr/testify/require"
 )
 
@@ -23,7 +25,7 @@ const (
 
 func testTransactor(rangeKey string, stateKeys ...string) *transactor {
 	var d = &transactor{
-		cp:                    make(checkpoint),
+		cp:                    make(connectorState),
 		peerShardsCheckpoints: make(rangeCheckpoints),
 		primary:               rangeKey == fullRangeKey || rangeKey == lowerRangeKey,
 		rangeKey:              rangeKey,
@@ -40,6 +42,21 @@ func testTransactor(rangeKey string, stateKeys ...string) *transactor {
 
 func item(query string, toDelete ...string) *checkpointItem {
 	return &checkpointItem{Queries: []string{query}, ToDelete: toDelete}
+}
+
+// reduce applies a state update to a JSON state document the way the runtime
+// consolidates connector state, returning the resulting document.
+func reduce(t *testing.T, doc string, update *pf.ConnectorState) string {
+	t.Helper()
+	var before, patch any
+	require.NoError(t, json.Unmarshal([]byte(doc), &before))
+	require.NoError(t, json.Unmarshal(update.UpdatedJson, &patch))
+	if !update.MergePatch {
+		before = nil
+	}
+	var out, err = json.Marshal(boilerplate.ApplyMergePatch(before, patch))
+	require.NoError(t, err)
+	return string(out)
 }
 
 // keys builds the non-nil restricted-processing predicate of Acknowledge's
@@ -101,45 +118,72 @@ func recordingDB(t *testing.T, failWith error) *stdsql.DB {
 }
 
 func TestUnmarshalStateRouting(t *testing.T) {
-	var legacyState = json.RawMessage(`{
+	var flatState = json.RawMessage(`{
 		"a_table.v1": {"Queries": ["Q1"], "ToDelete": ["f1"]},
 		"b_table.v1": {"Queries": ["Q2"], "ToDelete": []}
 	}`)
-	var mixedState = json.RawMessage(`{
+	var rangeFirstState = json.RawMessage(`{
 		"00000000-7fffffff": {"a_table.v1": {"Queries": ["QL"], "ToDelete": []}},
-		"80000000-ffffffff": {"a_table.v1": {"Queries": ["QU"], "ToDelete": []}},
-		"a_table.v1": {"Queries": ["Q0"], "ToDelete": []}
+		"80000000-ffffffff": {"a_table.v1": {"Queries": ["QU"], "ToDelete": []}}
+	}`)
+	var currentState = json.RawMessage(`{
+		"a_table.v1": {
+			"00000000-7fffffff": {"Queries": ["QL"], "ToDelete": []},
+			"80000000-ffffffff": {"Queries": ["QU"], "ToDelete": []}
+		}
+	}`)
+	// All three layouts under one state key: a flat item's fields merged with
+	// current range entries, plus a range-first bucket.
+	var mixedState = json.RawMessage(`{
+		"a_table.v1": {
+			"Queries": ["Q0"], "ToDelete": ["f0"],
+			"00000000-7fffffff": {"Queries": ["QL"], "ToDelete": []}
+		},
+		"80000000-ffffffff": {"a_table.v1": {"Queries": ["QU"], "ToDelete": []}}
 	}`)
 
-	t.Run("legacy top-level entries route to the legacy bucket", func(t *testing.T) {
+	t.Run("current layout", func(t *testing.T) {
+		var d = testTransactor(lowerRangeKey, "a_table.v1")
+		require.NoError(t, d.UnmarshalState(currentState))
+		require.True(t, d.cpRecovery)
+		require.Equal(t, []string{"QL"}, d.cp["a_table.v1"][lowerRangeKey].Queries)
+		require.Equal(t, []string{"QU"}, d.cp["a_table.v1"][upperRangeKey].Queries)
+		require.Empty(t, d.peerShardsCheckpoints)
+	})
+
+	t.Run("flat entries route to the legacy bucket", func(t *testing.T) {
 		var d = testTransactor(fullRangeKey, "a_table.v1", "b_table.v1")
-		require.NoError(t, d.UnmarshalState(legacyState))
+		require.NoError(t, d.UnmarshalState(flatState))
 		require.True(t, d.cpRecovery)
 		require.Empty(t, d.cp)
 		require.Len(t, d.peerShardsCheckpoints[legacyRangeKey], 2)
 		require.Equal(t, []string{"Q1"}, d.peerShardsCheckpoints[legacyRangeKey]["a_table.v1"].Queries)
+		require.Equal(t, []string{"f1"}, d.peerShardsCheckpoints[legacyRangeKey]["a_table.v1"].ToDelete)
+		require.Equal(t, []string{"Q2"}, d.peerShardsCheckpoints[legacyRangeKey]["b_table.v1"].Queries)
 	})
 
-	t.Run("single shard routes own range to cp, others to peers", func(t *testing.T) {
-		var d = testTransactor(fullRangeKey, "a_table.v1")
-		require.NoError(t, d.UnmarshalState(json.RawMessage(`{
-			"00000000-ffffffff": {"a_table.v1": {"Queries": ["OWN"], "ToDelete": []}},
-			"00000000-7fffffff": {"a_table.v1": {"Queries": ["QL"], "ToDelete": []}},
-			"a_table.v1": {"Queries": ["Q0"], "ToDelete": []}
-		}`)))
-		require.True(t, d.cpRecovery)
-		require.Equal(t, []string{"OWN"}, d.cp["a_table.v1"].Queries)
+	t.Run("range-first entries route to their range bucket, own range included", func(t *testing.T) {
+		var d = testTransactor(lowerRangeKey, "a_table.v1")
+		require.NoError(t, d.UnmarshalState(rangeFirstState))
+		require.Empty(t, d.cp)
 		require.Equal(t, []string{"QL"}, d.peerShardsCheckpoints[lowerRangeKey]["a_table.v1"].Queries)
-		require.Equal(t, []string{"Q0"}, d.peerShardsCheckpoints[legacyRangeKey]["a_table.v1"].Queries)
+		require.Equal(t, []string{"QU"}, d.peerShardsCheckpoints[upperRangeKey]["a_table.v1"].Queries)
 	})
 
-	t.Run("multi-shard primary routes own range to cp", func(t *testing.T) {
+	t.Run("all layouts under one state key", func(t *testing.T) {
 		var d = testTransactor(lowerRangeKey, "a_table.v1")
 		require.NoError(t, d.UnmarshalState(mixedState))
-		require.True(t, d.cpRecovery)
-		require.Equal(t, []string{"QL"}, d.cp["a_table.v1"].Queries)
-		require.Equal(t, []string{"QU"}, d.peerShardsCheckpoints[upperRangeKey]["a_table.v1"].Queries)
+		require.Len(t, d.cp["a_table.v1"], 1)
+		require.Equal(t, []string{"QL"}, d.cp["a_table.v1"][lowerRangeKey].Queries)
 		require.Equal(t, []string{"Q0"}, d.peerShardsCheckpoints[legacyRangeKey]["a_table.v1"].Queries)
+		require.Equal(t, []string{"f0"}, d.peerShardsCheckpoints[legacyRangeKey]["a_table.v1"].ToDelete)
+		require.Equal(t, []string{"QU"}, d.peerShardsCheckpoints[upperRangeKey]["a_table.v1"].Queries)
+	})
+
+	t.Run("an emptied bucket holds nothing", func(t *testing.T) {
+		var d = testTransactor(fullRangeKey, "a_table.v1")
+		require.NoError(t, d.UnmarshalState(json.RawMessage(`{"a_table.v1": {}}`)))
+		require.Empty(t, d.cp)
 	})
 
 	t.Run("non-primary discards everything", func(t *testing.T) {
@@ -153,28 +197,45 @@ func TestUnmarshalStateRouting(t *testing.T) {
 	t.Run("unknown fields error", func(t *testing.T) {
 		var d = testTransactor(fullRangeKey, "a_table.v1")
 		require.Error(t, d.UnmarshalState(json.RawMessage(`{"a_table.v1": {"Unknown": 1}}`)))
+		require.Error(t, d.UnmarshalState(json.RawMessage(`{"a_table.v1": {"00000000-ffffffff": {"Unknown": 1}}}`)))
+		require.Error(t, d.UnmarshalState(json.RawMessage(`{"00000000-ffffffff": {"a_table.v1": {"Unknown": 1}}}`)))
+	})
+
+	t.Run("non-object entries error", func(t *testing.T) {
+		var d = testTransactor(fullRangeKey, "a_table.v1")
+		require.Error(t, d.UnmarshalState(json.RawMessage(`{"a_table.v1": 1}`)))
+		require.Error(t, d.UnmarshalState(json.RawMessage(`{"00000000-ffffffff": 1}`)))
 	})
 }
 
 func TestStartCommitState(t *testing.T) {
 	t.Run("single shard emits a full-range merge patch", func(t *testing.T) {
 		var d = testTransactor(fullRangeKey, "a_table.v1")
-		d.cp["a_table.v1"] = item("Q1", "f1")
+		d.cp.add("a_table.v1", fullRangeKey, item("Q1", "f1"))
 
 		state, err := d.startCommitState()
 		require.NoError(t, err)
 		require.True(t, state.MergePatch)
-		require.JSONEq(t, `{"00000000-ffffffff": {"a_table.v1": {"Queries": ["Q1"], "ToDelete": ["f1"]}}}`, string(state.UpdatedJson))
+		require.JSONEq(t, `{"a_table.v1": {"00000000-ffffffff": {"Queries": ["Q1"], "ToDelete": ["f1"]}}}`, string(state.UpdatedJson))
 	})
 
-	t.Run("multi-shard emits a range-scoped merge patch", func(t *testing.T) {
+	t.Run("multi-shard emits a range-scoped merge patch of only its own entries", func(t *testing.T) {
 		var d = testTransactor(lowerRangeKey, "a_table.v1")
-		d.cp["a_table.v1"] = item("Q1", "f1")
+		d.cp.add("a_table.v1", lowerRangeKey, item("Q1", "f1"))
+		d.cp.add("a_table.v1", upperRangeKey, item("PEER"))
 
 		state, err := d.startCommitState()
 		require.NoError(t, err)
 		require.True(t, state.MergePatch)
-		require.JSONEq(t, `{"00000000-7fffffff": {"a_table.v1": {"Queries": ["Q1"], "ToDelete": ["f1"]}}}`, string(state.UpdatedJson))
+		require.JSONEq(t, `{"a_table.v1": {"00000000-7fffffff": {"Queries": ["Q1"], "ToDelete": ["f1"]}}}`, string(state.UpdatedJson))
+	})
+
+	t.Run("nothing staged emits an empty patch", func(t *testing.T) {
+		var d = testTransactor(lowerRangeKey, "a_table.v1")
+
+		state, err := d.startCommitState()
+		require.NoError(t, err)
+		require.JSONEq(t, `{}`, string(state.UpdatedJson))
 	})
 }
 
@@ -189,18 +250,26 @@ func TestMergePeerStatePatches(t *testing.T) {
 
 	t.Run("no-op when non-primary", func(t *testing.T) {
 		var d = testTransactor(upperRangeKey)
-		require.NoError(t, d.mergePeerStatePatches(patches(`{"00000000-7fffffff": {"a_table.v1": {"Queries": ["Q"], "ToDelete": []}}}`)))
-		require.Empty(t, d.peerShardsCheckpoints)
+		require.NoError(t, d.mergePeerStatePatches(patches(`{"a_table.v1": {"00000000-7fffffff": {"Queries": ["Q"], "ToDelete": []}}}`)))
+		require.Empty(t, d.cp)
 	})
 
 	t.Run("own contribution is skipped, peers merged", func(t *testing.T) {
 		var d = testTransactor(lowerRangeKey, "a_table.v1")
 		require.NoError(t, d.mergePeerStatePatches(patches(
-			`{"00000000-7fffffff": {"a_table.v1": {"Queries": ["OWN"], "ToDelete": []}}}`,
-			`{"80000000-ffffffff": {"a_table.v1": {"Queries": ["PEER"], "ToDelete": ["pf1"]}}}`,
+			`{"a_table.v1": {"00000000-7fffffff": {"Queries": ["OWN"], "ToDelete": []}}}`,
+			`{"a_table.v1": {"80000000-ffffffff": {"Queries": ["PEER"], "ToDelete": ["pf1"]}}}`,
 		)))
-		require.Empty(t, d.cp) // own patch is not folded back
-		require.Len(t, d.peerShardsCheckpoints, 1)
+		require.Len(t, d.cp["a_table.v1"], 1) // own patch is not folded back
+		require.Equal(t, []string{"PEER"}, d.cp["a_table.v1"][upperRangeKey].Queries)
+	})
+
+	t.Run("range-first peer patches are accepted", func(t *testing.T) {
+		var d = testTransactor(lowerRangeKey, "a_table.v1")
+		require.NoError(t, d.mergePeerStatePatches(patches(
+			`{"80000000-ffffffff": {"a_table.v1": {"Queries": ["PEER"], "ToDelete": []}}}`,
+		)))
+		require.Empty(t, d.cp)
 		require.Equal(t, []string{"PEER"}, d.peerShardsCheckpoints[upperRangeKey]["a_table.v1"].Queries)
 	})
 
@@ -261,9 +330,9 @@ func TestExecQueriesRetriesRetriableErrors(t *testing.T) {
 }
 
 func TestAcknowledge(t *testing.T) {
-	t.Run("single shard clears own entries nested, legacy entries top-level", func(t *testing.T) {
+	t.Run("single shard clears own entries nested, legacy entries by field", func(t *testing.T) {
 		var d = testTransactor(fullRangeKey, "a_table.v1", "b_table.v1")
-		d.cp["a_table.v1"] = item("Q1")
+		d.cp.add("a_table.v1", fullRangeKey, item("Q1"))
 		d.peerShardsCheckpoints[legacyRangeKey] = checkpoint{"b_table.v1": item("Q2")}
 
 		state, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
@@ -271,8 +340,11 @@ func TestAcknowledge(t *testing.T) {
 		require.Equal(t, []string{"Q1", "Q2"}, recording.executed)
 		require.True(t, state.MergePatch)
 		require.JSONEq(t, `{
-			"00000000-ffffffff": {"a_table.v1": null},
-			"b_table.v1": null
+			"a_table.v1": {"00000000-ffffffff": null},
+			"b_table.v1": {
+				"Query": null, "Queries": null, "ToDelete": null,
+				"StagedFiles": null, "Bounds": null, "NeedsMerge": null
+			}
 		}`, string(state.UpdatedJson))
 		require.Empty(t, d.cp)
 		require.Empty(t, d.peerShardsCheckpoints)
@@ -280,84 +352,135 @@ func TestAcknowledge(t *testing.T) {
 
 	t.Run("primary executes own and peer entries", func(t *testing.T) {
 		var d = testTransactor(lowerRangeKey, "a_table.v1")
-		d.cp["a_table.v1"] = item("OWN")
-		d.peerShardsCheckpoints[upperRangeKey] = checkpoint{"a_table.v1": item("PEER")}
-		d.peerShardsCheckpoints[legacyRangeKey] = checkpoint{"a_table.v1": item("LEGACY")}
+		d.cp.add("a_table.v1", lowerRangeKey, item("OWN"))
+		d.cp.add("a_table.v1", upperRangeKey, item("PEER"))
+		d.peerShardsCheckpoints[upperRangeKey] = checkpoint{"a_table.v1": item("OLD-PEER")}
 
 		state, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
 		require.NoError(t, err)
-		require.Equal(t, []string{"OWN", "LEGACY", "PEER"}, recording.executed)
+		require.Equal(t, []string{"OWN", "PEER", "OLD-PEER"}, recording.executed)
 		require.True(t, state.MergePatch)
 		require.JSONEq(t, `{
-			"00000000-7fffffff": {"a_table.v1": null},
-			"80000000-ffffffff": {"a_table.v1": null},
-			"a_table.v1": null
+			"a_table.v1": {"00000000-7fffffff": null, "80000000-ffffffff": null},
+			"80000000-ffffffff": {"a_table.v1": null}
 		}`, string(state.UpdatedJson))
 		require.Empty(t, d.cp)
 		require.Empty(t, d.peerShardsCheckpoints)
 	})
 
+	t.Run("each layout clears at its own path", func(t *testing.T) {
+		var recovered = `{
+			"a_table.v1": {
+				"Queries": ["FLAT"], "ToDelete": [],
+				"00000000-7fffffff": {"Queries": ["OWN"], "ToDelete": []}
+			},
+			"80000000-ffffffff": {
+				"a_table.v1": {"Queries": ["OLD-PEER"], "ToDelete": []},
+				"b_table.v1": {"Queries": ["OLD-PEER-B"], "ToDelete": []}
+			}
+		}`
+		var d = testTransactor(lowerRangeKey, "a_table.v1")
+		require.NoError(t, d.UnmarshalState(json.RawMessage(recovered)))
+
+		state, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
+		require.NoError(t, err)
+		require.Equal(t, []string{"OWN", "FLAT", "OLD-PEER"}, recording.executed)
+		require.JSONEq(t, `{
+			"a_table.v1": {
+				"Query": null, "Queries": null, "ToDelete": null,
+				"StagedFiles": null, "Bounds": null, "NeedsMerge": null,
+				"00000000-7fffffff": null
+			},
+			"80000000-ffffffff": {"a_table.v1": null}
+		}`, string(state.UpdatedJson))
+		require.Empty(t, d.cp["a_table.v1"])
+
+		// Reduced into the recovered document, only the unbound b_table entry
+		// survives.
+		require.JSONEq(t, `{
+			"a_table.v1": {},
+			"80000000-ffffffff": {"b_table.v1": {"Queries": ["OLD-PEER-B"], "ToDelete": []}}
+		}`, reduce(t, recovered, state))
+	})
+
+	t.Run("clearing a flat entry spares a current entry merged onto it", func(t *testing.T) {
+		// The flat entry was recovered and executed on its own; a peer's
+		// current entry landed under the same state key in the meantime.
+		var d = testTransactor(lowerRangeKey, "a_table.v1")
+		d.peerShardsCheckpoints[legacyRangeKey] = checkpoint{"a_table.v1": item("FLAT")}
+
+		state, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
+		require.NoError(t, err)
+		require.JSONEq(t, `{
+			"a_table.v1": {"80000000-ffffffff": {"Queries": ["PEER"], "ToDelete": []}}
+		}`, reduce(t, `{
+			"a_table.v1": {
+				"Queries": ["FLAT"], "ToDelete": [],
+				"80000000-ffffffff": {"Queries": ["PEER"], "ToDelete": []}
+			}
+		}`, state))
+	})
+
 	t.Run("removed binding entries are retained and not cleared", func(t *testing.T) {
 		var d = testTransactor(lowerRangeKey, "a_table.v1")
-		d.peerShardsCheckpoints[upperRangeKey] = checkpoint{
-			"a_table.v1":       item("PEER"),
-			"removed_table.v1": item("REMOVED"),
-		}
+		d.cp.add("a_table.v1", upperRangeKey, item("PEER"))
+		d.cp.add("removed_table.v1", upperRangeKey, item("REMOVED"))
 
 		state, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
 		require.NoError(t, err)
 		require.Equal(t, []string{"PEER"}, recording.executed)
 		require.JSONEq(t, `{
-			"80000000-ffffffff": {"a_table.v1": null}
+			"a_table.v1": {"80000000-ffffffff": null}
 		}`, string(state.UpdatedJson))
-		require.NotNil(t, d.peerShardsCheckpoints[upperRangeKey]["removed_table.v1"])
+		require.NotNil(t, d.cp["removed_table.v1"][upperRangeKey])
 	})
 
 	t.Run("subset drain executes only requested state keys", func(t *testing.T) {
 		var d = testTransactor(fullRangeKey, "a_table.v1", "b_table.v1")
-		d.cp["a_table.v1"] = item("QA")
-		d.cp["b_table.v1"] = item("QB")
+		d.cp.add("a_table.v1", fullRangeKey, item("QA"))
+		d.cp.add("b_table.v1", fullRangeKey, item("QB"))
 
 		state, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), keys("a_table.v1"))
 		require.NoError(t, err)
 		require.Equal(t, []string{"QA"}, recording.executed)
-		require.JSONEq(t, `{"00000000-ffffffff": {"a_table.v1": null}}`, string(state.UpdatedJson))
-		require.NotNil(t, d.cp["b_table.v1"]) // untouched, still pending
+		require.JSONEq(t, `{"a_table.v1": {"00000000-ffffffff": null}}`, string(state.UpdatedJson))
+		require.NotNil(t, d.cp["b_table.v1"][fullRangeKey]) // untouched, still pending
 	})
 
 	t.Run("subset drain spans all range buckets", func(t *testing.T) {
 		var d = testTransactor(lowerRangeKey, "a_table.v1", "b_table.v1")
-		d.cp["a_table.v1"] = item("OWN-A")
-		d.peerShardsCheckpoints[upperRangeKey] = checkpoint{
-			"a_table.v1": item("PEER-A"),
-			"b_table.v1": item("PEER-B"),
-		}
 		d.peerShardsCheckpoints[legacyRangeKey] = checkpoint{"a_table.v1": item("LEGACY-A")}
+		d.cp.add("a_table.v1", lowerRangeKey, item("OWN-A"))
+		d.cp.add("a_table.v1", upperRangeKey, item("PEER-A"))
+		d.cp.add("b_table.v1", upperRangeKey, item("PEER-B"))
 
 		state, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), keys("a_table.v1"))
 		require.NoError(t, err)
-		require.Equal(t, []string{"OWN-A", "LEGACY-A", "PEER-A"}, recording.executed)
+		require.Equal(t, []string{"OWN-A", "PEER-A", "LEGACY-A"}, recording.executed)
 		require.JSONEq(t, `{
-			"00000000-7fffffff": {"a_table.v1": null},
-			"a_table.v1": null,
-			"80000000-ffffffff": {"a_table.v1": null}
+			"a_table.v1": {
+				"Query": null, "Queries": null, "ToDelete": null,
+				"StagedFiles": null, "Bounds": null, "NeedsMerge": null,
+				"00000000-7fffffff": null,
+				"80000000-ffffffff": null
+			}
 		}`, string(state.UpdatedJson))
-		require.NotNil(t, d.peerShardsCheckpoints[upperRangeKey]["b_table.v1"])
+		require.NotNil(t, d.cp["b_table.v1"][upperRangeKey])
 	})
 
 	t.Run("nothing to drain returns nil state", func(t *testing.T) {
 		var d = testTransactor(fullRangeKey, "a_table.v1", "b_table.v1")
-		d.cp["b_table.v1"] = item("QB")
+		d.cp.add("b_table.v1", fullRangeKey, item("QB"))
 
 		state, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), keys("a_table.v1"))
 		require.NoError(t, err)
 		require.Nil(t, state)
-		require.NotNil(t, d.cp["b_table.v1"]) // untouched, still pending
+		require.NotNil(t, d.cp["b_table.v1"][fullRangeKey]) // untouched, still pending
 	})
 
 	t.Run("non-primary does no work", func(t *testing.T) {
 		var d = testTransactor(upperRangeKey, "a_table.v1")
-		d.cp["a_table.v1"] = item("SHOULD NOT RUN")
+		d.cp.add("a_table.v1", upperRangeKey, item("SHOULD NOT RUN"))
 		d.cpRecovery = true
 
 		// Acknowledge itself is callable here since the non-primary path
@@ -371,14 +494,14 @@ func TestAcknowledge(t *testing.T) {
 
 	t.Run("recovery tolerates deleted paths", func(t *testing.T) {
 		var d = testTransactor(lowerRangeKey, "a_table.v1")
-		d.cp["a_table.v1"] = item("Q1")
+		d.cp.add("a_table.v1", lowerRangeKey, item("Q1"))
 		d.cpRecovery = true
 
 		_, err := d.acknowledgeApply(context.Background(), recordingDB(t, fmt.Errorf("some PATH_NOT_FOUND error")), allKeys)
 		require.NoError(t, err)
 		require.False(t, d.cpRecovery)
 
-		d.cp["a_table.v1"] = item("Q1")
+		d.cp.add("a_table.v1", lowerRangeKey, item("Q1"))
 		_, err = d.acknowledgeApply(context.Background(), recordingDB(t, fmt.Errorf("some PATH_NOT_FOUND error")), allKeys)
 		require.Error(t, err) // no longer a recovery apply
 	})
@@ -436,14 +559,12 @@ func structuredItem(needsMerge bool, bounds []mergeBoundLiterals, files ...strin
 func TestAcknowledgeCoalescesShardEntries(t *testing.T) {
 	t.Run("entries of all shards coalesce into a single merge", func(t *testing.T) {
 		var d = renderingTransactor(lowerRangeKey)
-		d.cp["a_table.v1"] = structuredItem(true,
+		d.cp.add("a_table.v1", lowerRangeKey, structuredItem(true,
 			[]mergeBoundLiterals{bound("1", "10"), bound("'2024-01-01T00:00:00Z'", "'2024-01-02T00:00:00Z'")},
-			"own.json")
-		d.peerShardsCheckpoints[upperRangeKey] = checkpoint{
-			"a_table.v1": structuredItem(false,
-				[]mergeBoundLiterals{bound("5", "50"), bound("'2024-01-01T12:00:00Z'", "'2024-01-03T00:00:00Z'")},
-				"peer.json"),
-		}
+			"own.json"))
+		d.cp.add("a_table.v1", upperRangeKey, structuredItem(false,
+			[]mergeBoundLiterals{bound("5", "50"), bound("'2024-01-01T12:00:00Z'", "'2024-01-03T00:00:00Z'")},
+			"peer.json"))
 
 		state, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
 		require.NoError(t, err)
@@ -459,19 +580,15 @@ func TestAcknowledgeCoalescesShardEntries(t *testing.T) {
 		require.Contains(t, query, "l.ts <= GREATEST('2024-01-02T00:00:00Z'::TIMESTAMP, '2024-01-03T00:00:00Z'::TIMESTAMP)")
 
 		require.JSONEq(t, `{
-			"00000000-7fffffff": {"a_table.v1": null},
-			"80000000-ffffffff": {"a_table.v1": null}
+			"a_table.v1": {"00000000-7fffffff": null, "80000000-ffffffff": null}
 		}`, string(state.UpdatedJson))
 		require.Empty(t, d.cp)
-		require.Empty(t, d.peerShardsCheckpoints)
 	})
 
 	t.Run("one merging entry is enough to merge the coalesced files", func(t *testing.T) {
 		var d = renderingTransactor(lowerRangeKey)
-		d.cp["a_table.v1"] = structuredItem(false, nil, "own.json")
-		d.peerShardsCheckpoints[upperRangeKey] = checkpoint{
-			"a_table.v1": structuredItem(true, nil, "peer.json"),
-		}
+		d.cp.add("a_table.v1", lowerRangeKey, structuredItem(false, nil, "own.json"))
+		d.cp.add("a_table.v1", upperRangeKey, structuredItem(true, nil, "peer.json"))
 
 		_, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
 		require.NoError(t, err)
@@ -481,10 +598,8 @@ func TestAcknowledgeCoalescesShardEntries(t *testing.T) {
 
 	t.Run("entries with no merging coalesce into a single copy", func(t *testing.T) {
 		var d = renderingTransactor(lowerRangeKey)
-		d.cp["a_table.v1"] = structuredItem(false, nil, "own.json")
-		d.peerShardsCheckpoints[upperRangeKey] = checkpoint{
-			"a_table.v1": structuredItem(false, nil, "peer.json"),
-		}
+		d.cp.add("a_table.v1", lowerRangeKey, structuredItem(false, nil, "own.json"))
+		d.cp.add("a_table.v1", upperRangeKey, structuredItem(false, nil, "peer.json"))
 
 		_, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
 		require.NoError(t, err)
@@ -496,10 +611,8 @@ func TestAcknowledgeCoalescesShardEntries(t *testing.T) {
 
 	t.Run("recovery coalesces exactly like steady state", func(t *testing.T) {
 		var d = renderingTransactor(lowerRangeKey)
-		d.cp["a_table.v1"] = structuredItem(true, nil, "own.json")
-		d.peerShardsCheckpoints[upperRangeKey] = checkpoint{
-			"a_table.v1": structuredItem(true, nil, "peer.json"),
-		}
+		d.cp.add("a_table.v1", lowerRangeKey, structuredItem(true, nil, "own.json"))
+		d.cp.add("a_table.v1", upperRangeKey, structuredItem(true, nil, "peer.json"))
 		d.cpRecovery = true
 
 		_, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
@@ -513,10 +626,8 @@ func TestAcknowledgeCoalescesShardEntries(t *testing.T) {
 
 	t.Run("recovery tolerates an already-applied group whose files are gone", func(t *testing.T) {
 		var d = renderingTransactor(lowerRangeKey)
-		d.cp["a_table.v1"] = structuredItem(true, nil, "own.json")
-		d.peerShardsCheckpoints[upperRangeKey] = checkpoint{
-			"a_table.v1": structuredItem(true, nil, "peer.json"),
-		}
+		d.cp.add("a_table.v1", lowerRangeKey, structuredItem(true, nil, "own.json"))
+		d.cp.add("a_table.v1", upperRangeKey, structuredItem(true, nil, "peer.json"))
 		d.cpRecovery = true
 
 		// The coalesced query fails on deleted staged files, which during
@@ -527,16 +638,14 @@ func TestAcknowledgeCoalescesShardEntries(t *testing.T) {
 		require.NoError(t, err)
 		require.Empty(t, recording.executed)
 		require.JSONEq(t, `{
-			"00000000-7fffffff": {"a_table.v1": null},
-			"80000000-ffffffff": {"a_table.v1": null}
+			"a_table.v1": {"00000000-7fffffff": null, "80000000-ffffffff": null}
 		}`, string(state.UpdatedJson))
 		require.Empty(t, d.cp)
-		require.Empty(t, d.peerShardsCheckpoints)
 	})
 
 	t.Run("non-recovery missing objects are fatal", func(t *testing.T) {
 		var d = renderingTransactor(lowerRangeKey)
-		d.cp["a_table.v1"] = structuredItem(true, nil, "own.json")
+		d.cp.add("a_table.v1", lowerRangeKey, structuredItem(true, nil, "own.json"))
 
 		_, err := d.acknowledgeApply(context.Background(),
 			recordingDB(t, fmt.Errorf("some PATH_NOT_FOUND error")), allKeys)
@@ -545,10 +654,8 @@ func TestAcknowledgeCoalescesShardEntries(t *testing.T) {
 
 	t.Run("entries of older versions run pre-rendered alongside the coalesced query", func(t *testing.T) {
 		var d = renderingTransactor(lowerRangeKey)
-		d.cp["a_table.v1"] = structuredItem(true, nil, "own.json")
-		d.peerShardsCheckpoints[upperRangeKey] = checkpoint{
-			"a_table.v1": item("OLD-PEER"),
-		}
+		d.cp.add("a_table.v1", lowerRangeKey, structuredItem(true, nil, "own.json"))
+		d.cp.add("a_table.v1", upperRangeKey, item("OLD-PEER"))
 
 		state, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
 		require.NoError(t, err)
@@ -556,16 +663,15 @@ func TestAcknowledgeCoalescesShardEntries(t *testing.T) {
 		require.Equal(t, "OLD-PEER", recording.executed[0])
 		require.Contains(t, recording.executed[1], "MERGE INTO `schema`.`a_table`")
 		require.JSONEq(t, `{
-			"00000000-7fffffff": {"a_table.v1": null},
-			"80000000-ffffffff": {"a_table.v1": null}
+			"a_table.v1": {"00000000-7fffffff": null, "80000000-ffffffff": null}
 		}`, string(state.UpdatedJson))
 	})
 
 	t.Run("a single entry renders its bounds verbatim", func(t *testing.T) {
 		var d = renderingTransactor(fullRangeKey)
-		d.cp["a_table.v1"] = structuredItem(true,
+		d.cp.add("a_table.v1", fullRangeKey, structuredItem(true,
 			[]mergeBoundLiterals{bound("1", "10"), bound("'2024-01-01T00:00:00Z'", "'2024-01-02T00:00:00Z'")},
-			"own.json")
+			"own.json"))
 
 		_, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
 		require.NoError(t, err)
@@ -580,7 +686,7 @@ func TestAcknowledgeCoalescesShardEntries(t *testing.T) {
 		for i := 0; i < queryBatchSize+1; i++ {
 			files = append(files, fmt.Sprintf("f%d.json", i))
 		}
-		d.cp["a_table.v1"] = structuredItem(true, nil, files...)
+		d.cp.add("a_table.v1", lowerRangeKey, structuredItem(true, nil, files...))
 
 		_, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
 		require.NoError(t, err)
@@ -636,4 +742,3 @@ func TestCombineBounds(t *testing.T) {
 		require.Equal(t, keys[0].Identifier, out[0].Identifier)
 	})
 }
-
