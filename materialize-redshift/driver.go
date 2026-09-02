@@ -335,6 +335,17 @@ type transactor struct {
 	// from it. Nil until a StartCommit has actually run here, which a
 	// recovery Acknowledge (settling work recovered from the state, with no
 	// preceding StartCommit in this process) must not mistake for one.
+	//
+	// Known accepted gap: a recovery Acknowledge durably applies its work to
+	// Redshift while correctly leaving this mirror stale (there is no fresh
+	// checkpoint to advance it to). Downgrading to a pre-migration binary
+	// while that gap is open makes the runtime replay the just-applied
+	// transaction against a binary with no idempotency mechanism of its own;
+	// a MERGE binding self-heals, but a delta-updates (no-MERGE) binding
+	// duplicates those rows. The gap closes on its own at the next
+	// StartCommit in this process, but stays open indefinitely on an idle
+	// task. Do not downgrade a task that has crashed and recovered without
+	// first confirming at least one more transaction has committed since.
 	lastRuntimeCheckpoint []byte
 }
 
@@ -903,7 +914,9 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	// Mirror the runtime checkpoint into the checkpoints row, for a
 	// downgraded connector to resume from, only when this call settles
 	// every pending entry (not a partial, Apply-RPC-scoped commit) and a
-	// StartCommit has actually run in this process to produce one.
+	// StartCommit has actually run in this process to produce one. See
+	// lastRuntimeCheckpoint's comment for the accepted downgrade gap this
+	// leaves open on a recovery Acknowledge.
 	var legacyCheckpoint []byte
 	if pending.entryCount() == d.state.entryCount() {
 		legacyCheckpoint = d.lastRuntimeCheckpoint
