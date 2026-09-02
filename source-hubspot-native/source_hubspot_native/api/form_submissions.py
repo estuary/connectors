@@ -1,3 +1,4 @@
+from datetime import UTC, datetime, timedelta
 from logging import Logger
 from typing import (
     AsyncGenerator,
@@ -17,6 +18,7 @@ from ..models import (
 )
 from .shared import (
     HUB,
+    dt_to_ms,
 )
 
 
@@ -25,13 +27,17 @@ from .shared import (
 # FORM_TYPE_NOT_ALLOWED.
 FORM_TYPES_WITHOUT_SUBMISSIONS = frozenset({"blog_comment"})
 
+FORM_SUBMISSIONS_LAG = timedelta(minutes=5)
 
-async def _fetch_form_submissions_since(
+
+async def _fetch_form_submissions_between(
     http: HTTPSession,
     log: Logger,
     form_id: str,
-    last_submitted_at: int,
+    since: int,
+    until: int,
 ) -> AsyncGenerator[FormSubmission, None]:
+    """Yield the form's submissions with `since < submittedAt <= until`."""
     url = f"{HUB}/form-integrations/v1/submissions/forms/{form_id}"
     after: str | None = None
     params: dict[str, str | int] = {
@@ -50,9 +56,12 @@ async def _fetch_form_submissions_since(
 
         for form_submission in result.results:
             # Form submissions are returned in reverse chronological order.
-            # We can safely stop paginating once we see a submission with
-            # a timestamp before the previous sweep.
-            if form_submission.submittedAt > last_submitted_at:
+            # Submissions newer than `until` are skipped over, and we can
+            # safely stop paginating once we see a submission with a
+            # timestamp at or before `since`.
+            if form_submission.submittedAt > until:
+                continue
+            elif form_submission.submittedAt > since:
                 yield form_submission
             else:
                 return
@@ -68,7 +77,17 @@ async def fetch_form_submissions(
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[FormSubmission | LogCursor, None]:
+    """
+    Emit every form's submissions in (cursor, horizon], where the horizon is
+    the sweep's start less FORM_SUBMISSIONS_LAG, then checkpoint the newest
+    submittedAt emitted.
+    """
     assert isinstance(log_cursor, int)
+
+    horizon = dt_to_ms(datetime.now(tz=UTC) - FORM_SUBMISSIONS_LAG)
+    if horizon <= log_cursor:
+        return
+
     form_ids: list[str] = []
 
     async for form in fetch_forms(http, log):
@@ -80,8 +99,8 @@ async def fetch_form_submissions(
     latest_submitted_at = log_cursor
 
     for id in form_ids:
-        async for submission in _fetch_form_submissions_since(
-            http, log, id, log_cursor
+        async for submission in _fetch_form_submissions_between(
+            http, log, id, log_cursor, horizon
         ):
             if submission.submittedAt > latest_submitted_at:
                 latest_submitted_at = submission.submittedAt

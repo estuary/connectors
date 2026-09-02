@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-09-02
+### Fixed
+- The `form_submissions` binding could permanently skip submissions that arrived on a
+  form while a sweep was still checking other forms. Each sweep now only emits
+  submissions made at least five minutes before it started and checkpoints the newest
+  one emitted, so anything newer is read by a later sweep.
+
 ## 2026-08-27
 ### Added
 - New `leads` binding for the HubSpot Leads object. Leads requires a Sales Hub
