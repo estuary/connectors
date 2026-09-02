@@ -1,0 +1,40 @@
+info:
+  name: extensive
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{base_url}}/v2/calls/extensive"
+  headers:
+    - name: content-type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "filter": {
+          "fromDateTime": "2026-08-01T00:00:00Z",
+          "toDateTime": "2026-09-01T00:00:00Z"
+        }
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://gong.app.gong.io/settings/api/documentation#post-/v2/calls/extensive
+
+  **WHY:** not an endpoint the connector uses — kept because it is the second
+  place to ask whether a call exists that `bare` declines to list.
+
+  **VERIFIED (2026-08-31):** it declines the same calls `bare` does. A call
+  created but never successfully given media is invisible here too, with the
+  same empty-filter `404`. There is no read path to a call Gong has not
+  processed — but the id is still recoverable by re-posting its
+  `clientUniqueId`, which returns it in the duplicate error (see
+  `Seeding / A1`).

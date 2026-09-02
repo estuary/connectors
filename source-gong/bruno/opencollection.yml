@@ -1,0 +1,221 @@
+opencollection: 1.0.0
+
+info:
+  name: Gong
+
+request:
+  scripts:
+    - type: before-request
+      code: |-
+        // Gong auth via the connector's sops-encrypted config.yaml. The access key and
+        // secret are re-derived from sops on every request and live only on `req` —
+        // they are never persisted to a var or env file. Requires the developer JS
+        // sandbox:
+        //   CLI: `bru run <request>.yml --env Gong --sandbox developer`
+        //   GUI: jsSandboxMode "developer" in ~/.config/bruno/collection-security.json
+        const { execFileSync } = require('child_process');
+        const path = require('path');
+        const configured = bru.getEnvVar('config_path');
+        if (!configured) throw new Error('config_path env var is not set');
+        // Resolve relative to the collection root, not the process cwd — the GUI's
+        // cwd is wherever Bruno was launched from, only the CLI runs from bruno/.
+        const configPath = path.isAbsolute(configured)
+          ? configured
+          : path.resolve(bru.cwd(), configured);
+        const decrypted = execFileSync(
+          'sops', ['-d', '--output-type=json', configPath], { encoding: 'utf8' },
+        );
+        // Raw `sops -d` keeps the `_sops` encrypted-suffix on key names (the platform
+        // strips it at runtime, sops itself does not) — accept both spellings.
+        const creds = JSON.parse(decrypted)?.credentials;
+        const accessKey = creds?.access_key ?? creds?.access_key_sops;
+        const accessKeySecret = creds?.access_key_secret ?? creds?.access_key_secret_sops;
+        if (!accessKey || !accessKeySecret) {
+          throw new Error('credentials.{access_key,access_key_secret}(_sops) missing from decrypted config');
+        }
+
+        // HTTP Basic: base64(accessKey:accessKeySecret). Mirrors the BasicAuth
+        // TokenSource wired in source_gong/models.py.
+        const basic = Buffer.from(`${accessKey}:${accessKeySecret}`).toString('base64');
+        req.setHeader('Authorization', `Basic ${basic}`);
+    - type: after-response
+      code: |-
+        // Redact contact details from the response so any Response Example saved from a
+        // run is already clean. This MUST cover FIELDS_TO_REDACT in
+        // tests/test_snapshots.py: a field redacted in the snapshot tests is redacted
+        // here, with the same marker, so examples reflect what the tests assert.
+        const REDACTED_FIELDS = [
+          'emailAddress',
+          'emailAliases',
+          'phoneNumber',
+          'personalMeetingUrls',
+          'meetingConsentPageUrl',
+          'trustedEmailAddress',
+        ];
+
+        const redact = (node) => {
+          if (Array.isArray(node)) return node.forEach(redact);
+          if (!node || typeof node !== 'object') return;
+          for (const [key, value] of Object.entries(node)) {
+            if (REDACTED_FIELDS.includes(key)) node[key] = 'redacted';
+            else redact(value);
+          }
+        };
+
+        const body = res.getBody();
+        if (body && typeof body === 'object') redact(body);
+
+docs:
+  content: |-
+    ## API constraints (account-wide)
+
+    Facts that hold for the whole Gong account, not any single endpoint.
+
+    - **Base URL is per-instance:** `https://<region>.api.gong.io`, where
+      `<region>` is the label in the instance's app hostname. For this sandbox
+      that is `us02-16381`, giving `https://us02-16381.api.gong.io`. The
+      connector rebuilds this from its `region` config field in
+      `source_gong/models.py`.
+    - **VERIFIED (2026-08-31):** the generic host `https://api.gong.io` returns
+      `401` for this account's credentials, while
+      `https://us02-16381.api.gong.io` returns `200` on `GET /v2/users`. The
+      instance-specific host is mandatory, not a convenience alias.
+    - **Auth:** HTTP Basic, `base64(accessKey:accessKeySecret)`. Keys are minted
+      at Admin center > Settings > Ecosystem > API (Tech admin role required).
+      On this instance that screen renders only the OAuth section; the API-key
+      screen is reachable from the docs link
+      `https://app.gong.io/company/api-authentication?currentTab=MY_API_TAB`,
+      which redirects into the logged-in instance.
+    - **Rate limit (DOCUMENTED 2026-08-31):** 3 requests/second and 10,000
+      requests/day, with `429` plus a `Retry-After` header on breach. The
+      connector limits itself to 170 requests per 60s in `source_gong/api.py`.
+    - **Empty *filtered* lists return 404; empty *unfiltered* lists return 200
+      (VERIFIED 2026-08-31).** The split runs along whether the request carries
+      a filter, not along the endpoint:
+      - `GET /v2/calls?fromDateTime=…&toDateTime=…` → `404`
+        `{"errors":["No calls found corresponding to the provided filters"]}`
+      - `POST /v2/stats/activity/scorecards` with a `filter` body → `404`
+        `{"errors":["No answered scorecards found corresponding to the provided filters."]}`
+        (note the trailing period — the two strings are not formatted alike)
+      - `GET /v2/settings/scorecards`, which takes no filter → `200`
+        `{"scorecards": []}`
+      `_NO_RESULTS_404_PATTERN` in `source_gong/api.py` was checked against both
+      404 strings above and matches each, so genuine 404s (wrong region or
+      path) still surface as fatal. A missing call by id is one such genuine
+      404: `GET /v2/calls/{id}` answers `{"errors":["Call ID … was not found"]}`,
+      which the pattern correctly does **not** match.
+    - **Date formats differ by endpoint:** `/v2/calls` and
+      `/v2/users/extensive` take ISO-8601 (`2026-08-28T15:00:00Z`);
+      `/v2/stats/activity/scorecards` takes bare `YYYY-MM-DD`.
+    - **Filter bounds:** `from*` parameters are inclusive, `to*` are exclusive.
+    - **Pagination:** cursor-based on every endpoint. Responses carry
+      `records.cursor`; the next request echoes it as a `cursor` query param
+      (GET) or body field (POST).
+    - **One workspace (VERIFIED 2026-08-31):** `GET /v2/workspaces` returns a
+      single "Initial workspace" (`4042227664642553970`). Seeded calls cannot
+      be landing in an unwatched workspace, so that explanation is ruled out
+      for anything that fails to appear.
+
+    ## Seed data belongs to a fake user, never a real one
+
+    Every account in this instance that belongs to an actual Estuary person is
+    off limits as a seeding target. These are the accounts the company will
+    authenticate and work with for as long as the partnership lasts; polluting
+    one with test calls, or getting one into a broken state, is not a
+    reversible mistake in the way deleting a seeded call is.
+
+    So: create a dedicated non-human team member in the instance and point
+    `primary_user_id` at it. It needs an active seat and
+    `telephonyCallsImported: true` (check via `Users / extensive`), or its
+    uploaded calls are silently dropped. It does **not** need Business Admin or
+    Technical administrator — the API key authenticates the upload; the seed
+    user is only the call's host. The environment file ships
+    `primary_user_id` as the placeholder `PIN_SEED_USER_ID` rather than a real
+    id, so a seeding run against an unconfigured checkout fails loudly instead
+    of quietly writing to whoever sorted first.
+
+    ## Seeding this sandbox
+
+    The developer instance starts with users and nothing else — a live capture
+    on 2026-08-31 produced documents for `users` only, with `calls`,
+    `scorecards`, and `scorecard_definitions` all empty. What each stream needs:
+
+    | Stream | Seedable via API? | How |
+    |---|---|---|
+    | `users` | No | Already populated. Add more from the instance's admin UI. |
+    | `calls` | **Yes** | `bru run Seeding --env Gong --sandbox developer` — creates two calls and uploads their media, in one invocation. |
+    | `scorecard_definitions` | No | Coaching settings in the UI. Gong exposes no create endpoint. |
+    | `scorecards` | No | A reviewer answers a scorecard against a call, in the UI. Depends on both rows above. |
+
+    Only two of the four streams can be driven from here. That is a property of
+    the Gong API, not a gap in this collection: `GET /v2/settings/scorecards`
+    and `POST /v2/stats/activity/scorecards` are both read-only.
+
+    ### The manual half
+
+    The two scorecard streams need UI work on the instance, in this order,
+    after `Seeding/A*` has put at least one call in the account:
+
+    1. **Create a definition** (Business admin role): left sidebar >
+       **Assets** > **Scorecards**, hover **AI Call Reviewer** > **Settings**,
+       then **+ New scorecard** in the top right. Build from scratch or from a
+       Gong template, then **Save** and **Publish** — an unpublished scorecard
+       is not available for scoring, so it will not appear to a reviewer even
+       though it exists. This alone populates `scorecard_definitions`.
+    2. **Get one answered.** Two routes, and the automatic one is preferred
+       because it keeps every human out of the seed data:
+
+       - **Automatic review (preferred).** Gong's AI Call Reviewer scores
+         matching calls by itself, no human reviewer. Enable automatic review
+         on the scorecard and set its call filters to match the seeded calls
+         — they are telephony uploads (`system: "Upload API"`), one `Inbound`
+         and one `Outbound`, hosted by the seed account. By default only the
+         **call host** is scored, which is exactly the seed account. Requires
+         an **Enable** or **Enable Essentials** seat on the scored user;
+         Gong Foundation alone is not enough. Automatic review covers calls
+         from the past 90 days.
+       - **Manual review.** A scorer opens the call and fills the scorecard
+         in. This records a real person as the reviewer, so prefer automatic
+         review unless it proves unavailable.
+
+       Either way this populates `scorecards`, whose `reviewTime` cursor is the
+       moment the review is submitted — not the call's own timestamp.
+
+    **VERIFIED (2026-09-02) — automatic review does not reach backwards on its
+    own.** The toggle scores *new* matching calls only. Existing calls are
+    scored by a separate, explicit action: **More actions > Apply to past
+    calls**, which backfills up to 90 days before the scorecard's publication.
+    So publishing a scorecard and waiting will never populate `scorecards` for
+    calls that already existed — which is exactly what happened here on the
+    first attempt, and reads identically to auto-review being broken.
+
+    Setup, in the scorecard editor: turn on **Automatic review**, set **Scored
+    participants** to "Only the call host" (the seed account), and add call
+    filters via **+ Add filter** — permissive ones, since the seeded calls are
+    telephony uploads rather than web conferences.
+
+    **PENDING:** what the API records as the reviewer for an automatically
+    answered scorecard. If it names a system identity rather than a person,
+    that is worth knowing before assuming the stream is free of real accounts.
+
+    Re-run `Scorecards / definitions` and `Scorecards / answered` after each
+    step; both currently return empty (200 and 404 respectively, see above).
+
+    ## Docs conventions
+
+    Request docs follow the `bruno-probe-endpoint` skill's conventions: a
+    `**WHY:**` opener plus dated, classified findings (`**VERIFIED
+    (YYYY-MM-DD):**` / `**PENDING:**` / `**UNOBSERVABLE:**` / `**DOCUMENTED
+    (YYYY-MM-DD):**`), with `**LIMITATION**` marking endpoint-specific
+    constraints that carry connector consequences.
+
+    ### Per-endpoint limitations
+
+    - `Scorecards / definitions`, `Scorecards / answered` — no create endpoint
+      exists for either; both are UI-only to seed. See those requests.
+    - `Seeding / A2`, `Seeding / B2` — media content must be unique per call,
+      so the two seeded calls use distinct generated audio files. A `201` on
+      the upload does **not** mean the call will exist: Gong drops uploads it
+      judges too short, and reports that nowhere. See those requests for the
+      full account of what was tried.
+    - `Calls / bare` — does not list calls that have no media attached.

@@ -1,0 +1,72 @@
+info:
+  name: B1 - Add second call
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{base_url}}/v2/calls"
+  headers:
+    - name: content-type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "clientUniqueId": "estuary-seed-b1e-20260830",
+        "actualStart": "2026-08-30T10:00:00Z",
+        "title": "Estuary seed call B",
+        "purpose": "Connector integration test",
+        "direction": "Inbound",
+        "duration": 891.91,
+        "primaryUser": "{{primary_user_id}}",
+        "parties": [
+          {
+            "partyId": "1",
+            "userId": "{{primary_user_id}}",
+            "name": "Seed Host"
+          },
+          {
+            "partyId": "2",
+            "emailAddress": "seed-participant@example.com",
+            "name": "Seed Participant"
+          }
+        ]
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // Chain: "B2 - Upload second call media" consumes this id as
+        // {{seed_call_id}}, overwriting what A1 set earlier in the same run.
+        const callId = res.getBody()?.callId;
+        if (callId) bru.setVar('seed_call_id', callId);
+
+docs: |-
+  **REFERENCE:** https://gong.app.gong.io/settings/api/documentation#post-/v2/calls
+
+  SEEDING REQUEST — only the user runs this; never the assistant.
+
+  **WHY:** a second call, two days after `A1`, so the two land in different
+  1-day fetch windows. One call proves the `Call` model parses; two calls on
+  different days prove the incremental walk advances its cursor across windows
+  instead of re-reading the same one.
+
+  **Differs from A1 deliberately:** `direction` is `Inbound` rather than
+  `Outbound` and the duration is longer, so the two records are not
+  indistinguishable in a snapshot.
+
+  **LIMITATION — `clientUniqueId` is the duplicate guard.** Suffixes `-b1` and
+  `-b1b` were consumed by stranded calls on 2026-08-31; bump again after any
+  successful run.
+
+  **`primaryUser` must be the seed account** — same rule as A1, see the
+  collection root.

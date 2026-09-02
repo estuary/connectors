@@ -1,0 +1,112 @@
+info:
+  name: A1 - Add call
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{base_url}}/v2/calls"
+  headers:
+    - name: content-type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "clientUniqueId": "estuary-seed-a1f-20260828",
+        "actualStart": "2026-08-28T15:00:00Z",
+        "title": "Estuary seed call A",
+        "purpose": "Connector integration test",
+        "direction": "Outbound",
+        "duration": 789.51,
+        "primaryUser": "{{primary_user_id}}",
+        "parties": [
+          {
+            "partyId": "1",
+            "userId": "{{primary_user_id}}",
+            "name": "Seed Host"
+          },
+          {
+            "partyId": "2",
+            "emailAddress": "seed-participant@example.com",
+            "name": "Seed Participant"
+          }
+        ]
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // Chain: "A2 - Upload call media" consumes this id as {{seed_call_id}}.
+        // Runtime var only (resource id, not a credential) — overrides the pinned
+        // seed_call_id in the environment file for this session.
+        const callId = res.getBody()?.callId;
+        if (callId) bru.setVar('seed_call_id', callId);
+
+docs: |-
+  **REFERENCE:** https://gong.app.gong.io/settings/api/documentation#post-/v2/calls
+
+  SEEDING REQUEST — only the user runs this; never the assistant.
+
+  **WHY:** the `calls` stream is empty on this sandbox and Gong has no other
+  way to create a call from outside the product. This registers the call
+  record; `A2` attaches its audio.
+
+  **DOCUMENTED (2026-08-31):** required fields are `clientUniqueId`,
+  `actualStart`, `direction`, `parties` (at least one, including the
+  `primaryUser`), and `primaryUser`. `direction` is one of `Inbound`,
+  `Outbound`, `Conference`, `Unknown`. The response is `200` with `callId` and
+  `requestId`.
+
+  **`primaryUser` must be the seed account**, never a real person's — see the
+  collection root. The environment ships `primary_user_id` as
+  `PIN_SEED_USER_ID` so an unconfigured run fails instead of writing to a real
+  user. The account also needs `telephonyCallsImported: true` or the call is
+  dropped; confirm via `Users / extensive`.
+
+  **VERIFIED (2026-08-31) — a call with no media is invisible to the API.**
+  After this request returned `200`, neither `GET /v2/calls` nor
+  `POST /v2/calls/extensive` would list the new call, and `GET /v2/calls/{id}`
+  answered `"Call ID … was not found"`. So A2 is not optional polish — without
+  it the call effectively does not exist. Good news for the connector: it will
+  never observe a half-built call record.
+
+  **VERIFIED (2026-09-01) — a lost `callId` is recoverable, contrary to what
+  this file said earlier.** Re-posting the same `clientUniqueId` returns `400`
+  naming the existing call: `"A call with clientUniqueId 'estuary-seed-a1f-…'
+  has already been posted for the call 7022652889306584427"`. So the duplicate
+  guard doubles as a lookup: repost the id, read the call id out of the error,
+  then upload media straight to it with
+
+      bru run "Seeding/A2 - Upload call media.yml" --env Gong --sandbox developer --env-var seed_call_id=<id>
+
+  That is how the seed account's two calls were rescued after their first
+  media upload failed.
+
+  **LIMITATION — A1 and A2 must run in ONE `bru run` invocation.** `bru.setVar`
+  holds `seed_call_id` only for the lifetime of a single run, so running A2 as
+  a separate command resolves `{{seed_call_id}}` to the environment file's
+  placeholder and fails. Run the folder instead:
+
+      bru run Seeding --env Gong --sandbox developer
+
+  which executes A1, A2, B1, B2 in seq order, each pair chaining correctly.
+
+  **LIMITATION — `clientUniqueId` is the duplicate guard.** Gong rejects a
+  second upload carrying a `clientUniqueId` it has already seen. Suffixes
+  `-a1`, `-a1b`, `-a1c` were consumed by stranded calls on 2026-08-31; bump
+  the suffix again after any successful run.
+
+  **Deliberate date choice:** `actualStart` is 2026-08-28, inside the
+  connector's `start_date` window (2026-08-01 in `config.yaml`). `B1` sits two
+  days later so the two calls land in different 1-day fetch windows — that is
+  what exercises the incremental walk rather than just proving one record
+  parses.
