@@ -1,0 +1,35 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/v2/users"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://gong.app.gong.io/settings/api/documentation#get-/v2/users
+
+  **WHY:** the cheapest authenticated call in the API, so it doubles as the
+  auth probe — `validate_credentials` in `source_gong/resources.py` hits this
+  exact path.
+
+  Use it to look up the **seed account's** id for `primary_user_id`. This
+  request deliberately does not pin an id automatically: the first user in the
+  response is a real person, and seed data must never be attributed to one
+  (see the collection root).
+
+  **VERIFIED (2026-08-31):** returns `200` against
+  `https://us02-16381.api.gong.io` with 4 users on this sandbox. The same
+  credentials against the generic host `https://api.gong.io` return `401`.
+
+  Note this is *not* the endpoint the `users` stream captures — the connector
+  reads `POST /v2/users/extensive` for its richer field set and its
+  `createdFromDateTime` filter. See `Users / extensive`.

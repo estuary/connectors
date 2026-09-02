@@ -1,0 +1,102 @@
+info:
+  name: A2 - Upload call media
+  type: http
+  seq: 2
+
+http:
+  method: PUT
+  url: "{{base_url}}/v2/calls/{{seed_call_id}}/media"
+  body:
+    type: multipart-form
+    data:
+      - name: mediaFile
+        type: file
+        value:
+          - ./seed-media/seed-call-a.mp3
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://gong.app.gong.io/settings/api/documentation#put-/v2/calls/-id-/media
+
+  SEEDING REQUEST — only the user runs this; never the assistant.
+
+  **WHY:** a call created by `A1` has no audio until this lands — and until it
+  does, the call is invisible to every read endpoint (see A1). Consumes
+  `{{seed_call_id}}` from A1's post-response script, which survives only
+  within a single `bru run`, so this must run in the *same invocation* as A1:
+
+      bru run Seeding --env Gong --sandbox developer
+
+  **DOCUMENTED (2026-08-31):** `multipart/form-data` with the file in a
+  `mediaFile` field. Accepted formats are WAV, MP3, MP4, MKV and FLAC, up to
+  1.5GB. Responds `201` with `requestId`, `callId`, and `url`.
+
+  **LIMITATION — a `201` here means accepted, not processed.** The upload is
+  acknowledged synchronously; whether the call ever materializes is decided
+  later and reported nowhere. Treat the read probes, never this status code,
+  as proof that seeding worked.
+
+  **VERIFIED (2026-08-31) — synthetic tone audio does not work, at any
+  length.** Two rounds were tried: 20s/35s tones, then 90s/150s tones. All
+  four uploads returned `201`; none ever became a recording. The 90s/150s pair
+  was polled every two minutes for a full hour (Gong's documented outer bound
+  for analysis) and stayed `404` on both `GET /v2/calls` and
+  `GET /v2/calls/{id}`, while the Gong UI listed the call records as "Not
+  recorded".
+
+  The likely mechanism: Gong measures duration *after* trimming blank audio
+  from each end, and voice-activity detection treats a constant tone as blank
+  — so the trimmed length is zero regardless of file length, and the call
+  falls under the 60 second floor either way. That would explain why raising
+  the duration changed nothing.
+
+  **VERIFIED (2026-09-01) — Gong stated the cause itself.** The call page for
+  a tone upload reads: *"Call was recorded but the recording doesn't contain
+  any audio or video"*. So the media was ingested and then judged to contain
+  no audio at all, which is why duration changes never helped — a constant
+  tone reads as silence to Gong's analysis, leaving nothing to transcribe and
+  no call to surface. The UI is the only place this is reported; the API just
+  keeps returning `404`.
+
+  `seed-media/fetch.py` now downloads real human speech (public-domain
+  LibriVox readings, ~28MB each, distinct tales so the two calls carry
+  different media). `generate.py` remains as an offline fallback, though
+  whether synthesized speech satisfies Gong is still untested.
+
+  **VERIFIED (2026-09-01) — real recorded speech works.** Both LibriVox
+  uploads processed and the calls became queryable about 4 minutes after
+  upload, far inside Gong's advertised "less than an hour". The UI moved from
+  "the recording doesn't contain any audio or video" to "Call is currently
+  being analyzed", then to a finished call. Real audio was the only variable
+  changed; the media path, user, workspace, and request shape were identical
+  to the runs that failed.
+
+  A useful upload-time signal: the 28MB recordings took ~7s each to PUT, where
+  the discarded tone files took ~1.5s. A suspiciously fast upload means the
+  file is too small to contain a real conversation.
+
+  **DOCUMENTED (2026-08-31) — why an accepted upload gets dropped.** Gong
+  discards uploaded calls that are:
+  - **shorter than 60 seconds**, measured after it trims blank audio off each
+    end;
+  - recorded for a user who is not **set to be recorded** in the instance
+    (`telephonyCallsImported`, see `Users / extensive`);
+  - duplicates of a `clientUniqueId` already seen.
+
+  **VERIFIED (2026-09-01) — media uniqueness is enforced across the whole
+  account, not just within a run.** Re-seeding with the two files that had
+  already been attached to earlier calls returned `400 {"errors":["Bad
+  request"]}` — a generic message that says nothing about the real cause.
+  Swapping in two different recordings made both uploads succeed first try.
+  So every new call needs genuinely new audio: `seed-media/fetch.py` has to be
+  repointed at unused material before any re-seed.
+
+  **A useful smell test:** `bru run` reports the whole folder as PASS even when
+  every request returned 4xx — with no assertions defined it only checks that
+  a response arrived. Read the status codes, not the summary table.
