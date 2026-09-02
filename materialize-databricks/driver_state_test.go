@@ -694,6 +694,71 @@ func TestAcknowledgeCoalescesShardEntries(t *testing.T) {
 	})
 }
 
+// TestFormatMigrationCrashRecovery proves that upgrading a task while it has
+// pending work staged in an earlier checkpoint layout survives a crash at
+// either risky point of the post-commit-apply cycle: after a StartedCommit
+// checkpoint is durable but before Acknowledge's clearing patch lands, and
+// again during the retry that follows. Each layout is the state exactly as
+// an older connector version, or an older scale-out topology, would have
+// left it mid-crash; the new binary must recover it, apply it at most once,
+// and converge to an empty checkpoint with no residue that could trigger a
+// phantom re-run.
+func TestFormatMigrationCrashRecovery(t *testing.T) {
+	var entry = `{"StagedFiles": ["f.json"], "NeedsMerge": true, "Bounds": [{"Lower":"1","Upper":"10"},{"Lower":"'2024-01-01T00:00:00Z'","Upper":"'2024-01-02T00:00:00Z'"}]}`
+
+	var layouts = []struct {
+		name string
+		doc  string
+	}{
+		{"flat, pre-range-scoping", fmt.Sprintf(`{"a_table.v1": %s}`, entry)},
+		{"range-first, pre-this-PR scale-out", fmt.Sprintf(`{%q: {"a_table.v1": %s}}`, fullRangeKey, entry)},
+		{"current", fmt.Sprintf(`{"a_table.v1": {%q: %s}}`, fullRangeKey, entry)},
+	}
+
+	for _, layout := range layouts {
+		t.Run(layout.name, func(t *testing.T) {
+			var doc = layout.doc
+
+			// Crash 1: a StartedCommit checkpoint in this layout is durable,
+			// then the process dies before Acknowledge's clearing patch is
+			// persisted. The new binary boots and recovers it.
+			var d1 = renderingTransactor(fullRangeKey)
+			require.NoError(t, d1.UnmarshalState(json.RawMessage(doc)))
+			require.True(t, d1.cpRecovery)
+
+			state1, err := d1.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
+			require.NoError(t, err)
+			require.Len(t, recording.executed, 1) // the one real side effect
+			require.Contains(t, recording.executed[0], "MERGE INTO `schema`.`a_table`")
+			require.NotNil(t, state1) // the clear patch the runtime failed to persist
+
+			// Crash 2: the process dies again before the retry's clearing
+			// patch persists either, so a second restart recovers the exact
+			// same pending entry from the still-unclearred `doc`. Its staged
+			// file was already deleted by crash 1's successful MERGE, so
+			// this retry's query hits a missing-file error, which recovery
+			// tolerates as "already applied" rather than re-running it.
+			var d2 = renderingTransactor(fullRangeKey)
+			require.NoError(t, d2.UnmarshalState(json.RawMessage(doc)))
+			require.True(t, d2.cpRecovery)
+
+			state2, err := d2.acknowledgeApply(context.Background(),
+				recordingDB(t, fmt.Errorf("some PATH_NOT_FOUND error")), allKeys)
+			require.NoError(t, err)
+			require.Empty(t, recording.executed) // no second real side effect
+			require.NotNil(t, state2)
+
+			// This time the clearing patch lands. The persisted document
+			// converges to nothing pending for a_table.v1, regardless of the
+			// layout it started in, so a third restart finds no work at all.
+			var d3 = renderingTransactor(fullRangeKey)
+			require.NoError(t, d3.UnmarshalState(json.RawMessage(reduce(t, doc, state2))))
+			require.Empty(t, d3.cp)
+			require.Empty(t, d3.peerShardsCheckpoints)
+		})
+	}
+}
+
 func TestCombineBounds(t *testing.T) {
 	var keys = renderableTable().Keys
 
