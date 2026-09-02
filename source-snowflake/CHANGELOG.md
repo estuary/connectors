@@ -1,5 +1,12 @@
 # source-snowflake
 
+## 2026-09-02
+
+### Fixed
+- Dynamic table discovery is now scoped to the capture database. Previously a
+  same-named dynamic table in another database could cause a captured table to
+  disappear from discovery.
+
 ## 2026-07-30
 
 ### Changed

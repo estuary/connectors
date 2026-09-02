@@ -158,13 +158,17 @@ type snowflakeDynamicTable struct {
 func listDynamicTables(ctx context.Context, cfg *config, db *sql.DB) (map[snowflakeObject]*snowflakeDynamicTable, error) {
 	var xdb = sqlx.NewDb(db, "snowflake").Unsafe()
 	var tables []*snowflakeDynamicTable
-	if err := xdb.SelectContext(ctx, &tables, "SHOW DYNAMIC TABLES IN ACCOUNT;"); err != nil {
-		return nil, fmt.Errorf("error listing tables: %w", err)
+	var query = fmt.Sprintf("SHOW DYNAMIC TABLES IN DATABASE %s;", quoteSnowflakeIdentifier(cfg.Database))
+	if err := xdb.SelectContext(ctx, &tables, query); err != nil {
+		return nil, fmt.Errorf("error listing dynamic tables: %w", err)
 	}
 
 	var result = make(map[snowflakeObject]*snowflakeDynamicTable)
 	for _, table := range tables {
-		var tableID = snowflakeObject{cfg.Database, table.Schema, table.Name}
+		if table.Database != cfg.Database {
+			return nil, fmt.Errorf("internal error: dynamic table %q.%q.%q is not in database %q", table.Database, table.Schema, table.Name, cfg.Database)
+		}
+		var tableID = snowflakeObject{table.Database, table.Schema, table.Name}
 		result[tableID] = table
 	}
 	return result, nil
