@@ -105,19 +105,24 @@ func TestDecodeCheckpointsColumns(t *testing.T) {
 		require.Equal(t, checkpointTokensMap{"a_table.v1": {fullRange: "p/x/files.manifest"}}, tokens)
 	})
 
-	t.Run("the legacy checkpoint column, compressed", func(t *testing.T) {
+	t.Run("the legacy checkpoint column", func(t *testing.T) {
+		legacy, err := s.decodeLegacyCheckpoint(nil)
+		require.NoError(t, err)
+		require.Nil(t, legacy)
+
 		checkpoint := []byte("some-runtime-checkpoint")
 		compressed, err := compressBytes(checkpoint)
 		require.NoError(t, err)
-
-		legacy, err := s.decodeLegacyCheckpoint(hex.EncodeToString([]byte(base64.StdEncoding.EncodeToString(compressed))))
+		raw := hex.EncodeToString([]byte(base64.StdEncoding.EncodeToString(compressed)))
+		legacy, err = s.decodeLegacyCheckpoint(&raw)
 		require.NoError(t, err)
 		require.Equal(t, checkpoint, legacy)
 	})
 
 	t.Run("the legacy checkpoint column, never compressed", func(t *testing.T) {
 		checkpoint := []byte("some-runtime-checkpoint")
-		legacy, err := s.decodeLegacyCheckpoint(hex.EncodeToString([]byte(base64.StdEncoding.EncodeToString(checkpoint))))
+		raw := hex.EncodeToString([]byte(base64.StdEncoding.EncodeToString(checkpoint)))
+		legacy, err := s.decodeLegacyCheckpoint(&raw)
 		require.NoError(t, err)
 		require.Equal(t, checkpoint, legacy)
 	})

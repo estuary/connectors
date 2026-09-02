@@ -110,10 +110,14 @@ type checkpointsTable struct {
 
 // decodeLegacyCheckpoint decodes a checkpoints row's checkpoint column: a
 // base64 (possibly gzipped) runtime checkpoint, the format written by
-// pre-migration versions of this connector and mirrored by this one. It
-// reads back as hex text because the column is VARBYTE.
-func (s *checkpointsTable) decodeLegacyCheckpoint(raw string) ([]byte, error) {
-	decoded, err := hex.DecodeString(raw)
+// pre-migration versions of this connector and mirrored by this one, nil
+// when raw is the column's NULL (a row this connector inserted before ever
+// mirroring one). It reads back as hex text because the column is VARBYTE.
+func (s *checkpointsTable) decodeLegacyCheckpoint(raw *string) ([]byte, error) {
+	if raw == nil {
+		return nil, nil
+	}
+	decoded, err := hex.DecodeString(*raw)
 	if err != nil {
 		return nil, fmt.Errorf("decoding checkpoints row: %w", err)
 	}
@@ -179,7 +183,7 @@ func (s *checkpointsTable) readAll(ctx context.Context, conn *pgx.Conn) (map[str
 	var crossedOver bool
 	for rows.Next() {
 		var keyBegin, keyEnd uint32
-		var checkpointRaw string
+		var checkpointRaw *string
 		var tokensRaw *string
 		if err := rows.Scan(&keyBegin, &keyEnd, &checkpointRaw, &tokensRaw); err != nil {
 			return nil, nil, false, fmt.Errorf("scanning checkpoints row: %w", err)
