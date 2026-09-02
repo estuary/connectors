@@ -13,6 +13,7 @@ import (
 	"time"
 
 	snowflake_auth "github.com/estuary/connectors/go/auth/snowflake"
+	"github.com/estuary/connectors/go/common"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
@@ -60,6 +61,11 @@ type streamV2Item struct {
 	// function of the documents the channel receives, not of the shard topology,
 	// which is what a split or join inherits whole.
 	KeyBegin, KeyEnd uint32
+	// Retiring marks a channel that the snowpipe streaming path is taking out of
+	// service. The item is written before the channel is dropped, so that a
+	// checkpoint which still names the channel after the drop explains why the
+	// channel is empty: it was retired, not lost.
+	Retiring bool
 }
 
 // streamV2Range is a key-hash subrange, as a channel name and a committed offset
@@ -134,6 +140,19 @@ func parseStreamV2Token(token string) (int64, streamV2Range, bool) {
 // can do this, and only with JWT credentials to authenticate its sidecar.
 func streamsV2(cfg *config, deltaUpdates bool, flagEnabled bool) bool {
 	return deltaUpdates && cfg.Credentials.AuthType == snowflake_auth.JWT && flagEnabled
+}
+
+// streamV2Downgrade reports whether a binding is leaving the snowpipe streaming v2
+// write path for the snowpipe streaming path by explicit choice: the endpoint
+// configuration names snowpipe_streaming itself and does not name
+// snowpipe_streaming_v2. The default value of snowpipe_streaming does not count,
+// because leaving the path duplicates documents and must be asked for.
+func streamV2Downgrade(cfg *config, deltaUpdates bool) bool {
+	if cfg.Credentials == nil || cfg.Credentials.AuthType != snowflake_auth.JWT || !deltaUpdates {
+		return false
+	}
+	var configured = common.ParseFeatureFlags(cfg.Advanced.FeatureFlags, nil)
+	return configured[flagSnowpipeStreaming] && !configured[flagSnowpipeStreamingV2]
 }
 
 // streamV2CannotDrainPendingBlobs reports that a binding moving onto the streaming
@@ -582,6 +601,34 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 		return err
 	}
 
+	// Channels the snowpipe streaming path took out of service after this binding
+	// left the write path. Whether or not a drop landed, such a channel holds
+	// nothing this binding may skip: open it, drop it, and record the deletion
+	// unless the target layout reuses the subrange, where flush writes the live
+	// item in its place.
+	var prior = make(map[string]*streamV2Item, len(b.prior))
+	for key, item := range b.prior {
+		if item == nil {
+			continue
+		}
+		if !item.Retiring {
+			prior[key] = item
+			continue
+		}
+		if _, err := client.OpenChannel(ctx, b.database, b.schema, b.table, item.Channel); err != nil {
+			return fmt.Errorf("opening channel %q: %w", item.Channel, err)
+		}
+		if err := retireChannel(ctx, client, item.Channel); err != nil {
+			return err
+		}
+		var r = streamV2Range{keyBegin: item.KeyBegin, keyEnd: item.KeyEnd}
+		if !slices.Contains(targets, r) {
+			b.retire = append(b.retire, r.key())
+		}
+		log.WithFields(log.Fields{"table": b.table, "channel": item.Channel}).Info("retiring a channel the snowpipe streaming path left behind")
+	}
+	b.prior = prior
+
 	// Sort the checkpoint's items for this binding into the ones nested in this
 	// shard's range and the ones that belong to live siblings. An item that does
 	// neither — its subrange crosses this shard's boundary — is the footprint of a
@@ -975,8 +1022,24 @@ func retireChannel(ctx context.Context, client *sidecarClient, channel string) e
 	return nil
 }
 
+// streamV2ChannelNames lists, sorted, the channels the items of a binding name. A
+// nil item is a channel the task already retired and names nothing.
+func streamV2ChannelNames(items map[string]*streamV2Item) []string {
+	var channels []string
+	for _, item := range items {
+		if item != nil {
+			channels = append(channels, item.Channel)
+		}
+	}
+	slices.Sort(channels)
+	return channels
+}
+
 // streamV2PathAbandoned refuses a binding that materialized through this write path
-// and no longer does. The error names the channels that the binding leaves behind.
+// and no longer does, unless the departure is the one exit this connector supports:
+// the break-glass downgrade to the snowpipe_streaming path, which streamV2Downgrade
+// recognizes and streamV2Retirement carries out. The error names the channels that
+// the binding otherwise leaves behind.
 //
 // The prior parameter holds the checkpoint items of the binding, one for each channel
 // it appended to. Each item carries the count of documents that channel holds. Only
@@ -998,29 +1061,32 @@ func retireChannel(ctx context.Context, client *sidecarClient, channel string) e
 // another path materializes them a second time. This path serves delta-updates
 // bindings, so those duplicates are permanent.
 //
-// The refusal rules both outcomes out, and it applies whatever moved the binding off
-// the path. A binding leaves this path when it no longer meets any one of the
-// conditions in streamsV2.
-//
-// A backfill is the way off this path. It rotates the state key of the binding, which
-// rotates both the channels and the checkpoint item. Nothing is then left for another
-// path to discard, and no channel is left for a later session to find.
+// A backfill is the other way off this path. It rotates the state key of the binding,
+// which rotates both the channels and the checkpoint item. Nothing is then left for
+// another path to discard, and no channel is left for a later session to find.
 func streamV2PathAbandoned(table string, prior map[string]*streamV2Item) error {
-	var channels []string
-	for _, item := range prior {
-		// A nil item is a channel that this task already retired. The runtime did not
-		// yet reduce its deletion away. It records nothing.
-		if item != nil {
-			channels = append(channels, item.Channel)
-		}
-	}
+	var channels = streamV2ChannelNames(prior)
 	if len(channels) == 0 {
 		return nil
 	}
-	slices.Sort(channels)
 
 	return fmt.Errorf(
 		"this binding has materialized into %s through the snowpipe_streaming_v2 write path, which this task's specification no longer selects for it, while the task's checkpoint still records the channel(s) %s it appended to. Those counters are the only account of which documents Snowflake's channels already hold, no other write path maintains them, and the first transaction on another path discards them — after which returning to this write path would skip that many of the documents it materializes. Restore this binding to the snowpipe_streaming_v2 write path — it needs the feature flag, delta updates, and key-pair authentication — or backfill it, which rotates its channels and its checkpoint together",
+		table, strings.Join(channels, ", "),
+	)
+}
+
+// streamV2DowngradeWarning reports what a publication moving a binding from the
+// snowpipe streaming v2 write path onto the snowpipe streaming path costs it, and
+// "" when the binding names no channel to leave behind.
+func streamV2DowngradeWarning(table string, items map[string]*streamV2Item) string {
+	var channels = streamV2ChannelNames(items)
+	if len(channels) == 0 {
+		return ""
+	}
+
+	return fmt.Sprintf(
+		"binding %s is leaving the snowpipe_streaming_v2 write path for snowpipe_streaming. Every document that its channel(s) %s committed beyond the counter the checkpoint records for them will be materialized again by the snowpipe_streaming path, and this binding uses delta updates, so those duplicates are permanent. The channels are retired by the task's first transaction on the new path",
 		table, strings.Join(channels, ", "),
 	)
 }

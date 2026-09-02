@@ -46,13 +46,17 @@
   table rather than deleting the table's rows, so grants on that table do not
   survive the backfill, and the `retain_existing_data_on_backfill` feature flag
   cannot be used for those bindings. A task's other bindings are unaffected.
-- A binding which has materialized on this path may not be moved off it, whether
-  by disabling the feature flag, by changing the binding away from delta updates,
-  or by changing the task's authentication. The publication which would move it
-  is rejected, naming the binding; a task which has already been moved fails when
-  it next starts rather than silently dropping rows on a later return to this
-  path. Backfilling the binding is the way off, and moving a binding onto this
-  path is unaffected.
+- A binding which has materialized on this path may not be moved off it, except
+  by the one break-glass exit this connector supports: naming
+  `snowpipe_streaming` explicitly while removing `snowpipe_streaming_v2`, on a
+  task that keeps the V2 materialization runtime. That downgrade's first
+  transaction fences and drops the binding's channels, and every document
+  Snowflake had already committed beyond the checkpoint is materialized again —
+  permanently, since this path serves delta-updates bindings. Any other
+  departure is rejected, naming the binding; a task which has already been moved
+  that way fails when it next starts rather than silently dropping rows on a
+  later return to this path. Backfilling the binding is the remaining way off,
+  and moving a binding onto this path is unaffected.
 - If the connector cannot establish which rows Snowflake already holds on this
   path, it fails rather than risk duplicating or dropping rows. Changing how a
   task's shards are split does not fail the binding, even while rows are in

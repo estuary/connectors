@@ -244,6 +244,7 @@ type transactor struct {
 	db                *stdsql.DB
 	streamManager     *streamManager
 	streamV2          *streamV2Manager
+	retirement        *streamV2Retirement
 	pipeClient        *PipeClient
 
 	// Variables exclusively used by Load.
@@ -347,6 +348,9 @@ func newTransactor(
 		be:                be,
 		cp:                make(checkpoint),
 	}
+	if sv2 != nil {
+		d.retirement = newStreamV2Retirement(sv2)
+	}
 
 	// Streaming v2 needs its part of the checkpoint state sooner than usual.
 	if len(open.StateJson) > 0 {
@@ -417,14 +421,15 @@ type binding struct {
 
 func (d *transactor) addBinding(ctx context.Context, target sql.Table, streamingEnabled bool, streamingV2Enabled bool) error {
 	var streamingV2 = streamsV2(&d.cfg, target.DeltaUpdates, streamingV2Enabled)
+	var prior = d.priorStreamV2(target.StateKey)
+	var held = streamV2PathAbandoned(target.Identifier, prior) // non-nil iff any non-nil item
+	var downgrade = !streamingV2 && held != nil && streamV2Downgrade(&d.cfg, target.DeltaUpdates)
 
 	// Ahead of everything else, so that a binding which may not leave the
 	// streaming v2 write path is refused before another path opens anything of
 	// its own against the same table.
-	if !streamingV2 {
-		if err := streamV2PathAbandoned(target.Identifier, d.priorStreamV2(target.StateKey)); err != nil {
-			return err
-		}
+	if !streamingV2 && !downgrade && held != nil {
+		return held
 	}
 
 	var b = new(binding)
@@ -465,6 +470,9 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, streaming
 	if b.target.DeltaUpdates && d.cfg.Credentials.AuthType == snowflake_auth.JWT && streamingEnabled {
 		loc := d.ep.Dialect.TableLocator(b.target.Path)
 		if err := d.streamManager.addBinding(ctx, loc.TableSchema, d.ep.Identifier(loc.TableName), target); err != nil {
+			if downgrade {
+				return fmt.Errorf("this binding is leaving the snowpipe_streaming_v2 write path for snowpipe_streaming, but the snowpipe_streaming path cannot open its channel on %s, and the binding may not fall back to staged files while its snowpipe_streaming_v2 channels stand: %w", target.Identifier, err)
+			}
 			var apiError *streamingApiError
 			var colError *unhandledColError
 			if errors.As(err, &apiError) && (apiError.Code == 6 || apiError.Code == 55) {
@@ -480,6 +488,13 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, streaming
 			}
 			log.WithError(err).WithField("table", b.target.Path).Info("not using Snowpipe Streaming for table")
 		} else {
+			if downgrade {
+				d.retirement.register(target.StateKey, d.cfg.Database, loc.TableSchema, d.ep.Identifier(loc.TableName), prior, d._range)
+				log.WithFields(log.Fields{
+					"table":    target.Identifier,
+					"channels": streamV2ChannelNames(prior),
+				}).Warn("this binding is leaving the snowpipe_streaming_v2 write path for snowpipe_streaming; documents its channels committed beyond the checkpoint will be materialized again")
+			}
 			b.streaming = true
 			d.bindings = append(d.bindings, b)
 			return nil
@@ -705,6 +720,12 @@ type checkpoint = map[string]*checkpointItem
 func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var ctx = it.Context()
 
+	if d.retirement != nil {
+		if err := d.retirement.fence(ctx); err != nil {
+			return nil, fmt.Errorf("fencing snowpipe streaming v2 channels: %w", err)
+		}
+	}
+
 	// Skip deleted, non-existent documents iff HardDelete is enabled.
 	for it.Next(d.cfg.HardDelete) {
 		var b = d.bindings[it.Binding]
@@ -783,10 +804,16 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 		}
 
 		if b.streaming {
-			if blobs, ok := streamBlobs[idx]; ok {
+			var blobs, ok = streamBlobs[idx]
+			var markers map[string]*streamV2Item
+			if d.retirement != nil {
+				markers = d.retirement.markers(b.target.StateKey)
+			}
+			if ok || len(markers) > 0 {
 				d.cp[b.target.StateKey] = &checkpointItem{
 					StreamBlobs:   blobs,
 					EncryptionKey: keys[idx],
+					StreamV2:      markers,
 				}
 			}
 			continue
@@ -969,6 +996,8 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	shouldProcess := m.StateKeyFilter(stateKeys)
 
 	var drained []string
+	var preserve []string
+	var toDrop []string
 	var pipes = make(map[string]*pipeRecord)
 	for stateKey, item := range d.cp {
 		// only process the state keys we've been asked to; other pending work
@@ -984,7 +1013,14 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 			continue
 		}
 
-		if len(item.StreamV2) > 0 {
+		// Only a key the retirement has pending is processed on a v2 binding's
+		// account. A v2 binding whose checkpoint holds only markers — a return to
+		// v2 after the downgrade's drop never landed — must keep its key
+		// un-drained until ensureOpened has dropped the channel, or it clears the
+		// items before the drop, which a return to v2 could read as documents to
+		// skip that were never committed.
+		var retiring = d.retirement != nil && d.retirement.pending(stateKey)
+		if len(item.StreamV2) > 0 && !retiring {
 			// There is nothing to apply for a streaming v2 binding: its rows were
 			// appended and committed to Snowflake before this transaction's
 			// checkpoint was produced, since a commit awaited here could no longer
@@ -995,6 +1031,20 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 			// Snowflake's committed offset token at the next Open — so this state
 			// key is deliberately not drained.
 			continue
+		}
+
+		var hasWork = len(item.Query) > 0 || len(item.StreamBlobs) > 0 || len(item.PipeFiles) > 0
+		if retiring && !d.retirement.fenced && !hasWork {
+			// Markers of a session that has not fenced yet, with no pending work
+			// under them. The transactor built to drain pending work at Apply, and
+			// the recovery Acknowledge of a session that has not stored yet, both
+			// land here, and neither may drop or clear anything.
+			continue
+		}
+		if retiring && !d.retirement.fenced {
+			preserve = append(preserve, stateKey) // pending work is applied below; the markers stay
+		} else if retiring {
+			toDrop = append(toDrop, stateKey)
 		}
 
 		drained = append(drained, stateKey)
@@ -1254,6 +1304,18 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 		}
 	}
 
+	var droppedKeys = make(map[string][]string)
+	for _, sk := range toDrop {
+		keys, err := d.retirement.drop(ctx, sk)
+		if err != nil {
+			return nil, fmt.Errorf("retiring snowpipe streaming v2 channels: %w", err)
+		}
+		droppedKeys[sk] = keys
+	}
+	if d.retirement != nil && d.retirement.fenced && d.retirement.done() && len(d.streamV2.bindings) == 0 {
+		d.streamV2.stop() // the sidecar has nothing left to do this session
+	}
+
 	if len(drained) == 0 {
 		return nil, nil
 	}
@@ -1268,6 +1330,21 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	// the binding and running the queries that are pending for its last transaction.
 	var checkpointClear = make(checkpoint)
 	for _, sk := range drained {
+		if slices.Contains(preserve, sk) {
+			var kept = &checkpointItem{StreamV2: d.retirement.markers(sk)}
+			checkpointClear[sk] = kept // zero pending-work fields, markers intact
+			d.cp[sk] = kept
+			continue
+		}
+		if keys := droppedKeys[sk]; len(keys) > 0 {
+			var deletions = make(map[string]*streamV2Item, len(keys))
+			for _, k := range keys {
+				deletions[k] = nil
+			}
+			checkpointClear[sk] = &checkpointItem{StreamV2: deletions} // pending work zeroed, own channels deleted
+			delete(d.cp, sk)
+			continue
+		}
 		checkpointClear[sk] = nil
 		delete(d.cp, sk)
 	}
