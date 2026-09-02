@@ -7,6 +7,11 @@
   submissions made at least five minutes before it started and checkpoints the newest
   one emitted, so anything newer is read by a later sweep.
 
+### Changed
+- The `form_submissions` binding now reads historical submissions through a dedicated
+  backfill task that checkpoints after each form, so a restart resumes from the last
+  completed form instead of re-reading every form's history in a single sweep.
+
 ## 2026-08-27
 ### Added
 - New `leads` binding for the HubSpot Leads object. Leads requires a Sales Hub
