@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
+	"math"
 	"sync"
 	"testing"
 
@@ -313,5 +314,70 @@ func TestGatedDriverRefusals(t *testing.T) {
 	t.Run("starting is refused", func(t *testing.T) {
 		_, _, _, err := driver.NewTransactor(ctx, pm.Request_Open{Materialization: spec}, nil)
 		require.ErrorContains(t, err, boilerplate.RuntimeV2FlagName)
+	})
+}
+
+func TestStreamV2DowngradeWarning(t *testing.T) {
+	t.Run("no items warns about nothing", func(t *testing.T) {
+		require.Empty(t, streamV2DowngradeWarning("TBL", nil))
+	})
+
+	t.Run("nil items name no channel", func(t *testing.T) {
+		require.Empty(t, streamV2DowngradeWarning("TBL", map[string]*streamV2Item{"00000000-ffffffff": nil}))
+	})
+
+	t.Run("a channel is named", func(t *testing.T) {
+		var warning = streamV2DowngradeWarning("TBL", map[string]*streamV2Item{
+			"00000000-ffffffff": {Channel: "chan-1", Counter: 3, KeyEnd: math.MaxUint32},
+		})
+		require.Contains(t, warning, "TBL")
+		require.Contains(t, warning, "chan-1")
+		require.Contains(t, warning, "permanent")
+	})
+}
+
+func TestRequireStreamingV2RuntimeForState(t *testing.T) {
+	const stateKey, channel = "sk.v1", "chan-1"
+
+	var specOf = func(t *testing.T, runtimeV2 bool) *pf.MaterializationSpec {
+		var spec = testStreamingSpec(t, "snowpipe_streaming", runtimeV2)
+		spec.Bindings = []*pf.MaterializationSpec_Binding{{ResourcePath: []string{"TBL"}, StateKey: stateKey}}
+		return spec
+	}
+
+	var stateWith = func(t *testing.T, items map[string]*streamV2Item) json.RawMessage {
+		t.Helper()
+		var out, err = json.Marshal(checkpoint{stateKey: &checkpointItem{StreamV2: items}})
+		require.NoError(t, err)
+		return out
+	}
+
+	t.Run("a nil spec is allowed", func(t *testing.T) {
+		require.NoError(t, requireStreamingV2RuntimeForState(nil, stateWith(t, nil)))
+	})
+
+	t.Run("no state carried is allowed", func(t *testing.T) {
+		require.NoError(t, requireStreamingV2RuntimeForState(specOf(t, false), nil))
+	})
+
+	t.Run("the v2 runtime is already running is allowed", func(t *testing.T) {
+		var items = map[string]*streamV2Item{"00000000-ffffffff": {Channel: channel, Counter: 3, KeyEnd: math.MaxUint32}}
+		require.NoError(t, requireStreamingV2RuntimeForState(specOf(t, true), stateWith(t, items)))
+	})
+
+	t.Run("nil items name nothing to retire", func(t *testing.T) {
+		var items = map[string]*streamV2Item{"00000000-ffffffff": nil}
+		require.NoError(t, requireStreamingV2RuntimeForState(specOf(t, false), stateWith(t, items)))
+	})
+
+	t.Run("an item off the v2 runtime is refused", func(t *testing.T) {
+		var items = map[string]*streamV2Item{"00000000-ffffffff": {Channel: channel, Counter: 3, KeyEnd: math.MaxUint32}}
+		var err = requireStreamingV2RuntimeForState(specOf(t, false), stateWith(t, items))
+		require.ErrorContains(t, err, boilerplate.RuntimeV2FlagName)
+		require.ErrorContains(t, err, channel)
+	})
+
+	t.Run("an unreadable state document is tolerated", func(t *testing.T) {
+		require.NoError(t, requireStreamingV2RuntimeForState(specOf(t, false), json.RawMessage(`not json`)))
 	})
 }
