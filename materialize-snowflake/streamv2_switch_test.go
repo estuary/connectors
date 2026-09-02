@@ -2,20 +2,26 @@ package connector
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
 	stdsql "database/sql"
 	"encoding/json"
 	"fmt"
 	"math"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"testing"
 	"time"
 
 	snowflake_auth "github.com/estuary/connectors/go/auth/snowflake"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	jsonpatch "github.com/evanphx/json-patch/v5"
 	"github.com/stretchr/testify/require"
+	"resty.dev/v3"
 )
 
 // TestStreamV2CheckpointDoesNotSurviveAnotherWritePath establishes what moving a
@@ -193,16 +199,102 @@ func TestStreamV2SwitchOffTheWritePathIsRefused(t *testing.T) {
 		require.Error(t, d.addBinding(ctx, target(stateKey, false), false, true))
 	})
 
-	t.Run("moving the binding to the snowpipe_streaming path is refused", func(t *testing.T) {
-		const stateKey = "streaming.v1"
-		var d = newTransactor(t, stateKey, itemsFor(&streamV2Item{
-			Channel: "task_00000000_streaming_v1", Counter: 3, KeyEnd: math.MaxUint32,
-		}))
+	t.Run("moving the binding to the snowpipe_streaming path", func(t *testing.T) {
+		// openChannelServer answers every "POST /channels/open" the way status
+		// tells it to, and every other route with a bare success — enough for the
+		// stream manager's addBinding to reach a verdict.
+		var openChannelServer = func(t *testing.T, status int) *streamManager {
+			t.Helper()
+			var mux = http.NewServeMux()
+			mux.HandleFunc("POST /v1/streaming/channels/open", func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				fmt.Fprintf(w, `{"message":"Success","status_code":%d,"table_columns":[]}`, status)
+			})
+			var ts = httptest.NewServer(mux)
+			t.Cleanup(ts.Close)
 
-		// The v1 streaming path would open a channel of its own against the same
-		// table, so the refusal must come before the stream manager is reached —
-		// this transactor has none.
-		require.Error(t, d.addBinding(ctx, target(stateKey, true), true, false))
+			pkey, err := rsa.GenerateKey(rand.Reader, 1024)
+			require.NoError(t, err)
+			var role = "TEST_ROLE"
+
+			return &streamManager{
+				c: &streamClient{
+					r:        resty.New().SetBaseURL(ts.URL + "/v1/streaming").SetDisableWarn(true),
+					key:      pkey,
+					user:     "TEST_USER",
+					database: "TEST_DB",
+					account:  "TEST_ACCOUNT",
+					role:     &role,
+				},
+				tableStreams: map[int]*tableStream{},
+				channelName:  "x",
+				lastBinding:  -1,
+				blobStats:    map[int][]*blobStatsTracker{},
+				counter:      -1,
+			}
+		}
+
+		t.Run("without naming snowpipe_streaming is refused", func(t *testing.T) {
+			const stateKey = "streaming.v1"
+			var d = newTransactor(t, stateKey, itemsFor(&streamV2Item{
+				Channel: "task_00000000_streaming_v1", Counter: 3, KeyEnd: math.MaxUint32,
+			}))
+			d.cfg.Advanced.FeatureFlags = ""
+
+			// The v1 streaming path would open a channel of its own against the
+			// same table, so the refusal must come before the stream manager is
+			// reached — this transactor has none.
+			var err = d.addBinding(ctx, target(stateKey, true), true, false)
+			require.Error(t, err)
+			require.ErrorContains(t, err, "backfill")
+		})
+
+		t.Run("by naming snowpipe_streaming is the downgrade", func(t *testing.T) {
+			const stateKey = "downgrade.v1"
+			var d = newTransactor(t, stateKey, itemsFor(&streamV2Item{
+				Channel: "task_00000000_downgrade_v1", Counter: 3, KeyEnd: math.MaxUint32,
+			}))
+			d.cfg.Advanced.FeatureFlags = "snowpipe_streaming"
+			d.retirement = newStreamV2Retirement(d.streamV2)
+			d.streamManager = openChannelServer(t, 0)
+
+			require.NoError(t, d.addBinding(ctx, target(stateKey, true), true, false))
+			require.True(t, d.retirement.pending(stateKey))
+			require.Equal(t, []string{"task_00000000_downgrade_v1"}, streamV2ChannelNames(d.retirement.markers(stateKey)))
+		})
+
+		t.Run("the downgrade refuses a table the snowpipe_streaming path cannot open", func(t *testing.T) {
+			const stateKey = "refused.v1"
+			var d = newTransactor(t, stateKey, itemsFor(&streamV2Item{
+				Channel: "task_00000000_refused_v1", Counter: 3, KeyEnd: math.MaxUint32,
+			}))
+			d.cfg.Advanced.FeatureFlags = "snowpipe_streaming"
+			d.retirement = newStreamV2Retirement(d.streamV2)
+			d.streamManager = openChannelServer(t, 6)
+
+			var err = d.addBinding(ctx, target(stateKey, true), true, false)
+			require.Error(t, err)
+			require.ErrorContains(t, err, "staged files")
+			require.False(t, d.retirement.pending(stateKey))
+			require.False(t, d.retirement.fenced)
+		})
+
+		t.Run("takes only the channels this shard owns", func(t *testing.T) {
+			const stateKey = "split.v1"
+			var d = newTransactor(t, stateKey, itemsFor(
+				&streamV2Item{Channel: "task_00000000_split_v1", Counter: 3, KeyBegin: 0, KeyEnd: 0x7fffffff},
+				&streamV2Item{Channel: "task_80000000_split_v1", Counter: 5, KeyBegin: 0x80000000, KeyEnd: math.MaxUint32},
+			))
+			d.cfg.Advanced.FeatureFlags = "snowpipe_streaming"
+			d._range = &pf.RangeSpec{KeyEnd: 0x7fffffff, RClockEnd: math.MaxUint32}
+			d.retirement = newStreamV2Retirement(d.streamV2)
+			d.streamManager = openChannelServer(t, 0)
+
+			require.NoError(t, d.addBinding(ctx, target(stateKey, true), true, false))
+			require.True(t, d.retirement.pending(stateKey))
+			require.Equal(t, []string{"task_00000000_split_v1"}, streamV2ChannelNames(d.retirement.markers(stateKey)))
+		})
 	})
 
 	t.Run("channels the task has already retired do not hold the binding to the path", func(t *testing.T) {
@@ -280,6 +372,53 @@ func TestStreamV2SwitchIsRefusedAtPublication(t *testing.T) {
 		var spec = specOf(t, "", true)
 		spec.Bindings = nil
 		require.NoError(t, refuseAbandonedStreamV2Bindings(spec, state))
+	})
+
+	var specOfRuntime = func(t *testing.T, featureFlags string, delta, runtimeV2 bool) *pf.MaterializationSpec {
+		var spec = testStreamingSpec(t, featureFlags, runtimeV2)
+		spec.Bindings = []*pf.MaterializationSpec_Binding{{
+			ResourcePath: []string{"mydb", "myschema", "TBL"},
+			StateKey:     stateKey,
+			DeltaUpdates: delta,
+		}}
+		return spec
+	}
+
+	t.Run("the downgrade to snowpipe_streaming is allowed", func(t *testing.T) {
+		require.NoError(t, refuseAbandonedStreamV2Bindings(specOf(t, "snowpipe_streaming", true), state))
+	})
+
+	t.Run("the downgrade must keep the v2 runtime", func(t *testing.T) {
+		var spec = specOfRuntime(t, "snowpipe_streaming", true, false)
+
+		var err = requireStreamingV2RuntimeForState(spec, state)
+		require.ErrorContains(t, err, boilerplate.RuntimeV2FlagName)
+		require.ErrorContains(t, err, channel)
+
+		// The refusal precedes any DB use.
+		_, applyErr := NewGatedDriver().Apply(ctx, &pm.Request_Apply{Materialization: spec, StateJson: state})
+		require.ErrorContains(t, applyErr, boilerplate.RuntimeV2FlagName)
+	})
+
+	t.Run("a checkpoint of only retired channels does not need the v2 runtime", func(t *testing.T) {
+		var retired, err = json.Marshal(checkpoint{stateKey: &checkpointItem{
+			StreamV2: map[string]*streamV2Item{channel: nil},
+		}})
+		require.NoError(t, err)
+
+		require.NoError(t, requireStreamingV2RuntimeForState(specOfRuntime(t, "snowpipe_streaming", true, false), retired))
+	})
+
+	t.Run("the downgrade to standard updates is still refused", func(t *testing.T) {
+		require.Error(t, refuseAbandonedStreamV2Bindings(specOf(t, "snowpipe_streaming", false), state))
+	})
+
+	t.Run("Open refuses the downgrade without the v2 runtime", func(t *testing.T) {
+		_, _, _, err := NewGatedDriver().NewTransactor(ctx, pm.Request_Open{
+			Materialization: specOfRuntime(t, "snowpipe_streaming", true, false),
+			StateJson:       state,
+		}, nil)
+		require.ErrorContains(t, err, boilerplate.RuntimeV2FlagName)
 	})
 
 	// The gate is what puts this ahead of the wrapped driver, so the refusal

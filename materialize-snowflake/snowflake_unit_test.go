@@ -4,11 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
+	"path/filepath"
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
+	snowflake_auth "github.com/estuary/connectors/go/auth/snowflake"
 	m "github.com/estuary/connectors/go/materialize"
 	sql "github.com/estuary/connectors/materialize-sql"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
 )
@@ -55,6 +59,84 @@ func TestAcknowledgeKeepsStreamV2Counter(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, state)
 	require.Equal(t, int64(42), d.cp["a_table.v1"].StreamV2["00000000-ffffffff"].Counter)
+}
+
+// TestAcknowledgeRetiresStreamV2Markers covers the drop half of the break-glass
+// downgrade: a marker-only key is drained only on the retirement's account, and
+// only once this session has fenced the channels it names.
+func TestAcknowledgeRetiresStreamV2Markers(t *testing.T) {
+	var ctx = context.Background()
+	const stateKey, channel = "ack.v1", "task_00000000_ack_v1"
+
+	t.Run("a v2 binding's marker-only key is not drained", func(t *testing.T) {
+		var d = &transactor{
+			cp: checkpoint{stateKey: {StreamV2: map[string]*streamV2Item{
+				"00000000-ffffffff": {Channel: channel, Counter: 42, KeyEnd: math.MaxUint32, Retiring: true},
+			}}},
+			bindings: []*binding{{target: sql.Table{StateKey: stateKey, TableShape: sql.TableShape{Path: []string{"TBL"}}}, streamingV2: true}},
+			be:       m.NewBindingEvents(),
+			streamV2: &streamV2Manager{},
+		}
+
+		state, err := d.Acknowledge(ctx, nil, []string{stateKey})
+		require.NoError(t, err)
+		require.Nil(t, state)
+		require.True(t, d.cp[stateKey].StreamV2["00000000-ffffffff"].Retiring)
+	})
+
+	// The remaining subtests drive a real retirement against the fake sidecar.
+	singleChannelLayout(t)
+	var statePath = filepath.Join(t.TempDir(), "channels.json")
+	t.Setenv("FAKE_SIDECAR_STATE", statePath)
+
+	var fullRange = &pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32}
+	var items = map[string]*streamV2Item{"00000000-ffffffff": {Channel: channel, Counter: 3, KeyEnd: math.MaxUint32}}
+
+	var newAckTransactor = func(t *testing.T) *transactor {
+		t.Helper()
+		var sv2 = newStreamV2Manager(ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/ack", "acct", fullRange)
+		sv2.argv = fakeSidecarArgv(t)
+		t.Cleanup(sv2.stop)
+
+		var d = &transactor{
+			cp:       checkpoint{stateKey: {StreamV2: items}},
+			bindings: []*binding{{target: sql.Table{StateKey: stateKey, TableShape: sql.TableShape{Path: []string{"TBL"}}}}},
+			be:       m.NewBindingEvents(),
+			streamV2: sv2,
+		}
+		d.retirement = newStreamV2Retirement(sv2)
+		d.retirement.register(stateKey, "DB", "SCH", "TBL", items, fullRange)
+		return d
+	}
+
+	t.Run("retiring markers with no pending work are left alone before the fence", func(t *testing.T) {
+		var d = newAckTransactor(t)
+
+		state, err := d.Acknowledge(ctx, nil, []string{stateKey})
+		require.NoError(t, err)
+		require.Nil(t, state)
+		require.Equal(t, items, d.cp[stateKey].StreamV2)
+	})
+
+	t.Run("fenced markers are dropped and only this shard's keys are cleared", func(t *testing.T) {
+		var d = newAckTransactor(t)
+		require.NoError(t, d.retirement.fence(ctx))
+
+		state, err := d.Acknowledge(ctx, nil, []string{stateKey})
+		require.NoError(t, err)
+		require.NotNil(t, state)
+
+		var patch checkpoint
+		require.NoError(t, json.Unmarshal(state.UpdatedJson, &patch))
+		require.Contains(t, patch, stateKey)
+		require.Len(t, patch[stateKey].StreamV2, 1)
+		for _, v := range patch[stateKey].StreamV2 {
+			require.Nil(t, v)
+		}
+
+		require.NotContains(t, fakeCommittedTokens(t, statePath), channel)
+		require.True(t, d.retirement.done())
+	})
 }
 
 func TestSpecification(t *testing.T) {
