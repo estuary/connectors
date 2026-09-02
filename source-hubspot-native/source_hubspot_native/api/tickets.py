@@ -66,5 +66,5 @@ def fetch_delayed_tickets(
         return await fetch_search_objects(Names.tickets, log, http, since, until, page)
 
     return fetch_chunked_changes_with_associations(
-        Names.tickets, Ticket, do_fetch, log, http, with_history, since, until
+        Names.tickets, Ticket, do_fetch, log, http, with_history
     )

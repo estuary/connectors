@@ -486,7 +486,7 @@ async def test_fetch_chunked_changes_checkpoints_at_the_page_resume_boundary():
 
     out = []
     async for item in fetch_chunked_changes_with_associations(
-        "products", Product, fake_fetcher, log, http, False, since, None
+        "products", Product, fake_fetcher, log, http, False
     ):
         out.append(item)
 
@@ -527,7 +527,7 @@ async def test_fetch_chunked_changes_emits_every_id_the_fetcher_returns():
 
     docs = []
     async for item in fetch_chunked_changes_with_associations(
-        "products", Product, fake_fetcher, log, http, False, since, until
+        "products", Product, fake_fetcher, log, http, False
     ):
         if not isinstance(item, datetime):
             docs.append((item[0], item[1]))

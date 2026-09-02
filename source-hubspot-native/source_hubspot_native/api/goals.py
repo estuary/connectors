@@ -49,5 +49,5 @@ def fetch_delayed_goals(
         return await fetch_search_objects(Names.goals, log, http, since, until, page)
 
     return fetch_chunked_changes_with_associations(
-        Names.goals, Goals, do_fetch, log, http, with_history, since, until
+        Names.goals, Goals, do_fetch, log, http, with_history
     )

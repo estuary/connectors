@@ -57,7 +57,7 @@ def fetch_delayed_custom_objects(
         return await fetch_search_objects(object_name, log, http, since, until, page)
 
     return fetch_chunked_changes_with_associations(
-        object_name, CustomObject, do_fetch, log, http, with_history, since, until
+        object_name, CustomObject, do_fetch, log, http, with_history
     )
 
 async def list_custom_objects(

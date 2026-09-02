@@ -49,5 +49,5 @@ def fetch_delayed_products(
         return await fetch_search_objects(Names.products, log, http, since, until, page)
 
     return fetch_chunked_changes_with_associations(
-        Names.products, Product, do_fetch, log, http, with_history, since, until
+        Names.products, Product, do_fetch, log, http, with_history
     )

@@ -49,5 +49,5 @@ def fetch_delayed_leads(
         return await fetch_search_objects(Names.leads, log, http, since, until, page)
 
     return fetch_chunked_changes_with_associations(
-        Names.leads, Lead, do_fetch, log, http, with_history, since, until
+        Names.leads, Lead, do_fetch, log, http, with_history
     )

@@ -53,5 +53,5 @@ def fetch_delayed_line_items(
         )
 
     return fetch_chunked_changes_with_associations(
-        Names.line_items, LineItem, do_fetch, log, http, with_history, since, until
+        Names.line_items, LineItem, do_fetch, log, http, with_history
     )
