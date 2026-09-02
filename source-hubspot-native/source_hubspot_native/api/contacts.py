@@ -82,5 +82,5 @@ def fetch_delayed_contacts(
         )
 
     return fetch_chunked_changes_with_associations(
-        Names.contacts, Contact, do_fetch, log, http, with_history, since, until
+        Names.contacts, Contact, do_fetch, log, http, with_history
     )

@@ -77,5 +77,5 @@ def fetch_delayed_companies(
         )
 
     return fetch_chunked_changes_with_associations(
-        Names.companies, Company, do_fetch, log, http, with_history, since, until
+        Names.companies, Company, do_fetch, log, http, with_history
     )

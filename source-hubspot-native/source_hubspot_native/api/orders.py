@@ -49,5 +49,5 @@ def fetch_delayed_orders(
         return await fetch_search_objects(Names.orders, log, http, since, until, page)
 
     return fetch_chunked_changes_with_associations(
-        Names.orders, Order, do_fetch, log, http, with_history, since, until
+        Names.orders, Order, do_fetch, log, http, with_history
     )

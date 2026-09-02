@@ -369,8 +369,6 @@ async def fetch_chunked_changes_with_associations(
     log: Logger,
     http: HTTPSession,
     with_history: bool,
-    since: datetime,
-    until: datetime | None,
 ) -> AsyncGenerator[TimestampedObject[CRMObject] | datetime, None]:
     """
     Like fetch_changes_with_associations, but emits each fetcher page's documents

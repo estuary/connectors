@@ -66,6 +66,4 @@ def fetch_delayed_feedback_submissions(
         log,
         http,
         with_history,
-        since,
-        until,
     )
