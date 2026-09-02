@@ -132,11 +132,12 @@ var _ m.Transactor = (*transactor)(nil)
 type transactor struct {
 	runtimeCheckpoint m.RuntimeCheckpoint
 	cfg               config
-	cp                connectorState // every shard's pending entries; non-primary shards hold only their own
+	// Every shard's pending entries; non-primary shards hold only their own.
+	cp connectorState
 	// Pending entries in the layouts of earlier connector versions: range-first
 	// buckets, and flat items under legacyRangeKey. Only the primary shard
 	// tracks and executes these.
-	// TODO: remove after checkpoints have all migrated
+	// TODO(#5176): remove in about January 2027, after checkpoints have all migrated
 	peerShardsCheckpoints rangeCheckpoints
 	cpRecovery            bool // is this checkpoint a recovered checkpoint?
 	primary               bool // does this shard's range begin at key 0?
@@ -172,7 +173,7 @@ func (d *transactor) UnmarshalState(state json.RawMessage) error {
 	return nil
 }
 
-// TODO: remove after checkpoints have all migrated
+// TODO(#5176): remove in about January 2027, after checkpoints have all migrated
 func (d *transactor) legacyBucket(rangeKey string) checkpoint {
 	if d.peerShardsCheckpoints[rangeKey] == nil {
 		d.peerShardsCheckpoints[rangeKey] = make(checkpoint)
@@ -197,7 +198,7 @@ func (d *transactor) absorbState(doc json.RawMessage, skipOwnRange bool) error {
 			return fmt.Errorf("parsing checkpoint entry %q: %w", key, err)
 		}
 
-		// TODO: remove after checkpoints have all migrated
+		// TODO(#5176): remove in about January 2027, after checkpoints have all migrated
 		if rangeKeyRe.MatchString(key) {
 			for stateKey, itemRaw := range bucket {
 				if item, err := parseCheckpointItem(itemRaw); err != nil {
@@ -211,7 +212,7 @@ func (d *transactor) absorbState(doc json.RawMessage, skipOwnRange bool) error {
 
 		var flat = make(map[string]json.RawMessage)
 		for rangeKey, itemRaw := range bucket {
-			// TODO: remove after checkpoints have all migrated
+			// TODO(#5176): remove in about January 2027, after checkpoints have all migrated
 			if !rangeKeyRe.MatchString(rangeKey) {
 				flat[rangeKey] = itemRaw
 			} else if skipOwnRange && rangeKey == d.rangeKey {
@@ -222,7 +223,7 @@ func (d *transactor) absorbState(doc json.RawMessage, skipOwnRange bool) error {
 				d.cp.add(key, rangeKey, item)
 			}
 		}
-		// TODO: remove after checkpoints have all migrated
+		// TODO(#5176): remove in about January 2027, after checkpoints have all migrated
 		if len(flat) > 0 {
 			var flatRaw, _ = json.Marshal(flat)
 			if item, err := parseCheckpointItem(flatRaw); err != nil {
@@ -555,16 +556,16 @@ func (s connectorState) add(stateKey, rangeKey string, item *checkpointItem) {
 }
 
 // rangeCheckpoints is the range-first layout of earlier connector versions.
-// TODO: remove after checkpoints have all migrated
+// TODO(#5176): remove in about January 2027, after checkpoints have all migrated
 type rangeCheckpoints map[string]checkpoint
 
 // legacyRangeKey is the in-memory bucket of flat per-stateKey entries written
 // before range scoping. A current bucket may since have been merged onto the
 // same state key, so these clear by nulling the item's fields, not the key.
-// TODO: remove after checkpoints have all migrated
+// TODO(#5176): remove in about January 2027, after checkpoints have all migrated
 const legacyRangeKey = ""
 
-// TODO: remove after checkpoints have all migrated
+// TODO(#5176): remove in about January 2027, after checkpoints have all migrated
 var legacyItemClear = map[string]any{
 	"Query": nil, "Queries": nil, "ToDelete": nil,
 	"StagedFiles": nil, "Bounds": nil, "NeedsMerge": nil,
@@ -741,7 +742,7 @@ func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB, should
 		}
 		return clear[key].(map[string]any)
 	}
-	// TODO: remove after checkpoints have all migrated
+	// TODO(#5176): remove in about January 2027, after checkpoints have all migrated
 	var peerRangeKeys = slices.Sorted(maps.Keys(d.peerShardsCheckpoints))
 
 	// Everything else pending — entries of other state keys, and entries whose
@@ -759,7 +760,7 @@ func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB, should
 		for _, rk := range slices.Sorted(maps.Keys(d.cp[sk])) {
 			items = append(items, d.cp[sk][rk])
 		}
-		// TODO: remove after checkpoints have all migrated
+		// TODO(#5176): remove in about January 2027, after checkpoints have all migrated
 		for _, rk := range peerRangeKeys {
 			if item := d.peerShardsCheckpoints[rk][sk]; item != nil {
 				items = append(items, item)
@@ -777,7 +778,7 @@ func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB, should
 			clearAt(sk)[rk] = nil
 		}
 		delete(d.cp, sk)
-		// TODO: remove after checkpoints have all migrated
+		// TODO(#5176): remove in about January 2027, after checkpoints have all migrated
 		for rk, cp := range d.peerShardsCheckpoints {
 			if cp[sk] != nil {
 				delete(cp, sk)
