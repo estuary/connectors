@@ -1,6 +1,6 @@
 import asyncio
 import itertools
-from datetime import datetime
+from datetime import datetime, timedelta
 from logging import Logger
 from typing import (
     Any,
@@ -30,6 +30,7 @@ from .properties import fetch_properties
 from .shared import (
     chunk_props,
     HUB,
+    str_to_dt,
 )
 
 
@@ -55,10 +56,13 @@ fetchers do so when their window is exhausted.
 # relies on. They are not enforced, so it's on each fetcher to honor it.
 _OrderedFetchIdsFn = _FetchIdsFn
 """
-A _FetchIdsFn whose pages never leave gaps: every record at or before a page's
-newest timestamp is in that page or an earlier one, and successive pages advance
-in time. This is what lets fetch_chunked_changes_with_associations treat each
-page's newest timestamp as a safe intermediate checkpoint.
+A _FetchIdsFn whose next_page, when present, is a timestamp string naming the
+first millisecond its pages so far do not cover: every record the fetcher's
+window holds before that instant is in this page or an earlier one, and
+successive pages advance in time. This is what lets
+fetch_chunked_changes_with_associations treat the millisecond before next_page
+as a safe intermediate checkpoint. Order within a page is not part of the
+contract.
 """
 
 
@@ -237,34 +241,19 @@ async def fetch_batch_with_associations(
 
 async def _fetch_id_chunks(
     fetcher: _FetchIdsFn,
-    since: datetime,
-    until: datetime | None,
 ) -> AsyncGenerator[IdChunk, None]:
     # Walk pages of IDs until the fetcher reports no more pages remain via a falsy
-    # next_page. Each fetcher page is yielded as its own chunk, along with
-    # whether more pages remain.
+    # next_page. Each fetcher page is yielded as its own chunk, along with the
+    # cursor for the page after it. Consumers apply their own window filtering.
     next_page: PageCursor = None
     count = 0
 
     while True:
         ids, next_page = await fetcher(next_page, count)
+        chunk = list(ids)
+        count += len(chunk)
 
-        chunk: list[TimestampedId] = []
-        for entry in ids:
-            count += 1
-            if until and entry.ts > until:
-                continue
-            elif entry.ts > since:
-                # TODO(whb): It may be worth consulting the emitted changes
-                # cache here to see if we have already emitted a more recent
-                # change event before we do all the associations fetching work.
-                # Before implementing that I'd like to make sure that the
-                # top-level filtering works in production. Since the delayed
-                # changes stream only runs every 5 minutes or so it shouldn't be
-                # a huge load on the connector.
-                chunk.append(entry)
-
-        yield IdChunk(chunk, bool(next_page))
+        yield IdChunk(chunk, next_page)
 
         if not next_page:
             break
@@ -351,9 +340,23 @@ async def fetch_changes_with_associations(
     until: datetime | None,
 ) -> AsyncGenerator[TimestampedObject[CRMObject], None]:
 
+    # The realtime fetchers can't all bound their results server-side: the
+    # legacy "recents" endpoints page newest-first and overrun `since` on their
+    # last page, so the window is applied here.
     recent: list[TimestampedId] = []
-    async for chunk in _fetch_id_chunks(fetcher, since, until):
-        recent.extend(chunk.ids)
+    async for chunk in _fetch_id_chunks(fetcher):
+        for entry in chunk.ids:
+            if until and entry.ts > until:
+                continue
+            elif entry.ts > since:
+                # TODO(whb): It may be worth consulting the emitted changes
+                # cache here to see if we have already emitted a more recent
+                # change event before we do all the associations fetching work.
+                # Before implementing that I'd like to make sure that the
+                # top-level filtering works in production. Since the delayed
+                # changes stream only runs every 5 minutes or so it shouldn't be
+                # a huge load on the connector.
+                recent.append(entry)
 
     async for res in _emit_batches(log, cls, http, with_history, object_name, recent):
         yield res
@@ -371,11 +374,16 @@ async def fetch_chunked_changes_with_associations(
 ) -> AsyncGenerator[TimestampedObject[CRMObject] | datetime, None]:
     """
     Like fetch_changes_with_associations, but emits each fetcher page's documents
-    as its own chunk and then yields the chunk's newest timestamp as an intermediate
-    checkpoint boundary. This lets a delayed stream checkpoint progress within a
-    large window instead of processing the whole window as one atomic, un-checkpointed unit.
+    as its own chunk and then yields the page's resume boundary as an intermediate
+    checkpoint. This lets a delayed stream checkpoint progress within a large
+    window instead of processing the whole window as one atomic, un-checkpointed unit.
+
+    Every id the fetcher returns is emitted, whatever timestamp it carries: the
+    fetcher's server-side window decides membership. The checkpoint after a page
+    is the millisecond before its next_page cursor, which the _OrderedFetchIdsFn
+    contract makes the newest instant the pages so far fully cover.
     """
-    async for chunk in _fetch_id_chunks(fetcher, since, until):
+    async for chunk in _fetch_id_chunks(fetcher):
         async for res in _emit_batches(
             log, cls, http, with_history, object_name, chunk.ids
         ):
@@ -383,5 +391,6 @@ async def fetch_chunked_changes_with_associations(
 
         # Emit an intermediate checkpoint. fetch_delayed_changes handles emitting
         # the final checkpoint once all chunks have been read.
-        if chunk.has_more and chunk.ids:
-            yield max(entry.ts for entry in chunk.ids)
+        if chunk.next_page:
+            assert isinstance(chunk.next_page, str)
+            yield str_to_dt(chunk.next_page) - timedelta(milliseconds=1)

@@ -20,6 +20,7 @@ from estuary_cdk.capture.common import (
     BaseOAuth2Credentials,
     CRON_REGEX,
     OAuth2Spec,
+    PageCursor,
     ReductionStrategy,
     ResourceConfigWithSchedule,
     ResourceState,
@@ -438,11 +439,11 @@ class TimestampedId(NamedTuple):
 
 
 class IdChunk(NamedTuple):
-    """One page of TimestampedIds yielded by _fetch_id_chunks, plus whether the
-    underlying fetcher reports more pages remain."""
+    """One page of TimestampedIds yielded by _fetch_id_chunks, plus the
+    underlying fetcher's cursor for the page after it, falsy when none remains."""
 
     ids: list[TimestampedId]
-    has_more: bool
+    next_page: PageCursor
 
 
 # The document type carried by a TimestampedObject. Its bound is intentionally
