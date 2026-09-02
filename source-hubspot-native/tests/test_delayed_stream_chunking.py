@@ -102,7 +102,9 @@ async def test_fetch_search_objects_reads_a_window_that_fits_in_one_search():
     t1, t2, t3 = (SINCE + timedelta(minutes=i) for i in (1, 2, 3))
     http = FakeHTTP(
         [
-            _search_page([(t1, 1), (t2, 2)], next_after="200", total=3),
+            # Out of order within the page; the reader sorts and never
+            # depends on the order HubSpot chose.
+            _search_page([(t2, 2), (t1, 1)], next_after="200", total=3),
             _search_page([(t3, 3)], next_after=None, total=3),
         ]
     )
@@ -146,7 +148,7 @@ async def test_fetch_search_objects_splits_an_oversized_window_at_the_peeked_bou
                 filler=boundary + 3 * MS,
             ),
             # A fresh search bounded just below it fits, and is read in full.
-            _search_page([(SINCE + MS, 1), (SINCE + 2 * MS, 2)], next_after=None, total=2),
+            _search_page([(SINCE + 2 * MS, 2), (SINCE + MS, 1)], next_after=None, total=2),
         ]
     )
 
@@ -281,6 +283,28 @@ async def test_fetch_search_objects_splits_when_paging_would_cross_the_cap_anywa
 
     assert page == dt_to_str(boundary)
     assert _afters(http) == [None, PEEK_OFFSET, None]
+
+
+@pytest.mark.asyncio
+async def test_fetch_search_objects_returns_records_reported_outside_the_window():
+    inside = SINCE + timedelta(minutes=1)
+    http = FakeHTTP(
+        [
+            # HubSpot's filter placed all three in the window; two report a
+            # timestamp outside it. All are returned, since the filter decides
+            # membership, and none moves the resume cursor.
+            _search_page(
+                [(SINCE - timedelta(hours=1), 1), (inside, 2), (UNTIL + timedelta(hours=1), 3)],
+                next_after=None,
+                total=3,
+            ),
+        ]
+    )
+
+    items, page = await fetch_search_objects("deals", log, http, SINCE, UNTIL, None)
+
+    assert [id for _, id in items] == ["1", "2", "3"]
+    assert page is None
 
 
 @pytest.mark.asyncio

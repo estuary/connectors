@@ -32,10 +32,7 @@ def fetch_recent_leads(
     async def do_fetch(
         page: PageCursor, count: int
     ) -> tuple[Iterable[TimestampedId], PageCursor]:
-        return await fetch_search_objects(
-            Names.leads, log, http, since, until, page,
-            should_crash_on_unordered_results=False,
-        )
+        return await fetch_search_objects(Names.leads, log, http, since, until, page)
 
     return fetch_changes_with_associations(
         Names.leads, Lead, do_fetch, log, http, with_history, since, until

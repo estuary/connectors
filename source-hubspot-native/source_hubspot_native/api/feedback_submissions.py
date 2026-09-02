@@ -33,8 +33,7 @@ def fetch_recent_feedback_submissions(
         page: PageCursor, count: int
     ) -> tuple[Iterable[TimestampedId], PageCursor]:
         return await fetch_search_objects(
-            Names.feedback_submissions, log, http, since, until, page,
-            should_crash_on_unordered_results=False,
+            Names.feedback_submissions, log, http, since, until, page
         )
 
     return fetch_changes_with_associations(

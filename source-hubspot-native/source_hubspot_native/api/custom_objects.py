@@ -35,10 +35,7 @@ def fetch_recent_custom_objects(
     async def do_fetch(
         page: PageCursor, count: int
     ) -> tuple[Iterable[TimestampedId], PageCursor]:
-        return await fetch_search_objects(
-            object_name, log, http, since, until, page,
-            should_crash_on_unordered_results=False,
-        )
+        return await fetch_search_objects(object_name, log, http, since, until, page)
 
     return fetch_changes_with_associations(
         object_name, CustomObject, do_fetch, log, http, with_history, since, until
