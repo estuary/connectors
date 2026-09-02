@@ -23,7 +23,11 @@ from source_hubspot_native.api.object_with_associations import (
 )
 from source_hubspot_native.api.properties import properties_cache
 from source_hubspot_native.api.search_objects import fetch_search_objects
-from source_hubspot_native.api.shared import dt_to_str, fetch_delayed_changes
+from source_hubspot_native.api.shared import (
+    MAX_DELAYED_WINDOW,
+    dt_to_str,
+    fetch_delayed_changes,
+)
 from source_hubspot_native.models import Product, TimestampedId
 
 log = getLogger("test_search_objects")
@@ -259,3 +263,73 @@ async def test_fetch_delayed_changes_ignores_duplicate_and_regressing_datetimes(
 
     assert cursors.count(c1) == 1
     assert all(b > a for a, b in zip(cursors, cursors[1:]))  # strictly increasing
+
+
+@pytest.mark.asyncio
+async def test_fetch_delayed_changes_emits_out_of_window_documents_and_checkpoints_at_bound():
+    object_name = "test_delayed_out_of_window"
+    cache.emitted_cache.pop(object_name, None)
+
+    # lower_bound is two hours back, so the stream is catching up and the
+    # window is capped at [lower_bound, lower_bound + MAX_DELAYED_WINDOW].
+    lower_bound = datetime.now(UTC) - timedelta(hours=2)
+    upper_bound = lower_bound + MAX_DELAYED_WINDOW
+    below = lower_bound - timedelta(minutes=30)
+    inside = lower_bound + timedelta(minutes=30)
+    above = upper_bound + timedelta(minutes=30)
+
+    fake_delayed = _make_delayed(
+        [(below, "k1", "doc_below"), (inside, "k2", "doc_inside"), (above, "k3", "doc_above")]
+    )
+
+    out = []
+    async for item in fetch_delayed_changes(
+        object_name, fake_delayed, None, False, log, lower_bound
+    ):
+        out.append(item)
+
+    docs = [x for x in out if isinstance(x, str)]
+    cursors = [x for x in out if isinstance(x, datetime)]
+
+    # Documents outside the window are emitted rather than dropped, and one
+    # below the window does not end the stream early.
+    assert docs == ["doc_below", "doc_inside", "doc_above"]
+    # The checkpoint is the window's bound, unaffected by any document's timestamp.
+    assert cursors == [upper_bound]
+
+
+@pytest.mark.asyncio
+async def test_fetch_delayed_changes_leaves_an_empty_caught_up_window_open():
+    object_name = "test_delayed_empty_window"
+    cache.emitted_cache.pop(object_name, None)
+
+    # Ten minutes of unread time: wide enough to poll, and within an hour of
+    # the horizon, so the stream is caught up and the window reaches it.
+    lower_bound = datetime.now(UTC) - timedelta(hours=1, minutes=10)
+
+    out = []
+    async for item in fetch_delayed_changes(
+        object_name, _make_delayed([]), None, False, log, lower_bound
+    ):
+        out.append(item)
+
+    assert out == []
+
+
+@pytest.mark.asyncio
+async def test_fetch_delayed_changes_checkpoints_an_empty_catch_up_window_at_its_bound():
+    object_name = "test_delayed_empty_catch_up"
+    cache.emitted_cache.pop(object_name, None)
+
+    # Three hours behind: the stream is catching up and the window is capped at
+    # MAX_DELAYED_WINDOW. Nothing is in it, but the cursor still moves so an
+    # empty hour doesn't stall the catch-up.
+    lower_bound = datetime.now(UTC) - timedelta(hours=3)
+
+    out = []
+    async for item in fetch_delayed_changes(
+        object_name, _make_delayed([]), None, False, log, lower_bound
+    ):
+        out.append(item)
+
+    assert out == [lower_bound + MAX_DELAYED_WINDOW]
