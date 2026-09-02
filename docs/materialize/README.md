@@ -662,6 +662,13 @@ these use cases, delta updates do the "right thing" by trivially replacing
 each document with its most recent version.
 This matches the behavior of Kafka Connect, for example.
 
+# Consistency testing
+
+See the [materialize-consistency suite][materialize-consistency] in the [flow] repo.
+
+[materialize-consistency]: https://github.com/estuary/flow/tree/master/crates/materialize-consistency
+[flow]: https://github.com/estuary/flow
+
 [connectors]: https://docs.estuary.dev/concepts/connectors/
 [collections]: https://docs.estuary.dev/concepts/collections/
 [protobuf]: https://github.com/estuary/flow/blob/master/go/protocols/materialize/materialize.proto
