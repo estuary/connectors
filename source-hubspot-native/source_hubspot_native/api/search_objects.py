@@ -90,12 +90,11 @@ async def _request_search_page(
     start: datetime,
     end: datetime | None,
     after: int | None,
-) -> tuple[SearchPageResult[CustomObjectSearchResult], dict[str, Any]]:
+) -> SearchPageResult[CustomObjectSearchResult]:
     """Request one page of Search API results for records whose last-modified
     property is in [start, end], or at or after `start` when `end` is None,
     sorted ascending, SEARCH_PAGE_LIMIT per page. `after` is HubSpot's offset
-    for the page; None requests the first. Also returns the request body, which
-    the ordering check logs when it fails."""
+    for the page; None requests the first."""
     filter = (
         {
             "propertyName": last_modified_property_name,
@@ -122,10 +121,9 @@ async def _request_search_page(
         input["after"] = after
 
     url = f"{HUB}/crm/v3/objects/{object_name}/search"
-    result = SearchPageResult[CustomObjectSearchResult].model_validate_json(
+    return SearchPageResult[CustomObjectSearchResult].model_validate_json(
         await http.request(log, url, method="POST", json=input)
     )
-    return result, input
 
 
 async def _fetch_all_ids_between(
@@ -135,19 +133,17 @@ async def _fetch_all_ids_between(
     last_modified_property_name: str,
     start: datetime,
     end: datetime | None,
-    first_page: tuple[SearchPageResult[CustomObjectSearchResult], dict[str, Any]],
-    should_crash_on_unordered_results: bool,
+    first_page: SearchPageResult[CustomObjectSearchResult],
 ) -> tuple[list[TimestampedId], int]:
-    """Fetch the id and last-modified timestamp of the records HubSpot returns
+    """Fetch the id and last-modified timestamp of every record HubSpot returns
     for [start, end], paging until it reports no more. The caller has already
     requested `first_page` to check the range's total, so reading continues
     from it. The range must hold at most SEARCH_RESULT_CAP records: if paging
     would cross the cap, raise _CapReached so the caller can narrow it. Returns
     the records sorted by timestamp and the number of pages read."""
     output_items: set[TimestampedId] = set()
-    max_updated = start
     pages = 0
-    result, input = first_page
+    result = first_page
 
     while True:
         pages += 1
@@ -155,41 +151,24 @@ async def _fetch_all_ids_between(
         for r in result.results:
             this_mod_time = r.properties.hs_lastmodifieddate
 
-            if this_mod_time < start:
-                # The search API will return records with a modification time
-                # before the requested "since" (the start of the window) if
-                # their updatedAt timestamp is within the same millisecond,
-                # effectively ignoring the microseconds part of the range
-                # criteria. These spurious results can be safely ignored in the
-                # rare case that there is a record with a modification time
-                # within the same millisecond as requested at the start of the
-                # time window, but some smaller fraction of a second earlier.
+            if this_mod_time < start or (end and this_mod_time > end):
+                # HubSpot's filter placed this record in the window although the
+                # timestamp it reports lies outside it. The filter decides
+                # membership, so the record is kept and its timestamp treated
+                # as payload. One cause is HubSpot matching at millisecond
+                # resolution while the reported value carries microseconds;
+                # another is the filter and the reported property disagreeing
+                # about when the record changed.
                 log.info(
-                    "ignoring search result with record modification time that is earlier than minimum search window",
-                    {"id": r.id, "this_mod_time": this_mod_time, "since": start},
+                    "search result reports a modification time outside its search window",
+                    {
+                        "id": r.id,
+                        "this_mod_time": this_mod_time,
+                        "start": start,
+                        "end": end,
+                    },
                 )
-                continue
 
-            if end and this_mod_time > end:
-                log.info(
-                    "ignoring search result with record modification time that is later than maximum search window",
-                    {"id": r.id, "this_mod_time": this_mod_time, "until": end},
-                )
-                continue
-
-            if this_mod_time < max_updated:
-                if should_crash_on_unordered_results:
-                    log.error("search query input", input)
-                    raise Exception(
-                        f"search query returned records out of order for {r.id} with {this_mod_time} < {max_updated}"
-                    )
-                # The realtime stream is best-effort and allowed to be
-                # incomplete, so an out-of-order result is skipped rather
-                # than treated as fatal. The delayed stream will capture
-                # any records the realtime stream skips.
-                continue
-
-            max_updated = this_mod_time
             output_items.add(TimestampedId(this_mod_time, str(r.id)))
 
         if not result.paging:
@@ -206,7 +185,7 @@ async def _fetch_all_ids_between(
         if after + SEARCH_PAGE_LIMIT > SEARCH_RESULT_CAP:
             raise _CapReached()
 
-        result, input = await _request_search_page(
+        result = await _request_search_page(
             log, http, object_name, last_modified_property_name, start, end, after
         )
 
@@ -219,7 +198,6 @@ async def fetch_search_objects(
     until: datetime | None,
     page: PageCursor,
     last_modified_property_name: str = "hs_lastmodifieddate",
-    should_crash_on_unordered_results: bool = True,
 ) -> tuple[Iterable[TimestampedId], PageCursor]:
     """
     Retrieve one chunk of the records modified in [since, until] (or from
@@ -230,6 +208,8 @@ async def fetch_search_objects(
     page up to that cap and rely on result order to know what was covered, a
     window holding more records is split by time into chunks the API can return
     completely, and every record in a chunk is read in whatever order it comes.
+    HubSpot's filter decides which records a chunk holds: a record is returned
+    even when the timestamp it reports falls outside the chunk.
 
                  start          chunk_end          until
     ───────────────┼────────────────┼────────────────┼──▶ time (1 ms ticks)
@@ -268,11 +248,10 @@ async def fetch_search_objects(
 
     async def fetch_all_ids(
         chunk_end: datetime | None,
-        first_page: tuple[SearchPageResult[CustomObjectSearchResult], dict[str, Any]],
+        first_page: SearchPageResult[CustomObjectSearchResult],
     ) -> tuple[list[TimestampedId], int]:
         return await _fetch_all_ids_between(
-            log, http, object_name, last_modified_property_name, start, chunk_end,
-            first_page, should_crash_on_unordered_results,
+            log, http, object_name, last_modified_property_name, start, chunk_end, first_page
         )
 
     def resume_after(chunk_end: datetime) -> PageCursor:
@@ -296,20 +275,20 @@ async def fetch_search_objects(
         # A fresh window. Its first page is needed regardless and carries the
         # window's total.
         first_page = await request_page(until, None)
-        if first_page[0].total <= SEARCH_RESULT_CAP:
+        if first_page.total <= SEARCH_RESULT_CAP:
             try:
                 items, _ = await fetch_all_ids(until, first_page)
                 return items, None
             except _CapReached:
                 log.warning(
                     "search paged past the cap despite its total; splitting the window",
-                    {"object_name": object_name, "start": start, "total": first_page[0].total},
+                    {"object_name": object_name, "start": start, "total": first_page.total},
                 )
 
     # The window contains over SEARCH_RESULT_CAP records or we're resuming
     # inside one that was. Peek at the last page the cap allows to see
     # where the cap falls in time.
-    peek, _ = await request_page(until, PEEK_OFFSET)
+    peek = await request_page(until, PEEK_OFFSET)
     method, chunk_end = _choose_chunk_end(
         start, end, [r.properties.hs_lastmodifieddate for r in peek.results]
     )
@@ -330,7 +309,7 @@ async def fetch_search_objects(
             )
 
         first_page = await request_page(chunk_end, None)
-        if first_page[0].total <= SEARCH_RESULT_CAP:
+        if first_page.total <= SEARCH_RESULT_CAP:
             try:
                 items, pages = await fetch_all_ids(chunk_end, first_page)
             except _CapReached:
@@ -347,7 +326,7 @@ async def fetch_search_objects(
                         "chunk_end": chunk_end,
                         "count": len(items),
                         "pages": pages,
-                        "total": first_page[0].total,
+                        "total": first_page.total,
                     },
                 )
                 return items, resume_after(chunk_end)

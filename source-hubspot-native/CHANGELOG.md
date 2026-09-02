@@ -2,6 +2,11 @@
 
 ## 2026-09-02
 ### Fixed
+- CRM object bindings no longer fail when the HubSpot Search API returns records out
+  of order. Search windows holding more than 10,000 records are split by time into
+  chunks HubSpot can return completely, so result order is never relied on. Records
+  HubSpot returns for a window are now always captured, even when their reported
+  last-modified time falls outside it.
 - The `form_submissions` binding could permanently skip submissions that arrived on a
   form while a sweep was still checking other forms. Each sweep now only emits
   submissions made at least five minutes before it started and checkpoints the newest

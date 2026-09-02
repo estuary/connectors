@@ -32,10 +32,7 @@ def fetch_recent_goals(
     async def do_fetch(
         page: PageCursor, count: int
     ) -> tuple[Iterable[TimestampedId], PageCursor]:
-        return await fetch_search_objects(
-            Names.goals, log, http, since, until, page,
-            should_crash_on_unordered_results=False,
-        )
+        return await fetch_search_objects(Names.goals, log, http, since, until, page)
 
     return fetch_changes_with_associations(
         Names.goals, Goals, do_fetch, log, http, with_history, since, until
