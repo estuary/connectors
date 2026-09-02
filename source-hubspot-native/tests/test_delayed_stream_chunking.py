@@ -4,8 +4,8 @@ These cover the pieces that make delayed streams checkpoint progress within a
 large window:
   - fetch_search_objects returning a fully-read chunk plus a resume cursor at the
     Search API's 10k offset boundary,
-  - fetch_chunked_changes_with_associations yielding each chunk's maximum
-    timestamp as the intermediate checkpoint, and
+  - fetch_chunked_changes_with_associations yielding the millisecond before
+    each page's resume cursor as the intermediate checkpoint, and
   - fetch_delayed_changes treating an interleaved bare datetime as an
     intermediate, strictly-increasing checkpoint.
 """
@@ -19,6 +19,7 @@ import pytest
 
 import estuary_cdk.emitted_changes_cache as cache
 from source_hubspot_native.api.object_with_associations import (
+    fetch_changes_with_associations,
     fetch_chunked_changes_with_associations,
 )
 from source_hubspot_native.api.properties import properties_cache
@@ -143,16 +144,17 @@ def _batch_page(items: list[tuple[datetime, int]]) -> bytes:
 
 
 @pytest.mark.asyncio
-async def test_fetch_chunked_changes_yields_max_ts_as_checkpoint():
+async def test_fetch_chunked_changes_checkpoints_at_the_page_resume_boundary():
     since = datetime(2026, 1, 1, tzinfo=UTC)
     t1, t2, t3 = (since + timedelta(minutes=i) for i in (1, 2, 3))
+    ms = timedelta(milliseconds=1)
 
-    # The fetcher's cursor is opaque to the chunked layer; only its presence
-    # (more pages remain) matters. IDs are deliberately out of order within the
-    # chunk since the chunked layer is order-agnostic.
+    # A page's cursor is the first millisecond it does not cover. IDs are
+    # deliberately out of order within the chunk since the chunked layer is
+    # order-agnostic.
     pages = [
-        ([TimestampedId(t2, "2"), TimestampedId(t1, "1")], "opaque-resume-cursor-1"),
-        ([], "opaque-resume-cursor-2"),  # empty non-final chunk
+        ([TimestampedId(t2, "2"), TimestampedId(t1, "1")], dt_to_str(t2 + ms)),
+        ([], dt_to_str(t2 + 2 * ms)),  # empty non-final chunk
         ([TimestampedId(t3, "3")], None),  # final page
     ]
 
@@ -181,12 +183,79 @@ async def test_fetch_chunked_changes_yields_max_ts_as_checkpoint():
 
     # Documents are emitted oldest-first within each chunk.
     assert docs == [(t1, "1"), (t2, "2"), (t3, "3")]
-    # Only the first chunk checkpoints, at its newest timestamp: the empty
-    # chunk has no safe checkpoint of its own, and the final page's checkpoint
-    # is the window edge emitted by fetch_delayed_changes instead.
-    assert checkpoints == [t2]
-    # The checkpoint lands between the first chunk's documents and the rest.
+    # Each non-final page checkpoints at the millisecond before its cursor,
+    # including the empty one, since the cursor alone says what has been
+    # covered. The final page's checkpoint is the window edge emitted by
+    # fetch_delayed_changes instead.
+    assert checkpoints == [t2, t2 + ms]
+    # The first checkpoint lands between the first chunk's documents and the rest.
     assert out.index(t2) == 2
+
+
+@pytest.mark.asyncio
+async def test_fetch_chunked_changes_emits_every_id_the_fetcher_returns():
+    since = datetime(2026, 1, 1, tzinfo=UTC)
+    until = since + timedelta(hours=1)
+    below, inside, above = since - timedelta(minutes=1), since + timedelta(minutes=1), until + timedelta(minutes=1)
+
+    pages = [
+        ([TimestampedId(below, "0"), TimestampedId(inside, "1"), TimestampedId(above, "9")], None),
+    ]
+
+    async def fake_fetcher(page: Any, count: int) -> Any:
+        return pages.pop(0)
+
+    properties_cache.pop("products", None)
+    http = FakeHTTP(
+        [
+            _properties_page(["hs_lastmodifieddate"]),
+            _batch_page([(below, 0), (inside, 1), (above, 9)]),
+        ]
+    )
+
+    docs = []
+    async for item in fetch_chunked_changes_with_associations(
+        "products", Product, fake_fetcher, log, http, False, since, until
+    ):
+        if not isinstance(item, datetime):
+            docs.append((item[0], item[1]))
+
+    # The fetcher's window decides membership; timestamps outside it are payload.
+    assert docs == [(below, "0"), (inside, "1"), (above, "9")]
+
+
+@pytest.mark.asyncio
+async def test_fetch_changes_with_associations_filters_to_the_window():
+    since = datetime(2026, 1, 1, tzinfo=UTC)
+    until = since + timedelta(hours=1)
+    below, inside, above = since, since + timedelta(minutes=1), until + timedelta(minutes=1)
+
+    # A legacy recents-style fetcher overruns `since` on its last page and has
+    # no server-side `until`.
+    pages = [
+        ([TimestampedId(above, "9"), TimestampedId(inside, "1"), TimestampedId(below, "0")], None),
+    ]
+
+    async def fake_fetcher(page: Any, count: int) -> Any:
+        return pages.pop(0)
+
+    properties_cache.pop("products", None)
+    http = FakeHTTP(
+        [
+            _properties_page(["hs_lastmodifieddate"]),
+            _batch_page([(inside, 1)]),
+        ]
+    )
+
+    docs = []
+    async for ts, id, _ in fetch_changes_with_associations(
+        "products", Product, fake_fetcher, log, http, False, since, until
+    ):
+        docs.append((ts, id))
+
+    assert docs == [(inside, "1")]
+    # Only the in-window id was batch-read.
+    assert http.requests[1]["json"]["inputs"] == [{"id": "1"}]
 
 
 def _make_delayed(items: list[Any]):
