@@ -73,7 +73,36 @@
         "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
-      "accepted_payment_instrument_logos": [],
+      "accepted_payment_instrument_logos": [
+        {
+          "alt_text": "American Express",
+          "icon_name": "american_express.png"
+        },
+        {
+          "alt_text": "Discover",
+          "icon_name": "discover.png"
+        },
+        {
+          "alt_text": "JCB",
+          "icon_name": "jcb.png"
+        },
+        {
+          "alt_text": "MasterCard",
+          "icon_name": "mastercard.png"
+        },
+        {
+          "alt_text": "Visa",
+          "icon_name": "visa.png"
+        },
+        {
+          "alt_text": "PayPal Account",
+          "icon_name": "paypal_account.png"
+        },
+        {
+          "alt_text": "Local Payment",
+          "icon_name": "local_payment.png"
+        }
+      ],
       "accepted_payment_methods": [
         "AMERICAN_EXPRESS",
         "DISCOVER",

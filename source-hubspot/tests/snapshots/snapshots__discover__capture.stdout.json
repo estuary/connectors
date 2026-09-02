@@ -824,6 +824,13 @@
                 "number"
               ]
             },
+            "hs_latest_suggested_contact_date": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_latest_suggested_contact_timestamp": {
               "type": [
                 "null",
@@ -3096,12 +3103,6 @@
               ]
             },
             "hs_sub_role": {
-              "type": [
-                "null",
-                "string"
-              ]
-            },
-            "hs_testpurge": {
               "type": [
                 "null",
                 "string"
@@ -7463,6 +7464,12 @@
                 "boolean"
               ]
             },
+            "hs_has_call_notes": {
+              "type": [
+                "null",
+                "boolean"
+              ]
+            },
             "hs_hosted_video_conference_url": {
               "type": [
                 "null",
@@ -9113,6 +9120,12 @@
               "type": [
                 "null",
                 "number"
+              ]
+            },
+            "hs_organizer_email": {
+              "type": [
+                "null",
+                "string"
               ]
             },
             "hs_origin_object_coordinates": {
@@ -14056,12 +14069,6 @@
               ]
             },
             "hs_sub_role": {
-              "type": [
-                "null",
-                "string"
-              ]
-            },
-            "hs_testpurge": {
               "type": [
                 "null",
                 "string"
