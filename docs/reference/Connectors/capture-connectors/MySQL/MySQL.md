@@ -174,6 +174,42 @@ GRANT SELECT ON *.* TO 'flow_capture';
 
 ### IAM Authentication
 
+On Amazon Aurora and Azure Database for MySQL you can authenticate with a cloud IAM identity instead of a password. IAM authentication always connects over TLS and never falls back to an unencrypted connection.
+
+#### AWS IAM
+
+For Amazon Aurora MySQL clusters, you can authenticate with an AWS IAM role instead of a password.
+
+Follow the steps in the [AWS IAM guide][aws-iam] to create a role for Flow to assume, and make note of its ARN and your cluster's region to use when configuring the connector's authentication options.
+
+[Enable IAM database authentication](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.IAMDBAuth.Enabling.html) on the cluster, then run the following commands to create a database user which authenticates through the RDS plugin, granting it the same permissions as the `flow_capture` user in the [Amazon Aurora](#amazon-aurora) setup instructions above:
+
+```sql
+CREATE USER IF NOT EXISTS flow_capture
+  IDENTIFIED WITH AWSAuthenticationPlugin AS 'RDS'
+  REQUIRE SSL
+  COMMENT 'User account for Estuary MySQL data capture';
+GRANT REPLICATION CLIENT, REPLICATION SLAVE ON *.* TO 'flow_capture';
+GRANT SELECT ON *.* TO 'flow_capture';
+```
+
+Finally, [attach a policy](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.IAMDBAuth.IAMPolicy.html) to the role granting it `rds-db:connect` on that user, substituting your own region, account ID, and the cluster's resource ID:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["rds-db:connect"],
+      "Resource": ["arn:aws:rds-db:us-east-1:123456789012:dbuser:cluster-ABCDEFGHIJKL01234/flow_capture"]
+    }
+  ]
+}
+```
+
+#### Azure IAM
+
 For Azure Database for MySQL flexible servers, you can authenticate with an Azure App Registration instead of a password.
 
 Follow the steps in the [Azure IAM guide][azure-iam] to create an App Registration and make note of the Application ID and Tenant ID to use when configuring the connector's authentication options.
@@ -189,6 +225,7 @@ GRANT SELECT ON *.* TO 'flow_capture';
 
 Use the name given in the `CREATE AADUSER` statement as the connector's `user` property.
 
+[aws-iam]: /guides/iam-auth/aws/
 [azure-iam]: /guides/iam-auth/azure/
 
 ## Capturing from Read Replicas
@@ -268,8 +305,10 @@ See [connectors](/concepts/connectors.md#using-connectors) to learn more about u
 | Property | Title | Description | Type | Required/Default |
 | --- | --- | --- | --- | --- |
 | **`/credentials`** | Authentication | Authentication method and credentials that provide access to the database. | object | Required |
-| `/credentials/auth_type` | Auth Type | The authentication method to use. One of `UserPassword` or `AzureIAM`. | string |  |
+| `/credentials/auth_type` | Auth Type | The authentication method to use. One of `UserPassword`, `AWSIAM`, or `AzureIAM`. | string |  |
 | `/credentials/password` | Password | Password for the specified database user. | string | Required for `UserPassword` auth |
+| `/credentials/aws_region` | AWS Region | AWS region of your resource. | string | Required for `AWSIAM` auth |
+| `/credentials/aws_role_arn` | AWS Role ARN | AWS role for Estuary to use that has access to the resource. | string | Required for `AWSIAM` auth |
 | `/credentials/azure_client_id` | Azure Client ID | Application (client) ID of the App Registration. | string | Required for `AzureIAM` auth |
 | `/credentials/azure_tenant_id` | Azure Tenant ID | Directory (tenant) ID of the App Registration. | string | Required for `AzureIAM` auth |
 
@@ -326,7 +365,16 @@ captures:
         target: ${PREFIX}/${COLLECTION_NAME}
 ```
 
-To authenticate to an Azure Database for MySQL flexible server with [Azure IAM](#iam-authentication) instead, replace the credentials block:
+To authenticate to an Amazon Aurora MySQL cluster with [AWS IAM](#aws-iam) instead, replace the credentials block:
+
+```yaml
+          credentials:
+            auth_type: AWSIAM
+            aws_region: "us-east-1"
+            aws_role_arn: "arn:aws:iam::123456789012:role/flow-capture"
+```
+
+To authenticate to an Azure Database for MySQL flexible server with [Azure IAM](#azure-iam) instead, replace the credentials block:
 
 ```yaml
           credentials:

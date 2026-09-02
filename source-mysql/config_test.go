@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -89,6 +90,31 @@ func TestConfigValidate(t *testing.T) {
 		require.ErrorContains(t, cfg.Validate(), "cannot exceed 32 characters")
 	})
 
+	t.Run("AWSIAMValid", func(t *testing.T) {
+		var cfg = valid()
+		cfg.Credentials = &CredentialsConfig{AuthType: AWSIAM}
+		cfg.Credentials.AWSRegion = "us-east-1"
+		cfg.Credentials.AWSRole = "arn:aws:iam::123456789012:role/flow-capture"
+
+		require.NoError(t, cfg.Validate())
+	})
+
+	t.Run("AWSIAMMissingRegion", func(t *testing.T) {
+		var cfg = valid()
+		cfg.Credentials = &CredentialsConfig{AuthType: AWSIAM}
+		cfg.Credentials.AWSRole = "arn:aws:iam::123456789012:role/flow-capture"
+
+		require.ErrorContains(t, cfg.Validate(), "missing 'aws_region'")
+	})
+
+	t.Run("AWSIAMMissingRoleARN", func(t *testing.T) {
+		var cfg = valid()
+		cfg.Credentials = &CredentialsConfig{AuthType: AWSIAM}
+		cfg.Credentials.AWSRegion = "us-east-1"
+
+		require.ErrorContains(t, cfg.Validate(), "missing 'aws_role_arn'")
+	})
+
 	t.Run("AzureIAMValid", func(t *testing.T) {
 		var cfg = valid()
 		cfg.Credentials = &CredentialsConfig{AuthType: AzureIAM}
@@ -114,14 +140,94 @@ func TestConfigValidate(t *testing.T) {
 	})
 }
 
+// awsIAMConfig is a config authenticating with AWS IAM, with the session credentials
+// the control plane would have injected alongside the user's region and role.
+func awsIAMConfig() Config {
+	return Config{
+		Address: "example.abcdefg.us-east-1.rds.amazonaws.com:3306",
+		User:    "flow_capture",
+		Credentials: &CredentialsConfig{
+			AuthType: AWSIAM,
+			IAMConfig: iam.IAMConfig{
+				AWSConfig: iam.AWSConfig{
+					AWSRegion: "us-east-1",
+					AWSRole:   "arn:aws:iam::123456789012:role/flow-capture",
+				},
+				IAMTokens: iam.IAMTokens{AWSTokens: iam.AWSTokens{
+					AWSAccessKeyID:     "AKIAIOSFODNN7EXAMPLE",
+					AWSSecretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+					AWSSessionToken:    "FwoGZXIvYXdzEXAMPLESESSIONTOKEN",
+				}},
+			},
+		},
+	}
+}
+
 func TestEffectivePassword(t *testing.T) {
 	t.Run("UserPassword", func(t *testing.T) {
 		var cfg = Config{Address: "example.com:3306", User: "flow_capture", Password: "secret1234"}
 		cfg.normalizeCredentials()
 
-		password, err := cfg.EffectivePassword()
+		password, err := cfg.EffectivePassword(context.Background())
 		require.NoError(t, err)
 		require.Equal(t, "secret1234", password)
+	})
+
+	t.Run("AWSIAMToken", func(t *testing.T) {
+		var cfg = awsIAMConfig()
+		cfg.normalizeCredentials()
+
+		require.NoError(t, cfg.Validate())
+		password, err := cfg.EffectivePassword(context.Background())
+		require.NoError(t, err)
+		// The RDS auth token is a presigned request against the configured endpoint,
+		// and is far longer than the 32 characters allowed for a real password.
+		require.Greater(t, len(password), 32)
+		require.Contains(t, password, "example.abcdefg.us-east-1.rds.amazonaws.com:3306")
+		require.Contains(t, password, "X-Amz-Signature=")
+		require.Contains(t, password, "DBUser=flow_capture")
+	})
+
+	t.Run("AWSIAMTokenIsFreshlyMinted", func(t *testing.T) {
+		// Tokens expire fifteen minutes after they are built, so every call must mint
+		// a new one rather than hand back a value cached at startup.
+		var cfg = awsIAMConfig()
+		cfg.normalizeCredentials()
+		cfg.Credentials.AWSRegion = "us-west-2"
+
+		password, err := cfg.EffectivePassword(context.Background())
+		require.NoError(t, err)
+		require.Contains(t, password, "us-west-2%2Frds-db%2Faws4_request")
+	})
+
+	t.Run("AWSIAMMissingSessionCredentials", func(t *testing.T) {
+		var cfg = awsIAMConfig()
+		cfg.Credentials.AWSAccessKeyID = ""
+		cfg.normalizeCredentials()
+
+		_, err := cfg.EffectivePassword(context.Background())
+		require.ErrorContains(t, err, "missing iam session 'aws_access_key_id'")
+	})
+
+	t.Run("NormalizedShapeMatchesLegacy", func(t *testing.T) {
+		var legacy = Config{Address: "example.com:3306", User: "flow_capture", Password: "secret1234"}
+		var union = Config{
+			Address: "example.com:3306",
+			User:    "flow_capture",
+			Credentials: &CredentialsConfig{
+				AuthType:           UserPassword,
+				UserPasswordConfig: UserPasswordConfig{Password: "secret1234"},
+			},
+		}
+
+		legacy.normalizeCredentials()
+		union.normalizeCredentials()
+
+		legacyPassword, err := legacy.EffectivePassword(context.Background())
+		require.NoError(t, err)
+		unionPassword, err := union.EffectivePassword(context.Background())
+		require.NoError(t, err)
+		require.Equal(t, unionPassword, legacyPassword)
 	})
 
 	t.Run("AzureIAMToken", func(t *testing.T) {
@@ -145,7 +251,7 @@ func TestEffectivePassword(t *testing.T) {
 		cfg.normalizeCredentials()
 
 		require.NoError(t, cfg.Validate())
-		password, err := cfg.EffectivePassword()
+		password, err := cfg.EffectivePassword(context.Background())
 		require.NoError(t, err)
 		require.Equal(t, token, password)
 	})
@@ -158,7 +264,7 @@ func TestEffectivePassword(t *testing.T) {
 		}
 		cfg.normalizeCredentials()
 
-		_, err := cfg.EffectivePassword()
+		_, err := cfg.EffectivePassword(context.Background())
 		require.ErrorContains(t, err, "missing 'azure_access_token'")
 	})
 
@@ -169,7 +275,7 @@ func TestEffectivePassword(t *testing.T) {
 			Credentials: &CredentialsConfig{AuthType: "Bogus"},
 		}
 
-		_, err := cfg.EffectivePassword()
+		_, err := cfg.EffectivePassword(context.Background())
 		require.ErrorContains(t, err, `unsupported 'auth_type' "Bogus"`)
 	})
 }
@@ -182,8 +288,8 @@ func TestRequiresTLS(t *testing.T) {
 		expect   bool
 	}{
 		{UserPassword, false},
+		{AWSIAM, true},
 		{AzureIAM, true},
-		{AuthType(iam.AWSIAM), true},
 		{AuthType(iam.GCPIAM), true},
 		{AuthType("Bogus"), true},
 	} {

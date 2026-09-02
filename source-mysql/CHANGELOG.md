@@ -1,5 +1,13 @@
 # source-mysql
 
+## 2026-09-01
+
+### Added
+- The `credentials` configuration union now also supports AWS IAM
+  authentication, for Amazon RDS and Aurora instances with IAM database
+  authentication enabled. A fresh RDS auth token is minted from the assumed
+  role's session credentials for each connection attempt.
+
 ## 2026-08-28
 
 ### Added

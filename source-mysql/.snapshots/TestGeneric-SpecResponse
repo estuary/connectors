@@ -45,6 +45,34 @@
           },
           {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/go/auth/iam/aws-config",
+            "properties": {
+              "auth_type": {
+                "type": "string",
+                "const": "AWSIAM",
+                "default": "AWSIAM",
+                "order": 0
+              },
+              "aws_region": {
+                "type": "string",
+                "title": "AWS Region",
+                "description": "AWS Region of your resource"
+              },
+              "aws_role_arn": {
+                "type": "string",
+                "title": "AWS Role ARN",
+                "description": "AWS Role which has access to the resource which will be assumed by Flow"
+              }
+            },
+            "type": "object",
+            "required": [
+              "aws_region",
+              "aws_role_arn"
+            ],
+            "title": "AWS IAM"
+          },
+          {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "$id": "https://github.com/estuary/connectors/go/auth/iam/azure-config",
             "properties": {
               "auth_type": {
