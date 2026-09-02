@@ -19,6 +19,57 @@ from .shared import (
     HUB,
 )
 
+# HubSpot's Search API serves at most this many results for one query; paging
+# past it returns a 400.
+SEARCH_RESULT_CAP = 10_000
+SEARCH_PAGE_LIMIT = 200
+
+
+async def _request_search_page(
+    log: Logger,
+    http: HTTPSession,
+    object_name: str,
+    last_modified_property_name: str,
+    start: datetime,
+    end: datetime | None,
+    after: int | None,
+) -> tuple[SearchPageResult[CustomObjectSearchResult], dict[str, Any]]:
+    """Request one page of Search API results for records whose last-modified
+    property is in [start, end], or at or after `start` when `end` is None,
+    sorted ascending, SEARCH_PAGE_LIMIT per page. `after` is HubSpot's offset
+    for the page; None requests the first. Also returns the request body, which
+    the ordering check logs when it fails."""
+    filter = (
+        {
+            "propertyName": last_modified_property_name,
+            "operator": "BETWEEN",
+            "value": dt_to_str(start),
+            "highValue": dt_to_str(end),
+        }
+        if end
+        else {
+            "propertyName": last_modified_property_name,
+            "operator": "GTE",
+            "value": dt_to_str(start),
+        }
+    )
+
+    input: dict[str, Any] = {
+        "filters": [filter],
+        "sorts": [
+            {"propertyName": last_modified_property_name, "direction": "ASCENDING"}
+        ],
+        "limit": SEARCH_PAGE_LIMIT,
+    }
+    if after is not None:
+        input["after"] = after
+
+    url = f"{HUB}/crm/v3/objects/{object_name}/search"
+    result = SearchPageResult[CustomObjectSearchResult].model_validate_json(
+        await http.request(log, url, method="POST", json=input)
+    )
+    return result, input
+
 
 async def fetch_search_objects(
     object_name: str,
@@ -58,42 +109,15 @@ async def fetch_search_objects(
     if isinstance(page, str):
         since = str_to_dt(page)
 
-    url = f"{HUB}/crm/v3/objects/{object_name}/search"
-    limit = 200
     output_items: set[TimestampedId] = set()
     cursor: int | None = None
     max_updated: datetime = since
     original_total: int | None = None
 
     while True:
-        filter = (
-            {
-                "propertyName": last_modified_property_name,
-                "operator": "BETWEEN",
-                "value": dt_to_str(since),
-                "highValue": dt_to_str(until),
-            }
-            if until
-            else {
-                "propertyName": last_modified_property_name,
-                "operator": "GTE",
-                "value": dt_to_str(since),
-            }
+        result, input = await _request_search_page(
+            log, http, object_name, last_modified_property_name, since, until, cursor
         )
-
-        input = {
-            "filters": [filter],
-            "sorts": [
-                {"propertyName": last_modified_property_name, "direction": "ASCENDING"}
-            ],
-            "limit": limit,
-        }
-        if cursor:
-            input["after"] = cursor
-
-        result: SearchPageResult[CustomObjectSearchResult] = SearchPageResult[
-            CustomObjectSearchResult
-        ].model_validate_json(await http.request(log, url, method="POST", json=input))
 
         if not original_total:
             # Record the total from the original entire request range for
@@ -145,7 +169,7 @@ async def fetch_search_objects(
             return sorted(output_items), None
 
         cursor = int(result.paging.next.after)
-        if cursor + limit <= 10_000:
+        if cursor + SEARCH_PAGE_LIMIT <= SEARCH_RESULT_CAP:
             # Still within the offset cap; keep paginating this same search.
             continue
 
