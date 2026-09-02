@@ -119,7 +119,10 @@ func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursorJSON 
 		flavor = mysql.MariaDBFlavor
 	}
 
-	password, err := db.config.EffectivePassword()
+	// The syncer keeps this password for its entire lifetime, so under AWS IAM auth an
+	// internal reconnect attempted more than fifteen minutes from now will be denied.
+	// That failure terminates the capture and the restarted connector mints a fresh token.
+	password, err := db.config.EffectivePassword(ctx)
 	if err != nil {
 		return nil, err
 	}

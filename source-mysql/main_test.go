@@ -85,9 +85,12 @@ func mysqlTestBackend(t testing.TB) *testBackend {
 
 	// Construct the capture config
 	var captureConfig = Config{
-		Address:  *dbCaptureAddress,
-		User:     *dbCaptureUser,
-		Password: *dbCapturePass,
+		Address: *dbCaptureAddress,
+		User:    *dbCaptureUser,
+		Credentials: &CredentialsConfig{
+			AuthType:           UserPassword,
+			UserPasswordConfig: UserPasswordConfig{Password: *dbCapturePass},
+		},
 		Advanced: advancedConfig{
 			DBName:                   *dbName,
 			SkipBinlogRetentionCheck: *skipBinlogRetentionCheck,

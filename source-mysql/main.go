@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/feature/rds/auth"
 	"github.com/estuary/connectors/go/auth/iam"
 	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
@@ -150,6 +151,7 @@ type AuthType string
 
 const (
 	UserPassword AuthType = "UserPassword"
+	AWSIAM       AuthType = "AWSIAM"
 	AzureIAM     AuthType = "AzureIAM"
 )
 
@@ -170,6 +172,7 @@ type CredentialsConfig struct {
 func (CredentialsConfig) JSONSchema() *jsonschema.Schema {
 	return schemagen.OneOfSchema("Authentication", "", "auth_type", string(UserPassword),
 		schemagen.OneOfSubSchema("Password", UserPasswordConfig{}, string(UserPassword)),
+		schemagen.OneOfSubSchema("AWS IAM", iam.AWSConfig{}, string(AWSIAM)),
 		schemagen.OneOfSubSchema("Azure IAM", iam.AzureConfig{}, string(AzureIAM)),
 	)
 }
@@ -181,7 +184,7 @@ func (c *CredentialsConfig) Validate() error {
 			return errors.New("missing 'password'")
 		}
 		return nil
-	case AzureIAM:
+	case AWSIAM, AzureIAM:
 		// The embedded IAMConfig has its own auth_type field which JSON decoding
 		// leaves empty (the outer field shadows it), so sync it before ValidateIAM
 		// switches on it.
@@ -329,13 +332,28 @@ func (c *Config) normalizeCredentials() {
 
 // EffectivePassword returns the secret to present as the MySQL password for the
 // configured authentication method. It requires normalizeCredentials to have run,
-// and only reads the credentials union. For Azure IAM the password is the Entra
-// access token injected into the config by the control plane, which restarts the
-// connector with a fresh token before expiry.
-func (c *Config) EffectivePassword() (string, error) {
+// and only reads the credentials union. For AWS IAM the password is an RDS auth
+// token minted here from the session credentials the control plane injects, valid
+// for fifteen minutes, so callers should invoke this per connection attempt rather
+// than caching the result. For Azure IAM the password is the Entra access token
+// injected into the config by the control plane, which restarts the connector with
+// a fresh token before expiry.
+func (c *Config) EffectivePassword(ctx context.Context) (string, error) {
 	switch c.Credentials.AuthType {
 	case UserPassword:
 		return c.Credentials.Password, nil
+	case AWSIAM:
+		credProvider, err := c.Credentials.AWSCredentialsProvider()
+		if err != nil {
+			return "", err
+		}
+		// The token is bound to the endpoint it will be presented to, so it's built
+		// from the configured address rather than the network tunnel's local address.
+		token, err := auth.BuildAuthToken(ctx, c.Address, c.Credentials.AWSRegion, c.User, credProvider)
+		if err != nil {
+			return "", fmt.Errorf("building AWS IAM auth token: %w", err)
+		}
+		return token, nil
 	case AzureIAM:
 		var token = c.Credentials.AzureToken()
 		if token == "" {
@@ -423,7 +441,7 @@ func (db *mysqlDatabase) connectPreferringTLS(address, password string) (*client
 	}
 }
 
-func (db *mysqlDatabase) connect(_ context.Context) error {
+func (db *mysqlDatabase) connect(ctx context.Context) error {
 	logrus.WithFields(logrus.Fields{
 		"addr":     db.config.Address,
 		"dbName":   db.config.Advanced.DBName,
@@ -448,7 +466,7 @@ func (db *mysqlDatabase) connect(_ context.Context) error {
 	})
 	defer connectionTimer.Stop()
 
-	var password, err = db.config.EffectivePassword()
+	var password, err = db.config.EffectivePassword(ctx)
 	if err != nil {
 		return err
 	}

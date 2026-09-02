@@ -1,6 +1,6 @@
 ---
 sidebar_position: 3
-description: Set up Estuary's Amazon RDS for MariaDB capture connector with CDC, binlog configuration, replication permissions, and backfill and time zone settings.
+description: Set up Estuary's Amazon RDS for MariaDB capture connector with CDC, binlog configuration, replication permissions, IAM authentication, and backfill and time zone settings.
 ---
 
 # Amazon RDS for MariaDB
@@ -26,6 +26,7 @@ To use this connector, you'll need a MariaDB database setup with the following.
   - Permission to read from `information_schema` tables, if automatic discovery is used.
 - If the table(s) to be captured include columns of type `DATETIME`, the `time_zone` system variable
   must be set to an IANA zone name or numerical offset or the capture configured with a `timezone` to use by default.
+- When using [IAM authentication](#iam-authentication), IAM database authentication enabled on the instance and a database user which authenticates through the RDS plugin.
 
 ### Setup
 
@@ -78,6 +79,42 @@ CALL mysql.rds_set_configuration('binlog retention hours', 168);
 ```
 
 5. In the [RDS console](https://console.aws.amazon.com/rds/), note the instance's Endpoint and Port. You'll need these for the `address` property when you configure the connector.
+
+### IAM Authentication
+
+Instead of a password, you can authenticate to your instance with an AWS IAM role.
+
+Follow the steps in the [AWS IAM guide][aws-iam] to create a role for Flow to assume, and make note of its ARN and your instance's region to use when configuring the connector's authentication options.
+
+[Enable IAM database authentication](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.IAMDBAuth.Enabling.html) on the instance, then switch to your MariaDB client and run the following commands to create a database user which authenticates through the RDS plugin, granting it the same permissions as the `flow_capture` user in the [setup instructions](#setup) above:
+
+```sql
+CREATE USER IF NOT EXISTS flow_capture
+  IDENTIFIED WITH AWSAuthenticationPlugin AS 'RDS'
+  REQUIRE SSL
+  COMMENT 'User account for Estuary MySQL data capture';
+GRANT REPLICATION CLIENT, REPLICATION SLAVE ON *.* TO 'flow_capture';
+GRANT SELECT ON *.* TO 'flow_capture';
+```
+
+Finally, [attach a policy](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.IAMDBAuth.IAMPolicy.html) to the role granting it `rds-db:connect` on that user, substituting your own region, account ID, and the instance's resource ID:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["rds-db:connect"],
+      "Resource": ["arn:aws:rds-db:us-east-1:123456789012:dbuser:db-ABCDEFGHIJKL01234/flow_capture"]
+    }
+  ]
+}
+```
+
+IAM authentication always connects over TLS and never falls back to an unencrypted connection.
+
+[aws-iam]: /guides/iam-auth/aws/
 
 ## Capturing from Read Replicas
 
@@ -136,8 +173,10 @@ See [connectors](/concepts/connectors.md#using-connectors) to learn more about u
 | Property | Title | Description | Type | Required/Default |
 | --- | --- | --- | --- | --- |
 | **`/credentials`** | Authentication | Authentication method and credentials that provide access to the database. | object | Required |
-| `/credentials/auth_type` | Auth Type | The authentication method to use. Amazon RDS for MariaDB supports `UserPassword`. | string |  |
+| `/credentials/auth_type` | Auth Type | The authentication method to use. One of `UserPassword` or `AWSIAM`. | string |  |
 | `/credentials/password` | Password | Password for the specified database user. | string | Required for `UserPassword` auth |
+| `/credentials/aws_region` | AWS Region | AWS region of your resource. | string | Required for `AWSIAM` auth |
+| `/credentials/aws_role_arn` | AWS Role ARN | AWS role for Estuary to use that has access to the resource. | string | Required for `AWSIAM` auth |
 
 #### Bindings
 
@@ -177,6 +216,15 @@ captures:
           namespace: ${TABLE_NAMESPACE}
           stream: ${TABLE_NAME}
         target: ${PREFIX}/${COLLECTION_NAME}
+```
+
+To authenticate with [AWS IAM](#iam-authentication) instead, replace the credentials block:
+
+```yaml
+          credentials:
+            auth_type: AWSIAM
+            aws_region: "us-east-1"
+            aws_role_arn: "arn:aws:iam::123456789012:role/flow-capture"
 ```
 
 Your capture definition will likely be more complex, with additional bindings for each table in the source database.
