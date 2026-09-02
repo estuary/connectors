@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from logging import Logger
 from typing import (
@@ -6,8 +7,9 @@ from typing import (
 
 from estuary_cdk.capture.common import (
     LogCursor,
+    PageCursor,
 )
-from estuary_cdk.http import HTTPSession
+from estuary_cdk.http import HTTPError, HTTPSession
 
 from .forms import fetch_forms
 
@@ -28,6 +30,28 @@ from .shared import (
 FORM_TYPES_WITHOUT_SUBMISSIONS = frozenset({"blog_comment"})
 
 FORM_SUBMISSIONS_LAG = timedelta(minutes=5)
+
+
+@dataclass
+class FormIdCache:
+    """
+    Sorted ids of the forms whose submissions HubSpot will export, listed once
+    per connector process and shared by every backfill invocation in it.
+    """
+
+    form_ids: list[str] | None = None
+
+    async def get(self, http: HTTPSession, log: Logger) -> list[str]:
+        if self.form_ids is None:
+            self.form_ids = sorted(
+                [
+                    form.id
+                    async for form in fetch_forms(http, log)
+                    if form.formType not in FORM_TYPES_WITHOUT_SUBMISSIONS
+                ]
+            )
+
+        return self.form_ids
 
 
 async def _fetch_form_submissions_between(
@@ -109,3 +133,46 @@ async def fetch_form_submissions(
 
     if latest_submitted_at != log_cursor:
         yield latest_submitted_at
+
+
+async def fetch_form_submissions_page(
+    http: HTTPSession,
+    cache: FormIdCache,
+    log: Logger,
+    page: PageCursor,
+    cutoff: LogCursor,
+) -> AsyncGenerator[FormSubmission | PageCursor, None]:
+    """
+    Emit one form's submissions with `submittedAt <= cutoff`, then checkpoint
+    that form's id. Forms are walked in ascending id order and `page` is the id
+    of the last form completed, so a resumed backfill continues with the next
+    form.
+    """
+    assert page is None or isinstance(page, str)
+    assert isinstance(cutoff, int)
+
+    form_ids = await cache.get(http, log)
+    form_id = next(
+        (form_id for form_id in form_ids if page is None or form_id > page),
+        None,
+    )
+    if form_id is None:
+        return
+
+    try:
+        async for submission in _fetch_form_submissions_between(
+            http, log, form_id, 0, cutoff
+        ):
+            yield submission
+    except HTTPError as err:
+        # A form deleted after this process listed it has nothing left to
+        # export. Skip it rather than stall the backfill on it.
+        if err.code != 404:
+            raise
+
+        log.warning(
+            "form no longer exists, skipping its submissions backfill",
+            {"formId": form_id},
+        )
+
+    yield form_id
