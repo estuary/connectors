@@ -90,7 +90,7 @@ func (e *emrClient) ensureSecret(ctx context.Context, wantCred string) error {
 	return nil
 }
 
-func (e *emrClient) runJob(ctx context.Context, input any, entryPointUri, pyFilesCommonURI, jobName, workingPrefix string) error {
+func (e *emrClient) runJob(ctx context.Context, job computeJob) error {
 	/***
 	Available arguments to the pyspark script:
 	| --input-uri              | Input for the program, as an s3 URI, to be parsed by the script                      | Required |
@@ -105,7 +105,7 @@ func (e *emrClient) runJob(ctx context.Context, input any, entryPointUri, pyFile
 	***/
 	getStatus := func() (*python.StatusOutput, error) {
 		var status python.StatusOutput
-		statusKey := path.Join(workingPrefix, statusFile)
+		statusKey := path.Join(job.WorkingPrefix, statusFile)
 		if statusObj, err := e.bucket.NewReader(ctx, statusKey); err != nil {
 			return nil, fmt.Errorf("reading status object %q: %w", statusKey, err)
 		} else if err := json.NewDecoder(statusObj).Decode(&status); err != nil {
@@ -116,8 +116,8 @@ func (e *emrClient) runJob(ctx context.Context, input any, entryPointUri, pyFile
 		return &status, nil
 	}
 
-	inputKey := path.Join(workingPrefix, "input.json")
-	if inputBytes, err := encodeInput(input); err != nil {
+	inputKey := path.Join(job.WorkingPrefix, "input.json")
+	if inputBytes, err := encodeInput(job.Input); err != nil {
 		return fmt.Errorf("encoding input: %w", err)
 	} else if err := e.bucket.Upload(ctx, inputKey, bytes.NewReader(inputBytes)); err != nil {
 		return fmt.Errorf("putting input file object: %w", err)
@@ -125,7 +125,7 @@ func (e *emrClient) runJob(ctx context.Context, input any, entryPointUri, pyFile
 
 	args := []string{
 		"--input-uri", "s3://" + path.Join(e.cfg.Bucket, inputKey),
-		"--status-output", "s3://" + path.Join(e.cfg.Bucket, workingPrefix, statusFile),
+		"--status-output", "s3://" + path.Join(e.cfg.Bucket, job.WorkingPrefix, statusFile),
 		"--catalog-url", e.catalogURL,
 		"--warehouse", e.warehouse,
 		"--region", e.cfg.Region,
@@ -154,12 +154,12 @@ func (e *emrClient) runJob(ctx context.Context, input any, entryPointUri, pyFile
 		ExecutionRoleArn: aws.String(e.cfg.ExecutionRoleArn),
 		JobDriver: &emrTypes.JobDriverMemberSparkSubmit{
 			Value: emrTypes.SparkSubmit{
-				SparkSubmitParameters: aws.String(fmt.Sprintf("--py-files %s --conf spark.driver.maxResultSize=0 --conf spark.sql.iceberg.vectorization.enabled=false", pyFilesCommonURI)),
-				EntryPoint:            aws.String(entryPointUri),
+				SparkSubmitParameters: aws.String(fmt.Sprintf("--py-files %s --conf spark.driver.maxResultSize=0 --conf spark.sql.iceberg.vectorization.enabled=false", job.PyFilesCommonURI)),
+				EntryPoint:            aws.String(job.EntryPointURI),
 				EntryPointArguments:   args,
 			},
 		},
-		Name: aws.String(jobName),
+		Name: aws.String(job.Name),
 	}
 	if !e.tagsDisabled {
 		startInput.Tags = map[string]string{"estuary:materialization": e.materializationName}
