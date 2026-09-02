@@ -151,10 +151,20 @@ own. Either half of that convergence can be interrupted and repeats safely.
   table that it appends to. Grants on the old table do not survive.
 - `retain_existing_data_on_backfill` does not work on this path, for the same
   reason.
-- A binding cannot move off this write path. The publication which would move it
-  is rejected, naming the binding, and a task that was moved before that check
-  existed refuses to start instead. To take a binding off the path, backfill it,
-  which starts it on the new path with an empty checkpoint.
+- A binding can leave this path only for the `snowpipe_streaming` path, by naming
+  `snowpipe_streaming` explicitly in `feature_flags` and removing
+  `snowpipe_streaming_v2`, while keeping the task on the v2 materialization
+  runtime. The publication logs a warning per binding it moves this way. The
+  task's first transaction on the new path fences and drops the binding's v2
+  channels, and every document Snowflake had already committed beyond the
+  checkpoint is materialized again — permanently, since this path serves
+  delta-updates bindings — so the duplicate count is C − K summed over the
+  binding's channels, where C is what each channel had committed and K is what
+  the checkpoint recorded for it. A later return to `snowpipe_streaming_v2`
+  starts the binding on fresh channels. Any other departure is rejected, naming
+  the binding, and a task that was moved before that check existed refuses to
+  start instead; the remedy there is still a backfill, which starts the binding
+  on the new path with an empty checkpoint.
 - A binding can move onto this write path at any time. Work that the previous
   path staged and did not finish is drained by the machinery that staged it, while
   the binding's rows go to this path. Only when that drain is impossible, because

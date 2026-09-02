@@ -59,6 +59,8 @@ func (d gatedDriver) Validate(ctx context.Context, req *pm.Request_Validate) (*p
 func (d gatedDriver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
 	if err := requireStreamingV2Runtime(req.Materialization); err != nil {
 		return nil, err
+	} else if err := requireStreamingV2RuntimeForState(req.Materialization, req.StateJson); err != nil {
+		return nil, err
 	} else if err := refuseAbandonedStreamV2Bindings(req.Materialization, req.StateJson); err != nil {
 		return nil, err
 	} else if err := adoptStreamV2Generations(ctx, req.Materialization); err != nil {
@@ -74,6 +76,8 @@ func (d gatedDriver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Resp
 // longer hold.
 func (d gatedDriver) NewTransactor(ctx context.Context, req pm.Request_Open, be *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
 	if err := requireStreamingV2Runtime(req.Materialization); err != nil {
+		return nil, nil, nil, err
+	} else if err := requireStreamingV2RuntimeForState(req.Materialization, req.StateJson); err != nil {
 		return nil, nil, nil, err
 	}
 
@@ -112,8 +116,9 @@ func missingRuntimeV2Warning(configJson json.RawMessage, last *pf.Materializatio
 }
 
 // refuseAbandonedStreamV2Bindings refuses a publication which moves a binding
-// off the snowpipe_streaming_v2 write path — see streamV2PathAbandoned for what
-// that costs the binding.
+// off the snowpipe_streaming_v2 write path, other than by the one exit this
+// connector supports — see streamV2PathAbandoned for what an unsupported
+// departure costs the binding, and streamV2Downgrade for the one it allows.
 //
 // The transactor refuses the same thing, and has to: the connector state a task
 // runs on is its own, and a specification published before this check existed
@@ -150,7 +155,15 @@ func refuseAbandonedStreamV2Bindings(spec *pf.MaterializationSpec, stateJson jso
 		var item = cp[binding.StateKey]
 		if item == nil || streamsV2(&cfg, binding.DeltaUpdates, flagEnabled) {
 			continue
-		} else if err := streamV2PathAbandoned(strings.Join(binding.ResourcePath, "."), item.StreamV2); err != nil {
+		}
+		var table = strings.Join(binding.ResourcePath, ".")
+		if streamV2Downgrade(&cfg, binding.DeltaUpdates) {
+			if warning := streamV2DowngradeWarning(table, item.StreamV2); warning != "" {
+				log.Warn(warning)
+			}
+			continue
+		}
+		if err := streamV2PathAbandoned(table, item.StreamV2); err != nil {
 			return err
 		}
 	}
@@ -303,4 +316,35 @@ func requireStreamingV2Runtime(spec *pf.MaterializationSpec) error {
 		"the %q feature flag requires the v2 materialization runtime, which this task is not running: add %q to the task's shards.flags, or remove %q from the endpoint configuration's feature_flags",
 		flagSnowpipeStreamingV2, boilerplate.RuntimeV2FlagName, flagSnowpipeStreamingV2,
 	)
+}
+
+// requireStreamingV2RuntimeForState refuses a task that is not on the v2
+// materialization runtime while its checkpoint still names snowpipe streaming v2
+// channels for a binding the specification keeps. Retiring those channels replays
+// the interrupted transaction, and only the v2 runtime replays it in order.
+func requireStreamingV2RuntimeForState(spec *pf.MaterializationSpec, stateJson json.RawMessage) error {
+	if spec == nil || len(stateJson) == 0 || boilerplate.IsMaterializationSpecRuntimeV2(spec) {
+		return nil
+	}
+
+	var cp checkpoint
+	if err := json.Unmarshal(stateJson, &cp); err != nil {
+		return nil
+	}
+
+	for _, binding := range spec.Bindings {
+		var item = cp[binding.StateKey]
+		if item == nil {
+			continue
+		}
+		var channels = streamV2ChannelNames(item.StreamV2)
+		if len(channels) == 0 {
+			continue
+		}
+		return fmt.Errorf(
+			"the task's checkpoint still records the snowpipe_streaming_v2 channel(s) %s for %s, and this task is not running the v2 materialization runtime: retiring them requires that runtime, so add %q to the task's shards.flags, or restore %q to the endpoint configuration's feature_flags",
+			strings.Join(channels, ", "), strings.Join(binding.ResourcePath, "."), boilerplate.RuntimeV2FlagName, flagSnowpipeStreamingV2,
+		)
+	}
+	return nil
 }
