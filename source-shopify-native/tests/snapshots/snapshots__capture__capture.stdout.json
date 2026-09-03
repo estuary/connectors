@@ -162,133 +162,133 @@
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "createdAt": "2025-01-14T15:10:14Z",
-      "id": "gid://shopify/Product/8086707830829",
-      "legacyResourceId": "8086707830829",
+      "id": "gid://shopify/Product/8086708027437",
+      "legacyResourceId": "8086708027437",
       "updatedAt": "redacted",
       "variants": [
         {
-          "__parentId": "gid://shopify/Product/8086707830829",
-          "barcode": "",
+          "__parentId": "gid://shopify/Product/8086708027437",
+          "barcode": null,
           "compareAtPrice": null,
           "createdAt": "2025-01-14T15:10:14Z",
-          "id": "gid://shopify/ProductVariant/43217823334445",
-          "image": null,
+          "id": "gid://shopify/ProductVariant/43217823924269",
+          "image": {
+            "id": "gid://shopify/ProductImage/34440549072941"
+          },
           "inventoryItem": {
-            "id": "gid://shopify/InventoryItem/45258934976557",
-            "legacyResourceId": "45258934976557"
+            "id": "gid://shopify/InventoryItem/45258935566381",
+            "legacyResourceId": "45258935566381"
           },
           "inventoryPolicy": "DENY",
-          "inventoryQuantity": 0,
-          "legacyResourceId": "43217823334445",
+          "inventoryQuantity": 10000,
+          "legacyResourceId": "43217823924269",
+          "media": [
+            {
+              "__parentId": "gid://shopify/ProductVariant/43217823924269",
+              "alt": "A bar of golden yellow wax",
+              "id": "gid://shopify/MediaImage/26890923638829",
+              "image": {
+                "height": 2881,
+                "url": "https://cdn.shopify.com/s/files/1/0663/4006/1229/files/snowboard_wax.png?v=1736867416",
+                "width": 2881
+              },
+              "mediaContentType": "IMAGE"
+            }
+          ],
           "position": 1,
-          "price": "10.00",
+          "price": "24.95",
           "selectedOptions": [
             {
-              "name": "Denominations",
+              "name": "Title",
               "optionValue": {
-                "id": "gid://shopify/ProductOptionValue/4829205987373",
-                "name": "$10"
+                "id": "gid://shopify/ProductOptionValue/4829206577197",
+                "name": "Selling Plans Ski Wax"
               },
-              "value": "$10"
+              "value": "Selling Plans Ski Wax"
             }
           ],
           "sku": null,
-          "taxable": false,
-          "title": "$10",
-          "updatedAt": "2025-08-29T12:12:00Z"
+          "taxable": true,
+          "title": "Selling Plans Ski Wax",
+          "updatedAt": "2026-09-01T13:05:16Z"
         },
         {
-          "__parentId": "gid://shopify/Product/8086707830829",
+          "__parentId": "gid://shopify/Product/8086708027437",
           "barcode": null,
           "compareAtPrice": null,
           "createdAt": "2025-01-14T15:10:14Z",
-          "id": "gid://shopify/ProductVariant/43217823367213",
-          "image": null,
+          "id": "gid://shopify/ProductVariant/43217823957037",
+          "image": {
+            "id": "gid://shopify/ProductImage/34440548974637"
+          },
           "inventoryItem": {
-            "id": "gid://shopify/InventoryItem/45258935009325",
-            "legacyResourceId": "45258935009325"
+            "id": "gid://shopify/InventoryItem/45258935599149",
+            "legacyResourceId": "45258935599149"
           },
           "inventoryPolicy": "DENY",
-          "inventoryQuantity": -1,
-          "legacyResourceId": "43217823367213",
+          "inventoryQuantity": 10000,
+          "legacyResourceId": "43217823957037",
+          "media": [
+            {
+              "__parentId": "gid://shopify/ProductVariant/43217823957037",
+              "alt": "A bar of purple wax",
+              "id": "gid://shopify/MediaImage/26890923835437",
+              "image": {
+                "height": 2881,
+                "url": "https://cdn.shopify.com/s/files/1/0663/4006/1229/files/wax-special.png?v=1736867416",
+                "width": 2881
+              },
+              "mediaContentType": "IMAGE"
+            }
+          ],
           "position": 2,
-          "price": "25.00",
+          "price": "49.95",
           "selectedOptions": [
             {
-              "name": "Denominations",
+              "name": "Title",
               "optionValue": {
-                "id": "gid://shopify/ProductOptionValue/4829206020141",
-                "name": "$25"
+                "id": "gid://shopify/ProductOptionValue/4829206609965",
+                "name": "Special Selling Plans Ski Wax"
               },
-              "value": "$25"
+              "value": "Special Selling Plans Ski Wax"
             }
           ],
           "sku": null,
-          "taxable": false,
-          "title": "$25",
-          "updatedAt": "2025-04-10T17:43:00Z"
+          "taxable": true,
+          "title": "Special Selling Plans Ski Wax",
+          "updatedAt": "2026-09-01T13:05:16Z"
         },
         {
-          "__parentId": "gid://shopify/Product/8086707830829",
+          "__parentId": "gid://shopify/Product/8086708027437",
           "barcode": null,
           "compareAtPrice": null,
           "createdAt": "2025-01-14T15:10:14Z",
-          "id": "gid://shopify/ProductVariant/43217823399981",
+          "id": "gid://shopify/ProductVariant/43217823989805",
           "image": null,
           "inventoryItem": {
-            "id": "gid://shopify/InventoryItem/45258935042093",
-            "legacyResourceId": "45258935042093"
+            "id": "gid://shopify/InventoryItem/45258935631917",
+            "legacyResourceId": "45258935631917"
           },
           "inventoryPolicy": "DENY",
-          "inventoryQuantity": -1,
-          "legacyResourceId": "43217823399981",
+          "inventoryQuantity": 10000,
+          "legacyResourceId": "43217823989805",
+          "media": [],
           "position": 3,
-          "price": "50.00",
+          "price": "9.95",
           "selectedOptions": [
             {
-              "name": "Denominations",
+              "name": "Title",
               "optionValue": {
-                "id": "gid://shopify/ProductOptionValue/4829206052909",
-                "name": "$50"
+                "id": "gid://shopify/ProductOptionValue/4829206642733",
+                "name": "Sample Selling Plans Ski Wax"
               },
-              "value": "$50"
+              "value": "Sample Selling Plans Ski Wax"
             }
           ],
           "sku": null,
-          "taxable": false,
-          "title": "$50",
-          "updatedAt": "2025-04-10T17:43:00Z"
-        },
-        {
-          "__parentId": "gid://shopify/Product/8086707830829",
-          "barcode": null,
-          "compareAtPrice": null,
-          "createdAt": "2025-01-14T15:10:14Z",
-          "id": "gid://shopify/ProductVariant/43217823432749",
-          "image": null,
-          "inventoryItem": {
-            "id": "gid://shopify/InventoryItem/45258935074861",
-            "legacyResourceId": "45258935074861"
-          },
-          "inventoryPolicy": "DENY",
-          "inventoryQuantity": 0,
-          "legacyResourceId": "43217823432749",
-          "position": 4,
-          "price": "100.00",
-          "selectedOptions": [
-            {
-              "name": "Denominations",
-              "optionValue": {
-                "id": "gid://shopify/ProductOptionValue/4829206085677",
-                "name": "$100"
-              },
-              "value": "$100"
-            }
-          ],
-          "sku": null,
-          "taxable": false,
-          "title": "$100",
-          "updatedAt": "2025-01-14T15:10:14Z"
+          "taxable": true,
+          "title": "Sample Selling Plans Ski Wax",
+          "updatedAt": "2026-06-11T17:29:31Z"
         }
       ]
     }
