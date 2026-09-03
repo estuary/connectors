@@ -28,11 +28,11 @@ func (e *checkpointItem) objects() []string {
 	return append(append([]string{}, e.StoreFiles...), e.DeleteFiles...)
 }
 
-// connectorState is staged transactions by binding state key, then by the
-// staging shard's key range.
-type connectorState map[string]map[string]*checkpointItem
+// pendingState is the connector state: staged transactions by binding state
+// key, then by the staging shard's key range.
+type pendingState map[string]map[string]*checkpointItem
 
-func (p connectorState) add(stateKey, rangeKey string, e *checkpointItem) {
+func (p pendingState) add(stateKey, rangeKey string, e *checkpointItem) {
 	if p[stateKey] == nil {
 		p[stateKey] = make(map[string]*checkpointItem)
 	}
@@ -40,7 +40,7 @@ func (p connectorState) add(stateKey, rangeKey string, e *checkpointItem) {
 }
 
 // hasRange reports whether any state key has an entry staged under rangeKey.
-func (p connectorState) hasRange(rangeKey string) bool {
+func (p pendingState) hasRange(rangeKey string) bool {
 	for _, bucket := range p {
 		if _, ok := bucket[rangeKey]; ok {
 			return true
@@ -55,8 +55,8 @@ func rangeKeyOf(keyBegin, keyEnd uint32) string {
 
 // parseState decodes a state document or a StartedCommit patch of the same
 // shape.
-func parseState(raw json.RawMessage) (connectorState, error) {
-	var state = make(connectorState)
+func parseState(raw json.RawMessage) (pendingState, error) {
+	var state = make(pendingState)
 	if len(bytes.TrimSpace(raw)) == 0 {
 		return state, nil
 	}
