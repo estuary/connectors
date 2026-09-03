@@ -2,13 +2,17 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"regexp"
+	"strings"
 	"testing"
 
 	st "github.com/estuary/connectors/source-boilerplate/testing"
+	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/connectors/sqlcapture/tests"
+	"github.com/stretchr/testify/require"
 )
 
 // TestMariaDBTemporalTables exercises the connector's handling of MariaDB
@@ -140,4 +144,32 @@ func TestMariaDBTemporalTables(t *testing.T) {
 			t.Run("SchemaChange", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 		})
 	}
+}
+
+func TestMariaDBImplicitSystemVersionedTableWithoutKey(t *testing.T) {
+	if os.Getenv("TEST_MARIADB") != "yes" {
+		t.Skip("Skipping MariaDB specific test, set TEST_MARIADB=yes to enable")
+	}
+	var tb, ctx = mysqlTestBackend(t), context.Background()
+	tb.config.Advanced.FeatureFlags = "system_versioned_tables"
+
+	var uniqueID = uniqueTableID(t)
+	var table = tb.CreateTable(ctx, t, uniqueID, "(data TEXT) WITH SYSTEM VERSIONING")
+	for i := range 32 {
+		tb.Query(ctx, t, fmt.Sprintf("INSERT INTO %s (data) VALUES ('row-%d');", table, i))
+	}
+
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	require.Len(t, cs.Bindings, 1)
+	require.Equal(t, []string{"/_meta/source/cursor"}, cs.Bindings[0].Collection.Key)
+
+	var resource sqlcapture.Resource
+	require.NoError(t, json.Unmarshal(cs.Bindings[0].ResourceConfigJson, &resource))
+	require.Equal(t, sqlcapture.BackfillModeWithoutKey, resource.Mode)
+
+	cs.Validator = &st.OrderedCaptureValidator{}
+	var summary = tests.RunCapture(ctx, t, cs)
+	require.Empty(t, cs.Errors)
+	require.Contains(t, summary, ": 32 Documents")
+	require.Equal(t, 32, strings.Count(summary, `"cursor":"backfill:`))
 }
