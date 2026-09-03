@@ -37,8 +37,9 @@ const (
 // fileSizeLimit, the current file will be flushed to S3 and a new one started the next time
 // writeRow is called.
 //
-// - flush: Closes out the last file that was started (if any) and returns the keys of the files
-// written for the current transaction, for a manifest that Redshift can load them from.
+// - flush: Closes out the last file that was started (if any) and writes a manifest file that can
+// be used by Redshift to load all of the files stored for the current transaction. Returns the
+// manifest key and the keys of the files it lists.
 type stagedFile struct {
 	fields   []string
 	client   *s3.Client
@@ -180,21 +181,35 @@ func objectURI(bucket, key string) string {
 	return "s3://" + path.Join(bucket, key)
 }
 
-// flush closes the last file and returns the keys of the transaction's files.
-func (f *stagedFile) flush() ([]string, error) {
+func (f *stagedFile) fileURI(file string) string {
+	return objectURI(f.bucket, f.fileKey(file))
+}
+
+func (f *stagedFile) fileKey(file string) string {
+	return path.Join(f.prefix, file)
+}
+
+// flush writes the manifest of this transaction's files and returns its key
+// along with the keys of the files it lists.
+func (f *stagedFile) flush(ctx context.Context) (string, []string, error) {
 	if err := f.flushFile(); err != nil {
-		return nil, err
+		return "", nil, err
 	}
 
+	manifestKey := f.fileKey(manifestFile)
 	files := make([]string, 0, len(f.uploaded))
 	for _, u := range f.uploaded {
-		files = append(files, path.Join(f.prefix, u))
+		files = append(files, f.fileKey(u))
+	}
+
+	if err := putManifest(ctx, f.client, f.bucket, manifestKey, files); err != nil {
+		return "", nil, err
 	}
 
 	// Reset for next round.
 	f.started = false
 
-	return files, nil
+	return manifestKey, files, nil
 }
 
 // putManifest writes a COPY manifest at key listing the given data files.

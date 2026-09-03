@@ -20,8 +20,11 @@ const (
 	upperRange = "80000000-ffffffff"
 )
 
-func entry(id string, files ...string) *stagedTransaction {
-	return &stagedTransaction{ID: id, StoreFiles: files}
+func entry(manifest string, files ...string) *stagedTransaction {
+	e := newStagedTransaction()
+	e.StoreManifest = manifest
+	e.StoreFiles = files
+	return e
 }
 
 // testTransactor builds a transactor of the given range with bindings for
@@ -59,7 +62,8 @@ func TestParseState(t *testing.T) {
 		pending, err := parseState(json.RawMessage(`{
 			"00000000-ffffffff": {
 				"a_table.v1": {
-					"id": "p/x/files.manifest",
+					"storeManifest": "p/x/files.manifest",
+					"deleteManifest": "",
 					"storeFiles": ["p/x/f1"],
 					"deleteFiles": [],
 					"mustMerge": true,
@@ -69,11 +73,11 @@ func TestParseState(t *testing.T) {
 		}`))
 		require.NoError(t, err)
 		require.Equal(t, pendingState{fullRange: {"a_table.v1": &stagedTransaction{
-			ID:          "p/x/files.manifest",
-			StoreFiles:  []string{"p/x/f1"},
-			DeleteFiles: []string{},
-			MustMerge:   true,
-			Widen:       []string{`"col"`},
+			StoreManifest: "p/x/files.manifest",
+			StoreFiles:    []string{"p/x/f1"},
+			DeleteFiles:   []string{},
+			MustMerge:     true,
+			Widen:         []string{`"col"`},
 		}}}, pending)
 	})
 
@@ -88,20 +92,23 @@ func TestParseState(t *testing.T) {
 		require.Error(t, err)
 	})
 
-	t.Run("a document not keyed by range is rejected", func(t *testing.T) {
-		_, err := parseState(json.RawMessage(`{"a_table.v1": {"id": "m", "storeFiles": [], "deleteFiles": [], "mustMerge": false, "widen": []}}`))
-		require.Error(t, err)
-	})
-
-	t.Run("a null document is rejected", func(t *testing.T) {
-		_, err := parseState(json.RawMessage(`null`))
+	t.Run("a top-level key that is not a range is rejected", func(t *testing.T) {
+		_, err := parseState(json.RawMessage(`{"a_table.v1": {"storeManifest": "m", "deleteManifest": "", "storeFiles": [], "deleteFiles": [], "mustMerge": false, "widen": []}}`))
 		require.Error(t, err)
 	})
 }
 
-func TestStagedTransactionObjects(t *testing.T) {
-	e := &stagedTransaction{ID: "t1", StoreFiles: []string{"p/s/f1", "p/s/f2"}, DeleteFiles: []string{"p/d/f1"}}
-	require.Equal(t, []string{"p/s/f1", "p/s/f2", "p/d/f1"}, e.objects())
+func TestStagedTransactionTokenAndObjects(t *testing.T) {
+	e := &stagedTransaction{
+		StoreManifest:  "p/s/files.manifest",
+		DeleteManifest: "p/d/files.manifest",
+		StoreFiles:     []string{"p/s/f1", "p/s/f2"},
+		DeleteFiles:    []string{"p/d/f1"},
+	}
+	require.Equal(t, "p/s/files.manifest", e.token())
+	require.ElementsMatch(t, []string{"p/s/files.manifest", "p/d/files.manifest", "p/s/f1", "p/s/f2", "p/d/f1"}, e.objects())
+
+	require.Equal(t, "p/d/files.manifest", (&stagedTransaction{DeleteManifest: "p/d/files.manifest"}).token())
 }
 
 func TestParseCheckpointsRow(t *testing.T) {
@@ -134,11 +141,12 @@ func TestParseCheckpointsRow(t *testing.T) {
 
 func TestEntryPatchReplacesPrevious(t *testing.T) {
 	previous := &stagedTransaction{
-		ID:          "t1",
-		StoreFiles:  []string{"p/1/f1"},
-		DeleteFiles: []string{"p/1d/f1"},
-		MustMerge:   true,
-		Widen:       []string{`"col"`},
+		StoreManifest:  "p/1/files.manifest",
+		DeleteManifest: "p/1d/files.manifest",
+		StoreFiles:     []string{"p/1/f1"},
+		DeleteFiles:    []string{"p/1d/f1"},
+		MustMerge:      true,
+		Widen:          []string{`"col"`},
 	}
 	next := entry("p/2/files.manifest", "p/2/f1")
 
@@ -156,16 +164,16 @@ func TestEntryPatchReplacesPrevious(t *testing.T) {
 
 func TestStateRouting(t *testing.T) {
 	var state = json.RawMessage(`{
-		"00000000-7fffffff": {"a_table.v1": {"id": "l/files.manifest", "storeFiles": ["l/f"], "deleteFiles": [], "mustMerge": false, "widen": []}},
-		"80000000-ffffffff": {"a_table.v1": {"id": "u/files.manifest", "storeFiles": ["u/f"], "deleteFiles": [], "mustMerge": true, "widen": []}}
+		"00000000-7fffffff": {"a_table.v1": {"storeManifest": "l/files.manifest", "deleteManifest": "", "storeFiles": ["l/f"], "deleteFiles": [], "mustMerge": false, "widen": []}},
+		"80000000-ffffffff": {"a_table.v1": {"storeManifest": "u/files.manifest", "deleteManifest": "", "storeFiles": ["u/f"], "deleteFiles": [], "mustMerge": true, "widen": []}}
 	}`)
 
 	t.Run("the primary recovers every range", func(t *testing.T) {
 		d := testTransactor(lowerRange, "a_table.v1")
 		require.NoError(t, d.UnmarshalState(state))
 		require.Len(t, d.pending, 2)
-		require.Equal(t, "l/files.manifest", d.pending[lowerRange]["a_table.v1"].ID)
-		require.Equal(t, "u/files.manifest", d.pending[upperRange]["a_table.v1"].ID)
+		require.Equal(t, "l/files.manifest", d.pending[lowerRange]["a_table.v1"].StoreManifest)
+		require.Equal(t, "u/files.manifest", d.pending[upperRange]["a_table.v1"].StoreManifest)
 	})
 
 	t.Run("a non-primary shard recovers nothing and acknowledges nothing", func(t *testing.T) {
@@ -181,8 +189,8 @@ func TestStateRouting(t *testing.T) {
 		d := testTransactor(lowerRange, "a_table.v1")
 		d.pending[lowerRange] = map[string]*stagedTransaction{"a_table.v1": entry("own/files.manifest", "own/f")}
 		require.NoError(t, d.mergePeerStatePatches([]json.RawMessage{state}))
-		require.Equal(t, "own/files.manifest", d.pending[lowerRange]["a_table.v1"].ID)
-		require.Equal(t, "u/files.manifest", d.pending[upperRange]["a_table.v1"].ID)
+		require.Equal(t, "own/files.manifest", d.pending[lowerRange]["a_table.v1"].StoreManifest)
+		require.Equal(t, "u/files.manifest", d.pending[upperRange]["a_table.v1"].StoreManifest)
 
 		require.Error(t, d.mergePeerStatePatches([]json.RawMessage{json.RawMessage(`null`)}))
 
@@ -193,7 +201,7 @@ func TestStateRouting(t *testing.T) {
 	t.Run("an entry with no live binding stays pending and gives Acknowledge nothing to do", func(t *testing.T) {
 		d := testTransactor(fullRange, "a_table.v1")
 		require.NoError(t, d.UnmarshalState(json.RawMessage(`{
-			"00000000-ffffffff": {"gone_table.v1": {"id": "g/files.manifest", "storeFiles": ["g/f"], "deleteFiles": [], "mustMerge": false, "widen": []}}
+			"00000000-ffffffff": {"gone_table.v1": {"storeManifest": "g/files.manifest", "deleteManifest": "", "storeFiles": ["g/f"], "deleteFiles": [], "mustMerge": false, "widen": []}}
 		}`)))
 		patch, err := d.Acknowledge(t.Context(), nil, nil)
 		require.NoError(t, err)
@@ -207,16 +215,16 @@ func TestStateRouting(t *testing.T) {
 		d.pending[upperRange]["gone_table.v1"] = entry("g/files.manifest", "g/f")
 
 		var seen []string
-		for _, w := range d.stagedWork(m.StateKeyFilter(nil)) {
-			for _, pe := range w.entries {
-				seen = append(seen, w.binding.target.StateKey+"@"+pe.rangeKey)
+		for b, entries := range d.stagedWork(m.StateKeyFilter(nil)) {
+			for _, pe := range entries {
+				seen = append(seen, b.target.StateKey+"@"+pe.rangeKey)
 			}
 		}
 		require.Equal(t, []string{"a_table.v1@" + lowerRange, "a_table.v1@" + upperRange}, seen)
 
 		seen = nil
-		for _, w := range d.stagedWork(m.StateKeyFilter([]string{"other.v1"})) {
-			seen = append(seen, w.binding.target.StateKey)
+		for b := range d.stagedWork(m.StateKeyFilter([]string{"other.v1"})) {
+			seen = append(seen, b.target.StateKey)
 		}
 		require.Empty(t, seen)
 	})
