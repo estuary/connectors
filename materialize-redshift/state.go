@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"slices"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -33,7 +32,7 @@ type stateItem struct {
 
 // objects is every S3 object the transaction staged.
 func (e *stateItem) objects() []string {
-	return slices.Concat(e.StoreFiles, e.DeleteFiles)
+	return append(append([]string{}, e.StoreFiles...), e.DeleteFiles...)
 }
 
 // connectorState is staged transactions by binding state key, then by the
