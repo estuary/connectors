@@ -148,6 +148,41 @@ func runtimeV1SnapshotName(t *testing.T) (name string, exists bool) {
 	return name, false
 }
 
+// stripRuntimeNextOutput removes from a runtime-next snapshot the lines only a
+// runtime-next run produces: flowctl's `--output-apply` / `--output-state`
+// records, which single-shard runs capture under each resource. What remains
+// is the destination alone, in the shape the runtime v1 pass snapshots.
+func stripRuntimeNextOutput(snapshot string) string {
+	var out []string
+	for _, line := range strings.Split(snapshot, "\n") {
+		if strings.HasPrefix(line, `["applied.actionDescription",`) || strings.HasPrefix(line, `["connectorState",`) {
+			continue
+		}
+		out = append(out, line)
+	}
+	return strings.Join(out, "\n")
+}
+
+// requireMatchesRuntimeNextSnapshot requires the runtime v1 pass's value to
+// equal this test's runtime-next golden with the runtime-next-only output
+// lines removed: both runtimes must leave the same destination behind.
+func requireMatchesRuntimeNextSnapshot(t *testing.T, got string) {
+	t.Helper()
+
+	path := filepath.Join(".snapshots", strings.ReplaceAll(t.Name(), "/", "-"))
+	golden, err := os.ReadFile(path)
+	require.NoErrorf(t, err, "reading the runtime-next snapshot to compare the runtime v1 run against")
+
+	want := strings.TrimSuffix(stripRuntimeNextOutput(string(golden)), "\n")
+	if want == got {
+		return
+	}
+	if err := os.WriteFile(path+".runtime-v1.actual", []byte(got+"\n"), 0o644); err == nil {
+		t.Logf("wrote %s.runtime-v1.actual with the runtime v1 run's value", path)
+	}
+	t.Errorf("runtime v1 run does not match the runtime-next snapshot %s with its output lines removed; the run's value is in %s.runtime-v1.actual", path, path)
+}
+
 // RunTestAllTasks calls testFn for each materialization task found in the spec
 // at sourcePath. The endpoint configuration for the task is decrypted and
 // unmarshalled into EC.
@@ -233,8 +268,11 @@ func RunMaterializationTest[EC boilerplate.EndpointConfiger, FC boilerplate.Fiel
 
 	if !RuntimeV1() {
 		snapshotT(t, snap.String())
-	} else if name, ok := runtimeV1SnapshotName(t); ok {
-		snapshotNamed(t, name, snap.String())
+	} else {
+		if name, ok := runtimeV1SnapshotName(t); ok {
+			snapshotNamed(t, name, snap.String())
+		}
+		requireMatchesRuntimeNextSnapshot(t, snap.String())
 	}
 }
 
@@ -264,8 +302,11 @@ func RunMaterializationTestParallel[EC boilerplate.EndpointConfiger, FC boilerpl
 
 	if !RuntimeV1() {
 		snapshotT(t, snap.String())
-	} else if name, ok := runtimeV1SnapshotName(t); ok {
-		snapshotNamed(t, name, snap.String())
+	} else {
+		if name, ok := runtimeV1SnapshotName(t); ok {
+			snapshotNamed(t, name, snap.String())
+		}
+		requireMatchesRuntimeNextSnapshot(t, snap.String())
 	}
 }
 
