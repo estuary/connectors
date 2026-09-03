@@ -26,6 +26,20 @@ import (
 
 var _ m.Transactor = (*transactor)(nil)
 
+var IdempotencyTokenNamespace = uuid.MustParse("6f6e5e0a-6bfa-4f47-9d16-3a475cc6a204")
+
+// mergeIdempotencyTokens combines the binding's idempotency tokens so that the
+// set of bindings will produce a unique value.  If the bindings are changed,
+// perhaps a partial Acknowledge, the token will change.
+func mergeIdempotencyTokens(bindings []python.MergeBinding) string {
+	var buf bytes.Buffer
+	for _, b := range bindings {
+		buf.WriteString(b.IdempotencyToken)
+		buf.WriteByte(0)
+	}
+	return uuid.NewSHA1(IdempotencyTokenNamespace, buf.Bytes()).String()
+}
+
 type binding struct {
 	Idx    int
 	Mapped *boilerplate.MappedBinding[config, resource, mapped]
@@ -206,10 +220,11 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			}
 
 			pyBindings[b.Mapped.StateKey] = &python.MergeBinding{
-				Binding: idx,
-				Query:   mergeQuery.String(),
-				Columns: b.store.columns,
-				Files:   files,
+				Binding:          idx,
+				Query:            mergeQuery.String(),
+				Columns:          b.store.columns,
+				Files:            files,
+				IdempotencyToken: uuid.NewString(),
 			}
 		}
 
@@ -227,7 +242,6 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 }
 
 func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
-	outputPrefix := path.Join(t.cfg.Compute.BucketPath, uuid.NewString())
 	checkpointClear := make(map[string]*python.MergeBinding)
 	var mergeInput python.MergeInput
 	var allFileUris []string
@@ -279,7 +293,10 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 
 	var stateUpdate *pf.ConnectorState
 	if len(mergeInput.Bindings) > 0 {
+		token := mergeIdempotencyTokens(mergeInput.Bindings)
+
 		// Make sure the job status output file gets cleaned up.
+		outputPrefix := path.Join(t.cfg.Compute.BucketPath, token)
 		cleanupStatus := cleanPrefixOnceFn(ctx, t.bucket, outputPrefix)
 		defer cleanupStatus()
 
@@ -289,6 +306,7 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 			PyFilesCommonURI: t.pyFiles.common,
 			Name:             fmt.Sprintf("store for: %s", t.materializationName),
 			WorkingPrefix:    outputPrefix,
+			IdempotencyToken: token,
 		}); err != nil {
 			return nil, fmt.Errorf("store merge job failed: %w", err)
 		} else if err := cleanupStatus(); err != nil {

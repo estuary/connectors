@@ -55,6 +55,18 @@ type computeJob struct {
 	PyFilesCommonURI string
 	Name             string
 	WorkingPrefix    string
+	// IdempotencyToken is used to avoid starting duplicate jobs.  If a job
+	// with this token is already started the computeRunner will attempt to
+	// adopt it and not start a new job.  If the job cannot be adopted, a new
+	// job will be created.
+	//
+	// Not all computeRunner implementations support this, in this case a new
+	// job will be started.
+	//
+	// This is a resource saving device, it cannot be relied on for
+	// correctness.  The token has a limited lifetime, and after it expires a
+	// new job would be created even with the same token.
+	IdempotencyToken string
 }
 
 // computeRunner abstracts the execution backend that runs the materialization's
