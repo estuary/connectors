@@ -1164,12 +1164,8 @@ func (c *Capture) acknowledgeWorker(ctx context.Context, stream *boilerplate.Pul
 func (c *Capture) handleAcknowledgement(ctx context.Context, count int, replStream ReplicationStream) error {
 	c.pending.Lock()
 	defer c.pending.Unlock()
-	if count == 0 {
-		// Originally the Acknowledge message implicitly meant acknowledging one checkpoint,
-		// so in the absence of a count we will continue to interpret it that way.
-		count = 1
-	}
-	if count > len(c.pending.cursors) {
+
+	if count <= 0 || count > len(c.pending.cursors) {
 		return fmt.Errorf("invalid acknowledgement count %d, only %d pending checkpoints", count, len(c.pending.cursors))
 	}
 
