@@ -1178,7 +1178,14 @@ func flowctlCommand(args ...string) *exec.Cmd {
 	// and the CI
 	os.Setenv("TZ", "UTC")
 
-	cmd := exec.Command("flowctl", args...)
+	// FLOW_TEST_FLOWCTL names the flowctl binary to drive tests with; CI points
+	// the runtime v1 pass at a pinned release whose `flowctl preview` is still
+	// the legacy runtime (see fetch-flow.sh).
+	flowctl := os.Getenv("FLOW_TEST_FLOWCTL")
+	if flowctl == "" {
+		flowctl = "flowctl"
+	}
+	cmd := exec.Command(flowctl, args...)
 	cmd.Env = append(cmd.Environ(),
 		// Set the LOG_FORMAT to text instead of color for better to avoid
 		// escaping of ansi control characters and better compatibility with
