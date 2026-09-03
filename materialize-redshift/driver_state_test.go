@@ -176,16 +176,24 @@ func TestStateRouting(t *testing.T) {
 		require.Nil(t, patch)
 	})
 
-	t.Run("the primary folds every shard's patches, including its own echo", func(t *testing.T) {
+	t.Run("the primary folds peers' patches and skips its own echo", func(t *testing.T) {
 		d := testTransactor(lowerRange, "a_table.v1")
+		d.state["a_table.v1"] = map[string]*stateItem{lowerRange: entry("own/files.manifest", "own/f")}
 		require.NoError(t, d.mergePeerStatePatches([]json.RawMessage{state}))
-		require.Equal(t, "l/files.manifest", d.state["a_table.v1"][lowerRange].ID)
+		require.Equal(t, "own/files.manifest", d.state["a_table.v1"][lowerRange].ID)
 		require.Equal(t, "u/files.manifest", d.state["a_table.v1"][upperRange].ID)
 
 		require.Error(t, d.mergePeerStatePatches([]json.RawMessage{json.RawMessage(`null`)}))
 
-		// The previous transaction is still pending: its work would be lost.
+		// The peer's previous transaction is still pending: its work would be lost.
 		require.Error(t, d.mergePeerStatePatches([]json.RawMessage{state}))
+	})
+
+	t.Run("the primary acknowledges with no patches at all, as on runtime v1", func(t *testing.T) {
+		d := testTransactor(lowerRange, "a_table.v1")
+		d.state["a_table.v1"] = map[string]*stateItem{lowerRange: entry("own/files.manifest", "own/f")}
+		require.NoError(t, d.mergePeerStatePatches(nil))
+		require.Equal(t, "own/files.manifest", d.state["a_table.v1"][lowerRange].ID)
 	})
 
 	t.Run("an entry with no live binding stays pending and gives Acknowledge nothing to do", func(t *testing.T) {
