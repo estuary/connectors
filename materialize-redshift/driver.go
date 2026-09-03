@@ -539,9 +539,8 @@ func (t *transactor) UnmarshalState(state json.RawMessage) error {
 	return nil
 }
 
-// mergePeerStatePatches folds every shard's StartedCommit patches of the
-// just-committed transaction, including the primary's own, into the
-// primary's pending set.
+// mergePeerStatePatches folds the other shards' StartedCommit patches of the
+// just-committed transaction into the primary's pending set.
 func (t *transactor) mergePeerStatePatches(patches []json.RawMessage) error {
 	if !t.primary {
 		return nil
@@ -558,6 +557,9 @@ func (t *transactor) mergePeerStatePatches(patches []json.RawMessage) error {
 		}
 		for sk, bucket := range state {
 			for rk, e := range bucket {
+				if rk == t.rangeKey {
+					continue // Own range: already pending.
+				}
 				// The previous transaction's entry is applied before the next
 				// one's patch arrives, so a collision would lose staged work.
 				if t.pending[sk][rk] != nil {
@@ -830,16 +832,23 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 	return func(ctx context.Context, _ *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
 		// Only this transaction's entries: an entry whose state key no longer
-		// has a binding stays pending forever and must not be re-sent. The
-		// primary picks its own entries back up from Acknowledge's statePatches,
-		// same as its peers'.
-		var update = make(pendingState)
+		// has a binding stays pending forever and must not be re-sent.
+		var staged = make(map[string]*checkpointItem)
 		for _, b := range d.bindings {
 			if b.staged == nil {
 				continue
 			}
-			update.add(b.target.StateKey, d.rangeKey, b.staged)
+			staged[b.target.StateKey] = b.staged
 			b.staged = nil
+		}
+		var update = make(pendingState)
+		for sk, e := range staged {
+			update.add(sk, d.rangeKey, e)
+		}
+		if d.primary {
+			for sk, e := range staged {
+				d.pending.add(sk, d.rangeKey, e)
+			}
 		}
 
 		patch, err := json.Marshal(update)
