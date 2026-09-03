@@ -140,10 +140,10 @@ func stageRows(t *testing.T, cfg config, fields []string, rows [][]any) *stagedT
 	t.Helper()
 	ctx := context.Background()
 
-	client, err := cfg.toS3Client(ctx, boilerplate.ParseFlags(cfg))
+	s3client, err := cfg.toS3Client(ctx, boilerplate.ParseFlags(cfg))
 	require.NoError(t, err)
 
-	f := newStagedFile(newS3Store(client, cfg.Bucket), cfg.effectiveBucketPath(), fields)
+	f := newStagedFile(s3client, cfg.Bucket, cfg.effectiveBucketPath(), fields)
 	f.start()
 	for _, row := range rows {
 		require.NoError(t, f.writeRow(ctx, row))
