@@ -13,6 +13,7 @@ from estuary_cdk.http import HTTPSession, HTTPError
 from ..client import FacebookAPIError, FacebookError
 from ..models import DATA_RETENTION_PERIOD, FacebookInsightsResource
 from ..enums import ActionBreakdown, ApiLevel, AttributionWindow, Breakdown
+from ..fields import OPT_IN_REQUIRED_BREAKDOWNS
 
 from .errors import (
     CannotSplitFurtherError,
@@ -985,6 +986,16 @@ class FacebookInsightsJobManager:
                         "since": time_range["since"],
                         "until": time_range["until"],
                     },
+                )
+
+            gated = [b for b in model.breakdowns if b in OPT_IN_REQUIRED_BREAKDOWNS]
+            if gated and metrics.records == 0:
+                log.warning(
+                    f'Stream "{model.name}" returned no records. Meta requires each ad '
+                    f"account to enable these breakdowns in Ads Manager before it will "
+                    f"return data for them: {', '.join(gated)}. See "
+                    f"https://developers.facebook.com/documentation/ads-commerce"
+                    f"/marketing-api/out-of-cycle-changes/occ-2026"
                 )
 
     async def _wait_for_completion(
