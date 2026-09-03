@@ -321,11 +321,11 @@ type transactor struct {
 	rangeKey string
 	// The shard whose key range begins at 0 applies every shard's staged
 	// work; the others only stage.
-	primary          bool
-	checkpointsTable *checkpointsTable
+	primary     bool
+	checkpoints *checkpointsTable
 	// IDs of every checkpointItem already committed, across the materialization.
 	committedTokens map[string]bool
-	// The whole state: staged transactions not yet applied, from every shard.
+	// The whole checkpoint: staged transactions not yet applied, from every shard.
 	cp connectorState
 	// Set only for a task crossing over from the old format, whose row still
 	// holds the runtime checkpoint and whose state has nothing staged.
@@ -362,7 +362,7 @@ func prepareNewTransactor(
 			caseSensitiveIdentifierEnabled: caseSensitiveIdentifierEnabled,
 			rangeKey:                       rangeKeyOf(fence.KeyBegin, fence.KeyEnd),
 			primary:                        fence.KeyBegin == 0,
-			checkpointsTable: &checkpointsTable{
+			checkpoints: &checkpointsTable{
 				table:           ep.Dialect.Identifier(fence.TablePath...),
 				materialization: fence.Materialization.String(),
 				keyBegin:        fence.KeyBegin,
@@ -398,7 +398,7 @@ func prepareNewTransactor(
 		defer conn.Close(ctx)
 
 		var legacyCheckpoint []byte
-		if d.committedTokens, legacyCheckpoint, err = d.checkpointsTable.readAll(ctx, conn); err != nil {
+		if d.committedTokens, legacyCheckpoint, err = d.checkpoints.readAll(ctx, conn); err != nil {
 			return nil, err
 		}
 		if d.primary {
@@ -909,7 +909,7 @@ func (d *transactor) commit(ctx context.Context, pending connectorState) error {
 		storeManifest, deleteManifest string
 	}
 	var groups []*group
-	var cp = make(checkpointTokensMap)
+	var cp = make(checkpoints)
 	for _, b := range d.bindings {
 		var bucket = pending[b.target.StateKey]
 		if len(bucket) == 0 {
@@ -1081,7 +1081,7 @@ func (d *transactor) commit(ctx context.Context, pending connectorState) error {
 
 	// Written in the same transaction as the data: a committed token proves
 	// the data committed, and a rolled-back commit leaves no token.
-	if err := d.checkpointsTable.write(ctx, txn, cp); err != nil {
+	if err := d.checkpoints.write(ctx, txn, cp); err != nil {
 		return err
 	} else if err := txn.Commit(ctx); err != nil {
 		return fmt.Errorf("committing store transaction: %w", err)

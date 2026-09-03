@@ -70,12 +70,11 @@ func parseState(raw json.RawMessage) (connectorState, error) {
 	return state, nil
 }
 
-// checkpointTokensMap is what the checkpoints row holds once a task has
-// crossed over: the last applied transaction's ID by state key and staging
-// key range.
-type checkpointTokensMap map[string]map[string]string
+// checkpoints is what the checkpoints row holds once a task has crossed over:
+// the last applied transaction's ID by state key and staging key range.
+type checkpoints map[string]map[string]string
 
-func (p checkpointTokensMap) add(stateKey, rangeKey, token string) {
+func (p checkpoints) add(stateKey, rangeKey, token string) {
 	if p[stateKey] == nil {
 		p[stateKey] = make(map[string]string)
 	}
@@ -86,14 +85,14 @@ func (p checkpointTokensMap) add(stateKey, rangeKey, token string) {
 // reads back as hex text because the column is VARBYTE. Its decoded bytes are
 // either a token payload or, for a row still in the old format, a base64
 // (possibly gzipped) runtime checkpoint. Base64 cannot produce a leading `{`.
-func (s *checkpointsTable) parseCheckpointsRow(raw string) (checkpointTokensMap, []byte, error) {
+func (s *checkpointsTable) parseCheckpointsRow(raw string) (checkpoints, []byte, error) {
 	decoded, err := hex.DecodeString(raw)
 	if err != nil {
 		return nil, nil, fmt.Errorf("decoding checkpoints row: %w", err)
 	}
 
 	if len(decoded) > 0 && decoded[0] == '{' {
-		var tokens checkpointTokensMap
+		var tokens checkpoints
 		if err := json.Unmarshal(decoded, &tokens); err != nil {
 			return nil, nil, fmt.Errorf("parsing applied tokens: %w", err)
 		}
@@ -119,7 +118,7 @@ type checkpointsTable struct {
 	table            string // quoted identifier
 	materialization  string
 	keyBegin, keyEnd uint32
-	payload          checkpointTokensMap
+	payload          checkpoints
 }
 
 // readAll returns the tokens committed by every row of the materialization,
@@ -163,7 +162,7 @@ func (s *checkpointsTable) readAll(ctx context.Context, conn *pgx.Conn) (map[str
 }
 
 // write records the tokens of just-applied transactions in the row, within txn.
-func (s *checkpointsTable) write(ctx context.Context, txn pgx.Tx, applied checkpointTokensMap) error {
+func (s *checkpointsTable) write(ctx context.Context, txn pgx.Tx, applied checkpoints) error {
 	// Materializations sharing a metadata schema update the same table
 	// concurrently, which raises serializable isolation violations even for
 	// different rows. All applies take this one lock in the same order.
@@ -172,7 +171,7 @@ func (s *checkpointsTable) write(ctx context.Context, txn pgx.Tx, applied checkp
 	}
 
 	if s.payload == nil {
-		s.payload = make(checkpointTokensMap)
+		s.payload = make(checkpoints)
 	}
 	for sk, bucket := range applied {
 		for rk, token := range bucket {
