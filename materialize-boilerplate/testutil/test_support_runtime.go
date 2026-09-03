@@ -98,7 +98,10 @@ func rewriteTaskForTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resource
 }
 
 // RuntimeConfig configures how a materialization integration test drives the
-// runtime, via `flowctl raw preview-next --fixture --shards N`. Multi-shard
+// runtime, via `flowctl raw preview-next --fixture --shards N`. Setting the
+// FLOW_TEST_RUNTIME environment variable to "v1" drives it through legacy
+// `flowctl preview` instead, which is the runtime v1 protocol (Acknowledge
+// never carries statePatches); CI runs both. Multi-shard
 // runs hash-route fixture documents across shards exactly as live shuffled
 // reads would, and require the connector to implement the scale-out contract
 // (range-scoped state, shard-zero-executes).
@@ -178,17 +181,35 @@ func runMaterializationTestForTask[EC boilerplate.EndpointConfiger, FC boilerpla
 	// final commit without running the post-commit Acknowledge, so flowctl
 	// appends an empty drain session which recovery-applies that last
 	// transaction before the destination tables are snapshotted.
-	args := []string{
-		"raw", "preview-next",
-		"--name", rt.workingTaskName,
-		"--source", rt.sourcePath,
-		"--fixture", relativePath(t, "testdata/integration/fixture.materialize.json"),
-		"--shards", strconv.Itoa(shards),
-		"--timeout", timeout.String(),
-		"--network", "flow-test",
-	}
-	if shards == 1 {
-		args = append(args, "--output-apply", "--output-state")
+	var args []string
+	if os.Getenv("FLOW_TEST_RUNTIME") == "v1" {
+		// Legacy preview has no --shards and does not auto-append the drain
+		// session: the trailing 0-transaction session runs the recovery
+		// Acknowledge that applies the last transaction. Apply and state
+		// output are omitted, as for sharded runs, so the destination snapshot
+		// is the same golden the runtime-next run produces.
+		args = []string{
+			"preview",
+			"--name", rt.workingTaskName,
+			"--source", rt.sourcePath,
+			"--fixture", relativePath(t, "testdata/integration/fixture.materialize.json"),
+			"--sessions=-1,0", // one argument: clap reads a bare "-1" as a flag
+			"--timeout", timeout.String(),
+			"--network", "flow-test",
+		}
+	} else {
+		args = []string{
+			"raw", "preview-next",
+			"--name", rt.workingTaskName,
+			"--source", rt.sourcePath,
+			"--fixture", relativePath(t, "testdata/integration/fixture.materialize.json"),
+			"--shards", strconv.Itoa(shards),
+			"--timeout", timeout.String(),
+			"--network", "flow-test",
+		}
+		if shards == 1 {
+			args = append(args, "--output-apply", "--output-state")
+		}
 	}
 
 	actionDescription := RunFlowctl(t, args...)

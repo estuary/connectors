@@ -419,6 +419,22 @@ jobs:
         run: |
           CONNECTOR=${{ matrix.connector }} VERSION=local tests/materialize/run.sh;
 
+      # The step above drives the connector through runtime-next. This one repeats
+      # the connector's own tests through legacy `flowctl preview`, i.e. the
+      # runtime v1 protocol, whose Acknowledge never carries statePatches: a
+      # connector that only learns its own staged work from that echo applies
+      # nothing within a v1 session, and every other check passes. Allowlisted
+      # because a v1 run is single-shard and omits the apply/state output, so it
+      # only matches the golden of a connector whose snapshot already omits them
+      # (a `Shards: 2` run); add a connector here once it's verified on v1.
+      - name: Materialization connector ${{ matrix.connector }} integration tests (runtime v1)
+        if: |
+          contains(fromJson('[
+            "materialize-redshift"
+            ]'), matrix.connector)
+        run: |
+          cd ${{ matrix.connector }} && FLOW_TEST_RUNTIME=v1 go test -v ./... -timeout 20m
+
       # On a snapshot mismatch the harness writes this run's value beside the
       # snapshot as `<name>.actual`. Hand it back: a cloud-credentialed
       # connector's snapshot can only be regenerated where its endpoint is
