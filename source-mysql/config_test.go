@@ -132,6 +132,31 @@ func TestConfigValidate(t *testing.T) {
 		require.ErrorContains(t, cfg.Validate(), "missing 'azure_client_id'")
 	})
 
+	t.Run("GCPIAMValid", func(t *testing.T) {
+		var cfg = valid()
+		cfg.Credentials = &CredentialsConfig{AuthType: GCPIAM}
+		cfg.Credentials.GCPServiceAccount = "flow-capture@example-project.iam.gserviceaccount.com"
+		cfg.Credentials.GCPWorkloadAudience = "//iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/test-pool/providers/test-provider"
+
+		require.NoError(t, cfg.Validate())
+	})
+
+	t.Run("GCPIAMMissingServiceAccount", func(t *testing.T) {
+		var cfg = valid()
+		cfg.Credentials = &CredentialsConfig{AuthType: GCPIAM}
+		cfg.Credentials.GCPWorkloadAudience = "//iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/test-pool/providers/test-provider"
+
+		require.ErrorContains(t, cfg.Validate(), "missing 'gcp_service_account_to_impersonate'")
+	})
+
+	t.Run("GCPIAMMissingWorkloadAudience", func(t *testing.T) {
+		var cfg = valid()
+		cfg.Credentials = &CredentialsConfig{AuthType: GCPIAM}
+		cfg.Credentials.GCPServiceAccount = "flow-capture@example-project.iam.gserviceaccount.com"
+
+		require.ErrorContains(t, cfg.Validate(), "missing 'gcp_workload_identity_pool_audience'")
+	})
+
 	t.Run("UnknownAuthType", func(t *testing.T) {
 		var cfg = valid()
 		cfg.Credentials = &CredentialsConfig{AuthType: "Bogus"}
@@ -230,6 +255,44 @@ func TestEffectivePassword(t *testing.T) {
 		require.Equal(t, unionPassword, legacyPassword)
 	})
 
+	t.Run("GCPIAMToken", func(t *testing.T) {
+		// Cloud SQL login tokens are far longer than 32 characters, which is fine:
+		// the replication password length limit only applies to password auth.
+		var token = strings.Repeat("token", 200)
+		var cfg = Config{
+			Address: "203.0.113.10:3306",
+			User:    "flow-capture",
+			Credentials: &CredentialsConfig{
+				AuthType: GCPIAM,
+				IAMConfig: iam.IAMConfig{
+					GCPConfig: iam.GCPConfig{
+						GCPServiceAccount:   "flow-capture@example-project.iam.gserviceaccount.com",
+						GCPWorkloadAudience: "//iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/test-pool/providers/test-provider",
+					},
+					IAMTokens: iam.IAMTokens{GCPTokens: iam.GCPTokens{GCPAccessToken: token}},
+				},
+			},
+		}
+		cfg.normalizeCredentials()
+
+		require.NoError(t, cfg.Validate())
+		password, err := cfg.EffectivePassword(context.Background())
+		require.NoError(t, err)
+		require.Equal(t, token, password)
+	})
+
+	t.Run("GCPIAMMissingToken", func(t *testing.T) {
+		var cfg = Config{
+			Address:     "203.0.113.10:3306",
+			User:        "flow-capture",
+			Credentials: &CredentialsConfig{AuthType: GCPIAM},
+		}
+		cfg.normalizeCredentials()
+
+		_, err := cfg.EffectivePassword(context.Background())
+		require.ErrorContains(t, err, "missing 'gcp_access_token'")
+	})
+
 	t.Run("AzureIAMToken", func(t *testing.T) {
 		// Entra access tokens are far longer than 32 characters, which is fine:
 		// the replication password length limit only applies to password auth.
@@ -289,8 +352,8 @@ func TestRequiresTLS(t *testing.T) {
 	}{
 		{UserPassword, false},
 		{AWSIAM, true},
+		{GCPIAM, true},
 		{AzureIAM, true},
-		{AuthType(iam.GCPIAM), true},
 		{AuthType("Bogus"), true},
 	} {
 		t.Run(string(tc.authType), func(t *testing.T) {

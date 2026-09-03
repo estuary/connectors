@@ -73,6 +73,34 @@
           },
           {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/go/auth/iam/gcp-config",
+            "properties": {
+              "auth_type": {
+                "type": "string",
+                "const": "GCPIAM",
+                "default": "GCPIAM",
+                "order": 0
+              },
+              "gcp_service_account_to_impersonate": {
+                "type": "string",
+                "title": "Service Account",
+                "description": "GCP Service Account email for Cloud SQL IAM authentication"
+              },
+              "gcp_workload_identity_pool_audience": {
+                "type": "string",
+                "title": "Workload Identity Pool Audience",
+                "description": "GCP Workload Identity Pool Audience in the format //iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/test-pool/providers/test-provider"
+              }
+            },
+            "type": "object",
+            "required": [
+              "gcp_service_account_to_impersonate",
+              "gcp_workload_identity_pool_audience"
+            ],
+            "title": "Google Cloud IAM"
+          },
+          {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "$id": "https://github.com/estuary/connectors/go/auth/iam/azure-config",
             "properties": {
               "auth_type": {

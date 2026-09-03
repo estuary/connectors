@@ -152,6 +152,7 @@ type AuthType string
 const (
 	UserPassword AuthType = "UserPassword"
 	AWSIAM       AuthType = "AWSIAM"
+	GCPIAM       AuthType = "GCPIAM"
 	AzureIAM     AuthType = "AzureIAM"
 )
 
@@ -173,6 +174,7 @@ func (CredentialsConfig) JSONSchema() *jsonschema.Schema {
 	return schemagen.OneOfSchema("Authentication", "", "auth_type", string(UserPassword),
 		schemagen.OneOfSubSchema("Password", UserPasswordConfig{}, string(UserPassword)),
 		schemagen.OneOfSubSchema("AWS IAM", iam.AWSConfig{}, string(AWSIAM)),
+		schemagen.OneOfSubSchema("Google Cloud IAM", iam.GCPConfig{}, string(GCPIAM)),
 		schemagen.OneOfSubSchema("Azure IAM", iam.AzureConfig{}, string(AzureIAM)),
 	)
 }
@@ -184,7 +186,7 @@ func (c *CredentialsConfig) Validate() error {
 			return errors.New("missing 'password'")
 		}
 		return nil
-	case AWSIAM, AzureIAM:
+	case AWSIAM, GCPIAM, AzureIAM:
 		// The embedded IAMConfig has its own auth_type field which JSON decoding
 		// leaves empty (the outer field shadows it), so sync it before ValidateIAM
 		// switches on it.
@@ -335,9 +337,9 @@ func (c *Config) normalizeCredentials() {
 // and only reads the credentials union. For AWS IAM the password is an RDS auth
 // token minted here from the session credentials the control plane injects, valid
 // for fifteen minutes, so callers should invoke this per connection attempt rather
-// than caching the result. For Azure IAM the password is the Entra access token
-// injected into the config by the control plane, which restarts the connector with
-// a fresh token before expiry.
+// than caching the result. For Google Cloud and Azure IAM the password is an access
+// token injected into the config by the control plane, which restarts the connector
+// with a fresh token before expiry.
 func (c *Config) EffectivePassword(ctx context.Context) (string, error) {
 	switch c.Credentials.AuthType {
 	case UserPassword:
@@ -352,6 +354,14 @@ func (c *Config) EffectivePassword(ctx context.Context) (string, error) {
 		token, err := auth.BuildAuthToken(ctx, c.Address, c.Credentials.AWSRegion, c.User, credProvider)
 		if err != nil {
 			return "", fmt.Errorf("building AWS IAM auth token: %w", err)
+		}
+		return token, nil
+	case GCPIAM:
+		// Cloud SQL IAM database authentication presents this token via the
+		// 'mysql_clear_password' plugin, which the server only allows over TLS.
+		var token = c.Credentials.GoogleToken()
+		if token == "" {
+			return "", errors.New("missing 'gcp_access_token'")
 		}
 		return token, nil
 	case AzureIAM:

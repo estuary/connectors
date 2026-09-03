@@ -1,6 +1,6 @@
 ---
 sidebar_position: 5
-description: Set up Estuary's MySQL capture connector with CDC, binlog configuration, and time zone settings using self-hosted and cloud platform guides.
+description: Set up Estuary's MySQL capture connector with CDC, binlog configuration, IAM authentication, and time zone settings using self-hosted and cloud platform guides.
 ---
 
 # MySQL
@@ -174,13 +174,13 @@ GRANT SELECT ON *.* TO 'flow_capture';
 
 ### IAM Authentication
 
-On Amazon Aurora and Azure Database for MySQL you can authenticate with a cloud IAM identity instead of a password. IAM authentication always connects over TLS and never falls back to an unencrypted connection.
+On Amazon Aurora, Google Cloud SQL, and Azure Database for MySQL you can authenticate with a cloud IAM identity instead of a password. IAM authentication always connects over TLS and never falls back to an unencrypted connection.
 
 #### AWS IAM
 
 For Amazon Aurora MySQL clusters, you can authenticate with an AWS IAM role instead of a password.
 
-Follow the steps in the [AWS IAM guide][aws-iam] to create a role for Flow to assume, and make note of its ARN and your cluster's region to use when configuring the connector's authentication options.
+Follow the steps in the [AWS IAM guide][aws-iam] to create a role for Estuary to assume, and make note of its ARN and your cluster's region to use when configuring the connector's authentication options.
 
 [Enable IAM database authentication](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.IAMDBAuth.Enabling.html) on the cluster, then run the following commands to create a database user which authenticates through the RDS plugin, granting it the same permissions as the `flow_capture` user in the [Amazon Aurora](#amazon-aurora) setup instructions above:
 
@@ -208,6 +208,21 @@ Finally, [attach a policy](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuid
 }
 ```
 
+#### Google Cloud IAM
+
+For Google Cloud SQL for MySQL instances, you can authenticate with a Google Cloud service account instead of a password.
+
+Follow the steps in the [GCP IAM guide][gcp-iam] to set up a workload identity pool for Estuary, and make note of the pool audience and the service account email to use when configuring the connector's authentication options.
+
+Set the instance's `cloudsql_iam_authentication` flag to `on`, then [add the service account as an IAM database user](https://cloud.google.com/sql/docs/mysql/add-manage-iam-users#creating-database-user) and grant it the `roles/cloudsql.instanceUser` role. Cloud SQL logs the service account in under its email address with the `@PROJECT_ID.iam.gserviceaccount.com` suffix removed, and MySQL usernames are limited to 32 characters, so pick a service account name that fits. Grant that user the same permissions as the `flow_capture` user in the [Google Cloud SQL](./google-cloud-sql-mysql/) setup instructions:
+
+```sql
+GRANT REPLICATION CLIENT, REPLICATION SLAVE ON *.* TO 'flow-capture';
+GRANT SELECT ON *.* TO 'flow-capture';
+```
+
+Use the same truncated name as the connector's `user` property.
+
 #### Azure IAM
 
 For Azure Database for MySQL flexible servers, you can authenticate with an Azure App Registration instead of a password.
@@ -226,6 +241,7 @@ GRANT SELECT ON *.* TO 'flow_capture';
 Use the name given in the `CREATE AADUSER` statement as the connector's `user` property.
 
 [aws-iam]: /guides/iam-auth/aws/
+[gcp-iam]: /guides/iam-auth/gcp/
 [azure-iam]: /guides/iam-auth/azure/
 
 ## Capturing from Read Replicas
@@ -305,10 +321,12 @@ See [connectors](/concepts/connectors.md#using-connectors) to learn more about u
 | Property | Title | Description | Type | Required/Default |
 | --- | --- | --- | --- | --- |
 | **`/credentials`** | Authentication | Authentication method and credentials that provide access to the database. | object | Required |
-| `/credentials/auth_type` | Auth Type | The authentication method to use. One of `UserPassword`, `AWSIAM`, or `AzureIAM`. | string |  |
+| `/credentials/auth_type` | Auth Type | The authentication method to use. One of `UserPassword`, `AWSIAM`, `GCPIAM`, or `AzureIAM`. | string |  |
 | `/credentials/password` | Password | Password for the specified database user. | string | Required for `UserPassword` auth |
 | `/credentials/aws_region` | AWS Region | AWS region of your resource. | string | Required for `AWSIAM` auth |
 | `/credentials/aws_role_arn` | AWS Role ARN | AWS role for Estuary to use that has access to the resource. | string | Required for `AWSIAM` auth |
+| `/credentials/gcp_service_account_to_impersonate` | Service Account | GCP service account email for Cloud SQL IAM authentication. | string | Required for `GCPIAM` auth |
+| `/credentials/gcp_workload_identity_pool_audience` | Workload Identity Pool Audience | GCP workload identity pool audience. The format should be similar to: `//iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/test-pool/providers/test-provider`. | string | Required for `GCPIAM` auth |
 | `/credentials/azure_client_id` | Azure Client ID | Application (client) ID of the App Registration. | string | Required for `AzureIAM` auth |
 | `/credentials/azure_tenant_id` | Azure Tenant ID | Directory (tenant) ID of the App Registration. | string | Required for `AzureIAM` auth |
 
@@ -372,6 +390,15 @@ To authenticate to an Amazon Aurora MySQL cluster with [AWS IAM](#aws-iam) inste
             auth_type: AWSIAM
             aws_region: "us-east-1"
             aws_role_arn: "arn:aws:iam::123456789012:role/flow-capture"
+```
+
+To authenticate to a Google Cloud SQL for MySQL instance with [Google Cloud IAM](#google-cloud-iam) instead, replace the credentials block:
+
+```yaml
+          credentials:
+            auth_type: GCPIAM
+            gcp_service_account_to_impersonate: "flow-capture@example-project.iam.gserviceaccount.com"
+            gcp_workload_identity_pool_audience: "//iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/test-pool/providers/test-provider"
 ```
 
 To authenticate to an Azure Database for MySQL flexible server with [Azure IAM](#azure-iam) instead, replace the credentials block:
