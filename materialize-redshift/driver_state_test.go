@@ -100,7 +100,7 @@ func TestParseCheckpointsRow(t *testing.T) {
 		tokens, legacy, err := s.parseCheckpointsRow(hex.EncodeToString([]byte(`{"a_table.v1":{"00000000-ffffffff":"p/x/files.manifest"}}`)))
 		require.NoError(t, err)
 		require.Nil(t, legacy)
-		require.Equal(t, checkpointTokensMap{"a_table.v1": {fullRange: "p/x/files.manifest"}}, tokens)
+		require.Equal(t, checkpoints{"a_table.v1": {fullRange: "p/x/files.manifest"}}, tokens)
 	})
 
 	t.Run("a row in the old format", func(t *testing.T) {
