@@ -8,6 +8,7 @@ import (
 
 	"github.com/bradleyjkemp/cupaloy"
 	sql "github.com/estuary/connectors/materialize-sql"
+	sqlDriver "github.com/estuary/connectors/materialize-sql"
 	"github.com/stretchr/testify/require"
 )
 
@@ -150,7 +151,15 @@ func runSQLGen(t *testing.T, testDialect sql.Dialect, testTemplates templates) {
 	}
 
 	var copyParams = copyFromS3Params{
-		Target:      "my_temp_table",
+		Target: "my_temp_table",
+		Columns: []*sqlDriver.Column{
+			{
+				Identifier: "firstCol",
+			},
+			{
+				Identifier: "secondCol",
+			},
+		},
 		ManifestURL: "s3://some_bucket/files.manifest",
 		Config: config{
 			AWSAccessKeyID:     "accessKeyID",

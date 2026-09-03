@@ -227,6 +227,7 @@ func varbyteToSuperCast(migration sql.ColumnTypeMigration) string {
 
 type copyFromS3Params struct {
 	Target                         string
+	Columns                        []*sql.Column
 	ManifestURL                    string
 	Config                         config
 	CaseSensitiveIdentifierEnabled bool
