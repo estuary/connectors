@@ -105,7 +105,7 @@ func TestIntegration(t *testing.T) {
 				}
 
 				entry := stageRows(t, cfg, fields, [][]any{row})
-				return mustMarshal(t, pendingState{b.StateKey: {rangeKeyOf(0, math.MaxUint32): entry}})
+				return mustMarshal(t, pendingState{rangeKeyOf(0, math.MaxUint32): {b.StateKey: entry}})
 			}
 
 			verifyDrained := func(t *testing.T, _ *pf.MaterializationSpec, _ []string, rows [][]any) {
@@ -242,7 +242,7 @@ func runIdempotencyTest(t *testing.T, makeResourceFn func(string, bool) tableCon
 		return len(rows)
 	}
 	stateWith := func(t *testing.T, entry *stagedTransaction) json.RawMessage {
-		return mustMarshal(t, pendingState{table.StateKey: {rangeKeyOf(0, math.MaxUint32): entry}})
+		return mustMarshal(t, pendingState{rangeKeyOf(0, math.MaxUint32): {table.StateKey: entry}})
 	}
 
 	t.Run("a committed token settles a recovered entry", func(t *testing.T) {
@@ -257,7 +257,7 @@ func runIdempotencyTest(t *testing.T, makeResourceFn func(string, bool) tableCon
 		require.Nil(t, recoverCheckpoint(t, d))
 		patch := acknowledge(t, d)
 		require.NotNil(t, patch)
-		require.JSONEq(t, `{"idempotency.v1": {"00000000-ffffffff": null}}`, string(patch.UpdatedJson))
+		require.JSONEq(t, `{"00000000-ffffffff": {"idempotency.v1": null}}`, string(patch.UpdatedJson))
 		require.Equal(t, before+3, countRows(t))
 
 		// The clearing was never persisted: a new session recovers the same
@@ -265,7 +265,7 @@ func runIdempotencyTest(t *testing.T, makeResourceFn func(string, bool) tableCon
 		d = newTransactor(t, taskName, state)
 		patch = acknowledge(t, d)
 		require.NotNil(t, patch)
-		require.JSONEq(t, `{"idempotency.v1": {"00000000-ffffffff": null}}`, string(patch.UpdatedJson))
+		require.JSONEq(t, `{"00000000-ffffffff": {"idempotency.v1": null}}`, string(patch.UpdatedJson))
 		require.Equal(t, before+3, countRows(t))
 
 		// With nothing pending, Acknowledge reports convergence.
