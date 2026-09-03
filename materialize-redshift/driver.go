@@ -1,6 +1,7 @@
 package connector
 
 import (
+	"bytes"
 	"context"
 	stdsql "database/sql"
 	"encoding/json"
@@ -8,6 +9,8 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"path"
+	"slices"
 	"strings"
 	"text/template"
 
@@ -23,6 +26,7 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	log "github.com/sirupsen/logrus"
@@ -281,9 +285,11 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 			}
 
 			return &sql.Endpoint[config]{
-				Config:              cfg,
-				Dialect:             dialect,
-				SerPolicy:           boilerplate.SerPolicyStd,
+				Config:    cfg,
+				Dialect:   dialect,
+				SerPolicy: boilerplate.SerPolicyStd,
+				// Creates the row that holds applied-transaction tokens; the
+				// fence itself is unused.
 				MetaCheckpoints:     sql.FlowCheckpointsTable(metaBase),
 				NewClient:           newClient,
 				CreateTableTemplate: templates.createTargetTable,
@@ -305,18 +311,48 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 }
 
 type transactor struct {
-	templates templates
-	dialect   sql.Dialect
-	fence     sql.Fence
-	bindings  []*binding
-	be        *m.BindingEvents
-	cfg       config
+	templates                      templates
+	bindings                       []*binding
+	be                             *m.BindingEvents
+	cfg                            config
+	store                          *s3Store
+	caseSensitiveIdentifierEnabled bool
+
+	rangeKey string
+	// The shard whose key range begins at 0 applies every shard's staged
+	// work; the others only stage.
+	primary          bool
+	checkpointsTable *checkpointsTable
+	// IDs of every stateItem already committed, across the materialization.
+	committedTokens map[string]bool
+	// The whole state: staged transactions not yet applied, from every shard.
+	state connectorState
+	// Set only for a task crossing over from the old format, whose row still
+	// holds the runtime checkpoint and whose state has nothing staged.
+	runtimeCheckpoint m.RuntimeCheckpoint
+	// The runtime checkpoint of the most recent StartCommit in this process,
+	// mirrored into the checkpoints row so a downgraded connector can resume
+	// from it. Nil until a StartCommit has actually run here, which a
+	// recovery Acknowledge (settling work recovered from the state, with no
+	// preceding StartCommit in this process) must not mistake for one.
+	//
+	// Known accepted gap: a recovery Acknowledge durably applies its work to
+	// Redshift while correctly leaving this mirror stale (there is no fresh
+	// checkpoint to advance it to). Downgrading to a pre-migration binary
+	// while that gap is open makes the runtime replay the just-applied
+	// transaction against a binary with no idempotency mechanism of its own;
+	// a MERGE binding self-heals, but a delta-updates (no-MERGE) binding
+	// duplicates those rows. The gap closes on its own at the next
+	// StartCommit in this process, but stays open indefinitely on an idle
+	// task. Do not downgrade a task that has crashed and recovered without
+	// first confirming at least one more transaction has committed since.
+	lastRuntimeCheckpoint []byte
 }
 
 var _ m.Transactor = (*transactor)(nil)
 
 func (d *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSpec, _ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
-	return d.fence.Checkpoint, nil
+	return d.runtimeCheckpoint, nil
 }
 
 func prepareNewTransactor(
@@ -337,28 +373,68 @@ func prepareNewTransactor(
 		var cfg = ep.Config
 
 		var d = &transactor{
-			templates: templates,
-			dialect:   ep.Dialect,
-			fence:     fence,
-			cfg:       cfg,
-			be:        be,
+			templates:                      templates,
+			cfg:                            cfg,
+			be:                             be,
+			caseSensitiveIdentifierEnabled: caseSensitiveIdentifierEnabled,
+			rangeKey:                       rangeKeyOf(fence.KeyBegin, fence.KeyEnd),
+			primary:                        fence.KeyBegin == 0,
+			checkpointsTable: &checkpointsTable{
+				table:           ep.Dialect.Identifier(fence.TablePath...),
+				materialization: fence.Materialization.String(),
+				keyBegin:        fence.KeyBegin,
+				keyEnd:          fence.KeyEnd,
+			},
+			committedTokens: make(map[string]bool),
+			state:           make(connectorState),
 		}
 
-		s3client, err := d.cfg.toS3Client(ctx, featureFlags)
+		client, err := d.cfg.toS3Client(ctx, featureFlags)
+		if err != nil {
+			return nil, err
+		}
+		d.store = newS3Store(client, d.cfg.Bucket)
+
+		for _, target := range bindings {
+			if err = d.addBinding(target, is); err != nil {
+				return nil, fmt.Errorf("addBinding of %s: %w", target.Path, err)
+			}
+		}
+
+		// The crossover decision below needs the state before the runtime
+		// hands it over separately.
+		state, err := parseState(open.StateJson)
 		if err != nil {
 			return nil, err
 		}
 
-		for idx, target := range bindings {
-			if err = d.addBinding(
-				idx,
-				target,
-				s3client,
-				is,
-				caseSensitiveIdentifierEnabled,
-			); err != nil {
-				return nil, fmt.Errorf("addBinding of %s: %w", target.Path, err)
-			}
+		conn, err := pgx.Connect(ctx, d.cfg.toURI())
+		if err != nil {
+			return nil, fmt.Errorf("open pgx.Connect: %w", err)
+		}
+		defer conn.Close(ctx)
+
+		if err := d.checkpointsTable.ensureTokensColumn(ctx, conn); err != nil {
+			return nil, err
+		}
+
+		var legacyCheckpoint []byte
+		var crossedOver bool
+		if d.committedTokens, legacyCheckpoint, crossedOver, err = d.checkpointsTable.readAll(ctx, conn); err != nil {
+			return nil, err
+		}
+		if d.primary {
+			d.state = state
+		}
+
+		// A shard's row is authoritative only until it has staged a
+		// transaction: after that the recovery log is, and returning the
+		// row's checkpoint would rewind the runtime and stage that
+		// transaction twice. A row this connector has already written to
+		// once is never authoritative again, even though it keeps mirroring
+		// a legacy checkpoint from then on.
+		if legacyCheckpoint != nil && !crossedOver && !state.hasRange(d.rangeKey) {
+			d.runtimeCheckpoint = legacyCheckpoint
 		}
 
 		return d, nil
@@ -378,22 +454,9 @@ type binding struct {
 	mergeIntoSQL              string
 	deleteQuerySQL            string
 	loadQuerySQL              string
-	copyIntoLoadTableSQL      string
-	copyIntoMergeTableSQL     string
-	copyIntoDeleteTableSQL    string
-	copyIntoTargetTableSQL    string
 
-	// A reference of all staged file cleanup operations that should be run once
-	// the commit has completed. Will be empty if not data was processed for
-	// this binding. Applies to the Store phase only.
-	cleanupFiles []func(context.Context)
-	// If any deletions must be done for the Store data processed by this binding.
-	hasDeletes bool
-	// If any non-deletion Store requests were received for this binding.
-	hasStores bool
-	// If a merge operation must be done, or if a more efficient COPY INTO can
-	// be used to store the data for the transaction.
-	mustMerge bool
+	// The transaction being staged, if any.
+	staged *stateItem
 }
 
 // VarcharColumnMeta contains metadata about Redshift varchar columns. Currently this is just the
@@ -404,49 +467,16 @@ type VarcharColumnMeta struct {
 	IsVarchar  bool
 }
 
-func (t *transactor) addBinding(
-	bindingIdx int,
-	target sql.Table,
-	client *s3.Client,
-	is *boilerplate.InfoSchema,
-	caseSensitiveIdentifierEnabled bool,
-) error {
+func (t *transactor) addBinding(target sql.Table, is *boilerplate.InfoSchema) error {
 	var b = &binding{
 		target:     target,
-		loadFile:   newStagedFile(client, t.cfg.Bucket, t.cfg.effectiveBucketPath(), target.KeyNames()),
-		storeFile:  newStagedFile(client, t.cfg.Bucket, t.cfg.effectiveBucketPath(), target.ColumnNames()),
-		deleteFile: newStagedFile(client, t.cfg.Bucket, t.cfg.effectiveBucketPath(), target.KeyNames()),
+		loadFile:   newStagedFile(t.store, t.cfg.effectiveBucketPath(), target.KeyNames()),
+		storeFile:  newStagedFile(t.store, t.cfg.effectiveBucketPath(), target.ColumnNames()),
+		deleteFile: newStagedFile(t.store, t.cfg.effectiveBucketPath(), target.KeyNames()),
 	}
 
 	if t.cfg.Advanced.NoFlowDocument {
 		b.nullFieldsToStrip = target.NullableFieldsToStrip()
-	}
-
-	// Render templates that require specific S3 "COPY INTO" parameters.
-	for _, m := range []struct {
-		sql             *string
-		target          string
-		columns         []*sql.Column
-		truncateColumns bool
-		stagedFile      *stagedFile
-	}{
-		{&b.copyIntoLoadTableSQL, fmt.Sprintf("flow_temp_table_%d", bindingIdx), target.KeyPtrs(), false, b.loadFile},
-		{&b.copyIntoMergeTableSQL, fmt.Sprintf("flow_temp_table_%d", bindingIdx), target.Columns(), true, b.storeFile},
-		{&b.copyIntoDeleteTableSQL, fmt.Sprintf("flow_temp_table_%d_deleted", bindingIdx), target.KeyPtrs(), false, b.deleteFile},
-		{&b.copyIntoTargetTableSQL, target.Identifier, target.Columns(), true, b.storeFile},
-	} {
-		var sql strings.Builder
-		if err := t.templates.copyFromS3.Execute(&sql, copyFromS3Params{
-			Target:                         m.target,
-			Columns:                        m.columns,
-			ManifestURL:                    m.stagedFile.fileURI(manifestFile),
-			Config:                         t.cfg,
-			CaseSensitiveIdentifierEnabled: caseSensitiveIdentifierEnabled,
-			TruncateColumns:                m.truncateColumns,
-		}); err != nil {
-			return err
-		}
-		*m.sql = sql.String()
 	}
 
 	// Choose appropriate templates based on configuration
@@ -506,8 +536,63 @@ func (t *transactor) addBinding(
 	return nil
 }
 
-func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
-func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) { return nil, nil }
+// copyFromS3 renders the COPY of a staged manifest into target.
+func (t *transactor) copyFromS3(target string, manifestKey string, truncateColumns bool) (string, error) {
+	var sql strings.Builder
+	if err := t.templates.copyFromS3.Execute(&sql, copyFromS3Params{
+		Target:                         target,
+		ManifestURL:                    t.store.objectURI(manifestKey),
+		Config:                         t.cfg,
+		CaseSensitiveIdentifierEnabled: t.caseSensitiveIdentifierEnabled,
+		TruncateColumns:                truncateColumns,
+	}); err != nil {
+		return "", fmt.Errorf("rendering COPY for %s: %w", target, err)
+	}
+	return sql.String(), nil
+}
+
+func (t *transactor) UnmarshalState(state json.RawMessage) error {
+	if !t.primary {
+		return nil
+	}
+	pending, err := parseState(state)
+	if err != nil {
+		return err
+	}
+	t.state = pending
+	return nil
+}
+
+// mergePeerStatePatches folds every shard's StartedCommit patches of the
+// just-committed transaction, including the primary's own, into the
+// primary's pending set.
+func (t *transactor) mergePeerStatePatches(patches []json.RawMessage) error {
+	if !t.primary {
+		return nil
+	}
+	for _, patch := range patches {
+		if bytes.Equal(bytes.TrimSpace(patch), []byte("null")) {
+			// The runtime's encoding of a peer's full (non-merge-patch) state
+			// replacement, which no shard here ever produces.
+			return fmt.Errorf("unexpected state reset patch in aggregated shard state")
+		}
+		state, err := parseState(patch)
+		if err != nil {
+			return fmt.Errorf("parsing aggregated state patch: %w", err)
+		}
+		for sk, bucket := range state {
+			for rk, e := range bucket {
+				// The previous transaction's entry is applied before the next
+				// one's patch arrives, so a collision would lose staged work.
+				if t.state[sk][rk] != nil {
+					return fmt.Errorf("shard %s staged a new transaction for %s while its previous one is still pending", rk, sk)
+				}
+				t.state.add(sk, rk, e)
+			}
+		}
+	}
+	return nil
+}
 
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
@@ -594,14 +679,21 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			return fmt.Errorf("creating load table for target table '%s': %w", b.target.Identifier, err)
 		}
 
-		delete, err := b.loadFile.flush(ctx)
+		files, err := b.loadFile.flush()
 		if err != nil {
 			return fmt.Errorf("flushing load file for binding[%d]: %w", idx, err)
 		}
-		defer delete(ctx)
+		manifest, err := d.putManifest(ctx, files)
+		if err != nil {
+			return err
+		}
+		var objects = append(slices.Clone(files), manifest)
+		defer d.store.deleteObjects(ctx, objects)
 
-		if _, err := txn.Exec(ctx, b.copyIntoLoadTableSQL); err != nil {
-			return handleCopyIntoErr(ctx, txn, d.cfg.Bucket, b.loadFile.prefix, b.target.Identifier, err)
+		if copySQL, err := d.copyFromS3(fmt.Sprintf("flow_temp_table_%d", b.target.Binding), manifest, false); err != nil {
+			return err
+		} else if _, err := txn.Exec(ctx, copySQL); err != nil {
+			return handleCopyIntoErr(ctx, txn, d.cfg.Bucket, files, b.target.Identifier, err)
 		}
 	}
 
@@ -648,25 +740,17 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	ctx := it.Context()
 
-	// varcharColumnUpdates records any VARCHAR columns that need their lengths increased. The keys
-	// are table identifiers, and the values are a list of column identifiers that need altered.
-	// Columns will only ever be to altered it to VARCHAR(MAX).
-	varcharColumnUpdates := make(map[string][]string)
-
 	flushStagedFile := func(ctx context.Context, b *binding) error {
+		var err error
 		if b.storeFile.started {
-			cleanup, err := b.storeFile.flush(ctx)
-			if err != nil {
+			if b.staged.StoreFiles, err = b.storeFile.flush(); err != nil {
 				return fmt.Errorf("flushing store file: %w", err)
 			}
-			b.cleanupFiles = append(b.cleanupFiles, cleanup)
 		}
 		if b.deleteFile.started {
-			cleanup, err := b.deleteFile.flush(ctx)
-			if err != nil {
+			if b.staged.DeleteFiles, err = b.deleteFile.flush(); err != nil {
 				return fmt.Errorf("flushing delete file: %w", err)
 			}
-			b.cleanupFiles = append(b.cleanupFiles, cleanup)
 		}
 		return nil
 	}
@@ -689,6 +773,9 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 
 		var b = d.bindings[it.Binding]
+		if b.staged == nil {
+			b.staged = &stateItem{ID: uuid.NewString()}
+		}
 		var file *stagedFile
 
 		var err error
@@ -699,16 +786,14 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		// temporary table and run a `DELETE USING` query to delete rows
 		if d.cfg.HardDelete && it.Delete {
 			file = b.deleteFile
-			b.hasDeletes = true
 
 			converted, err = b.target.ConvertKey(it.Key)
 			if err != nil {
 				return nil, fmt.Errorf("converting delete parameters: %w", err)
 			}
 		} else {
-			b.hasStores = true
 			if it.Exists {
-				b.mustMerge = true
+				b.staged.MustMerge = true
 			}
 
 			file = b.storeFile
@@ -737,7 +822,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 							"currentColumnLength": varcharMeta.MaxLength,
 							"stringValueLength":   len(v),
 						}).Info("column will be altered to VARCHAR(MAX) to accommodate large string value")
-						varcharColumnUpdates[b.target.Identifier] = append(varcharColumnUpdates[b.target.Identifier], varcharMeta.Identifier)
+						b.staged.Widen = append(b.staged.Widen, varcharMeta.Identifier)
 						b.varcharColumnMetas[idx].MaxLength = redshiftVarcharMaxLength // Do not need to alter this column again.
 					}
 				case nil:
@@ -767,41 +852,158 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 	}
 
-	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
-		var err error
-		if d.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
-			return nil, m.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
+	return func(ctx context.Context, checkpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
+		if checkpoint != nil {
+			raw, err := checkpoint.Marshal()
+			if err != nil {
+				return nil, m.FinishedOperation(fmt.Errorf("marshalling runtime checkpoint: %w", err))
+			}
+			d.lastRuntimeCheckpoint = raw
 		}
 
-		if err := d.commit(ctx, varcharColumnUpdates); err != nil {
-			return nil, pf.FinishedOperation(err)
+		// Only this transaction's entries: an entry whose state key no longer
+		// has a binding stays pending forever and must not be re-sent. The
+		// primary picks its own entries back up from Acknowledge's statePatches,
+		// same as its peers'.
+		var update = make(connectorState)
+		for _, b := range d.bindings {
+			if b.staged == nil {
+				continue
+			}
+			update.add(b.target.StateKey, d.rangeKey, b.staged)
+			b.staged = nil
 		}
 
-		// Reset the connector state to an empty object, as a full replacement
-		// rather than a merge patch. This connector keeps its checkpoint in the
-		// destination and has no use for the state, but tasks that briefly ran
-		// #5157 still carry its staged-work entries in their recovery logs;
-		// left in place, its reland would read them as pending work.
-		return &pf.ConnectorState{UpdatedJson: json.RawMessage(`{}`), MergePatch: false}, nil
+		patch, err := json.Marshal(update)
+		if err != nil {
+			return nil, m.FinishedOperation(fmt.Errorf("marshalling staged transactions: %w", err))
+		}
+		return &pf.ConnectorState{UpdatedJson: patch, MergePatch: true}, nil
 	}, nil
 }
 
-func (d *transactor) commit(ctx context.Context, varcharColumnUpdates map[string][]string) error {
-	defer func() {
-		for _, b := range d.bindings {
-			// Arrange to clean up any staged files once this commit attempt is
-			// done.
-			for _, cleanupFn := range b.cleanupFiles {
-				cleanupFn(ctx)
-			}
+func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
+	if err := d.mergePeerStatePatches(statePatches); err != nil {
+		return nil, err
+	}
+	if !d.primary {
+		return nil, nil
+	}
 
-			// Reset per-transaction properties for the next round.
-			b.cleanupFiles = nil
-			b.hasDeletes = false
-			b.hasStores = false
-			b.mustMerge = false
+	// Entries of a binding with no live table are left pending. Clearing an
+	// entry from the state is a null at its place.
+	var shouldProcess = m.StateKeyFilter(stateKeys)
+	var pending = make(connectorState)
+	var clear = make(connectorState)
+	var toDelete []string
+	for _, b := range d.bindings {
+		var sk = b.target.StateKey
+		if !shouldProcess(sk) {
+			continue
 		}
-	}()
+		for rk, e := range d.state[sk] {
+			pending.add(sk, rk, e)
+			clear.add(sk, rk, nil)
+			toDelete = append(toDelete, e.objects()...)
+		}
+	}
+	if len(pending) == 0 {
+		return nil, nil
+	}
+
+	// Mirror the runtime checkpoint into the checkpoints row, for a
+	// downgraded connector to resume from, only when this call settles
+	// every pending entry (not a partial, Apply-RPC-scoped commit) and a
+	// StartCommit has actually run in this process to produce one. See
+	// lastRuntimeCheckpoint's comment for the accepted downgrade gap this
+	// leaves open on a recovery Acknowledge.
+	var legacyCheckpoint []byte
+	if pending.entryCount() == d.state.entryCount() {
+		legacyCheckpoint = d.lastRuntimeCheckpoint
+	}
+
+	if err := d.commit(ctx, pending, legacyCheckpoint); err != nil {
+		return nil, err
+	}
+
+	d.store.deleteObjects(ctx, toDelete)
+	for sk, bucket := range pending {
+		for rk := range bucket {
+			delete(d.state[sk], rk)
+		}
+		if len(d.state[sk]) == 0 {
+			delete(d.state, sk)
+		}
+	}
+
+	patch, err := json.Marshal(clear)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling state clearing patch: %w", err)
+	}
+	return &pf.ConnectorState{UpdatedJson: patch, MergePatch: true}, nil
+}
+
+// commit runs the staged transactions of pending as one Redshift
+// transaction, skipping any whose token is already committed. legacyCheckpoint,
+// when non-nil, is mirrored into the checkpoints row alongside the tokens.
+func (d *transactor) commit(ctx context.Context, pending connectorState, legacyCheckpoint []byte) error {
+	// group is one binding's pending transactions from every shard, merged
+	// into one, with manifests written for the commit.
+	type group struct {
+		binding                       *binding
+		merged                        stateItem
+		storeManifest, deleteManifest string
+	}
+	var groups []*group
+	var tokensMap = make(checkpointTokensMap)
+	for _, b := range d.bindings {
+		var bucket = pending[b.target.StateKey]
+		if len(bucket) == 0 {
+			continue
+		}
+		var g = &group{binding: b}
+		for rk, e := range bucket {
+			if d.committedTokens[e.ID] {
+				log.WithFields(log.Fields{
+					"table": b.target.Identifier,
+					"range": rk,
+					"id":    e.ID,
+				}).Info("skipping staged transaction that was already applied")
+				continue
+			}
+			g.merged.StoreFiles = append(g.merged.StoreFiles, e.StoreFiles...)
+			g.merged.DeleteFiles = append(g.merged.DeleteFiles, e.DeleteFiles...)
+			g.merged.MustMerge = g.merged.MustMerge || e.MustMerge
+			for _, column := range e.Widen {
+				if !slices.Contains(g.merged.Widen, column) {
+					g.merged.Widen = append(g.merged.Widen, column)
+				}
+			}
+			tokensMap.add(b.target.StateKey, rk, e.ID)
+		}
+		if len(g.merged.StoreFiles) > 0 || len(g.merged.DeleteFiles) > 0 {
+			groups = append(groups, g)
+		}
+	}
+	if len(groups) == 0 {
+		return nil
+	}
+
+	var manifests []string
+	defer func() { d.store.deleteObjects(ctx, manifests) }()
+	for _, g := range groups {
+		var err error
+		if g.storeManifest, err = d.putManifest(ctx, g.merged.StoreFiles); err != nil {
+			return err
+		} else if g.storeManifest != "" {
+			manifests = append(manifests, g.storeManifest)
+		}
+		if g.deleteManifest, err = d.putManifest(ctx, g.merged.DeleteFiles); err != nil {
+			return err
+		} else if g.deleteManifest != "" {
+			manifests = append(manifests, g.deleteManifest)
+		}
+	}
 
 	conn, err := pgx.Connect(ctx, d.cfg.toURI())
 	if err != nil {
@@ -819,9 +1021,10 @@ func (d *transactor) commit(ctx context.Context, varcharColumnUpdates map[string
 
 	// Update any columns that require setting to VARCHAR(MAX) for storing large strings. ALTER
 	// TABLE ALTER COLUMN statements cannot be run inside transaction blocks.
-	for table, updates := range varcharColumnUpdates {
-		for _, column := range updates {
-			if _, err := conn.Exec(ctx, fmt.Sprintf(varcharTableAlter, table, column)); err != nil {
+	for _, g := range groups {
+		var b = g.binding
+		for _, column := range g.merged.Widen {
+			if _, err := conn.Exec(ctx, fmt.Sprintf(varcharTableAlter, b.target.Identifier, column)); err != nil {
 				// It is possible that another shard of this materialization will have already
 				// updated this column. Practically this means we will try to set a column that is
 				// already VARCHAR(MAX) to VARCHAR(MAX), and Redshift returns a specific error in
@@ -830,20 +1033,27 @@ func (d *transactor) commit(ctx context.Context, varcharColumnUpdates map[string
 				if errors.As(err, &pgErr) {
 					if pgErr.Code == "0A000" && strings.Contains(pgErr.Message, "target column size should be different") {
 						log.WithFields(log.Fields{
-							"table":  table,
+							"table":  b.target.Identifier,
 							"column": column,
 						}).Info("attempted to alter column VARCHAR(MAX) but it was already VARCHAR(MAX)")
 						continue
 					}
 				}
 
-				return fmt.Errorf("altering size for column %s of table %s: %w", column, table, err)
+				return fmt.Errorf("altering size for column %s of table %s: %w", column, b.target.Identifier, err)
 			}
 
 			log.WithFields(log.Fields{
-				"table":  table,
+				"table":  b.target.Identifier,
 				"column": column,
 			}).Info("column altered to VARCHAR(MAX) to accommodate large string value")
+		}
+		// A recovered or peer-staged entry may widen a column this shard's
+		// metadata still has at its original length.
+		for idx := range b.varcharColumnMetas {
+			if slices.Contains(g.merged.Widen, b.varcharColumnMetas[idx].Identifier) {
+				b.varcharColumnMetas[idx].MaxLength = redshiftVarcharMaxLength
+			}
 		}
 	}
 
@@ -853,25 +1063,11 @@ func (d *transactor) commit(ctx context.Context, varcharColumnUpdates map[string
 	}
 	defer txn.Rollback(ctx)
 
-	// If there are multiple materializations operating on different tables within the same database
-	// using the same metadata table path, they will need to concurrently update the checkpoints
-	// table. Acquiring a table-level lock prevents "serializable isolation violation" errors in
-	// this case (they still happen even though the queries update different _rows_ in the same
-	// table), although it means each materialization will have to take turns updating the
-	// checkpoints table. For best performance, a single materialization per database should be
-	// used, or separate materializations within the same database should use a different schema for
-	// their metadata.
-	if _, err := txn.Exec(ctx, fmt.Sprintf("lock %s;", d.dialect.Identifier(d.fence.TablePath...))); err != nil {
-		return fmt.Errorf("obtaining checkpoints table lock: %w", err)
-	}
-
-	for _, b := range d.bindings {
-		if !b.hasDeletes && !b.hasStores {
-			continue
-		}
+	for _, g := range groups {
+		var b = g.binding
 		d.be.StartedResourceCommit(b.target.Path)
 
-		if b.hasDeletes {
+		if g.deleteManifest != "" {
 			// Create the temporary table for staging values to delete from the target table.
 			// Redshift actually supports transactional DDL for creating tables, so this can be
 			// executed within the transaction.
@@ -885,16 +1081,18 @@ func (d *transactor) commit(ctx context.Context, varcharColumnUpdates map[string
 				return fmt.Errorf("creating delete table: %w", err)
 			}
 
-			if _, err := txn.Exec(ctx, b.copyIntoDeleteTableSQL); err != nil {
-				return handleCopyIntoErr(ctx, txn, d.cfg.Bucket, b.deleteFile.prefix, b.target.Identifier, err)
+			if copySQL, err := d.copyFromS3(fmt.Sprintf("flow_temp_table_%d_deleted", b.target.Binding), g.deleteManifest, false); err != nil {
+				return err
+			} else if _, err := txn.Exec(ctx, copySQL); err != nil {
+				return handleCopyIntoErr(ctx, txn, d.cfg.Bucket, g.merged.DeleteFiles, b.target.Identifier, err)
 			} else if _, err := txn.Exec(ctx, b.deleteQuerySQL); err != nil {
 				return fmt.Errorf("deleting from table '%s': %w", b.target.Identifier, err)
 			}
 		}
 
-		if !b.hasStores {
+		if g.storeManifest == "" {
 			// Pass.
-		} else if b.mustMerge {
+		} else if g.merged.MustMerge {
 			// Create the temporary table for staging values to merge into the target table.
 			// Redshift actually supports transactional DDL for creating tables, so this can be
 			// executed within the transaction.
@@ -908,28 +1106,52 @@ func (d *transactor) commit(ctx context.Context, varcharColumnUpdates map[string
 				return fmt.Errorf("creating store table: %w", err)
 			}
 
-			if _, err := txn.Exec(ctx, b.copyIntoMergeTableSQL); err != nil {
-				return handleCopyIntoErr(ctx, txn, d.cfg.Bucket, b.storeFile.prefix, b.target.Identifier, err)
+			if copySQL, err := d.copyFromS3(fmt.Sprintf("flow_temp_table_%d", b.target.Binding), g.storeManifest, true); err != nil {
+				return err
+			} else if _, err := txn.Exec(ctx, copySQL); err != nil {
+				return handleCopyIntoErr(ctx, txn, d.cfg.Bucket, g.merged.StoreFiles, b.target.Identifier, err)
 			} else if _, err := txn.Exec(ctx, b.mergeIntoSQL); err != nil {
 				return fmt.Errorf("merging to table '%s': %w", b.target.Identifier, err)
 			}
 		} else {
 			// Can copy directly into the target table since all values are new.
-			if _, err := txn.Exec(ctx, b.copyIntoTargetTableSQL); err != nil {
-				return handleCopyIntoErr(ctx, txn, d.cfg.Bucket, b.storeFile.prefix, b.target.Identifier, err)
+			if copySQL, err := d.copyFromS3(b.target.Identifier, g.storeManifest, true); err != nil {
+				return err
+			} else if _, err := txn.Exec(ctx, copySQL); err != nil {
+				return handleCopyIntoErr(ctx, txn, d.cfg.Bucket, g.merged.StoreFiles, b.target.Identifier, err)
 			}
 		}
 
 		d.be.FinishedResourceCommit(b.target.Path)
 	}
 
-	if err := updateFence(ctx, txn, d.dialect, d.fence); err != nil {
+	// Written in the same transaction as the data: a committed token proves
+	// the data committed, and a rolled-back commit leaves no token.
+	if err := d.checkpointsTable.write(ctx, txn, tokensMap, legacyCheckpoint); err != nil {
 		return err
 	} else if err := txn.Commit(ctx); err != nil {
 		return fmt.Errorf("committing store transaction: %w", err)
 	}
+	for _, bucket := range tokensMap {
+		for _, token := range bucket {
+			d.committedTokens[token] = true
+		}
+	}
 
 	return nil
+}
+
+// putManifest writes a manifest listing files under a fresh key, or returns
+// "" when there are none.
+func (d *transactor) putManifest(ctx context.Context, files []string) (string, error) {
+	if len(files) == 0 {
+		return "", nil
+	}
+	var key = path.Join(d.cfg.effectiveBucketPath(), uuid.NewString(), manifestFile)
+	if err := d.store.putManifest(ctx, key, files); err != nil {
+		return "", err
+	}
+	return key, nil
 }
 
 // handleCopyIntoErr queries the `sys_load_error_detail` table for relevant COPY INTO error details
@@ -937,13 +1159,13 @@ func (d *transactor) commit(ctx context.Context, varcharColumnUpdates map[string
 // always return an error. `sys_load_error_detail` is queried instead of `stl_load_errors` since it
 // is available to both serverless and provisioned versions of Redshift, whereas `stl_load_errors`
 // is only available on provisioned Redshift.
-func handleCopyIntoErr(ctx context.Context, txn pgx.Tx, bucket, prefix, table string, copyIntoErr error) error {
+func handleCopyIntoErr(ctx context.Context, txn pgx.Tx, bucket string, files []string, table string, copyIntoErr error) error {
 	// The transaction has failed. It must be finish being rolled back before using its underlying
 	// connection again.
 	txn.Rollback(ctx)
 	conn := txn.Conn()
 
-	loadErrInfo, err := getLoadErrorInfo(ctx, conn, bucket, prefix)
+	loadErrInfo, err := getLoadErrorInfo(ctx, conn, bucket, files)
 	if err != nil {
 		// If querying sys_load_error_detail fails for some reason, return the original error back
 		// unchanged, but log why sys_load_error_detail could not be queried. Some errors (target

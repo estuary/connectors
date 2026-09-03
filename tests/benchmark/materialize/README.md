@@ -32,6 +32,20 @@ pointing at a real credentials file. If no `docker-compose.yaml` is
 found for the connector, the script assumes the endpoint is already
 reachable.
 
+Check the config's feature flags before benchmarking. Integration-test
+configs often set `allow_existing_tables_for_new_bindings` (or
+`retain_existing_data_on_backfill`), and with either flag the connector
+tells the runtime to disable its load optimization, so the runtime issues a
+`Load` for every key in every transaction — even against a table the run
+just created. That load phase then dominates small-document runs and
+measures the runtime rather than the connector. Make a copy with the flag
+removed and pass it with `--config`; the copy stays encrypted:
+
+```bash
+cp materialize-redshift/testdata/config.local.yaml /tmp/config.bench.yaml
+sops set /tmp/config.bench.yaml '["advanced"]["feature_flags"]' '""'
+```
+
 ## Scenario file
 
 ```yaml
