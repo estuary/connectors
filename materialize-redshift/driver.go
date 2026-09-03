@@ -315,7 +315,7 @@ type transactor struct {
 	bindings                       []*binding
 	be                             *m.BindingEvents
 	cfg                            config
-	store                          *s3Store
+	s3client                       *s3.Client
 	caseSensitiveIdentifierEnabled bool
 
 	rangeKey string
@@ -372,11 +372,10 @@ func prepareNewTransactor(
 			pending: make(pendingState),
 		}
 
-		client, err := d.cfg.toS3Client(ctx, featureFlags)
-		if err != nil {
+		var err error
+		if d.s3client, err = d.cfg.toS3Client(ctx, featureFlags); err != nil {
 			return nil, err
 		}
-		d.store = newS3Store(client, d.cfg.Bucket)
 
 		for _, target := range bindings {
 			if err = d.addBinding(target, is); err != nil {
@@ -446,9 +445,9 @@ type VarcharColumnMeta struct {
 func (t *transactor) addBinding(target sql.Table, is *boilerplate.InfoSchema) error {
 	var b = &binding{
 		target:     target,
-		loadFile:   newStagedFile(t.store, t.cfg.effectiveBucketPath(), target.KeyNames()),
-		storeFile:  newStagedFile(t.store, t.cfg.effectiveBucketPath(), target.ColumnNames()),
-		deleteFile: newStagedFile(t.store, t.cfg.effectiveBucketPath(), target.KeyNames()),
+		loadFile:   newStagedFile(t.s3client, t.cfg.Bucket, t.cfg.effectiveBucketPath(), target.KeyNames()),
+		storeFile:  newStagedFile(t.s3client, t.cfg.Bucket, t.cfg.effectiveBucketPath(), target.ColumnNames()),
+		deleteFile: newStagedFile(t.s3client, t.cfg.Bucket, t.cfg.effectiveBucketPath(), target.KeyNames()),
 	}
 
 	if t.cfg.Advanced.NoFlowDocument {
@@ -517,7 +516,7 @@ func (t *transactor) copyFromS3(target string, manifestKey string, truncateColum
 	var sql strings.Builder
 	if err := t.templates.copyFromS3.Execute(&sql, copyFromS3Params{
 		Target:                         target,
-		ManifestURL:                    t.store.objectURI(manifestKey),
+		ManifestURL:                    objectURI(t.cfg.Bucket, manifestKey),
 		Config:                         t.cfg,
 		CaseSensitiveIdentifierEnabled: t.caseSensitiveIdentifierEnabled,
 		TruncateColumns:                truncateColumns,
@@ -657,7 +656,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			return fmt.Errorf("flushing load file for binding[%d]: %w", idx, err)
 		}
 		var objects = slices.Clone(files)
-		defer d.store.deleteObjects(ctx, objects)
+		defer deleteObjects(ctx, d.s3client, d.cfg.Bucket, objects)
 		manifest, err := d.putManifest(ctx, files, &objects)
 		if err != nil {
 			return err
@@ -918,7 +917,7 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	var clear = make(pendingState)
 	for rk, bucket := range processed {
 		for sk, e := range bucket {
-			d.store.deleteObjects(ctx, e.objects())
+			deleteObjects(ctx, d.s3client, d.cfg.Bucket, e.objects())
 			delete(d.pending[rk], sk)
 			clear.add(rk, sk, nil)
 		}
@@ -978,7 +977,7 @@ func (d *transactor) apply(ctx context.Context, work []bindingWork) error {
 	}
 
 	var manifests []string
-	defer func() { d.store.deleteObjects(ctx, manifests) }()
+	defer func() { deleteObjects(ctx, d.s3client, d.cfg.Bucket, manifests) }()
 	for _, g := range groups {
 		var err error
 		if g.storeManifest, err = d.putManifest(ctx, g.merged.StoreFiles, &manifests); err != nil {
@@ -1132,7 +1131,7 @@ func (d *transactor) putManifest(ctx context.Context, files []string, objects *[
 		return "", nil
 	}
 	var key = path.Join(d.cfg.effectiveBucketPath(), uuid.NewString(), manifestFile)
-	if err := d.store.putManifest(ctx, key, files); err != nil {
+	if err := putManifest(ctx, d.s3client, d.cfg.Bucket, key, files); err != nil {
 		return "", err
 	}
 	*objects = append(*objects, key)
