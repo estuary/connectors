@@ -337,8 +337,12 @@ func (db *mysqlDatabase) applySystemVersioning(ctx context.Context, dst map[sqlc
 		info.ColumnNames = append(info.ColumnNames, startCol.Name, endCol.Name)
 		// MariaDB implicitly extends the primary key of a system-versioned table
 		// by the row_end column, but this extension is not reflected in
-		// information_schema.statistics for the implicit form, so we mirror it.
-		info.PrimaryKey = append(info.PrimaryKey, endCol.Name)
+		// information_schema.statistics for the implicit form, so we mirror it
+		// when the table has a usable key. A table without a primary or suitable
+		// fallback key must remain keyless because row_end alone is not unique.
+		if len(info.PrimaryKey) > 0 {
+			info.PrimaryKey = append(info.PrimaryKey, endCol.Name)
+		}
 	}
 	return nil
 }
