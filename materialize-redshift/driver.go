@@ -326,16 +326,10 @@ type transactor struct {
 	// IDs of every stateItem already committed, across the materialization.
 	committedTokens map[string]bool
 	// The whole state: staged transactions not yet applied, from every shard.
-	state connectorState
+	cp connectorState
 	// Set only for a task crossing over from the old format, whose row still
 	// holds the runtime checkpoint and whose state has nothing staged.
 	runtimeCheckpoint m.RuntimeCheckpoint
-	// The runtime checkpoint of the most recent StartCommit in this process,
-	// mirrored into the checkpoints row so a downgraded connector can resume
-	// from it. Nil until a StartCommit has actually run here, which a
-	// recovery Acknowledge (settling work recovered from the state, with no
-	// preceding StartCommit in this process) must not mistake for one.
-	lastRuntimeCheckpoint []byte
 }
 
 var _ m.Transactor = (*transactor)(nil)
@@ -375,7 +369,7 @@ func prepareNewTransactor(
 				keyEnd:          fence.KeyEnd,
 			},
 			committedTokens: make(map[string]bool),
-			state:           make(connectorState),
+			cp:              make(connectorState),
 		}
 
 		client, err := d.cfg.toS3Client(ctx, featureFlags)
@@ -403,26 +397,19 @@ func prepareNewTransactor(
 		}
 		defer conn.Close(ctx)
 
-		if err := d.checkpointsTable.ensureTokensColumn(ctx, conn); err != nil {
-			return nil, err
-		}
-
 		var legacyCheckpoint []byte
-		var crossedOver bool
-		if d.committedTokens, legacyCheckpoint, crossedOver, err = d.checkpointsTable.readAll(ctx, conn); err != nil {
+		if d.committedTokens, legacyCheckpoint, err = d.checkpointsTable.readAll(ctx, conn); err != nil {
 			return nil, err
 		}
 		if d.primary {
-			d.state = state
+			d.cp = state
 		}
 
 		// A shard's row is authoritative only until it has staged a
 		// transaction: after that the recovery log is, and returning the
 		// row's checkpoint would rewind the runtime and stage that
-		// transaction twice. A row this connector has already written to
-		// once is never authoritative again, even though it keeps mirroring
-		// a legacy checkpoint from then on.
-		if legacyCheckpoint != nil && !crossedOver && !state.hasRange(d.rangeKey) {
+		// transaction twice.
+		if legacyCheckpoint != nil && !state.hasRange(d.rangeKey) {
 			d.runtimeCheckpoint = legacyCheckpoint
 		}
 
@@ -548,7 +535,7 @@ func (t *transactor) UnmarshalState(state json.RawMessage) error {
 	if err != nil {
 		return err
 	}
-	t.state = pending
+	t.cp = pending
 	return nil
 }
 
@@ -573,10 +560,10 @@ func (t *transactor) mergePeerStatePatches(patches []json.RawMessage) error {
 			for rk, e := range bucket {
 				// The previous transaction's entry is applied before the next
 				// one's patch arrives, so a collision would lose staged work.
-				if t.state[sk][rk] != nil {
+				if t.cp[sk][rk] != nil {
 					return fmt.Errorf("shard %s staged a new transaction for %s while its previous one is still pending", rk, sk)
 				}
-				t.state.add(sk, rk, e)
+				t.cp.add(sk, rk, e)
 			}
 		}
 	}
@@ -841,15 +828,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 	}
 
-	return func(ctx context.Context, checkpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
-		if checkpoint != nil {
-			raw, err := checkpoint.Marshal()
-			if err != nil {
-				return nil, m.FinishedOperation(fmt.Errorf("marshalling runtime checkpoint: %w", err))
-			}
-			d.lastRuntimeCheckpoint = raw
-		}
-
+	return func(ctx context.Context, _ *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
 		// Only this transaction's entries: an entry whose state key no longer
 		// has a binding stays pending forever and must not be re-sent. The
 		// primary picks its own entries back up from Acknowledge's statePatches,
@@ -890,7 +869,7 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 		if !shouldProcess(sk) {
 			continue
 		}
-		for rk, e := range d.state[sk] {
+		for rk, e := range d.cp[sk] {
 			pending.add(sk, rk, e)
 			clear.add(sk, rk, nil)
 			toDelete = append(toDelete, e.objects()...)
@@ -900,26 +879,17 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 		return nil, nil
 	}
 
-	// Mirror the runtime checkpoint into the checkpoints row, for a
-	// downgraded connector to resume from, only when this call settles
-	// every pending entry (not a partial, Apply-RPC-scoped commit) and a
-	// StartCommit has actually run in this process to produce one.
-	var legacyCheckpoint []byte
-	if pending.entryCount() == d.state.entryCount() {
-		legacyCheckpoint = d.lastRuntimeCheckpoint
-	}
-
-	if err := d.commit(ctx, pending, legacyCheckpoint); err != nil {
+	if err := d.commit(ctx, pending); err != nil {
 		return nil, err
 	}
 
 	d.store.deleteObjects(ctx, toDelete)
 	for sk, bucket := range pending {
 		for rk := range bucket {
-			delete(d.state[sk], rk)
+			delete(d.cp[sk], rk)
 		}
-		if len(d.state[sk]) == 0 {
-			delete(d.state, sk)
+		if len(d.cp[sk]) == 0 {
+			delete(d.cp, sk)
 		}
 	}
 
@@ -931,9 +901,8 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 }
 
 // commit runs the staged transactions of pending as one Redshift
-// transaction, skipping any whose token is already committed. legacyCheckpoint,
-// when non-nil, is mirrored into the checkpoints row alongside the tokens.
-func (d *transactor) commit(ctx context.Context, pending connectorState, legacyCheckpoint []byte) error {
+// transaction, skipping any whose token is already committed.
+func (d *transactor) commit(ctx context.Context, pending connectorState) error {
 	// group is one binding's pending transactions from every shard, merged
 	// into one, with manifests written for the commit.
 	type group struct {
@@ -942,7 +911,7 @@ func (d *transactor) commit(ctx context.Context, pending connectorState, legacyC
 		storeManifest, deleteManifest string
 	}
 	var groups []*group
-	var tokensMap = make(checkpointTokensMap)
+	var cp = make(checkpointTokensMap)
 	for _, b := range d.bindings {
 		var bucket = pending[b.target.StateKey]
 		if len(bucket) == 0 {
@@ -966,7 +935,7 @@ func (d *transactor) commit(ctx context.Context, pending connectorState, legacyC
 					g.merged.Widen = append(g.merged.Widen, column)
 				}
 			}
-			tokensMap.add(b.target.StateKey, rk, e.ID)
+			cp.add(b.target.StateKey, rk, e.ID)
 		}
 		if len(g.merged.StoreFiles) > 0 || len(g.merged.DeleteFiles) > 0 {
 			groups = append(groups, g)
@@ -1114,12 +1083,12 @@ func (d *transactor) commit(ctx context.Context, pending connectorState, legacyC
 
 	// Written in the same transaction as the data: a committed token proves
 	// the data committed, and a rolled-back commit leaves no token.
-	if err := d.checkpointsTable.write(ctx, txn, tokensMap, legacyCheckpoint); err != nil {
+	if err := d.checkpointsTable.write(ctx, txn, cp); err != nil {
 		return err
 	} else if err := txn.Commit(ctx); err != nil {
 		return fmt.Errorf("committing store transaction: %w", err)
 	}
-	for _, bucket := range tokensMap {
+	for _, bucket := range cp {
 		for _, token := range bucket {
 			d.committedTokens[token] = true
 		}
