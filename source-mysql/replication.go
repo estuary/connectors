@@ -303,6 +303,26 @@ type mysqlTableMetadata struct {
 type mysqlTableSchema struct {
 	Columns     []string               `json:"columns"`
 	ColumnTypes map[string]interface{} `json:"types"`
+
+	// ImplicitSystemVersioning is set for MariaDB tables declared `WITH SYSTEM
+	// VERSIONING` without an explicit `PERIOD FOR SYSTEM_TIME` clause. Such tables
+	// have hidden row_start and row_end columns which always follow the visible
+	// columns in binlog row images, and which MariaDB keeps at the end even when
+	// columns are added later. They are deliberately left out of Columns, so that
+	// DDL handling only ever manipulates visible columns, and this flag is the
+	// sole source of their presence when decoding row images.
+	ImplicitSystemVersioning bool `json:"implicit_system_versioning,omitempty"`
+}
+
+// rowImageColumns returns the names of every column present in binlog row images
+// for the table, in row image order.
+func (s *mysqlTableSchema) rowImageColumns() []string {
+	if !s.ImplicitSystemVersioning {
+		return s.Columns
+	}
+	var names = make([]string, 0, len(s.Columns)+2)
+	names = append(names, s.Columns...)
+	return append(names, implicitSystemVersioningStartColumn, implicitSystemVersioningEndColumn)
 }
 
 func (rs *mysqlReplicationStream) StartReplication(ctx context.Context, _ map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo) error {
@@ -591,7 +611,7 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 	var columnTypes = metadata.Schema.ColumnTypes
 	var columnNames = data.Table.ColumnNameString()
 	if len(columnNames) == 0 {
-		columnNames = metadata.Schema.Columns
+		columnNames = metadata.Schema.rowImageColumns()
 	}
 
 	keyColumns, ok := rs.keyColumns(streamID)
@@ -1440,6 +1460,15 @@ func (rs *mysqlReplicationStream) ActivateTable(ctx context.Context, streamID sq
 		metadata.Schema.ColumnTypes = colTypes
 		if extraDetails, ok := discovery.ExtraDetails.(*mysqlTableDiscoveryDetails); ok {
 			metadata.DefaultCharset = extraDetails.DefaultCharset
+			if extraDetails.ImplicitSystemVersioning {
+				// Discovery synthesizes the hidden row_start and row_end columns so that
+				// they appear in the generated schema and key, but the tracked column
+				// list should only hold visible columns so DDL tracking works properly.
+				metadata.Schema.ImplicitSystemVersioning = true
+				metadata.Schema.Columns = slices.DeleteFunc(slices.Clone(discovery.ColumnNames), func(name string) bool {
+					return name == implicitSystemVersioningStartColumn || name == implicitSystemVersioningEndColumn
+				})
+			}
 		}
 
 		logrus.WithFields(logrus.Fields{
