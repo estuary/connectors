@@ -867,11 +867,11 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 		layout[c.r.String()] = fmt.Sprintf("counter %d skip %d", c.counter, c.skip)
 	}
 	log.WithFields(log.Fields{
-		"table":    b.table,
-		"shard":    shard.String(),
-		"channels": len(active),
-		"layout":   layout,
-		"retiring": b.retire,
+		"table":      b.table,
+		"shardRange": shard.String(),
+		"channels":   len(active),
+		"layout":     layout,
+		"retiring":   b.retire,
 	}).Info("opened snowpipe streaming v2 channels")
 	return nil
 }
