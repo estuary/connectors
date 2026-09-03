@@ -36,7 +36,7 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 			"stream": streamID,
 			"offset": state.BackfilledCount,
 		}).Debug("scanning keyless table chunk")
-		query = db.keylessScanQuery(info, schema, table, backfillFilter)
+		query = db.keylessScanQuery(info, backfillFilter)
 		args = []any{state.BackfilledCount}
 	case sqlcapture.TableStatePreciseBackfill, sqlcapture.TableStateUnfilteredBackfill:
 		var isPrecise = (state.Mode == sqlcapture.TableStatePreciseBackfill)
@@ -62,13 +62,13 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 			for i := range resumeKey {
 				args = append(args, resumeKey[:i+1]...)
 			}
-			query = db.buildScanQuery(false, isPrecise, keyColumns, columnTypes, schema, table, backfillFilter)
+			query = db.buildScanQuery(info, false, isPrecise, keyColumns, columnTypes, backfillFilter)
 		} else {
 			logrus.WithFields(logrus.Fields{
 				"stream":     streamID,
 				"keyColumns": keyColumns,
 			}).Debug("scanning initial table chunk")
-			query = db.buildScanQuery(true, isPrecise, keyColumns, columnTypes, schema, table, backfillFilter)
+			query = db.buildScanQuery(info, true, isPrecise, keyColumns, columnTypes, backfillFilter)
 		}
 	default:
 		return false, nil, fmt.Errorf("invalid backfill mode %q", state.Mode)
@@ -215,7 +215,7 @@ var columnBinaryKeyComparison = map[string]bool{
 	"longtext":   true,
 }
 
-func (db *mysqlDatabase) keylessScanQuery(_ *sqlcapture.DiscoveryInfo, schemaName, tableName, backfillFilter string) string {
+func (db *mysqlDatabase) keylessScanQuery(info *sqlcapture.DiscoveryInfo, backfillFilter string) string {
 	// Generate a list of individual WHERE clauses which should be ANDed together
 	var whereClauses []string
 	if backfillFilter != "" {
@@ -223,7 +223,7 @@ func (db *mysqlDatabase) keylessScanQuery(_ *sqlcapture.DiscoveryInfo, schemaNam
 	}
 
 	var query = new(strings.Builder)
-	fmt.Fprintf(query, "SELECT * FROM `%s`.`%s`", schemaName, tableName)
+	query.WriteString(backfillSelectFrom(info))
 	if len(whereClauses) > 0 {
 		fmt.Fprintf(query, " WHERE %s", strings.Join(whereClauses, " AND "))
 	}
@@ -232,7 +232,24 @@ func (db *mysqlDatabase) keylessScanQuery(_ *sqlcapture.DiscoveryInfo, schemaNam
 	return query.String()
 }
 
-func (db *mysqlDatabase) buildScanQuery(start, isPrecise bool, keyColumns []string, columnTypes map[string]interface{}, schemaName, tableName, backfillFilter string) string {
+// backfillSelectFrom returns the `SELECT ... FROM ...` prefix of a backfill query.
+// In the common case this is just `SELECT * FROM table`. MariaDB system-versioned
+// tables are scanned with `FOR SYSTEM_TIME ALL` so that historical row versions
+// are backfilled along with current ones, and when the system-versioning columns
+// are implicit (and thus omitted from `SELECT *`) they are listed explicitly.
+func backfillSelectFrom(info *sqlcapture.DiscoveryInfo) string {
+	var selectList = "*"
+	var suffix = ""
+	if details, ok := info.ExtraDetails.(*mysqlTableDiscoveryDetails); ok && details.SystemVersioned {
+		suffix = " FOR SYSTEM_TIME ALL"
+		if details.ImplicitSystemVersioning {
+			selectList = "*, row_start, row_end"
+		}
+	}
+	return fmt.Sprintf("SELECT %s FROM `%s`.`%s`%s", selectList, info.Schema, info.Name, suffix)
+}
+
+func (db *mysqlDatabase) buildScanQuery(info *sqlcapture.DiscoveryInfo, start, isPrecise bool, keyColumns []string, columnTypes map[string]interface{}, backfillFilter string) string {
 	// Construct lists of key specifiers and placeholders. They will be joined with commas and used in the query itself.
 	var pkey []string
 	for _, colName := range keyColumns {
@@ -271,7 +288,7 @@ func (db *mysqlDatabase) buildScanQuery(start, isPrecise bool, keyColumns []stri
 
 	// Construct the query itself.
 	var query = new(strings.Builder)
-	fmt.Fprintf(query, "SELECT * FROM `%s`.`%s`", schemaName, tableName)
+	query.WriteString(backfillSelectFrom(info))
 	if len(whereClauses) > 0 {
 		fmt.Fprintf(query, " WHERE %s", strings.Join(whereClauses, " AND "))
 	}
