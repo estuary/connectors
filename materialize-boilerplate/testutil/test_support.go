@@ -182,7 +182,9 @@ func RunMaterializationTest[EC boilerplate.EndpointConfiger, FC boilerplate.Fiel
 		snap.WriteString(runMaterializationTestForTask(t, ctx, newMaterializer, taskName, bundled, tsSuffix, makeResourceFn, actionDescSanitizers, runtime))
 	})
 
-	snapshotT(t, snap.String())
+	if !RuntimeV1() {
+		snapshotT(t, snap.String())
+	}
 }
 
 // RunMaterializationTestParallel is like RunMaterializationTest but runs tasks
@@ -209,7 +211,9 @@ func RunMaterializationTestParallel[EC boilerplate.EndpointConfiger, FC boilerpl
 		snap.WriteString(results[name])
 	}
 
-	snapshotT(t, snap.String())
+	if !RuntimeV1() {
+		snapshotT(t, snap.String())
+	}
 }
 
 // RunApplyTest tests a variety of scenarios involving changes to materialized

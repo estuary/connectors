@@ -98,10 +98,10 @@ func rewriteTaskForTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resource
 }
 
 // RuntimeConfig configures how a materialization integration test drives the
-// runtime, via `flowctl raw preview-next --fixture --shards N`. Setting the
-// FLOW_TEST_RUNTIME environment variable to "v1" drives it through legacy
-// `flowctl preview` instead, which is the runtime v1 protocol (Acknowledge
-// never carries statePatches); CI runs both. Multi-shard
+// runtime, via `flowctl raw preview-next --fixture --shards N`. With the
+// FLOW_TEST_RUNTIME environment variable set to "v1" the test instead checks
+// runtime v1 liveness (see runtimeV1Liveness) and compares no snapshot; CI runs
+// both. Multi-shard
 // runs hash-route fixture documents across shards exactly as live shuffled
 // reads would, and require the connector to implement the scale-out contract
 // (range-scoped state, shard-zero-executes).
@@ -181,35 +181,22 @@ func runMaterializationTestForTask[EC boilerplate.EndpointConfiger, FC boilerpla
 	// final commit without running the post-commit Acknowledge, so flowctl
 	// appends an empty drain session which recovery-applies that last
 	// transaction before the destination tables are snapshotted.
-	var args []string
-	if os.Getenv("FLOW_TEST_RUNTIME") == "v1" {
-		// Legacy preview has no --shards and does not auto-append the drain
-		// session: the trailing 0-transaction session runs the recovery
-		// Acknowledge that applies the last transaction. Apply and state
-		// output are omitted, as for sharded runs, so the destination snapshot
-		// is the same golden the runtime-next run produces.
-		args = []string{
-			"preview",
-			"--name", rt.workingTaskName,
-			"--source", rt.sourcePath,
-			"--fixture", relativePath(t, "testdata/integration/fixture.materialize.json"),
-			"--sessions=-1,0", // one argument: clap reads a bare "-1" as a flag
-			"--timeout", timeout.String(),
-			"--network", "flow-test",
-		}
-	} else {
-		args = []string{
-			"raw", "preview-next",
-			"--name", rt.workingTaskName,
-			"--source", rt.sourcePath,
-			"--fixture", relativePath(t, "testdata/integration/fixture.materialize.json"),
-			"--shards", strconv.Itoa(shards),
-			"--timeout", timeout.String(),
-			"--network", "flow-test",
-		}
-		if shards == 1 {
-			args = append(args, "--output-apply", "--output-state")
-		}
+	if RuntimeV1() {
+		runtimeV1Liveness(t, ctx, materializer, rt)
+		return ""
+	}
+
+	args := []string{
+		"raw", "preview-next",
+		"--name", rt.workingTaskName,
+		"--source", rt.sourcePath,
+		"--fixture", relativePath(t, "testdata/integration/fixture.materialize.json"),
+		"--shards", strconv.Itoa(shards),
+		"--timeout", timeout.String(),
+		"--network", "flow-test",
+	}
+	if shards == 1 {
+		args = append(args, "--output-apply", "--output-state")
 	}
 
 	actionDescription := RunFlowctl(t, args...)
@@ -265,5 +252,45 @@ func SanitizeCheckpointHashes(pattern, placeholder string) func(string) string {
 		out.WriteString(s[last:])
 
 		return out.String()
+	}
+}
+
+// RuntimeV1 reports whether FLOW_TEST_RUNTIME selects the runtime v1 pass.
+func RuntimeV1() bool { return os.Getenv("FLOW_TEST_RUNTIME") == "v1" }
+
+// runtimeV1Liveness drives the task through legacy `flowctl preview` -- the
+// runtime v1 protocol, under which Acknowledge never carries statePatches -- as
+// a single session with no trailing drain session, and requires that every
+// binding's resource then holds data.
+//
+// The fixture writes each collection in two of its four transactions, and a
+// session's final Acknowledge never runs, so a connector that applies what it
+// acknowledges lands most of the fixture within the session. One that only
+// learns its own staged work from the statePatches echo runtime-next sends
+// lands nothing until the session rotates -- which a drain session, and every
+// runtime-next test, would hide. No snapshot: this asserts liveness, not
+// content, so it holds for every connector without a runtime v1 golden.
+func runtimeV1Liveness[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
+	t *testing.T,
+	ctx context.Context,
+	materializer boilerplate.Materializer[EC, FC, RC, MT],
+	rt rewrittenTask[RC],
+) {
+	t.Helper()
+
+	RunFlowctl(t,
+		"preview",
+		"--name", rt.workingTaskName,
+		"--source", rt.sourcePath,
+		"--fixture", relativePath(t, "testdata/integration/fixture.materialize.json"),
+		"--sessions=-1", // one argument: clap reads a bare "-1" as a flag
+		"--network", "flow-test",
+	)
+
+	for _, path := range rt.resourcePaths {
+		_, rows, err := materializer.SnapshotTestResource(ctx, path)
+		require.NoError(t, err)
+		require.NotEmptyf(t, rows,
+			"runtime v1: %v is empty after a single session; the connector applied nothing it acknowledged within the session (does it only learn its own staged work from Acknowledge's statePatches, which runtime v1 never sends?)", path)
 	}
 }
