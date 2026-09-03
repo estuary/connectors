@@ -136,7 +136,7 @@ func TestIntegration(t *testing.T) {
 
 // stageRows stages rows to S3 as a transaction of a binding having the given
 // column fields would, returning the entry describing them.
-func stageRows(t *testing.T, cfg config, fields []string, rows [][]any) *checkpointItem {
+func stageRows(t *testing.T, cfg config, fields []string, rows [][]any) *stagedTransaction {
 	t.Helper()
 	ctx := context.Background()
 
@@ -151,7 +151,7 @@ func stageRows(t *testing.T, cfg config, fields []string, rows [][]any) *checkpo
 	files, err := f.flush()
 	require.NoError(t, err)
 
-	return &checkpointItem{ID: uuid.NewString(), StoreFiles: files}
+	return &stagedTransaction{ID: uuid.NewString(), StoreFiles: files}
 }
 
 // runIdempotencyTest covers what the runtime-driven tests cannot, because they
@@ -241,7 +241,7 @@ func runIdempotencyTest(t *testing.T, makeResourceFn func(string, bool) tableCon
 		require.NoError(t, err)
 		return len(rows)
 	}
-	stateWith := func(t *testing.T, entry *checkpointItem) json.RawMessage {
+	stateWith := func(t *testing.T, entry *stagedTransaction) json.RawMessage {
 		return mustMarshal(t, pendingState{table.StateKey: {rangeKeyOf(0, math.MaxUint32): entry}})
 	}
 
