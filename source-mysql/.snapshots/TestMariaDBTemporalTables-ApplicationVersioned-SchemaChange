@@ -1,0 +1,10 @@
+# ================================
+# Collection "acmeCo/test/test/mariadbtemporaltables_applicationversioned_271800": 2 Documents
+# ================================
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"MariaDBTemporalTables_ApplicationVersioned_271800","cursor":"binlog.000123:56789:123","txid":"0-1-111"}},"data":"six","extra":42,"id":6,"valid_from":"<TIMESTAMP>","valid_to":"<TIMESTAMP>"}
+{"_meta":{"op":"u","source":{"ts_ms":1111111111111,"schema":"test","table":"MariaDBTemporalTables_ApplicationVersioned_271800","cursor":"binlog.000123:56789:123","txid":"0-1-111"},"before":{"data":"one-v3","extra":null,"id":1,"valid_from":"<TIMESTAMP>","valid_to":"<TIMESTAMP>"}},"data":"one-v3","extra":7,"id":1,"valid_from":"<TIMESTAMP>","valid_to":"<TIMESTAMP>"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FMariaDBTemporalTables_ApplicationVersioned_271800":{"backfilled":2,"key_columns":["id"],"metadata":{"charset":"utf8mb4","schema":{"columns":["id","valid_from","valid_to","data","extra"],"types":{"data":{"charset":"utf8mb4","type":"text"},"extra":{"type":"int"},"id":{"type":"int"},"valid_from":"datetime","valid_to":"datetime"}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+
