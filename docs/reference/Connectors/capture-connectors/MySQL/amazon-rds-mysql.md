@@ -75,7 +75,7 @@ CALL mysql.rds_set_configuration('binlog retention hours', 168);
 
 Instead of a password, you can authenticate to your instance with an AWS IAM role.
 
-Follow the steps in the [AWS IAM guide][aws-iam] to create a role for Flow to assume, and make note of its ARN and your instance's region to use when configuring the connector's authentication options.
+Follow the steps in the [AWS IAM guide][aws-iam] to create a role for Estuary to assume, and make note of its ARN and your instance's region to use when configuring the connector's authentication options.
 
 [Enable IAM database authentication](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.IAMDBAuth.Enabling.html) on the instance, then switch to your MySQL client and run the following commands to create a database user which authenticates through the RDS plugin, granting it the same permissions as the `flow_capture` user in the [setup instructions](#setup) above:
 
