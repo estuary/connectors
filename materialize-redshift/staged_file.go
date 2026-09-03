@@ -23,7 +23,10 @@ const (
 	manifestFile = "files.manifest"
 )
 
-// s3Store is the S3 client configured with the user bucket.
+// s3Store is the S3 client and bucket shared by every stagedFile of a
+// transactor, and the S3 operations the transactor runs outside of any one
+// stagedFile: writing COPY manifests and deleting objects once they are no
+// longer needed.
 type s3Store struct {
 	client   *s3.Client
 	uploader *manager.Uploader
@@ -80,13 +83,13 @@ type manifestEntry struct {
 }
 
 // putManifest writes a COPY manifest at manifestKey listing the given data
-// files, each an object key.
+// files, each a full object key.
 func (s *s3Store) putManifest(ctx context.Context, manifestKey string, files []string) error {
 	manifest := copyManifest{Entries: make([]manifestEntry, 0, len(files))}
 	for _, key := range files {
 		manifest.Entries = append(manifest.Entries, manifestEntry{
 			URL:       s.objectURI(key),
-			Mandatory: true,
+			Mandatory: true, // Always true
 		})
 	}
 
