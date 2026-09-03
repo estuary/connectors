@@ -1,5 +1,13 @@
 # source-mysql
 
+## 2026-09-03
+
+### Added
+- The `credentials` configuration union now also supports Google Cloud IAM
+  authentication, for Cloud SQL for MySQL instances with the
+  `cloudsql_iam_authentication` flag enabled. The access token obtained through
+  the workload identity pool is presented as the database password.
+
 ## 2026-09-01
 
 ### Added
