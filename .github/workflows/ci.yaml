@@ -419,22 +419,18 @@ jobs:
         run: |
           CONNECTOR=${{ matrix.connector }} VERSION=local tests/materialize/run.sh;
 
-      # The step above drives the connector through runtime-next. This one repeats
-      # the connector's own tests through legacy `flowctl preview`, i.e. the
-      # runtime v1 protocol, whose Acknowledge never carries statePatches: a
-      # connector that only learns its own staged work from that echo applies
-      # nothing within a v1 session, and every other check passes. It uses
-      # `flowctl-v1`, a tagged release pinned in fetch-flow.sh, because the rolling
-      # `dev-next` flowctl tracks runtime-next and legacy preview is slated to be
-      # rewired onto it -- at which point this step would silently test v2 twice.
-      # Allowlisted because a v1 run is single-shard and omits the apply/state
-      # output, so it only matches the golden of a connector whose snapshot
-      # already omits them (a `Shards: 2` run); add a connector once verified on v1.
+      # The step above drives the connector through runtime-next. This one checks
+      # runtime v1 liveness: the same tests through legacy `flowctl preview` as a
+      # single session with no drain, requiring every binding to hold data after
+      # it. Runtime v1's Acknowledge never carries statePatches, so a connector
+      # that only learns its own staged work from that echo applies nothing
+      # within a v1 session -- while every runtime-next test passes. It uses
+      # `flowctl-v1`, a tagged release pinned in fetch-flow.sh, because the
+      # rolling `dev-next` flowctl tracks runtime-next and legacy preview is
+      # slated to be rewired onto it. No golden is involved, so it runs for every
+      # materialization connector (see testutil.runtimeV1Liveness).
       - name: Materialization connector ${{ matrix.connector }} integration tests (runtime v1)
-        if: |
-          contains(fromJson('[
-            "materialize-redshift"
-            ]'), matrix.connector)
+        if: startsWith(matrix.connector, 'materialize-')
         env:
           FLOW_TEST_RUNTIME: v1
           FLOW_TEST_FLOWCTL: flowctl-v1
