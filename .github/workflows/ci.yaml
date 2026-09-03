@@ -427,8 +427,10 @@ jobs:
       # within a v1 session -- while every runtime-next test passes. It uses
       # `flowctl-v1`, a tagged release pinned in fetch-flow.sh, because the
       # rolling `dev-next` flowctl tracks runtime-next and legacy preview is
-      # slated to be rewired onto it. No golden is involved, so it runs for every
-      # materialization connector (see testutil.runtimeV1Liveness).
+      # slated to be rewired onto it. The liveness check needs no golden, so this
+      # runs for every materialization connector; a drained run then compares
+      # against a table-only `<test>-runtime-v1` snapshot when the connector has
+      # one (see testutil.runtimeV1Liveness and runtimeV1SnapshotName).
       - name: Materialization connector ${{ matrix.connector }} integration tests (runtime v1)
         if: startsWith(matrix.connector, 'materialize-')
         env:

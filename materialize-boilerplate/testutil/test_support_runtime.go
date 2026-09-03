@@ -99,9 +99,10 @@ func rewriteTaskForTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resource
 
 // RuntimeConfig configures how a materialization integration test drives the
 // runtime, via `flowctl raw preview-next --fixture --shards N`. With the
-// FLOW_TEST_RUNTIME environment variable set to "v1" the test instead checks
-// runtime v1 liveness (see runtimeV1Liveness) and compares no snapshot; CI runs
-// both. Multi-shard
+// FLOW_TEST_RUNTIME environment variable set to "v1" the test instead drives
+// legacy `flowctl preview` (runtime v1): a liveness check (runtimeV1Liveness)
+// and then a drained run snapshotted against a table-only `-runtime-v1`
+// golden; CI runs both. Multi-shard
 // runs hash-route fixture documents across shards exactly as live shuffled
 // reads would, and require the connector to implement the scale-out contract
 // (range-scoped state, shard-zero-executes).
@@ -181,22 +182,37 @@ func runMaterializationTestForTask[EC boilerplate.EndpointConfiger, FC boilerpla
 	// final commit without running the post-commit Acknowledge, so flowctl
 	// appends an empty drain session which recovery-applies that last
 	// transaction before the destination tables are snapshotted.
+	var args []string
 	if RuntimeV1() {
 		runtimeV1Liveness(t, ctx, materializer, rt)
-		return ""
-	}
-
-	args := []string{
-		"raw", "preview-next",
-		"--name", rt.workingTaskName,
-		"--source", rt.sourcePath,
-		"--fixture", relativePath(t, "testdata/integration/fixture.materialize.json"),
-		"--shards", strconv.Itoa(shards),
-		"--timeout", timeout.String(),
-		"--network", "flow-test",
-	}
-	if shards == 1 {
-		args = append(args, "--output-apply", "--output-state")
+		// Then the whole fixture, drained, for the runtime v1 golden: what a
+		// correct connector leaves in the destination on either runtime. Legacy
+		// preview does not auto-append the drain session that preview-next
+		// does, and the apply/state output is omitted because it embeds
+		// per-run values and differs by runtime.
+		CleanupTestResources(t, ctx, materializer, rt.resourcePaths, tsSuffix)
+		args = []string{
+			"preview",
+			"--name", rt.workingTaskName,
+			"--source", rt.sourcePath,
+			"--fixture", relativePath(t, "testdata/integration/fixture.materialize.json"),
+			"--sessions=-1,0", // one argument: clap reads a bare "-1" as a flag
+			"--timeout", timeout.String(),
+			"--network", "flow-test",
+		}
+	} else {
+		args = []string{
+			"raw", "preview-next",
+			"--name", rt.workingTaskName,
+			"--source", rt.sourcePath,
+			"--fixture", relativePath(t, "testdata/integration/fixture.materialize.json"),
+			"--shards", strconv.Itoa(shards),
+			"--timeout", timeout.String(),
+			"--network", "flow-test",
+		}
+		if shards == 1 {
+			args = append(args, "--output-apply", "--output-state")
+		}
 	}
 
 	actionDescription := RunFlowctl(t, args...)
