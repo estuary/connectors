@@ -99,20 +99,11 @@ func (p checkpointTokensMap) add(stateKey, rangeKey, token string) {
 	p[stateKey][rangeKey] = token
 }
 
-// checkpointsTable reaches one materialization's checkpoints row for one key range,
-// and mirrors that row's payload.
-type checkpointsTable struct {
-	table            string // quoted identifier
-	materialization  string
-	keyBegin, keyEnd uint32
-	payload          checkpointTokensMap
-}
-
 // decodeLegacyCheckpoint decodes a checkpoints row's checkpoint column: a
 // base64 (possibly gzipped) runtime checkpoint, the format written by
 // pre-migration versions of this connector and mirrored by this one. It
 // reads back as hex text because the column is VARBYTE.
-func (s *checkpointsTable) decodeLegacyCheckpoint(raw string) ([]byte, error) {
+func decodeLegacyCheckpoint(raw string) ([]byte, error) {
 	decoded, err := hex.DecodeString(raw)
 	if err != nil {
 		return nil, fmt.Errorf("decoding checkpoints row: %w", err)
@@ -129,7 +120,7 @@ func (s *checkpointsTable) decodeLegacyCheckpoint(raw string) ([]byte, error) {
 // decodeTokensColumn decodes a checkpoints row's checkpoint_tokens column,
 // nil when raw is the column's NULL. It reads back as hex text because the
 // column is VARBYTE.
-func (s *checkpointsTable) decodeTokensColumn(raw *string) (checkpointTokensMap, error) {
+func decodeTokensColumn(raw *string) (checkpointTokensMap, error) {
 	if raw == nil {
 		return nil, nil
 	}
@@ -142,6 +133,15 @@ func (s *checkpointsTable) decodeTokensColumn(raw *string) (checkpointTokensMap,
 		return nil, fmt.Errorf("parsing applied tokens: %w", err)
 	}
 	return tokens, nil
+}
+
+// checkpointsTable reaches one materialization's checkpoints row for one key range,
+// and mirrors that row's payload.
+type checkpointsTable struct {
+	table            string // quoted identifier
+	materialization  string
+	keyBegin, keyEnd uint32
+	payload          checkpointTokensMap
 }
 
 // ensureTokensColumn adds the checkpoint_tokens column to a checkpoints
@@ -184,7 +184,7 @@ func (s *checkpointsTable) readAll(ctx context.Context, conn *pgx.Conn) (map[str
 		if err := rows.Scan(&keyBegin, &keyEnd, &checkpointRaw, &tokensRaw); err != nil {
 			return nil, nil, false, fmt.Errorf("scanning checkpoints row: %w", err)
 		}
-		tokens, err := s.decodeTokensColumn(tokensRaw)
+		tokens, err := decodeTokensColumn(tokensRaw)
 		if err != nil {
 			return nil, nil, false, err
 		}
@@ -195,7 +195,7 @@ func (s *checkpointsTable) readAll(ctx context.Context, conn *pgx.Conn) (map[str
 		}
 		if keyBegin == s.keyBegin && keyEnd == s.keyEnd {
 			s.payload, crossedOver = tokens, tokensRaw != nil
-			if legacyCheckpoint, err = s.decodeLegacyCheckpoint(checkpointRaw); err != nil {
+			if legacyCheckpoint, err = decodeLegacyCheckpoint(checkpointRaw); err != nil {
 				return nil, nil, false, err
 			}
 		}
