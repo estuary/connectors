@@ -112,11 +112,6 @@ func (e *emrClient) startJobRun(ctx context.Context, startInput *emr.StartJobRun
 
 	// When re-using a ClientToken, the job configuration must exactly match.
 	// We always ensure this is the case during normal operation.
-	//
-	// However should there be code change that modifies how the job is
-	// created, we don't want the task to get recovery loop.  Starting a new
-	// job with a different ClientToken will duplicate the work, but this is
-	// better than not being able to make progress.
 	if isConflictErr(err) {
 		log.Warn("job exists with conflicting definition; starting job with new ClientToken")
 		startInput.ClientToken = aws.String(uuid.NewString())
