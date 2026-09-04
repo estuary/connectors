@@ -1,6 +1,6 @@
 """A stdlib-only fake of the snowpipe streaming sidecar, for Go unit tests.
 
-Speaks the same transport handshake and NDJSON RPC protocol as the real
+Speaks the same readiness handshake and NDJSON RPC protocol as the real
 sidecar — including an append's framing, whose rows follow the request line as a
 payload of the length that line declares — backed by an in-memory "Snowflake"
 that commits appends instantly.
@@ -57,18 +57,10 @@ def main():
 
     auth = sys.stdin.readline().strip()
 
-    if "--uds" in argv:
-        path = argv[argv.index("--uds") + 1]
-        server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        server.bind(path)
-        ready = {"ready": True, "transport": "uds"}
-    else:
-        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        server.bind(("127.0.0.1", 0))
-        ready = {"ready": True, "transport": "tcp", "port": server.getsockname()[1]}
-
+    server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    server.bind(argv[argv.index("--uds") + 1])
     server.listen(1)
-    sys.stdout.write(json.dumps(ready) + "\n")
+    sys.stdout.write(json.dumps({"ready": True}) + "\n")
     sys.stdout.flush()
 
     conn, _ = server.accept()
