@@ -137,9 +137,11 @@ func parseStreamV2Token(token string) (int64, streamV2Range, bool) {
 
 // streamsV2 reports whether a binding writes through the snowpipe streaming v2 path.
 // That path appends rows to a channel as it stores them. Only a delta-updates binding
-// can do this, and only with JWT credentials to authenticate its sidecar.
+// can do this, and only with JWT credentials to authenticate its sidecar. A
+// configuration with no credentials object, as older versions of this connector
+// wrote, never streams.
 func streamsV2(cfg *config, deltaUpdates bool, flagEnabled bool) bool {
-	return deltaUpdates && cfg.Credentials.AuthType == snowflake_auth.JWT && flagEnabled
+	return deltaUpdates && cfg.Credentials != nil && cfg.Credentials.AuthType == snowflake_auth.JWT && flagEnabled
 }
 
 // streamV2Downgrade reports whether a binding is leaving the snowpipe streaming v2
