@@ -60,8 +60,11 @@ func TestIntegration(t *testing.T) {
 
 	// Two shards exercise the primary shard applying a peer's staged files.
 	t.Run("materialize", func(t *testing.T) {
+		// Redshift now applies staged files in Acknowledge under the scale-out
+		// model, so it does not yet report transaction-health row stats; a
+		// follow-up can report the primary's totals from that apply path.
 		sql.RunMaterializationTest(t, NewDriver(), "testdata/materialize.flow.yaml", makeResourceFn, sanitizers,
-			sql.RuntimeConfig{Shards: 2})
+			sql.RuntimeConfig{Shards: 2, Fidelity: m.FidelityNone})
 	})
 
 	t.Run("apply", func(t *testing.T) {

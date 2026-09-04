@@ -37,6 +37,11 @@ type checkpointItem struct {
 	Bounds     []mergeBoundLiterals `json:",omitempty"`
 	SourceURIs []string             `json:",omitempty"`
 	JobPrefix  string               `json:",omitempty"`
+
+	// round is the transaction round this session staged the entry in, for
+	// attributing its commit's row stats. Recovered and peer entries are
+	// reported outside of round pairing, so theirs is left zero.
+	round int
 }
 
 // mergeBoundLiterals is the serialized form of a key column's sql.MergeBound:
@@ -478,6 +483,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			NeedsMerge: b.mustMerge,
 			SourceURIs: uris,
 			JobPrefix:  uuid.NewString(),
+			round:      it.Round,
 		}
 
 		b.mustMerge = false
@@ -615,6 +621,8 @@ func (t *transactor) acknowledgeApply(ctx context.Context, shouldProcess func(st
 			// fully rendered when staged, so they run individually. The rest
 			// coalesce into a single query over their combined bounds and
 			// source files.
+			// items[0] is this shard's own entry when it has one.
+			round := items[0].item.round
 			needsMerge := false
 			var coalesce []*checkpointItem
 			var sourceURIs []string
@@ -627,9 +635,11 @@ func (t *transactor) acknowledgeApply(ctx context.Context, shouldProcess func(st
 					}
 					continue
 				}
-				if err := t.client.queryIdempotent(groupCtx, b.storeSchema, e.item.Query, e.item.JobPrefix, e.item.SourceURIs, e.item.TempTableName); err != nil {
+				stat, err := t.client.queryIdempotent(groupCtx, b.storeSchema, e.item.Query, e.item.JobPrefix, e.item.SourceURIs, e.item.TempTableName)
+				if err != nil {
 					return fmt.Errorf("acknowledge query for %q: %w", b.target.Path, err)
 				}
+				t.be.ReportRowStats(round, b.target.Path, dmlRowStats(stat))
 				log.WithFields(log.Fields{
 					"query":         e.item.Query,
 					"external_data": map[string][]string{e.item.TempTableName: e.item.SourceURIs},
@@ -650,9 +660,11 @@ func (t *transactor) acknowledgeApply(ctx context.Context, shouldProcess func(st
 				for _, item := range coalesce {
 					coalescedURIs = append(coalescedURIs, item.SourceURIs...)
 				}
-				if err := t.client.queryIdempotent(groupCtx, b.storeSchema, query, coalesce[0].JobPrefix, coalescedURIs, b.tempTableName); err != nil {
+				stat, err := t.client.queryIdempotent(groupCtx, b.storeSchema, query, coalesce[0].JobPrefix, coalescedURIs, b.tempTableName)
+				if err != nil {
 					return fmt.Errorf("acknowledge query for %q: %w", b.target.Path, err)
 				}
+				t.be.ReportRowStats(round, b.target.Path, dmlRowStats(stat))
 				log.WithFields(log.Fields{
 					"query":         query,
 					"external_data": map[string][]string{b.tempTableName: coalescedURIs},

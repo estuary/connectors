@@ -268,6 +268,7 @@ func (d *materialization) NewTransactor(
 
 		bindings = append(bindings, &binding{
 			collection:      d.client.Database(d.cfg.Database).Collection(b.ResourcePath[1]),
+			path:            b.ResourcePath,
 			deltaUpdates:    b.DeltaUpdates,
 			keyRestorations: keyRestorations,
 		})
@@ -277,6 +278,7 @@ func (d *materialization) NewTransactor(
 		cfg:      &d.cfg,
 		client:   d.client,
 		bindings: bindings,
+		be:       be,
 	}, nil
 }
 

@@ -81,7 +81,7 @@ func TestRetryBulkStoreResendsOnlyFailedItems(t *testing.T) {
 
 	responses := []*bulkResponse{
 		bulkResp(t, "", "retry_on_primary_exception", ""), // item 1 fails transiently
-		bulkResp(t, ""),                                   // resent item succeeds
+		bulkResp(t, ""), // resent item succeeds
 	}
 	var sentBodies [][]byte
 	send := func(body []byte) (*bulkResponse, error) {
@@ -92,7 +92,7 @@ func TestRetryBulkStoreResendsOnlyFailedItems(t *testing.T) {
 	}
 	noDelay := func(context.Context, int) error { return nil }
 
-	err := retryBulkStore(context.Background(), items, maxStoreRetries, send, noDelay)
+	_, err := retryBulkStore(context.Background(), items, maxStoreRetries, send, noDelay)
 	require.NoError(t, err)
 	require.Len(t, sentBodies, 2, "should send the initial batch then a retry")
 	require.Equal(t, []byte("A\nB\nC\n"), sentBodies[0], "first send is the whole batch")
@@ -111,7 +111,7 @@ func TestRetryBulkStoreFailsFastOnTerminal(t *testing.T) {
 	}
 	noDelay := func(context.Context, int) error { return nil }
 
-	err := retryBulkStore(context.Background(), items, maxStoreRetries, send, noDelay)
+	_, err := retryBulkStore(context.Background(), items, maxStoreRetries, send, noDelay)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "mapper_parsing_exception")
 	require.Equal(t, 1, sends, "terminal error must not be retried")
@@ -130,7 +130,7 @@ func TestRetryBulkStoreExhaustsAttempts(t *testing.T) {
 	}
 	noDelay := func(context.Context, int) error { return nil }
 
-	err := retryBulkStore(context.Background(), items, 3 /* maxAttempts */, send, noDelay)
+	_, err := retryBulkStore(context.Background(), items, 3 /* maxAttempts */, send, noDelay)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "retry_on_primary_exception")
 	require.Equal(t, 3, sends, "should attempt exactly maxAttempts times")

@@ -65,6 +65,9 @@ type bindingState struct {
 	PreviousCheckpoint string   `json:"previousCheckpoint,omitempty"`
 	CurrentCheckpoint  string   `json:"currentCheckpoint,omitempty"`
 	FileKeys           []string `json:"fileKeys"`
+	// Round and Rows are what Acknowledge reports once FileKeys are appended.
+	Round int   `json:"round,omitempty"`
+	Rows  int64 `json:"rows,omitempty"`
 }
 
 func hashCheckpoint(cp *protocol.Checkpoint) (string, error) {
@@ -84,6 +87,7 @@ type transactor struct {
 	prefix          string
 	store           *filesink.S3Store
 	state           connectorState
+	be              *m.BindingEvents
 }
 
 var _ m.Transactor = &transactor{}
@@ -161,9 +165,11 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		return nil
 	}
 
+	rows := make(map[int]int64)
 	lastBinding := -1
 	for it.Next(false) {
 		b := t.bindings[it.Binding]
+		rows[it.Binding]++
 
 		if lastBinding != -1 && lastBinding != it.Binding {
 			if err := finishFile(); err != nil {
@@ -200,6 +206,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	if err := finishFile(); err != nil {
 		return nil, fmt.Errorf("final finishFile: %w", err)
 	}
+	round := it.Round
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
 		// The driver checkpoint for this transaction will include the list of files upload for each
@@ -211,7 +218,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil, m.FinishedOperation(err)
 		}
 
-		for _, b := range t.bindings {
+		for idx, b := range t.bindings {
 			bindingState := t.state.BindingStates[b.stateKey]
 
 			if len(bindingState.FileKeys) == 0 {
@@ -219,6 +226,8 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			}
 
 			bindingState.PreviousCheckpoint, bindingState.CurrentCheckpoint = bindingState.CurrentCheckpoint, currentCp
+			bindingState.Round = round
+			bindingState.Rows += rows[idx]
 		}
 
 		checkpointJSON, err := json.Marshal(t.state)
@@ -262,7 +271,13 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 		}
 		ll.Info("finished appendFiles for table")
 
+		// Checkpoints from before Rows was recorded have nothing to report.
+		if bindingState.Rows > 0 {
+			t.be.ReportRowStats(bindingState.Round, b.path, m.TotalRowStats(bindingState.Rows).WithStaged(bindingState.Rows))
+		}
+
 		bindingState.FileKeys = nil // reset for next txn
+		bindingState.Round, bindingState.Rows = 0, 0
 	}
 
 	if !processed {

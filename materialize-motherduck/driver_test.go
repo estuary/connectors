@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	m "github.com/estuary/connectors/go/materialize"
 	testutil "github.com/estuary/connectors/materialize-boilerplate/testutil"
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/stretchr/testify/require"
@@ -95,7 +96,7 @@ func runIntegrationSuite(t *testing.T, variant integrationVariant) {
 
 	t.Run("materialize", func(t *testing.T) {
 		sql.RunMaterializationTest(t, NewDriver(), variant.materializeSpec, makeTestResource, nil,
-			sql.RuntimeConfig{Shards: 1})
+			sql.RuntimeConfig{Shards: 1, Fidelity: m.FidelityTotal})
 	})
 
 	t.Run("apply", func(t *testing.T) {

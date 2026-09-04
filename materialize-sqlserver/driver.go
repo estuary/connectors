@@ -436,6 +436,7 @@ type binding struct {
 	// will always be false
 	needsMerge bool
 	hasData    bool
+	staged     int64 // rows bulk-copied into the store table this round
 
 	createLoadTableSQL string
 	loadQuerySQL       string
@@ -502,8 +503,10 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, featureFl
 	return nil
 }
 
-func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
-func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) { return nil, nil }
+func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
+	return nil, nil
+}
 
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
@@ -634,6 +637,23 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	// memory use
 	var lastBinding = -1
 
+	// Finishing a bulk insert reports the rows it copied.
+	finishBatch := func(idx int) error {
+		batch, ok := batches[idx]
+		if !ok {
+			return nil
+		}
+		var b = d.bindings[idx]
+		if res, err := batch.ExecContext(ctx); err != nil {
+			return fmt.Errorf("store batch insert on %q: %w", b.target.Identifier, err)
+		} else if n, err := res.RowsAffected(); err == nil {
+			b.staged += n
+		}
+		return nil
+	}
+
+	round := it.Round
+
 	// Skip deleted, non-existent documents iff HardDelete is enabled.
 	for it.Next(d.cfg.HardDelete) {
 		if lastBinding == -1 {
@@ -643,11 +663,8 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		// The last binding is fully processed for this RPC now, we can drain its
 		// remaining batches
 		if lastBinding != it.Binding {
-			if batch, ok := batches[lastBinding]; ok {
-				var b = d.bindings[lastBinding]
-				if _, err := batch.ExecContext(ctx); err != nil {
-					return nil, fmt.Errorf("store batch insert on %q: %w", b.target.Identifier, err)
-				}
+			if err := finishBatch(lastBinding); err != nil {
+				return nil, err
 			}
 			lastBinding = it.Binding
 		}
@@ -688,10 +705,8 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}
 
 	if lastBinding != -1 {
-		if batch, ok := batches[lastBinding]; ok {
-			if _, err := batch.ExecContext(ctx); err != nil {
-				return nil, fmt.Errorf("store batch insert on %q: %w", d.bindings[lastBinding].tempStoreTableName, err)
-			}
+		if err := finishBatch(lastBinding); err != nil {
+			return nil, err
 		}
 	}
 
@@ -705,14 +720,16 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			}
 
 			d.be.StartedResourceCommit(b.target.Path)
+			// A single-statement batch, so RowsAffected is the target rows
+			// this statement touched; MERGE counts every clause that fired.
+			stmt, what := b.directCopy, "direct insert"
 			if b.needsMerge {
-				if _, err := txn.ExecContext(ctx, b.mergeInto); err != nil {
-					return nil, m.FinishedOperation(fmt.Errorf("store batch merge on %q: %w", b.target.Identifier, err))
-				}
-			} else {
-				if _, err := txn.ExecContext(ctx, b.directCopy); err != nil {
-					return nil, m.FinishedOperation(fmt.Errorf("store batch direct insert on %q: %w", b.target.Identifier, err))
-				}
+				stmt, what = b.mergeInto, "merge"
+			}
+			if res, err := txn.ExecContext(ctx, stmt); err != nil {
+				return nil, m.FinishedOperation(fmt.Errorf("store batch %s on %q: %w", what, b.target.Identifier, err))
+			} else if n, err := res.RowsAffected(); err == nil {
+				d.be.ReportRowStats(round, b.target.Path, m.TotalRowStats(n).WithStaged(b.staged))
 			}
 
 			if _, err = txn.ExecContext(ctx, b.tempStoreTruncate); err != nil {
@@ -723,6 +740,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			// reset the value for next transaction
 			b.needsMerge = false
 			b.hasData = false
+			b.staged = 0
 		}
 
 		var err error
@@ -755,4 +773,3 @@ func (d *transactor) Destroy() {
 	d.load.conn.Close()
 	d.store.conn.Close()
 }
-

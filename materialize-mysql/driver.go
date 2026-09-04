@@ -435,8 +435,10 @@ func (t *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSp
 	return t.store.fence.Checkpoint, nil
 }
 
-func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
-func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) { return nil, nil }
+func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
+	return nil, nil
+}
 
 func prepareNewTransactor(
 	templates templates,
@@ -525,6 +527,12 @@ type binding struct {
 
 	mustMerge  bool
 	mustDelete bool
+
+	// Per-round counts for the transaction health report: rows LOAD DATA
+	// inserted straight into the target, and rows staged for REPLACE.
+	hasData      bool
+	insertRows   int64
+	updateStaged int64
 }
 
 func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boilerplate.InfoSchema) error {
@@ -644,7 +652,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		if lastBinding != it.Binding {
 			var b = d.bindings[lastBinding]
 			// Drain the prior binding as naturally-ordered key groupings are cycled through.
-			if err := d.load.infile.drain(ctx, txn, b.loadLoadSQL); err != nil {
+			if _, err := d.load.infile.drain(ctx, txn, b.loadLoadSQL); err != nil {
 				return fmt.Errorf("load infile drain on %q: %w", b.target.Identifier, err)
 			}
 			lastBinding = it.Binding
@@ -680,7 +688,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			}
 		}
 
-		if err := d.load.infile.write(ctx, converted, txn, b.loadLoadSQL); err != nil {
+		if _, err := d.load.infile.write(ctx, converted, txn, b.loadLoadSQL); err != nil {
 			return fmt.Errorf("load writing to infile: %w", err)
 		}
 	}
@@ -691,7 +699,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	// Drain the final binding if we processed any loads.
 	if lastBinding != -1 {
 		var b = d.bindings[lastBinding]
-		if err := d.load.infile.drain(ctx, txn, b.loadLoadSQL); err != nil {
+		if _, err := d.load.infile.drain(ctx, txn, b.loadLoadSQL); err != nil {
 			return fmt.Errorf("load infile drain on %q: %w", b.target.Identifier, err)
 		}
 	}
@@ -755,15 +763,22 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	defer defuser.MaybeRollback()
 
 	drainBinding := func(b *binding) error {
-		if err := d.store.insertInfile.drain(ctx, txn, b.storeInsertSQL); err != nil {
+		n, err := d.store.insertInfile.drain(ctx, txn, b.storeInsertSQL)
+		if err != nil {
 			return fmt.Errorf("store writing to insert infile for %q: %w", b.target.Identifier, err)
-		} else if err := d.store.updateInfile.drain(ctx, txn, b.storeUpdateSQL); err != nil {
+		}
+		b.insertRows += n
+		if n, err = d.store.updateInfile.drain(ctx, txn, b.storeUpdateSQL); err != nil {
 			return fmt.Errorf("store writing to update infile for %q: %w", b.target.Identifier, err)
-		} else if err := d.store.deleteInfile.drain(ctx, txn, b.loadDeleteSQL); err != nil {
+		}
+		b.updateStaged += n
+		if _, err = d.store.deleteInfile.drain(ctx, txn, b.loadDeleteSQL); err != nil {
 			return fmt.Errorf("store writing to delete infile for %q: %w", b.target.Identifier, err)
 		}
 		return nil
 	}
+
+	round := it.Round
 
 	// The StoreIterator iterates over documents ordered by their binding, so we
 	// can keep track of the last binding that we have seen, and if we have moved
@@ -827,7 +842,9 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 		var inf *infile
 		var drainQuery string
+		var flushed *int64 // receives rows affected by a mid-store flush
 
+		b.hasData = true
 		if it.Delete && d.cfg.HardDelete {
 			b.mustDelete = true
 			inf = d.store.deleteInfile
@@ -836,13 +853,17 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			b.mustMerge = true
 			inf = d.store.updateInfile
 			drainQuery = b.storeUpdateSQL
+			flushed = &b.updateStaged
 		} else {
 			inf = d.store.insertInfile
 			drainQuery = b.storeInsertSQL
+			flushed = &b.insertRows
 		}
 
-		if err := inf.write(ctx, converted, txn, drainQuery); err != nil {
+		if n, err := inf.write(ctx, converted, txn, drainQuery); err != nil {
 			return nil, fmt.Errorf("store writing to infile for %q: %w", b.target.Identifier, err)
+		} else if flushed != nil {
+			*flushed += n
 		}
 	}
 
@@ -859,11 +880,20 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 		for _, b := range d.bindings {
 			d.be.StartedResourceCommit(b.target.Path)
+			// Target rows affected this round. LOAD DATA and DELETE report
+			// one per row; REPLACE reports 2 per replaced row and 1 per row
+			// that did not exist, so subtracting the staged rows leaves the
+			// rows that were actually updated. None of these counts depend
+			// on CLIENT_FOUND_ROWS (which the DSN sets regardless).
+			affected := b.insertRows
 			if b.mustDelete {
 				// Apply any deletions
-				if _, err := txn.ExecContext(ctx, b.deleteQuerySQL); err != nil {
+				if res, err := txn.ExecContext(ctx, b.deleteQuerySQL); err != nil {
 					return nil, m.FinishedOperation(fmt.Errorf("running DELETE USING for %q: %w", b.target.Identifier, err))
-				} else if _, err := txn.ExecContext(ctx, b.deleteTruncateSQL); err != nil {
+				} else if n, err := res.RowsAffected(); err == nil {
+					affected += n
+				}
+				if _, err := txn.ExecContext(ctx, b.deleteTruncateSQL); err != nil {
 					return nil, m.FinishedOperation(fmt.Errorf("truncating delete table for %q: %w", b.target.Identifier, err))
 				}
 
@@ -873,15 +903,22 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			if b.mustMerge {
 				// Merge data from the temporary staging table into the target table, replacing keys
 				// that already exist.
-				if _, err := txn.ExecContext(ctx, b.updateReplaceSQL); err != nil {
+				if res, err := txn.ExecContext(ctx, b.updateReplaceSQL); err != nil {
 					return nil, m.FinishedOperation(fmt.Errorf("running REPLACE INTO for %q: %w", b.target.Identifier, err))
-				} else if _, err := txn.ExecContext(ctx, b.updateTruncateSQL); err != nil {
+				} else if n, err := res.RowsAffected(); err == nil {
+					affected += n - b.updateStaged
+				}
+				if _, err := txn.ExecContext(ctx, b.updateTruncateSQL); err != nil {
 					return nil, m.FinishedOperation(fmt.Errorf("truncating update table for %q: %w", b.target.Identifier, err))
 				}
 
 				// Reset for the next round.
 				b.mustMerge = false
 			}
+			if b.hasData {
+				d.be.ReportRowStats(round, b.target.Path, m.TotalRowStats(affected))
+			}
+			b.hasData, b.insertRows, b.updateStaged = false, 0, 0
 			d.be.FinishedResourceCommit(b.target.Path)
 		}
 
@@ -915,4 +952,3 @@ func (d *transactor) Destroy() {
 	d.load.conn.Close()
 	d.store.conn.Close()
 }
-
