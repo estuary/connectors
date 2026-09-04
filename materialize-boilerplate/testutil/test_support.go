@@ -1194,33 +1194,46 @@ func flowctlCommand(args ...string) *exec.Cmd {
 // logged to the test log.
 func RunFlowctl(t *testing.T, args ...string) []byte {
 	t.Helper()
+	stdout, _ := runFlowctl(t, args...)
+	return stdout
+}
+
+// runFlowctl is RunFlowctl, also returning the captured stderr. Task logs of a
+// preview run land there, and are the observable output of the boilerplate's
+// transaction health check.
+func runFlowctl(t *testing.T, args ...string) (stdout, stderr []byte) {
+	t.Helper()
 
 	cmd := flowctlCommand(args...)
 
-	stdout, err := cmd.StdoutPipe()
+	stdoutPipe, err := cmd.StdoutPipe()
 	require.NoError(t, err)
-	stderr, err := cmd.StderrPipe()
+	stderrPipe, err := cmd.StderrPipe()
 	require.NoError(t, err)
 	require.NoError(t, cmd.Start())
 
+	var stderrBuf bytes.Buffer
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		scanner := bufio.NewScanner(stderr)
+		scanner := bufio.NewScanner(stderrPipe)
+		scanner.Buffer(make([]byte, 0, 1<<20), 1<<24)
 		for scanner.Scan() {
 			t.Log(scanner.Text())
+			stderrBuf.Write(scanner.Bytes())
+			stderrBuf.WriteByte('\n')
 		}
 	}()
 
 	var stdoutBuf bytes.Buffer
-	_, err = io.Copy(&stdoutBuf, stdout)
+	_, err = io.Copy(&stdoutBuf, stdoutPipe)
 	require.NoError(t, err)
 
 	require.NoError(t, cmd.Wait())
 	wg.Wait()
 
-	return stdoutBuf.Bytes()
+	return stdoutBuf.Bytes(), stderrBuf.Bytes()
 }
 
 func dumpSchema[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](

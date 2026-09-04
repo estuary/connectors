@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -116,6 +117,11 @@ type RuntimeConfig struct {
 	// Timeout is a backstop against a hung run; a healthy run ends by
 	// transaction count. Zero defaults to ten minutes.
 	Timeout time.Duration
+	// Fidelity is the transaction health fidelity the connector is expected to
+	// report: the run's "transaction health" log lines must all be healthy and
+	// carry exactly this fidelity, so a connector that stops reporting fails
+	// its own suite. Zero means the connector reports nothing (FidelityNone).
+	Fidelity m.Fidelity
 }
 
 func runMaterializationTestForTask[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
@@ -186,12 +192,14 @@ func runMaterializationTestForTask[EC boilerplate.EndpointConfiger, FC boilerpla
 		"--shards", strconv.Itoa(shards),
 		"--timeout", timeout.String(),
 		"--network", "flow-test",
+		"--log-json",
 	}
 	if shards == 1 {
 		args = append(args, "--output-apply", "--output-state")
 	}
 
-	actionDescription := RunFlowctl(t, args...)
+	actionDescription, stderr := runFlowctl(t, args...)
+	AssertTransactionHealth(t, ParseHealthLines(stderr), shards, runtime.Fidelity)
 	for _, sanitize := range actionDescSanitizers {
 		actionDescription = []byte(sanitize(string(actionDescription)))
 	}
