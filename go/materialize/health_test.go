@@ -281,6 +281,24 @@ func runHealthScenario(t *testing.T, tr *scriptedTransactor, open *pm.Request_Op
 	return decodeHealthLines(t, hook)
 }
 
+// sumLines adds up the countable fields of several health lines.
+func sumLines(lines []healthLine) healthLine {
+	var out healthLine
+	for _, l := range lines {
+		out.Rounds += l.Rounds
+		out.LoadRequests += l.LoadRequests
+		out.Loaded += l.Loaded
+		out.Expected.Insert += l.Expected.Insert
+		out.Expected.Update += l.Expected.Update
+		out.Expected.Delete += l.Expected.Delete
+		out.Actual.Inserted += l.Actual.Inserted
+		out.Actual.Updated += l.Actual.Updated
+		out.Actual.Total += l.Actual.Total
+		out.Pending += l.Pending
+	}
+	return out
+}
+
 var twoBindings = []testBinding{{path: []string{"schema", "alpha"}}, {path: []string{"schema", "beta"}}}
 
 func exactReport(inserted, updated, deleted int64) func(int, int, int64) *RowStats {
@@ -352,24 +370,39 @@ func TestHealthWindowAggregation(t *testing.T) {
 		{loads: []pm.Request{loadReq(1, "d"), loadReq(1, "e")}, stores: []pm.Request{storeReq(1, "d", false, false)}},
 	}
 	lines := runHealthScenario(t, tr, openRequest(twoBindings, nil), txns, nil, nil)
-	require.Len(t, lines, 1)
-	l := lines[0]
-	require.Equal(t, "ok", l.Verdict)
-	require.Equal(t, "exact", l.Fidelity)
-	require.Equal(t, 4, l.Rounds)
-	require.Equal(t, 0, l.FirstRound)
-	require.Equal(t, 3, l.LastRound)
-	require.Equal(t, 2, l.Bindings)
-	require.Equal(t, int64(3), l.LoadRequests)
-	require.Equal(t, int64(3), l.Loaded)
-	require.Equal(t, int64(4), l.Expected.Insert)
-	require.Equal(t, int64(4), l.Actual.Inserted)
-	require.Equal(t, int64(4), l.Actual.Total)
-	require.Nil(t, l.Actual.Staged)
-	require.Equal(t, 0, l.Pending)
-	require.Empty(t, l.Mismatches)
-	require.False(t, l.Recovery)
-	require.False(t, l.Sharded)
+	require.Len(t, lines, 2)
+
+	// The first judged round with stores is logged at once; those that follow
+	// within the interval roll up into one line, flushed here by EOF.
+	first := lines[0]
+	require.Equal(t, "ok", first.Verdict)
+	require.Equal(t, "exact", first.Fidelity)
+	require.Equal(t, 1, first.Rounds)
+	require.Equal(t, 0, first.FirstRound)
+	require.Equal(t, 0, first.LastRound)
+	require.Equal(t, 2, first.Bindings)
+	require.Equal(t, int64(1), first.LoadRequests)
+	require.Equal(t, int64(1), first.Loaded)
+	require.Equal(t, int64(2), first.Expected.Insert)
+	require.Equal(t, int64(2), first.Actual.Inserted)
+
+	rest := lines[1]
+	require.Equal(t, "ok", rest.Verdict)
+	require.Equal(t, "exact", rest.Fidelity)
+	require.Equal(t, 3, rest.Rounds)
+	require.Equal(t, 1, rest.FirstRound)
+	require.Equal(t, 3, rest.LastRound)
+	require.Equal(t, 2, rest.Bindings)
+	require.Equal(t, int64(2), rest.LoadRequests)
+	require.Equal(t, int64(2), rest.Loaded)
+	require.Equal(t, int64(2), rest.Expected.Insert)
+	require.Equal(t, int64(2), rest.Actual.Inserted)
+	require.Equal(t, int64(2), rest.Actual.Total)
+	require.Nil(t, rest.Actual.Staged)
+	require.Equal(t, 0, rest.Pending)
+	require.Empty(t, rest.Mismatches)
+	require.False(t, rest.Recovery)
+	require.False(t, rest.Sharded)
 }
 
 func TestHealthMismatchFastPath(t *testing.T) {
@@ -398,16 +431,18 @@ func TestHealthMismatchFastPath(t *testing.T) {
 		{stores: updates(0, "f")},
 	}
 	lines := runHealthScenario(t, tr, openRequest(twoBindings, nil), txns, nil, nil)
-	require.Len(t, lines, 3)
+	require.Len(t, lines, 4)
 
-	// The healthy window is flushed first, then the mismatching round on
-	// its own, then the healthy rounds that followed at EOF.
+	// Round 0 is logged at once, round 1 accumulates and is flushed ahead of
+	// the mismatching round 2, which goes out on its own; round 3 follows at
+	// EOF.
 	require.Equal(t, "ok", lines[0].Verdict)
-	require.Equal(t, 2, lines[0].Rounds)
 	require.Equal(t, 0, lines[0].FirstRound)
-	require.Equal(t, 1, lines[0].LastRound)
+	require.Equal(t, "ok", lines[1].Verdict)
+	require.Equal(t, 1, lines[1].Rounds)
+	require.Equal(t, 1, lines[1].FirstRound)
 
-	m := lines[1]
+	m := lines[2]
 	require.Equal(t, "mismatch", m.Verdict)
 	require.Equal(t, 1, m.Rounds)
 	require.Equal(t, 2, m.FirstRound)
@@ -421,9 +456,9 @@ func TestHealthMismatchFastPath(t *testing.T) {
 		{Check: "update", ResourcePath: []string{"schema", "beta"}, Expected: 2, Actual: 0},
 	}, m.Mismatches)
 
-	require.Equal(t, "ok", lines[2].Verdict)
-	require.Equal(t, 1, lines[2].Rounds)
-	require.Equal(t, 3, lines[2].FirstRound)
+	require.Equal(t, "ok", lines[3].Verdict)
+	require.Equal(t, 1, lines[3].Rounds)
+	require.Equal(t, 3, lines[3].FirstRound)
 }
 
 func TestHealthChecks(t *testing.T) {
@@ -547,14 +582,16 @@ func TestHealthFidelityNone(t *testing.T) {
 		{stores: []pm.Request{storeReq(1, "b", true, false)}},
 	}
 	lines := runHealthScenario(t, tr, openRequest(twoBindings, nil), txns, nil, nil)
-	require.Len(t, lines, 1)
-	l := lines[0]
-	require.Equal(t, "unchecked", l.Verdict)
-	require.Equal(t, "none", l.Fidelity)
-	require.Equal(t, 2, l.Rounds)
-	require.Equal(t, int64(1), l.Expected.Insert)
-	require.Equal(t, int64(1), l.Expected.Update)
-	require.Equal(t, 0, l.Pending)
+	require.Len(t, lines, 2)
+	for _, l := range lines {
+		require.Equal(t, "unchecked", l.Verdict)
+		require.Equal(t, "none", l.Fidelity)
+		require.Equal(t, 0, l.Pending)
+	}
+	sum := sumLines(lines)
+	require.Equal(t, 2, sum.Rounds)
+	require.Equal(t, int64(1), sum.Expected.Insert)
+	require.Equal(t, int64(1), sum.Expected.Update)
 }
 
 func TestHealthNeverReports(t *testing.T) {
@@ -566,14 +603,16 @@ func TestHealthNeverReports(t *testing.T) {
 		{stores: []pm.Request{storeReq(0, "c", false, false)}},
 	}
 	lines := runHealthScenario(t, tr, openRequest(twoBindings, nil), txns, nil, nil)
-	require.Len(t, lines, 1)
-	l := lines[0]
-	require.Equal(t, "unchecked", l.Verdict)
-	require.Equal(t, "none", l.Fidelity)
-	require.Equal(t, 2, l.Rounds)
-	require.Equal(t, 3, l.Pending)
-	require.Equal(t, int64(3), l.Expected.Insert)
-	require.Equal(t, int64(0), l.Actual.Total)
+	require.Len(t, lines, 2)
+	for _, l := range lines {
+		require.Equal(t, "unchecked", l.Verdict)
+		require.Equal(t, "none", l.Fidelity)
+	}
+	sum := sumLines(lines)
+	require.Equal(t, 2, sum.Rounds)
+	require.Equal(t, 3, sum.Pending)
+	require.Equal(t, int64(3), sum.Expected.Insert)
+	require.Equal(t, int64(0), sum.Actual.Total)
 }
 
 func TestHealthPendingBindingAtWindowFlush(t *testing.T) {
@@ -644,10 +683,13 @@ func TestHealthDeferredReports(t *testing.T) {
 		{stores: []pm.Request{storeReq(1, "d", false, false)}},
 	}
 	lines := runHealthScenario(t, tr, openRequest(twoBindings, nil), txns, nil, nil)
-	require.Len(t, lines, 1)
-	require.Equal(t, "ok", lines[0].Verdict)
-	require.Equal(t, 3, lines[0].Rounds)
-	require.Equal(t, int64(4), lines[0].Actual.Inserted)
+	require.Len(t, lines, 2)
+	for _, l := range lines {
+		require.Equal(t, "ok", l.Verdict)
+	}
+	sum := sumLines(lines)
+	require.Equal(t, 3, sum.Rounds)
+	require.Equal(t, int64(4), sum.Actual.Inserted)
 }
 
 func TestHealthRecovery(t *testing.T) {
@@ -694,15 +736,20 @@ func TestHealthSharded(t *testing.T) {
 	}
 	rng := &pf.RangeSpec{KeyBegin: 0, KeyEnd: math.MaxUint32 / 2, RClockEnd: math.MaxUint32}
 	lines := runHealthScenario(t, tr, openRequest(twoBindings, rng), txns, nil, nil)
-	require.Len(t, lines, 1)
-	l := lines[0]
-	require.True(t, l.Sharded)
-	require.Equal(t, "unchecked", l.Verdict)
-	require.Equal(t, "exact", l.Fidelity)
-	require.Equal(t, 2, l.Rounds)
-	require.Equal(t, int64(2), l.Expected.Insert)
-	require.Equal(t, int64(4), l.Actual.Inserted)
-	require.Empty(t, l.Mismatches)
+	require.Len(t, lines, 2)
+	for _, l := range lines {
+		require.True(t, l.Sharded)
+		require.Equal(t, "unchecked", l.Verdict)
+		require.Empty(t, l.Mismatches)
+	}
+	// Round 0's expected side is logged as soon as it is recorded, before its
+	// actuals are reported; everything else rolls up to EOF.
+	require.Equal(t, "none", lines[0].Fidelity)
+	require.Equal(t, "exact", lines[1].Fidelity)
+	sum := sumLines(lines)
+	require.Equal(t, 2, sum.Rounds)
+	require.Equal(t, int64(2), sum.Expected.Insert)
+	require.Equal(t, int64(4), sum.Actual.Inserted)
 }
 
 func TestHealthUnknownBinding(t *testing.T) {

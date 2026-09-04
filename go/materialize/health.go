@@ -12,8 +12,11 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// healthFlushInterval is how long healthy transaction rounds accumulate before
-// they are rolled up into a single "transaction health" log line.
+// healthFlushInterval bounds how often "transaction health" lines are logged.
+// A judged round is logged at once when nothing has been logged for this long,
+// so a task that commits rarely, or a short-lived preview run, reports each
+// round promptly; a busier task's rounds accumulate and are rolled up into one
+// line per interval.
 var healthFlushInterval = 5 * time.Minute
 
 // Fidelity describes how much of a binding's commit result a connector was
@@ -291,6 +294,8 @@ type healthTracker struct {
 	shardedWindow *healthWindow
 	// okWindow and uncheckedWindow roll up evaluated rounds by verdict.
 	okWindow, uncheckedWindow *healthWindow
+	// lastEmit is when a line was last logged, gating the rollup.
+	lastEmit time.Time
 
 	stopFlusher func(func())
 }
@@ -325,7 +330,35 @@ func newHealthTracker(open *pm.Request_Open) *healthTracker {
 
 // start begins the periodic window flush.
 func (h *healthTracker) start() {
-	h.stopFlusher = repeatAsync(func() { h.flush(false) }, healthFlushInterval)
+	h.stopFlusher = repeatAsync(func() {
+		h.mu.Lock()
+		due := h.intervalElapsed()
+		h.mu.Unlock()
+		if due {
+			h.flush(false)
+		}
+	}, healthFlushInterval)
+}
+
+// intervalElapsed is whether enough time has passed since the last logged
+// line for another to be logged. Callers hold h.mu.
+func (h *healthTracker) intervalElapsed() bool {
+	return time.Since(h.lastEmit) >= healthFlushInterval
+}
+
+// maybeFlushWindows logs the accumulated windows right away when they hold
+// something worth logging and the interval since the last line has elapsed.
+// Callers hold h.mu.
+func (h *healthTracker) maybeFlushWindows() {
+	if !h.intervalElapsed() {
+		return
+	}
+	for _, w := range []*healthWindow{h.okWindow, h.uncheckedWindow, h.shardedWindow} {
+		if len(w.bindings) > 0 {
+			h.flushWindows()
+			return
+		}
+	}
 }
 
 // close stops the periodic flush and flushes whatever can be judged. Rounds
@@ -380,6 +413,7 @@ func (h *healthTracker) recordExpected(round int, loadRequests, loaded int64) {
 		for key, e := range r.expected {
 			w.addExpected(key, e)
 		}
+		h.maybeFlushWindows()
 		return
 	}
 
@@ -411,6 +445,7 @@ func (h *healthTracker) report(round int, path []string, stats RowStats) {
 		return
 	} else if h.sharded {
 		h.shardedWindow.addActual(key, stats)
+		h.maybeFlushWindows()
 		return
 	}
 
@@ -547,8 +582,10 @@ func (h *healthTracker) evaluate(r *healthRound) {
 		h.emit(w, verdictMismatch, nil)
 	case w.pending > 0 || w.fidelity == FidelityNone:
 		h.mergeWindow(h.uncheckedWindow, w)
+		h.maybeFlushWindows()
 	default:
 		h.mergeWindow(h.okWindow, w)
+		h.maybeFlushWindows()
 	}
 }
 
@@ -661,5 +698,8 @@ func (h *healthTracker) emit(w *healthWindow, verdict string, extra log.Fields) 
 		fields[k] = v
 	}
 
+	if _, recovery := extra["recovery"]; !recovery {
+		h.lastEmit = time.Now()
+	}
 	h.log(fields, "transaction health")
 }
