@@ -777,7 +777,12 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil, pf.FinishedOperation(err)
 		}
 
-		return nil, nil
+		// Reset the connector state to an empty object, as a full replacement
+		// rather than a merge patch. This connector keeps its checkpoint in the
+		// destination and has no use for the state, but tasks that briefly ran
+		// #5157 still carry its staged-work entries in their recovery logs;
+		// left in place, its reland would read them as pending work.
+		return &pf.ConnectorState{UpdatedJson: json.RawMessage(`{}`), MergePatch: false}, nil
 	}, nil
 }
 
