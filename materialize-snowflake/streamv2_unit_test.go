@@ -343,11 +343,10 @@ func TestStreamV2BackfillRecreatesTheTable(t *testing.T) {
 			unreadable: true,
 		},
 		{
-			// A configuration published before this connector took its
-			// credentials as one object has no `credentials` key, and no streaming
-			// flag either. Its table was written through staged files and may be
-			// emptied in place.
-			name:        "a replaced configuration in the pre-2024 shape",
+			// A configuration with no `credentials` object and no streaming flag.
+			// Its table was written through staged files and may be emptied in
+			// place.
+			name:        "a replaced configuration with no credentials object",
 			lastCfgJson: `{"image":"ghcr.io/estuary/materialize-snowflake:v1","config":{"host":"x.snowflakecomputing.com","account":"x","database":"DB","schema":"S","user":"u","password_sops":"ENC[AES256_GCM,data:0Ld3]","advanced":{"feature_flags":""},"sops":{"encrypted_suffix":"_sops"}}}`,
 			incoming:    noFlagCfg,
 			last:        binding(true),
@@ -558,9 +557,8 @@ func TestStreamV2StateKeyConflict(t *testing.T) {
 			wantContains: []string{"WIDGETS", "acmeCo/other", task, "renamed"},
 		},
 		{
-			// A table created before this connector recorded state keys, or while
-			// the binding used standard updates, says nothing about which state
-			// key may stream into it.
+			// A table created by a write path that records no state key says
+			// nothing about which state key may stream into it.
 			name:    "the table records no state key",
 			comment: "Generated for materialization " + task,
 		},
