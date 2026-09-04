@@ -6,6 +6,7 @@ This directory contains two kinds of documentation:
 
 Internal references for connector developers.
 
+- [Captures](capture/README.md) — capture gRPC protocol reference
 - [Materializations](materialize/README.md) — materialization gRPC protocol reference
 - [Inbound networking](inbound_networking.md) — Dockerfile `LABEL`s for exposed ports
 - [Feature flags](feature_flags.md) — per-task feature-flag mechanism + bulk-publish workflow
