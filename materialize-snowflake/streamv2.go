@@ -64,9 +64,8 @@ type streamV2Item struct {
 	// Tombstone marks a channel that the snowpipe streaming path is dropping. The
 	// item is written before the channel is dropped, so that a checkpoint which
 	// still names the channel after the drop explains why the channel is empty: it
-	// was dropped, not lost. The persisted key stays "Retiring" because live
-	// checkpoints already carry it.
-	Tombstone bool `json:"Retiring"`
+	// was dropped, not lost.
+	Tombstone bool
 }
 
 // streamV2Range is a key range of the key-hash space, as a channel name and a
@@ -183,7 +182,7 @@ func streamV2CannotDrainPendingBlobs(table string, blobs int, cause error) error
 
 // streamV2StateKeyPrefix starts the line in the comment of a streaming v2 table.
 // That line names the task and the binding state key that the table was created for.
-const streamV2StateKeyPrefix = "flow_generation: "
+const streamV2StateKeyPrefix = "flow_state_key: "
 
 // streamV2RecordedStateKey is what a streaming v2 table records about the binding
 // that created it: the task, and the state key of the binding. A backfill rotates
