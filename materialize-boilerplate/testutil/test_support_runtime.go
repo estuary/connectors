@@ -195,6 +195,11 @@ func runMaterializationTestForTask[EC boilerplate.EndpointConfiger, FC boilerpla
 		// only the fixture's tail, and a table that survived a name-based sweep
 		// would take these rows on top of the liveness run's.
 		rt = rewriteTaskForTest[EC, RC](t, bundled, taskName, tsSuffix, cfg, makeResourceFn)
+		// And a fresh materializer to read it back with: a test materializer may
+		// cache what it read for the liveness run (eventbridge drains its queue
+		// once), or hold connections the liveness run's cleanup closes.
+		materializer, err = newMaterializer(ctx, taskName, cfg, boilerplate.ParseFlags(cfg))
+		require.NoError(t, err)
 		t.Cleanup(func() {
 			CleanupTestResources(t, ctx, materializer, rt.resourcePaths, tsSuffix)
 		})
