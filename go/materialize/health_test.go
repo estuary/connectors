@@ -709,6 +709,7 @@ func TestHealthRecovery(t *testing.T) {
 		recoveryReports: func(be *BindingEvents) {
 			// A replayed idempotent merge from the prior session's round 7.
 			be.ReportRowStats(7, []string{"schema", "alpha"}, ExactRowStats(5, 2, 0))
+			be.ReportRowStats(7, []string{"schema", "beta"}, ExactRowStats(1, 0, 0))
 		},
 	}
 	txns := []txn{{stores: []pm.Request{storeReq(0, "a", false, false)}}}
@@ -720,8 +721,10 @@ func TestHealthRecovery(t *testing.T) {
 	require.Equal(t, "unchecked", r.Verdict)
 	require.Equal(t, "exact", r.Fidelity)
 	require.Equal(t, 7, r.FirstRound)
+	require.Equal(t, 1, r.Rounds)
+	require.Equal(t, 2, r.Bindings)
 	require.Equal(t, int64(0), r.Expected.Insert)
-	require.Equal(t, int64(5), r.Actual.Inserted)
+	require.Equal(t, int64(6), r.Actual.Inserted)
 	require.Equal(t, int64(2), r.Actual.Updated)
 	require.Empty(t, r.Mismatches)
 
