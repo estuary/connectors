@@ -471,16 +471,10 @@ func (l *BindingEvents) FinishedResourceCommit(path []string) {
 	})
 }
 
-// ReportRowStats reports what the destination did for one binding's stored
-// documents of one transaction round, for the "transaction health" log line
-// that reconciles it against what the runtime asked the connector to store.
-//
-// round is the StoreIterator.Round of the transaction whose stores produced
-// the result. Call it from wherever the result is in hand: StartCommit, a
-// deferred Acknowledge, or a later poll. It is safe to call concurrently,
-// repeated reports for the same binding and round are summed, and it never
-// blocks or fails a transaction. Unlike the other BindingEvents methods, it is
-// active regardless of extended logging.
+// ReportRowStats reports what the destination did for one binding's stores of
+// a round (StoreIterator.Round), for the "transaction health" line; see
+// docs/materialize/README.md. Goroutine-safe, sums repeated reports, never
+// fails or blocks, and is active regardless of extended logging.
 func (l *BindingEvents) ReportRowStats(round int, path []string, stats RowStats) {
 	if l.health != nil {
 		l.health.report(round, path, stats)

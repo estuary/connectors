@@ -107,10 +107,8 @@ type StoreIterator struct {
 	PackedValues []byte          // PackedValues of the document to store.
 	RawJSON      json.RawMessage // Document to store.
 	Total        int             // Total number of iterated stores.
-	// Round is the zero-based transaction round these stores belong to. Pass
-	// it to BindingEvents.ReportRowStats when reporting the commit's result,
-	// so that a result which arrives after later rounds have begun is still
-	// attributed to this one.
+	// Round is the zero-based transaction round these stores belong to, to
+	// pass to BindingEvents.ReportRowStats when the commit's result is in hand.
 	Round int
 
 	stream  Stream

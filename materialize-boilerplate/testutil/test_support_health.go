@@ -44,10 +44,10 @@ type HealthLine struct {
 	Mismatches []json.RawMessage `json:"mismatches"`
 }
 
-// stores is the number of documents the line says the runtime asked the
-// connector to store.
+// stores is the number of documents the line says were handed to the
+// connector; skipped hard deletes never are.
 func (l HealthLine) stores() int64 {
-	return l.Expected.Insert + l.Expected.Update + l.Expected.Delete + l.Expected.Skipped
+	return l.Expected.Insert + l.Expected.Update + l.Expected.Delete
 }
 
 func (l HealthLine) String() string {
