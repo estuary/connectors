@@ -643,6 +643,8 @@ func TestHealthPendingBindingAtWindowFlush(t *testing.T) {
 		deadline := time.Now().Add(5 * time.Second)
 		for time.Now().Before(deadline) {
 			if atFlush = decodeHealthLines(t, hook); len(atFlush) >= 2 {
+				// A late report for the round just judged as pending.
+				tr.be.ReportRowStats(0, []string{"schema", "beta"}, ExactRowStats(1, 0, 0))
 				return
 			}
 			time.Sleep(5 * time.Millisecond)
@@ -662,8 +664,16 @@ func TestHealthPendingBindingAtWindowFlush(t *testing.T) {
 	require.Equal(t, int64(2), atFlush[1].Expected.Insert)
 	require.Equal(t, int64(1), atFlush[1].Actual.Inserted)
 
-	// Nothing further is logged at EOF.
-	require.Len(t, lines, 2)
+	// The report that finally arrived for the judged round is logged as an
+	// actual-only unchecked round rather than lost.
+	require.Len(t, lines, 3)
+	late := lines[2]
+	require.Equal(t, "unchecked", late.Verdict)
+	require.Equal(t, 1, late.Rounds)
+	require.Equal(t, 0, late.FirstRound)
+	require.Equal(t, int64(0), late.Expected.Insert)
+	require.Equal(t, int64(1), late.Actual.Inserted)
+	require.Equal(t, 0, late.Pending)
 }
 
 func TestHealthDeferredReports(t *testing.T) {

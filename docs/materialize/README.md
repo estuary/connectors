@@ -736,7 +736,8 @@ match and the total must equal its sum; at `total` the total must equal
 `loaded` equals `staged`. A delta binding that merges rather than appends
 fails the `insert`/`update` checks since it expects only inserts.
 
-- `ok`: every check passed.
+- `ok`: every check passed. A round that stored nothing has nothing to check
+  and is `ok` at fidelity `none`.
 - `mismatch`: at least one check failed. The round is logged on its own,
   immediately, with a `mismatches` array of `{check, resourcePath, expected,
   actual}` entries.
@@ -748,14 +749,15 @@ fails the `insert`/`update` checks since it expects only inserts.
 
 ## Output
 
-Lines are rate-limited to one per five minutes per verdict. A judged round is
-logged at once when nothing has been logged for that long, so a task that
-commits rarely, or a short preview run, reports each round promptly; a busier
-task's rounds accumulate and flush as one line with summed `expected` and
-`actual` buckets, `rounds`, `firstRound` and `lastRound`. Unchecked rounds
-roll up the same way. A mismatch flushes the pending window first. The window
-also flushes on graceful shutdown. Rounds whose commit was never acknowledged
-in the session are not judged; recovery re-applies them.
+Healthy and unchecked rounds are rate-limited to one line each per five
+minutes. A judged round is logged at once when nothing has been logged for
+that long, so a task that commits rarely, or a short preview run, reports each
+round promptly; a busier task's rounds accumulate and flush as one line with
+summed `expected` and `actual` buckets, `rounds`, `firstRound` and
+`lastRound`. A mismatch is never held back: it flushes the pending windows
+first and is then logged on its own. The windows also flush on graceful
+shutdown. Rounds whose commit was never acknowledged in the session are not
+judged; recovery re-applies them.
 Every line carries `verdict`, `fidelity`, `bindings`, `loadRequests`,
 `loaded`, `expected.{insert,update,delete,softDeleted,skipped}` and
 `actual.{inserted,updated,deleted,total}` (plus `staged`/`loaded` when
