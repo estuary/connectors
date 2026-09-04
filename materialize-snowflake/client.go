@@ -1,11 +1,13 @@
 package connector
 
 import (
+	"bytes"
 	"context"
 	stdsql "database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"regexp"
 	"slices"
 	"strconv"
@@ -422,41 +424,42 @@ func (c *client) MustRecreateResource(req *pm.Request_Apply, lastBinding, newBin
 	// shape this connector is handed for itself.
 	outgoingCfg, ok := endpointConfigOf(req.LastMaterialization.ConfigJson)
 	if !ok {
-		return false, fmt.Errorf(
-			"cannot read the endpoint configuration of the specification being replaced, so whether its generation streams into the table cannot be established: backfilling this binding requires knowing whether the table must be re-created rather than emptied",
+		// Re-creating the table is correct whether or not the old spec streamed,
+		// so an unreadable configuration costs the grants a truncate would have
+		// kept, and nothing more.
+		log.WithField("table", newBinding.ResourcePath).Warn(
+			"cannot read the endpoint configuration of the specification being replaced; the table will be dropped and re-created for this backfill rather than emptied",
 		)
+		return true, nil
 	}
 	return streamsV2(&outgoingCfg, true, boilerplate.ParseFlags(outgoingCfg)[flagSnowpipeStreamingV2]), nil
 }
 
-// endpointConfigOf parses the endpoint configuration out of a materialization
-// specification's configuration, which comes in either of two shapes.
-//
-// The runtime hands this connector its configuration directly, decrypted. The
-// last-applied specification of an Apply request is not given that treatment: it
-// arrives as the control plane stores it, which is the endpoint spec — the
-// connector image alongside a configuration whose secrets are still sops
-// ciphertext. Both are read here, and a document which is neither reports false
-// rather than an empty configuration, so that a caller cannot mistake "could not
-// be read" for "configured no feature flags".
+// endpointConfigOf parses an endpoint configuration which arrives in one of two
+// shapes: the configuration object itself, or the object the control plane stores,
+// which carries the configuration under `config` beside the connector image. The
+// configuration may be from an older version of this connector and may still hold
+// sops ciphertext, so no field is required of it. A document which is not an
+// object, or whose `config` is not an object, reports false, so that a caller
+// cannot mistake "could not be read" for "configured no feature flags".
 func endpointConfigOf(configJson json.RawMessage) (config, bool) {
-	var direct config
-	if err := json.Unmarshal(configJson, &direct); err == nil && direct.Credentials != nil {
-		return direct, true
-	}
-
 	var wrapper struct {
 		Config json.RawMessage `json:"config"`
 	}
-	if err := json.Unmarshal(configJson, &wrapper); err != nil || len(wrapper.Config) == 0 {
+	if err := json.Unmarshal(configJson, &wrapper); err != nil {
 		return config{}, false
+	}
+	if len(wrapper.Config) > 0 {
+		configJson = wrapper.Config
 	}
 
-	var inner config
-	if err := json.Unmarshal(wrapper.Config, &inner); err != nil || inner.Credentials == nil {
+	var cfg config
+	if trimmed := bytes.TrimSpace(configJson); len(trimmed) == 0 || trimmed[0] != '{' {
+		return config{}, false
+	} else if err := json.Unmarshal(trimmed, &cfg); err != nil {
 		return config{}, false
 	}
-	return inner, true
+	return cfg, true
 }
 
 func (c *client) DeleteCheckpointsEntry(ctx context.Context, taskName string) error {
