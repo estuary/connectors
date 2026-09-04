@@ -45,11 +45,19 @@ RUN apt-get update -y \
      && apt-get install --no-install-recommends -y \
      python3 \
      python3-venv \
+     python3-poetry \
      && rm -rf /var/lib/apt/lists/*
 
-COPY materialize-snowflake/sidecar /sidecar
-RUN python3 -m venv /opt/venv \
-     && /opt/venv/bin/pip install --no-cache-dir /sidecar
+RUN python3 -m venv /opt/venv
+ENV VIRTUAL_ENV=/opt/venv
+
+# The sidecar depends on estuary-cdk from this repository, so the CDK is copied
+# to where the sidecar's pyproject.toml expects it. Both are installed in
+# development mode, so the runtime stage carries both source trees too.
+COPY estuary-cdk                   /opt/estuary-cdk
+COPY materialize-snowflake/sidecar /opt/materialize-snowflake/sidecar
+WORKDIR /opt/materialize-snowflake/sidecar
+RUN poetry install --only main
 
 # Test the sidecar, as the builder stage does the connector. A throwaway venv
 # holds pytest, keeping the test dependencies out of the venv the image ships,
@@ -60,8 +68,8 @@ RUN python3 -m venv /opt/venv \
 RUN python3 -m venv /tmp/testvenv \
      && /tmp/testvenv/bin/pip install --no-cache-dir pytest \
      && SNOWPIPE_SDK_GUARD=required \
-        PYTHONPATH="/sidecar:$(/opt/venv/bin/python -c 'import site; print(site.getsitepackages()[0])')" \
-        /tmp/testvenv/bin/python -m pytest -q /sidecar/tests \
+        PYTHONPATH="/opt/materialize-snowflake/sidecar:/opt/estuary-cdk:$(/opt/venv/bin/python -c 'import site; print(site.getsitepackages()[0])')" \
+        /tmp/testvenv/bin/python -m pytest -q tests \
      && rm -rf /tmp/testvenv
 
 # Runtime Stage
@@ -77,7 +85,9 @@ RUN apt-get update -y \
      && rm -rf /var/lib/apt/lists/*
 
 # The Snowpipe Streaming (high-performance) python SDK sidecar.
-COPY --from=pybuilder /opt/venv /opt/venv
+COPY --from=pybuilder /opt/venv                   /opt/venv
+COPY --from=pybuilder /opt/estuary-cdk            /opt/estuary-cdk
+COPY --from=pybuilder /opt/materialize-snowflake  /opt/materialize-snowflake
 
 # Avoid running the connector as root.
 USER nonroot:nonroot
