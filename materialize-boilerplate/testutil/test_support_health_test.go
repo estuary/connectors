@@ -28,6 +28,8 @@ const (
 		`"expected":{"insert":5,"update":0,"delete":0,"softDeleted":0,"skipped":0},"actual":{"inserted":0,"updated":0,"deleted":0,"total":0}}`
 	shardedPrimary = `{"verdict":"unchecked","fidelity":"exact","sharded":true,"rounds":2,"firstRound":0,"lastRound":1,"bindings":2,"loadRequests":0,"loaded":0,` +
 		`"expected":{"insert":7,"update":0,"delete":0,"softDeleted":0,"skipped":0},"actual":{"inserted":12,"updated":0,"deleted":0,"total":12}}`
+	shardedRecovery = `{"verdict":"unchecked","fidelity":"exact","sharded":true,"recovery":true,"rounds":1,"firstRound":0,"lastRound":0,"bindings":2,"loadRequests":0,"loaded":0,` +
+		`"expected":{"insert":0,"update":0,"delete":0,"softDeleted":0,"skipped":0},"actual":{"inserted":12,"updated":0,"deleted":0,"total":12}}`
 )
 
 func TestParseHealthLines(t *testing.T) {
@@ -70,6 +72,7 @@ func TestAssertTransactionHealth(t *testing.T) {
 		{name: "non-reporting connector", lines: parse(pending, okEmpty), shards: 1, declared: m.FidelityNone},
 		{name: "non-reporting connector, undeclared", lines: parse(pending, okEmpty), shards: 1},
 		{name: "sharded run", lines: parse(shardedExpected, shardedPrimary), shards: 2, declared: m.FidelityExact},
+		{name: "sharded run, actuals only in recovery", lines: parse(shardedExpected, shardedRecovery), shards: 2, declared: m.FidelityExact},
 		{name: "sharded non-reporting run", lines: parse(shardedExpected), shards: 2, declared: m.FidelityNone},
 
 		{name: "mismatch", lines: parse(okTotal, mismatch), shards: 1, declared: m.FidelityTotal, wantFail: "mismatch"},
@@ -78,7 +81,7 @@ func TestAssertTransactionHealth(t *testing.T) {
 		{name: "started reporting without declaring", lines: parse(okTotal), shards: 1, declared: m.FidelityNone, wantFail: "differs from the declared"},
 		{name: "no lines at all", lines: nil, shards: 1, declared: m.FidelityTotal, wantFail: "no transaction health lines"},
 		{name: "only empty rounds", lines: parse(okEmpty), shards: 1, declared: m.FidelityTotal, wantFail: "covered stored documents"},
-		{name: "sharded primary never reported", lines: parse(shardedExpected), shards: 2, declared: m.FidelityExact, wantFail: "covered stored documents"},
+		{name: "sharded primary never reported", lines: parse(shardedExpected), shards: 2, declared: m.FidelityExact, wantFail: "carried the declared fidelity"},
 		{name: "unsharded line in sharded run", lines: parse(okTotal), shards: 2, declared: m.FidelityTotal, wantFail: "unsharded"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {

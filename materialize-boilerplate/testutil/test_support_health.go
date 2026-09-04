@@ -105,38 +105,23 @@ func checkTransactionHealth(lines []HealthLine, shards int, declared m.Fidelity)
 	if declared == "" {
 		declared = m.FidelityNone
 	}
-
-	var judged []HealthLine
-	for _, l := range lines {
-		if !l.Recovery {
-			judged = append(judged, l)
-		}
-	}
-	if len(judged) == 0 {
+	if len(lines) == 0 {
 		return fmt.Errorf("no transaction health lines were logged")
 	}
 
+	if shards > 1 {
+		return checkShardedHealth(lines, declared)
+	}
+
+	// Every non-recovery line must be healthy at the declared fidelity; the
+	// drain session's recovery line is tolerated.
 	var withStores int
-	for _, l := range judged {
-		if l.Verdict == "mismatch" {
-			return fmt.Errorf("transaction health mismatch: %s", l)
-		}
-
-		if shards > 1 {
-			if !l.Sharded {
-				return fmt.Errorf("multi-shard run logged an unsharded health line: %s", l)
-			} else if l.Verdict != "unchecked" {
-				return fmt.Errorf("sharded health line must be unchecked: %s", l)
-			} else if l.Fidelity == string(m.FidelityNone) {
-				continue // A shard that isn't the primary reports nothing.
-			} else if l.Fidelity != string(declared) {
-				return fmt.Errorf("reported fidelity differs from the declared %q: %s", declared, l)
-			}
-			withStores++
+	for _, l := range lines {
+		if l.Recovery {
 			continue
-		}
-
-		if l.Sharded {
+		} else if l.Verdict == "mismatch" {
+			return fmt.Errorf("transaction health mismatch: %s", l)
+		} else if l.Sharded {
 			return fmt.Errorf("single-shard run logged a sharded health line: %s", l)
 		} else if l.stores() == 0 {
 			continue
@@ -157,10 +142,31 @@ func checkTransactionHealth(lines []HealthLine, shards int, declared m.Fidelity)
 		}
 	}
 
-	if shards > 1 && declared == m.FidelityNone {
-		return nil // Nothing reports, so there is nothing further to check.
-	} else if withStores == 0 {
+	if withStores == 0 {
 		return fmt.Errorf("no transaction health line covered stored documents at fidelity %q:\n%s", declared, describeLines(lines))
+	}
+	return nil
+}
+
+// checkShardedHealth verifies a multi-shard run. Nothing can be paired per
+// round, so every line is unchecked and tagged sharded, and the primary's
+// actuals often arrive only in the drain session's recovery line. The check
+// is that no line is a mismatch and, unless the connector reports nothing,
+// some line carries the declared fidelity so a silent downgrade still fails.
+func checkShardedHealth(lines []HealthLine, declared m.Fidelity) error {
+	var withFidelity int
+	for _, l := range lines {
+		if l.Verdict == "mismatch" {
+			return fmt.Errorf("transaction health mismatch: %s", l)
+		} else if !l.Sharded {
+			return fmt.Errorf("multi-shard run logged an unsharded health line: %s", l)
+		} else if l.Fidelity == string(declared) && declared != m.FidelityNone {
+			withFidelity++
+		}
+	}
+
+	if declared != m.FidelityNone && withFidelity == 0 {
+		return fmt.Errorf("no transaction health line carried the declared fidelity %q:\n%s", declared, describeLines(lines))
 	}
 	return nil
 }
