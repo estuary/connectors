@@ -280,6 +280,9 @@ func TestStreamV2BackfillRecreatesTheTable(t *testing.T) {
 		// unreadable carries a replaced specification whose configuration is
 		// neither shape this connector understands.
 		unreadable bool
+		// outgoingJson, when set, is the stored configuration of the replaced
+		// specification verbatim, for shapes this connector no longer writes.
+		outgoingJson string
 	}{
 		{
 			name:     "a streaming v2 binding",
@@ -340,6 +343,30 @@ func TestStreamV2BackfillRecreatesTheTable(t *testing.T) {
 			unreadable: true,
 		},
 		{
+			// A configuration published before this connector took its
+			// credentials as one object has no `credentials` key, and no streaming
+			// flag either. Its table was written through staged files and may be
+			// emptied in place.
+			name:         "a replaced configuration in the pre-2024 shape",
+			outgoingJson: `{"image":"ghcr.io/estuary/materialize-snowflake:v1","config":{"host":"x.snowflakecomputing.com","account":"x","database":"DB","schema":"S","user":"u","password_sops":"ENC[AES256_GCM,data:0Ld3]","advanced":{"feature_flags":""},"sops":{"encrypted_suffix":"_sops"}}}`,
+			incoming:     noFlagCfg,
+			last:         binding(true),
+			next:         binding(true),
+		},
+		{
+			// With no configuration which streams in hand, a replaced
+			// configuration which cannot be read leaves the question open, and
+			// the table is re-created rather than the task failed: a re-creation
+			// is always correct for a backfill, whereas a truncate is not.
+			name:       "a replaced configuration which cannot be read, off the streaming v2 path",
+			outgoing:   nil,
+			incoming:   noFlagCfg,
+			last:       binding(true),
+			next:       binding(true),
+			want:       true,
+			unreadable: true,
+		},
+		{
 			// The outgoing generation wrote this table through staged files, which
 			// hold no channel on it, so its backfill may empty it in place — even
 			// though the generation replacing it will stream.
@@ -388,7 +415,9 @@ func TestStreamV2BackfillRecreatesTheTable(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			var req = new(pm.Request_Apply)
-			if tt.unreadable {
+			if tt.outgoingJson != "" {
+				req.LastMaterialization = &pf.MaterializationSpec{ConfigJson: []byte(tt.outgoingJson)}
+			} else if tt.unreadable {
 				req.LastMaterialization = &pf.MaterializationSpec{
 					ConfigJson: []byte(`{"image":"ghcr.io/estuary/materialize-snowflake:v1","config":"ENC[AES256_GCM,data:0Ld3]"}`),
 				}
