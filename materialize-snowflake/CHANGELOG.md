@@ -1,5 +1,47 @@
 # materialize-snowflake
 
+## 2026-09-04
+
+### Added
+- New `snowpipe_streaming_v2` feature flag (off by default). Delta-updates
+  bindings stream their rows to Snowflake through the high-performance Snowpipe
+  Streaming architecture as they are materialized, so nothing is staged and each
+  row is transmitted once. Requires key-pair (JWT) authentication and the
+  `enable-runtime-v2` shard flag. A task missing either, or which also sets
+  `snowpipe_streaming`, is rejected before anything in Snowflake is created or
+  altered. The runtime flag can only be checked once the task runs, so a
+  publication of a task without it logs a warning naming the flag.
+
+### Changed
+With `snowpipe_streaming_v2` set, delta-updates bindings behave as follows.
+- Each binding writes through four channels per shard, one per equal key range
+  of the shard's key-hash range, for a ceiling of 80 MB/s per shard. A shard
+  split or join hands each surviving shard whole channels, which resume from
+  their committed offset tokens, so a topology change loses nothing.
+- Rows become visible in the destination slightly before the Flow transaction
+  which produced them commits. Every committed transaction is still
+  materialized exactly once, including across restarts.
+- Backfilling a binding drops and re-creates its table rather than deleting its
+  rows, so grants on that table do not survive the backfill, and the
+  `retain_existing_data_on_backfill` feature flag does not apply to it. Other
+  bindings of the task are unaffected.
+- A binding moving onto this path first finishes the work its previous write
+  path staged. Where that is impossible, the binding is rejected, naming the
+  table and the count outstanding.
+- Two tasks may not stream into one table; the second is rejected, naming the
+  first. A renamed task is rejected the same way until the binding is
+  backfilled.
+- The one way off this path without a backfill is setting `snowpipe_streaming`
+  while removing `snowpipe_streaming_v2`, on a task that keeps the V2 runtime.
+  Documents Snowflake had committed beyond the checkpoint are then materialized
+  again. Any other departure is rejected, naming the binding.
+- A row Snowflake's ingestion rejects fails the transaction, reporting
+  Snowflake's own description of what it rejected. Rejected rows cannot be
+  re-sent, so the failure holds until the binding is backfilled.
+- If the connector cannot establish which rows Snowflake already holds, such as
+  after the same shard is split twice before its channels converged, it fails
+  rather than duplicate or drop rows. Backfilling the binding recovers.
+
 ## 2026-08-25
 
 ### Added

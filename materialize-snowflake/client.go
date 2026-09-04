@@ -1,6 +1,7 @@
 package connector
 
 import (
+	"bytes"
 	"context"
 	stdsql "database/sql"
 	"encoding/json"
@@ -18,6 +19,7 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/jmoiron/sqlx"
+	log "github.com/sirupsen/logrus"
 	sf "github.com/snowflakedb/gosnowflake/v2"
 	"golang.org/x/sync/errgroup"
 )
@@ -34,11 +36,16 @@ const (
 var _ sql.SchemaManager = (*client)(nil)
 
 type client struct {
-	db         *stdsql.DB
-	dbNoSchema *stdsql.DB // for metadata operations performed before the endpoint-level schema is created
-	xdb        *sqlx.DB   // used to easily read the results of SHOW queries
-	cfg        config
-	ep         *sql.Endpoint[config]
+	db                  *stdsql.DB
+	dbNoSchema          *stdsql.DB // for metadata operations performed before the endpoint-level schema is created
+	xdb                 *sqlx.DB   // used to easily read the results of SHOW queries
+	cfg                 config
+	ep                  *sql.Endpoint[config]
+	materializationName string
+	// streamingV2Enabled is this task's snowpipe_streaming_v2 feature flag, parsed
+	// once from the endpoint configuration so that every decision this client
+	// makes about the write path reads one resolution of it.
+	streamingV2Enabled bool
 }
 
 func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint[config]) (sql.Client, error) {
@@ -63,11 +70,13 @@ func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint
 	}
 
 	return &client{
-		db:         db,
-		dbNoSchema: dbNoSchema,
-		xdb:        sqlx.NewDb(dbNoSchema, "snowflake").Unsafe(),
-		cfg:        ep.Config,
-		ep:         ep,
+		db:                  db,
+		dbNoSchema:          dbNoSchema,
+		xdb:                 sqlx.NewDb(dbNoSchema, "snowflake").Unsafe(),
+		cfg:                 ep.Config,
+		ep:                  ep,
+		materializationName: materializationName,
+		streamingV2Enabled:  boilerplate.ParseFlags(ep.Config)[flagSnowpipeStreamingV2],
 	}, nil
 }
 
@@ -188,11 +197,38 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 var errInsufficientPrivileges = regexp.MustCompile(`Insufficient privileges to operate on schema '([^']+)'`)
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
+	// We record the task name and the binding's state key (streamV2RecordedStateKey)
+	// in the Snowflake table comment. A binding without a state key would leave
+	// that record empty, and an empty record lets any task or any state key
+	// append to the table. The check therefore runs before the CREATE, so the
+	// error below creates no table at all.
+	var recordStateKey = streamsV2(&c.cfg, tc.Table.DeltaUpdates, c.streamingV2Enabled)
+	if recordStateKey && tc.StateKey == "" {
+		return fmt.Errorf("cannot record the state key of table %s: the binding resolved for it carries no state key", tc.Identifier)
+	}
+
 	if _, err := c.db.ExecContext(ctx, tc.TableCreateSql); err != nil {
 		if matches := errInsufficientPrivileges.FindStringSubmatch(err.Error()); len(matches) > 0 {
 			err = errors.New(matches[0])
 		}
 		return err
+	}
+
+	// The task name and binding state key are recorded here, right after table
+	// creation, because a backfill of a streaming v2 binding re-creates the table
+	// rather than emptying it (MustRecreateResource), so every backfill of a
+	// table created here passes through here. A table
+	// created before the binding streamed gets its record from
+	// adoptStreamV2StateKeys.
+	if recordStateKey {
+		var comment = streamV2EmbedStateKeyInTableComment(tc.Comment, streamV2RecordedStateKey{
+			materialization: c.materializationName,
+			stateKey:        tc.StateKey,
+		})
+		var stmt = fmt.Sprintf("COMMENT ON TABLE %s IS %s;", tc.Identifier, c.ep.Dialect.Literal(comment))
+		if _, err := c.db.ExecContext(ctx, stmt); err != nil {
+			return fmt.Errorf("recording the state key of table %s: %w", tc.Identifier, err)
+		}
 	}
 
 	if rc, ok := tc.Resource.(tableConfig); ok {
@@ -353,7 +389,71 @@ func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence 
 }
 
 func (c *client) MustRecreateResource(req *pm.Request_Apply, lastBinding, newBinding *pf.MaterializationSpec_Binding) (bool, error) {
-	return false, nil
+	// A backfill of a streaming v2 binding must drop and re-create the table
+	// rather than truncate it. Apply runs while the shards of the old spec are
+	// still running, and their Snowpipe channels are bound to this table. A
+	// truncate leaves those channels open, so rows they append after it survive
+	// and are then materialized a second time by the backfill. Dropping the
+	// table closes every channel on it, including channels no checkpoint names
+	// because their shard committed nothing yet.
+
+	if lastBinding != nil && !lastBinding.DeltaUpdates {
+		return false, nil
+	}
+
+	// We need to know whether the old spec streamed into this table, because
+	// its channels are what a truncate would leave open. When the new
+	// configuration streams, the old one usually did too, and re-creating the
+	// table is safe either way, so no further checking is needed.
+	if streamsV2(&c.cfg, true, c.streamingV2Enabled) {
+		return true, nil
+	} else if req.LastMaterialization == nil {
+		return false, nil
+	}
+
+	// Otherwise the old spec's own configuration is read, because a publication
+	// may turn streaming off and bump a backfill counter at once. That answer
+	// can only widen this one, never narrow it: the old configuration arrives
+	// in whatever shape the control plane stored it, not the shape the runtime
+	// hands this connector for itself.
+	lastCfg, ok := endpointConfigOf(req.LastMaterialization.ConfigJson)
+	if !ok {
+		// Re-creating the table is correct whether or not the old spec streamed,
+		// so an unreadable configuration costs the grants a truncate would have
+		// kept, and nothing more.
+		log.WithField("table", newBinding.ResourcePath).Warn(
+			"cannot read the endpoint configuration of the specification being replaced; the table will be dropped and re-created for this backfill rather than emptied",
+		)
+		return true, nil
+	}
+	return streamsV2(&lastCfg, true, boilerplate.ParseFlags(lastCfg)[flagSnowpipeStreamingV2]), nil
+}
+
+// endpointConfigOf parses an endpoint configuration which arrives in one of two
+// shapes: the configuration object itself, or the object the control plane stores,
+// which carries the configuration under `config` beside the connector image. The
+// configuration may carry fields this version does not know, lack ones it does,
+// and still hold sops ciphertext, so no field is required of it. A document which
+// is not an object, or whose `config` is not an object, reports false, so that a
+// caller cannot mistake "could not be read" for "configured no feature flags".
+func endpointConfigOf(configJson json.RawMessage) (config, bool) {
+	var wrapper struct {
+		Config json.RawMessage `json:"config"`
+	}
+	if err := json.Unmarshal(configJson, &wrapper); err != nil {
+		return config{}, false
+	}
+	if len(wrapper.Config) > 0 {
+		configJson = wrapper.Config
+	}
+
+	var cfg config
+	if trimmed := bytes.TrimSpace(configJson); len(trimmed) == 0 || trimmed[0] != '{' {
+		return config{}, false
+	} else if err := json.Unmarshal(trimmed, &cfg); err != nil {
+		return config{}, false
+	}
+	return cfg, true
 }
 
 func (c *client) DeleteCheckpointsEntry(ctx context.Context, taskName string) error {
