@@ -279,8 +279,9 @@ func (d *transactor) UnmarshalState(state json.RawMessage) error {
 	return nil
 }
 
-// priorStreamV2 returns the streaming v2 state the checkpoint records for a
-// binding, or nil if it records none.
+// priorStreamV2 returns the streaming v2 items the checkpoint holds for a binding,
+// one per channel, or nil when it holds none. "Prior" means written by a session
+// before this one.
 func (d *transactor) priorStreamV2(stateKey string) map[string]*streamV2Item {
 	if item, ok := d.cp[stateKey]; ok {
 		return item.StreamV2
