@@ -1,21 +1,27 @@
-[project]
-name = "snowpipe-sidecar"
+[tool.poetry]
+name = "snowpipe_sidecar"
 version = "0.1.0"
 description = "Snowpipe Streaming (high-performance) sidecar for materialize-snowflake"
-requires-python = ">=3.9"
+authors = ["Jacob Marble <jacob@estuary.dev>"]
+packages = [{include = "snowpipe_sidecar"}]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+estuary-cdk = {path="../../estuary-cdk", develop = true}
 # The SDK is pinned exactly: the append path hands its channels one msgspec.Raw
 # per row, which is an internal of the SDK rather than something it documents —
 # see tests/test_sdk_raw_rows.py. msgspec is the SDK's own dependency, which
 # pins it exactly in turn, and is listed here because this package imports it
 # directly to frame those rows.
-dependencies = ["snowpipe-streaming==1.6.2", "msgspec"]
+snowpipe-streaming = "1.6.2"
+msgspec = "*"
 
-[project.optional-dependencies]
-test = ["pytest"]
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.4"
+
+[tool.ruff]
+target-version = "py312"
 
 [build-system]
-requires = ["setuptools>=61"]
-build-backend = "setuptools.build_meta"
-
-[tool.setuptools]
-packages = ["snowpipe_sidecar"]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
