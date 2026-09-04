@@ -467,18 +467,18 @@ func TestStreamV2StateKeyComment(t *testing.T) {
 			// Whoever rewrites the comment of a table takes the record with it,
 			// which reads as a table that never had one.
 			name:    "a record without a state key",
-			comment: "flow_generation: acmeCo/materialize-snowflake",
+			comment: "flow_state_key: acmeCo/materialize-snowflake",
 		},
 		{
 			// A half-written record names no state key rather than naming one no
 			// shard can match, which would turn every shard of the task away
 			// instead of only those a backfill has replaced.
 			name:    "a record whose state key is empty",
-			comment: "flow_generation: acmeCo/materialize-snowflake ",
+			comment: "flow_state_key: acmeCo/materialize-snowflake ",
 		},
 		{
 			name:    "a record whose task is empty",
-			comment: "flow_generation:  widgets.v3",
+			comment: "flow_state_key:  widgets.v3",
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
