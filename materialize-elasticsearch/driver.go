@@ -289,8 +289,8 @@ func (c config) toClient(disableRetry bool) (*client, error) {
 			// header when it is absent so the product check passes. Genuine
 			// Elasticsearch always sends this header, so its responses are never
 			// modified and the check still validates against it.
-			Transport: productHeaderInjector{inner: http.DefaultTransport},
-			RetryOnStatus:       []int{429, 502, 503, 504},
+			Transport:     productHeaderInjector{inner: http.DefaultTransport},
+			RetryOnStatus: []int{429, 502, 503, 504},
 			RetryBackoff: func(i int) time.Duration {
 				d := min(time.Duration(1<<i)*time.Second, 5*time.Second)
 				log.WithFields(log.Fields{
@@ -725,6 +725,7 @@ func (d *materialization) NewTransactor(
 		indexToBinding[b.ResourcePath[0]] = idx
 		bindings = append(bindings, binding{
 			index:          b.ResourcePath[0],
+			path:           b.ResourcePath,
 			deltaUpdates:   b.DeltaUpdates,
 			fields:         fields,
 			floatFields:    floatFields,
@@ -740,6 +741,7 @@ func (d *materialization) NewTransactor(
 		client:         d.dataClient,
 		bindings:       bindings,
 		isServerless:   isServerless,
+		be:             be,
 		indexToBinding: indexToBinding,
 	}
 	return transactor, nil
@@ -798,4 +800,3 @@ func translateField(f string) string {
 
 	return f
 }
-

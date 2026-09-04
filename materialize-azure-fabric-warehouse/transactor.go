@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"text/template"
 
 	"github.com/estuary/connectors/go/blob"
 	m "github.com/estuary/connectors/go/materialize"
@@ -26,7 +27,10 @@ type binding struct {
 	}
 
 	store struct {
-		mustMerge   bool
+		mustMerge bool
+		// updates is the number of stored documents that replace an existing
+		// row, for the transaction health report.
+		updates     int64
 		mergeBounds *sql.MergeBoundsBuilder
 	}
 }
@@ -102,8 +106,10 @@ func newTransactor(
 	return t, nil
 }
 
-func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
-func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) { return nil, nil }
+func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
+	return nil, nil
+}
 
 func (t *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSpec, _ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
 	return t.fence.Checkpoint, nil
@@ -256,6 +262,9 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 		if it.Exists {
 			b.store.mustMerge = true
+			if !flowDelete {
+				b.store.updates++
+			}
 		}
 
 		if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
@@ -269,6 +278,8 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	if it.Err() != nil {
 		return nil, it.Err()
 	}
+
+	round := it.Round
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
 		var err error
@@ -312,35 +323,60 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 				Bounds:            b.store.mergeBounds.Build(),
 			}
 
-			t.be.StartedResourceCommit(b.target.Path)
-			if b.store.mustMerge {
-				var mergeQuery strings.Builder
-				if err := t.templates.storeMergeQuery.Execute(&mergeQuery, params); err != nil {
-					return nil, m.FinishedOperation(err)
-				} else if _, err := txn.ExecContext(ctx, mergeQuery.String()); err != nil {
+			// Statements run one per Exec: go-mssqldb sums the row counts of
+			// every statement in a batch, which would fold the staging load
+			// into the count of target rows affected.
+			exec := func(tpl *template.Template, name string) (int64, error) {
+				var query strings.Builder
+				if err := tpl.Execute(&query, params); err != nil {
+					return 0, err
+				}
+				res, err := txn.ExecContext(ctx, query.String())
+				if err != nil {
 					log.WithField(
-						"query", redactedQuery(mergeQuery, t.cfg.StorageAccountKey),
-					).Error("merge query failed")
-					return nil, m.FinishedOperation(fmt.Errorf("executing store merge query for binding[%d]: %w", idx, err))
+						"query", redactedQuery(query, t.cfg.StorageAccountKey),
+					).Error(name + " query failed")
+					return 0, fmt.Errorf("executing store %s query for binding[%d]: %w", name, idx, err)
+				}
+				rows, _ := res.RowsAffected()
+				return rows, nil
+			}
+
+			t.be.StartedResourceCommit(b.target.Path)
+			var affected int64
+			if !b.store.mustMerge && !b.hasBinaryColumns {
+				// All values are new and need no conversion, so the data can
+				// be loaded directly into the target table.
+				if n, err := exec(t.templates.storeCopyIntoDirectQuery, "copy into"); err != nil {
+					return nil, m.FinishedOperation(err)
+				} else {
+					affected += n
 				}
 			} else {
-				var copyIntoQuery strings.Builder
-				tpl := t.templates.storeCopyIntoDirectQuery
-				if b.hasBinaryColumns {
-					tpl = t.templates.storeCopyIntoFromStagedQuery
-				}
-
-				if err := tpl.Execute(&copyIntoQuery, params); err != nil {
+				if _, err := exec(t.templates.createStoreTable, "create store table"); err != nil {
 					return nil, m.FinishedOperation(err)
-				} else if _, err := txn.ExecContext(ctx, copyIntoQuery.String()); err != nil {
-					log.WithField(
-						"query", redactedQuery(copyIntoQuery, t.cfg.StorageAccountKey),
-					).Error("copy into query failed")
-					return nil, m.FinishedOperation(fmt.Errorf("executing store copy into query for binding[%d]: %w", idx, err))
+				}
+				if b.store.mustMerge {
+					if n, err := exec(t.templates.storeDeleteQuery, "delete"); err != nil {
+						return nil, m.FinishedOperation(err)
+					} else {
+						affected += n
+					}
+				}
+				if n, err := exec(t.templates.storeInsertQuery, "insert"); err != nil {
+					return nil, m.FinishedOperation(err)
+				} else if _, err := exec(t.templates.dropStoreTable, "drop store table"); err != nil {
+					return nil, m.FinishedOperation(err)
+				} else {
+					affected += n
 				}
 			}
+			// An update is a DELETE of the old row plus an INSERT of the new
+			// one, so it counts twice; subtract it once so the total counts
+			// documents.
+			t.be.ReportRowStats(round, b.target.Path, m.TotalRowStats(affected-b.store.updates))
 			t.be.FinishedResourceCommit(b.target.Path)
-			b.store.mustMerge = false
+			b.store.mustMerge, b.store.updates = false, 0
 		}
 
 		if res, err := txn.ExecContext(ctx, fenceUpdate.String()); err != nil {

@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"regexp"
+	"strconv"
 	"strings"
 	"text/template"
 
@@ -506,8 +508,10 @@ func (t *transactor) addBinding(
 	return nil
 }
 
-func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
-func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) { return nil, nil }
+func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
+	return nil, nil
+}
 
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
@@ -767,13 +771,15 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 	}
 
+	round := it.Round
+
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
 		var err error
 		if d.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
 			return nil, m.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
 		}
 
-		if err := d.commit(ctx, varcharColumnUpdates); err != nil {
+		if err := d.commit(ctx, varcharColumnUpdates, round); err != nil {
 			return nil, pf.FinishedOperation(err)
 		}
 
@@ -786,7 +792,22 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}, nil
 }
 
-func (d *transactor) commit(ctx context.Context, varcharColumnUpdates map[string][]string) error {
+// copyLoadedRe matches the INFO notice Redshift sends after a COPY, which is
+// the only place it reports the loaded row count: the command tag is bare.
+var copyLoadedRe = regexp.MustCompile(`^Load into table '.*' completed, (\d+) record\(s\) loaded successfully\.$`)
+
+// tagRows returns a command tag's row count, or false when it has none.
+func tagRows(tag pgconn.CommandTag) (int64, bool) {
+	s := tag.String()
+	if i := strings.LastIndexByte(s, ' '); i >= 0 {
+		if n, err := strconv.ParseInt(s[i+1:], 10, 64); err == nil {
+			return n, true
+		}
+	}
+	return 0, false
+}
+
+func (d *transactor) commit(ctx context.Context, varcharColumnUpdates map[string][]string, round int) error {
 	defer func() {
 		for _, b := range d.bindings {
 			// Arrange to clean up any staged files once this commit attempt is
@@ -803,7 +824,18 @@ func (d *transactor) commit(ctx context.Context, varcharColumnUpdates map[string
 		}
 	}()
 
-	conn, err := pgx.Connect(ctx, d.cfg.toURI())
+	connCfg, err := pgx.ParseConfig(d.cfg.toURI())
+	if err != nil {
+		return fmt.Errorf("store pgx.ParseConfig: %w", err)
+	}
+	// Rows loaded by the most recent COPY, or -1 if it reported none.
+	var copied int64 = -1
+	connCfg.OnNotice = func(_ *pgconn.PgConn, n *pgconn.Notice) {
+		if match := copyLoadedRe.FindStringSubmatch(n.Message); match != nil {
+			copied, _ = strconv.ParseInt(match[1], 10, 64)
+		}
+	}
+	conn, err := pgx.ConnectConfig(ctx, connCfg)
 	if err != nil {
 		return fmt.Errorf("store pgx.Connect: %w", err)
 	}
@@ -871,6 +903,15 @@ func (d *transactor) commit(ctx context.Context, varcharColumnUpdates map[string
 		}
 		d.be.StartedResourceCommit(b.target.Path)
 
+		// Target rows affected this round, for the transaction health report.
+		// Skipped if any statement's count is unavailable.
+		var affected int64
+		var counted = true
+		count := func(n int64, ok bool) {
+			affected += n
+			counted = counted && ok
+		}
+
 		if b.hasDeletes {
 			// Create the temporary table for staging values to delete from the target table.
 			// Redshift actually supports transactional DDL for creating tables, so this can be
@@ -887,8 +928,10 @@ func (d *transactor) commit(ctx context.Context, varcharColumnUpdates map[string
 
 			if _, err := txn.Exec(ctx, b.copyIntoDeleteTableSQL); err != nil {
 				return handleCopyIntoErr(ctx, txn, d.cfg.Bucket, b.deleteFile.prefix, b.target.Identifier, err)
-			} else if _, err := txn.Exec(ctx, b.deleteQuerySQL); err != nil {
+			} else if tag, err := txn.Exec(ctx, b.deleteQuerySQL); err != nil {
 				return fmt.Errorf("deleting from table '%s': %w", b.target.Identifier, err)
+			} else {
+				count(tagRows(tag))
 			}
 		}
 
@@ -910,16 +953,23 @@ func (d *transactor) commit(ctx context.Context, varcharColumnUpdates map[string
 
 			if _, err := txn.Exec(ctx, b.copyIntoMergeTableSQL); err != nil {
 				return handleCopyIntoErr(ctx, txn, d.cfg.Bucket, b.storeFile.prefix, b.target.Identifier, err)
-			} else if _, err := txn.Exec(ctx, b.mergeIntoSQL); err != nil {
+			} else if tag, err := txn.Exec(ctx, b.mergeIntoSQL); err != nil {
 				return fmt.Errorf("merging to table '%s': %w", b.target.Identifier, err)
+			} else {
+				count(tagRows(tag))
 			}
 		} else {
 			// Can copy directly into the target table since all values are new.
+			copied = -1
 			if _, err := txn.Exec(ctx, b.copyIntoTargetTableSQL); err != nil {
 				return handleCopyIntoErr(ctx, txn, d.cfg.Bucket, b.storeFile.prefix, b.target.Identifier, err)
 			}
+			count(copied, copied >= 0)
 		}
 
+		if counted {
+			d.be.ReportRowStats(round, b.target.Path, m.TotalRowStats(affected))
+		}
 		d.be.FinishedResourceCommit(b.target.Path)
 	}
 

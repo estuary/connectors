@@ -162,7 +162,7 @@ func (d FileDriver[T, R]) Validate(ctx context.Context, req *pm.Request_Validate
 	return &pm.Response_Validated{Bindings: out}, nil
 }
 
-func (d FileDriver[T, R]) NewTransactor(ctx context.Context, open pm.Request_Open, _ *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
+func (d FileDriver[T, R]) NewTransactor(ctx context.Context, open pm.Request_Open, be *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
 	driverCfg, err := d.NewConfig(open.Materialization.ConfigJson)
 	if err != nil {
 		return nil, nil, nil, err
@@ -212,6 +212,7 @@ func (d FileDriver[T, R]) NewTransactor(ctx context.Context, open pm.Request_Ope
 		bindings: bindings,
 		store:    store,
 		common:   driverCfg.CommonConfig(),
+		be:       be,
 	}, &pm.Response_Opened{}, opts, nil
 }
 
@@ -226,6 +227,7 @@ type transactor[T Upload] struct {
 	bindings []binding
 	store    Store[T]
 	common   CommonConfig
+	be       *m.BindingEvents
 
 	stateLock sync.Mutex
 	state     connectorState[T]
@@ -377,9 +379,11 @@ func (t *transactor[T]) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		return nil
 	}
 
+	rows := make(map[int]int64)
 	lastBinding := -1
 	for it.Next(false) {
 		b := t.bindings[it.Binding]
+		rows[it.Binding]++
 
 		if lastBinding != -1 && lastBinding != it.Binding {
 			if err := finishFile(); err != nil {
@@ -419,11 +423,17 @@ func (t *transactor[T]) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	if err := finishFile(); err != nil {
 		return nil, fmt.Errorf("final finishFile: %w", err)
 	}
+	round := it.Round
 
 	return func(ctx context.Context, _ *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
 		checkpointJSON, err := json.Marshal(t.state)
 		if err != nil {
 			return nil, m.FinishedOperation(fmt.Errorf("creating checkpoint json: %w", err))
+		}
+
+		// Every file of the round has finished uploading by now.
+		for idx, n := range rows {
+			t.be.ReportRowStats(round, []string{t.bindings[idx].path}, m.TotalRowStats(n).WithStaged(n))
 		}
 
 		return &pf.ConnectorState{UpdatedJson: checkpointJSON}, nil
