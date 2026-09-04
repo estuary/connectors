@@ -189,8 +189,15 @@ func runMaterializationTestForTask[EC boilerplate.EndpointConfiger, FC boilerpla
 		// correct connector leaves in the destination on either runtime. Legacy
 		// preview does not auto-append the drain session that preview-next
 		// does, and the apply/state output is omitted because it embeds
-		// per-run values and differs by runtime.
-		CleanupTestResources(t, ctx, materializer, rt.resourcePaths, tsSuffix)
+		// per-run values and differs by runtime. It runs as a fresh task with
+		// fresh tables: a connector that keeps its runtime checkpoint in the
+		// destination would otherwise resume from the liveness run's and apply
+		// only the fixture's tail, and a table that survived a name-based sweep
+		// would take these rows on top of the liveness run's.
+		rt = rewriteTaskForTest[EC, RC](t, bundled, taskName, tsSuffix, cfg, makeResourceFn)
+		t.Cleanup(func() {
+			CleanupTestResources(t, ctx, materializer, rt.resourcePaths, tsSuffix)
+		})
 		args = []string{
 			"preview",
 			"--name", rt.workingTaskName,
@@ -304,8 +311,12 @@ func runtimeV1Liveness[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConf
 	)
 
 	for _, path := range rt.resourcePaths {
-		_, rows, err := materializer.SnapshotTestResource(ctx, path)
+		columns, rows, err := materializer.SnapshotTestResource(ctx, path)
 		require.NoError(t, err)
+		if columns == nil && rows == nil {
+			t.Logf("runtime v1: %v cannot be read back (SnapshotTestResource is not implemented); liveness not checked", path)
+			continue
+		}
 		require.NotEmptyf(t, rows,
 			"runtime v1: %v is empty after a single session; the connector applied nothing it acknowledged within the session (does it only learn its own staged work from Acknowledge's statePatches, which runtime v1 never sends?)", path)
 	}
