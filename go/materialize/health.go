@@ -224,6 +224,7 @@ func (r *healthRound) complete() bool {
 // healthWindow accumulates evaluated rounds sharing a verdict.
 type healthWindow struct {
 	rounds                int
+	seen                  map[int]struct{} // Rounds counted so far.
 	firstRound, lastRound int
 	bindings              map[string]struct{}
 	loadRequests, loaded  int64
@@ -235,10 +236,14 @@ type healthWindow struct {
 }
 
 func newHealthWindow() *healthWindow {
-	return &healthWindow{bindings: make(map[string]struct{})}
+	return &healthWindow{bindings: make(map[string]struct{}), seen: make(map[int]struct{})}
 }
 
 func (w *healthWindow) addRound(round int) {
+	if _, ok := w.seen[round]; ok {
+		return
+	}
+	w.seen[round] = struct{}{}
 	if w.rounds == 0 || round < w.firstRound {
 		w.firstRound = round
 	}
@@ -601,13 +606,9 @@ func (h *healthTracker) evaluate(r *healthRound) {
 }
 
 func (h *healthTracker) mergeWindow(into, w *healthWindow) {
-	if into.rounds == 0 {
-		into.firstRound, into.lastRound = w.firstRound, w.lastRound
-	} else {
-		into.firstRound = min(into.firstRound, w.firstRound)
-		into.lastRound = max(into.lastRound, w.lastRound)
+	for round := range w.seen {
+		into.addRound(round)
 	}
-	into.rounds += w.rounds
 	for key := range w.bindings {
 		into.bindings[key] = struct{}{}
 	}
