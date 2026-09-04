@@ -11,7 +11,34 @@ import (
 	st "github.com/estuary/connectors/source-boilerplate/testing"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/connectors/sqlcapture/tests"
+	"github.com/stretchr/testify/require"
 )
+
+func TestTemporalKeyEncoding(t *testing.T) {
+	for _, tc := range []struct {
+		columnType string
+		value      string
+	}{
+		{columnType: "date", value: "2026-09-04"},
+		{columnType: "datetime", value: "2026-09-04 12:34:56.123456"},
+		{columnType: "time", value: "12:34:56.123456"},
+		{columnType: "timestamp", value: "2026-09-04 12:34:56.123456"},
+	} {
+		t.Run(tc.columnType, func(t *testing.T) {
+			var db mysqlDatabase
+			var backfillTranscoder, backfillTranscoderErr = db.constructFDBTranscoder(true, tc.columnType)
+			require.NoError(t, backfillTranscoderErr)
+			var replicationTranscoder, replicationTranscoderErr = db.constructFDBTranscoder(false, tc.columnType)
+			require.NoError(t, replicationTranscoderErr)
+
+			var backfillKey, backfillErr = backfillTranscoder.TranscodeFDB(nil, []byte(tc.value))
+			var replicationKey, replicationErr = replicationTranscoder.TranscodeFDB(nil, tc.value)
+			require.NoError(t, backfillErr)
+			require.NoError(t, replicationErr)
+			require.Equal(t, backfillKey, replicationKey)
+		})
+	}
+}
 
 // TestDatatypes runs the discovery test on various datatypes.
 func TestDatatypes(t *testing.T) {

@@ -38,6 +38,10 @@ var featureFlagDefaults = map[string]bool{
 	// When true, columns of type TINYINT(1) will be treated as booleans.
 	"tinyint1_as_bool": false,
 
+	// When true, MariaDB system-versioned tables are discovered. When false
+	// they are excluded from discovery.
+	"system_versioned_tables": false,
+
 	// When set, discovered collection schemas will request that schema inference be
 	// used _in addition to_ the full column/types discovery we already do.
 	"use_schema_inference": true,

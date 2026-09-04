@@ -1,5 +1,12 @@
 # source-mysql
 
+## 2026-09-04
+
+### Added
+- MariaDB system-versioned tables can be discovered and captured, including
+  historical row versions, when the `system_versioned_tables` feature flag
+  is set.
+
 ## 2026-09-03
 
 ### Added
