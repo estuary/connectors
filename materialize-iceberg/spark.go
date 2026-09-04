@@ -58,8 +58,8 @@ func (s *sparkClient) ensureSecret(ctx context.Context, wantCred string) error {
 // (load.py, merge.py, exec.py); pyFilesCommonURI and workingPrefix are part
 // of the EMR contract but unused here — the daemon imports the python modules
 // directly and returns status in the HTTP response body.
-func (s *sparkClient) runJob(ctx context.Context, input any, entryPointURI, pyFilesCommonURI, jobName, workingPrefix string) error {
-	action, err := actionFromEntryPoint(entryPointURI)
+func (s *sparkClient) runJob(ctx context.Context, job computeJob) error {
+	action, err := actionFromEntryPoint(job.EntryPointURI)
 	if err != nil {
 		return err
 	}
@@ -69,33 +69,33 @@ func (s *sparkClient) runJob(ctx context.Context, input any, entryPointURI, pyFi
 		Input  any    `json:"input"`
 	}{
 		Action: action,
-		Input:  input,
+		Input:  job.Input,
 	})
 	if err != nil {
-		return fmt.Errorf("encoding daemon request for %q: %w", jobName, err)
+		return fmt.Errorf("encoding daemon request for %q: %w", job.Name, err)
 	}
 
 	url := strings.TrimSuffix(s.cfg.DaemonURL, "/") + "/run"
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
 	if err != nil {
-		return fmt.Errorf("building daemon request for %q: %w", jobName, err)
+		return fmt.Errorf("building daemon request for %q: %w", job.Name, err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	log.WithFields(log.Fields{"job": jobName, "action": action}).Debug("submitting spark job to daemon")
+	log.WithFields(log.Fields{"job": job.Name, "action": action}).Debug("submitting spark job to daemon")
 
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("spark job %q request failed: %w", jobName, err)
+		return fmt.Errorf("spark job %q request failed: %w", job.Name, err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("reading daemon response for %q: %w", jobName, err)
+		return fmt.Errorf("reading daemon response for %q: %w", job.Name, err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("spark job %q daemon returned %d: %s", jobName, resp.StatusCode, string(respBody))
+		return fmt.Errorf("spark job %q daemon returned %d: %s", job.Name, resp.StatusCode, string(respBody))
 	}
 
 	var result struct {
@@ -103,10 +103,10 @@ func (s *sparkClient) runJob(ctx context.Context, input any, entryPointURI, pyFi
 		Error   string `json:"error"`
 	}
 	if err := json.Unmarshal(respBody, &result); err != nil {
-		return fmt.Errorf("decoding daemon response for %q: %w (body: %s)", jobName, err, string(respBody))
+		return fmt.Errorf("decoding daemon response for %q: %w (body: %s)", job.Name, err, string(respBody))
 	}
 	if !result.Success {
-		return fmt.Errorf("spark job %q failed: %s", jobName, result.Error)
+		return fmt.Errorf("spark job %q failed: %s", job.Name, result.Error)
 	}
 
 	return nil

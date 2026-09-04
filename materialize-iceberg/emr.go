@@ -90,7 +90,38 @@ func (e *emrClient) ensureSecret(ctx context.Context, wantCred string) error {
 	return nil
 }
 
-func (e *emrClient) runJob(ctx context.Context, input any, entryPointUri, pyFilesCommonURI, jobName, workingPrefix string) error {
+func (e *emrClient) startJobRun(ctx context.Context, startInput *emr.StartJobRunInput) (*emr.StartJobRunOutput, error) {
+	start, err := e.c.StartJobRun(ctx, startInput)
+	if err == nil {
+		return start, nil
+	}
+
+	// AccessDenied likely means the execution role lacks
+	// `emr-serverless:TagResource`. Disable tagging for the lifetime of
+	// this client and retry without tags so the materialization can keep
+	// running on existing IAM policies.
+	if startInput.Tags != nil && isAccessDeniedErr(err) {
+		log.WithError(err).Warn("StartJobRun denied while passing tags; retrying without tags. Grant 'emr-serverless:TagResource' to the execution role to enable cost-allocation tagging.")
+		e.tagsDisabled = true
+		startInput.Tags = nil
+		start, err = e.c.StartJobRun(ctx, startInput)
+	}
+	if err == nil {
+		return start, nil
+	}
+
+	// When re-using a ClientToken, the job configuration must exactly match.
+	// We always ensure this is the case during normal operation.
+	if isConflictErr(err) {
+		log.Warn("job exists with conflicting definition; starting job with new ClientToken")
+		startInput.ClientToken = aws.String(uuid.NewString())
+		start, err = e.c.StartJobRun(ctx, startInput)
+	}
+
+	return start, err
+}
+
+func (e *emrClient) runJob(ctx context.Context, job computeJob) error {
 	/***
 	Available arguments to the pyspark script:
 	| --input-uri              | Input for the program, as an s3 URI, to be parsed by the script                      | Required |
@@ -105,7 +136,7 @@ func (e *emrClient) runJob(ctx context.Context, input any, entryPointUri, pyFile
 	***/
 	getStatus := func() (*python.StatusOutput, error) {
 		var status python.StatusOutput
-		statusKey := path.Join(workingPrefix, statusFile)
+		statusKey := path.Join(job.WorkingPrefix, statusFile)
 		if statusObj, err := e.bucket.NewReader(ctx, statusKey); err != nil {
 			return nil, fmt.Errorf("reading status object %q: %w", statusKey, err)
 		} else if err := json.NewDecoder(statusObj).Decode(&status); err != nil {
@@ -116,8 +147,8 @@ func (e *emrClient) runJob(ctx context.Context, input any, entryPointUri, pyFile
 		return &status, nil
 	}
 
-	inputKey := path.Join(workingPrefix, "input.json")
-	if inputBytes, err := encodeInput(input); err != nil {
+	inputKey := path.Join(job.WorkingPrefix, "input.json")
+	if inputBytes, err := encodeInput(job.Input); err != nil {
 		return fmt.Errorf("encoding input: %w", err)
 	} else if err := e.bucket.Upload(ctx, inputKey, bytes.NewReader(inputBytes)); err != nil {
 		return fmt.Errorf("putting input file object: %w", err)
@@ -125,7 +156,7 @@ func (e *emrClient) runJob(ctx context.Context, input any, entryPointUri, pyFile
 
 	args := []string{
 		"--input-uri", "s3://" + path.Join(e.cfg.Bucket, inputKey),
-		"--status-output", "s3://" + path.Join(e.cfg.Bucket, workingPrefix, statusFile),
+		"--status-output", "s3://" + path.Join(e.cfg.Bucket, job.WorkingPrefix, statusFile),
 		"--catalog-url", e.catalogURL,
 		"--warehouse", e.warehouse,
 		"--region", e.cfg.Region,
@@ -148,36 +179,53 @@ func (e *emrClient) runJob(ctx context.Context, input any, entryPointUri, pyFile
 		args = append(args, "--signing-name", signingName)
 	}
 
+	clientToken := job.IdempotencyToken
+	if clientToken == "" {
+		clientToken = uuid.NewString()
+	}
+
 	startInput := &emr.StartJobRunInput{
 		ApplicationId:    aws.String(e.cfg.ApplicationId),
-		ClientToken:      aws.String(uuid.NewString()),
+		ClientToken:      aws.String(clientToken),
 		ExecutionRoleArn: aws.String(e.cfg.ExecutionRoleArn),
 		JobDriver: &emrTypes.JobDriverMemberSparkSubmit{
 			Value: emrTypes.SparkSubmit{
-				SparkSubmitParameters: aws.String(fmt.Sprintf("--py-files %s --conf spark.driver.maxResultSize=0 --conf spark.sql.iceberg.vectorization.enabled=false", pyFilesCommonURI)),
-				EntryPoint:            aws.String(entryPointUri),
+				SparkSubmitParameters: aws.String(fmt.Sprintf("--py-files %s --conf spark.driver.maxResultSize=0 --conf spark.sql.iceberg.vectorization.enabled=false", job.PyFilesCommonURI)),
+				EntryPoint:            aws.String(job.EntryPointURI),
 				EntryPointArguments:   args,
 			},
 		},
-		Name: aws.String(jobName),
+		Name: aws.String(job.Name),
 	}
 	if !e.tagsDisabled {
 		startInput.Tags = map[string]string{"estuary:materialization": e.materializationName}
 	}
 
-	start, err := e.c.StartJobRun(ctx, startInput)
+	// Start the Job or adopt a existing run with the clientToken.
+	start, err := e.startJobRun(ctx, startInput)
 	if err != nil {
-		// AccessDenied likely means the execution role lacks
-		// `emr-serverless:TagResource`. Disable tagging for the lifetime of
-		// this client and retry without tags so the materialization can keep
-		// running on existing IAM policies.
-		if startInput.Tags != nil && isAccessDeniedErr(err) {
-			log.WithError(err).Warn("StartJobRun denied while passing tags; retrying without tags. Grant 'emr-serverless:TagResource' to the execution role to enable cost-allocation tagging.")
-			e.tagsDisabled = true
-			startInput.Tags = nil
-			startInput.ClientToken = aws.String(uuid.NewString())
-			start, err = e.c.StartJobRun(ctx, startInput)
-		}
+		return err
+	}
+	// If the job is immediately failed or cancelled, restart it.  This
+	// prevents a succesfully adopted job that that previously failed or was
+	// cancelled from blocking recovery.
+	//
+	// We initially always attempt to adopt the original job for a transaction,
+	// since we can't record an updated ClientToken jobs created later due to
+	// conflict errors.  This limits our ability to prevent duplicate jobs but
+	// still handles the common case of the connector restarting during a job
+	// run when the job is working.
+	jobRun, err := e.c.GetJobRun(ctx, &emr.GetJobRunInput{
+		ApplicationId: aws.String(e.cfg.ApplicationId),
+		JobRunId:      start.JobRunId,
+	})
+	if err != nil {
+		return err
+	}
+	switch jobRun.JobRun.State {
+	case emrTypes.JobRunStateFailed, emrTypes.JobRunStateCancelling, emrTypes.JobRunStateCancelled:
+		startInput.ClientToken = aws.String(uuid.NewString())
+		start, err = e.startJobRun(ctx, startInput)
 		if err != nil {
 			return err
 		}
@@ -277,6 +325,11 @@ func isAccessDeniedErr(err error) bool {
 		return true
 	}
 	return false
+}
+
+func isConflictErr(err error) bool {
+	var conflictErr *emrTypes.ConflictException
+	return errors.As(err, &conflictErr)
 }
 
 func encodeInput(in any) ([]byte, error) {

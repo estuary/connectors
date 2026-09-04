@@ -23,10 +23,11 @@ type LoadInput struct {
 }
 
 type MergeBinding struct {
-	Binding int           `json:"binding"`
-	Query   string        `json:"query"`
-	Columns []NestedField `json:"columns"`
-	Files   []string      `json:"files"`
+	Binding          int           `json:"binding"`
+	Query            string        `json:"query"`
+	Columns          []NestedField `json:"columns"`
+	Files            []string      `json:"files"`
+	IdempotencyToken string        `json:"idempotency_token"`
 }
 
 type MergeInput struct {

@@ -48,12 +48,33 @@ const (
 	statusFile = "status.json"
 )
 
+// computeJob is the fields required to start a compute job.
+type computeJob struct {
+	Input            any
+	EntryPointURI    string
+	PyFilesCommonURI string
+	Name             string
+	WorkingPrefix    string
+	// IdempotencyToken is used to avoid starting duplicate jobs.  If a job
+	// with this token is already started the computeRunner will attempt to
+	// adopt it and not start a new job.  If the job cannot be adopted, a new
+	// job will be created.
+	//
+	// Not all computeRunner implementations support this, in this case a new
+	// job will be started.
+	//
+	// This is a resource saving device, it cannot be relied on for
+	// correctness.  The token has a limited lifetime, and after it expires a
+	// new job would be created even with the same token.
+	IdempotencyToken string
+}
+
 // computeRunner abstracts the execution backend that runs the materialization's
 // PySpark jobs. emrClient submits to AWS EMR Serverless for production
 // deployments; sparkClient shells out to a local Spark standalone cluster
 // running in docker-compose for integration tests.
 type computeRunner interface {
-	runJob(ctx context.Context, input any, entryPointURI, pyFilesCommonURI, jobName, workingPrefix string) error
+	runJob(ctx context.Context, job computeJob) error
 	checkPrereqs(ctx context.Context, errs *cerrors.PrereqErr)
 	ensureSecret(ctx context.Context, wantCred string) error
 }
@@ -537,14 +558,13 @@ func (d *materialization) UpdateResource(
 			})
 			ll.Info("running column migration job")
 			ts := time.Now()
-			if err := d.compute.runJob(
-				ctx,
-				python.ExecInput{Query: q.String()},
-				d.pyFiles.exec,
-				d.pyFiles.common,
-				fmt.Sprintf("column migration for: %s", d.materializationName),
-				outputPrefix,
-			); err != nil {
+			if err := d.compute.runJob(ctx, computeJob{
+				Input:            python.ExecInput{Query: q.String()},
+				EntryPointURI:    d.pyFiles.exec,
+				PyFilesCommonURI: d.pyFiles.common,
+				Name:             fmt.Sprintf("column migration for: %s", d.materializationName),
+				WorkingPrefix:    outputPrefix,
+			}); err != nil {
 				return fmt.Errorf("failed to run column migration job: %w", err)
 			}
 			ll.WithField("took", time.Since(ts).String()).Info("column migration job complete")
