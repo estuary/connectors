@@ -165,6 +165,7 @@ jobs:
           - materialize-motherduck
           - materialize-mysql
           - materialize-pinecone
+          - materialize-qdrant
           - materialize-postgres
           - materialize-redshift
           - materialize-s3-csv
