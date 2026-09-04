@@ -1,6 +1,6 @@
 # materialize-snowflake
 
-## 2026-08-28
+## 2026-09-04
 
 ### Added
 - New `snowpipe_streaming_v2` feature flag (off by default). Delta-updates

@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	log "github.com/sirupsen/logrus"
 	"regexp"
 	"slices"
 	"strconv"
@@ -20,6 +19,7 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/jmoiron/sqlx"
+	log "github.com/sirupsen/logrus"
 	sf "github.com/snowflakedb/gosnowflake/v2"
 	"golang.org/x/sync/errgroup"
 )
@@ -197,12 +197,11 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 var errInsufficientPrivileges = regexp.MustCompile(`Insufficient privileges to operate on schema '([^']+)'`)
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
-	// The generation this table belongs to is recorded in its comment. A missing
-	// state key parses as no generation at all — which streamV2GenerationConflict
-	// reads as permission for any generation to append, leaving the backfill race
-	// it guards unchecked. Refused ahead of the CREATE, so such a binding leaves
-	// no table, instead of a table whose generation cannot be parsed from the
-	// table comment.
+	// We record the task name and the binding's state key (streamV2Generation)
+	// in the Snowflake table comment. A binding without a state key would leave
+	// that record empty, and an empty record lets any task or any state key
+	// append to the table. The check therefore runs before the CREATE, so the
+	// error below creates no table at all.
 	var recordGeneration = streamsV2(&c.cfg, tc.Table.DeltaUpdates, c.streamingV2Enabled)
 	if recordGeneration && tc.StateKey == "" {
 		return fmt.Errorf("cannot record the generation of table %s: the binding resolved for it carries no state key", tc.Identifier)
@@ -215,9 +214,12 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 		return err
 	}
 
-	// The generation is recorded here, right after table creation, because a
-	// backfill of a streaming v2 binding re-creates the table rather than emptying
-	// it (MustRecreateResource), so every generation of the table passes through here.
+	// The generation (task name and binding state key) is recorded here, right
+	// after table creation, because a backfill of a streaming v2 binding
+	// re-creates the table rather than emptying it (MustRecreateResource), so
+	// every generation of a table created here passes through here. A table
+	// created before the binding streamed gets its record from
+	// adoptStreamV2Generations.
 	if recordGeneration {
 		var comment = streamV2EmbedGenerationInTableComment(tc.Comment, streamV2Generation{
 			materialization: c.materializationName,
@@ -387,41 +389,33 @@ func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence 
 }
 
 func (c *client) MustRecreateResource(req *pm.Request_Apply, lastBinding, newBinding *pf.MaterializationSpec_Binding) (bool, error) {
-	// A backfill of a streaming v2 binding must recreate the table because Apply
-	// runs while the outgoing generation's shards are still storing - nothing
-	// stops them first - and their channels are bound to the very table the new
-	// generation is about to re-materialize. A truncate empties that table and
-	// leaves those channels valid and pointed at it, so the rows they append
-	// next land after the truncate, survive it, and are re-materialized a second
-	// time. Nothing about a channel says which generation opened it, so the
-	// duplication is silent.
-	//
-	// Dropping the table is what drops those channels with it, and it takes all of
-	// them: including the channel of a shard which has committed nothing for this
-	// binding and so has no checkpoint item to name it by, which is what a retirement
-	// of the channels the checkpoint does name could not reach. What the outgoing
-	// generation may not then do is reopen one, which reconcileStreamV2Channel
-	// refuses.
+	// A backfill of a streaming v2 binding must drop and re-create the table
+	// rather than truncate it. Apply runs while the shards of the old spec are
+	// still running, and their Snowpipe channels are bound to this table. A
+	// truncate leaves those channels open, so rows they append after it survive
+	// and are then materialized a second time by the backfill. Dropping the
+	// table closes every channel on it, including channels no checkpoint names
+	// because their shard committed nothing yet.
 
 	if lastBinding != nil && !lastBinding.DeltaUpdates {
 		return false, nil
 	}
 
-	// The endpoint configuration is read from the one in hand, which is the
-	// configuration that generation was running unless this same publication also
-	// changes the write path.
+	// We need to know whether the old spec streamed into this table, because
+	// its channels are what a truncate would leave open. When the new
+	// configuration streams, the old one usually did too, and re-creating the
+	// table is safe either way, so no further checking is needed.
 	if streamsV2(&c.cfg, true, c.streamingV2Enabled) {
 		return true, nil
 	} else if req.LastMaterialization == nil {
 		return false, nil
 	}
 
-	// A publication may turn the write path off in the same breath as it bumps a
-	// backfill counter, and the generation it replaces is streaming either way. So
-	// the replaced specification's own configuration is consulted too — but only
-	// ever to widen this answer, never to narrow it, because a request carries that
-	// configuration in whatever shape the control plane stored it rather than the
-	// shape this connector is handed for itself.
+	// Otherwise the old spec's own configuration is read, because a publication
+	// may turn streaming off and bump a backfill counter at once. That answer
+	// can only widen this one, never narrow it: the old configuration arrives
+	// in whatever shape the control plane stored it, not the shape the runtime
+	// hands this connector for itself.
 	outgoingCfg, ok := endpointConfigOf(req.LastMaterialization.ConfigJson)
 	if !ok {
 		// Re-creating the table is correct whether or not the old spec streamed,
