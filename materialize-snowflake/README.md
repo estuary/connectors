@@ -161,10 +161,9 @@ own. Either half of that convergence can be interrupted and repeats safely.
   delta-updates bindings — so the duplicate count is C − K summed over the
   binding's channels, where C is what each channel had committed and K is what
   the checkpoint recorded for it. A later return to `snowpipe_streaming_v2`
-  starts the binding on fresh channels. Any other departure is rejected, naming
-  the binding, and a task that was moved before that check existed is rejected
-  at startup instead; the remedy there is still a backfill, which starts the binding
-  on the new path with an empty checkpoint.
+  starts the binding on fresh channels. Any other departure is rejected at
+  publication, and again at startup, naming the binding. The remedy is a
+  backfill, which starts the binding on the new path with an empty checkpoint.
 - A binding can move onto this write path at any time. Work that the path it
   leaves staged and did not finish is drained by the machinery that staged it,
   while the binding's rows go to this path. Only when that drain is impossible,

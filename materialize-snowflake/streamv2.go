@@ -138,8 +138,7 @@ func parseStreamV2Token(token string) (int64, streamV2Range, bool) {
 // streamsV2 reports whether a binding writes through the snowpipe streaming v2 path.
 // That path appends rows to a channel as it stores them. Only a delta-updates binding
 // can do this, and only with JWT credentials to authenticate its sidecar. A
-// configuration with no credentials object, as older versions of this connector
-// wrote, never streams.
+// configuration with no credentials object never streams.
 func streamsV2(cfg *config, deltaUpdates bool, flagEnabled bool) bool {
 	return deltaUpdates && cfg.Credentials != nil && cfg.Credentials.AuthType == snowflake_auth.JWT && flagEnabled
 }
@@ -210,7 +209,7 @@ func streamV2EmbedStateKeyInTableComment(comment string, rec streamV2RecordedSta
 
 // streamV2StateKeyFromTableComment reads the task and state key that a table comment
 // names, and reports whether the comment named them at all. Two comments name none:
-// one written before this connector recorded state keys, and one that an operator
+// one written by a write path that records no state key, and one that an operator
 // rewrote.
 func streamV2StateKeyFromTableComment(comment string) (streamV2RecordedStateKey, bool) {
 	for line := range strings.SplitSeq(comment, "\n") {
@@ -248,10 +247,9 @@ func streamV2QueryTableComment(ctx context.Context, db *stdsql.DB, dialect sql.D
 // streamV2CheckStateKeyConflict rejects a binding when its table records a
 // different state key of that same binding.
 //
-// A comment that names no state key is not a conflict. Two tables report no state
-// key: one created before this connector recorded them, and one created while the
-// binding used standard updates. Neither says which state key can stream into the
-// table.
+// A comment that names no state key is not a conflict. A table created by a write
+// path that records no state key reports none, and says nothing about which state
+// key can stream into it.
 //
 // A state key of another task is not a conflict either. Two tasks that materialize
 // into one table are not backfills of each other. The comment names whichever of
@@ -259,8 +257,8 @@ func streamV2QueryTableComment(ctx context.Context, db *stdsql.DB, dialect sql.D
 func streamV2CheckStateKeyConflict(comment string, mine streamV2RecordedStateKey, table string) error {
 	recorded, ok := streamV2StateKeyFromTableComment(comment)
 	if !ok {
-		// A table created before this connector recorded state keys, or by a write
-		// path which records none. Apply records this state key on such a table
+		// A table created by a write path which records no state key. Apply
+		// records this state key on such a table
 		// (adoptStreamV2StateKeys), so what reaches here is a table Apply could
 		// not reach, and it says nothing about which state key may append.
 		return nil
@@ -1491,7 +1489,7 @@ func (m *streamV2Manager) waitCommit(ctx context.Context, b *streamV2Binding, c 
 	}
 
 	// The commit of the token is the earliest point where this transaction can see its
-	// own rejections. That point is now before flush checkpoints its counter. A rejection
+	// own rejections. That point is before flush checkpoints its counter. A rejection
 	// therefore fails the transaction that produced it, and not a later one.
 	if err := rejectedRowsError(c.name, b.table, status); err != nil {
 		return err

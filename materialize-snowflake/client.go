@@ -432,10 +432,10 @@ func (c *client) MustRecreateResource(req *pm.Request_Apply, lastBinding, newBin
 // endpointConfigOf parses an endpoint configuration which arrives in one of two
 // shapes: the configuration object itself, or the object the control plane stores,
 // which carries the configuration under `config` beside the connector image. The
-// configuration may be from an older version of this connector and may still hold
-// sops ciphertext, so no field is required of it. A document which is not an
-// object, or whose `config` is not an object, reports false, so that a caller
-// cannot mistake "could not be read" for "configured no feature flags".
+// configuration may carry fields this version does not know, lack ones it does,
+// and still hold sops ciphertext, so no field is required of it. A document which
+// is not an object, or whose `config` is not an object, reports false, so that a
+// caller cannot mistake "could not be read" for "configured no feature flags".
 func endpointConfigOf(configJson json.RawMessage) (config, bool) {
 	var wrapper struct {
 		Config json.RawMessage `json:"config"`

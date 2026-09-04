@@ -803,8 +803,8 @@ func TestStreamV2Manager(t *testing.T) {
 		// recreateTable drops and re-creates the table, as Apply does for a
 		// streaming v2 binding whose backfill counter has been bumped, recording the
 		// state key it re-creates the table for the way client.CreateTable does. An
-		// empty recorded state key stands for a table created before this connector
-		// recorded state keys at all.
+		// empty recorded state key stands for a table created by a write path that
+		// records none.
 		var recreateTable = func(t *testing.T, backfillTable, recorded string) {
 			_, err := db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s;", backfillTable))
 			require.NoError(t, err)
@@ -884,7 +884,7 @@ func TestStreamV2Manager(t *testing.T) {
 			var lastShard, checkpointed = lastSpecShard(t, backfillTable, "backfill-drop.v1")
 
 			// Re-created without recording a state key, which is what a table
-			// created before this connector recorded them looks like: the committed
+			// created by a write path that records none looks like: the committed
 			// offset token is all this shard has to go on.
 			recreateTable(t, backfillTable, "")
 

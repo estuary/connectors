@@ -120,9 +120,8 @@ func missingRuntimeV2Warning(configJson json.RawMessage, last *pf.Materializatio
 // connector supports — see streamV2PathOrphaned for what an unsupported
 // departure costs the binding, and streamV2Downgrade for the one it allows.
 //
-// The transactor rejects the same thing, and has to: the connector state a task
-// runs on is its own, and a specification published before this check existed
-// may already have made the move. But a task which is rejected is a task an
+// The transactor rejects the same thing, and has to, because the connector state
+// a task runs on is its own. But a task which is rejected is a task an
 // operator has to notice, while a publication which is rejected is one they are already
 // watching. Apply is the earliest RPC that can tell: it is the first to carry
 // both the specification being published and the connector state the task has
