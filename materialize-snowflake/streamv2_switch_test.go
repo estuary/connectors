@@ -152,14 +152,14 @@ func TestStreamV2SwitchOffTheWritePathIsRefused(t *testing.T) {
 			Credentials: &snowflake_auth.CredentialConfig{AuthType: snowflake_auth.JWT},
 		}
 		var d = &transactor{
-			cfg:      cfg,
-			ep:       &sql.Endpoint[config]{Dialect: snowflakeDialect("SCH", timestampTypeLTZ, nil)},
-			_range:   &pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32},
-			version:  "v1",
-			cp:       checkpoint{stateKey: &checkpointItem{StreamV2: prior}},
-			streamV2: newStreamV2Manager(ctx, &cfg, "test/switch", "acct", &pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32}),
+			cfg:                 cfg,
+			ep:                  &sql.Endpoint[config]{Dialect: snowflakeDialect("SCH", timestampTypeLTZ, nil)},
+			_range:              &pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32},
+			version:             "v1",
+			cp:                  checkpoint{stateKey: &checkpointItem{StreamV2: prior}},
+			snowpipeStreamingV2: newStreamV2Manager(ctx, &cfg, "test/switch", "acct", &pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32}),
 		}
-		t.Cleanup(d.streamV2.stop)
+		t.Cleanup(d.snowpipeStreamingV2.stop)
 		return d
 	}
 
@@ -256,8 +256,8 @@ func TestStreamV2SwitchOffTheWritePathIsRefused(t *testing.T) {
 				Channel: "task_00000000_downgrade_v1", Counter: 3, KeyEnd: math.MaxUint32,
 			}))
 			d.cfg.Advanced.FeatureFlags = "snowpipe_streaming"
-			d.retirement = newStreamV2Retirement(d.streamV2)
-			d.streamManager = openChannelServer(t, 0)
+			d.retirement = newStreamV2Retirement(d.snowpipeStreamingV2)
+			d.snowpipeStreaming = openChannelServer(t, 0)
 
 			require.NoError(t, d.addBinding(ctx, target(stateKey, true), true, false))
 			require.True(t, d.retirement.pending(stateKey))
@@ -270,8 +270,8 @@ func TestStreamV2SwitchOffTheWritePathIsRefused(t *testing.T) {
 				Channel: "task_00000000_refused_v1", Counter: 3, KeyEnd: math.MaxUint32,
 			}))
 			d.cfg.Advanced.FeatureFlags = "snowpipe_streaming"
-			d.retirement = newStreamV2Retirement(d.streamV2)
-			d.streamManager = openChannelServer(t, 6)
+			d.retirement = newStreamV2Retirement(d.snowpipeStreamingV2)
+			d.snowpipeStreaming = openChannelServer(t, 6)
 
 			var err = d.addBinding(ctx, target(stateKey, true), true, false)
 			require.Error(t, err)
@@ -288,8 +288,8 @@ func TestStreamV2SwitchOffTheWritePathIsRefused(t *testing.T) {
 			))
 			d.cfg.Advanced.FeatureFlags = "snowpipe_streaming"
 			d._range = &pf.RangeSpec{KeyEnd: 0x7fffffff, RClockEnd: math.MaxUint32}
-			d.retirement = newStreamV2Retirement(d.streamV2)
-			d.streamManager = openChannelServer(t, 0)
+			d.retirement = newStreamV2Retirement(d.snowpipeStreamingV2)
+			d.snowpipeStreaming = openChannelServer(t, 0)
 
 			require.NoError(t, d.addBinding(ctx, target(stateKey, true), true, false))
 			require.True(t, d.retirement.pending(stateKey))
@@ -636,14 +636,14 @@ func TestStreamV2SwitchOntoTheWritePathWithPendingWorkIsRefused(t *testing.T) {
 		}
 		var rng = &pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32}
 		var d = &transactor{
-			cfg:      cfg,
-			ep:       &sql.Endpoint[config]{Dialect: snowflakeDialect("SCH", timestampTypeLTZ, nil)},
-			_range:   rng,
-			version:  "v1",
-			cp:       checkpoint{target.StateKey: item},
-			streamV2: newStreamV2Manager(ctx, &cfg, "test/onto", "acct", rng),
+			cfg:                 cfg,
+			ep:                  &sql.Endpoint[config]{Dialect: snowflakeDialect("SCH", timestampTypeLTZ, nil)},
+			_range:              rng,
+			version:             "v1",
+			cp:                  checkpoint{target.StateKey: item},
+			snowpipeStreamingV2: newStreamV2Manager(ctx, &cfg, "test/onto", "acct", rng),
 		}
-		t.Cleanup(d.streamV2.stop)
+		t.Cleanup(d.snowpipeStreamingV2.stop)
 		return d
 	}
 
