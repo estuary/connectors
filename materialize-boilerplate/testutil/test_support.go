@@ -99,6 +99,90 @@ func snapshotT(t *testing.T, got string) {
 	cupaloy.SnapshotT(t, got)
 }
 
+// snapshotNamed is snapshotT against the snapshot file `name`. cupaloy derives
+// the file name from the calling test, so a differently named snapshot is
+// compared here directly, in cupaloy's format: the string verbatim with a
+// trailing newline, written (or rewritten) when UPDATE_SNAPSHOTS is set. On a
+// mismatch the diff is `.snapshots/<name>` against `<name>.actual`.
+func snapshotNamed(t *testing.T, name string, got string) {
+	t.Helper()
+
+	path := filepath.Join(".snapshots", name)
+	want := got + "\n"
+
+	prev, err := os.ReadFile(path)
+	if err == nil && string(prev) == want {
+		return
+	}
+	if err == nil {
+		if err := os.WriteFile(path+".actual", []byte(want), 0o644); err != nil {
+			t.Logf("failed to write %s.actual: %s", path, err)
+		} else {
+			t.Logf("wrote %s.actual with this run's value", path)
+		}
+	}
+	if os.Getenv("UPDATE_SNAPSHOTS") != "" {
+		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+		require.NoError(t, os.WriteFile(path, []byte(want), 0o644))
+		t.Logf("snapshot %s %s", path, map[bool]string{true: "updated", false: "created"}[err == nil])
+		return
+	}
+	if err != nil {
+		t.Errorf("snapshot %s does not exist; run with UPDATE_SNAPSHOTS=true to create it", path)
+		return
+	}
+	t.Errorf("snapshot %s not equal; this run's value is in %s.actual", path, path)
+}
+
+// runtimeV1SnapshotName is the runtime v1 pass's snapshot file for this test:
+// a table-only golden, since the pass omits the apply/state output. Its content
+// is what a runtime-next run leaves in the destination, so a connector's first
+// one is generated like any other, with UPDATE_SNAPSHOTS=true against its
+// endpoint. Until then the pass logs and enforces liveness alone.
+func runtimeV1SnapshotName(t *testing.T) (name string, exists bool) {
+	name = strings.ReplaceAll(t.Name(), "/", "-") + "-runtime-v1"
+	if _, err := os.Stat(filepath.Join(".snapshots", name)); err == nil || os.Getenv("UPDATE_SNAPSHOTS") != "" {
+		return name, true
+	}
+	t.Logf("no runtime v1 snapshot .snapshots/%s; run with UPDATE_SNAPSHOTS=true to create it", name)
+	return name, false
+}
+
+// stripRuntimeNextOutput removes from a runtime-next snapshot the lines only a
+// runtime-next run produces: flowctl's `--output-apply` / `--output-state`
+// records, which single-shard runs capture under each resource. What remains
+// is the destination alone, in the shape the runtime v1 pass snapshots.
+func stripRuntimeNextOutput(snapshot string) string {
+	var out []string
+	for _, line := range strings.Split(snapshot, "\n") {
+		if strings.HasPrefix(line, `["applied.actionDescription",`) || strings.HasPrefix(line, `["connectorState",`) {
+			continue
+		}
+		out = append(out, line)
+	}
+	return strings.Join(out, "\n")
+}
+
+// requireMatchesRuntimeNextSnapshot requires the runtime v1 pass's value to
+// equal this test's runtime-next golden with the runtime-next-only output
+// lines removed: both runtimes must leave the same destination behind.
+func requireMatchesRuntimeNextSnapshot(t *testing.T, got string) {
+	t.Helper()
+
+	path := filepath.Join(".snapshots", strings.ReplaceAll(t.Name(), "/", "-"))
+	golden, err := os.ReadFile(path)
+	require.NoErrorf(t, err, "reading the runtime-next snapshot to compare the runtime v1 run against")
+
+	want := strings.TrimSuffix(stripRuntimeNextOutput(string(golden)), "\n")
+	if want == got {
+		return
+	}
+	if err := os.WriteFile(path+".runtime-v1.actual", []byte(got+"\n"), 0o644); err == nil {
+		t.Logf("wrote %s.runtime-v1.actual with the runtime v1 run's value", path)
+	}
+	t.Errorf("runtime v1 run does not match the runtime-next snapshot %s with its output lines removed; the run's value is in %s.runtime-v1.actual", path, path)
+}
+
 // RunTestAllTasks calls testFn for each materialization task found in the spec
 // at sourcePath. The endpoint configuration for the task is decrypted and
 // unmarshalled into EC.
@@ -182,7 +266,14 @@ func RunMaterializationTest[EC boilerplate.EndpointConfiger, FC boilerplate.Fiel
 		snap.WriteString(runMaterializationTestForTask(t, ctx, newMaterializer, taskName, bundled, tsSuffix, makeResourceFn, actionDescSanitizers, runtime))
 	})
 
-	snapshotT(t, snap.String())
+	if !RuntimeV1() {
+		snapshotT(t, snap.String())
+	} else {
+		if name, ok := runtimeV1SnapshotName(t); ok {
+			snapshotNamed(t, name, snap.String())
+		}
+		requireMatchesRuntimeNextSnapshot(t, snap.String())
+	}
 }
 
 // RunMaterializationTestParallel is like RunMaterializationTest but runs tasks
@@ -209,7 +300,14 @@ func RunMaterializationTestParallel[EC boilerplate.EndpointConfiger, FC boilerpl
 		snap.WriteString(results[name])
 	}
 
-	snapshotT(t, snap.String())
+	if !RuntimeV1() {
+		snapshotT(t, snap.String())
+	} else {
+		if name, ok := runtimeV1SnapshotName(t); ok {
+			snapshotNamed(t, name, snap.String())
+		}
+		requireMatchesRuntimeNextSnapshot(t, snap.String())
+	}
 }
 
 // RunApplyTest tests a variety of scenarios involving changes to materialized
@@ -1178,7 +1276,14 @@ func flowctlCommand(args ...string) *exec.Cmd {
 	// and the CI
 	os.Setenv("TZ", "UTC")
 
-	cmd := exec.Command("flowctl", args...)
+	// FLOW_TEST_FLOWCTL names the flowctl binary to drive tests with; CI points
+	// the runtime v1 pass at a pinned release whose `flowctl preview` is still
+	// the legacy runtime (see fetch-flow.sh).
+	flowctl := os.Getenv("FLOW_TEST_FLOWCTL")
+	if flowctl == "" {
+		flowctl = "flowctl"
+	}
+	cmd := exec.Command(flowctl, args...)
 	cmd.Env = append(cmd.Environ(),
 		// Set the LOG_FORMAT to text instead of color for better to avoid
 		// escaping of ansi control characters and better compatibility with
