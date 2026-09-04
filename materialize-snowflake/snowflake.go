@@ -3,12 +3,12 @@ package connector
 import (
 	"context"
 	stdsql "database/sql"
-	"database/sql/driver"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -383,6 +383,7 @@ type binding struct {
 		copyInto    string
 		mustMerge   bool
 		mergeBounds *sql.MergeBoundsBuilder
+		rows        int64
 	}
 }
 
@@ -624,12 +625,17 @@ type checkpointItem struct {
 	PipeFiles     []fileRecord
 	Version       string
 	EncryptionKey string
+	// Round and Rows are the transaction round and number of rows staged,
+	// for reporting the commit's row stats when it runs in Acknowledge.
+	Round int
+	Rows  int64
 }
 
 type checkpoint = map[string]*checkpointItem
 
 func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var ctx = it.Context()
+	var round = it.Round
 
 	// Skip deleted, non-existent documents iff HardDelete is enabled.
 	for it.Next(d.cfg.HardDelete) {
@@ -655,13 +661,14 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		} else {
 			b.store.mergeBounds.NextKey(converted[:len(b.target.Keys)])
 		}
+		b.store.rows++
 	}
 	if it.Err() != nil {
 		return nil, it.Err()
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
-		var checkpointJSON, err = d.buildDriverCheckpoint(ctx, runtimeCheckpoint)
+		var checkpointJSON, err = d.buildDriverCheckpoint(ctx, runtimeCheckpoint, round)
 		if err != nil {
 			return nil, pf.FinishedOperation(err)
 		}
@@ -670,7 +677,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}, nil
 }
 
-func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (json.RawMessage, error) {
+func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, round int) (json.RawMessage, error) {
 	streamBlobs := make(map[int][]*blobMetadata)
 	keys := make(map[int]string)
 	if d.streamManager != nil {
@@ -686,11 +693,16 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 	}
 
 	for idx, b := range d.bindings {
+		rows := b.store.rows
+		b.store.rows = 0
+
 		if b.streaming {
 			if blobs, ok := streamBlobs[idx]; ok {
 				d.cp[b.target.StateKey] = &checkpointItem{
 					StreamBlobs:   blobs,
 					EncryptionKey: keys[idx],
+					Round:         round,
+					Rows:          rows,
 				}
 			}
 			continue
@@ -715,6 +727,8 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 				Query:     mergeIntoQuery,
 				StagedDir: dir,
 				Version:   d.version,
+				Round:     round,
+				Rows:      rows,
 			}
 			// Reset for next round.
 			b.store.mustMerge = false
@@ -754,6 +768,8 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 				PipeFiles: b.store.stage.uploaded,
 				PipeName:  b.pipeName,
 				Version:   d.version,
+				Round:     round,
+				Rows:      rows,
 			}
 
 		} else {
@@ -764,6 +780,8 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 					Table:     b.target.Identifier,
 					Query:     copyIntoQuery,
 					StagedDir: dir,
+					Round:     round,
+					Rows:      rows,
 				}
 			}
 		}
@@ -781,6 +799,19 @@ type pipeRecord struct {
 	files     []fileRecord
 	dir       string
 	tableName string
+	path      []string
+	round     int
+	rows      int64 // rows staged
+	loaded    int64 // rows Snowpipe reports having loaded
+}
+
+// finished reports the pipe's row stats once all of its files have loaded.
+func (pipe *pipeRecord) finished(be *m.BindingEvents) {
+	stats := m.ExactRowStats(pipe.loaded, 0, 0).WithLoaded(pipe.loaded)
+	if pipe.rows > 0 {
+		stats = stats.WithStaged(pipe.rows)
+	}
+	be.ReportRowStats(pipe.round, pipe.path, stats)
 }
 
 // When a file has been successfully loaded, we remove it from the pipe record
@@ -799,6 +830,7 @@ type copyHistoryRow struct {
 	fileName          string
 	status            string
 	firstErrorMessage string
+	rowCount          int64
 }
 
 func (d *transactor) copyHistory(ctx context.Context, tableName string, fileNames []string) ([]copyHistoryRow, error) {
@@ -820,10 +852,11 @@ func (d *transactor) copyHistory(ctx context.Context, tableName string, fileName
 		status                    string
 		firstErrorMessage         string
 		firstErrorMessageNullable stdsql.NullString
+		rowCount                  stdsql.NullInt64
 	)
 
 	for rows.Next() {
-		if err := rows.Scan(&fileName, &status, &firstErrorMessageNullable); err != nil {
+		if err := rows.Scan(&fileName, &status, &firstErrorMessageNullable, &rowCount); err != nil {
 			return nil, fmt.Errorf("scanning copy history row: %w", err)
 		}
 
@@ -841,6 +874,7 @@ func (d *transactor) copyHistory(ctx context.Context, tableName string, fileName
 			fileName:          fileName,
 			status:            status,
 			firstErrorMessage: firstErrorMessage,
+			rowCount:          rowCount.Int64,
 		})
 	}
 
@@ -888,37 +922,9 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 				// NB: Not using groupTx here since the Go Snowflake driver
 				// retains contexts internally, and groupCtx is cancelled after
 				// group.Wait() returns.
-				if strings.HasPrefix(item.Query, "\nMERGE INTO") {
-					conn, err := d.db.Conn(ctx)
-					if err != nil {
-						return fmt.Errorf("getting connection for MERGE INTO: %w", err)
-					}
-					defer conn.Close()
-
-					var queryID string
-					err = conn.Raw(func(x any) error {
-						stmt, err := x.(driver.ConnPrepareContext).PrepareContext(ctx, item.Query)
-						if err != nil {
-							return err
-						}
-						result, err := stmt.(driver.StmtExecContext).ExecContext(ctx, nil)
-						if err != nil {
-							return err
-						}
-						queryID = result.(sf.SnowflakeResult).GetQueryID()
-						return nil
-					})
-					if err != nil {
-						return fmt.Errorf("running ack query: %w", err)
-					}
-
-					logQueryStats(ctx, d.db, queryID, item.Table)
-				} else {
-					if _, err := d.db.ExecContext(ctx, item.Query); err != nil {
-						return fmt.Errorf("running ack query: %w", err)
-					}
+				if err := d.runStoreQuery(ctx, item, path); err != nil {
+					return err
 				}
-
 				d.be.FinishedResourceCommit(path)
 
 				if err := d.deleteFiles(groupCtx, []string{item.StagedDir}); err != nil {
@@ -934,6 +940,13 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 					return fmt.Errorf("writing streaming blobs for %s: %w", path, err)
 				}
 				d.be.FinishedResourceCommit(path)
+
+				// Snowpipe Streaming gives no row counts back.
+				stats := m.RowStats{}
+				if item.Rows > 0 {
+					stats = stats.WithStaged(item.Rows)
+				}
+				d.be.ReportRowStats(item.Round, path, stats)
 
 				return nil
 			})
@@ -974,6 +987,9 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 				files:     item.PipeFiles,
 				dir:       item.StagedDir,
 				tableName: item.Table,
+				path:      path,
+				round:     item.Round,
+				rows:      item.Rows,
 			}
 		}
 	}
@@ -1042,7 +1058,9 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 
 				for _, row := range rows {
 					if row.status == "Loaded" {
-						pipe.fileLoaded(row.fileName)
+						if pipe.fileLoaded(row.fileName) {
+							pipe.loaded += row.rowCount
+						}
 					} else if row.status == "Load in progress" {
 						hasItemsInProgress = true
 					} else {
@@ -1070,13 +1088,16 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 				if err := d.deleteFiles(ctx, []string{pipe.dir}); err != nil {
 					return nil, fmt.Errorf("cleaning up files: %w", err)
 				}
+				pipe.finished(d.be)
 				delete(pipes, pipeName)
 				continue
 			}
 
 			for _, reportFile := range report.Files {
 				if reportFile.Status == "LOADED" {
-					pipe.fileLoaded(reportFile.Path)
+					if pipe.fileLoaded(reportFile.Path) {
+						pipe.loaded += int64(reportFile.RowsInserted)
+					}
 				} else if reportFile.Status == "LOAD_FAILED" || reportFile.Status == "PARTIALLY_LOADED" {
 					return nil, fmt.Errorf("failed to load files in pipe %q: %s, %s", pipeName, reportFile.FirstError, reportFile.SystemError)
 				} else if reportFile.Status == "LOAD_IN_PROGRESS" {
@@ -1089,6 +1110,7 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 				if err := d.deleteFiles(ctx, []string{pipe.dir}); err != nil {
 					return nil, fmt.Errorf("cleaning up files: %w", err)
 				}
+				pipe.finished(d.be)
 				delete(pipes, pipeName)
 			}
 
@@ -1160,6 +1182,100 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	}
 
 	return &pf.ConnectorState{UpdatedJson: json.RawMessage(checkpointJSON), MergePatch: true}, nil
+}
+
+// runStoreQuery runs a checkpoint item's MERGE INTO or COPY INTO and reports
+// the row counts from its result set. A result that can't be read is logged
+// and skipped; only the query itself can fail the commit.
+func (d *transactor) runStoreQuery(ctx context.Context, item *checkpointItem, path []string) error {
+	isMerge := strings.HasPrefix(item.Query, "\nMERGE INTO")
+
+	queryIDs := make(chan string, 1)
+	if isMerge {
+		ctx = sf.WithQueryIDChan(ctx, queryIDs)
+	}
+	rows, err := d.db.QueryContext(ctx, item.Query)
+	if err != nil {
+		return fmt.Errorf("running ack query: %w", err)
+	}
+	if isMerge {
+		select {
+		case queryID := <-queryIDs:
+			logQueryStats(ctx, d.db, queryID, item.Table)
+		default:
+		}
+	}
+
+	stats, err := scanStoreResult(rows, isMerge)
+	if err != nil {
+		log.WithError(err).WithField("table", item.Table).Warn("could not read store query result")
+		return nil
+	}
+	if item.Rows > 0 {
+		stats = stats.WithStaged(item.Rows)
+	}
+	d.be.ReportRowStats(item.Round, path, stats)
+	return nil
+}
+
+// scanStoreResult reads a MERGE INTO result ("number of rows inserted" /
+// "updated" / "deleted") or a COPY INTO result (one row per file with
+// "rows_loaded"; a lone "status" row when no files were processed).
+func scanStoreResult(rows *stdsql.Rows, isMerge bool) (m.RowStats, error) {
+	defer rows.Close()
+
+	cols, err := rows.Columns()
+	if err != nil {
+		return m.RowStats{}, err
+	}
+	colIdx := make(map[string]int, len(cols))
+	for i, c := range cols {
+		colIdx[strings.ToLower(c)] = i
+	}
+
+	vals := make([]stdsql.NullString, len(cols))
+	ptrs := make([]any, len(cols))
+	for i := range vals {
+		ptrs[i] = &vals[i]
+	}
+	col := func(name string) (int64, bool) {
+		i, ok := colIdx[name]
+		if !ok || !vals[i].Valid {
+			return 0, false
+		}
+		n, err := strconv.ParseInt(vals[i].String, 10, 64)
+		return n, err == nil
+	}
+
+	var inserted, updated, deleted, loaded int64
+	var seen bool
+	for rows.Next() {
+		if err := rows.Scan(ptrs...); err != nil {
+			return m.RowStats{}, err
+		}
+		if isMerge {
+			i, okI := col("number of rows inserted")
+			u, okU := col("number of rows updated")
+			d, okD := col("number of rows deleted")
+			if !okI && !okU && !okD {
+				return m.RowStats{}, fmt.Errorf("unexpected MERGE result columns %v", cols)
+			}
+			inserted, updated, deleted = inserted+i, updated+u, deleted+d
+		} else if n, ok := col("rows_loaded"); ok {
+			loaded += n
+		}
+		seen = true
+	}
+	if err := rows.Err(); err != nil {
+		return m.RowStats{}, err
+	} else if !seen {
+		return m.RowStats{}, fmt.Errorf("store query returned no result rows")
+	}
+
+	if isMerge {
+		return m.ExactRowStats(inserted, updated, deleted), nil
+	}
+	return m.ExactRowStats(loaded, 0, 0).WithLoaded(loaded), nil
 }
 
 func (d *transactor) pathForStateKey(stateKey string) []string {

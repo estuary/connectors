@@ -517,6 +517,11 @@ type checkpointItem struct {
 	// NeedsMerge marks entries whose files must MERGE into the target table;
 	// otherwise a direct COPY INTO suffices.
 	NeedsMerge bool `json:",omitempty"`
+
+	// round is the transaction round this session staged the entry in, for
+	// attributing its commit's row stats. Recovered and peer entries are
+	// reported outside of round pairing, so theirs is left zero.
+	round int
 }
 
 // mergeBoundLiterals is the serialized form of a key column's sql.MergeBound:
@@ -658,6 +663,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			StagedFiles: toCopy,
 			Bounds:      boundsLiterals(b.storeMergeBounds.Build()),
 			NeedsMerge:  !b.target.DeltaUpdates && b.needsMerge,
+			round:       it.Round,
 		})
 		b.needsMerge = false // reset for next round
 	}
@@ -819,6 +825,10 @@ func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB, should
 func (d *transactor) commitBindingCheckpointItems(ctx context.Context, db *stdsql.DB, b *binding, items []*checkpointItem) error {
 	var coalesce []*checkpointItem
 	d.be.StartedResourceCommit(b.target.Path)
+	// items[0] is this shard's own entry when it has one.
+	var report = func(stats m.RowStats) {
+		d.be.ReportRowStats(items[0].round, b.target.Path, stats)
+	}
 	for _, item := range items {
 		if len(item.StagedFiles) > 0 {
 			coalesce = append(coalesce, item)
@@ -832,7 +842,7 @@ func (d *transactor) commitBindingCheckpointItems(ctx context.Context, db *stdsq
 			}
 			queries = []string{item.Query}
 		}
-		if err := d.execQueries(ctx, db, queries, d.cpRecovery); err != nil {
+		if err := d.execQueries(ctx, db, queries, d.cpRecovery, report); err != nil {
 			return err
 		}
 	}
@@ -849,7 +859,7 @@ func (d *transactor) commitBindingCheckpointItems(ctx context.Context, db *stdsq
 		if err != nil {
 			return err
 		}
-		if err := d.execQueries(ctx, db, queries, d.cpRecovery); err != nil {
+		if err := d.execQueries(ctx, db, queries, d.cpRecovery, report); err != nil {
 			return err
 		}
 	}
@@ -862,18 +872,20 @@ func (d *transactor) commitBindingCheckpointItems(ctx context.Context, db *stdsq
 	return nil
 }
 
-// execQueries runs the given queries in order. tolerateMissing is set when
-// recovering entries which may already have been applied by a previous
-// session whose state clearing didn't commit: their staged files (and
-// possibly their target table) were already deleted, and it is okay to skip
-// them in this case.
-func (d *transactor) execQueries(ctx context.Context, db *stdsql.DB, queries []string, tolerateMissing bool) error {
+// execQueries runs the given queries in order, passing each one's row stats
+// to report. tolerateMissing is set when recovering entries which may already
+// have been applied by a previous session whose state clearing didn't commit:
+// their staged files (and possibly their target table) were already deleted,
+// and it is okay to skip them in this case.
+func (d *transactor) execQueries(ctx context.Context, db *stdsql.DB, queries []string, tolerateMissing bool, report func(m.RowStats)) error {
 	for _, query := range queries {
-		if err := d.execQuery(ctx, db, query); err != nil {
+		if stats, err := d.execQuery(ctx, db, query); err != nil {
 			if tolerateMissing && (strings.Contains(err.Error(), "PATH_NOT_FOUND") || strings.Contains(err.Error(), "Path does not exist") || strings.Contains(err.Error(), "Table doesn't exist") || strings.Contains(err.Error(), "TABLE_OR_VIEW_NOT_FOUND")) {
 				continue
 			}
 			return fmt.Errorf("query %q failed: %w", query, err)
+		} else {
+			report(stats)
 		}
 	}
 	return nil
@@ -904,11 +916,14 @@ func isRetriableError(err error) bool {
 	})
 }
 
-func (d *transactor) execQuery(ctx context.Context, db *stdsql.DB, query string) error {
+// execQuery runs a commit query and returns the row counts of its result row.
+func (d *transactor) execQuery(ctx context.Context, db *stdsql.DB, query string) (m.RowStats, error) {
 	for attempt := 0; ; attempt++ {
-		var _, err = db.ExecContext(ctx, query)
-		if err == nil || !isRetriableError(err) || attempt >= maxQueryRetries {
-			return err
+		var rows, err = db.QueryContext(ctx, query)
+		if err == nil {
+			return scanRowStats(rows), nil
+		} else if !isRetriableError(err) || attempt >= maxQueryRetries {
+			return m.RowStats{}, err
 		}
 
 		var delay = queryRetryDelay(attempt)
@@ -920,10 +935,39 @@ func (d *transactor) execQuery(ctx context.Context, db *stdsql.DB, query string)
 
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return m.RowStats{}, ctx.Err()
 		case <-time.After(delay):
 		}
 	}
+}
+
+// scanRowStats reads the result row of MERGE INTO (num_affected_rows,
+// num_updated_rows, num_deleted_rows, num_inserted_rows) or COPY INTO
+// (num_affected_rows, num_inserted_rows, num_skipped_corrupt_files). The
+// query has already succeeded, so any other result yields the zero stats.
+func scanRowStats(rows *stdsql.Rows) m.RowStats {
+	defer rows.Close()
+
+	cols, err := rows.Columns()
+	if err != nil || !slices.Contains(cols, "num_affected_rows") || !rows.Next() {
+		return m.RowStats{}
+	}
+	var vals = make([]int64, len(cols))
+	var dest = make([]any, len(cols))
+	for i := range vals {
+		dest[i] = &vals[i]
+	}
+	if err := rows.Scan(dest...); err != nil {
+		return m.RowStats{}
+	}
+	var count = func(col string) int64 {
+		if i := slices.Index(cols, col); i >= 0 {
+			return vals[i]
+		}
+		return 0
+	}
+	return m.ExactRowStats(count("num_inserted_rows"), count("num_updated_rows"), count("num_deleted_rows")).
+		WithTotal(count("num_affected_rows"))
 }
 
 // renderCommitQueries renders the queries which commit a set of staged files

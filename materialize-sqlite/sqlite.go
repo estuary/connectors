@@ -170,10 +170,11 @@ func newTransactor(
 	bindings []sql.Table,
 	open pm.Request_Open,
 	is *boilerplate.InfoSchema,
-	_ *m.BindingEvents,
+	be *m.BindingEvents,
 ) (m.Transactor, error) {
 	var d = &transactor{
 		dialect: &sqliteDialect,
+		be:      be,
 	}
 	d.store.fence = &fence
 
@@ -241,6 +242,7 @@ type transactor struct {
 		fence *sql.Fence
 	}
 	bindings []*binding
+	be       *m.BindingEvents
 }
 
 type binding struct {
@@ -302,8 +304,10 @@ func (t *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSp
 	return nil, nil
 }
 
-func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
-func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) { return nil, nil }
+func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
+	return nil, nil
+}
 
 func (d *transactor) Load(
 	it *m.LoadIterator,
@@ -366,22 +370,31 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		return nil, fmt.Errorf("conn.BeginTx: %w", err)
 	}
 
+	var round = it.Round
+	var rowsAffected = make([]int64, len(d.bindings))
+	var stored = make([]bool, len(d.bindings))
+
 	for it.Next(false) {
 		var ctx = it.Context()
 		var b = d.bindings[it.Binding]
+		stored[it.Binding] = true
 
+		var res stdsql.Result
 		if it.Exists {
 			if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
 				return nil, fmt.Errorf("converting update store key: %w", err)
-			} else if _, err = txn.ExecContext(ctx, b.store.updateSQL, converted...); err != nil {
+			} else if res, err = txn.ExecContext(ctx, b.store.updateSQL, converted...); err != nil {
 				return nil, fmt.Errorf("updating store: %w", err)
 			}
 		} else {
 			if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
 				return nil, fmt.Errorf("converting update store key: %w", err)
-			} else if _, err = txn.ExecContext(ctx, b.store.insertSQL, converted...); err != nil {
+			} else if res, err = txn.ExecContext(ctx, b.store.insertSQL, converted...); err != nil {
 				return nil, fmt.Errorf("updating store: %w", err)
 			}
+		}
+		if n, err := res.RowsAffected(); err == nil {
+			rowsAffected[it.Binding] += n
 		}
 	}
 
@@ -390,6 +403,11 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
+		for i, b := range d.bindings {
+			if stored[i] {
+				d.be.ReportRowStats(round, b.target.Path, m.TotalRowStats(rowsAffected[i]))
+			}
+		}
 		return nil, nil
 	}, nil
 }

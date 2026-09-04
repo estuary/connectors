@@ -627,6 +627,7 @@ func (d *materialization) NewTransactor(
 		bucket:          d.cfg.Bucket,
 		prefix:          d.cfg.Prefix,
 		store:           s3store,
+		be:              be,
 	}, nil
 }
 
