@@ -441,11 +441,11 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, streaming
 		// The checkpoint may still hold work that the write path this binding is
 		// leaving staged into the table and did not finish. Acknowledge drains it
 		// through the manager of the path which staged it. Of the three kinds of
-		// staged work, only Snowpipe Streaming blobs need anything of this binding: a staged-file query
-		// runs on the transactor's connection, and pipe files go through its pipe
-		// client, while blobs are registered against a channel the bdec manager holds
-		// per table. So the binding is registered there for the drain, and its rows
-		// still go to streaming v2.
+		// staged work, only Snowpipe Streaming blobs need anything of this binding:
+		// a staged-file query runs on the transactor's connection, and pipe files go
+		// through its pipe client, while blobs are registered against a channel the
+		// bdec manager holds per table. So the binding is registered there for the
+		// drain, and its rows still go to streaming v2.
 		if prior := d.cp[target.StateKey]; prior != nil && len(prior.StreamBlobs) > 0 {
 			var loc = d.ep.Dialect.TableLocator(target.Path)
 			if d.snowpipeStreaming == nil {
