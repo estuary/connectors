@@ -52,7 +52,7 @@ func TestAcknowledgeKeepsStreamV2Counter(t *testing.T) {
 		// The rows the counter accounts for were committed as the checkpoint was
 		// produced, so Acknowledge needs nothing from the manager and no sidecar
 		// is started.
-		streamV2: &streamV2Manager{},
+		snowpipeStreamingV2: &streamV2Manager{},
 	}
 
 	state, err := d.Acknowledge(context.Background(), nil, []string{"a_table.v1"})
@@ -73,9 +73,9 @@ func TestAcknowledgeRetiresStreamV2Markers(t *testing.T) {
 			cp: checkpoint{stateKey: {StreamV2: map[string]*streamV2Item{
 				"00000000-ffffffff": {Channel: channel, Counter: 42, KeyEnd: math.MaxUint32, Retiring: true},
 			}}},
-			bindings: []*binding{{target: sql.Table{StateKey: stateKey, TableShape: sql.TableShape{Path: []string{"TBL"}}}, streamingV2: true}},
-			be:       m.NewBindingEvents(),
-			streamV2: &streamV2Manager{},
+			bindings:            []*binding{{target: sql.Table{StateKey: stateKey, TableShape: sql.TableShape{Path: []string{"TBL"}}}, streamingV2: true}},
+			be:                  m.NewBindingEvents(),
+			snowpipeStreamingV2: &streamV2Manager{},
 		}
 
 		state, err := d.Acknowledge(ctx, nil, []string{stateKey})
@@ -99,10 +99,10 @@ func TestAcknowledgeRetiresStreamV2Markers(t *testing.T) {
 		t.Cleanup(sv2.stop)
 
 		var d = &transactor{
-			cp:       checkpoint{stateKey: {StreamV2: items}},
-			bindings: []*binding{{target: sql.Table{StateKey: stateKey, TableShape: sql.TableShape{Path: []string{"TBL"}}}}},
-			be:       m.NewBindingEvents(),
-			streamV2: sv2,
+			cp:                  checkpoint{stateKey: {StreamV2: items}},
+			bindings:            []*binding{{target: sql.Table{StateKey: stateKey, TableShape: sql.TableShape{Path: []string{"TBL"}}}}},
+			be:                  m.NewBindingEvents(),
+			snowpipeStreamingV2: sv2,
 		}
 		d.retirement = newStreamV2Retirement(sv2)
 		d.retirement.register(stateKey, "DB", "SCH", "TBL", items, fullRange)

@@ -217,11 +217,11 @@ func TestStreamV2Retirement(t *testing.T) {
 		var expected = r.markers(retireTestTarget.StateKey)
 
 		var d = &transactor{
-			cp:            make(checkpoint),
-			bindings:      []*binding{{target: retireTestTarget, streaming: true}},
-			streamManager: &streamManager{blobStats: map[int][]*blobStatsTracker{}},
-			streamV2:      v2,
-			retirement:    r,
+			cp:                  make(checkpoint),
+			bindings:            []*binding{{target: retireTestTarget, streaming: true}},
+			snowpipeStreaming:   &streamManager{blobStats: map[int][]*blobStatsTracker{}},
+			snowpipeStreamingV2: v2,
+			retirement:          r,
 		}
 
 		_, err := d.buildDriverCheckpoint(ctx, &protocol.Checkpoint{})
