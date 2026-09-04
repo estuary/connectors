@@ -372,6 +372,7 @@ func (l *extendedLogger) finishedWaitingForDocsLogFn(round int) func() {
 // ExtendedLogging, or unless debug logging is enabled for the task.
 type BindingEvents struct {
 	enabled              bool
+	health               *healthTracker
 	log                  func(log.Fields, string)
 	wg                   sync.WaitGroup
 	stopLogger           chan struct{}
@@ -468,6 +469,22 @@ func (l *BindingEvents) FinishedResourceCommit(path []string) {
 			"took":         took.String(),
 		}, "finished committing documents for resource")
 	})
+}
+
+// ReportRowStats reports what the destination did for one binding's stored
+// documents of one transaction round, for the "transaction health" log line
+// that reconciles it against what the runtime asked the connector to store.
+//
+// round is the StoreIterator.Round of the transaction whose stores produced
+// the result. Call it from wherever the result is in hand: StartCommit, a
+// deferred Acknowledge, or a later poll. It is safe to call concurrently,
+// repeated reports for the same binding and round are summed, and it never
+// blocks or fails a transaction. Unlike the other BindingEvents methods, it is
+// active regardless of extended logging.
+func (l *BindingEvents) ReportRowStats(round int, path []string, stats RowStats) {
+	if l.health != nil {
+		l.health.report(round, path, stats)
+	}
 }
 
 func repeatAsync(repeat func(), every time.Duration) (stop func(onStop func())) {
