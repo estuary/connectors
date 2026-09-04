@@ -17,9 +17,7 @@ def main() -> None:
     logger = setup_logging()
 
     parser = argparse.ArgumentParser()
-    group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--uds", metavar="PATH", help="listen on this unix domain socket")
-    group.add_argument("--tcp", action="store_true", help="listen on an ephemeral localhost port")
+    parser.add_argument("--uds", metavar="PATH", required=True, help="listen on this unix domain socket")
     args = parser.parse_args()
 
     # SIGTERM is the supervisor asking us to go; buffered SDK data is
@@ -30,22 +28,15 @@ def main() -> None:
     # The auth token arrives on stdin so it appears in no argv or environ.
     auth_token = sys.stdin.readline().strip()
 
-    if args.uds:
-        server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        server.bind(args.uds)
-        ready = {"ready": True, "transport": "uds"}
-    else:
-        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        server.bind(("127.0.0.1", 0))
-        ready = {"ready": True, "transport": "tcp", "port": server.getsockname()[1]}
-
+    server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    server.bind(args.uds)
     server.listen(1)
-    sys.stdout.write(json.dumps(ready) + "\n")
+    sys.stdout.write(json.dumps({"ready": True}) + "\n")
     sys.stdout.flush()
 
     conn, _ = server.accept()
     server.close()
-    logger.info("sidecar ready", extra={"transport": ready["transport"]})
+    logger.info("sidecar ready")
 
     from .server import Server
 

@@ -54,7 +54,7 @@ func defaultSidecarArgv() []string {
 }
 
 // sidecarSupervisor owns the lifecycle of the Python sidecar process: spawn,
-// readiness, transport establishment, failure detection, and teardown. The
+// readiness, connection, failure detection, and teardown. The
 // failure policy is crash-only: the supervisor never restarts the sidecar;
 // callers surface its errors up the transactor, exiting the connector so that
 // the runtime restarts it and recovery replays via offset tokens.
@@ -74,15 +74,11 @@ type sidecarSupervisor struct {
 }
 
 type sidecarReadyMsg struct {
-	Ready     bool   `json:"ready"`
-	Transport string `json:"transport"`
-	Port      int    `json:"port"`
+	Ready bool `json:"ready"`
 }
 
 // startSidecar launches argv (the sidecar command), performs the readiness
-// handshake, and connects the RPC transport. A unix domain socket is used
-// whenever one can be bound; otherwise the sidecar listens on an ephemeral
-// localhost TCP port which it reports in its ready message.
+// handshake, and connects to the unix domain socket the sidecar listens on.
 func startSidecar(ctx context.Context, argv []string) (*sidecarSupervisor, *sidecarClient, error) {
 	tmpDir, err := os.MkdirTemp("", "sfss")
 	if err != nil {
@@ -101,20 +97,8 @@ func startSidecar(ctx context.Context, argv []string) (*sidecarSupervisor, *side
 	}
 	s.authToken = hex.EncodeToString(token[:])
 
-	// Prefer a unix domain socket; fall back to TCP over localhost only if
-	// this system can't bind one (e.g. an exotic tmpdir filesystem).
 	var sockPath = filepath.Join(tmpDir, "rpc.sock")
-	var transportArgs []string
-	if probe, err := net.Listen("unix", filepath.Join(tmpDir, "probe.sock")); err != nil {
-		log.WithError(err).Warn("cannot bind unix domain socket; sidecar will use TCP over localhost")
-		transportArgs = []string{"--tcp"}
-	} else {
-		probe.Close()
-		os.Remove(filepath.Join(tmpDir, "probe.sock"))
-		transportArgs = []string{"--uds", sockPath}
-	}
-
-	s.cmd = exec.CommandContext(ctx, argv[0], append(argv[1:], transportArgs...)...)
+	s.cmd = exec.CommandContext(ctx, argv[0], append(argv[1:], "--uds", sockPath)...)
 	s.cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pdeathsig: syscall.SIGKILL}
 	// On ctx cancellation ask politely first; WaitDelay bounds how long we
 	// wait before the runtime force-kills and closes the pipes.
@@ -163,7 +147,7 @@ func startSidecar(ctx context.Context, argv []string) (*sidecarSupervisor, *side
 	}()
 
 	// readyCh receives the single ready line the sidecar prints to stdout.
-	var readyCh = make(chan sidecarReadyMsg, 1)
+	var readyCh = make(chan struct{}, 1)
 	var readyErrCh = make(chan error, 1)
 	pipesDone.Add(1)
 	go func() {
@@ -179,7 +163,7 @@ func startSidecar(ctx context.Context, argv []string) (*sidecarSupervisor, *side
 			readyErrCh <- fmt.Errorf("unexpected sidecar ready line %q", strings.TrimSpace(line))
 			return
 		}
-		readyCh <- msg
+		readyCh <- struct{}{}
 		// Nothing further is expected on stdout, but drain it so the child
 		// can never block writing there.
 		io.Copy(io.Discard, reader)
@@ -191,9 +175,8 @@ func startSidecar(ctx context.Context, argv []string) (*sidecarSupervisor, *side
 		close(s.died)
 	}()
 
-	var ready sidecarReadyMsg
 	select {
-	case ready = <-readyCh:
+	case <-readyCh:
 	case err := <-readyErrCh:
 		s.killAfterFailure()
 		return nil, nil, s.exitError(err)
@@ -207,19 +190,11 @@ func startSidecar(ctx context.Context, argv []string) (*sidecarSupervisor, *side
 		return nil, nil, ctx.Err()
 	}
 
-	switch ready.Transport {
-	case "uds":
-		s.conn, err = net.Dial("unix", sockPath)
-	case "tcp":
-		s.conn, err = net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", ready.Port))
-	default:
-		err = fmt.Errorf("sidecar reported unknown transport %q", ready.Transport)
-	}
-	if err != nil {
+	if s.conn, err = net.Dial("unix", sockPath); err != nil {
 		s.killAfterFailure()
 		return nil, nil, s.exitError(fmt.Errorf("connecting to sidecar: %w", err))
 	}
-	log.WithField("transport", ready.Transport).Debug("connected to snowpipe streaming sidecar")
+	log.Debug("connected to snowpipe streaming sidecar")
 
 	return s, newSidecarClient(s.conn, s.died, func() error { return s.exitError(nil) }), nil
 }
