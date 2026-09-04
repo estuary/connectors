@@ -161,7 +161,7 @@ func streamV2Downgrade(cfg *config, deltaUpdates bool) bool {
 // v2 write path carries Snowpipe Streaming blobs which no manager can register.
 //
 // Acknowledge drains a pending item through the manager of the write path which
-// staged it. A binding whose rows now go to streaming v2 still registers with the
+// staged it. A binding whose rows go to streaming v2 still registers with the
 // bdec manager for that drain, so this is reached only where the registration is
 // impossible: a table whose columns that path does not support, or one it may not
 // stream into at all.
@@ -171,11 +171,11 @@ func streamV2Downgrade(cfg *config, deltaUpdates bool) bool {
 // them.
 func streamV2CannotDrainPendingBlobs(table string, blobs int, cause error) error {
 	var err = fmt.Errorf(
-		"this binding is moving onto the snowpipe_streaming_v2 write path while the task's checkpoint still records %d Snowpipe Streaming blob(s) that its previous write path staged into %s and did not finish. Those blobs are the only record of documents which Snowflake does not hold yet, and they can only be finished by the write path that staged them. Restore the write path this task was running, which lets the next transaction finish them before you move the binding onto snowpipe_streaming_v2, or backfill the binding, which discards them and materializes those documents again",
+		"this binding is moving onto the snowpipe_streaming_v2 write path while the task's checkpoint still records %d Snowpipe Streaming blob(s) that the snowpipe_streaming write path staged into %s and did not finish. Those blobs are the only record of documents which Snowflake does not hold yet, and only the snowpipe_streaming path can finish them. Restore that path for one transaction, which finishes them, before you move the binding onto snowpipe_streaming_v2, or backfill the binding, which discards them and materializes those documents again",
 		blobs, table,
 	)
 	if cause != nil {
-		return fmt.Errorf("%w: the previous write path cannot reopen its channel on the table: %w", err, cause)
+		return fmt.Errorf("%w: the snowpipe_streaming path cannot reopen its channel on the table: %w", err, cause)
 	}
 	return err
 }

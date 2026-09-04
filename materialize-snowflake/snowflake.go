@@ -438,9 +438,10 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, streaming
 	b.store.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
 
 	if streamingV2 {
-		// Work that the previous write path staged and did not finish is drained by
-		// Acknowledge through the manager which staged it. Of the three kinds, only
-		// Snowpipe Streaming blobs need anything of this binding: a staged-file query
+		// The checkpoint may still hold work that the write path this binding is
+		// leaving staged into the table and did not finish. Acknowledge drains it
+		// through the manager of the path which staged it. Of the three kinds of
+		// staged work, only Snowpipe Streaming blobs need anything of this binding: a staged-file query
 		// runs on the transactor's connection, and pipe files go through its pipe
 		// client, while blobs are registered against a channel the bdec manager holds
 		// per table. So the binding is registered there for the drain, and its rows
@@ -456,7 +457,7 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, streaming
 			log.WithFields(log.Fields{
 				"table": target.Identifier,
 				"blobs": len(prior.StreamBlobs),
-			}).Info("opened a channel of the previous write path to finish the blobs it staged")
+			}).Info("opened a snowpipe_streaming channel to finish the blobs that path staged")
 		}
 
 		var loc = d.ep.Dialect.TableLocator(b.target.Path)

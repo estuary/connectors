@@ -165,12 +165,12 @@ own. Either half of that convergence can be interrupted and repeats safely.
   the binding, and a task that was moved before that check existed is rejected
   at startup instead; the remedy there is still a backfill, which starts the binding
   on the new path with an empty checkpoint.
-- A binding can move onto this write path at any time. Work that the previous
-  path staged and did not finish is drained by the machinery that staged it, while
-  the binding's rows go to this path. Only when that drain is impossible, because
-  the previous path cannot reopen its channel on the table, is the task rejected
-  at startup, naming the table and the count outstanding. Restore the previous path
-  for one transaction, or backfill the binding.
+- A binding can move onto this write path at any time. Work that the path it
+  leaves staged and did not finish is drained by the machinery that staged it,
+  while the binding's rows go to this path. Only when that drain is impossible,
+  because the `snowpipe_streaming` path cannot reopen its channel on the table, is
+  the task rejected at startup, naming the table and the count outstanding.
+  Restore that path for one transaction, or backfill the binding.
 - The path adopts a table that another path created. Apply records the task and
   state key in the comment of a table that records none. The guard against a
   replaced state key then works for that table too.
