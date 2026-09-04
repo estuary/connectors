@@ -91,7 +91,7 @@ func appendValueJSON(buf []byte, value any) ([]byte, error) {
 		return appendJSONString(buf, v), nil
 	case json.RawMessage:
 		// An empty payload is left to the standard encoder, which writes a nil
-		// RawMessage as null and refuses an empty non-nil one.
+		// RawMessage as null and rejects an empty non-nil one.
 		if len(v) == 0 {
 			return appendMarshaled(buf, value)
 		}
@@ -156,7 +156,7 @@ func appendPreEncoded(buf []byte, raw json.RawMessage) ([]byte, error) {
 // switching to an exponent at the magnitudes the standard encoder switches at so
 // that a value reaches Snowflake in the form the staged paths write it in.
 //
-// NaN and ±Inf are refused, as the standard encoder refuses them, because
+// NaN and ±Inf are rejected, as the standard encoder rejects them, because
 // written out literally they are not JSON at all and would take down every row
 // batched with them rather than just this one.
 func appendJSONFloat(buf []byte, f float64) ([]byte, error) {

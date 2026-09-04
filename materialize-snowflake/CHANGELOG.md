@@ -14,7 +14,7 @@
 
 ### Changed
 With `snowpipe_streaming_v2` set, delta-updates bindings behave as follows.
-- Each binding writes through four channels per shard, one per equal subrange
+- Each binding writes through four channels per shard, one per equal key range
   of the shard's key-hash range, for a ceiling of 80 MB/s per shard. A shard
   split or join hands each surviving shard whole channels, which resume from
   their committed offset tokens, so a topology change loses nothing.
@@ -26,10 +26,10 @@ With `snowpipe_streaming_v2` set, delta-updates bindings behave as follows.
   `retain_existing_data_on_backfill` feature flag does not apply to it. Other
   bindings of the task are unaffected.
 - A binding moving onto this path first finishes the work its previous write
-  path staged. Where that is impossible, the binding is refused, naming the
+  path staged. Where that is impossible, the binding is rejected, naming the
   table and the count outstanding.
-- Two tasks may not stream into one table; the second is refused, naming the
-  first. A renamed task is refused the same way until the binding is
+- Two tasks may not stream into one table; the second is rejected, naming the
+  first. A renamed task is rejected the same way until the binding is
   backfilled.
 - The one way off this path without a backfill is setting `snowpipe_streaming`
   while removing `snowpipe_streaming_v2`, on a task that keeps the V2 runtime.

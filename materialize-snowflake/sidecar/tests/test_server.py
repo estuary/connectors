@@ -120,7 +120,7 @@ class Harness:
 
     def append(self, channel, start_token, end_token, rows=None, payload=None, row_count=None):
         """Append rows through the framing the connector uses: a header line
-        declaring the batch, and the rows themselves as the payload which
+        stating the batch's length, and the rows themselves as the payload which
         follows it. Giving the payload or the row count outright is how a test
         sends what a well-behaved connector never would."""
         if payload is None:
@@ -245,7 +245,7 @@ def test_unknown_channel(harness):
     res = harness.append("nope", "t", "t", [{"ID": 1}])
     assert not res["ok"] and res["code"] == "unknown_channel"
 
-    # A refused append's payload is still consumed, or what remained of it would
+    # A rejected append's payload is still consumed, or what remained of it would
     # be read as the header of whatever came next.
     assert harness.call("open_channel", database="DB", schema="SCH", table="TBL", channel="ch_0")["ok"]
 
@@ -290,19 +290,19 @@ def test_invalid_rows(harness):
     res = harness.append("ch_0", "t", "t", [{"ID": 1}, [{"ID": 2}]])
     assert not res["ok"] and res["code"] == "invalid_rows"
 
-    # A payload holding a different number of rows than the header declares: the
+    # A payload holding a different number of rows than the header states: the
     # count is what the offset tokens of the batch account for, so a mismatch
     # cannot be committed under them.
     res = harness.append("ch_0", "t", "t", [{"ID": 1}, {"ID": 2}], row_count=3)
     assert not res["ok"] and res["code"] == "invalid_rows"
 
-    # Every refusal above leaves the channel usable, since none of them was the
+    # Every rejection above leaves the channel usable, since none of them was the
     # framing losing its place in the stream.
     assert harness.append("ch_0", "1", "1", [{"ID": 1}])["ok"]
 
 
 def test_append_framing_failures_are_fatal(harness):
-    # A payload shorter than its header declared, or a header which declares no
+    # A payload shorter than its header states, or a header which states no
     # payload at all, leaves the reader unable to say where the next request
     # begins. There is nothing to resynchronize on, so the sidecar exits and lets
     # the connector's supervision restart it.
@@ -351,7 +351,7 @@ def test_close_channel_releases_the_handle(harness):
     assert harness.call("close_channel", channel="ch_0")["ok"]
     stub = harness.stub_clients[("DB", "SCH", "TBL")]
 
-    # The handle is spent, so an op which needs one is refused rather than
+    # The handle is spent, so an op which needs one is rejected rather than
     # silently working against a closed channel.
     res = harness.append("ch_0", "3", "3", [{"ID": 3}])
     assert not res["ok"] and res["code"] == "unknown_channel"
@@ -362,8 +362,8 @@ def test_close_channel_releases_the_handle(harness):
     assert stub.committed["ch_0"] == "2"
 
 
-def test_close_channel_with_drop_retires_the_channel(harness):
-    # Dropping is what retires a channel: the name reopens as one which has
+def test_close_channel_with_drop_takes_the_channel_out_of_service(harness):
+    # Dropping is what takes a channel out of service: the name reopens as one which has
     # committed nothing, so a later shard deriving it inherits no skip threshold.
     assert configure(harness)["ok"]
     assert harness.call("open_channel", database="DB", schema="SCH", table="TBL", channel="ch_0")["ok"]

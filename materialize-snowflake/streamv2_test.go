@@ -165,14 +165,14 @@ func TestStreamV2Manager(t *testing.T) {
 		streamV2ChannelsPerShard = n
 	}
 
-	// The midpoint split's two halves, as shard ranges and as subranges.
+	// The midpoint split's two halves, as shard ranges and as key ranges.
 	var lowHalf = &pf.RangeSpec{KeyEnd: math.MaxUint32 / 2, RClockEnd: math.MaxUint32}
 	var highHalf = &pf.RangeSpec{KeyBegin: math.MaxUint32/2 + 1, KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32}
 	var lowShard = streamV2Range{keyEnd: math.MaxUint32 / 2}
 	var highShard = streamV2Range{keyBegin: math.MaxUint32/2 + 1, keyEnd: math.MaxUint32}
 	var fullShard = streamV2Range{keyEnd: math.MaxUint32}
 
-	// keysHashingInto finds n keys whose packed-key hash the subrange covers, by
+	// keysHashingInto finds n keys whose packed-key hash the key range covers, by
 	// scanning a deterministic candidate sequence: the same call always produces
 	// the same keys in the same order, which is what lets a subtest replay them.
 	var keysHashingInto = func(r streamV2Range, prefix string, n int) []string {
@@ -186,7 +186,7 @@ func TestStreamV2Manager(t *testing.T) {
 		return keys
 	}
 
-	// interleave orders one key from each subrange in turn, so every channel's
+	// interleave orders one key from each key range in turn, so every channel's
 	// rows arrive interleaved the way a real transaction's would.
 	var interleave = func(perRange [][]string) []string {
 		var rows []string
@@ -438,7 +438,7 @@ func TestStreamV2Manager(t *testing.T) {
 		require.Equal(t, 26, countRows())
 
 		// The acknowledged boundary: the declaration is durable, so the child
-		// converges — the inherited channels retire and the targets take over.
+		// converges — the inherited channels are dropped and the targets take over.
 		var inherited, inheritedKeys []string
 		for _, c := range low.bindings[0].channels {
 			inherited = append(inherited, c.name)
@@ -456,7 +456,7 @@ func TestStreamV2Manager(t *testing.T) {
 		require.NoError(t, err)
 		for _, key := range inheritedKeys {
 			del, ok := post[0][key]
-			require.True(t, ok, "the retirement of %s must ride the checkpoint", key)
+			require.True(t, ok, "the drop of %s must ride the checkpoint", key)
 			require.Nil(t, del)
 		}
 		require.Equal(t, 30, countRows())
@@ -512,7 +512,7 @@ func TestStreamV2Manager(t *testing.T) {
 
 		// Each child replays its half of the interrupted transaction. Every
 		// inherited channel's token stands at four documents against a
-		// checkpoint of two, and the token names the channel's own subrange,
+		// checkpoint of two, and the token names the channel's own key range,
 		// so the replay skips instead of re-appending.
 		var replay = interleave(second)
 		for _, child := range []struct {
@@ -630,7 +630,7 @@ func TestStreamV2Manager(t *testing.T) {
 		require.NoError(t, err)
 		for _, key := range inheritedKeys {
 			del, ok := final[0][key]
-			require.True(t, ok, "the retirement of %s must ride the checkpoint", key)
+			require.True(t, ok, "the drop of %s must ride the checkpoint", key)
 			require.Nil(t, del)
 		}
 		require.Equal(t, 26, countRows())
@@ -641,7 +641,7 @@ func TestStreamV2Manager(t *testing.T) {
 
 	t.Run("a joined task splits back onto the pivot the join removed", func(t *testing.T) {
 		// Each child's targets are the very names the join's convergence
-		// dropped. The cutover refuses a declared channel which reports a
+		// dropped. The switch rejects a declared channel which reports a
 		// token, so its success is the proof the drop reached Snowflake and
 		// the re-created boundary starts from fresh channels.
 		if joinConverged == nil {
@@ -676,21 +676,21 @@ func TestStreamV2Manager(t *testing.T) {
 		require.Equal(t, joinRows+6, countRows())
 	})
 
-	t.Run("retiring a channel discards what Snowflake holds for it", func(t *testing.T) {
-		// What a channel name outlives is the whole problem retirement exists for:
+	t.Run("dropping a channel discards what Snowflake holds for it", func(t *testing.T) {
+		// What a channel name outlives is the whole problem the channel drop exists for:
 		// it is derived from (task, key-begin, state key), so a shard deleted today
 		// and a shard given the same key-begin tomorrow derive the same name. This
-		// is the experiment that says which SDK operation actually retires the
+		// is the experiment that says which SDK operation actually drops the
 		// channel behind that name, since only Snowflake can answer it.
 		truncate(t)
-		var tgt = target("retire.v1")
+		var tgt = target("drop.v1")
 
 		var m = newManager(fullRange)
 		m.addBinding(cfg.Database, cfg.Schema, tableName, tgt, nil)
 
 		writeRows(m, 0, 3)
-		var retired = m.bindings[0].channels[0]
-		var channel = retired.name
+		var dropped = m.bindings[0].channels[0]
+		var channel = dropped.name
 		entries, err := m.flush(ctx)
 		require.NoError(t, err)
 		require.Equal(t, int64(3), soleItem(t, entries, 0).Counter)
@@ -705,33 +705,33 @@ func TestStreamV2Manager(t *testing.T) {
 
 		t.Run("a close leaves the committed offset token behind, a drop does not", func(t *testing.T) {
 			// Closing without dropping is the operation this connector used to
-			// have, and the one the retirement design was provisionally built on.
+			// have, and the one the channel-drop design was provisionally built on.
 			require.NoError(t, client.CloseChannel(ctx, channel, false))
 			var afterClose = reopen()
 			t.Logf("reopened %s after a close: committed token %v", channel, afterClose.committedToken())
 
-			require.NoError(t, retireChannel(ctx, client, channel))
+			require.NoError(t, dropChannel(ctx, client, channel))
 			var afterDrop = reopen()
-			t.Logf("reopened %s after a retirement: committed token %v", channel, afterDrop.committedToken())
+			t.Logf("reopened %s after a drop: committed token %v", channel, afterDrop.committedToken())
 
 			// A close only releases the local handle: Snowflake still holds the
 			// channel, and hands its committed offset token to the next opener.
 			require.NotNil(t, afterClose.CommittedToken)
-			require.Equal(t, retired.offsetToken(3), *afterClose.CommittedToken)
+			require.Equal(t, dropped.offsetToken(3), *afterClose.CommittedToken)
 
-			// A drop is what retires it, so the same name reopens as a channel
+			// A drop is what takes it out of service, so the same name reopens as a channel
 			// which has committed nothing.
 			require.Nil(t, afterDrop.CommittedToken)
 
-			// Retirement is about the channel, not the rows it delivered: those
+			// The drop is about the channel, not the rows it delivered: those
 			// are committed to the table and stay there.
 			require.Equal(t, 3, countRows())
 		})
 
-		t.Run("a later shard may reuse the retired name", func(t *testing.T) {
-			// A shard given the retired key-begin — a scale-down followed by a
+		t.Run("a later shard may reuse the dropped name", func(t *testing.T) {
+			// A shard given the dropped channel's key-begin — a scale-down followed by a
 			// scale-up — derives this same channel name, with no checkpoint item of
-			// its own to reconcile against. Nothing of the retired channel is
+			// its own to reconcile against. Nothing of the dropped channel is
 			// adopted as a skip threshold, so its documents are appended in full
 			// rather than silently dropped as replays.
 			var reused = newManager(fullRange)
@@ -748,14 +748,14 @@ func TestStreamV2Manager(t *testing.T) {
 
 		t.Run("the row-error count goes with it", func(t *testing.T) {
 			// The committed offset token is not the only thing a channel
-			// accumulates: the row-error count which refuses a channel for good is
-			// kept for its whole life too. Whether a retirement takes that with it
+			// accumulates: the row-error count which rejects a channel for good is
+			// kept for its whole life too. Whether a drop takes that with it
 			// is measured rather than assumed, because it is what the fake sidecar
 			// and the sidecar's own tests model a drop as doing.
-			var notNullTable = "STREAMV2_TEST_RETIRE_NOT_NULL"
+			var notNullTable = "STREAMV2_TEST_DROP_NOT_NULL"
 			var rejecting = newManager(fullRange)
 			rejecting.addBinding(cfg.Database, cfg.Schema, notNullTable,
-				rejectingTable(t, notNullTable, "retire-notnull.v1"), nil)
+				rejectingTable(t, notNullTable, "drop-notnull.v1"), nil)
 
 			require.NoError(t, testWriteRow(ctx, rejecting, 0, []any{"dropped", nil}))
 			var rejected = rejecting.bindings[0].channels[0].name
@@ -764,23 +764,23 @@ func TestStreamV2Manager(t *testing.T) {
 
 			rejectingClient, err := rejecting.ensureStarted(ctx)
 			require.NoError(t, err)
-			require.NoError(t, retireChannel(ctx, rejectingClient, rejected))
+			require.NoError(t, dropChannel(ctx, rejectingClient, rejected))
 
 			afterRejection, err := rejectingClient.OpenChannel(ctx, cfg.Database, cfg.Schema, notNullTable, rejected)
 			require.NoError(t, err)
-			t.Logf("reopened %s after a retirement: committed token %v, %d row(s) rejected",
+			t.Logf("reopened %s after a drop: committed token %v, %d row(s) rejected",
 				rejected, afterRejection.committedToken(), afterRejection.RowsErrorCount)
 			require.Zero(t, afterRejection.RowsErrorCount)
 			require.Nil(t, afterRejection.CommittedToken)
 		})
 	})
 
-	t.Run("a backfill the outgoing generation cannot race", func(t *testing.T) {
+	t.Run("a backfill the last specification cannot race", func(t *testing.T) {
 		// Bumping a binding's backfill re-materializes it into the same table,
-		// and Apply does that while the outgoing generation's shards are still
+		// and Apply does that while the last specification's shards are still
 		// storing: nothing stops them first. Their channels are bound to that
 		// same table, so what Apply does to the table is what decides whether the
-		// rows they append next end up in what the new generation materializes.
+		// rows they append next end up in what the backfill materializes.
 		// Only Snowflake can say which operation takes those channels with it, so
 		// each is measured here in turn.
 		// Each experiment takes a table of its own, named for this run. Snowflake's
@@ -792,8 +792,8 @@ func TestStreamV2Manager(t *testing.T) {
 		var runNonce = fmt.Sprintf("%d", time.Now().Unix())
 		// Named in upper case, which is what Snowflake stores for the unquoted
 		// identifier the CREATE below uses, and so what a SHOW reports it as.
-		var newTurnoverTable = func(t *testing.T, experiment string) string {
-			var table = fmt.Sprintf("STREAMV2_TEST_TURNOVER_%s_%s", strings.ToUpper(experiment), runNonce)
+		var newBackfillTable = func(t *testing.T, experiment string) string {
+			var table = fmt.Sprintf("STREAMV2_TEST_BACKFILL_%s_%s", strings.ToUpper(experiment), runNonce)
 			t.Cleanup(func() {
 				db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s;", table))
 			})
@@ -802,30 +802,30 @@ func TestStreamV2Manager(t *testing.T) {
 
 		// recreateTable drops and re-creates the table, as Apply does for a
 		// streaming v2 binding whose backfill counter has been bumped, recording the
-		// generation it re-creates the table for the way client.CreateTable does. An
-		// empty owner stands for a table created before this connector recorded
-		// generations at all.
-		var recreateTable = func(t *testing.T, turnoverTable, owner string) {
-			_, err := db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s;", turnoverTable))
+		// state key it re-creates the table for the way client.CreateTable does. An
+		// empty recorded state key stands for a table created before this connector
+		// recorded state keys at all.
+		var recreateTable = func(t *testing.T, backfillTable, recorded string) {
+			_, err := db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s;", backfillTable))
 			require.NoError(t, err)
-			_, err = db.ExecContext(ctx, fmt.Sprintf("CREATE TABLE %s %s;", turnoverTable, testTableColumns))
+			_, err = db.ExecContext(ctx, fmt.Sprintf("CREATE TABLE %s %s;", backfillTable, testTableColumns))
 			require.NoError(t, err)
 
-			if owner == "" {
+			if recorded == "" {
 				return
 			}
-			var comment = streamV2EmbedGenerationInTableComment(
+			var comment = streamV2EmbedStateKeyInTableComment(
 				"Generated for materialization "+testMaterialization,
-				streamV2Generation{materialization: testMaterialization, stateKey: owner})
+				streamV2RecordedStateKey{materialization: testMaterialization, stateKey: recorded})
 			_, err = db.ExecContext(ctx, fmt.Sprintf("COMMENT ON TABLE %s IS %s;",
-				turnoverTable, testDialect.Literal(comment)))
+				backfillTable, testDialect.Literal(comment)))
 			require.NoError(t, err)
 		}
 
-		var turnoverTarget = func(turnoverTable, stateKey string) sql.Table {
+		var backfillTarget = func(backfillTable, stateKey string) sql.Table {
 			var tgt = target(stateKey)
-			tgt.Identifier = turnoverTable
-			tgt.Path = []string{cfg.Schema, turnoverTable}
+			tgt.Identifier = backfillTable
+			tgt.Path = []string{cfg.Schema, backfillTable}
 			tgt.DeltaUpdates = true
 			return tgt
 		}
@@ -836,141 +836,141 @@ func TestStreamV2Manager(t *testing.T) {
 			return streamV2QueryTableComment(ctx, db, testDialect, database, schema, table)
 		}
 
-		// outgoingGeneration is a shard of the generation being replaced, holding
+		// lastSpecShard is a shard of the specification being replaced, holding
 		// an open channel with three documents appended, committed, and accounted
 		// for by its checkpoint.
-		var outgoingGeneration = func(t *testing.T, turnoverTable, stateKey string) (*streamV2Manager, streamV2Item) {
-			recreateTable(t, turnoverTable, "")
+		var lastSpecShard = func(t *testing.T, backfillTable, stateKey string) (*streamV2Manager, streamV2Item) {
+			recreateTable(t, backfillTable, "")
 
 			var m = newManager(fullRange)
-			m.addBinding(cfg.Database, cfg.Schema, turnoverTable, turnoverTarget(turnoverTable, stateKey), nil)
+			m.addBinding(cfg.Database, cfg.Schema, backfillTable, backfillTarget(backfillTable, stateKey), nil)
 
 			writeRows(m, 0, 3)
 			entries, err := m.flush(ctx)
 			require.NoError(t, err)
 			var item = soleItem(t, entries, 0)
 			require.Equal(t, int64(3), item.Counter)
-			require.Equal(t, 3, countRowsIn(turnoverTable))
+			require.Equal(t, 3, countRowsIn(backfillTable))
 			return m, *item
 		}
 
 		t.Run("a truncate leaves it appending", func(t *testing.T) {
-			// This is the defect. The truncate empties the table for the new
-			// generation while the outgoing generation's channel — untouched, and
+			// This is the defect. The truncate empties the table for the
+			// backfill while the last specification's channel — untouched, and
 			// still bound to that table — goes on appending into it. Those rows
 			// land after the truncate, survive it, and are then re-materialized by
-			// the new generation: a duplicate of each, for good, on a
+			// the backfill: a duplicate of each, for good, on a
 			// delta-updates binding.
-			var turnoverTable = newTurnoverTable(t, "truncate")
-			var outgoing, _ = outgoingGeneration(t, turnoverTable, "turnover-truncate.v1")
+			var backfillTable = newBackfillTable(t, "truncate")
+			var lastShard, _ = lastSpecShard(t, backfillTable, "backfill-truncate.v1")
 
-			_, err := db.ExecContext(ctx, fmt.Sprintf("TRUNCATE TABLE %s;", turnoverTable))
+			_, err := db.ExecContext(ctx, fmt.Sprintf("TRUNCATE TABLE %s;", backfillTable))
 			require.NoError(t, err)
-			require.Zero(t, countRowsIn(turnoverTable))
+			require.Zero(t, countRowsIn(backfillTable))
 
-			writeRows(outgoing, 3, 5)
-			entries, err := outgoing.flush(ctx)
+			writeRows(lastShard, 3, 5)
+			entries, err := lastShard.flush(ctx)
 			require.NoError(t, err)
 			require.Equal(t, int64(5), soleItem(t, entries, 0).Counter)
-			require.Equal(t, 2, countRowsIn(turnoverTable))
-			outgoing.stop()
+			require.Equal(t, 2, countRowsIn(backfillTable))
+			lastShard.stop()
 		})
 
 		t.Run("a drop and re-create does not", func(t *testing.T) {
 			// Dropping the table takes every channel bound to it, named by the
-			// checkpoint or not, so the outgoing generation's appends fail instead
-			// of landing in the table the new generation is re-materializing.
-			var turnoverTable = newTurnoverTable(t, "drop")
-			var outgoing, checkpointed = outgoingGeneration(t, turnoverTable, "turnover-drop.v1")
+			// checkpoint or not, so the last specification's appends fail instead
+			// of landing in the table the backfill is re-materializing.
+			var backfillTable = newBackfillTable(t, "drop")
+			var lastShard, checkpointed = lastSpecShard(t, backfillTable, "backfill-drop.v1")
 
-			// Re-created without recording a generation, which is what a table
+			// Re-created without recording a state key, which is what a table
 			// created before this connector recorded them looks like: the committed
 			// offset token is all this shard has to go on.
-			recreateTable(t, turnoverTable, "")
+			recreateTable(t, backfillTable, "")
 
-			writeRows(outgoing, 3, 5)
-			_, err := outgoing.flush(ctx)
+			writeRows(lastShard, 3, 5)
+			_, err := lastShard.flush(ctx)
 			require.Error(t, err)
-			require.Zero(t, countRowsIn(turnoverTable))
-			t.Logf("the outgoing generation's append failed with: %s", err)
-			outgoing.sup.kill()
+			require.Zero(t, countRowsIn(backfillTable))
+			t.Logf("the last specification's append failed with: %s", err)
+			lastShard.sup.kill()
 
 			// Nor may it come back. A shard which has not yet been told to stop
 			// restarts and reopens a channel Snowflake no longer holds: its
 			// committed offset token is gone while the checkpoint still records
-			// three documents appended to it. That is the same lost-state refusal
+			// three documents appended to it. That is the same lost-state rejection
 			// an absorbed channel gets from a join, and the only reading of it
-			// which does not append this generation's documents into a table that
+			// which does not append the last specification's documents into a table that
 			// has been re-materialized under them.
 			var restarted = newManager(fullRange)
-			restarted.addBinding(cfg.Database, cfg.Schema, turnoverTable,
-				turnoverTarget(turnoverTable, "turnover-drop.v1"), priorOf(&checkpointed))
+			restarted.addBinding(cfg.Database, cfg.Schema, backfillTable,
+				backfillTarget(backfillTable, "backfill-drop.v1"), priorOf(&checkpointed))
 
 			// Reopening is what Snowflake's ingestion answers only once it has caught
 			// up with the re-created table; until then it fails the open outright
 			// rather than reporting the fresh channel. A shard meeting that restarts,
-			// so the refusal is what it arrives at rather than what it sees first.
-			var refusal error
+			// so the rejection is what it arrives at rather than what it sees first.
+			var rejection error
 			require.Eventually(t, func() bool {
-				refusal = testWriteRow(ctx, restarted, 0, []any{"k", 1, json.RawMessage(`{}`)})
-				require.Error(t, refusal)
-				if strings.Contains(refusal.Error(), "has committed nothing while this task's checkpoint records") {
+				rejection = testWriteRow(ctx, restarted, 0, []any{"k", 1, json.RawMessage(`{}`)})
+				require.Error(t, rejection)
+				if strings.Contains(rejection.Error(), "has committed nothing while this task's checkpoint records") {
 					return true
 				}
-				t.Logf("awaiting the reopen, which failed with: %s", refusal)
+				t.Logf("awaiting the reopen, which failed with: %s", rejection)
 				return false
 			}, 3*time.Minute, 5*time.Second)
 
-			require.ErrorContains(t, refusal, checkpointed.Channel)
-			require.Zero(t, countRowsIn(turnoverTable))
-			t.Logf("the outgoing generation's reopen was refused with: %s", refusal)
+			require.ErrorContains(t, rejection, checkpointed.Channel)
+			require.Zero(t, countRowsIn(backfillTable))
+			t.Logf("the last specification's reopen was rejected with: %s", rejection)
 		})
 
 		t.Run("nor may a shard which committed nothing for the binding", func(t *testing.T) {
-			// The refusal above rests on there being a checkpoint item to contradict.
+			// The rejection above rests on there being a checkpoint item to contradict.
 			// A shard which has committed nothing for the binding has none, and a
 			// channel Snowflake has never held is exactly what its first transaction
 			// expects to open — so nothing about the channel tells it apart from a
-			// shard of the generation the backfill published. The table is what tells
-			// them apart: it records the generation it was created for.
-			var turnoverTable = newTurnoverTable(t, "owned")
-			recreateTable(t, turnoverTable, noncedStateKey("turnover-owned.v1"))
+			// shard of the specification the backfill published. The table is what tells
+			// them apart: it records the state key it was created for.
+			var backfillTable = newBackfillTable(t, "owned")
+			recreateTable(t, backfillTable, noncedStateKey("backfill-owned.v1"))
 
-			// Steady state first: the table records this shard's own generation, so
+			// Steady state first: the table records this shard's own state key, so
 			// it appends as usual.
-			var owner = newManager(fullRange)
-			owner.tableComment = readComment
-			owner.addBinding(cfg.Database, cfg.Schema, turnoverTable, turnoverTarget(turnoverTable, "turnover-owned.v1"), nil)
+			var recorded = newManager(fullRange)
+			recorded.tableComment = readComment
+			recorded.addBinding(cfg.Database, cfg.Schema, backfillTable, backfillTarget(backfillTable, "backfill-owned.v1"), nil)
 
-			writeRows(owner, 0, 2)
-			entries, err := owner.flush(ctx)
+			writeRows(recorded, 0, 2)
+			entries, err := recorded.flush(ctx)
 			require.NoError(t, err)
 			require.Equal(t, int64(2), soleItem(t, entries, 0).Counter)
-			require.Equal(t, 2, countRowsIn(turnoverTable))
-			owner.stop()
+			require.Equal(t, 2, countRowsIn(backfillTable))
+			recorded.stop()
 
-			// The turnover, with this shard having stored nothing for the binding of
+			// The backfill, with this shard having stored nothing for the binding of
 			// its own. This session is built before the backfill lands, as a shard
-			// which is still running through one is: what it may append is settled by
+			// which is still running through one is: what it may append is decided by
 			// the table as its channel opens, not by the table as it started.
 			var stale = newManager(fullRange)
 			stale.tableComment = readComment
-			stale.addBinding(cfg.Database, cfg.Schema, turnoverTable, turnoverTarget(turnoverTable, "turnover-owned.v1"), nil)
+			stale.addBinding(cfg.Database, cfg.Schema, backfillTable, backfillTarget(backfillTable, "backfill-owned.v1"), nil)
 
-			recreateTable(t, turnoverTable, noncedStateKey("turnover-owned.v2"))
+			recreateTable(t, backfillTable, noncedStateKey("backfill-owned.v2"))
 
-			var refusal = testWriteRow(ctx, stale, 0, []any{"k", 1, json.RawMessage(`{}`)})
-			require.ErrorContains(t, refusal, "turnover-owned.v2")
-			require.ErrorContains(t, refusal, "has been backfilled")
-			require.Zero(t, countRowsIn(turnoverTable))
-			t.Logf("the stale generation was refused with: %s", refusal)
+			var rejection = testWriteRow(ctx, stale, 0, []any{"k", 1, json.RawMessage(`{}`)})
+			require.ErrorContains(t, rejection, "backfill-owned.v2")
+			require.ErrorContains(t, rejection, "has been backfilled")
+			require.Zero(t, countRowsIn(backfillTable))
+			t.Logf("the stale specification was rejected with: %s", rejection)
 		})
 	})
 
-	t.Run("refusals", func(t *testing.T) {
+	t.Run("rejections", func(t *testing.T) {
 		truncate(t)
 		smallBatches(t)
-		var tgt = target("refusal.v1")
+		var tgt = target("rejection.v1")
 
 		// Commit a transaction, then leave a further batch committed in
 		// Snowflake beyond it, as an interruption would.
@@ -988,7 +988,7 @@ func TestStreamV2Manager(t *testing.T) {
 		require.NoError(t, err)
 		m.stop()
 
-		// Each refusal is reported before the document which provoked it can be
+		// Each rejection is reported before the document which provoked it can be
 		// appended, and the row count is unchanged by the attempt.
 		var rowsBefore = countRows()
 
@@ -1002,17 +1002,17 @@ func TestStreamV2Manager(t *testing.T) {
 			require.Equal(t, rowsBefore, countRows())
 		})
 
-		t.Run("a channel crossing this shard's boundary is refused", func(t *testing.T) {
+		t.Run("a channel crossing this shard's boundary is rejected", func(t *testing.T) {
 			// The shard now covers half the range while its checkpointed channel
 			// covers the whole of it: a split that did not land on this binding's
 			// channel boundaries. The rows outstanding on that channel belong to
 			// both children, so neither may skip them.
 			var m2 = newManager(&pf.RangeSpec{KeyEnd: math.MaxUint32 / 2, RClockEnd: math.MaxUint32})
 			m2.addBinding(cfg.Database, cfg.Schema, tableName, tgt, priorOf(&checkpointed))
-			var refusal = testWriteRow(ctx, m2, 0, []any{"k", 1, json.RawMessage(`{}`)})
-			require.ErrorContains(t, refusal, "crosses the boundary of this shard's range")
+			var rejection = testWriteRow(ctx, m2, 0, []any{"k", 1, json.RawMessage(`{}`)})
+			require.ErrorContains(t, rejection, "crosses the boundary of this shard's range")
 			require.Equal(t, rowsBefore, countRows())
-			t.Logf("the replay was refused with: %s", refusal)
+			t.Logf("the replay was rejected with: %s", rejection)
 		})
 	})
 
@@ -1054,7 +1054,7 @@ func TestStreamV2Manager(t *testing.T) {
 		// The failure outlives the session that saw it. Snowflake's count is
 		// cumulative for the life of the channel, and the transaction failed
 		// before it could checkpoint, so a restart reconciles against a checkpoint
-		// accounting for none of it: it refuses as the channel opens rather than
+		// accounting for none of it: it is rejected as the channel opens rather than
 		// replaying the transaction and acknowledging it with the row still
 		// missing.
 		m.sup.kill()
@@ -1110,15 +1110,15 @@ func TestStreamV2Manager(t *testing.T) {
 	})
 }
 
-// TestStreamV2CreateTableRecordsGeneration drives the connector's own create path
+// TestStreamV2CreateTableRecordsStateKey drives the connector's own create path
 // against live Snowflake and reads back what it left on the table.
 //
-// Apply is the only writer of the generation a streaming v2 table carries, and a
-// generation naming the wrong state key would refuse every shard of the task
+// Apply is the only writer of the state key a streaming v2 table carries, and a
+// record naming the wrong state key would reject every shard of the task
 // rather than only the ones a backfill has replaced. So this covers the whole
 // round trip — the table this connector creates, the comment Snowflake reports for
-// it, and the generation read back out of it — rather than the rendering alone.
-func TestStreamV2CreateTableRecordsGeneration(t *testing.T) {
+// it, and the state key read back out of it — rather than the rendering alone.
+func TestStreamV2CreateTableRecordsStateKey(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping test in short mode")
 	}
@@ -1128,8 +1128,8 @@ func TestStreamV2CreateTableRecordsGeneration(t *testing.T) {
 	cfg.Advanced.FeatureFlags = flagSnowpipeStreamingV2
 
 	const materialization = "test/streamV2CreateTable"
-	const stateKey = "generation%2Frecorded.v2"
-	var tableName = "STREAMV2_TEST_GENERATION"
+	const stateKey = "statekey%2Frecorded.v2"
+	var tableName = "STREAMV2_TEST_STATE_KEY"
 
 	dsn, err := cfg.toURI(true, "")
 	require.NoError(t, err)
@@ -1154,7 +1154,7 @@ func TestStreamV2CreateTableRecordsGeneration(t *testing.T) {
 			Path:         []string{cfg.Schema, tableName},
 			Binding:      0,
 			DeltaUpdates: true,
-			Comment:      "Generated for materialization " + materialization + " of collection test/generation",
+			Comment:      "Generated for materialization " + materialization + " of collection test/statekey",
 		},
 		Identifier: tableName,
 		Keys:       []sql.Column{{Identifier: `KEY`, MappedType: sql.MappedType{DDL: "TEXT"}}},
@@ -1175,18 +1175,18 @@ func TestStreamV2CreateTableRecordsGeneration(t *testing.T) {
 	t.Logf("created %s with comment: %s", tableName, comment)
 
 	// The comment the table would have carried anyway is still there for whoever
-	// reads the table, and the generation is recorded alongside it.
+	// reads the table, and the state key is recorded alongside it.
 	require.Contains(t, comment, tbl.Comment)
 
-	gen, ok := streamV2GenerationFromTableComment(comment)
+	rec, ok := streamV2StateKeyFromTableComment(comment)
 	require.True(t, ok)
-	require.Equal(t, streamV2Generation{materialization: materialization, stateKey: stateKey}, gen)
+	require.Equal(t, streamV2RecordedStateKey{materialization: materialization, stateKey: stateKey}, rec)
 
-	// The generation this table was created for may append to it; the one a
+	// The state key this table was created for may append to it; the one a
 	// backfill of the same binding replaced may not.
-	require.NoError(t, streamV2CheckGenerationConflict(comment, gen, tableName))
+	require.NoError(t, streamV2CheckStateKeyConflict(comment, rec, tableName))
 	require.ErrorContains(t,
-		streamV2CheckGenerationConflict(comment, streamV2Generation{materialization: materialization, stateKey: "generation%2Frecorded.v1"}, tableName),
+		streamV2CheckStateKeyConflict(comment, streamV2RecordedStateKey{materialization: materialization, stateKey: "statekey%2Frecorded.v1"}, tableName),
 		"has been backfilled")
 }
 
@@ -1195,7 +1195,7 @@ func TestStreamV2CreateTableRecordsGeneration(t *testing.T) {
 // type, and snapshots what Snowflake ends up holding.
 //
 // This coverage used to be a data-types binding of the integration-harness
-// fixture. That fixture now proves only that the write path refuses a task which
+// fixture. That fixture now proves only that the write path rejects a task which
 // is not on the v2 runtime, which is all `flowctl preview` can drive, so the type
 // sweep lives at the seam that actually appends: the manager against live
 // Snowflake. The values of each type follow the classic path's sweep in
@@ -1360,22 +1360,22 @@ func TestStreamV2Datatypes(t *testing.T) {
 	}
 }
 
-// TestStreamV2AdoptsATableWithNoGeneration covers a table that the streaming v2
+// TestStreamV2AdoptsATableWithNoStateKey covers a table that the streaming v2
 // path did not create: one an older build of this connector created, or one a
-// bdec generation of the same binding created, carries no generation marker in
+// bdec build of the same binding created, carries no recorded state key in
 // its comment.
 //
-// streamV2CheckGenerationConflict reads a marker-less table as a table that says
-// nothing about which generation may append to it, and so allows every generation
-// to. The backfill race that the marker guards is therefore unguarded on exactly
+// streamV2CheckStateKeyConflict reads a table with no recorded state key as a table
+// that says nothing about which state key may append to it, and so allows every
+// one to. The backfill race that the record guards is therefore unguarded on exactly
 // those tables which were carried onto this write path in place — and it stays
-// that way, because only CreateTable stamps the marker and a change of write path
+// that way, because only CreateTable stamps the record and a change of write path
 // creates no table.
 //
-// The write path must adopt such a table by recording its own generation in the
+// The write path must adopt such a table by recording its own state key in the
 // comment, after which the guard holds for it as it does for a table this path
 // created itself.
-func TestStreamV2AdoptsATableWithNoGeneration(t *testing.T) {
+func TestStreamV2AdoptsATableWithNoStateKey(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping test in short mode")
 	}
@@ -1414,9 +1414,9 @@ func TestStreamV2AdoptsATableWithNoGeneration(t *testing.T) {
 		StateKey:   stateKey,
 	}
 
-	// The table is created the way a generation that does not record generations
-	// creates it: the comment it would carry anyway, and no marker. Going through
-	// the templates rather than client.CreateTable is what leaves the marker off.
+	// The table is created the way a build that does not record state keys
+	// creates it: the comment it would carry anyway, and no record. Going through
+	// the templates rather than client.CreateTable is what leaves the record off.
 	var createQuery strings.Builder
 	require.NoError(t, renderTemplates(testDialect).createTargetTable.Execute(&createQuery, &tbl))
 	_, err = db.ExecContext(ctx, createQuery.String())
@@ -1425,16 +1425,16 @@ func TestStreamV2AdoptsATableWithNoGeneration(t *testing.T) {
 		db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s;", tbl.Identifier))
 	})
 
-	// The comment such a generation leaves: what the table is for, and nothing
-	// about which generation may stream into it.
+	// The comment such a build leaves: what the table is for, and nothing
+	// about which state key may stream into it.
 	_, err = db.ExecContext(ctx, fmt.Sprintf(
 		"COMMENT ON TABLE %s IS %s;", tbl.Identifier, testDialect.Literal(tbl.Comment)))
 	require.NoError(t, err)
 
 	before, err := streamV2QueryTableComment(ctx, db, testDialect, cfg.Database, cfg.Schema, storedName)
 	require.NoError(t, err)
-	_, ok := streamV2GenerationFromTableComment(before)
-	require.False(t, ok, "the table must start with no generation recorded, or this test proves nothing")
+	_, ok := streamV2StateKeyFromTableComment(before)
+	require.False(t, ok, "the table must start with no state key recorded, or this test proves nothing")
 
 	// Apply is what adopts the table, as it does for a task whose publication moves
 	// this binding onto the write path without creating anything.
@@ -1444,7 +1444,7 @@ func TestStreamV2AdoptsATableWithNoGeneration(t *testing.T) {
 	configJson, err := json.Marshal(v2Cfg)
 	require.NoError(t, err)
 	require.True(t, streamsV2(&v2Cfg, true, true), "the test config must select the streaming v2 write path")
-	require.NoError(t, adoptStreamV2Generations(ctx, &pf.MaterializationSpec{
+	require.NoError(t, adoptStreamV2StateKeys(ctx, &pf.MaterializationSpec{
 		Name:       pf.Materialization(materialization),
 		ConfigJson: configJson,
 		Bindings: []*pf.MaterializationSpec_Binding{{
@@ -1460,7 +1460,7 @@ func TestStreamV2AdoptsATableWithNoGeneration(t *testing.T) {
 	t.Cleanup(m.stop)
 
 	// The manager reads the comment exactly as the transactor wires it to, so the
-	// generation Apply recorded is the one the guard checks each append against.
+	// state key Apply recorded is the one the guard checks each append against.
 	m.tableComment = func(ctx context.Context, database, schema, table string) (string, error) {
 		return streamV2QueryTableComment(ctx, db, testDialect, database, schema, table)
 	}
@@ -1471,21 +1471,21 @@ func TestStreamV2AdoptsATableWithNoGeneration(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, int64(1), soleItem(t, entries, 0).Counter)
 
-	// Having appended to the table, this generation owns it, and the comment must
-	// say so — otherwise a generation this one has already been replaced by can
+	// Having appended to the table, this state key is recorded for it, and the comment must
+	// say so — otherwise a backfill this specification has already been replaced by can
 	// append to the same table without the guard noticing.
 	after, err := streamV2QueryTableComment(ctx, db, testDialect, cfg.Database, cfg.Schema, storedName)
 	require.NoError(t, err)
 	require.Contains(t, after, tbl.Comment, "the comment the table carried anyway must survive")
 
-	gen, ok := streamV2GenerationFromTableComment(after)
-	require.True(t, ok, "the streaming v2 path must record its generation on a table it adopts")
-	require.Equal(t, streamV2Generation{materialization: materialization, stateKey: stateKey}, gen)
+	rec, ok := streamV2StateKeyFromTableComment(after)
+	require.True(t, ok, "the streaming v2 path must record its state key on a table it adopts")
+	require.Equal(t, streamV2RecordedStateKey{materialization: materialization, stateKey: stateKey}, rec)
 
-	// And the guard must now do its work: the generation a backfill of this
+	// And the guard must now do its work: the state key a backfill of this
 	// binding would replace this one with may not append to the same table.
 	require.ErrorContains(t,
-		streamV2CheckGenerationConflict(after, streamV2Generation{materialization: materialization, stateKey: "adopt.v2"}, tableName),
+		streamV2CheckStateKeyConflict(after, streamV2RecordedStateKey{materialization: materialization, stateKey: "adopt.v2"}, tableName),
 		"has been backfilled",
 	)
 }

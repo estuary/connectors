@@ -197,14 +197,14 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 var errInsufficientPrivileges = regexp.MustCompile(`Insufficient privileges to operate on schema '([^']+)'`)
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
-	// We record the task name and the binding's state key (streamV2Generation)
+	// We record the task name and the binding's state key (streamV2RecordedStateKey)
 	// in the Snowflake table comment. A binding without a state key would leave
 	// that record empty, and an empty record lets any task or any state key
 	// append to the table. The check therefore runs before the CREATE, so the
 	// error below creates no table at all.
-	var recordGeneration = streamsV2(&c.cfg, tc.Table.DeltaUpdates, c.streamingV2Enabled)
-	if recordGeneration && tc.StateKey == "" {
-		return fmt.Errorf("cannot record the generation of table %s: the binding resolved for it carries no state key", tc.Identifier)
+	var recordStateKey = streamsV2(&c.cfg, tc.Table.DeltaUpdates, c.streamingV2Enabled)
+	if recordStateKey && tc.StateKey == "" {
+		return fmt.Errorf("cannot record the state key of table %s: the binding resolved for it carries no state key", tc.Identifier)
 	}
 
 	if _, err := c.db.ExecContext(ctx, tc.TableCreateSql); err != nil {
@@ -214,20 +214,20 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 		return err
 	}
 
-	// The generation (task name and binding state key) is recorded here, right
-	// after table creation, because a backfill of a streaming v2 binding
-	// re-creates the table rather than emptying it (MustRecreateResource), so
-	// every generation of a table created here passes through here. A table
+	// The task name and binding state key are recorded here, right after table
+	// creation, because a backfill of a streaming v2 binding re-creates the table
+	// rather than emptying it (MustRecreateResource), so every backfill of a
+	// table created here passes through here. A table
 	// created before the binding streamed gets its record from
-	// adoptStreamV2Generations.
-	if recordGeneration {
-		var comment = streamV2EmbedGenerationInTableComment(tc.Comment, streamV2Generation{
+	// adoptStreamV2StateKeys.
+	if recordStateKey {
+		var comment = streamV2EmbedStateKeyInTableComment(tc.Comment, streamV2RecordedStateKey{
 			materialization: c.materializationName,
 			stateKey:        tc.StateKey,
 		})
 		var stmt = fmt.Sprintf("COMMENT ON TABLE %s IS %s;", tc.Identifier, c.ep.Dialect.Literal(comment))
 		if _, err := c.db.ExecContext(ctx, stmt); err != nil {
-			return fmt.Errorf("recording the generation of table %s: %w", tc.Identifier, err)
+			return fmt.Errorf("recording the state key of table %s: %w", tc.Identifier, err)
 		}
 	}
 
@@ -416,7 +416,7 @@ func (c *client) MustRecreateResource(req *pm.Request_Apply, lastBinding, newBin
 	// can only widen this one, never narrow it: the old configuration arrives
 	// in whatever shape the control plane stored it, not the shape the runtime
 	// hands this connector for itself.
-	outgoingCfg, ok := endpointConfigOf(req.LastMaterialization.ConfigJson)
+	lastCfg, ok := endpointConfigOf(req.LastMaterialization.ConfigJson)
 	if !ok {
 		// Re-creating the table is correct whether or not the old spec streamed,
 		// so an unreadable configuration costs the grants a truncate would have
@@ -426,7 +426,7 @@ func (c *client) MustRecreateResource(req *pm.Request_Apply, lastBinding, newBin
 		)
 		return true, nil
 	}
-	return streamsV2(&outgoingCfg, true, boilerplate.ParseFlags(outgoingCfg)[flagSnowpipeStreamingV2]), nil
+	return streamsV2(&lastCfg, true, boilerplate.ParseFlags(lastCfg)[flagSnowpipeStreamingV2]), nil
 }
 
 // endpointConfigOf parses an endpoint configuration which arrives in one of two

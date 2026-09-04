@@ -49,7 +49,7 @@ type rpcResponse struct {
 // sidecarClient is an NDJSON request/response client for the Python sidecar.
 // Requests may be issued concurrently from multiple goroutines; responses are
 // correlated by id. Any transport-level failure poisons the client and fails
-// all in-flight and future calls.
+// all pending and future calls.
 //
 // An append is the one op whose request is not a single line: its rows follow
 // the header line as an opaque payload, so that the sidecar can hand them to the
@@ -109,7 +109,7 @@ func (c *sidecarClient) readLoop() {
 	c.fail(err)
 }
 
-// fail poisons the client: all in-flight calls fail immediately and future
+// fail poisons the client: all pending calls fail immediately and future
 // calls fail without touching the connection.
 func (c *sidecarClient) fail(err error) {
 	c.mu.Lock()
@@ -129,7 +129,7 @@ func (c *sidecarClient) call(ctx context.Context, op string, params any, timeout
 }
 
 // callWithPayload issues one request and awaits its response. A non-nil payload
-// is written immediately after the request line; the header must declare the
+// is written immediately after the request line; the header must state the
 // payload's length for the sidecar to know where it ends.
 func (c *sidecarClient) callWithPayload(ctx context.Context, op string, params any, payload []byte, timeout time.Duration, result any) error {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
@@ -183,9 +183,9 @@ func (c *sidecarClient) callWithPayload(ctx context.Context, op string, params a
 }
 
 // write frames one request onto the connection: its header as a JSON line, then
-// the payload it declared, if any. The write lock spans both, since a payload
-// separated from its header by another request's line would be read as that
-// request's own.
+// the payload whose length its header states, if any. The write lock spans both,
+// since a payload separated from its header by another request's line would be
+// read as that request's own.
 func (c *sidecarClient) write(req rpcRequest, payload []byte) error {
 	var line, err = json.Marshal(req)
 	if err != nil {
@@ -255,7 +255,7 @@ func (c *sidecarClient) OpenChannel(ctx context.Context, database, schema, table
 // row. Snowflake's committed token for the channel advances to endToken once the
 // batch is durable. The payload is the batch's rows as a JSON array of objects
 // keyed by column name; rowCount travels in the header so that a payload holding
-// a different number of rows than the batch it claims to be is refused rather
+// a different number of rows than the batch it claims to be is rejected rather
 // than committed under this batch's offset token.
 func (c *sidecarClient) Append(ctx context.Context, channel, startToken, endToken string, payload []byte, rowCount int) error {
 	return c.callWithPayload(ctx, "append", struct {

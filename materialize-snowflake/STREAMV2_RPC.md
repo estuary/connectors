@@ -45,7 +45,7 @@ must echo the auth token. Everything after that is channel work.
 ## Framing
 
 Every request and every response is one JSON line. `id` matches a response to
-its request, so the connector may keep many requests in flight and responses
+its request, so the connector may keep many requests pending and responses
 may arrive in any order.
 
 ```
@@ -108,7 +108,7 @@ they were sent, and a slow `wait_commit` on one channel never delays an
 A failed op answers with `ok: false` and a stable `code` for logs:
 
 ```json
-{"id": 9, "ok": false, "code": "invalid_rows", "error": "append declared 2 row(s) but its payload holds 3"}
+{"id": 9, "ok": false, "code": "invalid_rows", "error": "append header states 2 row(s) but its payload holds 3"}
 ```
 
 The failure policy is crash-only. Every error is fatal to the write path;

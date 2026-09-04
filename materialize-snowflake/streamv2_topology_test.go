@@ -15,10 +15,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// These suites cover the property the subrange-channel design exists for: a
+// These suites cover the property the key-range-channel design exists for: a
 // channel's contents are a function of the data, so a shard topology change
 // hands whole channels — committed offset tokens included — to the shards that
-// inherit their subranges, and those shards skip by position and then converge
+// inherit their key ranges, and those shards skip by position and then converge
 // back to their own target layout. Every scenario drives real managers against
 // the fake sidecar, whose channel state outlives each manager through
 // FAKE_SIDECAR_STATE, so successive managers stand for successive sessions —
@@ -60,7 +60,7 @@ func keysHashingTo(r streamV2Range, n int, salt string) []string {
 
 // storeKeys stores one row per key. The rows the runtime would deliver to a
 // shard are exactly those whose hash its range covers, so callers filter with
-// keysHashingTo per subrange rather than replaying rows a shard would not see.
+// keysHashingTo per key range rather than replaying rows a shard would not see.
 func storeKeys(t *testing.T, m *streamV2Manager, keys []string) {
 	t.Helper()
 	for _, key := range keys {
@@ -69,7 +69,7 @@ func storeKeys(t *testing.T, m *streamV2Manager, keys []string) {
 }
 
 // mergeItems collects the non-nil items of a flush's entries for binding zero,
-// keyed by subrange, as the durable checkpoint would carry them forward.
+// keyed by key range, as the durable checkpoint would carry them forward.
 func mergeItems(entries map[int]map[string]*streamV2Item) map[string]*streamV2Item {
 	var items = make(map[string]*streamV2Item)
 	for key, item := range entries[0] {
@@ -157,7 +157,7 @@ func TestStreamV2SteadyStateRouting(t *testing.T) {
 	require.Empty(t, deletionsOf(entries))
 	require.Len(t, items, len(quarters))
 
-	// Each channel counted exactly the rows whose hash its subrange covers, so
+	// Each channel counted exactly the rows whose hash its key range covers, so
 	// the item counters are the routing, read back.
 	for i, q := range quarters {
 		require.Contains(t, items, q.key())
@@ -169,7 +169,7 @@ func TestStreamV2SteadyStateRouting(t *testing.T) {
 	first.stop()
 
 	// A later session opens every channel at a clean boundary — nothing to
-	// skip, nothing refused — and continues the counters where they stood.
+	// skip, nothing rejected — and continues the counters where they stood.
 	var second = newTopologyManager(t, task, 0, math.MaxUint32, items)
 	var more []string
 	for _, q := range quarters {
@@ -192,7 +192,7 @@ func TestStreamV2SteadyStateRouting(t *testing.T) {
 // each child inherits the two whole channels nested in its half — committed
 // offset tokens and all, the interrupted transaction's unaccounted rows
 // included. The replay skips by position per channel, the first flush declares
-// the child's own layout, and the acknowledged cutover converges to it.
+// the child's own layout, and the acknowledged switching converges to it.
 func TestStreamV2SplitInheritsChannels(t *testing.T) {
 	var ctx = context.Background()
 	const task = "test/topologySplit"
@@ -270,8 +270,8 @@ func TestStreamV2SplitInheritsChannels(t *testing.T) {
 				require.Zero(t, declared[key].Counter)
 			}
 
-			// The runtime made that checkpoint durable, so the cutover runs:
-			// the inherited channels retire and the target layout takes over.
+			// The runtime made that checkpoint durable, so the switch runs:
+			// the inherited channels are dropped and the target layout takes over.
 			require.NoError(t, m.acknowledged(ctx))
 			require.Equal(t, channelNames(task, targets), activeNames(m))
 
@@ -431,7 +431,7 @@ func TestStreamV2RebalanceCrashWindows(t *testing.T) {
 		}
 	}
 
-	// The child replays, declares, and dies before the cutover. Its flush
+	// The child replays, declares, and dies before the switch. Its flush
 	// entries are the declaration checkpoint every later session recovers.
 	var declaring = newTopologyManager(t, task, loBegin, loEnd, parentItems)
 	storeKeys(t, declaring, replay)
@@ -441,25 +441,25 @@ func TestStreamV2RebalanceCrashWindows(t *testing.T) {
 	require.Len(t, declaration, 6)
 	declaring.stop()
 
-	// Window one: declaration durable, cutover never ran. The next session
-	// finds the inherited channels quiescent beside a full declaration and
-	// completes the cutover at open.
+	// Window one: declaration durable, switch never ran. The next session
+	// finds the inherited channels idle beside a full declaration and
+	// completes the switching at open.
 	var fresh []string
 	for _, r := range targets {
 		fresh = append(fresh, keysHashingTo(r, 2, "win-c")...)
 	}
 
-	var cutover = newTopologyManager(t, task, loBegin, loEnd, declaration)
-	storeKeys(t, cutover, fresh)
-	require.Equal(t, targetNames, activeNames(cutover))
-	require.ElementsMatch(t, rangeKeys(quarters)[:2], cutover.bindings[0].retire)
-	entries, err = cutover.flush(ctx)
+	var switching = newTopologyManager(t, task, loBegin, loEnd, declaration)
+	storeKeys(t, switching, fresh)
+	require.Equal(t, targetNames, activeNames(switching))
+	require.ElementsMatch(t, rangeKeys(quarters)[:2], switching.bindings[0].dropped)
+	entries, err = switching.flush(ctx)
 	require.NoError(t, err)
 	require.ElementsMatch(t, rangeKeys(quarters)[:2], deletionsOf(entries))
 	// The crash lands here: the inherited channels are dropped and the target
 	// channels hold this transaction's appends, but neither the deletions nor
 	// the counters ever reach a durable checkpoint.
-	cutover.stop()
+	switching.stop()
 
 	var tokens = fakeCommittedTokens(t, statePath)
 	require.NotContains(t, tokens, parentNames[0])
@@ -474,7 +474,7 @@ func TestStreamV2RebalanceCrashWindows(t *testing.T) {
 	var resumed = newTopologyManager(t, task, loBegin, loEnd, declaration)
 	storeKeys(t, resumed, fresh)
 	require.Equal(t, targetNames, activeNames(resumed))
-	require.ElementsMatch(t, rangeKeys(quarters)[:2], resumed.bindings[0].retire)
+	require.ElementsMatch(t, rangeKeys(quarters)[:2], resumed.bindings[0].dropped)
 	for _, c := range resumed.bindings[0].channels {
 		require.Equal(t, int64(2), c.skip)
 		require.Equal(t, int64(2), c.counter)
@@ -490,20 +490,20 @@ func TestStreamV2RebalanceCrashWindows(t *testing.T) {
 	resumed.stop()
 
 	// The checkpoint finally lands, and the next session is plain steady
-	// state: four channels, clean boundaries, nothing retiring.
+	// state: four channels, clean boundaries, nothing dropped.
 	var steady = newTopologyManager(t, task, loBegin, loEnd, converged)
 	storeKeys(t, steady, keysHashingTo(targets[0], 1, "win-d"))
 	require.Equal(t, targetNames, activeNames(steady))
-	require.Empty(t, steady.bindings[0].retire)
+	require.Empty(t, steady.bindings[0].dropped)
 	for _, c := range steady.bindings[0].channels {
 		require.Equal(t, int64(2), c.skip)
 	}
 }
 
 // TestStreamV2SplitThenJoinBack scales a task up and then back down after both
-// children converged. The join inherits eight settled channels, continues them
+// children converged. The join inherits eight committed channels, continues them
 // at clean boundaries, and converges — the down-and-up cycle that used to
-// require retiring channels by shard key-begin now falls out of subrange
+// require dropping channels by shard key-begin now falls out of key range
 // inheritance alone.
 func TestStreamV2SplitThenJoinBack(t *testing.T) {
 	var ctx = context.Background()
@@ -539,7 +539,7 @@ func TestStreamV2SplitThenJoinBack(t *testing.T) {
 	require.NoError(t, err)
 
 	// The joined shard is not replaying anything: both children committed and
-	// checkpointed. It simply continues eight settled channels until the
+	// checkpointed. It simply continues eight committed channels until the
 	// rebalance converges them.
 	var joined = newTopologyManager(t, task, 0, math.MaxUint32, prior)
 	var rows []string
@@ -565,12 +565,12 @@ func TestStreamV2SplitThenJoinBack(t *testing.T) {
 	require.ElementsMatch(t, rangeKeys(eighths), deletionsOf(entries))
 }
 
-// TestStreamV2MisalignedSplitRefused pins the one topology change the channels
-// cannot survive: a split cutting through a channel's subrange, which midpoint
+// TestStreamV2MisalignedSplitRejected pins the one topology change the channels
+// cannot survive: a split cutting through a channel's key range, which midpoint
 // splits only produce by splitting again before the layout converged past the
 // depth the new boundary cuts through. The rows that channel holds beyond its
-// counter belong to both children, so the only safe answer is a refusal.
-func TestStreamV2MisalignedSplitRefused(t *testing.T) {
+// counter belong to both children, so the only safe answer is a rejection.
+func TestStreamV2MisalignedSplitRejected(t *testing.T) {
 	t.Setenv("FAKE_SIDECAR_STATE", filepath.Join(t.TempDir(), "channels.json"))
 	const task = "test/topologyMisaligned"
 
@@ -587,11 +587,11 @@ func TestStreamV2MisalignedSplitRefused(t *testing.T) {
 	require.ErrorContains(t, err, name)
 }
 
-// TestStreamV2LostChannelRefused pins the reading of a channel that reports no
+// TestStreamV2LostChannelRejected pins the reading of a channel that reports no
 // committed offset token while the checkpoint records documents appended to it,
-// with no declaration to explain the loss as an interrupted cutover: the
-// account of what Snowflake holds is gone, so the binding refuses.
-func TestStreamV2LostChannelRefused(t *testing.T) {
+// with no declaration to explain the loss as an interrupted switch: the
+// account of what Snowflake holds is gone, so the binding is rejected.
+func TestStreamV2LostChannelRejected(t *testing.T) {
 	t.Setenv("FAKE_SIDECAR_STATE", filepath.Join(t.TempDir(), "channels.json"))
 	const task = "test/topologyLost"
 
@@ -607,11 +607,11 @@ func TestStreamV2LostChannelRefused(t *testing.T) {
 	require.ErrorContains(t, err, "has committed nothing while this task's checkpoint records")
 }
 
-// TestStreamV2ForeignTokenRefused pins the unconditional subrange guard at the
+// TestStreamV2ForeignTokenRejected pins the unconditional key range guard at the
 // seam where it matters: a channel whose committed offset token names a range
-// other than the channel's own subrange was written by something this write
+// other than the channel's own key range was written by something this write
 // path cannot account for, and nothing it counts may be skipped.
-func TestStreamV2ForeignTokenRefused(t *testing.T) {
+func TestStreamV2ForeignTokenRejected(t *testing.T) {
 	var statePath = filepath.Join(t.TempDir(), "channels.json")
 	t.Setenv("FAKE_SIDECAR_STATE", statePath)
 	const task = "test/topologyForeign"
@@ -635,15 +635,15 @@ func TestStreamV2ForeignTokenRefused(t *testing.T) {
 	})
 
 	err = testWriteRow(context.Background(), m, 0, []any{"any", "v"})
-	require.ErrorContains(t, err, "was not written against this channel's subrange")
+	require.ErrorContains(t, err, "was not written against this channel's key range")
 }
 
 // TestStreamV2SplitInheritsAnEmptyChannel pins the state a skewed transaction
 // leaves for a later split: a channel of the parent's layout that took no rows
 // legitimately stands in the checkpoint at counter zero with no committed
 // offset token. The child that inherits it must adopt it as a fresh channel of
-// the inherited layout — not read it as an orphaned declaration to retire,
-// which leaves the surviving layout unable to tile the child's range and
+// the inherited layout — not read it as an orphaned declaration to drop,
+// which leaves the surviving layout unable to cover the child's range and
 // wedges the binding over rows that never existed.
 func TestStreamV2SplitInheritsAnEmptyChannel(t *testing.T) {
 	var ctx = context.Background()

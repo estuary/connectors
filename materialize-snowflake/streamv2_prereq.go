@@ -16,36 +16,36 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// gatedDriver refuses the RPCs that carry a materialization spec when the spec
+// runtimePrereqDriver rejects the RPCs that carry a materialization spec when the spec
 // asks for a write path the task's runtime cannot support, then delegates to the
 // wrapped driver. Validate, which carries no spec of the task being published,
 // warns instead.
 //
-// The gate lives here rather than in a Materializer method because the runtime
-// is a property of the task, and Apply and Open are the only RPCs that carry the
-// task's spec.
-type gatedDriver struct {
+// The runtime prerequisite check lives here rather than in a Materializer method
+// because the runtime is a property of the task, and Apply and Open are the only
+// RPCs that carry the task's spec.
+type runtimePrereqDriver struct {
 	*sql.Driver[config, tableConfig]
 }
 
-var _ boilerplate.Connector = gatedDriver{}
+var _ boilerplate.Connector = runtimePrereqDriver{}
 
-// NewGatedDriver assembles the connector as it runs: the driver NewDriver builds,
-// behind the runtime gate.
+// NewRuntimePrereqDriver assembles the connector as it runs: the driver NewDriver builds,
+// behind the runtime prerequisite check.
 //
-// The gate is applied here rather than in cmd/connector so that it cannot be lost
+// The check is applied here rather than in cmd/connector so that it cannot be lost
 // by a caller which builds the connector for itself, and NewDriver goes on
 // returning the driver rather than this wrapper because the test helpers of
 // materialize-sql take the concrete driver.
-func NewGatedDriver() boilerplate.Connector {
-	return gatedDriver{NewDriver()}
+func NewRuntimePrereqDriver() boilerplate.Connector {
+	return runtimePrereqDriver{NewDriver()}
 }
 
 // Validate warns while the operator is still making the change, which is the most
 // a publication can do about the runtime: see missingRuntimeV2Warning for what the
 // request does and does not carry. The warning is logged rather than returned
 // because it cannot be told apart from a publish which is correct.
-func (d gatedDriver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
+func (d runtimePrereqDriver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
 	if warning := missingRuntimeV2Warning(req.ConfigJson, req.LastMaterialization); warning != "" {
 		log.Warn(warning)
 	}
@@ -53,28 +53,28 @@ func (d gatedDriver) Validate(ctx context.Context, req *pm.Request_Validate) (*p
 	return d.Driver.Validate(ctx, req)
 }
 
-// Apply refuses ahead of the first session of a new specification, so a task
+// Apply rejects ahead of the first session of a new specification, so a task
 // whose runtime cannot support the configured write path fails before anything in
 // Snowflake is created or altered for it.
-func (d gatedDriver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
+func (d runtimePrereqDriver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
 	if err := requireStreamingV2Runtime(req.Materialization); err != nil {
 		return nil, err
 	} else if err := requireStreamingV2RuntimeForState(req.Materialization, req.StateJson); err != nil {
 		return nil, err
-	} else if err := refuseAbandonedStreamV2Bindings(req.Materialization, req.StateJson); err != nil {
+	} else if err := rejectOrphanedStreamV2Bindings(req.Materialization, req.StateJson); err != nil {
 		return nil, err
-	} else if err := adoptStreamV2Generations(ctx, req.Materialization); err != nil {
+	} else if err := adoptStreamV2StateKeys(ctx, req.Materialization); err != nil {
 		return nil, err
 	}
 
 	return d.Driver.Apply(ctx, req)
 }
 
-// NewTransactor refuses at startup, covering the task whose runtime flag is
+// NewTransactor rejects at startup, covering the task whose runtime flag is
 // turned off without its endpoint configuration being touched. Such a task must
 // fail rather than fall back to a write path whose recovery assumptions no
 // longer hold.
-func (d gatedDriver) NewTransactor(ctx context.Context, req pm.Request_Open, be *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
+func (d runtimePrereqDriver) NewTransactor(ctx context.Context, req pm.Request_Open, be *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
 	if err := requireStreamingV2Runtime(req.Materialization); err != nil {
 		return nil, nil, nil, err
 	} else if err := requireStreamingV2RuntimeForState(req.Materialization, req.StateJson); err != nil {
@@ -94,9 +94,9 @@ func (d gatedDriver) NewTransactor(ctx context.Context, req pm.Request_Open, be 
 // implies it. So the only shard template a publish can be read against is the
 // last one, which says what the task has been running rather than what it will
 // run — enough to recognise a task being moved onto this write path, and not
-// enough to refuse one. A publish which adds the runtime flag and the feature
+// enough to reject one. A publish which adds the runtime flag and the feature
 // flag together is indistinguishable here from one which forgets the runtime
-// flag, and refusing would break the first.
+// flag, and rejecting would break the first.
 func missingRuntimeV2Warning(configJson json.RawMessage, last *pf.MaterializationSpec) string {
 	var cfg config
 	if err := json.Unmarshal(configJson, &cfg); err != nil {
@@ -110,29 +110,29 @@ func missingRuntimeV2Warning(configJson json.RawMessage, last *pf.Materializatio
 	}
 
 	return fmt.Sprintf(
-		"this task's last published specification did not run the v2 materialization runtime, which the %q feature flag requires: unless this publication also adds %q to the task's shards.flags, the task will refuse to start",
+		"this task's last published specification did not run the v2 materialization runtime, which the %q feature flag requires: unless this publication also adds %q to the task's shards.flags, the task will be rejected at startup",
 		flagSnowpipeStreamingV2, boilerplate.RuntimeV2FlagName,
 	)
 }
 
-// refuseAbandonedStreamV2Bindings refuses a publication which moves a binding
+// rejectOrphanedStreamV2Bindings rejects a publication which moves a binding
 // off the snowpipe_streaming_v2 write path, other than by the one exit this
-// connector supports — see streamV2PathAbandoned for what an unsupported
+// connector supports — see streamV2PathOrphaned for what an unsupported
 // departure costs the binding, and streamV2Downgrade for the one it allows.
 //
-// The transactor refuses the same thing, and has to: the connector state a task
+// The transactor rejects the same thing, and has to: the connector state a task
 // runs on is its own, and a specification published before this check existed
-// may already have made the move. But a task which refuses is a task an operator
-// has to notice, while a publication which refuses is one they are already
+// may already have made the move. But a task which is rejected is a task an
+// operator has to notice, while a publication which is rejected is one they are already
 // watching. Apply is the earliest RPC that can tell: it is the first to carry
 // both the specification being published and the connector state the task has
 // accumulated, which Validate does not.
 //
 // A state document this connector cannot read reports nothing rather than
-// refusing. The runtime owns that document's shape, and a binding whose write
+// rejecting. The runtime owns that document's shape, and a binding whose write
 // path cannot be established from it is one the transactor will establish for
 // itself.
-func refuseAbandonedStreamV2Bindings(spec *pf.MaterializationSpec, stateJson json.RawMessage) error {
+func rejectOrphanedStreamV2Bindings(spec *pf.MaterializationSpec, stateJson json.RawMessage) error {
 	if spec == nil || len(stateJson) == 0 {
 		return nil
 	}
@@ -163,21 +163,21 @@ func refuseAbandonedStreamV2Bindings(spec *pf.MaterializationSpec, stateJson jso
 			}
 			continue
 		}
-		if err := streamV2PathAbandoned(table, item.StreamV2); err != nil {
+		if err := streamV2PathOrphaned(table, item.StreamV2); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// adoptStreamV2Generations records this task's generation in the comment of every
-// table that a streaming v2 binding appends to and that records no generation of
-// its own.
+// adoptStreamV2StateKeys records this task and each binding's state key in the
+// comment of every table that a streaming v2 binding appends to and that records
+// no state key of its own.
 //
 // Only CreateTable stamps that comment, and a publication which moves a binding
 // onto this write path creates no table: it adopts the table the binding has been
-// materializing into all along. streamV2CheckGenerationConflict reads a table with
-// no generation as one that says nothing about which generation may append, so the
+// materializing into all along. streamV2CheckStateKeyConflict reads a table with
+// no state key as one that says nothing about which state key may append, so the
 // backfill race that the comment guards runs unguarded on exactly those tables
 // which were carried onto this write path in place.
 //
@@ -185,10 +185,10 @@ func refuseAbandonedStreamV2Bindings(spec *pf.MaterializationSpec, stateJson jso
 // shard opens a channel, so the comment is in place ahead of the first append
 // rather than racing it. The write path itself issues no DDL.
 //
-// A comment which already records a generation is left exactly as it stands,
+// A comment which already records a state key is left exactly as it stands,
 // whether it names this task or another one. That comment is the account the guard
 // reads, and overwriting it would erase the very conflict the guard reports.
-func adoptStreamV2Generations(ctx context.Context, spec *pf.MaterializationSpec) error {
+func adoptStreamV2StateKeys(ctx context.Context, spec *pf.MaterializationSpec) error {
 	if spec == nil {
 		return nil
 	}
@@ -218,7 +218,7 @@ func adoptStreamV2Generations(ctx context.Context, spec *pf.MaterializationSpec)
 	}
 	db, err := stdsql.Open("snowflake", dsn)
 	if err != nil {
-		return fmt.Errorf("opening connection to record streaming v2 generations: %w", err)
+		return fmt.Errorf("opening connection to record streaming v2 state keys: %w", err)
 	}
 	defer db.Close()
 
@@ -226,7 +226,7 @@ func adoptStreamV2Generations(ctx context.Context, spec *pf.MaterializationSpec)
 
 	for _, binding := range streaming {
 		if n := len(binding.ResourcePath); n != 1 && n != 2 {
-			return fmt.Errorf("cannot record the streaming v2 generation of resource path %q: expected a table, or a schema and a table", strings.Join(binding.ResourcePath, "."))
+			return fmt.Errorf("cannot record the streaming v2 state key of resource path %q: expected a table, or a schema and a table", strings.Join(binding.ResourcePath, "."))
 		}
 
 		// Through the locator, which folds an identifier the way the DDL that created
@@ -256,11 +256,11 @@ func adoptStreamV2Generations(ctx context.Context, spec *pf.MaterializationSpec)
 		if comment != nil {
 			existing = *comment
 		}
-		if _, ok := streamV2GenerationFromTableComment(existing); ok {
+		if _, ok := streamV2StateKeyFromTableComment(existing); ok {
 			continue
 		}
 
-		var adopted = streamV2EmbedGenerationInTableComment(existing, streamV2Generation{
+		var adopted = streamV2EmbedStateKeyInTableComment(existing, streamV2RecordedStateKey{
 			materialization: spec.TaskName(),
 			stateKey:        binding.StateKey,
 		})
@@ -268,13 +268,13 @@ func adoptStreamV2Generations(ctx context.Context, spec *pf.MaterializationSpec)
 		if _, err := db.ExecContext(ctx, fmt.Sprintf(
 			"COMMENT ON TABLE %s IS %s;", identifier, dialect.Literal(adopted),
 		)); err != nil {
-			return fmt.Errorf("recording the generation of table %s: %w", identifier, err)
+			return fmt.Errorf("recording the state key of table %s: %w", identifier, err)
 		}
 
 		log.WithFields(log.Fields{
 			"table":    identifier,
 			"stateKey": binding.StateKey,
-		}).Info("recorded the streaming v2 generation of a table this task adopted")
+		}).Info("recorded the streaming v2 state key of a table this task adopted")
 	}
 
 	return nil
@@ -286,14 +286,14 @@ func adoptStreamV2Generations(ctx context.Context, spec *pf.MaterializationSpec)
 // correct if an interrupted transaction is replayed identically — a guarantee
 // the v2 runtime makes and the v1 runtime does not.
 func requireStreamingV2Runtime(spec *pf.MaterializationSpec) error {
-	// The gate reads the spec before anything else validates it, so an absent one
-	// is reported here rather than dereferenced.
+	// The runtime prerequisite check reads the spec before anything else validates
+	// it, so an absent one is reported here rather than dereferenced.
 	if spec == nil {
 		return fmt.Errorf("request carries no materialization spec")
 	}
 
 	// The full configuration is validated by the boilerplate, which reports a
-	// better error than this gate could. Only the feature flags are read here.
+	// better error than this check could. Only the feature flags are read here.
 	var cfg config
 	if err := json.Unmarshal(spec.ConfigJson, &cfg); err != nil {
 		return fmt.Errorf("parsing endpoint config: %w", err)
@@ -318,9 +318,9 @@ func requireStreamingV2Runtime(spec *pf.MaterializationSpec) error {
 	)
 }
 
-// requireStreamingV2RuntimeForState refuses a task that is not on the v2
+// requireStreamingV2RuntimeForState rejects a task that is not on the v2
 // materialization runtime while its checkpoint still names snowpipe streaming v2
-// channels for a binding the specification keeps. Retiring those channels replays
+// channels for a binding the specification keeps. Dropping those channels replays
 // the interrupted transaction, and only the v2 runtime replays it in order.
 func requireStreamingV2RuntimeForState(spec *pf.MaterializationSpec, stateJson json.RawMessage) error {
 	if spec == nil || len(stateJson) == 0 || boilerplate.IsMaterializationSpecRuntimeV2(spec) {
@@ -342,7 +342,7 @@ func requireStreamingV2RuntimeForState(spec *pf.MaterializationSpec, stateJson j
 			continue
 		}
 		return fmt.Errorf(
-			"the task's checkpoint still records the snowpipe_streaming_v2 channel(s) %s for %s, and this task is not running the v2 materialization runtime: retiring them requires that runtime, so add %q to the task's shards.flags, or restore %q to the endpoint configuration's feature_flags",
+			"the task's checkpoint still records the snowpipe_streaming_v2 channel(s) %s for %s, and this task is not running the v2 materialization runtime: dropping them requires that runtime, so add %q to the task's shards.flags, or restore %q to the endpoint configuration's feature_flags",
 			strings.Join(channels, ", "), strings.Join(binding.ResourcePath, "."), boilerplate.RuntimeV2FlagName, flagSnowpipeStreamingV2,
 		)
 	}

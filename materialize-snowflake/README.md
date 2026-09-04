@@ -66,7 +66,7 @@ Python SDK and communicate with a Python sidecar process via unix socket. The
 messages are NDJSON.
 
 The sidecar opens four Snowpipe channels for each Estuary binding+shard, one per
-equal subrange of the shard's key-hash range. The connector routes each document
+equal key range of the shard's key-hash range. The connector routes each document
 to a channel by the same packed-key hash the runtime routes documents to shards
 by, so a channel's contents depend only on the data, never on how many shards the
 task runs. Snowflake meters throughput per channel, so four channels also give
@@ -95,7 +95,7 @@ each shard four times the single-channel ceiling.
 
 The connector converts each document to a JSON row and holds it in a buffer. It
 appends the buffer to the channel at 10,000 rows or at 8 MiB, whichever limit it
-reaches first. One append per channel is in flight at a time. A slow channel
+reaches first. One append per channel is pending at a time. A slow channel
 therefore applies back pressure to the buffer instead of opening more requests.
 All channels together buffer 128 MiB at most.
 
@@ -104,8 +104,8 @@ append that it committed, and the connector reads that token back when it starts
 
 ```
    42@00000000-3fffffff
-   │  │        └─ key-end of the channel's subrange
-   │  └─ key-begin of the channel's subrange
+   │  │        └─ key-end of the channel's key range
+   │  └─ key-begin of the channel's key range
    └─ this append ends at document 42 of the channel
 ```
 
@@ -140,7 +140,7 @@ the rows of an interrupted transaction, so a topology change during a backfill
 neither wedges the task nor duplicates rows.
 
 An inherited layout still works, but at fewer or more than four channels. At the
-first transaction boundary where every channel is settled, the shard converges:
+first transaction boundary where every channel is committed, the shard converges:
 it first records the four channels of its own range in the checkpoint, and only
 after that record is durable does it drop the inherited channels and route to its
 own. Either half of that convergence can be interrupted and repeats safely.
@@ -162,17 +162,17 @@ own. Either half of that convergence can be interrupted and repeats safely.
   binding's channels, where C is what each channel had committed and K is what
   the checkpoint recorded for it. A later return to `snowpipe_streaming_v2`
   starts the binding on fresh channels. Any other departure is rejected, naming
-  the binding, and a task that was moved before that check existed refuses to
-  start instead; the remedy there is still a backfill, which starts the binding
+  the binding, and a task that was moved before that check existed is rejected
+  at startup instead; the remedy there is still a backfill, which starts the binding
   on the new path with an empty checkpoint.
 - A binding can move onto this write path at any time. Work that the previous
   path staged and did not finish is drained by the machinery that staged it, while
   the binding's rows go to this path. Only when that drain is impossible, because
-  the previous path cannot reopen its channel on the table, does the task refuse
-  to start, naming the table and the count outstanding. Restore the previous path
+  the previous path cannot reopen its channel on the table, is the task rejected
+  at startup, naming the table and the count outstanding. Restore the previous path
   for one transaction, or backfill the binding.
-- The path adopts a table that another path created. Apply records this generation
-  in the comment of a table that records none. The guard against a replaced
-  generation then works for that table too.
+- The path adopts a table that another path created. Apply records the task and
+  state key in the comment of a table that records none. The guard against a
+  replaced state key then works for that table too.
 - The sidecar is crash-only. The connector never restarts it. The runtime restarts
   the connector, and recovery replays through the offset token.

@@ -61,17 +61,17 @@ func TestAcknowledgeKeepsStreamV2Counter(t *testing.T) {
 	require.Equal(t, int64(42), d.cp["a_table.v1"].StreamV2["00000000-ffffffff"].Counter)
 }
 
-// TestAcknowledgeRetiresStreamV2Markers covers the drop half of the break-glass
-// downgrade: a marker-only key is drained only on the retirement's account, and
+// TestAcknowledgeDropsStreamV2Tombstones covers the drop half of the escape-hatch
+// downgrade: a tombstone-only key is drained only on the channel drop's account, and
 // only once this session has fenced the channels it names.
-func TestAcknowledgeRetiresStreamV2Markers(t *testing.T) {
+func TestAcknowledgeDropsStreamV2Tombstones(t *testing.T) {
 	var ctx = context.Background()
 	const stateKey, channel = "ack.v1", "task_00000000_ack_v1"
 
-	t.Run("a v2 binding's marker-only key is not drained", func(t *testing.T) {
+	t.Run("a v2 binding's tombstone-only key is not drained", func(t *testing.T) {
 		var d = &transactor{
 			cp: checkpoint{stateKey: {StreamV2: map[string]*streamV2Item{
-				"00000000-ffffffff": {Channel: channel, Counter: 42, KeyEnd: math.MaxUint32, Retiring: true},
+				"00000000-ffffffff": {Channel: channel, Counter: 42, KeyEnd: math.MaxUint32, Tombstone: true},
 			}}},
 			bindings:            []*binding{{target: sql.Table{StateKey: stateKey, TableShape: sql.TableShape{Path: []string{"TBL"}}}, streamingV2: true}},
 			be:                  m.NewBindingEvents(),
@@ -81,10 +81,10 @@ func TestAcknowledgeRetiresStreamV2Markers(t *testing.T) {
 		state, err := d.Acknowledge(ctx, nil, []string{stateKey})
 		require.NoError(t, err)
 		require.Nil(t, state)
-		require.True(t, d.cp[stateKey].StreamV2["00000000-ffffffff"].Retiring)
+		require.True(t, d.cp[stateKey].StreamV2["00000000-ffffffff"].Tombstone)
 	})
 
-	// The remaining subtests drive a real retirement against the fake sidecar.
+	// The remaining subtests drive a real channel drop against the fake sidecar.
 	singleChannelLayout(t)
 	var statePath = filepath.Join(t.TempDir(), "channels.json")
 	t.Setenv("FAKE_SIDECAR_STATE", statePath)
@@ -104,12 +104,12 @@ func TestAcknowledgeRetiresStreamV2Markers(t *testing.T) {
 			be:                  m.NewBindingEvents(),
 			snowpipeStreamingV2: sv2,
 		}
-		d.retirement = newStreamV2Retirement(sv2)
-		d.retirement.register(stateKey, "DB", "SCH", "TBL", items, fullRange)
+		d.channelDrop = newStreamV2ChannelDrop(sv2)
+		d.channelDrop.register(stateKey, "DB", "SCH", "TBL", items, fullRange)
 		return d
 	}
 
-	t.Run("retiring markers with no pending work are left alone before the fence", func(t *testing.T) {
+	t.Run("tombstones with no pending work are left alone before the fence", func(t *testing.T) {
 		var d = newAckTransactor(t)
 
 		state, err := d.Acknowledge(ctx, nil, []string{stateKey})
@@ -118,9 +118,9 @@ func TestAcknowledgeRetiresStreamV2Markers(t *testing.T) {
 		require.Equal(t, items, d.cp[stateKey].StreamV2)
 	})
 
-	t.Run("fenced markers are dropped and only this shard's keys are cleared", func(t *testing.T) {
+	t.Run("fenced tombstones are dropped and only this shard's keys are cleared", func(t *testing.T) {
 		var d = newAckTransactor(t)
-		require.NoError(t, d.retirement.fence(ctx))
+		require.NoError(t, d.channelDrop.fence(ctx))
 
 		state, err := d.Acknowledge(ctx, nil, []string{stateKey})
 		require.NoError(t, err)
@@ -135,7 +135,7 @@ func TestAcknowledgeRetiresStreamV2Markers(t *testing.T) {
 		}
 
 		require.NotContains(t, fakeCommittedTokens(t, statePath), channel)
-		require.True(t, d.retirement.done())
+		require.True(t, d.channelDrop.done())
 	})
 }
 

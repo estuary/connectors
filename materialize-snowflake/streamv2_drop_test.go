@@ -14,16 +14,16 @@ import (
 	"go.gazette.dev/core/consumer/protocol"
 )
 
-// retireTestTarget is the table this suite's binding materializes into.
-var retireTestTarget = sql.Table{
+// dropTestTarget is the table this suite's binding materializes into.
+var dropTestTarget = sql.Table{
 	TableShape: sql.TableShape{Binding: 0, DeltaUpdates: true, Path: []string{"DB", "SCH", "TBL"}},
 	Identifier: "TBL",
 	Keys:       []sql.Column{{Identifier: `KEY`}},
 	Values:     []sql.Column{{Identifier: `VAL`}},
-	StateKey:   "retire.v1",
+	StateKey:   "drop.v1",
 }
 
-func newRetireTestManager(t *testing.T, task string, rng *pf.RangeSpec) *streamV2Manager {
+func newDropTestManager(t *testing.T, task string, rng *pf.RangeSpec) *streamV2Manager {
 	t.Helper()
 	var m = newStreamV2Manager(context.Background(),
 		&config{Credentials: &snowflake_auth.CredentialConfig{}}, task, "acct", rng)
@@ -32,11 +32,11 @@ func newRetireTestManager(t *testing.T, task string, rng *pf.RangeSpec) *streamV
 	return m
 }
 
-// seedRetiringChannel writes a single channel three committed documents, then
+// seedChannelToDrop writes a single channel three committed documents, then
 // two more that reach Snowflake without a checkpoint recording them, leaving C
 // (5, in the fake sidecar's "Snowflake") ahead of K (3, the checkpoint items).
 // It pins the layout to one channel so tests can follow it by index.
-func seedRetiringChannel(t *testing.T) (statePath string, items map[string]*streamV2Item) {
+func seedChannelToDrop(t *testing.T) (statePath string, items map[string]*streamV2Item) {
 	t.Helper()
 	singleChannelLayout(t)
 
@@ -48,8 +48,8 @@ func seedRetiringChannel(t *testing.T) (statePath string, items map[string]*stre
 	streamV2BatchRows = 1
 
 	var ctx = context.Background()
-	var m = newRetireTestManager(t, "test/retire", &pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
-	m.addBinding("DB", "SCH", "TBL", retireTestTarget, nil)
+	var m = newDropTestManager(t, "test/drop", &pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
+	m.addBinding("DB", "SCH", "TBL", dropTestTarget, nil)
 
 	for i := range 3 {
 		require.NoError(t, testWriteRow(ctx, m, 0, []any{fmt.Sprintf("k%d", i), i}))
@@ -71,69 +71,69 @@ func seedRetiringChannel(t *testing.T) (statePath string, items map[string]*stre
 	return statePath, items
 }
 
-func TestStreamV2Retirement(t *testing.T) {
+func TestStreamV2ChannelDrop(t *testing.T) {
 	var ctx = context.Background()
 	var fullRange = &pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32}
 
-	t.Run("markers set Retiring on every owned item and leave counters alone", func(t *testing.T) {
-		var _, items = seedRetiringChannel(t)
+	t.Run("tombstones set Tombstone on every owned item and leave counters alone", func(t *testing.T) {
+		var _, items = seedChannelToDrop(t)
 
-		var r = newStreamV2Retirement(newRetireTestManager(t, "test/retire", fullRange))
-		r.register(retireTestTarget.StateKey, "DB", "SCH", "TBL", items, fullRange)
+		var r = newStreamV2ChannelDrop(newDropTestManager(t, "test/drop", fullRange))
+		r.register(dropTestTarget.StateKey, "DB", "SCH", "TBL", items, fullRange)
 
-		var marked = r.markers(retireTestTarget.StateKey)
+		var marked = r.tombstones(dropTestTarget.StateKey)
 		require.Len(t, marked, len(items))
 		for key, orig := range items {
-			require.True(t, marked[key].Retiring)
+			require.True(t, marked[key].Tombstone)
 			require.Equal(t, orig.Channel, marked[key].Channel)
 			require.Equal(t, orig.Counter, marked[key].Counter)
-			require.False(t, orig.Retiring)
+			require.False(t, orig.Tombstone)
 		}
 	})
 
-	t.Run("drop before fence is refused", func(t *testing.T) {
-		var _, items = seedRetiringChannel(t)
+	t.Run("drop before fence is rejected", func(t *testing.T) {
+		var _, items = seedChannelToDrop(t)
 
-		var r = newStreamV2Retirement(newRetireTestManager(t, "test/retire", fullRange))
-		r.register(retireTestTarget.StateKey, "DB", "SCH", "TBL", items, fullRange)
+		var r = newStreamV2ChannelDrop(newDropTestManager(t, "test/drop", fullRange))
+		r.register(dropTestTarget.StateKey, "DB", "SCH", "TBL", items, fullRange)
 
-		_, err := r.drop(ctx, retireTestTarget.StateKey)
+		_, err := r.drop(ctx, dropTestTarget.StateKey)
 		require.Error(t, err)
 	})
 
 	t.Run("crash after the drop, before the clear", func(t *testing.T) {
-		var statePath, items = seedRetiringChannel(t)
+		var statePath, items = seedChannelToDrop(t)
 		var channel = items[soleKey(t, items)].Channel
 
-		// Retirement A: fence and drop. Its markers, captured before the drop, are
+		// Channel drop A: fence and drop. Its tombstones, captured before the drop, are
 		// what a checkpoint durable ahead of a crash between the drop and the
 		// clear would still hold.
-		var mgrA = newRetireTestManager(t, "test/retire", fullRange)
-		var rA = newStreamV2Retirement(mgrA)
-		rA.register(retireTestTarget.StateKey, "DB", "SCH", "TBL", items, fullRange)
-		var markersA = rA.markers(retireTestTarget.StateKey)
+		var mgrA = newDropTestManager(t, "test/drop", fullRange)
+		var rA = newStreamV2ChannelDrop(mgrA)
+		rA.register(dropTestTarget.StateKey, "DB", "SCH", "TBL", items, fullRange)
+		var tombstonesA = rA.tombstones(dropTestTarget.StateKey)
 		require.NoError(t, rA.fence(ctx))
-		_, err := rA.drop(ctx, retireTestTarget.StateKey)
+		_, err := rA.drop(ctx, dropTestTarget.StateKey)
 		require.NoError(t, err)
 		require.NotContains(t, fakeCommittedTokens(t, statePath), channel)
 
-		// Retirement B, built from the checkpoint that outlived the drop: fence
+		// Channel drop B, built from the checkpoint that outlived the drop: fence
 		// reopens an empty channel, and the drop it repeats finds nothing new to
 		// discard.
-		var mgrB = newRetireTestManager(t, "test/retire", fullRange)
-		var rB = newStreamV2Retirement(mgrB)
-		rB.register(retireTestTarget.StateKey, "DB", "SCH", "TBL", markersA, fullRange)
+		var mgrB = newDropTestManager(t, "test/drop", fullRange)
+		var rB = newStreamV2ChannelDrop(mgrB)
+		rB.register(dropTestTarget.StateKey, "DB", "SCH", "TBL", tombstonesA, fullRange)
 		require.NoError(t, rB.fence(ctx))
-		_, err = rB.drop(ctx, retireTestTarget.StateKey)
+		_, err = rB.drop(ctx, dropTestTarget.StateKey)
 		require.NoError(t, err)
 		require.NotContains(t, fakeCommittedTokens(t, statePath), channel)
 
-		// A v2 manager returning to the path with the outlived markers as its
-		// prior: under the single-channel layout the marker's subrange is the
-		// target subrange, so ensureOpened's retiring pass leaves the live item
+		// A v2 manager returning to the path with the outlived tombstones as its
+		// prior: under the single-channel layout the tombstone's key range is the
+		// target key range, so ensureOpened's tombstone pass leaves the live item
 		// flush writes in its place, with no deletion of its own.
-		var v2 = newRetireTestManager(t, "test/retire", fullRange)
-		v2.addBinding("DB", "SCH", "TBL", retireTestTarget, markersA)
+		var v2 = newDropTestManager(t, "test/drop", fullRange)
+		v2.addBinding("DB", "SCH", "TBL", dropTestTarget, tombstonesA)
 		for i := 5; i < 7; i++ {
 			require.NoError(t, testWriteRow(ctx, v2, 0, []any{fmt.Sprintf("k%d", i), i}))
 		}
@@ -141,24 +141,24 @@ func TestStreamV2Retirement(t *testing.T) {
 		require.NoError(t, err)
 		var item = soleItem(t, entries, 0)
 		require.Equal(t, int64(2), item.Counter)
-		require.False(t, item.Retiring)
+		require.False(t, item.Tombstone)
 		require.Empty(t, deletionsOf(entries))
 		require.Zero(t, v2.bindings[0].channels[0].skip)
 	})
 
-	t.Run("a marker of another layout is deleted", func(t *testing.T) {
+	t.Run("a tombstone of another layout is deleted", func(t *testing.T) {
 		singleChannelLayout(t)
 		var statePath = filepath.Join(t.TempDir(), "channels.json")
 		t.Setenv("FAKE_SIDECAR_STATE", statePath)
 
-		// A marker whose subrange is not the target this shard converges to —
+		// A tombstone whose key range is not the target this shard converges to —
 		// built directly, standing for a layout that has since been superseded.
-		const otherChannel = "task_00000000_retire_v1_other_layout"
-		var marker = &streamV2Item{Channel: otherChannel, Counter: 3, KeyBegin: 0, KeyEnd: 0x7fffffff, Retiring: true}
-		var markers = map[string]*streamV2Item{streamV2Range{keyEnd: 0x7fffffff}.key(): marker}
+		const otherChannel = "task_00000000_drop_v1_other_layout"
+		var tombstone = &streamV2Item{Channel: otherChannel, Counter: 3, KeyBegin: 0, KeyEnd: 0x7fffffff, Tombstone: true}
+		var tombstones = map[string]*streamV2Item{streamV2Range{keyEnd: 0x7fffffff}.key(): tombstone}
 
-		var v2 = newRetireTestManager(t, "test/retire", fullRange)
-		v2.addBinding("DB", "SCH", "TBL", retireTestTarget, markers)
+		var v2 = newDropTestManager(t, "test/drop", fullRange)
+		v2.addBinding("DB", "SCH", "TBL", dropTestTarget, tombstones)
 		for i := 5; i < 7; i++ {
 			require.NoError(t, testWriteRow(ctx, v2, 0, []any{fmt.Sprintf("k%d", i), i}))
 		}
@@ -172,19 +172,19 @@ func TestStreamV2Retirement(t *testing.T) {
 	})
 
 	t.Run("crash after the clear", func(t *testing.T) {
-		var statePath, items = seedRetiringChannel(t)
+		var statePath, items = seedChannelToDrop(t)
 		var channel = items[soleKey(t, items)].Channel
 
-		var r = newStreamV2Retirement(newRetireTestManager(t, "test/retire", fullRange))
-		r.register(retireTestTarget.StateKey, "DB", "SCH", "TBL", items, fullRange)
+		var r = newStreamV2ChannelDrop(newDropTestManager(t, "test/drop", fullRange))
+		r.register(dropTestTarget.StateKey, "DB", "SCH", "TBL", items, fullRange)
 		require.NoError(t, r.fence(ctx))
-		_, err := r.drop(ctx, retireTestTarget.StateKey)
+		_, err := r.drop(ctx, dropTestTarget.StateKey)
 		require.NoError(t, err)
 		require.NotContains(t, fakeCommittedTokens(t, statePath), channel)
 
 		// The clear landed: a return to v2 finds nothing at all for the binding.
-		var v2 = newRetireTestManager(t, "test/retire", fullRange)
-		v2.addBinding("DB", "SCH", "TBL", retireTestTarget, nil)
+		var v2 = newDropTestManager(t, "test/drop", fullRange)
+		v2.addBinding("DB", "SCH", "TBL", dropTestTarget, nil)
 		for i := 5; i < 7; i++ {
 			require.NoError(t, testWriteRow(ctx, v2, 0, []any{fmt.Sprintf("k%d", i), i}))
 		}
@@ -195,39 +195,39 @@ func TestStreamV2Retirement(t *testing.T) {
 		require.Zero(t, v2.bindings[0].channels[0].skip)
 	})
 
-	t.Run("the v2 side retires a marker whose drop never happened", func(t *testing.T) {
-		var statePath, items = seedRetiringChannel(t)
+	t.Run("the v2 side drops a tombstone whose drop never happened", func(t *testing.T) {
+		var statePath, items = seedChannelToDrop(t)
 		var key = soleKey(t, items)
-		var marker = *items[key]
-		marker.Retiring = true
+		var tombstone = *items[key]
+		tombstone.Tombstone = true
 
-		var v2 = newRetireTestManager(t, "test/retire", fullRange)
-		v2.addBinding("DB", "SCH", "TBL", retireTestTarget, map[string]*streamV2Item{key: &marker})
+		var v2 = newDropTestManager(t, "test/drop", fullRange)
+		v2.addBinding("DB", "SCH", "TBL", dropTestTarget, map[string]*streamV2Item{key: &tombstone})
 		require.NoError(t, testWriteRow(ctx, v2, 0, []any{"k", 0}))
 
-		require.NotContains(t, fakeCommittedTokens(t, statePath), marker.Channel)
+		require.NotContains(t, fakeCommittedTokens(t, statePath), tombstone.Channel)
 	})
 
-	t.Run("the mark phase writes markers without blobs", func(t *testing.T) {
-		var _, items = seedRetiringChannel(t)
+	t.Run("the mark phase writes tombstones without blobs", func(t *testing.T) {
+		var _, items = seedChannelToDrop(t)
 
-		var v2 = newRetireTestManager(t, "test/retire", fullRange)
-		var r = newStreamV2Retirement(v2)
-		r.register(retireTestTarget.StateKey, "DB", "SCH", "TBL", items, fullRange)
-		var expected = r.markers(retireTestTarget.StateKey)
+		var v2 = newDropTestManager(t, "test/drop", fullRange)
+		var r = newStreamV2ChannelDrop(v2)
+		r.register(dropTestTarget.StateKey, "DB", "SCH", "TBL", items, fullRange)
+		var expected = r.tombstones(dropTestTarget.StateKey)
 
 		var d = &transactor{
 			cp:                  make(checkpoint),
-			bindings:            []*binding{{target: retireTestTarget, streaming: true}},
+			bindings:            []*binding{{target: dropTestTarget, streaming: true}},
 			snowpipeStreaming:   &streamManager{blobStats: map[int][]*blobStatsTracker{}},
 			snowpipeStreamingV2: v2,
-			retirement:          r,
+			channelDrop:         r,
 		}
 
 		_, err := d.buildDriverCheckpoint(ctx, &protocol.Checkpoint{})
 		require.NoError(t, err)
-		require.Nil(t, d.cp[retireTestTarget.StateKey].StreamBlobs)
-		require.Equal(t, expected, d.cp[retireTestTarget.StateKey].StreamV2)
+		require.Nil(t, d.cp[dropTestTarget.StateKey].StreamBlobs)
+		require.Equal(t, expected, d.cp[dropTestTarget.StateKey].StreamV2)
 	})
 }
 

@@ -83,7 +83,7 @@ func TestSidecarHappyPath(t *testing.T) {
 }
 
 // TestSidecarAppendFraming pins the wire shape of an append against the sidecar
-// reader which consumes it: a header line declaring the batch, then the row
+// reader which consumes it: a header line stating the batch's length, then the row
 // bytes verbatim, delimited by the length the header gave and nothing else. The
 // rows appear nowhere in the header, which is what keeps them off the sidecar's
 // JSON parsing path.
