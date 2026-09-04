@@ -23,15 +23,14 @@ logger = logging.getLogger("snowpipe_sidecar.channels")
 # tests/test_sdk_raw_rows.py is the guard on that route through the SDK.
 _ROWS_DECODER = msgspec.json.Decoder(List[Raw])
 
-# A row must be a JSON object: the decode validates each row's syntax, but the
-# SDK would forward anything else — a number, a string, an array — to Snowflake
-# unchecked, and Snowflake counts what it cannot store as a rejected row rather
-# than failing the append. Reading the first byte is enough to tell: a decoded
-# Raw begins at its value, the whitespace between array elements excluded.
+# A row must be a JSON object, but the SDK forwards everything to Snowflake
+# unchecked, and Snowflake counts an invalid row as a rejected row rather than
+# failing to append. We check that the first byte of each row is an opening
+# curly brace '{'.
 _OPEN_BRACE = 0x7B
 
 # RECEIVER_SATURATED is the SDK's flow-control signal: its internal buffer is
-# full and the caller should back off, not fail. The total wait stays under the
+# full and the caller should back off, not fail. The max_wait stays under the
 # Go client's append RPC timeout so a genuinely wedged channel still surfaces
 # as an error there.
 _SATURATION_MAX_WAIT_S = 90.0
