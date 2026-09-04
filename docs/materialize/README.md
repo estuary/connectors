@@ -748,11 +748,14 @@ fails the `insert`/`update` checks since it expects only inserts.
 
 ## Output
 
-Healthy rounds accumulate for five minutes and flush as one line with summed
-`expected` and `actual` buckets, `rounds`, `firstRound` and `lastRound`;
-unchecked rounds roll up the same way. A mismatch flushes the pending window
-first. The window also flushes on graceful shutdown. Rounds whose commit was
-never acknowledged in the session are not judged; recovery re-applies them.
+Lines are rate-limited to one per five minutes per verdict. A judged round is
+logged at once when nothing has been logged for that long, so a task that
+commits rarely, or a short preview run, reports each round promptly; a busier
+task's rounds accumulate and flush as one line with summed `expected` and
+`actual` buckets, `rounds`, `firstRound` and `lastRound`. Unchecked rounds
+roll up the same way. A mismatch flushes the pending window first. The window
+also flushes on graceful shutdown. Rounds whose commit was never acknowledged
+in the session are not judged; recovery re-applies them.
 Every line carries `verdict`, `fidelity`, `bindings`, `loadRequests`,
 `loaded`, `expected.{insert,update,delete,softDeleted,skipped}` and
 `actual.{inserted,updated,deleted,total}` (plus `staged`/`loaded` when
