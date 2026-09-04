@@ -48,7 +48,7 @@ class SidecarError(Exception):
 
 def _default_client_factory(props: Dict[str, Any], database: str, schema: str, table: str):
     # Imported here so that process environment (SS_LOG_TARGET et al) is
-    # settled before the SDK's native core initializes.
+    # in place before the SDK's native core initializes.
     from snowflake.ingest.streaming import StreamingIngestClient
 
     return StreamingIngestClient.from_table(
@@ -77,7 +77,7 @@ def _decode_rows(payload: bytes, row_count: int) -> List[Raw]:
     if len(rows) != row_count:
         raise SidecarError(
             "invalid_rows",
-            f"append declared {row_count} row(s) but its payload holds {len(rows)}",
+            f"append header states {row_count} row(s) but its payload holds {len(rows)}",
         )
     for i, row in enumerate(rows):
         if memoryview(row)[0] != _OPEN_BRACE:
@@ -187,7 +187,7 @@ class ChannelManager:
         """Close a channel, optionally dropping it in Snowflake.
 
         A plain close releases the local handle and flushes what it holds. Only
-        the drop reaches Snowflake, which is what retires the channel's
+        the drop reaches Snowflake, which is what discards the channel's
         committed offset token rather than leaving it for a later open of the
         same name to inherit."""
         ch = self._channel(channel)

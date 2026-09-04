@@ -23,7 +23,7 @@ import (
 
 // testJWTPrivateKey is a throwaway key pair in the PKCS#8 PEM form credentials
 // carry, generated once for the whole package because the v2 write path is
-// refused outright without JWT credentials, and those only validate against a
+// rejected outright without JWT credentials, and those only validate against a
 // key which really parses.
 var testJWTPrivateKey = sync.OnceValue(func() string {
 	var key, err = rsa.GenerateKey(rand.Reader, 2048)
@@ -132,25 +132,25 @@ func TestValidateStreamingFlags(t *testing.T) {
 
 			require.ErrorContains(t, err, "snowpipe_streaming")
 			require.ErrorContains(t, err, "snowpipe_streaming_v2")
-			// The conflicting-flags refusal must be distinguishable from the
-			// runtime-mismatch refusal, which is the only other reason this
-			// write path is refused.
+			// The conflicting-flags rejection must be distinguishable from the
+			// runtime-mismatch rejection, which is the only other reason this
+			// write path is rejected.
 			require.NotContains(t, err.Error(), boilerplate.RuntimeV2FlagName)
 		})
 	}
 }
 
 // TestValidateStreamingV2Auth covers the v2 write path's requirement of key-pair
-// credentials. Refusing the combination is what keeps the flag from being silently
+// credentials. Rejecting the combination is what keeps the flag from being silently
 // ignored: streamsV2 would decline the path for want of a key pair while the
-// runtime gate went on holding the task to the v2 runtime for having named the
-// flag, leaving it on the staged path the operator asked it to leave.
+// runtime prerequisite check went on holding the task to the v2 runtime for having
+// named the flag, leaving it on the staged path the operator asked it to leave.
 func TestValidateStreamingV2Auth(t *testing.T) {
 	t.Run("the v2 write path with key-pair credentials is allowed", func(t *testing.T) {
 		require.NoError(t, testStreamingConfigAuth(t, "snowpipe_streaming_v2", snowflake_auth.JWT).Validate())
 	})
 
-	t.Run("the v2 write path without key-pair credentials is refused", func(t *testing.T) {
+	t.Run("the v2 write path without key-pair credentials is rejected", func(t *testing.T) {
 		var err = testStreamingConfigAuth(t, "snowpipe_streaming_v2", snowflake_auth.UserPass).Validate()
 		require.ErrorContains(t, err, flagSnowpipeStreamingV2)
 		// The operator's remedies are the authentication method and the flag, so
@@ -164,11 +164,11 @@ func TestValidateStreamingV2Auth(t *testing.T) {
 		}
 	})
 
-	t.Run("the gate refuses the same configuration", func(t *testing.T) {
+	t.Run("the runtime prerequisite check rejects the same configuration", func(t *testing.T) {
 		configJson, err := json.Marshal(testStreamingConfigAuth(t, "snowpipe_streaming_v2", snowflake_auth.UserPass))
 		require.NoError(t, err)
 
-		// Reported ahead of the runtime mismatch, as the conflicting-flags refusal
+		// Reported ahead of the runtime mismatch, as the conflicting-flags rejection
 		// is: the operator is told about the configuration they wrote rather than
 		// the runtime it implies.
 		var spec = testStreamingSpec(t, "snowpipe_streaming_v2", false)
@@ -178,7 +178,7 @@ func TestValidateStreamingV2Auth(t *testing.T) {
 		require.NotContains(t, err.Error(), boilerplate.RuntimeV2FlagName)
 	})
 
-	t.Run("a configuration carrying no credentials at all is refused rather than panicking", func(t *testing.T) {
+	t.Run("a configuration carrying no credentials at all is rejected rather than panicking", func(t *testing.T) {
 		var spec = testStreamingSpec(t, "snowpipe_streaming_v2", true)
 		spec.ConfigJson = json.RawMessage(`{"host":"h.snowflakecomputing.com","advanced":{"feature_flags":"snowpipe_streaming_v2"}}`)
 		require.ErrorContains(t, requireStreamingV2Runtime(spec), "key-pair")
@@ -207,7 +207,7 @@ func TestRequireStreamingV2Runtime(t *testing.T) {
 		require.NoError(t, requireStreamingV2Runtime(testStreamingSpec(t, "snowpipe_streaming_v2", true)))
 	})
 
-	t.Run("v2 write path without the v2 runtime is refused", func(t *testing.T) {
+	t.Run("v2 write path without the v2 runtime is rejected", func(t *testing.T) {
 		var err = requireStreamingV2Runtime(testStreamingSpec(t, "snowpipe_streaming_v2", false))
 		require.ErrorContains(t, err, "snowpipe_streaming_v2")
 		// The operator's remedy is the shard flag, so the message must name it.
@@ -223,7 +223,7 @@ func TestRequireStreamingV2Runtime(t *testing.T) {
 		require.NoError(t, requireStreamingV2Runtime(testStreamingSpec(t, "", true)))
 	})
 
-	t.Run("a nil shard template is refused", func(t *testing.T) {
+	t.Run("a nil shard template is rejected", func(t *testing.T) {
 		var spec = testStreamingSpec(t, "snowpipe_streaming_v2", false)
 		spec.ShardTemplate = nil
 		require.ErrorContains(t, requireStreamingV2Runtime(spec), boilerplate.RuntimeV2FlagName)
@@ -286,7 +286,7 @@ func TestMissingRuntimeV2Warning(t *testing.T) {
 	})
 
 	t.Run("a task with nothing published before it is silent", func(t *testing.T) {
-		// A task being created has no last spec to read, and its startup refusal
+		// A task being created has no last spec to read, and its startup rejection
 		// is the clean one: nothing has run under the v2 runtime, so no recovery
 		// log guard fires ahead of the connector's own message.
 		require.Empty(t, missingRuntimeV2Warning(configJson(t, "snowpipe_streaming_v2"), nil))
@@ -299,19 +299,20 @@ func TestMissingRuntimeV2Warning(t *testing.T) {
 	})
 }
 
-// TestGatedDriverRefusals pins the RPCs the gate is wired into. Both refuse
-// before the wrapped driver runs, so neither reaches Snowflake.
-func TestGatedDriverRefusals(t *testing.T) {
+// TestRuntimePrereqDriverRejections pins the RPCs the runtime prerequisite check is
+// wired into. Both reject before the wrapped driver runs, so neither reaches
+// Snowflake.
+func TestRuntimePrereqDriverRejections(t *testing.T) {
 	var ctx = context.Background()
-	var driver = NewGatedDriver()
+	var driver = NewRuntimePrereqDriver()
 	var spec = testStreamingSpec(t, "snowpipe_streaming_v2", false)
 
-	t.Run("publishing is refused", func(t *testing.T) {
+	t.Run("publishing is rejected", func(t *testing.T) {
 		_, err := driver.Apply(ctx, &pm.Request_Apply{Materialization: spec})
 		require.ErrorContains(t, err, boilerplate.RuntimeV2FlagName)
 	})
 
-	t.Run("starting is refused", func(t *testing.T) {
+	t.Run("starting is rejected", func(t *testing.T) {
 		_, _, _, err := driver.NewTransactor(ctx, pm.Request_Open{Materialization: spec}, nil)
 		require.ErrorContains(t, err, boilerplate.RuntimeV2FlagName)
 	})
@@ -365,12 +366,12 @@ func TestRequireStreamingV2RuntimeForState(t *testing.T) {
 		require.NoError(t, requireStreamingV2RuntimeForState(specOf(t, true), stateWith(t, items)))
 	})
 
-	t.Run("nil items name nothing to retire", func(t *testing.T) {
+	t.Run("nil items name nothing to drop", func(t *testing.T) {
 		var items = map[string]*streamV2Item{"00000000-ffffffff": nil}
 		require.NoError(t, requireStreamingV2RuntimeForState(specOf(t, false), stateWith(t, items)))
 	})
 
-	t.Run("an item off the v2 runtime is refused", func(t *testing.T) {
+	t.Run("an item off the v2 runtime is rejected", func(t *testing.T) {
 		var items = map[string]*streamV2Item{"00000000-ffffffff": {Channel: channel, Counter: 3, KeyEnd: math.MaxUint32}}
 		var err = requireStreamingV2RuntimeForState(specOf(t, false), stateWith(t, items))
 		require.ErrorContains(t, err, boilerplate.RuntimeV2FlagName)

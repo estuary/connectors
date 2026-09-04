@@ -165,7 +165,7 @@ func TestStreamV2RowOmitsNilColumns(t *testing.T) {
 	})
 }
 
-func TestStreamV2RowRefusesUnrepresentableFloats(t *testing.T) {
+func TestStreamV2RowRejectsUnrepresentableFloats(t *testing.T) {
 	var columns = rowColumnsOf([]string{"A", "B"})
 
 	for _, tc := range []struct {
@@ -177,10 +177,10 @@ func TestStreamV2RowRefusesUnrepresentableFloats(t *testing.T) {
 		{"-Inf", math.Inf(-1)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			// The standard encoder refuses these, so such a row fails the
+			// The standard encoder rejects these, so such a row fails the
 			// transaction today. Writing the value out literally instead would put
 			// bare NaN into the payload — invalid JSON, which Snowflake's decode of
-			// the append refuses in full, failing every row batched alongside it.
+			// the append rejects in full, failing every row batched alongside it.
 			var prior = append([]byte(nil), `[{"A":1}`...)
 
 			var got, err = appendRowJSON(prior, columns, []any{"a", tc.value})
@@ -262,7 +262,7 @@ func TestStreamV2BatchPayload(t *testing.T) {
 		require.Equal(t, len(b.buf), total, "the reported growth must account for every buffered byte")
 	})
 
-	t.Run("a refused row leaves the rows before it buffered", func(t *testing.T) {
+	t.Run("a rejected row leaves the rows before it buffered", func(t *testing.T) {
 		var b = newChannel()
 
 		var _, err = b.bufferRow(1, columns, []any{"one", int64(1), nil})
@@ -275,7 +275,7 @@ func TestStreamV2BatchPayload(t *testing.T) {
 		require.Equal(t, `[{"KEY":"one","VAL":1}`, string(b.buf))
 	})
 
-	t.Run("a refused first row leaves no batch started", func(t *testing.T) {
+	t.Run("a rejected first row leaves no batch started", func(t *testing.T) {
 		var b = newChannel()
 
 		var _, err = b.bufferRow(1, columns, []any{"one", math.Inf(1), nil})

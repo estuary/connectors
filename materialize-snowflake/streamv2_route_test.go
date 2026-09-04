@@ -22,7 +22,7 @@ func TestStreamV2TargetLayout(t *testing.T) {
 			{keyBegin: 0x80000000, keyEnd: 0xbfffffff},
 			{keyBegin: 0xc0000000, keyEnd: 0xffffffff},
 		}, layout)
-		require.True(t, streamV2LayoutTiles(layout, full))
+		require.True(t, streamV2LayoutCovers(layout, full))
 	})
 
 	t.Run("half range", func(t *testing.T) {
@@ -34,7 +34,7 @@ func TestStreamV2TargetLayout(t *testing.T) {
 			{keyBegin: 0xc0000000, keyEnd: 0xdfffffff},
 			{keyBegin: 0xe0000000, keyEnd: 0xffffffff},
 		}, layout)
-		require.True(t, streamV2LayoutTiles(layout, streamV2Range{keyBegin: 0x80000000, keyEnd: math.MaxUint32}))
+		require.True(t, streamV2LayoutCovers(layout, streamV2Range{keyBegin: 0x80000000, keyEnd: math.MaxUint32}))
 	})
 
 	t.Run("eighth of the range", func(t *testing.T) {
@@ -48,19 +48,19 @@ func TestStreamV2TargetLayout(t *testing.T) {
 		}, layout)
 	})
 
-	t.Run("uneven width refuses", func(t *testing.T) {
+	t.Run("uneven width is rejected", func(t *testing.T) {
 		var _, err = streamV2TargetLayout(0, 5)
 		require.ErrorContains(t, err, "cannot be subdivided evenly")
 	})
 }
 
-func TestStreamV2LayoutTiles(t *testing.T) {
+func TestStreamV2LayoutCovers(t *testing.T) {
 	var shard = streamV2Range{keyBegin: 0x40000000, keyEnd: 0x7fffffff}
 
 	var cases = []struct {
 		name   string
 		layout []streamV2Range
-		tiles  bool
+		covers bool
 	}{
 		{"exact quarters", []streamV2Range{
 			{keyBegin: 0x40000000, keyEnd: 0x4fffffff},
@@ -71,11 +71,11 @@ func TestStreamV2LayoutTiles(t *testing.T) {
 		{"one range covering the shard", []streamV2Range{
 			{keyBegin: 0x40000000, keyEnd: 0x7fffffff},
 		}, true},
-		{"gap between subranges", []streamV2Range{
+		{"gap between key ranges", []streamV2Range{
 			{keyBegin: 0x40000000, keyEnd: 0x4ffffffe},
 			{keyBegin: 0x50000000, keyEnd: 0x7fffffff},
 		}, false},
-		{"overlapping subranges", []streamV2Range{
+		{"overlapping key ranges", []streamV2Range{
 			{keyBegin: 0x40000000, keyEnd: 0x50000000},
 			{keyBegin: 0x50000000, keyEnd: 0x7fffffff},
 		}, false},
@@ -89,21 +89,21 @@ func TestStreamV2LayoutTiles(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.tiles, streamV2LayoutTiles(tc.layout, shard))
+			require.Equal(t, tc.covers, streamV2LayoutCovers(tc.layout, shard))
 		})
 	}
 
-	t.Run("subrange ending at the top of the key space cannot wrap", func(t *testing.T) {
+	t.Run("key range ending at the top of the key space cannot wrap", func(t *testing.T) {
 		// If the continuation check ran in uint32, 0xffffffff+1 would wrap to
 		// zero and a layout circling past the top would read as contiguous.
-		require.False(t, streamV2LayoutTiles([]streamV2Range{
+		require.False(t, streamV2LayoutCovers([]streamV2Range{
 			{keyBegin: 0x80000000, keyEnd: 0xffffffff},
 			{keyBegin: 0x00000000, keyEnd: 0x7fffffff},
 		}, streamV2Range{keyBegin: 0x80000000, keyEnd: 0x7fffffff}))
 	})
 }
 
-func TestClassifySubrange(t *testing.T) {
+func TestClassifyKeyRange(t *testing.T) {
 	var shard = streamV2Range{keyBegin: 0x40000000, keyEnd: 0x7fffffff}
 	targets, err := streamV2TargetLayout(shard.keyBegin, shard.keyEnd)
 	require.NoError(t, err)
@@ -111,23 +111,23 @@ func TestClassifySubrange(t *testing.T) {
 	var cases = []struct {
 		name   string
 		item   streamV2Range
-		expect streamV2Subrange
+		expect streamV2KeyRangeClass
 	}{
-		{"first target", targets[0], streamV2SubrangeTarget},
-		{"last target", targets[3], streamV2SubrangeTarget},
-		{"half of the shard", streamV2Range{keyBegin: 0x40000000, keyEnd: 0x5fffffff}, streamV2SubrangeInherited},
-		{"eighth of the shard", streamV2Range{keyBegin: 0x40000000, keyEnd: 0x47ffffff}, streamV2SubrangeInherited},
-		{"the whole shard range", shard, streamV2SubrangeInherited},
-		{"below the shard", streamV2Range{keyBegin: 0x00000000, keyEnd: 0x3fffffff}, streamV2SubrangeSibling},
-		{"above the shard", streamV2Range{keyBegin: 0x80000000, keyEnd: 0xffffffff}, streamV2SubrangeSibling},
-		{"adjacent below", streamV2Range{keyBegin: 0x30000000, keyEnd: 0x3fffffff}, streamV2SubrangeSibling},
-		{"straddling the low boundary", streamV2Range{keyBegin: 0x30000000, keyEnd: 0x4fffffff}, streamV2SubrangeStraddling},
-		{"straddling the high boundary", streamV2Range{keyBegin: 0x70000000, keyEnd: 0x8fffffff}, streamV2SubrangeStraddling},
-		{"covering the whole key space", streamV2Range{keyBegin: 0x00000000, keyEnd: 0xffffffff}, streamV2SubrangeStraddling},
+		{"first target", targets[0], streamV2KeyRangeTarget},
+		{"last target", targets[3], streamV2KeyRangeTarget},
+		{"half of the shard", streamV2Range{keyBegin: 0x40000000, keyEnd: 0x5fffffff}, streamV2KeyRangeInherited},
+		{"eighth of the shard", streamV2Range{keyBegin: 0x40000000, keyEnd: 0x47ffffff}, streamV2KeyRangeInherited},
+		{"the whole shard range", shard, streamV2KeyRangeInherited},
+		{"below the shard", streamV2Range{keyBegin: 0x00000000, keyEnd: 0x3fffffff}, streamV2KeyRangeSibling},
+		{"above the shard", streamV2Range{keyBegin: 0x80000000, keyEnd: 0xffffffff}, streamV2KeyRangeSibling},
+		{"adjacent below", streamV2Range{keyBegin: 0x30000000, keyEnd: 0x3fffffff}, streamV2KeyRangeSibling},
+		{"straddling the low boundary", streamV2Range{keyBegin: 0x30000000, keyEnd: 0x4fffffff}, streamV2KeyRangeStraddling},
+		{"straddling the high boundary", streamV2Range{keyBegin: 0x70000000, keyEnd: 0x8fffffff}, streamV2KeyRangeStraddling},
+		{"covering the whole key space", streamV2Range{keyBegin: 0x00000000, keyEnd: 0xffffffff}, streamV2KeyRangeStraddling},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.expect, classifySubrange(tc.item, shard, targets))
+			require.Equal(t, tc.expect, classifyKeyRange(tc.item, shard, targets))
 		})
 	}
 }
@@ -141,11 +141,11 @@ func TestStreamV2RouteHash(t *testing.T) {
 		hash   uint32
 		expect int
 	}{
-		{"exact begin of the first subrange", 0x40000000, 0},
-		{"exact end of the first subrange", 0x4fffffff, 0},
-		{"exact begin of the second subrange", 0x50000000, 1},
-		{"interior of the last subrange", 0x7abcdef0, 3},
-		{"exact end of the last subrange", 0x7fffffff, 3},
+		{"exact begin of the first key range", 0x40000000, 0},
+		{"exact end of the first key range", 0x4fffffff, 0},
+		{"exact begin of the second key range", 0x50000000, 1},
+		{"interior of the last key range", 0x7abcdef0, 3},
+		{"exact end of the last key range", 0x7fffffff, 3},
 		{"just below the shard", 0x3fffffff, -1},
 		{"just above the shard", 0x80000000, -1},
 	}

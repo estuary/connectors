@@ -1,7 +1,7 @@
 """NDJSON RPC server over a single accepted connection.
 
 Every op is a single JSON line, except that an append's line is a header
-declaring the byte length of the row payload which follows it immediately. The
+stating the byte length of the row payload which follows it immediately. The
 reader hands that payload on as bytes without looking inside it, so no row is
 ever parsed on this thread — see channels._decode_rows for what becomes of it.
 
@@ -81,7 +81,7 @@ class Server:
                 if len(payload) != length:
                     logger.error(
                         "append payload truncated",
-                        extra={"declared": length, "read": len(payload)},
+                        extra={"stated": length, "read": len(payload)},
                     )
                     self._exit(3)
                     return

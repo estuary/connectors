@@ -6,5 +6,5 @@ import (
 )
 
 func main() {
-	boilerplate.RunMain(connector.NewGatedDriver())
+	boilerplate.RunMain(connector.NewRuntimePrereqDriver())
 }
