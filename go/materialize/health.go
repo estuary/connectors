@@ -12,11 +12,9 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// healthFlushInterval bounds how often "transaction health" lines are logged.
-// A judged round is logged at once when nothing has been logged for this long,
-// so a task that commits rarely, or a short-lived preview run, reports each
-// round promptly; a busier task's rounds accumulate and are rolled up into one
-// line per interval.
+// healthFlushInterval bounds how often healthy and unchecked rounds are logged:
+// a judged round is logged at once when nothing has been for this long, and
+// otherwise rolls up into the next line.
 var healthFlushInterval = 5 * time.Minute
 
 // Fidelity describes how much of a binding's commit result a connector was
@@ -258,12 +256,7 @@ func (w *healthWindow) addExpected(key string, e expectedCounts) {
 func (w *healthWindow) addActual(key string, a RowStats) {
 	w.bindings[key] = struct{}{}
 	w.fidelity = minFidelity(w.fidelity, a.Fidelity.orNone())
-	w.actual.Inserted += a.Inserted
-	w.actual.Updated += a.Updated
-	w.actual.Deleted += a.Deleted
-	w.actual.Total += a.Total
-	w.actual.Staged = addOptional(w.actual.Staged, a.Staged)
-	w.actual.Loaded = addOptional(w.actual.Loaded, a.Loaded)
+	w.actual = w.actual.add(a)
 }
 
 const (
@@ -296,6 +289,9 @@ type healthTracker struct {
 	okWindow, uncheckedWindow *healthWindow
 	// lastEmit is when a line was last logged, gating the rollup.
 	lastEmit time.Time
+	// maxAcked is the highest acknowledged round; a report for a round at or
+	// below it that is no longer open arrived after the round was judged.
+	maxAcked int
 
 	stopFlusher func(func())
 }
@@ -309,6 +305,7 @@ func newHealthTracker(open *pm.Request_Open) *healthTracker {
 		},
 		paths:           make(map[string][]string),
 		recovery:        true,
+		maxAcked:        -1,
 		rounds:          make(map[int]*healthRound),
 		recoveryWindow:  newHealthWindow(),
 		shardedWindow:   newHealthWindow(),
@@ -383,6 +380,7 @@ func recoverHealthPanic() {
 
 // observeStore classifies one Store request as the StoreIterator reads it.
 func (h *healthTracker) observeStore(round, binding int, exists, deleted, hardDelete bool) {
+	defer recoverHealthPanic()
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -449,7 +447,19 @@ func (h *healthTracker) report(round int, path []string, stats RowStats) {
 		return
 	}
 
-	r := h.openRound(round)
+	r, open := h.rounds[round]
+	if !open && round <= h.maxAcked {
+		// The round was already judged (and logged as pending); the late
+		// result is still worth logging, as unchecked.
+		w := newHealthWindow()
+		w.addRound(round)
+		w.addActual(key, stats)
+		h.mergeWindow(h.uncheckedWindow, w)
+		h.maybeFlushWindows()
+		return
+	} else if !open {
+		r = h.openRound(round)
+	}
 	if prior, ok := r.actual[key]; ok {
 		stats = prior.add(stats)
 	} else {
@@ -486,6 +496,7 @@ func (h *healthTracker) acknowledged(round int) {
 	if h.sharded {
 		return
 	}
+	h.maxAcked = max(h.maxAcked, round)
 	r := h.openRound(round)
 	r.acknowledged = true
 	if r.complete() {
@@ -603,12 +614,7 @@ func (h *healthTracker) mergeWindow(into, w *healthWindow) {
 	into.loadRequests += w.loadRequests
 	into.loaded += w.loaded
 	into.expected = into.expected.add(w.expected)
-	into.actual.Inserted += w.actual.Inserted
-	into.actual.Updated += w.actual.Updated
-	into.actual.Deleted += w.actual.Deleted
-	into.actual.Total += w.actual.Total
-	into.actual.Staged = addOptional(into.actual.Staged, w.actual.Staged)
-	into.actual.Loaded = addOptional(into.actual.Loaded, w.actual.Loaded)
+	into.actual = into.actual.add(w.actual)
 	into.pending += w.pending
 	into.fidelity = minFidelity(into.fidelity, w.fidelity)
 }
