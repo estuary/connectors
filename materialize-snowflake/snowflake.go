@@ -180,12 +180,10 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 			}
 
 			return &sql.Endpoint[config]{
-				Config:    cfg,
-				Dialect:   dialect,
-				SerPolicy: serPolicy,
-				NewClient: func(ctx context.Context, materializationName string, ep *sql.Endpoint[config]) (sql.Client, error) {
-					return newClient(ctx, materializationName, ep, featureFlags[flagSnowpipeStreamingV2])
-				},
+				Config:              cfg,
+				Dialect:             dialect,
+				SerPolicy:           serPolicy,
+				NewClient:           newClient,
 				CreateTableTemplate: templates.createTargetTable,
 				NewTransactor:       newTransactor,
 				ConcurrentApply:     true,
