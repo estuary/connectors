@@ -401,11 +401,7 @@ func (c *client) MustRecreateResource(req *pm.Request_Apply, lastBinding, newBin
 	// generation may not then do is reopen one, which reconcileStreamV2Channel
 	// refuses.
 
-	// Decide whether the generation being replaced could hold channels on the
-	// table: a delta-updates binding, on an endpoint configured for the
-	// streaming path.
-	var outgoingDeltaUpdates = lastBinding == nil || lastBinding.DeltaUpdates
-	if !outgoingDeltaUpdates {
+	if lastBinding != nil && !lastBinding.DeltaUpdates {
 		return false, nil
 	}
 
