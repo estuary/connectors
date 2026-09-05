@@ -1,0 +1,19 @@
+credentials:
+    credentials_title: API Key
+    access_token_sops: ENC[AES256_GCM,data:8y7c8Q3ILFBMMEUidjHpDI0c0JiDOwkkirVn8BawNt1/CdThuMVZSTRnGoo1vLl78C1vCN9ELcNvb42LwrbSvOJAh6dD,iv:Zg98W64Rwm+PY9INTh1hCxiszgTMj3rqoC7yAPeV/ag=,tag:O4uSma2a31Toqlw9kB9u6g==,type:str]
+start_date: "2024-01-01T00:00:00Z"
+sops:
+    age:
+        - recipient: age1awckyjye9wtgw6glczpjkqkpnqsak5vug0w9tpev45cpsaq2y3ks5j6qu6
+          enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBnbXFLRHBGUkluQUx1dlBz
+            U0t2bWp5Yk9YOFUzaUxXcmxHQ0t3VHZyMnh3CjcwY3dBRUxReThVWEVWbUNXNE5h
+            RUYvUU5GVXF6RHIydk5nWWJGdndwL00KLS0tIHp2bEtPRnd4N3lxUHlHUGZjbjl5
+            RzZLZ2lvdzc0UHdzRms0TGtoOS9XbjAKZFLY7IKS0I4ugrxcramhKW15NtY6EU9Z
+            ceu7QOHyfFm3k2YJ2fKFVH/Wh2YFhiEYfjDXLCZpGJSFEItKtavW5A==
+            -----END AGE ENCRYPTED FILE-----
+    lastmodified: "2026-09-04T22:07:18Z"
+    mac: ENC[AES256_GCM,data:cmHt6vumI1U+PrgIPaHLHQ73xnXzrZrxVBO0n7hm3+gY51IsFJlkRgh4jvuC/YLQ2McKRjR6g5rg21ljapZOHusc9x7rvr4ueLFRdjnLlQdTd/uJw12KFKZ+dKOY13SfKdyRAaQvBvXFwZ8TpE9kr7LyddB2UPGO4XfT/qWvr9k=,iv:aW2U37DhYSwt3aGcwkKfAzTU+yYa7msS7OOHizRuVO8=,tag:XIDD+wR8HJCHqqHiXvaMBg==,type:str]
+    encrypted_suffix: _sops
+    version: 3.12.2

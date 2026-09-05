@@ -1,0 +1,68 @@
+info:
+  name: updated_at filter probe
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/price-configurations?take=1&updated_at__gte=2030-01-01T00:00:00Z"
+  params:
+    - name: take
+      value: "1"
+      type: query
+    - name: updated_at__gte
+      value: "2030-01-01T00:00:00Z"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - far-future gte ignored, total unchanged (projection of meta + id)
+    request:
+      url: "{{base_url}}/v1/price-configurations?take=1&updated_at__gte=2030-01-01T00:00:00Z"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "meta": {
+              "total": "REDACTED",
+              "taken": 1,
+              "skipped": 0
+            },
+            "data": [
+              {
+                "id": "prc_YQJEdVRl8ntCOn",
+                "updated_at": "2026-08-17T10:27:04.211Z"
+              }
+            ]
+          }
+
+docs: |-
+  **REFERENCE:** [Pagination and filtering](https://docs.hyperline.co/api-reference/docs/pagination.md)
+
+  **WHY:** Hyperline documents a generic `fieldName__operator` filter convention
+  (incl. `gte`) but lists no date-filterable fields on this endpoint. If an
+  undocumented `updated_at__gte` were honored, incremental replication would
+  become possible on updated_at-bearing resources and the snapshot
+  classification would need revisiting.
+
+  **LIMITATION (VERIFIED 2026-09-04):** `updated_at__gte=2030-01-01T00:00:00Z`
+  (far-future bound) → 200 with meta.total 69, unchanged vs `Price
+  Configurations / bare` → the undocumented filter is SILENTLY IGNORED (not
+  rejected, not honored). Corollary: never rely on any query param the
+  endpoint's own doc page doesn't list — the API validates known params
+  (`_top-level / take limit probe` got a 400) but drops unknown ones without
+  error, which would produce silent full-table results where a narrowed set was
+  expected. Snapshot classification stands for the whole cluster.

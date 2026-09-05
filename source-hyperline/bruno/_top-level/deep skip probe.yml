@@ -1,0 +1,60 @@
+info:
+  name: deep skip probe
+  type: http
+  seq: 3
+
+http:
+  method: GET
+  url: "{{base_url}}/{{resource}}?take=1&skip=10001"
+  params:
+    - name: take
+      value: "1"
+      type: query
+    - name: skip
+      value: "10001"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - transactions skip 10001 accepted
+    request:
+      url: "{{base_url}}/v1/transactions?take=1&skip=10001"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "meta": {
+              "total": "REDACTED",
+              "taken": 0,
+              "skipped": 10001
+            },
+            "data": []
+          }
+
+docs: |-
+  **REFERENCE:** [API upgrades](https://docs.hyperline.co/api-reference/docs/upgrades)
+
+  **WHY:** since 2026-05-27 `skip + take > 10000` returns 400 on `/v1/customers`
+  and `/v1/invoices`. None of this cluster's endpoints are named there, but if
+  the cap ever applies to `/v1/transactions` (the one potentially-unbounded
+  resource, with no filters and no v2 cursor alternative), a full snapshot sweep
+  becomes impossible past 10k rows. Set `resource` in the environment.
+
+  **VERIFIED (2026-09-04):** `v1/transactions?take=1&skip=10001` → 200 with meta
+  `{total: 7, taken: 0, skipped: 10001}` and empty `data` — the deep-pagination
+  cap does NOT apply to `/v1/transactions` today. Caveat: the account holds only
+  7 transactions; the provider could extend the cap later (they did exactly that
+  to customers/invoices) — a growth risk noted in the plan.

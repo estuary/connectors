@@ -1,0 +1,265 @@
+[
+  [
+    "acmeCo/audit_logs",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "customer_id": "cus_P46Xssu9W5wZW9",
+      "happened_at": "2026-09-02T09:35:57.519000Z",
+      "invoice_id": null,
+      "quote_id": null,
+      "subscription_id": null,
+      "type": "customer.created"
+    }
+  ],
+  [
+    "acmeCo/products",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "accounting": {
+        "ive_EqrmiKPHAPVueR": {
+          "account_code": "40160",
+          "integrations": "REDACTED",
+          "product_code": null,
+          "tax_rate_id": null
+        }
+      },
+      "custom_properties": "REDACTED",
+      "description": null,
+      "description_display_interval_dates": false,
+      "id": "itm_5gEthpjqY9kEUL",
+      "integrations": "REDACTED",
+      "is_available_on_demand": true,
+      "is_available_on_subscription": true,
+      "name": "REDACTED",
+      "properties": "REDACTED",
+      "public_description": null,
+      "status": "active",
+      "translations": {
+        "de": {
+          "name": "REDACTED",
+          "public_description": null
+        },
+        "en": {
+          "name": "REDACTED",
+          "public_description": null
+        },
+        "es": {
+          "name": "REDACTED",
+          "public_description": null
+        },
+        "fr": {
+          "name": "REDACTED",
+          "public_description": null
+        },
+        "it": {
+          "name": "REDACTED",
+          "public_description": null
+        },
+        "nl": {
+          "name": "REDACTED",
+          "public_description": null
+        },
+        "pl": {
+          "name": "REDACTED",
+          "public_description": null
+        },
+        "pt": {
+          "name": "REDACTED",
+          "public_description": null
+        }
+      },
+      "type": "flat_fee"
+    }
+  ],
+  [
+    "acmeCo/price_configurations",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "archived_at": null,
+      "billing_interval": {
+        "count": 1,
+        "period": "years"
+      },
+      "commitment_interval": {
+        "period": "all"
+      },
+      "countries": null,
+      "country": null,
+      "currency": "USD",
+      "id": "prc_YQJEdVRl8ntCOn",
+      "integrations": "REDACTED",
+      "metering_filter": null,
+      "plan_id": null,
+      "price_book_id": null,
+      "prices": "REDACTED",
+      "product_id": "itm_xr1jfgWeasRQjY",
+      "status": "active",
+      "type": "volume",
+      "updated_at": "2026-08-17T10:27:04.211Z"
+    }
+  ],
+  [
+    "acmeCo/invoicing_entities",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "accounting_currency": "CAD",
+      "address_line1": "REDACTED",
+      "address_line2": "REDACTED",
+      "billing_email": "REDACTED",
+      "brand_color": null,
+      "city": "REDACTED",
+      "country": "CA",
+      "created_at": "2026-06-12T14:24:48.627Z",
+      "credit_note_number_pattern": "CM{number}",
+      "credit_note_wallet_refund_enabled": false,
+      "currency": "CAD",
+      "default_payment_delay": 30,
+      "deleted_at": null,
+      "document_footer": "REDACTED",
+      "document_number_pattern": "{number}",
+      "document_payment_initiation_delay": null,
+      "favicon_url": null,
+      "forced_customer_type": null,
+      "id": "ive_EqrmiKPHAPVueR",
+      "invoice_footer": "REDACTED",
+      "invoice_grace_period_duration": 3,
+      "invoice_late_fees": "REDACTED",
+      "invoice_number_pattern": "INV{number}",
+      "invoice_payment_initiation_delay": null,
+      "is_default": true,
+      "language": "en",
+      "logo_url": "REDACTED",
+      "name": "REDACTED",
+      "next_credit_note_number": 1,
+      "next_document_number": 1,
+      "next_invoice_number": 7,
+      "registration_number": "REDACTED",
+      "standalone_credit_note_creation_enabled": true,
+      "state": "REDACTED",
+      "tax_id": "REDACTED",
+      "tax_id_valid": null,
+      "timezone": "America/Toronto",
+      "trade_name": "REDACTED",
+      "updated_at": "2026-09-01T13:48:57.148Z",
+      "zip_code": "REDACTED"
+    }
+  ],
+  [
+    "acmeCo/users",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "email": "REDACTED",
+      "first_name": "REDACTED",
+      "id": "usr_R2zb4x7zgd9xdn",
+      "is_account_owner": false,
+      "last_name": "REDACTED",
+      "manager_id": null,
+      "picture_url": "REDACTED",
+      "role_id": "rol_ekql2sDuLW8cMl"
+    }
+  ],
+  [
+    "acmeCo/customer_segments",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "created_at": "2026-09-01T12:15:07.285Z",
+      "description": null,
+      "id": "seg_Y8IiZJQmPnNZBM",
+      "name": "REDACTED",
+      "rules": [
+        {
+          "conditions": [
+            {
+              "field": "country",
+              "operator": "in",
+              "value": [
+                "AT",
+                "BE",
+                "BG",
+                "HR",
+                "CY",
+                "CZ",
+                "DK",
+                "EE",
+                "FI",
+                "FR",
+                "DE",
+                "GR",
+                "HU",
+                "IE",
+                "IT",
+                "LV",
+                "LT",
+                "LU",
+                "MT",
+                "NL",
+                "PL",
+                "PT",
+                "RO",
+                "SK",
+                "SI",
+                "ES",
+                "SE"
+              ]
+            }
+          ],
+          "id": "segr_6GSUgYssyCsH97",
+          "operator": "and"
+        }
+      ],
+      "updated_at": "2026-09-01T12:15:07.285Z"
+    }
+  ],
+  [
+    "acmeCo/transactions",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "allocations": [
+        {
+          "amount": "REDACTED",
+          "invoice_id": "inv_xia3ppssL0FRya"
+        }
+      ],
+      "amount": "REDACTED",
+      "currency": "USD",
+      "customer_id": "cus_5D7TZMr1aKhy8d",
+      "id": "tra_PnTaznIzIamiUr",
+      "integrations": "REDACTED",
+      "last_refreshed_at": "REDACTED",
+      "payment_method_type": "external",
+      "process_at": "2025-10-01T10:59:00.000Z",
+      "provider_fee": null,
+      "provider_id": null,
+      "refunded_at": null,
+      "settled_at": null,
+      "status": "settled",
+      "type": "one_time"
+    }
+  ]
+]

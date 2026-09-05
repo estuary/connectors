@@ -1,0 +1,69 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/customers/credits?take=3"
+  params:
+    - name: take
+      value: "3"
+      type: query
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // Pin a document for `Customer Credits / since updated`.
+        const body = res.getBody();
+        if (body && Array.isArray(body.data) && body.data.length && body.data[0].updated_at) {
+          bru.setVar('credits_pin_updated_at', body.data[0].updated_at);
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://docs.hyperline.co/api-reference/endpoints/customers-%3E-credits/list-credit-products.md
+
+  **WHY:** Observe the v1 credits envelope and item shape — the OpenAPI item
+  schema has NO `id` field (keys are `customer_id` + `product_id`); confirm
+  live that the pair is present on every row and that no hidden `id` exists,
+  since the pair becomes the collection key. Pins `data[0].updated_at`
+  (runtime var `credits_pin_updated_at`) for `Customer Credits / since
+  updated`; run this first in a fresh session.
+  **VERIFIED (2026-09-04):** envelope `{meta, data}`; EMPTY — `meta.total=0`.
+  The credits feature appears unused by this account (no credit-enabled
+  products). Item shape/keys are **UNOBSERVABLE** without enabling the
+  feature in the Hyperline UI (no simple API seed exists — topups require a
+  credits-configured product). Proceeding on the spec item schema, whose key
+  fields (`customer_id`, `product_id`, `updated_at`, `created_at`) are
+  required there; fallback: revisit if a customer account has credits.
+
+examples:
+  - name: 200 - empty list (credits feature unused)
+    request:
+      url: "{{base_url}}/v1/customers/credits?take=3"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "meta": {
+              "total": "REDACTED",
+              "taken": 0,
+              "skipped": 0
+            },
+            "data": []
+          }
