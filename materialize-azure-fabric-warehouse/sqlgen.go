@@ -166,33 +166,37 @@ type migrateColumn struct {
 }
 
 type templates struct {
-	createTargetTable            *template.Template
-	alterTableColumns            *template.Template
-	createMigrationTable         *template.Template
-	createLoadTable              *template.Template
-	loadQuery                    *template.Template
-	loadQueryNoFlowDocument      *template.Template
-	dropLoadTable                *template.Template
-	storeMergeQuery              *template.Template
-	storeCopyIntoFromStagedQuery *template.Template
-	storeCopyIntoDirectQuery     *template.Template
-	updateFence                  *template.Template
+	createTargetTable        *template.Template
+	alterTableColumns        *template.Template
+	createMigrationTable     *template.Template
+	createLoadTable          *template.Template
+	loadQuery                *template.Template
+	loadQueryNoFlowDocument  *template.Template
+	dropLoadTable            *template.Template
+	createStoreTable         *template.Template
+	storeDeleteQuery         *template.Template
+	storeInsertQuery         *template.Template
+	dropStoreTable           *template.Template
+	storeCopyIntoDirectQuery *template.Template
+	updateFence              *template.Template
 }
 
 func renderTemplates(dialect sql.Dialect) *templates {
 	tplAll := sql.MustParseTemplate(dialect, "root", tplRoot)
 	return &templates{
-		createTargetTable:            tplAll.Lookup("createTargetTable"),
-		alterTableColumns:            tplAll.Lookup("alterTableColumns"),
-		createMigrationTable:         tplAll.Lookup("createMigrationTable"),
-		createLoadTable:              tplAll.Lookup("createLoadTable"),
-		loadQuery:                    tplAll.Lookup("loadQuery"),
-		loadQueryNoFlowDocument:      tplAll.Lookup("loadQueryNoFlowDocument"),
-		dropLoadTable:                tplAll.Lookup("dropLoadTable"),
-		storeMergeQuery:              tplAll.Lookup("storeMergeQuery"),
-		storeCopyIntoFromStagedQuery: tplAll.Lookup("storeCopyIntoFromStagedQuery"),
-		storeCopyIntoDirectQuery:     tplAll.Lookup("storeCopyIntoDirectQuery"),
-		updateFence:                  tplAll.Lookup("updateFence"),
+		createTargetTable:        tplAll.Lookup("createTargetTable"),
+		alterTableColumns:        tplAll.Lookup("alterTableColumns"),
+		createMigrationTable:     tplAll.Lookup("createMigrationTable"),
+		createLoadTable:          tplAll.Lookup("createLoadTable"),
+		loadQuery:                tplAll.Lookup("loadQuery"),
+		loadQueryNoFlowDocument:  tplAll.Lookup("loadQueryNoFlowDocument"),
+		dropLoadTable:            tplAll.Lookup("dropLoadTable"),
+		createStoreTable:         tplAll.Lookup("createStoreTable"),
+		storeDeleteQuery:         tplAll.Lookup("storeDeleteQuery"),
+		storeInsertQuery:         tplAll.Lookup("storeInsertQuery"),
+		dropStoreTable:           tplAll.Lookup("dropStoreTable"),
+		storeCopyIntoDirectQuery: tplAll.Lookup("storeCopyIntoDirectQuery"),
+		updateFence:              tplAll.Lookup("updateFence"),
 	}
 }
 
@@ -309,7 +313,7 @@ JOIN {{ $.Identifier}} AS r
 DROP TABLE {{ template "temp_name_load" $ }};
 {{- end }}
 
-{{ define "create_store_staging_table" -}}
+{{ define "createStoreTable" -}}
 CREATE TABLE {{ template "temp_name_store" $ }} (
 {{- range $ind, $col := $.Columns }}
 	{{- if $ind }},{{ end }}
@@ -332,11 +336,11 @@ WITH (
 -- Azure Fabric Warehouse doesn't yet support an actual "merge" query,
 -- so the best we can do is a delete followed by an insert. A true
 -- merge query may eventually be supported and we should switch to using
--- that when it is.
+-- that when it is. The staging table is also used when there is nothing
+-- to merge but binary columns must be converted from the staged CSV
+-- data, which is base64 encoded; the delete is skipped in that case.
 
-{{ define "storeMergeQuery" }}
-{{ template "create_store_staging_table" $ }}
-
+{{ define "storeDeleteQuery" }}
 DELETE r
 FROM {{$.Identifier}} AS r
 INNER JOIN {{ template "temp_name_store" $ }} AS l
@@ -345,29 +349,18 @@ INNER JOIN {{ template "temp_name_store" $ }} AS l
 	{{ template "maybe_unbase64_lhs" $bound }} = r.{{ $bound.Identifier }}
 	{{- if $bound.LiteralLower }} AND r.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND r.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
 {{- end }};
+{{ end }}
 
+{{ define "storeInsertQuery" }}
 INSERT INTO {{$.Identifier}} ({{- range $ind, $col := $.Columns }}{{- if $ind }}, {{ end }}{{$col.Identifier}}{{- end }})
 SELECT {{ range $ind, $col := $.Columns }}{{- if $ind }}, {{ end }}{{ template "maybe_unbase64" $col }}{{- end }}
 FROM {{ template "temp_name_store" $ }}
 WHERE _flow_delete = 0;
-
-DROP TABLE {{ template "temp_name_store" $ }};
 {{ end }}
 
-
--- storeCopyIntoFromStagedQuery is used when there is no data to
--- merge, but there are binary columns that must be converted from
--- the staged CSV data, which is base64 encoded.
-
-{{ define "storeCopyIntoFromStagedQuery" }}
-{{ template "create_store_staging_table" $ }}
-
-INSERT INTO {{$.Identifier}} ({{- range $ind, $col := $.Columns }}{{- if $ind }}, {{ end }}{{$col.Identifier}}{{ end }})
-SELECT {{ range $ind, $col := $.Columns }}{{- if $ind }}, {{ end }}{{ template "maybe_unbase64" $col }}{{- end }}
-FROM {{ template "temp_name_store" $ }};
-
+{{ define "dropStoreTable" }}
 DROP TABLE {{ template "temp_name_store" $ }};
-{{ end }}
+{{- end }}
 
 -- storeCopyIntoDirectQuery is used when there is no data to
 -- merge and none of the columns are binary. In this case the

@@ -662,6 +662,120 @@ these use cases, delta updates do the "right thing" by trivially replacing
 each document with its most recent version.
 This matches the behavior of Kafka Connect, for example.
 
+# Transaction health
+
+Every Go materialization built on `m.RunTransactions` logs an INFO-level
+`transaction health` line that reconciles what the runtime asked the connector
+to do against what the destination reports it did. It is always on, needs no
+configuration, and is observation only: no verdict ever fails, delays or blocks
+a transaction. Its purpose is to surface a regression in the commit path (a
+MERGE that appends instead of updating, a delete branch that stops firing, a
+COPY that loads nothing) within minutes of a release rather than days later
+from a row count.
+
+## Expected side
+
+The boilerplate's `StoreIterator` classifies every Store request per binding
+and per transaction round using the `Exists` and `Delete` flags the runtime
+sends and the hard-delete argument the connector passes to `it.Next(...)`:
+
+| Exists | Delete | Hard delete | Expected op                          |
+|--------|--------|-------------|--------------------------------------|
+| no     | no     | any         | `insert`                             |
+| yes    | no     | any         | `update`                             |
+| yes    | yes    | on          | `delete`                             |
+| yes    | yes    | off         | `update`, also counted `softDeleted` |
+| no     | yes    | on          | `skipped` (never handed to the connector) |
+| no     | yes    | off         | `insert`, also counted `softDeleted` |
+
+`softDeleted` and `skipped` are visibility buckets only; the comparison uses
+`insert`, `update` and `delete`. Delta-updates bindings never see `Exists` and
+so expect only inserts. The line also carries the round's `loadRequests` and
+`loaded` responses.
+
+## Actual side: the reporting contract
+
+A connector reports the destination's own result with
+`BindingEvents.ReportRowStats(round, resourcePath, stats)` from wherever that
+result is in hand: inside its `StartCommitFunc`, in a deferred `Acknowledge`
+that merges staged files, or from a later poll such as a Snowpipe insert
+report. The `round` is the `StoreIterator.Round` of the transaction whose
+stores produced the result, captured in `Store`; connectors that commit from
+persisted pending state carry it alongside that state. The call is
+goroutine-safe, repeated reports for one binding and round are summed, and it
+is active regardless of extended logging. A connector that never calls it
+remains valid.
+
+`RowStats` carries a fidelity:
+
+- `exact`: the destination gives inserted, updated and deleted counts
+  (`m.ExactRowStats(ins, upd, del)`; use `.WithTotal(n)` when it also reports
+  an independent total). Snowflake MERGE output, BigQuery DML statistics,
+  Databricks MERGE output, Elasticsearch bulk item results and MongoDB
+  bulk-write results are examples.
+- `total`: only the number of affected rows is known
+  (`m.TotalRowStats(n)`), summed across a binding's statements in the round.
+  Postgres, MySQL, SQL Server, Redshift, MotherDuck, Fabric, SQLite and
+  append-only sinks that count records written report at this level.
+- `none`: no usable result (a zero `RowStats`, or no report at all).
+
+Each driver owns the correctness of its number: it must count only rows of the
+target table, exclude checkpoint and staging-table statements, and configure
+its client to report matched rather than changed rows where those differ
+(MySQL's `clientFoundRows`). Optional `.WithStaged(n)` and `.WithLoaded(n)`
+carry rows written to and loaded from a staging area, for connectors that
+already have them.
+
+## Verdicts
+
+Rounds are judged per binding, once their commit is acknowledged, so that
+offsetting errors across bindings cannot cancel. At `exact` the triplet must
+match and the total must equal its sum; at `total` the total must equal
+`insert + update + delete`. Further checks: `loaded` responses never exceed
+`loadRequests`; a reported `staged` equals the documents stored; a reported
+`loaded` equals `staged`. A delta binding that merges rather than appends
+fails the `insert`/`update` checks since it expects only inserts.
+
+- `ok`: every check passed. A round that stored nothing has nothing to check
+  and is `ok` at fidelity `none`.
+- `mismatch`: at least one check failed. The round is logged on its own,
+  immediately, with a `mismatches` array of `{check, resourcePath, expected,
+  actual}` entries.
+- `unchecked`: nothing could be compared, because fidelity was `none`, a
+  binding that stored documents never reported before the window flushed
+  (`pending` counts them), the line is a recovery replay (`recovery: true`),
+  or the task runs on a multi-shard range (`sharded: true`), where each shard
+  logs its own expected counts and only the primary logs actuals.
+
+## Output
+
+Healthy and unchecked rounds are rate-limited to one line each per five
+minutes. A judged round is logged at once when nothing has been logged for
+that long, so a task that commits rarely, or a short preview run, reports each
+round promptly; a busier task's rounds accumulate and flush as one line with
+summed `expected` and `actual` buckets, `rounds`, `firstRound` and
+`lastRound`. A mismatch is never held back: it flushes the pending windows
+first and is then logged on its own. The windows also flush on graceful
+shutdown. Rounds whose commit was never acknowledged in the session are not
+judged; recovery re-applies them.
+Every line is marked `observable: true` and carries the `catalog_task_name`,
+so the data plane forwards it into the Grafana log stream operators alert on;
+it is also published to the tenant's ops logs like any connector log. Every
+line carries `verdict`, `fidelity`, `bindings`, `loadRequests`,
+`loaded`, `expected.{insert,update,delete,softDeleted,skipped}` and
+`actual.{inserted,updated,deleted,total}` (plus `staged`/`loaded` when
+reported).
+
+## Testing
+
+The integration harness (`RunMaterializationTest`) captures the preview run's
+task logs and requires every judged round to be `ok` at the fidelity the
+connector's test declares through `RuntimeConfig.Fidelity`, so a connector's
+existing suite proves its reporting against a live destination and a silent
+downgrade to `none` fails the suite. The recovery line from the drain session
+is tolerated. A connector that reports nothing declares `FidelityNone`, and
+its rounds must then be `unchecked`.
+
 # Consistency testing
 
 See the [materialize-consistency suite][materialize-consistency] in the [flow] repo.

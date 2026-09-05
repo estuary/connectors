@@ -32,7 +32,9 @@ func TestSQLGeneration(t *testing.T) {
 
 	for _, tbl := range tables {
 		for _, tpl := range []*template.Template{
-			testTemplates.storeCopyIntoFromStagedQuery,
+			testTemplates.createStoreTable,
+			testTemplates.storeInsertQuery,
+			testTemplates.dropStoreTable,
 			testTemplates.storeCopyIntoDirectQuery,
 		} {
 			var testcase = tbl.Identifier + " " + tpl.Name()
@@ -52,7 +54,7 @@ func TestSQLGeneration(t *testing.T) {
 		testTemplates.loadQuery,
 		testTemplates.loadQueryNoFlowDocument,
 		testTemplates.dropLoadTable,
-		testTemplates.storeMergeQuery,
+		testTemplates.storeDeleteQuery,
 	} {
 		tbl := tables[0] // these queries are never run for delta updates mode
 		var testcase = tbl.Identifier + " " + tpl.Name()

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/estuary/connectors/go/blob"
+	m "github.com/estuary/connectors/go/materialize"
 	testutil "github.com/estuary/connectors/materialize-boilerplate/testutil"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -40,7 +41,7 @@ func TestIntegration(t *testing.T) {
 
 	t.Run("materialize", func(t *testing.T) {
 		sql.RunMaterializationTest(t, NewDriver(), "testdata/materialize.flow.yaml", makeResourceFn, actionDescSanitizers,
-			sql.RuntimeConfig{Shards: 1})
+			sql.RuntimeConfig{Shards: 1, Fidelity: m.FidelityExact})
 	})
 
 	t.Run("apply", func(t *testing.T) {
@@ -104,4 +105,3 @@ func TestIntegration(t *testing.T) {
 		}, actionDescSanitizers)
 	})
 }
-
