@@ -22,6 +22,8 @@ import (
 
 // healthLine is a decoded "transaction health" log line.
 type healthLine struct {
+	Observable   bool   `json:"observable"`
+	TaskName     string `json:"catalog_task_name"`
 	Verdict      string
 	Fidelity     string
 	Rounds       int
@@ -55,6 +57,8 @@ func decodeHealthLines(t *testing.T, hook *logtest.Hook) []healthLine {
 		require.NoError(t, err)
 		var line healthLine
 		require.NoError(t, json.Unmarshal(raw, &line))
+		require.True(t, line.Observable, "health lines must be operator-observable")
+		require.Equal(t, "test/materialization", line.TaskName)
 		out = append(out, line)
 	}
 	return out
@@ -147,6 +151,7 @@ func openRequest(bindings []testBinding, rng *pf.RangeSpec) *pm.Request_Open {
 	if err := spec.Unmarshal(raw); err != nil {
 		panic(err)
 	}
+	spec.Name = pf.Materialization("test/materialization")
 	template := *spec.Bindings[0]
 	spec.Bindings = nil
 	for _, b := range bindings {

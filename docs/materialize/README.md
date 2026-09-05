@@ -758,7 +758,10 @@ summed `expected` and `actual` buckets, `rounds`, `firstRound` and
 first and is then logged on its own. The windows also flush on graceful
 shutdown. Rounds whose commit was never acknowledged in the session are not
 judged; recovery re-applies them.
-Every line carries `verdict`, `fidelity`, `bindings`, `loadRequests`,
+Every line is marked `observable: true` and carries the `catalog_task_name`,
+so the data plane forwards it into the Grafana log stream operators alert on;
+it is also published to the tenant's ops logs like any connector log. Every
+line carries `verdict`, `fidelity`, `bindings`, `loadRequests`,
 `loaded`, `expected.{insert,update,delete,softDeleted,skipped}` and
 `actual.{inserted,updated,deleted,total}` (plus `staged`/`loaded` when
 reported).

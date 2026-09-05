@@ -275,10 +275,11 @@ const (
 // logs the result. It is observation only: nothing here can fail a
 // transaction.
 type healthTracker struct {
-	log     func(log.Fields, string)
-	keys    []string            // Binding index => binding key.
-	paths   map[string][]string // Binding key => resource path.
-	sharded bool
+	log      func(log.Fields, string)
+	taskName string
+	keys     []string            // Binding index => binding key.
+	paths    map[string][]string // Binding key => resource path.
+	sharded  bool
 
 	mu       sync.Mutex
 	closed   bool
@@ -318,6 +319,7 @@ func newHealthTracker(open *pm.Request_Open) *healthTracker {
 		uncheckedWindow: newHealthWindow(),
 	}
 	if open.Materialization != nil {
+		h.taskName = open.Materialization.Name.String()
 		for _, b := range open.Materialization.Bindings {
 			key := bindingKey(b.ResourcePath)
 			h.keys = append(h.keys, key)
@@ -675,14 +677,19 @@ func (h *healthTracker) emit(w *healthWindow, verdict string, extra log.Fields) 
 	}
 
 	fields := log.Fields{
-		"verdict":      verdict,
-		"fidelity":     w.fidelity.orNone(),
-		"rounds":       w.rounds,
-		"firstRound":   w.firstRound,
-		"lastRound":    w.lastRound,
-		"bindings":     len(w.bindings),
-		"loadRequests": w.loadRequests,
-		"loaded":       w.loaded,
+		// observable promotes the line into the data-plane's Grafana stream,
+		// where operators alert on commit-path regressions; see the ops
+		// protocol README. The line is low-volume and high-signal by design.
+		"observable":        true,
+		"catalog_task_name": h.taskName,
+		"verdict":           verdict,
+		"fidelity":          w.fidelity.orNone(),
+		"rounds":            w.rounds,
+		"firstRound":        w.firstRound,
+		"lastRound":         w.lastRound,
+		"bindings":          len(w.bindings),
+		"loadRequests":      w.loadRequests,
+		"loaded":            w.loaded,
 		"expected": log.Fields{
 			"insert":      w.expected.insert,
 			"update":      w.expected.update,
