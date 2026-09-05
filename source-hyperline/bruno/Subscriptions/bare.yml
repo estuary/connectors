@@ -1,0 +1,145 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/v2/subscriptions?take=3"
+  params:
+    - name: take
+      value: "3"
+      type: query
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // Pin a document for the boundary/membership probes.
+        const body = res.getBody();
+        if (body && Array.isArray(body.data) && body.data.length) {
+          bru.setVar('subscriptions_pin_id', body.data[0].id);
+          bru.setVar('subscriptions_pin_updated_at', body.data[0].updated_at);
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://docs.hyperline.co/api-reference/endpoints/subscriptions/list-subscriptions.md
+
+  **WHY:** Prove that v2 subscriptions uses the take/skip engine and the
+  `{meta:{total,taken,skipped}, data}` envelope (NOT the v2 cursor envelope —
+  the two v2 shapes coexist and this is the ground truth for which one this
+  endpoint speaks). Also eyeball the default status partition (cancelled/
+  paused/errored present?) and pin `data[0]`'s id and `updated_at` (runtime
+  vars `subscriptions_pin_id` / `subscriptions_pin_updated_at`) for
+  `Subscriptions / since updated membership` and `Subscriptions / skip compose`;
+  run this first in a fresh session.
+  **VERIFIED (2026-09-04):** take/skip engine confirmed on this v2 path —
+  envelope `{meta:{total,taken,skipped}, data}`, total=6. All rows seen are
+  `status: active`; no cancelled/paused rows exist in the account, so the
+  default-partition question is **UNOBSERVABLE** here (spec shows no `status`
+  param default; nothing to hide behind).
+
+examples:
+  - name: 200 - meta envelope (take/skip engine), 1 of 6 items kept
+    request:
+      url: "{{base_url}}/v2/subscriptions?take=3"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "meta": {
+              "total": "REDACTED",
+              "taken": 3,
+              "skipped": 0
+            },
+            "data": [
+              {
+                "id": "sub_cTPmfEKQo0q34b",
+                "name": null,
+                "currency": "USD",
+                "status": "active",
+                "purchase_order": null,
+                "customer_id": "cus_DLbkNq9AUjjk5u",
+                "invoicing_entity_id": "ive_EqrmiKPHAPVueR",
+                "plan_id": null,
+                "template_id": null,
+                "checkout_session_id": null,
+                "crm_opportunity_id": null,
+                "minimum_invoice_fee": null,
+                "commitment_interval": null,
+                "renew_automatically": false,
+                "renew_for": null,
+                "activation_strategy": "start_date",
+                "starts_at": "2026-09-01T16:21:35.859Z",
+                "contract_start": null,
+                "contract_end": null,
+                "initial_billing_at": "2026-09-01T16:21:35.859Z",
+                "paused_at": null,
+                "reactivate_at": null,
+                "cancel_at": "2027-09-01T16:21:35.858Z",
+                "cancellation_strategy": null,
+                "cancellation_amount": null,
+                "cancellation_reason": null,
+                "cancellation_source": null,
+                "estimated_arr": 21540,
+                "contract_value": 21540,
+                "current_period_started_at": "2026-09-01T16:21:35.859Z",
+                "current_period_ends_at": "2027-09-01T16:21:35.858Z",
+                "next_payment_at": null,
+                "next_payment_amount": null,
+                "renews_at": null,
+                "current_phase_id": "sup_m1RNMuSwWMPQG4",
+                "display_shipping_details": false,
+                "properties": "REDACTED",
+                "custom_properties": "REDACTED",
+                "invoice_schedule": null,
+                "generate_document": false,
+                "document_name": null,
+                "add_tax_to_document": false,
+                "generate_draft_invoices": true,
+                "do_not_charge_subscription": false,
+                "invoice_custom_note": null,
+                "created_at": "2026-09-01T16:21:32.458Z",
+                "updated_at": "2026-09-01T16:21:35.903Z",
+                "products": [
+                  {
+                    "id": "itm_SjbvrMcfwfC4i3",
+                    "catalog_version_id": null,
+                    "name": "REDACTED",
+                    "description": null,
+                    "description_display_interval_dates": false,
+                    "attached_at": null,
+                    "detached_at": null,
+                    "current_period_started_at": "2026-09-01T16:21:35.859Z",
+                    "current_period_ends_at": "2027-09-01T16:21:35.858Z",
+                    "next_payment_at": "2027-09-01T16:21:35.859Z",
+                    "payment_interval": {
+                      "period": "years",
+                      "count": 1
+                    },
+                    "payment_schedule": "start",
+                    "type": "seat",
+                    "unit_name": "seat",
+                    "count": 1,
+                    "prices": "REDACTED"
+                  }
+                ],
+                "coupons": [],
+                "integrations": "REDACTED"
+              }
+            ]
+          }

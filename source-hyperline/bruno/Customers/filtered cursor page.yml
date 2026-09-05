@@ -1,0 +1,90 @@
+info:
+  name: filtered cursor page
+  type: http
+  seq: 4
+
+http:
+  method: GET
+  url: "{{base_url}}/v2/customers?limit=1&include_total=true&sort=updated_at&order=asc&updated_at__gte={{customers_pin_updated_at}}&cursor={{customers_filtered_cursor}}"
+  params:
+    - name: limit
+      value: "1"
+      type: query
+    - name: include_total
+      value: "true"
+      type: query
+    - name: sort
+      value: updated_at
+      type: query
+    - name: order
+      value: asc
+      type: query
+    - name: updated_at__gte
+      value: "{{customers_pin_updated_at}}"
+      type: query
+    - name: cursor
+      value: "{{customers_filtered_cursor}}"
+      type: query
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // Requires `Customers / since updated asc` to have run first in this
+        // session (it captures customers_filtered_cursor). No pinned fallback —
+        // the cursor is opaque and account-time-specific, so fail loudly instead.
+        if (!bru.getVar('customers_filtered_cursor')) {
+          throw new Error("run 'Customers / since updated asc' first: customers_filtered_cursor unset");
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://docs.hyperline.co/api-reference/endpoints/customers/list-customers-1.md
+
+  **WHY:** Prove cursor pagination and `updated_at` filters COMPOSE — the docs
+  are silent on whether `cursor` carries the original query's filters or the
+  caller must re-send them. The connector re-sends filters+sort on every page,
+  so this request does exactly that plus `cursor`. Expect: the asc walk
+  continues (item 2 of the filtered set, `updated_at` >= page 1's) rather than
+  restarting or erroring. Run `Customers / since updated asc` first.
+  **VERIFIED (2026-09-04):** compose works. With
+  `updated_at__gte=2026-08-01T00:00:00Z&sort=updated_at&order=asc&limit=1`,
+  page 1 returned `cus_ZADImYAM8MvHMz` (12:40:43.642Z); re-sending the same
+  filters plus its `next_cursor` returned `cus_U4QFShjwEDuSIM` (12:43:15.819Z)
+  — the asc walk continues, no restart, no error. The cursor decodes to
+  `{"i":"cus_ZADImYAM8MvHMz","s":"updated_at","o":"asc"}` — it carries the
+  keyset + sort context of the filtered query.
+
+examples:
+  - name: 200 - cursor+filter compose, asc walk continues (projection, 2-run)
+    request:
+      url: "{{base_url}}/v2/customers?limit=1&include_total=true&sort=updated_at&order=asc&updated_at__gte=2026-08-01T00:00:00Z&cursor=<page1 next_cursor>"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "page1_first_item": {
+              "id": "cus_ZADImYAM8MvHMz",
+              "updated_at": "2026-08-17T12:40:43.642Z"
+            },
+            "page1_next_cursor": "eyJpIjoiY3VzX1pBREltWUFNOE12SE16IiwicyI6InVwZGF0ZWRfYXQiLCJvIjoiYXNjIn0",
+            "page2_first_item": {
+              "id": "cus_U4QFShjwEDuSIM",
+              "updated_at": "2026-08-17T12:43:15.819Z"
+            },
+            "page2_next_cursor": "eyJpIjoiY3VzX1U0UUZTaGp3RUR1U0lNIiwicyI6InVwZGF0ZWRfYXQiLCJvIjoiYXNjIn0",
+            "note": "projection of two consecutive runs; boundary updated_at__gte=2026-08-01T00:00:00Z"
+          }

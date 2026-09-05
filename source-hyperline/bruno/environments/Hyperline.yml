@@ -1,0 +1,21 @@
+variables:
+  - name: base_url
+    value: https://api.hyperline.co
+  - name: config_path
+    value: ../config.yaml
+  # Version-qualified resource path for the `_top-level` cross-resource probes
+  # (e.g. v1/products, v1/transactions, v2/wallets).
+  - name: resource
+    value: v1/transactions
+  # Fallbacks for out-of-order runs; each folder's `bare` re-pins them at run
+  # time via runtime vars (runtime overrides env). Values observed 2026-09-04.
+  - name: customers_pin_updated_at
+    value: "2026-09-02T09:35:57.522Z"
+  - name: invoices_pin_updated_at
+    value: "2026-09-01T16:21:52.397Z"
+  - name: subscriptions_pin_updated_at
+    value: "2026-09-01T16:21:35.903Z"
+  - name: seed_customer_id
+    value: cus_P46Xssu9W5wZW9
+  - name: audit_customer_id
+    value: cus_DLbkNq9AUjjk5u

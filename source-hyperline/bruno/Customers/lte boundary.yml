@@ -1,0 +1,73 @@
+info:
+  name: lte boundary
+  type: http
+  seq: 6
+
+http:
+  method: GET
+  url: "{{base_url}}/v2/customers?limit=1&include_total=true&sort=updated_at&order=desc&updated_at__gte={{customers_pin_updated_at}}&updated_at__lte={{customers_pin_updated_at}}"
+  params:
+    - name: limit
+      value: "1"
+      type: query
+    - name: include_total
+      value: "true"
+      type: query
+    - name: sort
+      value: updated_at
+      type: query
+    - name: order
+      value: desc
+      type: query
+    - name: updated_at__gte
+      value: "{{customers_pin_updated_at}}"
+      type: query
+    - name: updated_at__lte
+      value: "{{customers_pin_updated_at}}"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://docs.hyperline.co/api-reference/endpoints/customers/list-customers-1.md
+
+  **WHY:** Pin the UPPER window bound's inclusivity — the incremental
+  window's horizon side (`FETCH-SERVER-SIDE-BOUNDARIES`). Both bounds sit on
+  the pinned doc's exact `updated_at`: if `__lte` is inclusive the degenerate
+  one-tick window `[ts, ts]` returns exactly the pinned doc (total=1); if
+  exclusive it returns 0. Pair of `Customers / lt boundary`. Run
+  `Customers / bare` first (or rely on the env fallback pin).
+  **VERIFIED (2026-09-04):** `__lte` is INCLUSIVE — the degenerate window
+  `updated_at__gte = updated_at__lte = <pinned ts>` returned exactly the
+  pinned doc (total=1).
+
+examples:
+  - name: 200 - lte inclusive, degenerate one-tick window returns the pinned doc (projection)
+    request:
+      url: "{{base_url}}/v2/customers?limit=1&include_total=true&sort=updated_at&order=desc&updated_at__gte=2026-09-02T09:35:57.522Z&updated_at__lte=2026-09-02T09:35:57.522Z"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": [
+              {
+                "id": "cus_P46Xssu9W5wZW9",
+                "updated_at": "2026-09-02T09:35:57.522Z"
+              }
+            ],
+            "next_cursor": null,
+            "has_more": false,
+            "total": "REDACTED"
+          }

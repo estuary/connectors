@@ -1,0 +1,21 @@
+[tool.poetry]
+version = "0.1.0"
+name = "source-hyperline"
+description = ""
+authors = [ "Omar Mayar <omar.mayar@biorender.com>"]
+
+[tool.poetry.dependencies]
+estuary-cdk = {path="../estuary-cdk", develop = true}
+python = "^3.12"
+pydantic = "^2"
+xxhash = "^3.6.0"
+
+[tool.poetry.group.dev.dependencies]
+debugpy = "^1.8.0"
+mypy = "^1.8.0"
+pytest = "^7.4.3"
+pytest-insta = "^0.3.0"
+
+[build-system]
+requires = [ "poetry-core>=1.0.0",]
+build-backend = "poetry.core.masonry.api"
