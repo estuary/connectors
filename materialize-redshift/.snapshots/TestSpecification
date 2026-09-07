@@ -31,7 +31,7 @@
       "schema": {
         "type": "string",
         "title": "Database Schema",
-        "description": "Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables.",
+        "description": "Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as the flow_checkpoints_v1 metadata table.",
         "default": "public",
         "order": 4
       },
