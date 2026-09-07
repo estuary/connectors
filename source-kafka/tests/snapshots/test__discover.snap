@@ -11,9 +11,15 @@ expression: snap
             "op": {
               "const": "d"
             }
-          }
+          },
+          "required": [
+            "op"
+          ]
         }
-      }
+      },
+      "required": [
+        "_meta"
+      ]
     },
     "properties": {
       "_meta": {
@@ -167,9 +173,15 @@ expression: snap
             "op": {
               "const": "d"
             }
-          }
+          },
+          "required": [
+            "op"
+          ]
         }
-      }
+      },
+      "required": [
+        "_meta"
+      ]
     },
     "properties": {
       "_meta": {
@@ -237,9 +249,15 @@ expression: snap
             "op": {
               "const": "d"
             }
-          }
+          },
+          "required": [
+            "op"
+          ]
         }
-      }
+      },
+      "required": [
+        "_meta"
+      ]
     },
     "properties": {
       "_meta": {
@@ -324,9 +342,15 @@ expression: snap
             "op": {
               "const": "d"
             }
-          }
+          },
+          "required": [
+            "op"
+          ]
         }
-      }
+      },
+      "required": [
+        "_meta"
+      ]
     },
     "properties": {
       "_meta": {
@@ -397,9 +421,15 @@ expression: snap
             "op": {
               "const": "d"
             }
-          }
+          },
+          "required": [
+            "op"
+          ]
         }
-      }
+      },
+      "required": [
+        "_meta"
+      ]
     },
     "properties": {
       "_meta": {

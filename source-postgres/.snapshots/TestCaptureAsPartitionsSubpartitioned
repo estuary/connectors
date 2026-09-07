@@ -44,8 +44,14 @@ sql> CREATE TABLE test.captureaspartitionssubpartitioned_416337_h2_west PARTITIO
     "allOf": [
       {
         "if": {
+          "required": [
+            "_meta"
+          ],
           "properties": {
             "_meta": {
+              "required": [
+                "op"
+              ],
               "properties": {
                 "op": {
                   "const": "d"
@@ -186,8 +192,14 @@ sql> CREATE TABLE test.captureaspartitionssubpartitioned_416337_h2_west PARTITIO
     "allOf": [
       {
         "if": {
+          "required": [
+            "_meta"
+          ],
           "properties": {
             "_meta": {
+              "required": [
+                "op"
+              ],
               "properties": {
                 "op": {
                   "const": "d"
@@ -328,8 +340,14 @@ sql> CREATE TABLE test.captureaspartitionssubpartitioned_416337_h2_west PARTITIO
     "allOf": [
       {
         "if": {
+          "required": [
+            "_meta"
+          ],
           "properties": {
             "_meta": {
+              "required": [
+                "op"
+              ],
               "properties": {
                 "op": {
                   "const": "d"
@@ -470,8 +488,14 @@ sql> CREATE TABLE test.captureaspartitionssubpartitioned_416337_h2_west PARTITIO
     "allOf": [
       {
         "if": {
+          "required": [
+            "_meta"
+          ],
           "properties": {
             "_meta": {
+              "required": [
+                "op"
+              ],
               "properties": {
                 "op": {
                   "const": "d"

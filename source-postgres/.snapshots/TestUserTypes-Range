@@ -33,8 +33,14 @@ sql> CREATE TABLE test.usertypes_range_933528 (id INTEGER PRIMARY KEY, value Use
     "allOf": [
       {
         "if": {
+          "required": [
+            "_meta"
+          ],
           "properties": {
             "_meta": {
+              "required": [
+                "op"
+              ],
               "properties": {
                 "op": {
                   "const": "d"
