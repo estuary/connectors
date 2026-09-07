@@ -36,7 +36,7 @@ The connector will create new tables in the database per your specification. Tab
 |-----------------|----------|-------------------------------------------------|---------|------------------|
 | `/database`     | Database | Name of the logical database to materialize to. | string  |                  |
 | **`/address`**  | Address  | Host and port of the database                   | string  | Required         |
-| `/schema` | Database Schema | Database [schema](https://docs.timescale.com/timescaledb/latest/how-to-guides/schema-management/) to use for materialized tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables | string | `"public"` |
+| `/schema` | Database Schema | Database [schema](https://docs.timescale.com/timescaledb/latest/how-to-guides/schema-management/) to use for materialized tables (unless overridden within the binding resource configuration) as well as the [`flow_checkpoints_v1` metadata table](/concepts/materialization/#the-checkpoints-metadata-table) | string | `"public"` |
 | **`/user`**     | User     | Database user to connect as.                    | string  | Required         |
 | `/hardDelete` | Hard Delete | If enabled, items deleted in the source will also be deleted from the destination. By default, deletions are tracked via `_meta/op` (soft delete). | boolean | `false` |
 

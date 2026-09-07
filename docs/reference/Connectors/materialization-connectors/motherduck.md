@@ -145,14 +145,18 @@ materializations:
 
 ## Running multiple materializations to the same database
 
-The connector keeps its progress in one metadata table, `flow_checkpoints_v1`, placed in the endpoint
-`database` and `schema`. Materializations that share both share that table, which can cause write
-contention and failed transactions. To separate them, give each materialization its own endpoint
-`schema`, and set the binding-level `schema` to where the collection tables should go.
+The connector keeps its progress in the [`flow_checkpoints_v1` metadata table](/concepts/materialization/#the-checkpoints-metadata-table),
+placed in the endpoint `database` and `schema`. Materializations that share both share that table.
+Rows are keyed by materialization name and never overwrite each other, but MotherDuck aborts
+conflicting transactions rather than queuing them, so concurrent writes to the shared table can fail
+and retry. To separate them, give each materialization its own endpoint `schema`, and set the
+binding-level `schema` to where the collection tables should go.
 
 Changing the endpoint `schema` on an existing materialization points it at an empty checkpoints table
-and it re-processes every bound collection. To keep its progress, copy the rows across first, leaving
-the original table for any other materialization still using it:
+and it re-processes every bound collection. To keep its progress, pause the materialization, then
+copy the rows across, leaving the original table for any other materialization still using it. This
+procedure applies to MotherDuck only. Other connectors record different contents in this table, so
+copying rows between them does not carry a task's progress across:
 
 ```sql
 CREATE SCHEMA my_db.new_schema;
