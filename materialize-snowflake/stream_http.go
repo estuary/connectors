@@ -249,6 +249,42 @@ func (s *streamClient) openChannel(ctx context.Context, schema, table, name stri
 	return res, nil
 }
 
+// dropChannel drops a channel of a table. A channel Snowflake no longer holds
+// counts as dropped, since the drop exists to leave none standing.
+func (s *streamClient) dropChannel(ctx context.Context, schema, table, name string) error {
+	type req struct {
+		Role     *string `json:"role,omitempty"`
+		Database string  `json:"database"`
+		Schema   string  `json:"schema"`
+		Table    string  `json:"table"`
+		Channel  string  `json:"channel"`
+	}
+	type dropResponse struct {
+		StatusCode int    `json:"status_code"`
+		Message    string `json:"message"`
+	}
+
+	res, err := post[dropResponse](ctx, s, "/channels/drop", req{
+		Role:     s.role,
+		Database: s.database,
+		Schema:   schema,
+		Table:    table,
+		Channel:  name,
+	})
+	var apiErr *streamingApiError
+	if errors.As(err, &apiErr) && (apiErr.Code == 19 || apiErr.Code == 25) {
+		return nil
+	} else if err != nil {
+		return err
+	} else if codeErr := getErrorByCode(res.StatusCode); codeErr != nil {
+		return fmt.Errorf("request returned error code: %w", codeErr)
+	} else if res.Message != "Success" {
+		return fmt.Errorf("unexpected response message: %s", res.Message)
+	}
+
+	return nil
+}
+
 func (s *streamClient) write(ctx context.Context, blob *blobMetadata) error {
 	logger := Logger(ctx)
 	type req struct {

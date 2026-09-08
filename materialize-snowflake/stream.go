@@ -119,6 +119,24 @@ func (sm *streamManager) addBinding(ctx context.Context, schema string, table st
 	return nil
 }
 
+// dropChannel drops this shard's channel on a table and forgets any stream the
+// manager held for the binding, so that no blob can be registered against a
+// channel which is gone.
+func (sm *streamManager) dropChannel(ctx context.Context, schema, table string, binding int) error {
+	if err := sm.c.dropChannel(ctx, schema, table, sm.channelName); err != nil {
+		return fmt.Errorf("dropChannel: %w", err)
+	}
+	delete(sm.tableStreams, binding)
+
+	log.WithFields(log.Fields{
+		"schema":  schema,
+		"table":   table,
+		"channel": sm.channelName,
+	}).Info("dropped streaming channel")
+
+	return nil
+}
+
 func (sm *streamManager) writeRow(ctx context.Context, binding int, row []any) error {
 	if sm.lastBinding != -1 && binding != sm.lastBinding {
 		if err := sm.finishBlob(); err != nil {

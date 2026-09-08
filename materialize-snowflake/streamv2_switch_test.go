@@ -541,6 +541,27 @@ func TestStreamV2WritePathSwitch(t *testing.T) {
 		require.Equal(t, 5, countRows())
 	})
 
+	t.Run("a binding moved onto this write path drops the snowpipe_streaming channel", func(t *testing.T) {
+		truncate(t)
+		storeV1(t, "switch-drop-1", 0, 3)
+		require.Equal(t, 3, countRows())
+
+		// The snowpipe_streaming path holds one deterministic channel per shard,
+		// with the token of everything it committed. Dropping it leaves Snowflake
+		// with nothing under that name, so a later open starts from no token.
+		sm, err := newStreamManager(&cfg, testMaterialization, accountName, 0)
+		require.NoError(t, err)
+		require.NoError(t, sm.dropChannel(ctx, cfg.Schema, tableName, 0))
+
+		// Dropping what is already gone is not an error.
+		require.NoError(t, sm.dropChannel(ctx, cfg.Schema, tableName, 0))
+
+		reopened, err := sm.c.openChannel(ctx, cfg.Schema, tableName, sm.channelName)
+		require.NoError(t, err)
+		require.Nil(t, reopened.OffsetToken)
+		require.Equal(t, 3, countRows())
+	})
+
 	t.Run("a binding moved off this write path leaves its channel behind", func(t *testing.T) {
 		truncate(t)
 
@@ -716,7 +737,7 @@ func TestStreamV2SwitchOntoTheWritePathDropsTheStreamingChannel(t *testing.T) {
 
 	var target = func(stateKey string) sql.Table {
 		return sql.Table{
-			TableShape: sql.TableShape{Binding: 0, DeltaUpdates: true, Path: []string{"DB", "SCH", "TBL"}},
+			TableShape: sql.TableShape{Binding: 0, DeltaUpdates: true, Path: []string{"SCH", "TBL"}},
 			Identifier: "TBL",
 			Keys:       []sql.Column{{Identifier: `KEY`}},
 			Values:     []sql.Column{{Identifier: `VAL`}},
@@ -764,7 +785,7 @@ func TestStreamV2SwitchOntoTheWritePathDropsTheStreamingChannel(t *testing.T) {
 			cfg:    cfg,
 			ep:     &sql.Endpoint[config]{Dialect: snowflakeDialect("SCH", timestampTypeLTZ, nil)},
 			_range: rng,
-			cp:     checkpoint{"sk.v1": item},
+			cp:     checkpoint{},
 			snowpipeStreaming: &streamManager{
 				c: &streamClient{
 					r:        resty.New().SetBaseURL(ts.URL + "/v1/streaming").SetDisableWarn(true),
@@ -781,6 +802,9 @@ func TestStreamV2SwitchOntoTheWritePathDropsTheStreamingChannel(t *testing.T) {
 				counter:      -1,
 			},
 			snowpipeStreamingV2: newStreamV2Manager(ctx, &cfg, "test/onto", "acct", rng),
+		}
+		if item != nil {
+			d.cp["sk.v1"] = item
 		}
 		t.Cleanup(d.snowpipeStreamingV2.stop)
 		return d, &drops
@@ -818,7 +842,8 @@ func TestStreamV2SwitchOntoTheWritePathDropsTheStreamingChannel(t *testing.T) {
 			var mux = http.NewServeMux()
 			mux.HandleFunc("POST /v1/streaming/channels/drop", func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
-				fmt.Fprint(w, `{"message":"channel does not exist","status_code":25}`)
+				w.WriteHeader(http.StatusBadRequest)
+				fmt.Fprint(w, `{"message":"The requested channel no longer exists.","status_code":19}`)
 			})
 			var ts = httptest.NewServer(mux)
 			t.Cleanup(ts.Close)

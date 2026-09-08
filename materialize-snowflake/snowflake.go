@@ -397,7 +397,11 @@ type binding struct {
 
 	streaming   bool
 	streamingV2 bool
-	pipeName    string
+	// dropStreamingChannel marks a streaming v2 binding whose snowpipe_streaming
+	// channel still has blobs to register, so the channel is dropped once
+	// Acknowledge has drained them rather than at Open.
+	dropStreamingChannel bool
+	pipeName             string
 	// clusteringExpr is the parenthesized CLUSTER BY expression for this
 	// binding, or empty if clustering is not configured.
 	clusteringExpr string
@@ -463,6 +467,19 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, streaming
 		var loc = d.ep.Dialect.TableLocator(b.target.Path)
 		d.snowpipeStreamingV2.addBinding(d.cfg.Database, loc.TableSchema, d.ep.Identifier(loc.TableName), target, d.priorStreamV2(target.StateKey))
 		b.streamingV2 = true
+
+		// A binding this shard has no streaming v2 items for is arriving on the
+		// path, and the snowpipe_streaming path may hold its channel. Nothing else
+		// drops that channel, so this binding does, once the blobs the channel
+		// still has to register are drained.
+		if held == nil && d.snowpipeStreaming != nil {
+			if pending := d.cp[target.StateKey]; pending != nil && len(pending.StreamBlobs) > 0 {
+				b.dropStreamingChannel = true
+			} else if err := d.snowpipeStreaming.dropChannel(ctx, loc.TableSchema, d.ep.Identifier(loc.TableName), target.Binding); err != nil {
+				return fmt.Errorf("dropping the snowpipe_streaming channel of %s: %w", target.Identifier, err)
+			}
+		}
+
 		d.bindings = append(d.bindings, b)
 		return nil
 	}
@@ -1148,6 +1165,17 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 
 	if err := group.Wait(); err != nil {
 		return nil, fmt.Errorf("executing concurrent store query: %w", err)
+	}
+
+	for _, b := range d.bindings {
+		if !b.dropStreamingChannel || !slices.Contains(drained, b.target.StateKey) {
+			continue
+		}
+		var loc = d.ep.Dialect.TableLocator(b.target.Path)
+		if err := d.snowpipeStreaming.dropChannel(ctx, loc.TableSchema, d.ep.Identifier(loc.TableName), b.target.Binding); err != nil {
+			return nil, fmt.Errorf("dropping the snowpipe_streaming channel of %s after draining its blobs: %w", b.target.Identifier, err)
+		}
+		b.dropStreamingChannel = false
 	}
 
 	// Keep asking for a report on the files that have been submitted for processing
