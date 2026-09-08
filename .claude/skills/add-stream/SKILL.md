@@ -9,8 +9,6 @@ Add a `stream-name` stream to the `source-$1` connector. Read a few neighboring 
 
 ## Laws
 
-These apply in every phase. Re-read them before each phase boundary.
-
 **Shared laws** — read both before Phase 0; they are the single authority:
 
 - [`.claude/shared/session-conduct.md`](../../shared/session-conduct.md)
@@ -25,13 +23,7 @@ These apply in every phase. Re-read them before each phase boundary.
 
 Confirm the connector exists. Locate its `models.py`, `resources.py`, `api.py` (or equivalents — naming varies between Python connectors). Read streams in the same connector before designing anything.
 
-**Baseline check (`CONDUCT-ESTABLISH-BASELINE`).** Kick off the connector's existing test suite in the background as soon as Phase 0 begins. Phases 1–3 are read-only / planning and may proceed in parallel while the suite runs — do **not** block on it. The result is a **gate on Phase 4**: confirm the baseline passes before writing any code for the new stream. Failure handling — including the separate `<connector-name>: update tests` commit for stale snapshots — is in [session-conduct.md](../../shared/session-conduct.md).
-
-If the suite fails:
-
-- **Simple schema drift** (the connector spec/discover output has shifted but the code is unchanged): you may dispatch the `regenerate-flow-discovery` agent to refresh the snapshots, then commit the result on its own with the message `<connector-name>: update tests` — a pure snapshot regeneration, so `CONDUCT-CONFIRM-BEFORE-WRITE-HISTORY`'s mechanical-change exception covers it. Keep this commit separate from the new-stream work so the PR diff stays scoped.
-- **Flakey fields in the diff** (timestamps like `updated_at`, ETags, anything that changes between runs): surface them to the user and ask whether to add them to the connector's `FIELDS_TO_REDACT` list in `tests/test_snapshots.py` (name varies between connectors — grep for `FIELDS_TO_REDACT` to find the convention).
-- **Anything else:** stop and surface the failure to the user before entering Phase 4.
+Start the baseline test suite now (`CONDUCT-ESTABLISH-BASELINE`). Phases 1–3 are read-only and run in parallel with it; its result gates Phase 4. Failure handling is in the rule.
 
 ## Phase 1 — Rate Limit Survey
 
@@ -47,10 +39,7 @@ Before researching the requested stream, figure out the provider's API rate limi
 
 Then **record the findings in the collection** so the next stream addition doesn't repeat the work. The block format — and where endpoint-specific limitations go instead (a `**LIMITATION**` finding on the proving request) — is defined in `bruno-probe-endpoint`, which also stands the collection up during verification; if it doesn't exist yet at this point, carry the findings forward and write them there once it's created.
 
-**Set the budget for the rest of the skill** (`API-BUDGET-20RPH`, `API-DISCOVER-STATIC-IS-FREE`, `API-COST-SAVER-DISABLE` in [`.claude/shared/provider-api-consent.md`](../../shared/provider-api-consent.md)):
-
-- **All required endpoints > 20 req/hr:** run `flowctl raw preview-next` / `flowctl raw discover` / `pytest` / captures freely.
-- **Any required endpoint ≤ 20 req/hr:** ask before each run — `flowctl raw discover` included, unless this connector's discovery is static (see `API-DISCOVER-STATIC-IS-FREE` above); plan to disable unrelated bindings in `test.flow.yaml` (`disable: true`) before testing.
+The survey's result sets the run budget for the rest of the skill — `API-BUDGET-20RPH` (with `API-DISCOVER-STATIC-IS-FREE` and `API-COST-SAVER-DISABLE`) says what each outcome allows.
 
 ## Phase 2 — Endpoint Survey
 
@@ -104,7 +93,7 @@ Re-run the test suite if any of these changed code. If a tool isn't on PATH, fin
 
 ## Phase 6 — Flow Regeneration
 
-Dispatch the `regenerate-flow-discovery` agent (runs on Haiku in its own context) via the Agent tool. Pass it the connector name and — since Phase 1 already surveyed the provider's rate limits — whether the budget is cleared (all required endpoints > 20 req/hr) so it can run the snapshot tests without re-asking for consent.
+Dispatch the `regenerate-flow-discovery` agent (runs on Haiku in its own context) via the Agent tool. Pass it the connector name and the Phase 1 budget verdict so it doesn't re-survey.
 
 ## Phase 7 — Snapshot Refresh
 
