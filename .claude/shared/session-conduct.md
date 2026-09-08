@@ -14,7 +14,7 @@ Open the session with a TODO list: one task per phase of whatever skill you're r
 
 Ask the user for consent before any destructive operation — deleting generated files or directories, rewriting bindings, mutating provider state.
 
-Provider-state mutation additionally falls under `API-NEVER-MUTATE`.
+Provider-state mutation additionally falls under `API-MUTATE-ONLY-WITH-CONSENT`.
 
 ---
 
