@@ -168,7 +168,6 @@ def incremental_resource(
                 name,
                 fields,
                 model_cls,
-                config.advanced.window_size.as_timedelta,
                 config.start_date,
             ),
             fetch_changes=functools.partial(

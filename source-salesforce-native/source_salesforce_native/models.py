@@ -128,7 +128,7 @@ class EndpointConfig(BaseModel):
 
     class Advanced(BaseModel):
         window_size: WindowSizeAsInterval | WindowSizeInDays = Field(
-            description="Date window size for Bulk API 2.0 queries. Typically left as the default unless Estuary Support or the connector logs indicate otherwise.",
+            description="Date window size for incremental queries. Typically left as the default unless Estuary Support or the connector logs indicate otherwise.",
             title="Window size",
             default_factory=lambda: WindowSizeInDays(days=18250),
             discriminator="window_type",

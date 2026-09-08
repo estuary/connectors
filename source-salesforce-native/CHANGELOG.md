@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-09-08
+
+### Changed
+- The date window strategy that drove backfills started before 2026-07-22 to completion has
+  been removed, and the `advanced.window_size` setting now only applies to incremental
+  catch-up sweeps.
+
 ## 2026-08-04
 
 ### Fixed
