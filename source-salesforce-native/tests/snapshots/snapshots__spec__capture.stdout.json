@@ -6,7 +6,7 @@
         "Advanced": {
           "properties": {
             "window_size": {
-              "description": "Date window size for Bulk API 2.0 queries. Typically left as the default unless Estuary Support or the connector logs indicate otherwise.",
+              "description": "Date window size for incremental queries. Typically left as the default unless Estuary Support or the connector logs indicate otherwise.",
               "discriminator": {
                 "mapping": {
                   "days": "#/$defs/WindowSizeInDays",
