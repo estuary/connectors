@@ -100,7 +100,6 @@ Gates are the points where a skill would ask the user; each resolves as _interac
 | `GATE-PLAN-REVIEW` | conduct | Human gate / self-review + reviewer subagent |
 | `GATE-SEEDING` | conduct | Hand over / PENDING, unless `seeding: assistant` |
 | `GATE-CONFIG-DIRTY` | conduct | Ask / stop live calls |
-| `GATE-BRUNO-WORKSPACE` | conduct | Ask / no reference |
 | `GATE-COMMIT-SPLIT` | conduct | Recommend / perform |
 
 ### Situational skills
