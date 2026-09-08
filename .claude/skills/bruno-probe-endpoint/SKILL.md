@@ -45,12 +45,7 @@ The collection lives in the connector at `<connector>/bruno/`, committed alongsi
 
 Endpoint-specific constraints do **not** go in this block (nor in `CLAUDE.md`) — they carry a `**LIMITATION**` marker on the request that proves them (see Documentation, Phase 4); the root docs keep only the index of them.
 
-**Don't invent the layout — model it on an existing collection.** To find a reference:
-
-1. If a **sibling connector** has a `bruno/` collection, copy its structure and pre-request script from there (`source-mailchimp-native/bruno/` is a full OpenCollection YAML example).
-2. Otherwise, model on a collection in the user's **Bruno workspace** (the directory where their reference collections live). Its location should already be in memory ([[reference-bruno-workspace]]). If it isn't, this is `GATE-BRUNO-WORKSPACE`: in human-in-the-loop mode **ask where the workspace is and commit the answer to memory** so the next run doesn't ask again; in autonomous mode use no reference at all, build `bruno/` from this skill's layout rules alone, and ledger that.
-
-A reference collection may still be in the legacy `.bru` format — the structure maps 1:1 (`bruno.json` + `collection.bru` → `opencollection.yml`; `meta` → `info`; `docs { }` → `docs:`; `script:pre-request` → a `scripts:` entry with `type: before-request`; inline `example` blocks → `examples:`). To migrate an existing `.bru` collection, convert mechanically with Bruno's own `@usebruno/filestore` npm package (`parseRequest(…, {format:'bru'})` → `stringifyRequest(…, {format:'yml'})`, and the collection/environment/folder equivalents) rather than hand-writing YAML.
+**Don't invent the layout — model it on an existing collection.** If a **sibling connector** has a `bruno/` collection, copy its structure and pre-request script from there (`source-mailchimp-native/bruno/` is a full OpenCollection YAML example). If none does, build `bruno/` from this skill's layout rules alone.
 
 The config-path var in `environments/<Provider>.yml` can be the connector-relative `config.yaml` (e.g. `../config.yaml` from inside `bruno/`), since the collection ships with the connector.
 
@@ -79,7 +74,7 @@ Implementation contract:
 
 ### House style A — provider takes a static token (e.g. Stripe)
 
-When the sops-decrypted config exposes a long-lived API key directly, decrypt and attach in one step. Reference: a static-token collection's root file (e.g. the Stripe collection in your Bruno workspace). In `opencollection.yml`:
+When the sops-decrypted config exposes a long-lived API key directly, decrypt and attach in one step. Reference: `source-mailchimp-native/bruno/opencollection.yml`. In `opencollection.yml`:
 
 ```yaml
 request:
@@ -99,7 +94,7 @@ request:
 
 ### House style B — provider uses OAuth refresh-token (e.g. HubSpot)
 
-When the sops-decrypted config holds a `refresh_token` plus `client_id`/`client_secret`, exchange them for a short-lived access token via `bru.sendRequest` on every request. Reference: an OAuth refresh-token collection's root file (e.g. the HubSpot collection in your Bruno workspace). In `opencollection.yml`:
+When the sops-decrypted config holds a `refresh_token` plus `client_id`/`client_secret`, exchange them for a short-lived access token via `bru.sendRequest` on every request. No sibling collection uses this style yet; the block below is the reference. In `opencollection.yml`:
 
 ```yaml
 request:
@@ -134,7 +129,7 @@ request:
 
 The per-request OAuth roundtrip is intentional — caching the access token via `bru.setEnvVar` would persist it to a committed file (an `API-TOKEN-EPHEMERAL` violation). Most providers' token endpoints are far above the connector's rate-limit budget; if yours isn't, that's a separate problem to surface to the user.
 
-When pasting either style into a new collection, look at a reference collection root — a sibling connector's `bruno/opencollection.yml`, or a reference collection in your Bruno workspace (e.g. Stripe; possibly still legacy `.bru`) — for the most current shape rather than copying from this doc.
+When pasting either style into a new collection, look at a sibling connector's `bruno/opencollection.yml` for the most current shape rather than copying from this doc.
 
 ## Phase 4 — Request Authoring
 
@@ -250,6 +245,8 @@ In every branch the finding the mutation would unblock stays `**PENDING:**` (sta
 **Placement.** Every mutating/seeding request lives in a `Seeding/` subdirectory of the collection — never at the collection's top level. The top level holds only read-only verification requests; the folder split keeps the mutating set visually distinct and lets the whole sequence run with a folder-level `bru run`.
 
 **Naming.** Seeding requests that run in sequence are named with a `[LETTER][NUMBER]` prefix — one letter per dependency group, numbered in run order within the group (e.g. `A1 - Create Customer.yml`, `A2 - Create Invoice.yml`; an unrelated sequence gets `B1`…`B4`). The letter tells the reader at a glance which requests form one sequence (and share chained runtime vars — see "Chain sequential requests" in Phase 4); the number is the order to run them in. A mutation that depends on a seeded resource is **not** standalone — it belongs to that resource's dependency group, or to a trailing group (`D1`, `D2`, …) for post-read mutations that touch already-seeded records (an archive, an update that advances a cursor). Reserve no-prefix only for a mutation that depends on nothing and that nothing depends on. Keep `info.seq` consistent with the prefix ordering and contiguous within `Seeding/`, so the GUI lists the whole sequence in run order.
+
+<!-- TODO: Migrate the naming scheme to request chaining -->
 
 **Keep the mutation's HTTP verb visible — never hide it inside a decoy GET.** A seeding request's method and URL must be the mutation it performs (`post { url: …/lists/{id} }`), so a reviewer sees what it does at a glance. Do **not** make the request a `GET` whose pre-request script secretly POSTs/DELETEs — that obscures the real call.
 
