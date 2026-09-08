@@ -261,7 +261,7 @@
         {
           "__parentId": "gid://shopify/Product/8086708027437",
           "barcode": null,
-          "compareAtPrice": null,
+          "compareAtPrice": "14.95",
           "createdAt": "2025-01-14T15:10:14Z",
           "id": "gid://shopify/ProductVariant/43217823989805",
           "image": null,
@@ -288,7 +288,7 @@
           "sku": null,
           "taxable": true,
           "title": "Sample Selling Plans Ski Wax",
-          "updatedAt": "2026-06-11T17:29:31Z"
+          "updatedAt": "2026-09-02T09:42:19Z"
         }
       ]
     }
