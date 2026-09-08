@@ -49,7 +49,6 @@ Removing the human from the gates removes the review that catches wrong plans. A
 | `GATE-PLAN-REVIEW` — `stream-builder` draft plan | Render the draft inline, `AskUserQuestion`, incorporate feedback. | Self-review against `rules-index.md`, write `## Decisions made without review`; the orchestrator's reviewer subagent grades it before integration. |
 | `GATE-SEEDING` — `bruno-probe-endpoint` Phase 6 | `seeding: assistant` → run it; `seeding: user` → hand over and wait. | `seeding: assistant` → run it; otherwise author nothing and leave the finding PENDING — never relabeled UNOBSERVABLE. |
 | `GATE-CONFIG-DIRTY` — the hook refuses a live run because `config.yaml` is dirty or was re-committed (`API-CONFIG-GATE`) | Ask the user to commit / re-confirm, then `permissions.py stamp`. | No live calls until hand-off; PENDING; ledger. |
-| `GATE-BRUNO-WORKSPACE` — `bruno-probe-endpoint` Phase 1, no sibling collection to model on | Ask where the Bruno workspace is; persist to memory. | Build from the skill's layout rules with no reference; ledger it. |
 | `GATE-COMMIT-SPLIT` — the diff mixes the connector with an unrelated snapshot/schema sweep | Recommend the split. | Perform it. Push and PR need a human in both modes (`CONDUCT-CONFIRM-BEFORE-WRITE-HISTORY`). |
 
 ## The batched checkpoint (`GATE-CREDENTIALS` in autonomous mode)
