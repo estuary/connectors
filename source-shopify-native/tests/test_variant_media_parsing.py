@@ -110,6 +110,49 @@ async def test_media_for_a_previous_product_variant_is_rejected():
 
 
 @pytest.mark.asyncio
+async def test_non_media_line_parented_to_a_variant_is_rejected():
+    # A connection added under variants later, without updating process_result, must not be
+    # silently stitched into `media` — it falls through to the unidentified-line error.
+    with pytest.raises(RuntimeError):
+        await _process(
+            [
+                {"id": PRODUCT_1},
+                {"id": VARIANT_1, "__parentId": PRODUCT_1},
+                {"id": "gid://shopify/Metafield/77", "__parentId": VARIANT_1},
+            ]
+        )
+
+
+@pytest.mark.asyncio
+async def test_media_parented_to_an_unknown_variant_is_rejected():
+    with pytest.raises(RuntimeError):
+        await _process(
+            [
+                {"id": PRODUCT_1},
+                {"id": VARIANT_1, "__parentId": PRODUCT_1},
+                {"id": IMAGE_1, "__parentId": "gid://shopify/ProductVariant/999"},
+            ]
+        )
+
+
+@pytest.mark.asyncio
+async def test_every_media_type_is_captured():
+    # ProductVariant.media takes no media_type filter, so all four Media types can arrive.
+    media_ids = [
+        "gid://shopify/MediaImage/1",
+        "gid://shopify/Video/2",
+        "gid://shopify/ExternalVideo/3",
+        "gid://shopify/Model3d/4",
+    ]
+    documents = await _process(
+        [{"id": PRODUCT_1}, {"id": VARIANT_1, "__parentId": PRODUCT_1}]
+        + [{"id": m, "__parentId": VARIANT_1} for m in media_ids]
+    )
+
+    assert [m["id"] for m in documents[0]["variants"][0]["media"]] == media_ids
+
+
+@pytest.mark.asyncio
 async def test_unidentified_line_is_still_rejected():
     with pytest.raises(RuntimeError):
         await _process(

@@ -5,6 +5,16 @@ from typing import Any, AsyncGenerator
 
 from source_shopify_native.models import ShopifyGraphQLResource, SortKey, StoreCapabilities
 
+# Every type implementing Shopify's `Media` interface, one per `MediaContentType` value
+# (IMAGE, VIDEO, EXTERNAL_VIDEO, MODEL_3D). `ProductVariant.media` takes no media_type
+# filter, so a variant's media line can be any of these.
+MEDIA_GID_PREFIXES = (
+    "gid://shopify/MediaImage/",
+    "gid://shopify/Video/",
+    "gid://shopify/ExternalVideo/",
+    "gid://shopify/Model3d/",
+)
+
 
 class ProductVariants(ShopifyGraphQLResource):
     NAME = "product_variants"
@@ -125,11 +135,23 @@ class ProductVariants(ShopifyGraphQLResource):
                 current_product[VARIANTS_KEY].append(record)
                 current_variants_by_id[id] = record
 
-            elif parent_id in current_variants_by_id:
-                # Any other line parented to one of this product's variants is one of that
-                # variant's media nodes. Media is matched on __parentId rather than on a gid
-                # prefix because ProductVariant.media takes no media_type filter, so a node can
-                # be a MediaImage, Video, ExternalVideo or Model3d.
+            elif id.startswith(MEDIA_GID_PREFIXES):
+                # Classify on the gid prefix rather than "parented to a variant", so a
+                # connection added under variants later without updating this function falls
+                # through to the unidentified-line error instead of landing in `media`.
+                if parent_id not in current_variants_by_id:
+                    log.error(
+                        "Media's parent is not a variant of the current product. Check if the JSONL response from Shopify is not ordered correctly.",
+                        {
+                            "media.id": id,
+                            "media.__parentId": parent_id,
+                            "current_product.id": current_product.get("id")
+                            if current_product
+                            else None,
+                        },
+                    )
+                    raise RuntimeError()
+
                 current_variants_by_id[parent_id][MEDIA_KEY].append(record)
 
             else:
