@@ -1,0 +1,65 @@
+info:
+  name: null updated count
+  type: http
+  seq: 4
+
+http:
+  method: GET
+  url: "{{base_url}}/v2/invoices?limit=1&include_total=true&updated_at__isNull=true"
+  params:
+    - name: limit
+      value: "1"
+      type: query
+    - name: include_total
+      value: "true"
+      type: query
+    - name: updated_at__isNull
+      value: "true"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://docs.hyperline.co/api-reference/endpoints/invoices/list-invoices-1.md
+
+  **LIMITATION** — invoice `updated_at` is nullable per the OpenAPI item
+  schema. **WHY:** count the null partition. Any row with `updated_at = null`
+  is invisible to a `updated_at__gte` incremental filter → silent data loss if
+  the count is non-zero and such rows can appear/mutate after backfill. The
+  result decides whether the invoices fetch needs a null-partition sweep or
+  can treat null as backfill-only.
+  **VERIFIED (2026-09-04):** the probe as designed is IMPOSSIBLE — 400
+  `{"updated_at__isNull": ["Invalid ISO datetime"]}`; the validator parses
+  every `updated_at__*` value as a datetime, so `__isNull`/`__isNotNull` are
+  unusable despite appearing in the OpenAPI spec. The null-partition question
+  is instead closed by `Invoices / full scan null audit` (0 of 14 rows null).
+
+examples:
+  - name: 400 - isNull filter unusable (validator wants a datetime)
+    request:
+      url: "{{base_url}}/v2/invoices?limit=1&include_total=true&updated_at__isNull=true"
+      method: GET
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "statusCode": 400,
+            "type": "ValidationError",
+            "message": "Invalid query params",
+            "errors": {
+              "updated_at__isNull": [
+                "Invalid ISO datetime"
+              ]
+            }
+          }

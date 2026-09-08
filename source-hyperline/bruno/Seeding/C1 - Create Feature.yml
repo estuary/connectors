@@ -1,0 +1,40 @@
+info:
+  name: C1 - Create Feature
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{base_url}}/v1/features"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "code": "estuary_test_feature",
+        "name": "Estuary connector test feature",
+        "description": "Created for source-hyperline probe verification; safe to delete",
+        "value_type": "boolean",
+        "default_value": false
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Create feature](https://docs.hyperline.co/api-reference/endpoints/features/create-feature.md)
+
+  **Only the user runs this request — never the assistant** (`API-NEVER-MUTATE`).
+  It mutates production account state. A boolean feature assigned to no product
+  is inert; delete from the dashboard after verification.
+
+  **WHY:** `/v1/features` is empty, so `Features / bare` could not observe the
+  item shape — in particular whether items really carry `code` but no `id`
+  (the OpenAPI claim the connector's primary-key choice rests on; see the
+  PENDING there). Standalone group C. After running, re-run `Features / bare`.

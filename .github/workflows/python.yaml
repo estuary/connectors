@@ -318,6 +318,10 @@ jobs:
             type: capture
             version: v1
             usage_rate: "1.0"
+          - name: source-hyperline
+            type: capture
+            version: v1
+            usage_rate: "1.0"
 
     steps:
       - uses: actions/checkout@v4

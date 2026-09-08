@@ -1,0 +1,66 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/quotes?take=3"
+  params:
+    - name: take
+      value: "3"
+      type: query
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // Pin a document for `Quotes / since updated`.
+        const body = res.getBody();
+        if (body && Array.isArray(body.data) && body.data.length && body.data[0].updated_at) {
+          bru.setVar('quotes_pin_updated_at', body.data[0].updated_at);
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://docs.hyperline.co/api-reference/endpoints/quotes/list-quotes.md
+
+  **WHY:** Observe the v1 quotes envelope and the real item shape — the
+  OpenAPI `Quote` schema is a status-discriminated anyOf (draft / pending /
+  approved / signed / voided variants) and only a live row shows which fields
+  are actually present per status. Pins `data[0].updated_at` (runtime var
+  `quotes_pin_updated_at`) for `Quotes / since updated`; run this first in a
+  fresh session.
+  **VERIFIED (2026-09-04):** envelope `{meta, data}`; EMPTY — `meta.total=0`.
+  Real item shape (the spec's status-discriminated anyOf) is **UNOBSERVABLE (until seeded)**:
+  close by having the user run `Seeding / A1 - Create Draft Quote`, then
+  re-run this request and re-pin.
+
+examples:
+  - name: 200 - empty list (account has no quotes)
+    request:
+      url: "{{base_url}}/v1/quotes?take=3"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "meta": {
+              "total": "REDACTED",
+              "taken": 0,
+              "skipped": 0
+            },
+            "data": []
+          }

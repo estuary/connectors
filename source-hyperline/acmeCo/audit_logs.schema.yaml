@@ -1,0 +1,80 @@
+$defs:
+  Meta:
+    properties:
+      op:
+        default: u
+        description: 'Operation type (c: Create, u: Update, d: Delete)'
+        enum:
+        - c
+        - u
+        - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: Row ID of the Document, counting up from zero, or -1 if not known
+        title: Row Id
+        type: integer
+      estuary_id:
+        default: ''
+        description: Surrogate key derived from the event's characteristic fields; audit-log events carry no id on the wire.
+        title: Estuary Id
+        type: string
+    title: Meta
+    type: object
+additionalProperties: true
+properties:
+  _meta:
+    $ref: '#/$defs/Meta'
+    description: Document metadata
+  type:
+    title: Type
+    type: string
+  happened_at:
+    format: date-time
+    title: Happened At
+    type: string
+  customer_id:
+    anyOf:
+    - type: string
+    - type: 'null'
+    title: Customer Id
+  subscription_id:
+    anyOf:
+    - type: string
+    - type: 'null'
+    title: Subscription Id
+  invoice_id:
+    anyOf:
+    - type: string
+    - type: 'null'
+    title: Invoice Id
+  quote_id:
+    anyOf:
+    - type: string
+    - type: 'null'
+    title: Quote Id
+required:
+- type
+- happened_at
+- customer_id
+- subscription_id
+- invoice_id
+- quote_id
+title: AuditLog
+type: object
+x-infer-schema: true
+if:
+  required:
+  - _meta
+  properties:
+    _meta:
+      required:
+      - op
+      properties:
+        op:
+          const: d
+then:
+  reduce:
+    strategy: merge
+    delete: true

@@ -1,0 +1,54 @@
+info:
+  name: A1 - Create Draft Quote
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{base_url}}/v1/quotes"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "status": "draft",
+        "customer_id": "{{seed_customer_id}}",
+        "expires_at": "2027-01-01T00:00:00Z",
+        "subscription": {},
+        "comments": "REDACTED"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://docs.hyperline.co/api-reference/endpoints/quotes/list-quotes.md
+  (create endpoint: POST /v1/quotes, same docs family)
+
+  ONLY THE USER RUNS THIS; NEVER THE ASSISTANT. This is a mutation against
+  the PRODUCTION Hyperline account — it creates a draft (inert, deletable)
+  quote attached to `{{seed_customer_id}}`. Decide whether a probe artifact
+  in the production quotes list is acceptable before running.
+
+  **WHY:** `Quotes / bare` is empty (total=0), so the real quote item shape,
+  its status-variant fields, and `updated_at__gte` narrowing are unproven.
+  This seed feeds: re-running `Quotes / bare` (capture a populated example +
+  re-pin `quotes_pin_updated_at`) and `Quotes / since updated` (narrowing
+  evidence). A draft quote is the least invasive variant: not visible to the
+  customer, no signature flow, no billing side effects (a draft
+  subscription-type quote does not create the subscription until signed).
+
+  Body shape: `CreateQuote` requires `customer_id` plus ONE OF
+  `{template_id}` / `{expires_at, subscription}` / `{expires_at, invoice}`
+  (DOCUMENTED 2026-09-04, https://api.hyperline.co/openapi). The
+  `subscription` sub-object has no required fields, so `{}` is the minimal
+  legal payload; if the API still rejects it, attach a product from the
+  catalog or use a quote template id from GET /v1/quotes/templates.
+
+  Outcome: not yet run.

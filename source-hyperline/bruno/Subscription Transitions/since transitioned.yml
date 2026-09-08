@@ -1,0 +1,83 @@
+info:
+  name: since transitioned
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/v2/subscriptions/transitions?take=3&transitioned_at__gte=2020-01-01T00:00:00Z"
+  params:
+    - name: take
+      value: "3"
+      type: query
+    - name: transitioned_at__gte
+      value: "2020-01-01T00:00:00Z"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://docs.hyperline.co/api-reference/endpoints/subscriptions-%3E-transitions/list-subscription-transitions.md
+
+  **WHY:** Prove the `transitioned_at__gte` range param is accepted and
+  narrows (compare `meta.total` vs `Subscription Transitions / bare` — a
+  `__gte` bound should also exclude rows where `transitioned_at` is null,
+  i.e. pending transitions, which is exactly why this field alone is NOT a
+  safe incremental cursor). `transition_date__*` shares the same generated
+  filter grammar; not probed separately.
+
+  **VERIFIED (2026-09-04):** a date-only bound (`2020-01-01`) is REJECTED —
+  400 `{"transitioned_at__gte": ["Invalid ISO datetime"]}` — even though the
+  response field itself is `format: date`. Filter values must be full ISO
+  datetimes (`2020-01-01T00:00:00Z`).
+
+examples:
+  - name: 400 - date-only bound rejected
+    request:
+      url: "{{base_url}}/v2/subscriptions/transitions?take=3&transitioned_at__gte=2020-01-01"
+      method: GET
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "statusCode": 400,
+            "type": "ValidationError",
+            "message": "Invalid query params",
+            "errors": {
+              "transitioned_at__gte": [
+                "Invalid ISO datetime"
+              ]
+            }
+          }
+  - name: 200 - full ISO datetime accepted (empty account)
+    request:
+      url: "{{base_url}}/v2/subscriptions/transitions?take=3&transitioned_at__gte=2020-01-01T00:00:00Z"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "meta": {
+              "total": "REDACTED",
+              "taken": 0,
+              "skipped": 0
+            },
+            "data": []
+          }

@@ -1,0 +1,50 @@
+info:
+  name: B1 - Create Coupon
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{base_url}}/v1/coupons"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "name": "Estuary connector test coupon",
+        "description": "Created for source-hyperline probe verification; safe to delete",
+        "type": "percent",
+        "discount_percent": 1,
+        "repeat": "once"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // Chain the created coupon id into B2 (runtime var — in-memory only).
+        const b = res.getBody();
+        if (b && b.id) bru.setVar('seed_coupon_id', b.id);
+
+docs: |-
+  **REFERENCE:** [Create coupon](https://docs.hyperline.co/api-reference/endpoints/coupons/create-coupon.md)
+
+  **Only the user runs this request — never the assistant** (`API-NEVER-MUTATE`).
+  It mutates production account state. A 1% once-only coupon attached to no
+  product is inert until someone applies it; delete it from the dashboard after
+  verification.
+
+  **WHY:** `/v1/coupons` is empty, so `Coupons / bare` could not observe the item
+  shape (see its PENDING). Seeds one percent-type coupon; the after-response
+  script captures its id into `seed_coupon_id` for `Seeding / B2 - Create
+  Promotion Code`. After running B1+B2, re-run `Coupons / bare` and
+  `Promotion Codes / bare` and save the populated examples.

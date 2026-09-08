@@ -1,0 +1,59 @@
+info:
+  name: take limit probe
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/{{resource}}?take=101"
+  params:
+    - name: take
+      value: "101"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 400 - take 101 rejected
+    request:
+      url: "{{base_url}}/v1/products?take=101"
+      method: GET
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "statusCode": 400,
+            "type": "ValidationError",
+            "message": "Invalid query params",
+            "errors": {
+              "take": [
+                "Too big: expected number to be <=100"
+              ]
+            }
+          }
+
+docs: |-
+  **REFERENCE:** [Pagination and filtering](https://docs.hyperline.co/api-reference/docs/pagination.md)
+
+  **WHY:** the docs cap `take` at 100; push one past to learn the enforcement
+  mode — rejected (4xx: connector must clamp), silent clamp (benign), or silent
+  truncation without a pagination signal (data-loss hazard). Set `resource` in
+  the environment.
+
+  **LIMITATION (VERIFIED 2026-09-04):** `take=101` on `v1/products` → 400
+  `ValidationError: Invalid query params — take: ["Too big: expected number to
+  be <=100"]`. Enforcement mode is REJECTED: the connector must clamp `take` to
+  100 itself. Note the asymmetry with unknown params, which are silently ignored
+  (see `Price Configurations / updated_at filter probe`) — validation applies to
+  known params only.

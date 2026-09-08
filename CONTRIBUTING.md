@@ -17,7 +17,7 @@ Instead of defining connector configuration in `test.flow.yaml`, the `config` fi
   > **Note**: the `_sops` suffix for encrypted field is convention here. Whatever you pick for the encrypted suffix, Flow will strip that suffix out of the decrypted config object to provide to the connector.
 2. Run `sops` and overwrite the file you just created with the encrypted version:
   ``` bash
-  $ sops --encrypt --input-type yaml --output-type yaml --gcp-kms projects/helpful-kingdom-273219/locations/us-central1/keyRings/dev/cryptoKeys/CI-estuary-flow --encrypted-suffix _sops path/to/connector_config.yaml
+  $ sops --encrypt --input-type yaml --output-type yaml --gcp-kms projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository --encrypted-suffix _sops path/to/connector_config.yaml
   ```
   ```yaml
   client_id: exctatic_emu@service-accounts.estuary.dev
@@ -25,7 +25,7 @@ Instead of defining connector configuration in `test.flow.yaml`, the `config` fi
   sops:
     kms: []
     gcp_kms:
-        - resource_id: projects/helpful-kingdom-273219/locations/us-central1/keyRings/dev/cryptoKeys/CI-estuary-flow
+        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
           created_at: "2023-11-06T22:16:37Z"
           enc: CiQAW8BC2JnhfMjWVLeRYPPQgnzBVM2MtLMlh/84pcfCRbQExBcSSQBgR/fKuXztEtnXLcNceSt9XGDi0A/9nqYQrFFqTD5d0R2HEATmH4Fyqg/Gn5/sYAdDegI0g3hHYZd91rJir0TaljFQ2YRAnYw=
     azure_kv: []

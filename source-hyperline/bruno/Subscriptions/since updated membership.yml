@@ -1,0 +1,63 @@
+info:
+  name: since updated membership
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/v2/subscriptions?take=100&updated_at__gte={{subscriptions_pin_updated_at}}"
+  params:
+    - name: take
+      value: "100"
+      type: query
+    - name: updated_at__gte
+      value: "{{subscriptions_pin_updated_at}}"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://docs.hyperline.co/api-reference/endpoints/subscriptions/list-subscriptions.md
+
+  **WHY:** Prove `updated_at__gte` narrows server-side on the take/skip engine
+  (`meta.total` shrinks vs `Subscriptions / bare`) AND that `__gte` is
+  boundary-inclusive here too: the bound is the pinned doc's exact
+  `updated_at`, so the pinned id must appear in `data` (take=100; membership
+  check only valid while the filtered set is <= 100 — note `meta.total` in the
+  saved example). The saved example is a projection (ids + updated_at + meta).
+  Run `Subscriptions / bare` first.
+  **VERIFIED (2026-09-04):** narrowed meta.total 6 -> 1 and the returned row
+  IS the pinned doc — `__gte` inclusive on the take/skip engine too.
+
+examples:
+  - name: 200 - gte inclusive on take/skip engine, narrowed 6 to 1, pinned id present (projection)
+    request:
+      url: "{{base_url}}/v2/subscriptions?take=100&updated_at__gte=2026-09-01T16:21:35.903Z"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "meta": {
+              "total": "REDACTED",
+              "taken": 1,
+              "skipped": 0
+            },
+            "data": [
+              {
+                "id": "sub_cTPmfEKQo0q34b",
+                "updated_at": "2026-09-01T16:21:35.903Z"
+              }
+            ]
+          }

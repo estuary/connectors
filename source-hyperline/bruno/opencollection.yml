@@ -1,0 +1,216 @@
+opencollection: 1.0.0
+
+info:
+  name: Hyperline
+
+request:
+  scripts:
+    - type: before-request
+      code: |-
+        // Hyperline auth via the connector's sops-encrypted config.yaml. The key is
+        // re-derived from sops on every request and lives only on `req` — it is never
+        // persisted to a var or env file. Requires the developer JS sandbox:
+        //   CLI: `bru run <request>.yml --env Hyperline --sandbox developer`
+        //   GUI: jsSandboxMode "developer" in ~/.config/bruno/collection-security.json
+        const { execFileSync } = require('child_process');
+        const path = require('path');
+        const configured = bru.getEnvVar('config_path');
+        if (!configured) throw new Error('config_path env var is not set');
+        // Resolve relative to the collection root, not the process cwd — the GUI's
+        // cwd is wherever Bruno was launched from, only the CLI runs from bruno/.
+        const configPath = path.isAbsolute(configured)
+          ? configured
+          : path.resolve(bru.cwd(), configured);
+        const decrypted = execFileSync(
+          'sops', ['-d', '--output-type=json', configPath], { encoding: 'utf8' },
+        );
+        // Raw `sops -d` keeps the `_sops` encrypted-suffix on key names (the platform
+        // strips it at runtime, sops itself does not) — accept both spellings.
+        const creds = JSON.parse(decrypted)?.credentials;
+        const apiKey = creds?.access_token ?? creds?.access_token_sops;
+        if (!apiKey) {
+          throw new Error('credentials.access_token(_sops) missing from decrypted config');
+        }
+        // Hyperline keys are environment-bound by prefix: test_ keys only work against
+        // https://sandbox.api.hyperline.co, prod_ keys only against production. This
+        // environment pins the production base_url; a test_ key needs the sandbox host.
+        req.setHeader('Authorization', `Bearer ${apiKey}`);
+    - type: after-response
+      code: |-
+        // This account is PRODUCTION billing data. Redact PII / customer-identifying
+        // fields from every response so any saved Response Example is clean by
+        // construction — no manual scrub step. Decision-relevant fields (ids,
+        // timestamps, statuses, pagination/meta) are never redacted. Keep this list
+        // in sync with the connector's snapshot-test redactions
+        // (tests/test_snapshots.py REDACTED_FIELDS).
+        const PII_KEYS = new Set([
+          'name', 'billing_email', 'invoice_emails', 'email', 'owner_email',
+          'domain', 'billing_address', 'shipping_address', 'address', 'tax_ids', 'tax_id',
+          'local_tax_number', 'registration_number', 'external_id', 'owner',
+          'public_url', 'url', 'signed_file', 'phone', 'custom_properties',
+          'properties', 'comments', 'terms', 'additional_info', 'custom_note',
+          'footer', 'document_name', 'integrations',
+          'first_name', 'last_name', 'display_name', 'company_name', 'legal_name',
+          'trade_name', 'picture_url', 'logo_url', 'website', 'invoice_late_fees',
+          'invoice_footer', 'document_footer', 'invoice_memo', 'bank_details',
+          'address_line1', 'address_line2', 'city', 'zip_code', 'state', 'vat_number',
+        ]);
+        function redact(node) {
+          if (Array.isArray(node)) { node.forEach(redact); return; }
+          if (node && typeof node === 'object') {
+            for (const k of Object.keys(node)) {
+              if (PII_KEYS.has(k) && node[k] !== null) node[k] = 'REDACTED';
+              else redact(node[k]);
+            }
+          }
+        }
+        try {
+          const body = res.getBody();
+          if (body && typeof body === 'object') { redact(body); res.setBody(body); }
+        } catch (e) { /* non-JSON body (e.g. throttle error) — leave untouched */ }
+
+docs:
+  content: |-
+    Probe collection for source-hyperline. Conventions (WHY/VERIFIED/PENDING/
+    UNOBSERVABLE markers, laws) live in `.claude/skills/bruno-probe-endpoint`.
+
+    Run: `bru run <Folder> --env Hyperline --sandbox developer` from this
+    directory (bru CLI >= 3.0). Folder-level runs matter: `bare` requests
+    capture pinned ids/timestamps into runtime vars that the later requests in
+    the folder consume.
+
+    ## API constraints (account-wide)
+
+    Facts that hold for the whole Hyperline account, not any single endpoint.
+    This block is the collection root, so it is the first thing read when
+    surveying the API — treat it as the canonical home for cross-cutting limits.
+
+    - **Base URLs (key-prefix-bound):** `https://api.hyperline.co` for `prod_`
+      keys, `https://sandbox.api.hyperline.co` for `test_` keys. A key only
+      works against its own host (the connector derives the host from the key
+      prefix in `source_hyperline/api.py:base_url`). This collection targets
+      production.
+    - **Auth:** static API key, `Authorization: Bearer <key>` (wired by
+      configure-auth; confirmed live by every request in this collection).
+    - **Rate limits (VERIFIED 2026-09-04):** reads (GET) 200 req / 10 s
+      (headers observed live: `x-ratelimit-limit: 200`, `x-ratelimit-reset`
+      ~10 s ahead, RFC3339 reset time — saved on `Audit Logs / bare`); writes
+      50 req / 10 s and events-ingestion 1,000 req / 10 s are DOCUMENTED
+      2026-09-04 — https://docs.hyperline.co/api-reference/docs/rate-limiting.md
+      Headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`,
+      `X-RateLimit-Reset`, plus `Retry-After` on 429. On 429 pause until reset
+      with backoff.
+    - **Three pagination engines coexist.** Check each endpoint's OpenAPI spec
+      entry (https://api.hyperline.co/openapi is authoritative; the public
+      pagination doc only describes take/skip):
+      - v2 customers/invoices: keyset cursor — `limit` (default 50, max 100) +
+        opaque `cursor`, envelope `data`/`next_cursor`/`has_more`, optional
+        `total` via `include_total=true`.
+      - v2 subscriptions(+transitions) and all v1 lists: offset — `take`
+        (default 50, max 100) + `skip`, `{meta:{total,taken,skipped}, data}`
+        envelope.
+      - /v1/audit-logs: keyset cursor (`limit`/`cursor`, same
+        `data`/`next_cursor`/`has_more` envelope), strictly `happened_at`
+        descending.
+    - **Over-max page size is REJECTED (VERIFIED 2026-09-04):** `take=101` /
+      `limit=101` → 400 ValidationError on every engine; clamp client-side.
+      See `_top-level / take limit probe`, `Customers / limit 101 over max`,
+      `Audit Logs / limit over max`.
+    - **Unknown query params are SILENTLY IGNORED (VERIFIED 2026-09-04):**
+      undocumented filters (`updated_at__gte`, `process_at__gte`) and
+      undocumented `sort`/`order` return 200 with the result set unchanged —
+      never rely on a param the endpoint's own spec entry doesn't list. See
+      `Price Configurations / updated_at filter probe`, `Transactions /
+      sort asc probe`.
+    - **`meta.taken` is inconsistent (VERIFIED 2026-09-04):** on empty results
+      some endpoints echo the requested `take` (coupons, promotion-codes:
+      `taken: 2` with `total: 0`), others report the actual count (`taken: 0`).
+      Use `len(data)` as the completion signal, never `meta.taken`. See
+      `Coupons / bare`.
+    - **Deep-pagination cap (DOCUMENTED 2026-09-04,
+      https://docs.hyperline.co/api-reference/docs/upgrades):** since
+      2026-05-27, `skip + take > 10000` returns 400 on `/v1/customers` and
+      `/v1/invoices` (their v2 endpoints offer cursor pagination instead).
+      VERIFIED 2026-09-04: the cap does NOT apply to `/v1/transactions` today
+      (`skip=10001` → 200) — see `_top-level / deep skip probe`.
+    - **Timestamp filters require full ISO datetimes (VERIFIED 2026-09-04):**
+      date-only values are 400-rejected; stamps carry millisecond precision and
+      the shared `__gte`/`__gt`/`__lt`/`__lte` grammar honors it (tick = 1 ms).
+      Inclusivity: `__gte`/`__lte` inclusive, `__gt`/`__lt` exclusive. See
+      `Subscription Transitions / since transitioned`, `Customers` boundary
+      probes.
+
+    ## Docs conventions
+
+    Request docs follow the `bruno-probe-endpoint` skill's conventions: a
+    `**WHY:**` opener plus dated, classified findings (`**VERIFIED
+    (YYYY-MM-DD):**` / `**PENDING:**` / `**UNOBSERVABLE:**` / `**DOCUMENTED
+    (YYYY-MM-DD):**`), with `**LIMITATION**` marking endpoint-specific
+    constraints that carry connector consequences. The conventions live in the
+    skill; this file only indexes what is here.
+
+    ### Per-endpoint limitations
+
+    (Index only — the findings live on the named requests.)
+
+    - `Invoices / sort updated probe` — v2 invoices cannot sort by updated_at
+      (enum created_at|emitted_at only; 400 on violation).
+    - `Invoices / null updated count` — `updated_at__isNull`/`__isNotNull` are
+      unusable on datetime fields (validator parses the value as a datetime);
+      null-partition closed by `Invoices / full scan null audit` instead.
+    - `Transactions / bare` — no filters or sort honored; snapshot-only, with
+      a growth risk if a large account meets a future skip cap.
+    - `Price Configurations / updated_at filter probe` — undocumented filters
+      silently ignored; snapshot classification stands for the whole cluster.
+    - `Products / status archived` — bare-default status partition
+      unobservable on this account; connector passes `status=all` defensively
+      (products and features).
+    - `Audit Logs / bare` — events carry NO id field and NO timestamp filter
+      exists; sorted `happened_at` descending only. `next_cursor` is stateless
+      base64-JSON keyset (`{"i":"hlo_…","s":"happened_at","o":"desc"}`).
+    - `Audit Logs / bad cursor` — invalid cursor fails loudly (400
+      "Invalid cursor"); long-term staleness of a well-formed cursor is
+      UNOBSERVABLE (docs silent).
+
+    ## Shared cross-resource requests
+
+    The mechanical pagination probes are grouped by URL shape so every variable
+    is visible in the request URL:
+
+    - `_top-level / offset page`, `_top-level / take limit probe`,
+      `_top-level / deep skip probe` — `{{base_url}}/{{resource}}`. Set
+      `resource` (version-qualified, e.g. `v1/products`, `v1/transactions`,
+      `v2/wallets`) in the environment.
+
+    Save each run as a resource-named response example (e.g.
+    "transactions - take 101 clamped") so per-resource evidence is kept.
+
+    ## Seeding
+
+    Requests under `Seeding/` are **user-run only** — they create objects in
+    the production account (draft quote, price book, coupon, promotion code,
+    feature, tax rate) to close PENDING item-shape findings on endpoints that
+    are empty in this account. Never run them from an agent session.
+
+    ## Format
+
+    This collection is stored in Bruno's OpenCollection YAML format
+    (`opencollection.yml` + one `.yml` per request) — it requires Bruno / bru
+    CLI >= 3.0.0. Run requests with:
+    `bru run <request>.yml --env Hyperline --sandbox developer`
+    (the developer sandbox is required by the sops pre-request script above).
+
+    ## Redaction
+
+    The account behind this collection is production billing data. The
+    collection-level after-response script above redacts PII / customer-
+    identifying fields from every response so saved examples are clean by
+    construction. Keep its `PII_KEYS` list in sync with the connector's
+    snapshot-test redactions (`tests/test_snapshots.py` REDACTED_FIELDS).
+  type: text/markdown
+bundled: false
+extensions:
+  bruno:
+    ignore:
+      - node_modules
+      - .git

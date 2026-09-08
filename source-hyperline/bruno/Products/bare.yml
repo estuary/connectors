@@ -1,0 +1,107 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/products?take=2"
+  params:
+    - name: take
+      value: "2"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - populated list
+    request:
+      url: "{{base_url}}/v1/products?take=2"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "meta": {
+              "total": "REDACTED",
+              "taken": 2,
+              "skipped": 0
+            },
+            "data": [
+              {
+                "id": "itm_5gEthpjqY9kEUL",
+                "name": "REDACTED",
+                "status": "active",
+                "description": null,
+                "description_display_interval_dates": false,
+                "public_description": null,
+                "translations": {
+                  "de": {
+                    "name": null,
+                    "public_description": null
+                  },
+                  "en": {
+                    "name": null,
+                    "public_description": null
+                  },
+                  "es": {
+                    "name": null,
+                    "public_description": null
+                  },
+                  "fr": {
+                    "name": null,
+                    "public_description": null
+                  },
+                  "it": {
+                    "name": null,
+                    "public_description": null
+                  },
+                  "nl": {
+                    "name": null,
+                    "public_description": null
+                  },
+                  "pl": {
+                    "name": null,
+                    "public_description": null
+                  },
+                  "pt": {
+                    "name": null,
+                    "public_description": null
+                  }
+                },
+                "properties": null,
+                "custom_properties": "REDACTED",
+                "accounting": {
+                  "ive_EqrmiKPHAPVueR": {
+                    "tax_rate_id": null,
+                    "product_code": null,
+                    "account_code": "40160",
+                    "integrations": "REDACTED"
+                  }
+                },
+                "integrations": "REDACTED",
+                "type": "flat_fee",
+                "is_available_on_demand": true,
+                "is_available_on_subscription": true
+              }
+            ]
+          }
+docs: |-
+  **REFERENCE:** [List products](https://docs.hyperline.co/api-reference/endpoints/products/list-products.md)
+
+  **WHY:** bare list for the `products` stream. Teaches the live envelope, the
+  per-item field set (primary key, created_at/updated_at presence and precision),
+  and `meta.total` (dataset size — snapshot sweep cost).
+
+  **VERIFIED (2026-09-04):** envelope `{meta: {total, taken, skipped}, data: [...]}`; `meta.total: 69`; id prefix `itm_`; items carry NO created_at/updated_at (confirmed live, matching OpenAPI) → no cursor candidate, snapshot-only. `type` discriminates flat_fee/seat/dynamic/credit/bundle variants. See `Products / status all` + `Products / status archived` for the status-partition audit.

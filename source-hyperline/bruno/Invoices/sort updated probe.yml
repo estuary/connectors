@@ -1,0 +1,61 @@
+info:
+  name: sort updated probe
+  type: http
+  seq: 3
+
+http:
+  method: GET
+  url: "{{base_url}}/v2/invoices?limit=1&sort=updated_at"
+  params:
+    - name: limit
+      value: "1"
+      type: query
+    - name: sort
+      value: updated_at
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://docs.hyperline.co/api-reference/endpoints/invoices/list-invoices-1.md
+
+  **LIMITATION** — the invoices `sort` enum is `created_at | emitted_at` only
+  (no `updated_at`), unlike customers. **WHY:** learn the enforcement mode of
+  the enum (400 reject vs silently ignored) — if silently ignored, a buggy
+  future `sort=updated_at` call would return default-ordered data without any
+  error signal, so the connector must not rely on catching it at runtime.
+  **VERIFIED (2026-09-04):** REJECTED — 400 `{"sort": ["Invalid option:
+  expected one of \"created_at\"|\"emitted_at\""]}`. Enum enforced with a
+  hard error, not silently ignored. Consequence: the invoices incremental
+  walk cannot be server-ordered by its cursor field; windows must be drained
+  fully before checkpointing.
+
+examples:
+  - name: 400 - sort=updated_at rejected (enum enforced)
+    request:
+      url: "{{base_url}}/v2/invoices?limit=1&sort=updated_at"
+      method: GET
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "statusCode": 400,
+            "type": "ValidationError",
+            "message": "Invalid query params",
+            "errors": {
+              "sort": [
+                "Invalid option: expected one of \"created_at\"|\"emitted_at\""
+              ]
+            }
+          }

@@ -1,0 +1,155 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/v2/invoices?limit=3&include_total=true"
+  params:
+    - name: limit
+      value: "3"
+      type: query
+    - name: include_total
+      value: "true"
+      type: query
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // Pin the first non-null updated_at for `Invoices / since updated`.
+        const body = res.getBody();
+        const hit = body && Array.isArray(body.data)
+          ? body.data.find((d) => d.updated_at) : null;
+        if (hit) bru.setVar('invoices_pin_updated_at', hit.updated_at);
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://docs.hyperline.co/api-reference/endpoints/invoices/list-invoices-1.md
+
+  **WHY:** Prove the v2 cursor envelope on invoices and inspect the default
+  status partition — the spec gives `status` no default, but eyeball whether
+  draft/voided invoices actually appear unfiltered. Also observe `updated_at`
+  nullability in the wild (the item schema marks it `string|null`) and pin the
+  first non-null `updated_at` (runtime var `invoices_pin_updated_at`) for
+  `Invoices / since updated`; run this first in a fresh session.
+  **VERIFIED (2026-09-04):** v2 cursor envelope confirmed; total=14. Rows
+  seen are `status` to_pay/paid and `type` invoice — plus one credit_note in
+  `Invoices / full scan null audit`, so CREDIT NOTES FLOW THROUGH THIS
+  STREAM. All rows seen have non-null `updated_at`. The item payload has NO
+  `created_at`/`emitted_at` field even though the `sort` enum names them —
+  they are internal columns, not response fields.
+
+examples:
+  - name: 200 - cursor envelope, 1 of 14 items kept
+    request:
+      url: "{{base_url}}/v2/invoices?limit=3&include_total=true"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": [
+              {
+                "id": "inv_wHV65Sds7ssdEC",
+                "number": "INV6",
+                "type": "invoice",
+                "document_name": null,
+                "status": "to_pay",
+                "reference": "C2P5RBDBHX",
+                "purchase_order": null,
+                "currency": "USD",
+                "source": "hyperline",
+                "total_amount": "REDACTED",
+                "amount_due": "REDACTED",
+                "amount_paid": "REDACTED",
+                "amount_fixed": 21540,
+                "amount_excluding_tax": 21540,
+                "tax_amount": 1379,
+                "tax_scheme": "manual",
+                "discount_amount": 0,
+                "conversion_rate": 1.390415,
+                "converted_amount": 31867,
+                "converted_at": "2026-09-01T16:21:36.101Z",
+                "payment_method_id": null,
+                "bank_account_id": "bac_G6PMj6MAIZxVAY",
+                "custom_note": null,
+                "additional_info": null,
+                "footer": null,
+                "customer": {
+                  "id": "cus_DLbkNq9AUjjk5u",
+                  "name": "REDACTED",
+                  "email": "REDACTED",
+                  "external_id": null,
+                  "tax_id": null,
+                  "local_tax_number": null,
+                  "address": "REDACTED"
+                },
+                "seller": {
+                  "id": "ive_EqrmiKPHAPVueR",
+                  "name": "REDACTED",
+                  "tax_id": "REDACTED",
+                  "address": "REDACTED"
+                },
+                "subscription_id": "sub_cTPmfEKQo0q34b",
+                "period_starts_at": "2026-09-01T16:21:35.859Z",
+                "period_ends_at": "2027-09-01T16:21:35.858Z",
+                "due_at": "2026-10-01T16:21:36.454Z",
+                "refunded_at": null,
+                "grace_period_ended_at": null,
+                "settled_at": null,
+                "updated_at": "2026-09-01T16:21:52.397Z",
+                "properties": null,
+                "custom_properties": "REDACTED",
+                "additional_display_fields": null,
+                "original_invoice_id": null,
+                "original_invoice_number": null,
+                "line_items": [
+                  {
+                    "id": "ili_jcwvxqDpKBwjt0",
+                    "name": "REDACTED",
+                    "entry_type": "debit",
+                    "product_id": "itm_SjbvrMcfwfC4i3",
+                    "product_type": "seat",
+                    "units_count": 1,
+                    "unit_amount": 21540,
+                    "amount": "REDACTED",
+                    "amount_excluding_tax": 21540,
+                    "tax_rate": 6.4,
+                    "tax_rate_id": null,
+                    "tax_amount": 1379,
+                    "discount_amount": 0,
+                    "discount_percent": null,
+                    "period_starts_at": "2026-09-01T16:21:35.859Z",
+                    "period_ends_at": "2027-09-01T16:21:35.858Z",
+                    "revenue_type": "recurring",
+                    "revenue_interval_count": 1,
+                    "revenue_interval_period": "years",
+                    "display_unit_amount": true,
+                    "display_service_period": false,
+                    "original_line_item_id": null
+                  }
+                ],
+                "coupons": [],
+                "transactions": [],
+                "public_url": "REDACTED",
+                "issued_at": "2026-09-01T16:21:52.397Z"
+              }
+            ],
+            "next_cursor": "eyJpIjoiaW52X1hCU292aDBYZTVXUkNvIiwicyI6ImNyZWF0ZWRfYXQiLCJvIjoiZGVzYyJ9",
+            "has_more": true,
+            "total": "REDACTED"
+          }

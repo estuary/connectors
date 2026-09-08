@@ -1,0 +1,38 @@
+info:
+  name: A1 - Create Price Book
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{base_url}}/v1/price-books"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "name": "Estuary connector test price book",
+        "description": "Created for source-hyperline probe verification; safe to delete"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Create price book](https://docs.hyperline.co/api-reference/endpoints/price-books/create-price-book.md)
+
+  **Only the user runs this request — never the assistant** (`API-NEVER-MUTATE`).
+  It mutates production account state. All seeded objects are named/coded
+  `estuary`/`Estuary connector test …` so they are identifiable and can be
+  deleted from the Hyperline dashboard afterwards.
+
+  **WHY:** `/v1/price-books` is empty on this account, so `Price Books / bare`
+  could not observe the item shape (see its PENDING). This seeds one price book;
+  after running, re-run `Price Books / bare` and save the populated example.
+  Standalone group A — depends on nothing.

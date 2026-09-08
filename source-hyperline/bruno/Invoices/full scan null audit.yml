@@ -1,0 +1,159 @@
+info:
+  name: full scan null audit
+  type: http
+  seq: 5
+
+http:
+  method: GET
+  url: "{{base_url}}/v2/invoices?limit=100&include_total=true"
+  params:
+    - name: limit
+      value: "100"
+      type: query
+    - name: include_total
+      value: "true"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://docs.hyperline.co/api-reference/endpoints/invoices/list-invoices-1.md
+
+  **WHY:** `updated_at__isNull` is rejected by the validator (see `Invoices /
+  null updated count`), so the nullable-`updated_at` partition can't be
+  queried directly. The account holds only 14 invoices, so a single
+  limit=100 page IS the full table: count rows with `updated_at = null` and
+  tabulate the `status`/`type` distribution (are drafts/voided present
+  unfiltered?) by direct inspection instead. Saved example is a projection
+  (id, status, type, updated_at, issued_at per row).
+  **VERIFIED (2026-09-04):** 14 of 14 rows returned in one page; ZERO rows
+  with null `updated_at`; status distribution 7 to_pay / 7 paid; type
+  distribution 13 invoice / 1 credit_note. No draft rows exist in this
+  account, so whether drafts appear unfiltered is **UNOBSERVABLE** here —
+  the spec gives `status` no default (no documented hidden partition), and
+  the fallback is a one-off `status` filter probe if a production account
+  ever reports missing drafts.
+
+examples:
+  - name: 200 - all 14 rows, zero null updated_at (projection)
+    request:
+      url: "{{base_url}}/v2/invoices?limit=100&include_total=true"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "total": "REDACTED",
+            "has_more": false,
+            "rows": [
+              {
+                "id": "inv_wHV65Sds7ssdEC",
+                "status": "to_pay",
+                "type": "invoice",
+                "updated_at": "2026-09-01T16:21:52.397Z",
+                "issued_at": "2026-09-01T16:21:52.397Z"
+              },
+              {
+                "id": "inv_pewi8wZbVIuuuA",
+                "status": "to_pay",
+                "type": "invoice",
+                "updated_at": "2026-08-31T13:29:03.695Z",
+                "issued_at": "2026-08-31T13:29:03.695Z"
+              },
+              {
+                "id": "inv_XBSovh0Xe5WRCo",
+                "status": "to_pay",
+                "type": "invoice",
+                "updated_at": "2026-08-29T20:10:07.269Z",
+                "issued_at": "2026-08-29T20:10:07.268Z"
+              },
+              {
+                "id": "inv_6GCEw7hKB4xhqa",
+                "status": "to_pay",
+                "type": "invoice",
+                "updated_at": "2026-08-29T19:45:34.287Z",
+                "issued_at": "2026-08-29T19:45:34.287Z"
+              },
+              {
+                "id": "inv_jGKTUyhpODOmK3",
+                "status": "to_pay",
+                "type": "invoice",
+                "updated_at": "2026-08-29T16:52:37.815Z",
+                "issued_at": "2026-08-29T16:52:37.814Z"
+              },
+              {
+                "id": "inv_PuhExOFTEQl0cX",
+                "status": "paid",
+                "type": "credit_note",
+                "updated_at": "2026-08-28T16:45:33.359Z",
+                "issued_at": "2022-02-28T00:00:00.000Z"
+              },
+              {
+                "id": "inv_SqjYSv47n6AyZ2",
+                "status": "to_pay",
+                "type": "invoice",
+                "updated_at": "2026-08-28T16:45:32.124Z",
+                "issued_at": "2025-10-07T00:00:00.000Z"
+              },
+              {
+                "id": "inv_6hyygx5RdbRB0S",
+                "status": "paid",
+                "type": "invoice",
+                "updated_at": "2026-08-28T16:45:30.932Z",
+                "issued_at": "2022-12-21T00:00:00.000Z"
+              },
+              {
+                "id": "inv_hceAowe0qkVF3D",
+                "status": "paid",
+                "type": "invoice",
+                "updated_at": "2026-08-28T16:45:29.664Z",
+                "issued_at": "2025-06-23T00:00:00.000Z"
+              },
+              {
+                "id": "inv_e68UlYIYJ3pc3I",
+                "status": "paid",
+                "type": "invoice",
+                "updated_at": "2026-08-28T16:45:28.274Z",
+                "issued_at": "2025-06-25T00:00:00.000Z"
+              },
+              {
+                "id": "inv_xia3ppssL0FRya",
+                "status": "paid",
+                "type": "invoice",
+                "updated_at": "2026-08-28T16:45:26.933Z",
+                "issued_at": "2025-06-20T00:00:00.000Z"
+              },
+              {
+                "id": "inv_eDQM75vvQ42HCI",
+                "status": "paid",
+                "type": "invoice",
+                "updated_at": "2026-08-28T16:45:25.553Z",
+                "issued_at": "2025-06-23T00:00:00.000Z"
+              },
+              {
+                "id": "inv_5sXCbDDMMwvB9r",
+                "status": "paid",
+                "type": "invoice",
+                "updated_at": "2026-08-28T16:45:23.945Z",
+                "issued_at": "2025-06-20T00:00:00.000Z"
+              },
+              {
+                "id": "inv_9w6bSJNA7Ppuao",
+                "status": "to_pay",
+                "type": "invoice",
+                "updated_at": "2026-08-27T02:44:25.467Z",
+                "issued_at": "2026-08-27T02:44:25.467Z"
+              }
+            ]
+          }
