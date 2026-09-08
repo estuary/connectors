@@ -707,3 +707,124 @@ func TestStreamV2SwitchOntoTheWritePathWithPendingWorkIsRejected(t *testing.T) {
 		require.NoError(t, addBinding(d))
 	})
 }
+
+// TestStreamV2SwitchOntoTheWritePathDropsTheStreamingChannel covers what a binding
+// arriving on streaming v2 does with the channel the snowpipe_streaming path holds
+// for it: one deterministic channel per shard, which nothing else would ever drop.
+func TestStreamV2SwitchOntoTheWritePathDropsTheStreamingChannel(t *testing.T) {
+	var ctx = context.Background()
+
+	var target = func(stateKey string) sql.Table {
+		return sql.Table{
+			TableShape: sql.TableShape{Binding: 0, DeltaUpdates: true, Path: []string{"DB", "SCH", "TBL"}},
+			Identifier: "TBL",
+			Keys:       []sql.Column{{Identifier: `KEY`}},
+			Values:     []sql.Column{{Identifier: `VAL`}},
+			StateKey:   stateKey,
+		}
+	}
+
+	type dropRequest struct {
+		Schema  string `json:"schema"`
+		Table   string `json:"table"`
+		Channel string `json:"channel"`
+	}
+
+	// newTransactor serves the snowpipe_streaming REST API from a fake which
+	// records every channel drop and answers everything else with a bare success.
+	var newTransactor = func(t *testing.T, item *checkpointItem) (*transactor, *[]dropRequest) {
+		t.Helper()
+		var drops []dropRequest
+		var mux = http.NewServeMux()
+		mux.HandleFunc("POST /v1/streaming/channels/drop", func(w http.ResponseWriter, r *http.Request) {
+			var req dropRequest
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
+			drops = append(drops, req)
+			w.Header().Set("Content-Type", "application/json")
+			fmt.Fprint(w, `{"message":"Success","status_code":0}`)
+		})
+		mux.HandleFunc("POST /v1/streaming/channels/open", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			fmt.Fprint(w, `{"message":"Success","status_code":0,"table_columns":[]}`)
+		})
+		var ts = httptest.NewServer(mux)
+		t.Cleanup(ts.Close)
+
+		pkey, err := rsa.GenerateKey(rand.Reader, 1024)
+		require.NoError(t, err)
+		var role = "TEST_ROLE"
+
+		var cfg = config{
+			Database:    "DB",
+			Schema:      "SCH",
+			Credentials: &snowflake_auth.CredentialConfig{AuthType: snowflake_auth.JWT},
+		}
+		var rng = &pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32}
+		var d = &transactor{
+			cfg:    cfg,
+			ep:     &sql.Endpoint[config]{Dialect: snowflakeDialect("SCH", timestampTypeLTZ, nil)},
+			_range: rng,
+			cp:     checkpoint{"sk.v1": item},
+			snowpipeStreaming: &streamManager{
+				c: &streamClient{
+					r:        resty.New().SetBaseURL(ts.URL + "/v1/streaming").SetDisableWarn(true),
+					key:      pkey,
+					user:     "TEST_USER",
+					database: "DB",
+					account:  "TEST_ACCOUNT",
+					role:     &role,
+				},
+				tableStreams: map[int]*tableStream{},
+				channelName:  channelName("test/onto", 0),
+				lastBinding:  -1,
+				blobStats:    map[int][]*blobStatsTracker{},
+				counter:      -1,
+			},
+			snowpipeStreamingV2: newStreamV2Manager(ctx, &cfg, "test/onto", "acct", rng),
+		}
+		t.Cleanup(d.snowpipeStreamingV2.stop)
+		return d, &drops
+	}
+
+	t.Run("a binding arriving on this write path drops the channel at Open", func(t *testing.T) {
+		var d, drops = newTransactor(t, nil)
+		require.NoError(t, d.addBinding(ctx, target("sk.v1"), true, true))
+		require.Equal(t, []dropRequest{{Schema: "SCH", Table: "TBL", Channel: channelName("test/onto", 0)}}, *drops)
+		require.False(t, d.bindings[0].dropStreamingChannel)
+	})
+
+	t.Run("a binding with blobs still to drain drops the channel after the drain instead", func(t *testing.T) {
+		var d, drops = newTransactor(t, &checkpointItem{
+			Table:       "TBL",
+			StreamBlobs: []*blobMetadata{{Path: "one.bdec"}},
+		})
+		require.NoError(t, d.addBinding(ctx, target("sk.v1"), true, true))
+		require.Empty(t, *drops)
+		require.True(t, d.bindings[0].dropStreamingChannel)
+	})
+
+	t.Run("a binding already on this write path leaves the channel alone", func(t *testing.T) {
+		var d, drops = newTransactor(t, &checkpointItem{StreamV2: map[string]*streamV2Item{
+			"00000000-ffffffff": {Channel: "task_00000000_sk_v1", Counter: 7, KeyEnd: math.MaxUint32},
+		}})
+		require.NoError(t, d.addBinding(ctx, target("sk.v1"), true, true))
+		require.Empty(t, *drops)
+		require.False(t, d.bindings[0].dropStreamingChannel)
+	})
+
+	t.Run("a channel Snowflake no longer holds counts as dropped", func(t *testing.T) {
+		var d, drops = newTransactor(t, nil)
+		d.snowpipeStreaming.c.r.SetBaseURL(func() string {
+			var mux = http.NewServeMux()
+			mux.HandleFunc("POST /v1/streaming/channels/drop", func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				fmt.Fprint(w, `{"message":"channel does not exist","status_code":25}`)
+			})
+			var ts = httptest.NewServer(mux)
+			t.Cleanup(ts.Close)
+			return ts.URL + "/v1/streaming"
+		}())
+		require.NoError(t, d.addBinding(ctx, target("sk.v1"), true, true))
+		require.Empty(t, *drops)
+	})
+}
