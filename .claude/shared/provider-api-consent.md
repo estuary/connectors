@@ -38,7 +38,7 @@ Runtime vars _are_ fine for non-secret resource ids chained between requests —
 
 ### `API-DONT-READ-CREDS` · conduct-only
 
-Don't read the encrypted credentials file directly, even just to check its structure. Ask the user where it lives and what JSON path the token sits at.
+Don't read the encrypted credentials file directly, even just to check its structure. The file is the connector's own `config.yaml`; the token's JSON path and wire scheme come from the credential class in `models.py` and from `api.py` (Phase 2 of `bruno-probe-endpoint`) — never from the file, and never by asking the user to describe it.
 
 ---
 
