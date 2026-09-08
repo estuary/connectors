@@ -63,6 +63,9 @@ type sidecarClient struct {
 	nextID  uint64
 	pending map[uint64]chan *rpcResponse
 	broken  error // non-nil once the read loop has terminated
+	// readDone is closed when the read loop has terminated, by which point every
+	// reply the sidecar wrote has been delivered and every pending call is closed.
+	readDone chan struct{}
 
 	// died is closed by the supervisor when the sidecar process exits, and
 	// diedErr() reports the exit as an error including captured stderr.
@@ -72,16 +75,18 @@ type sidecarClient struct {
 
 func newSidecarClient(conn net.Conn, died <-chan struct{}, diedErr func() error) *sidecarClient {
 	var c = &sidecarClient{
-		conn:    conn,
-		pending: make(map[uint64]chan *rpcResponse),
-		died:    died,
-		diedErr: diedErr,
+		conn:     conn,
+		pending:  make(map[uint64]chan *rpcResponse),
+		readDone: make(chan struct{}),
+		died:     died,
+		diedErr:  diedErr,
 	}
 	go c.readLoop()
 	return c
 }
 
 func (c *sidecarClient) readLoop() {
+	defer close(c.readDone)
 	var scanner = bufio.NewScanner(c.conn)
 	scanner.Buffer(make([]byte, 64*1024), 16*1024*1024)
 
@@ -163,15 +168,23 @@ func (c *sidecarClient) callWithPayload(ctx context.Context, op string, params a
 			var err = c.broken
 			c.mu.Unlock()
 			return c.callError(op, err)
-		} else if !res.OK {
-			return &sidecarError{Code: res.Code, Message: res.Error}
-		} else if result != nil && len(res.Result) > 0 {
-			if err := json.Unmarshal(res.Result, result); err != nil {
-				return fmt.Errorf("decoding sidecar %q result: %w", op, err)
-			}
 		}
-		return nil
+		return decodeReply(op, res, result)
 	case <-c.died:
+		// The process can exit right after writing its reply, so the reply may
+		// still be on the connection. The read loop ends once the connection
+		// closes, and only a call it never answered is reported as the death.
+		select {
+		case <-c.readDone:
+		case <-ctx.Done():
+		}
+		select {
+		case res, ok := <-ch:
+			if ok {
+				return decodeReply(op, res, result)
+			}
+		default:
+		}
 		return c.callError(op, c.diedErr())
 	case <-ctx.Done():
 		// A timed-out RPC leaves the connection in an indeterminate state, so
@@ -180,6 +193,19 @@ func (c *sidecarClient) callWithPayload(ctx context.Context, op string, params a
 		c.fail(err)
 		return c.callError(op, err)
 	}
+}
+
+// decodeReply turns the sidecar's reply to op into the call's outcome, decoding
+// its result into result when the call asked for one.
+func decodeReply(op string, res *rpcResponse, result any) error {
+	if !res.OK {
+		return &sidecarError{Code: res.Code, Message: res.Error}
+	} else if result != nil && len(res.Result) > 0 {
+		if err := json.Unmarshal(res.Result, result); err != nil {
+			return fmt.Errorf("decoding sidecar %q result: %w", op, err)
+		}
+	}
+	return nil
 }
 
 // write frames one request onto the connection: its header as a JSON line, then
