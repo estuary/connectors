@@ -145,7 +145,7 @@ Keep `environments/<Provider>.yml` free of dead vars: it should hold only vars s
 
 **Order the tree with folders, not seq bands.** Each resource family's folder carries its own `info.seq`; within a folder, requests run `seq` 1..n, ordered `bare` first, then filters/cursors, then the mechanical pagination probes. The folder split is what keeps the GUI tree skimmable as the collection accretes streams across sessions — per-session incremental numbering over a flat top level scrambles it.
 
-**Chain sequential requests with post-response scripts.** When request B consumes an id produced by request A (seed step 2 needs the campaign id created by step 1, a fetch-by-id needs the bare list's first id), don't leave a `PIN_FROM_…` placeholder for a human to fill — add an after-response script to A (`runtime.scripts`, `type: after-response`) that captures the id into a runtime var (`bru.setVar('seed_campaign_id', res.body.id)`) and reference `{{seed_campaign_id}}` in B. The user can then run the sequence seamlessly, in the GUI or via a folder-level `bru run`. Runtime vars are in-memory only, so this is fine for resource ids — never do it for credentials (`API-TOKEN-EPHEMERAL`). For out-of-order runs, give B a _conditional_ fallback in its before-request script (`if (!bru.getVar('seed_campaign_id')) bru.setVar('seed_campaign_id', '<pinned id>')`) — don't use a declarative pre-request var default, which is reassigned on every run and would clobber the value A captured — and note in B's `docs:` that A must run first in a fresh session.
+**Chain dependent requests with scripts, not run order.** When request B consumes an id produced by request A (seed step 2 needs the campaign id created by step 1, a fetch-by-id needs the bare list's first id), don't leave a `PIN_FROM_…` placeholder for a human to fill. Give A an after-response script (`runtime.scripts`, `type: after-response`) that captures the id into a runtime var (`bru.setVar('seed_campaign_id', res.body.id)`), reference `{{seed_campaign_id}}` in B, and give B a before-request guard that runs A when the var is missing: `if (!bru.getVar('seed_campaign_id')) await bru.runRequest('Seeding/Create Campaign');` (path from the collection root, no extension). B is then self-contained: run alone it pulls in its prerequisite; run after A (GUI, or a folder-level `bru run`) the guard sees the var and doesn't run A twice. Runtime vars are in-memory only, so this is fine for resource ids — never for credentials (`API-TOKEN-EPHEMERAL`). Don't use a declarative pre-request var default for the fallback — it is reassigned on every run and would clobber the value A captured — and never call `bru.runRequest` from a collection-level script, which recurses.
 
 If the upstream `add-stream` skill's rate limit survey flagged a tight per-endpoint budget, keep the request set minimal — typically the bare list and one filtered list is enough to confirm shape and cursor behavior.
 
@@ -236,17 +236,15 @@ In every branch the finding the mutation would unblock stays `**PENDING:**` (sta
 **Seeding an empty endpoint.** Write the create requests (POST/PUT) for a small, representative set of test records:
 
 - One request per object type the empty endpoint depends on, in dependency order (e.g. create a customer before an invoice).
-- Use minimal, clearly-labeled test values; pin any parent ids from earlier responses.
-- Wire each step's output into the next step's input with post-response scripts (see "Chain sequential requests" in Phase 4) so the whole sequence runs without hand-copying ids between requests.
+- Use minimal, clearly-labeled test values; parent ids come from the chained request's runtime var, never from pinned literals.
+- Chain each step to the one it depends on (see "Chain dependent requests" in Phase 4) so any request in the sequence can be run alone and pulls in its prerequisites.
 - Record in the verification report that the endpoint was empty and what seeding it needs, so the gap is visible even before the requests run.
 
 ### How to author it
 
 **Placement.** Every mutating/seeding request lives in a `Seeding/` subdirectory of the collection — never at the collection's top level. The top level holds only read-only verification requests; the folder split keeps the mutating set visually distinct and lets the whole sequence run with a folder-level `bru run`.
 
-**Naming.** Seeding requests that run in sequence are named with a `[LETTER][NUMBER]` prefix — one letter per dependency group, numbered in run order within the group (e.g. `A1 - Create Customer.yml`, `A2 - Create Invoice.yml`; an unrelated sequence gets `B1`…`B4`). The letter tells the reader at a glance which requests form one sequence (and share chained runtime vars — see "Chain sequential requests" in Phase 4); the number is the order to run them in. A mutation that depends on a seeded resource is **not** standalone — it belongs to that resource's dependency group, or to a trailing group (`D1`, `D2`, …) for post-read mutations that touch already-seeded records (an archive, an update that advances a cursor). Reserve no-prefix only for a mutation that depends on nothing and that nothing depends on. Keep `info.seq` consistent with the prefix ordering and contiguous within `Seeding/`, so the GUI lists the whole sequence in run order.
-
-<!-- TODO: Migrate the naming scheme to request chaining -->
+**Dependencies live in the request, not its name.** Name a seeding request for the mutation it performs (`Create Customer.yml`, `Archive Member.yml`) — no run-order prefixes. Ordering is enforced by the chaining guard from Phase 4: a request that needs a seeded resource `bru.runRequest`s the request that seeds it when the runtime var is missing, so the reader sees its prerequisites in the script and can run any request alone. Post-read mutations that touch already-seeded records (an archive, an update that advances a cursor) chain to the request that seeded the record the same way. Still order `info.seq` so every request comes after the ones it chains to: a folder-level `bru run` walks seq order, and a dependent listed first would seed its prerequisite itself and then the runner would seed it again. Collections written before this rule carry `A1 - …` prefixes and pinned-id fallbacks; treat that as legacy, don't copy it.
 
 **Keep the mutation's HTTP verb visible — never hide it inside a decoy GET.** A seeding request's method and URL must be the mutation it performs (`post { url: …/lists/{id} }`), so a reviewer sees what it does at a glance. Do **not** make the request a `GET` whose pre-request script secretly POSTs/DELETEs — that obscures the real call.
 
@@ -255,7 +253,7 @@ In every branch the finding the mutation would unblock stays `**PENDING:**` (sta
 **Docs block.** A seeding request gets a `docs:` block like any other request, holding what is true of the request itself:
 
 - `**WHY:**` — which downstream probe the seeded data feeds.
-- **Prerequisites** — which request must run first, and how to clean up afterwards.
+- **Prerequisites** — anything the chaining guard can't set up (account-level settings, a sandbox flag), and how to clean up afterwards.
 - **Outcome** — added once the request has actually run: a dated line such as "Outcome: ran YYYY-MM-DD; finding VERIFIED in `<request>`".
 
 ### After it runs
