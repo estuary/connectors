@@ -10,7 +10,7 @@ Fix the reported bug in `source-$1`. This skill is an orchestrator — most step
 ## Laws
 
 - [`.claude/shared/session-conduct.md`](../../shared/session-conduct.md) — TODO list, consent, citing sources.
-- [`.claude/shared/provider-api-consent.md`](../../shared/provider-api-consent.md) — the `config.yaml` gate, never running mutations, the budget rule.
+- [`.claude/shared/provider-api-consent.md`](../../shared/provider-api-consent.md) — the `config.yaml` gate, mutations only with consent, the budget rule.
 
 Plus one specific to fixing rather than building:
 
