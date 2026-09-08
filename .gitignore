@@ -59,3 +59,6 @@ source-kafka/tests/test.generated.flow.yaml
 
 # Written by the materialization test harness when a snapshot mismatches.
 .snapshots/*.actual
+
+# Per-run permissions files written by the connector skills (see .claude/hooks/permission-gate.py)
+.claude/permissions/

@@ -61,7 +61,7 @@ Invoke before writing or changing any `fetch_*` / `backfill_*` function.
 | Rule | Check | Statement |
 | ---- | ----- | --------- |
 | `API-CONFIG-GATE` | conduct | Read-only calls only while `config.yaml` is clean and tracked |
-| `API-NEVER-MUTATE` | conduct | The user runs mutations, not you — consent doesn't lift this |
+| `API-MUTATE-ONLY-WITH-CONSENT` | conduct | Mutations only with `seeding: assistant`, only under `bruno/Seeding/` |
 | `API-ROUTE-THROUGH-BRUNO` | diff | No ad-hoc `curl` against the provider in committed files |
 | `API-TOKEN-EPHEMERAL` | diff | Token on `req` only; never `setVar` / `setEnvVar` / committed |
 | `API-DONT-READ-CREDS` | conduct | Don't read the encrypted credentials file directly |
@@ -81,6 +81,27 @@ Invoke before writing or changing any `fetch_*` / `backfill_*` function.
 | `CONDUCT-GREP-BEFORE-CITE` | conduct | Grep for remembered symbols before recommending them |
 | `CONDUCT-ESTABLISH-BASELINE` | conduct | Baseline suite in background at session start; gate the first edit on it |
 | `CONDUCT-VERIFY-FIRST` | conduct | Live behavior over docs over recall |
+
+### Interaction mode — [`interaction-mode.md`](interaction-mode.md)
+
+Gates are the points where a skill would ask the user; each resolves as _interactive / autonomous_ below. All are `conduct` — invisible in a diff except through the decision ledger.
+
+| Rule | Check | Statement |
+| ---- | ----- | --------- |
+| `CONDUCT-FORWARD-MODE` | conduct | Every dispatch carries `interaction mode: …` and the seeding answer |
+| `CONDUCT-PERMISSIONS-FILE` | conduct | Permissions file managed only via `permissions.py`, only by the orchestrator |
+| `CONDUCT-CONSENT-PER-CONNECTOR` | conduct | Questionnaire answers are per connector, per run |
+| `GATE-STREAM-LIST` | conduct | Ask / build every documented resource |
+| `GATE-AUTH-SCHEME` | conduct | Confirm / simplest static scheme |
+| `GATE-CREDENTIALS` | conduct | Hard stop in both modes; batched in autonomous |
+| `GATE-TIGHT-BUDGET` | conduct | Ask per run / declare a budget at the checkpoint |
+| `GATE-INCREMENTAL-ONLY` | conduct | Confirm / never |
+| `GATE-STRATEGY-UNCLEAR` | conduct | Ask / decide on size and cursor |
+| `GATE-PLAN-REVIEW` | conduct | Human gate / self-review + reviewer subagent |
+| `GATE-SEEDING` | conduct | Hand over / PENDING, unless `seeding: assistant` |
+| `GATE-CONFIG-DIRTY` | conduct | Ask / stop live calls |
+| `GATE-BRUNO-WORKSPACE` | conduct | Ask / no reference |
+| `GATE-COMMIT-SPLIT` | conduct | Recommend / perform |
 
 ### Situational skills
 

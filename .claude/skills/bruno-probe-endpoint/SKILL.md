@@ -11,13 +11,13 @@ Verify that the provider's `endpoint-path` actually returns what the docs say it
 
 **Shared laws** — read both before Phase 1; they are the single authority and are shared with `add-stream` and `configure-auth`:
 
-- [`.claude/shared/provider-api-consent.md`](../../shared/provider-api-consent.md) — `API-CONFIG-GATE` (the `config.yaml` check before _every_ read call), `API-NEVER-MUTATE`, `API-ROUTE-THROUGH-BRUNO`, `API-TOKEN-EPHEMERAL`, `API-DONT-READ-CREDS`.
+- [`.claude/shared/provider-api-consent.md`](../../shared/provider-api-consent.md) — `API-CONFIG-GATE`, `API-MUTATE-ONLY-WITH-CONSENT`, `API-ROUTE-THROUGH-BRUNO`, `API-TOKEN-EPHEMERAL`, `API-DONT-READ-CREDS`.
 - [`.claude/shared/session-conduct.md`](../../shared/session-conduct.md).
 
 **Skill-specific laws:**
 
-1. The Bruno collection is the source of truth for "what does this endpoint actually return today." When it and the provider's docs disagree, the collection wins and the docs claim gets re-marked (Phase 5, step 5).
-2. When a mutation is needed, it goes to the user via Phase 6 — never run by you, even with consent. `API-NEVER-MUTATE` states the rule; Phase 6 is the handoff procedure.
+1. The Bruno collection is the source of truth for "what does this endpoint actually return today." When it and the provider's docs disagree, the collection wins and the docs claim gets re-marked (Phase 5, step 4).
+2. You run a mutation only when the recorded seeding answer is `seeding: assistant` and the request lives under `Seeding/`. In every other case the request is authored for the user to run, or the finding stays PENDING. `API-MUTATE-ONLY-WITH-CONSENT` states the rule; Phase 6 is the procedure.
 
 This skill writes no connector code and never modifies `config.yaml`. Its output is a Bruno collection and a set of observed responses to compare against the docs.
 
@@ -48,7 +48,7 @@ Endpoint-specific constraints do **not** go in this block (nor in `CLAUDE.md`) �
 **Don't invent the layout — model it on an existing collection.** To find a reference:
 
 1. If a **sibling connector** has a `bruno/` collection, copy its structure and pre-request script from there (`source-mailchimp-native/bruno/` is a full OpenCollection YAML example).
-2. Otherwise, use the user's **Bruno workspace** (the directory where their reference collections live). If its location isn't already recorded in memory ([[reference-bruno-workspace]]), **ask the user where their Bruno workspace is and commit the answer to memory** so the next run doesn't ask again. Then model on a collection found there.
+2. Otherwise, model on a collection in the user's **Bruno workspace** (the directory where their reference collections live). Its location should already be in memory ([[reference-bruno-workspace]]). If it isn't, this is `GATE-BRUNO-WORKSPACE`: in human-in-the-loop mode **ask where the workspace is and commit the answer to memory** so the next run doesn't ask again; in autonomous mode use no reference at all, build `bruno/` from this skill's layout rules alone, and ledger that.
 
 A reference collection may still be in the legacy `.bru` format — the structure maps 1:1 (`bruno.json` + `collection.bru` → `opencollection.yml`; `meta` → `info`; `docs { }` → `docs:`; `script:pre-request` → a `scripts:` entry with `type: before-request`; inline `example` blocks → `examples:`). To migrate an existing `.bru` collection, convert mechanically with Bruno's own `@usebruno/filestore` npm package (`parseRequest(…, {format:'bru'})` → `stringifyRequest(…, {format:'yml'})`, and the collection/environment/folder equivalents) rather than hand-writing YAML.
 
@@ -206,40 +206,61 @@ An assumption written as fact is a latent bug; the same assumption written as UN
 
 ## Phase 5 — Execution
 
-Apply `API-CONFIG-GATE` to every request. For each:
+For each request:
 
-1. `git status --porcelain <connector>/config.yaml` — empty? proceed. Non-empty? ask. (`API-CONFIG-GATE`.)
-2. `bru run "<request>.yml" --env <Provider> --sandbox developer` from the collection directory (requires `bru` CLI >= 3.0.0 for the OpenCollection YAML format).
-3. **Save every successful response as a Bruno response example.** Bruno's native "Response Examples" feature (see [docs](https://docs.usebruno.com/send-requests/res-data-cookies/response-examples.md)) persists a response as an entry in the request's `examples:` list, inside the same `.yml`. After each run, save the response with a descriptive name (e.g. `200 — populated list`, `200 — empty list`, `400 — invalid filter`) so future runs can be diffed against the recorded shape and future stream additions inherit the artifact.
+1. `bru run "<request>.yml" --env <Provider> --sandbox developer` from the collection directory (requires `bru` CLI >= 3.0.0 for the OpenCollection YAML format). The repo's hook refuses the run while `config.yaml` is dirty or unstamped (`GATE-CONFIG-DIRTY`); if it does, follow its message.
+2. **Save every successful response as a Bruno response example.** Bruno's native "Response Examples" feature (see [docs](https://docs.usebruno.com/send-requests/res-data-cookies/response-examples.md)) persists a response as an entry in the request's `examples:` list, inside the same `.yml`. After each run, save the response with a descriptive name (e.g. `200 — populated list`, `200 — empty list`, `400 — invalid filter`) so future runs can be diffed against the recorded shape and future stream additions inherit the artifact.
    - **Mirror the connector's snapshot redactions.** Whatever fields the connector's snapshot tests redact or ignore (HATEOAS `_links`, volatile URLs/ids, churning timestamps), redact the _same_ fields in saved examples with the _same_ marker (e.g. `"REDACTED"`). The example should reflect what the tests actually assert, not the raw response — otherwise the two drift and a reviewer can't tell signal from noise. **Mechanism:** prefer a collection-level after-response script in `opencollection.yml` (`request.scripts`, `type: after-response`) that walks `res.getBody()` and `res.setBody(...)` with the redactions — verified to apply to the saved response example, so it's automatic and there's no manual edit step to forget. (Guard it to JSON object/array bodies; never parse throttle-error bodies.) Two caveats: it's a _second_ copy of the field list (the first being the test's `REDACTED_FIELDS`), so comment each pointing at the other and keep them in sync; and it hides those fields from live `bru run` output too, so keep the list **minimal** — only fields you never need to eyeball during verification.
    - **Body proportionality.** Full provider objects are often mostly boilerplate (HATEOAS `_links`, unused settings blocks). The `bare`/shape request keeps one full representative item; filter/pagination/finding probes save a projection of just the decision-relevant fields (id, the cursor field, `total_items`), and note the projection in the example name so it isn't mistaken for the full response.
-4. Diff the response shape against the provider docs: key set on the object envelope (`object`, `has_more`, `data`), per-item key set, id prefix, pagination contract. Note discrepancies before proceeding.
-5. **Reconcile the request's own `docs:` against the evidence you just saved.** A request's docs are drafted from a pre-run hypothesis ("the `name` filter is substring; expect narrowing"); the live response is the verdict. Re-read the docs and rewrite any claim the result contradicted so the prose states the _observed finding_ as a dated `**VERIFIED (YYYY-MM-DD):**` entry, never the refuted guess — the docs block and its saved example must never disagree. This collection is a memory layer for future readers, human and assistant; a docs block recording a refuted hypothesis is worse than an empty one. If you could **not** capture an example for a request (verified in a sibling session, or it needs a mutation you handed off in Phase 6), mark the claim `**PENDING:** <why + how to close>`; if no practical path to evidence exists (feature-gated, unseedable), mark it `**UNOBSERVABLE:** <reason + what you rely on instead>` (see Documentation, Phase 4).
+3. Diff the response shape against the provider docs: key set on the object envelope (`object`, `has_more`, `data`), per-item key set, id prefix, pagination contract. Note discrepancies before proceeding.
+4. **Reconcile the request's own `docs:` against the evidence you just saved.** A request's docs are drafted from a pre-run hypothesis ("the `name` filter is substring; expect narrowing"); the live response is the verdict. Re-read the docs and rewrite any claim the result contradicted so the prose states the _observed finding_ as a dated `**VERIFIED (YYYY-MM-DD):**` entry, never the refuted guess — the docs block and its saved example must never disagree. This collection is a memory layer for future readers, human and assistant; a docs block recording a refuted hypothesis is worse than an empty one. If you could **not** capture an example for a request (verified in a sibling session, or it needs a mutation you handed off in Phase 6), mark the claim `**PENDING:** <why + how to close>`; if no practical path to evidence exists (feature-gated, unseedable), mark it `**UNOBSERVABLE:** <reason + what you rely on instead>` (see Documentation, Phase 4).
 
 Surface findings as a short report — what matched, what didn't, what the implications are for the connector implementation. The report must include a **Cursors** section naming the chosen backfill cursor, the chosen incremental cursor, their types and filter parameters, and a one-line note confirming the filter behavior observed in the live runs (e.g. "`created[gte]=… → narrowed from 9 to 3 items, has_more=true`").
 
-## Phase 6 — Mutation & Seeding Handoff
+## Phase 6 — Mutation & Seeding
 
-Some verification needs provider state to change. There are two cases; in **both**, you _author_ the request and hand it to the user — you never run a state-mutating call yourself (`API-NEVER-MUTATE`).
+Some verification needs provider state to change. Either an incremental cursor can only be confirmed by provoking an `update` event, or a read endpoint is empty and its shape, pagination, and cursor behavior can't be observed until records exist. Both are handled the same way: the mutation becomes a request under `Seeding/`, and who runs it is `GATE-SEEDING`, settled by the seeding answer in your brief (`API-MUTATE-ONLY-WITH-CONSENT`). Decide that first, because it also decides whether to author the request at all.
 
-**Placement:** every mutating/seeding request lives in a `Seeding/` subdirectory of the collection — never at the collection's top level. The top level holds only read-only verification requests; the folder split keeps the mutating set visually distinct and lets the user run the whole sequence with a folder-level `bru run`.
+### Who runs it
 
-**Naming:** seeding requests that run in sequence are named with a `[LETTER][NUMBER]` prefix — one letter per dependency group, numbered in run order within the group (e.g. `A1 - Create Customer.yml`, `A2 - Create Invoice.yml`; an unrelated sequence gets `B1`…`B4`). The letter tells the user at a glance which requests form one sequence (and share chained runtime vars — see "Chain sequential requests" in Phase 4); the number is the order to run them in. A mutation that depends on a seeded resource is **not** standalone — it belongs to that resource's dependency group, or to a trailing group (`D1`, `D2`, …) for post-read mutations that touch already-seeded records (an archive, an update that advances a cursor). Reserve no-prefix only for a mutation that depends on nothing and that nothing depends on. Keep `info.seq` consistent with the prefix ordering and contiguous within `Seeding/`, so the GUI lists the whole sequence in run order.
+A seeding request exists to be run in this session, so author one only when someone in this session will run it:
 
-**Provoking a change (incremental verification).** If confirming an incremental cursor requires an `update` event, write a request for the mutation:
+- **`seeding: assistant`**, either mode — author the request and run it yourself against the sandbox. This is the only case in which you mutate, and only for requests under `Seeding/`.
+- **`seeding: user`**, human-in-the-loop mode — author the request and hand it over now; resume only after the user confirms they ran it.
+- **Anything else** — `seeding: user` in autonomous mode, `seeding: none`, or no answer — author nothing beyond what proves the gap. Nobody will run the request in this session, and an unrun seeding request is dead weight. Record in the verification report what the endpoint needs and move on.
+
+In every branch the finding the mutation would unblock stays `**PENDING:**` (stating what seeding would resolve it) until the request has actually run. Relabeling it UNOBSERVABLE to clear the finalize check misstates the evidence.
+
+### What to author
+
+**Provoking a change (incremental verification).** Write one request for the mutation:
 
 - Pre-fill it with a specific id from a list response.
 - Target a no-op-shaped field (typically `metadata` or `nickname`) so other endpoints' snapshots aren't perturbed.
 
-**Seeding when a read endpoint is empty.** If a `list`/`GET` returns no records — so you can't observe the real response shape, pagination, or cursor behavior — author the create requests (POST/PUT) needed to populate a small, representative set of test records:
+**Seeding an empty endpoint.** Write the create requests (POST/PUT) for a small, representative set of test records:
 
 - One request per object type the empty endpoint depends on, in dependency order (e.g. create a customer before an invoice).
 - Use minimal, clearly-labeled test values; pin any parent ids from earlier responses.
-- Wire each step's output into the next step's input with post-response scripts (see "Chain sequential requests" in Phase 4) so the user can run the whole seeding sequence without hand-copying ids between requests.
-- Record in the verification report that the endpoint was empty and what seeding it needs, so the gap is visible even before the user runs the requests.
+- Wire each step's output into the next step's input with post-response scripts (see "Chain sequential requests" in Phase 4) so the whole sequence runs without hand-copying ids between requests.
+- Record in the verification report that the endpoint was empty and what seeding it needs, so the gap is visible even before the requests run.
+
+### How to author it
+
+**Placement.** Every mutating/seeding request lives in a `Seeding/` subdirectory of the collection — never at the collection's top level. The top level holds only read-only verification requests; the folder split keeps the mutating set visually distinct and lets the whole sequence run with a folder-level `bru run`.
+
+**Naming.** Seeding requests that run in sequence are named with a `[LETTER][NUMBER]` prefix — one letter per dependency group, numbered in run order within the group (e.g. `A1 - Create Customer.yml`, `A2 - Create Invoice.yml`; an unrelated sequence gets `B1`…`B4`). The letter tells the reader at a glance which requests form one sequence (and share chained runtime vars — see "Chain sequential requests" in Phase 4); the number is the order to run them in. A mutation that depends on a seeded resource is **not** standalone — it belongs to that resource's dependency group, or to a trailing group (`D1`, `D2`, …) for post-read mutations that touch already-seeded records (an archive, an update that advances a cursor). Reserve no-prefix only for a mutation that depends on nothing and that nothing depends on. Keep `info.seq` consistent with the prefix ordering and contiguous within `Seeding/`, so the GUI lists the whole sequence in run order.
 
 **Keep the mutation's HTTP verb visible — never hide it inside a decoy GET.** A seeding request's method and URL must be the mutation it performs (`post { url: …/lists/{id} }`), so a reviewer sees what it does at a glance. Do **not** make the request a `GET` whose pre-request script secretly POSTs/DELETEs — that obscures the real call.
 
 **Never loop requests in a script, and cap seeding at ~10 manual requests.** No `bru.sendRequest` loops, no script-driven request generation, no "advance an offset env var and re-run N times" schemes. A seeding script may shape a _single_ request's body, but it must not stand in for many requests. The hard line: **if a precondition can't be set up in ~10 plain, visible, individually-runnable requests, drop the request entirely** — don't author the read probe it would feed. Verifications that need bulk data (e.g. exceeding a page cap to watch its truncation order) are simply out of scope; trust the docs and record the assumption (see "Pagination order & cap truncation" and "Documented limits").
 
-For either case, add a `docs:` block stating: only the user runs this; never the assistant (plus the `**WHY:**` section as always — what downstream probe the seeded data feeds). Hand the request(s) to the user and resume only after they confirm they've run them — then re-run the affected read request to capture the now-populated example, and record the outcome in the seeding request's docs (e.g. "Outcome: ran YYYY-MM-DD; finding VERIFIED in `<request>`").
+**Docs block.** A seeding request gets a `docs:` block like any other request, holding what is true of the request itself:
+
+- `**WHY:**` — which downstream probe the seeded data feeds.
+- **Prerequisites** — which request must run first, and how to clean up afterwards.
+- **Outcome** — added once the request has actually run: a dated line such as "Outcome: ran YYYY-MM-DD; finding VERIFIED in `<request>`".
+
+### After it runs
+
+Whoever ran it, re-run the affected read request to capture the now-populated example, add the **Outcome** line to the seeding request's docs, and resolve the PENDING finding to `**VERIFIED (YYYY-MM-DD):**` (Phase 5, step 4).

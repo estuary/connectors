@@ -49,7 +49,10 @@ Map the answer to a CDK primitive. In order of preference:
 
 ## Phase 2 — Checkpoint
 
-Present to the user: the recommended scheme(s), the exact union shape (e.g. `OAuth2Credentials | AccessToken`), the probe endpoint you'll use in `validate_credentials`, and — if OAuth — the managed-OAuth registration dependency. Stop until they confirm. Auth shape and whether to offer OAuth are decisions with downstream cost; don't write code until this is settled.
+This is `GATE-AUTH-SCHEME` ([`interaction-mode.md`](../../shared/interaction-mode.md)).
+
+- **Human-in-the-loop mode:** present to the user the recommended scheme(s), the exact union shape (e.g. `OAuth2Credentials | AccessToken`), the probe endpoint you'll use in `validate_credentials`, and — if OAuth — the managed-OAuth registration dependency. Stop until they confirm. Auth shape and whether to offer OAuth are decisions with downstream cost; don't write code until this is settled.
+- **Autonomous mode:** pick the simplest scheme the provider offers — usually a static API key or token — and wire **only that arm**, no union. Autonomous users want a one-and-done credential, not an OAuth app to register (and managed OAuth needs an Estuary-side registration nobody can do from here); reach for OAuth only when the provider issues nothing static. Ledger the decision, and carry forward for the orchestrator's batched checkpoint: the chosen scheme (the user must produce credentials for it) plus a one-line mention of the provider's other schemes, in case they already hold different credentials.
 
 ## Phase 3 — Wire `models.py`
 
@@ -156,7 +159,7 @@ Configuration setup ends here, but **nothing downstream can run against the live
 1. Populate `config.yaml` with their real credential values for the chosen scheme.
 2. Encrypt it with sops (the repo's standard — match a sibling connector's `sops`/KMS setup; e.g. `sops --encrypt --in-place config.yaml` with the project's key).
 
-Do not proceed to `bruno-probe-endpoint` or any authenticated step until the user confirms `config.yaml` is populated and encrypted. This pause is mandatory — the credentials are the user's to provide and this skill must never fabricate or encrypt them on their behalf.
+Do not proceed to `bruno-probe-endpoint` or any authenticated step until the user confirms `config.yaml` is populated and encrypted. This pause is mandatory in **both** interaction modes (`GATE-CREDENTIALS`) — the credentials are the user's to provide and this skill must never fabricate or encrypt them on their behalf. In autonomous mode it is the run's one interruption, so the orchestrator batches its other questions into it; standalone, compose the hand-off per `interaction-mode.md` § The batched checkpoint.
 
 ## Output
 

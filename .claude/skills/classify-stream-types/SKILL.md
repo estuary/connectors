@@ -18,9 +18,9 @@ Evaluate each endpoint in order:
 3. **No filtering, but offers a cursor field and supports sorting in reverse order?** → **Incremental only**. Use `fetch_changes` to walk from the latest document backward to the cursor (initially `start_date`). Only yield a cursor checkpoint once the walk reaches the cursor — if interrupted mid-walk, the next invocation restarts from the top. After the initial catch-up, subsequent invocations only walk back to the last checkpoint.
 4. **Is the dataset small with no change tracking?** → **Snapshot**. They carry the added benefit that they can infer deletions.
 5. **Is the resource mutable but there's no `updated_at` style field, only a `created` cursor?** Incremental-only on `created` catches new rows but **silently misses every update/delete** to existing rows. Pair the incremental stream with a **scheduled backfill** as the only mechanism that recovers update/delete state. See "Scheduled backfill as update fetcher".
-6. **Large dataset, no filtering or sorting?** → Look for a different endpoint or ask the user.
+6. **Large dataset, no filtering or sorting?** → Look for a different endpoint; failing that, `GATE-STRATEGY-UNCLEAR` (resolved under "Scheduled backfill as update fetcher").
 
-**Always ask the user for confirmation before committing to an incremental-only approach (no backfill).** If there's any usable cursor, prefer incremental + backfill. Only fall back to incremental-only if the user explicitly confirms backfill isn't needed.
+**Never commit to an incremental-only approach (no backfill) without confirmation — `GATE-INCREMENTAL-ONLY`** ([`interaction-mode.md`](../../shared/interaction-mode.md)). If there's any usable cursor, prefer incremental + backfill. Human-in-the-loop: incremental-only only if the user explicitly confirms backfill isn't needed. Autonomous: nobody can confirm, so any usable cursor → incremental + backfill, none → snapshot (slower, but observes every row); ledger the tradeoff and the endpoint's size estimate so the user can revisit it.
 
 ## Scheduled backfill as update fetcher
 
@@ -32,7 +32,7 @@ Before reaching for it, rule out the alternatives so the choice is deliberate:
 - **Lookback window** (used in `source-hubspot-native`, `source-outreach`, `source-jira-native`): runs a second incremental subtask trailing the realtime cursor by a fixed lag (e.g. 1h, 6h) to recover late-arriving rows from an eventually-consistent index.
 - **Sliding window of recent data** (used in `source-calendly` for scheduled events): re-fetches a bounded window like `[now - N months, now + M months]` on every poll, using a server-side time filter that _correlates with where updates actually happen_ (e.g. `min_start_time` for upcoming meetings). Works only when updates are concentrated in a known window relative to `now`. **Doesn't work for resources where any historical record can and is likely to be edited at any time** (e.g. a blocklist created 2 years ago getting an entry added today).
 
-If none of those fit, ask the user for assessment.
+If none of those fit → `GATE-STRATEGY-UNCLEAR`: in human-in-the-loop mode ask the user for assessment. In autonomous mode decide on dataset size and cursor availability: a **small** dataset gets a **snapshot**; a **large** dataset with **any usable cursor** (a `created`-only cursor counts) gets **incremental + scheduled backfill** — `fetch_changes` on the cursor for prompt new rows, `fetch_page` on the cron to recover updates and deletes (see "Code pattern" below). A large dataset with no cursor at all falls back to a snapshot on a long poll interval; never a bare `fetch_page`-only cron. Ledger the size estimate, the cursor decision, and the alternatives you ruled out as an open question.
 
 ### Code pattern
 
