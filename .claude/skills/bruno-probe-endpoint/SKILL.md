@@ -9,9 +9,7 @@ Verify that the provider's `endpoint-path` actually returns what the docs say it
 
 ## Laws
 
-These apply in every phase. Re-read them before each phase boundary.
-
-**Shared laws** — read both before Phase 0; they are the single authority and are shared with `add-stream` and `configure-auth`:
+**Shared laws** — read both before Phase 1; they are the single authority and are shared with `add-stream` and `configure-auth`:
 
 - [`.claude/shared/provider-api-consent.md`](../../shared/provider-api-consent.md) — `API-CONFIG-GATE` (the `config.yaml` check before _every_ read call), `API-NEVER-MUTATE`, `API-ROUTE-THROUGH-BRUNO`, `API-TOKEN-EPHEMERAL`, `API-DONT-READ-CREDS`.
 - [`.claude/shared/session-conduct.md`](../../shared/session-conduct.md).
@@ -21,9 +19,7 @@ These apply in every phase. Re-read them before each phase boundary.
 1. The Bruno collection is the source of truth for "what does this endpoint actually return today." When it and the provider's docs disagree, the collection wins and the docs claim gets re-marked (Phase 5, step 5).
 2. When a mutation is needed, it goes to the user via Phase 6 — never run by you, even with consent. `API-NEVER-MUTATE` states the rule; Phase 6 is the handoff procedure.
 
-## Phase 0 — Stance
-
-Make explicit to the user what this skill does _not_ do: it does not write connector code, does not modify `config.yaml`, does not run any effectful API calls. It produces a Bruno collection and a set of observed responses for you to compare against the docs.
+This skill writes no connector code and never modifies `config.yaml`. Its output is a Bruno collection and a set of observed responses to compare against the docs.
 
 ## Phase 1 — Collection Layout
 
@@ -60,13 +56,13 @@ The config-path var in `environments/<Provider>.yml` can be the connector-relati
 
 ## Phase 2 — Credential Discovery
 
-Ask the user:
+The pre-request script needs three facts, and the connector's code already holds all of them once `configure-auth` has run. Derive them from the code; don't ask the user, and don't read the encrypted file to check its structure (`API-DONT-READ-CREDS`).
 
-1. Where do the connector's credentials live? (Typically `<connector>/config.yaml`, sops-encrypted.)
-2. What's the JSON path of the access token inside the decrypted file? (Names vary — `credentials.access_token`, `credentials.access_token_sops`, `api_key`, etc.)
-3. What auth scheme does the provider expect? (Bearer, Basic, custom header.) Confirm by reading the connector's existing `api.py` — don't guess.
+1. **Where the credentials live** — the connector's own `config.yaml`, sops-encrypted, referenced connector-relative from `bruno/`.
+2. **The JSON path of the token inside the decrypted file** — the credential class in `models.py`; its field names are the path (`credentials.access_token`, `api_key`, …). Only `*_sops`-suffixed keys are encrypted, and the model field keeps the plain name.
+3. **The auth scheme the provider expects** (Bearer, Basic, custom header) — the `TokenSource` settings and `api.py`.
 
-Do not read the encrypted file just to check structure.
+If `models.py` has no credential class yet, a prerequisite is missing: run `configure-auth` first rather than asking the user to describe a layout that doesn't exist.
 
 ## Phase 3 — Auth Wiring
 

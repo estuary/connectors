@@ -13,7 +13,7 @@ Build a new pull capture connector `source-$1` covering the streams the user lis
 - **One hard barrier.** Scaffold + auth must finish, **and the user must have entered real encrypted credentials**, before any `stream-builder` runs (they verify against the live API).
 - **Parallel plans, serial integration.** Clusters research and plan concurrently; you integrate one at a time into the shared files (`models.py`/`resources.py`/`test.flow.yaml`), so there are no concurrent-write collisions.
 - **You dispatch; stream-builders escalate.** If a cluster recommends a split, you decide whether to dispatch another session.
-- **The connector's `bruno/` collection is the home for API knowledge — go there first.** Verified facts about the provider's API (base URL resolution, rate limits, throttling, and per-endpoint limitations) live in `source-$1/bruno/` (OpenCollection YAML), next to the requests that prove them: account-wide facts in `bruno/opencollection.yml`'s `docs:` block under `## API constraints (account-wide)`, and endpoint-specific constraints on each proving request under a `**LIMITATION**` marker (`grep -rl LIMITATION bruno/`). Findings are dated and classified VERIFIED / PENDING / UNOBSERVABLE / DOCUMENTED (defined in `bruno-probe-endpoint`; the collection root only indexes them).
+- **`source-$1/bruno/` is the home for API knowledge — go there first.** Rate limits, throttling and per-endpoint limitations live next to the requests that prove them, with the layout and finding taxonomy defined in `bruno-probe-endpoint`.
 - This skill covers **pull** streams. Webhook-receiver streams are routed to `create-webhook-connector` (see Phase 7).
 
 ## Phase 0 — Intake
