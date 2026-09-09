@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-09-10
+
+### Changed
+- Incremental streams now trail roughly 5 minutes behind the present to combat the Zendesk Support API's eventually consistent behavior. Records still arrive on each binding's normal polling interval, with up to 5 minutes of additional delay.
+
 ## 2026-08-05
 
 ### Fixed
