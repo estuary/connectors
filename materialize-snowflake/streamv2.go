@@ -62,11 +62,6 @@ type streamV2Item struct {
 	// function of the documents the channel receives, not of the shard topology,
 	// which is what a split or join inherits whole.
 	KeyBegin, KeyEnd uint32
-	// Tombstone marks a channel that the snowpipe streaming path is dropping. The
-	// item is written before the channel is dropped, so that a checkpoint which
-	// still names the channel after the drop explains why the channel is empty: it
-	// was dropped, not lost.
-	Tombstone bool
 }
 
 // streamV2Range is a key range of the key-hash space, as a channel name and a
@@ -84,15 +79,56 @@ func (r streamV2Range) key() string {
 	return fmt.Sprintf("%08x-%08x", r.keyBegin, r.keyEnd)
 }
 
-// streamV2ChannelName names the channel of one key range of one binding. The name
-// carries the key range's begin and end, so subdivision depths never collide: a
-// channel covering a half-range and one covering the quarter that starts at the same
-// key take different names. The state key is retained so that a backfill rotates the
-// binding's channels and its checkpoint items together — both start empty, which is
-// what makes a backfill the escape from every rejection in this file.
-func streamV2ChannelName(materialization string, r streamV2Range, stateKey string) string {
-	return fmt.Sprintf("%s_%08x-%08x_%s",
-		sanitizeAndAppendHash(materialization), r.keyBegin, r.keyEnd, sanitizeAndAppendHash(stateKey))
+// streamV2ChannelName names the channel of one key range of one binding, in one
+// epoch. The name carries the key range's begin and end, so subdivision depths never
+// collide: a channel covering a half-range and one covering the quarter that starts
+// at the same key take different names. It carries the epoch so a name is never
+// reused: a shard mints an epoch past every one the binding has used before routing
+// to a fresh layout, so a stale channel a later layout leaves standing is inert
+// rather than a name the layout re-derives. The state key is retained so a backfill
+// rotates the binding's channels and its checkpoint items together — both start
+// empty, which is what makes a backfill the escape from every rejection in this file.
+func streamV2ChannelName(materialization string, epoch int, r streamV2Range, stateKey string) string {
+	return fmt.Sprintf("%s_%d_%08x-%08x_%s",
+		sanitizeAndAppendHash(materialization), epoch, r.keyBegin, r.keyEnd, sanitizeAndAppendHash(stateKey))
+}
+
+// streamV2ParseChannel reads the epoch and key range that streamV2ChannelName encoded,
+// and reports whether the name is one this materialization and state key derived. A
+// name derived for another task or another state key is not, and reports false, so a
+// shard reasons only about its own binding's channels among all that stand on a pipe.
+func streamV2ParseChannel(name, materialization, stateKey string) (int, streamV2Range, bool) {
+	var mid, ok = strings.CutPrefix(name, sanitizeAndAppendHash(materialization)+"_")
+	if !ok {
+		return 0, streamV2Range{}, false
+	}
+	mid, ok = strings.CutSuffix(mid, "_"+sanitizeAndAppendHash(stateKey))
+	if !ok {
+		return 0, streamV2Range{}, false
+	}
+
+	epochStr, rangeStr, ok := strings.Cut(mid, "_")
+	if !ok {
+		return 0, streamV2Range{}, false
+	}
+	epoch, err := strconv.Atoi(epochStr)
+	if err != nil {
+		return 0, streamV2Range{}, false
+	}
+
+	begin, end, ok := strings.Cut(rangeStr, "-")
+	if !ok {
+		return 0, streamV2Range{}, false
+	}
+	keyBegin, err := strconv.ParseUint(begin, 16, 32)
+	if err != nil {
+		return 0, streamV2Range{}, false
+	}
+	keyEnd, err := strconv.ParseUint(end, 16, 32)
+	if err != nil {
+		return 0, streamV2Range{}, false
+	}
+	return epoch, streamV2Range{keyBegin: uint32(keyBegin), keyEnd: uint32(keyEnd)}, true
 }
 
 // streamV2Token renders the offset token of an append. The token holds two facts:
@@ -432,11 +468,17 @@ type streamV2Binding struct {
 	// opened reports whether this session classified the checkpoint's channels,
 	// opened its own, and reconciled each of them.
 	opened bool
-	// dropped holds the item keys of the channels this shard has dropped in
-	// Snowflake. The next checkpoint deletes their items. Every checkpoint of the
-	// session reports them again, not only the first, so that a transaction that
-	// never commits does not lose the deletion.
-	dropped []string
+	// abandoned holds the item keys of the channels this shard no longer routes to.
+	// The next checkpoint deletes their items so a later session does not reconcile
+	// against a channel this layout left behind. Every checkpoint of the session
+	// reports them again, not only the first, so a transaction that never commits
+	// does not lose the deletion. The channels themselves are left standing for the
+	// sweep to drop, since a fresh epoch keeps their names out of any live layout.
+	abandoned []string
+	// targetEpoch is the epoch of the channels this shard converges to. It continues
+	// the epoch the shard's own target items already run at, or is minted one past
+	// every epoch the binding has used, so the target names collide with nothing.
+	targetEpoch int
 
 	// channels is the active layout: the channels rows route to, sorted by key range
 	// begin. The layout always covers the shard's key range with no gaps or
@@ -447,9 +489,8 @@ type streamV2Binding struct {
 	targets []streamV2Range
 	// declared reports that the last flush wrote the target layout's items into the
 	// checkpoint. Acknowledge runs after the runtime made that checkpoint durable,
-	// which is what makes the switch it performs crash-safe: a shard that dies
-	// after the switch's drops restarts to a checkpoint that names the channels it
-	// was converging to.
+	// which is what makes the switch it performs crash-safe: a shard that dies after
+	// the switch restarts to a checkpoint that names the channels it was converging to.
 	declared bool
 }
 
@@ -529,6 +570,13 @@ type streamV2Manager struct {
 	// streamV2CheckStateKeyConflict. The transactor supplies this function, because it
 	// owns the connection that the read needs.
 	tableComment func(ctx context.Context, database, schema, table string) (string, error)
+
+	// listChannels reports the channels standing on a table's default pipe. The
+	// transactor supplies it over its own connection. It is what lets a shard mint an
+	// epoch past channels no checkpoint records, and what the sweep reads to drop the
+	// channels a layout has left behind. It is nil when no connection backs the
+	// manager, and the manager then reasons from the checkpoint alone.
+	listChannels func(ctx context.Context, database, schema, table string) ([]string, error)
 
 	// procCtx bounds the lifetime of the sidecar process to the transactor session.
 	procCtx    context.Context
@@ -666,33 +714,50 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 		return err
 	}
 
-	// Channels the snowpipe streaming path took out of service after this binding
-	// left the write path. Whether or not a drop landed, such a channel holds
-	// nothing this binding may skip: open it, drop it, and record the deletion
-	// unless the target layout reuses the key range, where flush writes the live
-	// item in its place.
+	// A nil item is a channel a layout left behind, which the runtime has not yet
+	// reduced out of the checkpoint. Drop them so the live-item count below, and the
+	// epoch minted from the items, reason only about channels that still stand.
 	var prior = make(map[string]*streamV2Item, len(b.prior))
 	for key, item := range b.prior {
-		if item == nil {
-			continue
-		}
-		if !item.Tombstone {
+		if item != nil {
 			prior[key] = item
-			continue
 		}
-		if _, err := client.OpenChannel(ctx, b.database, b.schema, b.table, item.Channel); err != nil {
-			return fmt.Errorf("opening channel %q: %w", item.Channel, err)
-		}
-		if err := dropChannel(ctx, client, item.Channel); err != nil {
-			return err
-		}
-		var r = streamV2Range{keyBegin: item.KeyBegin, keyEnd: item.KeyEnd}
-		if !slices.Contains(targets, r) {
-			b.dropped = append(b.dropped, r.key())
-		}
-		log.WithFields(log.Fields{"table": b.table, "channel": item.Channel}).Info("dropping a channel the snowpipe streaming path left behind")
 	}
 	b.prior = prior
+
+	// The epoch of the target layout. The shard's own target items, where the
+	// checkpoint holds them, fix it, so a restart continues the channels it already
+	// ran rather than rotating them. Otherwise it is minted one past every epoch a
+	// checkpoint item nested in this shard's range has used, so the target names
+	// collide with nothing a rebalance abandoned and a sweep has yet to drop.
+	// Channels outside this shard's range are a sibling's, and their names, at
+	// whatever epoch, never collide with this shard's, so a sibling's convergence
+	// does not push this shard's epoch.
+	//
+	// The epoch is read from the checkpoint alone, never from the channels standing
+	// on the pipe: an interrupted first transaction leaves a committed channel with
+	// no checkpoint item, and that channel must be reopened and its committed
+	// documents skipped, not stepped over by a fresh epoch that would materialize
+	// them twice.
+	b.targetEpoch = -1
+	for _, r := range targets {
+		if item := b.prior[r.key()]; item != nil {
+			if epoch, _, ok := streamV2ParseChannel(item.Channel, m.materialization, b.stateKey); ok {
+				b.targetEpoch = epoch
+				break
+			}
+		}
+	}
+	if b.targetEpoch < 0 {
+		var maxEpoch = -1
+		for _, item := range b.prior {
+			if epoch, r, ok := streamV2ParseChannel(item.Channel, m.materialization, b.stateKey); ok &&
+				r.keyBegin >= shard.keyBegin && r.keyEnd <= shard.keyEnd {
+				maxEpoch = max(maxEpoch, epoch)
+			}
+		}
+		b.targetEpoch = maxEpoch + 1
+	}
 
 	// Sort the checkpoint's items for this binding into the ones nested in this
 	// shard's range and the ones that belong to live siblings. An item that does
@@ -774,18 +839,15 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 			}
 			if !isTarget && declared {
 				// A counter with the declaration in place: an interrupted switch
-				// already dropped the channel — the open above re-created it
-				// empty — and only the deletion of its item was lost. The drop
-				// repeats, and the deletion is re-recorded.
-				if err := dropChannel(ctx, client, item.Channel); err != nil {
-					return err
-				}
-				b.dropped = append(b.dropped, r.key())
+				// already abandoned the channel — the open above re-created it
+				// empty — and only the deletion of its item was lost. The deletion
+				// is re-recorded, and the sweep drops the empty channel.
+				b.abandoned = append(b.abandoned, r.key())
 				log.WithFields(log.Fields{
 					"table":   b.table,
 					"channel": item.Channel,
 					"counter": item.Counter,
-				}).Info("re-recording the drop of a channel an interrupted session dropped")
+				}).Info("re-recording the deletion of a channel an interrupted session abandoned")
 				continue
 			}
 			// A counter with no token and no declaration to explain it falls
@@ -806,7 +868,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 
 	// Decide the empty non-target channels. With no live inherited channel, the
 	// layout is the target layout and every candidate is an empty declaration or
-	// an already-converged-away relic: drop them. With live inherited channels,
+	// an already-converged-away relic: abandon them. With live inherited channels,
 	// the layout is the inherited one, and a candidate is part of it exactly when
 	// it overlaps no live channel — the empty quarter a skewed transaction left,
 	// which the coverage check below demands. A candidate overlapping a live
@@ -824,20 +886,17 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 			liveNonTarget = append(liveNonTarget, c)
 			continue
 		}
-		if err := dropChannel(ctx, client, c.name); err != nil {
-			return err
-		}
-		b.dropped = append(b.dropped, c.r.key())
+		b.abandoned = append(b.abandoned, c.r.key())
 		log.WithFields(log.Fields{
 			"table":   b.table,
 			"channel": c.name,
-		}).Info("dropping an empty channel of a layout this shard does not continue")
+		}).Info("abandoning an empty channel of a layout this shard does not continue")
 	}
 
 	// The open-time switch. The declaration is durable — it arrived with the
 	// recovered checkpoint — and every inherited channel is committed at its counter,
 	// so the convergence an interrupted session declared completes here: the
-	// inherited channels are dropped, and the target layout takes over.
+	// inherited channels are abandoned, and the target layout takes over.
 	if len(liveNonTarget) > 0 && declared {
 		var idle = true
 		for _, c := range liveNonTarget {
@@ -848,10 +907,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 		}
 		if idle {
 			for _, c := range liveNonTarget {
-				if err := dropChannel(ctx, client, c.name); err != nil {
-					return err
-				}
-				b.dropped = append(b.dropped, c.r.key())
+				b.abandoned = append(b.abandoned, c.r.key())
 			}
 			liveNonTarget = nil
 		}
@@ -878,7 +934,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 				continue
 			}
 
-			var name = streamV2ChannelName(m.materialization, r, b.stateKey)
+			var name = streamV2ChannelName(m.materialization, b.targetEpoch, r, b.stateKey)
 			var status = statuses[name]
 			if status == nil {
 				if status, err = client.OpenChannel(ctx, b.database, b.schema, b.table, name); err != nil {
@@ -936,8 +992,98 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 		"shardRange": shard.String(),
 		"channels":   len(active),
 		"layout":     layout,
-		"dropped":    b.dropped,
+		"abandoned":  b.abandoned,
 	}).Info("opened snowpipe streaming v2 channels")
+
+	// Drop the channels this layout stands past — the ones just abandoned, and any a
+	// prior session or another write path left on the pipe — before the first append.
+	return m.sweep(ctx, b)
+}
+
+// sweep drops the channels standing on the binding's pipe that its current layout has
+// left behind: the ones nested in this shard's range, derived for this binding, that
+// neither the active layout nor the declared target layout names. A fresh epoch keeps
+// an abandoned channel's name out of every live layout, so the drop only reclaims the
+// pipe's channel budget and races no shard that still routes to one. It requires the
+// channel listing, and does nothing when no connection backs the manager.
+//
+// A channel whose range this shard does not wholly contain is a sibling's or a
+// parent's, never this shard's to drop, so it is left alone.
+func (m *streamV2Manager) sweep(ctx context.Context, b *streamV2Binding) error {
+	if m.listChannels == nil {
+		return nil
+	}
+	names, err := m.listChannels(ctx, b.database, b.schema, unquotedIdentifier(b.table))
+	if err != nil {
+		return err
+	}
+
+	var keep = make(map[string]bool, len(b.channels)+len(b.targets))
+	for _, c := range b.channels {
+		keep[c.name] = true
+	}
+	for _, r := range b.targets {
+		keep[streamV2ChannelName(m.materialization, b.targetEpoch, r, b.stateKey)] = true
+	}
+
+	var shard = m.shardRange()
+	client, err := m.ensureStarted(ctx)
+	if err != nil {
+		return err
+	}
+	for _, name := range names {
+		if keep[name] {
+			continue
+		}
+		_, r, ok := streamV2ParseChannel(name, m.materialization, b.stateKey)
+		if !ok {
+			continue
+		}
+		if r.keyBegin < shard.keyBegin || r.keyEnd > shard.keyEnd {
+			continue
+		}
+
+		// The drop needs an open handle. A channel this session opened — one a
+		// rebalance just abandoned — already has one, and re-opening it is an error,
+		// so the drop is tried first and a channel this session never opened, a
+		// prior session's orphan, is opened only when the drop reports none.
+		var err = dropChannel(ctx, client, name)
+		if unknownChannel(err) {
+			if _, err = client.OpenChannel(ctx, b.database, b.schema, b.table, name); err != nil {
+				return fmt.Errorf("opening channel %q to drop it: %w", name, err)
+			}
+			err = dropChannel(ctx, client, name)
+		}
+		if err != nil {
+			return err
+		}
+		log.WithFields(log.Fields{"table": b.table, "channel": name}).Info("swept a snowpipe streaming v2 channel a layout left behind")
+	}
+	return nil
+}
+
+// dropBindingChannels drops the streaming v2 channels this shard holds for a binding
+// that is leaving the write path, so a later return to it starts from channels with
+// no committed offset token to misread as documents to skip. It opens each channel to
+// obtain the handle the drop needs; a channel Snowflake no longer holds is re-created
+// empty by the open and then dropped, so a repeated call is idempotent. Only channels
+// nested in this shard's range are its to drop; the rest are a sibling's.
+func (m *streamV2Manager) dropBindingChannels(ctx context.Context, database, schema, table string, prior map[string]*streamV2Item, shard *pf.RangeSpec) error {
+	client, err := m.ensureStarted(ctx)
+	if err != nil {
+		return err
+	}
+	for _, item := range prior {
+		if item == nil || item.KeyBegin < shard.KeyBegin || item.KeyEnd > shard.KeyEnd {
+			continue
+		}
+		if _, err := client.OpenChannel(ctx, database, schema, table, item.Channel); err != nil {
+			return fmt.Errorf("opening channel %q to drop it: %w", item.Channel, err)
+		}
+		if err := dropChannel(ctx, client, item.Channel); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -1087,6 +1233,14 @@ func dropChannel(ctx context.Context, client *sidecarClient, channel string) err
 	return nil
 }
 
+// unknownChannel reports whether err is the sidecar's rejection of an operation on
+// a channel it holds no open handle for — because it was never opened this session,
+// or was closed since.
+func unknownChannel(err error) bool {
+	var se *sidecarError
+	return errors.As(err, &se) && se.Code == "unknown_channel"
+}
+
 // streamV2ChannelNames lists, sorted, the channels the items of a binding name. A
 // nil item is a channel the task already dropped and names nothing.
 func streamV2ChannelNames(items map[string]*streamV2Item) []string {
@@ -1151,7 +1305,7 @@ func streamV2DowngradeWarning(table string, items map[string]*streamV2Item) stri
 	}
 
 	return fmt.Sprintf(
-		"binding %s is leaving the snowpipe_streaming_v2 write path for snowpipe_streaming. Every document that its channel(s) %s committed beyond the counter the checkpoint records for them will be materialized again by the snowpipe_streaming path, and this binding uses delta updates, so those duplicates are permanent. The channels are dropped by the task's first transaction on the new path",
+		"binding %s is leaving the snowpipe_streaming_v2 write path for snowpipe_streaming. Every document that its channel(s) %s committed beyond the counter the checkpoint records for them will be materialized again by the snowpipe_streaming path, and this binding uses delta updates, so those duplicates are permanent. The channels are dropped when the task next opens on the new path",
 		table, strings.Join(channels, ", "),
 	)
 }
@@ -1365,8 +1519,8 @@ func (m *streamV2Manager) flush(ctx context.Context) (map[int]map[string]*stream
 		}
 
 		var declaring = !b.isTargetLayout()
-		if !advanced && !declaring && len(b.dropped) == 0 {
-			continue // nothing stored, nothing dropped, nothing to converge
+		if !advanced && !declaring && len(b.abandoned) == 0 {
+			continue // nothing stored, nothing abandoned, nothing to converge
 		}
 
 		var items = make(map[string]*streamV2Item)
@@ -1389,17 +1543,17 @@ func (m *streamV2Manager) flush(ctx context.Context) (map[int]map[string]*stream
 			// checkpoint carrying these is durable.
 			for _, r := range b.targets {
 				if _, ok := items[r.key()]; !ok {
-					var name = streamV2ChannelName(m.materialization, r, b.stateKey)
+					var name = streamV2ChannelName(m.materialization, b.targetEpoch, r, b.stateKey)
 					items[r.key()] = &streamV2Item{Channel: name, KeyBegin: r.keyBegin, KeyEnd: r.keyEnd}
 				}
 			}
 			b.declared = true
 		}
 
-		// Deletions of dropped channels ride every checkpoint of the session, not
+		// Deletions of abandoned channels ride every checkpoint of the session, not
 		// only the first, so that a transaction that never commits does not lose
 		// them.
-		for _, key := range b.dropped {
+		for _, key := range b.abandoned {
 			items[key] = nil
 		}
 
@@ -1428,11 +1582,12 @@ func (m *streamV2Manager) flush(ctx context.Context) (map[int]map[string]*stream
 // counter, and the boilerplate serializes this call before the next Store, so no row
 // routes anywhere while the layout changes.
 //
-// The switch drops every non-target channel of the layout — recording each drop for
-// deletion — and opens the target channels in their place. A crash between the drops
-// and the durability of the deletions restarts to a checkpoint that still holds the
-// dropped channels' items alongside the declaration, which is exactly the state
-// ensureOpened re-enters the drop from.
+// The switch abandons every non-target channel of the layout — recording each
+// deletion — opens the target channels in their place, and sweeps the abandoned
+// channels off the pipe. A crash between the switch and the durability of the
+// deletions restarts to a checkpoint that still holds the abandoned channels' items
+// alongside the declaration, which is exactly the state ensureOpened re-enters the
+// switch from.
 func (m *streamV2Manager) acknowledged(ctx context.Context) error {
 	var indices = make([]int, 0, len(m.bindings))
 	for idx := range m.bindings {
@@ -1478,17 +1633,14 @@ func (m *streamV2Manager) acknowledged(ctx context.Context) error {
 				next = append(next, c)
 				continue
 			}
-			if err := dropChannel(ctx, client, c.name); err != nil {
-				return err
-			}
-			b.dropped = append(b.dropped, c.r.key())
+			b.abandoned = append(b.abandoned, c.r.key())
 		}
 
 		for _, r := range b.targets {
 			if slices.ContainsFunc(next, func(c *streamV2Channel) bool { return c.r == r }) {
 				continue
 			}
-			var name = streamV2ChannelName(m.materialization, r, b.stateKey)
+			var name = streamV2ChannelName(m.materialization, b.targetEpoch, r, b.stateKey)
 			status, err := client.OpenChannel(ctx, b.database, b.schema, b.table, name)
 			if err != nil {
 				return fmt.Errorf("opening channel %q: %w", name, err)
@@ -1514,10 +1666,15 @@ func (m *streamV2Manager) acknowledged(ctx context.Context) error {
 		b.channels = next
 
 		log.WithFields(log.Fields{
-			"table":    b.table,
-			"channels": len(next),
-			"dropped":  b.dropped,
+			"table":     b.table,
+			"channels":  len(next),
+			"abandoned": b.abandoned,
 		}).Info("snowpipe streaming v2: converged the channel layout to the target layout")
+
+		// The inherited channels are out of the layout now; drop them from the pipe.
+		if err := m.sweep(ctx, b); err != nil {
+			return err
+		}
 	}
 	return nil
 }

@@ -41,7 +41,36 @@ func newTopologyManager(t *testing.T, task string, keyBegin, keyEnd uint32, prio
 		Values:     []sql.Column{{Identifier: `VAL`}},
 		StateKey:   "topology.v1",
 	}, prior)
+	// The fake sidecar's committed map stands in for the channels on the pipe, so
+	// the manager can mint epochs and sweep abandoned channels as it would live.
+	m.listChannels = fakeListChannels
 	return m
+}
+
+// fakeListChannels reports the channels the fake sidecar holds committed offset
+// tokens for, which stands in for the channels standing on a table's default pipe.
+func fakeListChannels(context.Context, string, string, string) ([]string, error) {
+	var path = os.Getenv("FAKE_SIDECAR_STATE")
+	if path == "" {
+		return nil, nil
+	}
+	raw, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+	var state struct {
+		Committed map[string]string `json:"committed"`
+	}
+	if err := json.Unmarshal(raw, &state); err != nil {
+		return nil, err
+	}
+	var names []string
+	for name := range state.Committed {
+		names = append(names, name)
+	}
+	return names, nil
 }
 
 // keysHashingTo returns n distinct keys whose packed-key hash falls inside r.
@@ -113,11 +142,12 @@ func rangeKeys(layout []streamV2Range) []string {
 	return keys
 }
 
-// channelNames maps a layout to the channel names a binding derives for it.
-func channelNames(task string, layout []streamV2Range) []string {
+// channelNames maps a layout to the channel names a binding derives for it at an
+// epoch.
+func channelNames(task string, epoch int, layout []streamV2Range) []string {
 	var names = make([]string, len(layout))
 	for i, r := range layout {
-		names[i] = streamV2ChannelName(task, r, "topology.v1")
+		names[i] = streamV2ChannelName(task, epoch, r, "topology.v1")
 	}
 	return names
 }
@@ -164,7 +194,7 @@ func TestStreamV2SteadyStateRouting(t *testing.T) {
 		require.Equal(t, q.keyBegin, items[q.key()].KeyBegin)
 		require.Equal(t, q.keyEnd, items[q.key()].KeyEnd)
 		require.Equal(t, int64(3), items[q.key()].Counter)
-		require.Equal(t, channelNames(task, quarters)[i], items[q.key()].Channel)
+		require.Equal(t, channelNames(task, 0, quarters)[i], items[q.key()].Channel)
 	}
 	first.stop()
 
@@ -201,7 +231,7 @@ func TestStreamV2SplitInheritsChannels(t *testing.T) {
 
 	quarters, err := streamV2TargetLayout(0, math.MaxUint32)
 	require.NoError(t, err)
-	var parentNames = channelNames(task, quarters)
+	var parentNames = channelNames(task, 0, quarters)
 
 	var committed, interrupted []string
 	for _, q := range quarters {
@@ -273,7 +303,7 @@ func TestStreamV2SplitInheritsChannels(t *testing.T) {
 			// The runtime made that checkpoint durable, so the switch runs:
 			// the inherited channels are dropped and the target layout takes over.
 			require.NoError(t, m.acknowledged(ctx))
-			require.Equal(t, channelNames(task, targets), activeNames(m))
+			require.Equal(t, channelNames(task, 1, targets), activeNames(m))
 
 			var fresh []string
 			for _, r := range targets {
@@ -294,7 +324,7 @@ func TestStreamV2SplitInheritsChannels(t *testing.T) {
 			for _, name := range child.inherited {
 				require.NotContains(t, tokens, name)
 			}
-			for i, name := range channelNames(task, targets) {
+			for i, name := range channelNames(task, 1, targets) {
 				require.Equal(t, streamV2Token(2, targets[i]), tokens[name])
 			}
 		})
@@ -355,7 +385,7 @@ func TestStreamV2JoinInheritsChannels(t *testing.T) {
 	var joined = newTopologyManager(t, task, 0, math.MaxUint32, prior)
 	storeKeys(t, joined, interrupted)
 
-	require.Equal(t, channelNames(task, eighths), activeNames(joined))
+	require.Equal(t, channelNames(task, 0, eighths), activeNames(joined))
 	for _, c := range joined.bindings[0].channels {
 		require.Equal(t, int64(3), c.skip)
 		require.Equal(t, int64(3), c.counter)
@@ -366,7 +396,7 @@ func TestStreamV2JoinInheritsChannels(t *testing.T) {
 	require.Len(t, mergeItems(entries), 12) // eight inherited counters, four declared at zero
 
 	require.NoError(t, joined.acknowledged(ctx))
-	require.Equal(t, channelNames(task, quarters), activeNames(joined))
+	require.Equal(t, channelNames(task, 1, quarters), activeNames(joined))
 
 	var fresh []string
 	for _, r := range quarters {
@@ -378,10 +408,10 @@ func TestStreamV2JoinInheritsChannels(t *testing.T) {
 	require.ElementsMatch(t, rangeKeys(eighths), deletionsOf(entries))
 
 	var tokens = fakeCommittedTokens(t, statePath)
-	for _, name := range channelNames(task, eighths) {
+	for _, name := range channelNames(task, 0, eighths) {
 		require.NotContains(t, tokens, name)
 	}
-	for i, name := range channelNames(task, quarters) {
+	for i, name := range channelNames(task, 1, quarters) {
 		require.Equal(t, streamV2Token(2, quarters[i]), tokens[name])
 	}
 }
@@ -399,12 +429,12 @@ func TestStreamV2RebalanceCrashWindows(t *testing.T) {
 
 	quarters, err := streamV2TargetLayout(0, math.MaxUint32)
 	require.NoError(t, err)
-	var parentNames = channelNames(task, quarters)
+	var parentNames = channelNames(task, 0, quarters)
 
 	const loBegin, loEnd = 0, 0x7fffffff
 	targets, err := streamV2TargetLayout(loBegin, loEnd)
 	require.NoError(t, err)
-	var targetNames = channelNames(task, targets)
+	var targetNames = channelNames(task, 1, targets)
 
 	// A parent commits, is interrupted, and is split — the state every window
 	// below descends from.
@@ -452,7 +482,7 @@ func TestStreamV2RebalanceCrashWindows(t *testing.T) {
 	var switching = newTopologyManager(t, task, loBegin, loEnd, declaration)
 	storeKeys(t, switching, fresh)
 	require.Equal(t, targetNames, activeNames(switching))
-	require.ElementsMatch(t, rangeKeys(quarters)[:2], switching.bindings[0].dropped)
+	require.ElementsMatch(t, rangeKeys(quarters)[:2], switching.bindings[0].abandoned)
 	entries, err = switching.flush(ctx)
 	require.NoError(t, err)
 	require.ElementsMatch(t, rangeKeys(quarters)[:2], deletionsOf(entries))
@@ -474,7 +504,7 @@ func TestStreamV2RebalanceCrashWindows(t *testing.T) {
 	var resumed = newTopologyManager(t, task, loBegin, loEnd, declaration)
 	storeKeys(t, resumed, fresh)
 	require.Equal(t, targetNames, activeNames(resumed))
-	require.ElementsMatch(t, rangeKeys(quarters)[:2], resumed.bindings[0].dropped)
+	require.ElementsMatch(t, rangeKeys(quarters)[:2], resumed.bindings[0].abandoned)
 	for _, c := range resumed.bindings[0].channels {
 		require.Equal(t, int64(2), c.skip)
 		require.Equal(t, int64(2), c.counter)
@@ -494,7 +524,7 @@ func TestStreamV2RebalanceCrashWindows(t *testing.T) {
 	var steady = newTopologyManager(t, task, loBegin, loEnd, converged)
 	storeKeys(t, steady, keysHashingTo(targets[0], 1, "win-d"))
 	require.Equal(t, targetNames, activeNames(steady))
-	require.Empty(t, steady.bindings[0].dropped)
+	require.Empty(t, steady.bindings[0].abandoned)
 	for _, c := range steady.bindings[0].channels {
 		require.Equal(t, int64(2), c.skip)
 	}
@@ -547,7 +577,7 @@ func TestStreamV2SplitThenJoinBack(t *testing.T) {
 		rows = append(rows, keysHashingTo(r, 1, "rejoin-b")...)
 	}
 	storeKeys(t, joined, rows)
-	require.Equal(t, channelNames(task, eighths), activeNames(joined))
+	require.Equal(t, channelNames(task, 0, eighths), activeNames(joined))
 	for _, c := range joined.bindings[0].channels {
 		require.Equal(t, int64(2), c.skip)
 		require.Equal(t, int64(3), c.counter)
@@ -557,7 +587,7 @@ func TestStreamV2SplitThenJoinBack(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, mergeItems(entries), 12)
 	require.NoError(t, joined.acknowledged(ctx))
-	require.Equal(t, channelNames(task, quarters), activeNames(joined))
+	require.Equal(t, channelNames(task, 1, quarters), activeNames(joined))
 
 	storeKeys(t, joined, keysHashingTo(quarters[0], 1, "rejoin-c"))
 	entries, err = joined.flush(ctx)
@@ -577,7 +607,7 @@ func TestStreamV2MisalignedSplitRejected(t *testing.T) {
 	// A channel covering the parent's low half, presented to a shard covering
 	// the low quarter: the shard's upper boundary lands mid-channel.
 	var half = streamV2Range{keyBegin: 0, keyEnd: 0x7fffffff}
-	var name = streamV2ChannelName(task, half, "topology.v1")
+	var name = streamV2ChannelName(task, 0, half, "topology.v1")
 	var m = newTopologyManager(t, task, 0, 0x3fffffff, map[string]*streamV2Item{
 		half.key(): {Channel: name, Counter: 5, KeyBegin: half.keyBegin, KeyEnd: half.keyEnd},
 	})
@@ -597,7 +627,7 @@ func TestStreamV2LostChannelRejected(t *testing.T) {
 
 	quarters, err := streamV2TargetLayout(0, math.MaxUint32)
 	require.NoError(t, err)
-	var name = streamV2ChannelName(task, quarters[1], "topology.v1")
+	var name = streamV2ChannelName(task, 0, quarters[1], "topology.v1")
 
 	var m = newTopologyManager(t, task, 0, math.MaxUint32, map[string]*streamV2Item{
 		quarters[1].key(): {Channel: name, Counter: 5, KeyBegin: quarters[1].keyBegin, KeyEnd: quarters[1].keyEnd},
@@ -618,7 +648,7 @@ func TestStreamV2ForeignTokenRejected(t *testing.T) {
 
 	quarters, err := streamV2TargetLayout(0, math.MaxUint32)
 	require.NoError(t, err)
-	var name = streamV2ChannelName(task, quarters[0], "topology.v1")
+	var name = streamV2ChannelName(task, 0, quarters[0], "topology.v1")
 
 	// Snowflake holds a token for this channel's name written under the whole
 	// key range — the footprint of a channel scheme this write path never ran.
@@ -653,7 +683,7 @@ func TestStreamV2SplitInheritsAnEmptyChannel(t *testing.T) {
 
 	quarters, err := streamV2TargetLayout(0, math.MaxUint32)
 	require.NoError(t, err)
-	var parentNames = channelNames(task, quarters)
+	var parentNames = channelNames(task, 0, quarters)
 
 	// Every row of the parent's one transaction misses the first quarter, so
 	// its item is checkpointed at counter zero and Snowflake holds no token
@@ -689,9 +719,60 @@ func TestStreamV2SplitInheritsAnEmptyChannel(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, int64(2), mergeItems(entries)[quarters[0].key()].Counter)
 	require.NoError(t, child.acknowledged(ctx))
-	require.Equal(t, channelNames(task, targets), activeNames(child))
+	require.Equal(t, channelNames(task, 1, targets), activeNames(child))
 	entries, err = child.flush(ctx)
 	require.NoError(t, err)
 	require.ElementsMatch(t, rangeKeys(quarters)[:2], deletionsOf(entries))
 	child.stop()
+}
+
+// TestStreamV2SweepDropsAPriorSessionsOrphan covers the sweep of a channel no
+// session of this shard has opened: a prior session left it committed on the pipe,
+// and the checkpoint no longer names it. The drop has no handle to use, so the
+// sweep must open the channel first, and then Snowflake holds nothing under its
+// name.
+func TestStreamV2SweepDropsAPriorSessionsOrphan(t *testing.T) {
+	var ctx = context.Background()
+	const task = "test/topologyOrphan"
+	var statePath = filepath.Join(t.TempDir(), "channels.json")
+	t.Setenv("FAKE_SIDECAR_STATE", statePath)
+
+	quarters, err := streamV2TargetLayout(0, math.MaxUint32)
+	require.NoError(t, err)
+
+	// A session at epoch zero commits into every quarter and is gone.
+	var rows []string
+	for _, q := range quarters {
+		rows = append(rows, keysHashingTo(q, 1, "orphan")...)
+	}
+	var first = newTopologyManager(t, task, 0, math.MaxUint32, nil)
+	storeKeys(t, first, rows)
+	_, err = first.flush(ctx)
+	require.NoError(t, err)
+	first.stop()
+	for _, name := range channelNames(task, 0, quarters) {
+		require.Contains(t, fakeCommittedTokens(t, statePath), name)
+	}
+
+	// The checkpoint a later session recovers declares the same layout at epoch
+	// one and names nothing at epoch zero, so the epoch-zero channels stand on the
+	// pipe as orphans of this shard's range.
+	var declaration = make(map[string]*streamV2Item, len(quarters))
+	for i, q := range quarters {
+		declaration[q.key()] = &streamV2Item{Channel: channelNames(task, 1, quarters)[i], KeyBegin: q.keyBegin, KeyEnd: q.keyEnd}
+	}
+	var second = newTopologyManager(t, task, 0, math.MaxUint32, declaration)
+	storeKeys(t, second, keysHashingTo(quarters[0], 1, "orphan-later"))
+	require.Equal(t, channelNames(task, 1, quarters), activeNames(second))
+	require.Empty(t, second.bindings[0].abandoned)
+
+	// The orphans are swept off the pipe before the first append, and the epoch-one
+	// layout is untouched.
+	_, err = second.flush(ctx)
+	require.NoError(t, err)
+	var tokens = fakeCommittedTokens(t, statePath)
+	for _, name := range channelNames(task, 0, quarters) {
+		require.NotContains(t, tokens, name)
+	}
+	require.Equal(t, streamV2Token(1, quarters[0]), tokens[channelNames(task, 1, quarters)[0]])
 }

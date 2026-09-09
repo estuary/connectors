@@ -159,6 +159,8 @@ func TestStreamV2SwitchOffTheWritePathIsRejected(t *testing.T) {
 			cp:                  checkpoint{stateKey: &checkpointItem{StreamV2: prior}},
 			snowpipeStreamingV2: newStreamV2Manager(ctx, &cfg, "test/switch", "acct", &pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32}),
 		}
+		// The downgrade drops this shard's streaming v2 channels through the sidecar.
+		d.snowpipeStreamingV2.argv = fakeSidecarArgv(t)
 		t.Cleanup(d.snowpipeStreamingV2.stop)
 		return d
 	}
@@ -250,18 +252,18 @@ func TestStreamV2SwitchOffTheWritePathIsRejected(t *testing.T) {
 			require.ErrorContains(t, err, "backfill")
 		})
 
-		t.Run("by naming snowpipe_streaming is the downgrade", func(t *testing.T) {
+		t.Run("by naming snowpipe_streaming is allowed as the downgrade", func(t *testing.T) {
 			const stateKey = "downgrade.v1"
 			var d = newTransactor(t, stateKey, itemsFor(&streamV2Item{
 				Channel: "task_00000000_downgrade_v1", Counter: 3, KeyEnd: math.MaxUint32,
 			}))
 			d.cfg.Advanced.FeatureFlags = "snowpipe_streaming"
-			d.channelDrop = newStreamV2ChannelDrop(d.snowpipeStreamingV2)
 			d.snowpipeStreaming = openChannelServer(t, 0)
 
+			// The binding leaves for the snowpipe_streaming path; its streaming v2
+			// channels are left standing for a later return to sweep.
 			require.NoError(t, d.addBinding(ctx, target(stateKey, true), true, false))
-			require.True(t, d.channelDrop.pending(stateKey))
-			require.Equal(t, []string{"task_00000000_downgrade_v1"}, streamV2ChannelNames(d.channelDrop.tombstones(stateKey)))
+			require.True(t, d.bindings[len(d.bindings)-1].streaming)
 		})
 
 		t.Run("the downgrade rejects a table the snowpipe_streaming path cannot open", func(t *testing.T) {
@@ -270,30 +272,11 @@ func TestStreamV2SwitchOffTheWritePathIsRejected(t *testing.T) {
 				Channel: "task_00000000_rejected_v1", Counter: 3, KeyEnd: math.MaxUint32,
 			}))
 			d.cfg.Advanced.FeatureFlags = "snowpipe_streaming"
-			d.channelDrop = newStreamV2ChannelDrop(d.snowpipeStreamingV2)
 			d.snowpipeStreaming = openChannelServer(t, 6)
 
 			var err = d.addBinding(ctx, target(stateKey, true), true, false)
 			require.Error(t, err)
 			require.ErrorContains(t, err, "staged files")
-			require.False(t, d.channelDrop.pending(stateKey))
-			require.False(t, d.channelDrop.fenced)
-		})
-
-		t.Run("takes only the channels this shard owns", func(t *testing.T) {
-			const stateKey = "split.v1"
-			var d = newTransactor(t, stateKey, itemsFor(
-				&streamV2Item{Channel: "task_00000000_split_v1", Counter: 3, KeyBegin: 0, KeyEnd: 0x7fffffff},
-				&streamV2Item{Channel: "task_80000000_split_v1", Counter: 5, KeyBegin: 0x80000000, KeyEnd: math.MaxUint32},
-			))
-			d.cfg.Advanced.FeatureFlags = "snowpipe_streaming"
-			d._range = &pf.RangeSpec{KeyEnd: 0x7fffffff, RClockEnd: math.MaxUint32}
-			d.channelDrop = newStreamV2ChannelDrop(d.snowpipeStreamingV2)
-			d.snowpipeStreaming = openChannelServer(t, 0)
-
-			require.NoError(t, d.addBinding(ctx, target(stateKey, true), true, false))
-			require.True(t, d.channelDrop.pending(stateKey))
-			require.Equal(t, []string{"task_00000000_split_v1"}, streamV2ChannelNames(d.channelDrop.tombstones(stateKey)))
 		})
 	})
 
@@ -508,6 +491,9 @@ func TestStreamV2WritePathSwitch(t *testing.T) {
 
 	var newV2 = func(t *testing.T, tgt sql.Table, prior map[string]*streamV2Item) *streamV2Manager {
 		var m = newStreamV2Manager(ctx, &cfg, testMaterialization, accountName, fullRange)
+		m.listChannels = func(ctx context.Context, database, schema, table string) ([]string, error) {
+			return streamV2ListChannels(ctx, db, testDialect, database, schema, table)
+		}
 		t.Cleanup(m.stop)
 		m.addBinding(cfg.Database, cfg.Schema, tableName, tgt, prior)
 		return m
