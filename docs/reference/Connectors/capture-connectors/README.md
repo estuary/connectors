@@ -171,6 +171,9 @@ All Estuary connectors capture data in real time, as it appears in the source sy
 - IBM Db2 Batch
   - [Configuration](./db2-batch.md)
   - Package - ghcr.io/estuary/source-db2-batch:v1
+- Impact
+  - [Configuration](./impact.md)
+  - Package - ghcr.io/estuary/source-impact-native:v2
 - Incident.io
   - [Configuration](./incident-io.md)
   - Package - ghcr.io/estuary/source-incident-io:v1
