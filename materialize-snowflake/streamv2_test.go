@@ -128,6 +128,9 @@ func TestStreamV2Manager(t *testing.T) {
 
 	var newManager = func(keyRange *pf.RangeSpec) *streamV2Manager {
 		var m = newStreamV2Manager(ctx, &cfg, testMaterialization, accountName, keyRange)
+		m.listChannels = func(ctx context.Context, database, schema, table string) ([]string, error) {
+			return streamV2ListChannels(ctx, db, testDialect, database, schema, table)
+		}
 		t.Cleanup(m.stop)
 		return m
 	}

@@ -97,8 +97,9 @@ func TestStreamV2RejectedRows(t *testing.T) {
 	var ctx = context.Background()
 	singleChannelLayout(t)
 
-	// The single channel of the binding under a one-channel layout.
-	var channel = streamV2ChannelName("test/rejectedRows",
+	// The single channel of the binding under a one-channel layout, at the epoch a
+	// fresh binding mints.
+	var channel = streamV2ChannelName("test/rejectedRows", 0,
 		streamV2Range{keyBegin: 0, keyEnd: math.MaxUint32}, "rejected.v1")
 
 	var newManager = func(t *testing.T, prior *streamV2Item) *streamV2Manager {
