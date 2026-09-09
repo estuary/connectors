@@ -153,11 +153,12 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(binding int, doc json.
 
 	t.be.StartedEvaluatingLoads()
 	if err := t.compute.runJob(ctx, computeJob{
-		Input:            loadInput,
-		EntryPointURI:    t.pyFiles.load,
-		PyFilesCommonURI: t.pyFiles.common,
-		Name:             fmt.Sprintf("load for: %s", t.materializationName),
-		WorkingPrefix:    outputPrefix,
+		Input:              loadInput,
+		EntryPointURI:      t.pyFiles.load,
+		PyFilesCommonURI:   t.pyFiles.common,
+		Name:               fmt.Sprintf("load for: %s", t.materializationName),
+		WorkingPrefix:      outputPrefix,
+		SparkJobProperties: t.cfg.Compute.SparkJobProperties,
 	}); err != nil {
 		return fmt.Errorf("load job failed: %w", err)
 	} else if err := t.loadFiles.CleanupCurrentTransaction(ctx); err != nil {
@@ -301,12 +302,13 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 		defer cleanupStatus()
 
 		if err := t.compute.runJob(ctx, computeJob{
-			Input:            mergeInput,
-			EntryPointURI:    t.pyFiles.merge,
-			PyFilesCommonURI: t.pyFiles.common,
-			Name:             fmt.Sprintf("store for: %s", t.materializationName),
-			WorkingPrefix:    outputPrefix,
-			IdempotencyToken: token,
+			Input:              mergeInput,
+			EntryPointURI:      t.pyFiles.merge,
+			PyFilesCommonURI:   t.pyFiles.common,
+			Name:               fmt.Sprintf("store for: %s", t.materializationName),
+			WorkingPrefix:      outputPrefix,
+			IdempotencyToken:   token,
+			SparkJobProperties: t.cfg.Compute.SparkJobProperties,
 		}); err != nil {
 			return nil, fmt.Errorf("store merge job failed: %w", err)
 		} else if err := cleanupStatus(); err != nil {

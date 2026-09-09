@@ -260,6 +260,42 @@
                   "propertyName": "auth_type"
                 },
                 "order": 9
+              },
+              "spark_job_properties": {
+                "items": {
+                  "properties": {
+                    "key": {
+                      "type": "string",
+                      "enum": [
+                        "spark.dynamicAllocation.initialExecutors",
+                        "spark.dynamicAllocation.maxExecutors",
+                        "spark.executor.instances"
+                      ],
+                      "title": "Key",
+                      "description": "Spark Job Property Key.",
+                      "nonsensitive": true,
+                      "order": 1
+                    },
+                    "value": {
+                      "type": "string",
+                      "pattern": "^[0-9A-Za-z]+$",
+                      "title": "Value",
+                      "description": "Spark Job Property Value.",
+                      "nonsensitive": true,
+                      "order": 2
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "key",
+                    "value"
+                  ]
+                },
+                "type": "array",
+                "title": "Spark Job Properties",
+                "description": "Override Spark Job Properties",
+                "nonsensitive": true,
+                "order": 10
               }
             },
             "type": "object",

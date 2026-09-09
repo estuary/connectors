@@ -647,9 +647,10 @@ See below for a full list of configuration options.
 | **`/compute/credentials`**           | EMR Authentication     | Authentication method for EMR.                                                                                       | [EMR Credentials](#emr-credentials) | Required     |
 |   `/compute/bucket_path`             | Bucket Path            | Optional prefix used to store staged data files.                                                                     | string           |                                 |
 |   `/compute/systems_manager_prefix`  | System Manager Prefix  | Prefix for parameters in Systems Manager as an absolute directory path (must start and end with `/`).                | string           | `/estuary/`                     |
+|   `/compute/spark_job_properties`    | Spark Job Properties   | Override Spark Job Properties.  Reference the default [Spark Job Properties][spark-job-properties].                  | array            |                                 |
 |   `/advanced/table_identifier_case`  | Table Identifier Case  | Casing for namespace and table names: 'lowercase' (default), 'uppercase', or 'preserve'.                             | string           |                                 |
 |   `/advanced/field_name_case`        | Field Name Case        | Casing for column names: 'preserve' (default), 'lowercase', or 'uppercase'.                                          | string           |                                 |
-|   `/glue_optimizers`                 | Glue Table Optimizers  | Configure AWS Glue managed table optimizers for compaction. See [configuration details](#glue-table-optimizers).    | object           |                                 |
+|   `/glue_optimizers`                 | Glue Table Optimizers  | Configure AWS Glue managed table optimizers for compaction. See [configuration details](#glue-table-optimizers).     | object           |                                 |
 
 #### Credentials
 
@@ -776,3 +777,5 @@ to enable automatic maintenance on your tables, including data file compaction, 
 If you do not use Glue for your catalog or otherwise do not configure automatic optimization through the connector,
 you should conduct [regular maintenance](https://iceberg.apache.org/docs/latest/maintenance/)
 for your materialized tables to ensure optimal query performance.
+
+[spark-job-properties]: https://docs.aws.amazon.com/emr/latest/EMR-Serverless-UserGuide/jobs-spark.html#spark-defaults
