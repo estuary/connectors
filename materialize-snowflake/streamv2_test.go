@@ -1489,3 +1489,73 @@ func TestStreamV2AdoptsATableWithNoStateKey(t *testing.T) {
 		"has been backfilled",
 	)
 }
+
+// TestStreamV2ListChannels drives the channel listing against live Snowflake: a
+// table that has never streamed reports no channels, and one that has reports the
+// channel the write path opened on it, by the name the write path derived.
+func TestStreamV2ListChannels(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode")
+	}
+
+	var ctx = context.Background()
+	var cfg = mustGetCfg(t)
+	t.Setenv("SNOWPIPE_SIDECAR_PYTHON", testSidecarPython(t))
+	singleChannelLayout(t)
+
+	dsn, err := cfg.toURI(true, "")
+	require.NoError(t, err)
+	db, err := stdsql.Open("snowflake", dsn)
+	require.NoError(t, err)
+	defer db.Close()
+
+	var accountName string
+	require.NoError(t, db.QueryRowContext(ctx, "SELECT CURRENT_ACCOUNT()").Scan(&accountName))
+
+	// Upper case, which is what Snowflake stores for the unquoted identifier the
+	// CREATE below uses, so the name passed to the listing is the name Snowflake
+	// holds the table — and its default pipe — under.
+	var tableName = fmt.Sprintf("STREAMV2_LIST_FLOW_TEST_%d", time.Now().Unix())
+	var cleanup = func() {
+		db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s;", tableName))
+	}
+	cleanup()
+	_, err = db.ExecContext(ctx, fmt.Sprintf("CREATE TABLE %s (KEY TEXT, VAL NUMBER);", tableName))
+	require.NoError(t, err)
+	// Registered before the manager's stop below, so the cleanup stack stops the
+	// manager while the table it holds a channel on still exists.
+	t.Cleanup(cleanup)
+
+	// A table nothing has streamed into has no default pipe, so no channels.
+	names, err := streamV2ListChannels(ctx, db, testDialect, cfg.Database, cfg.Schema, tableName)
+	require.NoError(t, err)
+	require.Empty(t, names)
+
+	// Stream one row, which opens a channel on the table's default pipe.
+	var m = newStreamV2Manager(ctx, &cfg, "test/streamV2List", accountName,
+		&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
+	t.Cleanup(m.stop)
+	m.addBinding(cfg.Database, cfg.Schema, tableName, sql.Table{
+		TableShape: sql.TableShape{Binding: 0, DeltaUpdates: true},
+		Identifier: tableName,
+		Keys:       []sql.Column{{Identifier: `KEY`}},
+		Values:     []sql.Column{{Identifier: `VAL`}},
+		StateKey:   "list.v1",
+	}, nil)
+	require.NoError(t, testWriteRow(ctx, m, 0, []any{"k", 1}))
+	var opened = m.bindings[0].channels[0].name
+	_, err = m.flush(ctx)
+	require.NoError(t, err)
+
+	// The listing names that channel, by the name the write path derived for it.
+	// The first stream is what creates the table's default pipe, so the listing
+	// is polled to tolerate any delay in that pipe becoming visible. Eventually
+	// runs its condition off the test goroutine, so the error is carried out and
+	// checked here rather than failing inside.
+	require.Eventually(t, func() bool {
+		names, err = streamV2ListChannels(ctx, db, testDialect, cfg.Database, cfg.Schema, tableName)
+		return err != nil || slices.Contains(names, opened)
+	}, 3*time.Minute, 5*time.Second)
+	require.NoError(t, err)
+	require.Contains(t, names, opened)
+}
