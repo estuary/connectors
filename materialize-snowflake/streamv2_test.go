@@ -970,6 +970,54 @@ func TestStreamV2Manager(t *testing.T) {
 		})
 	})
 
+	t.Run("a second task on the table is rejected", func(t *testing.T) {
+		// A backfill of either task drops the table and every channel on it, so
+		// neither task's channels and tokens can account for the other's rows. The
+		// first task's channels on the pipe are what betray it to the second.
+		var sharedTable = fmt.Sprintf("STREAMV2_TEST_TWO_TASKS_%d", time.Now().Unix())
+		t.Cleanup(func() {
+			db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s;", sharedTable))
+		})
+		_, err := db.ExecContext(ctx, fmt.Sprintf("CREATE TABLE %s %s;", sharedTable, testTableColumns))
+		require.NoError(t, err)
+
+		var tgt = target("two-tasks.v1")
+		tgt.Identifier = sharedTable
+		tgt.Path = []string{cfg.Schema, sharedTable}
+		tgt.DeltaUpdates = true
+
+		var first = newManager(fullRange)
+		first.addBinding(cfg.Database, cfg.Schema, sharedTable, tgt, nil)
+		writeRows(first, 0, 3)
+		_, err = first.flush(ctx)
+		require.NoError(t, err)
+		require.Equal(t, 3, countRowsIn(sharedTable))
+		var firstChannel = first.bindings[0].channels[0].name
+
+		var second = newStreamV2Manager(ctx, &cfg, testMaterialization+"-second", accountName, fullRange)
+		second.listChannels = first.listChannels
+		t.Cleanup(second.stop)
+		second.addBinding(cfg.Database, cfg.Schema, sharedTable, tgt, nil)
+		var rejection = testWriteRow(ctx, second, 0, []any{"k", 1, json.RawMessage(`{}`)})
+		require.ErrorContains(t, rejection, sanitizeAndAppendHash(testMaterialization))
+		require.ErrorContains(t, rejection, firstChannel)
+		require.ErrorContains(t, rejection, "backfill this binding")
+		t.Logf("the second task was rejected with: %s", rejection)
+
+		// The second task opened nothing: the first's channel is the only one on the
+		// pipe, and the table holds only the first's rows.
+		names, err := second.listChannels(ctx, cfg.Database, cfg.Schema, sharedTable)
+		require.NoError(t, err)
+		require.Equal(t, []string{firstChannel}, names)
+		require.Equal(t, 3, countRowsIn(sharedTable))
+
+		// The first task carries on unaffected.
+		writeRows(first, 3, 5)
+		_, err = first.flush(ctx)
+		require.NoError(t, err)
+		require.Equal(t, 5, countRowsIn(sharedTable))
+	})
+
 	t.Run("rejections", func(t *testing.T) {
 		truncate(t)
 		smallBatches(t)

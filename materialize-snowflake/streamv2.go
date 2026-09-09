@@ -6,6 +6,7 @@ import (
 	stdsql "database/sql"
 	"errors"
 	"fmt"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -129,6 +130,50 @@ func streamV2ParseChannel(name, materialization, stateKey string) (int, streamV2
 		return 0, streamV2Range{}, false
 	}
 	return epoch, streamV2Range{keyBegin: uint32(keyBegin), keyEnd: uint32(keyEnd)}, true
+}
+
+// streamV2ChannelShape is the shape of every name streamV2ChannelName produces,
+// whatever task and state key it was produced for: a sanitized task and a sanitized
+// state key, each ending in the 16 uppercase hex digits sanitizeAndAppendHash appends,
+// around a decimal epoch and a key range of two lowercase 8-digit hex bounds. The
+// task match is lazy because the sanitized human-readable part is capped well short
+// of the length the epoch-and-range middle needs, so the shortest task prefix is the
+// one the name was derived from.
+var streamV2ChannelShape = regexp.MustCompile(
+	`^(.+?_[0-9A-F]{16})_(\d+)_([0-9a-f]{8})-([0-9a-f]{8})_(.+_[0-9A-F]{16})$`)
+
+// streamV2ChannelTask reports the sanitized task a v2 channel name was derived for,
+// and whether the name is a v2 channel name at all. It recognizes the names of any
+// task, which streamV2ParseChannel cannot, since that requires the task to be known.
+func streamV2ChannelTask(name string) (string, bool) {
+	var groups = streamV2ChannelShape.FindStringSubmatch(name)
+	if groups == nil {
+		return "", false
+	}
+	return groups[1], true
+}
+
+// streamV2ForeignTaskError rejects a table on which another Flow task's v2 channels
+// stand. The connector cannot tell a live task from a deleted or renamed one whose
+// channels outlived it, so the message carries the remedy for each.
+func streamV2ForeignTaskError(table string, foreign map[string][]string) error {
+	var tasks = make([]string, 0, len(foreign))
+	for task := range foreign {
+		tasks = append(tasks, task)
+	}
+	slices.Sort(tasks)
+
+	var described = make([]string, len(tasks))
+	for i, task := range tasks {
+		var channels = foreign[task]
+		slices.Sort(channels)
+		described[i] = fmt.Sprintf("%s (channels %s)", task, strings.Join(channels, ", "))
+	}
+
+	return fmt.Errorf(
+		"table %s already receives snowpipe streaming v2 rows from another Flow task, whose channel names begin with %s. Two tasks may not stream into one table. If that task still exists, materialize this binding into a table of its own, or remove this table from that task. If that task was deleted or renamed, its channels have outlived it: backfill this binding, which re-creates the table and drops every channel standing on it",
+		table, strings.Join(described, "; "),
+	)
 }
 
 // streamV2Token renders the offset token of an append. The token holds two facts:
@@ -351,9 +396,9 @@ func streamV2ListChannels(ctx context.Context, db *stdsql.DB, dialect sql.Dialec
 // path that records no state key reports none, and says nothing about which state
 // key can stream into it.
 //
-// A state key of another task is not a conflict either. Two tasks that materialize
-// into one table are not backfills of each other. The comment names whichever of
-// them created the table last.
+// A comment naming another task is not a conflict either. It records that task's
+// state key, not one of this binding's, so it is no account of a backfill of this
+// binding.
 func streamV2CheckStateKeyConflict(comment string, mine streamV2RecordedStateKey, table string) error {
 	recorded, ok := streamV2StateKeyFromTableComment(comment)
 	if !ok {
@@ -364,17 +409,7 @@ func streamV2CheckStateKeyConflict(comment string, mine streamV2RecordedStateKey
 		return nil
 	}
 
-	// Two tasks are not backfills of each other, and neither one's account covers
-	// what the other appended. A backfill of either drops the table, and with it
-	// every channel appending to it, including the other task's.
-	if recorded.materialization != mine.materialization {
-		return fmt.Errorf(
-			"table %s records materialization %q as the one materializing into it, while this task is %q: each task's channels account only for the documents it appended itself, and a backfill of either task drops the table along with every channel appending to it, so two tasks may not stream into one table. Materialize this binding into a table of its own, or take the other task off this one. If this task was renamed, backfill the binding, which re-creates the table and records the new name",
-			table, recorded.materialization, mine.materialization,
-		)
-	}
-
-	if recorded.stateKey == mine.stateKey {
+	if recorded.materialization != mine.materialization || recorded.stateKey == mine.stateKey {
 		return nil
 	}
 
@@ -572,10 +607,11 @@ type streamV2Manager struct {
 	tableComment func(ctx context.Context, database, schema, table string) (string, error)
 
 	// listChannels reports the channels standing on a table's default pipe. The
-	// transactor supplies it over its own connection. It is what lets a shard mint an
-	// epoch past channels no checkpoint records, and what the sweep reads to drop the
-	// channels a layout has left behind. It is nil when no connection backs the
-	// manager, and the manager then reasons from the checkpoint alone.
+	// transactor supplies it over its own connection. It is what reveals another
+	// task's channels on a table this one is about to stream into, and what the sweep
+	// reads to drop the channels a layout has left behind. It is nil when no
+	// connection backs the manager, and the manager then reasons from the checkpoint
+	// alone.
 	listChannels func(ctx context.Context, database, schema, table string) ([]string, error)
 
 	// procCtx bounds the lifetime of the sidecar process to the transactor session.
@@ -685,6 +721,37 @@ func newStreamV2Channel(name string, r streamV2Range, counter, skip int64) *stre
 func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) error {
 	if b.opened {
 		return nil
+	}
+
+	// The channels standing on the table's pipe, read once and before this shard opens
+	// any channel of its own: a table another task already streams into is rejected
+	// here, before this shard has created anything the other task could see, and the
+	// same listing is what the sweep at the end reads. A name of the v2 shape derived
+	// for another task is that task's; a name of no v2 shape is some other
+	// high-performance client's, which the connector cannot attribute and leaves alone.
+	var standing []string
+	if m.listChannels != nil {
+		names, err := m.listChannels(ctx, b.database, b.schema, unquotedIdentifier(b.table))
+		if err != nil {
+			return err
+		}
+		standing = names
+
+		var own = sanitizeAndAppendHash(m.materialization)
+		var foreign = make(map[string][]string)
+		for _, name := range standing {
+			var task, ok = streamV2ChannelTask(name)
+			if !ok {
+				log.WithFields(log.Fields{"table": b.table, "channel": name}).Info("a channel of no snowpipe streaming v2 shape stands on the table's pipe")
+				continue
+			}
+			if task != own {
+				foreign[task] = append(foreign[task], name)
+			}
+		}
+		if len(foreign) > 0 {
+			return streamV2ForeignTaskError(b.table, foreign)
+		}
 	}
 
 	// This check runs before the manager starts a sidecar, and before it opens any
@@ -997,25 +1064,22 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 
 	// Drop the channels this layout stands past — the ones just abandoned, and any a
 	// prior session or another write path left on the pipe — before the first append.
-	return m.sweep(ctx, b)
+	return m.sweep(ctx, b, standing)
 }
 
 // sweep drops the channels standing on the binding's pipe that its current layout has
 // left behind: the ones nested in this shard's range, derived for this binding, that
 // neither the active layout nor the declared target layout names. A fresh epoch keeps
 // an abandoned channel's name out of every live layout, so the drop only reclaims the
-// pipe's channel budget and races no shard that still routes to one. It requires the
-// channel listing, and does nothing when no connection backs the manager.
+// pipe's channel budget and races no shard that still routes to one. It reads the
+// channel listing the caller passes, which is empty when no connection backs the
+// manager, and then does nothing.
 //
 // A channel whose range this shard does not wholly contain is a sibling's or a
 // parent's, never this shard's to drop, so it is left alone.
-func (m *streamV2Manager) sweep(ctx context.Context, b *streamV2Binding) error {
-	if m.listChannels == nil {
+func (m *streamV2Manager) sweep(ctx context.Context, b *streamV2Binding, names []string) error {
+	if len(names) == 0 {
 		return nil
-	}
-	names, err := m.listChannels(ctx, b.database, b.schema, unquotedIdentifier(b.table))
-	if err != nil {
-		return err
 	}
 
 	var keep = make(map[string]bool, len(b.channels)+len(b.targets))
@@ -1672,8 +1736,15 @@ func (m *streamV2Manager) acknowledged(ctx context.Context) error {
 		}).Info("snowpipe streaming v2: converged the channel layout to the target layout")
 
 		// The inherited channels are out of the layout now; drop them from the pipe.
-		if err := m.sweep(ctx, b); err != nil {
-			return err
+		// The listing is fresh, since the layout changed since the binding opened.
+		if m.listChannels != nil {
+			names, err := m.listChannels(ctx, b.database, b.schema, unquotedIdentifier(b.table))
+			if err != nil {
+				return err
+			}
+			if err := m.sweep(ctx, b, names); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
