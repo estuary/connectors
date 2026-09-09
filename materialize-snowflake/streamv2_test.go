@@ -1257,4 +1257,24 @@ func TestStreamV2ListChannels(t *testing.T) {
 	}, 3*time.Minute, 5*time.Second)
 	require.NoError(t, err)
 	require.Contains(t, names, opened)
+
+	// The table's snowpipe_streaming channel is listed too, upper-cased as Snowflake
+	// holds it, and the drop accepts the listed name.
+	sm, err := newStreamManager(&cfg, "test/streamV2List", accountName, 0)
+	require.NoError(t, err)
+	_, err = sm.c.openChannel(ctx, cfg.Schema, tableName, sm.channelName)
+	require.NoError(t, err)
+	names, err = streamV2ListChannels(ctx, db, testDialect, cfg.Database, cfg.Schema, tableName)
+	require.NoError(t, err)
+	require.Contains(t, names, opened)
+	var listed = slices.IndexFunc(names, func(n string) bool { return strings.EqualFold(n, sm.channelName) })
+	require.GreaterOrEqual(t, listed, 0, "%v does not list %s", names, sm.channelName)
+	keyBegin, ok := streamingChannelKeyBegin(names[listed], "test/streamV2List")
+	require.True(t, ok)
+	require.Zero(t, keyBegin)
+
+	require.NoError(t, sm.dropChannel(ctx, cfg.Schema, tableName, names[listed]))
+	names, err = streamV2ListChannels(ctx, db, testDialect, cfg.Database, cfg.Schema, tableName)
+	require.NoError(t, err)
+	require.Equal(t, []string{opened}, names)
 }

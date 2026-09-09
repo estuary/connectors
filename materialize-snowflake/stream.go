@@ -119,21 +119,18 @@ func (sm *streamManager) addBinding(ctx context.Context, schema string, table st
 	return nil
 }
 
-// dropChannel drops this shard's channel on a table and forgets any stream the
-// manager held for the binding, so that no blob can be registered against a
-// channel which is gone.
-func (sm *streamManager) dropChannel(ctx context.Context, schema, table string, binding int) error {
-	if err := sm.c.dropChannel(ctx, schema, table, sm.channelName); err != nil {
+// dropChannel drops a channel of a table, unless this manager holds it open.
+// Snowflake holds channel names case-insensitively, so the match ignores case.
+func (sm *streamManager) dropChannel(ctx context.Context, schema, table, name string) error {
+	for _, ts := range sm.tableStreams {
+		if strings.EqualFold(ts.channel.Channel, name) {
+			return nil
+		}
+	}
+	if err := sm.c.dropChannel(ctx, schema, table, name); err != nil {
 		return fmt.Errorf("dropChannel: %w", err)
 	}
-	delete(sm.tableStreams, binding)
-
-	log.WithFields(log.Fields{
-		"schema":  schema,
-		"table":   table,
-		"channel": sm.channelName,
-	}).Info("dropped streaming channel")
-
+	log.WithFields(log.Fields{"schema": schema, "table": table, "channel": name}).Info("dropped streaming channel")
 	return nil
 }
 
