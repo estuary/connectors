@@ -147,23 +147,27 @@ own. Either half of that convergence can be interrupted and repeats safely.
 
 ### What else changes on this path
 
-- A backfill drops and re-creates the table, because a channel cannot outlive the
-  table that it appends to. Grants on the old table do not survive.
-- `retain_existing_data_on_backfill` does not work on this path, for the same
-  reason.
+- A backfill truncates the table like any other backfill. The v2 materialization
+  runtime stops every shard of the specification being replaced before Apply
+  runs, so nothing appends while the table is truncated, and the backfill's shards
+  derive channel names under a fresh state key, so they share nothing with the
+  channels the truncate left standing. Those channels are swept the first time a
+  shard of the backfill opens the binding. `retain_existing_data_on_backfill`
+  works on this path the same as any other.
 - Two tasks may not stream into one table. Every channel name carries the task it
   was derived for, and a shard lists the channels on the table's pipe before it
   opens any of its own, so a second task is rejected naming the first, and creates
-  nothing the first could see. A deleted or renamed task's channels stay on the
-  table and reject the same way until the binding is backfilled, which drops the
+  nothing the first could see. Since a backfill truncates rather than drops, a
+  deleted or renamed task's channels stay on the table and reject the same way;
+  backfilling the binding with `always_drop_tables_on_backfill` set drops the
   table and every channel on it. A channel of no Estuary shape, from some other
   high-performance client, cannot be attributed and is left alone.
 - A binding can leave this path only for the `snowpipe_streaming` path, by naming
   `snowpipe_streaming` explicitly in `feature_flags` and removing
   `snowpipe_streaming_v2`, while keeping the task on the v2 materialization
   runtime. The publication logs a warning per binding it moves this way. The
-  task's first transaction on the new path fences and drops the binding's v2
-  channels, and every document Snowflake had already committed beyond the
+  task's first transaction on the new path drops the binding's v2 channels, and
+  every document Snowflake had already committed beyond the
   checkpoint is materialized again — permanently, since this path serves
   delta-updates bindings — so the duplicate count is C − K summed over the
   binding's channels, where C is what each channel had committed and K is what
@@ -177,8 +181,5 @@ own. Either half of that convergence can be interrupted and repeats safely.
   because the `snowpipe_streaming` path cannot reopen its channel on the table, is
   the task rejected at startup, naming the table and the count outstanding.
   Restore that path for one transaction, or backfill the binding.
-- The path adopts a table that another path created. Apply records the task and
-  state key in the comment of a table that records none. The guard against a
-  replaced state key then works for that table too.
 - The sidecar is crash-only. The connector never restarts it. The runtime restarts
   the connector, and recovery replays through the offset token.

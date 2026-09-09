@@ -325,11 +325,6 @@ func newTransactor(
 		}
 
 		sv2 = newStreamV2Manager(ctx, &cfg, open.Materialization.TaskName(), accountName, open.Range)
-		// A streaming v2 binding's table records the task and state key it was
-		// created for.
-		sv2.tableComment = func(ctx context.Context, database, schema, table string) (string, error) {
-			return streamV2QueryTableComment(ctx, db, ep.Dialect, database, schema, table)
-		}
 		// The manager holds no SQL connection of its own, so the listing runs on the
 		// transactor's.
 		sv2.listChannels = func(ctx context.Context, database, schema, table string) ([]string, error) {

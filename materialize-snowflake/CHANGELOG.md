@@ -1,6 +1,6 @@
 # materialize-snowflake
 
-## 2026-09-04
+## 2026-09-09
 
 ### Added
 - New `snowpipe_streaming_v2` feature flag (off by default). Delta-updates
@@ -21,16 +21,18 @@ With `snowpipe_streaming_v2` set, delta-updates bindings behave as follows.
 - Rows become visible in the destination slightly before the Flow transaction
   which produced them commits. Every committed transaction is still
   materialized exactly once, including across restarts.
-- Backfilling a binding drops and re-creates its table rather than deleting its
-  rows, so grants on that table do not survive the backfill, and the
-  `retain_existing_data_on_backfill` feature flag does not apply to it. Other
-  bindings of the task are unaffected.
+- Backfilling a binding truncates its table like any other backfill, so grants
+  on that table survive it, and the `retain_existing_data_on_backfill` feature
+  flag applies to it the same way it applies to every other binding. The
+  channels of the replaced binding are dropped when the backfill first opens.
 - A binding moving onto this path first finishes the work its previous write
   path staged. Where that is impossible, the binding is rejected, naming the
   table and the count outstanding.
 - Two tasks may not stream into one table; the second is rejected, naming the
   first. A task that was deleted or renamed leaves its channels on the table,
-  and is named the same way, until the binding is backfilled.
+  and is named the same way, until the binding is backfilled with the
+  `always_drop_tables_on_backfill` feature flag set, which drops the table and
+  every channel on it.
 - The one way off this path without a backfill is setting `snowpipe_streaming`
   while removing `snowpipe_streaming_v2`, on a task that keeps the V2 runtime.
   Documents Snowflake had committed beyond the checkpoint are then materialized
