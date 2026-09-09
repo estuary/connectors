@@ -158,7 +158,10 @@ See [connectors](../../../../concepts/connectors.md#using-connectors) to learn m
 | `/my_domain` | My Domain | Your Salesforce My Domain login host. Enter the full host ending in .my.salesforce.com to login with your My Domain host. e.g. mycompany.my.salesforce.com, acme--uat.sandbox.my.salesforce.com. Leave blank to log in via the standard login/test endpoint. Required when authenticating with Client Credentials. | string | `""` |
 | `/is_sandbox` | Sandbox | Whether you&#x27;re using a [Salesforce Sandbox](https://help.salesforce.com/s/articleView?id=sf.deploy_sandboxes_parent.htm&type=5). | boolean | `false` |
 | **`/credentials`** | Authentication | Credentials for the chosen [authentication method](#authentication). See the per-method credential properties below. | object | Required |
-| `/advanced/window_size` | Window size | The date window size in days to use when querying the Salesforce APIs. | integer | 18250 |
+| `/advanced/window_size` | Incremental Query Window Size | How much time a single incremental query covers when the connector sweeps for changes. Typically left as the default unless Estuary Support or the connector logs indicate otherwise. | object | `{"window_type": "days", "days": 18250}` |
+| `/advanced/window_size/window_type` | Window Type | Either `days` or `interval`. Selects which of the two properties below sets the window size. | string | `days` |
+| `/advanced/window_size/days` | Days | Size of the date window each incremental query covers, in whole days. Used when `window_type` is `days`. | integer | 18250 |
+| `/advanced/window_size/interval` | Duration | Size of the date window each incremental query covers, as an ISO 8601 duration, e.g. `PT1H` for one hour. Used when `window_type` is `interval`. | string | |
 
 ##### Credentials
 
@@ -216,7 +219,9 @@ captures:
           is_sandbox: false
           start_date: "2025-03-19T12:00:00Z"
           advanced:
-            window_size: 18250
+            window_size:
+              window_type: days
+              days: 18250
     bindings:
       - resource:
           name: Account

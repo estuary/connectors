@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-09-09
+
+### Fixed
+- Setting `advanced.window_size` when first configuring a capture no longer fails with an
+  `Unable to extract tag using discriminator 'window_type'` error. A window size saved without
+  the window type selector is now resolved from the value that was provided.
+
+### Changed
+- The `advanced.window_size` setting is now labeled `Incremental Query Window Size`, and its
+  duration option is labeled `Duration`, to distinguish it from the per-binding sync schedule.
+
 ## 2026-09-08
 
 ### Changed
