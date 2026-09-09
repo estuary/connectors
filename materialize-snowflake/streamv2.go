@@ -17,6 +17,7 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
+	sf "github.com/snowflakedb/gosnowflake/v2"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/time/rate"
 )
@@ -242,6 +243,69 @@ func streamV2QueryTableComment(ctx context.Context, db *stdsql.DB, dialect sql.D
 		return "", nil
 	}
 	return *comment, nil
+}
+
+// streamV2DefaultPipeSuffix ends the name Snowflake gives the pipe it auto-creates
+// for a table streamed into through the high-performance architecture: the table's
+// own name, followed by this suffix.
+const streamV2DefaultPipeSuffix = "-STREAMING"
+
+// streamV2ErrObjectNotExistOrAuthorized is the Snowflake SQL compilation error
+// number for an object that does not exist, or that the role may not see; Snowflake
+// does not tell the two apart.
+const streamV2ErrObjectNotExistOrAuthorized = 2003
+
+// streamV2ListChannels reports, sorted by name, the channels Snowflake holds on
+// the default pipe of a table. A table that has never been streamed into has no
+// default pipe, and reports no channels rather than an error.
+//
+// database, schema, and table are the unquoted names Snowflake stores.
+func streamV2ListChannels(ctx context.Context, db *stdsql.DB, dialect sql.Dialect, database, schema, table string) ([]string, error) {
+	var pipe = dialect.Identifier(database, schema, table+streamV2DefaultPipeSuffix)
+
+	rows, err := db.QueryContext(ctx, fmt.Sprintf("SHOW CHANNELS IN PIPE %s;", pipe))
+	if err != nil {
+		// A table that has never been streamed into has no default pipe. Snowflake
+		// reports an absent pipe with the same error as one the role may not see,
+		// so the miss is logged for the case where it is a permissions mistake.
+		var sfErr *sf.SnowflakeError
+		if errors.As(err, &sfErr) && sfErr.Number == streamV2ErrObjectNotExistOrAuthorized {
+			log.WithFields(log.Fields{"pipe": pipe, "error": err.Error()}).Info("the table has no default pipe visible to this role")
+			return nil, nil
+		}
+		return nil, fmt.Errorf("listing channels of pipe %s: %w", pipe, err)
+	}
+	defer rows.Close()
+
+	// SHOW reports many columns; only "name" is read, and the rest are scanned
+	// into a sink, so the column order Snowflake chooses does not matter.
+	columns, err := rows.Columns()
+	if err != nil {
+		return nil, fmt.Errorf("reading columns of the channel listing of pipe %s: %w", pipe, err)
+	}
+	var nameAt = slices.Index(columns, "name")
+	if nameAt < 0 {
+		return nil, fmt.Errorf("the channel listing of pipe %s reports no \"name\" column", pipe)
+	}
+
+	var names []string
+	for rows.Next() {
+		var name string
+		var dest = make([]any, len(columns))
+		for i := range dest {
+			dest[i] = new(any)
+		}
+		dest[nameAt] = &name
+		if err := rows.Scan(dest...); err != nil {
+			return nil, fmt.Errorf("scanning the channel listing of pipe %s: %w", pipe, err)
+		}
+		names = append(names, name)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating the channel listing of pipe %s: %w", pipe, err)
+	}
+	slices.Sort(names)
+	return names, nil
 }
 
 // streamV2CheckStateKeyConflict rejects a binding when its table records a
