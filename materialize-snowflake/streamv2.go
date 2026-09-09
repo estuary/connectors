@@ -153,6 +153,27 @@ func streamV2ChannelTask(name string) (string, bool) {
 	return groups[1], true
 }
 
+// streamV2ParseBackfilledChannel reads the key range of a channel this
+// materialization derived for a state key other than the one given, and reports
+// whether the name is such a channel. A backfill rotates a binding's state key and
+// never restores one, so a channel this task named under any other state key belongs
+// to a binding that no longer exists.
+func streamV2ParseBackfilledChannel(name, materialization, stateKey string) (streamV2Range, bool) {
+	var groups = streamV2ChannelShape.FindStringSubmatch(name)
+	if groups == nil || groups[1] != sanitizeAndAppendHash(materialization) || groups[5] == sanitizeAndAppendHash(stateKey) {
+		return streamV2Range{}, false
+	}
+	keyBegin, err := strconv.ParseUint(groups[3], 16, 32)
+	if err != nil {
+		return streamV2Range{}, false
+	}
+	keyEnd, err := strconv.ParseUint(groups[4], 16, 32)
+	if err != nil {
+		return streamV2Range{}, false
+	}
+	return streamV2Range{keyBegin: uint32(keyBegin), keyEnd: uint32(keyEnd)}, true
+}
+
 // streamV2ForeignTaskError rejects a table on which another Flow task's v2 channels
 // stand. The connector cannot tell a live task from a deleted or renamed one whose
 // channels outlived it, so the message carries the remedy for each.
@@ -171,7 +192,7 @@ func streamV2ForeignTaskError(table string, foreign map[string][]string) error {
 	}
 
 	return fmt.Errorf(
-		"table %s already receives snowpipe streaming v2 rows from another Flow task, whose channel names begin with %s. Two tasks may not stream into one table. If that task still exists, materialize this binding into a table of its own, or remove this table from that task. If that task was deleted or renamed, its channels have outlived it: backfill this binding, which re-creates the table and drops every channel standing on it",
+		"table %s already receives snowpipe streaming v2 rows from another Flow task, whose channel names begin with %s. Two tasks may not stream into one table. If that task still exists, materialize this binding into a table of its own, or remove this table from that task. If that task was deleted or renamed, its channels have outlived it: backfill this binding with the always_drop_tables_on_backfill feature flag set, which drops the table and every channel standing on it",
 		table, strings.Join(described, "; "),
 	)
 }
@@ -261,71 +282,6 @@ func streamV2CannotDrainPendingBlobs(table string, blobs int, cause error) error
 	return err
 }
 
-// streamV2StateKeyPrefix starts the line in the comment of a streaming v2 table.
-// That line names the task and the binding state key that the table was created for.
-const streamV2StateKeyPrefix = "flow_state_key: "
-
-// streamV2RecordedStateKey is what a streaming v2 table records about the binding
-// that created it: the task, and the state key of the binding. A backfill rotates
-// that state key.
-type streamV2RecordedStateKey struct {
-	materialization string
-	stateKey        string
-}
-
-// streamV2EmbedStateKeyInTableComment builds the comment of a streaming v2 table.
-// The comment includes the task and state key that the table was created for.
-//
-// They go in the table comment because a channel has no attribute for them.
-// A backfill re-creates the table (client.MustRecreateResource). The drop of the table
-// destroys every channel bound to it, and the committed offset token with them.
-//
-// A later open of the same channel name therefore gets a new channel. That channel
-// looks the same as one opened against a table that was new all along. But the shards
-// running the replaced specification still run, and they will open channels against
-// the re-created table. Only the table outlives the drop, and it records the state
-// key that created it.
-func streamV2EmbedStateKeyInTableComment(comment string, rec streamV2RecordedStateKey) string {
-	return fmt.Sprintf("%s\n%s%s %s", comment, streamV2StateKeyPrefix, rec.materialization, rec.stateKey)
-}
-
-// streamV2StateKeyFromTableComment reads the task and state key that a table comment
-// names, and reports whether the comment named them at all. Two comments name none:
-// one written by a write path that records no state key, and one that an operator
-// rewrote.
-func streamV2StateKeyFromTableComment(comment string) (streamV2RecordedStateKey, bool) {
-	for line := range strings.SplitSeq(comment, "\n") {
-		rest, found := strings.CutPrefix(strings.TrimSpace(line), streamV2StateKeyPrefix)
-		if !found {
-			continue
-		} else if materialization, stateKey, ok := strings.Cut(rest, " "); ok && materialization != "" && stateKey != "" {
-			return streamV2RecordedStateKey{materialization: materialization, stateKey: stateKey}, true
-		}
-	}
-	return streamV2RecordedStateKey{}, false
-}
-
-// streamV2QueryTableComment queries the comment of a table. The comment of a
-// streaming v2 table names the task and state key it was created for. A table that
-// does not exist, and a table with no comment, both report the empty string. Neither
-// names a state key.
-func streamV2QueryTableComment(ctx context.Context, db *stdsql.DB, dialect sql.Dialect, database, schema, table string) (string, error) {
-	var query = fmt.Sprintf(
-		"SELECT COMMENT FROM %s.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?;",
-		dialect.Identifier(database),
-	)
-
-	var comment *string
-	if err := db.QueryRowContext(ctx, query, schema, table).Scan(&comment); errors.Is(err, stdsql.ErrNoRows) {
-		return "", nil
-	} else if err != nil {
-		return "", fmt.Errorf("querying the comment of table %s.%s: %w", schema, table, err)
-	} else if comment == nil {
-		return "", nil
-	}
-	return *comment, nil
-}
-
 // streamV2DefaultPipeSuffix ends the name Snowflake gives the pipe it auto-creates
 // for a table streamed into through the high-performance architecture: the table's
 // own name, followed by this suffix.
@@ -387,36 +343,6 @@ func streamV2ListChannels(ctx context.Context, db *stdsql.DB, dialect sql.Dialec
 	}
 	slices.Sort(names)
 	return names, nil
-}
-
-// streamV2CheckStateKeyConflict rejects a binding when its table records a
-// different state key of that same binding.
-//
-// A comment that names no state key is not a conflict. A table created by a write
-// path that records no state key reports none, and says nothing about which state
-// key can stream into it.
-//
-// A comment naming another task is not a conflict either. It records that task's
-// state key, not one of this binding's, so it is no account of a backfill of this
-// binding.
-func streamV2CheckStateKeyConflict(comment string, mine streamV2RecordedStateKey, table string) error {
-	recorded, ok := streamV2StateKeyFromTableComment(comment)
-	if !ok {
-		// A table created by a write path which records no state key. Apply
-		// records this state key on such a table
-		// (adoptStreamV2StateKeys), so what reaches here is a table Apply could
-		// not reach, and it says nothing about which state key may append.
-		return nil
-	}
-
-	if recorded.materialization != mine.materialization || recorded.stateKey == mine.stateKey {
-		return nil
-	}
-
-	return fmt.Errorf(
-		"table %s records state key %q of this binding as the one materializing into it, while this task is materializing state key %q: the binding has been backfilled, which re-created the table, and this task is running the specification that backfill replaced. The runtime replaces this task with the one that backfill published; appending to the table before it does would duplicate the rows the backfill is re-materializing",
-		table, recorded.stateKey, mine.stateKey,
-	)
 }
 
 // streamV2Channel is one channel of a binding: the key range of the key-hash space it
@@ -600,12 +526,6 @@ type streamV2Manager struct {
 	keyBegin        uint32
 	keyEnd          uint32
 
-	// tableComment reports the comment that Snowflake holds for the table of a binding.
-	// That comment names the task and state key the table was created for — see
-	// streamV2CheckStateKeyConflict. The transactor supplies this function, because it
-	// owns the connection that the read needs.
-	tableComment func(ctx context.Context, database, schema, table string) (string, error)
-
 	// listChannels reports the channels standing on a table's default pipe. The
 	// transactor supplies it over its own connection. It is what reveals another
 	// task's channels on a table this one is about to stream into, and what the sweep
@@ -751,22 +671,6 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 		}
 		if len(foreign) > 0 {
 			return streamV2ForeignTaskError(b.table, foreign)
-		}
-	}
-
-	// This check runs before the manager starts a sidecar, and before it opens any
-	// channel. A backfill that re-created the table of this binding leaves the shard
-	// nothing to append there, whatever its own channels report.
-	if m.tableComment != nil {
-		comment, err := m.tableComment(ctx, b.database, b.schema, unquotedIdentifier(b.table))
-		if err != nil {
-			return err
-		} else if err := streamV2CheckStateKeyConflict(
-			comment,
-			streamV2RecordedStateKey{materialization: m.materialization, stateKey: b.stateKey},
-			b.table,
-		); err != nil {
-			return err
 		}
 	}
 
@@ -1077,6 +981,11 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 //
 // A channel whose range this shard does not wholly contain is a sibling's or a
 // parent's, never this shard's to drop, so it is left alone.
+//
+// It also drops the channels this task derived for the binding under a state key a
+// backfill has since rotated away, because a backfill truncates the table and so
+// leaves them standing. No shard routes to one of those, whatever its range, so the
+// shard whose range holds the channel's first key drops it, and exactly one does.
 func (m *streamV2Manager) sweep(ctx context.Context, b *streamV2Binding, names []string) error {
 	if len(names) == 0 {
 		return nil
@@ -1099,11 +1008,15 @@ func (m *streamV2Manager) sweep(ctx context.Context, b *streamV2Binding, names [
 		if keep[name] {
 			continue
 		}
-		_, r, ok := streamV2ParseChannel(name, m.materialization, b.stateKey)
-		if !ok {
-			continue
-		}
-		if r.keyBegin < shard.keyBegin || r.keyEnd > shard.keyEnd {
+		if _, r, ok := streamV2ParseChannel(name, m.materialization, b.stateKey); ok {
+			if r.keyBegin < shard.keyBegin || r.keyEnd > shard.keyEnd {
+				continue
+			}
+		} else if r, ok := streamV2ParseBackfilledChannel(name, m.materialization, b.stateKey); ok {
+			if r.keyBegin < shard.keyBegin || r.keyBegin > shard.keyEnd {
+				continue
+			}
+		} else {
 			continue
 		}
 
@@ -1192,24 +1105,14 @@ func reconcileStreamV2Channel(channel, table string, committedToken *string, ite
 	// is nothing to skip. With a counter, the channel that held those documents is
 	// gone, and the token that said which of them Snowflake holds went with it.
 	//
-	// A shard that restarts into a backfill of its binding finds exactly this. The
-	// backfill re-creates the table, and the drop destroys every channel bound to it —
-	// see client.MustRecreateResource. The rejection is what stops that shard from
-	// appending into a table that the backfill re-materializes under it. The
-	// runtime already replaces the specification that shard runs, so that replacement
-	// resolves the rejection, not the backfill the message asks for.
-	//
-	// The one drop this connector performs itself — the drop of a channel a
-	// rebalance converged away — is recognized before reconciliation, by the
-	// declaration its checkpoint carries. A missing token here has no such record,
-	// so the message names both remaining readings. An operator who is in a backfill
-	// lost nothing and wants to know it. An operator who is not must hear that the
-	// account Snowflake keeps of this channel is gone. Neither reading bounds what
-	// the channel committed beyond the counter, so the remedy is the same either way.
+	// The one drop this connector performs itself — a rebalance abandoning a channel
+	// it converges away from — is recognized before reconciliation reaches here, by
+	// the declaration its checkpoint carries. A missing token here has no such
+	// record, so it names an account Snowflake itself has lost.
 	if committedToken == nil {
 		if counter > 0 {
 			return 0, fmt.Errorf(
-				"channel %q has committed nothing while this task's checkpoint records %d documents appended to it. Either the binding has been backfilled, which re-created the table and took every channel bound to it — in which case no rows were lost and the backfill which re-created the table is re-materializing them — or Snowflake has lost this channel's committed offset token. This shard cannot tell those apart, and neither leaves it able to identify which of its documents Snowflake still holds. Backfill this binding",
+				"channel %q has committed nothing while this task's checkpoint records %d documents appended to it: Snowflake has lost this channel's committed offset token, so this shard cannot identify which of its documents Snowflake still holds. Backfill this binding",
 				channel, counter,
 			)
 		}

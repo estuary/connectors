@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
-	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/stretchr/testify/require"
@@ -778,202 +777,56 @@ func TestStreamV2Manager(t *testing.T) {
 		})
 	})
 
-	t.Run("a backfill the last specification cannot race", func(t *testing.T) {
-		// Bumping a binding's backfill re-materializes it into the same table,
-		// and Apply does that while the last specification's shards are still
-		// storing: nothing stops them first. Their channels are bound to that
-		// same table, so what Apply does to the table is what decides whether the
-		// rows they append next end up in what the backfill materializes.
-		// Only Snowflake can say which operation takes those channels with it, so
-		// each is measured here in turn.
-		// Each experiment takes a table of its own, named for this run. Snowflake's
-		// ingestion goes on serving the table it knew under a name for some time
-		// after that table is dropped, so a table re-created under a name another
-		// experiment — or an earlier run — has streamed to cannot be appended to
-		// promptly. Nothing in the connector waits for that: a shard which meets it
-		// fails and is restarted, which is the very thing these experiments drive.
-		var runNonce = fmt.Sprintf("%d", time.Now().Unix())
-		// Named in upper case, which is what Snowflake stores for the unquoted
-		// identifier the CREATE below uses, and so what a SHOW reports it as.
-		var newBackfillTable = func(t *testing.T, experiment string) string {
-			var table = fmt.Sprintf("STREAMV2_TEST_BACKFILL_%s_%s", strings.ToUpper(experiment), runNonce)
-			t.Cleanup(func() {
-				db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s;", table))
-			})
-			return table
-		}
-
-		// recreateTable drops and re-creates the table, as Apply does for a
-		// streaming v2 binding whose backfill counter has been bumped, recording the
-		// state key it re-creates the table for the way client.CreateTable does. An
-		// empty recorded state key stands for a table created by a write path that
-		// records none.
-		var recreateTable = func(t *testing.T, backfillTable, recorded string) {
-			_, err := db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s;", backfillTable))
-			require.NoError(t, err)
-			_, err = db.ExecContext(ctx, fmt.Sprintf("CREATE TABLE %s %s;", backfillTable, testTableColumns))
-			require.NoError(t, err)
-
-			if recorded == "" {
-				return
-			}
-			var comment = streamV2EmbedStateKeyInTableComment(
-				"Generated for materialization "+testMaterialization,
-				streamV2RecordedStateKey{materialization: testMaterialization, stateKey: recorded})
-			_, err = db.ExecContext(ctx, fmt.Sprintf("COMMENT ON TABLE %s IS %s;",
-				backfillTable, testDialect.Literal(comment)))
-			require.NoError(t, err)
-		}
-
-		var backfillTarget = func(backfillTable, stateKey string) sql.Table {
-			var tgt = target(stateKey)
-			tgt.Identifier = backfillTable
-			tgt.Path = []string{cfg.Schema, backfillTable}
-			tgt.DeltaUpdates = true
-			return tgt
-		}
-
-		// readComment is what the transactor hands the manager: the comment of the
-		// binding's table as Snowflake reports it, read as each channel is opened.
-		var readComment = func(ctx context.Context, database, schema, table string) (string, error) {
-			return streamV2QueryTableComment(ctx, db, testDialect, database, schema, table)
-		}
-
-		// lastSpecShard is a shard of the specification being replaced, holding
-		// an open channel with three documents appended, committed, and accounted
-		// for by its checkpoint.
-		var lastSpecShard = func(t *testing.T, backfillTable, stateKey string) (*streamV2Manager, streamV2Item) {
-			recreateTable(t, backfillTable, "")
-
-			var m = newManager(fullRange)
-			m.addBinding(cfg.Database, cfg.Schema, backfillTable, backfillTarget(backfillTable, stateKey), nil)
-
-			writeRows(m, 0, 3)
-			entries, err := m.flush(ctx)
-			require.NoError(t, err)
-			var item = soleItem(t, entries, 0)
-			require.Equal(t, int64(3), item.Counter)
-			require.Equal(t, 3, countRowsIn(backfillTable))
-			return m, *item
-		}
-
-		t.Run("a truncate leaves it appending", func(t *testing.T) {
-			// This is the defect. The truncate empties the table for the
-			// backfill while the last specification's channel — untouched, and
-			// still bound to that table — goes on appending into it. Those rows
-			// land after the truncate, survive it, and are then re-materialized by
-			// the backfill: a duplicate of each, for good, on a
-			// delta-updates binding.
-			var backfillTable = newBackfillTable(t, "truncate")
-			var lastShard, _ = lastSpecShard(t, backfillTable, "backfill-truncate.v1")
-
-			_, err := db.ExecContext(ctx, fmt.Sprintf("TRUNCATE TABLE %s;", backfillTable))
-			require.NoError(t, err)
-			require.Zero(t, countRowsIn(backfillTable))
-
-			writeRows(lastShard, 3, 5)
-			entries, err := lastShard.flush(ctx)
-			require.NoError(t, err)
-			require.Equal(t, int64(5), soleItem(t, entries, 0).Counter)
-			require.Equal(t, 2, countRowsIn(backfillTable))
-			lastShard.stop()
+	t.Run("a backfill truncates its table", func(t *testing.T) {
+		// A backfill rotates the binding's state key, which is baked into every
+		// channel name (streamV2ChannelName) alongside the epoch, so a channel the
+		// specification being replaced holds shares a name with nothing the
+		// backfill's own shards ever derive: the table is the only thing they have
+		// in common. The crux fact this rests on is empirical — a TRUNCATE, unlike a
+		// DROP, does not touch a channel bound to the table — and is pinned here.
+		var backfillTable = fmt.Sprintf("STREAMV2_TEST_BACKFILL_TRUNCATE_%d", time.Now().Unix())
+		t.Cleanup(func() {
+			db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s;", backfillTable))
 		})
+		_, err := db.ExecContext(ctx, fmt.Sprintf("CREATE TABLE %s %s;", backfillTable, testTableColumns))
+		require.NoError(t, err)
 
-		t.Run("a drop and re-create does not", func(t *testing.T) {
-			// Dropping the table takes every channel bound to it, named by the
-			// checkpoint or not, so the last specification's appends fail instead
-			// of landing in the table the backfill is re-materializing.
-			var backfillTable = newBackfillTable(t, "drop")
-			var lastShard, checkpointed = lastSpecShard(t, backfillTable, "backfill-drop.v1")
+		var tgt = target("backfill-truncate.v1")
+		tgt.Identifier = backfillTable
+		tgt.Path = []string{cfg.Schema, backfillTable}
+		tgt.DeltaUpdates = true
 
-			// Re-created without recording a state key, which is what a table
-			// created by a write path that records none looks like: the committed
-			// offset token is all this shard has to go on.
-			recreateTable(t, backfillTable, "")
+		var m = newManager(fullRange)
+		m.addBinding(cfg.Database, cfg.Schema, backfillTable, tgt, nil)
+		writeRows(m, 0, 3)
+		var c = m.bindings[0].channels[0]
+		entries, err := m.flush(ctx)
+		require.NoError(t, err)
+		require.Equal(t, int64(3), soleItem(t, entries, 0).Counter)
+		require.Equal(t, 3, countRowsIn(backfillTable))
 
-			writeRows(lastShard, 3, 5)
-			_, err := lastShard.flush(ctx)
-			require.Error(t, err)
-			require.Zero(t, countRowsIn(backfillTable))
-			t.Logf("the last specification's append failed with: %s", err)
-			lastShard.sup.kill()
+		// The backfill's effect on this table: a truncate, not a drop.
+		_, err = db.ExecContext(ctx, fmt.Sprintf("TRUNCATE TABLE %s;", backfillTable))
+		require.NoError(t, err)
+		require.Zero(t, countRowsIn(backfillTable))
 
-			// Nor may it come back. A shard which has not yet been told to stop
-			// restarts and reopens a channel Snowflake no longer holds: its
-			// committed offset token is gone while the checkpoint still records
-			// three documents appended to it. That is the same lost-state rejection
-			// an absorbed channel gets from a join, and the only reading of it
-			// which does not append the last specification's documents into a table that
-			// has been re-materialized under them.
-			var restarted = newManager(fullRange)
-			restarted.addBinding(cfg.Database, cfg.Schema, backfillTable,
-				backfillTarget(backfillTable, "backfill-drop.v1"), priorOf(&checkpointed))
+		// The channel survives it: its committed offset token stands, and it goes
+		// on appending as though nothing happened to the table.
+		status, err := m.client.ChannelStatus(ctx, c.name)
+		require.NoError(t, err)
+		require.Equal(t, c.offsetToken(3), status.committedToken())
 
-			// Reopening is what Snowflake's ingestion answers only once it has caught
-			// up with the re-created table; until then it fails the open outright
-			// rather than reporting the fresh channel. A shard meeting that restarts,
-			// so the rejection is what it arrives at rather than what it sees first.
-			var rejection error
-			require.Eventually(t, func() bool {
-				rejection = testWriteRow(ctx, restarted, 0, []any{"k", 1, json.RawMessage(`{}`)})
-				require.Error(t, rejection)
-				if strings.Contains(rejection.Error(), "has committed nothing while this task's checkpoint records") {
-					return true
-				}
-				t.Logf("awaiting the reopen, which failed with: %s", rejection)
-				return false
-			}, 3*time.Minute, 5*time.Second)
-
-			require.ErrorContains(t, rejection, checkpointed.Channel)
-			require.Zero(t, countRowsIn(backfillTable))
-			t.Logf("the last specification's reopen was rejected with: %s", rejection)
-		})
-
-		t.Run("nor may a shard which committed nothing for the binding", func(t *testing.T) {
-			// The rejection above rests on there being a checkpoint item to contradict.
-			// A shard which has committed nothing for the binding has none, and a
-			// channel Snowflake has never held is exactly what its first transaction
-			// expects to open — so nothing about the channel tells it apart from a
-			// shard of the specification the backfill published. The table is what tells
-			// them apart: it records the state key it was created for.
-			var backfillTable = newBackfillTable(t, "owned")
-			recreateTable(t, backfillTable, noncedStateKey("backfill-owned.v1"))
-
-			// Steady state first: the table records this shard's own state key, so
-			// it appends as usual.
-			var recorded = newManager(fullRange)
-			recorded.tableComment = readComment
-			recorded.addBinding(cfg.Database, cfg.Schema, backfillTable, backfillTarget(backfillTable, "backfill-owned.v1"), nil)
-
-			writeRows(recorded, 0, 2)
-			entries, err := recorded.flush(ctx)
-			require.NoError(t, err)
-			require.Equal(t, int64(2), soleItem(t, entries, 0).Counter)
-			require.Equal(t, 2, countRowsIn(backfillTable))
-			recorded.stop()
-
-			// The backfill, with this shard having stored nothing for the binding of
-			// its own. This session is built before the backfill lands, as a shard
-			// which is still running through one is: what it may append is decided by
-			// the table as its channel opens, not by the table as it started.
-			var stale = newManager(fullRange)
-			stale.tableComment = readComment
-			stale.addBinding(cfg.Database, cfg.Schema, backfillTable, backfillTarget(backfillTable, "backfill-owned.v1"), nil)
-
-			recreateTable(t, backfillTable, noncedStateKey("backfill-owned.v2"))
-
-			var rejection = testWriteRow(ctx, stale, 0, []any{"k", 1, json.RawMessage(`{}`)})
-			require.ErrorContains(t, rejection, "backfill-owned.v2")
-			require.ErrorContains(t, rejection, "has been backfilled")
-			require.Zero(t, countRowsIn(backfillTable))
-			t.Logf("the stale specification was rejected with: %s", rejection)
-		})
+		writeRows(m, 3, 5)
+		entries, err = m.flush(ctx)
+		require.NoError(t, err)
+		require.Equal(t, int64(5), soleItem(t, entries, 0).Counter)
+		require.Equal(t, 2, countRowsIn(backfillTable))
 	})
 
 	t.Run("a second task on the table is rejected", func(t *testing.T) {
-		// A backfill of either task drops the table and every channel on it, so
-		// neither task's channels and tokens can account for the other's rows. The
-		// first task's channels on the pipe are what betray it to the second.
+		// Because a backfill truncates, a second task streaming into the table would
+		// wipe the first task's rows while the first task's channels and tokens stand.
+		// The first task's channels on the pipe are what betray it to the second.
 		var sharedTable = fmt.Sprintf("STREAMV2_TEST_TWO_TASKS_%d", time.Now().Unix())
 		t.Cleanup(func() {
 			db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s;", sharedTable))
@@ -1001,7 +854,7 @@ func TestStreamV2Manager(t *testing.T) {
 		var rejection = testWriteRow(ctx, second, 0, []any{"k", 1, json.RawMessage(`{}`)})
 		require.ErrorContains(t, rejection, sanitizeAndAppendHash(testMaterialization))
 		require.ErrorContains(t, rejection, firstChannel)
-		require.ErrorContains(t, rejection, "backfill this binding")
+		require.ErrorContains(t, rejection, "always_drop_tables_on_backfill")
 		t.Logf("the second task was rejected with: %s", rejection)
 
 		// The second task opened nothing: the first's channel is the only one on the
@@ -1159,86 +1012,6 @@ func TestStreamV2Manager(t *testing.T) {
 		require.ErrorAs(t, err, &scErr)
 		t.Logf("view ingestion failed after %s: code %s message %s", time.Since(start), scErr.Code, scErr.Message)
 	})
-}
-
-// TestStreamV2CreateTableRecordsStateKey drives the connector's own create path
-// against live Snowflake and reads back what it left on the table.
-//
-// Apply is the only writer of the state key a streaming v2 table carries, and a
-// record naming the wrong state key would reject every shard of the task
-// rather than only the ones a backfill has replaced. So this covers the whole
-// round trip — the table this connector creates, the comment Snowflake reports for
-// it, and the state key read back out of it — rather than the rendering alone.
-func TestStreamV2CreateTableRecordsStateKey(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping test in short mode")
-	}
-
-	var ctx = context.Background()
-	var cfg = mustGetCfg(t)
-	cfg.Advanced.FeatureFlags = flagSnowpipeStreamingV2
-
-	const materialization = "test/streamV2CreateTable"
-	const stateKey = "statekey%2Frecorded.v2"
-	var tableName = "STREAMV2_TEST_STATE_KEY"
-
-	dsn, err := cfg.toURI(true, "")
-	require.NoError(t, err)
-	db, err := stdsql.Open("snowflake", dsn)
-	require.NoError(t, err)
-	defer db.Close()
-
-	var cleanup = func() {
-		db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s;", tableName))
-	}
-	cleanup()
-	t.Cleanup(cleanup)
-
-	ep, err := NewDriver().NewEndpoint(ctx, cfg, boilerplate.ParseFlags(cfg))
-	require.NoError(t, err)
-	client, err := ep.NewClient(ctx, materialization, ep)
-	require.NoError(t, err)
-	t.Cleanup(client.Close)
-
-	var tbl = sql.Table{
-		TableShape: sql.TableShape{
-			Path:         []string{cfg.Schema, tableName},
-			Binding:      0,
-			DeltaUpdates: true,
-			Comment:      "Generated for materialization " + materialization + " of collection test/statekey",
-		},
-		Identifier: tableName,
-		Keys:       []sql.Column{{Identifier: `KEY`, MappedType: sql.MappedType{DDL: "TEXT"}}},
-		Values:     []sql.Column{{Identifier: `VAL`, MappedType: sql.MappedType{DDL: "VARIANT"}}},
-		StateKey:   stateKey,
-	}
-
-	var createQuery strings.Builder
-	require.NoError(t, renderTemplates(ep.Dialect).createTargetTable.Execute(&createQuery, &tbl))
-	require.NoError(t, client.CreateTable(ctx, sql.TableCreate{
-		Table:          tbl,
-		TableCreateSql: createQuery.String(),
-		Resource:       tableConfig{Table: tableName, Schema: cfg.Schema, Delta: true},
-	}))
-
-	comment, err := streamV2QueryTableComment(ctx, db, ep.Dialect, cfg.Database, cfg.Schema, tableName)
-	require.NoError(t, err)
-	t.Logf("created %s with comment: %s", tableName, comment)
-
-	// The comment the table would have carried anyway is still there for whoever
-	// reads the table, and the state key is recorded alongside it.
-	require.Contains(t, comment, tbl.Comment)
-
-	rec, ok := streamV2StateKeyFromTableComment(comment)
-	require.True(t, ok)
-	require.Equal(t, streamV2RecordedStateKey{materialization: materialization, stateKey: stateKey}, rec)
-
-	// The state key this table was created for may append to it; the one a
-	// backfill of the same binding replaced may not.
-	require.NoError(t, streamV2CheckStateKeyConflict(comment, rec, tableName))
-	require.ErrorContains(t,
-		streamV2CheckStateKeyConflict(comment, streamV2RecordedStateKey{materialization: materialization, stateKey: "statekey%2Frecorded.v1"}, tableName),
-		"has been backfilled")
 }
 
 // TestStreamV2Datatypes sweeps every Snowflake column type this connector's
@@ -1416,131 +1189,6 @@ func TestStreamV2Datatypes(t *testing.T) {
 // bdec build of the same binding created, carries no recorded state key in
 // its comment.
 //
-// streamV2CheckStateKeyConflict reads a table with no recorded state key as a table
-// that says nothing about which state key may append to it, and so allows every
-// one to. The backfill race that the record guards is therefore unguarded on exactly
-// those tables which were carried onto this write path in place — and it stays
-// that way, because only CreateTable stamps the record and a change of write path
-// creates no table.
-//
-// The write path must adopt such a table by recording its own state key in the
-// comment, after which the guard holds for it as it does for a table this path
-// created itself.
-func TestStreamV2AdoptsATableWithNoStateKey(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping test in short mode")
-	}
-
-	var ctx = context.Background()
-	var cfg = mustGetCfg(t)
-	t.Setenv("SNOWPIPE_SIDECAR_PYTHON", testSidecarPython(t))
-
-	dsn, err := cfg.toURI(true, "")
-	require.NoError(t, err)
-	db, err := stdsql.Open("snowflake", dsn)
-	require.NoError(t, err)
-	defer db.Close()
-
-	var accountName string
-	require.NoError(t, db.QueryRowContext(ctx, "SELECT CURRENT_ACCOUNT()").Scan(&accountName))
-
-	const materialization = "test/streamV2Adopt"
-	// Lower case, as a resource configuration names a table. Snowflake folds an
-	// unquoted identifier to upper case, so this is not the name it records, and a
-	// lookup has to fold the name the same way the DDL did.
-	var tableName = fmt.Sprintf("streamv2_adopt_flow_test_%d", time.Now().Unix())
-	var storedName = strings.ToUpper(tableName)
-	var stateKey = "adopt.v1"
-
-	var tbl = sql.Table{
-		TableShape: sql.TableShape{
-			Path:         []string{cfg.Schema, tableName},
-			Binding:      0,
-			DeltaUpdates: true,
-			Comment:      "Generated for materialization " + materialization + " of collection test/adopt",
-		},
-		Identifier: tableName,
-		Keys:       []sql.Column{{Identifier: `KEY`, MappedType: sql.MappedType{DDL: "TEXT"}}},
-		Values:     []sql.Column{{Identifier: `VAL`, MappedType: sql.MappedType{DDL: "VARIANT"}}},
-		StateKey:   stateKey,
-	}
-
-	// The table is created the way a build that does not record state keys
-	// creates it: the comment it would carry anyway, and no record. Going through
-	// the templates rather than client.CreateTable is what leaves the record off.
-	var createQuery strings.Builder
-	require.NoError(t, renderTemplates(testDialect).createTargetTable.Execute(&createQuery, &tbl))
-	_, err = db.ExecContext(ctx, createQuery.String())
-	require.NoError(t, err)
-	t.Cleanup(func() {
-		db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s;", tbl.Identifier))
-	})
-
-	// The comment such a build leaves: what the table is for, and nothing
-	// about which state key may stream into it.
-	_, err = db.ExecContext(ctx, fmt.Sprintf(
-		"COMMENT ON TABLE %s IS %s;", tbl.Identifier, testDialect.Literal(tbl.Comment)))
-	require.NoError(t, err)
-
-	before, err := streamV2QueryTableComment(ctx, db, testDialect, cfg.Database, cfg.Schema, storedName)
-	require.NoError(t, err)
-	_, ok := streamV2StateKeyFromTableComment(before)
-	require.False(t, ok, "the table must start with no state key recorded, or this test proves nothing")
-
-	// Apply is what adopts the table, as it does for a task whose publication moves
-	// this binding onto the write path without creating anything.
-	// The spec Apply receives is one whose configuration selects this write path.
-	var v2Cfg = cfg
-	v2Cfg.Advanced.FeatureFlags = flagSnowpipeStreamingV2
-	configJson, err := json.Marshal(v2Cfg)
-	require.NoError(t, err)
-	require.True(t, streamsV2(&v2Cfg, true, true), "the test config must select the streaming v2 write path")
-	require.NoError(t, adoptStreamV2StateKeys(ctx, &pf.MaterializationSpec{
-		Name:       pf.Materialization(materialization),
-		ConfigJson: configJson,
-		Bindings: []*pf.MaterializationSpec_Binding{{
-			ResourcePath: []string{cfg.Schema, tableName},
-			DeltaUpdates: true,
-			StateKey:     stateKey,
-		}},
-	}))
-
-	singleChannelLayout(t)
-	var m = newStreamV2Manager(ctx, &cfg, materialization, accountName,
-		&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
-	t.Cleanup(m.stop)
-
-	// The manager reads the comment exactly as the transactor wires it to, so the
-	// state key Apply recorded is the one the guard checks each append against.
-	m.tableComment = func(ctx context.Context, database, schema, table string) (string, error) {
-		return streamV2QueryTableComment(ctx, db, testDialect, database, schema, table)
-	}
-
-	m.addBinding(cfg.Database, cfg.Schema, tbl.Identifier, tbl, nil)
-	require.NoError(t, testWriteRow(ctx, m, 0, []any{"one", "1"}))
-	entries, err := m.flush(ctx)
-	require.NoError(t, err)
-	require.Equal(t, int64(1), soleItem(t, entries, 0).Counter)
-
-	// Having appended to the table, this state key is recorded for it, and the comment must
-	// say so — otherwise a backfill this specification has already been replaced by can
-	// append to the same table without the guard noticing.
-	after, err := streamV2QueryTableComment(ctx, db, testDialect, cfg.Database, cfg.Schema, storedName)
-	require.NoError(t, err)
-	require.Contains(t, after, tbl.Comment, "the comment the table carried anyway must survive")
-
-	rec, ok := streamV2StateKeyFromTableComment(after)
-	require.True(t, ok, "the streaming v2 path must record its state key on a table it adopts")
-	require.Equal(t, streamV2RecordedStateKey{materialization: materialization, stateKey: stateKey}, rec)
-
-	// And the guard must now do its work: the state key a backfill of this
-	// binding would replace this one with may not append to the same table.
-	require.ErrorContains(t,
-		streamV2CheckStateKeyConflict(after, streamV2RecordedStateKey{materialization: materialization, stateKey: "adopt.v2"}, tableName),
-		"has been backfilled",
-	)
-}
-
 // TestStreamV2ListChannels drives the channel listing against live Snowflake: a
 // table that has never streamed reports no channels, and one that has reports the
 // channel the write path opened on it, by the name the write path derived.

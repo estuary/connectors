@@ -10,10 +10,8 @@ import (
 	"testing"
 
 	snowflake_auth "github.com/estuary/connectors/go/auth/snowflake"
-	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
-	pm "github.com/estuary/flow/go/protocols/materialize"
 	jsonpatch "github.com/evanphx/json-patch/v5"
 	"github.com/stretchr/testify/require"
 )
@@ -238,342 +236,6 @@ func TestStreamV2DropChannel(t *testing.T) {
 	require.Equal(t, int64(1), soleItem(t, entries, 0).Counter)
 }
 
-// TestStreamV2BackfillRecreatesTheTable pins how a backfill of a streaming v2
-// binding must reach its table.
-//
-// Apply runs while the last specification's shards are still storing, and their
-// channels are bound to the very table the backfill is about to
-// re-materialize. Truncating it leaves those channels valid and pointed at it, so
-// the rows they append next land after the truncate, survive it, and are
-// re-materialized a second time. Dropping the table is what takes the channels
-// with it — every one of them, including those of a shard the checkpoint names no
-// item for. The live experiment behind both halves of that is the backfill
-// subtest of TestStreamV2Manager.
-func TestStreamV2BackfillRecreatesTheTable(t *testing.T) {
-	var streamingCfg = config{
-		Credentials: &snowflake_auth.CredentialConfig{AuthType: snowflake_auth.JWT},
-		Advanced:    advancedConfig{FeatureFlags: flagSnowpipeStreamingV2},
-	}
-	var noFlagCfg = config{
-		Credentials: &snowflake_auth.CredentialConfig{AuthType: snowflake_auth.JWT},
-	}
-	var noKeyPairCfg = config{
-		Credentials: &snowflake_auth.CredentialConfig{AuthType: snowflake_auth.UserPass},
-		Advanced:    advancedConfig{FeatureFlags: flagSnowpipeStreamingV2},
-	}
-	var binding = func(deltaUpdates bool) *pf.MaterializationSpec_Binding {
-		return &pf.MaterializationSpec_Binding{DeltaUpdates: deltaUpdates}
-	}
-
-	for _, tt := range []struct {
-		name string
-		// lastCfg is the endpoint configuration of the specification this
-		// publication replaces, and incoming the one it publishes. They differ
-		// whenever a publication changes the write path in the same breath as it
-		// bumps a backfill counter.
-		lastCfg *config
-		// storedShape wraps the last configuration the way the control plane
-		// stores it — the connector image alongside it — which is how a request
-		// carries the specification being replaced.
-		storedShape bool
-		incoming    config
-		last, next  *pf.MaterializationSpec_Binding
-		want        bool
-		// unreadable carries a replaced specification whose configuration is
-		// neither shape this connector understands.
-		unreadable bool
-		// lastCfgJson, when set, is the stored configuration of the replaced
-		// specification verbatim, for shapes this connector no longer writes.
-		lastCfgJson string
-	}{
-		{
-			name:     "a streaming v2 binding",
-			lastCfg:  &streamingCfg,
-			incoming: streamingCfg,
-			last:     binding(true),
-			next:     binding(true),
-			want:     true,
-		},
-		{
-			// The channels which must not outlive the backfill are the last
-			// specification's, so it is the write path that specification ran on
-			// which decides this, not the one the backfill will run.
-			name:     "a binding leaving the streaming v2 path",
-			lastCfg:  &streamingCfg,
-			incoming: streamingCfg,
-			last:     binding(true),
-			next:     binding(false),
-			want:     true,
-		},
-		{
-			// Nor does turning the write path off protect the backfill: the shards
-			// this publication replaces are streaming while it is applied, whatever
-			// the shards replacing them will do. The replaced configuration is read
-			// in the shape the control plane stores it, which is how the request
-			// carries it.
-			name:        "a publication which also turns the write path off",
-			lastCfg:     &streamingCfg,
-			storedShape: true,
-			incoming:    noFlagCfg,
-			last:        binding(true),
-			next:        binding(true),
-			want:        true,
-		},
-		{
-			// Nor does taking the key pair away, which is the other way to leave
-			// the write path.
-			name:        "a publication which also changes the authentication type",
-			lastCfg:     &streamingCfg,
-			storedShape: true,
-			incoming:    noKeyPairCfg,
-			last:        binding(true),
-			next:        binding(true),
-			want:        true,
-		},
-		{
-			// A configuration in hand which streams decides the answer, so a
-			// replaced configuration which cannot be read does not narrow it. This
-			// is the ordinary case: the request carries the replaced specification
-			// with its secrets still encrypted, and reading that as "no feature
-			// flags" would empty a table the last specification streams into.
-			name:       "a replaced configuration which cannot be read",
-			lastCfg:    nil,
-			incoming:   streamingCfg,
-			last:       binding(true),
-			next:       binding(true),
-			want:       true,
-			unreadable: true,
-		},
-		{
-			// A configuration with no `credentials` object and no streaming flag.
-			// Its table was written through staged files and may be emptied in
-			// place.
-			name:        "a replaced configuration with no credentials object",
-			lastCfgJson: `{"image":"ghcr.io/estuary/materialize-snowflake:v1","config":{"host":"x.snowflakecomputing.com","account":"x","database":"DB","schema":"S","user":"u","password_sops":"ENC[AES256_GCM,data:0Ld3]","advanced":{"feature_flags":""},"sops":{"encrypted_suffix":"_sops"}}}`,
-			incoming:    noFlagCfg,
-			last:        binding(true),
-			next:        binding(true),
-		},
-		{
-			// With no configuration which streams in hand, a replaced
-			// configuration which cannot be read leaves the question open, and
-			// the table is re-created rather than the task failed: a re-creation
-			// is always correct for a backfill, whereas a truncate is not.
-			name:       "a replaced configuration which cannot be read, off the streaming v2 path",
-			lastCfg:    nil,
-			incoming:   noFlagCfg,
-			last:       binding(true),
-			next:       binding(true),
-			want:       true,
-			unreadable: true,
-		},
-		{
-			// The last specification wrote this table through staged files, which
-			// hold no channel on it, so its backfill may empty it in place — even
-			// though the specification replacing it will stream.
-			name:     "a binding arriving on the streaming v2 path",
-			lastCfg:  &streamingCfg,
-			incoming: streamingCfg,
-			last:     binding(false),
-			next:     binding(true),
-		},
-		{
-			// Standard updates are written through staged files, which a truncate
-			// cannot race.
-			name:     "a standard updates binding",
-			lastCfg:  &streamingCfg,
-			incoming: streamingCfg,
-			last:     binding(false),
-			next:     binding(false),
-		},
-		{
-			name:     "the streaming v2 flag not set",
-			lastCfg:  &noFlagCfg,
-			incoming: noFlagCfg,
-			last:     binding(true),
-			next:     binding(true),
-		},
-		{
-			// The write path needs a key pair to authenticate the sidecar with, so
-			// a binding of a password-authenticated task never streams.
-			name:     "a task which cannot stream at all",
-			lastCfg:  &noKeyPairCfg,
-			incoming: noKeyPairCfg,
-			last:     binding(true),
-			next:     binding(true),
-		},
-		{
-			// A resource which exists while the last-applied specification is not
-			// on hand says nothing about what has been writing to it, so it is
-			// re-created rather than assumed safe to empty.
-			name:     "no last applied specification",
-			lastCfg:  nil,
-			incoming: streamingCfg,
-			last:     nil,
-			next:     binding(false),
-			want:     true,
-		},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			var req = new(pm.Request_Apply)
-			if tt.lastCfgJson != "" {
-				req.LastMaterialization = &pf.MaterializationSpec{ConfigJson: []byte(tt.lastCfgJson)}
-			} else if tt.unreadable {
-				req.LastMaterialization = &pf.MaterializationSpec{
-					ConfigJson: []byte(`{"image":"ghcr.io/estuary/materialize-snowflake:v1","config":"ENC[AES256_GCM,data:0Ld3]"}`),
-				}
-			} else if tt.lastCfg != nil {
-				configJson, err := json.Marshal(tt.lastCfg)
-				require.NoError(t, err)
-				if tt.storedShape {
-					configJson, err = json.Marshal(map[string]any{
-						"image":  "ghcr.io/estuary/materialize-snowflake:v1",
-						"config": json.RawMessage(configJson),
-					})
-					require.NoError(t, err)
-				}
-				req.LastMaterialization = &pf.MaterializationSpec{ConfigJson: configJson}
-			}
-
-			var c = &client{cfg: tt.incoming, streamingV2Enabled: boilerplate.ParseFlags(tt.incoming)[flagSnowpipeStreamingV2]}
-			got, err := c.MustRecreateResource(req, tt.last, tt.next)
-			require.NoError(t, err)
-			require.Equal(t, tt.want, got)
-		})
-	}
-}
-
-// TestStreamV2StateKeyComment covers the line a streaming v2 binding's table
-// carries to name the task and state key it was created for: it must survive the
-// round trip through a comment which also carries prose meant for whoever reads
-// the table.
-func TestStreamV2StateKeyComment(t *testing.T) {
-	var rec = streamV2RecordedStateKey{materialization: "acmeCo/materialize-snowflake", stateKey: "public%2Fwidgets.v3"}
-	var comment = streamV2EmbedStateKeyInTableComment("Generated for materialization acmeCo/materialize-snowflake of collection acmeCo/widgets", rec)
-
-	readBack, ok := streamV2StateKeyFromTableComment(comment)
-	require.True(t, ok)
-	require.Equal(t, rec, readBack)
-
-	for _, tt := range []struct {
-		name    string
-		comment string
-	}{
-		{name: "no comment at all"},
-		{
-			name:    "a comment this connector wrote before it recorded state keys",
-			comment: "Generated for materialization acmeCo/materialize-snowflake of collection acmeCo/widgets",
-		},
-		{
-			// Whoever rewrites the comment of a table takes the record with it,
-			// which reads as a table that never had one.
-			name:    "a record without a state key",
-			comment: "flow_state_key: acmeCo/materialize-snowflake",
-		},
-		{
-			// A half-written record names no state key rather than naming one no
-			// shard can match, which would turn every shard of the task away
-			// instead of only those a backfill has replaced.
-			name:    "a record whose state key is empty",
-			comment: "flow_state_key: acmeCo/materialize-snowflake ",
-		},
-		{
-			name:    "a record whose task is empty",
-			comment: "flow_state_key:  widgets.v3",
-		},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			_, ok := streamV2StateKeyFromTableComment(tt.comment)
-			require.False(t, ok)
-		})
-	}
-}
-
-// TestStreamV2CreateTableNeedsAStateKey pins what happens when the binding
-// resolved for a streaming v2 table carries no state key.
-//
-// The record a table carries is only as good as the state key in it: one
-// recording an empty state key matches no shard, so it would turn away the whole
-// task rather than only the shards a backfill has replaced. Rejecting the creation
-// of the table at all is the only safe reading, and it has to happen before
-// any statement runs — which is what lets this drive a client with no connection.
-func TestStreamV2CreateTableNeedsAStateKey(t *testing.T) {
-	var c = &client{
-		cfg:                config{Credentials: &snowflake_auth.CredentialConfig{AuthType: snowflake_auth.JWT}},
-		streamingV2Enabled: true,
-	}
-
-	var tc = sql.TableCreate{
-		Table: sql.Table{
-			TableShape: sql.TableShape{DeltaUpdates: true},
-			Identifier: "WIDGETS",
-		},
-		TableCreateSql: "CREATE TABLE WIDGETS (KEY TEXT);",
-	}
-
-	require.ErrorContains(t, c.CreateTable(context.Background(), tc), "carries no state key")
-}
-
-// TestStreamV2StateKeyConflict covers which shards a table turns away.
-//
-// A backfill re-creates the table, which takes every channel bound to it, but the
-// shards of the specification it replaces keep running and open channels against the
-// table again — and a channel opened against a re-created table looks exactly like
-// one opened against a table that was always empty. The state key the table
-// records is what tells them apart.
-func TestStreamV2StateKeyConflict(t *testing.T) {
-	const task = "acmeCo/materialize-snowflake"
-	var mine = streamV2RecordedStateKey{materialization: task, stateKey: "widgets.v3"}
-	var commentOf = func(rec streamV2RecordedStateKey) string {
-		return streamV2EmbedStateKeyInTableComment("Generated for materialization "+rec.materialization, rec)
-	}
-
-	for _, tt := range []struct {
-		name    string
-		comment string
-		wantErr bool
-	}{
-		{
-			name:    "the table records this state key",
-			comment: commentOf(mine),
-		},
-		{
-			// The state key rotates with the backfill counter, so a table naming a
-			// different one of this task's own is a table this task has already
-			// been replaced on.
-			name:    "the table records a later state key of this binding",
-			comment: commentOf(streamV2RecordedStateKey{materialization: task, stateKey: "widgets.v4"}),
-			wantErr: true,
-		},
-		{
-			// A comment naming another task records that task's state key, which
-			// says nothing about a backfill of this binding.
-			name:    "the table records another task",
-			comment: commentOf(streamV2RecordedStateKey{materialization: "acmeCo/other", stateKey: "widgets.v4"}),
-		},
-		{
-			// A table created by a write path that records no state key says
-			// nothing about which state key may stream into it.
-			name:    "the table records no state key",
-			comment: "Generated for materialization " + task,
-		},
-		{
-			name: "the table has no comment",
-		},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			var err = streamV2CheckStateKeyConflict(tt.comment, mine, "WIDGETS")
-			if !tt.wantErr {
-				require.NoError(t, err)
-				return
-			}
-			require.ErrorContains(t, err, "WIDGETS")
-			require.ErrorContains(t, err, "widgets.v3")
-			require.ErrorContains(t, err, "widgets.v4")
-		})
-	}
-}
-
 // TestStreamV2ChannelTask pins the parser that recognizes the v2 channel name of any
 // task, against the names this connector's write paths produce.
 func TestStreamV2ChannelTask(t *testing.T) {
@@ -594,9 +256,9 @@ func TestStreamV2ChannelTask(t *testing.T) {
 }
 
 // TestStreamV2RejectsForeignTask covers, without credentials, the rejection of a
-// table another task already streams into. A backfill of either task drops the table
-// and every channel on it, so neither task's channels and tokens can account for the
-// other's rows; the listing of the pipe's channels is what reveals the first task
+// table another task already streams into. A backfill truncates the table, so a
+// second task on it would silently wipe the first's rows while the first's channels
+// and tokens stand; the listing of the pipe's channels is what reveals the first task
 // before the second opens anything.
 func TestStreamV2RejectsForeignTask(t *testing.T) {
 	var ctx = context.Background()
@@ -642,7 +304,7 @@ func TestStreamV2RejectsForeignTask(t *testing.T) {
 	err = testWriteRow(ctx, rejected, 0, []any{"k", "v"})
 	require.ErrorContains(t, err, sanitizeAndAppendHash("other/task"))
 	require.ErrorContains(t, err, foreignChannel)
-	require.ErrorContains(t, err, "backfill this binding")
+	require.ErrorContains(t, err, "always_drop_tables_on_backfill")
 	require.NotContains(t, err.Error(), unattributable)
 	require.Empty(t, rejected.bindings[0].channels)
 
@@ -653,6 +315,52 @@ func TestStreamV2RejectsForeignTask(t *testing.T) {
 	// The other task itself is not rejected by its own channel.
 	var owner = newSession(t, "other/task")
 	require.NoError(t, testWriteRow(ctx, owner, 0, []any{"k", "v"}))
+}
+
+// TestStreamV2SweepsBackfilledChannels covers, without credentials, the sweep of the
+// channels a backfill leaves standing: a backfill truncates the table, so the channels
+// this task derived under the state key it rotated away survive it. The shard whose
+// range holds a stale channel's first key drops it, so a channel spanning the whole
+// key space falls to the first shard alone, and a channel inside one shard's range
+// falls to that shard.
+func TestStreamV2SweepsBackfilledChannels(t *testing.T) {
+	var ctx = context.Background()
+	singleChannelLayout(t)
+	t.Setenv("FAKE_SIDECAR_STATE", filepath.Join(t.TempDir(), "channels.json"))
+
+	var full = streamV2Range{keyEnd: math.MaxUint32}
+	var upper = streamV2Range{keyBegin: 0x80000000, keyEnd: math.MaxUint32}
+	var lower = streamV2Range{keyEnd: 0x7fffffff}
+	var staleFull = streamV2ChannelName("test/task", 0, full, "topology.v0")
+	var staleUpper = streamV2ChannelName("test/task", 3, upper, "topology.v0")
+
+	require.NoError(t, os.WriteFile(os.Getenv("FAKE_SIDECAR_STATE"),
+		fmt.Appendf(nil, `{"committed":{%q:"5",%q:"7"},"errors":{}}`, staleFull, staleUpper), 0o644))
+
+	// The upper shard of the backfill drops the stale channel inside its range, and
+	// leaves the one whose first key lies in the lower shard's range.
+	var hi = newTopologyManager(t, "test/task", upper.keyBegin, upper.keyEnd, nil)
+	storeKeys(t, hi, keysHashingTo(upper, 1, "hi"))
+	_, err := hi.flush(ctx)
+	require.NoError(t, err)
+	hi.stop()
+
+	names, err := fakeListChannels(ctx, "", "", "")
+	require.NoError(t, err)
+	require.Contains(t, names, staleFull)
+	require.NotContains(t, names, staleUpper)
+	require.Len(t, names, 2)
+
+	// The lower shard drops the channel spanning the key space.
+	var lo = newTopologyManager(t, "test/task", lower.keyBegin, lower.keyEnd, nil)
+	storeKeys(t, lo, keysHashingTo(lower, 1, "lo"))
+	_, err = lo.flush(ctx)
+	require.NoError(t, err)
+
+	names, err = fakeListChannels(ctx, "", "", "")
+	require.NoError(t, err)
+	require.NotContains(t, names, staleFull)
+	require.Len(t, names, 2)
 }
 
 func TestReconcileStreamV2Channel(t *testing.T) {
