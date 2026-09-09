@@ -70,6 +70,8 @@ func TestAssertTransactionHealth(t *testing.T) {
 		{name: "healthy total run", lines: parse(okTotal, okEmpty, recovery), shards: 1, declared: m.FidelityTotal},
 		{name: "healthy total run tolerates recovery only line", lines: parse(okTotal, recovery), shards: 1, declared: m.FidelityTotal},
 		{name: "non-reporting connector", lines: parse(pending, okEmpty), shards: 1, declared: m.FidelityNone},
+		{name: "non-reporting connector, only empty observable", lines: parse(okEmpty), shards: 1, declared: m.FidelityNone},
+		{name: "non-reporting connector, undeclared, only empty observable", lines: parse(okEmpty), shards: 1},
 		{name: "non-reporting connector, undeclared", lines: parse(pending, okEmpty), shards: 1},
 		{name: "sharded run", lines: parse(shardedExpected, shardedPrimary), shards: 2, declared: m.FidelityExact},
 		{name: "sharded run, actuals only in recovery", lines: parse(shardedExpected, shardedRecovery), shards: 2, declared: m.FidelityExact},

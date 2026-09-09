@@ -142,7 +142,12 @@ func checkTransactionHealth(lines []HealthLine, shards int, declared m.Fidelity)
 		}
 	}
 
-	if withStores == 0 {
+	// A reporting connector's rounds complete during the run and are logged at
+	// once, so a missing stored-documents line means reporting silently
+	// stopped. A connector that declares no fidelity never completes a round,
+	// and its pending line only flushes at shutdown, which the preview run
+	// does not observe; requiring one there would fail every non-reporter.
+	if withStores == 0 && declared != m.FidelityNone {
 		return fmt.Errorf("no transaction health line covered stored documents at fidelity %q:\n%s", declared, describeLines(lines))
 	}
 	return nil
