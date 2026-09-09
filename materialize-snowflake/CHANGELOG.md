@@ -29,8 +29,8 @@ With `snowpipe_streaming_v2` set, delta-updates bindings behave as follows.
   path staged. Where that is impossible, the binding is rejected, naming the
   table and the count outstanding.
 - Two tasks may not stream into one table; the second is rejected, naming the
-  first. A renamed task is rejected the same way until the binding is
-  backfilled.
+  first. A task that was deleted or renamed leaves its channels on the table,
+  and is named the same way, until the binding is backfilled.
 - The one way off this path without a backfill is setting `snowpipe_streaming`
   while removing `snowpipe_streaming_v2`, on a task that keeps the V2 runtime.
   Documents Snowflake had committed beyond the checkpoint are then materialized

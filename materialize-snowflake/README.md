@@ -151,6 +151,13 @@ own. Either half of that convergence can be interrupted and repeats safely.
   table that it appends to. Grants on the old table do not survive.
 - `retain_existing_data_on_backfill` does not work on this path, for the same
   reason.
+- Two tasks may not stream into one table. Every channel name carries the task it
+  was derived for, and a shard lists the channels on the table's pipe before it
+  opens any of its own, so a second task is rejected naming the first, and creates
+  nothing the first could see. A deleted or renamed task's channels stay on the
+  table and reject the same way until the binding is backfilled, which drops the
+  table and every channel on it. A channel of no Estuary shape, from some other
+  high-performance client, cannot be attributed and is left alone.
 - A binding can leave this path only for the `snowpipe_streaming` path, by naming
   `snowpipe_streaming` explicitly in `feature_flags` and removing
   `snowpipe_streaming_v2`, while keeping the task on the v2 materialization

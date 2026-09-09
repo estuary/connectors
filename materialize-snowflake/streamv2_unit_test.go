@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -531,10 +532,6 @@ func TestStreamV2StateKeyConflict(t *testing.T) {
 		name    string
 		comment string
 		wantErr bool
-		// wantContains names what the error must say. It is empty for the conflict
-		// between state keys of one binding, which every such error reports the
-		// same way.
-		wantContains []string
 	}{
 		{
 			name:    "the table records this state key",
@@ -549,13 +546,10 @@ func TestStreamV2StateKeyConflict(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			// Two tasks materializing into one table are not backfills of each
-			// other, and a backfill of either drops the table and every channel
-			// appending to it. Neither task can account for what the other holds.
-			name:         "the table records another task",
-			comment:      commentOf(streamV2RecordedStateKey{materialization: "acmeCo/other", stateKey: "widgets.v4"}),
-			wantErr:      true,
-			wantContains: []string{"WIDGETS", "acmeCo/other", task, "renamed"},
+			// A comment naming another task records that task's state key, which
+			// says nothing about a backfill of this binding.
+			name:    "the table records another task",
+			comment: commentOf(streamV2RecordedStateKey{materialization: "acmeCo/other", stateKey: "widgets.v4"}),
 		},
 		{
 			// A table created by a write path that records no state key says
@@ -573,17 +567,92 @@ func TestStreamV2StateKeyConflict(t *testing.T) {
 				require.NoError(t, err)
 				return
 			}
-			if len(tt.wantContains) > 0 {
-				for _, want := range tt.wantContains {
-					require.ErrorContains(t, err, want)
-				}
-				return
-			}
 			require.ErrorContains(t, err, "WIDGETS")
 			require.ErrorContains(t, err, "widgets.v3")
 			require.ErrorContains(t, err, "widgets.v4")
 		})
 	}
+}
+
+// TestStreamV2ChannelTask pins the parser that recognizes the v2 channel name of any
+// task, against the names this connector's write paths produce.
+func TestStreamV2ChannelTask(t *testing.T) {
+	var r = streamV2Range{keyBegin: 0x80000000, keyEnd: math.MaxUint32}
+
+	for _, task := range []string{"acme/prod/snowflake", "a", "a-task-whose-name-runs-well-past-the-thirty-two-character-cap"} {
+		var name = streamV2ChannelName(task, 7, r, "binding.v3")
+		got, ok := streamV2ChannelTask(name)
+		require.True(t, ok, name)
+		require.Equal(t, sanitizeAndAppendHash(task), got)
+	}
+
+	// The snowpipe_streaming path's channel, and a name of no Estuary shape at all.
+	for _, name := range []string{channelName("acme/prod/snowflake", 0x80000000), "someone_elses_channel", ""} {
+		_, ok := streamV2ChannelTask(name)
+		require.False(t, ok, name)
+	}
+}
+
+// TestStreamV2RejectsForeignTask covers, without credentials, the rejection of a
+// table another task already streams into. A backfill of either task drops the table
+// and every channel on it, so neither task's channels and tokens can account for the
+// other's rows; the listing of the pipe's channels is what reveals the first task
+// before the second opens anything.
+func TestStreamV2RejectsForeignTask(t *testing.T) {
+	var ctx = context.Background()
+	singleChannelLayout(t)
+	t.Setenv("FAKE_SIDECAR_STATE", filepath.Join(t.TempDir(), "channels.json"))
+
+	var fullRange = streamV2Range{keyEnd: math.MaxUint32}
+	var foreignChannel = streamV2ChannelName("other/task", 0, fullRange, "theirs.v1")
+	var unattributable = "someone_elses_channel"
+
+	var newSession = func(t *testing.T, task string) *streamV2Manager {
+		var m = newStreamV2Manager(ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, task, "acct",
+			&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
+		m.argv = fakeSidecarArgv(t)
+		m.listChannels = fakeListChannels
+		t.Cleanup(m.stop)
+		m.addBinding("DB", "SCH", "TBL", sql.Table{
+			TableShape: sql.TableShape{Binding: 0, DeltaUpdates: true},
+			Identifier: "TBL",
+			Keys:       []sql.Column{{Identifier: `KEY`}},
+			Values:     []sql.Column{{Identifier: `VAL`}},
+			StateKey:   "mine.v1",
+		}, nil)
+		return m
+	}
+
+	// A channel of no v2 shape is another high-performance client's. The connector
+	// cannot attribute it, so it is left alone and the table is accepted.
+	require.NoError(t, os.WriteFile(os.Getenv("FAKE_SIDECAR_STATE"),
+		fmt.Appendf(nil, `{"committed":{%q:"1"},"errors":{}}`, unattributable), 0o644))
+	var alone = newSession(t, "test/task")
+	require.NoError(t, testWriteRow(ctx, alone, 0, []any{"k", "v"}))
+	_, err := alone.flush(ctx)
+	require.NoError(t, err)
+	alone.stop()
+
+	// The other task's committed channel joins the pipe. The next session of this
+	// task is rejected before it opens a channel, naming the other task and both
+	// remedies, and appending nothing.
+	require.NoError(t, os.WriteFile(os.Getenv("FAKE_SIDECAR_STATE"),
+		fmt.Appendf(nil, `{"committed":{%q:"1",%q:"3"},"errors":{}}`, unattributable, foreignChannel), 0o644))
+	var rejected = newSession(t, "test/task")
+	err = testWriteRow(ctx, rejected, 0, []any{"k", "v"})
+	require.ErrorContains(t, err, sanitizeAndAppendHash("other/task"))
+	require.ErrorContains(t, err, foreignChannel)
+	require.ErrorContains(t, err, "backfill this binding")
+	require.NotContains(t, err.Error(), unattributable)
+	require.Empty(t, rejected.bindings[0].channels)
+
+	names, err := fakeListChannels(ctx, "", "", "")
+	require.NoError(t, err)
+	require.ElementsMatch(t, []string{unattributable, foreignChannel}, names)
+
+	// The other task itself is not rejected by its own channel.
+	var owner = newSession(t, "other/task")
+	require.NoError(t, testWriteRow(ctx, owner, 0, []any{"k", "v"}))
 }
 
 func TestReconcileStreamV2Channel(t *testing.T) {
