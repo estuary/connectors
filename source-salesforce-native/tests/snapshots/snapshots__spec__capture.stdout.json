@@ -6,7 +6,7 @@
         "Advanced": {
           "properties": {
             "window_size": {
-              "description": "Date window size for incremental queries. Typically left as the default unless Estuary Support or the connector logs indicate otherwise.",
+              "description": "How much time a single incremental query covers when the connector sweeps for changes. Typically left as the default unless Estuary Support or the connector logs indicate otherwise.",
               "discriminator": {
                 "mapping": {
                   "days": "#/$defs/WindowSizeInDays",
@@ -23,7 +23,7 @@
                   "$ref": "#/$defs/WindowSizeInDays"
                 }
               ],
-              "title": "Window size"
+              "title": "Incremental Query Window Size"
             }
           },
           "title": "Advanced",
@@ -106,18 +106,18 @@
               "type": "string"
             },
             "interval": {
-              "description": "Window size as an ISO 8601 duration, e.g. PT1H for one hour.",
+              "description": "Size of the date window each incremental query covers, as an ISO 8601 duration, e.g. PT1H for one hour.",
               "format": "duration",
               "nonsensitive": true,
               "order": 1,
-              "title": "Interval",
+              "title": "Duration",
               "type": "string"
             }
           },
           "required": [
             "interval"
           ],
-          "title": "Interval",
+          "title": "Duration",
           "type": "object"
         },
         "WindowSizeInDays": {
@@ -131,7 +131,7 @@
               "type": "string"
             },
             "days": {
-              "description": "Window size as a whole number of days.",
+              "description": "Size of the date window each incremental query covers, in whole days.",
               "exclusiveMinimum": 0,
               "order": 1,
               "title": "Days",

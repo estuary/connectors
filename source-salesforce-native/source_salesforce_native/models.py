@@ -54,7 +54,7 @@ class WindowSizeInDays(BaseModel):
     )
     days: int = Field(
         title="Days",
-        description="Window size as a whole number of days.",
+        description="Size of the date window each incremental query covers, in whole days.",
         gt=0,
         json_schema_extra={"order": 1},
     )
@@ -65,15 +65,18 @@ class WindowSizeInDays(BaseModel):
 
 
 class WindowSizeAsInterval(BaseModel):
-    model_config = ConfigDict(title="Interval")
+    model_config = ConfigDict(title="Duration")
 
     window_type: Literal["interval"] = Field(
         default="interval",
         json_schema_extra={"nonsensitive": True, "type": "string", "order": 0},
     )
     interval: timedelta = Field(
-        title="Interval",
-        description="Window size as an ISO 8601 duration, e.g. PT1H for one hour.",
+        title="Duration",
+        description=(
+            "Size of the date window each incremental query covers, as an ISO 8601 duration, "
+            "e.g. PT1H for one hour."
+        ),
         gt=MIN_INCREMENTAL_WINDOW_SIZE,
         json_schema_extra={"nonsensitive": True, "order": 1},
     )
@@ -130,8 +133,12 @@ class EndpointConfig(BaseModel):
 
     class Advanced(BaseModel):
         window_size: WindowSizeAsInterval | WindowSizeInDays = Field(
-            description="Date window size for incremental queries. Typically left as the default unless Estuary Support or the connector logs indicate otherwise.",
-            title="Window size",
+            description=(
+                "How much time a single incremental query covers when the connector sweeps for "
+                "changes. Typically left as the default unless Estuary Support or the connector "
+                "logs indicate otherwise."
+            ),
+            title="Incremental Query Window Size",
             default_factory=lambda: WindowSizeInDays(days=18250),
             discriminator="window_type",
             json_schema_extra={"nonsensitive": True},
@@ -139,15 +146,32 @@ class EndpointConfig(BaseModel):
 
         @model_validator(mode="before")
         @classmethod
-        def _coerce_legacy_window_size(cls, data: Any) -> Any:
+        def _coerce_untagged_window_size(cls, data: Any) -> Any:
             # Older configs stored window_size as a bare integer count of days, before it became a
             # discriminated union. Wrap that legacy form so running captures keep working without the
             # user re-saving their config.
-            if isinstance(data, dict) and isinstance(data.get("window_size"), int):
+            if not isinstance(data, dict):
+                return data
+
+            window_size = data.get("window_size")
+
+            if isinstance(window_size, int):
                 return {
                     **data,
-                    "window_size": {"window_type": "days", "days": data["window_size"]},
+                    "window_size": {"window_type": "days", "days": window_size},
                 }
+
+            # A window_size can also arrive untagged, since the UI only fills a union's hidden
+            # discriminator for required fields. Each variant's value key doubles as its
+            # window_type, so whichever key is present selects the tag.
+            if isinstance(window_size, dict) and "window_type" not in window_size:
+                for window_type in ("interval", "days"):
+                    if window_type in window_size:
+                        return {
+                            **data,
+                            "window_size": {**window_size, "window_type": window_type},
+                        }
+
             return data
 
     advanced: Advanced = Field(
