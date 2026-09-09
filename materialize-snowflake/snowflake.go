@@ -330,6 +330,7 @@ func newTransactor(
 		sv2.listChannels = func(ctx context.Context, database, schema, table string) ([]string, error) {
 			return streamV2ListChannels(ctx, db, ep.Dialect, database, schema, table)
 		}
+		sv2.dropStreamingChannel = sm.dropChannel
 	}
 
 	var d = &transactor{
@@ -393,11 +394,7 @@ type binding struct {
 
 	streaming   bool
 	streamingV2 bool
-	// dropStreamingChannel marks a streaming v2 binding whose snowpipe_streaming
-	// channel still has blobs to register, so the channel is dropped once
-	// Acknowledge has drained them rather than at Open.
-	dropStreamingChannel bool
-	pipeName             string
+	pipeName    string
 	// clusteringExpr is the parenthesized CLUSTER BY expression for this
 	// binding, or empty if clustering is not configured.
 	clusteringExpr string
@@ -463,19 +460,6 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, streaming
 		var loc = d.ep.Dialect.TableLocator(b.target.Path)
 		d.snowpipeStreamingV2.addBinding(d.cfg.Database, loc.TableSchema, d.ep.Identifier(loc.TableName), target, d.priorStreamV2(target.StateKey))
 		b.streamingV2 = true
-
-		// A binding this shard has no streaming v2 items for is arriving on the
-		// path, and the snowpipe_streaming path may hold its channel. Nothing else
-		// drops that channel, so this binding does, once the blobs the channel
-		// still has to register are drained.
-		if held == nil && d.snowpipeStreaming != nil {
-			if pending := d.cp[target.StateKey]; pending != nil && len(pending.StreamBlobs) > 0 {
-				b.dropStreamingChannel = true
-			} else if err := d.snowpipeStreaming.dropChannel(ctx, loc.TableSchema, d.ep.Identifier(loc.TableName), target.Binding); err != nil {
-				return fmt.Errorf("dropping the snowpipe_streaming channel of %s: %w", target.Identifier, err)
-			}
-		}
-
 		d.bindings = append(d.bindings, b)
 		return nil
 	}
@@ -503,13 +487,9 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, streaming
 		} else {
 			if downgrade {
 				// Drop this shard's streaming v2 channels as it leaves the path, so a
-				// return to streaming v2 cannot read their committed offset tokens as
-				// documents to skip that this path never appended — which would drop
-				// them for good. The return starts clean once the first Acknowledge on
-				// this path has deleted the binding's state key; a return before that
-				// finds counters for channels holding no token, which reconciliation
-				// rejects.
-				if err := d.snowpipeStreamingV2.dropBindingChannels(ctx, d.cfg.Database, loc.TableSchema, d.ep.Identifier(loc.TableName), prior, d._range); err != nil {
+				// return to it cannot read their committed offset tokens as documents
+				// to skip.
+				if err := d.snowpipeStreamingV2.sweep(ctx, d.cfg.Database, loc.TableSchema, d.ep.Identifier(loc.TableName), target.StateKey, nil); err != nil {
 					return fmt.Errorf("dropping the snowpipe_streaming_v2 channels of %s as it downgrades to snowpipe_streaming: %w", target.Identifier, err)
 				}
 				log.WithFields(log.Fields{
@@ -1135,17 +1115,6 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 
 	if err := group.Wait(); err != nil {
 		return nil, fmt.Errorf("executing concurrent store query: %w", err)
-	}
-
-	for _, b := range d.bindings {
-		if !b.dropStreamingChannel || !slices.Contains(drained, b.target.StateKey) {
-			continue
-		}
-		var loc = d.ep.Dialect.TableLocator(b.target.Path)
-		if err := d.snowpipeStreaming.dropChannel(ctx, loc.TableSchema, d.ep.Identifier(loc.TableName), b.target.Binding); err != nil {
-			return nil, fmt.Errorf("dropping the snowpipe_streaming channel of %s after draining its blobs: %w", b.target.Identifier, err)
-		}
-		b.dropStreamingChannel = false
 	}
 
 	// Keep asking for a report on the files that have been submitted for processing
