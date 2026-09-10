@@ -1,0 +1,120 @@
+sql> CREATE TABLE test.hashshardedpk_667198 (id INTEGER PRIMARY KEY USING HASH, v TEXT)
+=== Discover: Discover ===
+acmeCo/test_capture/test/hashshardedpk_667198
+sql> INSERT INTO test.hashshardedpk_667198 VALUES (1, 'a'), (2, 'b')
+=== Run: Backfill ===
+[
+  "acmeCo/test_capture/test/hashshardedpk_667198",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "hashshardedpk_667198"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 1,
+    "v": "a"
+  }
+]
+[
+  "acmeCo/test_capture/test/hashshardedpk_667198",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "hashshardedpk_667198"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 2,
+    "v": "b"
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fhashshardedpk_667198": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO test.hashshardedpk_667198 VALUES (3, 'c')
+sql> UPDATE test.hashshardedpk_667198 SET v = 'z' WHERE id = 1
+sql> DELETE FROM test.hashshardedpk_667198 WHERE id = 2
+=== Run: Replication ===
+[
+  "acmeCo/test_capture/test/hashshardedpk_667198",
+  {
+    "_meta": {
+      "op": "u",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "hashshardedpk_667198",
+        "ts_ms": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 1,
+    "v": "z"
+  }
+]
+[
+  "acmeCo/test_capture/test/hashshardedpk_667198",
+  {
+    "_meta": {
+      "op": "d",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "hashshardedpk_667198",
+        "ts_ms": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/test/hashshardedpk_667198",
+  {
+    "_meta": {
+      "op": "u",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "hashshardedpk_667198",
+        "ts_ms": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 3,
+    "v": "c"
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fhashshardedpk_667198": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

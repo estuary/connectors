@@ -1,0 +1,43 @@
+# Local test database for source-cockroachdb. Brings up a single-node CockroachDB on the
+# `flow-test` external network (shared with the rest of the connector test suite) and enables
+# rangefeeds, which changefeeds (and therefore this connector) require.
+#
+#   docker network create flow-test   # if it doesn't already exist
+#   docker compose up -d
+#   TEST_DATABASE=yes go test ./source-cockroachdb/...
+services:
+  db:
+    image: 'cockroachdb/cockroach:latest'
+    command: ["start-single-node", "--insecure"]
+    ports:
+      - "26257:26257"
+      - "8090:8080"
+    healthcheck:
+      test: ["CMD", "cockroach", "sql", "--insecure", "-e", "SELECT 1"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+    networks:
+      - flow-test
+
+  # CockroachDB has no docker-entrypoint-initdb.d mechanism, so a one-shot init container applies
+  # the rangefeed cluster setting and creates the test schema once the database is healthy.
+  db-init:
+    image: 'cockroachdb/cockroach:latest'
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        cockroach sql --insecure --host db -e "
+          SET CLUSTER SETTING kv.rangefeed.enabled = true;
+          CREATE SCHEMA IF NOT EXISTS defaultdb.test;
+        "
+    networks:
+      - flow-test
+
+networks:
+  flow-test:
+    name: flow-test
+    external: true
