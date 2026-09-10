@@ -645,7 +645,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 	}
 
 	// A table another task streams into is rejected before this shard creates any
-	// channel of its own. A name of no v2 shape is another client's and is left alone.
+	// channel of its own. A name of no v2 shape is left alone here.
 	if m.listChannels != nil {
 		names, err := m.listChannels(ctx, b.database, b.schema, unquotedIdentifier(b.table))
 		if err != nil {
@@ -657,7 +657,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 		for _, name := range names {
 			var task, ok = streamV2ChannelTask(name)
 			if !ok {
-				log.WithFields(log.Fields{"table": b.table, "channel": name}).Info("a channel of no snowpipe streaming v2 shape stands on the table's pipe")
+				log.WithFields(log.Fields{"table": b.table, "channel": name}).Info("a channel of no snowpipe streaming v2 shape stands on the table")
 				continue
 			}
 			if task != own {
