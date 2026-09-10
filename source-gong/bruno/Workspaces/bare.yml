@@ -1,0 +1,29 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/v2/workspaces"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://gong.app.gong.io/settings/api/documentation#get-/v2/workspaces
+
+  **WHY:** not a stream the connector captures — kept as a diagnostic. Calls
+  belong to a workspace, and `POST /v2/calls` accepts an optional
+  `workspaceId`. When a seeded call is accepted but never becomes visible, one
+  candidate explanation is that it landed in a workspace the reader is not
+  looking at.
+
+  **VERIFIED (2026-08-31):** this instance has exactly one workspace —
+  `{"id":"4042227664642553970","name":"Initial workspace"}`. So that
+  explanation is ruled out here, and `workspaceId` can be omitted from seeding
+  requests entirely.

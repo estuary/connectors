@@ -1,0 +1,73 @@
+info:
+  name: answered
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{base_url}}/v2/stats/activity/scorecards"
+  headers:
+    - name: content-type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "filter": {
+          "reviewFromDate": "2026-08-01",
+          "reviewToDate": "2026-10-01"
+        }
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://gong.app.gong.io/settings/api/documentation#post-/v2/stats/activity/scorecards
+
+  **WHY:** the read side of the `scorecards` stream — scorecard answers, keyed
+  on `scorecardId` and cursored on `reviewTime`.
+
+  **VERIFIED (2026-08-31):** empty on this sandbox — `404` with
+  `{"errors":["No answered scorecards found corresponding to the provided
+  filters."]}`. Note the trailing period, which the `calls` variant of this
+  message lacks; anything matching these strings must tolerate both.
+
+  **VERIFIED (2026-09-02) — the exclusive upper bound hides same-day reviews.**
+  This probe originally ended at `2026-09-01`, which silently excluded any
+  review submitted on the 2nd and returned the ordinary empty-result `404` —
+  indistinguishable from "auto-review never ran". The same trap caught
+  `Users / extensive` with the seed account. Keep the upper bound comfortably
+  in the future when using this to check whether seeding worked.
+
+  **LIMITATION — bare `YYYY-MM-DD` dates, not ISO-8601.** `reviewFromDate` and
+  `reviewToDate` take a plain date, unlike every other filtered endpoint in
+  this API. The `Scorecard` model sets `DATE_FORMAT = DateFormat.DATE` for
+  exactly this reason. Sending a full ISO timestamp here is a shape the
+  connector never produces, so it is untested against live behavior.
+
+  **LIMITATION — the connector cannot read this stream at all today.** Three
+  layered defects, each masking the ones beneath it:
+
+  1. `Scorecard.ITEMS_KEY` is `"scorecards"`, but the response array is under
+     **`answeredScorecards`** — so the envelope parser extracts nothing and the
+     stream is silently empty regardless of account contents.
+  2. The cursor/filter granularity mismatch documented in
+     `answered window probe` — today's reviews are invisible, then permanently
+     skipped.
+  3. `Scorecard.KEY` is `["/scorecardId"]`, the *definition* id shared by every
+     review of that scorecard. Two reviews on 2026-09-02 confirmed it:
+     `answeredScorecardId` 7572903405772665558 and 8436689824891728485, both
+     carrying `scorecardId` 6617040866921841803. Keyed on the shared id they
+     reduce to a single document. The per-review id is `answeredScorecardId`.
+
+  **LIMITATION — UI-only to seed.** Answering a scorecard is a human action in
+  the Gong UI: a reviewer opens a call, picks a scorecard, and fills it in.
+  There is no create endpoint. So this stream needs, in order: a seeded call
+  that Gong actually processed, a scorecard definition built and published by
+  hand, and a review performed by hand. It is the last stream that can be
+  brought to life on this sandbox.

@@ -1,0 +1,15 @@
+credentials:
+    credentials_title: API Key
+    access_key_sops: ENC[AES256_GCM,data:rqGDi7szCifNy3gX+u26ZA4vh0V+61cKB1kALMhQmZg=,iv:c3UBa6ZIIxc93cn6Z8lW0aTiHFhLIFGmHhDZ+8yQW4s=,tag:QMibcA9PopHYLjMSYgKpYw==,type:str]
+    access_key_secret_sops: ENC[AES256_GCM,data:KfiHiyM1+6/K87u5zeP0PjyM1z/dzAZeSrL2vVLeU3alVNoKBvkAkMuJs75kSL5YKQWJpuH22KsUEJxfLs8NGKQt76VKniMLsQEW4t7zoSX8X35TFTidONAPu80JM2qoXXztpJ+bGF6VPvUSyi6A0rcEfxqLjfKoVX54K2ErAeKBqjVv18pm+8cJVpSnAEqLRpstIRQUdIU=,iv:0rWV+12DE0DHk1k3A/M4H+Lq+8i/HVx3H5xpoCZKlrg=,tag:lR00S6y4bBSs8oJor5ApOg==,type:str]
+region: us02-16381
+start_date: "2026-08-01T00:00:00Z"
+sops:
+    encrypted_suffix: _sops
+    gcp_kms:
+        - created_at: "2026-09-01T15:02:03Z"
+          enc: CiUAW8BC2IxOqplmR4xnTlrrgOxqXvQXGpB1QIdsM45A+WYADugtEkkAXnXMaENXpyoP5bzIWSZ7ffMu6oWUWuZySwG/LGk9rjtjR/w3Sf/BLrGpXMdgBN4/O10kTZYNbgIEFNlRV30RSFZaDlopWyaD
+          resource_id: projects/helpful-kingdom-273219/locations/us-central1/keyRings/dev/cryptoKeys/CI-estuary-flow
+    lastmodified: "2026-09-01T15:02:04Z"
+    mac: ENC[AES256_GCM,data:1DHBG8ncbpaQhotC4Wm2QxeyDkVZRnjHDWR5QGdTctMiDbyBwz8rBslH090DVCvyBYKDIPQwVf8Juk2BEKUVLedQR0qCGguodjfyM+P2/TIyj7HYvDOzwhF4gvef3aWXJUXNda+T3HzJibDjtkRldDW+cUSrUjmkmjQI62vQw2Q=,iv:eu2w3EMU+rBmxrSVOni6S+XL9Lb9xoSjOnFngrjWuFk=,tag:ODNq8xEmTxUW4RePNvYKHQ==,type:str]
+    version: 3.13.2
