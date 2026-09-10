@@ -66,7 +66,8 @@ type computeJob struct {
 	// This is a resource saving device, it cannot be relied on for
 	// correctness.  The token has a limited lifetime, and after it expires a
 	// new job would be created even with the same token.
-	IdempotencyToken string
+	IdempotencyToken   string
+	SparkJobProperties []sparkJobProperty
 }
 
 // computeRunner abstracts the execution backend that runs the materialization's

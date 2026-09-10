@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-09
+
+### Added
+- Add support for overriding Spark executor defaults for jobs started by
+  EMR.
+
 ## 2026-09-03
 
 ### Changed

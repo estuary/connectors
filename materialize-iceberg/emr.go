@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -184,13 +185,22 @@ func (e *emrClient) runJob(ctx context.Context, job computeJob) error {
 		clientToken = uuid.NewString()
 	}
 
+	sparkParameters := []string{
+		"--py-files", job.PyFilesCommonURI,
+		"--conf", "spark.driver.maxResultSize=0",
+		"--conf", "spark.sql.iceberg.vectorization.enabled=false",
+	}
+	for _, property := range job.SparkJobProperties {
+		sparkParameters = append(sparkParameters, "--conf", fmt.Sprintf("%s=%s", property.Key, property.Value))
+	}
+
 	startInput := &emr.StartJobRunInput{
 		ApplicationId:    aws.String(e.cfg.ApplicationId),
 		ClientToken:      aws.String(clientToken),
 		ExecutionRoleArn: aws.String(e.cfg.ExecutionRoleArn),
 		JobDriver: &emrTypes.JobDriverMemberSparkSubmit{
 			Value: emrTypes.SparkSubmit{
-				SparkSubmitParameters: aws.String(fmt.Sprintf("--py-files %s --conf spark.driver.maxResultSize=0 --conf spark.sql.iceberg.vectorization.enabled=false", job.PyFilesCommonURI)),
+				SparkSubmitParameters: aws.String(strings.Join(sparkParameters, " ")),
 				EntryPoint:            aws.String(job.EntryPointURI),
 				EntryPointArguments:   args,
 			},
