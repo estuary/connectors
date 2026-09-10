@@ -33,9 +33,8 @@ func TestIntegration(t *testing.T) {
 	}
 
 	t.Run("materialize", func(t *testing.T) {
-		// Fidelity must become m.FidelityTotal once this CI job is repaired.
 		sql.RunMaterializationTest(t, NewDriver(), "testdata/materialize.flow.yaml", makeResourceFn, nil,
-			sql.RuntimeConfig{Shards: 1, Fidelity: m.FidelityNone})
+			sql.RuntimeConfig{Shards: 1, Fidelity: m.FidelityTotal})
 	})
 
 	t.Run("apply", func(t *testing.T) {
