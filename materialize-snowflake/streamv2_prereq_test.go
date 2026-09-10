@@ -329,7 +329,7 @@ func TestStreamV2DowngradeWarning(t *testing.T) {
 
 	t.Run("a channel is named", func(t *testing.T) {
 		var warning = streamV2DowngradeWarning("TBL", map[string]*streamV2Item{
-			"00000000-ffffffff": {Channel: "chan-1", Counter: 3, KeyEnd: math.MaxUint32},
+			"00000000-ffffffff": {Channel: "chan-1", Routed: 3, KeyEnd: math.MaxUint32},
 		})
 		require.Contains(t, warning, "TBL")
 		require.Contains(t, warning, "chan-1")
@@ -362,7 +362,7 @@ func TestRequireStreamingV2RuntimeForState(t *testing.T) {
 	})
 
 	t.Run("the v2 runtime is already running is allowed", func(t *testing.T) {
-		var items = map[string]*streamV2Item{"00000000-ffffffff": {Channel: channel, Counter: 3, KeyEnd: math.MaxUint32}}
+		var items = map[string]*streamV2Item{"00000000-ffffffff": {Channel: channel, Routed: 3, KeyEnd: math.MaxUint32}}
 		require.NoError(t, requireStreamingV2RuntimeForState(specOf(t, true), stateWith(t, items)))
 	})
 
@@ -372,7 +372,7 @@ func TestRequireStreamingV2RuntimeForState(t *testing.T) {
 	})
 
 	t.Run("an item off the v2 runtime is rejected", func(t *testing.T) {
-		var items = map[string]*streamV2Item{"00000000-ffffffff": {Channel: channel, Counter: 3, KeyEnd: math.MaxUint32}}
+		var items = map[string]*streamV2Item{"00000000-ffffffff": {Channel: channel, Routed: 3, KeyEnd: math.MaxUint32}}
 		var err = requireStreamingV2RuntimeForState(specOf(t, false), stateWith(t, items))
 		require.ErrorContains(t, err, boilerplate.RuntimeV2FlagName)
 		require.ErrorContains(t, err, channel)

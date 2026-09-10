@@ -31,7 +31,7 @@ import (
 //
 // Every other write path treats a state key's checkpoint item as pending work:
 // Acknowledge applies it and then patches the key to null, which takes the whole
-// item. The streaming v2 counter is not pending work but durable per-binding
+// item. The streaming v2 item is not pending work but durable per-binding
 // state, and it goes with it — while Snowflake keeps the channel and the
 // documents it has committed, neither of which any checkpoint is left to
 // account for.
@@ -40,13 +40,13 @@ func TestStreamV2CheckpointDoesNotSurviveAnotherWritePath(t *testing.T) {
 
 	var state, err = json.Marshal(checkpoint{stateKey: &checkpointItem{
 		Table:    "TBL",
-		StreamV2: map[string]*streamV2Item{"00000000-ffffffff": {Channel: channel, Counter: 3, KeyEnd: math.MaxUint32}},
+		StreamV2: map[string]*streamV2Item{"00000000-ffffffff": {Channel: channel, Routed: 3, KeyEnd: math.MaxUint32}},
 	}})
 	require.NoError(t, err)
 
 	// A transaction on another write path records that path's pending work for
 	// the state key. StreamV2 is omitted rather than nulled, so the reduce
-	// leaves the counter standing: the item survives the switch itself.
+	// leaves the routed index standing: the item survives the switch itself.
 	stored, err := json.Marshal(checkpoint{stateKey: &checkpointItem{
 		Table:       "TBL",
 		StreamBlobs: []*blobMetadata{{Path: "blob"}},
@@ -58,7 +58,7 @@ func TestStreamV2CheckpointDoesNotSurviveAnotherWritePath(t *testing.T) {
 	require.Contains(t, string(state), channel)
 
 	// Acknowledging that transaction is what takes it. The state key is drained,
-	// and a drained key is patched to null, which removes the counter along with
+	// and a drained key is patched to null, which removes the routed index along with
 	// the pending work it was recorded beside.
 	cleared, err := json.Marshal(checkpoint{stateKey: nil})
 	require.NoError(t, err)
@@ -118,7 +118,7 @@ func TestStreamV2ReturningToTheWritePathSkipsNewDocuments(t *testing.T) {
 	entries, err := before.flush(ctx)
 	require.NoError(t, err)
 	var channel = before.bindings[0].channels[0].name
-	require.Equal(t, int64(3), entries[0]["00000000-ffffffff"].Counter)
+	require.Equal(t, int64(3), entries[0]["00000000-ffffffff"].Routed)
 	before.stop()
 
 	// The task materializes through another write path for a while, which
@@ -127,7 +127,7 @@ func TestStreamV2ReturningToTheWritePathSkipsNewDocuments(t *testing.T) {
 	var after = newSession(t, nil)
 	require.NoError(t, testWriteRow(ctx, after, 0, []any{"k", "new"}))
 	require.Equal(t, channel, after.bindings[0].channels[0].name)
-	require.Equal(t, int64(3), after.bindings[0].channels[0].committed)
+	require.Equal(t, int64(3), after.bindings[0].channels[0].progress.committed)
 }
 
 // TestStreamV2SwitchOffTheWritePathIsRejected covers the switch itself, which is
@@ -184,7 +184,7 @@ func TestStreamV2SwitchOffTheWritePathIsRejected(t *testing.T) {
 	t.Run("turning the feature flag off is rejected", func(t *testing.T) {
 		const stateKey = "flag.v1"
 		var d = newTransactor(t, stateKey, itemsFor(&streamV2Item{
-			Channel: "task_00000000_flag_v1", Counter: 3, KeyEnd: math.MaxUint32,
+			Channel: "task_00000000_flag_v1", Routed: 3, KeyEnd: math.MaxUint32,
 		}))
 
 		var err = d.addBinding(ctx, target(stateKey, true), false, false)
@@ -196,7 +196,7 @@ func TestStreamV2SwitchOffTheWritePathIsRejected(t *testing.T) {
 	t.Run("moving the binding to standard updates is rejected", func(t *testing.T) {
 		const stateKey = "delta.v1"
 		var d = newTransactor(t, stateKey, itemsFor(&streamV2Item{
-			Channel: "task_00000000_delta_v1", Counter: 3, KeyEnd: math.MaxUint32,
+			Channel: "task_00000000_delta_v1", Routed: 3, KeyEnd: math.MaxUint32,
 		}))
 
 		require.Error(t, d.addBinding(ctx, target(stateKey, false), false, true))
@@ -241,7 +241,7 @@ func TestStreamV2SwitchOffTheWritePathIsRejected(t *testing.T) {
 		t.Run("without naming snowpipe_streaming is rejected", func(t *testing.T) {
 			const stateKey = "streaming.v1"
 			var d = newTransactor(t, stateKey, itemsFor(&streamV2Item{
-				Channel: "task_00000000_streaming_v1", Counter: 3, KeyEnd: math.MaxUint32,
+				Channel: "task_00000000_streaming_v1", Routed: 3, KeyEnd: math.MaxUint32,
 			}))
 			d.cfg.Advanced.FeatureFlags = ""
 
@@ -256,7 +256,7 @@ func TestStreamV2SwitchOffTheWritePathIsRejected(t *testing.T) {
 		t.Run("by naming snowpipe_streaming is allowed as the downgrade", func(t *testing.T) {
 			const stateKey = "downgrade.v1"
 			var d = newTransactor(t, stateKey, itemsFor(&streamV2Item{
-				Channel: "task_00000000_downgrade_v1", Counter: 3, KeyEnd: math.MaxUint32,
+				Channel: "task_00000000_downgrade_v1", Routed: 3, KeyEnd: math.MaxUint32,
 			}))
 			d.cfg.Advanced.FeatureFlags = "snowpipe_streaming"
 			d.snowpipeStreaming = openChannelServer(t, 0)
@@ -270,7 +270,7 @@ func TestStreamV2SwitchOffTheWritePathIsRejected(t *testing.T) {
 		t.Run("the downgrade rejects a table the snowpipe_streaming path cannot open", func(t *testing.T) {
 			const stateKey = "rejected.v1"
 			var d = newTransactor(t, stateKey, itemsFor(&streamV2Item{
-				Channel: "task_00000000_rejected_v1", Counter: 3, KeyEnd: math.MaxUint32,
+				Channel: "task_00000000_rejected_v1", Routed: 3, KeyEnd: math.MaxUint32,
 			}))
 			d.cfg.Advanced.FeatureFlags = "snowpipe_streaming"
 			d.snowpipeStreaming = openChannelServer(t, 6)
@@ -293,7 +293,7 @@ func TestStreamV2SwitchOffTheWritePathIsRejected(t *testing.T) {
 	t.Run("staying on the write path is not rejected", func(t *testing.T) {
 		const stateKey = "stay.v1"
 		var d = newTransactor(t, stateKey, itemsFor(&streamV2Item{
-			Channel: "task_00000000_stay_v1", Counter: 3, KeyEnd: math.MaxUint32,
+			Channel: "task_00000000_stay_v1", Routed: 3, KeyEnd: math.MaxUint32,
 		}))
 
 		require.NoError(t, d.addBinding(ctx, target(stateKey, true), false, true))
@@ -314,7 +314,7 @@ func TestStreamV2SwitchIsRejectedAtPublication(t *testing.T) {
 	const stateKey, channel = "publish.v1", "task_00000000_publish_v1"
 
 	var state, err = json.Marshal(checkpoint{stateKey: &checkpointItem{
-		StreamV2: map[string]*streamV2Item{channel: {Channel: channel, Counter: 3, KeyEnd: math.MaxUint32}},
+		StreamV2: map[string]*streamV2Item{channel: {Channel: channel, Routed: 3, KeyEnd: math.MaxUint32}},
 	}})
 	require.NoError(t, err)
 
@@ -520,11 +520,11 @@ func TestStreamV2WritePathSwitch(t *testing.T) {
 		var m = newV2(t, target("onto.v1"), nil)
 		storeV2(t, m, 3, 5)
 		var c = m.bindings[0].channels[0]
-		require.Zero(t, c.committed)
+		require.Zero(t, c.progress.committed)
 
 		entries, err := m.flush(ctx)
 		require.NoError(t, err)
-		require.Equal(t, int64(2), entries[0][c.keyRange.key()].Counter)
+		require.Equal(t, int64(2), entries[0][c.keyRange.key()].Routed)
 		require.Equal(t, 5, countRows())
 	})
 
@@ -597,7 +597,7 @@ func TestStreamV2WritePathSwitch(t *testing.T) {
 		// because Snowflake's committed offset token says it holds them.
 		var replay = newV2(t, tgt, nil)
 		storeV2(t, replay, 0, 3)
-		require.Equal(t, int64(3), replay.bindings[0].channels[0].committed)
+		require.Equal(t, int64(3), replay.bindings[0].channels[0].progress.committed)
 		_, err = replay.flush(ctx)
 		require.NoError(t, err)
 		require.Equal(t, 3, countRows())
@@ -699,7 +699,7 @@ func TestStreamV2SwitchOntoTheWritePathWithPendingWorkIsRejected(t *testing.T) {
 
 	t.Run("a checkpoint holding only streaming v2 state is added as usual", func(t *testing.T) {
 		var d = newTransactor(t, &checkpointItem{StreamV2: map[string]*streamV2Item{
-			"00000000-ffffffff": {Channel: "task_00000000_sk_v1", Counter: 7, KeyEnd: math.MaxUint32},
+			"00000000-ffffffff": {Channel: "task_00000000_sk_v1", Routed: 7, KeyEnd: math.MaxUint32},
 		}})
 
 		require.NoError(t, addBinding(d))

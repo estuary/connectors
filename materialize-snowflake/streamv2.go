@@ -42,7 +42,7 @@ var streamV2MaxBufferedBytes = 128 * 1024 * 1024
 const streamV2PaceBytesPerSecond = 20 * 1000 * 1000
 
 // streamV2Item records one channel of a binding, and how many documents this write
-// path appended to it.
+// path routed to it.
 //
 // This item is not pending work, unlike the other items of the driver checkpoint. It
 // is durable state, one per channel. The connector reconciles it against Snowflake's
@@ -56,9 +56,9 @@ const streamV2PaceBytesPerSecond = 20 * 1000 * 1000
 // to the shards that inherit their key ranges.
 type streamV2Item struct {
 	Channel string
-	// Counter is the index of the last document appended to Channel. The count
-	// starts at the first document of the channel and never resets.
-	Counter int64
+	// Routed is the index of the last document routed to Channel. The index starts
+	// at the channel's first document and never resets.
+	Routed int64
 	// KeyBegin and KeyEnd are the channel's key range. The key range is a
 	// function of the documents the channel receives, not of the shard topology,
 	// which is what a split or join inherits whole.
@@ -205,12 +205,12 @@ func streamV2ForeignTaskError(table string, foreign map[string][]string) error {
 // own. A token whose range is not the channel's key range was written by something
 // else — another connector, or a channel scheme this write path never ran — and
 // nothing it counts may be skipped.
-func streamV2Token(counter int64, keyRange streamV2Range) string {
-	return fmt.Sprintf("%d@%s", counter, keyRange.key())
+func streamV2Token(index int64, keyRange streamV2Range) string {
+	return fmt.Sprintf("%d@%s", index, keyRange.key())
 }
 
 // parseStreamV2Token reads a committed offset token back as two values: the document
-// count it carries, and the key range those documents were appended under. It returns
+// index it carries, and the key range those documents were appended under. It returns
 // false for a token that this write path never writes.
 func parseStreamV2Token(token string) (int64, streamV2Range, bool) {
 	var count, spec, hasRange = strings.Cut(token, "@")
@@ -218,7 +218,7 @@ func parseStreamV2Token(token string) (int64, streamV2Range, bool) {
 		return 0, streamV2Range{}, false
 	}
 
-	counter, err := strconv.ParseInt(count, 10, 64)
+	index, err := strconv.ParseInt(count, 10, 64)
 	if err != nil {
 		return 0, streamV2Range{}, false
 	}
@@ -235,7 +235,7 @@ func parseStreamV2Token(token string) (int64, streamV2Range, bool) {
 	if err != nil {
 		return 0, streamV2Range{}, false
 	}
-	return counter, streamV2Range{keyBegin: uint32(keyBegin), keyEnd: uint32(keyEnd)}, true
+	return index, streamV2Range{keyBegin: uint32(keyBegin), keyEnd: uint32(keyEnd)}, true
 }
 
 // streamsV2 reports whether a binding writes through the snowpipe streaming v2 path.
@@ -347,27 +347,28 @@ func streamV2ListChannels(ctx context.Context, db *stdsql.DB, dialect sql.Dialec
 	return slices.Compact(names), nil
 }
 
-// streamV2Channel is a handle for one Snowflake channel of one connector binding.
+// streamV2Channel is a handle for one Snowpipe channel of one connector binding.
 type streamV2Channel struct {
 	name string
 	// keyRange is the key range this channel covers. The key range is embedded in
 	// the channel's name and in every offset token it appends with.
 	keyRange streamV2Range
 
-	// counter is the index of the last document counted for this channel. It starts
-	// at the checkpointed Counter at open, and it advances by one for each document
-	// routed here.
-	counter int64
-	// recorded is the counter value that the last checkpoint item reported. It is how
-	// flush finds a channel that stored nothing this transaction.
-	recorded int64
-	// committed is the highest document index that Snowflake durably holds. It starts
-	// at the channel's committed offset token when this session opens the channel, and
-	// then takes each counter this session has waited on. A document at or below it is
-	// counted but not appended again, because Snowflake already holds it. That happens
-	// when an earlier attempt of the transaction now being replayed appended documents
-	// before it was interrupted.
-	committed int64
+	// progress tracks the position of the channel along its ordinal document index.
+	// The first document the shard routes to the channel has index 1, each later
+	// document is assigned the next index, and the index never resets.
+	//
+	// committed exceeds routed only while a replayed transaction routes documents
+	// that an interrupted attempt already committed.
+	progress struct {
+		// routed leads progress. Its value is the index of the most recent
+		// document that the shard routed to this channel.
+		routed int64
+		// checkpointed is the index that the last checkpoint item carried.
+		checkpointed int64
+		// committed is the highest index that Snowflake durably holds.
+		committed int64
+	}
 
 	// buf is the payload of the batch under construction
 	buf      []byte
@@ -387,8 +388,8 @@ type streamV2Channel struct {
 }
 
 // offsetToken renders the offset token for a document index on this channel.
-func (c *streamV2Channel) offsetToken(counter int64) string {
-	return streamV2Token(counter, c.keyRange)
+func (c *streamV2Channel) offsetToken(index int64) string {
+	return streamV2Token(index, c.keyRange)
 }
 
 type streamV2Binding struct {
@@ -589,16 +590,23 @@ func (m *streamV2Manager) addBinding(database, schema, table string, target sql.
 	}
 }
 
-// newChannel builds the in-memory state of one opened, reconciled channel.
-func newStreamV2Channel(name string, keyRange streamV2Range, counter, committed int64) *streamV2Channel {
-	return &streamV2Channel{
-		name:      name,
-		keyRange:  keyRange,
-		counter:   counter,
-		recorded:  counter,
-		committed: committed,
-		limiter:   rate.NewLimiter(streamV2PaceBytesPerSecond, 2*streamV2PaceBytesPerSecond),
+// newStreamV2Channel builds the in-memory state of one opened, reconciled channel.
+func newStreamV2Channel(name string, keyRange streamV2Range, routed, committed int64) *streamV2Channel {
+	var c = &streamV2Channel{
+		name:     name,
+		keyRange: keyRange,
+		limiter:  rate.NewLimiter(streamV2PaceBytesPerSecond, 2*streamV2PaceBytesPerSecond),
+		progress: struct {
+			routed       int64
+			checkpointed int64
+			committed    int64
+		}{
+			routed:       routed,
+			checkpointed: routed,
+			committed:    committed,
+		},
 	}
+	return c
 }
 
 // ensureOpened builds the active channel layout of the binding and captures each
@@ -704,7 +712,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 	// split that did not land on channel boundaries. Midpoint-only splits cannot
 	// produce it, except by splitting a shard again before its channels converged
 	// past the depth the new boundary cuts through. The rows that channel holds
-	// beyond its counter belong to both children, so neither can skip them.
+	// beyond its routed index belong to both children, so neither can skip them.
 	var nested []*streamV2Item
 	var targetItems int
 	for _, item := range b.prior {
@@ -760,13 +768,13 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 		}
 
 		if status.CommittedToken == nil {
-			if isTarget && item.Counter == 0 {
+			if isTarget && item.Routed == 0 {
 				// A declaration nothing was appended under. It stays dormant: the
 				// item keeps the declaration durable, and the channel joins the
 				// layout when a switch converges to it.
 				continue
 			}
-			if !isTarget && item.Counter == 0 {
+			if !isTarget && item.Routed == 0 {
 				// A channel of another layout which holds nothing at all. A skewed
 				// transaction leaves one behind legitimately — a channel of the
 				// shard this one inherits from that took no rows — and so does a
@@ -777,7 +785,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 				continue
 			}
 			if !isTarget && declared {
-				// A counter with the declaration in place: an interrupted switch
+				// A routed index with the declaration in place: an interrupted switch
 				// already abandoned the channel — the open above re-created it
 				// empty — and only the deletion of its item was lost. The deletion
 				// is re-recorded, and the sweep drops the empty channel.
@@ -785,11 +793,11 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 				log.WithFields(log.Fields{
 					"table":   b.table,
 					"channel": item.Channel,
-					"counter": item.Counter,
+					"routed":  item.Routed,
 				}).Info("re-recording the deletion of a channel an interrupted session abandoned")
 				continue
 			}
-			// A counter with no token and no declaration to explain it falls
+			// A routed index with no token and no declaration to explain it falls
 			// through to the reconciliation, which rejects it as a lost channel.
 		}
 
@@ -797,7 +805,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 		if err != nil {
 			return err
 		}
-		var c = newStreamV2Channel(item.Channel, keyRange, item.Counter, committed)
+		var c = newStreamV2Channel(item.Channel, keyRange, item.Routed, committed)
 		if isTarget {
 			liveTarget = append(liveTarget, c)
 		} else {
@@ -833,13 +841,13 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 	}
 
 	// The open-time switch. The declaration is durable — it arrived with the
-	// recovered checkpoint — and every inherited channel is committed at its counter,
-	// so the convergence an interrupted session declared completes here: the
+	// recovered checkpoint — and every inherited channel is settled, so the
+	// convergence an interrupted session declared completes here: the
 	// inherited channels are abandoned, and the target layout takes over.
 	if len(liveNonTarget) > 0 && declared {
 		var idle = true
 		for _, c := range liveNonTarget {
-			if c.committed != c.counter {
+			if c.progress.routed != c.progress.committed {
 				idle = false
 				break
 			}
@@ -889,11 +897,11 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 			if err != nil {
 				return err
 			}
-			var counter int64
+			var routed int64
 			if item != nil {
-				counter = item.Counter
+				routed = item.Routed
 			}
-			active = append(active, newStreamV2Channel(name, keyRange, counter, committed))
+			active = append(active, newStreamV2Channel(name, keyRange, routed, committed))
 		}
 	}
 
@@ -924,7 +932,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 
 	var layout = make(log.Fields, len(active))
 	for _, c := range active {
-		layout[c.keyRange.String()] = fmt.Sprintf("counter %d committed %d", c.counter, c.committed)
+		layout[c.keyRange.String()] = fmt.Sprintf("routed %d committed %d", c.progress.routed, c.progress.committed)
 	}
 	log.WithFields(log.Fields{
 		"table":      b.table,
@@ -1053,7 +1061,7 @@ func rejectedRowsError(channel, table string, status *channelStatusResult) error
 }
 
 // reconcileStreamV2Channel compares Snowflake's committed offset token for one
-// channel against the counter that the driver checkpoint recorded for it. It reports
+// channel against the routed index that the driver checkpoint recorded for it. It reports
 // the highest document index that Snowflake already holds. A replay must not append a
 // document at or below that threshold again.
 //
@@ -1062,13 +1070,13 @@ func rejectedRowsError(channel, table string, status *channelStatusResult) error
 // the task's channels; it is what tells a channel's interrupted first transaction
 // apart from a token nothing accounts for.
 func reconcileStreamV2Channel(channel, table string, committedToken *string, item *streamV2Item, keyRange streamV2Range, priorItems int) (int64, error) {
-	var counter int64
+	var routed int64
 	if item != nil {
-		counter = item.Counter
+		routed = item.Routed
 	}
 
-	// Snowflake holds nothing for this channel. With no counter to account for, there
-	// is nothing to skip. With a counter, the channel that held those documents is
+	// Snowflake holds nothing for this channel. With nothing routed to account for,
+	// there is nothing to skip. With routed documents, the channel that held them is
 	// gone, and the token that said which of them Snowflake holds went with it.
 	//
 	// The one drop this connector performs itself — a rebalance abandoning a channel
@@ -1076,10 +1084,10 @@ func reconcileStreamV2Channel(channel, table string, committedToken *string, ite
 	// the declaration its checkpoint carries. A missing token here has no such
 	// record, so it names an account Snowflake itself has lost.
 	if committedToken == nil {
-		if counter > 0 {
+		if routed > 0 {
 			return 0, fmt.Errorf(
 				"channel %q has committed nothing while this task's checkpoint records %d documents appended to it: Snowflake has lost this channel's committed offset token, so this shard cannot identify which of its documents Snowflake still holds. Backfill this binding",
-				channel, counter,
+				channel, routed,
 			)
 		}
 		return 0, nil
@@ -1104,10 +1112,10 @@ func reconcileStreamV2Channel(channel, table string, committedToken *string, ite
 		)
 	}
 
-	if committed < counter {
+	if committed < routed {
 		return 0, fmt.Errorf(
 			"channel %q has committed %d documents but this task's checkpoint records %d as appended: the channel has lost committed data, so the missing rows cannot be identified. Backfill this binding",
-			channel, committed, counter,
+			channel, committed, routed,
 		)
 	}
 
@@ -1130,7 +1138,7 @@ func reconcileStreamV2Channel(channel, table string, committedToken *string, ite
 		)
 	}
 
-	// committed == counter is the clean boundary, and committed > counter is an
+	// committed == routed is the clean boundary, and committed > routed is an
 	// interrupted attempt of the transaction now replayed. The replay produces the
 	// same documents in the same order, and the routing hash is a function of each
 	// document alone, so this channel receives exactly the documents the token
@@ -1202,7 +1210,7 @@ func streamV2ChannelNames(items map[string]*streamV2Item) []string {
 //
 // The channels themselves stay in Snowflake, named from the state key of the binding,
 // and they still report the committed offset tokens they ended on. A later return to
-// this path derives those same names. It meets a token that no counter accounts for,
+// this path derives those same names. It meets a token that no item accounts for,
 // and reads it as an interrupted first transaction of a fresh channel. Only a backfill
 // otherwise leaves a checkpoint with nothing for the binding. The return then skips
 // that many of the documents it was about to materialize.
@@ -1223,7 +1231,7 @@ func streamV2PathOrphaned(table string, prior map[string]*streamV2Item) error {
 	}
 
 	return fmt.Errorf(
-		"this binding has materialized into %s through the snowpipe_streaming_v2 write path, which this task's specification no longer selects for it, while the task's checkpoint still records the channel(s) %s it appended to. Those counters are the only account of which documents Snowflake's channels already hold, no other write path maintains them, and the first transaction on another path discards them — after which returning to this write path would skip that many of the documents it materializes. Restore this binding to the snowpipe_streaming_v2 write path — it needs the feature flag, delta updates, and key-pair authentication — or backfill it, which rotates its channels and its checkpoint together",
+		"this binding has materialized into %s through the snowpipe_streaming_v2 write path, which this task's specification no longer selects for it, while the task's checkpoint still records the channel(s) %s it appended to. Those items are the only account of which documents Snowflake's channels already hold, no other write path maintains them, and the first transaction on another path discards them — after which returning to this write path would skip that many of the documents it materializes. Restore this binding to the snowpipe_streaming_v2 write path — it needs the feature flag, delta updates, and key-pair authentication — or backfill it, which rotates its channels and its checkpoint together",
 		table, strings.Join(channels, ", "),
 	)
 }
@@ -1238,7 +1246,7 @@ func streamV2DowngradeWarning(table string, items map[string]*streamV2Item) stri
 	}
 
 	return fmt.Sprintf(
-		"binding %s is leaving the snowpipe_streaming_v2 write path for snowpipe_streaming. Every document that its channel(s) %s committed beyond the counter the checkpoint records for them will be materialized again by the snowpipe_streaming path, and this binding uses delta updates, so those duplicates are permanent. The channels are dropped when the task next opens on the new path",
+		"binding %s is leaving the snowpipe_streaming_v2 write path for snowpipe_streaming. Every document that its channel(s) %s committed beyond the index the checkpoint records for them will be materialized again by the snowpipe_streaming path, and this binding uses delta updates, so those duplicates are permanent. The channels are dropped when the task next opens on the new path",
 		table, strings.Join(channels, ", "),
 	)
 }
@@ -1267,12 +1275,13 @@ func (m *streamV2Manager) writeRow(ctx context.Context, binding int, packedKey [
 		)
 	}
 
-	c.counter++
-	if c.counter <= c.committed {
+	c.progress.routed++
+	var index = c.progress.routed
+	if index <= c.progress.committed {
 		return nil
 	}
 
-	var grew, err = c.bufferRow(c.counter, b.columns, converted)
+	var grew, err = c.bufferRow(index, b.columns, converted)
 	if err != nil {
 		return fmt.Errorf("encoding row for %s: %w", b.table, err)
 	}
@@ -1286,7 +1295,7 @@ func (m *streamV2Manager) writeRow(ctx context.Context, binding int, packedKey [
 	return nil
 }
 
-// bufferRow writes the document at index counter into the payload of the current
+// bufferRow writes the document at index into the payload of the current
 // batch. It starts that batch when this is the first row. It reports how many bytes the
 // payload grew by.
 //
@@ -1297,11 +1306,11 @@ func (m *streamV2Manager) writeRow(ctx context.Context, binding int, packedKey [
 // This is the whole of the encoding this path does. appendRowJSON copies through the
 // values that reach it already encoded, and nothing rescans the row after it. The bytes
 // written here are the bytes the append carries.
-func (c *streamV2Channel) bufferRow(counter int64, columns []rowColumn, converted []any) (int, error) {
+func (c *streamV2Channel) bufferRow(index int64, columns []rowColumn, converted []any) (int, error) {
 	var before = len(c.buf)
 	if c.bufRows == 0 {
 		c.startBatch()
-		c.bufFirst = counter
+		c.bufFirst = index
 	} else {
 		c.buf = append(c.buf, ',')
 	}
@@ -1366,7 +1375,7 @@ func (m *streamV2Manager) appendAllBatches(ctx context.Context) error {
 // channel. Ownership of the buffer passes to the append, so the next batch starts a
 // buffer of its own.
 func (m *streamV2Manager) appendBatch(ctx context.Context, c *streamV2Channel) error {
-	var first, last = c.bufFirst, c.counter
+	var first, last = c.bufFirst, c.progress.routed
 	payload, rows, released := c.finishBatch()
 	m.bufBytes -= released
 
@@ -1391,19 +1400,19 @@ func (m *streamV2Manager) appendBatch(ctx context.Context, c *streamV2Channel) e
 // flush appends the remaining buffered documents of each channel. It waits for every
 // pending append, and then waits for Snowflake to durably commit them. It returns
 // the checkpoint entries of each binding that did anything this transaction, and it
-// reports them only after Snowflake holds the documents their counters account for.
+// reports them only after Snowflake holds the documents their items account for.
 //
 // The entries hold an item for every active channel, advanced or not. This is the
 // declaration invariant: every channel rows can route to has an item in the
 // checkpoint no later than the transaction that first routes to it, and the target
-// layout a rebalance converges to is declared — written as counter-zero items — at
+// layout a rebalance converges to is declared — written as items with nothing routed — at
 // least one durable checkpoint before the switch routes anything there. A token
 // with no item to account for therefore never has a benign reading.
 //
 // flush awaits the commit here, as part of the checkpoint it produces, and not at
 // Acknowledge. The checkpoint of the runtime is durable before Acknowledge runs. A
-// commit that failed there could no longer fail the transaction whose counter it
-// belongs to. The task resumes from a counter Snowflake never committed, and the next
+// commit that failed there could no longer fail the transaction whose item it
+// belongs to. The task resumes from an index Snowflake never committed, and the next
 // Open can only reject it. No replay re-appends rows the runtime already considers
 // delivered.
 //
@@ -1412,9 +1421,9 @@ func (m *streamV2Manager) appendBatch(ctx context.Context, c *streamV2Channel) e
 func (m *streamV2Manager) flush(ctx context.Context) (map[int]map[string]*streamV2Item, error) {
 	var entries = make(map[int]map[string]*streamV2Item)
 	type commitWait struct {
-		b       *streamV2Binding
-		c       *streamV2Channel
-		counter int64
+		b     *streamV2Binding
+		c     *streamV2Channel
+		index int64
 	}
 	var waits []commitWait
 
@@ -1437,16 +1446,16 @@ func (m *streamV2Manager) flush(ctx context.Context) (map[int]map[string]*stream
 			// A replayed transaction that routed fewer documents to this channel
 			// than the interrupted attempt committed was not replayed identically.
 			// Store then withheld documents that Snowflake does not hold. Only the
-			// first transaction of the session can trip this, because the counter
-			// only grows from there.
-			if c.counter < c.committed {
+			// first transaction of the session can trip this, because the routed
+			// index only grows from there.
+			if c.progress.routed < c.progress.committed {
 				return nil, fmt.Errorf(
 					"channel %q holds %d committed documents but the transaction replayed against it produced only %d: it was not replayed identically, so the rows Snowflake already holds cannot be identified. Backfill this binding",
-					c.name, c.committed, c.counter,
+					c.name, c.progress.committed, c.progress.routed,
 				)
 			}
 
-			if c.counter != c.recorded {
+			if c.progress.routed != c.progress.checkpointed {
 				advanced = true
 			}
 		}
@@ -1458,15 +1467,15 @@ func (m *streamV2Manager) flush(ctx context.Context) (map[int]map[string]*stream
 
 		var items = make(map[string]*streamV2Item)
 		for _, c := range b.channels {
-			c.recorded = c.counter
+			c.progress.checkpointed = c.progress.routed
 			items[c.keyRange.key()] = &streamV2Item{
 				Channel:  c.name,
-				Counter:  c.counter,
+				Routed:   c.progress.routed,
 				KeyBegin: c.keyRange.keyBegin,
 				KeyEnd:   c.keyRange.keyEnd,
 			}
-			if c.counter > c.committed {
-				waits = append(waits, commitWait{b: b, c: c, counter: c.counter})
+			if c.progress.routed > c.progress.committed {
+				waits = append(waits, commitWait{b: b, c: c, index: c.progress.routed})
 			}
 		}
 
@@ -1500,7 +1509,7 @@ func (m *streamV2Manager) flush(ctx context.Context) (map[int]map[string]*stream
 	group, groupCtx := errgroup.WithContext(ctx)
 	group.SetLimit(MaxConcurrentQueries * streamV2ChannelsPerShard)
 	for _, w := range waits {
-		group.Go(func() error { return m.waitCommit(groupCtx, w.b, w.c, w.counter) })
+		group.Go(func() error { return m.waitCommit(groupCtx, w.b, w.c, w.index) })
 	}
 	if err := group.Wait(); err != nil {
 		return nil, err
@@ -1511,8 +1520,8 @@ func (m *streamV2Manager) flush(ctx context.Context) (map[int]map[string]*stream
 
 // acknowledged runs after the runtime durably committed the transaction whose
 // checkpoint the last flush produced. It is where a rebalance switches: the
-// declaration that flush wrote is durable now, every channel is committed at its
-// counter, and the boilerplate serializes this call before the next Store, so no row
+// declaration that flush wrote is durable now, every channel is settled, and the
+// boilerplate serializes this call before the next Store, so no row
 // routes anywhere while the layout changes.
 //
 // The switch abandons every non-target channel of the layout — recording each
@@ -1544,7 +1553,7 @@ func (m *streamV2Manager) acknowledged(ctx context.Context) error {
 		// deferred convergence costs only throughput — so defer, loudly.
 		var idle = true
 		for _, c := range b.channels {
-			if c.committed != c.counter || c.bufRows > 0 {
+			if c.progress.routed != c.progress.committed || c.bufRows > 0 {
 				idle = false
 				break
 			}
@@ -1612,12 +1621,12 @@ func (m *streamV2Manager) acknowledged(ctx context.Context) error {
 	return nil
 }
 
-// waitCommit blocks until the channel durably holds every document counted through
-// counter. If Snowflake rejected any of its rows, waitCommit fails the transaction.
-func (m *streamV2Manager) waitCommit(ctx context.Context, b *streamV2Binding, c *streamV2Channel, counter int64) error {
-	// A replay of documents Snowflake already holds appends nothing. Its counter is
+// waitCommit blocks until the channel durably holds every document through index. If
+// Snowflake rejected any of its rows, waitCommit fails the transaction.
+func (m *streamV2Manager) waitCommit(ctx context.Context, b *streamV2Binding, c *streamV2Channel, index int64) error {
+	// A replay of documents Snowflake already holds appends nothing. Its index is
 	// already committed, so waitCommit must not wait on it.
-	if counter <= c.committed {
+	if index <= c.progress.committed {
 		return nil
 	}
 
@@ -1632,28 +1641,28 @@ func (m *streamV2Manager) waitCommit(ctx context.Context, b *streamV2Binding, c 
 	log.WithFields(log.Fields{
 		"table":   b.table,
 		"channel": c.name,
-		"counter": counter,
+		"index":   index,
 	}).Info("snowpipe streaming v2: awaiting commit")
 
 	var started = time.Now()
-	var token = c.offsetToken(counter)
+	var token = c.offsetToken(index)
 	status, err := client.WaitCommit(ctx, c.name, token)
 	if err != nil {
 		return fmt.Errorf("waiting for commit of document %s on channel %q: %w", token, c.name, err)
 	}
 
 	// The commit of the token is the earliest point where this transaction can see its
-	// own rejections. That point is before flush checkpoints its counter. A rejection
+	// own rejections. That point is before flush checkpoints its index. A rejection
 	// therefore fails the transaction that produced it, and not a later one.
 	if err := rejectedRowsError(c.name, b.table, status); err != nil {
 		return err
 	}
-	c.committed = counter
+	c.progress.committed = index
 
 	log.WithFields(log.Fields{
 		"table":   b.table,
 		"channel": c.name,
-		"counter": counter,
+		"index":   index,
 		"took":    time.Since(started).String(),
 	}).Info("snowpipe streaming v2: committed")
 	return nil

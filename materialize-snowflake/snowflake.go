@@ -719,6 +719,12 @@ type checkpointItem struct {
 
 type checkpoint = map[string]*checkpointItem
 
+// streamV2Only reports whether the item holds streaming v2 channel state and no
+// staged work.
+func (item *checkpointItem) streamV2Only() bool {
+	return len(item.StreamV2) > 0 && len(item.Query) == 0 && len(item.StreamBlobs) == 0 && len(item.PipeFiles) == 0
+}
+
 func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var ctx = it.Context()
 
@@ -988,8 +994,13 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	var drained []string
 	var pipes = make(map[string]*pipeRecord)
 	for stateKey, item := range d.cp {
-		// only process the state keys we've been asked to; other pending work
-		// remains staged in the persisted state
+		if item.streamV2Only() {
+			// The checkpoint item for this state key was written by the streaming
+			// v2 write path. The next Open reads this item, so it stays in the
+			// checkpoint.
+			continue
+		}
+
 		if !shouldProcess(stateKey) {
 			continue
 		}
@@ -998,19 +1009,6 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 		// we skip queries that belong to tables which do not have a binding anymore
 		// since these tables might be deleted already
 		if len(path) == 0 {
-			continue
-		}
-
-		if len(item.StreamV2) > 0 {
-			// There is nothing to apply for a streaming v2 binding: its rows were
-			// appended and committed to Snowflake before this transaction's
-			// checkpoint was produced, since a commit awaited here could no longer
-			// fail the transaction whose counter it belongs to.
-			//
-			// The counter is durable per-binding state rather than pending work —
-			// it must outlive this transaction to be reconciled against Snowflake's
-			// committed offset token at the next Open — so this state key is
-			// deliberately not drained.
 			continue
 		}
 
