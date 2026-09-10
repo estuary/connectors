@@ -246,8 +246,8 @@ func TestStreamV2Manager(t *testing.T) {
 	// rejectingTable creates a table Snowflake will reject a row of, and returns a
 	// delta-updates target for it.
 	//
-	// A null against a NOT NULL column is the rejection it provokes: omitting a
-	// column from the appended row object is how a nil converted value reaches
+	// A null against a NOT NULL column is the rejection it provokes: a nil converted
+	// value is written as no entry in the row's JSON, which is how it reaches
 	// Snowflake as SQL NULL, and the connector marks a column NOT NULL only for a
 	// field the collection schema requires, so the runtime does not in fact
 	// deliver a nil for one. Nothing about the rejection is specific to nulls —
