@@ -15,163 +15,58 @@ In the future, other open-source materialization connectors from third parties c
 
 ## Available materialization connectors
 
-* AlloyDB
-  * [Configuration](./alloydb.md)
-  * Package - ghcr.io/estuary/materialize-alloydb:v5
-* Amazon DynamoDB
-  * [Configuration](./amazon-dynamodb.md)
-  * Package - ghcr.io/estuary/materialize-dynamodb:v1
-* Amazon EventBridge
-  * [Configuration](./amazon-eventbridge.md)
-  * Package - ghcr.io/estuary/materialize-eventbridge:v1
-* Amazon MySQL
-  * [Configuration](./MySQL/amazon-rds-mysql.md)
-  * Package - ghcr.io/estuary/materialize-amazon-rds-mysql:v2
-* Amazon PostgreSQL
-  * [Configuration](./PostgreSQL/amazon-rds-postgres.md)
-  * Package - ghcr.io/estuary/materialize-amazon-rds-postgres:v5
-* Amazon Redshift
-  * [Configuration](./amazon-redshift.md)
-  * Package - ghcr.io/estuary/materialize-redshift:v2
-* Amazon SNS
-  * [Configuration](./amazon-sns.md)
-  * Package - ghcr.io/estuary/materialize-sns:v1
-* Amazon SQL Server
-  * [Configuration](./SQLServer/amazon-rds-sqlserver.md)
-  * Package - ghcr.io/estuary/materialize-amazon-rds-sqlserver:v2
-* Apache Iceberg Tables
-  * [Configuration](./apache-iceberg/apache-iceberg.md)
-  * Package — ghcr.io/estuary/materialize-iceberg:v1
-* Apache Iceberg Tables in S3 (delta updates)
-  * [Configuration](./amazon-s3-iceberg.md)
-  * Package — ghcr.io/estuary/materialize-s3-iceberg:v2
-* Apache Kafka
-  * [Configuration](./apache-kafka.md)
-  * Package — ghcr.io/estuary/materialize-kafka:v1
-* Apache Parquet Files in Azure Blob Storage
-  * [Configuration](./azure-blob-parquet.md)
-  * Package — ghcr.io/estuary/materialize-azure-blob-parquet:v1
-* Apache Parquet Files in GCS
-  * [Configuration](./google-gcs-parquet.md)
-  * Package — ghcr.io/estuary/materialize-gcs-parquet:v1
-* Apache Parquet Files in S3
-  * [Configuration](./amazon-s3-parquet.md)
-  * Package — ghcr.io/estuary/materialize-s3-parquet:v3
-* Azure Fabric Warehouse
-  * [Configuration](./azure-fabric-warehouse.md)
-  * Package - ghcr.io/estuary/materialize-azure-fabric-warehouse:v1
-* Azure SQL Server
-  * [Configuration](./SQLServer/)
-  * Package - ghcr.io/estuary/materialize-sqlserver:v2
-* Bauplan
-  * [Configuration](./apache-iceberg/bauplan.md)
-  * Package - ghcr.io/estuary/materialize-bauplan:v1
-* Bytewax
-  * [Configuration](./Dekaf/bytewax.md)
-* ClickHouse
-  * [Configuration](./ClickHouse.md)
-  * Package - ghcr.io/estuary/materialize-clickhouse:v1
-* ClickHouse (Dekaf)
-  * [Configuration](./Dekaf/clickhouse.md)
-* CSV Files in GCS
-  * [Configuration](./google-gcs-csv.md)
-  * Package — ghcr.io/estuary/materialize-gcs-csv:v1
-* CSV Files in S3
-  * [Configuration](./amazon-s3-csv.md)
-  * Package — ghcr.io/estuary/materialize-s3-csv:v1
-* Databricks
-  * [Configuration](./databricks.md)
-  * Package — ghcr.io/estuary/materialize-databricks:v3
-* Dekaf
-  * [Configuration](./Dekaf/dekaf.md)
-* Dremio
-  * [Configuration](./apache-iceberg/dremio.md)
-  * Package - ghcr.io/estuary/materialize-dremio:v1
-* Elasticsearch
-  * [Configuration](./Elasticsearch/Elasticsearch.md)
-  * Package — ghcr.io/estuary/materialize-elasticsearch:v3
-* Google BigQuery
-  * [Configuration](./BigQuery.md)
-  * Package — ghcr.io/estuary/materialize-bigquery:v3
-* Google Cloud Bigtable
-  * [Configuration](./google-bigtable.md)
-  * Package — ghcr.io/estuary/materialize-bigtable:v1
-* Google Cloud MySQL
-  * [Configuration](./MySQL/google-cloud-sql-mysql.md)
-  * Package - ghcr.io/estuary/materialize-google-cloud-sql-mysql:v2
-* Google Cloud PostgreSQL
-  * [Configuration](./PostgreSQL/google-cloud-sql-postgres.md)
-  * Package - ghcr.io/estuary/materialize-google-cloud-sql-postgres:v5
-* Google Cloud Pub/Sub
-  * [Configuration](./google-pubsub.md)
-  * Package - ghcr.io/estuary/materialize-google-pubsub:v1
-* Google Cloud SQL Server
-  * [Configuration](./SQLServer/google-cloud-sql-sqlserver.md)
-  * Package - ghcr.io/estuary/materialize-google-cloud-sql-sqlserver:v2
-* Google Sheets
-  * [Configuration](./Google-sheets.md)
-  * Package - ghcr.io/estuary/materialize-google-sheets:v2
-* Google Spanner
-  * [Configuration](./google-spanner.md)
-  * Package - ghcr.io/estuary/materialize-spanner:v1
-* HTTP Webhook
-  * [Configuration](./http-webhook.md)
-  * Package - ghcr.io/estuary/materialize-webhook:v1
-* HubSpot
-  * [Configuration](./hubspot.md)
-  * Package - ghcr.io/estuary/materialize-hubspot:v1
-* Imply Polaris
-  * [Configuration](./Dekaf/imply-polaris.md)
-* Materialize
-  * [Configuration](./Dekaf/materialize.md)
-* MongoDB
-  * [Configuration](./mongodb.md)
-  * Package - ghcr.io/estuary/materialize-mongodb:v1
-* MotherDuck
-  * [Configuration](./motherduck.md)
-  * Package - ghcr.io/estuary/materialize-motherduck:v4
-* MySQL
-  * [Configuration](./MySQL/)
-  * Package - ghcr.io/estuary/materialize-mysql:v2
-* MySQL Heatwave
-  * [Configuration](./mysql-heatwave.md)
-  * Package - ghcr.io/estuary/materialize-mysql-heatwave:v2
-* OpenSearch
-  * [Configuration](./Elasticsearch/opensearch.md)
-  * Package - ghcr.io/estuary/materialize-opensearch:v3
-* Pinecone
-  * [Configuration](./pinecone.md)
-  * Package — ghcr.io/estuary/materialize-pinecone:v1
-* PostgreSQL
-  * [Configuration](./PostgreSQL/)
-  * Package — ghcr.io/estuary/materialize-postgres:v5
-* Rockset (Deprecated)
-  * [Configuration](./Rockset.md)
-  * Package — ghcr.io/estuary/materialize-rockset:v2
-* SingleStore
-  * [Configuration](./MySQL/singlestore-mysql.md)
-  * Package - ghcr.io/estuary/materialize-singlestore:v2
-* SingleStore (Dekaf)
-  * [Configuration](./Dekaf/singlestore.md)
-* Slack
-  * [Configuration](./slack.md)
-  * Package - ghcr.io/estuary/materialize-slack:v1
-* Snowflake
-  * [Configuration](./Snowflake.md)
-  * Package — ghcr.io/estuary/materialize-snowflake:v4
-* SQLite
-  * [Configuration](./SQLite.md)
-  * Package — ghcr.io/estuary/materialize-sqlite:v1
-* SQL Server
-  * [Configuration](./SQLServer/)
-  * Package - ghcr.io/estuary/materialize-sqlserver:v2
-* Startree
-  * [Configuration](./Dekaf/startree.md)
-* Supabase
-  * [Configuration](./PostgreSQL/supabase.md)
-  * Package - ghcr.io/estuary/materialize-supabase-postgres:v5
-* TimescaleDB
-  * [Configuration](./timescaledb.md)
-  * Package - ghcr.io/estuary/materialize-timescaledb:v5
-* Tinybird
-  * [Configuration](./Dekaf/tinybird.md)
+* [AlloyDB](./alloydb.md)
+* [Amazon DynamoDB](./amazon-dynamodb.md)
+* [Amazon EventBridge](./amazon-eventbridge.md)
+* [Amazon MySQL](./MySQL/amazon-rds-mysql.md)
+* [Amazon PostgreSQL](./PostgreSQL/amazon-rds-postgres.md)
+* [Amazon Redshift](./amazon-redshift.md)
+* [Amazon SNS](./amazon-sns.md)
+* [Amazon SQL Server](./SQLServer/amazon-rds-sqlserver.md)
+* [Apache Iceberg Tables](./apache-iceberg/apache-iceberg.md)
+* [Apache Iceberg Tables in S3 (delta updates)](./amazon-s3-iceberg.md)
+* [Apache Kafka](./apache-kafka.md)
+* [Apache Parquet Files in Azure Blob Storage](./azure-blob-parquet.md)
+* [Apache Parquet Files in GCS](./google-gcs-parquet.md)
+* [Apache Parquet Files in S3](./amazon-s3-parquet.md)
+* [Azure Fabric Warehouse](./azure-fabric-warehouse.md)
+* [Azure SQL Server](./SQLServer/)
+* [Bauplan](./apache-iceberg/bauplan.md)
+* [Bytewax](./Dekaf/bytewax.md)
+* [ClickHouse](./ClickHouse.md)
+* [ClickHouse (Dekaf)](./Dekaf/clickhouse.md)
+* [CSV Files in GCS](./google-gcs-csv.md)
+* [CSV Files in S3](./amazon-s3-csv.md)
+* [Databricks](./databricks.md)
+* [Dekaf](./Dekaf/dekaf.md)
+* [Dremio](./apache-iceberg/dremio.md)
+* [Elasticsearch](./Elasticsearch/Elasticsearch.md)
+* [Google BigQuery](./BigQuery.md)
+* [Google Cloud Bigtable](./google-bigtable.md)
+* [Google Cloud MySQL](./MySQL/google-cloud-sql-mysql.md)
+* [Google Cloud PostgreSQL](./PostgreSQL/google-cloud-sql-postgres.md)
+* [Google Cloud Pub/Sub](./google-pubsub.md)
+* [Google Cloud SQL Server](./SQLServer/google-cloud-sql-sqlserver.md)
+* [Google Sheets](./Google-sheets.md)
+* [Google Spanner](./google-spanner.md)
+* [HTTP Webhook](./http-webhook.md)
+* [HubSpot](./hubspot.md)
+* [Imply Polaris (Dekaf)](./Dekaf/imply-polaris.md)
+* [Materialize (Dekaf)](./Dekaf/materialize.md)
+* [MongoDB](./mongodb.md)
+* [MotherDuck](./motherduck.md)
+* [MySQL](./MySQL/)
+* [MySQL Heatwave](./mysql-heatwave.md)
+* [OpenSearch](./Elasticsearch/opensearch.md)
+* [Pinecone](./pinecone.md)
+* [PostgreSQL](./PostgreSQL/)
+* [SingleStore](./MySQL/singlestore-mysql.md)
+* [SingleStore (Dekaf)](./Dekaf/singlestore.md)
+* [Slack](./slack.md)
+* [Snowflake](./Snowflake.md)
+* [SQLite](./SQLite.md)
+* [SQL Server](./SQLServer/)
+* [Startree (Dekaf)](./Dekaf/startree.md)
+* [Supabase](./PostgreSQL/supabase.md)
+* [TimescaleDB](./timescaledb.md)
+* [Tinybird (Dekaf)](./Dekaf/tinybird.md)
