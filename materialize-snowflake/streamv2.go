@@ -273,7 +273,7 @@ func streamV2Downgrade(cfg *config, deltaUpdates bool) bool {
 // them.
 func streamV2CannotDrainPendingBlobs(table string, blobs int, cause error) error {
 	var err = fmt.Errorf(
-		"this binding is moving onto the snowpipe_streaming_v2 write path while the task's checkpoint still records %d Snowpipe Streaming blob(s) that the snowpipe_streaming write path staged into %s and did not finish. Those blobs are the only record of documents which Snowflake does not hold yet, and only the snowpipe_streaming path can finish them. Restore that path for one transaction, which finishes them, before you move the binding onto snowpipe_streaming_v2, or backfill the binding, which discards them and materializes those documents again",
+		"this binding is moving onto the snowpipe_streaming_v2 write path while the task's checkpoint still records %d Snowpipe Streaming blob(s) that the snowpipe_streaming write path staged into %s and did not finish, and only the snowpipe_streaming path can finish them. Restore that path for one transaction before you move the binding onto snowpipe_streaming_v2, or backfill the binding, which discards them and materializes those documents again",
 		blobs, table,
 	)
 	if cause != nil {
@@ -347,19 +347,13 @@ func streamV2ListChannels(ctx context.Context, db *stdsql.DB, dialect sql.Dialec
 	return slices.Compact(names), nil
 }
 
-// streamV2Channel is one channel of a binding: the key range of the key-hash space it
+// streamV2Channel is one channel of a binding: the key range it
 // covers, the document counter it advances, and the batch it is building.
-//
-// A shard holds several channels per binding. In steady state they are the shard's
-// target layout — its key range cut into streamV2ChannelsPerShard equal key ranges —
-// and after a topology change they are the channels inherited from the shards this
-// one replaced, until a rebalance converges them.
 type streamV2Channel struct {
 	name string
-	// r is the key range of the key-hash space this channel covers. Documents route
-	// here when their packed-key hash falls inside it. The key range is embedded in
-	// the channel's name and in every offset token it appends under.
-	r streamV2Range
+	// keyRange is the key range this channel covers. The key range is embedded in
+	// the channel's name and in every offset token it appends with.
+	keyRange streamV2Range
 
 	// counter is the index of the last document counted for this channel. It starts
 	// at the checkpointed Counter at open, and it advances by one for each document
@@ -383,18 +377,12 @@ type streamV2Channel struct {
 	// a counter.
 	committed int64
 
-	// buf is the payload of the batch under construction: the framed JSON array that
-	// the append carries. bufferRow writes it row by row as Store stores each document.
-	// This way bufferRow assembles the bytes of a batch once, and not once per row and
-	// again per batch. bufRows counts the rows it holds, and bufFirst is the index of
-	// the first row.
+	// buf is the payload of the batch under construction
 	buf      []byte
 	bufRows  int
 	bufFirst int64
 	// bufHint is the size of the batch handed off before this one, and it sizes the next
-	// buffer. The manager cannot reuse the buffer itself. Ownership passes to the
-	// append. That append still writes the buffer to the sidecar while bufferRow builds
-	// the next batch.
+	// buffer.
 	bufHint int
 
 	// pipe carries one append at a time. Store can buffer more rows while a batch is on
@@ -402,23 +390,19 @@ type streamV2Channel struct {
 	pipe appendPipe
 
 	// limiter meters the uncompressed bytes this channel hands to Snowflake. One limiter
-	// per channel, because Snowflake meters each channel independently. This is why
-	// several channels per shard raise the shard's ceiling: four channels are four
-	// independently metered pipes, and the shard may legitimately drive all of them.
+	// per channel, because Snowflake meters each channel independently.
 	limiter *rate.Limiter
 }
 
 // offsetToken renders the offset token for a document index on this channel.
 func (c *streamV2Channel) offsetToken(counter int64) string {
-	return streamV2Token(counter, c.r)
+	return streamV2Token(counter, c.keyRange)
 }
 
 type streamV2Binding struct {
 	database string
 	schema   string
 	table    string
-	// stateKey is the state key of the binding that this shard materializes. The
-	// table it appends to must record the same state key.
 	stateKey string
 	// columns holds the row-object prefix of each Snowflake column, in the same order
 	// as the output of Table.ConvertAll. The append writes row objects by name, and the
@@ -443,8 +427,8 @@ type streamV2Binding struct {
 	// every epoch the binding has used, so the target names collide with nothing.
 	targetEpoch int
 
-	// channels is the active layout: the channels rows route to, sorted by key range
-	// begin. The layout always covers the shard's key range with no gaps or
+	// channels is the active layout: the channels rows route to, sorted by
+	// keyRangeBegin. The layout always covers the shard's key range with no gaps or
 	// overlaps, so every document the runtime delivers routes to exactly one of them.
 	channels []*streamV2Channel
 	// targets is the shard's target layout: its key range cut into
@@ -452,8 +436,7 @@ type streamV2Binding struct {
 	targets []streamV2Range
 	// declared reports that the last flush wrote the target layout's items into the
 	// checkpoint. Acknowledge runs after the runtime made that checkpoint durable,
-	// which is what makes the switch it performs crash-safe: a shard that dies after
-	// the switch restarts to a checkpoint that names the channels it was converging to.
+	// which is what makes the switch it performs crash-safe.
 	declared bool
 }
 
@@ -463,7 +446,7 @@ func (b *streamV2Binding) isTargetLayout() bool {
 		return false
 	}
 	for i, c := range b.channels {
-		if c.r != b.targets[i] {
+		if c.keyRange != b.targets[i] {
 			return false
 		}
 	}
@@ -473,7 +456,7 @@ func (b *streamV2Binding) isTargetLayout() bool {
 // route reports the active channel that covers a key hash, or nil when none does.
 func (b *streamV2Binding) route(hash uint32) *streamV2Channel {
 	for _, c := range b.channels {
-		if c.r.contains(hash) {
+		if c.keyRange.contains(hash) {
 			return c
 		}
 	}
@@ -618,7 +601,7 @@ func (m *streamV2Manager) addBinding(database, schema, table string, target sql.
 func newStreamV2Channel(name string, r streamV2Range, counter, skip int64) *streamV2Channel {
 	return &streamV2Channel{
 		name:      name,
-		r:         r,
+		keyRange:  r,
 		counter:   counter,
 		recorded:  counter,
 		skip:      skip,
@@ -843,7 +826,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 	for _, c := range candidates {
 		var overlapsLive = false
 		for _, live := range append(liveNonTarget, liveTarget...) {
-			if c.r.keyBegin <= live.r.keyEnd && live.r.keyBegin <= c.r.keyEnd {
+			if c.keyRange.keyBegin <= live.keyRange.keyEnd && live.keyRange.keyBegin <= c.keyRange.keyEnd {
 				overlapsLive = true
 				break
 			}
@@ -852,7 +835,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 			liveNonTarget = append(liveNonTarget, c)
 			continue
 		}
-		b.abandoned = append(b.abandoned, c.r.key())
+		b.abandoned = append(b.abandoned, c.keyRange.key())
 		log.WithFields(log.Fields{
 			"table":   b.table,
 			"channel": c.name,
@@ -873,7 +856,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 		}
 		if idle {
 			for _, c := range liveNonTarget {
-				b.abandoned = append(b.abandoned, c.r.key())
+				b.abandoned = append(b.abandoned, c.keyRange.key())
 			}
 			liveNonTarget = nil
 		}
@@ -890,7 +873,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 		for _, r := range targets {
 			var have *streamV2Channel
 			for _, c := range liveTarget {
-				if c.r == r {
+				if c.keyRange == r {
 					have = c
 					break
 				}
@@ -925,7 +908,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 	}
 
 	slices.SortFunc(active, func(a, b *streamV2Channel) int {
-		return cmp.Compare(a.r.keyBegin, b.r.keyBegin)
+		return cmp.Compare(a.keyRange.keyBegin, b.keyRange.keyBegin)
 	})
 
 	// The layout must cover the shard's range with no gaps or overlaps, or some
@@ -934,12 +917,12 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 	// reaching here means the checkpoint and the shard ranges disagree about history.
 	var ranges = make([]streamV2Range, len(active))
 	for i, c := range active {
-		ranges[i] = c.r
+		ranges[i] = c.keyRange
 	}
 	if !streamV2LayoutCovers(ranges, shard) {
 		var described = make([]string, len(active))
 		for i, c := range active {
-			described[i] = c.r.String()
+			described[i] = c.keyRange.String()
 		}
 		return fmt.Errorf(
 			"the channels this task's checkpoint records for this binding cover %s, which does not cover this shard's range %s with no gaps or overlaps: the checkpoint and the shard topology disagree about the ranges that have been appended under. Restore the task's shard key ranges to the topology which appended them, or backfill this binding",
@@ -951,7 +934,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 
 	var layout = make(log.Fields, len(active))
 	for _, c := range active {
-		layout[c.r.String()] = fmt.Sprintf("counter %d skip %d", c.counter, c.skip)
+		layout[c.keyRange.String()] = fmt.Sprintf("counter %d skip %d", c.counter, c.skip)
 	}
 	log.WithFields(log.Fields{
 		"table":      b.table,
@@ -1486,11 +1469,11 @@ func (m *streamV2Manager) flush(ctx context.Context) (map[int]map[string]*stream
 		var items = make(map[string]*streamV2Item)
 		for _, c := range b.channels {
 			c.recorded = c.counter
-			items[c.r.key()] = &streamV2Item{
+			items[c.keyRange.key()] = &streamV2Item{
 				Channel:  c.name,
 				Counter:  c.counter,
-				KeyBegin: c.r.keyBegin,
-				KeyEnd:   c.r.keyEnd,
+				KeyBegin: c.keyRange.keyBegin,
+				KeyEnd:   c.keyRange.keyEnd,
 			}
 			if c.counter > c.committed {
 				waits = append(waits, commitWait{b: b, c: c, counter: c.counter})
@@ -1589,15 +1572,15 @@ func (m *streamV2Manager) acknowledged(ctx context.Context) error {
 
 		var next []*streamV2Channel
 		for _, c := range b.channels {
-			if slices.Contains(b.targets, c.r) {
+			if slices.Contains(b.targets, c.keyRange) {
 				next = append(next, c)
 				continue
 			}
-			b.abandoned = append(b.abandoned, c.r.key())
+			b.abandoned = append(b.abandoned, c.keyRange.key())
 		}
 
 		for _, r := range b.targets {
-			if slices.ContainsFunc(next, func(c *streamV2Channel) bool { return c.r == r }) {
+			if slices.ContainsFunc(next, func(c *streamV2Channel) bool { return c.keyRange == r }) {
 				continue
 			}
 			var name = streamV2ChannelName(m.materialization, b.targetEpoch, r, b.stateKey)
@@ -1621,7 +1604,7 @@ func (m *streamV2Manager) acknowledged(ctx context.Context) error {
 		}
 
 		slices.SortFunc(next, func(a, b *streamV2Channel) int {
-			return cmp.Compare(a.r.keyBegin, b.r.keyBegin)
+			return cmp.Compare(a.keyRange.keyBegin, b.keyRange.keyBegin)
 		})
 		b.channels = next
 

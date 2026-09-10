@@ -444,12 +444,12 @@ func TestStreamV2Manager(t *testing.T) {
 		var inherited, inheritedKeys []string
 		for _, c := range low.bindings[0].channels {
 			inherited = append(inherited, c.name)
-			inheritedKeys = append(inheritedKeys, c.r.key())
+			inheritedKeys = append(inheritedKeys, c.keyRange.key())
 		}
 		require.NoError(t, low.acknowledged(ctx))
 		require.Len(t, low.bindings[0].channels, 4)
 		for i, c := range low.bindings[0].channels {
-			require.Equal(t, lowTargets[i], c.r)
+			require.Equal(t, lowTargets[i], c.keyRange)
 			require.Zero(t, c.counter)
 		}
 
@@ -606,7 +606,7 @@ func TestStreamV2Manager(t *testing.T) {
 		storeKeys(t, parent, extra)
 		require.Len(t, parent.bindings[0].channels, 8, "the parent inherits both children's channels")
 		for _, c := range parent.bindings[0].channels {
-			if c.r == lowTargets[0] {
+			if c.keyRange == lowTargets[0] {
 				require.Equal(t, int64(4), c.skip)
 			} else {
 				require.Equal(t, int64(2), c.skip)
@@ -622,7 +622,7 @@ func TestStreamV2Manager(t *testing.T) {
 
 		var inheritedKeys []string
 		for _, c := range parent.bindings[0].channels {
-			inheritedKeys = append(inheritedKeys, c.r.key())
+			inheritedKeys = append(inheritedKeys, c.keyRange.key())
 		}
 		require.NoError(t, parent.acknowledged(ctx))
 		require.Len(t, parent.bindings[0].channels, 4)

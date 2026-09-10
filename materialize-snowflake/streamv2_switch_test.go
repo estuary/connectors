@@ -524,7 +524,7 @@ func TestStreamV2WritePathSwitch(t *testing.T) {
 
 		entries, err := m.flush(ctx)
 		require.NoError(t, err)
-		require.Equal(t, int64(2), entries[0][c.r.key()].Counter)
+		require.Equal(t, int64(2), entries[0][c.keyRange.key()].Counter)
 		require.Equal(t, 5, countRows())
 	})
 
