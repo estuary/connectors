@@ -24,9 +24,6 @@ All Estuary connectors capture data in real time, as it appears in the source sy
 - Airtable
   - [Configuration](./airtable-native.md)
   - Package - ghcr.io/estuary/source-airtable-native:v1
-- Airtable (deprecated)
-  - [Configuration](./airtable.md)
-  - Package - ghcr.io/estuary/source-airtable:v1
 - AlloyDB
   - [Configuration](./alloydb.md)
   - Package - ghcr.io/estuary/source-alloydb:v3
@@ -51,6 +48,9 @@ All Estuary connectors capture data in real time, as it appears in the source sy
 - Amazon S3
   - [Configuration](./amazon-s3.md)
   - Package — ghcr.io/estuary/source-s3:v2
+- Amazon SQS
+  - [Configuration](./amazon-sqs-native.md)
+  - Package - ghcr.io/estuary/source-sqs:v1
 - Apache Kafka
   - [Configuration](./apache-kafka.md)
   - Package — ghcr.io/estuary/source-kafka:v1
@@ -186,15 +186,9 @@ All Estuary connectors capture data in real time, as it appears in the source sy
 - Iterable
   - [Configuration](./iterable-native.md)
   - Package - ghcr.io/estuary/source-iterable-native:v1
-- Iterable (deprecated)
-  - [Configuration](./iterable.md)
-  - Package - ghcr.io/estuary/source-iterable:v2
 - Iterate
   - [Configuration](./iterate.md)
   - Package - ghcr.io/estuary/source-iterate:v1
-- Jira (legacy)
-  - [Configuration](./jira-legacy.md)
-  - Package - ghcr.io/estuary/source-jira-legacy:v2
 - Jira
   - [Configuration](./jira-native.md)
   - Package - ghcr.io/estuary/source-jira-native:v3
@@ -282,9 +276,6 @@ All Estuary connectors capture data in real time, as it appears in the source sy
 - Salesforce
   - [Configuration](./Salesforce/salesforce-native.md)
   - Package - ghcr.io/estuary/source-salesforce-native:v1
-- Salesforce - Real-time data (deprecated)
-  - [Configuration](./Salesforce/)
-  - Package - ghcr.io/estuary/source-salesforce-next:v1
 - Sentry
   - [Configuration](./sentry.md)
   - Package - ghcr.io/estuary/source-sentry:v2
@@ -297,9 +288,6 @@ All Estuary connectors capture data in real time, as it appears in the source sy
 - Shopify
   - [Configuration](./shopify-native.md)
   - Package - ghcr.io/estuary/source-shopify-native:v2
-- Shopify (deprecated)
-  - [Configuration](./shopify.md)
-  - Package - ghcr.io/estuary/source-shopify:v1
 - Smartsheet
   - [Configuration](./smartsheet.md)
   - Package - ghcr.io/estuary/source-smartsheet:v1
@@ -309,9 +297,6 @@ All Estuary connectors capture data in real time, as it appears in the source sy
 - Stripe Real-time
   - [Configuration](./stripe-realtime.md)
   - Package - ghcr.io/estuary/source-stripe-native:v1
-- Stripe (deprecated)
-  - [Configuration](./stripe.md)
-  - Package - ghcr.io/estuary/source-stripe:v3
 - Twilio
   - [Configuration](./twilio.md)
   - Package - ghcr.io/estuary/source-twilio:v2
@@ -321,9 +306,6 @@ All Estuary connectors capture data in real time, as it appears in the source sy
 - Zendesk Chat
   - [Configuration](./zendesk-chat.md)
   - Package - ghcr.io/estuary/source-zendesk-chat:v1
-- Zendesk Support (deprecated)
-  - [Configuration](./zendesk-support.md)
-  - Package - ghcr.io/estuary/source-zendesk-support:v2
 - Zendesk Support Real-Time
   - [Configuration](./zendesk-support-native.md)
   - Package - ghcr.io/estuary/source-zendesk-support-native:v1
@@ -348,12 +330,6 @@ Typically, we enable SaaS connectors from third parties to allow more diverse da
 - Amazon Ads
   - [Configuration](./amazon-ads.md)
   - Package - ghcr.io/estuary/source-amazon-ads:v2
-- Amazon SQS
-  - [Configuration](./amazon-sqs-native.md)
-  - Package - ghcr.io/estuary/source-sqs:v1
-- Amazon SQS (deprecated)
-  - [Configuration](./amazon-sqs.md)
-  - Package - ghcr.io/estuary/source-amazon-sqs:v1
 - Amplitude
   - [Configuration](./amplitude.md)
   - Package - ghcr.io/estuary/source-amplitude:v2
@@ -363,9 +339,6 @@ Typically, we enable SaaS connectors from third parties to allow more diverse da
 - Braze
   - [Configuration](./braze.md)
   - Package - ghcr.io/estuary/source-braze:v1
-- Chargebee (deprecated)
-  - [Configuration](./chargebee.md)
-  - Package - ghcr.io/estuary/source-chargebee:v1
 - Confluence
   - [Configuration](./confluence.md)
   - Package - ghcr.io/estuary/source-confluence:v1
@@ -387,30 +360,15 @@ Typically, we enable SaaS connectors from third parties to allow more diverse da
 - Google Search Console
   - [Configuration](./google-search-console.md)
   - Package - ghcr.io/estuary/source-google-search-console:v2
-- Greenhouse (deprecated)
-  - [Configuration](./greenhouse.md)
-  - Package - ghcr.io/estuary/source-greenhouse:v1
 - Harvest
   - [Configuration](./harvest.md)
   - Package - ghcr.io/estuary/source-harvest:v1
 - Instagram
   - [Configuration](./instagram.md)
   - Package - ghcr.io/estuary/source-instagram:v1
-- Intercom (deprecated)
-  - [Configuration](./intercom.md)
-  - Package - ghcr.io/estuary/source-intercom:v1
-- Jira (deprecated)
-  - [Configuration](./jira.md)
-  - Package - ghcr.io/estuary/source-jira:v1
-- Klaviyo (deprecated)
-  - [Configuration](./klaviyo.md)
-  - Package - ghcr.io/estuary/source-klaviyo:v1
 - LinkedIn Ads
   - [Configuration](./linkedin-ads.md)
   - Package - ghcr.io/estuary/source-linkedin-ads:v2
-- Mailchimp (deprecated)
-  - [Configuration](./mailchimp.md)
-  - Package - ghcr.io/estuary/source-mailchimp:v3
 - Marketo
   - [Configuration](./marketo.md)
   - Package - ghcr.io/estuary/source-marketo:v1
@@ -429,9 +387,6 @@ Typically, we enable SaaS connectors from third parties to allow more diverse da
 - Recharge
   - [Configuration](./recharge.md)
   - Package - ghcr.io/estuary/source-recharge:v1
-- Salesforce - Historical data (deprecated)
-  - [Configuration](./Salesforce/)
-  - Package - ghcr.io/estuary/source-salesforce:v1
 - SendGrid
   - [Configuration](./sendgrid.md)
   - Package - ghcr.io/estuary/source-sendgrid:v1
