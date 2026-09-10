@@ -155,15 +155,17 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 	return &pm.Response_Applied{}, nil
 }
 
-func (driver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
+func (driver) NewTransactor(ctx context.Context, open pm.Request_Open, be *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
 	var cfg config
 	if err := pf.UnmarshalStrict(open.Materialization.ConfigJson, &cfg); err != nil {
 		return nil, nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
 	var addresses []*url.URL
+	var paths [][]string
 
 	for _, binding := range open.Materialization.Bindings {
+		paths = append(paths, binding.ResourcePath)
 		// Join paths of each binding with the base URL.
 		var res resource
 		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
@@ -174,18 +176,24 @@ func (driver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *m.Bind
 
 	var transactor = &transactor{
 		addresses:     addresses,
+		paths:         paths,
 		customHeaders: cfg.Headers.CustomHeaders,
+		be:            be,
 	}
 	return transactor, &pm.Response_Opened{}, nil, nil
 }
 
 type transactor struct {
 	addresses     []*url.URL
+	paths         [][]string // Resource path of each binding, parallel to addresses.
 	customHeaders []customHeader
+	be            *m.BindingEvents
 }
 
-func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
-func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) { return nil, nil }
+func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
+	return nil, nil
+}
 
 // Load should not be called and panics.
 func (d *transactor) Load(it *m.LoadIterator, _ func(int, json.RawMessage) error) error {
@@ -240,6 +248,11 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var body bytes.Buffer
 	ctx := it.Context()
 
+	// sent counts the documents of each binding whose request succeeded, for
+	// the transaction health report; inBody is those in the pending request.
+	sent := make([]int64, len(d.addresses))
+	var inBody int64
+
 	previousBinding := -1
 	for it.Next(false) {
 		if previousBinding == -1 {
@@ -252,6 +265,8 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			if err := d.sendWebhook(ctx, d.addresses[previousBinding].String(), body); err != nil {
 				return nil, fmt.Errorf("draining previous binding: %w", err)
 			}
+			sent[previousBinding] += inBody
+			inBody = 0
 
 			body.Reset()
 			previousBinding = it.Binding
@@ -266,6 +281,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		if _, err := body.Write(it.RawJSON); err != nil {
 			return nil, err
 		}
+		inBody++
 	}
 
 	if body.Len() > 0 {
@@ -273,9 +289,15 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		if err := d.sendWebhook(ctx, d.addresses[previousBinding].String(), body); err != nil {
 			return nil, fmt.Errorf("draining previous binding: %w", err)
 		}
+		sent[previousBinding] += inBody
 		body.Reset()
 	}
 
+	for i, n := range sent {
+		if n > 0 {
+			d.be.ReportRowStats(it.Round, d.paths[i], m.TotalRowStats(n))
+		}
+	}
 	return nil, nil
 }
 
