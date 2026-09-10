@@ -466,6 +466,51 @@ func TestHealthMismatchFastPath(t *testing.T) {
 	require.Equal(t, 3, lines[3].FirstRound)
 }
 
+// TestHealthMismatchRollup is that a systematic discrepancy costs one line per
+// flush interval: the first mismatching round is logged at once, and the ones
+// that follow within the interval roll up into a single mismatch line whose
+// entries sum expected and actual per check and binding.
+func TestHealthMismatchRollup(t *testing.T) {
+	tr := &scriptedTransactor{
+		bindings: twoBindings,
+		report: func(round, binding int, stored int64) *RowStats {
+			// Every round appends instead of updating.
+			s := ExactRowStats(stored, 0, 0)
+			return &s
+		},
+	}
+	var txns []txn
+	for _, k := range []string{"a", "b", "c", "d"} {
+		txns = append(txns, txn{stores: []pm.Request{
+			storeReq(0, k, true, false),
+			storeReq(1, k, true, false),
+		}})
+	}
+	lines := runHealthScenario(t, tr, openRequest(twoBindings, nil), txns, nil, nil)
+	require.Len(t, lines, 2)
+
+	first := lines[0]
+	require.Equal(t, "mismatch", first.Verdict)
+	require.Equal(t, 1, first.Rounds)
+	require.Equal(t, 0, first.FirstRound)
+	require.Len(t, first.Mismatches, 4)
+
+	rest := lines[1]
+	require.Equal(t, "mismatch", rest.Verdict)
+	require.Equal(t, 3, rest.Rounds)
+	require.Equal(t, 1, rest.FirstRound)
+	require.Equal(t, 3, rest.LastRound)
+	require.Equal(t, 2, rest.Bindings)
+	require.Equal(t, int64(6), rest.Expected.Update)
+	require.Equal(t, int64(6), rest.Actual.Inserted)
+	require.Equal(t, []healthMismatch{
+		{Check: "insert", ResourcePath: []string{"schema", "alpha"}, Expected: 0, Actual: 3},
+		{Check: "update", ResourcePath: []string{"schema", "alpha"}, Expected: 3, Actual: 0},
+		{Check: "insert", ResourcePath: []string{"schema", "beta"}, Expected: 0, Actual: 3},
+		{Check: "update", ResourcePath: []string{"schema", "beta"}, Expected: 3, Actual: 0},
+	}, rest.Mismatches)
+}
+
 func TestHealthChecks(t *testing.T) {
 	stores := []pm.Request{
 		storeReq(0, "a", false, false),

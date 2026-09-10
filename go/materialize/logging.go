@@ -474,9 +474,11 @@ func (l *BindingEvents) FinishedResourceCommit(path []string) {
 // ReportRowStats reports what the destination did for one binding's stores of
 // a round (StoreIterator.Round), for the "transaction health" line; see
 // docs/materialize/README.md. Goroutine-safe, sums repeated reports, never
-// fails or blocks, and is active regardless of extended logging.
+// fails or blocks, and is active regardless of extended logging. Safe on a
+// nil receiver, so transactors built without events (tests, RunApply's
+// pending-state drain) can report unconditionally.
 func (l *BindingEvents) ReportRowStats(round int, path []string, stats RowStats) {
-	if l.health != nil {
+	if l != nil && l.health != nil {
 		l.health.report(round, path, stats)
 	}
 }
