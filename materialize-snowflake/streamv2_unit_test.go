@@ -156,7 +156,7 @@ func TestStreamV2RejectedRows(t *testing.T) {
 // TestStreamV2DropChannel covers, without credentials, what the live test
 // establishes against Snowflake: a channel name outlives the shard it was named
 // for, and only dropping the channel stops the next shard to derive that name
-// from adopting its committed offset token as a skip threshold.
+// from adopting its committed offset token as its own.
 func TestStreamV2DropChannel(t *testing.T) {
 	var ctx = context.Background()
 	singleChannelLayout(t)
@@ -203,7 +203,7 @@ func TestStreamV2DropChannel(t *testing.T) {
 	var reused = newSession(t)
 	require.NoError(t, testWriteRow(ctx, reused, 0, []any{"k", 0}))
 	require.Equal(t, channel, reused.bindings[0].channels[0].name)
-	require.Equal(t, int64(3), reused.bindings[0].channels[0].skip)
+	require.Equal(t, int64(3), reused.bindings[0].channels[0].committed)
 	reused.stop()
 
 	// Dropping it is what makes the name reusable. The dropping session opens
@@ -229,7 +229,7 @@ func TestStreamV2DropChannel(t *testing.T) {
 	var after = newSession(t)
 	require.NoError(t, testWriteRow(ctx, after, 0, []any{"k", 0}))
 	require.Equal(t, channel, after.bindings[0].channels[0].name)
-	require.Zero(t, after.bindings[0].channels[0].skip)
+	require.Zero(t, after.bindings[0].channels[0].committed)
 
 	entries, err = after.flush(ctx)
 	require.NoError(t, err)
@@ -373,12 +373,12 @@ func TestReconcileStreamV2Channel(t *testing.T) {
 	}
 
 	for _, tt := range []struct {
-		name       string
-		committed  *string
-		item       *streamV2Item
-		priorItems int
-		wantSkip   int64
-		wantErr    string
+		name          string
+		committed     *string
+		item          *streamV2Item
+		priorItems    int
+		wantCommitted int64
+		wantErr       string
 	}{
 		{
 			name:      "nothing committed and nothing checkpointed",
@@ -399,30 +399,30 @@ func TestReconcileStreamV2Channel(t *testing.T) {
 			wantErr:    "has committed nothing while this task's checkpoint records",
 		},
 		{
-			name:       "clean boundary",
-			committed:  token("42@10000000-1fffffff"),
-			item:       item(42),
-			priorItems: 1,
-			wantSkip:   42,
+			name:          "clean boundary",
+			committed:     token("42@10000000-1fffffff"),
+			item:          item(42),
+			priorItems:    1,
+			wantCommitted: 42,
 		},
 		{
 			// An interrupted attempt of the transaction now replayed. The channel's
 			// contents are a function of the data, so the replay routes the same
 			// documents here and skips them by position.
-			name:       "committed ahead of the checkpoint is skipped",
-			committed:  token("50@10000000-1fffffff"),
-			item:       item(42),
-			priorItems: 1,
-			wantSkip:   50,
+			name:          "committed ahead of the checkpoint is skipped",
+			committed:     token("50@10000000-1fffffff"),
+			item:          item(42),
+			priorItems:    1,
+			wantCommitted: 50,
 		},
 		{
 			// An interruption before this channel's first checkpoint, with the
 			// checkpoint holding nothing for the binding at all: the token is this
 			// channel's own interrupted first transaction, and the documents it
 			// counts are the ones about to be replayed.
-			name:      "committed ahead with an empty checkpoint is skipped",
-			committed: token("50@10000000-1fffffff"),
-			wantSkip:  50,
+			name:          "committed ahead with an empty checkpoint is skipped",
+			committed:     token("50@10000000-1fffffff"),
+			wantCommitted: 50,
 		},
 		{
 			// The binding holds state, so its channels' items are maintained by
@@ -482,13 +482,13 @@ func TestReconcileStreamV2Channel(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			skip, err := reconcileStreamV2Channel("chan", "WIDGETS", tt.committed, tt.item, r, tt.priorItems)
+			committed, err := reconcileStreamV2Channel("chan", "WIDGETS", tt.committed, tt.item, r, tt.priorItems)
 			if tt.wantErr != "" {
 				require.ErrorContains(t, err, tt.wantErr)
 				return
 			}
 			require.NoError(t, err)
-			require.Equal(t, tt.wantSkip, skip)
+			require.Equal(t, tt.wantCommitted, committed)
 		})
 	}
 }

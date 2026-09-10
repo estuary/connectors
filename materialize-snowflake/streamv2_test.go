@@ -110,7 +110,7 @@ func TestStreamV2Manager(t *testing.T) {
 
 	var fullRange = &pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32}
 
-	// These subtests follow a single channel's counter, skip threshold, and token
+	// These subtests follow a single channel's counter, committed index, and token
 	// against live Snowflake; the multi-channel routing and the split/join
 	// inheritance have fake-sidecar suites of their own.
 	singleChannelLayout(t)
@@ -352,7 +352,7 @@ func TestStreamV2Manager(t *testing.T) {
 
 		writeRows(m2, 0, 5)
 		var c2 = m2.bindings[0].channels[0]
-		require.Equal(t, int64(4), c2.skip)
+		require.Equal(t, int64(4), c2.committed)
 		entries, err := m2.flush(ctx)
 		require.NoError(t, err)
 		require.Equal(t, int64(5), soleItem(t, entries, 0).Counter)
@@ -372,7 +372,7 @@ func TestStreamV2Manager(t *testing.T) {
 		m3.addBinding(cfg.Database, cfg.Schema, tableName, tgt, priorOf(checkpointed))
 
 		writeRows(m3, 5, 8)
-		require.Equal(t, int64(7), m3.bindings[0].channels[0].skip)
+		require.Equal(t, int64(7), m3.bindings[0].channels[0].committed)
 		entries, err = m3.flush(ctx)
 		require.NoError(t, err)
 		require.Equal(t, int64(8), soleItem(t, entries, 0).Counter)
@@ -525,8 +525,8 @@ func TestStreamV2Manager(t *testing.T) {
 			m.addBinding(cfg.Database, cfg.Schema, tableName, tgt, parentEntries[0])
 			storeKeys(t, m, keysWithin(replay, child.cover))
 			for _, c := range m.bindings[0].channels {
-				require.Equal(t, int64(4), c.skip)
-				require.Equal(t, c.skip, c.counter, "the replay must land exactly at the committed token")
+				require.Equal(t, int64(4), c.committed)
+				require.Equal(t, c.committed, c.counter, "the replay must land exactly at the committed token")
 			}
 			entries, err := m.flush(ctx)
 			require.NoError(t, err)
@@ -607,11 +607,11 @@ func TestStreamV2Manager(t *testing.T) {
 		require.Len(t, parent.bindings[0].channels, 8, "the parent inherits both children's channels")
 		for _, c := range parent.bindings[0].channels {
 			if c.keyRange == lowTargets[0] {
-				require.Equal(t, int64(4), c.skip)
+				require.Equal(t, int64(4), c.committed)
 			} else {
-				require.Equal(t, int64(2), c.skip)
+				require.Equal(t, int64(2), c.committed)
 			}
-			require.Equal(t, c.skip, c.counter)
+			require.Equal(t, c.committed, c.counter)
 		}
 
 		storeKeys(t, parent, keysHashingInto(fullShard, "join-new", 4))
@@ -734,14 +734,14 @@ func TestStreamV2Manager(t *testing.T) {
 			// A shard given the dropped channel's key-begin — a scale-down followed by a
 			// scale-up — derives this same channel name, with no checkpoint item of
 			// its own to reconcile against. Nothing of the dropped channel is
-			// adopted as a skip threshold, so its documents are appended in full
+			// adopted as its committed index, so its documents are appended in full
 			// rather than silently dropped as replays.
 			var reused = newManager(fullRange)
 			reused.addBinding(cfg.Database, cfg.Schema, tableName, tgt, nil)
 
 			writeRows(reused, 100, 104)
 			require.Equal(t, channel, reused.bindings[0].channels[0].name)
-			require.Zero(t, reused.bindings[0].channels[0].skip)
+			require.Zero(t, reused.bindings[0].channels[0].committed)
 			entries, err := reused.flush(ctx)
 			require.NoError(t, err)
 			require.Equal(t, int64(4), soleItem(t, entries, 0).Counter)
