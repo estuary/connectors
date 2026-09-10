@@ -119,6 +119,21 @@ func (sm *streamManager) addBinding(ctx context.Context, schema string, table st
 	return nil
 }
 
+// dropChannel drops a channel of a table, unless this manager holds it open.
+// Snowflake holds channel names case-insensitively, so the match ignores case.
+func (sm *streamManager) dropChannel(ctx context.Context, schema, table, name string) error {
+	for _, ts := range sm.tableStreams {
+		if strings.EqualFold(ts.channel.Channel, name) {
+			return nil
+		}
+	}
+	if err := sm.c.dropChannel(ctx, schema, table, name); err != nil {
+		return fmt.Errorf("dropChannel: %w", err)
+	}
+	log.WithFields(log.Fields{"schema": schema, "table": table, "channel": name}).Info("dropped streaming channel")
+	return nil
+}
+
 func (sm *streamManager) writeRow(ctx context.Context, binding int, row []any) error {
 	if sm.lastBinding != -1 && binding != sm.lastBinding {
 		if err := sm.finishBlob(); err != nil {
