@@ -21,3 +21,35 @@ Bauplan exposes a standard Iceberg REST catalog endpoint. When configuring the m
 - **Catalog Authentication**: Select **OAuth 2.0 Client Credentials** and supply the client ID and secret from your Bauplan account
 
 For all other configuration options (EMR Serverless compute, staging bucket, IAM roles, bindings), refer to the [Apache Iceberg connector docs](./apache-iceberg.md).
+
+### Sample
+
+```yaml
+materializations:
+  ${PREFIX}/${mat_name}:
+    endpoint:
+      connector:
+        image: ghcr.io/estuary/materialize-bauplan:v1
+        config:
+          url: https://api.use1.aprod.bauplanlabs.com/iceberg
+          warehouse: default
+          namespace: <namespace>
+          base_location: s3://<bucket>/iceberg
+          credentials:
+            auth_type: OAuth 2.0 Client Credentials
+            oauth2_server_uri: v1/oauth/tokens
+            credential: <client-id>:<client-secret>
+          compute:
+            region: us-east-1
+            application_id: <emr-app-id>
+            execution_role_arn: <emr-arn>
+            bucket: <bucket>
+            credentials:
+              auth_type: AWSAccessKey
+              aws_access_key_id: <aws-access-key-id>
+              aws_secret_access_key: <aws-secret-access-key>
+    bindings:
+      - resource:
+          table: ${COLLECTION_NAME}
+        source: ${PREFIX}/${COLLECTION_NAME}
+```
