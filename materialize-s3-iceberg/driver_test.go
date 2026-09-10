@@ -145,20 +145,17 @@ func TestIntegration(t *testing.T) {
 
 	t.Run("materialize", func(t *testing.T) {
 		boilerplate.RunMaterializationTest(t, NewMaterializer, "testdata/materialize.flow.yaml", makeResourceFn, materializeSanitizers(),
-			// Raise to m.FidelityTotal once this known-red job is repaired.
-			boilerplate.RuntimeConfig{Shards: 1, Fidelity: m.FidelityNone})
+			boilerplate.RuntimeConfig{Shards: 1, Fidelity: m.FidelityTotal})
 	})
 
 	t.Run("materialize-ns", func(t *testing.T) {
 		boilerplate.RunMaterializationTest(t, NewMaterializer, "testdata/materialize-ns.flow.yaml", makeResourceFn, materializeSanitizers(),
-			// Raise to m.FidelityTotal once this known-red job is repaired.
-			boilerplate.RuntimeConfig{Shards: 1, Fidelity: m.FidelityNone})
+			boilerplate.RuntimeConfig{Shards: 1, Fidelity: m.FidelityTotal})
 	})
 
 	t.Run("materialize-variant", func(t *testing.T) {
 		boilerplate.RunMaterializationTest(t, NewMaterializer, "testdata/materialize-variant.flow.yaml", makeResourceFn, materializeSanitizers(),
-			// Raise to m.FidelityTotal once this known-red job is repaired.
-			boilerplate.RuntimeConfig{Shards: 1, Fidelity: m.FidelityNone})
+			boilerplate.RuntimeConfig{Shards: 1, Fidelity: m.FidelityTotal})
 	})
 
 	t.Run("apply", func(t *testing.T) {
@@ -332,20 +329,17 @@ func TestIntegrationGlue(t *testing.T) {
 
 	t.Run("materialize", func(t *testing.T) {
 		boilerplate.RunMaterializationTest(t, NewMaterializer, "testdata/materialize-glue.flow.yaml", makeResourceFn, materializeSanitizers(),
-			// Raise to m.FidelityTotal once this known-red job is repaired.
-			boilerplate.RuntimeConfig{Shards: 1, Fidelity: m.FidelityNone})
+			boilerplate.RuntimeConfig{Shards: 1, Fidelity: m.FidelityTotal})
 	})
 
 	t.Run("materialize-ns", func(t *testing.T) {
 		boilerplate.RunMaterializationTest(t, NewMaterializer, "testdata/materialize-glue-ns.flow.yaml", makeResourceFn, materializeSanitizers(),
-			// Raise to m.FidelityTotal once this known-red job is repaired.
-			boilerplate.RuntimeConfig{Shards: 1, Fidelity: m.FidelityNone})
+			boilerplate.RuntimeConfig{Shards: 1, Fidelity: m.FidelityTotal})
 	})
 
 	t.Run("materialize-variant", func(t *testing.T) {
 		boilerplate.RunMaterializationTest(t, NewMaterializer, "testdata/materialize-glue-variant.flow.yaml", makeResourceFn, materializeSanitizers(),
-			// Raise to m.FidelityTotal once this known-red job is repaired.
-			boilerplate.RuntimeConfig{Shards: 1, Fidelity: m.FidelityNone})
+			boilerplate.RuntimeConfig{Shards: 1, Fidelity: m.FidelityTotal})
 	})
 
 	t.Run("apply", func(t *testing.T) {
