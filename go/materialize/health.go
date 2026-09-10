@@ -264,6 +264,20 @@ func (w *healthWindow) addActual(key string, a RowStats) {
 	w.actual = w.actual.add(a)
 }
 
+// addMismatch records a failed check, summing expected and actual into an
+// entry for the same check and binding so that a rolled-up window stays
+// bounded by bindings times checks rather than growing with rounds.
+func (w *healthWindow) addMismatch(m healthMismatch) {
+	for i, have := range w.mismatches {
+		if have.Check == m.Check && bindingKey(have.ResourcePath) == bindingKey(m.ResourcePath) {
+			w.mismatches[i].Expected += m.Expected
+			w.mismatches[i].Actual += m.Actual
+			return
+		}
+	}
+	w.mismatches = append(w.mismatches, m)
+}
+
 const (
 	verdictOK        = "ok"
 	verdictMismatch  = "mismatch"
@@ -291,10 +305,16 @@ type healthTracker struct {
 	// shardedWindow gathers both sides under a multi-shard range, where
 	// they cannot be paired.
 	shardedWindow *healthWindow
-	// okWindow and uncheckedWindow roll up evaluated rounds by verdict.
-	okWindow, uncheckedWindow *healthWindow
+	// okWindow, uncheckedWindow and mismatchWindow roll up evaluated rounds
+	// by verdict.
+	okWindow, uncheckedWindow, mismatchWindow *healthWindow
 	// lastEmit is when a line was last logged, gating the rollup.
 	lastEmit time.Time
+	// lastMismatchEmit is when a mismatch line was last logged. The first
+	// mismatch after a quiet interval is logged at once; further mismatching
+	// rounds within the interval roll up so that a systematic discrepancy
+	// costs one line per interval rather than one per transaction.
+	lastMismatchEmit time.Time
 	// maxAcked is the highest acknowledged round; a report for a round at or
 	// below it that is no longer open arrived after the round was judged.
 	maxAcked int
@@ -317,6 +337,7 @@ func newHealthTracker(open *pm.Request_Open) *healthTracker {
 		shardedWindow:   newHealthWindow(),
 		okWindow:        newHealthWindow(),
 		uncheckedWindow: newHealthWindow(),
+		mismatchWindow:  newHealthWindow(),
 	}
 	if open.Materialization != nil {
 		h.taskName = open.Materialization.Name.String()
@@ -357,7 +378,7 @@ func (h *healthTracker) maybeFlushWindows() {
 	if !h.intervalElapsed() {
 		return
 	}
-	for _, w := range []*healthWindow{h.okWindow, h.uncheckedWindow, h.shardedWindow} {
+	for _, w := range []*healthWindow{h.okWindow, h.uncheckedWindow, h.mismatchWindow, h.shardedWindow} {
 		if len(w.bindings) > 0 {
 			h.flushWindows()
 			return
@@ -561,7 +582,7 @@ func (h *healthTracker) evaluate(r *healthRound) {
 
 		check := func(name string, expected, actual int64) {
 			if expected != actual {
-				w.mismatches = append(w.mismatches, healthMismatch{
+				w.addMismatch(healthMismatch{
 					Check: name, ResourcePath: path, Expected: expected, Actual: actual,
 				})
 			}
@@ -589,15 +610,18 @@ func (h *healthTracker) evaluate(r *healthRound) {
 	}
 
 	if r.loaded > r.loadRequests {
-		w.mismatches = append(w.mismatches, healthMismatch{
+		w.addMismatch(healthMismatch{
 			Check: "loadResponses", Expected: r.loadRequests, Actual: r.loaded,
 		})
 	}
 
 	switch {
-	case len(w.mismatches) > 0:
+	case len(w.mismatches) > 0 && time.Since(h.lastMismatchEmit) >= healthFlushInterval:
 		h.flushWindows()
 		h.emit(w, verdictMismatch, nil)
+	case len(w.mismatches) > 0:
+		h.mergeWindow(h.mismatchWindow, w)
+		h.maybeFlushWindows()
 	case w.pending > 0 || w.fidelity == FidelityNone:
 		h.mergeWindow(h.uncheckedWindow, w)
 		h.maybeFlushWindows()
@@ -620,6 +644,9 @@ func (h *healthTracker) mergeWindow(into, w *healthWindow) {
 	into.actual = into.actual.add(w.actual)
 	into.pending += w.pending
 	into.fidelity = minFidelity(into.fidelity, w.fidelity)
+	for _, m := range w.mismatches {
+		into.addMismatch(m)
+	}
 }
 
 // flush judges every acknowledged round still awaiting reports as
@@ -655,6 +682,10 @@ func (h *healthTracker) flushWindows() {
 	if h.uncheckedWindow.rounds > 0 {
 		h.emit(h.uncheckedWindow, verdictUnchecked, nil)
 		h.uncheckedWindow = newHealthWindow()
+	}
+	if h.mismatchWindow.rounds > 0 {
+		h.emit(h.mismatchWindow, verdictMismatch, nil)
+		h.mismatchWindow = newHealthWindow()
 	}
 	if w := h.shardedWindow; w.rounds > 0 || len(w.bindings) > 0 {
 		h.emit(w, verdictUnchecked, log.Fields{"sharded": true})
@@ -714,6 +745,9 @@ func (h *healthTracker) emit(w *healthWindow, verdict string, extra log.Fields) 
 
 	if _, recovery := extra["recovery"]; !recovery {
 		h.lastEmit = time.Now()
+	}
+	if verdict == verdictMismatch {
+		h.lastMismatchEmit = h.lastEmit
 	}
 	h.log(fields, "transaction health")
 }

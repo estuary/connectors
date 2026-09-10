@@ -738,9 +738,10 @@ fails the `insert`/`update` checks since it expects only inserts.
 
 - `ok`: every check passed. A round that stored nothing has nothing to check
   and is `ok` at fidelity `none`.
-- `mismatch`: at least one check failed. The round is logged on its own,
-  immediately, with a `mismatches` array of `{check, resourcePath, expected,
-  actual}` entries.
+- `mismatch`: at least one check failed. The line carries a `mismatches`
+  array of `{check, resourcePath, expected, actual}` entries, one per failed
+  check and binding, with `expected` and `actual` summed over the rounds the
+  line covers.
 - `unchecked`: nothing could be compared, because fidelity was `none`, a
   binding that stored documents never reported before the window flushed
   (`pending` counts them), the line is a recovery replay (`recovery: true`),
@@ -754,9 +755,11 @@ minutes. A judged round is logged at once when nothing has been logged for
 that long, so a task that commits rarely, or a short preview run, reports each
 round promptly; a busier task's rounds accumulate and flush as one line with
 summed `expected` and `actual` buckets, `rounds`, `firstRound` and
-`lastRound`. A mismatch is never held back: it flushes the pending windows
-first and is then logged on its own. The windows also flush on graceful
-shutdown. Rounds whose commit was never acknowledged in the session are not
+`lastRound`. The first mismatch after five quiet minutes is never held back:
+it flushes the pending windows first and is then logged on its own. Further
+mismatching rounds within that interval roll up into one `mismatch` line, so a
+systematic discrepancy costs one line per interval rather than one per
+transaction. The windows also flush on graceful shutdown. Rounds whose commit was never acknowledged in the session are not
 judged; recovery re-applies them.
 Every line is marked `observable: true` and carries the `catalog_task_name`,
 so the data plane forwards it into the Grafana log stream operators alert on;
