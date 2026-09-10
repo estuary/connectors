@@ -359,10 +359,6 @@ func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence 
 	return sql.Fence{}, nil
 }
 
-// MustRecreateResource permits every backfill of a Snowflake table to truncate it.
-// A streaming v2 channel is bound to its own name and epoch, not to the table, and
-// the runtime this write path requires holds every shard of the task idle for the
-// whole of Apply, so no shard appends into a table a backfill is truncating.
 func (c *client) MustRecreateResource(req *pm.Request_Apply, lastBinding, newBinding *pf.MaterializationSpec_Binding) (bool, error) {
 	return false, nil
 }
