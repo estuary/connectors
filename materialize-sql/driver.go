@@ -31,7 +31,9 @@ type Driver[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]] s
 	// connector, to as much of an extent as possible. The returned PrereqErr
 	// can include multiple separate errors if it possible to determine that
 	// there is more than one issue that needs corrected.
-	PreReqs func(ctx context.Context, cfg EC) *cerrors.PrereqErr
+	// featureFlags are the flags resolved for the task from its spec, so that a
+	// check which varies by flag uses the same values as the rest of the RPC.
+	PreReqs func(ctx context.Context, cfg EC, featureFlags map[string]bool) *cerrors.PrereqErr
 }
 
 var _ boilerplate.Connector = &Driver[boilerplate.EndpointConfiger, Resource]{}
@@ -75,7 +77,8 @@ func (d *Driver[EC, RC]) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.
 }
 
 func (d *Driver[EC, RC]) NewTransactor(ctx context.Context, req pm.Request_Open, be *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
-	return boilerplate.RunNewTransactor(ctx, req, be, d.NewMaterializer)
+	return boilerplate.RunNewTransactor(ctx, req, be, d.NewMaterializer,
+		boilerplate.WithConfigUpdates([]string{"advanced", "feature_flags"}))
 }
 
 type sqlMaterialization[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]] struct {
@@ -124,7 +127,7 @@ var _ boilerplate.Materializer[
 ] = &sqlMaterialization[boilerplate.EndpointConfiger, Resource]{}
 
 func (s *sqlMaterialization[EC, RC]) CheckPrerequisites(ctx context.Context) *cerrors.PrereqErr {
-	return s.driver.PreReqs(ctx, s.endpoint.Config)
+	return s.driver.PreReqs(ctx, s.endpoint.Config, s.featureFlags)
 }
 
 func (s *sqlMaterialization[EC, RC]) Config() boilerplate.MaterializeCfg {

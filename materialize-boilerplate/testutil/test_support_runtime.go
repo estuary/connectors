@@ -176,7 +176,7 @@ func runMaterializationTestForTask[EC boilerplate.EndpointConfiger, FC boilerpla
 	cfg := decryptConfig[EC](t, bundled, taskName)
 	rt := rewriteTaskForTest[EC, RC](t, bundled, taskName, tsSuffix, cfg, makeResourceFn)
 
-	materializer, err := newMaterializer(ctx, taskName, cfg, boilerplate.ParseFlags(cfg))
+	materializer, err := newMaterializer(ctx, taskName, cfg, harnessFlags(t, cfg))
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
@@ -204,7 +204,7 @@ func runMaterializationTestForTask[EC boilerplate.EndpointConfiger, FC boilerpla
 		// And a fresh materializer to read it back with: a test materializer may
 		// cache what it read for the liveness run (eventbridge drains its queue
 		// once), or hold connections the liveness run's cleanup closes.
-		materializer, err = newMaterializer(ctx, taskName, cfg, boilerplate.ParseFlags(cfg))
+		materializer, err = newMaterializer(ctx, taskName, cfg, harnessFlags(t, cfg))
 		require.NoError(t, err)
 		t.Cleanup(func() {
 			CleanupTestResources(t, ctx, materializer, rt.resourcePaths, tsSuffix)

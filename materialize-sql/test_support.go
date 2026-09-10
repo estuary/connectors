@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
-	"github.com/estuary/connectors/go/common"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	testutil "github.com/estuary/connectors/materialize-boilerplate/testutil"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -91,7 +90,10 @@ func DrainSeedInsertQuery[EC boilerplate.EndpointConfiger, RC boilerplate.Resour
 	t.Helper()
 	ctx := context.Background()
 
-	m, err := driver.NewMaterializer(ctx, "apply-drain-seed", cfg, boilerplate.ParseFlags(cfg))
+	flags, err := boilerplate.ResolveFlags(cfg, appliedSpec)
+	require.NoError(t, err)
+
+	m, err := driver.NewMaterializer(ctx, "apply-drain-seed", cfg, flags)
 	require.NoError(t, err)
 	defer m.Close(ctx)
 	s, ok := m.(*sqlMaterialization[EC, RC])
@@ -183,8 +185,10 @@ func RunFencingTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC
 
 		checkpointsTable := "temp_test_fencing_checkpoints" + rngSuffix
 
-		rawFlags, defaultFlags := cfg.FeatureFlags()
-		parsedFlags := common.ParseFeatureFlags(rawFlags, defaultFlags)
+		// The fencing harness has no runtime spec to take a creation date from,
+		// so date-gated flags resolve as they do for a brand-new task.
+		parsedFlags, err := boilerplate.ResolveFlags(cfg, &pf.MaterializationSpec{})
+		require.NoError(t, err)
 
 		ep, err := driver.NewEndpoint(ctx, cfg, parsedFlags)
 		require.NoError(t, err)

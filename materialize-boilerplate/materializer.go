@@ -191,7 +191,7 @@ type EndpointConfiger interface {
 
 	// FeatureFlags returns the raw string of comma-separated feature flags, and
 	// the default feature flag values that should be applied.
-	FeatureFlags() (raw string, defaults map[string]bool)
+	FeatureFlags() (raw string, defaults map[string]common.FlagDefault)
 }
 
 // Resourcer represents a parsed resource config.
@@ -356,7 +356,14 @@ func RunValidate[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT
 		return nil, err
 	}
 
-	parsedFlags := ParseFlags(cfg)
+	// Validate carries no spec for the task being validated, only the last
+	// published one; a task with no last spec is brand new and has no creation
+	// date yet.
+	createdAt, err := specCreatedAt(req.LastMaterialization)
+	if err != nil {
+		return nil, err
+	}
+	parsedFlags := resolveFlags(cfg, createdAt)
 	materializer, err := newMaterializer(ctx, req.Name.String(), cfg, parsedFlags)
 	if err != nil {
 		return nil, err
@@ -413,6 +420,31 @@ func RunValidate[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT
 	return &pm.Response_Validated{Bindings: out}, nil
 }
 
+type openOptions struct {
+	featureFlagsPath []string
+}
+
+// OpenOption customizes the behavior of RunNewTransactor.
+type OpenOption func(*openOptions)
+
+// WithConfigUpdates enables recording the resolved value of cutoff-gated feature
+// flags into the task's persisted endpoint config, via a configUpdate event, so
+// that every task ends up carrying an explicit list of the flags its behavior
+// depends on instead of one implied by its creation date. featureFlagsPath
+// locates the feature flags property within the config document, e.g.
+// ["advanced", "feature_flags"].
+//
+// The value written is the same value the connector resolves from the task's
+// creation date, so this is a record rather than a decision: the configUpdate is
+// published asynchronously and is only eventually consistent, but the task
+// behaves identically before and after it lands. It is recomputed on each Open
+// and stops being emitted once the config contains it.
+func WithConfigUpdates(featureFlagsPath []string) OpenOption {
+	return func(o *openOptions) {
+		o.featureFlagsPath = featureFlagsPath
+	}
+}
+
 // RunApply produces an Applied response for an Apply request.
 func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
 	ctx context.Context,
@@ -428,7 +460,11 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 		return nil, err
 	}
 
-	parsedFlags := ParseFlags(endpointCfg)
+	createdAt, err := specCreatedAt(req.Materialization)
+	if err != nil {
+		return nil, err
+	}
+	parsedFlags := resolveFlags(endpointCfg, createdAt)
 	materializer, err := newMaterializer(ctx, req.Materialization.Name.String(), endpointCfg, parsedFlags)
 	if err != nil {
 		return nil, err
@@ -511,7 +547,7 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 		setupActionDescriptions = append(setupActionDescriptions, desc)
 	}
 
-	common, err := computeCommonUpdates(req.LastMaterialization, req.Materialization, is)
+	updates, err := computeCommonUpdates(req.LastMaterialization, req.Materialization, is)
 	if err != nil {
 		return nil, err
 	}
@@ -524,7 +560,7 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 	destructiveBindings := make(map[int]bool)
 	drainBindings := make(map[int]bool)
 
-	for _, bindingIdx := range common.newBindings {
+	for _, bindingIdx := range updates.newBindings {
 		if mapped, err := buildMappedBinding(endpointCfg, materializer, *req.Materialization, bindingIdx); err != nil {
 			return nil, err
 		} else if desc, action, err := materializer.CreateResource(ctx, *mapped); err != nil {
@@ -535,7 +571,7 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 	}
 
 	validator := NewValidator(&constrainterAdapter[EC, FC, RC, MT]{m: materializer}, is, mCfg.MaxFieldLength, mCfg.CaseInsensitiveFields, parsedFlags)
-	for _, bindingIdx := range common.backfillBindings {
+	for _, bindingIdx := range updates.backfillBindings {
 		mapped, err := buildMappedBinding(endpointCfg, materializer, *req.Materialization, bindingIdx)
 		if err != nil {
 			return nil, err
@@ -613,7 +649,7 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 			if err != nil {
 				return nil, err
 			}
-			common.updatedBindings[bindingIdx] = *upd
+			updates.updatedBindings[bindingIdx] = *upd
 		} else {
 			// Check if retain_existing_data_on_backfill is enabled, and if so, return an error
 			if parsedFlags["retain_existing_data_on_backfill"] {
@@ -651,7 +687,7 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 		}
 	}
 
-	for bindingIdx, commonUpdates := range common.updatedBindings {
+	for bindingIdx, commonUpdates := range updates.updatedBindings {
 		mb, err := buildMappedBinding(endpointCfg, materializer, *req.Materialization, bindingIdx)
 		if err != nil {
 			return nil, err
@@ -793,6 +829,40 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 	return &pm.Response_Applied{ActionDescription: strings.Join(allActions, "\n")}, nil
 }
 
+// pinFeatureFlags records the resolved value of any cutoff-gated flag that the
+// endpoint config does not already mention, by emitting a configUpdate event
+// restating the config with those flags made explicit. Failures are logged and
+// otherwise ignored: the value is one the connector re-derives from the task's
+// creation date on every RPC, so the config is a record of behavior rather than
+// its source, and a task is unaffected by the write being late or lost.
+func pinFeatureFlags[EC EndpointConfiger](
+	endpointCfg EC,
+	sealedConfig json.RawMessage,
+	createdAt common.CreatedAt,
+	openOpts openOptions,
+) {
+	rawFlags, defaultFlags := endpointCfg.FeatureFlags()
+	toPin := common.PendingFlagPins(rawFlags, defaultFlags, createdAt)
+	if len(toPin) == 0 {
+		return
+	}
+
+	if len(sealedConfig) == 0 {
+		// The sealed config is what a restatement of an encrypted config is
+		// built from, and runtimes predating it send nothing.
+		log.Debug("not recording feature flag defaults: runtime did not provide the sealed endpoint config")
+		return
+	}
+
+	pinned, err := common.SetSealedConfigProperty(sealedConfig, openOpts.featureFlagsPath, common.PinnedFlagsString(rawFlags, toPin))
+	if err != nil {
+		log.WithError(err).Warn("failed to record feature flag defaults in endpoint config")
+		return
+	}
+
+	common.EmitConfigUpdate("Recording default values for newly introduced settings in the endpoint config.", pinned)
+}
+
 // RunNewTransactor builds a transactor and Opened response from an Open
 // request.
 func RunNewTransactor[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
@@ -800,9 +870,15 @@ func RunNewTransactor[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC
 	req pm.Request_Open,
 	be *m.BindingEvents,
 	newMaterializer NewMaterializerFn[EC, FC, RC, MT],
+	opts ...OpenOption,
 ) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
 	if err := req.Validate(); err != nil {
 		return nil, nil, nil, fmt.Errorf("validating request: %w", err)
+	}
+
+	var openOpts openOptions
+	for _, opt := range opts {
+		opt(&openOpts)
 	}
 
 	var epCfg EC
@@ -810,7 +886,11 @@ func RunNewTransactor[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC
 		return nil, nil, nil, err
 	}
 
-	featureFlags := ParseFlags(epCfg)
+	createdAt, err := specCreatedAt(req.Materialization)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	featureFlags := resolveFlags(epCfg, createdAt)
 	materializer, err := newMaterializer(ctx, req.Materialization.Name.String(), epCfg, featureFlags)
 	if err != nil {
 		return nil, nil, nil, err
@@ -852,6 +932,10 @@ func RunNewTransactor[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC
 		if err := cp.Unmarshal(checkpoint); err != nil {
 			return nil, nil, nil, fmt.Errorf("unmarshalling checkpoint: %w", err)
 		}
+	}
+
+	if openOpts.featureFlagsPath != nil {
+		pinFeatureFlags(epCfg, req.SealedConfigJson, createdAt, openOpts)
 	}
 
 	return transactor, &pm.Response_Opened{
@@ -1028,14 +1112,52 @@ func (c *constrainterAdapter[EC, FC, RC, MT]) DescriptionForType(p *pf.Projectio
 	return mt.String(), nil
 }
 
-func ParseFlags(cfg EndpointConfiger) map[string]bool {
+// ResolveFlags returns the feature flags of the task described by spec, for
+// connectors which implement the materialization RPCs themselves rather than
+// through RunValidate, RunApply and RunNewTransactor.
+//
+// The spec is required: a date-gated default can only be resolved against the
+// creation date the runtime stamped onto it, and resolving one without a spec
+// would silently hand the task whichever behavior a brand-new task gets. Take it
+// from `req.LastMaterialization` in Validate, and from `req.Materialization` in
+// Apply and Open. Anywhere further from the RPC boundary, thread down the flags
+// resolved there instead of re-resolving them.
+func ResolveFlags[EC EndpointConfiger](cfg EC, spec *pf.MaterializationSpec) (map[string]bool, error) {
+	createdAt, err := specCreatedAt(spec)
+	if err != nil {
+		return nil, err
+	}
+
+	return resolveFlags(cfg, createdAt), nil
+}
+
+// resolveFlags resolves the feature flags of a task created on createdAt. Since
+// the creation date is carried by every task spec, all of Validate, Apply and
+// Open resolve the same flags for a given task without persisting anything.
+func resolveFlags(cfg EndpointConfiger, createdAt common.CreatedAt) map[string]bool {
 	rawFlags, defaultFlags := cfg.FeatureFlags()
-	parsedFlags := common.ParseFeatureFlags(rawFlags, defaultFlags)
+	parsedFlags := common.ResolveFlags(rawFlags, defaultFlags, createdAt)
 	if rawFlags != "" {
 		log.WithField("flags", parsedFlags).Info("parsed feature flags")
 	}
 
 	return parsedFlags
+}
+
+// specCreatedAt returns the validated date on which a task was created. A spec
+// that is absent, or that predates the control plane stamping creation dates,
+// yields a brand-new CreatedAt. A date that cannot be parsed is an error rather
+// than something to resolve flags around: it would silently give the task the
+// behavior of the wrong era.
+func specCreatedAt(spec *pf.MaterializationSpec) (common.CreatedAt, error) {
+	if spec == nil {
+		return common.CreatedAt{}, nil
+	}
+	createdAt, err := common.ParseCreatedAt(spec.CreatedAt)
+	if err != nil {
+		return common.CreatedAt{}, fmt.Errorf("resolving feature flags: %w", err)
+	}
+	return createdAt, nil
 }
 
 func UnmarshalStrict[T pb.Validator](raw []byte, into *T) error {
