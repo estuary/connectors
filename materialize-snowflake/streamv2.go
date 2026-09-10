@@ -89,9 +89,9 @@ func (r streamV2Range) key() string {
 // rather than a name the layout re-derives. The state key is retained so a backfill
 // rotates the binding's channels and its checkpoint items together — both start
 // empty, which is what makes a backfill the escape from every rejection in this file.
-func streamV2ChannelName(materialization string, epoch int, r streamV2Range, stateKey string) string {
+func streamV2ChannelName(materialization string, epoch int, keyRange streamV2Range, stateKey string) string {
 	return fmt.Sprintf("%s_%d_%08x-%08x_%s",
-		sanitizeAndAppendHash(materialization), epoch, r.keyBegin, r.keyEnd, sanitizeAndAppendHash(stateKey))
+		sanitizeAndAppendHash(materialization), epoch, keyRange.keyBegin, keyRange.keyEnd, sanitizeAndAppendHash(stateKey))
 }
 
 // streamV2ParseChannel reads the epoch and key range that streamV2ChannelName encoded,
@@ -205,8 +205,8 @@ func streamV2ForeignTaskError(table string, foreign map[string][]string) error {
 // own. A token whose range is not the channel's key range was written by something
 // else — another connector, or a channel scheme this write path never ran — and
 // nothing it counts may be skipped.
-func streamV2Token(counter int64, r streamV2Range) string {
-	return fmt.Sprintf("%d@%s", counter, r.key())
+func streamV2Token(counter int64, keyRange streamV2Range) string {
+	return fmt.Sprintf("%d@%s", counter, keyRange.key())
 }
 
 // parseStreamV2Token reads a committed offset token back as two values: the document
@@ -590,10 +590,10 @@ func (m *streamV2Manager) addBinding(database, schema, table string, target sql.
 }
 
 // newChannel builds the in-memory state of one opened, reconciled channel.
-func newStreamV2Channel(name string, r streamV2Range, counter, committed int64) *streamV2Channel {
+func newStreamV2Channel(name string, keyRange streamV2Range, counter, committed int64) *streamV2Channel {
 	return &streamV2Channel{
 		name:      name,
-		keyRange:  r,
+		keyRange:  keyRange,
 		counter:   counter,
 		recorded:  counter,
 		committed: committed,
@@ -679,8 +679,8 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 	// documents skipped, not stepped over by a fresh epoch that would materialize
 	// them twice.
 	b.targetEpoch = -1
-	for _, r := range targets {
-		if item := b.prior[r.key()]; item != nil {
+	for _, keyRange := range targets {
+		if item := b.prior[keyRange.key()]; item != nil {
 			if epoch, _, ok := streamV2ParseChannel(item.Channel, m.materialization, b.stateKey); ok {
 				b.targetEpoch = epoch
 				break
@@ -690,8 +690,8 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 	if b.targetEpoch < 0 {
 		var maxEpoch = -1
 		for _, item := range b.prior {
-			if epoch, r, ok := streamV2ParseChannel(item.Channel, m.materialization, b.stateKey); ok &&
-				r.keyBegin >= shard.keyBegin && r.keyEnd <= shard.keyEnd {
+			if epoch, keyRange, ok := streamV2ParseChannel(item.Channel, m.materialization, b.stateKey); ok &&
+				keyRange.keyBegin >= shard.keyBegin && keyRange.keyEnd <= shard.keyEnd {
 				maxEpoch = max(maxEpoch, epoch)
 			}
 		}
@@ -713,8 +713,8 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 			// its deletion away. It records nothing.
 			continue
 		}
-		var r = streamV2Range{keyBegin: item.KeyBegin, keyEnd: item.KeyEnd}
-		switch classifyKeyRange(r, shard, targets) {
+		var keyRange = streamV2Range{keyBegin: item.KeyBegin, keyEnd: item.KeyEnd}
+		switch classifyKeyRange(keyRange, shard, targets) {
 		case streamV2KeyRangeTarget:
 			targetItems++
 			nested = append(nested, item)
@@ -724,7 +724,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 		case streamV2KeyRangeStraddling:
 			return fmt.Errorf(
 				"channel %q covers %s, which crosses the boundary of this shard's range %s: the shard was split off a boundary its channels do not subdivide along, so the rows that channel holds cannot be attributed to either side. Restore the task's shard key ranges to the topology which appended them, or backfill this binding",
-				item.Channel, r, shard,
+				item.Channel, keyRange, shard,
 			)
 		}
 	}
@@ -747,8 +747,8 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 	var liveNonTarget, liveTarget, candidates []*streamV2Channel
 	var statuses = make(map[string]*channelStatusResult)
 	for _, item := range nested {
-		var r = streamV2Range{keyBegin: item.KeyBegin, keyEnd: item.KeyEnd}
-		var isTarget = classifyKeyRange(r, shard, targets) == streamV2KeyRangeTarget
+		var keyRange = streamV2Range{keyBegin: item.KeyBegin, keyEnd: item.KeyEnd}
+		var isTarget = classifyKeyRange(keyRange, shard, targets) == streamV2KeyRangeTarget
 
 		status, err := client.OpenChannel(ctx, b.database, b.schema, b.table, item.Channel)
 		if err != nil {
@@ -773,7 +773,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 				// declaration the declaring shard never converged to before its
 				// range changed. Which of the two it is turns on the channels
 				// around it, so the decision waits for all of them.
-				candidates = append(candidates, newStreamV2Channel(item.Channel, r, 0, 0))
+				candidates = append(candidates, newStreamV2Channel(item.Channel, keyRange, 0, 0))
 				continue
 			}
 			if !isTarget && declared {
@@ -781,7 +781,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 				// already abandoned the channel — the open above re-created it
 				// empty — and only the deletion of its item was lost. The deletion
 				// is re-recorded, and the sweep drops the empty channel.
-				b.abandoned = append(b.abandoned, r.key())
+				b.abandoned = append(b.abandoned, keyRange.key())
 				log.WithFields(log.Fields{
 					"table":   b.table,
 					"channel": item.Channel,
@@ -793,11 +793,11 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 			// through to the reconciliation, which rejects it as a lost channel.
 		}
 
-		committed, err := reconcileStreamV2Channel(item.Channel, b.table, status.CommittedToken, item, r, len(b.prior))
+		committed, err := reconcileStreamV2Channel(item.Channel, b.table, status.CommittedToken, item, keyRange, len(b.prior))
 		if err != nil {
 			return err
 		}
-		var c = newStreamV2Channel(item.Channel, r, item.Counter, committed)
+		var c = newStreamV2Channel(item.Channel, keyRange, item.Counter, committed)
 		if isTarget {
 			liveTarget = append(liveTarget, c)
 		} else {
@@ -860,10 +860,10 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 	if len(liveNonTarget) > 0 {
 		active = append(liveNonTarget, liveTarget...)
 	} else {
-		for _, r := range targets {
+		for _, keyRange := range targets {
 			var have *streamV2Channel
 			for _, c := range liveTarget {
-				if c.keyRange == r {
+				if c.keyRange == keyRange {
 					have = c
 					break
 				}
@@ -873,7 +873,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 				continue
 			}
 
-			var name = streamV2ChannelName(m.materialization, b.targetEpoch, r, b.stateKey)
+			var name = streamV2ChannelName(m.materialization, b.targetEpoch, keyRange, b.stateKey)
 			var status = statuses[name]
 			if status == nil {
 				if status, err = client.OpenChannel(ctx, b.database, b.schema, b.table, name); err != nil {
@@ -884,8 +884,8 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 				}
 			}
 
-			var item = b.prior[r.key()]
-			committed, err := reconcileStreamV2Channel(name, b.table, status.CommittedToken, item, r, len(b.prior))
+			var item = b.prior[keyRange.key()]
+			committed, err := reconcileStreamV2Channel(name, b.table, status.CommittedToken, item, keyRange, len(b.prior))
 			if err != nil {
 				return err
 			}
@@ -893,7 +893,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 			if item != nil {
 				counter = item.Counter
 			}
-			active = append(active, newStreamV2Channel(name, r, counter, committed))
+			active = append(active, newStreamV2Channel(name, keyRange, counter, committed))
 		}
 	}
 
@@ -944,8 +944,8 @@ func (m *streamV2Manager) layoutNames(b *streamV2Binding) map[string]bool {
 	for _, c := range b.channels {
 		keep[c.name] = true
 	}
-	for _, r := range b.targets {
-		keep[streamV2ChannelName(m.materialization, b.targetEpoch, r, b.stateKey)] = true
+	for _, keyRange := range b.targets {
+		keep[streamV2ChannelName(m.materialization, b.targetEpoch, keyRange, b.stateKey)] = true
 	}
 	return keep
 }
@@ -979,12 +979,12 @@ func (m *streamV2Manager) sweep(ctx context.Context, database, schema, table, st
 			}
 			continue
 		}
-		if _, r, ok := streamV2ParseChannel(name, m.materialization, stateKey); ok {
-			if r.keyBegin < shard.keyBegin || r.keyEnd > shard.keyEnd {
+		if _, keyRange, ok := streamV2ParseChannel(name, m.materialization, stateKey); ok {
+			if keyRange.keyBegin < shard.keyBegin || keyRange.keyEnd > shard.keyEnd {
 				continue
 			}
-		} else if r, ok := streamV2ParseBackfilledChannel(name, m.materialization, stateKey); ok {
-			if r.keyBegin < shard.keyBegin || r.keyBegin > shard.keyEnd {
+		} else if keyRange, ok := streamV2ParseBackfilledChannel(name, m.materialization, stateKey); ok {
+			if keyRange.keyBegin < shard.keyBegin || keyRange.keyBegin > shard.keyEnd {
 				continue
 			}
 		} else {
@@ -1061,7 +1061,7 @@ func rejectedRowsError(channel, table string, status *channelStatusResult) error
 // priorItems counts every item the checkpoint holds for the binding, across all of
 // the task's channels; it is what tells a channel's interrupted first transaction
 // apart from a token nothing accounts for.
-func reconcileStreamV2Channel(channel, table string, committedToken *string, item *streamV2Item, r streamV2Range, priorItems int) (int64, error) {
+func reconcileStreamV2Channel(channel, table string, committedToken *string, item *streamV2Item, keyRange streamV2Range, priorItems int) (int64, error) {
 	var counter int64
 	if item != nil {
 		counter = item.Counter
@@ -1097,10 +1097,10 @@ func reconcileStreamV2Channel(channel, table string, committedToken *string, ite
 	// in the channel's name, so every append this write path makes carries it. A
 	// token naming any other range was written under a channel scheme this write
 	// path never ran, and nothing it counts may be skipped.
-	if appendedBy != r {
+	if appendedBy != keyRange {
 		return 0, fmt.Errorf(
 			"channel %q covers %s but reports a committed offset token for %d documents appended under %s: that token was not written against this channel's key range, so the documents it counts cannot be identified. Backfill this binding",
-			channel, r, committed, appendedBy,
+			channel, keyRange, committed, appendedBy,
 		)
 	}
 
@@ -1474,10 +1474,10 @@ func (m *streamV2Manager) flush(ctx context.Context) (map[int]map[string]*stream
 			// The declaration: an item for every target channel the layout has not
 			// converged to yet. The switch at Acknowledge runs only after the
 			// checkpoint carrying these is durable.
-			for _, r := range b.targets {
-				if _, ok := items[r.key()]; !ok {
-					var name = streamV2ChannelName(m.materialization, b.targetEpoch, r, b.stateKey)
-					items[r.key()] = &streamV2Item{Channel: name, KeyBegin: r.keyBegin, KeyEnd: r.keyEnd}
+			for _, keyRange := range b.targets {
+				if _, ok := items[keyRange.key()]; !ok {
+					var name = streamV2ChannelName(m.materialization, b.targetEpoch, keyRange, b.stateKey)
+					items[keyRange.key()] = &streamV2Item{Channel: name, KeyBegin: keyRange.keyBegin, KeyEnd: keyRange.keyEnd}
 				}
 			}
 			b.declared = true
@@ -1569,11 +1569,11 @@ func (m *streamV2Manager) acknowledged(ctx context.Context) error {
 			b.abandoned = append(b.abandoned, c.keyRange.key())
 		}
 
-		for _, r := range b.targets {
-			if slices.ContainsFunc(next, func(c *streamV2Channel) bool { return c.keyRange == r }) {
+		for _, keyRange := range b.targets {
+			if slices.ContainsFunc(next, func(c *streamV2Channel) bool { return c.keyRange == keyRange }) {
 				continue
 			}
-			var name = streamV2ChannelName(m.materialization, b.targetEpoch, r, b.stateKey)
+			var name = streamV2ChannelName(m.materialization, b.targetEpoch, keyRange, b.stateKey)
 			status, err := client.OpenChannel(ctx, b.database, b.schema, b.table, name)
 			if err != nil {
 				return fmt.Errorf("opening channel %q: %w", name, err)
@@ -1590,7 +1590,7 @@ func (m *streamV2Manager) acknowledged(ctx context.Context) error {
 					name, *status.CommittedToken,
 				)
 			}
-			next = append(next, newStreamV2Channel(name, r, 0, 0))
+			next = append(next, newStreamV2Channel(name, keyRange, 0, 0))
 		}
 
 		slices.SortFunc(next, func(a, b *streamV2Channel) int {
