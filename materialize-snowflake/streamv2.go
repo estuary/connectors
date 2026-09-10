@@ -347,8 +347,7 @@ func streamV2ListChannels(ctx context.Context, db *stdsql.DB, dialect sql.Dialec
 	return slices.Compact(names), nil
 }
 
-// streamV2Channel is one channel of a binding: the key range it
-// covers, the document counter it advances, and the batch it is building.
+// streamV2Channel is a handle for one Snowflake channel of one connector binding.
 type streamV2Channel struct {
 	name string
 	// keyRange is the key range this channel covers. The key range is embedded in
@@ -362,19 +361,12 @@ type streamV2Channel struct {
 	// recorded is the counter value that the last checkpoint item reported. It is how
 	// flush finds a channel that stored nothing this transaction.
 	recorded int64
-	// skip is the document index that Snowflake already held when this session opened
-	// the channel. An interrupted attempt of the transaction now replayed appended the
-	// documents at or below that index. The manager counts those documents again, but
-	// does not append them again. Document indices are absolute, so this one threshold
-	// holds for the whole session.
-	skip int64
-	// committed is the highest index that Snowflake durably holds. It starts at the
-	// committed offset token when this session opened the channel, and then takes each
-	// counter this session committed. waitCommit must not wait on a counter at or below
-	// it. The wait is for the committed token to *equal* the requested token, and a
-	// channel already past that token never reports it again. Such a wait runs to its
-	// timeout. A replay of documents that Snowflake already holds produces exactly such
-	// a counter.
+	// committed is the highest document index that Snowflake durably holds. It starts
+	// at the channel's committed offset token when this session opens the channel, and
+	// then takes each counter this session has waited on. A document at or below it is
+	// counted but not appended again, because Snowflake already holds it. That happens
+	// when an earlier attempt of the transaction now being replayed appended documents
+	// before it was interrupted.
 	committed int64
 
 	// buf is the payload of the batch under construction
@@ -598,20 +590,19 @@ func (m *streamV2Manager) addBinding(database, schema, table string, target sql.
 }
 
 // newChannel builds the in-memory state of one opened, reconciled channel.
-func newStreamV2Channel(name string, r streamV2Range, counter, skip int64) *streamV2Channel {
+func newStreamV2Channel(name string, r streamV2Range, counter, committed int64) *streamV2Channel {
 	return &streamV2Channel{
 		name:      name,
 		keyRange:  r,
 		counter:   counter,
 		recorded:  counter,
-		skip:      skip,
-		committed: skip,
+		committed: committed,
 		limiter:   rate.NewLimiter(streamV2PaceBytesPerSecond, 2*streamV2PaceBytesPerSecond),
 	}
 }
 
 // ensureOpened builds the active channel layout of the binding and captures each
-// channel's skip threshold. It does this on the first document of the binding.
+// channel's committed index. It does this on the first document of the binding.
 //
 // The manager waits for the first document, and does not open channels while the
 // transactor is built. A transactor built only to drain pending work stores nothing,
@@ -619,9 +610,8 @@ func newStreamV2Channel(name string, r streamV2Range, counter, skip int64) *stre
 // it will not use. It must also not reconcile against a key range that stands for the
 // whole task instead of one shard.
 //
-// This delay costs nothing. The manager still captures each threshold before the
-// first append. The thresholds are absolute document indices, so they then hold for
-// the whole session.
+// This delay costs nothing. The manager still captures each committed index before
+// the first append.
 func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) error {
 	if b.opened {
 		return nil
@@ -803,11 +793,11 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 			// through to the reconciliation, which rejects it as a lost channel.
 		}
 
-		skip, err := reconcileStreamV2Channel(item.Channel, b.table, status.CommittedToken, item, r, len(b.prior))
+		committed, err := reconcileStreamV2Channel(item.Channel, b.table, status.CommittedToken, item, r, len(b.prior))
 		if err != nil {
 			return err
 		}
-		var c = newStreamV2Channel(item.Channel, r, item.Counter, skip)
+		var c = newStreamV2Channel(item.Channel, r, item.Counter, committed)
 		if isTarget {
 			liveTarget = append(liveTarget, c)
 		} else {
@@ -849,7 +839,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 	if len(liveNonTarget) > 0 && declared {
 		var idle = true
 		for _, c := range liveNonTarget {
-			if c.skip != c.counter {
+			if c.committed != c.counter {
 				idle = false
 				break
 			}
@@ -895,7 +885,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 			}
 
 			var item = b.prior[r.key()]
-			skip, err := reconcileStreamV2Channel(name, b.table, status.CommittedToken, item, r, len(b.prior))
+			committed, err := reconcileStreamV2Channel(name, b.table, status.CommittedToken, item, r, len(b.prior))
 			if err != nil {
 				return err
 			}
@@ -903,7 +893,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 			if item != nil {
 				counter = item.Counter
 			}
-			active = append(active, newStreamV2Channel(name, r, counter, skip))
+			active = append(active, newStreamV2Channel(name, r, counter, committed))
 		}
 	}
 
@@ -934,7 +924,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 
 	var layout = make(log.Fields, len(active))
 	for _, c := range active {
-		layout[c.keyRange.String()] = fmt.Sprintf("counter %d skip %d", c.counter, c.skip)
+		layout[c.keyRange.String()] = fmt.Sprintf("counter %d committed %d", c.counter, c.committed)
 	}
 	log.WithFields(log.Fields{
 		"table":      b.table,
@@ -1278,7 +1268,7 @@ func (m *streamV2Manager) writeRow(ctx context.Context, binding int, packedKey [
 	}
 
 	c.counter++
-	if c.counter <= c.skip {
+	if c.counter <= c.committed {
 		return nil
 	}
 
@@ -1446,13 +1436,13 @@ func (m *streamV2Manager) flush(ctx context.Context) (map[int]map[string]*stream
 
 			// A replayed transaction that routed fewer documents to this channel
 			// than the interrupted attempt committed was not replayed identically.
-			// The skip threshold then dropped documents that Snowflake does not
-			// hold. Only the first transaction of the session can trip this,
-			// because the counter only grows from there.
-			if c.counter < c.skip {
+			// Store then withheld documents that Snowflake does not hold. Only the
+			// first transaction of the session can trip this, because the counter
+			// only grows from there.
+			if c.counter < c.committed {
 				return nil, fmt.Errorf(
 					"channel %q holds %d committed documents but the transaction replayed against it produced only %d: it was not replayed identically, so the rows Snowflake already holds cannot be identified. Backfill this binding",
-					c.name, c.skip, c.counter,
+					c.name, c.committed, c.counter,
 				)
 			}
 

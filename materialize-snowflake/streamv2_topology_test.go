@@ -207,7 +207,7 @@ func TestStreamV2SteadyStateRouting(t *testing.T) {
 	}
 	storeKeys(t, second, more)
 	for _, c := range second.bindings[0].channels {
-		require.Equal(t, int64(3), c.skip)
+		require.Equal(t, int64(3), c.committed)
 	}
 
 	entries, err = second.flush(ctx)
@@ -284,7 +284,7 @@ func TestStreamV2SplitInheritsChannels(t *testing.T) {
 			// holding the interrupted appends the replay must not repeat.
 			require.Equal(t, child.inherited, activeNames(m))
 			for _, c := range m.bindings[0].channels {
-				require.Equal(t, int64(5), c.skip)
+				require.Equal(t, int64(5), c.committed)
 				require.Equal(t, int64(5), c.counter)
 			}
 
@@ -387,7 +387,7 @@ func TestStreamV2JoinInheritsChannels(t *testing.T) {
 
 	require.Equal(t, channelNames(task, 0, eighths), activeNames(joined))
 	for _, c := range joined.bindings[0].channels {
-		require.Equal(t, int64(3), c.skip)
+		require.Equal(t, int64(3), c.committed)
 		require.Equal(t, int64(3), c.counter)
 	}
 
@@ -506,7 +506,7 @@ func TestStreamV2RebalanceCrashWindows(t *testing.T) {
 	require.Equal(t, targetNames, activeNames(resumed))
 	require.ElementsMatch(t, rangeKeys(quarters)[:2], resumed.bindings[0].abandoned)
 	for _, c := range resumed.bindings[0].channels {
-		require.Equal(t, int64(2), c.skip)
+		require.Equal(t, int64(2), c.committed)
 		require.Equal(t, int64(2), c.counter)
 	}
 	entries, err = resumed.flush(ctx)
@@ -526,7 +526,7 @@ func TestStreamV2RebalanceCrashWindows(t *testing.T) {
 	require.Equal(t, targetNames, activeNames(steady))
 	require.Empty(t, steady.bindings[0].abandoned)
 	for _, c := range steady.bindings[0].channels {
-		require.Equal(t, int64(2), c.skip)
+		require.Equal(t, int64(2), c.committed)
 	}
 }
 
@@ -579,7 +579,7 @@ func TestStreamV2SplitThenJoinBack(t *testing.T) {
 	storeKeys(t, joined, rows)
 	require.Equal(t, channelNames(task, 0, eighths), activeNames(joined))
 	for _, c := range joined.bindings[0].channels {
-		require.Equal(t, int64(2), c.skip)
+		require.Equal(t, int64(2), c.committed)
 		require.Equal(t, int64(3), c.counter)
 	}
 

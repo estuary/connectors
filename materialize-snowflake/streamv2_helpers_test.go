@@ -36,7 +36,7 @@ func soleItem(t *testing.T, entries map[int]map[string]*streamV2Item, binding in
 }
 
 // singleChannelLayout pins streamV2ChannelsPerShard to one for a test whose
-// assertions follow a single channel's counter, skip threshold, or token. The write
+// assertions follow a single channel's counter, committed index, or token. The write
 // path's behavior per channel is identical at any depth; these tests are about that
 // behavior, not about routing, which has coverage of its own.
 func singleChannelLayout(t *testing.T) {
