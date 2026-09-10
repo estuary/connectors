@@ -1,10 +1,10 @@
-clientID: 91d36d73-9e3e-4ba1-a468-d7d61702d4a2
-clientSecret_sops: ENC[AES256_GCM,data:aLEZb0pxvTyKztS2vvaNzSYF8wpULA896h4+a3wMjuGUMzTYgoiiAA==,iv:VGkaCJMcs+dzhxWjkt6lFYuFFchUcXG9TvyolosnnsY=,tag:j/n2zMrdpEl90C6TYnqD3Q==,type:str]
-warehouse: whb_warehouse
+clientID: d845ffbf-bad9-4955-9edf-2194524c23c3
+clientSecret_sops: ENC[AES256_GCM,data:FgdMN3Fek4f9WnC9hSR46R1BtXg593iecJCWmHXt+DUT8WZ0Q0l1AQ==,iv:0X8iYNIVDL5U0JB96FbQiht570B+qlD0G2i5xkFOrKY=,tag:ePYWuUHVSlqREP8VrZSCkQ==,type:str]
+warehouse: integration_tests
 schema: estuary_test_schema
-connectionString: jc5wrnsaqm5eplfxoiid6tylbe-hb5yc63i54uuld4ymr7gheq5yi.datawarehouse.fabric.microsoft.com
-storageAccountName: whbfabricstaging
-storageAccountKey_sops: ENC[AES256_GCM,data:XRTcO/kpWDSAq7H7YWdE9SBK9Uo1E0gpSuA3p7sg22VA9mhbXCLP26kyWaVnQm9+IaK9VTi//GFxqVAbWWr0fMWmtkh8Em46oZO8HsFf/7mI19QjghwfSQ==,iv:f8bJnZ1LXnMZMhGYh0JTwFPmXoVJJKwzKUev0OXTA+Q=,tag:LEVJ4P9uqnuJcGmMdBGJmQ==,type:str]
+connectionString: jc5wrnsaqm5eplfxoiid6tylbe-ygaoe6buyonuzktlb336cfgz4y.datawarehouse.fabric.microsoft.com
+storageAccountName: integrationteststaging
+storageAccountKey_sops: ENC[AES256_GCM,data:O47qJXIYYpYxdn2YeiVoBucHXojIa3/bncqtlH+fHYt29/c+1aYW5erxrSF8Qx8q7bEHHPSzINlV4VovCLpe08o6zJ83z1A5zkcJPJcjkP0EAw8AkCv71A==,iv:em0D1RGQ4Y+9BK0dSLKvKQ5+2JrHLRkHSqo7Mq9Opsg=,tag:P6Nsrs/zXxwz6dZ5YbTMSg==,type:str]
 containerName: tmp
 hardDelete: true
 syncSchedule:
@@ -12,16 +12,11 @@ syncSchedule:
 advanced:
     feature_flags: allow_existing_tables_for_new_bindings
 sops:
-    kms: []
     gcp_kms:
         - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
           created_at: "2024-02-01T17:08:49Z"
           enc: CiQAdmEdwu+udGkiZbfnnE8djh5o4P8p4Rm3WeXcN0XpcDF4sewSSQCVvC1zSqNDZIN7J2EPjuvJM4ILtloOm9w/OGsE4YwB2qH+sKsDDBYuIDDXtHml6w4wG0iksPY1Yxty0casvU6v02mfM3QOvyk=
-    azure_kv: []
-    hc_vault: []
-    age: []
-    lastmodified: "2025-09-23T21:46:24Z"
-    mac: ENC[AES256_GCM,data:YI0I8VQ6fogBSG/vKSKSVWtZuMD+JT4/38ZOvLchS0AYcqx0e0N3aumDBxPgoDF22txrQcAXpGhL/9PDK1H/XGaITLSpJor0SEiVjVd5jtkQ+0H+8BjIJ4efNYeG45XAGMK2q0G6D4w2NilHESRfhK96DRtRiVdnGWP+MuRgbyc=,iv:p1OwOb/fpGK+OMmw+vwkQP2hvzPej9aoiVv8fAxgyms=,tag:IWjAvbhJJqoom3Fx3s6NKQ==,type:str]
-    pgp: []
+    lastmodified: "2026-09-10T08:48:13Z"
+    mac: ENC[AES256_GCM,data:+Za0NhauxaEA79zkNpIxdK0k6/Fs4+yKhiqOJ5vSyoitpywcjc9AZr9PgpbBeqsbyMablz4gxYZasG73cpC7UWJXuEIa/rMLESr9Vzp/bfTRxVsjWi5qxZGqvdAuKKfz5T/SZ0rgBgg9+WVgP0A4c3wVySQFO1meoQK1E/a4+SY=,iv:oik0BJ6VzScThw0OoK1mVzruc2zMWvhllmjHIOiiEhI=,tag:34vhco/oSAUXSMfEqGLmsw==,type:str]
     encrypted_suffix: _sops
-    version: 3.9.4
+    version: 3.10.2
