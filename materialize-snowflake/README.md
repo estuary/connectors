@@ -116,7 +116,7 @@ count. The two numbers describe the same position, one on each side.
 ### How recovery avoids duplicate rows
 
 A shard can fail at any moment. On initialization, the connector compares, for
-each channel, the committed token in Snowflake to that channel's counter in the
+each channel, the committed token in Snowflake to that channel's routed index in the
 Flow checkpoint. The difference is the number of documents that Snowflake already
 holds. The connector skips those documents as the runtime replays them.
 

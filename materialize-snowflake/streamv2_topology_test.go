@@ -164,7 +164,7 @@ func activeNames(m *streamV2Manager) []string {
 // TestStreamV2SteadyStateRouting pins the steady state everything else builds
 // on: rows route by key hash across the shard's four channels, the checkpoint
 // holds one item per channel, and a later session recovers each channel at a
-// clean boundary and continues its counter.
+// clean boundary and continues its routed index.
 func TestStreamV2SteadyStateRouting(t *testing.T) {
 	var ctx = context.Background()
 	const task = "test/topologySteady"
@@ -188,18 +188,18 @@ func TestStreamV2SteadyStateRouting(t *testing.T) {
 	require.Len(t, items, len(quarters))
 
 	// Each channel counted exactly the rows whose hash its key range covers, so
-	// the item counters are the routing, read back.
+	// the items' routed indices are the routing, read back.
 	for i, q := range quarters {
 		require.Contains(t, items, q.key())
 		require.Equal(t, q.keyBegin, items[q.key()].KeyBegin)
 		require.Equal(t, q.keyEnd, items[q.key()].KeyEnd)
-		require.Equal(t, int64(3), items[q.key()].Counter)
+		require.Equal(t, int64(3), items[q.key()].Routed)
 		require.Equal(t, channelNames(task, 0, quarters)[i], items[q.key()].Channel)
 	}
 	first.stop()
 
 	// A later session opens every channel at a clean boundary — nothing to
-	// skip, nothing rejected — and continues the counters where they stood.
+	// skip, nothing rejected — and continues the routed indices where they stood.
 	var second = newTopologyManager(t, task, 0, math.MaxUint32, items)
 	var more []string
 	for _, q := range quarters {
@@ -207,13 +207,13 @@ func TestStreamV2SteadyStateRouting(t *testing.T) {
 	}
 	storeKeys(t, second, more)
 	for _, c := range second.bindings[0].channels {
-		require.Equal(t, int64(3), c.committed)
+		require.Equal(t, int64(3), c.progress.committed)
 	}
 
 	entries, err = second.flush(ctx)
 	require.NoError(t, err)
 	for _, item := range mergeItems(entries) {
-		require.Equal(t, int64(4), item.Counter)
+		require.Equal(t, int64(4), item.Routed)
 	}
 }
 
@@ -284,11 +284,11 @@ func TestStreamV2SplitInheritsChannels(t *testing.T) {
 			// holding the interrupted appends the replay must not repeat.
 			require.Equal(t, child.inherited, activeNames(m))
 			for _, c := range m.bindings[0].channels {
-				require.Equal(t, int64(5), c.committed)
-				require.Equal(t, int64(5), c.counter)
+				require.Equal(t, int64(5), c.progress.committed)
+				require.Equal(t, int64(5), c.progress.routed)
 			}
 
-			// The first flush is the declaration: the inherited counters, plus
+			// The first flush is the declaration: the inherited items, plus
 			// the child's own four channels at zero, written one durable
 			// checkpoint ahead of any row routing to them.
 			entries, err := m.flush(ctx)
@@ -297,7 +297,7 @@ func TestStreamV2SplitInheritsChannels(t *testing.T) {
 			require.Len(t, declared, 6)
 			for _, key := range rangeKeys(targets) {
 				require.Contains(t, declared, key)
-				require.Zero(t, declared[key].Counter)
+				require.Zero(t, declared[key].Routed)
 			}
 
 			// The runtime made that checkpoint durable, so the switch runs:
@@ -314,7 +314,7 @@ func TestStreamV2SplitInheritsChannels(t *testing.T) {
 			require.NoError(t, err)
 			require.ElementsMatch(t, child.inheritedKeys, deletionsOf(entries))
 			for _, item := range mergeItems(entries) {
-				require.Equal(t, int64(2), item.Counter)
+				require.Equal(t, int64(2), item.Routed)
 			}
 			m.stop()
 
@@ -387,13 +387,13 @@ func TestStreamV2JoinInheritsChannels(t *testing.T) {
 
 	require.Equal(t, channelNames(task, 0, eighths), activeNames(joined))
 	for _, c := range joined.bindings[0].channels {
-		require.Equal(t, int64(3), c.committed)
-		require.Equal(t, int64(3), c.counter)
+		require.Equal(t, int64(3), c.progress.committed)
+		require.Equal(t, int64(3), c.progress.routed)
 	}
 
 	entries, err := joined.flush(ctx)
 	require.NoError(t, err)
-	require.Len(t, mergeItems(entries), 12) // eight inherited counters, four declared at zero
+	require.Len(t, mergeItems(entries), 12) // eight inherited items, four declared at zero
 
 	require.NoError(t, joined.acknowledged(ctx))
 	require.Equal(t, channelNames(task, 1, quarters), activeNames(joined))
@@ -488,7 +488,7 @@ func TestStreamV2RebalanceCrashWindows(t *testing.T) {
 	require.ElementsMatch(t, rangeKeys(quarters)[:2], deletionsOf(entries))
 	// The crash lands here: the inherited channels are dropped and the target
 	// channels hold this transaction's appends, but neither the deletions nor
-	// the counters ever reach a durable checkpoint.
+	// the items ever reach a durable checkpoint.
 	switching.stop()
 
 	var tokens = fakeCommittedTokens(t, statePath)
@@ -497,17 +497,17 @@ func TestStreamV2RebalanceCrashWindows(t *testing.T) {
 
 	// Windows two and three together: the recovered checkpoint still carries
 	// the declaration and the inherited items, the channels behind those items
-	// are gone, and the target channels hold appends their counter-zero items
+	// are gone, and the target channels hold appends their zero-routed items
 	// do not account for. The deletions are re-recorded, and the replay skips
-	// per channel — through tokens standing on counter-zero items, which only
+	// per channel — through tokens standing on zero-routed items, which only
 	// the declaration makes safe to honor.
 	var resumed = newTopologyManager(t, task, loBegin, loEnd, declaration)
 	storeKeys(t, resumed, fresh)
 	require.Equal(t, targetNames, activeNames(resumed))
 	require.ElementsMatch(t, rangeKeys(quarters)[:2], resumed.bindings[0].abandoned)
 	for _, c := range resumed.bindings[0].channels {
-		require.Equal(t, int64(2), c.committed)
-		require.Equal(t, int64(2), c.counter)
+		require.Equal(t, int64(2), c.progress.committed)
+		require.Equal(t, int64(2), c.progress.routed)
 	}
 	entries, err = resumed.flush(ctx)
 	require.NoError(t, err)
@@ -515,7 +515,7 @@ func TestStreamV2RebalanceCrashWindows(t *testing.T) {
 	var converged = mergeItems(entries)
 	require.Len(t, converged, 4)
 	for _, item := range converged {
-		require.Equal(t, int64(2), item.Counter)
+		require.Equal(t, int64(2), item.Routed)
 	}
 	resumed.stop()
 
@@ -526,7 +526,7 @@ func TestStreamV2RebalanceCrashWindows(t *testing.T) {
 	require.Equal(t, targetNames, activeNames(steady))
 	require.Empty(t, steady.bindings[0].abandoned)
 	for _, c := range steady.bindings[0].channels {
-		require.Equal(t, int64(2), c.committed)
+		require.Equal(t, int64(2), c.progress.committed)
 	}
 }
 
@@ -579,8 +579,8 @@ func TestStreamV2SplitThenJoinBack(t *testing.T) {
 	storeKeys(t, joined, rows)
 	require.Equal(t, channelNames(task, 0, eighths), activeNames(joined))
 	for _, c := range joined.bindings[0].channels {
-		require.Equal(t, int64(2), c.committed)
-		require.Equal(t, int64(3), c.counter)
+		require.Equal(t, int64(2), c.progress.committed)
+		require.Equal(t, int64(3), c.progress.routed)
 	}
 
 	entries, err := joined.flush(ctx)
@@ -599,7 +599,7 @@ func TestStreamV2SplitThenJoinBack(t *testing.T) {
 // cannot survive: a split cutting through a channel's key range, which midpoint
 // splits only produce by splitting again before the layout converged past the
 // depth the new boundary cuts through. The rows that channel holds beyond its
-// counter belong to both children, so the only safe answer is a rejection.
+// routed index belong to both children, so the only safe answer is a rejection.
 func TestStreamV2MisalignedSplitRejected(t *testing.T) {
 	t.Setenv("FAKE_SIDECAR_STATE", filepath.Join(t.TempDir(), "channels.json"))
 	const task = "test/topologyMisaligned"
@@ -609,7 +609,7 @@ func TestStreamV2MisalignedSplitRejected(t *testing.T) {
 	var half = streamV2Range{keyBegin: 0, keyEnd: 0x7fffffff}
 	var name = streamV2ChannelName(task, 0, half, "topology.v1")
 	var m = newTopologyManager(t, task, 0, 0x3fffffff, map[string]*streamV2Item{
-		half.key(): {Channel: name, Counter: 5, KeyBegin: half.keyBegin, KeyEnd: half.keyEnd},
+		half.key(): {Channel: name, Routed: 5, KeyBegin: half.keyBegin, KeyEnd: half.keyEnd},
 	})
 
 	var err = testWriteRow(context.Background(), m, 0, []any{"any", "v"})
@@ -630,7 +630,7 @@ func TestStreamV2LostChannelRejected(t *testing.T) {
 	var name = streamV2ChannelName(task, 0, quarters[1], "topology.v1")
 
 	var m = newTopologyManager(t, task, 0, math.MaxUint32, map[string]*streamV2Item{
-		quarters[1].key(): {Channel: name, Counter: 5, KeyBegin: quarters[1].keyBegin, KeyEnd: quarters[1].keyEnd},
+		quarters[1].key(): {Channel: name, Routed: 5, KeyBegin: quarters[1].keyBegin, KeyEnd: quarters[1].keyEnd},
 	})
 
 	err = testWriteRow(context.Background(), m, 0, []any{"any", "v"})
@@ -661,7 +661,7 @@ func TestStreamV2ForeignTokenRejected(t *testing.T) {
 	require.NoError(t, os.WriteFile(statePath, raw, 0o644))
 
 	var m = newTopologyManager(t, task, 0, math.MaxUint32, map[string]*streamV2Item{
-		quarters[0].key(): {Channel: name, Counter: 5, KeyBegin: quarters[0].keyBegin, KeyEnd: quarters[0].keyEnd},
+		quarters[0].key(): {Channel: name, Routed: 5, KeyBegin: quarters[0].keyBegin, KeyEnd: quarters[0].keyEnd},
 	})
 
 	err = testWriteRow(context.Background(), m, 0, []any{"any", "v"})
@@ -670,7 +670,7 @@ func TestStreamV2ForeignTokenRejected(t *testing.T) {
 
 // TestStreamV2SplitInheritsAnEmptyChannel pins the state a skewed transaction
 // leaves for a later split: a channel of the parent's layout that took no rows
-// legitimately stands in the checkpoint at counter zero with no committed
+// legitimately stands in the checkpoint with nothing routed and no committed
 // offset token. The child that inherits it must adopt it as a fresh channel of
 // the inherited layout — not read it as an orphaned declaration to drop,
 // which leaves the surviving layout unable to cover the child's range and
@@ -686,7 +686,7 @@ func TestStreamV2SplitInheritsAnEmptyChannel(t *testing.T) {
 	var parentNames = channelNames(task, 0, quarters)
 
 	// Every row of the parent's one transaction misses the first quarter, so
-	// its item is checkpointed at counter zero and Snowflake holds no token
+	// its item is checkpointed with nothing routed and Snowflake holds no token
 	// for it.
 	var skewed []string
 	for _, q := range quarters[1:] {
@@ -697,7 +697,7 @@ func TestStreamV2SplitInheritsAnEmptyChannel(t *testing.T) {
 	entries, err := parent.flush(ctx)
 	require.NoError(t, err)
 	var prior = mergeItems(entries)
-	require.Zero(t, prior[quarters[0].key()].Counter)
+	require.Zero(t, prior[quarters[0].key()].Routed)
 	parent.stop()
 
 	// The low child inherits the empty first quarter alongside the second,
@@ -717,7 +717,7 @@ func TestStreamV2SplitInheritsAnEmptyChannel(t *testing.T) {
 	// empty channel's rows survive to its target channels.
 	entries, err = child.flush(ctx)
 	require.NoError(t, err)
-	require.Equal(t, int64(2), mergeItems(entries)[quarters[0].key()].Counter)
+	require.Equal(t, int64(2), mergeItems(entries)[quarters[0].key()].Routed)
 	require.NoError(t, child.acknowledged(ctx))
 	require.Equal(t, channelNames(task, 1, targets), activeNames(child))
 	entries, err = child.flush(ctx)

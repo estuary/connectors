@@ -231,8 +231,8 @@ func TestStreamV2Manager(t *testing.T) {
 	var commitOutstanding = func(t *testing.T, m *streamV2Manager) {
 		for _, c := range m.bindings[0].channels {
 			require.NoError(t, c.pipe.wait())
-			if c.counter > c.committed {
-				_, err := m.client.WaitCommit(ctx, c.name, c.offsetToken(c.counter))
+			if c.progress.routed > c.progress.committed {
+				_, err := m.client.WaitCommit(ctx, c.name, c.offsetToken(c.progress.routed))
 				require.NoError(t, err)
 			}
 		}
@@ -285,7 +285,7 @@ func TestStreamV2Manager(t *testing.T) {
 		entries, err := m.flush(ctx)
 		require.NoError(t, err)
 		require.Len(t, entries, 1)
-		require.Equal(t, int64(100), soleItem(t, entries, 0).Counter)
+		require.Equal(t, int64(100), soleItem(t, entries, 0).Routed)
 		require.Equal(t, 100, countRows())
 
 		// VARIANT columns must round-trip as real JSON objects, not strings.
@@ -294,16 +294,16 @@ func TestStreamV2Manager(t *testing.T) {
 		require.Equal(t, "OBJECT", docType)
 
 		// A transaction which stores nothing for the binding reports no item, so
-		// the counter already in the checkpoint stands.
+		// the routed index already in the checkpoint stands.
 		entries, err = m.flush(ctx)
 		require.NoError(t, err)
 		require.Empty(t, entries)
 
-		// The counter continues across transactions rather than restarting.
+		// The routed index continues across transactions rather than restarting.
 		writeRows(m, 100, 150)
 		entries, err = m.flush(ctx)
 		require.NoError(t, err)
-		require.Equal(t, int64(150), soleItem(t, entries, 0).Counter)
+		require.Equal(t, int64(150), soleItem(t, entries, 0).Routed)
 		require.Equal(t, 150, countRows())
 	})
 
@@ -322,7 +322,7 @@ func TestStreamV2Manager(t *testing.T) {
 		writeRows(m, 0, 50)
 		entries, err := m.flush(ctx)
 		require.NoError(t, err)
-		require.Equal(t, int64(50), soleItem(t, entries, 0).Counter)
+		require.Equal(t, int64(50), soleItem(t, entries, 0).Routed)
 		require.Equal(t, 50, countRows())
 	})
 
@@ -352,13 +352,13 @@ func TestStreamV2Manager(t *testing.T) {
 
 		writeRows(m2, 0, 5)
 		var c2 = m2.bindings[0].channels[0]
-		require.Equal(t, int64(4), c2.committed)
+		require.Equal(t, int64(4), c2.progress.committed)
 		entries, err := m2.flush(ctx)
 		require.NoError(t, err)
-		require.Equal(t, int64(5), soleItem(t, entries, 0).Counter)
+		require.Equal(t, int64(5), soleItem(t, entries, 0).Routed)
 		require.Equal(t, 5, countRows())
 
-		// A second interruption, now with a checkpoint counter to reconcile the
+		// A second interruption, now with a checkpointed routed index to reconcile the
 		// committed token against.
 		var checkpointed = soleItem(t, entries, 0)
 		writeRows(m2, 5, 8)
@@ -372,10 +372,10 @@ func TestStreamV2Manager(t *testing.T) {
 		m3.addBinding(cfg.Database, cfg.Schema, tableName, tgt, priorOf(checkpointed))
 
 		writeRows(m3, 5, 8)
-		require.Equal(t, int64(7), m3.bindings[0].channels[0].committed)
+		require.Equal(t, int64(7), m3.bindings[0].channels[0].progress.committed)
 		entries, err = m3.flush(ctx)
 		require.NoError(t, err)
-		require.Equal(t, int64(8), soleItem(t, entries, 0).Counter)
+		require.Equal(t, int64(8), soleItem(t, entries, 0).Routed)
 		require.Equal(t, 8, countRows())
 	})
 
@@ -407,14 +407,14 @@ func TestStreamV2Manager(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, parentEntries[0], 4, "one item per channel of the target layout")
 		for _, item := range parentEntries[0] {
-			require.Equal(t, int64(5), item.Counter)
+			require.Equal(t, int64(5), item.Routed)
 		}
 		require.Equal(t, 20, countRows())
 		parent.stop()
 
 		// The low child. Its own targets are the low half's quarters, so the
 		// two channels it inherits are not targets: its first flush writes
-		// their advanced counters and declares the layout it converges to.
+		// their advanced routed indices and declares the layout it converges to.
 		var low = newManager(lowHalf)
 		low.addBinding(cfg.Database, cfg.Schema, tableName, tgt, parentEntries[0])
 
@@ -429,10 +429,10 @@ func TestStreamV2Manager(t *testing.T) {
 			require.NotNil(t, item)
 			var r = streamV2Range{keyBegin: item.KeyBegin, keyEnd: item.KeyEnd}
 			if slices.Contains(lowTargets, r) {
-				require.Zero(t, item.Counter, "a declaration is durable before anything routes to its channel")
+				require.Zero(t, item.Routed, "a declaration is durable before anything routes to its channel")
 				declaredCount++
 			} else {
-				advanced += item.Counter
+				advanced += item.Routed
 			}
 		}
 		require.Equal(t, 4, declaredCount)
@@ -450,7 +450,7 @@ func TestStreamV2Manager(t *testing.T) {
 		require.Len(t, low.bindings[0].channels, 4)
 		for i, c := range low.bindings[0].channels {
 			require.Equal(t, lowTargets[i], c.keyRange)
-			require.Zero(t, c.counter)
+			require.Zero(t, c.progress.routed)
 		}
 
 		storeKeys(t, low, keysHashingInto(lowShard, "split-low-post", 4))
@@ -525,20 +525,20 @@ func TestStreamV2Manager(t *testing.T) {
 			m.addBinding(cfg.Database, cfg.Schema, tableName, tgt, parentEntries[0])
 			storeKeys(t, m, keysWithin(replay, child.cover))
 			for _, c := range m.bindings[0].channels {
-				require.Equal(t, int64(4), c.committed)
-				require.Equal(t, c.committed, c.counter, "the replay must land exactly at the committed token")
+				require.Equal(t, int64(4), c.progress.committed)
+				require.Equal(t, c.progress.committed, c.progress.routed, "the replay must land exactly at the committed token")
 			}
 			entries, err := m.flush(ctx)
 			require.NoError(t, err)
 			var caughtUp, declared int
 			for _, item := range entries[0] {
-				switch item.Counter {
+				switch item.Routed {
 				case 4:
 					caughtUp++
 				case 0:
 					declared++
 				default:
-					t.Fatalf("channel %s reports counter %d, want 4 (inherited) or 0 (declared)", item.Channel, item.Counter)
+					t.Fatalf("channel %s reports routed %d, want 4 (inherited) or 0 (declared)", item.Channel, item.Routed)
 				}
 			}
 			require.Equal(t, 2, caughtUp)
@@ -607,11 +607,11 @@ func TestStreamV2Manager(t *testing.T) {
 		require.Len(t, parent.bindings[0].channels, 8, "the parent inherits both children's channels")
 		for _, c := range parent.bindings[0].channels {
 			if c.keyRange == lowTargets[0] {
-				require.Equal(t, int64(4), c.committed)
+				require.Equal(t, int64(4), c.progress.committed)
 			} else {
-				require.Equal(t, int64(2), c.committed)
+				require.Equal(t, int64(2), c.progress.committed)
 			}
-			require.Equal(t, c.committed, c.counter)
+			require.Equal(t, c.progress.committed, c.progress.routed)
 		}
 
 		storeKeys(t, parent, keysHashingInto(fullShard, "join-new", 4))
@@ -695,7 +695,7 @@ func TestStreamV2Manager(t *testing.T) {
 		var channel = dropped.name
 		entries, err := m.flush(ctx)
 		require.NoError(t, err)
-		require.Equal(t, int64(3), soleItem(t, entries, 0).Counter)
+		require.Equal(t, int64(3), soleItem(t, entries, 0).Routed)
 
 		client, err := m.ensureStarted(ctx)
 		require.NoError(t, err)
@@ -741,10 +741,10 @@ func TestStreamV2Manager(t *testing.T) {
 
 			writeRows(reused, 100, 104)
 			require.Equal(t, channel, reused.bindings[0].channels[0].name)
-			require.Zero(t, reused.bindings[0].channels[0].committed)
+			require.Zero(t, reused.bindings[0].channels[0].progress.committed)
 			entries, err := reused.flush(ctx)
 			require.NoError(t, err)
-			require.Equal(t, int64(4), soleItem(t, entries, 0).Counter)
+			require.Equal(t, int64(4), soleItem(t, entries, 0).Routed)
 			require.Equal(t, 7, countRows())
 		})
 
@@ -802,7 +802,7 @@ func TestStreamV2Manager(t *testing.T) {
 		var c = m.bindings[0].channels[0]
 		entries, err := m.flush(ctx)
 		require.NoError(t, err)
-		require.Equal(t, int64(3), soleItem(t, entries, 0).Counter)
+		require.Equal(t, int64(3), soleItem(t, entries, 0).Routed)
 		require.Equal(t, 3, countRowsIn(backfillTable))
 
 		// The backfill's effect on this table: a truncate, not a drop.
@@ -819,7 +819,7 @@ func TestStreamV2Manager(t *testing.T) {
 		writeRows(m, 3, 5)
 		entries, err = m.flush(ctx)
 		require.NoError(t, err)
-		require.Equal(t, int64(5), soleItem(t, entries, 0).Counter)
+		require.Equal(t, int64(5), soleItem(t, entries, 0).Routed)
 		require.Equal(t, 2, countRowsIn(backfillTable))
 	})
 
@@ -896,9 +896,9 @@ func TestStreamV2Manager(t *testing.T) {
 		// appended, and the row count is unchanged by the attempt.
 		var rowsBefore = countRows()
 
-		t.Run("committed token below the checkpoint counter", func(t *testing.T) {
+		t.Run("committed token below the checkpointed routed index", func(t *testing.T) {
 			var ahead = checkpointed
-			ahead.Counter = 100
+			ahead.Routed = 100
 
 			var m2 = newManager(fullRange)
 			m2.addBinding(cfg.Database, cfg.Schema, tableName, tgt, priorOf(&ahead))
@@ -970,7 +970,7 @@ func TestStreamV2Manager(t *testing.T) {
 
 		// Backfilling the binding is the recovery the failure asks for: it
 		// rotates the channel, whose row-error count starts at zero along with
-		// its document counter.
+		// its routed index.
 		var backfilled = notNullTarget
 		backfilled.StateKey = noncedStateKey("notnull.v2")
 
@@ -1175,7 +1175,7 @@ func TestStreamV2Datatypes(t *testing.T) {
 			entries, err := m.flush(ctx)
 			require.NoError(t, err)
 			require.Len(t, entries, 1, "only the binding stored to this transaction reports an item")
-			require.Equal(t, int64(len(tt.vals)), soleItem(t, entries, binding).Counter)
+			require.Equal(t, int64(len(tt.vals)), soleItem(t, entries, binding).Routed)
 
 			dump, err := sql.StdDumpTable(ctx, db, tbl)
 			require.NoError(t, err)

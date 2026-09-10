@@ -12,7 +12,7 @@
 ### Fixed
 - Fix channel closed panic when debug logging is enabled.
 
-## 2026-09-09
+## 2026-09-10
 
 ### Added
 - New `snowpipe_streaming_v2` feature flag (off by default). Delta-updates

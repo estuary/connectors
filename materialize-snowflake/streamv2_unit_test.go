@@ -20,15 +20,15 @@ import (
 // v2 driver checkpoint against the only runtime this write path runs on. Every
 // shard of a v2 task merge-patches its connector state into one task-global
 // document, so two shards of the same binding write the same JSON path. The
-// counter each records is durable state rather than pending work, so it needs a
+// item each records is durable state rather than pending work, so it needs a
 // key of its own: keyed by state key alone it is overwritten by whichever
 // sibling reduced last, and the survivor is then reconciled against a channel it
 // does not describe.
 func TestStreamV2CheckpointHoldsOneItemPerChannel(t *testing.T) {
 	const stateKey = "shared.v1"
 	const loChannel, hiChannel = "task_00000000_shared_v1", "task_80000000_shared_v1"
-	var lo = fmt.Sprintf(`{"Channel":%q,"Counter":7,"KeyBegin":0,"KeyEnd":2147483647}`, loChannel)
-	var hi = fmt.Sprintf(`{"Channel":%q,"Counter":3,"KeyBegin":2147483648,"KeyEnd":4294967295}`, hiChannel)
+	var lo = fmt.Sprintf(`{"Channel":%q,"Routed":7,"KeyBegin":0,"KeyEnd":2147483647}`, loChannel)
+	var hi = fmt.Sprintf(`{"Channel":%q,"Routed":3,"KeyBegin":2147483648,"KeyEnd":4294967295}`, hiChannel)
 
 	// Under one key per state key the two shards collide: a merge patch replaces
 	// the scalars of the object they share, so only the shard which reduced last
@@ -41,7 +41,7 @@ func TestStreamV2CheckpointHoldsOneItemPerChannel(t *testing.T) {
 	require.NotContains(t, string(collided), loChannel)
 
 	// Under one key per channel, each shard patches a key of its own and both
-	// counters survive the reduce.
+	// items survive the reduce.
 	reduced, err := jsonpatch.MergePatch(
 		fmt.Appendf(nil, `{%q:{"StreamV2":{%q:%s}}}`, stateKey, loChannel, lo),
 		fmt.Appendf(nil, `{%q:{"StreamV2":{%q:%s}}}`, stateKey, hiChannel, hi),
@@ -54,13 +54,13 @@ func TestStreamV2CheckpointHoldsOneItemPerChannel(t *testing.T) {
 }
 
 // TestStreamV2CommitPrecedesCheckpoint pins where the commit is awaited. The
-// driver checkpoint records a counter as appended, and Snowflake's committed
-// offset token is what the next Open reconciles that counter against. The
+// driver checkpoint records a routed index, and Snowflake's committed offset
+// token is what the next Open reconciles that index against. The
 // runtime's own checkpoint is durable before Acknowledge runs, so a commit
-// awaited there cannot fail the transaction whose counter it belongs to: the
-// task would resume from a counter Snowflake never committed, which Open can
+// awaited there cannot fail the transaction whose item it belongs to: the
+// task would resume from an index Snowflake never committed, which Open can
 // only reject, and no replay can re-append rows the runtime considers
-// delivered. So the wait belongs to the call which produces the counter.
+// delivered. So the wait belongs to the call which produces the item.
 func TestStreamV2CommitPrecedesCheckpoint(t *testing.T) {
 	var ctx = context.Background()
 	singleChannelLayout(t)
@@ -133,7 +133,7 @@ func TestStreamV2RejectedRows(t *testing.T) {
 
 		// The rejection is the transaction's own, so it must fail the transaction
 		// rather than the one after it: the count is read as the commit is awaited,
-		// which is before the counter reaches the checkpoint.
+		// which is before the routed index reaches the checkpoint.
 		entries, err := m.flush(ctx)
 		require.ErrorContains(t, err, "1 row(s) rejected")
 		require.ErrorContains(t, err, channel)
@@ -147,7 +147,7 @@ func TestStreamV2RejectedRows(t *testing.T) {
 		// replay can append, and whether or not this session appends at all — is
 		// what stops that replay from acknowledging rows Snowflake does not hold.
 		t.Setenv("FAKE_SIDECAR_ROWS_ERROR_COUNT", "3")
-		var m = newManager(t, &streamV2Item{Counter: 2})
+		var m = newManager(t, &streamV2Item{Routed: 2})
 
 		require.ErrorContains(t, testWriteRow(ctx, m, 0, []any{"kept", "v", nil}), "3 row(s) rejected")
 	})
@@ -194,7 +194,7 @@ func TestStreamV2DropChannel(t *testing.T) {
 	var channel = first.bindings[0].channels[0].name
 	entries, err := first.flush(ctx)
 	require.NoError(t, err)
-	require.Equal(t, int64(3), soleItem(t, entries, 0).Counter)
+	require.Equal(t, int64(3), soleItem(t, entries, 0).Routed)
 	first.stop()
 
 	// Undropped, that channel wedges the next shard to derive its name: the
@@ -203,7 +203,7 @@ func TestStreamV2DropChannel(t *testing.T) {
 	var reused = newSession(t)
 	require.NoError(t, testWriteRow(ctx, reused, 0, []any{"k", 0}))
 	require.Equal(t, channel, reused.bindings[0].channels[0].name)
-	require.Equal(t, int64(3), reused.bindings[0].channels[0].committed)
+	require.Equal(t, int64(3), reused.bindings[0].channels[0].progress.committed)
 	reused.stop()
 
 	// Dropping it is what makes the name reusable. The dropping session opens
@@ -229,11 +229,11 @@ func TestStreamV2DropChannel(t *testing.T) {
 	var after = newSession(t)
 	require.NoError(t, testWriteRow(ctx, after, 0, []any{"k", 0}))
 	require.Equal(t, channel, after.bindings[0].channels[0].name)
-	require.Zero(t, after.bindings[0].channels[0].committed)
+	require.Zero(t, after.bindings[0].channels[0].progress.committed)
 
 	entries, err = after.flush(ctx)
 	require.NoError(t, err)
-	require.Equal(t, int64(1), soleItem(t, entries, 0).Counter)
+	require.Equal(t, int64(1), soleItem(t, entries, 0).Routed)
 }
 
 // TestStreamV2ChannelTask pins the parser that recognizes the v2 channel name of any
@@ -369,7 +369,7 @@ func TestReconcileStreamV2Channel(t *testing.T) {
 	// The channel under reconciliation covers one quarter of the key space.
 	var r = streamV2Range{keyBegin: 0x10000000, keyEnd: 0x1fffffff}
 	var item = func(counter int64) *streamV2Item {
-		return &streamV2Item{Channel: "chan", Counter: counter, KeyBegin: r.keyBegin, KeyEnd: r.keyEnd}
+		return &streamV2Item{Channel: "chan", Routed: counter, KeyBegin: r.keyBegin, KeyEnd: r.keyEnd}
 	}
 
 	for _, tt := range []struct {
@@ -392,7 +392,7 @@ func TestReconcileStreamV2Channel(t *testing.T) {
 			// specification finds when it restarts into a backfill. The one drop this
 			// connector makes itself is recognized before reconciliation, by the
 			// declaration in the checkpoint, so it never reaches here.
-			name:       "nothing committed with a checkpointed counter is rejected",
+			name:       "nothing committed with a checkpointed routed index is rejected",
 			committed:  nil,
 			item:       item(42),
 			priorItems: 1,
@@ -436,10 +436,10 @@ func TestReconcileStreamV2Channel(t *testing.T) {
 		},
 		{
 			// The token's range must be the channel's own key range whatever the
-			// counters say: the key range is in the channel's name, so every token
+			// indices say: the key range is in the channel's name, so every token
 			// this write path appends under it carries that key range. This guard is
 			// unconditional where the old shard-range guard applied only beyond the
-			// counter — a channel and its token can no longer drift apart by a
+			// routed index — a channel and its token can no longer drift apart by a
 			// topology change, so a mismatch is always foreign.
 			name:       "a token for another key range is rejected at a clean count",
 			committed:  token("42@10000000-2fffffff"),
