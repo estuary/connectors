@@ -3,9 +3,11 @@ import asyncio
 import base64
 import json
 import time
+import zlib
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from dataclasses import dataclass, field
 from logging import Logger
-from typing import Any, AsyncGenerator, Awaitable, Callable, Protocol, TypeVar
+from typing import Any, Protocol, TypeVar
 
 import aiohttp
 from google.auth.credentials import TokenState as GoogleTokenState
@@ -15,6 +17,14 @@ from multidict import CIMultiDictProxy
 from pydantic import BaseModel
 
 from . import Mixin
+from .content_encoding import (
+    ContentCodingChainTooDeep,
+    TruncatedContentStream,
+    UnsupportedContentCoding,
+    decompress,
+    decompress_stream,
+    parse_content_codings,
+)
 from .flow import (
     AccessToken,
     AuthorizationCodeFlowOAuth2Credentials,
@@ -80,6 +90,39 @@ class HTTPError(RuntimeError):
         super().__init__(message)
         self.code = code
         self.message = message
+
+
+def _response_codings(resp: aiohttp.ClientResponse) -> list[str]:
+    return parse_content_codings(resp.headers.get(aiohttp.hdrs.CONTENT_ENCODING, ""))
+
+
+async def read_error_body(log: Logger, resp: "aiohttp.ClientResponse") -> bytes:
+    """
+    Read an error response body, undoing any content codings aiohttp left.
+
+    Never raises. A body we can't decode is returned as-is: the caller is in
+    the middle of reporting an HTTP error, and losing that error is worse
+    than reporting it with a mangled body.
+    """
+    body = await resp.read()
+    try:
+        return await decompress(body, _response_codings(resp))
+    except (
+        OSError,
+        EOFError,
+        zlib.error,
+        UnsupportedContentCoding,
+        ContentCodingChainTooDeep,
+        TruncatedContentStream,
+    ) as exc:
+        log.warning(
+            "could not undo content codings on an error response body; reporting it as received",
+            {
+                "content_encoding": resp.headers.get(aiohttp.hdrs.CONTENT_ENCODING),
+                "error": format_error_message(exc),
+            },
+        )
+        return body
 
 
 def format_error_body(body: bytes) -> str:
@@ -652,7 +695,7 @@ class HTTPMixin(Mixin, HTTPSession):
                         )
 
                 elif resp.status >= 500 and resp.status < 600:
-                    body = await resp.read()
+                    body = await read_error_body(log, resp)
 
                     if should_retry is None or should_retry(
                         resp.status, resp.headers, body, attempt
@@ -671,7 +714,7 @@ class HTTPMixin(Mixin, HTTPSession):
                             resp.status,
                         )
                 elif resp.status >= 400 and resp.status < 500:
-                    body = await resp.read()
+                    body = await read_error_body(log, resp)
                     raise HTTPError(
                         f"Encountered HTTP error status {resp.status} which cannot be retried.\nURL: {resp.request_info.url}\nResponse:\n{format_error_body(body)}",
                         resp.status,
@@ -679,14 +722,33 @@ class HTTPMixin(Mixin, HTTPSession):
                 else:
                     resp.raise_for_status()
 
+                    response_headers = resp.headers
+
+                    if codings := _response_codings(resp):
+                        log.debug(
+                            "undoing content codings left on the response body",
+                            {
+                                "url": url,
+                                "content_encoding": response_headers.get(
+                                    aiohttp.hdrs.CONTENT_ENCODING
+                                ),
+                            },
+                        )
+
                     async def body_generator() -> AsyncGenerator[bytes, None]:
                         try:
-                            async for chunk in resp.content.iter_any():
+                            # The decoder stack must be built inside this
+                            # generator. The caller then iterates it
+                            # directly, so every stop (normal end, decoder
+                            # error, cancellation) runs the `finally` below
+                            # and releases the connection.
+                            async for chunk in decompress_stream(
+                                resp.content.iter_any(), codings
+                            ):
                                 yield chunk
                         finally:
                             await resp.release()
 
-                    response_headers = resp.headers
                     should_release_response = False
                     return (response_headers, body_generator)
 
