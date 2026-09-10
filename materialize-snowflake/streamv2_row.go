@@ -11,29 +11,29 @@ import (
 	"unicode/utf8"
 )
 
-// rowColumn is one column of a binding's row object, as the streaming v2 write
-// path writes it.
-type rowColumn struct {
+// columnName is one column's name, raw and in serialized form. Snowpipe Streaming
+// ingests each row as a JSON object with one entry per column, keyed by column
+// name, so the serialized form is computed once and copied into every row.
+type columnName struct {
 	// prefix introduces the column's value: its quoted and escaped name followed
 	// by a colon, preceded by the comma which separates it from the value before
 	// it. The first value written skips that leading byte, which is cheaper than
 	// tracking a separator across a loop whose iterations are skipped for nil.
 	prefix []byte
-	// name reports the column in an encoding failure, where the prefix's escaped
+	// raw reports the column in an encoding failure, where the prefix's escaped
 	// form would be noise.
-	name string
+	raw string
 }
 
-// rowColumnsOf precomputes the row-object prefix of each named column, so that
-// every stored row pays neither the quoting nor the escaping of the names it
-// repeats.
-func rowColumnsOf(names []string) []rowColumn {
-	var columns = make([]rowColumn, len(names))
+// columnNamesOf serializes each name once, so no stored row pays for quoting or
+// escaping the names it repeats.
+func columnNamesOf(names []string) []columnName {
+	var columnNames = make([]columnName, len(names))
 	for i, name := range names {
 		var prefix = appendJSONString([]byte{','}, name)
-		columns[i] = rowColumn{prefix: append(prefix, ':'), name: name}
+		columnNames[i] = columnName{prefix: append(prefix, ':'), raw: name}
 	}
-	return columns
+	return columnNames
 }
 
 // appendRowJSON writes one converted document into buf as a JSON object keyed by
@@ -51,7 +51,7 @@ func rowColumnsOf(names []string) []rowColumn {
 // A value JSON cannot represent fails the row, leaving buf as it was given,
 // because a half-written row would otherwise corrupt the payload of every row
 // batched alongside it rather than just failing this one.
-func appendRowJSON(buf []byte, columns []rowColumn, converted []any) ([]byte, error) {
+func appendRowJSON(buf []byte, columnNames []columnName, converted []any) ([]byte, error) {
 	var start = len(buf)
 	buf = append(buf, '{')
 
@@ -61,7 +61,7 @@ func appendRowJSON(buf []byte, columns []rowColumn, converted []any) ([]byte, er
 			continue
 		}
 
-		var prefix = columns[i].prefix
+		var prefix = columnNames[i].prefix
 		if first {
 			prefix, first = prefix[1:], false
 		}
@@ -69,7 +69,7 @@ func appendRowJSON(buf []byte, columns []rowColumn, converted []any) ([]byte, er
 
 		var err error
 		if buf, err = appendValueJSON(buf, value); err != nil {
-			return buf[:start], fmt.Errorf("column %s: %w", columns[i].name, err)
+			return buf[:start], fmt.Errorf("column %s: %w", columnNames[i].raw, err)
 		}
 	}
 

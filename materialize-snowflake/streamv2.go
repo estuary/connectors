@@ -393,14 +393,11 @@ func (c *streamV2Channel) offsetToken(index int64) string {
 }
 
 type streamV2Binding struct {
-	database string
-	schema   string
-	table    string
-	stateKey string
-	// columns holds the row-object prefix of each Snowflake column, in the same order
-	// as the output of Table.ConvertAll. The append writes row objects by name, and the
-	// SDK ingests them.
-	columns []rowColumn
+	database    string
+	schema      string
+	table       string
+	stateKey    string
+	columnNames []columnName
 	// prior is the streaming v2 state that the driver checkpoint recorded for this
 	// binding. The map key is the channel's key range, and the map covers every shard
 	// of the task. It is nil when the checkpoint recorded no state.
@@ -581,12 +578,12 @@ func (m *streamV2Manager) addBinding(database, schema, table string, target sql.
 	}
 
 	m.bindings[target.Binding] = &streamV2Binding{
-		database: database,
-		schema:   schema,
-		table:    table,
-		stateKey: target.StateKey,
-		columns:  rowColumnsOf(names),
-		prior:    prior,
+		database:    database,
+		schema:      schema,
+		table:       table,
+		stateKey:    target.StateKey,
+		columnNames: columnNamesOf(names),
+		prior:       prior,
 	}
 }
 
@@ -1281,7 +1278,7 @@ func (m *streamV2Manager) writeRow(ctx context.Context, binding int, packedKey [
 		return nil
 	}
 
-	var grew, err = c.bufferRow(index, b.columns, converted)
+	var grew, err = c.bufferRow(index, b.columnNames, converted)
 	if err != nil {
 		return fmt.Errorf("encoding row for %s: %w", b.table, err)
 	}
@@ -1306,7 +1303,7 @@ func (m *streamV2Manager) writeRow(ctx context.Context, binding int, packedKey [
 // This is the whole of the encoding this path does. appendRowJSON copies through the
 // values that reach it already encoded, and nothing rescans the row after it. The bytes
 // written here are the bytes the append carries.
-func (c *streamV2Channel) bufferRow(index int64, columns []rowColumn, converted []any) (int, error) {
+func (c *streamV2Channel) bufferRow(index int64, columnNames []columnName, converted []any) (int, error) {
 	var before = len(c.buf)
 	if c.bufRows == 0 {
 		c.startBatch()
@@ -1315,7 +1312,7 @@ func (c *streamV2Channel) bufferRow(index int64, columns []rowColumn, converted 
 		c.buf = append(c.buf, ',')
 	}
 
-	var payload, err = appendRowJSON(c.buf, columns, converted)
+	var payload, err = appendRowJSON(c.buf, columnNames, converted)
 	if err != nil {
 		c.buf = c.buf[:before]
 		return 0, err
@@ -1678,7 +1675,7 @@ func (m *streamV2Manager) stop() {
 }
 
 // unquotedIdentifier removes SQL identifier quotes. It returns the exact name that
-// Snowflake stores, which a row object needs to name its columns.
+// Snowflake stores, which is the name each row's JSON entry is keyed by.
 func unquotedIdentifier(ident string) string {
 	if strings.HasPrefix(ident, `"`) && strings.HasSuffix(ident, `"`) && len(ident) >= 2 {
 		return strings.ReplaceAll(ident[1:len(ident)-1], `""`, `"`)

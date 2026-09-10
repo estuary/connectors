@@ -53,7 +53,7 @@ func requireEquivalent(t *testing.T, names []string, converted []any) []byte {
 	var want, err = rowViaMap(names, converted)
 	require.NoError(t, err)
 
-	got, err := appendRowJSON(nil, rowColumnsOf(names), converted)
+	got, err := appendRowJSON(nil, columnNamesOf(names), converted)
 	require.NoError(t, err)
 
 	require.Equal(t, decodedJSON(t, want), decodedJSON(t, got))
@@ -166,7 +166,7 @@ func TestStreamV2RowOmitsNilColumns(t *testing.T) {
 }
 
 func TestStreamV2RowRejectsUnrepresentableFloats(t *testing.T) {
-	var columns = rowColumnsOf([]string{"A", "B"})
+	var columns = columnNamesOf([]string{"A", "B"})
 
 	for _, tc := range []struct {
 		name  string
@@ -194,7 +194,7 @@ func TestStreamV2RowRejectsUnrepresentableFloats(t *testing.T) {
 }
 
 func TestStreamV2RowPreEncodedLineBreaks(t *testing.T) {
-	var columns = rowColumnsOf([]string{"DOC"})
+	var columns = columnNamesOf([]string{"DOC"})
 
 	t.Run("a line break is compacted away", func(t *testing.T) {
 		var raw = json.RawMessage("{\"a\": 1,\n  \"b\": \"text\\nwith an escaped break\"\r\n}")
@@ -228,7 +228,7 @@ func TestStreamV2RowPreEncodedLineBreaks(t *testing.T) {
 }
 
 func TestStreamV2BatchPayload(t *testing.T) {
-	var columns = rowColumnsOf([]string{"KEY", "VAL", "DOC"})
+	var columns = columnNamesOf([]string{"KEY", "VAL", "DOC"})
 	var newChannel = func() *streamV2Channel {
 		return &streamV2Channel{}
 	}
@@ -364,7 +364,7 @@ func BenchmarkStreamV2RowEncoding(b *testing.B) {
 	for i := range rows {
 		_, rows[i] = benchmarkRow(i)
 	}
-	var columns = rowColumnsOf(names)
+	var columns = columnNamesOf(names)
 
 	b.Run("direct", func(b *testing.B) {
 		b.ReportAllocs()
