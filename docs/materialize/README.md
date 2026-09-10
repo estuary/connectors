@@ -715,8 +715,11 @@ remains valid.
   bulk-write results are examples.
 - `total`: only the number of affected rows is known
   (`m.TotalRowStats(n)`), summed across a binding's statements in the round.
-  Postgres, MySQL, SQL Server, Redshift, MotherDuck, Fabric, SQLite and
-  append-only sinks that count records written report at this level.
+  Postgres, MySQL, SQL Server, Redshift, MotherDuck, Fabric, SQLite,
+  ClickHouse (rows moved from its stage table) and Pinecone (upserted vector
+  count) report at this level, as do sinks whose API acknowledges each record
+  without a count and so report the records it accepted: Spanner, DynamoDB,
+  Bigtable, HubSpot, SNS, EventBridge, webhooks and the file sinks.
 - `none`: no usable result (a zero `RowStats`, or no report at all).
 
 Each driver owns the correctness of its number: it must count only rows of the

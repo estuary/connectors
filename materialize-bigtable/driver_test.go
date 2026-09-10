@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"testing"
 
+	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate/testutil"
 	"github.com/stretchr/testify/require"
 )
@@ -54,7 +55,7 @@ func TestIntegration(t *testing.T) {
 
 	t.Run("materialize", func(t *testing.T) {
 		boilerplate.RunMaterializationTest(t, NewMaterializer, materializeSpec, makeResourceFn, nil,
-			boilerplate.RuntimeConfig{Shards: 1})
+			boilerplate.RuntimeConfig{Shards: 1, Fidelity: m.FidelityTotal})
 	})
 
 	t.Run("apply", func(t *testing.T) {

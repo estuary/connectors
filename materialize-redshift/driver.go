@@ -778,8 +778,9 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 		var b = d.bindings[it.Binding]
 		if b.staged == nil {
-			b.staged = &stateItem{ID: uuid.NewString()}
+			b.staged = &stateItem{ID: uuid.NewString(), Round: it.Round}
 		}
+		b.staged.Rows++
 		var file *stagedFile
 
 		var err error
@@ -950,6 +951,14 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	return &pf.ConnectorState{UpdatedJson: patch, MergePatch: true}, nil
 }
 
+// lastCopyCount is the number of rows the session's most recent COPY loaded.
+// COPY's command tag carries no row count, unlike DELETE.
+func lastCopyCount(ctx context.Context, txn pgx.Tx) (int64, error) {
+	var n int64
+	err := txn.QueryRow(ctx, "SELECT pg_last_copy_count()").Scan(&n)
+	return n, err
+}
+
 // commit runs the staged transactions of pending as one Redshift
 // transaction, skipping any whose token is already committed. legacyCheckpoint,
 // when non-nil, is mirrored into the checkpoints row alongside the tokens.
@@ -960,6 +969,10 @@ func (d *transactor) commit(ctx context.Context, pending connectorState, legacyC
 		binding                       *binding
 		merged                        stateItem
 		storeManifest, deleteManifest string
+		// round is this shard's own entry's round when it has one, else the
+		// first merged entry's; a multi-shard commit is unchecked anyway.
+		round    int
+		hasRound bool
 	}
 	var groups []*group
 	var tokensMap = make(checkpointTokensMap)
@@ -981,6 +994,10 @@ func (d *transactor) commit(ctx context.Context, pending connectorState, legacyC
 			g.merged.StoreFiles = append(g.merged.StoreFiles, e.StoreFiles...)
 			g.merged.DeleteFiles = append(g.merged.DeleteFiles, e.DeleteFiles...)
 			g.merged.MustMerge = g.merged.MustMerge || e.MustMerge
+			g.merged.Rows += e.Rows
+			if rk == d.rangeKey || !g.hasRound {
+				g.round, g.hasRound = e.Round, true
+			}
 			for _, column := range e.Widen {
 				if !slices.Contains(g.merged.Widen, column) {
 					g.merged.Widen = append(g.merged.Widen, column)
@@ -1073,6 +1090,9 @@ func (d *transactor) commit(ctx context.Context, pending connectorState, legacyC
 	for _, g := range groups {
 		var b = g.binding
 		d.be.StartedResourceCommit(b.target.Path)
+		// affected sums the target rows each statement reports touching, for
+		// the transaction health report.
+		var affected int64
 
 		if g.deleteManifest != "" {
 			// Create the temporary table for staging values to delete from the target table.
@@ -1092,8 +1112,10 @@ func (d *transactor) commit(ctx context.Context, pending connectorState, legacyC
 				return err
 			} else if _, err := txn.Exec(ctx, copySQL); err != nil {
 				return handleCopyIntoErr(ctx, txn, d.cfg.Bucket, g.merged.DeleteFiles, b.target.Identifier, err)
-			} else if _, err := txn.Exec(ctx, b.deleteQuerySQL); err != nil {
+			} else if tag, err := txn.Exec(ctx, b.deleteQuerySQL); err != nil {
 				return fmt.Errorf("deleting from table '%s': %w", b.target.Identifier, err)
+			} else {
+				affected += tag.RowsAffected()
 			}
 		}
 
@@ -1117,8 +1139,15 @@ func (d *transactor) commit(ctx context.Context, pending connectorState, legacyC
 				return err
 			} else if _, err := txn.Exec(ctx, copySQL); err != nil {
 				return handleCopyIntoErr(ctx, txn, d.cfg.Bucket, g.merged.StoreFiles, b.target.Identifier, err)
+			} else if n, err := lastCopyCount(ctx, txn); err != nil {
+				return fmt.Errorf("reading rows staged for table '%s': %w", b.target.Identifier, err)
 			} else if _, err := txn.Exec(ctx, b.mergeIntoSQL); err != nil {
 				return fmt.Errorf("merging to table '%s': %w", b.target.Identifier, err)
+			} else {
+				// MERGE's command tag counts only the rows it inserted, so
+				// the rows COPY loaded into the staging table stand in for
+				// the target rows: each matches or inserts exactly one.
+				affected += n
 			}
 		} else {
 			// Can copy directly into the target table since all values are new.
@@ -1126,9 +1155,18 @@ func (d *transactor) commit(ctx context.Context, pending connectorState, legacyC
 				return err
 			} else if _, err := txn.Exec(ctx, copySQL); err != nil {
 				return handleCopyIntoErr(ctx, txn, d.cfg.Bucket, g.merged.StoreFiles, b.target.Identifier, err)
+			} else if n, err := lastCopyCount(ctx, txn); err != nil {
+				return fmt.Errorf("reading rows loaded into table '%s': %w", b.target.Identifier, err)
+			} else {
+				affected += n
 			}
 		}
 
+		stats := m.TotalRowStats(affected)
+		if g.merged.Rows > 0 {
+			stats = stats.WithStaged(g.merged.Rows)
+		}
+		d.be.ReportRowStats(g.round, b.target.Path, stats)
 		d.be.FinishedResourceCommit(b.target.Path)
 	}
 

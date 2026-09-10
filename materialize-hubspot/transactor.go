@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"iter"
+	"sync/atomic"
 
 	"github.com/estuary/connectors/go/materialize"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
@@ -19,6 +20,7 @@ const (
 
 type binding struct {
 	object     CRMObject
+	path       []string
 	properties map[string]*Property
 	idProperty *Property
 	fields     []*MappedField
@@ -63,6 +65,7 @@ func (b binding) convert(ts tuple.Tuple, doc json.RawMessage) (map[string]any, e
 type transactor struct {
 	client   *Client
 	bindings []*binding
+	be       *materialize.BindingEvents
 }
 
 var _ materialize.Transactor = (*transactor)(nil)
@@ -195,6 +198,10 @@ func (t *transactor) Store(it *materialize.StoreIterator) (materialize.StartComm
 
 	batches := make(chan *Batch)
 	group, groupCtx := errgroup.WithContext(ctx)
+	round := it.Round
+	// stored counts the records HubSpot accepted per binding, for the
+	// transaction health report.
+	stored := make([]atomic.Int64, len(t.bindings))
 
 	for range MaxConcurrentRequests {
 		group.Go(func() error {
@@ -212,6 +219,7 @@ func (t *transactor) Store(it *materialize.StoreIterator) (materialize.StartComm
 						return err
 					}
 				}
+				stored[batch.BindingIdx].Add(int64(len(batch.Items)))
 			}
 			return nil
 		})
@@ -234,8 +242,15 @@ func (t *transactor) Store(it *materialize.StoreIterator) (materialize.StartComm
 		return nil
 	})
 
-	err := group.Wait()
-	return nil, err
+	if err := group.Wait(); err != nil {
+		return nil, err
+	}
+	for i, b := range t.bindings {
+		if n := stored[i].Load(); n > 0 {
+			t.be.ReportRowStats(round, b.path, materialize.TotalRowStats(n))
+		}
+	}
+	return nil, nil
 }
 
 // BatchItem is a record to send to the Batch API.

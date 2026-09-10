@@ -29,6 +29,10 @@ type stateItem struct {
 	DeleteFiles []string `json:"deleteFiles"`
 	MustMerge   bool     `json:"mustMerge"`
 	Widen       []string `json:"widen"`
+	// Round and Rows are the transaction round that staged the entry and the
+	// rows it staged, for reporting the commit's row stats from Acknowledge.
+	Round int   `json:"round"`
+	Rows  int64 `json:"rows"`
 }
 
 // objects is every S3 object the transaction staged.

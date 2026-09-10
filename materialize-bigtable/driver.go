@@ -418,6 +418,7 @@ func (d *materialization) NewTransactor(
 	for _, mb := range mappedBindings {
 		b := binding{
 			tableName: mb.ResourcePath[0],
+			path:      mb.ResourcePath,
 			table:     d.dataClient.Open(mb.ResourcePath[0]),
 			docField:  mb.FieldSelection.Document, // Usually "flow_document", but can be projected to a different field name
 		}
@@ -429,7 +430,7 @@ func (d *materialization) NewTransactor(
 		bindings = append(bindings, b)
 	}
 
-	return &transactor{bindings: bindings, hardDelete: d.cfg.HardDelete}, nil
+	return &transactor{bindings: bindings, hardDelete: d.cfg.HardDelete, be: be}, nil
 }
 
 func (d *materialization) ListTestTasks(ctx context.Context) ([]string, error)        { return nil, nil }
