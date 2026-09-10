@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-09-10
+### Changed
+- OAuth token exchanges now use HubSpot's date-based `2026-03` OAuth API instead of the
+  deprecated v1 API, which HubSpot sunsets on February 16, 2027. Without this, OAuth
+  captures would fail at their first access token refresh after the sunset. Existing
+  captures keep working and do not need to re-authorize; refresh tokens remain valid.
+
 ## 2026-09-02
 ### Fixed
 - CRM object bindings no longer fail when the HubSpot Search API returns records out

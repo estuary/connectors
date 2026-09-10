@@ -73,7 +73,7 @@ OAUTH2_SPEC = OAuth2Spec(
         + r"&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}"
         r"&response_type=code&state={{#urlencode}}{{{ state }}}{{/urlencode}}"
     ),
-    accessTokenUrlTemplate="https://api.hubapi.com/oauth/v1/token",
+    accessTokenUrlTemplate="https://api.hubapi.com/oauth/2026-03/token",
     accessTokenHeaders={"content-type": "application/x-www-form-urlencoded"},
     accessTokenBody=(
         "grant_type=authorization_code"
