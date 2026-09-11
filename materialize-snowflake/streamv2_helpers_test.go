@@ -2,6 +2,7 @@ package connector
 
 import (
 	"context"
+	"math"
 	"testing"
 
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
@@ -21,18 +22,18 @@ func testWriteRow(ctx context.Context, m *streamV2Manager, binding int, converte
 
 // soleItem returns the one non-nil checkpoint item a flush produced for a binding,
 // for tests pinned to a single-channel layout.
-func soleItem(t *testing.T, entries map[int]map[string]*streamV2Item, binding int) *streamV2Item {
+func soleCheckpointItem(t *testing.T, entries map[int]streamV2Checkpoint, binding int) *streamV2ChannelCheckpointItem {
 	t.Helper()
-	var items []*streamV2Item
-	for _, item := range entries[binding] {
-		if item != nil {
-			items = append(items, item)
+	var sv2Checkpoint []*streamV2ChannelCheckpointItem
+	for _, sv2ChannelCheckpointItem := range entries[binding] {
+		if sv2ChannelCheckpointItem != nil {
+			sv2Checkpoint = append(sv2Checkpoint, sv2ChannelCheckpointItem)
 		}
 	}
-	if len(items) != 1 {
-		t.Fatalf("expected exactly one item for binding %d, got %d", binding, len(items))
+	if len(sv2Checkpoint) != 1 {
+		t.Fatalf("expected exactly one item for binding %d, got %d", binding, len(sv2Checkpoint))
 	}
-	return items[0]
+	return sv2Checkpoint[0]
 }
 
 // singleChannelLayout pins streamV2ChannelsPerShard to one for a test whose
@@ -44,3 +45,6 @@ func singleChannelLayout(t *testing.T) {
 	t.Cleanup(func() { streamV2ChannelsPerShard = restore })
 	streamV2ChannelsPerShard = 1
 }
+
+// fullKeyRange is the key range of a single-channel layout on an unsplit task.
+var fullKeyRange = streamV2Range{keyEnd: math.MaxUint32}

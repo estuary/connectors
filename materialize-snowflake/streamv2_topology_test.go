@@ -26,7 +26,7 @@ import (
 
 // newTopologyManager builds a manager standing for one shard of a task. Its
 // sessions share whatever FAKE_SIDECAR_STATE names.
-func newTopologyManager(t *testing.T, task string, keyBegin, keyEnd uint32, prior map[string]*streamV2Item) *streamV2Manager {
+func newTopologyManager(t *testing.T, task string, keyBegin, keyEnd uint32, prior streamV2Checkpoint) *streamV2Manager {
 	t.Helper()
 	var m = newStreamV2Manager(context.Background(),
 		&config{Credentials: &snowflake_auth.CredentialConfig{}}, task, "acct",
@@ -99,21 +99,21 @@ func storeKeys(t *testing.T, m *streamV2Manager, keys []string) {
 
 // mergeItems collects the non-nil items of a flush's entries for binding zero,
 // keyed by key range, as the durable checkpoint would carry them forward.
-func mergeItems(entries map[int]map[string]*streamV2Item) map[string]*streamV2Item {
-	var items = make(map[string]*streamV2Item)
-	for key, item := range entries[0] {
-		if item != nil {
-			items[key] = item
+func mergeCheckpoints(entries map[int]streamV2Checkpoint) streamV2Checkpoint {
+	var sv2Checkpoint = make(streamV2Checkpoint)
+	for key, sv2ChannelCheckpointItem := range entries[0] {
+		if sv2ChannelCheckpointItem != nil {
+			sv2Checkpoint[key] = sv2ChannelCheckpointItem
 		}
 	}
-	return items
+	return sv2Checkpoint
 }
 
 // deletionsOf collects the item keys a flush's entries delete for binding zero.
-func deletionsOf(entries map[int]map[string]*streamV2Item) []string {
-	var deleted []string
-	for key, item := range entries[0] {
-		if item == nil {
+func deletionsOf(entries map[int]streamV2Checkpoint) []streamV2Range {
+	var deleted []streamV2Range
+	for key, sv2ChannelCheckpointItem := range entries[0] {
+		if sv2ChannelCheckpointItem == nil {
 			deleted = append(deleted, key)
 		}
 	}
@@ -134,10 +134,10 @@ func fakeCommittedTokens(t *testing.T, path string) map[string]string {
 }
 
 // rangeKeys maps a layout to the checkpoint item keys of its channels.
-func rangeKeys(layout []streamV2Range) []string {
-	var keys = make([]string, len(layout))
+func rangeKeys(layout []streamV2Range) []streamV2Range {
+	var keys = make([]streamV2Range, len(layout))
 	for i, r := range layout {
-		keys[i] = r.key()
+		keys[i] = r
 	}
 	return keys
 }
@@ -183,24 +183,22 @@ func TestStreamV2SteadyStateRouting(t *testing.T) {
 
 	entries, err := first.flush(ctx)
 	require.NoError(t, err)
-	var items = mergeItems(entries)
+	var sv2Checkpoint = mergeCheckpoints(entries)
 	require.Empty(t, deletionsOf(entries))
-	require.Len(t, items, len(quarters))
+	require.Len(t, sv2Checkpoint, len(quarters))
 
 	// Each channel counted exactly the rows whose hash its key range covers, so
 	// the items' routed indices are the routing, read back.
 	for i, q := range quarters {
-		require.Contains(t, items, q.key())
-		require.Equal(t, q.keyBegin, items[q.key()].KeyBegin)
-		require.Equal(t, q.keyEnd, items[q.key()].KeyEnd)
-		require.Equal(t, int64(3), items[q.key()].Routed)
-		require.Equal(t, channelNames(task, 0, quarters)[i], items[q.key()].Channel)
+		require.Contains(t, sv2Checkpoint, q)
+		require.Equal(t, int64(3), sv2Checkpoint[q].Routed)
+		require.Equal(t, channelNames(task, 0, quarters)[i], sv2Checkpoint[q].ChannelName)
 	}
 	first.stop()
 
 	// A later session opens every channel at a clean boundary — nothing to
 	// skip, nothing rejected — and continues the routed indices where they stood.
-	var second = newTopologyManager(t, task, 0, math.MaxUint32, items)
+	var second = newTopologyManager(t, task, 0, math.MaxUint32, sv2Checkpoint)
 	var more []string
 	for _, q := range quarters {
 		more = append(more, keysHashingTo(q, 1, "steady-more")...)
@@ -212,8 +210,8 @@ func TestStreamV2SteadyStateRouting(t *testing.T) {
 
 	entries, err = second.flush(ctx)
 	require.NoError(t, err)
-	for _, item := range mergeItems(entries) {
-		require.Equal(t, int64(4), item.Routed)
+	for _, sv2ChannelCheckpointItem := range mergeCheckpoints(entries) {
+		require.Equal(t, int64(4), sv2ChannelCheckpointItem.Routed)
 	}
 }
 
@@ -245,7 +243,7 @@ func TestStreamV2SplitInheritsChannels(t *testing.T) {
 	storeKeys(t, parent, committed)
 	entries, err := parent.flush(ctx)
 	require.NoError(t, err)
-	var prior = mergeItems(entries)
+	var prior = mergeCheckpoints(entries)
 
 	storeKeys(t, parent, interrupted)
 	_, err = parent.flush(ctx)
@@ -256,7 +254,7 @@ func TestStreamV2SplitInheritsChannels(t *testing.T) {
 		name             string
 		keyBegin, keyEnd uint32
 		inherited        []string
-		inheritedKeys    []string
+		inheritedKeys    []streamV2Range
 		salt             string
 	}{
 		{name: "low child", keyBegin: 0, keyEnd: 0x7fffffff, inherited: parentNames[:2], inheritedKeys: rangeKeys(quarters)[:2], salt: "split-c-lo"},
@@ -293,7 +291,7 @@ func TestStreamV2SplitInheritsChannels(t *testing.T) {
 			// checkpoint ahead of any row routing to them.
 			entries, err := m.flush(ctx)
 			require.NoError(t, err)
-			var declared = mergeItems(entries)
+			var declared = mergeCheckpoints(entries)
 			require.Len(t, declared, 6)
 			for _, key := range rangeKeys(targets) {
 				require.Contains(t, declared, key)
@@ -313,8 +311,8 @@ func TestStreamV2SplitInheritsChannels(t *testing.T) {
 			entries, err = m.flush(ctx)
 			require.NoError(t, err)
 			require.ElementsMatch(t, child.inheritedKeys, deletionsOf(entries))
-			for _, item := range mergeItems(entries) {
-				require.Equal(t, int64(2), item.Routed)
+			for _, sv2ChannelCheckpointItem := range mergeCheckpoints(entries) {
+				require.Equal(t, int64(2), sv2ChannelCheckpointItem.Routed)
 			}
 			m.stop()
 
@@ -350,7 +348,7 @@ func TestStreamV2JoinInheritsChannels(t *testing.T) {
 	// Each child commits one transaction and is interrupted in the next, so
 	// every one of the eight channels holds appends its checkpoint item does
 	// not account for.
-	var prior = make(map[string]*streamV2Item)
+	var prior = make(streamV2Checkpoint)
 	var eighths []streamV2Range
 	var interrupted []string
 	for _, half := range halves {
@@ -368,8 +366,8 @@ func TestStreamV2JoinInheritsChannels(t *testing.T) {
 		storeKeys(t, child, committed)
 		entries, err := child.flush(ctx)
 		require.NoError(t, err)
-		for channel, item := range mergeItems(entries) {
-			prior[channel] = item
+		for channel, sv2ChannelCheckpointItem := range mergeCheckpoints(entries) {
+			prior[channel] = sv2ChannelCheckpointItem
 		}
 		storeKeys(t, child, replay)
 		_, err = child.flush(ctx)
@@ -393,7 +391,7 @@ func TestStreamV2JoinInheritsChannels(t *testing.T) {
 
 	entries, err := joined.flush(ctx)
 	require.NoError(t, err)
-	require.Len(t, mergeItems(entries), 12) // eight inherited items, four declared at zero
+	require.Len(t, mergeCheckpoints(entries), 12) // eight inherited items, four declared at zero
 
 	require.NoError(t, joined.acknowledged(ctx))
 	require.Equal(t, channelNames(task, 1, quarters), activeNames(joined))
@@ -447,7 +445,7 @@ func TestStreamV2RebalanceCrashWindows(t *testing.T) {
 	storeKeys(t, parent, committed)
 	entries, err := parent.flush(ctx)
 	require.NoError(t, err)
-	var parentItems = mergeItems(entries)
+	var parentItems = mergeCheckpoints(entries)
 	storeKeys(t, parent, interrupted)
 	_, err = parent.flush(ctx)
 	require.NoError(t, err)
@@ -467,7 +465,7 @@ func TestStreamV2RebalanceCrashWindows(t *testing.T) {
 	storeKeys(t, declaring, replay)
 	entries, err = declaring.flush(ctx)
 	require.NoError(t, err)
-	var declaration = mergeItems(entries)
+	var declaration = mergeCheckpoints(entries)
 	require.Len(t, declaration, 6)
 	declaring.stop()
 
@@ -512,10 +510,10 @@ func TestStreamV2RebalanceCrashWindows(t *testing.T) {
 	entries, err = resumed.flush(ctx)
 	require.NoError(t, err)
 	require.ElementsMatch(t, rangeKeys(quarters)[:2], deletionsOf(entries))
-	var converged = mergeItems(entries)
+	var converged = mergeCheckpoints(entries)
 	require.Len(t, converged, 4)
-	for _, item := range converged {
-		require.Equal(t, int64(2), item.Routed)
+	for _, sv2ChannelCheckpointItem := range converged {
+		require.Equal(t, int64(2), sv2ChannelCheckpointItem.Routed)
 	}
 	resumed.stop()
 
@@ -541,7 +539,7 @@ func TestStreamV2SplitThenJoinBack(t *testing.T) {
 	var statePath = filepath.Join(t.TempDir(), "channels.json")
 	t.Setenv("FAKE_SIDECAR_STATE", statePath)
 
-	var prior = make(map[string]*streamV2Item)
+	var prior = make(streamV2Checkpoint)
 	var eighths []streamV2Range
 	for _, half := range []struct{ keyBegin, keyEnd uint32 }{
 		{keyBegin: 0, keyEnd: 0x7fffffff},
@@ -559,8 +557,8 @@ func TestStreamV2SplitThenJoinBack(t *testing.T) {
 		storeKeys(t, child, rows)
 		entries, err := child.flush(ctx)
 		require.NoError(t, err)
-		for channel, item := range mergeItems(entries) {
-			prior[channel] = item
+		for channel, sv2ChannelCheckpointItem := range mergeCheckpoints(entries) {
+			prior[channel] = sv2ChannelCheckpointItem
 		}
 		child.stop()
 	}
@@ -585,7 +583,7 @@ func TestStreamV2SplitThenJoinBack(t *testing.T) {
 
 	entries, err := joined.flush(ctx)
 	require.NoError(t, err)
-	require.Len(t, mergeItems(entries), 12)
+	require.Len(t, mergeCheckpoints(entries), 12)
 	require.NoError(t, joined.acknowledged(ctx))
 	require.Equal(t, channelNames(task, 1, quarters), activeNames(joined))
 
@@ -608,8 +606,8 @@ func TestStreamV2MisalignedSplitRejected(t *testing.T) {
 	// the low quarter: the shard's upper boundary lands mid-channel.
 	var half = streamV2Range{keyBegin: 0, keyEnd: 0x7fffffff}
 	var name = streamV2FormatChannelName(task, 0, half, "topology.v1")
-	var m = newTopologyManager(t, task, 0, 0x3fffffff, map[string]*streamV2Item{
-		half.key(): {Channel: name, Routed: 5, KeyBegin: half.keyBegin, KeyEnd: half.keyEnd},
+	var m = newTopologyManager(t, task, 0, 0x3fffffff, streamV2Checkpoint{
+		half: {ChannelName: name, Routed: 5},
 	})
 
 	var err = testWriteRow(context.Background(), m, 0, []any{"any", "v"})
@@ -629,8 +627,8 @@ func TestStreamV2LostChannelRejected(t *testing.T) {
 	require.NoError(t, err)
 	var name = streamV2FormatChannelName(task, 0, quarters[1], "topology.v1")
 
-	var m = newTopologyManager(t, task, 0, math.MaxUint32, map[string]*streamV2Item{
-		quarters[1].key(): {Channel: name, Routed: 5, KeyBegin: quarters[1].keyBegin, KeyEnd: quarters[1].keyEnd},
+	var m = newTopologyManager(t, task, 0, math.MaxUint32, streamV2Checkpoint{
+		quarters[1]: {ChannelName: name, Routed: 5},
 	})
 
 	err = testWriteRow(context.Background(), m, 0, []any{"any", "v"})
@@ -660,8 +658,8 @@ func TestStreamV2ForeignTokenRejected(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(statePath, raw, 0o644))
 
-	var m = newTopologyManager(t, task, 0, math.MaxUint32, map[string]*streamV2Item{
-		quarters[0].key(): {Channel: name, Routed: 5, KeyBegin: quarters[0].keyBegin, KeyEnd: quarters[0].keyEnd},
+	var m = newTopologyManager(t, task, 0, math.MaxUint32, streamV2Checkpoint{
+		quarters[0]: {ChannelName: name, Routed: 5},
 	})
 
 	err = testWriteRow(context.Background(), m, 0, []any{"any", "v"})
@@ -696,8 +694,8 @@ func TestStreamV2SplitInheritsAnEmptyChannel(t *testing.T) {
 	storeKeys(t, parent, skewed)
 	entries, err := parent.flush(ctx)
 	require.NoError(t, err)
-	var prior = mergeItems(entries)
-	require.Zero(t, prior[quarters[0].key()].Routed)
+	var prior = mergeCheckpoints(entries)
+	require.Zero(t, prior[quarters[0]].Routed)
 	parent.stop()
 
 	// The low child inherits the empty first quarter alongside the second,
@@ -717,7 +715,7 @@ func TestStreamV2SplitInheritsAnEmptyChannel(t *testing.T) {
 	// empty channel's rows survive to its target channels.
 	entries, err = child.flush(ctx)
 	require.NoError(t, err)
-	require.Equal(t, int64(2), mergeItems(entries)[quarters[0].key()].Routed)
+	require.Equal(t, int64(2), mergeCheckpoints(entries)[quarters[0]].Routed)
 	require.NoError(t, child.acknowledged(ctx))
 	require.Equal(t, channelNames(task, 1, targets), activeNames(child))
 	entries, err = child.flush(ctx)
@@ -757,9 +755,9 @@ func TestStreamV2SweepDropsAPriorSessionsOrphan(t *testing.T) {
 	// The checkpoint a later session recovers declares the same layout at epoch
 	// one and names nothing at epoch zero, so the epoch-zero channels stand on the
 	// pipe as orphans of this shard's range.
-	var declaration = make(map[string]*streamV2Item, len(quarters))
+	var declaration = make(streamV2Checkpoint, len(quarters))
 	for i, q := range quarters {
-		declaration[q.key()] = &streamV2Item{Channel: channelNames(task, 1, quarters)[i], KeyBegin: q.keyBegin, KeyEnd: q.keyEnd}
+		declaration[q] = &streamV2ChannelCheckpointItem{ChannelName: channelNames(task, 1, quarters)[i]}
 	}
 	var second = newTopologyManager(t, task, 0, math.MaxUint32, declaration)
 	storeKeys(t, second, keysHashingTo(quarters[0], 1, "orphan-later"))

@@ -281,7 +281,7 @@ func (d *transactor) UnmarshalState(state json.RawMessage) error {
 // priorStreamV2 returns the streaming v2 items the checkpoint holds for a binding,
 // one per channel, or nil when it holds none. "Prior" means written by a session
 // before this one.
-func (d *transactor) priorStreamV2(stateKey string) map[string]*streamV2Item {
+func (d *transactor) priorStreamV2(stateKey string) streamV2Checkpoint {
 	if item, ok := d.cp[stateKey]; ok {
 		return item.StreamV2
 	}
@@ -710,7 +710,7 @@ type checkpointItem struct {
 	Query         string
 	StagedDir     string
 	StreamBlobs   []*blobMetadata
-	StreamV2      map[string]*streamV2Item `json:",omitempty"` // keyed by the channel's key-hash key range
+	StreamV2      streamV2Checkpoint `json:",omitempty"`
 	PipeName      string
 	PipeFiles     []fileRecord
 	Version       string
@@ -786,7 +786,7 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 		}
 	}
 
-	streamV2Entries := make(map[int]map[string]*streamV2Item)
+	streamV2Entries := make(map[int]streamV2Checkpoint)
 	if d.snowpipeStreamingV2 != nil {
 		var err error
 		if streamV2Entries, err = d.snowpipeStreamingV2.flush(ctx); err != nil {

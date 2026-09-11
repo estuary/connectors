@@ -45,8 +45,8 @@ func TestAcknowledgeSubsetLeavesOtherKeysPending(t *testing.T) {
 func TestAcknowledgeKeepsStreamV2Item(t *testing.T) {
 	d := &transactor{
 		cp: checkpoint{
-			"a_table.v1": {Table: "a_table", StreamV2: map[string]*streamV2Item{
-				"00000000-ffffffff": {Channel: "chan", Routed: 42, KeyEnd: 0xffffffff},
+			"a_table.v1": {Table: "a_table", StreamV2: streamV2Checkpoint{
+				fullKeyRange: {ChannelName: "chan", Routed: 42},
 			}},
 		},
 		bindings: []*binding{{target: sql.Table{StateKey: "a_table.v1"}, streamingV2: true}},
@@ -60,7 +60,7 @@ func TestAcknowledgeKeepsStreamV2Item(t *testing.T) {
 	state, err := d.Acknowledge(context.Background(), nil, []string{"a_table.v1"})
 	require.NoError(t, err)
 	require.Nil(t, state)
-	require.Equal(t, int64(42), d.cp["a_table.v1"].StreamV2["00000000-ffffffff"].Routed)
+	require.Equal(t, int64(42), d.cp["a_table.v1"].StreamV2[fullKeyRange].Routed)
 }
 
 func TestSpecification(t *testing.T) {
@@ -99,8 +99,8 @@ func TestValidHost(t *testing.T) {
 // same, and its clearing removes the streaming v2 state with it.
 func TestAcknowledgeDrainsStagedWorkBesideStreamV2(t *testing.T) {
 	var persisted, err = json.Marshal(checkpoint{
-		"a_table.v1": {Table: "a_table", StreamV2: map[string]*streamV2Item{
-			"00000000-ffffffff": {Channel: "chan", Routed: 42, KeyEnd: 0xffffffff},
+		"a_table.v1": {Table: "a_table", StreamV2: streamV2Checkpoint{
+			fullKeyRange: {ChannelName: "chan", Routed: 42},
 		}},
 	})
 	require.NoError(t, err)

@@ -40,7 +40,7 @@ func TestStreamV2CheckpointDoesNotSurviveAnotherWritePath(t *testing.T) {
 
 	var state, err = json.Marshal(checkpoint{stateKey: &checkpointItem{
 		Table:    "TBL",
-		StreamV2: map[string]*streamV2Item{"00000000-ffffffff": {Channel: channel, Routed: 3, KeyEnd: math.MaxUint32}},
+		StreamV2: streamV2Checkpoint{fullKeyRange: {ChannelName: channel, Routed: 3}},
 	}})
 	require.NoError(t, err)
 
@@ -100,7 +100,7 @@ func TestStreamV2ReturningToTheWritePathSkipsNewDocuments(t *testing.T) {
 		StateKey:   "roundtrip.v1",
 	}
 
-	var newSession = func(t *testing.T, prior map[string]*streamV2Item) *streamV2Manager {
+	var newSession = func(t *testing.T, prior streamV2Checkpoint) *streamV2Manager {
 		var m = newStreamV2Manager(ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/roundTrip", "acct",
 			&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
 		m.argv = fakeSidecarArgv(t)
@@ -118,7 +118,7 @@ func TestStreamV2ReturningToTheWritePathSkipsNewDocuments(t *testing.T) {
 	entries, err := before.flush(ctx)
 	require.NoError(t, err)
 	var channel = before.bindings[0].channels[0].channelName
-	require.Equal(t, int64(3), entries[0]["00000000-ffffffff"].Routed)
+	require.Equal(t, int64(3), entries[0][fullKeyRange].Routed)
 	before.stop()
 
 	// The task materializes through another write path for a while, which
@@ -146,7 +146,7 @@ func TestStreamV2SwitchOffTheWritePathIsRejected(t *testing.T) {
 		}
 	}
 
-	var newTransactor = func(t *testing.T, stateKey string, prior map[string]*streamV2Item) *transactor {
+	var newTransactor = func(t *testing.T, stateKey string, prior streamV2Checkpoint) *transactor {
 		var cfg = config{
 			Database:    "DB",
 			Schema:      "SCH",
@@ -166,14 +166,10 @@ func TestStreamV2SwitchOffTheWritePathIsRejected(t *testing.T) {
 		return d
 	}
 
-	// itemsFor keys items the way the driver checkpoint does — by the channel's
-	// key range — so that a shard reads back only the item it wrote.
-	var itemsFor = func(items ...*streamV2Item) map[string]*streamV2Item {
-		var byKeyRange = make(map[string]*streamV2Item, len(items))
-		for _, item := range items {
-			byKeyRange[streamV2Range{keyBegin: item.KeyBegin, keyEnd: item.KeyEnd}.key()] = item
-		}
-		return byKeyRange
+	// checkpointFor wraps a single-channel item as the checkpoint of a binding on an
+	// unsplit task, keyed the way the driver checkpoint keys it.
+	var checkpointFor = func(sv2ChannelCheckpointItem *streamV2ChannelCheckpointItem) streamV2Checkpoint {
+		return streamV2Checkpoint{fullKeyRange: sv2ChannelCheckpointItem}
 	}
 
 	t.Run("a binding which has never streamed v2 is added as usual", func(t *testing.T) {
@@ -183,8 +179,8 @@ func TestStreamV2SwitchOffTheWritePathIsRejected(t *testing.T) {
 
 	t.Run("turning the feature flag off is rejected", func(t *testing.T) {
 		const stateKey = "flag.v1"
-		var d = newTransactor(t, stateKey, itemsFor(&streamV2Item{
-			Channel: "task_00000000_flag_v1", Routed: 3, KeyEnd: math.MaxUint32,
+		var d = newTransactor(t, stateKey, checkpointFor(&streamV2ChannelCheckpointItem{
+			ChannelName: "task_00000000_flag_v1", Routed: 3,
 		}))
 
 		var err = d.addBinding(ctx, target(stateKey, true), false)
@@ -195,8 +191,8 @@ func TestStreamV2SwitchOffTheWritePathIsRejected(t *testing.T) {
 
 	t.Run("moving the binding to standard updates is rejected", func(t *testing.T) {
 		const stateKey = "delta.v1"
-		var d = newTransactor(t, stateKey, itemsFor(&streamV2Item{
-			Channel: "task_00000000_delta_v1", Routed: 3, KeyEnd: math.MaxUint32,
+		var d = newTransactor(t, stateKey, checkpointFor(&streamV2ChannelCheckpointItem{
+			ChannelName: "task_00000000_delta_v1", Routed: 3,
 		}))
 
 		d.cfg.Advanced.FeatureFlags = "snowpipe_streaming_v2"
@@ -242,8 +238,8 @@ func TestStreamV2SwitchOffTheWritePathIsRejected(t *testing.T) {
 
 		t.Run("without naming snowpipe_streaming is rejected", func(t *testing.T) {
 			const stateKey = "streaming.v1"
-			var d = newTransactor(t, stateKey, itemsFor(&streamV2Item{
-				Channel: "task_00000000_streaming_v1", Routed: 3, KeyEnd: math.MaxUint32,
+			var d = newTransactor(t, stateKey, checkpointFor(&streamV2ChannelCheckpointItem{
+				ChannelName: "task_00000000_streaming_v1", Routed: 3,
 			}))
 			d.cfg.Advanced.FeatureFlags = ""
 
@@ -257,8 +253,8 @@ func TestStreamV2SwitchOffTheWritePathIsRejected(t *testing.T) {
 
 		t.Run("by naming snowpipe_streaming is allowed as the downgrade", func(t *testing.T) {
 			const stateKey = "downgrade.v1"
-			var d = newTransactor(t, stateKey, itemsFor(&streamV2Item{
-				Channel: "task_00000000_downgrade_v1", Routed: 3, KeyEnd: math.MaxUint32,
+			var d = newTransactor(t, stateKey, checkpointFor(&streamV2ChannelCheckpointItem{
+				ChannelName: "task_00000000_downgrade_v1", Routed: 3,
 			}))
 			d.cfg.Advanced.FeatureFlags = "snowpipe_streaming"
 			d.snowpipeStreaming = openChannelServer(t, 0)
@@ -271,8 +267,8 @@ func TestStreamV2SwitchOffTheWritePathIsRejected(t *testing.T) {
 
 		t.Run("the downgrade rejects a table the snowpipe_streaming path cannot open", func(t *testing.T) {
 			const stateKey = "rejected.v1"
-			var d = newTransactor(t, stateKey, itemsFor(&streamV2Item{
-				Channel: "task_00000000_rejected_v1", Routed: 3, KeyEnd: math.MaxUint32,
+			var d = newTransactor(t, stateKey, checkpointFor(&streamV2ChannelCheckpointItem{
+				ChannelName: "task_00000000_rejected_v1", Routed: 3,
 			}))
 			d.cfg.Advanced.FeatureFlags = "snowpipe_streaming"
 			d.snowpipeStreaming = openChannelServer(t, 6)
@@ -287,15 +283,15 @@ func TestStreamV2SwitchOffTheWritePathIsRejected(t *testing.T) {
 		// A nil item is the deletion of a channel this task dropped, which the
 		// runtime has not yet reduced away. It records nothing.
 		const stateKey = "dropped.v1"
-		var d = newTransactor(t, stateKey, map[string]*streamV2Item{"80000000-ffffffff": nil})
+		var d = newTransactor(t, stateKey, streamV2Checkpoint{streamV2Range{keyBegin: 0x80000000, keyEnd: math.MaxUint32}: nil})
 
 		require.NoError(t, d.addBinding(ctx, target(stateKey, false), false))
 	})
 
 	t.Run("staying on the write path is not rejected", func(t *testing.T) {
 		const stateKey = "stay.v1"
-		var d = newTransactor(t, stateKey, itemsFor(&streamV2Item{
-			Channel: "task_00000000_stay_v1", Routed: 3, KeyEnd: math.MaxUint32,
+		var d = newTransactor(t, stateKey, checkpointFor(&streamV2ChannelCheckpointItem{
+			ChannelName: "task_00000000_stay_v1", Routed: 3,
 		}))
 
 		d.cfg.Advanced.FeatureFlags = "snowpipe_streaming_v2"
@@ -318,7 +314,7 @@ func TestStreamV2SwitchIsRejectedAtPublication(t *testing.T) {
 	const stateKey, channel = "publish.v1", "task_00000000_publish_v1"
 
 	var state, err = json.Marshal(checkpoint{stateKey: &checkpointItem{
-		StreamV2: map[string]*streamV2Item{channel: {Channel: channel, Routed: 3, KeyEnd: math.MaxUint32}},
+		StreamV2: streamV2Checkpoint{fullKeyRange: {ChannelName: channel, Routed: 3}},
 	}})
 	require.NoError(t, err)
 
@@ -390,7 +386,7 @@ func TestStreamV2SwitchIsRejectedAtPublication(t *testing.T) {
 
 	t.Run("a checkpoint of only dropped channels does not need the v2 runtime", func(t *testing.T) {
 		var dropped, err = json.Marshal(checkpoint{stateKey: &checkpointItem{
-			StreamV2: map[string]*streamV2Item{channel: nil},
+			StreamV2: streamV2Checkpoint{fullKeyRange: nil},
 		}})
 		require.NoError(t, err)
 
@@ -494,7 +490,7 @@ func TestStreamV2WritePathSwitch(t *testing.T) {
 		require.NoError(t, sm.write(ctx, blobs[0], keys[0], false))
 	}
 
-	var newV2 = func(t *testing.T, tgt sql.Table, prior map[string]*streamV2Item) *streamV2Manager {
+	var newV2 = func(t *testing.T, tgt sql.Table, prior streamV2Checkpoint) *streamV2Manager {
 		var m = newStreamV2Manager(ctx, &cfg, testMaterialization, accountName, fullRange)
 		m.listChannels = func(ctx context.Context, database, schema, table string) ([]string, error) {
 			return streamV2ListChannels(ctx, db, testDialect, database, schema, table)
@@ -528,7 +524,7 @@ func TestStreamV2WritePathSwitch(t *testing.T) {
 
 		entries, err := m.flush(ctx)
 		require.NoError(t, err)
-		require.Equal(t, int64(2), entries[0][c.keyRange.key()].Routed)
+		require.Equal(t, int64(2), entries[0][c.keyRange].Routed)
 		require.Equal(t, 5, countRows())
 	})
 
@@ -703,8 +699,8 @@ func TestStreamV2SwitchOntoTheWritePathWithPendingWorkIsRejected(t *testing.T) {
 	})
 
 	t.Run("a checkpoint holding only streaming v2 state is added as usual", func(t *testing.T) {
-		var d = newTransactor(t, &checkpointItem{StreamV2: map[string]*streamV2Item{
-			"00000000-ffffffff": {Channel: "task_00000000_sk_v1", Routed: 7, KeyEnd: math.MaxUint32},
+		var d = newTransactor(t, &checkpointItem{StreamV2: streamV2Checkpoint{
+			fullKeyRange: {ChannelName: "task_00000000_sk_v1", Routed: 7},
 		}})
 
 		require.NoError(t, addBinding(d))
