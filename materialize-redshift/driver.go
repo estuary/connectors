@@ -1082,10 +1082,8 @@ func (d *transactor) commit(ctx context.Context, pending connectorState, legacyC
 		}
 	}
 
-	// A serialization failure rolls the transaction back without applying
-	// anything, so the same staged files are simply applied again.
 	var affected map[*commitGroup]int64
-	if err := retryOnSerializationFailure(ctx, func() error {
+	if err := retry(ctx, func() error {
 		var err error
 		affected, err = d.applyStaged(ctx, conn, groups, tokensMap, legacyCheckpoint)
 		return err
@@ -1109,9 +1107,8 @@ func (d *transactor) commit(ctx context.Context, pending connectorState, legacyC
 	return nil
 }
 
-// applyStaged runs one Redshift transaction applying every group's staged
-// files to its table and recording their tokens, and returns the target rows
-// each group's statements reported touching.
+// applyStaged applies the groups in one transaction and returns the target
+// rows each touched.
 func (d *transactor) applyStaged(ctx context.Context, conn *pgx.Conn, groups []*commitGroup, tokensMap checkpointTokensMap, legacyCheckpoint []byte) (map[*commitGroup]int64, error) {
 	txn, err := conn.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
