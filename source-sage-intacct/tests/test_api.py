@@ -1,16 +1,24 @@
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from logging import Logger
-from typing import Any, AsyncGenerator, ClassVar
+from typing import Any, AsyncGenerator
 from unittest.mock import AsyncMock, MagicMock, call
 
 import estuary_cdk.emitted_changes_cache as cache
 import pytest
 from pydantic import AwareDatetime, model_validator
 
-from source_sage_intacct.api import fetch_changes, fetch_creations, fetch_page
+from source_sage_intacct.api import (
+    fetch_changes,
+    fetch_creations,
+    fetch_deletions,
+    fetch_page,
+)
 from source_sage_intacct.models import (
     CreationRecord,
+    DeletionEvent,
+    DeletionRecord,
     IncrementalResource,
+    ObjectKeyNotRecordNo,
 )
 from source_sage_intacct.sage import PAGE_SIZE, Sage, SageRecord
 
@@ -462,3 +470,77 @@ async def test_fetch_page_routes_by_whenmodified(mock_sage, mock_logger):
     assert isinstance(results[1], CreationRecord)
     assert results[1].RECORDNO == 2
     assert results[1].WHENCREATED == datetime(2023, 7, 1, tzinfo=UTC)
+
+
+class MockDeletionEvent(SageRecord):
+    OBJECTKEY: str
+    ACCESSTIME: AwareDatetime
+    ID: str
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_values(cls, values: dict[str, Any]) -> dict[str, Any]:
+        return values
+
+
+@pytest.mark.parametrize(
+    "object_key,expected",
+    [
+        ("12345", 12345),
+        ("12345--REC", 12345),
+        ("V10001", None),
+        ("0", None),
+        ("-3", None),
+        ("12--FOO", None),
+        ("1--2--REC", None),
+        ("", None),
+    ],
+)
+def test_deletion_event_record_no(object_key: str, expected: int | None):
+    event = DeletionEvent(
+        OBJECTKEY=object_key, ACCESSTIME=datetime(2023, 1, 2, tzinfo=UTC), ID="1"
+    )
+    if expected is None:
+        with pytest.raises(ObjectKeyNotRecordNo):
+            _ = event.record_no()
+        with pytest.raises(ObjectKeyNotRecordNo):
+            DeletionRecord.try_from_event(event)
+    else:
+        assert event.record_no() == expected
+        assert DeletionRecord.try_from_event(event).RECORDNO == expected
+
+
+@pytest.mark.asyncio
+async def test_fetch_deletions_skips_non_recordno_object_keys(mock_sage, mock_logger):
+    cursor = datetime(2023, 1, 1, tzinfo=UTC)
+    events = [
+        MockDeletionEvent(
+            OBJECTKEY="10--REC", ACCESSTIME=datetime(2023, 1, 2, tzinfo=UTC), ID="1"
+        ),
+        MockDeletionEvent(
+            OBJECTKEY="V10001", ACCESSTIME=datetime(2023, 1, 3, tzinfo=UTC), ID="2"
+        ),
+        MockDeletionEvent(
+            OBJECTKEY="11", ACCESSTIME=datetime(2023, 1, 4, tzinfo=UTC), ID="3"
+        ),
+    ]
+    mock_sage.fetch_deleted.return_value = async_iter(events)
+
+    results = [
+        item
+        async for item in fetch_deletions(
+            "vendor", mock_sage, None, PAGE_SIZE, mock_logger, cursor
+        )
+    ]
+
+    docs = [r for r in results if isinstance(r, DeletionRecord)]
+    assert [d.RECORDNO for d in docs] == [10, 11]
+    assert all(d.meta_.op == "d" for d in docs)
+    assert docs[0].model_dump(by_alias=True, exclude_unset=True) == {
+        "_meta": {"op": "d"},
+        "RECORDNO": 10,
+        "WHENMODIFIED": datetime(2023, 1, 2, tzinfo=UTC),
+    }
+    # The skipped event still advances the cursor past itself.
+    assert results[-1] == datetime(2023, 1, 4, tzinfo=UTC)
+    mock_logger.debug.assert_called_once()
