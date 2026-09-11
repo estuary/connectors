@@ -37,6 +37,11 @@ ENV PATH="/connector:$PATH"
 # Bring in the compiled connector artifact from the builder.
 COPY --from=builder /builder/connector ./materialize-bigquery
 
+# The build this image carries, for the transaction health log line. CI
+# passes "<VERSION>-<short sha>"; a local build reports "dev".
+ARG CONNECTOR_VERSION=dev
+ENV CONNECTOR_VERSION="${CONNECTOR_VERSION}"
+
 LABEL FLOW_RUNTIME_PROTOCOL=materialize
 
 ENTRYPOINT ["/connector/materialize-bigquery"]

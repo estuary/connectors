@@ -767,7 +767,12 @@ judged; recovery re-applies them.
 Every line is marked `observable: true` and carries the `catalog_task_name`,
 so the data plane forwards it into the Grafana log stream operators alert on;
 it is also published to the tenant's ops logs like any connector log. Every
-line carries `verdict`, `fidelity`, `bindings`, `loadRequests`,
+line also carries `connector` (the image's connector name: the binary's name,
+or `CONNECTOR_NAME` for a variant built from another connector's image) and
+`connectorVersion` (`CONNECTOR_VERSION`, which CI bakes into the image as
+`<VERSION>-<short sha>`, e.g. `v1-3f2a9c1`; local builds report `dev` or
+`local-<sha>`), so dashboards can aggregate verdicts by connector and build.
+Every line carries `verdict`, `fidelity`, `bindings`, `loadRequests`,
 `loaded`, `expected.{insert,update,delete,softDeleted,skipped}` and
 `actual.{inserted,updated,deleted,total}` (plus `staged`/`loaded` when
 reported).
