@@ -12,14 +12,13 @@ import (
 // values; it is not user-configurable.
 var streamV2ChannelsPerShard = 4
 
-// packedKeyHashHH64 routes documents to channels by the same hash the runtime
-// routes them to shards by, so a channel's contents depend only on the data and
-// a split or join inherits whole channels.
+// packedKeyHashHH64 is used to route documents to Snowflake channels by the
+// same hash function used to route documents to connector shards. This way, a
+// shard split or join inherits whole channels.
 var packedKeyHashHH64 = keyhash.PackedKeyHash_HH64
 
 // streamV2TargetLayout cuts the shard key range [keyBegin, keyEnd], inclusive on
-// both ends, into streamV2ChannelsPerShard equal key ranges. This is the layout a
-// shard's channels converge to.
+// both ends, into streamV2ChannelsPerShard equal key ranges.
 func streamV2TargetLayout(keyBegin, keyEnd uint32) ([]streamV2Range, error) {
 	// Math uses uint64 because the full range spans 1<<32 key hashes.
 	var width = uint64(keyEnd) - uint64(keyBegin) + 1
