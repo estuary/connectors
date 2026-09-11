@@ -214,20 +214,26 @@ func (s *checkpointsTable) readAll(ctx context.Context, conn *pgx.Conn) (map[str
 	return applied, legacyCheckpoint, crossedOver, nil
 }
 
+// lock takes an exclusive lock on the table for the rest of txn, and must be
+// txn's first statement. Materializations sharing a metadata schema update
+// this table concurrently, and under SERIALIZABLE isolation a write from a
+// snapshot older than a concurrent commit fails with ERROR: 1023 even when
+// the rows differ. Redshift takes the snapshot at the first DML statement,
+// so a lock before any of them waits out every concurrent commit first.
+func (s *checkpointsTable) lock(ctx context.Context, txn pgx.Tx) error {
+	if _, err := txn.Exec(ctx, fmt.Sprintf("lock %s;", s.table)); err != nil {
+		return fmt.Errorf("obtaining checkpoints table lock: %w", err)
+	}
+	return nil
+}
+
 // write records the tokens of just-applied transactions in the row, within
-// txn. When legacyCheckpoint is non-nil, it's mirrored into the legacy
+// txn, which must hold the table lock. When legacyCheckpoint is non-nil, it's mirrored into the legacy
 // checkpoint column too, so a downgraded connector can resume from it; the
 // caller passes one only once every entry that was pending is settled by
 // this call, so the mirror never claims a checkpoint whose data is only
 // partially applied.
 func (s *checkpointsTable) write(ctx context.Context, txn pgx.Tx, applied checkpointTokensMap, legacyCheckpoint []byte) error {
-	// Materializations sharing a metadata schema update the same table
-	// concurrently, which raises serializable isolation violations even for
-	// different rows. All applies take this one lock in the same order.
-	if _, err := txn.Exec(ctx, fmt.Sprintf("lock %s;", s.table)); err != nil {
-		return fmt.Errorf("obtaining checkpoints table lock: %w", err)
-	}
-
 	if s.payload == nil {
 		s.payload = make(checkpointTokensMap)
 	}

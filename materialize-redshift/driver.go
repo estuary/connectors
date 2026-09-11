@@ -959,29 +959,30 @@ func lastCopyCount(ctx context.Context, txn pgx.Tx) (int64, error) {
 	return n, err
 }
 
+// commitGroup is one binding's pending transactions from every shard, merged
+// into one, with manifests written for the commit.
+type commitGroup struct {
+	binding                       *binding
+	merged                        stateItem
+	storeManifest, deleteManifest string
+	// round is this shard's own entry's round when it has one, else the
+	// first merged entry's; a multi-shard commit is unchecked anyway.
+	round    int
+	hasRound bool
+}
+
 // commit runs the staged transactions of pending as one Redshift
 // transaction, skipping any whose token is already committed. legacyCheckpoint,
 // when non-nil, is mirrored into the checkpoints row alongside the tokens.
 func (d *transactor) commit(ctx context.Context, pending connectorState, legacyCheckpoint []byte) error {
-	// group is one binding's pending transactions from every shard, merged
-	// into one, with manifests written for the commit.
-	type group struct {
-		binding                       *binding
-		merged                        stateItem
-		storeManifest, deleteManifest string
-		// round is this shard's own entry's round when it has one, else the
-		// first merged entry's; a multi-shard commit is unchecked anyway.
-		round    int
-		hasRound bool
-	}
-	var groups []*group
+	var groups []*commitGroup
 	var tokensMap = make(checkpointTokensMap)
 	for _, b := range d.bindings {
 		var bucket = pending[b.target.StateKey]
 		if len(bucket) == 0 {
 			continue
 		}
-		var g = &group{binding: b}
+		var g = &commitGroup{binding: b}
 		for rk, e := range bucket {
 			if d.committedTokens[e.ID] {
 				log.WithFields(log.Fields{
@@ -1081,18 +1082,51 @@ func (d *transactor) commit(ctx context.Context, pending connectorState, legacyC
 		}
 	}
 
+	// A serialization failure rolls the transaction back without applying
+	// anything, so the same staged files are simply applied again.
+	var affected map[*commitGroup]int64
+	if err := retryOnSerializationFailure(ctx, func() error {
+		var err error
+		affected, err = d.applyStaged(ctx, conn, groups, tokensMap, legacyCheckpoint)
+		return err
+	}); err != nil {
+		return err
+	}
+
+	for _, g := range groups {
+		stats := m.TotalRowStats(affected[g])
+		if g.merged.Rows > 0 {
+			stats = stats.WithStaged(g.merged.Rows)
+		}
+		d.be.ReportRowStats(g.round, g.binding.target.Path, stats)
+	}
+	for _, bucket := range tokensMap {
+		for _, token := range bucket {
+			d.committedTokens[token] = true
+		}
+	}
+
+	return nil
+}
+
+// applyStaged runs one Redshift transaction applying every group's staged
+// files to its table and recording their tokens, and returns the target rows
+// each group's statements reported touching.
+func (d *transactor) applyStaged(ctx context.Context, conn *pgx.Conn, groups []*commitGroup, tokensMap checkpointTokensMap, legacyCheckpoint []byte) (map[*commitGroup]int64, error) {
 	txn, err := conn.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
-		return fmt.Errorf("store BeginTx: %w", err)
+		return nil, fmt.Errorf("store BeginTx: %w", err)
 	}
 	defer txn.Rollback(ctx)
 
+	if err := d.checkpointsTable.lock(ctx, txn); err != nil {
+		return nil, err
+	}
+
+	var affected = make(map[*commitGroup]int64)
 	for _, g := range groups {
 		var b = g.binding
 		d.be.StartedResourceCommit(b.target.Path)
-		// affected sums the target rows each statement reports touching, for
-		// the transaction health report.
-		var affected int64
 
 		if g.deleteManifest != "" {
 			// Create the temporary table for staging values to delete from the target table.
@@ -1103,19 +1137,19 @@ func (d *transactor) commit(ctx context.Context, pending connectorState, legacyC
 				Target:            &b.target,
 				VarcharColumnMeta: b.varcharColumnMetas,
 			}); err != nil {
-				return fmt.Errorf("evaluating create delete table template: %w", err)
+				return nil, fmt.Errorf("evaluating create delete table template: %w", err)
 			} else if _, err := txn.Exec(ctx, createDeleteTableSQL.String()); err != nil {
-				return fmt.Errorf("creating delete table: %w", err)
+				return nil, fmt.Errorf("creating delete table: %w", err)
 			}
 
 			if copySQL, err := d.copyFromS3(fmt.Sprintf("flow_temp_table_%d_deleted", b.target.Binding), g.deleteManifest, false); err != nil {
-				return err
+				return nil, err
 			} else if _, err := txn.Exec(ctx, copySQL); err != nil {
-				return handleCopyIntoErr(ctx, txn, d.cfg.Bucket, g.merged.DeleteFiles, b.target.Identifier, err)
+				return nil, handleCopyIntoErr(ctx, txn, d.cfg.Bucket, g.merged.DeleteFiles, b.target.Identifier, err)
 			} else if tag, err := txn.Exec(ctx, b.deleteQuerySQL); err != nil {
-				return fmt.Errorf("deleting from table '%s': %w", b.target.Identifier, err)
+				return nil, fmt.Errorf("deleting from table '%s': %w", b.target.Identifier, err)
 			} else {
-				affected += tag.RowsAffected()
+				affected[g] += tag.RowsAffected()
 			}
 		}
 
@@ -1130,60 +1164,49 @@ func (d *transactor) commit(ctx context.Context, pending connectorState, legacyC
 				Target:            &b.target,
 				VarcharColumnMeta: b.varcharColumnMetas,
 			}); err != nil {
-				return fmt.Errorf("evaluating create store table template: %w", err)
+				return nil, fmt.Errorf("evaluating create store table template: %w", err)
 			} else if _, err := txn.Exec(ctx, createStoreTableSQL.String()); err != nil {
-				return fmt.Errorf("creating store table: %w", err)
+				return nil, fmt.Errorf("creating store table: %w", err)
 			}
 
 			if copySQL, err := d.copyFromS3(fmt.Sprintf("flow_temp_table_%d", b.target.Binding), g.storeManifest, true); err != nil {
-				return err
+				return nil, err
 			} else if _, err := txn.Exec(ctx, copySQL); err != nil {
-				return handleCopyIntoErr(ctx, txn, d.cfg.Bucket, g.merged.StoreFiles, b.target.Identifier, err)
+				return nil, handleCopyIntoErr(ctx, txn, d.cfg.Bucket, g.merged.StoreFiles, b.target.Identifier, err)
 			} else if n, err := lastCopyCount(ctx, txn); err != nil {
-				return fmt.Errorf("reading rows staged for table '%s': %w", b.target.Identifier, err)
+				return nil, fmt.Errorf("reading rows staged for table '%s': %w", b.target.Identifier, err)
 			} else if _, err := txn.Exec(ctx, b.mergeIntoSQL); err != nil {
-				return fmt.Errorf("merging to table '%s': %w", b.target.Identifier, err)
+				return nil, fmt.Errorf("merging to table '%s': %w", b.target.Identifier, err)
 			} else {
 				// MERGE's command tag counts only the rows it inserted, so
 				// the rows COPY loaded into the staging table stand in for
 				// the target rows: each matches or inserts exactly one.
-				affected += n
+				affected[g] += n
 			}
 		} else {
 			// Can copy directly into the target table since all values are new.
 			if copySQL, err := d.copyFromS3(b.target.Identifier, g.storeManifest, true); err != nil {
-				return err
+				return nil, err
 			} else if _, err := txn.Exec(ctx, copySQL); err != nil {
-				return handleCopyIntoErr(ctx, txn, d.cfg.Bucket, g.merged.StoreFiles, b.target.Identifier, err)
+				return nil, handleCopyIntoErr(ctx, txn, d.cfg.Bucket, g.merged.StoreFiles, b.target.Identifier, err)
 			} else if n, err := lastCopyCount(ctx, txn); err != nil {
-				return fmt.Errorf("reading rows loaded into table '%s': %w", b.target.Identifier, err)
+				return nil, fmt.Errorf("reading rows loaded into table '%s': %w", b.target.Identifier, err)
 			} else {
-				affected += n
+				affected[g] += n
 			}
 		}
 
-		stats := m.TotalRowStats(affected)
-		if g.merged.Rows > 0 {
-			stats = stats.WithStaged(g.merged.Rows)
-		}
-		d.be.ReportRowStats(g.round, b.target.Path, stats)
 		d.be.FinishedResourceCommit(b.target.Path)
 	}
 
 	// Written in the same transaction as the data: a committed token proves
 	// the data committed, and a rolled-back commit leaves no token.
 	if err := d.checkpointsTable.write(ctx, txn, tokensMap, legacyCheckpoint); err != nil {
-		return err
+		return nil, err
 	} else if err := txn.Commit(ctx); err != nil {
-		return fmt.Errorf("committing store transaction: %w", err)
+		return nil, fmt.Errorf("committing store transaction: %w", err)
 	}
-	for _, bucket := range tokensMap {
-		for _, token := range bucket {
-			d.committedTokens[token] = true
-		}
-	}
-
-	return nil
+	return affected, nil
 }
 
 // putManifest writes a manifest listing files under a fresh key, or returns
