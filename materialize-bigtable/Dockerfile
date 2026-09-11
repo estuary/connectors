@@ -34,8 +34,6 @@ COPY --from=builder /builder/connector /connector/materialize-bigtable
 # Avoid running the connector as root.
 USER nonroot:nonroot
 
-# The build this image carries, for the transaction health log line. CI
-# passes "<VERSION>-<short sha>"; a local build reports "dev".
 ARG CONNECTOR_VERSION=dev
 ENV CONNECTOR_VERSION="${CONNECTOR_VERSION}"
 
