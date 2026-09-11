@@ -48,7 +48,7 @@ const (
 
 	// For blobs we only write a single chunk and a chunk can only have a single
 	// row group, so this ends up being the size limit for the single row group
-	// written by the bdec bdecparquet.
+	// written by the bdec writer
 	// Ref: https://github.com/snowflakedb/snowflake-ingest-java/blob/3cbaebfe26f59dc3a8b8e973649e3f1a1014438c/src/main/java/net/snowflake/ingest/utils/ParameterProvider.java#L64C62-L64C79
 	MAX_CHUNK_SIZE_IN_BYTES_DEFAULT = 256 * 1024 * 1024
 )
@@ -197,7 +197,7 @@ func (bw *bdecWriter) writeRow(row []any) error {
 			// integer stats, and must parse it into an int128 here for that.
 			// The original value (a date string) is left as-is in the row, so
 			// we'll end up parsing it twice: Once here for stats, and once in
-			// the parquet bdecparquet.
+			// the parquet writer.
 			v, err := getDateInt(row[i])
 			if err != nil {
 				return fmt.Errorf("getDateInt for column %q: %w", col.Name, err)
