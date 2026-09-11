@@ -62,8 +62,8 @@ type streamV2Range struct {
 
 // contains reports whether the key range covers a key hash. Bounds are inclusive
 // on both ends, as RangeSpec bounds are.
-func (r streamV2Range) contains(hash uint32) bool {
-	return r.keyBegin <= hash && hash <= r.keyEnd
+func (r streamV2Range) contains(keyHash uint32) bool {
+	return r.keyBegin <= keyHash && keyHash <= r.keyEnd
 }
 
 func (r streamV2Range) String() string {
@@ -394,9 +394,9 @@ func (b *streamV2Binding) isTargetLayout() bool {
 }
 
 // route reports the active channel that covers a key hash, or nil when none does.
-func (b *streamV2Binding) route(hash uint32) *streamV2Channel {
+func (b *streamV2Binding) route(keyHash uint32) *streamV2Channel {
 	for _, c := range b.channels {
-		if c.keyRange.contains(hash) {
+		if c.keyRange.contains(keyHash) {
 			return c
 		}
 	}
@@ -611,9 +611,9 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 	// items below, and the epoch minted from them, reason only about channels that
 	// still stand.
 	var prior = make(streamV2Checkpoint, len(b.prior))
-	for key, sv2ChannelCheckpointItem := range b.prior {
+	for keyRange, sv2ChannelCheckpointItem := range b.prior {
 		if sv2ChannelCheckpointItem != nil {
-			prior[key] = sv2ChannelCheckpointItem
+			prior[keyRange] = sv2ChannelCheckpointItem
 		}
 	}
 	b.prior = prior
@@ -1092,7 +1092,7 @@ func reconcileStreamV2Channel(channelName, table string, committedToken *string,
 
 	// A committed offset equal to the routed offset is the clean boundary, and one
 	// above it is an interrupted attempt of the transaction now replayed. The replay
-	// produces the same documents in the same order, and the routing hash is a
+	// produces the same documents in the same order, and the key hash is a
 	// function of each document alone, so this channel receives exactly the documents
 	// up to the committed offset, and skips them by offset.
 	return committedOffset, nil
@@ -1218,12 +1218,12 @@ func (m *streamV2Manager) writeRow(ctx context.Context, binding int, packedKey [
 	// not cover means the runtime and this connector disagree about routing, and
 	// nothing downstream of that disagreement can be trusted — reject rather than
 	// misfile a single row.
-	var hash = packedKeyHashHH64(packedKey)
-	var c = b.route(hash)
+	var keyHash = packedKeyHashHH64(packedKey)
+	var c = b.route(keyHash)
 	if c == nil {
 		return fmt.Errorf(
 			"the key hash %08x of a document stored to %s is covered by no channel of this shard, which covers %s: the runtime and this connector disagree about document routing",
-			hash, b.table, m.shardRange(),
+			keyHash, b.table, m.shardRange(),
 		)
 	}
 
@@ -1447,8 +1447,8 @@ func (m *streamV2Manager) flush(ctx context.Context) (map[int]streamV2Checkpoint
 		// Deletions of abandoned channels ride every checkpoint of the session, not
 		// only the first, so that a transaction that never commits does not lose
 		// them.
-		for _, key := range b.abandoned {
-			sv2Checkpoint[key] = nil
+		for _, keyRange := range b.abandoned {
+			sv2Checkpoint[keyRange] = nil
 		}
 
 		entries[idx] = sv2Checkpoint

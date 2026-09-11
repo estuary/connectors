@@ -21,7 +21,7 @@ var packedKeyHashHH64 = keyhash.PackedKeyHash_HH64
 // both ends, into streamV2ChannelsPerShard equal key ranges. This is the layout a
 // shard's channels converge to.
 func streamV2TargetLayout(keyBegin, keyEnd uint32) ([]streamV2Range, error) {
-	// Math uses uint64 because the full range spans 1<<32 keys.
+	// Math uses uint64 because the full range spans 1<<32 key hashes.
 	var width = uint64(keyEnd) - uint64(keyBegin) + 1
 	var n = uint64(streamV2ChannelsPerShard)
 	if width%n != 0 {
@@ -86,7 +86,7 @@ func streamV2LayoutCovers(layout []streamV2Range, shard streamV2Range) bool {
 	}
 	for i := 1; i < len(layout); i++ {
 		// The comparison runs in uint64 so that a key range ending at the top of
-		// the key space cannot wrap to zero and fake a continuation.
+		// the key hash space cannot wrap to zero and fake a continuation.
 		if uint64(layout[i].keyBegin) != uint64(layout[i-1].keyEnd)+1 {
 			return false
 		}
@@ -94,13 +94,13 @@ func streamV2LayoutCovers(layout []streamV2Range, shard streamV2Range) bool {
 	return layout[len(layout)-1].keyEnd == shard.keyEnd
 }
 
-// streamV2RouteHash reports the index of the layout key range that covers a key
+// streamV2RouteKeyHash reports the index of the layout key range that covers a key
 // hash, or -1 when none does. Under a layout that covers the shard range, -1
-// means the hash lies outside the shard entirely — a disagreement with the
+// means the key hash lies outside the shard entirely — a disagreement with the
 // runtime's routing that the caller must reject.
-func streamV2RouteHash(layout []streamV2Range, hash uint32) int {
+func streamV2RouteKeyHash(layout []streamV2Range, keyHash uint32) int {
 	for i, r := range layout {
-		if r.contains(hash) {
+		if r.contains(keyHash) {
 			return i
 		}
 	}
