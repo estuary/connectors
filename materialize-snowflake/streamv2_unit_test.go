@@ -414,7 +414,7 @@ func TestReconcileStreamV2Channel(t *testing.T) {
 			name:       "committed ahead with no item beside a sibling's is rejected",
 			committed:  token("50@10000000-1fffffff"),
 			priorItems: 1,
-			wantErr:    "cannot account for",
+			wantErr:    "does not account for",
 		},
 		{
 			// The token's range must be the channel's own key range whatever the

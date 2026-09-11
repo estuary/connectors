@@ -1085,7 +1085,7 @@ func reconcileStreamV2Channel(channelName, table string, committedToken *string,
 		// documents must not be skipped, or that many of the documents about to be
 		// materialized into the table are dropped instead.
 		return 0, fmt.Errorf(
-			"channel %q reports committed offset %d, which this task's checkpoint cannot account for: it holds no item for this channel, only items its other channels wrote, and this write path records an item for every channel before appending to it. The documents up to that offset must not be skipped, or that many of the documents about to be materialized into %s are dropped instead. Backfill this binding",
+			"channel %q reports committed offset %d, which this task's checkpoint does not account for. Skipping the documents up to that offset would drop that many documents materialized into %s. Backfill this binding",
 			channelName, committedOffset, table,
 		)
 	}
@@ -1183,7 +1183,7 @@ func streamV2PathOrphaned(table string, prior streamV2Checkpoint) error {
 	}
 
 	return fmt.Errorf(
-		"this binding has materialized into %s through the snowpipe_streaming_v2 write path, which this task's specification no longer selects for it, while the task's checkpoint still records the channel(s) %s it appended to. Those items are the only account of which documents Snowflake's channels already hold, no other write path maintains them, and the first transaction on another path discards them — after which returning to this write path would skip that many of the documents it materializes. Restore this binding to the snowpipe_streaming_v2 write path — it needs the feature flag, delta updates, and key-pair authentication — or backfill it, which rotates its channels and its checkpoint together",
+		"this binding materialized into %s through the snowpipe_streaming_v2 write path, which this task's specification no longer selects for it, and the task's checkpoint still records its channel(s) %s. Leaving this path discards that record, and returning later would skip the documents those channels already hold. Restore the snowpipe_streaming_v2 write path — it needs the feature flag, delta updates, and key-pair authentication — or backfill this binding",
 		table, strings.Join(channelNames, ", "),
 	)
 }
