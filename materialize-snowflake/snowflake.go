@@ -1190,11 +1190,12 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 func (d *transactor) runStoreQuery(ctx context.Context, item *checkpointItem, path []string) error {
 	isMerge := strings.HasPrefix(item.Query, "\nMERGE INTO")
 
+	queryCtx := ctx
 	queryIDs := make(chan string, 1)
 	if isMerge {
-		ctx = sf.WithQueryIDChan(ctx, queryIDs)
+		queryCtx = sf.WithQueryIDChan(ctx, queryIDs)
 	}
-	rows, err := d.db.QueryContext(ctx, item.Query)
+	rows, err := d.db.QueryContext(queryCtx, item.Query)
 	if err != nil {
 		return fmt.Errorf("running ack query: %w", err)
 	}
