@@ -3,6 +3,8 @@ package materialize
 import (
 	"fmt"
 	"math"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -291,9 +293,12 @@ const (
 type healthTracker struct {
 	log      func(log.Fields, string)
 	taskName string
-	keys     []string            // Binding index => binding key.
-	paths    map[string][]string // Binding key => resource path.
-	sharded  bool
+	// connector and connectorVersion identify the image, so that dashboards
+	// can aggregate verdicts by connector and build; see connectorIdentity.
+	connector, connectorVersion string
+	keys                        []string            // Binding index => binding key.
+	paths                       map[string][]string // Binding key => resource path.
+	sharded                     bool
 
 	mu       sync.Mutex
 	closed   bool
@@ -324,6 +329,22 @@ type healthTracker struct {
 
 func bindingKey(path []string) string { return strings.Join(path, "\x00") }
 
+// connectorIdentity is the connector's name and build. The name is
+// CONNECTOR_NAME when set (the variant Dockerfile sets it, since a variant
+// runs its base connector's binary) and otherwise the binary's name, which
+// every connector image ships as /connector/<connector-name>. The version is
+// CONNECTOR_VERSION, which CI bakes into the image as "<VERSION>-<short sha>";
+// a build without it reports "dev".
+func connectorIdentity() (name, version string) {
+	if name = os.Getenv("CONNECTOR_NAME"); name == "" && len(os.Args) > 0 {
+		name = filepath.Base(os.Args[0])
+	}
+	if version = os.Getenv("CONNECTOR_VERSION"); version == "" {
+		version = "dev"
+	}
+	return name, version
+}
+
 func newHealthTracker(open *pm.Request_Open) *healthTracker {
 	h := &healthTracker{
 		log: func(fields log.Fields, msg string) {
@@ -339,6 +360,7 @@ func newHealthTracker(open *pm.Request_Open) *healthTracker {
 		uncheckedWindow: newHealthWindow(),
 		mismatchWindow:  newHealthWindow(),
 	}
+	h.connector, h.connectorVersion = connectorIdentity()
 	if open.Materialization != nil {
 		h.taskName = open.Materialization.Name.String()
 		for _, b := range open.Materialization.Bindings {
@@ -713,6 +735,8 @@ func (h *healthTracker) emit(w *healthWindow, verdict string, extra log.Fields) 
 		// protocol README. The line is low-volume and high-signal by design.
 		"observable":        true,
 		"catalog_task_name": h.taskName,
+		"connector":         h.connector,
+		"connectorVersion":  h.connectorVersion,
 		"verdict":           verdict,
 		"fidelity":          w.fidelity.orNone(),
 		"rounds":            w.rounds,

@@ -7,6 +7,7 @@ import (
 	"io"
 	"math"
 	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -22,17 +23,19 @@ import (
 
 // healthLine is a decoded "transaction health" log line.
 type healthLine struct {
-	Observable   bool   `json:"observable"`
-	TaskName     string `json:"catalog_task_name"`
-	Verdict      string
-	Fidelity     string
-	Rounds       int
-	FirstRound   int
-	LastRound    int
-	Bindings     int
-	LoadRequests int64
-	Loaded       int64
-	Expected     struct {
+	Observable       bool   `json:"observable"`
+	TaskName         string `json:"catalog_task_name"`
+	Connector        string `json:"connector"`
+	ConnectorVersion string `json:"connectorVersion"`
+	Verdict          string
+	Fidelity         string
+	Rounds           int
+	FirstRound       int
+	LastRound        int
+	Bindings         int
+	LoadRequests     int64
+	Loaded           int64
+	Expected         struct {
 		Insert, Update, Delete, SoftDeleted, Skipped int64
 	}
 	Actual struct {
@@ -59,6 +62,8 @@ func decodeHealthLines(t *testing.T, hook *logtest.Hook) []healthLine {
 		require.NoError(t, json.Unmarshal(raw, &line))
 		require.True(t, line.Observable, "health lines must be operator-observable")
 		require.Equal(t, "test/materialization", line.TaskName)
+		require.Equal(t, filepath.Base(os.Args[0]), line.Connector, "connector defaults to the binary name")
+		require.Equal(t, "dev", line.ConnectorVersion, "version defaults to dev outside an image build")
 		out = append(out, line)
 	}
 	return out
@@ -509,6 +514,14 @@ func TestHealthMismatchRollup(t *testing.T) {
 		{Check: "insert", ResourcePath: []string{"schema", "beta"}, Expected: 0, Actual: 3},
 		{Check: "update", ResourcePath: []string{"schema", "beta"}, Expected: 3, Actual: 0},
 	}, rest.Mismatches)
+}
+
+func TestConnectorIdentityFromEnv(t *testing.T) {
+	t.Setenv("CONNECTOR_NAME", "materialize-variant")
+	t.Setenv("CONNECTOR_VERSION", "v1-abc1234")
+	name, version := connectorIdentity()
+	require.Equal(t, "materialize-variant", name)
+	require.Equal(t, "v1-abc1234", version)
 }
 
 func TestHealthChecks(t *testing.T) {

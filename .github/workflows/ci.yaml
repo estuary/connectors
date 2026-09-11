@@ -342,7 +342,9 @@ jobs:
           context: .
           file: ${{ matrix.connector }}/Dockerfile
           load: true
-          build-args: BASE_IMAGE=ghcr.io/estuary/base-image:${{ steps.prep.outputs.tag }}
+          build-args: |
+            BASE_IMAGE=ghcr.io/estuary/base-image:${{ steps.prep.outputs.tag }}
+            CONNECTOR_VERSION=${{ steps.prep.outputs.version }}-${{ steps.prep.outputs.tag }}
           tags: ghcr.io/estuary/${{ matrix.connector }}:local
 
       # Fetch the spec from the built image, to catch images which are entirely
@@ -469,6 +471,7 @@ jobs:
             echo "Building and pushing ${VARIANT}:${{ steps.prep.outputs.tag }}...";
             docker build --build-arg BASE_CONNECTOR=ghcr.io/estuary/${{ matrix.connector }}:local \
                          --build-arg DOCS_URL=https://go.estuary.dev/${VARIANT} \
+                         --build-arg CONNECTOR_NAME=${VARIANT} \
                          --tag ghcr.io/estuary/${VARIANT}:${{ steps.prep.outputs.tag }} \
                          --label org.opencontainers.image.revision=$GITHUB_SHA \
                          --file connector-variant.Dockerfile .;
