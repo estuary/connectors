@@ -38,8 +38,6 @@ ENV PATH="/connector:$PATH"
 
 COPY --from=builder /builder/connector ./materialize-s3-iceberg
 
-# The build this image carries, for the transaction health log line. CI
-# passes "<VERSION>-<short sha>"; a local build reports "dev".
 ARG CONNECTOR_VERSION=dev
 ENV CONNECTOR_VERSION="${CONNECTOR_VERSION}"
 
