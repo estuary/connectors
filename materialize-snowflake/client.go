@@ -40,10 +40,6 @@ type client struct {
 	cfg                 config
 	ep                  *sql.Endpoint[config]
 	materializationName string
-	// streamingV2Enabled is this task's snowpipe_streaming_v2 feature flag, parsed
-	// once from the endpoint configuration so that every decision this client
-	// makes about the write path reads one resolution of it.
-	streamingV2Enabled bool
 }
 
 func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint[config]) (sql.Client, error) {
@@ -74,7 +70,6 @@ func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint
 		cfg:                 ep.Config,
 		ep:                  ep,
 		materializationName: materializationName,
-		streamingV2Enabled:  boilerplate.ParseFlags(ep.Config)[flagSnowpipeStreamingV2],
 	}, nil
 }
 

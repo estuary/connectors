@@ -373,7 +373,7 @@ func newTransactor(
 	}
 
 	for _, binding := range bindings {
-		if err = d.addBinding(ctx, binding, featureFlags[flagSnowpipeStreaming], featureFlags[flagSnowpipeStreamingV2]); err != nil {
+		if err = d.addBinding(ctx, binding, featureFlags[flagSnowpipeStreaming]); err != nil {
 			return nil, fmt.Errorf("adding binding for %s: %w", binding.Path, err)
 		}
 	}
@@ -415,11 +415,11 @@ type binding struct {
 	}
 }
 
-func (d *transactor) addBinding(ctx context.Context, target sql.Table, streamingEnabled bool, streamingV2Enabled bool) error {
-	var streamingV2 = streamsV2(&d.cfg, target.DeltaUpdates, streamingV2Enabled)
+func (d *transactor) addBinding(ctx context.Context, target sql.Table, streamingEnabled bool) error {
+	var streamingV2 = d.cfg.isStreamsV2(target.DeltaUpdates)
 	var prior = d.priorStreamV2(target.StateKey)
 	var held = streamV2PathOrphaned(target.Identifier, prior) // non-nil iff any non-nil item
-	var downgrade = !streamingV2 && held != nil && streamV2Downgrade(&d.cfg, target.DeltaUpdates)
+	var downgrade = !streamingV2 && held != nil && d.cfg.isStreamsDowngradeV2ToV1(target.DeltaUpdates)
 
 	// Ahead of everything else, so that a binding which may not leave the
 	// streaming v2 write path is rejected before another path opens anything of

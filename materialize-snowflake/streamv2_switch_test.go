@@ -178,7 +178,7 @@ func TestStreamV2SwitchOffTheWritePathIsRejected(t *testing.T) {
 
 	t.Run("a binding which has never streamed v2 is added as usual", func(t *testing.T) {
 		var d = newTransactor(t, "fresh.v1", nil)
-		require.NoError(t, d.addBinding(ctx, target("fresh.v1", false), false, false))
+		require.NoError(t, d.addBinding(ctx, target("fresh.v1", false), false))
 	})
 
 	t.Run("turning the feature flag off is rejected", func(t *testing.T) {
@@ -187,7 +187,7 @@ func TestStreamV2SwitchOffTheWritePathIsRejected(t *testing.T) {
 			Channel: "task_00000000_flag_v1", Routed: 3, KeyEnd: math.MaxUint32,
 		}))
 
-		var err = d.addBinding(ctx, target(stateKey, true), false, false)
+		var err = d.addBinding(ctx, target(stateKey, true), false)
 		require.ErrorContains(t, err, "snowpipe_streaming_v2")
 		require.ErrorContains(t, err, "task_00000000_flag_v1")
 		require.ErrorContains(t, err, "backfill")
@@ -199,7 +199,9 @@ func TestStreamV2SwitchOffTheWritePathIsRejected(t *testing.T) {
 			Channel: "task_00000000_delta_v1", Routed: 3, KeyEnd: math.MaxUint32,
 		}))
 
-		require.Error(t, d.addBinding(ctx, target(stateKey, false), false, true))
+		d.cfg.Advanced.FeatureFlags = "snowpipe_streaming_v2"
+
+		require.Error(t, d.addBinding(ctx, target(stateKey, false), false))
 	})
 
 	t.Run("moving the binding to the snowpipe_streaming path", func(t *testing.T) {
@@ -248,7 +250,7 @@ func TestStreamV2SwitchOffTheWritePathIsRejected(t *testing.T) {
 			// The v1 streaming path would open a channel of its own against the
 			// same table, so the rejection must come before the stream manager is
 			// reached — this transactor has none.
-			var err = d.addBinding(ctx, target(stateKey, true), true, false)
+			var err = d.addBinding(ctx, target(stateKey, true), true)
 			require.Error(t, err)
 			require.ErrorContains(t, err, "backfill")
 		})
@@ -263,7 +265,7 @@ func TestStreamV2SwitchOffTheWritePathIsRejected(t *testing.T) {
 
 			// The binding leaves for the snowpipe_streaming path. With no listing
 			// here, the sweep drops nothing.
-			require.NoError(t, d.addBinding(ctx, target(stateKey, true), true, false))
+			require.NoError(t, d.addBinding(ctx, target(stateKey, true), true))
 			require.True(t, d.bindings[len(d.bindings)-1].streaming)
 		})
 
@@ -275,7 +277,7 @@ func TestStreamV2SwitchOffTheWritePathIsRejected(t *testing.T) {
 			d.cfg.Advanced.FeatureFlags = "snowpipe_streaming"
 			d.snowpipeStreaming = openChannelServer(t, 6)
 
-			var err = d.addBinding(ctx, target(stateKey, true), true, false)
+			var err = d.addBinding(ctx, target(stateKey, true), true)
 			require.Error(t, err)
 			require.ErrorContains(t, err, "staged files")
 		})
@@ -287,7 +289,7 @@ func TestStreamV2SwitchOffTheWritePathIsRejected(t *testing.T) {
 		const stateKey = "dropped.v1"
 		var d = newTransactor(t, stateKey, map[string]*streamV2Item{"80000000-ffffffff": nil})
 
-		require.NoError(t, d.addBinding(ctx, target(stateKey, false), false, false))
+		require.NoError(t, d.addBinding(ctx, target(stateKey, false), false))
 	})
 
 	t.Run("staying on the write path is not rejected", func(t *testing.T) {
@@ -296,7 +298,9 @@ func TestStreamV2SwitchOffTheWritePathIsRejected(t *testing.T) {
 			Channel: "task_00000000_stay_v1", Routed: 3, KeyEnd: math.MaxUint32,
 		}))
 
-		require.NoError(t, d.addBinding(ctx, target(stateKey, true), false, true))
+		d.cfg.Advanced.FeatureFlags = "snowpipe_streaming_v2"
+
+		require.NoError(t, d.addBinding(ctx, target(stateKey, true), false))
 	})
 }
 
@@ -641,6 +645,7 @@ func TestStreamV2SwitchOntoTheWritePathWithPendingWorkIsRejected(t *testing.T) {
 			Database:    "DB",
 			Schema:      "SCH",
 			Credentials: &snowflake_auth.CredentialConfig{AuthType: snowflake_auth.JWT},
+			Advanced:    advancedConfig{FeatureFlags: "snowpipe_streaming_v2"},
 		}
 		var rng = &pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32}
 		var d = &transactor{
@@ -655,10 +660,10 @@ func TestStreamV2SwitchOntoTheWritePathWithPendingWorkIsRejected(t *testing.T) {
 		return d
 	}
 
-	// addBinding is called with the streaming v2 flag enabled throughout, which is
-	// what routes the binding to the streaming v2 manager.
+	// The configuration enables the streaming v2 flag throughout, which is what
+	// routes the binding to the streaming v2 manager.
 	var addBinding = func(d *transactor) error {
-		return d.addBinding(ctx, target, true, true)
+		return d.addBinding(ctx, target, true)
 	}
 
 	// The transactor of this test carries no bdec manager, which stands for every
