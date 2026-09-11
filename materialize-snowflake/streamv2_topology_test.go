@@ -147,7 +147,7 @@ func rangeKeys(layout []streamV2Range) []string {
 func channelNames(task string, epoch int, layout []streamV2Range) []string {
 	var names = make([]string, len(layout))
 	for i, r := range layout {
-		names[i] = streamV2ChannelName(task, epoch, r, "topology.v1")
+		names[i] = streamV2FormatChannelName(task, epoch, r, "topology.v1")
 	}
 	return names
 }
@@ -607,7 +607,7 @@ func TestStreamV2MisalignedSplitRejected(t *testing.T) {
 	// A channel covering the parent's low half, presented to a shard covering
 	// the low quarter: the shard's upper boundary lands mid-channel.
 	var half = streamV2Range{keyBegin: 0, keyEnd: 0x7fffffff}
-	var name = streamV2ChannelName(task, 0, half, "topology.v1")
+	var name = streamV2FormatChannelName(task, 0, half, "topology.v1")
 	var m = newTopologyManager(t, task, 0, 0x3fffffff, map[string]*streamV2Item{
 		half.key(): {Channel: name, Routed: 5, KeyBegin: half.keyBegin, KeyEnd: half.keyEnd},
 	})
@@ -627,7 +627,7 @@ func TestStreamV2LostChannelRejected(t *testing.T) {
 
 	quarters, err := streamV2TargetLayout(0, math.MaxUint32)
 	require.NoError(t, err)
-	var name = streamV2ChannelName(task, 0, quarters[1], "topology.v1")
+	var name = streamV2FormatChannelName(task, 0, quarters[1], "topology.v1")
 
 	var m = newTopologyManager(t, task, 0, math.MaxUint32, map[string]*streamV2Item{
 		quarters[1].key(): {Channel: name, Routed: 5, KeyBegin: quarters[1].keyBegin, KeyEnd: quarters[1].keyEnd},
@@ -648,7 +648,7 @@ func TestStreamV2ForeignTokenRejected(t *testing.T) {
 
 	quarters, err := streamV2TargetLayout(0, math.MaxUint32)
 	require.NoError(t, err)
-	var name = streamV2ChannelName(task, 0, quarters[0], "topology.v1")
+	var name = streamV2FormatChannelName(task, 0, quarters[0], "topology.v1")
 
 	// Snowflake holds a token for this channel's name written under the whole
 	// key range — the footprint of a channel scheme this write path never ran.

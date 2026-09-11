@@ -78,98 +78,61 @@ func (r streamV2Range) key() string {
 	return fmt.Sprintf("%08x-%08x", r.keyBegin, r.keyEnd)
 }
 
-// streamV2ChannelName names the channel of one key range of one binding, in one
-// epoch. The name carries the key range's begin and end, so subdivision depths never
-// collide: a channel covering a half-range and one covering the quarter that starts
-// at the same key take different names. It carries the epoch so a name is never
-// reused: a shard mints an epoch past every one the binding has used before routing
-// to a fresh layout, so a stale channel a later layout leaves standing is inert
-// rather than a name the layout re-derives. The state key is retained so a backfill
-// rotates the binding's channels and its checkpoint items together — both start
-// empty, which is what makes a backfill the escape from every rejection in this file.
-func streamV2ChannelName(materialization string, epoch int, keyRange streamV2Range, stateKey string) string {
+// streamV2FormatChannelName builds a Snowpipe channel name as
+// "<materialization>_<epoch>_<keyBegin>-<keyEnd>_<stateKey>".
+func streamV2FormatChannelName(materialization string, epoch int, keyRange streamV2Range, stateKey string) string {
 	return fmt.Sprintf("%s_%d_%08x-%08x_%s",
 		sanitizeAndAppendHash(materialization), epoch, keyRange.keyBegin, keyRange.keyEnd, sanitizeAndAppendHash(stateKey))
 }
 
-// streamV2ParseChannel reads the epoch and key range that streamV2ChannelName encoded,
-// and reports whether the name is one this materialization and state key derived. A
-// name derived for another task or another state key is not, and reports false, so a
-// shard reasons only about its own binding's channels among all that stand on a pipe.
-func streamV2ParseChannel(channelName, materialization, stateKey string) (int, streamV2Range, bool) {
-	var mid, ok = strings.CutPrefix(channelName, sanitizeAndAppendHash(materialization)+"_")
-	if !ok {
-		return 0, streamV2Range{}, false
-	}
-	mid, ok = strings.CutSuffix(mid, "_"+sanitizeAndAppendHash(stateKey))
-	if !ok {
-		return 0, streamV2Range{}, false
-	}
-
-	epochStr, rangeStr, ok := strings.Cut(mid, "_")
-	if !ok {
-		return 0, streamV2Range{}, false
-	}
-	epoch, err := strconv.Atoi(epochStr)
-	if err != nil {
-		return 0, streamV2Range{}, false
-	}
-
-	begin, end, ok := strings.Cut(rangeStr, "-")
-	if !ok {
-		return 0, streamV2Range{}, false
-	}
-	keyBegin, err := strconv.ParseUint(begin, 16, 32)
-	if err != nil {
-		return 0, streamV2Range{}, false
-	}
-	keyEnd, err := strconv.ParseUint(end, 16, 32)
-	if err != nil {
-		return 0, streamV2Range{}, false
-	}
-	return epoch, streamV2Range{keyBegin: uint32(keyBegin), keyEnd: uint32(keyEnd)}, true
-}
-
-// streamV2ChannelShape is the shape of every name streamV2ChannelName produces,
-// whatever task and state key it was produced for: a sanitized task and a sanitized
-// state key, each ending in the 16 uppercase hex digits sanitizeAndAppendHash appends,
-// around a decimal epoch and a key range of two lowercase 8-digit hex bounds. The
-// task match is lazy because the sanitized human-readable part is capped well short
-// of the length the epoch-and-range middle needs, so the shortest task prefix is the
-// one the name was derived from.
-var streamV2ChannelShape = regexp.MustCompile(
+// streamV2ChannelNameShape is the shape of the names that streamV2FormatChannelName
+// produces.
+var streamV2ChannelNameShape = regexp.MustCompile(
 	`^(.+?_[0-9A-F]{16})_(\d+)_([0-9a-f]{8})-([0-9a-f]{8})_(.+_[0-9A-F]{16})$`)
 
-// streamV2ChannelTask reports the sanitized task a v2 channel name was derived for,
-// and whether the name is a v2 channel name at all. It recognizes the names of any
-// task, which streamV2ParseChannel cannot, since that requires the task to be known.
-func streamV2ChannelTask(channelName string) (string, bool) {
-	var groups = streamV2ChannelShape.FindStringSubmatch(channelName)
-	if groups == nil {
-		return "", false
-	}
-	return groups[1], true
+type streamV2ChannelNameParts struct {
+	materialization string // as formatted by sanitizeAndAppendHash
+	epoch           int
+	keyRange        streamV2Range
+	stateKey        string // as formatted by sanitizeAndAppendHash
 }
 
-// streamV2ParseBackfilledChannel reads the key range of a channel this
-// materialization derived for a state key other than the one given, and reports
-// whether the name is such a channel. A backfill rotates a binding's state key and
-// never restores one, so a channel this task named under any other state key belongs
-// to a binding that no longer exists.
-func streamV2ParseBackfilledChannel(channelName, materialization, stateKey string) (streamV2Range, bool) {
-	var groups = streamV2ChannelShape.FindStringSubmatch(channelName)
-	if groups == nil || groups[1] != sanitizeAndAppendHash(materialization) || groups[5] == sanitizeAndAppendHash(stateKey) {
-		return streamV2Range{}, false
+// streamV2SplitChannelName reads a channel name back into its parts, and reports
+// whether the name has the shape of a v2 channel name at all.
+func streamV2SplitChannelName(channelName string) (streamV2ChannelNameParts, bool) {
+	var groups = streamV2ChannelNameShape.FindStringSubmatch(channelName)
+	if groups == nil {
+		return streamV2ChannelNameParts{}, false
+	}
+	epoch, err := strconv.Atoi(groups[2])
+	if err != nil {
+		return streamV2ChannelNameParts{}, false
 	}
 	keyBegin, err := strconv.ParseUint(groups[3], 16, 32)
 	if err != nil {
-		return streamV2Range{}, false
+		return streamV2ChannelNameParts{}, false
 	}
 	keyEnd, err := strconv.ParseUint(groups[4], 16, 32)
 	if err != nil {
-		return streamV2Range{}, false
+		return streamV2ChannelNameParts{}, false
 	}
-	return streamV2Range{keyBegin: uint32(keyBegin), keyEnd: uint32(keyEnd)}, true
+	return streamV2ChannelNameParts{
+		materialization: groups[1],
+		epoch:           epoch,
+		keyRange:        streamV2Range{keyBegin: uint32(keyBegin), keyEnd: uint32(keyEnd)},
+		stateKey:        groups[5],
+	}, true
+}
+
+// streamV2ParseChannelName reads the epoch and key range of a channel name this
+// materialization and state key derived, and reports whether the name is such a
+// channel.
+func streamV2ParseChannelName(channelName, materialization, stateKey string) (int, streamV2Range, bool) {
+	var parts, ok = streamV2SplitChannelName(channelName)
+	if !ok || parts.materialization != sanitizeAndAppendHash(materialization) || parts.stateKey != sanitizeAndAppendHash(stateKey) {
+		return 0, streamV2Range{}, false
+	}
+	return parts.epoch, parts.keyRange, true
 }
 
 // streamV2ForeignTaskError rejects a table on which another Flow task's v2 channels
@@ -603,21 +566,19 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 	// A table another task streams into is rejected before this shard creates any
 	// channel of its own. A name of no v2 shape is left alone here.
 	if m.listChannels != nil {
-		names, err := m.listChannels(ctx, b.database, b.schema, unquotedIdentifier(b.table))
+		channelNames, err := m.listChannels(ctx, b.database, b.schema, unquotedIdentifier(b.table))
 		if err != nil {
 			return err
 		}
 
 		var own = sanitizeAndAppendHash(m.materialization)
 		var foreignChannelNames = make(map[string][]string)
-		for _, name := range names {
-			var task, ok = streamV2ChannelTask(name)
-			if !ok {
-				log.WithFields(log.Fields{"table": b.table, "channel": name}).Info("a channel of no snowpipe streaming v2 shape stands on the table")
+		for _, channelName := range channelNames {
+			if parts, ok := streamV2SplitChannelName(channelName); !ok {
+				log.WithFields(log.Fields{"table": b.table, "channel": channelName}).Info("a channel of no snowpipe streaming v2 shape stands on the table")
 				continue
-			}
-			if task != own {
-				foreignChannelNames[task] = append(foreignChannelNames[task], name)
+			} else if parts.materialization != own {
+				foreignChannelNames[parts.materialization] = append(foreignChannelNames[parts.materialization], channelName)
 			}
 		}
 		if len(foreignChannelNames) > 0 {
@@ -664,7 +625,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 	b.targetEpoch = -1
 	for _, keyRange := range targets {
 		if item := b.prior[keyRange.key()]; item != nil {
-			if epoch, _, ok := streamV2ParseChannel(item.Channel, m.materialization, b.stateKey); ok {
+			if epoch, _, ok := streamV2ParseChannelName(item.Channel, m.materialization, b.stateKey); ok {
 				b.targetEpoch = epoch
 				break
 			}
@@ -673,7 +634,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 	if b.targetEpoch < 0 {
 		var maxEpoch = -1
 		for _, item := range b.prior {
-			if epoch, keyRange, ok := streamV2ParseChannel(item.Channel, m.materialization, b.stateKey); ok &&
+			if epoch, keyRange, ok := streamV2ParseChannelName(item.Channel, m.materialization, b.stateKey); ok &&
 				keyRange.keyBegin >= shard.keyBegin && keyRange.keyEnd <= shard.keyEnd {
 				maxEpoch = max(maxEpoch, epoch)
 			}
@@ -856,7 +817,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 				continue
 			}
 
-			var channelName = streamV2ChannelName(m.materialization, b.targetEpoch, keyRange, b.stateKey)
+			var channelName = streamV2FormatChannelName(m.materialization, b.targetEpoch, keyRange, b.stateKey)
 			var status = statuses[channelName]
 			if status == nil {
 				if status, err = client.OpenChannel(ctx, b.database, b.schema, b.table, channelName); err != nil {
@@ -928,7 +889,7 @@ func (m *streamV2Manager) layoutNames(b *streamV2Binding) map[string]bool {
 		keep[c.channelName] = true
 	}
 	for _, keyRange := range b.targets {
-		keep[streamV2ChannelName(m.materialization, b.targetEpoch, keyRange, b.stateKey)] = true
+		keep[streamV2FormatChannelName(m.materialization, b.targetEpoch, keyRange, b.stateKey)] = true
 	}
 	return keep
 }
@@ -948,29 +909,35 @@ func (m *streamV2Manager) sweep(ctx context.Context, database, schema, table, st
 	}
 
 	var shard = m.shardRange()
+	var own, ownStateKey = sanitizeAndAppendHash(m.materialization), sanitizeAndAppendHash(stateKey)
 	var client *sidecarClient
-	for _, name := range names {
-		if keep[name] {
+	for _, channelName := range names {
+		if keep[channelName] {
 			continue
 		}
-		if keyBegin, ok := streamingChannelKeyBegin(name, m.materialization); ok {
+		if keyBegin, ok := streamingChannelKeyBegin(channelName, m.materialization); ok {
 			if keyBegin < shard.keyBegin || keyBegin > shard.keyEnd || m.dropStreamingChannel == nil {
 				continue
 			}
-			if err := m.dropStreamingChannel(ctx, schema, table, name); err != nil {
+			if err := m.dropStreamingChannel(ctx, schema, table, channelName); err != nil {
 				return err
 			}
 			continue
 		}
-		if _, keyRange, ok := streamV2ParseChannel(name, m.materialization, stateKey); ok {
-			if keyRange.keyBegin < shard.keyBegin || keyRange.keyEnd > shard.keyEnd {
+		parts, ok := streamV2SplitChannelName(channelName)
+		if !ok || parts.materialization != own {
+			continue
+		}
+		if parts.stateKey == ownStateKey {
+			// A channel of the live binding is this shard's to drop only when its key
+			// range nests in the shard's.
+			if parts.keyRange.keyBegin < shard.keyBegin || parts.keyRange.keyEnd > shard.keyEnd {
 				continue
 			}
-		} else if keyRange, ok := streamV2ParseBackfilledChannel(name, m.materialization, stateKey); ok {
-			if keyRange.keyBegin < shard.keyBegin || keyRange.keyBegin > shard.keyEnd {
-				continue
-			}
-		} else {
+		} else if parts.keyRange.keyBegin < shard.keyBegin || parts.keyRange.keyBegin > shard.keyEnd {
+			// A backfill rotates a binding's state key and never restores one, so a
+			// channel under any other state key belongs to a binding that no longer
+			// exists. The shard whose range holds its key-begin drops it.
 			continue
 		}
 
@@ -984,17 +951,17 @@ func (m *streamV2Manager) sweep(ctx context.Context, database, schema, table, st
 		// rebalance just abandoned — already has one, and re-opening it is an error,
 		// so the drop is tried first and a channel this session never opened, a
 		// prior session's orphan, is opened only when the drop reports none.
-		var err = dropChannel(ctx, client, name)
+		var err = dropChannel(ctx, client, channelName)
 		if unknownChannel(err) {
-			if _, err = client.OpenChannel(ctx, database, schema, table, name); err != nil {
-				return fmt.Errorf("opening channel %q to drop it: %w", name, err)
+			if _, err = client.OpenChannel(ctx, database, schema, table, channelName); err != nil {
+				return fmt.Errorf("opening channel %q to drop it: %w", channelName, err)
 			}
-			err = dropChannel(ctx, client, name)
+			err = dropChannel(ctx, client, channelName)
 		}
 		if err != nil {
 			return err
 		}
-		log.WithFields(log.Fields{"table": table, "channel": name}).Info("swept a snowpipe streaming v2 channel a layout left behind")
+		log.WithFields(log.Fields{"table": table, "channel": channelName}).Info("swept a snowpipe streaming v2 channel a layout left behind")
 	}
 	return nil
 }
@@ -1460,7 +1427,7 @@ func (m *streamV2Manager) flush(ctx context.Context) (map[int]map[string]*stream
 			// checkpoint carrying these is durable.
 			for _, keyRange := range b.targets {
 				if _, ok := items[keyRange.key()]; !ok {
-					var channelName = streamV2ChannelName(m.materialization, b.targetEpoch, keyRange, b.stateKey)
+					var channelName = streamV2FormatChannelName(m.materialization, b.targetEpoch, keyRange, b.stateKey)
 					items[keyRange.key()] = &streamV2Item{Channel: channelName, KeyBegin: keyRange.keyBegin, KeyEnd: keyRange.keyEnd}
 				}
 			}
@@ -1557,7 +1524,7 @@ func (m *streamV2Manager) acknowledged(ctx context.Context) error {
 			if slices.ContainsFunc(next, func(c *streamV2Channel) bool { return c.keyRange == keyRange }) {
 				continue
 			}
-			var channelName = streamV2ChannelName(m.materialization, b.targetEpoch, keyRange, b.stateKey)
+			var channelName = streamV2FormatChannelName(m.materialization, b.targetEpoch, keyRange, b.stateKey)
 			status, err := client.OpenChannel(ctx, b.database, b.schema, b.table, channelName)
 			if err != nil {
 				return fmt.Errorf("opening channel %q: %w", channelName, err)
