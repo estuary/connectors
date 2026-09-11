@@ -110,7 +110,7 @@ func TestAcknowledgeDrainsStagedWorkBesideStreamV2(t *testing.T) {
 	patch, err := json.Marshal(checkpoint{
 		"a_table.v1": {StreamBlobs: []*blobMetadata{{Path: "blob", Chunks: []uploadChunkMetadata{{
 			Database: "D", Schema: "S", Table: "T",
-			Channels: []uploadChunkChannelMetadata{{Channel: "C", OffsetToken: token}},
+			Channels: []uploadChunkChannelMetadata{{ChannelName: "C", OffsetToken: token}},
 		}}}}, EncryptionKey: "key"},
 	})
 	require.NoError(t, err)
@@ -145,7 +145,7 @@ func TestAcknowledgeDrainsStagedWorkBesideStreamV2(t *testing.T) {
 				account:  "TEST_ACCOUNT",
 			},
 			tableStreams: map[int]*tableStream{
-				0: {channel: &channel{Schema: "S", Table: "T", Channel: "C", OffsetToken: &token}},
+				0: {channel: &channel{Schema: "S", Table: "T", ChannelName: "C", OffsetToken: &token}},
 			},
 		},
 	}

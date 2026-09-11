@@ -191,7 +191,7 @@ func TestStreamV2DropChannel(t *testing.T) {
 	for i := range 3 {
 		require.NoError(t, testWriteRow(ctx, first, 0, []any{"k", i}))
 	}
-	var channel = first.bindings[0].channels[0].name
+	var channel = first.bindings[0].channels[0].channelName
 	entries, err := first.flush(ctx)
 	require.NoError(t, err)
 	require.Equal(t, int64(3), soleItem(t, entries, 0).Routed)
@@ -202,7 +202,7 @@ func TestStreamV2DropChannel(t *testing.T) {
 	// transaction it never ran, and skipped.
 	var reused = newSession(t)
 	require.NoError(t, testWriteRow(ctx, reused, 0, []any{"k", 0}))
-	require.Equal(t, channel, reused.bindings[0].channels[0].name)
+	require.Equal(t, channel, reused.bindings[0].channels[0].channelName)
 	require.Equal(t, int64(3), reused.bindings[0].channels[0].progress.committed)
 	reused.stop()
 
@@ -228,7 +228,7 @@ func TestStreamV2DropChannel(t *testing.T) {
 	// documents of the shard which reused it are appended in full.
 	var after = newSession(t)
 	require.NoError(t, testWriteRow(ctx, after, 0, []any{"k", 0}))
-	require.Equal(t, channel, after.bindings[0].channels[0].name)
+	require.Equal(t, channel, after.bindings[0].channels[0].channelName)
 	require.Zero(t, after.bindings[0].channels[0].progress.committed)
 
 	entries, err = after.flush(ctx)

@@ -96,8 +96,8 @@ func streamV2ChannelName(materialization string, epoch int, keyRange streamV2Ran
 // and reports whether the name is one this materialization and state key derived. A
 // name derived for another task or another state key is not, and reports false, so a
 // shard reasons only about its own binding's channels among all that stand on a pipe.
-func streamV2ParseChannel(name, materialization, stateKey string) (int, streamV2Range, bool) {
-	var mid, ok = strings.CutPrefix(name, sanitizeAndAppendHash(materialization)+"_")
+func streamV2ParseChannel(channelName, materialization, stateKey string) (int, streamV2Range, bool) {
+	var mid, ok = strings.CutPrefix(channelName, sanitizeAndAppendHash(materialization)+"_")
 	if !ok {
 		return 0, streamV2Range{}, false
 	}
@@ -143,8 +143,8 @@ var streamV2ChannelShape = regexp.MustCompile(
 // streamV2ChannelTask reports the sanitized task a v2 channel name was derived for,
 // and whether the name is a v2 channel name at all. It recognizes the names of any
 // task, which streamV2ParseChannel cannot, since that requires the task to be known.
-func streamV2ChannelTask(name string) (string, bool) {
-	var groups = streamV2ChannelShape.FindStringSubmatch(name)
+func streamV2ChannelTask(channelName string) (string, bool) {
+	var groups = streamV2ChannelShape.FindStringSubmatch(channelName)
 	if groups == nil {
 		return "", false
 	}
@@ -156,8 +156,8 @@ func streamV2ChannelTask(name string) (string, bool) {
 // whether the name is such a channel. A backfill rotates a binding's state key and
 // never restores one, so a channel this task named under any other state key belongs
 // to a binding that no longer exists.
-func streamV2ParseBackfilledChannel(name, materialization, stateKey string) (streamV2Range, bool) {
-	var groups = streamV2ChannelShape.FindStringSubmatch(name)
+func streamV2ParseBackfilledChannel(channelName, materialization, stateKey string) (streamV2Range, bool) {
+	var groups = streamV2ChannelShape.FindStringSubmatch(channelName)
 	if groups == nil || groups[1] != sanitizeAndAppendHash(materialization) || groups[5] == sanitizeAndAppendHash(stateKey) {
 		return streamV2Range{}, false
 	}
@@ -175,18 +175,18 @@ func streamV2ParseBackfilledChannel(name, materialization, stateKey string) (str
 // streamV2ForeignTaskError rejects a table on which another Flow task's v2 channels
 // stand. The connector cannot tell a live task from a deleted or renamed one whose
 // channels outlived it, so the message carries the remedy for each.
-func streamV2ForeignTaskError(table string, foreign map[string][]string) error {
-	var tasks = make([]string, 0, len(foreign))
-	for task := range foreign {
-		tasks = append(tasks, task)
+func streamV2ForeignTaskError(table string, foreignChannelNames map[string][]string) error {
+	var materializationNames = make([]string, 0, len(foreignChannelNames))
+	for materialization := range foreignChannelNames {
+		materializationNames = append(materializationNames, materialization)
 	}
-	slices.Sort(tasks)
+	slices.Sort(materializationNames)
 
-	var described = make([]string, len(tasks))
-	for i, task := range tasks {
-		var channels = foreign[task]
-		slices.Sort(channels)
-		described[i] = fmt.Sprintf("%s (channels %s)", task, strings.Join(channels, ", "))
+	var described = make([]string, len(materializationNames))
+	for i, materialization := range materializationNames {
+		var channelNames = foreignChannelNames[materialization]
+		slices.Sort(channelNames)
+		described[i] = fmt.Sprintf("%s (channels %s)", materialization, strings.Join(channelNames, ", "))
 	}
 
 	return fmt.Errorf(
@@ -275,7 +275,7 @@ const streamV2ErrObjectNotExistOrAuthorized = 2003
 //
 // database, schema, and table are the unquoted names Snowflake stores.
 func streamV2ListChannels(ctx context.Context, db *stdsql.DB, dialect sql.Dialect, database, schema, table string) ([]string, error) {
-	var names []string
+	var channelNames []string
 	for _, in := range []string{
 		"TABLE " + dialect.Identifier(database, schema, table),
 		"PIPE " + dialect.Identifier(database, schema, table+streamV2DefaultPipeSuffix),
@@ -305,28 +305,29 @@ func streamV2ListChannels(ctx context.Context, db *stdsql.DB, dialect sql.Dialec
 		}
 
 		for rows.Next() {
-			var name string
+			var channelName string
 			var dest = make([]any, len(columns))
 			for i := range dest {
 				dest[i] = new(any)
 			}
-			dest[nameAt] = &name
+			dest[nameAt] = &channelName
 			if err := rows.Scan(dest...); err != nil {
 				return nil, fmt.Errorf("scanning the channel listing in %s: %w", in, err)
 			}
-			names = append(names, name)
+			channelNames = append(channelNames, channelName)
 		}
 		if err := rows.Err(); err != nil {
 			return nil, fmt.Errorf("iterating the channel listing in %s: %w", in, err)
 		}
 	}
-	slices.Sort(names)
-	return slices.Compact(names), nil
+	slices.Sort(channelNames)
+	return slices.Compact(channelNames), nil
 }
 
 // streamV2Channel is a handle for one Snowpipe channel of one connector binding.
 type streamV2Channel struct {
-	name string
+	// channelName is the name of the Snowpipe channel.
+	channelName string
 	// keyRange is the key range this channel covers. The key range is embedded in
 	// the channel's name and in every offset token it appends with.
 	keyRange streamV2Range
@@ -565,11 +566,11 @@ func (m *streamV2Manager) addBinding(database, schema, table string, target sql.
 }
 
 // newStreamV2Channel builds the in-memory state of one opened, reconciled channel.
-func newStreamV2Channel(name string, keyRange streamV2Range, routed, committed int64) *streamV2Channel {
+func newStreamV2Channel(channelName string, keyRange streamV2Range, routed, committed int64) *streamV2Channel {
 	var c = &streamV2Channel{
-		name:     name,
-		keyRange: keyRange,
-		limiter:  rate.NewLimiter(streamV2PaceBytesPerSecond, 2*streamV2PaceBytesPerSecond),
+		channelName: channelName,
+		keyRange:    keyRange,
+		limiter:     rate.NewLimiter(streamV2PaceBytesPerSecond, 2*streamV2PaceBytesPerSecond),
 		progress: struct {
 			routed       int64
 			checkpointed int64
@@ -608,7 +609,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 		}
 
 		var own = sanitizeAndAppendHash(m.materialization)
-		var foreign = make(map[string][]string)
+		var foreignChannelNames = make(map[string][]string)
 		for _, name := range names {
 			var task, ok = streamV2ChannelTask(name)
 			if !ok {
@@ -616,11 +617,11 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 				continue
 			}
 			if task != own {
-				foreign[task] = append(foreign[task], name)
+				foreignChannelNames[task] = append(foreignChannelNames[task], name)
 			}
 		}
-		if len(foreign) > 0 {
-			return streamV2ForeignTaskError(b.table, foreign)
+		if len(foreignChannelNames) > 0 {
+			return streamV2ForeignTaskError(b.table, foreignChannelNames)
 		}
 	}
 
@@ -810,7 +811,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 		b.abandoned = append(b.abandoned, c.keyRange.key())
 		log.WithFields(log.Fields{
 			"table":   b.table,
-			"channel": c.name,
+			"channel": c.channelName,
 		}).Info("abandoning an empty channel of a layout this shard does not continue")
 	}
 
@@ -855,19 +856,19 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 				continue
 			}
 
-			var name = streamV2ChannelName(m.materialization, b.targetEpoch, keyRange, b.stateKey)
-			var status = statuses[name]
+			var channelName = streamV2ChannelName(m.materialization, b.targetEpoch, keyRange, b.stateKey)
+			var status = statuses[channelName]
 			if status == nil {
-				if status, err = client.OpenChannel(ctx, b.database, b.schema, b.table, name); err != nil {
-					return fmt.Errorf("opening channel %q: %w", name, err)
+				if status, err = client.OpenChannel(ctx, b.database, b.schema, b.table, channelName); err != nil {
+					return fmt.Errorf("opening channel %q: %w", channelName, err)
 				}
-				if err := rejectedRowsError(name, b.table, status); err != nil {
+				if err := rejectedRowsError(channelName, b.table, status); err != nil {
 					return err
 				}
 			}
 
 			var item = b.prior[keyRange.key()]
-			committed, err := reconcileStreamV2Channel(name, b.table, status.CommittedToken, item, keyRange, len(b.prior))
+			committed, err := reconcileStreamV2Channel(channelName, b.table, status.CommittedToken, item, keyRange, len(b.prior))
 			if err != nil {
 				return err
 			}
@@ -875,7 +876,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 			if item != nil {
 				routed = item.Routed
 			}
-			active = append(active, newStreamV2Channel(name, keyRange, routed, committed))
+			active = append(active, newStreamV2Channel(channelName, keyRange, routed, committed))
 		}
 	}
 
@@ -924,7 +925,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 func (m *streamV2Manager) layoutNames(b *streamV2Binding) map[string]bool {
 	var keep = make(map[string]bool, len(b.channels)+len(b.targets))
 	for _, c := range b.channels {
-		keep[c.name] = true
+		keep[c.channelName] = true
 	}
 	for _, keyRange := range b.targets {
 		keep[streamV2ChannelName(m.materialization, b.targetEpoch, keyRange, b.stateKey)] = true
@@ -1000,12 +1001,12 @@ func (m *streamV2Manager) sweep(ctx context.Context, database, schema, table, st
 
 // streamingChannelKeyBegin reads the key-begin of a snowpipe_streaming channel this
 // task derived. Snowflake lists those names upper-cased, so the match ignores case.
-func streamingChannelKeyBegin(name, materialization string) (uint32, bool) {
+func streamingChannelKeyBegin(channelName, materialization string) (uint32, bool) {
 	var prefix = sanitizeAndAppendHash(materialization) + "_"
-	if len(name) != len(prefix)+8 || !strings.EqualFold(name[:len(prefix)], prefix) {
+	if len(channelName) != len(prefix)+8 || !strings.EqualFold(channelName[:len(prefix)], prefix) {
 		return 0, false
 	}
-	keyBegin, err := strconv.ParseUint(name[len(prefix):], 16, 32)
+	keyBegin, err := strconv.ParseUint(channelName[len(prefix):], 16, 32)
 	if err != nil {
 		return 0, false
 	}
@@ -1024,13 +1025,13 @@ func streamingChannelKeyBegin(name, materialization string) (uint32, bool) {
 // there is nothing to re-send. No state can tell the connector that the destination is
 // whole again. Only a backfill clears the count, because it rotates the channels and
 // the checkpoint of the binding together.
-func rejectedRowsError(channel, table string, status *channelStatusResult) error {
+func rejectedRowsError(channelName, table string, status *channelStatusResult) error {
 	if status.RowsErrorCount == 0 {
 		return nil
 	}
 	return fmt.Errorf(
 		"channel %q had %d row(s) rejected and discarded by Snowflake, which reported: %s. Those rows are not in %s, and Snowflake's committed offset token has advanced past them, so they cannot be identified and re-sent. Backfill this binding",
-		channel, status.RowsErrorCount, status.LastErrorMessage, table,
+		channelName, status.RowsErrorCount, status.LastErrorMessage, table,
 	)
 }
 
@@ -1043,7 +1044,7 @@ func rejectedRowsError(channel, table string, status *channelStatusResult) error
 // priorItems counts every item the checkpoint holds for the binding, across all of
 // the task's channels; it is what tells a channel's interrupted first transaction
 // apart from a token nothing accounts for.
-func reconcileStreamV2Channel(channel, table string, committedToken *string, item *streamV2Item, keyRange streamV2Range, priorItems int) (int64, error) {
+func reconcileStreamV2Channel(channelName, table string, committedToken *string, item *streamV2Item, keyRange streamV2Range, priorItems int) (int64, error) {
 	var routed int64
 	if item != nil {
 		routed = item.Routed
@@ -1061,7 +1062,7 @@ func reconcileStreamV2Channel(channel, table string, committedToken *string, ite
 		if routed > 0 {
 			return 0, fmt.Errorf(
 				"channel %q has committed nothing while this task's checkpoint records %d documents appended to it: Snowflake has lost this channel's committed offset token, so this shard cannot identify which of its documents Snowflake still holds. Backfill this binding",
-				channel, routed,
+				channelName, routed,
 			)
 		}
 		return 0, nil
@@ -1071,7 +1072,7 @@ func reconcileStreamV2Channel(channel, table string, committedToken *string, ite
 	if !ok {
 		return 0, fmt.Errorf(
 			"channel %q reports the committed offset token %q, which is not a document count: this channel was written by something other than this connector's snowpipe_streaming_v2 write path, and continuing could duplicate or drop rows",
-			channel, *committedToken,
+			channelName, *committedToken,
 		)
 	}
 
@@ -1082,14 +1083,14 @@ func reconcileStreamV2Channel(channel, table string, committedToken *string, ite
 	if appendedBy != keyRange {
 		return 0, fmt.Errorf(
 			"channel %q covers %s but reports a committed offset token for %d documents appended under %s: that token was not written against this channel's key range, so the documents it counts cannot be identified. Backfill this binding",
-			channel, keyRange, committed, appendedBy,
+			channelName, keyRange, committed, appendedBy,
 		)
 	}
 
 	if committed < routed {
 		return 0, fmt.Errorf(
 			"channel %q has committed %d documents but this task's checkpoint records %d as appended: the channel has lost committed data, so the missing rows cannot be identified. Backfill this binding",
-			channel, committed, routed,
+			channelName, committed, routed,
 		)
 	}
 
@@ -1108,7 +1109,7 @@ func reconcileStreamV2Channel(channel, table string, committedToken *string, ite
 		// table are dropped instead.
 		return 0, fmt.Errorf(
 			"channel %q has committed %d documents this task's checkpoint cannot account for: it holds no item for this channel, only items its other channels wrote, and this write path records an item for every channel before appending to it. The documents that token counts must not be skipped, or that many of the documents about to be materialized into %s are dropped instead. Backfill this binding",
-			channel, committed, table,
+			channelName, committed, table,
 		)
 	}
 
@@ -1140,11 +1141,11 @@ func reconcileStreamV2Channel(channel, table string, committedToken *string, ite
 // The channel must already be open in this session, because the drop uses the handle
 // that an open produced. The committed rows are untouched. This drops the channel,
 // not the data it delivered.
-func dropChannel(ctx context.Context, client *sidecarClient, channel string) error {
-	if err := client.CloseChannel(ctx, channel, true); err != nil {
-		return fmt.Errorf("dropping channel %q: %w", channel, err)
+func dropChannel(ctx context.Context, client *sidecarClient, channelName string) error {
+	if err := client.CloseChannel(ctx, channelName, true); err != nil {
+		return fmt.Errorf("dropping channel %q: %w", channelName, err)
 	}
-	log.WithFields(log.Fields{"channel": channel}).Info("dropped snowpipe streaming v2 channel")
+	log.WithFields(log.Fields{"channel": channelName}).Info("dropped snowpipe streaming v2 channel")
 	return nil
 }
 
@@ -1159,14 +1160,14 @@ func unknownChannel(err error) bool {
 // streamV2ChannelNames lists, sorted, the channels the items of a binding name. A
 // nil item is a channel the task already dropped and names nothing.
 func streamV2ChannelNames(items map[string]*streamV2Item) []string {
-	var channels []string
+	var channelNames []string
 	for _, item := range items {
 		if item != nil {
-			channels = append(channels, item.Channel)
+			channelNames = append(channelNames, item.Channel)
 		}
 	}
-	slices.Sort(channels)
-	return channels
+	slices.Sort(channelNames)
+	return channelNames
 }
 
 // streamV2PathOrphaned rejects a binding that materialized through this write path
@@ -1199,14 +1200,14 @@ func streamV2ChannelNames(items map[string]*streamV2Item) []string {
 // which rotates both the channels and the checkpoint item. Nothing is then left for
 // another path to discard, and no channel is left for a later session to find.
 func streamV2PathOrphaned(table string, prior map[string]*streamV2Item) error {
-	var channels = streamV2ChannelNames(prior)
-	if len(channels) == 0 {
+	var channelNames = streamV2ChannelNames(prior)
+	if len(channelNames) == 0 {
 		return nil
 	}
 
 	return fmt.Errorf(
 		"this binding has materialized into %s through the snowpipe_streaming_v2 write path, which this task's specification no longer selects for it, while the task's checkpoint still records the channel(s) %s it appended to. Those items are the only account of which documents Snowflake's channels already hold, no other write path maintains them, and the first transaction on another path discards them — after which returning to this write path would skip that many of the documents it materializes. Restore this binding to the snowpipe_streaming_v2 write path — it needs the feature flag, delta updates, and key-pair authentication — or backfill it, which rotates its channels and its checkpoint together",
-		table, strings.Join(channels, ", "),
+		table, strings.Join(channelNames, ", "),
 	)
 }
 
@@ -1214,14 +1215,14 @@ func streamV2PathOrphaned(table string, prior map[string]*streamV2Item) error {
 // snowpipe streaming v2 write path onto the snowpipe streaming path costs it, and
 // "" when the binding names no channel to leave behind.
 func streamV2DowngradeWarning(table string, items map[string]*streamV2Item) string {
-	var channels = streamV2ChannelNames(items)
-	if len(channels) == 0 {
+	var channelNames = streamV2ChannelNames(items)
+	if len(channelNames) == 0 {
 		return ""
 	}
 
 	return fmt.Sprintf(
 		"binding %s is leaving the snowpipe_streaming_v2 write path for snowpipe_streaming. Every document that its channel(s) %s committed beyond the index the checkpoint records for them will be materialized again by the snowpipe_streaming path, and this binding uses delta updates, so those duplicates are permanent. The channels are dropped when the task next opens on the new path",
-		table, strings.Join(channels, ", "),
+		table, strings.Join(channelNames, ", "),
 	)
 }
 
@@ -1357,16 +1358,16 @@ func (m *streamV2Manager) appendBatch(ctx context.Context, c *streamV2Channel) e
 	// blocks the next submit, and that blocks Store.
 	var err = c.pipe.submit(func() error {
 		if err := c.limiter.WaitN(ctx, len(payload)); err != nil {
-			return fmt.Errorf("pacing channel %q: %w", c.name, err)
+			return fmt.Errorf("pacing channel %q: %w", c.channelName, err)
 		}
 		client, err := m.ensureStarted(ctx)
 		if err != nil {
 			return err
 		}
-		return client.Append(ctx, c.name, c.offsetToken(first), c.offsetToken(last), payload, rows)
+		return client.Append(ctx, c.channelName, c.offsetToken(first), c.offsetToken(last), payload, rows)
 	})
 	if err != nil {
-		return fmt.Errorf("appending to channel %q: %w", c.name, err)
+		return fmt.Errorf("appending to channel %q: %w", c.channelName, err)
 	}
 	return nil
 }
@@ -1414,7 +1415,7 @@ func (m *streamV2Manager) flush(ctx context.Context) (map[int]map[string]*stream
 				}
 			}
 			if err := c.pipe.wait(); err != nil {
-				return nil, fmt.Errorf("appending to channel %q: %w", c.name, err)
+				return nil, fmt.Errorf("appending to channel %q: %w", c.channelName, err)
 			}
 
 			// A replayed transaction that routed fewer documents to this channel
@@ -1425,7 +1426,7 @@ func (m *streamV2Manager) flush(ctx context.Context) (map[int]map[string]*stream
 			if c.progress.routed < c.progress.committed {
 				return nil, fmt.Errorf(
 					"channel %q holds %d committed documents but the transaction replayed against it produced only %d: it was not replayed identically, so the rows Snowflake already holds cannot be identified. Backfill this binding",
-					c.name, c.progress.committed, c.progress.routed,
+					c.channelName, c.progress.committed, c.progress.routed,
 				)
 			}
 
@@ -1443,7 +1444,7 @@ func (m *streamV2Manager) flush(ctx context.Context) (map[int]map[string]*stream
 		for _, c := range b.channels {
 			c.progress.checkpointed = c.progress.routed
 			items[c.keyRange.key()] = &streamV2Item{
-				Channel:  c.name,
+				Channel:  c.channelName,
 				Routed:   c.progress.routed,
 				KeyBegin: c.keyRange.keyBegin,
 				KeyEnd:   c.keyRange.keyEnd,
@@ -1459,8 +1460,8 @@ func (m *streamV2Manager) flush(ctx context.Context) (map[int]map[string]*stream
 			// checkpoint carrying these is durable.
 			for _, keyRange := range b.targets {
 				if _, ok := items[keyRange.key()]; !ok {
-					var name = streamV2ChannelName(m.materialization, b.targetEpoch, keyRange, b.stateKey)
-					items[keyRange.key()] = &streamV2Item{Channel: name, KeyBegin: keyRange.keyBegin, KeyEnd: keyRange.keyEnd}
+					var channelName = streamV2ChannelName(m.materialization, b.targetEpoch, keyRange, b.stateKey)
+					items[keyRange.key()] = &streamV2Item{Channel: channelName, KeyBegin: keyRange.keyBegin, KeyEnd: keyRange.keyEnd}
 				}
 			}
 			b.declared = true
@@ -1556,12 +1557,12 @@ func (m *streamV2Manager) acknowledged(ctx context.Context) error {
 			if slices.ContainsFunc(next, func(c *streamV2Channel) bool { return c.keyRange == keyRange }) {
 				continue
 			}
-			var name = streamV2ChannelName(m.materialization, b.targetEpoch, keyRange, b.stateKey)
-			status, err := client.OpenChannel(ctx, b.database, b.schema, b.table, name)
+			var channelName = streamV2ChannelName(m.materialization, b.targetEpoch, keyRange, b.stateKey)
+			status, err := client.OpenChannel(ctx, b.database, b.schema, b.table, channelName)
 			if err != nil {
-				return fmt.Errorf("opening channel %q: %w", name, err)
+				return fmt.Errorf("opening channel %q: %w", channelName, err)
 			}
-			if err := rejectedRowsError(name, b.table, status); err != nil {
+			if err := rejectedRowsError(channelName, b.table, status); err != nil {
 				return err
 			}
 			// The channel was declared this session and nothing has routed to it
@@ -1570,10 +1571,10 @@ func (m *streamV2Manager) acknowledged(ctx context.Context) error {
 			if status.CommittedToken != nil {
 				return fmt.Errorf(
 					"channel %q was declared by this shard and should hold nothing, but reports the committed offset token %q: something else is appending under this binding's channel names, and continuing could duplicate or drop rows. Backfill this binding",
-					name, *status.CommittedToken,
+					channelName, *status.CommittedToken,
 				)
 			}
-			next = append(next, newStreamV2Channel(name, keyRange, 0, 0))
+			next = append(next, newStreamV2Channel(channelName, keyRange, 0, 0))
 		}
 
 		slices.SortFunc(next, func(a, b *streamV2Channel) int {
@@ -1614,28 +1615,28 @@ func (m *streamV2Manager) waitCommit(ctx context.Context, b *streamV2Binding, c 
 	// returns or times out.
 	log.WithFields(log.Fields{
 		"table":   b.table,
-		"channel": c.name,
+		"channel": c.channelName,
 		"index":   index,
 	}).Info("snowpipe streaming v2: awaiting commit")
 
 	var started = time.Now()
 	var token = c.offsetToken(index)
-	status, err := client.WaitCommit(ctx, c.name, token)
+	status, err := client.WaitCommit(ctx, c.channelName, token)
 	if err != nil {
-		return fmt.Errorf("waiting for commit of document %s on channel %q: %w", token, c.name, err)
+		return fmt.Errorf("waiting for commit of document %s on channel %q: %w", token, c.channelName, err)
 	}
 
 	// The commit of the token is the earliest point where this transaction can see its
 	// own rejections. That point is before flush checkpoints its index. A rejection
 	// therefore fails the transaction that produced it, and not a later one.
-	if err := rejectedRowsError(c.name, b.table, status); err != nil {
+	if err := rejectedRowsError(c.channelName, b.table, status); err != nil {
 		return err
 	}
 	c.progress.committed = index
 
 	log.WithFields(log.Fields{
 		"table":   b.table,
-		"channel": c.name,
+		"channel": c.channelName,
 		"index":   index,
 		"took":    time.Since(started).String(),
 	}).Info("snowpipe streaming v2: committed")

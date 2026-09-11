@@ -156,7 +156,7 @@ func channelNames(task string, epoch int, layout []streamV2Range) []string {
 func activeNames(m *streamV2Manager) []string {
 	var names []string
 	for _, c := range m.bindings[0].channels {
-		names = append(names, c.name)
+		names = append(names, c.channelName)
 	}
 	return names
 }
