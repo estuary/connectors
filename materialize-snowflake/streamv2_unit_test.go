@@ -55,11 +55,11 @@ func TestStreamV2CheckpointHoldsOneItemPerChannel(t *testing.T) {
 }
 
 // TestStreamV2CommitPrecedesCheckpoint pins where the commit is awaited. The
-// driver checkpoint records a routed index, and Snowflake's committed offset
-// token is what the next Open reconciles that index against. The
+// driver checkpoint records a routed offset, and Snowflake's committed offset
+// token is what the next Open reconciles that offset against. The
 // runtime's own checkpoint is durable before Acknowledge runs, so a commit
 // awaited there cannot fail the transaction whose item it belongs to: the
-// task would resume from an index Snowflake never committed, which Open can
+// task would resume from an offset Snowflake never committed, which Open can
 // only reject, and no replay can re-append rows the runtime considers
 // delivered. So the wait belongs to the call which produces the item.
 func TestStreamV2CommitPrecedesCheckpoint(t *testing.T) {
@@ -134,7 +134,7 @@ func TestStreamV2RejectedRows(t *testing.T) {
 
 		// The rejection is the transaction's own, so it must fail the transaction
 		// rather than the one after it: the count is read as the commit is awaited,
-		// which is before the routed index reaches the checkpoint.
+		// which is before the routed offset reaches the checkpoint.
 		entries, err := m.flush(ctx)
 		require.ErrorContains(t, err, "1 row(s) rejected")
 		require.ErrorContains(t, err, channel)
@@ -374,11 +374,11 @@ func TestReconcileStreamV2Channel(t *testing.T) {
 			// specification finds when it restarts into a backfill. The one drop this
 			// connector makes itself is recognized before reconciliation, by the
 			// declaration in the checkpoint, so it never reaches here.
-			name:                     "nothing committed with a checkpointed routed index is rejected",
+			name:                     "nothing committed with a checkpointed routed offset is rejected",
 			committed:                nil,
 			sv2ChannelCheckpointItem: sv2ChannelCheckpointItem(42),
 			priorItems:               1,
-			wantErr:                  "has committed nothing while this task's checkpoint records",
+			wantErr:                  "reports no committed offset token while this task's checkpoint records",
 		},
 		{
 			name:                     "clean boundary",
@@ -390,7 +390,7 @@ func TestReconcileStreamV2Channel(t *testing.T) {
 		{
 			// An interrupted attempt of the transaction now replayed. The channel's
 			// contents are a function of the data, so the replay routes the same
-			// documents here and skips them by position.
+			// documents here and skips them by offset.
 			name:                     "committed ahead of the checkpoint is skipped",
 			committed:                token("50@10000000-1fffffff"),
 			sv2ChannelCheckpointItem: sv2ChannelCheckpointItem(42),
@@ -418,19 +418,19 @@ func TestReconcileStreamV2Channel(t *testing.T) {
 		},
 		{
 			// The token's range must be the channel's own key range whatever the
-			// indices say: the key range is in the channel's name, so every token
+			// offsets say: the key range is in the channel's name, so every token
 			// this write path appends under it carries that key range. This guard is
 			// unconditional where the old shard-range guard applied only beyond the
-			// routed index — a channel and its token can no longer drift apart by a
+			// routed offset — a channel and its token can no longer drift apart by a
 			// topology change, so a mismatch is always foreign.
-			name:                     "a token for another key range is rejected at a clean count",
+			name:                     "a token for another key range is rejected at a clean offset",
 			committed:                token("42@10000000-2fffffff"),
 			sv2ChannelCheckpointItem: sv2ChannelCheckpointItem(42),
 			priorItems:               1,
 			wantErr:                  "was not written against this channel's key range",
 		},
 		{
-			name:                     "a token for another key range is rejected ahead of the count",
+			name:                     "a token for another key range is rejected ahead of the offset",
 			committed:                token("50@00000000-ffffffff"),
 			sv2ChannelCheckpointItem: sv2ChannelCheckpointItem(42),
 			priorItems:               1,
@@ -453,14 +453,14 @@ func TestReconcileStreamV2Channel(t *testing.T) {
 			committed:                token("basetok0000000001:7"),
 			sv2ChannelCheckpointItem: sv2ChannelCheckpointItem(42),
 			priorItems:               1,
-			wantErr:                  "which is not a document count",
+			wantErr:                  "which carries no offset",
 		},
 		{
 			name:                     "a token whose range this connector could not have written is rejected",
 			committed:                token("50@10000000+1fffffff"),
 			sv2ChannelCheckpointItem: sv2ChannelCheckpointItem(42),
 			priorItems:               1,
-			wantErr:                  "which is not a document count",
+			wantErr:                  "which carries no offset",
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {

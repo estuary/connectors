@@ -18,7 +18,7 @@ import (
 // These suites cover the property the key-range-channel design exists for: a
 // channel's contents are a function of the data, so a shard topology change
 // hands whole channels — committed offset tokens included — to the shards that
-// inherit their key ranges, and those shards skip by position and then converge
+// inherit their key ranges, and those shards skip by offset and then converge
 // back to their own target layout. Every scenario drives real managers against
 // the fake sidecar, whose channel state outlives each manager through
 // FAKE_SIDECAR_STATE, so successive managers stand for successive sessions —
@@ -164,7 +164,7 @@ func activeNames(m *streamV2Manager) []string {
 // TestStreamV2SteadyStateRouting pins the steady state everything else builds
 // on: rows route by key hash across the shard's four channels, the checkpoint
 // holds one item per channel, and a later session recovers each channel at a
-// clean boundary and continues its routed index.
+// clean boundary and continues its routed offset.
 func TestStreamV2SteadyStateRouting(t *testing.T) {
 	var ctx = context.Background()
 	const task = "test/topologySteady"
@@ -188,7 +188,7 @@ func TestStreamV2SteadyStateRouting(t *testing.T) {
 	require.Len(t, sv2Checkpoint, len(quarters))
 
 	// Each channel counted exactly the rows whose hash its key range covers, so
-	// the items' routed indices are the routing, read back.
+	// the items' routed offsets are the routing, read back.
 	for i, q := range quarters {
 		require.Contains(t, sv2Checkpoint, q)
 		require.Equal(t, int64(3), sv2Checkpoint[q].Routed)
@@ -197,7 +197,7 @@ func TestStreamV2SteadyStateRouting(t *testing.T) {
 	first.stop()
 
 	// A later session opens every channel at a clean boundary — nothing to
-	// skip, nothing rejected — and continues the routed indices where they stood.
+	// skip, nothing rejected — and continues the routed offsets where they stood.
 	var second = newTopologyManager(t, task, 0, math.MaxUint32, sv2Checkpoint)
 	var more []string
 	for _, q := range quarters {
@@ -219,7 +219,7 @@ func TestStreamV2SteadyStateRouting(t *testing.T) {
 // shard is interrupted mid-transaction, its range is split at the midpoint, and
 // each child inherits the two whole channels nested in its half — committed
 // offset tokens and all, the interrupted transaction's unaccounted rows
-// included. The replay skips by position per channel, the first flush declares
+// included. The replay skips by offset per channel, the first flush declares
 // the child's own layout, and the acknowledged switching converges to it.
 func TestStreamV2SplitInheritsChannels(t *testing.T) {
 	var ctx = context.Background()
@@ -597,7 +597,7 @@ func TestStreamV2SplitThenJoinBack(t *testing.T) {
 // cannot survive: a split cutting through a channel's key range, which midpoint
 // splits only produce by splitting again before the layout converged past the
 // depth the new boundary cuts through. The rows that channel holds beyond its
-// routed index belong to both children, so the only safe answer is a rejection.
+// routed offset belong to both children, so the only safe answer is a rejection.
 func TestStreamV2MisalignedSplitRejected(t *testing.T) {
 	t.Setenv("FAKE_SIDECAR_STATE", filepath.Join(t.TempDir(), "channels.json"))
 	const task = "test/topologyMisaligned"
@@ -632,7 +632,7 @@ func TestStreamV2LostChannelRejected(t *testing.T) {
 	})
 
 	err = testWriteRow(context.Background(), m, 0, []any{"any", "v"})
-	require.ErrorContains(t, err, "has committed nothing while this task's checkpoint records")
+	require.ErrorContains(t, err, "reports no committed offset token while this task's checkpoint records")
 }
 
 // TestStreamV2ForeignTokenRejected pins the unconditional key range guard at the
