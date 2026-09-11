@@ -170,23 +170,23 @@ func streamV2ForeignTaskError(table string, foreignChannelNames map[string][]str
 	)
 }
 
-// streamV2Token renders the offset token of an append. The token holds two facts:
-// the index of the last document in the append, and the channel key range it was
-// appended under.
+// streamV2FormatOffsetToken renders the offset token of an append. It holds two
+// facts: the index of the last document in the append, and the channel key range
+// it was appended under.
 //
-// The key range is in the token so that a token can be recognized as this channel's
-// own. A token whose range is not the channel's key range was written by something
-// else — another connector, or a channel scheme this write path never ran — and
-// nothing it counts may be skipped.
-func streamV2Token(index int64, keyRange streamV2Range) string {
+// The key range is in the offset token so that it can be recognized as this
+// channel's own. An offset token whose range is not the channel's key range was
+// written by something else — another connector, or a channel scheme this write
+// path never ran — and nothing it counts may be skipped.
+func streamV2FormatOffsetToken(index int64, keyRange streamV2Range) string {
 	var spec, _ = keyRange.MarshalText()
 	return fmt.Sprintf("%d@%s", index, spec)
 }
 
-// parseStreamV2Token reads a committed offset token back as two values: the document
+// streamV2ParseOffsetToken reads a committed offset token back as two values: the document
 // index it carries, and the key range those documents were appended under. It returns
-// false for a token that this write path never writes.
-func parseStreamV2Token(token string) (int64, streamV2Range, bool) {
+// false for an offset token that this write path never writes.
+func streamV2ParseOffsetToken(token string) (int64, streamV2Range, bool) {
 	var count, spec, hasRange = strings.Cut(token, "@")
 	if !hasRange {
 		return 0, streamV2Range{}, false
@@ -335,7 +335,7 @@ type streamV2Channel struct {
 
 // offsetToken renders the offset token for a document index on this channel.
 func (c *streamV2Channel) offsetToken(index int64) string {
-	return streamV2Token(index, c.keyRange)
+	return streamV2FormatOffsetToken(index, c.keyRange)
 }
 
 type streamV2Binding struct {
@@ -737,8 +737,8 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 				}).Info("re-recording the deletion of a channel an interrupted session abandoned")
 				continue
 			}
-			// A routed index with no token and no declaration to explain it falls
-			// through to the reconciliation, which rejects it as a lost channel.
+			// A routed index with no offset token and no declaration to explain it
+			// falls through to the reconciliation, which rejects it as a lost channel.
 		}
 
 		committed, err := reconcileStreamV2Channel(sv2ChannelCheckpointItem.ChannelName, b.table, status.CommittedToken, sv2ChannelCheckpointItem, keyRange, len(b.prior))
@@ -1014,7 +1014,7 @@ func rejectedRowsError(channelName, table string, status *channelStatusResult) e
 // sv2ChannelCheckpointItem is the checkpoint item of this channel, or nil when the
 // checkpoint holds none. priorItems counts every item the checkpoint holds for the
 // binding, across all of the task's channels; it is what tells a channel's interrupted
-// first transaction apart from a token nothing accounts for.
+// first transaction apart from an offset token nothing accounts for.
 func reconcileStreamV2Channel(channelName, table string, committedToken *string, sv2ChannelCheckpointItem *streamV2ChannelCheckpointItem, keyRange streamV2Range, priorItems int) (int64, error) {
 	var routed int64
 	if sv2ChannelCheckpointItem != nil {
@@ -1023,12 +1023,13 @@ func reconcileStreamV2Channel(channelName, table string, committedToken *string,
 
 	// Snowflake holds nothing for this channel. With nothing routed to account for,
 	// there is nothing to skip. With routed documents, the channel that held them is
-	// gone, and the token that said which of them Snowflake holds went with it.
+	// gone, and the offset token that said which of them Snowflake holds went with
+	// it.
 	//
 	// The one drop this connector performs itself — a rebalance abandoning a channel
 	// it converges away from — is recognized before reconciliation reaches here, by
-	// the declaration its checkpoint carries. A missing token here has no such
-	// record, so it names an account Snowflake itself has lost.
+	// the declaration its checkpoint carries. A missing offset token here has no
+	// such record, so it names an account Snowflake itself has lost.
 	if committedToken == nil {
 		if routed > 0 {
 			return 0, fmt.Errorf(
@@ -1039,7 +1040,7 @@ func reconcileStreamV2Channel(channelName, table string, committedToken *string,
 		return 0, nil
 	}
 
-	committed, appendedBy, ok := parseStreamV2Token(*committedToken)
+	committed, appendedBy, ok := streamV2ParseOffsetToken(*committedToken)
 	if !ok {
 		return 0, fmt.Errorf(
 			"channel %q reports the committed offset token %q, which is not a document count: this channel was written by something other than this connector's snowpipe_streaming_v2 write path, and continuing could duplicate or drop rows",
@@ -1047,10 +1048,10 @@ func reconcileStreamV2Channel(channelName, table string, committedToken *string,
 		)
 	}
 
-	// The token's range must be the channel's own key range, always. The key range is
-	// in the channel's name, so every append this write path makes carries it. A
-	// token naming any other range was written under a channel scheme this write
-	// path never ran, and nothing it counts may be skipped.
+	// The offset token's range must be the channel's own key range, always. The key
+	// range is in the channel's name, so every append this write path makes carries
+	// it. An offset token naming any other range was written under a channel scheme
+	// this write path never ran, and nothing it counts may be skipped.
 	if appendedBy != keyRange {
 		return 0, fmt.Errorf(
 			"channel %q covers %s but reports a committed offset token for %d documents appended under %s: that token was not written against this channel's key range, so the documents it counts cannot be identified. Backfill this binding",
@@ -1066,7 +1067,7 @@ func reconcileStreamV2Channel(channelName, table string, committedToken *string,
 	}
 
 	if sv2ChannelCheckpointItem == nil && committed > 0 && priorItems > 0 {
-		// A token with no item to account for can be the interrupted first
+		// An offset token with no item to account for can be the interrupted first
 		// transaction of this channel. That reading holds only when the checkpoint
 		// holds nothing for the binding at all — a backfill produces that state, the
 		// state key rotating channels and items together.
@@ -1074,7 +1075,7 @@ func reconcileStreamV2Channel(channelName, table string, committedToken *string,
 		// When the checkpoint holds anything, this state should not exist: flush
 		// writes an item for every active channel of the binding, and it declares
 		// the target layout's items before any switch routes rows to those
-		// channels. A token no item accounts for is therefore something else
+		// channels. An offset token no item accounts for is therefore something else
 		// appending under this binding's names, and its documents must not be
 		// skipped, or that many of the documents about to be materialized into the
 		// table are dropped instead.
@@ -1087,8 +1088,8 @@ func reconcileStreamV2Channel(channelName, table string, committedToken *string,
 	// committed == routed is the clean boundary, and committed > routed is an
 	// interrupted attempt of the transaction now replayed. The replay produces the
 	// same documents in the same order, and the routing hash is a function of each
-	// document alone, so this channel receives exactly the documents the token
-	// counts, and skips them by position.
+	// document alone, so this channel receives exactly the documents the offset
+	// token counts, and skips them by position.
 	return committed, nil
 }
 
@@ -1352,8 +1353,8 @@ func (m *streamV2Manager) appendBatch(ctx context.Context, c *streamV2Channel) e
 // declaration invariant: every channel rows can route to has an item in the
 // checkpoint no later than the transaction that first routes to it, and the target
 // layout a rebalance converges to is declared — written as items with nothing routed — at
-// least one durable checkpoint before the switch routes anything there. A token
-// with no item to account for therefore never has a benign reading.
+// least one durable checkpoint before the switch routes anything there. An offset
+// token with no item to account for therefore never has a benign reading.
 //
 // flush awaits the commit here, as part of the checkpoint it produces, and not at
 // Acknowledge. The checkpoint of the runtime is durable before Acknowledge runs. A
@@ -1535,8 +1536,8 @@ func (m *streamV2Manager) acknowledged(ctx context.Context) error {
 				return err
 			}
 			// The channel was declared this session and nothing has routed to it
-			// yet, so it must be empty. A token here is something else appending
-			// under this binding's names.
+			// yet, so it must be empty. An offset token here is something else
+			// appending under this binding's names.
 			if status.CommittedToken != nil {
 				return fmt.Errorf(
 					"channel %q was declared by this shard and should hold nothing, but reports the committed offset token %q: something else is appending under this binding's channel names, and continuing could duplicate or drop rows. Backfill this binding",
@@ -1595,8 +1596,8 @@ func (m *streamV2Manager) waitCommit(ctx context.Context, b *streamV2Binding, c 
 		return fmt.Errorf("waiting for commit of document %s on channel %q: %w", token, c.channelName, err)
 	}
 
-	// The commit of the token is the earliest point where this transaction can see its
-	// own rejections. That point is before flush checkpoints its index. A rejection
+	// The commit of the offset token is the earliest point where this transaction can
+	// see its own rejections. That point is before flush checkpoints its index. A rejection
 	// therefore fails the transaction that produced it, and not a later one.
 	if err := rejectedRowsError(c.channelName, b.table, status); err != nil {
 		return err

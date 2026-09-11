@@ -323,7 +323,7 @@ func TestStreamV2SplitInheritsChannels(t *testing.T) {
 				require.NotContains(t, tokens, name)
 			}
 			for i, name := range channelNames(task, 1, targets) {
-				require.Equal(t, streamV2Token(2, targets[i]), tokens[name])
+				require.Equal(t, streamV2FormatOffsetToken(2, targets[i]), tokens[name])
 			}
 		})
 	}
@@ -410,7 +410,7 @@ func TestStreamV2JoinInheritsChannels(t *testing.T) {
 		require.NotContains(t, tokens, name)
 	}
 	for i, name := range channelNames(task, 1, quarters) {
-		require.Equal(t, streamV2Token(2, quarters[i]), tokens[name])
+		require.Equal(t, streamV2FormatOffsetToken(2, quarters[i]), tokens[name])
 	}
 }
 
@@ -651,7 +651,7 @@ func TestStreamV2ForeignTokenRejected(t *testing.T) {
 	// Snowflake holds a token for this channel's name written under the whole
 	// key range — the footprint of a channel scheme this write path never ran.
 	var seeded = map[string]any{
-		"committed": map[string]string{name: streamV2Token(5, streamV2Range{keyBegin: 0, keyEnd: math.MaxUint32})},
+		"committed": map[string]string{name: streamV2FormatOffsetToken(5, streamV2Range{keyBegin: 0, keyEnd: math.MaxUint32})},
 		"errors":    map[string]int{},
 	}
 	raw, err := json.Marshal(seeded)
@@ -772,5 +772,5 @@ func TestStreamV2SweepDropsAPriorSessionsOrphan(t *testing.T) {
 	for _, name := range channelNames(task, 0, quarters) {
 		require.NotContains(t, tokens, name)
 	}
-	require.Equal(t, streamV2Token(1, quarters[0]), tokens[channelNames(task, 1, quarters)[0]])
+	require.Equal(t, streamV2FormatOffsetToken(1, quarters[0]), tokens[channelNames(task, 1, quarters)[0]])
 }
