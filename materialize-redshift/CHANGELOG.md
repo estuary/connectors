@@ -1,5 +1,16 @@
 # materialize-redshift
 
+## 2026-09-11
+
+### Fixed
+- Materializations sharing a metadata schema on a database using
+  `SERIALIZABLE` isolation failed with `ERROR: 1023` (serializable isolation
+  violation) when they committed concurrently, because the checkpoints table
+  lock was taken after the transaction's snapshot. The lock is now the commit
+  transaction's first statement, as it was before the post-commit apply
+  change, and a serialization failure or deadlock during the commit is
+  retried instead of failing the task.
+
 ## 2026-08-29
 
 ### Changed
