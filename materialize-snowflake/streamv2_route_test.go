@@ -132,14 +132,14 @@ func TestClassifyKeyRange(t *testing.T) {
 	}
 }
 
-func TestStreamV2RouteHash(t *testing.T) {
+func TestStreamV2RouteKeyHash(t *testing.T) {
 	layout, err := streamV2TargetLayout(0x40000000, 0x7fffffff)
 	require.NoError(t, err)
 
 	var cases = []struct {
-		name   string
-		hash   uint32
-		expect int
+		name    string
+		keyHash uint32
+		expect  int
 	}{
 		{"exact begin of the first key range", 0x40000000, 0},
 		{"exact end of the first key range", 0x4fffffff, 0},
@@ -151,7 +151,7 @@ func TestStreamV2RouteHash(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.expect, streamV2RouteHash(layout, tc.hash))
+			require.Equal(t, tc.expect, streamV2RouteKeyHash(layout, tc.keyHash))
 		})
 	}
 }
