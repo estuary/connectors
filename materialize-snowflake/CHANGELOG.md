@@ -1,5 +1,10 @@
 # materialize-snowflake
 
+## 2026-09-11
+
+### Fixed
+- Fix channel closed panic when debug logging is enabled.
+
 ## 2026-08-25
 
 ### Added
