@@ -98,7 +98,7 @@ func TestStreamV2RejectedRows(t *testing.T) {
 
 	// The single channel of the binding under a one-channel layout, at the epoch a
 	// fresh binding mints.
-	var channel = streamV2ChannelName("test/rejectedRows", 0,
+	var channel = streamV2FormatChannelName("test/rejectedRows", 0,
 		streamV2Range{keyBegin: 0, keyEnd: math.MaxUint32}, "rejected.v1")
 
 	var newManager = func(t *testing.T, prior *streamV2Item) *streamV2Manager {
@@ -236,25 +236,6 @@ func TestStreamV2DropChannel(t *testing.T) {
 	require.Equal(t, int64(1), soleItem(t, entries, 0).Routed)
 }
 
-// TestStreamV2ChannelTask pins the parser that recognizes the v2 channel name of any
-// task, against the names this connector's write paths produce.
-func TestStreamV2ChannelTask(t *testing.T) {
-	var r = streamV2Range{keyBegin: 0x80000000, keyEnd: math.MaxUint32}
-
-	for _, task := range []string{"acme/prod/snowflake", "a", "a-task-whose-name-runs-well-past-the-thirty-two-character-cap"} {
-		var name = streamV2ChannelName(task, 7, r, "binding.v3")
-		got, ok := streamV2ChannelTask(name)
-		require.True(t, ok, name)
-		require.Equal(t, sanitizeAndAppendHash(task), got)
-	}
-
-	// The snowpipe_streaming path's channel, and a name of no Estuary shape at all.
-	for _, name := range []string{channelName("acme/prod/snowflake", 0x80000000), "someone_elses_channel", ""} {
-		_, ok := streamV2ChannelTask(name)
-		require.False(t, ok, name)
-	}
-}
-
 // TestStreamV2RejectsForeignTask covers, without credentials, the rejection of a
 // table another task already streams into. A backfill truncates the table, so a
 // second task on it would silently wipe the first's rows while the first's channels
@@ -266,7 +247,7 @@ func TestStreamV2RejectsForeignTask(t *testing.T) {
 	t.Setenv("FAKE_SIDECAR_STATE", filepath.Join(t.TempDir(), "channels.json"))
 
 	var fullRange = streamV2Range{keyEnd: math.MaxUint32}
-	var foreignChannel = streamV2ChannelName("other/task", 0, fullRange, "theirs.v1")
+	var foreignChannel = streamV2FormatChannelName("other/task", 0, fullRange, "theirs.v1")
 	var unattributable = "someone_elses_channel"
 
 	var newSession = func(t *testing.T, task string) *streamV2Manager {
@@ -331,8 +312,8 @@ func TestStreamV2SweepsBackfilledChannels(t *testing.T) {
 	var full = streamV2Range{keyEnd: math.MaxUint32}
 	var upper = streamV2Range{keyBegin: 0x80000000, keyEnd: math.MaxUint32}
 	var lower = streamV2Range{keyEnd: 0x7fffffff}
-	var staleFull = streamV2ChannelName("test/task", 0, full, "topology.v0")
-	var staleUpper = streamV2ChannelName("test/task", 3, upper, "topology.v0")
+	var staleFull = streamV2FormatChannelName("test/task", 0, full, "topology.v0")
+	var staleUpper = streamV2FormatChannelName("test/task", 3, upper, "topology.v0")
 
 	require.NoError(t, os.WriteFile(os.Getenv("FAKE_SIDECAR_STATE"),
 		fmt.Appendf(nil, `{"committed":{%q:"5",%q:"7"},"errors":{}}`, staleFull, staleUpper), 0o644))
