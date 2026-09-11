@@ -354,15 +354,17 @@ type streamV2Binding struct {
 	// opened its own, and reconciled each of them.
 	opened bool
 	// abandoned holds the key ranges of the channels this shard no longer routes to.
-	// The next checkpoint deletes their items so a later session does not reconcile
-	// against a channel this layout left behind. Every checkpoint of the session
-	// reports them again, not only the first, so a transaction that never commits
-	// does not lose the deletion. The channels themselves are left standing for the
-	// sweep to drop, since a fresh epoch keeps their names out of any live layout.
+	// The next checkpoint deletes their checkpoint items so a later session does not
+	// reconcile against a channel this layout left behind. Every checkpoint of the
+	// session reports them again, not only the first, so a transaction that never
+	// commits does not lose the deletion. The channels themselves are left standing
+	// for the sweep to drop, since a fresh epoch keeps their names out of any live
+	// layout.
 	abandoned []streamV2Range
 	// targetEpoch is the epoch of the channels this shard converges to. It continues
-	// the epoch the shard's own target items already run at, or is minted one past
-	// every epoch the binding has used, so the target names collide with nothing.
+	// the epoch the shard's own target checkpoint items already run at, or is minted
+	// one past every epoch the binding has used, so the target names collide with
+	// nothing.
 	targetEpoch int
 
 	// channels is the active layout: the channels rows route to, sorted by
@@ -372,9 +374,9 @@ type streamV2Binding struct {
 	// targets is the shard's target layout: its key range cut into
 	// streamV2ChannelsPerShard equal key ranges. The active layout converges to it.
 	targets []streamV2Range
-	// declared reports that the last flush wrote the target layout's items into the
-	// checkpoint. Acknowledge runs after the runtime made that checkpoint durable,
-	// which is what makes the switch it performs crash-safe.
+	// declared reports that the last flush wrote the target layout's checkpoint items
+	// into the checkpoint. Acknowledge runs after the runtime made that checkpoint
+	// durable, which is what makes the switch it performs crash-safe.
 	declared bool
 }
 
@@ -604,9 +606,10 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 		return err
 	}
 
-	// A nil item is a channel a layout left behind, which the runtime has not yet
-	// reduced out of the checkpoint. Drop them so the live-item count below, and the
-	// epoch minted from the items, reason only about channels that still stand.
+	// A nil checkpoint item is a channel a layout left behind, which the runtime has
+	// not yet reduced out of the checkpoint. Drop them so the count of live checkpoint
+	// items below, and the epoch minted from them, reason only about channels that
+	// still stand.
 	var prior = make(streamV2Checkpoint, len(b.prior))
 	for key, sv2ChannelCheckpointItem := range b.prior {
 		if sv2ChannelCheckpointItem != nil {
@@ -615,7 +618,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 	}
 	b.prior = prior
 
-	// The epoch of the target layout. The shard's own target items, where the
+	// The epoch of the target layout. The shard's own target checkpoint items, where the
 	// checkpoint holds them, fix it, so a restart continues the channels it already
 	// ran rather than rotating them. Otherwise it is minted one past every epoch a
 	// checkpoint item nested in this shard's range has used, so the target names
@@ -649,8 +652,8 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 		b.targetEpoch = maxEpoch + 1
 	}
 
-	// Sort the checkpoint's items for this binding into the ones nested in this
-	// shard's range and the ones that belong to live siblings. An item that does
+	// Sort the binding's checkpoint items into the ones nested in this shard's range
+	// and the ones that belong to live siblings. A checkpoint item that does
 	// neither — its key range crosses this shard's boundary — is the footprint of a
 	// split that did not land on channel boundaries. Midpoint-only splits cannot
 	// produce it, except by splitting a shard again before its channels converged
@@ -682,9 +685,9 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 		return cmp.Or(cmp.Compare(a.keyBegin, b.keyBegin), cmp.Compare(a.keyEnd, b.keyEnd))
 	})
 
-	// declared reports that the checkpoint holds an item for every target key range.
-	// flush writes those items — the declaration — strictly before any switch
-	// routes rows to the target channels, so a channel this shard drops always
+	// declared reports that the checkpoint holds a checkpoint item for every target key
+	// range. flush writes those checkpoint items — the declaration — strictly before
+	// any switch routes rows to the target channels, so a channel this shard drops always
 	// leaves the declaration behind as the durable record of why it is gone.
 	var declared = targetItems == len(targets)
 
@@ -712,7 +715,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 		if status.CommittedToken == nil {
 			if isTarget && sv2ChannelCheckpointItem.Routed == 0 {
 				// A declaration nothing was appended under. It stays dormant: the
-				// item keeps the declaration durable, and the channel joins the
+				// checkpoint item keeps the declaration durable, and the channel joins the
 				// layout when a switch converges to it.
 				continue
 			}
@@ -729,7 +732,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 			if !isTarget && declared {
 				// A routed offset with the declaration in place: an interrupted switch
 				// already abandoned the channel — the open above re-created it
-				// empty — and only the deletion of its item was lost. The deletion
+				// empty — and only the deletion of its checkpoint item was lost. The deletion
 				// is re-recorded, and the sweep drops the empty channel.
 				b.abandoned = append(b.abandoned, keyRange)
 				log.WithFields(log.Fields{
@@ -1069,18 +1072,18 @@ func reconcileStreamV2Channel(channelName, table string, committedToken *string,
 	}
 
 	if sv2ChannelCheckpointItem == nil && committedOffset > 0 && priorItems > 0 {
-		// An offset token with no item to account for can be the interrupted first
-		// transaction of this channel. That reading holds only when the checkpoint
+		// An offset token with no checkpoint item to account for can be the interrupted
+		// first transaction of this channel. That reading holds only when the checkpoint
 		// holds nothing for the binding at all — a backfill produces that state, the
-		// state key rotating channels and items together.
+		// state key rotating channels and checkpoint items together.
 		//
 		// When the checkpoint holds anything, this state should not exist: flush
-		// writes an item for every active channel of the binding, and it declares
-		// the target layout's items before any switch routes rows to those
-		// channels. An offset token no item accounts for is therefore something else
-		// appending under this binding's names, and its documents must not be
-		// skipped, or that many of the documents about to be materialized into the
-		// table are dropped instead.
+		// writes a checkpoint item for every active channel of the binding, and it
+		// declares the target layout's checkpoint items before any switch routes rows
+		// to those channels. An offset token no checkpoint item accounts for is
+		// therefore something else appending under this binding's names, and its
+		// documents must not be skipped, or that many of the documents about to be
+		// materialized into the table are dropped instead.
 		return 0, fmt.Errorf(
 			"channel %q reports committed offset %d, which this task's checkpoint cannot account for: it holds no item for this channel, only items its other channels wrote, and this write path records an item for every channel before appending to it. The documents up to that offset must not be skipped, or that many of the documents about to be materialized into %s are dropped instead. Backfill this binding",
 			channelName, committedOffset, table,
@@ -1131,8 +1134,8 @@ func unknownChannel(err error) bool {
 	return errors.As(err, &se) && se.Code == "unknown_channel"
 }
 
-// streamV2ChannelNames lists, sorted, the channels the items of a binding name. A
-// nil item is a channel the task already dropped and names nothing.
+// streamV2ChannelNames lists, sorted, the channels a binding's checkpoint items name.
+// A nil checkpoint item is a channel the task already dropped and names nothing.
 func streamV2ChannelNames(sv2Checkpoint streamV2Checkpoint) []string {
 	var channelNames []string
 	for _, sv2ChannelCheckpointItem := range sv2Checkpoint {
@@ -1349,21 +1352,23 @@ func (m *streamV2Manager) appendBatch(ctx context.Context, c *streamV2Channel) e
 // flush appends the remaining buffered documents of each channel. It waits for every
 // pending append, and then waits for Snowflake to durably commit them. It returns
 // the checkpoint entries of each binding that did anything this transaction, and it
-// reports them only after Snowflake holds the documents their items account for.
+// reports them only after Snowflake holds the documents their checkpoint items
+// account for.
 //
-// The entries hold an item for every active channel, advanced or not. This is the
-// declaration invariant: every channel rows can route to has an item in the
-// checkpoint no later than the transaction that first routes to it, and the target
-// layout a rebalance converges to is declared — written as items with nothing routed — at
-// least one durable checkpoint before the switch routes anything there. An offset
-// token with no item to account for therefore never has a benign reading.
+// The entries hold a checkpoint item for every active channel, advanced or not. This
+// is the declaration invariant: every channel rows can route to has a checkpoint item
+// in the checkpoint no later than the transaction that first routes to it, and the
+// target layout a rebalance converges to is declared — written as checkpoint items
+// with nothing routed — at least one durable checkpoint before the switch routes
+// anything there. An offset token with no checkpoint item to account for therefore
+// never has a benign reading.
 //
 // flush awaits the commit here, as part of the checkpoint it produces, and not at
 // Acknowledge. The checkpoint of the runtime is durable before Acknowledge runs. A
-// commit that failed there could no longer fail the transaction whose item it
-// belongs to. The task resumes from an offset Snowflake never committed, and the next
-// Open can only reject it. No replay re-appends rows the runtime already considers
-// delivered.
+// commit that failed there could no longer fail the transaction whose checkpoint
+// item it belongs to. The task resumes from an offset Snowflake never committed, and
+// the next Open can only reject it. No replay re-appends rows the runtime already
+// considers delivered.
 //
 // A failure here instead leaves the runtime to replay the transaction, and the
 // reconciliation of that Open skips the documents Snowflake did commit.
@@ -1427,7 +1432,7 @@ func (m *streamV2Manager) flush(ctx context.Context) (map[int]streamV2Checkpoint
 		}
 
 		if declaring {
-			// The declaration: an item for every target channel the layout has not
+			// The declaration: a checkpoint item for every target channel the layout has not
 			// converged to yet. The switch at Acknowledge runs only after the
 			// checkpoint carrying these is durable.
 			for _, keyRange := range b.targets {
@@ -1474,9 +1479,9 @@ func (m *streamV2Manager) flush(ctx context.Context) (map[int]streamV2Checkpoint
 // The switch abandons every non-target channel of the layout — recording each
 // deletion — opens the target channels in their place, and sweeps the abandoned
 // channels off the pipe. A crash between the switch and the durability of the
-// deletions restarts to a checkpoint that still holds the abandoned channels' items
-// alongside the declaration, which is exactly the state ensureOpened re-enters the
-// switch from.
+// deletions restarts to a checkpoint that still holds the abandoned channels'
+// checkpoint items alongside the declaration, which is exactly the state
+// ensureOpened re-enters the switch from.
 func (m *streamV2Manager) acknowledged(ctx context.Context) error {
 	var indices = make([]int, 0, len(m.bindings))
 	for idx := range m.bindings {
