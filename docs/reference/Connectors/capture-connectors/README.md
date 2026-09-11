@@ -4,119 +4,161 @@ description: Browse Estuary's list of capture connectors for databases, SaaS app
 
 # Capture Connectors
 
-Estuary's available capture connectors are listed in this section. Each connector has a unique set of requirements for configuration; these are linked below the connector name.
-
-Also listed are links to the most recent Docker images for each connector. You'll need these to write Data Flow specifications manually (if you're [developing locally](../../../concepts/flowctl.md)). If you're using the Estuary web app, they aren't necessary.
+Estuary's available capture connectors are listed in this section. Each connector has a unique set of requirements for configuration; follow the connector link for a full reference on the system's requirements, properties, and best practices.
 
 Estuary is actively developing new connectors, so check back regularly for the latest additions. We’re prioritizing the development of high-scale technological systems, as well as client needs.
 
 ## Available capture connectors
 
-### Estuary connectors
+### SQL CDC connectors
 
-These connectors are created by Estuary. We prioritize high-scale technology systems for development.
+The SQL CDC group of database connectors share some common features, from
+real-time CDC ingestion to [extra backfill options](/reference/backfilling-data/#resource-configuration-backfill-modes)
+and other [advanced features](/guides/customize-dataflows/#sql-captures).
 
-All Estuary connectors capture data in real time, as it appears in the source system.
-
-- [Ada](./ada.md)
-- [Airtable](./airtable-native.md)
 - [AlloyDB](./alloydb.md)
-- [Alpaca](./alpaca.md)
+- [Amazon RDS SQL Server](./SQLServer/amazon-rds-sqlserver.md)
+- [Azure SQL Server](./SQLServer/)
+- [Google Cloud SQL Server](./SQLServer/google-cloud-sql-sqlserver.md)
+- [MariaDB](./MariaDB/)
+- [Microsoft SQL Server](./SQLServer/)
+- [MySQL](./MySQL/)
+- [OracleDB](./OracleDB/)
+- [PostgreSQL](./PostgreSQL/)
+
+### Other database connectors
+
+Besides [SQL CDC](#sql-cdc-connectors) databases, Estuary also provides capture
+connectors for batch and NoSQL databases.
+
 - [Amazon DocumentDB](./MongoDB/amazon-documentdb.md)
 - [Amazon Dynamodb](./amazon-dynamodb.md)
-- [Amazon Kinesis](./amazon-kinesis.md)
-- [Amazon RDS SQL Server](./SQLServer/amazon-rds-sqlserver.md)
+- [Azure Cosmos DB](./MongoDB/azure-cosmosdb.md)
+- [Google Firestore](./google-firestore.md)
+- [IBM Db2 Batch](./db2-batch.md)
+- [Microsoft SQL Server Batch](./SQLServer/sqlserver-batch.md)
+- [MongoDB](./MongoDB/mongodb.md)
+- [MySQL Batch](./MySQL/mysql-batch.md)
+- [OracleDB Batch](./OracleDB/oracle-batch.md)
+- [PostgreSQL Batch](./PostgreSQL/postgres-batch.md)
+
+### Data warehouse connectors
+
 - [Amazon Redshift](./redshift-batch.md)
+- [BigQuery](./bigquery-batch.md)
+- [Snowflake](./snowflake.md)
+
+### File connectors
+
+File connectors share features like parser configuration. Except for the
+spreadsheet-specific connectors, supported file types include Avro, JSON, CSV,
+Protobuf, W3C Extended Log, and Parquet.
+
 - [Amazon S3](./amazon-s3.md)
+- [Azure Blob Storage](./azure-blob-storage.md)
+- [Dropbox](./dropbox.md)
+- [Google Cloud Storage](./gcs.md)
+- [Google Drive](./google-drive.md)
+- [Google Sheets](./google-sheets.md)
+- [HTTP file](./http-file.md)
+- [OneDrive](./onedrive.md)
+- [SFTP](./sftp.md)
+- [SharePoint](./sharepoint.md)
+- [Smartsheet](./smartsheet.md)
+
+### Event connectors
+
+Integrations with streaming systems, queue services, and webhooks.
+
+- [Amazon Kinesis](./amazon-kinesis.md)
 - [Amazon SQS](./amazon-sqs-native.md)
 - [Apache Kafka](./apache-kafka.md)
-- [Apple App Store](./apple-app-store.md)
-- [AppsFlyer](./appsflyer.md)
-- [Asana](./asana.md)
-- [Ashby](./ashby.md)
-- [Azure Blob Storage](./azure-blob-storage.md)
-- [Azure Cosmos DB](./MongoDB/azure-cosmosdb.md)
-- [Azure SQL Server](./SQLServer/)
-- [BigQuery](./bigquery-batch.md)
-- [Braintree](./braintree.md)
-- [Brevo](./brevo.md)
-- [Calendly](./calendly.md)
-- [Chargebee](./chargebee-native.md)
-- [Commercetools](./commercetools.md)
-- [Criteo](./criteo.md)
-- [Datadog](./datadog.md)
 - [Datadog ingest (webhook)](./http-ingest/datadog-ingest.md)
-- [Dropbox](./dropbox.md)
+- [Google Cloud Pub/Sub](./google-pubsub.md)
+- [HTTP ingest (webhook)](./http-ingest/http-ingest.md)
+- [Intercom ingest (webhook)](./http-ingest/intercom-ingest.md)
+- [Jira ingest (webhook)](./http-ingest/jira-ingest.md)
+- [Twilio ingest (webhook)](./http-ingest/twilio-ingest.md)
+
+### SaaS connectors
+
+#### Marketing, ads, and socials
+
+- [AppsFlyer](./appsflyer.md)
+- [Brevo](./brevo.md)
+- [Criteo](./criteo.md)
 - [Facebook Marketing](./facebook-marketing-native.md)
+- [Google Ads](./google-ads.md)
+- [Impact](./impact.md)
+- [Iterable](./iterable-native.md)
+- [Klaviyo](./klaviyo-native.md)
+- [LinkedIn Pages](./linkedin-pages.md)
+- [Mailchimp](./mailchimp-native.md)
+
+#### BI and analytics
+
+- [Google Analytics BigQuery Exports](./google-analytics-4-bigquery-exports.md)
+- [Google Analytics Data API](./google-analytics-data-api-native.md)
+- [Looker](./looker.md)
+- [NetSuite SuiteAnalytics](./netsuite-suiteanalytics.md)
+- [NetSuite SuiteQL](./netsuite-suiteql.md)
+
+#### CRMs, sales, and support
+
+- [Ada](./ada.md)
 - [Front](./front.md)
 - [Gainsight NXT](./gainsight-nxt.md)
 - [Genesys](./genesys.md)
-- [GitHub](./github.md)
-- [Gladly](./gladly.md)
 - [Gong](./gong.md)
-- [Google Ads](./google-ads.md)
-- [Google Analytics BigQuery Exports](./google-analytics-4-bigquery-exports.md)
-- [Google Analytics Data API](./google-analytics-data-api-native.md)
-- [Google Cloud Storage](./gcs.md)
-- [Google Firestore](./google-firestore.md)
-- [Google Cloud Pub/Sub](./google-pubsub.md)
-- [Google Cloud SQL Server](./SQLServer/google-cloud-sql-sqlserver.md)
-- [Google Drive](./google-drive.md)
-- [Google Play](./google-play.md)
-- [Google Sheets](./google-sheets.md)
-- [Greenhouse](./greenhouse-native.md)
-- [HTTP file](./http-file.md)
-- [HTTP ingest (webhook)](./http-ingest/http-ingest.md)
 - [Hubspot](./HubSpot-real-time.md)
-- [IBM Db2 Batch](./db2-batch.md)
-- [Impact](./impact.md)
-- [Incident.io](./incident-io.md)
 - [Intercom](./intercom-native.md)
-- [Intercom ingest (webhook)](./http-ingest/intercom-ingest.md)
-- [Iterable](./iterable-native.md)
-- [Iterate](./iterate.md)
-- [Jira](./jira-native.md)
-- [Jira ingest (webhook)](./http-ingest/jira-ingest.md)
-- [Klaviyo](./klaviyo-native.md)
-- [LinkedIn Pages](./linkedin-pages.md)
-- [Looker](./looker.md)
-- [Mailchimp](./mailchimp-native.md)
-- [MariaDB](./MariaDB/)
-- [Microsoft Dynamics 365 Finance and Operations](./dynamics-365-finance-and-operations.md)
-- [Microsoft SQL Server](./SQLServer/)
-- [Microsoft SQL Server Batch](./SQLServer/sqlserver-batch.md)
-- [Monday](./monday.md)
-- [MongoDB](./MongoDB/mongodb.md)
-- [MySQL](./MySQL/)
-- [MySQL Batch](./MySQL/mysql-batch.md)
-- [Navan](./navan.md)
-- [NetSuite SuiteAnalytics](./netsuite-suiteanalytics.md)
-- [NetSuite SuiteQL](./netsuite-suiteql.md)
-- [OneDrive](./onedrive.md)
-- [OracleDB](./OracleDB/)
-- [OracleDB Batch](./OracleDB/oracle-batch.md)
 - [Outreach](./outreach.md)
-- [Pendo](./pendo.md)
-- [PostgreSQL](./PostgreSQL/)
-- [PostgreSQL Batch](./PostgreSQL/postgres-batch.md)
-- [Qualtrics](./qualtrics.md)
-- [QuickBooks](./quickbooks.md)
 - [RingCentral](./ringcentral.md)
-- [Sage Intacct](./sage-intacct.md)
 - [Salesforce](./Salesforce/salesforce-native.md)
-- [Sentry](./sentry.md)
-- [SFTP](./sftp.md)
-- [SharePoint](./sharepoint.md)
-- [Shopify](./shopify-native.md)
-- [Smartsheet](./smartsheet.md)
-- [Snowflake](./snowflake.md)
-- [Stripe](./stripe-realtime.md)
-- [Twilio](./twilio.md)
-- [Twilio ingest (webhook)](./http-ingest/twilio-ingest.md)
 - [Zendesk Chat](./zendesk-chat.md)
 - [Zendesk Support](./zendesk-support-native.md)
 - [Zoho CRM](./zoho-crm.md)
+
+#### Commerce and payments
+
+- [Alpaca](./alpaca.md)
+- [Braintree](./braintree.md)
+- [Chargebee](./chargebee-native.md)
+- [Commercetools](./commercetools.md)
+- [Gladly](./gladly.md)
+- [QuickBooks](./quickbooks.md)
+- [Shopify](./shopify-native.md)
+- [Stripe](./stripe-realtime.md)
 - [Zuora](./zuora.md)
+
+#### Finance, hiring, and operations
+
+- [Ashby](./ashby.md)
+- [Greenhouse](./greenhouse-native.md)
+- [Microsoft Dynamics 365 Finance and Operations](./dynamics-365-finance-and-operations.md)
+- [Sage Intacct](./sage-intacct.md)
+
+#### Workflow and incidents
+
+- [Airtable](./airtable-native.md)
+- [Asana](./asana.md)
+- [Calendly](./calendly.md)
+- [Datadog](./datadog.md)
+- [GitHub](./github.md)
+- [Incident.io](./incident-io.md)
+- [Jira](./jira-native.md)
+- [Monday](./monday.md)
+- [Navan](./navan.md)
+- [Sentry](./sentry.md)
+
+#### Other applications
+
+- [Apple App Store](./apple-app-store.md)
+- [Google Play](./google-play.md)
+- [Iterate](./iterate.md)
+- [Pendo](./pendo.md)
+- [Qualtrics](./qualtrics.md)
+- [Twilio](./twilio.md)
 
 ### Third party connectors
 
