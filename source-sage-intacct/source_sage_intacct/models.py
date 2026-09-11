@@ -17,7 +17,6 @@ from pydantic import (
     AwareDatetime,
     BaseModel,
     Field,
-    field_validator,
 )
 
 COMPANY_ID_FIELD = "COMPANY_ID"
@@ -235,56 +234,51 @@ def parse_backfill_record(raw: dict) -> "IncrementalResource | CreationRecord":
     return CreationRecord.model_validate(raw)
 
 
-class DeletionRecord(BaseDocument, extra="forbid"):
-    RECORDNO: int = Field(alias="OBJECTKEY", serialization_alias="RECORDNO")
-    WHENMODIFIED: AwareDatetime = Field(alias="ACCESSTIME", serialization_alias="WHENMODIFIED")
-    ID: str = Field(exclude=True)
+# DeletionEvent is an AUDITHISTORY row with ACCESSMODE=D. Sage fills OBJECTKEY
+# with the deleted object's unique name field, which differs based on the
+# object type: a RECORDNO (bare, or as "<RECORDNO>--REC") for some objects, and
+# a user-facing text ID (VENDORID, CUSTOMERID, ...) for others. Only the former
+# can be turned into a tombstone, since the collection is keyed on RECORDNO and
+# the deleted record can no longer be looked up.
+class ObjectKeyNotRecordNo(ValueError):
+    """Raised when an AUDITHISTORY OBJECTKEY identifies the deleted object by
+    something other than its RECORDNO, so no tombstone can be built for it."""
 
-    meta_: "DeletionRecord.Meta" = Field(
-        default_factory=lambda: DeletionRecord.Meta(op="d")
-    )
+
+class DeletionEvent(BaseModel):
+    OBJECTKEY: str
+    ACCESSTIME: AwareDatetime
+    ID: str
 
     def cursor_value(self) -> AwareDatetime:
-        return self.WHENMODIFIED
+        return self.ACCESSTIME
 
-    @field_validator("RECORDNO", mode="before")
-    @classmethod
-    def parse_object_key(cls, value: str) -> int:
-        assert isinstance(value, str)
-
-        # Handle case where OBJECTKEY is just a stringified integer, as it is
-        # for TASK objects and perhaps others.
-        if "--" not in value:
-            try:
-                record_no = int(value)
-                if record_no <= 0:
-                    raise ValueError(
-                        f"RECORDNO in OBJECTKEY must be positive, got {record_no}"
-                    )
-                return record_no
-            except ValueError:
-                raise ValueError(
-                    f"OBJECTKEY must be an integer or in format 'RECORDNO--REC', got {value}"
-                )
-
-        # Handle case where OBJECTKEY is in format "RECORDNO--REC".
-        parts = value.split("--")
-        if len(parts) != 2:
-            raise ValueError(
-                f"OBJECTKEY must be in format 'RECORDNO--REC', got {value}"
-            )
-
-        if parts[1] != "REC":
-            raise ValueError(f"OBJECTKEY suffix must be 'REC', got {parts[1]}")
-
+    def record_no(self) -> int:
+        """The RECORDNO named by OBJECTKEY. Raises ObjectKeyNotRecordNo when
+        OBJECTKEY is some other identifier of the deleted object."""
+        head, sep, tail = self.OBJECTKEY.partition("--")
+        if sep and tail != "REC":
+            raise ObjectKeyNotRecordNo(self.OBJECTKEY)
         try:
-            record_no = int(parts[0])
-            if record_no <= 0:
-                raise ValueError(
-                    f"RECORDNO in OBJECTKEY must be positive, got {record_no}"
-                )
-            return record_no
+            record_no = int(head)
         except ValueError:
-            raise ValueError(
-                f"RECORDNO in OBJECTKEY must be an integer, got {parts[0]}"
-            )
+            raise ObjectKeyNotRecordNo(self.OBJECTKEY) from None
+        if record_no <= 0:
+            raise ObjectKeyNotRecordNo(self.OBJECTKEY)
+        return record_no
+
+
+class DeletionRecord(BaseDocument, extra="forbid"):
+    RECORDNO: int
+    WHENMODIFIED: AwareDatetime
+
+    @classmethod
+    def try_from_event(cls, event: DeletionEvent) -> "DeletionRecord":
+        """The tombstone for `event`. Raises ObjectKeyNotRecordNo when the
+        event does not name a RECORDNO and so cannot address a document in
+        the collection."""
+        doc = cls(RECORDNO=event.record_no(), WHENMODIFIED=event.ACCESSTIME)
+        # Assigned rather than defaulted so that it survives the CDK's
+        # exclude_unset serialization.
+        doc.meta_ = cls.Meta(op="d")
+        return doc

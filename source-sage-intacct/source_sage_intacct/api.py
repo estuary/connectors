@@ -7,14 +7,16 @@ from estuary_cdk.capture.common import LogCursor, PageCursor
 
 from .models import (
     CreationRecord,
+    DeletionEvent,
     DeletionRecord,
     IncrementalResource,
+    ObjectKeyNotRecordNo,
     SnapshotResource,
     parse_backfill_record,
 )
 from .sage import Sage
 
-T = TypeVar("T", IncrementalResource, CreationRecord, DeletionRecord)
+T = TypeVar("T", IncrementalResource, CreationRecord, DeletionEvent)
 
 
 # This function is kind of intense, but what it's doing is repeatedly issuing
@@ -167,7 +169,7 @@ async def fetch_deletions(
 ) -> AsyncGenerator[DeletionRecord | LogCursor, None]:
     async for item in _fetch_records_generic(
         object=object,
-        cls=DeletionRecord,
+        cls=DeletionEvent,
         id_field="ID",
         horizon=horizon,
         page_size=page_size,
@@ -175,10 +177,28 @@ async def fetch_deletions(
         fetch_since=sage.fetch_deleted,
         fetch_at=sage.fetch_deleted_at,
     ):
-        if isinstance(item, DeletionRecord):
-            item.meta_ = item.Meta(op="d")
+        if not isinstance(item, DeletionEvent):
+            yield item
+            continue
 
-        yield item
+        # Sage records some objects' deletions under their user-facing text ID
+        # rather than their RECORDNO. Such a tombstone cannot be addressed to a
+        # document in the RECORDNO-keyed collection, so it is skipped.
+        try:
+            doc = DeletionRecord.try_from_event(item)
+        except ObjectKeyNotRecordNo:
+            log.debug(
+                "skipping deletion whose OBJECTKEY is not a RECORDNO",
+                {
+                    "object": object,
+                    "object_key": item.OBJECTKEY,
+                    "access_time": item.ACCESSTIME,
+                    "audit_id": item.ID,
+                },
+            )
+            continue
+
+        yield doc
 
 
 async def fetch_page(
