@@ -27,8 +27,9 @@ import (
 func TestStreamV2CheckpointHoldsOneItemPerChannel(t *testing.T) {
 	const stateKey = "shared.v1"
 	const loChannel, hiChannel = "task_00000000_shared_v1", "task_80000000_shared_v1"
-	var lo = fmt.Sprintf(`{"Channel":%q,"Routed":7,"KeyBegin":0,"KeyEnd":2147483647}`, loChannel)
-	var hi = fmt.Sprintf(`{"Channel":%q,"Routed":3,"KeyBegin":2147483648,"KeyEnd":4294967295}`, hiChannel)
+	const loKey, hiKey = "00000000-7fffffff", "80000000-ffffffff"
+	var lo = fmt.Sprintf(`{"ChannelName":%q,"Routed":7}`, loChannel)
+	var hi = fmt.Sprintf(`{"ChannelName":%q,"Routed":3}`, hiChannel)
 
 	// Under one key per state key the two shards collide: a merge patch replaces
 	// the scalars of the object they share, so only the shard which reduced last
@@ -43,8 +44,8 @@ func TestStreamV2CheckpointHoldsOneItemPerChannel(t *testing.T) {
 	// Under one key per channel, each shard patches a key of its own and both
 	// items survive the reduce.
 	reduced, err := jsonpatch.MergePatch(
-		fmt.Appendf(nil, `{%q:{"StreamV2":{%q:%s}}}`, stateKey, loChannel, lo),
-		fmt.Appendf(nil, `{%q:{"StreamV2":{%q:%s}}}`, stateKey, hiChannel, hi),
+		fmt.Appendf(nil, `{%q:{"StreamV2":{%q:%s}}}`, stateKey, loKey, lo),
+		fmt.Appendf(nil, `{%q:{"StreamV2":{%q:%s}}}`, stateKey, hiKey, hi),
 	)
 	require.NoError(t, err)
 
@@ -101,7 +102,7 @@ func TestStreamV2RejectedRows(t *testing.T) {
 	var channel = streamV2FormatChannelName("test/rejectedRows", 0,
 		streamV2Range{keyBegin: 0, keyEnd: math.MaxUint32}, "rejected.v1")
 
-	var newManager = func(t *testing.T, prior *streamV2Item) *streamV2Manager {
+	var newManager = func(t *testing.T, prior *streamV2ChannelCheckpointItem) *streamV2Manager {
 		var m = newStreamV2Manager(ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/rejectedRows", "acct",
 			&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
 		m.argv = fakeSidecarArgv(t)
@@ -110,10 +111,10 @@ func TestStreamV2RejectedRows(t *testing.T) {
 		// The fake sidecar rejects a row which carries the REJECT column, as
 		// Snowflake rejects one it cannot store: the append and the commit both
 		// succeed, and only the channel's row-error count moves.
-		var priorItems map[string]*streamV2Item
+		var priorItems streamV2Checkpoint
 		if prior != nil {
-			prior.Channel, prior.KeyEnd = channel, math.MaxUint32
-			priorItems = map[string]*streamV2Item{"00000000-ffffffff": prior}
+			prior.ChannelName = channel
+			priorItems = streamV2Checkpoint{fullKeyRange: prior}
 		}
 
 		m.addBinding("DB", "SCH", "TBL", sql.Table{
@@ -147,7 +148,7 @@ func TestStreamV2RejectedRows(t *testing.T) {
 		// replay can append, and whether or not this session appends at all — is
 		// what stops that replay from acknowledging rows Snowflake does not hold.
 		t.Setenv("FAKE_SIDECAR_ROWS_ERROR_COUNT", "3")
-		var m = newManager(t, &streamV2Item{Routed: 2})
+		var m = newManager(t, &streamV2ChannelCheckpointItem{Routed: 2})
 
 		require.ErrorContains(t, testWriteRow(ctx, m, 0, []any{"kept", "v", nil}), "3 row(s) rejected")
 	})
@@ -194,7 +195,7 @@ func TestStreamV2DropChannel(t *testing.T) {
 	var channel = first.bindings[0].channels[0].channelName
 	entries, err := first.flush(ctx)
 	require.NoError(t, err)
-	require.Equal(t, int64(3), soleItem(t, entries, 0).Routed)
+	require.Equal(t, int64(3), soleCheckpointItem(t, entries, 0).Routed)
 	first.stop()
 
 	// Undropped, that channel wedges the next shard to derive its name: the
@@ -233,7 +234,7 @@ func TestStreamV2DropChannel(t *testing.T) {
 
 	entries, err = after.flush(ctx)
 	require.NoError(t, err)
-	require.Equal(t, int64(1), soleItem(t, entries, 0).Routed)
+	require.Equal(t, int64(1), soleCheckpointItem(t, entries, 0).Routed)
 }
 
 // TestStreamV2RejectsForeignTask covers, without credentials, the rejection of a
@@ -349,17 +350,17 @@ func TestReconcileStreamV2Channel(t *testing.T) {
 
 	// The channel under reconciliation covers one quarter of the key space.
 	var r = streamV2Range{keyBegin: 0x10000000, keyEnd: 0x1fffffff}
-	var item = func(counter int64) *streamV2Item {
-		return &streamV2Item{Channel: "chan", Routed: counter, KeyBegin: r.keyBegin, KeyEnd: r.keyEnd}
+	var sv2ChannelCheckpointItem = func(counter int64) *streamV2ChannelCheckpointItem {
+		return &streamV2ChannelCheckpointItem{ChannelName: "chan", Routed: counter}
 	}
 
 	for _, tt := range []struct {
-		name          string
-		committed     *string
-		item          *streamV2Item
-		priorItems    int
-		wantCommitted int64
-		wantErr       string
+		name                     string
+		committed                *string
+		sv2ChannelCheckpointItem *streamV2ChannelCheckpointItem
+		priorItems               int
+		wantCommitted            int64
+		wantErr                  string
 	}{
 		{
 			name:      "nothing committed and nothing checkpointed",
@@ -373,28 +374,28 @@ func TestReconcileStreamV2Channel(t *testing.T) {
 			// specification finds when it restarts into a backfill. The one drop this
 			// connector makes itself is recognized before reconciliation, by the
 			// declaration in the checkpoint, so it never reaches here.
-			name:       "nothing committed with a checkpointed routed index is rejected",
-			committed:  nil,
-			item:       item(42),
-			priorItems: 1,
-			wantErr:    "has committed nothing while this task's checkpoint records",
+			name:                     "nothing committed with a checkpointed routed index is rejected",
+			committed:                nil,
+			sv2ChannelCheckpointItem: sv2ChannelCheckpointItem(42),
+			priorItems:               1,
+			wantErr:                  "has committed nothing while this task's checkpoint records",
 		},
 		{
-			name:          "clean boundary",
-			committed:     token("42@10000000-1fffffff"),
-			item:          item(42),
-			priorItems:    1,
-			wantCommitted: 42,
+			name:                     "clean boundary",
+			committed:                token("42@10000000-1fffffff"),
+			sv2ChannelCheckpointItem: sv2ChannelCheckpointItem(42),
+			priorItems:               1,
+			wantCommitted:            42,
 		},
 		{
 			// An interrupted attempt of the transaction now replayed. The channel's
 			// contents are a function of the data, so the replay routes the same
 			// documents here and skips them by position.
-			name:          "committed ahead of the checkpoint is skipped",
-			committed:     token("50@10000000-1fffffff"),
-			item:          item(42),
-			priorItems:    1,
-			wantCommitted: 50,
+			name:                     "committed ahead of the checkpoint is skipped",
+			committed:                token("50@10000000-1fffffff"),
+			sv2ChannelCheckpointItem: sv2ChannelCheckpointItem(42),
+			priorItems:               1,
+			wantCommitted:            50,
 		},
 		{
 			// An interruption before this channel's first checkpoint, with the
@@ -422,18 +423,18 @@ func TestReconcileStreamV2Channel(t *testing.T) {
 			// unconditional where the old shard-range guard applied only beyond the
 			// routed index — a channel and its token can no longer drift apart by a
 			// topology change, so a mismatch is always foreign.
-			name:       "a token for another key range is rejected at a clean count",
-			committed:  token("42@10000000-2fffffff"),
-			item:       item(42),
-			priorItems: 1,
-			wantErr:    "was not written against this channel's key range",
+			name:                     "a token for another key range is rejected at a clean count",
+			committed:                token("42@10000000-2fffffff"),
+			sv2ChannelCheckpointItem: sv2ChannelCheckpointItem(42),
+			priorItems:               1,
+			wantErr:                  "was not written against this channel's key range",
 		},
 		{
-			name:       "a token for another key range is rejected ahead of the count",
-			committed:  token("50@00000000-ffffffff"),
-			item:       item(42),
-			priorItems: 1,
-			wantErr:    "was not written against this channel's key range",
+			name:                     "a token for another key range is rejected ahead of the count",
+			committed:                token("50@00000000-ffffffff"),
+			sv2ChannelCheckpointItem: sv2ChannelCheckpointItem(42),
+			priorItems:               1,
+			wantErr:                  "was not written against this channel's key range",
 		},
 		{
 			name:      "a token for another key range with an empty checkpoint is rejected",
@@ -441,29 +442,29 @@ func TestReconcileStreamV2Channel(t *testing.T) {
 			wantErr:   "was not written against this channel's key range",
 		},
 		{
-			name:       "committed behind the checkpoint is rejected",
-			committed:  token("41@10000000-1fffffff"),
-			item:       item(42),
-			priorItems: 1,
-			wantErr:    "has lost committed data",
+			name:                     "committed behind the checkpoint is rejected",
+			committed:                token("41@10000000-1fffffff"),
+			sv2ChannelCheckpointItem: sv2ChannelCheckpointItem(42),
+			priorItems:               1,
+			wantErr:                  "has lost committed data",
 		},
 		{
-			name:       "a token this connector could not have written is rejected",
-			committed:  token("basetok0000000001:7"),
-			item:       item(42),
-			priorItems: 1,
-			wantErr:    "which is not a document count",
+			name:                     "a token this connector could not have written is rejected",
+			committed:                token("basetok0000000001:7"),
+			sv2ChannelCheckpointItem: sv2ChannelCheckpointItem(42),
+			priorItems:               1,
+			wantErr:                  "which is not a document count",
 		},
 		{
-			name:       "a token whose range this connector could not have written is rejected",
-			committed:  token("50@10000000+1fffffff"),
-			item:       item(42),
-			priorItems: 1,
-			wantErr:    "which is not a document count",
+			name:                     "a token whose range this connector could not have written is rejected",
+			committed:                token("50@10000000+1fffffff"),
+			sv2ChannelCheckpointItem: sv2ChannelCheckpointItem(42),
+			priorItems:               1,
+			wantErr:                  "which is not a document count",
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			committed, err := reconcileStreamV2Channel("chan", "WIDGETS", tt.committed, tt.item, r, tt.priorItems)
+			committed, err := reconcileStreamV2Channel("chan", "WIDGETS", tt.committed, tt.sv2ChannelCheckpointItem, r, tt.priorItems)
 			if tt.wantErr != "" {
 				require.ErrorContains(t, err, tt.wantErr)
 				return

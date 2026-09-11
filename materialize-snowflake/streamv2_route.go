@@ -43,12 +43,6 @@ func streamV2TargetLayout(keyBegin, keyEnd uint32) ([]streamV2Range, error) {
 	return layout, nil
 }
 
-// contains reports whether the key range covers a key hash. Bounds are inclusive
-// on both ends, as RangeSpec bounds are.
-func (r streamV2Range) contains(hash uint32) bool {
-	return r.keyBegin <= hash && hash <= r.keyEnd
-}
-
 // streamV2KeyRangeClass classifies a checkpoint item's channel key range against the
 // range of the shard reading it.
 type streamV2KeyRangeClass int

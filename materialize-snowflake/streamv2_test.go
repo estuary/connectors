@@ -115,14 +115,10 @@ func TestStreamV2Manager(t *testing.T) {
 	// inheritance have fake-sidecar suites of their own.
 	singleChannelLayout(t)
 
-	// priorOf keys checkpoint items by channel the way the connector's driver
-	// checkpoint does, so that a shard reads back only the item it wrote.
-	var priorOf = func(items ...*streamV2Item) map[string]*streamV2Item {
-		var byChannel = make(map[string]*streamV2Item, len(items))
-		for _, item := range items {
-			byChannel[item.Channel] = item
-		}
-		return byChannel
+	// priorOf wraps a single-channel item as the checkpoint of a binding on an
+	// unsplit task, keyed the way the driver checkpoint keys it.
+	var priorOf = func(sv2ChannelCheckpointItem *streamV2ChannelCheckpointItem) streamV2Checkpoint {
+		return streamV2Checkpoint{fullKeyRange: sv2ChannelCheckpointItem}
 	}
 
 	var newManager = func(keyRange *pf.RangeSpec) *streamV2Manager {
@@ -240,7 +236,7 @@ func TestStreamV2Manager(t *testing.T) {
 
 	// Carried from the join subtest into the split-back subtest, which
 	// re-derives the very channel names the join's convergence dropped.
-	var joinConverged map[string]*streamV2Item
+	var joinConverged streamV2Checkpoint
 	var joinRows int
 
 	// rejectingTable creates a table Snowflake will reject a row of, and returns a
@@ -285,7 +281,7 @@ func TestStreamV2Manager(t *testing.T) {
 		entries, err := m.flush(ctx)
 		require.NoError(t, err)
 		require.Len(t, entries, 1)
-		require.Equal(t, int64(100), soleItem(t, entries, 0).Routed)
+		require.Equal(t, int64(100), soleCheckpointItem(t, entries, 0).Routed)
 		require.Equal(t, 100, countRows())
 
 		// VARIANT columns must round-trip as real JSON objects, not strings.
@@ -303,7 +299,7 @@ func TestStreamV2Manager(t *testing.T) {
 		writeRows(m, 100, 150)
 		entries, err = m.flush(ctx)
 		require.NoError(t, err)
-		require.Equal(t, int64(150), soleItem(t, entries, 0).Routed)
+		require.Equal(t, int64(150), soleCheckpointItem(t, entries, 0).Routed)
 		require.Equal(t, 150, countRows())
 	})
 
@@ -322,7 +318,7 @@ func TestStreamV2Manager(t *testing.T) {
 		writeRows(m, 0, 50)
 		entries, err := m.flush(ctx)
 		require.NoError(t, err)
-		require.Equal(t, int64(50), soleItem(t, entries, 0).Routed)
+		require.Equal(t, int64(50), soleCheckpointItem(t, entries, 0).Routed)
 		require.Equal(t, 50, countRows())
 	})
 
@@ -355,12 +351,12 @@ func TestStreamV2Manager(t *testing.T) {
 		require.Equal(t, int64(4), c2.progress.committed)
 		entries, err := m2.flush(ctx)
 		require.NoError(t, err)
-		require.Equal(t, int64(5), soleItem(t, entries, 0).Routed)
+		require.Equal(t, int64(5), soleCheckpointItem(t, entries, 0).Routed)
 		require.Equal(t, 5, countRows())
 
 		// A second interruption, now with a checkpointed routed index to reconcile the
 		// committed token against.
-		var checkpointed = soleItem(t, entries, 0)
+		var checkpointed = soleCheckpointItem(t, entries, 0)
 		writeRows(m2, 5, 8)
 		require.NoError(t, c2.pipe.wait())
 		_, err = m2.client.WaitCommit(ctx, c2.channelName, c2.offsetToken(7))
@@ -375,7 +371,7 @@ func TestStreamV2Manager(t *testing.T) {
 		require.Equal(t, int64(7), m3.bindings[0].channels[0].progress.committed)
 		entries, err = m3.flush(ctx)
 		require.NoError(t, err)
-		require.Equal(t, int64(8), soleItem(t, entries, 0).Routed)
+		require.Equal(t, int64(8), soleCheckpointItem(t, entries, 0).Routed)
 		require.Equal(t, 8, countRows())
 	})
 
@@ -406,8 +402,8 @@ func TestStreamV2Manager(t *testing.T) {
 		parentEntries, err := parent.flush(ctx)
 		require.NoError(t, err)
 		require.Len(t, parentEntries[0], 4, "one item per channel of the target layout")
-		for _, item := range parentEntries[0] {
-			require.Equal(t, int64(5), item.Routed)
+		for _, sv2ChannelCheckpointItem := range parentEntries[0] {
+			require.Equal(t, int64(5), sv2ChannelCheckpointItem.Routed)
 		}
 		require.Equal(t, 20, countRows())
 		parent.stop()
@@ -425,14 +421,13 @@ func TestStreamV2Manager(t *testing.T) {
 		require.Len(t, lowEntries[0], 6, "two inherited channels and four declared targets")
 		var declaredCount int
 		var advanced int64
-		for _, item := range lowEntries[0] {
-			require.NotNil(t, item)
-			var r = streamV2Range{keyBegin: item.KeyBegin, keyEnd: item.KeyEnd}
-			if slices.Contains(lowTargets, r) {
-				require.Zero(t, item.Routed, "a declaration is durable before anything routes to its channel")
+		for keyRange, sv2ChannelCheckpointItem := range lowEntries[0] {
+			require.NotNil(t, sv2ChannelCheckpointItem)
+			if slices.Contains(lowTargets, keyRange) {
+				require.Zero(t, sv2ChannelCheckpointItem.Routed, "a declaration is durable before anything routes to its channel")
 				declaredCount++
 			} else {
-				advanced += item.Routed
+				advanced += sv2ChannelCheckpointItem.Routed
 			}
 		}
 		require.Equal(t, 4, declaredCount)
@@ -441,10 +436,11 @@ func TestStreamV2Manager(t *testing.T) {
 
 		// The acknowledged boundary: the declaration is durable, so the child
 		// converges — the inherited channels are dropped and the targets take over.
-		var inherited, inheritedKeys []string
+		var inherited []string
+		var inheritedKeys []streamV2Range
 		for _, c := range low.bindings[0].channels {
 			inherited = append(inherited, c.channelName)
-			inheritedKeys = append(inheritedKeys, c.keyRange.key())
+			inheritedKeys = append(inheritedKeys, c.keyRange)
 		}
 		require.NoError(t, low.acknowledged(ctx))
 		require.Len(t, low.bindings[0].channels, 4)
@@ -531,14 +527,14 @@ func TestStreamV2Manager(t *testing.T) {
 			entries, err := m.flush(ctx)
 			require.NoError(t, err)
 			var caughtUp, declared int
-			for _, item := range entries[0] {
-				switch item.Routed {
+			for _, sv2ChannelCheckpointItem := range entries[0] {
+				switch sv2ChannelCheckpointItem.Routed {
 				case 4:
 					caughtUp++
 				case 0:
 					declared++
 				default:
-					t.Fatalf("channel %s reports routed %d, want 4 (inherited) or 0 (declared)", item.Channel, item.Routed)
+					t.Fatalf("channel %s reports routed %d, want 4 (inherited) or 0 (declared)", sv2ChannelCheckpointItem.ChannelName, sv2ChannelCheckpointItem.Routed)
 				}
 			}
 			require.Equal(t, 2, caughtUp)
@@ -562,7 +558,7 @@ func TestStreamV2Manager(t *testing.T) {
 		highTargets, err := streamV2TargetLayout(math.MaxUint32/2+1, math.MaxUint32)
 		require.NoError(t, err)
 
-		var prior = make(map[string]*streamV2Item)
+		var prior = make(streamV2Checkpoint)
 
 		// The low child commits eight documents, then leaves two more
 		// committed on its first channel with no checkpoint to account for
@@ -620,9 +616,9 @@ func TestStreamV2Manager(t *testing.T) {
 		require.Len(t, parentEntries[0], 12, "eight inherited channels and four declared quarters")
 		require.Equal(t, 22, countRows())
 
-		var inheritedKeys []string
+		var inheritedKeys []streamV2Range
 		for _, c := range parent.bindings[0].channels {
-			inheritedKeys = append(inheritedKeys, c.keyRange.key())
+			inheritedKeys = append(inheritedKeys, c.keyRange)
 		}
 		require.NoError(t, parent.acknowledged(ctx))
 		require.Len(t, parent.bindings[0].channels, 4)
@@ -695,7 +691,7 @@ func TestStreamV2Manager(t *testing.T) {
 		var channel = dropped.channelName
 		entries, err := m.flush(ctx)
 		require.NoError(t, err)
-		require.Equal(t, int64(3), soleItem(t, entries, 0).Routed)
+		require.Equal(t, int64(3), soleCheckpointItem(t, entries, 0).Routed)
 
 		client, err := m.ensureStarted(ctx)
 		require.NoError(t, err)
@@ -744,7 +740,7 @@ func TestStreamV2Manager(t *testing.T) {
 			require.Zero(t, reused.bindings[0].channels[0].progress.committed)
 			entries, err := reused.flush(ctx)
 			require.NoError(t, err)
-			require.Equal(t, int64(4), soleItem(t, entries, 0).Routed)
+			require.Equal(t, int64(4), soleCheckpointItem(t, entries, 0).Routed)
 			require.Equal(t, 7, countRows())
 		})
 
@@ -802,7 +798,7 @@ func TestStreamV2Manager(t *testing.T) {
 		var c = m.bindings[0].channels[0]
 		entries, err := m.flush(ctx)
 		require.NoError(t, err)
-		require.Equal(t, int64(3), soleItem(t, entries, 0).Routed)
+		require.Equal(t, int64(3), soleCheckpointItem(t, entries, 0).Routed)
 		require.Equal(t, 3, countRowsIn(backfillTable))
 
 		// The backfill's effect on this table: a truncate, not a drop.
@@ -819,7 +815,7 @@ func TestStreamV2Manager(t *testing.T) {
 		writeRows(m, 3, 5)
 		entries, err = m.flush(ctx)
 		require.NoError(t, err)
-		require.Equal(t, int64(5), soleItem(t, entries, 0).Routed)
+		require.Equal(t, int64(5), soleCheckpointItem(t, entries, 0).Routed)
 		require.Equal(t, 2, countRowsIn(backfillTable))
 	})
 
@@ -883,7 +879,7 @@ func TestStreamV2Manager(t *testing.T) {
 		writeRows(m, 0, 2)
 		entries, err := m.flush(ctx)
 		require.NoError(t, err)
-		var checkpointed = *soleItem(t, entries, 0)
+		var checkpointed = *soleCheckpointItem(t, entries, 0)
 
 		writeRows(m, 2, 4)
 		var c = m.bindings[0].channels[0]
@@ -1175,7 +1171,7 @@ func TestStreamV2Datatypes(t *testing.T) {
 			entries, err := m.flush(ctx)
 			require.NoError(t, err)
 			require.Len(t, entries, 1, "only the binding stored to this transaction reports an item")
-			require.Equal(t, int64(len(tt.vals)), soleItem(t, entries, binding).Routed)
+			require.Equal(t, int64(len(tt.vals)), soleCheckpointItem(t, entries, binding).Routed)
 
 			dump, err := sql.StdDumpTable(ctx, db, tbl)
 			require.NoError(t, err)

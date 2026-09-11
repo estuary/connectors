@@ -7,7 +7,6 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
-	"math"
 	"sync"
 	"testing"
 
@@ -324,12 +323,12 @@ func TestStreamV2DowngradeWarning(t *testing.T) {
 	})
 
 	t.Run("nil items name no channel", func(t *testing.T) {
-		require.Empty(t, streamV2DowngradeWarning("TBL", map[string]*streamV2Item{"00000000-ffffffff": nil}))
+		require.Empty(t, streamV2DowngradeWarning("TBL", streamV2Checkpoint{fullKeyRange: nil}))
 	})
 
 	t.Run("a channel is named", func(t *testing.T) {
-		var warning = streamV2DowngradeWarning("TBL", map[string]*streamV2Item{
-			"00000000-ffffffff": {Channel: "chan-1", Routed: 3, KeyEnd: math.MaxUint32},
+		var warning = streamV2DowngradeWarning("TBL", streamV2Checkpoint{
+			fullKeyRange: {ChannelName: "chan-1", Routed: 3},
 		})
 		require.Contains(t, warning, "TBL")
 		require.Contains(t, warning, "chan-1")
@@ -346,9 +345,9 @@ func TestRequireStreamingV2RuntimeForState(t *testing.T) {
 		return spec
 	}
 
-	var stateWith = func(t *testing.T, items map[string]*streamV2Item) json.RawMessage {
+	var stateWith = func(t *testing.T, sv2Checkpoint streamV2Checkpoint) json.RawMessage {
 		t.Helper()
-		var out, err = json.Marshal(checkpoint{stateKey: &checkpointItem{StreamV2: items}})
+		var out, err = json.Marshal(checkpoint{stateKey: &checkpointItem{StreamV2: sv2Checkpoint}})
 		require.NoError(t, err)
 		return out
 	}
@@ -362,18 +361,18 @@ func TestRequireStreamingV2RuntimeForState(t *testing.T) {
 	})
 
 	t.Run("the v2 runtime is already running is allowed", func(t *testing.T) {
-		var items = map[string]*streamV2Item{"00000000-ffffffff": {Channel: channel, Routed: 3, KeyEnd: math.MaxUint32}}
-		require.NoError(t, requireStreamingV2RuntimeForState(specOf(t, true), stateWith(t, items)))
+		var sv2Checkpoint = streamV2Checkpoint{fullKeyRange: {ChannelName: channel, Routed: 3}}
+		require.NoError(t, requireStreamingV2RuntimeForState(specOf(t, true), stateWith(t, sv2Checkpoint)))
 	})
 
 	t.Run("nil items name nothing to drop", func(t *testing.T) {
-		var items = map[string]*streamV2Item{"00000000-ffffffff": nil}
-		require.NoError(t, requireStreamingV2RuntimeForState(specOf(t, false), stateWith(t, items)))
+		var sv2Checkpoint = streamV2Checkpoint{fullKeyRange: nil}
+		require.NoError(t, requireStreamingV2RuntimeForState(specOf(t, false), stateWith(t, sv2Checkpoint)))
 	})
 
 	t.Run("an item off the v2 runtime is rejected", func(t *testing.T) {
-		var items = map[string]*streamV2Item{"00000000-ffffffff": {Channel: channel, Routed: 3, KeyEnd: math.MaxUint32}}
-		var err = requireStreamingV2RuntimeForState(specOf(t, false), stateWith(t, items))
+		var sv2Checkpoint = streamV2Checkpoint{fullKeyRange: {ChannelName: channel, Routed: 3}}
+		var err = requireStreamingV2RuntimeForState(specOf(t, false), stateWith(t, sv2Checkpoint))
 		require.ErrorContains(t, err, boilerplate.RuntimeV2FlagName)
 		require.ErrorContains(t, err, channel)
 	})
