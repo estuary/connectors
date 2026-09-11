@@ -264,14 +264,14 @@ func (c *sidecarClient) Configure(ctx context.Context, profile sidecarProfile, a
 // the given table, returning Snowflake's authoritative status for it: the latest
 // committed offset token, nil if the channel has never committed, and the
 // row-error statistics accumulated over the channel's life so far.
-func (c *sidecarClient) OpenChannel(ctx context.Context, database, schema, table, channel string) (*channelStatusResult, error) {
+func (c *sidecarClient) OpenChannel(ctx context.Context, database, schema, table, channelName string) (*channelStatusResult, error) {
 	var res channelStatusResult
 	if err := c.call(ctx, "open_channel", struct {
-		Database string `json:"database"`
-		Schema   string `json:"schema"`
-		Table    string `json:"table"`
-		Channel  string `json:"channel"`
-	}{database, schema, table, channel}, rpcTimeoutOpenChannel, &res); err != nil {
+		Database    string `json:"database"`
+		Schema      string `json:"schema"`
+		Table       string `json:"table"`
+		ChannelName string `json:"channel"`
+	}{database, schema, table, channelName}, rpcTimeoutOpenChannel, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -283,14 +283,14 @@ func (c *sidecarClient) OpenChannel(ctx context.Context, database, schema, table
 // keyed by column name; rowCount travels in the header so that a payload holding
 // a different number of rows than the batch it claims to be is rejected rather
 // than committed under this batch's offset token.
-func (c *sidecarClient) Append(ctx context.Context, channel, startToken, endToken string, payload []byte, rowCount int) error {
+func (c *sidecarClient) Append(ctx context.Context, channelName, startToken, endToken string, payload []byte, rowCount int) error {
 	return c.callWithPayload(ctx, "append", struct {
-		Channel    string `json:"channel"`
-		StartToken string `json:"start_token"`
-		EndToken   string `json:"end_token"`
-		RowCount   int    `json:"row_count"`
-		PayloadLen int    `json:"payload_len"`
-	}{channel, startToken, endToken, rowCount, len(payload)}, payload, rpcTimeoutAppend, nil)
+		ChannelName string `json:"channel"`
+		StartToken  string `json:"start_token"`
+		EndToken    string `json:"end_token"`
+		RowCount    int    `json:"row_count"`
+		PayloadLen  int    `json:"payload_len"`
+	}{channelName, startToken, endToken, rowCount, len(payload)}, payload, rpcTimeoutAppend, nil)
 }
 
 // WaitCommit blocks until the channel's committed offset token equals token, and
@@ -298,13 +298,13 @@ func (c *sidecarClient) Append(ctx context.Context, channel, startToken, endToke
 // about the rows Snowflake rejected along the way, so the caller must also consult
 // the returned RowsErrorCount to know whether the commit delivered everything it
 // was given.
-func (c *sidecarClient) WaitCommit(ctx context.Context, channel, token string) (*channelStatusResult, error) {
+func (c *sidecarClient) WaitCommit(ctx context.Context, channelName, token string) (*channelStatusResult, error) {
 	var res channelStatusResult
 	if err := c.call(ctx, "wait_commit", struct {
-		Channel  string  `json:"channel"`
-		Token    string  `json:"token"`
-		TimeoutS float64 `json:"timeout_s"`
-	}{channel, token, (rpcTimeoutWaitCommit - 30*time.Second).Seconds()}, rpcTimeoutWaitCommit, &res); err != nil {
+		ChannelName string  `json:"channel"`
+		Token       string  `json:"token"`
+		TimeoutS    float64 `json:"timeout_s"`
+	}{channelName, token, (rpcTimeoutWaitCommit - 30*time.Second).Seconds()}, rpcTimeoutWaitCommit, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -329,11 +329,11 @@ func (s *channelStatusResult) committedToken() any {
 	return *s.CommittedToken
 }
 
-func (c *sidecarClient) ChannelStatus(ctx context.Context, channel string) (*channelStatusResult, error) {
+func (c *sidecarClient) ChannelStatus(ctx context.Context, channelName string) (*channelStatusResult, error) {
 	var res channelStatusResult
 	if err := c.call(ctx, "channel_status", struct {
-		Channel string `json:"channel"`
-	}{channel}, rpcTimeoutOpenChannel, &res); err != nil {
+		ChannelName string `json:"channel"`
+	}{channelName}, rpcTimeoutOpenChannel, &res); err != nil {
 		return nil, err
 	}
 	return &res, nil
@@ -345,11 +345,11 @@ func (c *sidecarClient) ChannelStatus(ctx context.Context, channel string) (*cha
 //
 // The channel must be open in this session, since dropping one is expressed
 // through the handle an open produced.
-func (c *sidecarClient) CloseChannel(ctx context.Context, channel string, drop bool) error {
+func (c *sidecarClient) CloseChannel(ctx context.Context, channelName string, drop bool) error {
 	return c.call(ctx, "close_channel", struct {
-		Channel string `json:"channel"`
-		Drop    bool   `json:"drop"`
-	}{channel, drop}, rpcTimeoutOpenChannel, nil)
+		ChannelName string `json:"channel"`
+		Drop        bool   `json:"drop"`
+	}{channelName, drop}, rpcTimeoutOpenChannel, nil)
 }
 
 // Shutdown asks the sidecar to drain and exit cleanly. Errors are expected if

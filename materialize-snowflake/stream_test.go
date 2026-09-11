@@ -624,4 +624,3 @@ func TestStreamDatatypes(t *testing.T) {
 		})
 	}
 }
-

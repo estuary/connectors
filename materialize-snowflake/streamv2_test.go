@@ -232,7 +232,7 @@ func TestStreamV2Manager(t *testing.T) {
 		for _, c := range m.bindings[0].channels {
 			require.NoError(t, c.pipe.wait())
 			if c.progress.routed > c.progress.committed {
-				_, err := m.client.WaitCommit(ctx, c.name, c.offsetToken(c.progress.routed))
+				_, err := m.client.WaitCommit(ctx, c.channelName, c.offsetToken(c.progress.routed))
 				require.NoError(t, err)
 			}
 		}
@@ -340,7 +340,7 @@ func TestStreamV2Manager(t *testing.T) {
 		writeRows(m1, 0, 5)
 		var c1 = m1.bindings[0].channels[0]
 		require.NoError(t, c1.pipe.wait())
-		_, err = m1.client.WaitCommit(ctx, c1.name, c1.offsetToken(4))
+		_, err = m1.client.WaitCommit(ctx, c1.channelName, c1.offsetToken(4))
 		require.NoError(t, err)
 		require.Equal(t, 4, countRows())
 		m1.sup.kill()
@@ -363,7 +363,7 @@ func TestStreamV2Manager(t *testing.T) {
 		var checkpointed = soleItem(t, entries, 0)
 		writeRows(m2, 5, 8)
 		require.NoError(t, c2.pipe.wait())
-		_, err = m2.client.WaitCommit(ctx, c2.name, c2.offsetToken(7))
+		_, err = m2.client.WaitCommit(ctx, c2.channelName, c2.offsetToken(7))
 		require.NoError(t, err)
 		require.Equal(t, 7, countRows())
 		m2.sup.kill()
@@ -443,7 +443,7 @@ func TestStreamV2Manager(t *testing.T) {
 		// converges — the inherited channels are dropped and the targets take over.
 		var inherited, inheritedKeys []string
 		for _, c := range low.bindings[0].channels {
-			inherited = append(inherited, c.name)
+			inherited = append(inherited, c.channelName)
 			inheritedKeys = append(inheritedKeys, c.keyRange.key())
 		}
 		require.NoError(t, low.acknowledged(ctx))
@@ -692,7 +692,7 @@ func TestStreamV2Manager(t *testing.T) {
 
 		writeRows(m, 0, 3)
 		var dropped = m.bindings[0].channels[0]
-		var channel = dropped.name
+		var channel = dropped.channelName
 		entries, err := m.flush(ctx)
 		require.NoError(t, err)
 		require.Equal(t, int64(3), soleItem(t, entries, 0).Routed)
@@ -740,7 +740,7 @@ func TestStreamV2Manager(t *testing.T) {
 			reused.addBinding(cfg.Database, cfg.Schema, tableName, tgt, nil)
 
 			writeRows(reused, 100, 104)
-			require.Equal(t, channel, reused.bindings[0].channels[0].name)
+			require.Equal(t, channel, reused.bindings[0].channels[0].channelName)
 			require.Zero(t, reused.bindings[0].channels[0].progress.committed)
 			entries, err := reused.flush(ctx)
 			require.NoError(t, err)
@@ -760,7 +760,7 @@ func TestStreamV2Manager(t *testing.T) {
 				rejectingTable(t, notNullTable, "drop-notnull.v1"), nil)
 
 			require.NoError(t, testWriteRow(ctx, rejecting, 0, []any{"dropped", nil}))
-			var rejected = rejecting.bindings[0].channels[0].name
+			var rejected = rejecting.bindings[0].channels[0].channelName
 			_, err := rejecting.flush(ctx)
 			require.ErrorContains(t, err, "rejected and discarded by Snowflake")
 
@@ -812,7 +812,7 @@ func TestStreamV2Manager(t *testing.T) {
 
 		// The channel survives it: its committed offset token stands, and it goes
 		// on appending as though nothing happened to the table.
-		status, err := m.client.ChannelStatus(ctx, c.name)
+		status, err := m.client.ChannelStatus(ctx, c.channelName)
 		require.NoError(t, err)
 		require.Equal(t, c.offsetToken(3), status.committedToken())
 
@@ -845,7 +845,7 @@ func TestStreamV2Manager(t *testing.T) {
 		_, err = first.flush(ctx)
 		require.NoError(t, err)
 		require.Equal(t, 3, countRowsIn(sharedTable))
-		var firstChannel = first.bindings[0].channels[0].name
+		var firstChannel = first.bindings[0].channels[0].channelName
 
 		var second = newStreamV2Manager(ctx, &cfg, testMaterialization+"-second", accountName, fullRange)
 		second.listChannels = first.listChannels
@@ -888,7 +888,7 @@ func TestStreamV2Manager(t *testing.T) {
 		writeRows(m, 2, 4)
 		var c = m.bindings[0].channels[0]
 		require.NoError(t, c.pipe.wait())
-		_, err = m.client.WaitCommit(ctx, c.name, c.offsetToken(4))
+		_, err = m.client.WaitCommit(ctx, c.channelName, c.offsetToken(4))
 		require.NoError(t, err)
 		m.stop()
 
@@ -935,7 +935,7 @@ func TestStreamV2Manager(t *testing.T) {
 
 		require.NoError(t, testWriteRow(ctx, m, 0, []any{"kept", json.RawMessage(`{"a":1}`)}))
 		require.NoError(t, testWriteRow(ctx, m, 0, []any{"dropped", nil}))
-		var channel = m.bindings[0].channels[0].name
+		var channel = m.bindings[0].channels[0].channelName
 		entries, waitErr := m.flush(ctx)
 		require.Error(t, waitErr)
 		require.ErrorContains(t, waitErr, channel)
@@ -1242,7 +1242,7 @@ func TestStreamV2ListChannels(t *testing.T) {
 		StateKey:   "list.v1",
 	}, nil)
 	require.NoError(t, testWriteRow(ctx, m, 0, []any{"k", 1}))
-	var opened = m.bindings[0].channels[0].name
+	var opened = m.bindings[0].channels[0].channelName
 	_, err = m.flush(ctx)
 	require.NoError(t, err)
 

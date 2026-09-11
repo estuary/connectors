@@ -117,7 +117,7 @@ func TestStreamV2ReturningToTheWritePathSkipsNewDocuments(t *testing.T) {
 	}
 	entries, err := before.flush(ctx)
 	require.NoError(t, err)
-	var channel = before.bindings[0].channels[0].name
+	var channel = before.bindings[0].channels[0].channelName
 	require.Equal(t, int64(3), entries[0]["00000000-ffffffff"].Routed)
 	before.stop()
 
@@ -126,7 +126,7 @@ func TestStreamV2ReturningToTheWritePathSkipsNewDocuments(t *testing.T) {
 	// documents Snowflake never had are dropped.
 	var after = newSession(t, nil)
 	require.NoError(t, testWriteRow(ctx, after, 0, []any{"k", "new"}))
-	require.Equal(t, channel, after.bindings[0].channels[0].name)
+	require.Equal(t, channel, after.bindings[0].channels[0].channelName)
 	require.Equal(t, int64(3), after.bindings[0].channels[0].progress.committed)
 }
 
@@ -571,7 +571,7 @@ func TestStreamV2WritePathSwitch(t *testing.T) {
 		var later = newV2(t, tgt, nil)
 		client, err := later.ensureStarted(ctx)
 		require.NoError(t, err)
-		status, err := client.OpenChannel(ctx, cfg.Database, cfg.Schema, tableName, c.name)
+		status, err := client.OpenChannel(ctx, cfg.Database, cfg.Schema, tableName, c.channelName)
 		require.NoError(t, err)
 		require.Equal(t, c.offsetToken(3), status.committedToken())
 	})
@@ -592,7 +592,7 @@ func TestStreamV2WritePathSwitch(t *testing.T) {
 		storeV2(t, m, 0, 3)
 		var c = m.bindings[0].channels[0]
 		require.NoError(t, c.pipe.wait())
-		_, err := m.client.WaitCommit(ctx, c.name, c.offsetToken(3))
+		_, err := m.client.WaitCommit(ctx, c.channelName, c.offsetToken(3))
 		require.NoError(t, err)
 		require.Equal(t, 3, countRows())
 		m.sup.kill()
@@ -765,7 +765,7 @@ func TestStreamV2SweepDropsTheStreamingChannel(t *testing.T) {
 	}
 
 	// Held open, to register blobs through: it stands.
-	sm.tableStreams[0] = &tableStream{channel: &channel{Channel: sm.channelName}}
+	sm.tableStreams[0] = &tableStream{channel: &channel{ChannelName: sm.channelName}}
 	require.NoError(t, m.sweep(ctx, "DB", "SCH", "TBL", "sk.v1", nil))
 	require.Empty(t, drops)
 
