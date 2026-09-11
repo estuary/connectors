@@ -110,7 +110,7 @@ func TestStreamV2Manager(t *testing.T) {
 
 	var fullRange = &pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32}
 
-	// These subtests follow a single channel's counter, committed index, and token
+	// These subtests follow a single channel's counter, committed offset, and token
 	// against live Snowflake; the multi-channel routing and the split/join
 	// inheritance have fake-sidecar suites of their own.
 	singleChannelLayout(t)
@@ -290,12 +290,12 @@ func TestStreamV2Manager(t *testing.T) {
 		require.Equal(t, "OBJECT", docType)
 
 		// A transaction which stores nothing for the binding reports no item, so
-		// the routed index already in the checkpoint stands.
+		// the routed offset already in the checkpoint stands.
 		entries, err = m.flush(ctx)
 		require.NoError(t, err)
 		require.Empty(t, entries)
 
-		// The routed index continues across transactions rather than restarting.
+		// The routed offset continues across transactions rather than restarting.
 		writeRows(m, 100, 150)
 		entries, err = m.flush(ctx)
 		require.NoError(t, err)
@@ -354,7 +354,7 @@ func TestStreamV2Manager(t *testing.T) {
 		require.Equal(t, int64(5), soleCheckpointItem(t, entries, 0).Routed)
 		require.Equal(t, 5, countRows())
 
-		// A second interruption, now with a checkpointed routed index to reconcile the
+		// A second interruption, now with a checkpointed routed offset to reconcile the
 		// committed token against.
 		var checkpointed = soleCheckpointItem(t, entries, 0)
 		writeRows(m2, 5, 8)
@@ -410,7 +410,7 @@ func TestStreamV2Manager(t *testing.T) {
 
 		// The low child. Its own targets are the low half's quarters, so the
 		// two channels it inherits are not targets: its first flush writes
-		// their advanced routed indices and declares the layout it converges to.
+		// their advanced routed offsets and declares the layout it converges to.
 		var low = newManager(lowHalf)
 		low.addBinding(cfg.Database, cfg.Schema, tableName, tgt, parentEntries[0])
 
@@ -480,7 +480,7 @@ func TestStreamV2Manager(t *testing.T) {
 		// The state #4983 wedged on: documents Snowflake committed that no
 		// checkpoint accounts for, redistributed by a split. Each child now
 		// inherits the whole channels those documents were appended under, so
-		// each skips them by position and the replay duplicates nothing.
+		// each skips them by offset and the replay duplicates nothing.
 		truncate(t)
 		channelsPerShard(t, 4)
 		smallBatches(t)
@@ -730,7 +730,7 @@ func TestStreamV2Manager(t *testing.T) {
 			// A shard given the dropped channel's key-begin — a scale-down followed by a
 			// scale-up — derives this same channel name, with no checkpoint item of
 			// its own to reconcile against. Nothing of the dropped channel is
-			// adopted as its committed index, so its documents are appended in full
+			// adopted as its committed offset, so its documents are appended in full
 			// rather than silently dropped as replays.
 			var reused = newManager(fullRange)
 			reused.addBinding(cfg.Database, cfg.Schema, tableName, tgt, nil)
@@ -892,7 +892,7 @@ func TestStreamV2Manager(t *testing.T) {
 		// appended, and the row count is unchanged by the attempt.
 		var rowsBefore = countRows()
 
-		t.Run("committed token below the checkpointed routed index", func(t *testing.T) {
+		t.Run("committed token below the checkpointed routed offset", func(t *testing.T) {
 			var ahead = checkpointed
 			ahead.Routed = 100
 
@@ -966,7 +966,7 @@ func TestStreamV2Manager(t *testing.T) {
 
 		// Backfilling the binding is the recovery the failure asks for: it
 		// rotates the channel, whose row-error count starts at zero along with
-		// its routed index.
+		// its routed offset.
 		var backfilled = notNullTarget
 		backfilled.StateKey = noncedStateKey("notnull.v2")
 

@@ -53,6 +53,7 @@ the bare words.
 | Channel | Snowflake | A named connection to one table. Snowflake stores a committed offset token for each channel, and that token is what recovery reads. |
 | Append | Snowflake | One call that sends a batch of rows to a channel. The v2 SDK names the method `append_rows`. |
 | Offset token | Snowflake | An opaque string that the connector attaches to an append. Snowflake keeps the token of the last append it stored. |
+| Offset | Connector | The 1-based position of a document among those routed to its channel. The connector writes it into the offset token, and it is the number the checkpoint and the recovery logic compare. |
 | Commit | Snowflake | The moment the ingest service stores an offset token durably. No SQL transaction takes part. |
 | Sidecar | Estuary | The Python process that holds the Snowflake SDK. The connector talks to it over a unix socket. |
 | Binding | Estuary | One collection mapped to one table. |
@@ -106,17 +107,19 @@ append that it committed, and the connector reads that token back when it starts
    42@00000000-3fffffff
    │  │        └─ key-end of the channel's key range
    │  └─ key-begin of the channel's key range
-   └─ this append ends at document 42 of the channel
+   └─ offset 42: this append ends at the channel's 42nd document
 ```
 
-At the end of a Flow transaction, the connector waits until Snowflake commits the
-token of its last append. The Flow checkpoint then records the same document
-count. The two numbers describe the same position, one on each side.
+A document's offset is its position, counting from 1, among the documents routed to
+its channel over the channel's whole life. At the end of a Flow transaction, the
+connector waits until Snowflake commits the token of its last append. The Flow
+checkpoint then records the same offset. The two numbers describe the same
+position, one on each side.
 
 ### How recovery avoids duplicate rows
 
 A shard can fail at any moment. On initialization, the connector compares, for
-each channel, the committed token in Snowflake to that channel's routed index in the
+each channel, the committed token in Snowflake to that channel's routed offset in the
 Flow checkpoint. The difference is the number of documents that Snowflake already
 holds. The connector skips those documents as the runtime replays them.
 

@@ -250,7 +250,7 @@ func TestStreamV2BatchPayload(t *testing.T) {
 			total += grew
 		}
 
-		// The batch's own first document index, which its offset token is rendered
+		// The batch's own first offset, which its offset token is rendered
 		// from, is the one the batch's first row was buffered under.
 		require.Equal(t, int64(100), b.bufFirst)
 

@@ -46,7 +46,7 @@ func TestStreamV2CheckpointDoesNotSurviveAnotherWritePath(t *testing.T) {
 
 	// A transaction on another write path records that path's pending work for
 	// the state key. StreamV2 is omitted rather than nulled, so the reduce
-	// leaves the routed index standing: the item survives the switch itself.
+	// leaves the routed offset standing: the item survives the switch itself.
 	stored, err := json.Marshal(checkpoint{stateKey: &checkpointItem{
 		Table:       "TBL",
 		StreamBlobs: []*blobMetadata{{Path: "blob"}},
@@ -58,7 +58,7 @@ func TestStreamV2CheckpointDoesNotSurviveAnotherWritePath(t *testing.T) {
 	require.Contains(t, string(state), channel)
 
 	// Acknowledging that transaction is what takes it. The state key is drained,
-	// and a drained key is patched to null, which removes the routed index along with
+	// and a drained key is patched to null, which removes the routed offset along with
 	// the pending work it was recorded beside.
 	cleared, err := json.Marshal(checkpoint{stateKey: nil})
 	require.NoError(t, err)
