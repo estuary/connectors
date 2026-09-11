@@ -13,8 +13,6 @@ import (
 	"sync"
 	"time"
 
-	snowflake_auth "github.com/estuary/connectors/go/auth/snowflake"
-	"github.com/estuary/connectors/go/common"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
@@ -236,27 +234,6 @@ func parseStreamV2Token(token string) (int64, streamV2Range, bool) {
 		return 0, streamV2Range{}, false
 	}
 	return index, streamV2Range{keyBegin: uint32(keyBegin), keyEnd: uint32(keyEnd)}, true
-}
-
-// streamsV2 reports whether a binding writes through the snowpipe streaming v2 path.
-// That path appends rows to a channel as it stores them. Only a delta-updates binding
-// can do this, and only with JWT credentials to authenticate its sidecar. A
-// configuration with no credentials object never streams.
-func streamsV2(cfg *config, deltaUpdates bool, flagEnabled bool) bool {
-	return deltaUpdates && cfg.Credentials != nil && cfg.Credentials.AuthType == snowflake_auth.JWT && flagEnabled
-}
-
-// streamV2Downgrade reports whether a binding is leaving the snowpipe streaming v2
-// write path for the snowpipe streaming path by explicit choice: the endpoint
-// configuration names snowpipe_streaming itself and does not name
-// snowpipe_streaming_v2. The default value of snowpipe_streaming does not count,
-// because leaving the path duplicates documents and must be asked for.
-func streamV2Downgrade(cfg *config, deltaUpdates bool) bool {
-	if cfg.Credentials == nil || cfg.Credentials.AuthType != snowflake_auth.JWT || !deltaUpdates {
-		return false
-	}
-	var configured = common.ParseFeatureFlags(cfg.Advanced.FeatureFlags, nil)
-	return configured[flagSnowpipeStreaming] && !configured[flagSnowpipeStreamingV2]
 }
 
 // streamV2CannotDrainPendingBlobs reports that a binding moving onto the streaming

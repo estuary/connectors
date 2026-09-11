@@ -12,6 +12,7 @@ import (
 	"github.com/estuary/connectors/go/common"
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	log "github.com/sirupsen/logrus"
 	sf "github.com/snowflakedb/gosnowflake/v2"
 )
@@ -276,4 +277,21 @@ func (c config) validateStreamingFlags() error {
 	}
 
 	return nil
+}
+
+func (c config) isStreamsV2(deltaUpdates bool) bool {
+	return deltaUpdates && c.Credentials != nil && c.Credentials.AuthType == snowflake_auth.JWT &&
+		boilerplate.ParseFlags(c)[flagSnowpipeStreamingV2]
+}
+
+// isStreamsDowngradeV2ToV1 reports whether a binding leaves the snowpipe streaming
+// v2 write path by explicit choice. Only the flags the configuration sets are
+// consulted, because flagSnowpipeStreaming is enabled by default and leaving the
+// path duplicates documents, so it must be asked for.
+func (c config) isStreamsDowngradeV2ToV1(deltaUpdates bool) bool {
+	if c.Credentials == nil || c.Credentials.AuthType != snowflake_auth.JWT || !deltaUpdates {
+		return false
+	}
+	var configured = common.ParseFeatureFlags(c.Advanced.FeatureFlags, nil)
+	return configured[flagSnowpipeStreaming] && !configured[flagSnowpipeStreamingV2]
 }

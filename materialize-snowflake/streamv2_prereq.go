@@ -145,14 +145,13 @@ func rejectOrphanedStreamV2Bindings(spec *pf.MaterializationSpec, stateJson json
 		return nil
 	}
 
-	var flagEnabled = boilerplate.ParseFlags(cfg)[flagSnowpipeStreamingV2]
 	for _, binding := range spec.Bindings {
 		var item = cp[binding.StateKey]
-		if item == nil || streamsV2(&cfg, binding.DeltaUpdates, flagEnabled) {
+		if item == nil || cfg.isStreamsV2(binding.DeltaUpdates) {
 			continue
 		}
 		var table = strings.Join(binding.ResourcePath, ".")
-		if streamV2Downgrade(&cfg, binding.DeltaUpdates) {
+		if cfg.isStreamsDowngradeV2ToV1(binding.DeltaUpdates) {
 			if warning := streamV2DowngradeWarning(table, item.StreamV2); warning != "" {
 				log.Warn(warning)
 			}
