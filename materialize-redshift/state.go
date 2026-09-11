@@ -214,12 +214,9 @@ func (s *checkpointsTable) readAll(ctx context.Context, conn *pgx.Conn) (map[str
 	return applied, legacyCheckpoint, crossedOver, nil
 }
 
-// lock takes an exclusive lock on the table for the rest of txn, and must be
-// txn's first statement. Materializations sharing a metadata schema update
-// this table concurrently, and under SERIALIZABLE isolation a write from a
-// snapshot older than a concurrent commit fails with ERROR: 1023 even when
-// the rows differ. Redshift takes the snapshot at the first DML statement,
-// so a lock before any of them waits out every concurrent commit first.
+// lock must be txn's first statement: Redshift snapshots at the first DML,
+// and under SERIALIZABLE isolation writing this shared table from a snapshot
+// older than another task's commit fails with ERROR: 1023.
 func (s *checkpointsTable) lock(ctx context.Context, txn pgx.Tx) error {
 	if _, err := txn.Exec(ctx, fmt.Sprintf("lock %s;", s.table)); err != nil {
 		return fmt.Errorf("obtaining checkpoints table lock: %w", err)

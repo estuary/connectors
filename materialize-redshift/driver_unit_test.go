@@ -24,7 +24,7 @@ func TestSpecification(t *testing.T) {
 	cupaloy.SnapshotT(t, formatted)
 }
 
-func TestIsSerializationFailure(t *testing.T) {
+func TestIsRetriable(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		err  error
@@ -39,17 +39,17 @@ func TestIsSerializationFailure(t *testing.T) {
 		{"column exists", &pgconn.PgError{Code: "42701"}, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.want, isSerializationFailure(tc.err))
+			require.Equal(t, tc.want, isRetriable(tc.err))
 		})
 	}
 }
 
-func TestRetryOnSerializationFailure(t *testing.T) {
-	serializationRetryDelay = 0
+func TestRetry(t *testing.T) {
+	retryDelay = 0
 	var violation = &pgconn.PgError{Code: "XX000", Message: "1023"}
 
 	var calls int
-	require.NoError(t, retryOnSerializationFailure(context.Background(), func() error {
+	require.NoError(t, retry(context.Background(), func() error {
 		calls++
 		if calls < 3 {
 			return fmt.Errorf("writing applied tokens: %w", violation)
@@ -59,15 +59,15 @@ func TestRetryOnSerializationFailure(t *testing.T) {
 	require.Equal(t, 3, calls)
 
 	calls = 0
-	require.ErrorIs(t, retryOnSerializationFailure(context.Background(), func() error {
+	require.ErrorIs(t, retry(context.Background(), func() error {
 		calls++
 		return violation
 	}), violation)
-	require.Equal(t, maxTxnAttempts, calls)
+	require.Equal(t, maxAttempts, calls)
 
 	calls = 0
 	var other = errors.New("not transient")
-	require.ErrorIs(t, retryOnSerializationFailure(context.Background(), func() error {
+	require.ErrorIs(t, retry(context.Background(), func() error {
 		calls++
 		return other
 	}), other)
