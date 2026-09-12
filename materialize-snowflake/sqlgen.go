@@ -93,6 +93,13 @@ var snowflakeDialect = func(configSchema string, timestampType snowflakeTimestam
 		binaryMapping = sql.MapStatic("BINARY", sql.AlsoCompatibleWith("varbinary"))
 	}
 
+	objectMapping := func(p *sql.Projection) (sql.DDLer, sql.CompatibleColumnTypes, sql.ElementConverter) {
+		if p.IsRootDocumentProjection() {
+			return sql.MapStatic("TEXT", sql.UsingConverter(sql.ToJsonString))(p)
+		}
+		return sql.MapStatic("VARIANT", sql.UsingConverter(sql.ToJsonBytes))(p)
+	}
+
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.ARRAY:    sql.MapStatic("VARIANT", sql.UsingConverter(sql.ToJsonBytes)),
@@ -100,7 +107,7 @@ var snowflakeDialect = func(configSchema string, timestampType snowflakeTimestam
 			sql.BOOLEAN:  sql.MapStatic("BOOLEAN"),
 			sql.INTEGER:  sql.MapStatic("INTEGER", sql.AlsoCompatibleWith("fixed")),
 			sql.NUMBER:   sql.MapStatic("FLOAT", sql.AlsoCompatibleWith("real")),
-			sql.OBJECT:   sql.MapStatic("VARIANT", sql.UsingConverter(sql.ToJsonBytes)),
+			sql.OBJECT:   objectMapping,
 			sql.MULTIPLE: sql.MapStatic("VARIANT", sql.UsingConverter(sql.ToJsonBytes)),
 			sql.STRING_INTEGER: sql.MapStringMaxLen(
 				sql.MapStatic("INTEGER", sql.AlsoCompatibleWith("fixed"), sql.UsingConverter(sql.StrToInt)), // Equivalent to NUMBER(38,0)
@@ -281,7 +288,7 @@ ALTER TABLE {{$.Identifier}} ALTER COLUMN
 
 {{ define "loadQuery" }}
 {{ if $.Table.Document -}}
-SELECT {{ $.Table.Binding }}, TO_JSON({{ $.Table.Identifier }}.{{ $.Table.Document.Identifier }})
+SELECT {{ $.Table.Binding }}, {{ if eq $.Table.Document.BareDDL "VARIANT" }}TO_JSON({{ $.Table.Identifier }}.{{ $.Table.Document.Identifier }}){{ else }}{{ $.Table.Identifier }}.{{ $.Table.Document.Identifier }}{{ end }}
 	FROM {{ $.Table.Identifier }}
 	JOIN (
 		SELECT {{ range $ind, $bound := $.Bounds }}
