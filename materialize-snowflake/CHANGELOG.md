@@ -1,5 +1,12 @@
 # materialize-snowflake
 
+## 2026-09-12
+
+### Fixed
+- Support loading the `flow_document` from non-variant columns.  This can be
+  used along with a custom DDL and castToString to store the flow_document as a
+  string, which may be required if the document contains certain values.
+
 ## 2026-09-11
 
 ### Fixed
