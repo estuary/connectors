@@ -120,7 +120,7 @@ Big Schema Changed Types Constraints:
 Big Schema Materialized Resource Schema With All Fields Required:
 {"Name":"ARRAYFIELD","Nullable":false,"Type":"VARIANT"}
 {"Name":"BOOLFIELD","Nullable":false,"Type":"BOOLEAN"}
-{"Name":"FLOW_DOCUMENT","Nullable":false,"Type":"VARIANT"}
+{"Name":"FLOW_DOCUMENT","Nullable":false,"Type":"TEXT"}
 {"Name":"FLOW_PUBLISHED_AT","Nullable":false,"Type":"TIMESTAMP_LTZ"}
 {"Name":"INTFIELD","Nullable":false,"Type":"FIXED"}
 {"Name":"KEY","Nullable":false,"Type":"TEXT"}
@@ -158,7 +158,7 @@ Big Schema Materialized Resource Schema With All Fields Required:
 Big Schema Materialized Resource Schema With No Fields Required:
 {"Name":"ARRAYFIELD","Nullable":true,"Type":"VARIANT"}
 {"Name":"BOOLFIELD","Nullable":true,"Type":"BOOLEAN"}
-{"Name":"FLOW_DOCUMENT","Nullable":false,"Type":"VARIANT"}
+{"Name":"FLOW_DOCUMENT","Nullable":false,"Type":"TEXT"}
 {"Name":"FLOW_PUBLISHED_AT","Nullable":false,"Type":"TIMESTAMP_LTZ"}
 {"Name":"INTFIELD","Nullable":true,"Type":"FIXED"}
 {"Name":"KEY","Nullable":false,"Type":"TEXT"}
@@ -235,7 +235,7 @@ Big Schema Changed Types With Backfill Constraints:
 Big Schema Materialized Resource Schema Changed Types With Backfill:
 {"Name":"ARRAYFIELD","Nullable":false,"Type":"VARIANT"}
 {"Name":"BOOLFIELD","Nullable":false,"Type":"FIXED"}
-{"Name":"FLOW_DOCUMENT","Nullable":false,"Type":"VARIANT"}
+{"Name":"FLOW_DOCUMENT","Nullable":false,"Type":"TEXT"}
 {"Name":"FLOW_PUBLISHED_AT","Nullable":false,"Type":"TIMESTAMP_LTZ"}
 {"Name":"INTFIELD","Nullable":false,"Type":"TEXT"}
 {"Name":"KEY","Nullable":false,"Type":"TEXT"}
@@ -273,7 +273,7 @@ Big Schema Materialized Resource Schema Changed Types With Backfill:
 
 add a single field:
 {"Name":"ADDEDOPTIONALSTRING","Nullable":true,"Type":"TEXT"}
-{"Name":"FLOW_DOCUMENT","Nullable":false,"Type":"VARIANT"}
+{"Name":"FLOW_DOCUMENT","Nullable":false,"Type":"TEXT"}
 {"Name":"FLOW_PUBLISHED_AT","Nullable":false,"Type":"TIMESTAMP_LTZ"}
 {"Name":"KEY","Nullable":false,"Type":"TEXT"}
 {"Name":"OPTIONALBOOLEAN","Nullable":true,"Type":"BOOLEAN"}
@@ -287,7 +287,7 @@ add a single field:
 {"Name":"_meta/flow_truncated","Nullable":false,"Type":"BOOLEAN"}
 
 remove a single optional field:
-{"Name":"FLOW_DOCUMENT","Nullable":false,"Type":"VARIANT"}
+{"Name":"FLOW_DOCUMENT","Nullable":false,"Type":"TEXT"}
 {"Name":"FLOW_PUBLISHED_AT","Nullable":false,"Type":"TIMESTAMP_LTZ"}
 {"Name":"KEY","Nullable":false,"Type":"TEXT"}
 {"Name":"OPTIONALBOOLEAN","Nullable":true,"Type":"BOOLEAN"}
@@ -301,7 +301,7 @@ remove a single optional field:
 {"Name":"_meta/flow_truncated","Nullable":false,"Type":"BOOLEAN"}
 
 remove a single required field:
-{"Name":"FLOW_DOCUMENT","Nullable":false,"Type":"VARIANT"}
+{"Name":"FLOW_DOCUMENT","Nullable":false,"Type":"TEXT"}
 {"Name":"FLOW_PUBLISHED_AT","Nullable":false,"Type":"TIMESTAMP_LTZ"}
 {"Name":"KEY","Nullable":false,"Type":"TEXT"}
 {"Name":"OPTIONALBOOLEAN","Nullable":true,"Type":"BOOLEAN"}
@@ -317,7 +317,7 @@ remove a single required field:
 add and remove many fields:
 {"Name":"ADDEDOPTIONALSTRING","Nullable":true,"Type":"TEXT"}
 {"Name":"ADDEDREQUIREDSTRING","Nullable":true,"Type":"TEXT"}
-{"Name":"FLOW_DOCUMENT","Nullable":false,"Type":"VARIANT"}
+{"Name":"FLOW_DOCUMENT","Nullable":false,"Type":"TEXT"}
 {"Name":"FLOW_PUBLISHED_AT","Nullable":false,"Type":"TIMESTAMP_LTZ"}
 {"Name":"KEY","Nullable":false,"Type":"TEXT"}
 {"Name":"OPTIONALBOOLEAN","Nullable":true,"Type":"BOOLEAN"}
@@ -336,7 +336,7 @@ Challenging Field Names Materialized Columns:
 {"Name":"$dollar$signs","Nullable":true,"Type":"TEXT"}
 {"Name":"123","Nullable":true,"Type":"TEXT"}
 {"Name":"123startsWithDigits","Nullable":true,"Type":"TEXT"}
-{"Name":"FLOW_DOCUMENT","Nullable":false,"Type":"VARIANT"}
+{"Name":"FLOW_DOCUMENT","Nullable":false,"Type":"TEXT"}
 {"Name":"FLOW_PUBLISHED_AT","Nullable":false,"Type":"TIMESTAMP_LTZ"}
 {"Name":"VALUE_WITH_SEPARATED_WORDS","Nullable":true,"Type":"TEXT"}
 {"Name":"_ID","Nullable":false,"Type":"TEXT"}
