@@ -1,17 +1,17 @@
 # Importing Airbyte Source Connectors
 
-The Estuary CDK supports adapting Airbyte connectors to run on Estuary Flow. These are the
+The Estuary CDK supports adapting Airbyte connectors to run on Estuary. These are the
 requirements for importing Airbyte connectors into this repository to run using the Estuary CDK. It
 is intended as a reference for developers working on importing these connectors, and reviewers of
 the connector import pull requests.
 
 ### A Note on Pre-existing Connectors
 
-For the time being, all imported connectors will have already been running as Estuary Flow
+For the time being, all imported connectors will have already been running as Estuary
 connectors using a separate mechanism which is referred to as airbyte-to-flow, also known as ATF.
 These connectors reside in the [estuary/airbyte repository](https://github.com/estuary/airbyte), and
 you can see the list of pre-existing connectors there. ATF is a binary which wraps a specific Docker
-image of an Airbyte connector and adapts its inputs and outputs to be compatible with Estuary Flow.
+image of an Airbyte connector and adapts its inputs and outputs to be compatible with Estuary.
 
 Since these imported connectors already exist in a different form, it is necessary to preserve
 compatibility with them when the connectors are imported. Ideally, both versions of the connector
@@ -19,7 +19,7 @@ will have exactly the same outputs for their specification, discovered bindings,
 documents, but this is often not the case, especially when importing an Airbyte connector version
 that is more recent than the version used by ATF. The requirements listed here assume that there is
 a pre-existing connector, and the process for importing a connector from Airbyte that did not
-previously exist as a connector in Estuary Flow will be different and are TBD.
+previously exist as a connector in Estuary will be different and are TBD.
 
 ## Requirements
 

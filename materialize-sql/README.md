@@ -1,6 +1,6 @@
 # materialize-sql
 
-A shared library for building SQL-based materialization connectors for Estuary Flow.
+A shared library for building SQL-based materialization connectors for Estuary.
 
 ## What it does
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-09-04
+
+### Changed
+- The client name the connector reports to ClickHouse is now `Estuary`, was
+  `EstuaryFlow`. This is the value shown in `system.query_log`,
+  `system.processes`, and similar tables. If you filter or group on that name,
+  update the value you match on. Historical rows keep the old name.
+
 ## 2026-08-26
 
 ### Fixed
