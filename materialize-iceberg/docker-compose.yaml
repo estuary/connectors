@@ -211,12 +211,116 @@ services:
       - /bin/bash
       - -lc
       - /opt/spark/bin/spark-submit --master spark://spark-master:7077 /opt/jobs/daemon.py
+    # The daemon answers 503 on /health until its SparkSession is up, which
+    # takes several seconds; failures inside start_period do not count toward
+    # retries, so `up --wait` doesn't declare it unhealthy while it boots.
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:9806/health || exit 1"]
+      interval: 1s
+      timeout: 1s
+      retries: 3
+      start_period: 120s
+    stop_grace_period: 1s
+
+  # Second Spark set on Spark 4.0.2 + Iceberg 1.10.1 (the EMR emr-spark-8.0.0
+  # pairing) sharing Polaris and RustFS with the 3.5 set above. Variant
+  # columns need it; the 3.5 set keeps the JSON-string path covered.
+  spark4-master:
+    image: iceberg-spark4:local
+    build:
+      context: .
+      dockerfile: scripts/Dockerfile.spark4
+    networks:
+      materialize-iceberg:
+    depends_on:
+      polaris-bootstrap:
+        condition: service_completed_successfully
+    environment:
+      SPARK_NO_DAEMONIZE: "true"
+      SPARK_MASTER_OPTS: "-Dspark.master.rest.enabled=false"
+    volumes:
+      - ./python:/opt/jobs:ro
+    command:
+      - /bin/bash
+      - -lc
+      - /opt/spark/sbin/start-master.sh -h spark4-master --webui-port 8080
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080 >/dev/null || exit 1"]
       interval: 500ms
       timeout: 1s
       retries: 2
       start_period: 500ms
+    stop_grace_period: 1s
+
+  spark4-worker:
+    image: iceberg-spark4:local
+    build:
+      context: .
+      dockerfile: scripts/Dockerfile.spark4
+    networks:
+      materialize-iceberg:
+    depends_on:
+      spark4-master:
+        condition: service_healthy
+    environment:
+      SPARK_NO_DAEMONIZE: "true"
+      SPARK_WORKER_MEMORY: "2G"
+    volumes:
+      - ./python:/opt/jobs:ro
+    command:
+      - /bin/bash
+      - -lc
+      - /opt/spark/sbin/start-worker.sh spark://spark4-master:7077
+    stop_grace_period: 1s
+
+  spark4-daemon:
+    image: iceberg-spark4:local
+    build:
+      context: .
+      dockerfile: scripts/Dockerfile.spark4
+    networks:
+      materialize-iceberg:
+    depends_on:
+      spark4-master:
+        condition: service_healthy
+      spark4-worker:
+        condition: service_started
+      polaris-bootstrap:
+        condition: service_completed_successfully
+      rustfs-init:
+        condition: service_completed_successfully
+    ports:
+      - "9807:9807"
+    environment:
+      SPARK_DAEMON_PORT: "9807"
+      SPARK_MASTER_URL: spark://spark4-master:7077
+      ICEBERG_CATALOG_URL: http://polaris:8181/api/catalog
+      ICEBERG_WAREHOUSE: quickstart_catalog
+      ICEBERG_REGION: us-east-1
+      ICEBERG_SCOPE: PRINCIPAL_ROLE:flow_user_role
+      ICEBERG_OAUTH2_SERVER_URI: http://polaris:8181/api/catalog/v1/oauth/tokens
+      ICEBERG_CREDENTIALS_PATH: /shared/polaris-creds.json
+      ICEBERG_S3_ENDPOINT: http://rustfs:9000
+      ICEBERG_S3_PATH_STYLE: "true"
+      ICEBERG_S3_ACCESS_KEY: flow
+      ICEBERG_S3_SECRET_KEY: flow
+    volumes:
+      - ./python:/opt/jobs:ro
+      - ./testdata/.local:/shared:ro
+    working_dir: /opt/jobs
+    command:
+      - /bin/bash
+      - -lc
+      - /opt/spark/bin/spark-submit --master spark://spark4-master:7077 /opt/jobs/daemon.py
+    # The daemon answers 503 on /health until its SparkSession is up, which
+    # takes several seconds; failures inside start_period do not count toward
+    # retries, so `up --wait` doesn't declare it unhealthy while it boots.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9807/health || exit 1"]
+      interval: 1s
+      timeout: 1s
+      retries: 3
+      start_period: 120s
     stop_grace_period: 1s
 
 networks:

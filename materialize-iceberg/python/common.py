@@ -33,6 +33,9 @@ class NestedField:
     name: str
     type: str
     element: Optional[str] = None
+    # How top-level string values of a "variant" column are typed: "date-time",
+    # "date", or "binary". None stores them as variant strings.
+    variant_format: Optional[str] = None
 
 
 def data_type_for_field(field: NestedField) -> DataType:
@@ -41,6 +44,10 @@ def data_type_for_field(field: NestedField) -> DataType:
     elif field.type == "binary":
         # Binary data is base64 encoded as strings in CSV files. Queries must
         # handle the unbase64'ing.
+        return StringType()
+    elif field.type == "variant":
+        # Variant data is staged as JSON text, exactly like a string column, and
+        # parsed into a variant by with_variant_columns before it is queried.
         return StringType()
     elif field.type == "boolean":
         return BooleanType()
@@ -67,6 +74,66 @@ def data_type_for_field(field: NestedField) -> DataType:
 
 def fields_to_struct(fields: list[NestedField]) -> StructType:
     return StructType([StructField(f.name, data_type_for_field(f)) for f in fields])
+
+
+def _quote(ident: str) -> str:
+    return "`" + ident.replace("`", "``") + "`"
+
+
+# A padded standard base64 string. unbase64 is only attempted on values that
+# look like one, so a string that merely happens to sit in a binary-annotated
+# field is stored as a variant string rather than failing the job.
+_BASE64_RE = r"^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+
+
+def variant_expr(field: NestedField) -> str:
+    """SQL expression turning the staged JSON text of a variant column into a
+    variant value.
+
+    Values nested inside objects and arrays keep their plain JSON types. A
+    top-level JSON string is typed according to the column's variant_format
+    when it parses as that type, and stored as a variant string otherwise;
+    a top-level value of any other JSON type is left as it is. This matches
+    the typing materialize-s3-iceberg's Parquet writer applies to variant
+    columns.
+    """
+    raw = _quote(field.name)
+    parsed = f"parse_json({raw})"
+    if field.variant_format is None:
+        return parsed
+
+    # The staged text of a JSON string starts with a quote; nothing else does.
+    text = f"try_variant_get({parsed}, '$', 'string')"
+    if field.variant_format == "date-time":
+        typed = f"cast(try_to_timestamp({text}) as variant)"
+    elif field.variant_format == "date":
+        # Spark has try_to_timestamp but no try_to_date; try_cast is its equivalent.
+        typed = f"cast(try_cast({text} as date) as variant)"
+    elif field.variant_format == "binary":
+        typed = f"case when {text} rlike '{_BASE64_RE}' then cast(unbase64({text}) as variant) end"
+    else:
+        raise ValueError(f"Unsupported variant format: {field.variant_format}")
+
+    return f"coalesce(case when startswith({raw}, '\"') then {typed} end, {parsed})"
+
+
+def with_variant_columns(df, cols: list[NestedField]):
+    """Replace each variant column of a DataFrame read with read_csv_opts by
+    its variant expression, keeping column order. A DataFrame without variant
+    columns is returned unchanged, so this is a no-op on Spark 3.5."""
+    if not any(c.type == "variant" for c in cols):
+        return df
+
+    from pyspark.sql import functions as F
+
+    return df.select(
+        *[
+            F.expr(variant_expr(c)).alias(c.name)
+            if c.type == "variant"
+            else F.col(_quote(c.name))
+            for c in cols
+        ]
+    )
 
 
 def read_csv_opts(files: list[str], cols: list[NestedField]):
@@ -173,6 +240,10 @@ def _build_session(c: dict) -> SparkSession:
         .config("spark.sql.catalog.estuary.type", "rest")
         .config("spark.sql.catalog.estuary.uri", c["catalog_url"])
         .config("spark.sql.catalog.estuary.warehouse", c["warehouse"])
+        # Also passed as a spark-submit conf by the EMR runner. Iceberg 1.10's
+        # vectorized Parquet reader cannot open a data file holding a variant
+        # column unless that column is projected, so it stays off everywhere.
+        .config("spark.sql.iceberg.vectorization.enabled", "false")
     )
 
     if c.get("spark_master_url"):

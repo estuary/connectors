@@ -24,5 +24,25 @@ UPDATE `estuary`.`some`.`table`
 SET
 	`long_to_decimal_flow_tmp` = CAST(`long_to_decimal` AS decimal(38, 0)), 
 	`datetime_to_string_flow_tmp` = DATE_FORMAT(`datetime_to_string`, 'yyyy-MM-dd\'T\'HH:mm:ss.SSSSSS\'Z\''), 
-	`binary_to_string_flow_tmp` = BASE64(`binary_to_string`)
+	`binary_to_string_flow_tmp` = BASE64(`binary_to_string`), 
+	`string_to_variant_flow_tmp` = COALESCE(TRY_PARSE_JSON(`string_to_variant`), CAST(`string_to_variant` AS VARIANT)), 
+	`variant_to_string_flow_tmp` = TO_JSON(`variant_to_string`), 
+	`binary_to_variant_flow_tmp` = CAST(`binary_to_variant` AS VARIANT)
 --- End migrate query ---
+
+--- Begin variant load query ---
+SELECT 1, TO_JSON(l.`flow_document`)
+FROM `estuary`.`foo`.`bar` AS l
+JOIN load_view_1 AS r
+	 ON  l.`first-key` = r.`first-key`
+--- End variant load query ---
+
+--- Begin variant merge query ---
+MERGE INTO `estuary`.`foo`.`bar` AS l
+USING merge_view_1 AS r
+ON 
+	l.`first-key` = r.`first-key`
+WHEN MATCHED AND TO_JSON(r.`flow_document`) = '"delete"' THEN DELETE
+WHEN MATCHED THEN UPDATE SET l.`first-key` = r.`first-key`, l.`first-val` = r.`first-val`, l.`second-val` = r.`second-val`, l.`third-val` = UNBASE64(r.`third-val`), l.`flow_document` = r.`flow_document`
+WHEN NOT MATCHED AND TO_JSON(r.`flow_document`) != '"delete"' THEN INSERT (`first-key`, `first-val`, `second-val`, `third-val`, `flow_document`) VALUES (r.`first-key`, r.`first-val`, r.`second-val`, UNBASE64(r.`third-val`), r.`flow_document`)
+--- End variant merge query ---

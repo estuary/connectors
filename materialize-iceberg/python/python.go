@@ -4,6 +4,10 @@ type NestedField struct {
 	Name    string `json:"name"`
 	Type    string `json:"type"`
 	Element string `json:"element,omitempty"`
+	// VariantFormat hints how top-level string values of a "variant" column
+	// are typed: "date-time", "date", or "binary". Absent for other types and
+	// for variants that store strings as strings.
+	VariantFormat string `json:"variant_format,omitempty"`
 }
 
 type ExecInput struct {

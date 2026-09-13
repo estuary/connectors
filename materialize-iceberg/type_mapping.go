@@ -1,6 +1,7 @@
 package connector
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"slices"
@@ -30,7 +31,14 @@ type mapped struct {
 	// nullable even if the collection schema says it's always present and
 	// non-null. Primary key fields are always required regardless of this flag.
 	Nullable bool
+	// VariantFormat hints how a top-level string value written into a variant
+	// column is typed by the Spark job: "date-time", "date", or "binary". It
+	// is empty for columns that are not variant and for variants whose string
+	// values carry no such annotation.
+	VariantFormat string
 }
+
+func (m mapped) isVariant() bool { return m.type_.Equals(iceberg.VariantType{}) }
 
 func (m mapped) String() string {
 	return m.type_.String()
@@ -45,48 +53,63 @@ func (m mapped) CanMigrate(existing boilerplate.ExistingField) bool {
 }
 
 var allowedMigrations = boilerplate.TypeMigrations[iceberg.Type]{
-	"long":                      {iceberg.DecimalTypeOf(38, 0), iceberg.Float64Type{}},
-	"decimal(38, 0)":            {iceberg.Float64Type{}},
-	"string":                    {iceberg.BinaryType{}},
-	boilerplate.AnyExistingType: {iceberg.StringType{}},
+	"long":           {iceberg.DecimalTypeOf(38, 0), iceberg.Float64Type{}},
+	"decimal(38, 0)": {iceberg.Float64Type{}},
+	"string":         {iceberg.BinaryType{}},
+	// Any column can become a string (JSON text) or a variant: with
+	// variant_columns on, variant takes the role string has as the
+	// catch-all for fields that evolve to multiple types.
+	boilerplate.AnyExistingType: {iceberg.StringType{}, iceberg.VariantType{}},
+}
+
+// jsonColumnType is the column type of a JSON-shaped projection: variant with
+// variant_columns on, otherwise a string holding JSON text.
+func jsonColumnType(variant bool) iceberg.Type {
+	if variant {
+		return iceberg.VariantType{}
+	}
+	return iceberg.StringType{}
+}
+
+// variantFormatHint is the type a top-level string value of a variant column
+// is stored as, from the projection's string inference: the same resolution a
+// string column of its own would get, limited to the types a variant can hold.
+func variantFormatHint(p boilerplate.Projection) string {
+	s := p.Inference.String_
+	if s == nil {
+		return ""
+	} else if boilerplate.IsBinaryInference(s) {
+		return "binary"
+	}
+	switch s.Format {
+	case "date-time", "date":
+		return s.Format
+	default:
+		return ""
+	}
 }
 
 var migrateFieldSuffix = "_flow_tmp"
 
-func mapProjection(p boilerplate.Projection, translateField boilerplate.TranslateFieldFn) (mapped, boilerplate.ElementConverter) {
+// mapProjection maps a projection to its Iceberg column type. With
+// variantColumns set, JSON-shaped projections (objects, arrays, multi-type
+// fields, and the root document) map to variant instead of a JSON string.
+// Collection keys keep their string mapping regardless: Iceberg forbids
+// variant as an identifier field, and keys are joined and filtered on across
+// engines. A castToString field config arrives here already flattened to a
+// plain string type, and string-encoded numbers keep their numeric mapping.
+func mapProjection(p boilerplate.Projection, translateField boilerplate.TranslateFieldFn, variantColumns bool) (mapped, boilerplate.ElementConverter) {
 	var m mapped
 	var converter boilerplate.ElementConverter
 
 	m.Name = translateField(p.Field)
+	useVariant := variantColumns && !p.IsPrimaryKey
 
 	switch ft := p.FlatType.(type) {
 	case boilerplate.FlatTypeArray:
-		if len(ft.ItemTypesWithoutNull) == 1 {
-			// NB: ElementID must be populated when creating/updating a table
-			// with a column that has a ListType.
-			switch ft.ItemTypesWithoutNull[0] {
-			case "integer":
-				m.type_ = &iceberg.ListType{Element: iceberg.Int64Type{}, ElementRequired: !ft.NullableItems}
-			case "number":
-				m.type_ = &iceberg.ListType{Element: iceberg.Float64Type{}, ElementRequired: !ft.NullableItems}
-			case "boolean":
-				m.type_ = &iceberg.ListType{Element: iceberg.BooleanType{}, ElementRequired: !ft.NullableItems}
-			case "string":
-				m.type_ = &iceberg.ListType{Element: iceberg.StringType{}, ElementRequired: !ft.NullableItems}
-			default:
-				m.type_ = iceberg.StringType{}
-			}
-		} else {
-			m.type_ = iceberg.StringType{}
-		}
-
-		// TODO(whb): If we want to support arrays with a single element type as
-		// Iceberg lists, remove this line which unconditionally makes them
-		// strings. I'm not doing that right now since it is a big pain reading
-		// from CSV as strings and then parsing to the specific list type in the
-		// queries. V3 of the Iceberg spec includes a VARIANT type which is
-		// probably what we'll use for all arrays when that is widely supported.
-		m.type_ = iceberg.StringType{}
+		// Arrays are always JSON text (or variant): reading typed lists out
+		// of the staged CSV files would need per-type parsing in the queries.
+		m.type_ = jsonColumnType(useVariant)
 	case boilerplate.FlatTypeBinary:
 		m.type_ = iceberg.BinaryType{}
 	case boilerplate.FlatTypeBoolean:
@@ -98,11 +121,14 @@ func mapProjection(p boilerplate.Projection, translateField boilerplate.Translat
 			m.type_ = iceberg.Int64Type{}
 		}
 	case boilerplate.FlatTypeMultiple:
-		m.type_ = iceberg.StringType{}
+		m.type_ = jsonColumnType(useVariant)
+		if useVariant {
+			m.VariantFormat = variantFormatHint(p)
+		}
 	case boilerplate.FlatTypeNumber:
 		m.type_ = iceberg.Float64Type{}
 	case boilerplate.FlatTypeObject:
-		m.type_ = iceberg.StringType{}
+		m.type_ = jsonColumnType(useVariant)
 	case boilerplate.FlatTypeString:
 		switch ft.InferenceString.Format {
 		case "date":
@@ -132,7 +158,22 @@ func mapProjection(p boilerplate.Projection, translateField boilerplate.Translat
 		panic(fmt.Sprintf("unhandled flat type: %T", p.FlatType))
 	}
 
+	if m.isVariant() {
+		converter = variantConverter
+	}
+
 	return m, converter
+}
+
+// variantConverter makes every staged value of a variant column valid JSON
+// text for parse_json. Objects, arrays, and the root document already arrive
+// as JSON, and numbers and booleans are written as their JSON literals, but a
+// string value of a multi-type field would be written bare.
+func variantConverter(te tuple.TupleElement) (any, error) {
+	if s, ok := te.(string); ok {
+		return json.Marshal(s)
+	}
+	return te, nil
 }
 
 func computeSchemaForNewTable(res boilerplate.MappedBinding[config, resource, mapped]) *iceberg.Schema {

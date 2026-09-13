@@ -1,0 +1,28 @@
+Task: acmeCo/tests/materialize-iceberg/rest-local-spark4
+
+Feature flags: "variant_columns"
+Resource: flow.migration_test
+["applied.actionDescription", "created table \"flow\".\"migration_test\" as table {\n\t1: id: required long (auto-generated projection of JSON at: /id with inferred types: [integer])\n\t2: _meta/op: required string (auto-generated projection of JSON at: /_meta/op with inferred types: [string])\n\t3: arr: optional variant (auto-generated projection of JSON at: /arr with inferred types: [array])\n\t4: asString: optional string (auto-generated projection of JSON at: /asString with inferred types: [object])\n\t5: binOrObj: optional variant (auto-generated projection of JSON at: /binOrObj with inferred types: [object string])\n\t6: dateOrInt: optional variant (auto-generated projection of JSON at: /dateOrInt with inferred types: [integer string])\n\t7: flow_published_at: required timestamptz (Flow Publication Time - Flow publication date-time of this document - auto-generated projection of JSON at: /_meta/uuid with inferred types: [string])\n\t8: intStr: optional decimal(38, 0) (auto-generated projection of JSON at: /intStr with inferred types: [integer string])\n\t9: multi: optional variant (auto-generated projection of JSON at: /multi with inferred types: [integer object string])\n\t10: obj: optional variant (auto-generated projection of JSON at: /obj with inferred types: [object])\n\t11: tsOrObj: optional variant (auto-generated projection of JSON at: /tsOrObj with inferred types: [object string])\n\t12: flow_document: required variant (auto-generated projection of the root document with inferred types: [object])\n}"]
+["applied.actionDescription", ""]
+
+{"Name":"_meta/op","Nullable":false,"Type":"string"}
+{"Name":"arr","Nullable":true,"Type":"variant"}
+{"Name":"asString","Nullable":true,"Type":"string"}
+{"Name":"binOrObj","Nullable":true,"Type":"variant"}
+{"Name":"dateOrInt","Nullable":true,"Type":"variant"}
+{"Name":"flow_document","Nullable":false,"Type":"variant"}
+{"Name":"flow_published_at","Nullable":false,"Type":"timestamptz"}
+{"Name":"id","Nullable":false,"Type":"long"}
+{"Name":"intStr","Nullable":true,"Type":"decimal(38, 0)"}
+{"Name":"multi","Nullable":true,"Type":"variant"}
+{"Name":"obj","Nullable":true,"Type":"variant"}
+{"Name":"tsOrObj","Nullable":true,"Type":"variant"}
+
+Table Data:
+{"_meta/op":"u","arr":"[\"updated\"]","asString":"{\"k\":\"v2\"}","binOrObj":"\"QmluYXJ5\"","dateOrInt":"\"1999-12-31\"","flow_document":"{\"_meta\":{\"op\":\"u\",\"uuid\":\"7545a800-1dda-11b2-8000-071353030311\"},\"arr\":[\"updated\"],\"asString\":{\"k\":\"v2\"},\"binOrObj\":\"QmluYXJ5\",\"dateOrInt\":\"1999-12-31\",\"id\":1,\"intStr\":\"45\",\"multi\":{\"now\":\"object\"},\"obj\":{\"a\":2},\"tsOrObj\":\"1999-12-31T23:59:59.999999999Z\"}","flow_published_at":"1970-01-01T01:00:00.000Z","id":1,"intStr":45,"multi":"{\"now\":\"object\"}","obj":"{\"a\":2}","tsOrObj":"\"1999-12-31 23:59:59.999999+00:00\""}
+{"_meta/op":"c","arr":"[]","asString":"{}","binOrObj":"{\"x\":1}","dateOrInt":"20240501","flow_document":"{\"_meta\":{\"op\":\"c\",\"uuid\":\"1419d680-1dd2-11b2-8000-071353030311\"},\"arr\":[],\"asString\":{},\"binOrObj\":{\"x\":1},\"dateOrInt\":20240501,\"id\":2,\"intStr\":43,\"multi\":7,\"obj\":{},\"tsOrObj\":{\"nested\":\"2024-05-01T00:00:00Z\"}}","flow_published_at":"1970-01-01T00:00:01.000Z","id":2,"intStr":43,"multi":"7","obj":"{}","tsOrObj":"{\"nested\":\"2024-05-01T00:00:00Z\"}"}
+{"_meta/op":"c","arr":null,"asString":null,"binOrObj":"\"not base64!!\"","dateOrInt":"\"2024-05-01\"","flow_document":"{\"_meta\":{\"op\":\"c\",\"uuid\":\"14b26d00-1dd2-11b2-8000-071353030311\"},\"binOrObj\":\"not base64!!\",\"dateOrInt\":\"2024-05-01\",\"id\":3,\"intStr\":\"44\",\"multi\":{\"o\":true},\"tsOrObj\":\"2024-06-30T23:59:60Z\"}","flow_published_at":"1970-01-01T00:00:02.000Z","id":3,"intStr":44,"multi":"{\"o\":true}","obj":null,"tsOrObj":"\"2024-06-30T23:59:60Z\""}
+{"_meta/op":"c","arr":null,"asString":null,"binOrObj":"\"\"","dateOrInt":"\"2024-05-01\"","flow_document":"{\"_meta\":{\"op\":\"c\",\"uuid\":\"154b0380-1dd2-11b2-8000-071353030311\"},\"binOrObj\":\"\",\"dateOrInt\":\"2024-05-01\",\"id\":4,\"tsOrObj\":\"2024-05-01T12:34:56+02:00\"}","flow_published_at":"1970-01-01T00:00:03.000Z","id":4,"intStr":null,"multi":null,"obj":null,"tsOrObj":"\"2024-05-01 10:34:56+00:00\""}
+{"_meta/op":"c","arr":"[[1,[2]]]","asString":null,"binOrObj":null,"dateOrInt":null,"flow_document":"{\"_meta\":{\"op\":\"c\",\"uuid\":\"7676d500-1dda-11b2-8000-071353030311\"},\"arr\":[[1,[2]]],\"id\":5,\"multi\":\"five\",\"obj\":{\"new\":true}}","flow_published_at":"1970-01-01T01:00:02.000Z","id":5,"intStr":null,"multi":"\"five\"","obj":"{\"new\":true}","tsOrObj":null}
+
+
