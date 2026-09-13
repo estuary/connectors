@@ -30,7 +30,7 @@ var featureFlagDefaults = map[string]bool{
 type config struct {
 	Token         string              `json:"token" jsonschema:"title=Motherduck Service Token,description=Service token for authenticating with MotherDuck." jsonschema_extras:"secret=true,order=0"`
 	Database      string              `json:"database" jsonschema:"title=Database,description=The database to materialize to." jsonschema_extras:"order=1"`
-	Schema        string              `json:"schema" jsonschema:"title=Database Schema,default=main,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables." jsonschema_extras:"order=2"`
+	Schema        string              `json:"schema" jsonschema:"title=Database Schema,default=main,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as the flow_checkpoints_v1 metadata table." jsonschema_extras:"order=2"`
 	HardDelete    bool                `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=3,nonsensitive=true"`
 	StagingBucket stagingBucketConfig `json:"stagingBucket" jsonschema_extras:"order=4"`
 	Schedule      m.ScheduleConfig    `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
