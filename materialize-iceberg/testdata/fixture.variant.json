@@ -1,0 +1,10 @@
+["tests/variant",{"id":1,"obj":{"a":1,"nested":{"b":[1,2],"when":"2024-05-01T12:34:56Z"}},"arr":[1,"two",{"c":3},null],"multi":"a string","tsOrObj":"2024-05-01T12:34:56.123456Z","dateOrInt":"2024-05-01","binOrObj":"SGVsbG8gV29ybGQ=","asString":{"k":"v"},"intStr":"42","_meta":{"op":"c"}}]
+["tests/variant",{"id":2,"obj":{},"arr":[],"multi":7,"tsOrObj":{"nested":"2024-05-01T00:00:00Z"},"dateOrInt":20240501,"binOrObj":{"x":1},"asString":{},"intStr":43,"_meta":{"op":"c"}}]
+["tests/variant",{"id":3,"multi":{"o":true},"tsOrObj":"2024-06-30T23:59:60Z","dateOrInt":"2024-05-01","binOrObj":"not base64!!","intStr":"44","_meta":{"op":"c"}}]
+["tests/variant",{"id":4,"tsOrObj":"2024-05-01T12:34:56+02:00","dateOrInt":"2024-05-01","binOrObj":"","_meta":{"op":"c"}}]
+["tests/variant",{"id":6,"obj":{"gone":true},"_meta":{"op":"c"}}]
+{"commit": true}
+["tests/variant",{"id":1,"obj":{"a":2},"arr":["updated"],"multi":{"now":"object"},"tsOrObj":"1999-12-31T23:59:59.999999999Z","dateOrInt":"1999-12-31","binOrObj":"QmluYXJ5","asString":{"k":"v2"},"intStr":"45","_meta":{"op":"u"}}]
+["tests/variant",{"id":6,"_meta":{"op":"d"}}]
+["tests/variant",{"id":5,"obj":{"new":true},"arr":[[1,[2]]],"multi":"five","_meta":{"op":"c"}}]
+{"commit": true}

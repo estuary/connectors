@@ -146,6 +146,24 @@ func SetCurrentSchemaUpdate(id int) TableUpdate {
 	}
 }
 
+type upgradeFormatVersionUpdateReq struct {
+	baseUpdate
+	FormatVersion int `json:"format-version"`
+}
+
+func (upgradeFormatVersionUpdateReq) isTableUpdate() {}
+
+// UpgradeFormatVersionUpdate raises the table's Iceberg format version. It is
+// committed in the same request as a schema change that needs the newer
+// version (a variant column needs v3), so the table is never left at a
+// version that cannot describe its own schema.
+func UpgradeFormatVersionUpdate(version int) TableUpdate {
+	return &upgradeFormatVersionUpdateReq{
+		baseUpdate:    baseUpdate{Action: "upgrade-format-version"},
+		FormatVersion: version,
+	}
+}
+
 type catalogOpts struct {
 	useClientCredential bool
 	oauth2ServerUri     string

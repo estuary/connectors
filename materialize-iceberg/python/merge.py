@@ -6,6 +6,7 @@ from common import (
     get_spark_session,
     read_csv_opts,
     run_with_status,
+    with_variant_columns,
 )
 
 
@@ -16,9 +17,8 @@ def run(spark, input):
         columns: list[NestedField] = [NestedField(**col) for col in binding["columns"]]
         files: list[str] = binding["files"]
 
-        spark.read.csv(**read_csv_opts(files, columns)).createTempView(
-            f"merge_view_{bindingIdx}"
-        )
+        df = spark.read.csv(**read_csv_opts(files, columns))
+        with_variant_columns(df, columns).createTempView(f"merge_view_{bindingIdx}")
 
         try:
             spark.sql(query)

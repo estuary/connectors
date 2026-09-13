@@ -1,0 +1,57 @@
+# Variant-only scenario, run against the Spark 4 set: a table created as
+# format v3 with variant columns, typed top-level variant values (date-time,
+# date, binary) with their fall-back-to-string and non-string cases, a
+# castToString escape hatch, a string-encoded number keeping its numeric
+# column, loads of variant documents through JSON, and hard deletes.
+collections:
+  tests/variant:
+    schema:
+      if:
+        properties:
+          _meta:
+            properties:
+              op:
+                const: d
+      then:
+        reduce:
+          delete: true
+          strategy: lastWriteWins
+      type: object
+      properties:
+        id: { type: integer }
+        obj: { type: object }
+        arr: { type: array }
+        multi: { type: [string, integer, object] }
+        tsOrObj: { type: [string, object], format: date-time }
+        dateOrInt: { type: [string, integer], format: date }
+        binOrObj:
+          type: [string, object]
+          contentEncoding: base64
+          contentMediaType: application/octet-stream
+        asString: { type: object }
+        intStr: { type: [string, integer], format: integer }
+        _meta:
+          type: object
+          properties:
+            op: { type: string }
+          required: [op]
+      required: [id, _meta]
+    key: [/id]
+
+materializations:
+  acmeCo/tests/materialize-iceberg/rest-local-spark4:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: .local/config.rest-local-spark4.yaml
+    bindings:
+    - resource:
+        table: variant
+      source: tests/variant
+      fields:
+        recommended: true
+        include:
+          obj: {}
+          # castToString keeps a JSON string column even with variant on.
+          asString: { castToString: true }

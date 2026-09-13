@@ -129,6 +129,12 @@ func (m TypeMigrations[T]) CanMigrate(from string, to T) bool {
 	return false
 }
 
+// MapProjection lifts a pf.Projection into a Projection with its FlatType
+// resolved, for connector unit tests of their type mapping.
+func MapProjection(p pf.Projection, fc FieldConfiger) Projection {
+	return mapProjection(p, fc)
+}
+
 func mapProjection(p pf.Projection, fc FieldConfiger) Projection {
 	mustExist := p.Inference.Exists == pf.Inference_MUST && !slices.Contains(p.Inference.Types, "null")
 	typesWithoutNull := getTypesWithoutNull(p.Inference.Types)

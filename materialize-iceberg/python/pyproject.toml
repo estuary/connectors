@@ -7,7 +7,7 @@ package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.12"
-pyspark = "^3.5.4"
+pyspark = "^4.0.0"
 botocore = "^1.37.0"
 boto3 = "^1.37.2"
 

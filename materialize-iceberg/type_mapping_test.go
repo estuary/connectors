@@ -1,7 +1,9 @@
 package connector
 
 import (
+	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -106,4 +108,96 @@ func TestComputeSchemas(t *testing.T) {
 	snap.WriteString(afterMigrateSchema.String())
 
 	cupaloy.SnapshotT(t, snap.String())
+}
+
+func TestMapProjectionVariant(t *testing.T) {
+	// Builds a boilerplate.Projection the way the validator does, from the
+	// projection's inference and field config.
+	proj := func(field string, types []string, isKey bool, str *pf.Inference_String, castToString bool) boilerplate.Projection {
+		p := pf.Projection{
+			Field:        field,
+			IsPrimaryKey: isKey,
+			Inference: pf.Inference{
+				Types:   types,
+				Exists:  pf.Inference_MUST,
+				String_: str,
+			},
+		}
+		if slices.Contains(types, "integer") || slices.Contains(types, "number") {
+			p.Inference.Numeric = &pf.Inference_Numeric{}
+		}
+		return boilerplate.MapProjection(p, fieldConfig{CastToString_: castToString})
+	}
+	identity := func(f string) string { return f }
+
+	for _, tt := range []struct {
+		name       string
+		p          boilerplate.Projection
+		variants   bool
+		wantType   iceberg.Type
+		wantFormat string
+	}{
+		// Flag off: byte-for-byte the historical mapping.
+		{"off/object", proj("f", []string{"object"}, false, nil, false), false, iceberg.StringType{}, ""},
+		{"off/array", proj("f", []string{"array"}, false, nil, false), false, iceberg.StringType{}, ""},
+		{"off/multiple", proj("f", []string{"string", "object"}, false, nil, false), false, iceberg.StringType{}, ""},
+
+		// Flag on: JSON-shaped fields become variant.
+		{"on/object", proj("f", []string{"object"}, false, nil, false), true, iceberg.VariantType{}, ""},
+		{"on/array", proj("f", []string{"array"}, false, nil, false), true, iceberg.VariantType{}, ""},
+		{"on/multiple", proj("f", []string{"string", "object"}, false, nil, false), true, iceberg.VariantType{}, ""},
+		{"on/multiple-with-int", proj("f", []string{"integer", "object"}, false, nil, false), true, iceberg.VariantType{}, ""},
+
+		// Format hints are taken from the string inference of a multi-type
+		// projection only.
+		{"on/multiple-date-time", proj("f", []string{"string", "object"}, false, &pf.Inference_String{Format: "date-time"}, false), true, iceberg.VariantType{}, "date-time"},
+		{"on/multiple-date", proj("f", []string{"string", "integer"}, false, &pf.Inference_String{Format: "date"}, false), true, iceberg.VariantType{}, "date"},
+		{"on/multiple-binary", proj("f", []string{"string", "object"}, false, &pf.Inference_String{ContentEncoding: "base64"}, false), true, iceberg.VariantType{}, "binary"},
+		{"on/multiple-binary-octet-stream", proj("f", []string{"string", "object"}, false, &pf.Inference_String{ContentEncoding: "base64", ContentType: boilerplate.BinaryContentMediaType}, false), true, iceberg.VariantType{}, "binary"},
+		{"on/multiple-base64-other-media-type", proj("f", []string{"string", "object"}, false, &pf.Inference_String{ContentEncoding: "base64", ContentType: "application/x-protobuf"}, false), true, iceberg.VariantType{}, ""},
+		{"on/multiple-other-format", proj("f", []string{"string", "object"}, false, &pf.Inference_String{Format: "uuid"}, false), true, iceberg.VariantType{}, ""},
+
+		// Keys, castToString, string-encoded numbers, and scalars are
+		// unaffected by the flag.
+		{"on/key-multiple", proj("f", []string{"string", "integer"}, true, nil, false), true, iceberg.StringType{}, ""},
+		{"on/castToString-object", proj("f", []string{"object"}, false, nil, true), true, iceberg.StringType{}, ""},
+		{"on/string-format-integer", proj("f", []string{"string", "integer"}, false, &pf.Inference_String{Format: "integer"}, false), true, iceberg.DecimalTypeOf(38, 0), ""},
+		{"on/string-format-number", proj("f", []string{"string", "number"}, false, &pf.Inference_String{Format: "number"}, false), true, iceberg.Float64Type{}, ""},
+		{"on/string", proj("f", []string{"string"}, false, nil, false), true, iceberg.StringType{}, ""},
+		{"on/date-time", proj("f", []string{"string"}, false, &pf.Inference_String{Format: "date-time"}, false), true, iceberg.TimestampTzType{}, ""},
+		{"on/integer", proj("f", []string{"integer"}, false, nil, false), true, iceberg.Int64Type{}, ""},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			m, _ := mapProjection(tt.p, identity, tt.variants)
+			require.True(t, tt.wantType.Equals(m.type_), "got %s, want %s", m.type_, tt.wantType)
+			require.Equal(t, tt.wantFormat, m.VariantFormat)
+		})
+	}
+}
+
+func TestVariantConverter(t *testing.T) {
+	for _, tt := range []struct {
+		in   any
+		want any
+	}{
+		{"a string", []byte(`"a string"`)},
+		{`"quoted"`, []byte(`"\"quoted\""`)},
+		{json.RawMessage(`{"a":1}`), json.RawMessage(`{"a":1}`)},
+		{int64(42), int64(42)},
+		{true, true},
+		{nil, nil},
+	} {
+		got, err := variantConverter(tt.in)
+		require.NoError(t, err)
+		require.Equal(t, tt.want, got)
+	}
+}
+
+func TestVariantMigrations(t *testing.T) {
+	for _, from := range []string{"string", "long", "double", "decimal(38, 0)", "boolean", "binary", "date", "timestamptz"} {
+		require.True(t, allowedMigrations.CanMigrate(from, iceberg.VariantType{}), from)
+	}
+	require.True(t, allowedMigrations.CanMigrate("variant", iceberg.StringType{}))
+	require.False(t, allowedMigrations.CanMigrate("variant", iceberg.Int64Type{}))
+	require.False(t, allowedMigrations.CanMigrate("variant", iceberg.BinaryType{}))
 }
