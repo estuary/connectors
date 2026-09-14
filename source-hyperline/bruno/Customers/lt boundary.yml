@@ -1,0 +1,67 @@
+info:
+  name: lt boundary
+  type: http
+  seq: 7
+
+http:
+  method: GET
+  url: "{{base_url}}/v2/customers?limit=1&include_total=true&sort=updated_at&order=desc&updated_at__gte={{customers_pin_updated_at}}&updated_at__lt={{customers_pin_updated_at}}"
+  params:
+    - name: limit
+      value: "1"
+      type: query
+    - name: include_total
+      value: "true"
+      type: query
+    - name: sort
+      value: updated_at
+      type: query
+    - name: order
+      value: desc
+      type: query
+    - name: updated_at__gte
+      value: "{{customers_pin_updated_at}}"
+      type: query
+    - name: updated_at__lt
+      value: "{{customers_pin_updated_at}}"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://docs.hyperline.co/api-reference/endpoints/customers/list-customers-1.md
+
+  **WHY:** Prove `__lt` is boundary-EXCLUSIVE: same degenerate window as
+  `Customers / lte boundary` but with `__lt` — expect total=0. Together the
+  pair fixes the backfill window's upper bound (`updated_at__lt=<cutoff>`)
+  and the incremental window's horizon (`updated_at__lte=<horizon>`) without
+  client-side filtering. Run `Customers / bare` first (or rely on the env
+  fallback pin).
+  **VERIFIED (2026-09-04):** `__lt` is EXCLUSIVE — same degenerate window
+  with `__lt` returned total=0.
+
+examples:
+  - name: 200 - lt exclusive, same window empty
+    request:
+      url: "{{base_url}}/v2/customers?limit=1&include_total=true&sort=updated_at&order=desc&updated_at__gte=2026-09-02T09:35:57.522Z&updated_at__lt=2026-09-02T09:35:57.522Z"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": [],
+            "next_cursor": null,
+            "has_more": false,
+            "total": "REDACTED"
+          }

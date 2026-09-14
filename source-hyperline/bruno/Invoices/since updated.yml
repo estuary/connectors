@@ -1,0 +1,66 @@
+info:
+  name: since updated
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/v2/invoices?limit=1&include_total=true&updated_at__gte={{invoices_pin_updated_at}}"
+  params:
+    - name: limit
+      value: "1"
+      type: query
+    - name: include_total
+      value: "true"
+      type: query
+    - name: updated_at__gte
+      value: "{{invoices_pin_updated_at}}"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://docs.hyperline.co/api-reference/endpoints/invoices/list-invoices-1.md
+
+  **WHY:** Prove `updated_at__gte` narrows invoices server-side (`total`
+  shrinks vs `Invoices / bare`). Invoices cannot be sorted by `updated_at`
+  (see `Invoices / sort updated probe`), so unlike customers the boundary
+  membership can't be read off the first asc item — narrowing of `total` is
+  the evidence here; `__gte`/`__gt` inclusivity is proven on the same filter
+  grammar by `Customers / since updated asc` + `Customers / gt boundary`.
+  Run `Invoices / bare` first.
+  **VERIFIED (2026-09-04):** narrowed total 14 -> 1 with the bound at the
+  newest row's exact `updated_at` — filter honored, inclusive (the pinned row
+  itself came back).
+
+examples:
+  - name: 200 - gte honored, narrowed 14 to 1 (projection)
+    request:
+      url: "{{base_url}}/v2/invoices?limit=1&include_total=true&updated_at__gte=2026-09-01T16:21:52.397Z"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": [
+              {
+                "id": "inv_wHV65Sds7ssdEC",
+                "updated_at": "2026-09-01T16:21:52.397Z",
+                "status": "to_pay"
+              }
+            ],
+            "next_cursor": null,
+            "has_more": false,
+            "total": "REDACTED"
+          }

@@ -1,0 +1,61 @@
+info:
+  name: skip compose
+  type: http
+  seq: 3
+
+http:
+  method: GET
+  url: "{{base_url}}/v2/subscriptions?take=1&skip=1&updated_at__gte={{subscriptions_pin_updated_at}}"
+  params:
+    - name: take
+      value: "1"
+      type: query
+    - name: skip
+      value: "1"
+      type: query
+    - name: updated_at__gte
+      value: "{{subscriptions_pin_updated_at}}"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://docs.hyperline.co/api-reference/endpoints/subscriptions/list-subscriptions.md
+
+  **WHY:** Prove `take`/`skip` compose with an `updated_at` filter: expect
+  `meta.skipped=1`, `meta.taken<=1`, and `meta.total` equal to
+  `Subscriptions / since updated membership`'s — i.e. skip offsets within the
+  FILTERED set, not the full table. This is the paging mode the backfill uses
+  inside a frozen window. Run `Subscriptions / bare` first.
+  **VERIFIED (2026-09-04):** `meta = {total: 1, taken: 0, skipped: 1}` —
+  skip offsets within the FILTERED set (total matches
+  `Subscriptions / since updated membership`), and paging past the end
+  returns an empty `data` with correct meta rather than an error.
+
+examples:
+  - name: 200 - skip offsets within the filtered set (total=1, skipped=1, taken=0)
+    request:
+      url: "{{base_url}}/v2/subscriptions?take=1&skip=1&updated_at__gte=2026-09-01T16:21:35.903Z"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "meta": {
+              "total": "REDACTED",
+              "taken": 0,
+              "skipped": 1
+            },
+            "data": []
+          }

@@ -1,0 +1,58 @@
+info:
+  name: since updated
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/customers/credits?take=3&updated_at__gte=2020-01-01T00:00:00Z"
+  params:
+    - name: take
+      value: "3"
+      type: query
+    - name: updated_at__gte
+      value: "2020-01-01T00:00:00Z"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://docs.hyperline.co/api-reference/endpoints/customers-%3E-credits/list-credit-products.md
+
+  **WHY:** Prove `updated_at__gte` is accepted by the v1 credits engine. The
+  account's credits list is empty (`Customer Credits / bare`: total=0 — the
+  credits feature appears unused), so narrowing can't be observed; the bound
+  is a fixed epoch-ish datetime. Inclusivity of the shared `__gte`/`__gt`
+  grammar is pinned by `Customers / since updated asc` + `Customers / gt
+  boundary`.
+  **VERIFIED (2026-09-04):** `updated_at__gte=2020-01-01T00:00:00Z` accepted
+  (200, total=0). Narrowing **UNOBSERVABLE** while the feature is unused
+  (see `Customer Credits / bare`).
+
+examples:
+  - name: 200 - gte param accepted on empty list
+    request:
+      url: "{{base_url}}/v1/customers/credits?take=3&updated_at__gte=2020-01-01T00:00:00Z"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "meta": {
+              "total": "REDACTED",
+              "taken": 0,
+              "skipped": 0
+            },
+            "data": []
+          }

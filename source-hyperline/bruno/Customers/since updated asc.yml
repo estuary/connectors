@@ -1,0 +1,80 @@
+info:
+  name: since updated asc
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/v2/customers?limit=1&include_total=true&sort=updated_at&order=asc&updated_at__gte={{customers_pin_updated_at}}"
+  params:
+    - name: limit
+      value: "1"
+      type: query
+    - name: include_total
+      value: "true"
+      type: query
+    - name: sort
+      value: updated_at
+      type: query
+    - name: order
+      value: asc
+      type: query
+    - name: updated_at__gte
+      value: "{{customers_pin_updated_at}}"
+      type: query
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // Feed `Customers / filtered cursor page` (cursor+filter composition).
+        const body = res.getBody();
+        if (body && body.next_cursor) bru.setVar('customers_filtered_cursor', body.next_cursor);
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://docs.hyperline.co/api-reference/endpoints/customers/list-customers-1.md
+
+  **WHY:** Three claims the incremental design leans on: (1) `updated_at__gte`
+  narrows server-side (`total` shrinks vs `Customers / bare`); (2)
+  `sort=updated_at&order=asc` is honored (spec enum allows it); (3) `__gte` is
+  boundary-INCLUSIVE — the bound is the pinned doc's exact `updated_at`, so
+  under asc sort the first returned item's `updated_at` must equal the bound if
+  inclusive. Captures `next_cursor` (runtime var `customers_filtered_cursor`)
+  for `Customers / filtered cursor page`. Run `Customers / bare` first.
+  **VERIFIED (2026-09-04):** all three: narrowed total 2395 -> 1;
+  `sort=updated_at&order=asc` honored; `__gte` is INCLUSIVE — the single
+  returned row is the pinned doc itself (`updated_at` == bound, ms precision
+  respected).
+
+examples:
+  - name: 200 - gte inclusive, narrowed 2395 to 1 (projection: id+updated_at)
+    request:
+      url: "{{base_url}}/v2/customers?limit=1&include_total=true&sort=updated_at&order=asc&updated_at__gte=2026-09-02T09:35:57.522Z"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": [
+              {
+                "id": "cus_P46Xssu9W5wZW9",
+                "updated_at": "2026-09-02T09:35:57.522Z"
+              }
+            ],
+            "next_cursor": null,
+            "has_more": false,
+            "total": "REDACTED"
+          }

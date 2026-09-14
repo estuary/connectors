@@ -1,0 +1,42 @@
+info:
+  name: D1 - Create Tax Rate
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: "{{base_url}}/v1/taxes/rates"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "code": "estuary_test_rate",
+        "invoicing_entity_id": "ive_EqrmiKPHAPVueR",
+        "type": "custom",
+        "name": "Estuary connector test rate (0 percent)",
+        "rate": 0
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Create tax rate](https://docs.hyperline.co/api-reference/endpoints/taxes/create-tax-rate.md)
+
+  **Only the user runs this request — never the assistant** (`API-NEVER-MUTATE`).
+  It mutates production account state. A 0-rate custom mapping applied to no
+  customer is inert, but tax config on a production billing entity deserves
+  extra caution — skip this one if in doubt (the tax_rates stream then ships on
+  the OpenAPI shape). Delete from the dashboard after verification.
+
+  **WHY:** `/v1/taxes/rates` is empty, so `Tax Rates / bare` could not observe
+  the item shape (see its PENDING). `invoicing_entity_id` is pinned from
+  `Invoicing Entities / bare` (`ive_EqrmiKPHAPVueR`, the account's only entity).
+  Standalone group D. After running, re-run `Tax Rates / bare`.

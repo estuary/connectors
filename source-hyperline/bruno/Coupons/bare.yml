@@ -1,0 +1,53 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/coupons?take=2"
+  params:
+    - name: take
+      value: "2"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - empty list
+    request:
+      url: "{{base_url}}/v1/coupons?take=2"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "meta": {
+              "total": "REDACTED",
+              "taken": 2,
+              "skipped": 0
+            },
+            "data": []
+          }
+
+docs: |-
+  **REFERENCE:** [List coupons](https://docs.hyperline.co/api-reference/endpoints/coupons/list-coupons.md)
+
+  **WHY:** bare list for the `coupons` stream. Teaches the live envelope, the
+  per-item field set (primary key, created_at/updated_at presence and precision),
+  and `meta.total` (dataset size — snapshot sweep cost).
+
+  **VERIFIED (2026-09-04):** endpoint EMPTY on this account — meta `{total: 0, taken: 2, skipped: 0}`. NOTE: `taken` echoes the requested `take` (2) even though 0 items were returned — on other empty endpoints (features, price-books, tax rates, wallets) `taken` is 0. `meta.taken` is inconsistent across endpoints and must not be used as a completion signal; use `len(data)` / `skipped + len(data) >= total`.
+
+  **UNOBSERVABLE (until seeded):** item shape unobserved (OpenAPI: anyOf amount/percent variants by `type`; created_at but NO updated_at). Close by running `Seeding / B1 - Create Coupon` (user-run only), then re-run this request.

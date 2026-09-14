@@ -1,0 +1,60 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/v2/subscriptions/transitions?take=3"
+  params:
+    - name: take
+      value: "3"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://docs.hyperline.co/api-reference/endpoints/subscriptions-%3E-transitions/list-subscription-transitions.md
+
+  **WHY:** Observe the transitions envelope and item shape live. This stream
+  has NO `updated_at` — only nullable, date-granularity `transition_date` /
+  `transitioned_at` — so its replication strategy (snapshot vs incremental +
+  scheduled backfill) hinges on what the live rows look like and how many
+  there are (`meta.total`). Rows are mutable: `status` and `transitioned_at`
+  change when a scheduled transition is applied or cancelled.
+  **VERIFIED (2026-09-04):** envelope is `{meta, data}` (take/skip engine);
+  the list is EMPTY — `meta.total=0`. Item shape, pagination order, and
+  filter narrowing are **UNOBSERVABLE** until a transition exists; seeding
+  one would schedule a real plan change on a production subscription
+  (`POST /v2/subscriptions/transitions`), which we will not hand off without
+  the user explicitly opting in. Assumption for the plan: spec item schema
+  (id + subscription ids + status + date-typed transition fields) is
+  accurate; fallback is snapshot semantics, which tolerate shape drift.
+
+examples:
+  - name: 200 - empty list (account has no transitions)
+    request:
+      url: "{{base_url}}/v2/subscriptions/transitions?take=3"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "meta": {
+              "total": "REDACTED",
+              "taken": 0,
+              "skipped": 0
+            },
+            "data": []
+          }

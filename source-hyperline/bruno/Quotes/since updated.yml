@@ -1,0 +1,62 @@
+info:
+  name: since updated
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/quotes?take=3&updated_at__gte=2020-01-01T00:00:00Z"
+  params:
+    - name: take
+      value: "3"
+      type: query
+    - name: updated_at__gte
+      value: "2020-01-01T00:00:00Z"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://docs.hyperline.co/api-reference/endpoints/quotes/list-quotes.md
+
+  **WHY:** Prove `updated_at__gte` is accepted by the v1 quotes engine. The
+  account's quotes list is empty (`Quotes / bare`: total=0), so narrowing
+  can't be observed — the bound is a fixed epoch-ish datetime instead of a
+  pinned document value. Inclusivity of the shared `__gte`/`__gt` grammar is
+  pinned by `Customers / since updated asc` + `Customers / gt boundary` and
+  cross-checked on take/skip by `Subscriptions / since updated membership`.
+  Once `Seeding / A1 - Create Draft Quote` has been run by the user, re-pin
+  from `Quotes / bare` and re-verify narrowing.
+  **VERIFIED (2026-09-04):** `updated_at__gte=2020-01-01T00:00:00Z` accepted
+  (200, total=0). Narrowing evidence **UNOBSERVABLE (until seeded)** — no quotes exist (see
+  `Quotes / bare`). NB: an earlier run confirmed the v1 engine rejects
+  non-datetime values with 400 "Invalid ISO datetime" — same grammar as
+  `Subscription Transitions / since transitioned`.
+
+examples:
+  - name: 200 - gte param accepted on empty list
+    request:
+      url: "{{base_url}}/v1/quotes?take=3&updated_at__gte=2020-01-01T00:00:00Z"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "meta": {
+              "total": "REDACTED",
+              "taken": 0,
+              "skipped": 0
+            },
+            "data": []
+          }

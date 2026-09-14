@@ -1,0 +1,48 @@
+info:
+  name: B2 - Create Promotion Code
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{base_url}}/v1/promotion-codes"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "code": "ESTUARY-TEST",
+        "coupon_id": "{{seed_coupon_id}}",
+        "max_redemptions": 1
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // B1 must run first in this session to chain the coupon id.
+        if (!bru.getVar('seed_coupon_id')) {
+          throw new Error('seed_coupon_id unset - run "Seeding / B1 - Create Coupon" first');
+        }
+
+docs: |-
+  **REFERENCE:** [Create promotion code](https://docs.hyperline.co/api-reference/endpoints/coupons->-promotion-codes/create-promotion-code.md)
+
+  **Only the user runs this request — never the assistant** (`API-NEVER-MUTATE`).
+  It mutates production account state; max_redemptions 1 keeps it inert. Delete
+  from the dashboard after verification.
+
+  **WHY:** `/v1/promotion-codes` is empty, so `Promotion Codes / bare` could not
+  observe the item shape (see its PENDING). Depends on `Seeding / B1 - Create
+  Coupon` (run B1 first in a fresh session — the before-request fallback throws
+  if the chained `seed_coupon_id` is missing). After running, re-run
+  `Promotion Codes / bare`.

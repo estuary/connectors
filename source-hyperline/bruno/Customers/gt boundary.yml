@@ -1,0 +1,66 @@
+info:
+  name: gt boundary
+  type: http
+  seq: 3
+
+http:
+  method: GET
+  url: "{{base_url}}/v2/customers?limit=1&include_total=true&sort=updated_at&order=asc&updated_at__gt={{customers_pin_updated_at}}"
+  params:
+    - name: limit
+      value: "1"
+      type: query
+    - name: include_total
+      value: "true"
+      type: query
+    - name: sort
+      value: updated_at
+      type: query
+    - name: order
+      value: asc
+      type: query
+    - name: updated_at__gt
+      value: "{{customers_pin_updated_at}}"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://docs.hyperline.co/api-reference/endpoints/customers/list-customers-1.md
+
+  **WHY:** Prove `__gt` is boundary-EXCLUSIVE: with the bound set to the pinned
+  doc's exact `updated_at`, the first asc-sorted item must have
+  `updated_at > bound`, and `total` must be strictly below
+  `Customers / since updated asc`'s (by the count of docs sharing the pinned
+  timestamp). Together the pair pins the window grammar the fetch functions
+  use: lower bound `updated_at__gt=<cursor>`, upper bound `updated_at__lte=<horizon>`
+  (or gte/lt — whichever the plan settles on, the semantics are now measured,
+  per FETCH-SERVER-SIDE-BOUNDARIES). Run `Customers / bare` first.
+  **VERIFIED (2026-09-04):** `__gt` is EXCLUSIVE — same bound as
+  `Customers / since updated asc` narrowed total 1 -> 0.
+
+examples:
+  - name: 200 - gt exclusive, narrowed 2395 to 0
+    request:
+      url: "{{base_url}}/v2/customers?limit=1&include_total=true&sort=updated_at&order=asc&updated_at__gt=2026-09-02T09:35:57.522Z"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": [],
+            "next_cursor": null,
+            "has_more": false,
+            "total": "REDACTED"
+          }

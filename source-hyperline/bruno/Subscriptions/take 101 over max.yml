@@ -1,0 +1,55 @@
+info:
+  name: take 101 over max
+  type: http
+  seq: 4
+
+http:
+  method: GET
+  url: "{{base_url}}/v2/subscriptions?take=101"
+  params:
+    - name: take
+      value: "101"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://docs.hyperline.co/api-reference/endpoints/subscriptions/list-subscriptions.md
+
+  **WHY:** The docs cap `take` at 100; learn the enforcement mode one past the
+  ceiling (reject / clamp / truncate) for the take/skip engine — `meta.taken`
+  makes clamp vs truncation directly readable if `meta.total > 100`.
+  Counterpart of `Customers / limit 101 over max` for the cursor engine.
+  **VERIFIED (2026-09-04):** REJECTED — 400 `{"take": ["Too big: expected
+  number to be <=100"]}`. Clamp client-side; same enforcement mode as the
+  cursor engine (`Customers / limit 101 over max`).
+
+examples:
+  - name: 400 - take 101 rejected, connector must clamp
+    request:
+      url: "{{base_url}}/v2/subscriptions?take=101"
+      method: GET
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "statusCode": 400,
+            "type": "ValidationError",
+            "message": "Invalid query params",
+            "errors": {
+              "take": [
+                "Too big: expected number to be <=100"
+              ]
+            }
+          }
