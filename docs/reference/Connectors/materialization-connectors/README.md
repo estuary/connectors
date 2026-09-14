@@ -142,6 +142,9 @@ In the future, other open-source materialization connectors from third parties c
 * Pinecone
   * [Configuration](./pinecone.md)
   * Package — ghcr.io/estuary/materialize-pinecone:v1
+* Qdrant
+  * [Configuration](./qdrant.md)
+  * Package — ghcr.io/estuary/materialize-qdrant:v1
 * PostgreSQL
   * [Configuration](./PostgreSQL/)
   * Package — ghcr.io/estuary/materialize-postgres:v5
