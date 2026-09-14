@@ -192,7 +192,7 @@ func TestStreamV2DropChannel(t *testing.T) {
 	for i := range 3 {
 		require.NoError(t, testWriteRow(ctx, first, 0, []any{"k", i}))
 	}
-	var channel = first.bindings[0].channels[0].channelName
+	var channel = first.bindings[0].activeChannels[0].channelName
 	entries, err := first.flush(ctx)
 	require.NoError(t, err)
 	require.Equal(t, int64(3), soleCheckpointItem(t, entries, 0).Routed)
@@ -203,8 +203,8 @@ func TestStreamV2DropChannel(t *testing.T) {
 	// transaction it never ran, and skipped.
 	var reused = newSession(t)
 	require.NoError(t, testWriteRow(ctx, reused, 0, []any{"k", 0}))
-	require.Equal(t, channel, reused.bindings[0].channels[0].channelName)
-	require.Equal(t, int64(3), reused.bindings[0].channels[0].progress.committed)
+	require.Equal(t, channel, reused.bindings[0].activeChannels[0].channelName)
+	require.Equal(t, int64(3), reused.bindings[0].activeChannels[0].progress.committed)
 	reused.stop()
 
 	// Dropping it is what makes the name reusable. The dropping session opens
@@ -229,8 +229,8 @@ func TestStreamV2DropChannel(t *testing.T) {
 	// documents of the shard which reused it are appended in full.
 	var after = newSession(t)
 	require.NoError(t, testWriteRow(ctx, after, 0, []any{"k", 0}))
-	require.Equal(t, channel, after.bindings[0].channels[0].channelName)
-	require.Zero(t, after.bindings[0].channels[0].progress.committed)
+	require.Equal(t, channel, after.bindings[0].activeChannels[0].channelName)
+	require.Zero(t, after.bindings[0].activeChannels[0].progress.committed)
 
 	entries, err = after.flush(ctx)
 	require.NoError(t, err)
@@ -288,7 +288,7 @@ func TestStreamV2RejectsForeignTask(t *testing.T) {
 	require.ErrorContains(t, err, foreignChannel)
 	require.ErrorContains(t, err, "always_drop_tables_on_backfill")
 	require.NotContains(t, err.Error(), unattributable)
-	require.Empty(t, rejected.bindings[0].channels)
+	require.Empty(t, rejected.bindings[0].activeChannels)
 
 	names, err := fakeListChannels(ctx, "", "", "")
 	require.NoError(t, err)
