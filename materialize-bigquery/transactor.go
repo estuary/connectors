@@ -69,6 +69,17 @@ const legacyRangeKey = ""
 
 var rangeKeyRe = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{8}$`)
 
+// loadResultsTablePrefix marks a table as holding the results of one
+// transaction's load query.
+const loadResultsTablePrefix = "flow_load_results_"
+
+// loadResultsTableName returns a fresh, unique table name for one transaction's
+// load query results. The materialization name and range key identify the
+// owning shard to an operator inspecting the dataset.
+func loadResultsTableName(materialization, rangeKey string) string {
+	return loadResultsTablePrefix + translateFlowIdentifier(materialization) + "_" + rangeKey + "_" + uuid.NewString()
+}
+
 func isJSONNull(data json.RawMessage) bool {
 	return bytes.Equal(bytes.TrimSpace(data), []byte("null"))
 }
