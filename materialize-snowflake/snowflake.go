@@ -418,7 +418,7 @@ type binding struct {
 func (d *transactor) addBinding(ctx context.Context, target sql.Table, streamingEnabled bool) error {
 	var streamingV2 = d.cfg.isStreamsV2(target.DeltaUpdates)
 	var prior = d.priorStreamV2(target.StateKey)
-	var held = streamV2PathOrphaned(target.Identifier, prior) // non-nil iff any non-nil item
+	var held = prior.validateNotOrphaned(target.Identifier) // non-nil iff any non-nil item
 	var downgrade = !streamingV2 && held != nil && d.cfg.isStreamsDowngradeV2ToV1(target.DeltaUpdates)
 
 	// Ahead of everything else, so that a binding which may not leave the
@@ -494,7 +494,7 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, streaming
 				}
 				log.WithFields(log.Fields{
 					"table":    target.Identifier,
-					"channels": streamV2ChannelNames(prior),
+					"channels": prior.channelNames(),
 				}).Warn("this binding is leaving the snowpipe_streaming_v2 write path for snowpipe_streaming; documents its channels committed beyond the checkpoint will be materialized again")
 			}
 			b.streaming = true

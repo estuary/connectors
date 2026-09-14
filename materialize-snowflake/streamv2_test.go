@@ -1265,7 +1265,7 @@ func TestStreamV2ListChannels(t *testing.T) {
 	require.Contains(t, names, opened)
 	var listed = slices.IndexFunc(names, func(n string) bool { return strings.EqualFold(n, sm.channelName) })
 	require.GreaterOrEqual(t, listed, 0, "%v does not list %s", names, sm.channelName)
-	keyBegin, ok := streamingChannelKeyBegin(names[listed], "test/streamV2List")
+	keyBegin, ok := (&streamV2Manager{materialization: "test/streamV2List"}).streamingChannelKeyBegin(names[listed])
 	require.True(t, ok)
 	require.Zero(t, keyBegin)
 

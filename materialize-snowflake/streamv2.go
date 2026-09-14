@@ -52,7 +52,33 @@ type streamV2ChannelCheckpointItem struct {
 }
 
 // streamV2Checkpoint is the streaming v2 state of all channels of a binding.
-type streamV2Checkpoint = map[streamV2Range]*streamV2ChannelCheckpointItem
+type streamV2Checkpoint map[streamV2Range]*streamV2ChannelCheckpointItem
+
+// channelNames lists, sorted, the channels the non-nil checkpoint items name.
+func (cp streamV2Checkpoint) channelNames() []string {
+	var channelNames []string
+	for _, sv2ChannelCheckpointItem := range cp {
+		if sv2ChannelCheckpointItem != nil {
+			channelNames = append(channelNames, sv2ChannelCheckpointItem.ChannelName)
+		}
+	}
+	slices.Sort(channelNames)
+	return channelNames
+}
+
+// validateNotOrphaned fails a binding that leaves this write path while the
+// checkpoint still records channels for it.
+func (cp streamV2Checkpoint) validateNotOrphaned(table string) error {
+	var channelNames = cp.channelNames()
+	if len(channelNames) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf(
+		"this binding materialized into %s through the snowpipe_streaming_v2 write path, which this task's specification no longer selects for it, and the task's checkpoint still records its channel(s) %s. Leaving this path discards that record, and returning later would skip the documents those channels already hold. Restore the snowpipe_streaming_v2 write path — it needs the feature flag, delta updates, and key-pair authentication — or backfill this binding",
+		table, strings.Join(channelNames, ", "),
+	)
+}
 
 type streamV2Range struct {
 	keyBegin, keyEnd uint32
@@ -131,17 +157,6 @@ func streamV2SplitChannelName(channelName string) (streamV2ChannelNameParts, boo
 		keyRange:        streamV2Range{keyBegin: uint32(keyBegin), keyEnd: uint32(keyEnd)},
 		stateKey:        groups[5],
 	}, true
-}
-
-// streamV2ParseChannelName reads the epoch and key range of a channel name this
-// materialization and state key derived, and reports whether the name is such a
-// channel.
-func streamV2ParseChannelName(channelName, materialization, stateKey string) (int, streamV2Range, bool) {
-	var parts, ok = streamV2SplitChannelName(channelName)
-	if !ok || parts.materialization != sanitizeAndAppendHash(materialization) || parts.stateKey != sanitizeAndAppendHash(stateKey) {
-		return 0, streamV2Range{}, false
-	}
-	return parts.epoch, parts.keyRange, true
 }
 
 // streamV2ForeignTaskError rejects a table on which another Flow task's v2 channels
@@ -458,6 +473,30 @@ func (m *streamV2Manager) shardRange() streamV2Range {
 	return streamV2Range{keyBegin: m.keyBegin, keyEnd: m.keyEnd}
 }
 
+// parseChannelName reads the epoch and key range of a channel name this task
+// derived for stateKey, and reports whether the name is such a channel.
+func (m *streamV2Manager) parseChannelName(channelName, stateKey string) (int, streamV2Range, bool) {
+	var parts, ok = streamV2SplitChannelName(channelName)
+	if !ok || parts.materialization != sanitizeAndAppendHash(m.materialization) || parts.stateKey != sanitizeAndAppendHash(stateKey) {
+		return 0, streamV2Range{}, false
+	}
+	return parts.epoch, parts.keyRange, true
+}
+
+// streamingChannelKeyBegin reads the key-begin of a snowpipe_streaming channel this
+// task derived. Snowflake lists those names upper-cased, so the match ignores case.
+func (m *streamV2Manager) streamingChannelKeyBegin(channelName string) (uint32, bool) {
+	var prefix = sanitizeAndAppendHash(m.materialization) + "_"
+	if len(channelName) != len(prefix)+8 || !strings.EqualFold(channelName[:len(prefix)], prefix) {
+		return 0, false
+	}
+	keyBegin, err := strconv.ParseUint(channelName[len(prefix):], 16, 32)
+	if err != nil {
+		return 0, false
+	}
+	return uint32(keyBegin), true
+}
+
 // ensureStarted spawns and configures the sidecar exactly once.
 func (m *streamV2Manager) ensureStarted(ctx context.Context) (*sidecarClient, error) {
 	m.mu.Lock()
@@ -585,7 +624,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 	b.targetEpoch = -1
 	for _, keyRange := range targets {
 		if sv2ChannelCheckpointItem := b.priorCheckpoint[keyRange]; sv2ChannelCheckpointItem != nil {
-			if epoch, _, ok := streamV2ParseChannelName(sv2ChannelCheckpointItem.ChannelName, m.materialization, b.stateKey); ok {
+			if epoch, _, ok := m.parseChannelName(sv2ChannelCheckpointItem.ChannelName, b.stateKey); ok {
 				b.targetEpoch = epoch
 				break
 			}
@@ -594,7 +633,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 	if b.targetEpoch < 0 {
 		var maxEpoch = -1
 		for _, sv2ChannelCheckpointItem := range b.priorCheckpoint {
-			if epoch, keyRange, ok := streamV2ParseChannelName(sv2ChannelCheckpointItem.ChannelName, m.materialization, b.stateKey); ok &&
+			if epoch, keyRange, ok := m.parseChannelName(sv2ChannelCheckpointItem.ChannelName, b.stateKey); ok &&
 				keyRange.keyBegin >= shard.keyBegin && keyRange.keyEnd <= shard.keyEnd {
 				maxEpoch = max(maxEpoch, epoch)
 			}
@@ -648,7 +687,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 			return fmt.Errorf("opening channel %q: %w", sv2ChannelCheckpointItem.ChannelName, err)
 		}
 		statuses[sv2ChannelCheckpointItem.ChannelName] = status
-		if err := rejectedRowsError(sv2ChannelCheckpointItem.ChannelName, b.table, status); err != nil {
+		if err := status.validateRejectedRows(sv2ChannelCheckpointItem.ChannelName, b.table); err != nil {
 			return err
 		}
 
@@ -768,7 +807,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 				if status, err = client.OpenChannel(ctx, b.database, b.schema, b.table, channelName); err != nil {
 					return fmt.Errorf("opening channel %q: %w", channelName, err)
 				}
-				if err := rejectedRowsError(channelName, b.table, status); err != nil {
+				if err := status.validateRejectedRows(channelName, b.table); err != nil {
 					return err
 				}
 			}
@@ -860,7 +899,7 @@ func (m *streamV2Manager) sweep(ctx context.Context, database, schema, table, st
 		if keep[channelName] {
 			continue
 		}
-		if keyBegin, ok := streamingChannelKeyBegin(channelName, m.materialization); ok {
+		if keyBegin, ok := m.streamingChannelKeyBegin(channelName); ok {
 			if keyBegin < shard.keyBegin || keyBegin > shard.keyEnd || m.dropStreamingChannel == nil {
 				continue
 			}
@@ -909,42 +948,6 @@ func (m *streamV2Manager) sweep(ctx context.Context, database, schema, table, st
 		log.WithFields(log.Fields{"table": table, "channel": channelName}).Info("swept a snowpipe streaming v2 channel a layout left behind")
 	}
 	return nil
-}
-
-// streamingChannelKeyBegin reads the key-begin of a snowpipe_streaming channel this
-// task derived. Snowflake lists those names upper-cased, so the match ignores case.
-func streamingChannelKeyBegin(channelName, materialization string) (uint32, bool) {
-	var prefix = sanitizeAndAppendHash(materialization) + "_"
-	if len(channelName) != len(prefix)+8 || !strings.EqualFold(channelName[:len(prefix)], prefix) {
-		return 0, false
-	}
-	keyBegin, err := strconv.ParseUint(channelName[len(prefix):], 16, 32)
-	if err != nil {
-		return 0, false
-	}
-	return uint32(keyBegin), true
-}
-
-// rejectedRowsError rejects a channel when Snowflake rejected any row on it. It
-// reports nil in every other case.
-//
-// Snowflake discards a row it rejects, and fails neither the append nor the commit. It
-// also advances the committed offset token of the channel past that row. This error
-// count is therefore the only place where the loss is visible.
-//
-// The error count covers the whole life of the channel and never resets. This is why one
-// rejected row fails the binding for good. Nothing can identify the discarded rows, so
-// there is nothing to re-send. No state can tell the connector that the destination is
-// whole again. Only a backfill clears the error count, because it rotates the channels and
-// the checkpoint of the binding together.
-func rejectedRowsError(channelName, table string, status *channelStatusResult) error {
-	if status.RowsErrorCount == 0 {
-		return nil
-	}
-	return fmt.Errorf(
-		"channel %q had %d row(s) rejected and discarded by Snowflake, which reported: %s. Those rows are not in %s, and Snowflake's committed offset token has advanced past them, so they cannot be identified and re-sent. Backfill this binding",
-		channelName, status.RowsErrorCount, status.LastErrorMessage, table,
-	)
 }
 
 // reconcileStreamV2Channel compares Snowflake's committed offset token for one
@@ -1069,41 +1072,11 @@ func unknownChannel(err error) bool {
 	return errors.As(err, &se) && se.Code == "unknown_channel"
 }
 
-// streamV2ChannelNames lists, sorted, the channels a binding's checkpoint items name.
-// A nil checkpoint item is a channel the task already dropped and names nothing.
-func streamV2ChannelNames(sv2Checkpoint streamV2Checkpoint) []string {
-	var channelNames []string
-	for _, sv2ChannelCheckpointItem := range sv2Checkpoint {
-		if sv2ChannelCheckpointItem != nil {
-			channelNames = append(channelNames, sv2ChannelCheckpointItem.ChannelName)
-		}
-	}
-	slices.Sort(channelNames)
-	return channelNames
-}
-
-// streamV2PathOrphaned rejects a binding that materialized through this write path
-// and no longer does, unless the departure is the escape-hatch downgrade to the
-// snowpipe_streaming path. It exists because no other write path preserves the
-// channel state in prior, and a later return to this path without it skips documents.
-// The error names the channels the binding leaves behind.
-func streamV2PathOrphaned(table string, prior streamV2Checkpoint) error {
-	var channelNames = streamV2ChannelNames(prior)
-	if len(channelNames) == 0 {
-		return nil
-	}
-
-	return fmt.Errorf(
-		"this binding materialized into %s through the snowpipe_streaming_v2 write path, which this task's specification no longer selects for it, and the task's checkpoint still records its channel(s) %s. Leaving this path discards that record, and returning later would skip the documents those channels already hold. Restore the snowpipe_streaming_v2 write path — it needs the feature flag, delta updates, and key-pair authentication — or backfill this binding",
-		table, strings.Join(channelNames, ", "),
-	)
-}
-
 // streamV2DowngradeWarning reports what a publication moving a binding from the
 // snowpipe streaming v2 write path onto the snowpipe streaming path costs it, and
 // "" when the binding names no channel to leave behind.
 func streamV2DowngradeWarning(table string, sv2Checkpoint streamV2Checkpoint) string {
-	var channelNames = streamV2ChannelNames(sv2Checkpoint)
+	var channelNames = sv2Checkpoint.channelNames()
 	if len(channelNames) == 0 {
 		return ""
 	}
@@ -1443,7 +1416,7 @@ func (m *streamV2Manager) acknowledged(ctx context.Context) error {
 			if err != nil {
 				return fmt.Errorf("opening channel %q: %w", channelName, err)
 			}
-			if err := rejectedRowsError(channelName, b.table, status); err != nil {
+			if err := status.validateRejectedRows(channelName, b.table); err != nil {
 				return err
 			}
 			// The channel was declared this session and nothing has routed to it
@@ -1510,7 +1483,7 @@ func (m *streamV2Manager) waitCommit(ctx context.Context, b *streamV2Binding, c 
 	// The commit of the offset token is the earliest point where this transaction can
 	// see its own rejections. That point is before flush checkpoints its offset. A rejection
 	// therefore fails the transaction that produced it, and not a later one.
-	if err := rejectedRowsError(c.channelName, b.table, status); err != nil {
+	if err := status.validateRejectedRows(c.channelName, b.table); err != nil {
 		return err
 	}
 	c.progress.committed = offset
@@ -1531,13 +1504,4 @@ func (m *streamV2Manager) stop() {
 		m.sup.stop(m.client)
 	}
 	m.procCancel()
-}
-
-// unquotedIdentifier removes SQL identifier quotes. It returns the exact name that
-// Snowflake stores, which is the name each row's JSON entry is keyed by.
-func unquotedIdentifier(ident string) string {
-	if strings.HasPrefix(ident, `"`) && strings.HasSuffix(ident, `"`) && len(ident) >= 2 {
-		return strings.ReplaceAll(ident[1:len(ident)-1], `""`, `"`)
-	}
-	return ident
 }
