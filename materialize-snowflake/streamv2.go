@@ -349,13 +349,12 @@ type streamV2Binding struct {
 	// so every document the runtime delivers routes to exactly one channel.
 	activeChannels []*streamV2Channel
 
-	// opened reports whether this session has classified, opened, and reconciled the
-	// channels of the binding.
+	// opened reports whether ensureOpened has been called successfully.
 	opened bool
 	// targetEpoch is the epoch in the target layout's channel names.
 	targetEpoch int
-	// targetRangesDeclared reports that a flush has written the target layout's checkpoint items
-	// since the last acknowledgement.
+	// targetRangesDeclared reports that the last flush wrote a checkpoint item for every
+	// target range.
 	targetRangesDeclared bool
 }
 
@@ -526,17 +525,9 @@ func newStreamV2Channel(channelName string, keyRange streamV2Range, routed, comm
 	return c
 }
 
-// ensureOpened builds the active channel layout of the binding and captures each
-// channel's committed offset. It does this on the first document of the binding.
-//
-// The manager waits for the first document, and does not open channels while the
-// transactor is built. A transactor built only to drain pending work stores nothing,
-// as Apply does before it alters a table. Such a transactor must not pay for a sidecar
-// it will not use. It must also not reconcile against a key range that stands for the
-// whole task instead of one shard.
-//
-// This delay costs nothing. The manager still captures each committed offset before
-// the first append.
+// ensureOpened opens the binding's channels on its first document. It builds the
+// active layout, reconciles each channel against Snowflake, and captures each
+// committed offset before anything is appended.
 func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) error {
 	if b.opened {
 		return nil
@@ -576,9 +567,9 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 		return err
 	}
 
-	// A nil checkpoint item marks a channel this binding abandoned. Drop them so the
-	// count of live checkpoint items below, and the epoch minted from them, reason
-	// only about channels that still stand.
+	// A nil checkpoint item is a channel this binding abandoned. Drop them, so that
+	// the loops below need no nil checks and len(b.priorCheckpoint) counts only live
+	// channels.
 	var priorCheckpoint = make(streamV2Checkpoint, len(b.priorCheckpoint))
 	for keyRange, sv2ChannelCheckpointItem := range b.priorCheckpoint {
 		if sv2ChannelCheckpointItem != nil {
@@ -587,20 +578,10 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 	}
 	b.priorCheckpoint = priorCheckpoint
 
-	// The epoch of the target layout. The shard's own target checkpoint items, where the
-	// checkpoint holds them, fix it, so a restart continues the channels it already
-	// ran rather than rotating them. Otherwise it is minted one past every epoch a
-	// checkpoint item nested in this shard's range has used, so the target names
-	// collide with nothing a rebalance abandoned and a sweep has yet to drop.
-	// Channels outside this shard's range are a sibling's, and their names, at
-	// whatever epoch, never collide with this shard's, so a sibling's convergence
-	// does not push this shard's epoch.
-	//
-	// The epoch is read from the checkpoint alone, never from the channels standing
-	// on the pipe: an interrupted first transaction leaves a committed channel with
-	// no checkpoint item, and that channel must be reopened and its committed
-	// documents skipped, not stepped over by a fresh epoch that would materialize
-	// them twice.
+	// The target epoch. A target range that already has a checkpoint item sets it,
+	// so a restart continues the channels it already ran. Otherwise it is one past
+	// the highest epoch among the items nested in this shard's range, so the new
+	// names collide with no channel a sweep has yet to drop.
 	b.targetEpoch = -1
 	for _, keyRange := range targets {
 		if sv2ChannelCheckpointItem := b.priorCheckpoint[keyRange]; sv2ChannelCheckpointItem != nil {
@@ -621,20 +602,13 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 		b.targetEpoch = maxEpoch + 1
 	}
 
-	// Sort the binding's checkpoint items into the ones nested in this shard's range
-	// and the ones that belong to live siblings. A checkpoint item that does
-	// neither — its key range crosses this shard's boundary — is the footprint of a
-	// split that did not land on channel boundaries. Midpoint-only splits cannot
-	// produce it, except by splitting a shard again before its channels converged
-	// past the depth the new boundary cuts through. The rows that channel holds
-	// beyond its routed offset belong to both children, so neither can skip them.
+	// Bucket the checkpoint items by where their key range falls relative to this
+	// shard. Nested items are this shard's channels to open. A sibling's are left
+	// alone. A straddling range is rejected, because the rows that channel holds
+	// belong to both sides of the boundary.
 	var nested []streamV2Range
 	var targetItems int
 	for keyRange, sv2ChannelCheckpointItem := range b.priorCheckpoint {
-		if sv2ChannelCheckpointItem == nil {
-			// A channel this binding abandoned. It records nothing.
-			continue
-		}
 		switch classifyKeyRange(keyRange, shard, targets) {
 		case streamV2KeyRangeTarget:
 			targetItems++
@@ -653,18 +627,16 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 		return cmp.Or(cmp.Compare(a.keyBegin, b.keyBegin), cmp.Compare(a.keyEnd, b.keyEnd))
 	})
 
-	// priorDeclaresTargets reports that the checkpoint holds a checkpoint item for every target key
-	// range. flush writes those checkpoint items — the declaration — strictly before
-	// any switch routes rows to the target channels, so a channel this shard drops always
-	// leaves the declaration behind as the durable record of why it is gone.
+	// priorDeclaresTargets reports that the prior checkpoint holds an item for every
+	// target range. The declaration is written before any switch, so when it holds,
+	// every non-target channel is one a switch was about to abandon.
 	var priorDeclaresTargets = targetItems == len(targets)
 
-	// Open every nested channel and reconcile it. What each one holds decides
-	// whether it is live — rows route to it — a relic to drop, or a dormant
-	// declaration waiting for a switch. An empty non-target channel cannot be
-	// decided alone: whether it is an inherited channel to continue or an
-	// orphaned declaration to drop depends on what the other channels hold,
-	// so those wait in candidates until every other channel has been read.
+	// Open every nested channel and reconcile it. Each becomes a live channel, a
+	// range to abandon, or a candidate, and an empty target channel is left for a
+	// later switch. A candidate is an empty non-target channel. The next loop
+	// decides those, because whether one is inherited or orphaned depends on what
+	// the other channels hold.
 	var liveNonTarget, liveTarget, candidates []*streamV2Channel
 	var statuses = make(map[string]*channelStatusResult)
 	for _, keyRange := range nested {
@@ -726,14 +698,10 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 		}
 	}
 
-	// Decide the empty non-target channels. With no live inherited channel, the
-	// layout is the target layout and every candidate is an empty declaration or
-	// an already-converged-away relic: abandon them. With live inherited channels,
-	// the layout is the inherited one, and a candidate is part of it exactly when
-	// it overlaps no live channel — the empty quarter a skewed transaction left,
-	// which the coverage check below demands. A candidate overlapping a live
-	// channel is a declaration at another depth, orphaned when the declaring
-	// shard's range changed before it converged.
+	// Decide the candidates. One joins the inherited layout when live inherited
+	// channels exist and it overlaps none of them, because a layout has no
+	// overlaps and the empty channel still covers its share of the range.
+	// Otherwise it is abandoned.
 	for _, c := range candidates {
 		var overlapsLive = false
 		for _, live := range append(liveNonTarget, liveTarget...) {
