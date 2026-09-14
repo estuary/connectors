@@ -3,6 +3,7 @@ package connector
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"cloud.google.com/go/bigquery"
@@ -17,6 +18,14 @@ const (
 	lowerRangeKey = "00000000-7fffffff"
 	upperRangeKey = "80000000-ffffffff"
 )
+
+func TestLoadResultsTableName(t *testing.T) {
+	var name = loadResultsTableName("acmeCo/tests/materialize bigquery.v2", fullRangeKey)
+	var prefix = "flow_load_results_acmeCo_tests_materialize_bigquery_v2_00000000-ffffffff_"
+	require.True(t, strings.HasPrefix(name, prefix), name)
+	require.Len(t, name, len(prefix)+36)
+	require.Regexp(t, `^[-_0-9a-zA-Z]+$`, name)
+}
 
 func testTransactor(rangeKey string, stateKeys ...string) *transactor {
 	var tr = &transactor{
