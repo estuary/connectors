@@ -300,6 +300,62 @@ messages, it sends `Request.Flushed` with the connector state.
 The use case for this message is quite niche, but explained below with a
 hypothetical use case:
 
+### Backfill truncation
+
+`Request.Flush` also carries `backfill_begins` and `backfill_completes`,
+each naming a binding and a truncation boundary time T. The runtime stales
+every pre-boundary `Request.Load` and drops every pre-boundary
+`Request.Store`, so every Store the connector sees after a begin signal is
+already post-boundary. Once a binding's backfill completes, the connector's
+only remaining job is to delete destination rows whose `flow_published_at`
+predates T. A complete signal may arrive more than once, since the runtime
+can repeat it after a restart, so the delete it triggers must be idempotent.
+
+The `Transactor` interface exposes this as a required method,
+`Truncate(ctx, binding, before)`. `materialize-boilerplate` calls it with
+the full-precision boundary and expects back the number of rows deleted. A
+connector's `Truncate` has three valid shapes: delete the rows and return
+the count, skip and say why with `m.TruncateSkipped` (a WARN log plus a
+`connectorStatus` message that clears on the next normal `Running`
+emission, so the skip is visible without failing the transaction), or skip
+quietly by returning zero.
+
+A materialization can run as several shards, each covering only part of
+the collection's key range and each receiving its own Complete signal for
+that range, so no single shard can tell from its own signal alone whether
+every other range has finished too. The boilerplate resolves this with an
+election. Each shard records its own boundary under a reserved
+connector-state key, `__truncations`, keyed first by the shard's key range
+and then by the binding's state key, holding the boundary as an
+RFC3339Nano string; it does this whenever it sees a Complete signal, and
+emits the entry alongside its `StartedCommit` state update. The shard whose
+key range begins at zero evaluates the election on every transaction,
+after its own `Acknowledge` call returns and before it sends `Acknowledged`.
+If the ranges reporting a state key tile the entire key space and all
+agree on T, it calls `Truncate` and clears those ranges' entries;
+otherwise it waits for the remaining shards to report. The same evaluation
+runs during recovery, from whatever `__truncations` state was last
+persisted, so a restart resumes an election in progress rather than
+losing it. This ordering is safe against a concurrent `Load` because
+connectors call `WaitForAcknowledged` before reading the destination, so
+a `Truncate` that runs before `Acknowledged` is sent always completes
+before any Load that could observe its effect.
+
+`materialize-sql` provides the reference plumbing for SQL destinations.
+`Table.FlowPublishedAtColumn` finds the column materialized from the
+document's `/_meta/uuid` projection, by convention named
+`flow_published_at`, and requires it to be a date-time column that is
+neither cast to a string nor overridden by field configuration; anything
+else comes back as a skip reason. `TruncateStatement` renders the delete
+against that column, first flooring the boundary to the whole second,
+because the column may store `flow_published_at` at a coarser precision
+than T's nanoseconds, so comparing at full precision risks matching a
+post-boundary row whose truncated value happens to fall below T.
+
+`materialize-postgres` is the reference implementation, deleting for both
+standard and delta-updates bindings; every other connector currently skips
+quietly.
+
 Consider a destination like Elasticsearch, via `materialize-elastic`.
 Elastic is a document DB suited for point lookup and point update.
 It doesn’t provide a meaningful bulk query API for reads or writes (its "batch"
@@ -693,6 +749,13 @@ sends and the hard-delete argument the connector passes to `it.Next(...)`:
 so expect only inserts. The line also carries the round's `loadRequests` and
 `loaded` responses.
 
+A `truncated` bucket sits alongside these on both the expected and actual
+sides: `expected.truncated` counts the round's `Transactor.Truncate` calls
+and `actual.truncated` sums the rows they deleted (see [Backfill
+truncation](#backfill-truncation)). Neither enters the verdict comparison,
+and both are present on every emitted line, including recovery and sharded
+windows.
+
 ## Actual side: the reporting contract
 
 A connector reports the destination's own result with
@@ -773,9 +836,9 @@ or `CONNECTOR_NAME` for a variant built from another connector's image) and
 `<VERSION>-<short sha>`, e.g. `v1-3f2a9c1`; local builds report `dev` or
 `local-<sha>`), so dashboards can aggregate verdicts by connector and build.
 Every line carries `verdict`, `fidelity`, `bindings`, `loadRequests`,
-`loaded`, `expected.{insert,update,delete,softDeleted,skipped}` and
-`actual.{inserted,updated,deleted,total}` (plus `staged`/`loaded` when
-reported).
+`loaded`, `expected.{insert,update,delete,softDeleted,skipped,truncated}` and
+`actual.{inserted,updated,deleted,total,truncated}` (plus `staged`/`loaded`
+when reported).
 
 ## Testing
 
