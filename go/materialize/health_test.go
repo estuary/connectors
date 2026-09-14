@@ -102,12 +102,22 @@ func (s *scriptedStream) RecvMsg(m *pm.Request) error {
 	return nil
 }
 
+// responseCount returns how many responses have been sent so far.
+func (s *scriptedStream) responseCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.responses)
+}
+
 // txn is one scripted transaction.
 type txn struct {
 	loads  []pm.Request
 	stores []pm.Request
 	// flush overrides the scripted Flush request; nil scripts an empty one.
 	flush *pm.Request_Flush
+	// ack overrides the scripted Acknowledge request preceding this
+	// transaction; nil scripts an empty one.
+	ack *pm.Request_Acknowledge
 }
 
 func loadReq(binding int, key string) pm.Request {
@@ -131,7 +141,11 @@ func storeReq(binding int, key string, exists, deleted bool) pm.Request {
 func scriptRequests(txns []txn) []pm.Request {
 	var out []pm.Request
 	for _, tx := range txns {
-		out = append(out, pm.Request{Acknowledge: &pm.Request_Acknowledge{}})
+		var ack = tx.ack
+		if ack == nil {
+			ack = &pm.Request_Acknowledge{}
+		}
+		out = append(out, pm.Request{Acknowledge: ack})
 		out = append(out, tx.loads...)
 		var flush = tx.flush
 		if flush == nil {
@@ -194,10 +208,21 @@ type scriptedTransactor struct {
 	deferReports bool
 	// recoveryReports are reported from the recovery Acknowledge.
 	recoveryReports func(be *BindingEvents)
+	// stream, when set, lets Truncate record how many responses the stream
+	// had already sent at call time.
+	stream *scriptedStream
 
-	mu      sync.Mutex
-	pending []func()
-	acks    int
+	mu        sync.Mutex
+	pending   []func()
+	acks      int
+	truncates []truncateCall
+}
+
+// truncateCall records one scriptedTransactor.Truncate invocation.
+type truncateCall struct {
+	binding   int
+	before    time.Time
+	responses int
 }
 
 func (t *scriptedTransactor) NewTransactor(_ context.Context, _ pm.Request_Open, be *BindingEvents) (Transactor, *pm.Response_Opened, *MaterializeOptions, error) {
@@ -270,7 +295,14 @@ func (t *scriptedTransactor) Acknowledge(context.Context, []json.RawMessage, []s
 	return nil, nil
 }
 
-func (t *scriptedTransactor) Truncate(context.Context, int, time.Time) (int64, error) {
+func (t *scriptedTransactor) Truncate(_ context.Context, binding int, before time.Time) (int64, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	var n int
+	if t.stream != nil {
+		n = t.stream.responseCount()
+	}
+	t.truncates = append(t.truncates, truncateCall{binding: binding, before: before, responses: n})
 	return 0, nil
 }
 
