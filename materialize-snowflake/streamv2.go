@@ -1372,12 +1372,6 @@ func (m *streamV2Manager) acknowledged(ctx context.Context) error {
 // waitCommit blocks until the channel durably holds every document through offset. If
 // Snowflake rejected any of its rows, waitCommit fails the transaction.
 func (m *streamV2Manager) waitCommit(ctx context.Context, b *streamV2Binding, c *streamV2Channel, offset int64) error {
-	// A replay of documents Snowflake already holds appends nothing. Its offset is
-	// already committed, so waitCommit must not wait on it.
-	if offset <= c.progress.committed {
-		return nil
-	}
-
 	client, err := m.ensureStarted(ctx)
 	if err != nil {
 		return err
