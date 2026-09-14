@@ -225,7 +225,7 @@ func TestStreamV2Manager(t *testing.T) {
 	// way an interruption after the appends and before flush leaves a channel:
 	// documents committed beyond what any checkpoint records.
 	var commitOutstanding = func(t *testing.T, m *streamV2Manager) {
-		for _, c := range m.bindings[0].channels {
+		for _, c := range m.bindings[0].activeChannels {
 			require.NoError(t, c.pipe.wait())
 			if c.progress.routed > c.progress.committed {
 				_, err := m.client.WaitCommit(ctx, c.channelName, c.offsetToken(c.progress.routed))
@@ -334,7 +334,7 @@ func TestStreamV2Manager(t *testing.T) {
 		m1.addBinding(cfg.Database, cfg.Schema, tableName, tgt, nil)
 
 		writeRows(m1, 0, 5)
-		var c1 = m1.bindings[0].channels[0]
+		var c1 = m1.bindings[0].activeChannels[0]
 		require.NoError(t, c1.pipe.wait())
 		_, err = m1.client.WaitCommit(ctx, c1.channelName, c1.offsetToken(4))
 		require.NoError(t, err)
@@ -347,7 +347,7 @@ func TestStreamV2Manager(t *testing.T) {
 		m2.addBinding(cfg.Database, cfg.Schema, tableName, tgt, nil)
 
 		writeRows(m2, 0, 5)
-		var c2 = m2.bindings[0].channels[0]
+		var c2 = m2.bindings[0].activeChannels[0]
 		require.Equal(t, int64(4), c2.progress.committed)
 		entries, err := m2.flush(ctx)
 		require.NoError(t, err)
@@ -368,7 +368,7 @@ func TestStreamV2Manager(t *testing.T) {
 		m3.addBinding(cfg.Database, cfg.Schema, tableName, tgt, priorOf(checkpointed))
 
 		writeRows(m3, 5, 8)
-		require.Equal(t, int64(7), m3.bindings[0].channels[0].progress.committed)
+		require.Equal(t, int64(7), m3.bindings[0].activeChannels[0].progress.committed)
 		entries, err = m3.flush(ctx)
 		require.NoError(t, err)
 		require.Equal(t, int64(8), soleCheckpointItem(t, entries, 0).Routed)
@@ -415,7 +415,7 @@ func TestStreamV2Manager(t *testing.T) {
 		low.addBinding(cfg.Database, cfg.Schema, tableName, tgt, parentEntries[0])
 
 		storeKeys(t, low, keysHashingInto(lowShard, "split-low-new", 6))
-		require.Len(t, low.bindings[0].channels, 2, "the low child inherits the two nested channels")
+		require.Len(t, low.bindings[0].activeChannels, 2, "the low child inherits the two nested channels")
 		lowEntries, err := low.flush(ctx)
 		require.NoError(t, err)
 		require.Len(t, lowEntries[0], 6, "two inherited channels and four declared targets")
@@ -438,13 +438,13 @@ func TestStreamV2Manager(t *testing.T) {
 		// converges — the inherited channels are dropped and the targets take over.
 		var inherited []string
 		var inheritedKeys []streamV2Range
-		for _, c := range low.bindings[0].channels {
+		for _, c := range low.bindings[0].activeChannels {
 			inherited = append(inherited, c.channelName)
 			inheritedKeys = append(inheritedKeys, c.keyRange)
 		}
 		require.NoError(t, low.acknowledged(ctx))
-		require.Len(t, low.bindings[0].channels, 4)
-		for i, c := range low.bindings[0].channels {
+		require.Len(t, low.bindings[0].activeChannels, 4)
+		for i, c := range low.bindings[0].activeChannels {
 			require.Equal(t, lowTargets[i], c.keyRange)
 			require.Zero(t, c.progress.routed)
 		}
@@ -469,7 +469,7 @@ func TestStreamV2Manager(t *testing.T) {
 		var high = newManager(highHalf)
 		high.addBinding(cfg.Database, cfg.Schema, tableName, tgt, parentEntries[0])
 		storeKeys(t, high, keysHashingInto(highShard, "split-high-new", 2))
-		require.Len(t, high.bindings[0].channels, 2, "the high child inherits the other two")
+		require.Len(t, high.bindings[0].activeChannels, 2, "the high child inherits the other two")
 		highEntries, err := high.flush(ctx)
 		require.NoError(t, err)
 		require.Len(t, highEntries[0], 6)
@@ -520,7 +520,7 @@ func TestStreamV2Manager(t *testing.T) {
 			var m = newManager(child.rng)
 			m.addBinding(cfg.Database, cfg.Schema, tableName, tgt, parentEntries[0])
 			storeKeys(t, m, keysWithin(replay, child.cover))
-			for _, c := range m.bindings[0].channels {
+			for _, c := range m.bindings[0].activeChannels {
 				require.Equal(t, int64(4), c.progress.committed)
 				require.Equal(t, c.progress.committed, c.progress.routed, "the replay must land exactly at the committed token")
 			}
@@ -600,8 +600,8 @@ func TestStreamV2Manager(t *testing.T) {
 		var parent = newManager(fullRange)
 		parent.addBinding(cfg.Database, cfg.Schema, tableName, tgt, prior)
 		storeKeys(t, parent, extra)
-		require.Len(t, parent.bindings[0].channels, 8, "the parent inherits both children's channels")
-		for _, c := range parent.bindings[0].channels {
+		require.Len(t, parent.bindings[0].activeChannels, 8, "the parent inherits both children's channels")
+		for _, c := range parent.bindings[0].activeChannels {
 			if c.keyRange == lowTargets[0] {
 				require.Equal(t, int64(4), c.progress.committed)
 			} else {
@@ -617,11 +617,11 @@ func TestStreamV2Manager(t *testing.T) {
 		require.Equal(t, 22, countRows())
 
 		var inheritedKeys []streamV2Range
-		for _, c := range parent.bindings[0].channels {
+		for _, c := range parent.bindings[0].activeChannels {
 			inheritedKeys = append(inheritedKeys, c.keyRange)
 		}
 		require.NoError(t, parent.acknowledged(ctx))
-		require.Len(t, parent.bindings[0].channels, 4)
+		require.Len(t, parent.bindings[0].activeChannels, 4)
 
 		storeKeys(t, parent, keysHashingInto(fullShard, "join-post", 4))
 		final, err := parent.flush(ctx)
@@ -651,13 +651,13 @@ func TestStreamV2Manager(t *testing.T) {
 		var low = newManager(lowHalf)
 		low.addBinding(cfg.Database, cfg.Schema, tableName, tgt, joinConverged)
 		storeKeys(t, low, keysHashingInto(lowShard, "pivot-low", 2))
-		require.Len(t, low.bindings[0].channels, 2, "the low child inherits two of the parent's quarters")
+		require.Len(t, low.bindings[0].activeChannels, 2, "the low child inherits two of the parent's quarters")
 		lowEntries, err := low.flush(ctx)
 		require.NoError(t, err)
 		require.Len(t, lowEntries[0], 6, "two inherited channels and four declared targets")
 
 		require.NoError(t, low.acknowledged(ctx))
-		require.Len(t, low.bindings[0].channels, 4)
+		require.Len(t, low.bindings[0].activeChannels, 4)
 
 		storeKeys(t, low, keysHashingInto(lowShard, "pivot-post", 2))
 		_, err = low.flush(ctx)
@@ -667,7 +667,7 @@ func TestStreamV2Manager(t *testing.T) {
 		var high = newManager(highHalf)
 		high.addBinding(cfg.Database, cfg.Schema, tableName, tgt, joinConverged)
 		storeKeys(t, high, keysHashingInto(highShard, "pivot-high", 2))
-		require.Len(t, high.bindings[0].channels, 2, "the high child inherits the other two quarters")
+		require.Len(t, high.bindings[0].activeChannels, 2, "the high child inherits the other two quarters")
 		highEntries, err := high.flush(ctx)
 		require.NoError(t, err)
 		require.Len(t, highEntries[0], 6)
@@ -687,7 +687,7 @@ func TestStreamV2Manager(t *testing.T) {
 		m.addBinding(cfg.Database, cfg.Schema, tableName, tgt, nil)
 
 		writeRows(m, 0, 3)
-		var dropped = m.bindings[0].channels[0]
+		var dropped = m.bindings[0].activeChannels[0]
 		var channel = dropped.channelName
 		entries, err := m.flush(ctx)
 		require.NoError(t, err)
@@ -736,8 +736,8 @@ func TestStreamV2Manager(t *testing.T) {
 			reused.addBinding(cfg.Database, cfg.Schema, tableName, tgt, nil)
 
 			writeRows(reused, 100, 104)
-			require.Equal(t, channel, reused.bindings[0].channels[0].channelName)
-			require.Zero(t, reused.bindings[0].channels[0].progress.committed)
+			require.Equal(t, channel, reused.bindings[0].activeChannels[0].channelName)
+			require.Zero(t, reused.bindings[0].activeChannels[0].progress.committed)
 			entries, err := reused.flush(ctx)
 			require.NoError(t, err)
 			require.Equal(t, int64(4), soleCheckpointItem(t, entries, 0).Routed)
@@ -756,7 +756,7 @@ func TestStreamV2Manager(t *testing.T) {
 				rejectingTable(t, notNullTable, "drop-notnull.v1"), nil)
 
 			require.NoError(t, testWriteRow(ctx, rejecting, 0, []any{"dropped", nil}))
-			var rejected = rejecting.bindings[0].channels[0].channelName
+			var rejected = rejecting.bindings[0].activeChannels[0].channelName
 			_, err := rejecting.flush(ctx)
 			require.ErrorContains(t, err, "rejected and discarded by Snowflake")
 
@@ -795,7 +795,7 @@ func TestStreamV2Manager(t *testing.T) {
 		var m = newManager(fullRange)
 		m.addBinding(cfg.Database, cfg.Schema, backfillTable, tgt, nil)
 		writeRows(m, 0, 3)
-		var c = m.bindings[0].channels[0]
+		var c = m.bindings[0].activeChannels[0]
 		entries, err := m.flush(ctx)
 		require.NoError(t, err)
 		require.Equal(t, int64(3), soleCheckpointItem(t, entries, 0).Routed)
@@ -841,7 +841,7 @@ func TestStreamV2Manager(t *testing.T) {
 		_, err = first.flush(ctx)
 		require.NoError(t, err)
 		require.Equal(t, 3, countRowsIn(sharedTable))
-		var firstChannel = first.bindings[0].channels[0].channelName
+		var firstChannel = first.bindings[0].activeChannels[0].channelName
 
 		var second = newStreamV2Manager(ctx, &cfg, testMaterialization+"-second", accountName, fullRange)
 		second.listChannels = first.listChannels
@@ -882,7 +882,7 @@ func TestStreamV2Manager(t *testing.T) {
 		var checkpointed = *soleCheckpointItem(t, entries, 0)
 
 		writeRows(m, 2, 4)
-		var c = m.bindings[0].channels[0]
+		var c = m.bindings[0].activeChannels[0]
 		require.NoError(t, c.pipe.wait())
 		_, err = m.client.WaitCommit(ctx, c.channelName, c.offsetToken(4))
 		require.NoError(t, err)
@@ -931,7 +931,7 @@ func TestStreamV2Manager(t *testing.T) {
 
 		require.NoError(t, testWriteRow(ctx, m, 0, []any{"kept", json.RawMessage(`{"a":1}`)}))
 		require.NoError(t, testWriteRow(ctx, m, 0, []any{"dropped", nil}))
-		var channel = m.bindings[0].channels[0].channelName
+		var channel = m.bindings[0].activeChannels[0].channelName
 		entries, waitErr := m.flush(ctx)
 		require.Error(t, waitErr)
 		require.ErrorContains(t, waitErr, channel)
@@ -1238,7 +1238,7 @@ func TestStreamV2ListChannels(t *testing.T) {
 		StateKey:   "list.v1",
 	}, nil)
 	require.NoError(t, testWriteRow(ctx, m, 0, []any{"k", 1}))
-	var opened = m.bindings[0].channels[0].channelName
+	var opened = m.bindings[0].activeChannels[0].channelName
 	_, err = m.flush(ctx)
 	require.NoError(t, err)
 

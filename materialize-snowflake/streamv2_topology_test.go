@@ -155,7 +155,7 @@ func channelNames(task string, epoch int, layout []streamV2Range) []string {
 // activeNames reports the names of a binding's active layout, in order.
 func activeNames(m *streamV2Manager) []string {
 	var names []string
-	for _, c := range m.bindings[0].channels {
+	for _, c := range m.bindings[0].activeChannels {
 		names = append(names, c.channelName)
 	}
 	return names
@@ -204,7 +204,7 @@ func TestStreamV2SteadyStateRouting(t *testing.T) {
 		more = append(more, keysHashingTo(q, 1, "steady-more")...)
 	}
 	storeKeys(t, second, more)
-	for _, c := range second.bindings[0].channels {
+	for _, c := range second.bindings[0].activeChannels {
 		require.Equal(t, int64(3), c.progress.committed)
 	}
 
@@ -281,7 +281,7 @@ func TestStreamV2SplitInheritsChannels(t *testing.T) {
 			// The child runs on the two inherited channels, each already
 			// holding the interrupted appends the replay must not repeat.
 			require.Equal(t, child.inherited, activeNames(m))
-			for _, c := range m.bindings[0].channels {
+			for _, c := range m.bindings[0].activeChannels {
 				require.Equal(t, int64(5), c.progress.committed)
 				require.Equal(t, int64(5), c.progress.routed)
 			}
@@ -384,7 +384,7 @@ func TestStreamV2JoinInheritsChannels(t *testing.T) {
 	storeKeys(t, joined, interrupted)
 
 	require.Equal(t, channelNames(task, 0, eighths), activeNames(joined))
-	for _, c := range joined.bindings[0].channels {
+	for _, c := range joined.bindings[0].activeChannels {
 		require.Equal(t, int64(3), c.progress.committed)
 		require.Equal(t, int64(3), c.progress.routed)
 	}
@@ -480,7 +480,7 @@ func TestStreamV2RebalanceCrashWindows(t *testing.T) {
 	var switching = newTopologyManager(t, task, loBegin, loEnd, declaration)
 	storeKeys(t, switching, fresh)
 	require.Equal(t, targetNames, activeNames(switching))
-	require.ElementsMatch(t, rangeKeys(quarters)[:2], switching.bindings[0].abandoned)
+	require.ElementsMatch(t, rangeKeys(quarters)[:2], switching.bindings[0].abandonedRanges)
 	entries, err = switching.flush(ctx)
 	require.NoError(t, err)
 	require.ElementsMatch(t, rangeKeys(quarters)[:2], deletionsOf(entries))
@@ -502,8 +502,8 @@ func TestStreamV2RebalanceCrashWindows(t *testing.T) {
 	var resumed = newTopologyManager(t, task, loBegin, loEnd, declaration)
 	storeKeys(t, resumed, fresh)
 	require.Equal(t, targetNames, activeNames(resumed))
-	require.ElementsMatch(t, rangeKeys(quarters)[:2], resumed.bindings[0].abandoned)
-	for _, c := range resumed.bindings[0].channels {
+	require.ElementsMatch(t, rangeKeys(quarters)[:2], resumed.bindings[0].abandonedRanges)
+	for _, c := range resumed.bindings[0].activeChannels {
 		require.Equal(t, int64(2), c.progress.committed)
 		require.Equal(t, int64(2), c.progress.routed)
 	}
@@ -522,8 +522,8 @@ func TestStreamV2RebalanceCrashWindows(t *testing.T) {
 	var steady = newTopologyManager(t, task, loBegin, loEnd, converged)
 	storeKeys(t, steady, keysHashingTo(targets[0], 1, "win-d"))
 	require.Equal(t, targetNames, activeNames(steady))
-	require.Empty(t, steady.bindings[0].abandoned)
-	for _, c := range steady.bindings[0].channels {
+	require.Empty(t, steady.bindings[0].abandonedRanges)
+	for _, c := range steady.bindings[0].activeChannels {
 		require.Equal(t, int64(2), c.progress.committed)
 	}
 }
@@ -576,7 +576,7 @@ func TestStreamV2SplitThenJoinBack(t *testing.T) {
 	}
 	storeKeys(t, joined, rows)
 	require.Equal(t, channelNames(task, 0, eighths), activeNames(joined))
-	for _, c := range joined.bindings[0].channels {
+	for _, c := range joined.bindings[0].activeChannels {
 		require.Equal(t, int64(2), c.progress.committed)
 		require.Equal(t, int64(3), c.progress.routed)
 	}
@@ -762,7 +762,7 @@ func TestStreamV2SweepDropsAPriorSessionsOrphan(t *testing.T) {
 	var second = newTopologyManager(t, task, 0, math.MaxUint32, declaration)
 	storeKeys(t, second, keysHashingTo(quarters[0], 1, "orphan-later"))
 	require.Equal(t, channelNames(task, 1, quarters), activeNames(second))
-	require.Empty(t, second.bindings[0].abandoned)
+	require.Empty(t, second.bindings[0].abandonedRanges)
 
 	// The orphans are swept off the pipe before the first append, and the epoch-one
 	// layout is untouched.

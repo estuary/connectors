@@ -117,7 +117,7 @@ func TestStreamV2ReturningToTheWritePathSkipsNewDocuments(t *testing.T) {
 	}
 	entries, err := before.flush(ctx)
 	require.NoError(t, err)
-	var channel = before.bindings[0].channels[0].channelName
+	var channel = before.bindings[0].activeChannels[0].channelName
 	require.Equal(t, int64(3), entries[0][fullKeyRange].Routed)
 	before.stop()
 
@@ -126,8 +126,8 @@ func TestStreamV2ReturningToTheWritePathSkipsNewDocuments(t *testing.T) {
 	// documents Snowflake never had are dropped.
 	var after = newSession(t, nil)
 	require.NoError(t, testWriteRow(ctx, after, 0, []any{"k", "new"}))
-	require.Equal(t, channel, after.bindings[0].channels[0].channelName)
-	require.Equal(t, int64(3), after.bindings[0].channels[0].progress.committed)
+	require.Equal(t, channel, after.bindings[0].activeChannels[0].channelName)
+	require.Equal(t, int64(3), after.bindings[0].activeChannels[0].progress.committed)
 }
 
 // TestStreamV2SwitchOffTheWritePathIsRejected covers the switch itself, which is
@@ -519,7 +519,7 @@ func TestStreamV2WritePathSwitch(t *testing.T) {
 		// which follow are appended in full rather than skipped.
 		var m = newV2(t, target("onto.v1"), nil)
 		storeV2(t, m, 3, 5)
-		var c = m.bindings[0].channels[0]
+		var c = m.bindings[0].activeChannels[0]
 		require.Zero(t, c.progress.committed)
 
 		entries, err := m.flush(ctx)
@@ -555,7 +555,7 @@ func TestStreamV2WritePathSwitch(t *testing.T) {
 		var tgt = target("off.v1")
 		var m = newV2(t, tgt, nil)
 		storeV2(t, m, 0, 3)
-		var c = m.bindings[0].channels[0]
+		var c = m.bindings[0].activeChannels[0]
 		_, err := m.flush(ctx)
 		require.NoError(t, err)
 		require.Equal(t, 3, countRows())
@@ -586,7 +586,7 @@ func TestStreamV2WritePathSwitch(t *testing.T) {
 		var tgt = target("pending.v1")
 		var m = newV2(t, tgt, nil)
 		storeV2(t, m, 0, 3)
-		var c = m.bindings[0].channels[0]
+		var c = m.bindings[0].activeChannels[0]
 		require.NoError(t, c.pipe.wait())
 		_, err := m.client.WaitCommit(ctx, c.channelName, c.offsetToken(3))
 		require.NoError(t, err)
@@ -597,7 +597,7 @@ func TestStreamV2WritePathSwitch(t *testing.T) {
 		// because Snowflake's committed offset token says it holds them.
 		var replay = newV2(t, tgt, nil)
 		storeV2(t, replay, 0, 3)
-		require.Equal(t, int64(3), replay.bindings[0].channels[0].progress.committed)
+		require.Equal(t, int64(3), replay.bindings[0].activeChannels[0].progress.committed)
 		_, err = replay.flush(ctx)
 		require.NoError(t, err)
 		require.Equal(t, 3, countRows())

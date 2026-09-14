@@ -332,39 +332,40 @@ type streamV2Binding struct {
 	table       string
 	stateKey    string
 	columnNames []columnName
-	// prior is the streaming v2 state that the driver checkpoint recorded for this
+
+	// priorCheckpoint is the streaming v2 state that the driver checkpoint recorded for this
 	// binding. The map key is the channel's key range, and the map covers every shard
 	// of the task. It is nil when the checkpoint recorded no state.
-	prior streamV2Checkpoint
+	priorCheckpoint streamV2Checkpoint
+	// targetRanges is the target layout (the channel key ranges we want rows to route to)
+	// in order by key range. See streamV2TargetLayout.
+	targetRanges []streamV2Range
+	// abandonedRanges holds the key ranges of the channels this shard dropped from its
+	// layout. Their checkpoint items are written as null, because the checkpoint is
+	// a JSON merge patch and an item that is merely omitted survives in the stored state.
+	abandonedRanges []streamV2Range
+	// activeChannels is the active layout (the channels that rows route to) in order by
+	// key range. The layout covers the shard's key range with no gaps or overlaps,
+	// so every document the runtime delivers routes to exactly one channel.
+	activeChannels []*streamV2Channel
+
 	// opened reports whether this session has classified, opened, and reconciled the
 	// channels of the binding.
 	opened bool
-	// abandoned holds the key ranges of the channels this shard dropped from its
-	// layout. Their checkpoint items are written as null, because the checkpoint is
-	// a JSON merge patch and an item that is merely omitted survives in the stored state.
-	abandoned []streamV2Range
 	// targetEpoch is the epoch in the target layout's channel names.
 	targetEpoch int
-
-	// channels is the active layout (the channels that rows route to) in order by
-	// key range. The layout covers the shard's key range with no gaps or overlaps,
-	// so every document the runtime delivers routes to exactly one channel.
-	channels []*streamV2Channel
-	// targets is the target layout (the channel key ranges we want rows to route to)
-	// in order by key range. See streamV2TargetLayout.
-	targets []streamV2Range
-	// declared reports that a flush has written the target layout's checkpoint items
+	// targetRangesDeclared reports that a flush has written the target layout's checkpoint items
 	// since the last acknowledgement.
-	declared bool
+	targetRangesDeclared bool
 }
 
 // isTargetLayout reports whether the active layout is the target layout.
 func (b *streamV2Binding) isTargetLayout() bool {
-	if len(b.channels) != len(b.targets) {
+	if len(b.activeChannels) != len(b.targetRanges) {
 		return false
 	}
-	for i, c := range b.channels {
-		if c.keyRange != b.targets[i] {
+	for i, c := range b.activeChannels {
+		if c.keyRange != b.targetRanges[i] {
 			return false
 		}
 	}
@@ -373,7 +374,7 @@ func (b *streamV2Binding) isTargetLayout() bool {
 
 // route reports the active channel that covers a key hash, or nil when none does.
 func (b *streamV2Binding) route(keyHash uint32) *streamV2Channel {
-	for _, c := range b.channels {
+	for _, c := range b.activeChannels {
 		if c.keyRange.contains(keyHash) {
 			return c
 		}
@@ -497,12 +498,12 @@ func (m *streamV2Manager) addBinding(database, schema, table string, target sql.
 	}
 
 	m.bindings[target.Binding] = &streamV2Binding{
-		database:    database,
-		schema:      schema,
-		table:       table,
-		stateKey:    target.StateKey,
-		columnNames: columnNamesOf(names),
-		prior:       prior,
+		database:        database,
+		schema:          schema,
+		table:           table,
+		stateKey:        target.StateKey,
+		columnNames:     columnNamesOf(names),
+		priorCheckpoint: prior,
 	}
 }
 
@@ -578,13 +579,13 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 	// A nil checkpoint item marks a channel this binding abandoned. Drop them so the
 	// count of live checkpoint items below, and the epoch minted from them, reason
 	// only about channels that still stand.
-	var prior = make(streamV2Checkpoint, len(b.prior))
-	for keyRange, sv2ChannelCheckpointItem := range b.prior {
+	var priorCheckpoint = make(streamV2Checkpoint, len(b.priorCheckpoint))
+	for keyRange, sv2ChannelCheckpointItem := range b.priorCheckpoint {
 		if sv2ChannelCheckpointItem != nil {
-			prior[keyRange] = sv2ChannelCheckpointItem
+			priorCheckpoint[keyRange] = sv2ChannelCheckpointItem
 		}
 	}
-	b.prior = prior
+	b.priorCheckpoint = priorCheckpoint
 
 	// The epoch of the target layout. The shard's own target checkpoint items, where the
 	// checkpoint holds them, fix it, so a restart continues the channels it already
@@ -602,7 +603,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 	// them twice.
 	b.targetEpoch = -1
 	for _, keyRange := range targets {
-		if sv2ChannelCheckpointItem := b.prior[keyRange]; sv2ChannelCheckpointItem != nil {
+		if sv2ChannelCheckpointItem := b.priorCheckpoint[keyRange]; sv2ChannelCheckpointItem != nil {
 			if epoch, _, ok := streamV2ParseChannelName(sv2ChannelCheckpointItem.ChannelName, m.materialization, b.stateKey); ok {
 				b.targetEpoch = epoch
 				break
@@ -611,7 +612,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 	}
 	if b.targetEpoch < 0 {
 		var maxEpoch = -1
-		for _, sv2ChannelCheckpointItem := range b.prior {
+		for _, sv2ChannelCheckpointItem := range b.priorCheckpoint {
 			if epoch, keyRange, ok := streamV2ParseChannelName(sv2ChannelCheckpointItem.ChannelName, m.materialization, b.stateKey); ok &&
 				keyRange.keyBegin >= shard.keyBegin && keyRange.keyEnd <= shard.keyEnd {
 				maxEpoch = max(maxEpoch, epoch)
@@ -629,7 +630,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 	// beyond its routed offset belong to both children, so neither can skip them.
 	var nested []streamV2Range
 	var targetItems int
-	for keyRange, sv2ChannelCheckpointItem := range b.prior {
+	for keyRange, sv2ChannelCheckpointItem := range b.priorCheckpoint {
 		if sv2ChannelCheckpointItem == nil {
 			// A channel this binding abandoned. It records nothing.
 			continue
@@ -652,11 +653,11 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 		return cmp.Or(cmp.Compare(a.keyBegin, b.keyBegin), cmp.Compare(a.keyEnd, b.keyEnd))
 	})
 
-	// declared reports that the checkpoint holds a checkpoint item for every target key
+	// priorDeclaresTargets reports that the checkpoint holds a checkpoint item for every target key
 	// range. flush writes those checkpoint items — the declaration — strictly before
 	// any switch routes rows to the target channels, so a channel this shard drops always
 	// leaves the declaration behind as the durable record of why it is gone.
-	var declared = targetItems == len(targets)
+	var priorDeclaresTargets = targetItems == len(targets)
 
 	// Open every nested channel and reconcile it. What each one holds decides
 	// whether it is live — rows route to it — a relic to drop, or a dormant
@@ -667,7 +668,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 	var liveNonTarget, liveTarget, candidates []*streamV2Channel
 	var statuses = make(map[string]*channelStatusResult)
 	for _, keyRange := range nested {
-		var sv2ChannelCheckpointItem = b.prior[keyRange]
+		var sv2ChannelCheckpointItem = b.priorCheckpoint[keyRange]
 		var isTarget = classifyKeyRange(keyRange, shard, targets) == streamV2KeyRangeTarget
 
 		status, err := client.OpenChannel(ctx, b.database, b.schema, b.table, sv2ChannelCheckpointItem.ChannelName)
@@ -696,12 +697,12 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 				candidates = append(candidates, newStreamV2Channel(sv2ChannelCheckpointItem.ChannelName, keyRange, 0, 0))
 				continue
 			}
-			if !isTarget && declared {
+			if !isTarget && priorDeclaresTargets {
 				// A routed offset with the declaration in place: an interrupted switch
 				// already abandoned the channel — the open above re-created it
 				// empty — and only the deletion of its checkpoint item was lost. The deletion
 				// is re-recorded, and the sweep drops the empty channel.
-				b.abandoned = append(b.abandoned, keyRange)
+				b.abandonedRanges = append(b.abandonedRanges, keyRange)
 				log.WithFields(log.Fields{
 					"table":   b.table,
 					"channel": sv2ChannelCheckpointItem.ChannelName,
@@ -713,7 +714,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 			// falls through to the reconciliation, which rejects it as a lost channel.
 		}
 
-		committedOffset, err := reconcileStreamV2Channel(sv2ChannelCheckpointItem.ChannelName, b.table, status.CommittedToken, sv2ChannelCheckpointItem, keyRange, len(b.prior))
+		committedOffset, err := reconcileStreamV2Channel(sv2ChannelCheckpointItem.ChannelName, b.table, status.CommittedToken, sv2ChannelCheckpointItem, keyRange, len(b.priorCheckpoint))
 		if err != nil {
 			return err
 		}
@@ -745,7 +746,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 			liveNonTarget = append(liveNonTarget, c)
 			continue
 		}
-		b.abandoned = append(b.abandoned, c.keyRange)
+		b.abandonedRanges = append(b.abandonedRanges, c.keyRange)
 		log.WithFields(log.Fields{
 			"table":   b.table,
 			"channel": c.channelName,
@@ -756,7 +757,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 	// recovered checkpoint — and every inherited channel is settled, so the
 	// convergence an interrupted session declared completes here: the
 	// inherited channels are abandoned, and the target layout takes over.
-	if len(liveNonTarget) > 0 && declared {
+	if len(liveNonTarget) > 0 && priorDeclaresTargets {
 		var idle = true
 		for _, c := range liveNonTarget {
 			if c.progress.routed != c.progress.committed {
@@ -766,7 +767,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 		}
 		if idle {
 			for _, c := range liveNonTarget {
-				b.abandoned = append(b.abandoned, c.keyRange)
+				b.abandonedRanges = append(b.abandonedRanges, c.keyRange)
 			}
 			liveNonTarget = nil
 		}
@@ -804,8 +805,8 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 				}
 			}
 
-			var sv2ChannelCheckpointItem = b.prior[keyRange]
-			committedOffset, err := reconcileStreamV2Channel(channelName, b.table, status.CommittedToken, sv2ChannelCheckpointItem, keyRange, len(b.prior))
+			var sv2ChannelCheckpointItem = b.priorCheckpoint[keyRange]
+			committedOffset, err := reconcileStreamV2Channel(channelName, b.table, status.CommittedToken, sv2ChannelCheckpointItem, keyRange, len(b.priorCheckpoint))
 			if err != nil {
 				return err
 			}
@@ -840,18 +841,18 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 		)
 	}
 
-	b.channels, b.targets, b.opened = active, targets, true
+	b.activeChannels, b.targetRanges, b.opened = active, targets, true
 
 	var layout = make(log.Fields, len(active))
 	for _, c := range active {
 		layout[c.keyRange.String()] = fmt.Sprintf("routed %d committed %d", c.progress.routed, c.progress.committed)
 	}
 	log.WithFields(log.Fields{
-		"table":      b.table,
-		"shardRange": shard.String(),
-		"channels":   len(active),
-		"layout":     layout,
-		"abandoned":  b.abandoned,
+		"table":           b.table,
+		"shardRange":      shard.String(),
+		"activeChannels":  len(active),
+		"layout":          layout,
+		"abandonedRanges": b.abandonedRanges,
 	}).Info("opened snowpipe streaming v2 channels")
 
 	// Drop the channels this layout leaves behind before the first append.
@@ -860,11 +861,11 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 
 // layoutNames is the set of channel names the binding's active and target layouts hold.
 func (m *streamV2Manager) layoutNames(b *streamV2Binding) map[string]bool {
-	var keep = make(map[string]bool, len(b.channels)+len(b.targets))
-	for _, c := range b.channels {
+	var keep = make(map[string]bool, len(b.activeChannels)+len(b.targetRanges))
+	for _, c := range b.activeChannels {
 		keep[c.channelName] = true
 	}
-	for _, keyRange := range b.targets {
+	for _, keyRange := range b.targetRanges {
 		keep[streamV2FormatChannelName(m.materialization, b.targetEpoch, keyRange, b.stateKey)] = true
 	}
 	return keep
@@ -1251,7 +1252,7 @@ func (c *streamV2Channel) startBatch() {
 // This brings the total of buffered bytes back to zero.
 func (m *streamV2Manager) appendAllBatches(ctx context.Context) error {
 	for _, b := range m.bindings {
-		for _, c := range b.channels {
+		for _, c := range b.activeChannels {
 			if c.bufRows == 0 {
 				continue
 			} else if err := m.appendBatch(ctx, c); err != nil {
@@ -1322,7 +1323,7 @@ func (m *streamV2Manager) flush(ctx context.Context) (map[int]streamV2Checkpoint
 		}
 
 		var advanced = false
-		for _, c := range b.channels {
+		for _, c := range b.activeChannels {
 			if c.bufRows > 0 {
 				if err := m.appendBatch(ctx, c); err != nil {
 					return nil, err
@@ -1350,12 +1351,12 @@ func (m *streamV2Manager) flush(ctx context.Context) (map[int]streamV2Checkpoint
 		}
 
 		var declaring = !b.isTargetLayout()
-		if !advanced && !declaring && len(b.abandoned) == 0 {
+		if !advanced && !declaring && len(b.abandonedRanges) == 0 {
 			continue // nothing stored, nothing abandoned, nothing to converge
 		}
 
 		var sv2Checkpoint = make(streamV2Checkpoint)
-		for _, c := range b.channels {
+		for _, c := range b.activeChannels {
 			c.progress.checkpointed = c.progress.routed
 			sv2Checkpoint[c.keyRange] = &streamV2ChannelCheckpointItem{
 				ChannelName: c.channelName,
@@ -1370,19 +1371,19 @@ func (m *streamV2Manager) flush(ctx context.Context) (map[int]streamV2Checkpoint
 			// The declaration: a checkpoint item for every target channel the layout has not
 			// converged to yet. The switch at Acknowledge runs only after the
 			// checkpoint carrying these is durable.
-			for _, keyRange := range b.targets {
+			for _, keyRange := range b.targetRanges {
 				if _, ok := sv2Checkpoint[keyRange]; !ok {
 					var channelName = streamV2FormatChannelName(m.materialization, b.targetEpoch, keyRange, b.stateKey)
 					sv2Checkpoint[keyRange] = &streamV2ChannelCheckpointItem{ChannelName: channelName}
 				}
 			}
-			b.declared = true
+			b.targetRangesDeclared = true
 		}
 
 		// Deletions of abandoned channels ride every checkpoint of the session, not
 		// only the first, so that a transaction that never commits does not lose
 		// them.
-		for _, keyRange := range b.abandoned {
+		for _, keyRange := range b.abandonedRanges {
 			sv2Checkpoint[keyRange] = nil
 		}
 
@@ -1426,10 +1427,10 @@ func (m *streamV2Manager) acknowledged(ctx context.Context) error {
 
 	for _, idx := range indices {
 		var b = m.bindings[idx]
-		if !b.opened || !b.declared {
+		if !b.opened || !b.targetRangesDeclared {
 			continue
 		}
-		b.declared = false
+		b.targetRangesDeclared = false
 		if b.isTargetLayout() {
 			continue
 		}
@@ -1439,7 +1440,7 @@ func (m *streamV2Manager) acknowledged(ctx context.Context) error {
 		// found uncommitted here means that reasoning is broken somewhere, and a
 		// deferred convergence costs only throughput — so defer, loudly.
 		var idle = true
-		for _, c := range b.channels {
+		for _, c := range b.activeChannels {
 			if c.progress.routed != c.progress.committed || c.bufRows > 0 {
 				idle = false
 				break
@@ -1457,15 +1458,15 @@ func (m *streamV2Manager) acknowledged(ctx context.Context) error {
 		}
 
 		var next []*streamV2Channel
-		for _, c := range b.channels {
-			if slices.Contains(b.targets, c.keyRange) {
+		for _, c := range b.activeChannels {
+			if slices.Contains(b.targetRanges, c.keyRange) {
 				next = append(next, c)
 				continue
 			}
-			b.abandoned = append(b.abandoned, c.keyRange)
+			b.abandonedRanges = append(b.abandonedRanges, c.keyRange)
 		}
 
-		for _, keyRange := range b.targets {
+		for _, keyRange := range b.targetRanges {
 			if slices.ContainsFunc(next, func(c *streamV2Channel) bool { return c.keyRange == keyRange }) {
 				continue
 			}
@@ -1492,12 +1493,12 @@ func (m *streamV2Manager) acknowledged(ctx context.Context) error {
 		slices.SortFunc(next, func(a, b *streamV2Channel) int {
 			return cmp.Compare(a.keyRange.keyBegin, b.keyRange.keyBegin)
 		})
-		b.channels = next
+		b.activeChannels = next
 
 		log.WithFields(log.Fields{
-			"table":     b.table,
-			"channels":  len(next),
-			"abandoned": b.abandoned,
+			"table":           b.table,
+			"activeChannels":  len(next),
+			"abandonedRanges": b.abandonedRanges,
 		}).Info("snowpipe streaming v2: converged the channel layout to the target layout")
 
 		// The inherited channels are out of the layout now; drop them from the pipe.
