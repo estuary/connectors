@@ -1,5 +1,10 @@
 # materialize-postgres
 
+## 2026-09-14
+
+### Added
+- The connector deletes rows published before a backfill's truncation boundary when the runtime signals the backfill complete, comparing on the `flow_published_at` column and skipping tables where that column is missing or not a timestamp.
+
 ## 2026-07-20
 
 ### Fixed

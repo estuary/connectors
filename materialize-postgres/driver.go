@@ -359,6 +359,7 @@ var _ m.Transactor = (*transactor)(nil)
 
 type transactor struct {
 	cfg       config
+	dialect   sql.Dialect
 	templates templates
 
 	// Variables exclusively used by Load.
@@ -391,7 +392,7 @@ func newTransactor(
 	// Create templates using the dialect from the endpoint (which already has feature flags)
 	templates := renderTemplates(ep.Dialect)
 
-	var d = &transactor{cfg: cfg, templates: templates, be: be}
+	var d = &transactor{cfg: cfg, dialect: ep.Dialect, templates: templates, be: be}
 	d.store.fence = fence
 
 	// Establish connections.
@@ -503,8 +504,26 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	return nil, nil
 }
 
-func (t *transactor) Truncate(_ context.Context, _ int, _ time.Time) (int64, error) {
-	return 0, nil
+func (t *transactor) Truncate(ctx context.Context, binding int, before time.Time) (int64, error) {
+	var b = t.bindings[binding]
+
+	if _, reason := b.target.FlowPublishedAtColumn(); reason != "" {
+		m.TruncateSkipped(b.target.Path, before, reason)
+		return 0, nil
+	}
+
+	stmt, err := sql.TruncateStatement(t.dialect, b.target, before)
+	if err != nil {
+		return 0, fmt.Errorf("building truncate statement: %w", err)
+	}
+
+	execCtx, cancel := ctxWithQueryTimeout(ctx)
+	defer cancel()
+	tag, err := t.store.conn.Exec(execCtx, stmt)
+	if err != nil {
+		return 0, fmt.Errorf("executing truncate statement: %w", err)
+	}
+	return tag.RowsAffected(), nil
 }
 
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
