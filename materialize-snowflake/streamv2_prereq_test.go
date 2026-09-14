@@ -317,25 +317,6 @@ func TestRuntimePrereqDriverRejections(t *testing.T) {
 	})
 }
 
-func TestStreamV2DowngradeWarning(t *testing.T) {
-	t.Run("no items warns about nothing", func(t *testing.T) {
-		require.Empty(t, streamV2DowngradeWarning("TBL", nil))
-	})
-
-	t.Run("nil items name no channel", func(t *testing.T) {
-		require.Empty(t, streamV2DowngradeWarning("TBL", streamV2Checkpoint{fullKeyRange: nil}))
-	})
-
-	t.Run("a channel is named", func(t *testing.T) {
-		var warning = streamV2DowngradeWarning("TBL", streamV2Checkpoint{
-			fullKeyRange: {ChannelName: "chan-1", Routed: 3},
-		})
-		require.Contains(t, warning, "TBL")
-		require.Contains(t, warning, "chan-1")
-		require.Contains(t, warning, "permanent")
-	})
-}
-
 func TestRequireStreamingV2RuntimeForState(t *testing.T) {
 	const stateKey, channel = "sk.v1", "chan-1"
 

@@ -159,29 +159,6 @@ func streamV2SplitChannelName(channelName string) (streamV2ChannelNameParts, boo
 	}, true
 }
 
-// streamV2ForeignTaskError rejects a table on which another Flow task's v2 channels
-// stand. The connector cannot tell a live task from a deleted or renamed one whose
-// channels outlived it, so the message carries the remedy for each.
-func streamV2ForeignTaskError(table string, foreignChannelNames map[string][]string) error {
-	var materializationNames = make([]string, 0, len(foreignChannelNames))
-	for materialization := range foreignChannelNames {
-		materializationNames = append(materializationNames, materialization)
-	}
-	slices.Sort(materializationNames)
-
-	var described = make([]string, len(materializationNames))
-	for i, materialization := range materializationNames {
-		var channelNames = foreignChannelNames[materialization]
-		slices.Sort(channelNames)
-		described[i] = fmt.Sprintf("%s (channels %s)", materialization, strings.Join(channelNames, ", "))
-	}
-
-	return fmt.Errorf(
-		"table %s already receives snowpipe streaming v2 rows from another Flow task, whose channel names begin with %s. Two tasks may not stream into one table. If that task still exists, materialize this binding into a table of its own, or remove this table from that task. If that task was deleted or renamed, its channels have outlived it: backfill this binding with the always_drop_tables_on_backfill feature flag set, which drops the table and every channel standing on it",
-		table, strings.Join(described, "; "),
-	)
-}
-
 // streamV2FormatOffsetToken renders the offset token of an append. It holds two
 // facts: the offset of the last document in the append, and the channel key range
 // it was appended under.
@@ -214,19 +191,6 @@ func streamV2ParseOffsetToken(token string) (int64, streamV2Range, bool) {
 		return 0, streamV2Range{}, false
 	}
 	return offset, keyRange, true
-}
-
-// streamV2CannotDrainPendingBlobs reports that a binding moving onto the streaming
-// v2 write path carries Snowpipe Streaming blobs which no manager can register.
-func streamV2CannotDrainPendingBlobs(table string, blobs int, cause error) error {
-	var err = fmt.Errorf(
-		"this binding is moving onto the snowpipe_streaming_v2 write path while the task's checkpoint still records %d Snowpipe Streaming blob(s) that the snowpipe_streaming write path staged into %s and did not finish, and only the snowpipe_streaming path can finish them. Restore that path for one transaction before you move the binding onto snowpipe_streaming_v2, or backfill the binding, which discards them and materializes those documents again",
-		blobs, table,
-	)
-	if cause != nil {
-		return fmt.Errorf("%w: the snowpipe_streaming path cannot reopen its channel on the table: %w", err, cause)
-	}
-	return err
 }
 
 // streamV2DefaultPipeSuffix ends the name Snowflake gives the pipe it auto-creates
@@ -581,17 +545,21 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 		}
 
 		var own = sanitizeAndAppendHash(m.materialization)
-		var foreignChannelNames = make(map[string][]string)
+		var foreignChannelNames []string
 		for _, channelName := range channelNames {
 			if parts, ok := streamV2SplitChannelName(channelName); !ok {
 				log.WithFields(log.Fields{"table": b.table, "channel": channelName}).Info("a channel of no snowpipe streaming v2 shape stands on the table")
 				continue
 			} else if parts.materialization != own {
-				foreignChannelNames[parts.materialization] = append(foreignChannelNames[parts.materialization], channelName)
+				foreignChannelNames = append(foreignChannelNames, channelName)
 			}
 		}
 		if len(foreignChannelNames) > 0 {
-			return streamV2ForeignTaskError(b.table, foreignChannelNames)
+			slices.Sort(foreignChannelNames)
+			return fmt.Errorf(
+				"table %s already receives snowpipe streaming v2 rows from another Flow task through channel(s) %s. Two tasks may not stream into one table. If that task still exists, materialize this binding into a table of its own, or remove this table from that task. If that task was deleted or renamed, its channels have outlived it: backfill this binding with the always_drop_tables_on_backfill feature flag set, which drops the table and every channel standing on it",
+				b.table, strings.Join(foreignChannelNames, ", "),
+			)
 		}
 	}
 
@@ -935,15 +903,17 @@ func (m *streamV2Manager) sweep(ctx context.Context, database, schema, table, st
 		// rebalance just abandoned — already has one, and re-opening it is an error,
 		// so the drop is tried first and a channel this session never opened, a
 		// prior session's orphan, is opened only when the drop reports none.
-		var err = dropChannel(ctx, client, channelName)
-		if unknownChannel(err) {
+		var err = client.CloseChannel(ctx, channelName, true)
+		var se *sidecarError
+		if errors.As(err, &se) && se.Code == "unknown_channel" {
+			// Channel never opened this session, or has been closed since it was opened.
 			if _, err = client.OpenChannel(ctx, database, schema, table, channelName); err != nil {
 				return fmt.Errorf("opening channel %q to drop it: %w", channelName, err)
 			}
-			err = dropChannel(ctx, client, channelName)
+			err = client.CloseChannel(ctx, channelName, true)
 		}
 		if err != nil {
-			return err
+			return fmt.Errorf("dropping channel %q: %w", channelName, err)
 		}
 		log.WithFields(log.Fields{"table": table, "channel": channelName}).Info("swept a snowpipe streaming v2 channel a layout left behind")
 	}
@@ -1034,57 +1004,6 @@ func reconcileStreamV2Channel(channelName, table string, committedToken *string,
 	// function of each document alone, so this channel receives exactly the documents
 	// up to the committed offset, and skips them by offset.
 	return committedOffset, nil
-}
-
-// dropChannel takes a channel out of service for good. It drops the channel in
-// Snowflake, and does not only close the local handle.
-//
-// The drop must reach Snowflake because a channel name is deterministic. The
-// connector derives it from the task, the key range, and the state key. A later shard
-// whose layout includes the same key range derives the same name.
-//
-// A channel that Snowflake still holds gives its committed offset token to whoever
-// opens it next. The drop is what makes the next open of the same name a fresh
-// channel, with nothing to account for.
-//
-// An experiment against live Snowflake showed that the drop does this and a plain
-// close does not. The SDK contract does not say so. A close releases only the local
-// handle, and Snowflake still reports the same committed offset token to the next open
-// of that name. The channel-drop subtest of TestStreamV2Manager is that experiment.
-// TestStreamV2DropChannel runs the same sequence against the fake sidecar.
-//
-// The channel must already be open in this session, because the drop uses the handle
-// that an open produced. The committed rows are untouched. This drops the channel,
-// not the data it delivered.
-func dropChannel(ctx context.Context, client *sidecarClient, channelName string) error {
-	if err := client.CloseChannel(ctx, channelName, true); err != nil {
-		return fmt.Errorf("dropping channel %q: %w", channelName, err)
-	}
-	log.WithFields(log.Fields{"channel": channelName}).Info("dropped snowpipe streaming v2 channel")
-	return nil
-}
-
-// unknownChannel reports whether err is the sidecar's rejection of an operation on
-// a channel it holds no open handle for — because it was never opened this session,
-// or was closed since.
-func unknownChannel(err error) bool {
-	var se *sidecarError
-	return errors.As(err, &se) && se.Code == "unknown_channel"
-}
-
-// streamV2DowngradeWarning reports what a publication moving a binding from the
-// snowpipe streaming v2 write path onto the snowpipe streaming path costs it, and
-// "" when the binding names no channel to leave behind.
-func streamV2DowngradeWarning(table string, sv2Checkpoint streamV2Checkpoint) string {
-	var channelNames = sv2Checkpoint.channelNames()
-	if len(channelNames) == 0 {
-		return ""
-	}
-
-	return fmt.Sprintf(
-		"binding %s is leaving the snowpipe_streaming_v2 write path for snowpipe_streaming. Every document that its channel(s) %s committed beyond the offset the checkpoint records for them will be materialized again by the snowpipe_streaming path, and this binding uses delta updates, so those duplicates are permanent. The channels are dropped when the task next opens on the new path",
-		table, strings.Join(channelNames, ", "),
-	)
 }
 
 // writeRow writes one converted document to the channel its key hash routes to, under

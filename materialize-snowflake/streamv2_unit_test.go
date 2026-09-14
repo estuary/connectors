@@ -214,7 +214,7 @@ func TestStreamV2DropChannel(t *testing.T) {
 	require.NoError(t, err)
 	_, err = client.OpenChannel(ctx, "DB", "SCH", "TBL", channel)
 	require.NoError(t, err)
-	require.NoError(t, dropChannel(ctx, client, channel))
+	require.NoError(t, client.CloseChannel(ctx, channel, true))
 
 	// A dropped channel is out of service: the handle it was dropped through is
 	// spent, so appending to it fails rather than quietly reviving it.

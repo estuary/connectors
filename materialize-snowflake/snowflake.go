@@ -446,10 +446,17 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, streaming
 		// drain, and its rows still go to streaming v2.
 		if prior := d.cp[target.StateKey]; prior != nil && len(prior.StreamBlobs) > 0 {
 			var loc = d.ep.Dialect.TableLocator(target.Path)
+			const remedy = "Restore the snowpipe_streaming write path for one transaction before moving the binding onto snowpipe_streaming_v2, or backfill the binding, which discards those blobs and materializes their documents again"
 			if d.snowpipeStreaming == nil {
-				return streamV2CannotDrainPendingBlobs(target.Identifier, len(prior.StreamBlobs), nil)
+				return fmt.Errorf(
+					"the task's checkpoint records %d Snowpipe Streaming blob(s) staged into %s that only the snowpipe_streaming write path can finish, and that path is not available. %s",
+					len(prior.StreamBlobs), target.Identifier, remedy,
+				)
 			} else if err := d.snowpipeStreaming.addBinding(ctx, loc.TableSchema, d.ep.Identifier(loc.TableName), target); err != nil {
-				return streamV2CannotDrainPendingBlobs(target.Identifier, len(prior.StreamBlobs), err)
+				return fmt.Errorf(
+					"opening the snowpipe_streaming channel on %s to finish %d staged blob(s): %w. %s",
+					target.Identifier, len(prior.StreamBlobs), err, remedy,
+				)
 			}
 
 			log.WithFields(log.Fields{

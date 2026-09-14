@@ -152,8 +152,11 @@ func rejectOrphanedStreamV2Bindings(spec *pf.MaterializationSpec, stateJson json
 		}
 		var table = strings.Join(binding.ResourcePath, ".")
 		if cfg.isStreamsDowngradeV2ToV1(binding.DeltaUpdates) {
-			if warning := streamV2DowngradeWarning(table, item.StreamV2); warning != "" {
-				log.Warn(warning)
+			if channelNames := item.StreamV2.channelNames(); len(channelNames) > 0 {
+				log.Warnf(
+					"binding %s is leaving the snowpipe_streaming_v2 write path for snowpipe_streaming. Every document that its channel(s) %s committed beyond the offset the checkpoint records for them will be materialized again by the snowpipe_streaming path, and this binding uses delta updates, so those duplicates are permanent. The channels are dropped when the task next opens on the new path",
+					table, strings.Join(channelNames, ", "),
+				)
 			}
 			continue
 		}
