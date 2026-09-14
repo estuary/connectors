@@ -1,0 +1,70 @@
+---
+# Test configuration for source-asana-native
+# Credentials are in config.yaml (gitignored)
+
+captures:
+  acmeCo/source-asana-native:
+    endpoint:
+      local:
+        command:
+          - poetry
+          - run
+          - python
+          - "-m"
+          - source_asana_native
+        config: config.yaml
+    bindings:
+      - resource:
+          name: Workspaces
+        target: acmeCo/Workspaces
+      - resource:
+          name: Users
+        target: acmeCo/Users
+      - resource:
+          name: Teams
+        target: acmeCo/Teams
+      - resource:
+          name: Projects
+        target: acmeCo/Projects
+      - resource:
+          name: Tasks
+        target: acmeCo/Tasks
+      - resource:
+          name: Sections
+        target: acmeCo/Sections
+      - resource:
+          name: Tags
+        target: acmeCo/Tags
+      - resource:
+          name: Portfolios
+        target: acmeCo/Portfolios
+      - resource:
+          name: Goals
+        target: acmeCo/Goals
+      - resource:
+          name: CustomFields
+        target: acmeCo/CustomFields
+      - resource:
+          name: TimePeriods
+        target: acmeCo/TimePeriods
+      - resource:
+          name: ProjectTemplates
+        target: acmeCo/ProjectTemplates
+      - resource:
+          name: StatusUpdates
+        target: acmeCo/StatusUpdates
+      - resource:
+          name: Attachments
+        target: acmeCo/Attachments
+      - resource:
+          name: Stories
+        target: acmeCo/Stories
+      - resource:
+          name: Memberships
+        target: acmeCo/Memberships
+      - resource:
+          name: TeamMemberships
+        target: acmeCo/TeamMemberships
+
+import:
+  - acmeCo/flow.yaml
