@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/feature/rds/auth"
 	"github.com/estuary/connectors/go/auth/iam"
@@ -506,6 +507,10 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, featureFl
 func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
 func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
 	return nil, nil
+}
+
+func (t *transactor) Truncate(_ context.Context, _ int, _ time.Time) (int64, error) {
+	return 0, nil
 }
 
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {

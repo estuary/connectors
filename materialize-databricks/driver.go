@@ -730,6 +730,10 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	return d.acknowledgeApply(ctx, db, shouldProcess)
 }
 
+func (d *transactor) Truncate(_ context.Context, _ int, _ time.Time) (int64, error) {
+	return 0, nil
+}
+
 // acknowledgeApply executes pending checkpoint entries — this shard's own, and as the primary
 // those of peers and prior sessions — and returns the state update clearing them, or nil if
 // nothing was executed.

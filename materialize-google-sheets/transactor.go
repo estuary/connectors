@@ -71,6 +71,10 @@ func (b transactorBinding) columnCount() int {
 func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
 func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) { return nil, nil }
 
+func (t *transactor) Truncate(_ context.Context, _ int, _ time.Time) (int64, error) {
+	return 0, nil
+}
+
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	it.WaitForAcknowledged()
 

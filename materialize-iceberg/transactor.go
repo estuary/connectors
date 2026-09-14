@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/estuary/connectors/go/blob"
 	m "github.com/estuary/connectors/go/materialize"
@@ -362,6 +363,10 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 
 	t.recovery = false
 	return stateUpdate, nil
+}
+
+func (t *transactor) Truncate(_ context.Context, _ int, _ time.Time) (int64, error) {
+	return 0, nil
 }
 
 func (t *transactor) Destroy() {}

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync/atomic"
+	"time"
 
 	"cloud.google.com/go/pubsub"
 	"github.com/estuary/connectors/go/keyhash"
@@ -27,6 +28,10 @@ type topicBinding struct {
 func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
 func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
 	return nil, nil
+}
+
+func (t *transactor) Truncate(_ context.Context, _ int, _ time.Time) (int64, error) {
+	return 0, nil
 }
 
 // PubSub is delta-update only.

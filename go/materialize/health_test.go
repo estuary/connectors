@@ -270,6 +270,10 @@ func (t *scriptedTransactor) Acknowledge(context.Context, []json.RawMessage, []s
 	return nil, nil
 }
 
+func (t *scriptedTransactor) Truncate(context.Context, int, time.Time) (int64, error) {
+	return 0, nil
+}
+
 // runHealthScenario drives RunTransactions over a scripted stream and returns
 // the health lines it logged.
 func runHealthScenario(t *testing.T, tr *scriptedTransactor, open *pm.Request_Open, txns []txn, hold chan struct{}, beforeEOF func(hook *logtest.Hook)) []healthLine {

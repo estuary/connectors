@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/estuary/connectors/go/blob"
 	m "github.com/estuary/connectors/go/materialize"
@@ -109,6 +110,10 @@ func newTransactor(
 func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
 func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
 	return nil, nil
+}
+
+func (t *transactor) Truncate(_ context.Context, _ int, _ time.Time) (int64, error) {
+	return 0, nil
 }
 
 func (t *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSpec, _ pf.RangeSpec) (m.RuntimeCheckpoint, error) {

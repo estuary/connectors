@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"iter"
 	"sync/atomic"
+	"time"
 
 	"github.com/estuary/connectors/go/materialize"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
@@ -80,6 +81,10 @@ func (t *transactor) UnmarshalState(state json.RawMessage) error {
 
 func (t *transactor) Acknowledge(context.Context, []json.RawMessage, []string) (*pf.ConnectorState, error) {
 	return nil, nil
+}
+
+func (t *transactor) Truncate(_ context.Context, _ int, _ time.Time) (int64, error) {
+	return 0, nil
 }
 
 func (t *transactor) Destroy() {

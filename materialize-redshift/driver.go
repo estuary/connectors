@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
@@ -949,6 +950,10 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 		return nil, fmt.Errorf("marshalling state clearing patch: %w", err)
 	}
 	return &pf.ConnectorState{UpdatedJson: patch, MergePatch: true}, nil
+}
+
+func (d *transactor) Truncate(_ context.Context, _ int, _ time.Time) (int64, error) {
+	return 0, nil
 }
 
 // lastCopyCount is the number of rows the session's most recent COPY loaded.

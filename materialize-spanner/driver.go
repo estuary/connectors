@@ -603,6 +603,10 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	return nil, nil
 }
 
+func (t *transactor) Truncate(_ context.Context, _ int, _ time.Time) (int64, error) {
+	return 0, nil
+}
+
 // timedSpannerApply wraps spanner.Client.Apply with timing instrumentation
 func (t *transactor) timedSpannerApply(ctx context.Context, mutations []*spanner.Mutation, operation string) (time.Time, time.Duration, error) {
 	start := time.Now()

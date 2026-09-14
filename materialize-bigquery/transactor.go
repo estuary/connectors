@@ -611,6 +611,10 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	return t.acknowledgeApply(ctx, shouldProcess)
 }
 
+func (t *transactor) Truncate(_ context.Context, _ int, _ time.Time) (int64, error) {
+	return 0, nil
+}
+
 // pendingItem pairs a checkpoint entry with the range and state key it was
 // staged under, so the clearing pass afterward knows which JSON path it
 // occupies.

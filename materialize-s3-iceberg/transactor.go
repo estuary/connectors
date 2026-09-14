@@ -292,6 +292,10 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	return &pf.ConnectorState{UpdatedJson: checkpointJSON}, nil
 }
 
+func (t *transactor) Truncate(_ context.Context, _ int, _ time.Time) (int64, error) {
+	return 0, nil
+}
+
 func (t *transactor) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, range_ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
 	return nil, nil
 }

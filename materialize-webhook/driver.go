@@ -195,6 +195,10 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	return nil, nil
 }
 
+func (t *transactor) Truncate(_ context.Context, _ int, _ time.Time) (int64, error) {
+	return 0, nil
+}
+
 // Load should not be called and panics.
 func (d *transactor) Load(it *m.LoadIterator, _ func(int, json.RawMessage) error) error {
 	for it.Next() {

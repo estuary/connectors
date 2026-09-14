@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	chproto "github.com/ClickHouse/ch-go/proto"
 	"github.com/ClickHouse/clickhouse-go/v2"
@@ -983,6 +984,10 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	}
 
 	return &pf.ConnectorState{UpdatedJson: checkpointJSON, MergePatch: true}, nil
+}
+
+func (t *transactor) Truncate(_ context.Context, _ int, _ time.Time) (int64, error) {
+	return 0, nil
 }
 
 // isUnknownTableErr reports whether err (anywhere in its chain) is a ClickHouse

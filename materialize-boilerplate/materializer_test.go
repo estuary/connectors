@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	m "github.com/estuary/connectors/go/materialize"
@@ -566,6 +567,10 @@ func (t *testTransactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 func (t *testTransactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
 	panic("unimplemented")
+}
+
+func (t *testTransactor) Truncate(ctx context.Context, binding int, before time.Time) (int64, error) {
+	return 0, nil
 }
 
 func (t *testTransactor) Destroy() {

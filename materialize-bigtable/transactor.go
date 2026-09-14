@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"cloud.google.com/go/bigtable"
 	m "github.com/estuary/connectors/go/materialize"
@@ -70,6 +71,10 @@ func (t *transactor) UnmarshalState(raw json.RawMessage) error {
 
 func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
 	return nil, nil
+}
+
+func (t *transactor) Truncate(_ context.Context, _ int, _ time.Time) (int64, error) {
+	return 0, nil
 }
 
 type loadBatch struct {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	m "github.com/estuary/connectors/go/materialize"
 	"github.com/estuary/connectors/materialize-pinecone/client"
@@ -48,6 +49,10 @@ type upsertDoc struct {
 func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
 func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
 	return nil, nil
+}
+
+func (t *transactor) Truncate(_ context.Context, _ int, _ time.Time) (int64, error) {
+	return 0, nil
 }
 
 func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {

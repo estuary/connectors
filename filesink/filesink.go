@@ -480,6 +480,10 @@ func (t *transactor[T]) Acknowledge(ctx context.Context, statePatches []json.Raw
 	return &pf.ConnectorState{UpdatedJson: json.RawMessage(checkpointJSON)}, nil
 }
 
+func (t *transactor[T]) Truncate(_ context.Context, _ int, _ time.Time) (int64, error) {
+	return 0, nil
+}
+
 func (t *transactor[T]) Destroy() {}
 
 func (t *transactor[T]) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, rangeSpec pf.RangeSpec) (m.RuntimeCheckpoint, error) {

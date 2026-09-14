@@ -1184,6 +1184,10 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	return &pf.ConnectorState{UpdatedJson: json.RawMessage(checkpointJSON), MergePatch: true}, nil
 }
 
+func (d *transactor) Truncate(_ context.Context, _ int, _ time.Time) (int64, error) {
+	return 0, nil
+}
+
 // runStoreQuery runs a checkpoint item's MERGE INTO or COPY INTO and reports
 // the row counts from its result set. A result that can't be read is logged
 // and skipped; only the query itself can fail the commit.
