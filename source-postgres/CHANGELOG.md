@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-09-14
+
+### Fixed
+- Stream Abort replication messages are now logged and ignored instead of
+  failing the capture. PostgreSQL 18 can send one for a subtransaction of a
+  large, rolled back transaction even though the connector never enables
+  streaming of in-progress transactions.
+
 ## 2026-08-18
 
 ### Added
