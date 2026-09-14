@@ -708,7 +708,7 @@ func TestStreamV2Manager(t *testing.T) {
 			var afterClose = reopen()
 			t.Logf("reopened %s after a close: committed token %v", channel, afterClose.committedToken())
 
-			require.NoError(t, dropChannel(ctx, client, channel))
+			require.NoError(t, client.CloseChannel(ctx, channel, true))
 			var afterDrop = reopen()
 			t.Logf("reopened %s after a drop: committed token %v", channel, afterDrop.committedToken())
 
@@ -762,7 +762,7 @@ func TestStreamV2Manager(t *testing.T) {
 
 			rejectingClient, err := rejecting.ensureStarted(ctx)
 			require.NoError(t, err)
-			require.NoError(t, dropChannel(ctx, rejectingClient, rejected))
+			require.NoError(t, rejectingClient.CloseChannel(ctx, rejected, true))
 
 			afterRejection, err := rejectingClient.OpenChannel(ctx, cfg.Database, cfg.Schema, notNullTable, rejected)
 			require.NoError(t, err)
