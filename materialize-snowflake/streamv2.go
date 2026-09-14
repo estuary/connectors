@@ -300,9 +300,84 @@ type streamV2Channel struct {
 	limiter *rate.Limiter
 }
 
+// newStreamV2Channel builds the in-memory state of one opened, reconciled channel.
+func newStreamV2Channel(channelName string, keyRange streamV2Range, routed, committed int64) *streamV2Channel {
+	var c = &streamV2Channel{
+		channelName: channelName,
+		keyRange:    keyRange,
+		limiter:     rate.NewLimiter(streamV2PaceBytesPerSecond, 2*streamV2PaceBytesPerSecond),
+		progress: struct {
+			routed       int64
+			checkpointed int64
+			committed    int64
+		}{
+			routed:       routed,
+			checkpointed: routed,
+			committed:    committed,
+		},
+	}
+	return c
+}
+
 // offsetToken renders the offset token for an offset on this channel.
 func (c *streamV2Channel) offsetToken(offset int64) string {
 	return streamV2FormatOffsetToken(offset, c.keyRange)
+}
+
+// bufferRow encodes the document at offset onto the payload of the channel's current
+// batch. When the payload is empty it starts the batch and records offset as the
+// batch's first. It reports how many bytes the payload grew by.
+//
+// A document that fails to encode leaves the payload exactly as it was, so the batch
+// keeps the rows before it and none of the failed row.
+func (c *streamV2Channel) bufferRow(offset int64, columnNames []columnName, converted []any) (int, error) {
+	var before = len(c.buf)
+	if c.bufRows == 0 {
+		c.startBatch()
+		c.bufFirst = offset
+	} else {
+		c.buf = append(c.buf, ',')
+	}
+
+	var payload, err = appendRowJSON(c.buf, columnNames, converted)
+	if err != nil {
+		c.buf = c.buf[:before]
+		return 0, err
+	}
+
+	c.buf = payload
+	c.bufRows++
+	return len(c.buf) - before, nil
+}
+
+// finishBatch closes the payload of the batch and gives up ownership of the buffer. It
+// reports the payload, the number of rows it holds, and the buffered bytes it releases.
+//
+// finishBatch counts those bytes before it writes the closing bracket, because that is
+// the byte total bufferRow reported as it built the batch. A count of the bracket here
+// as well leaves the total of buffered bytes one byte short of zero for every batch of
+// the session. That drifts the back-pressure ceiling away from the memory it stands
+// for.
+func (c *streamV2Channel) finishBatch() (payload []byte, rows int, released int) {
+	released = len(c.buf)
+	c.buf = append(c.buf, ']')
+
+	payload, rows = c.buf, c.bufRows
+	c.bufHint = len(c.buf)
+	c.buf, c.bufRows, c.bufFirst = nil, 0, 0
+	return payload, rows, released
+}
+
+// streamV2MinBatchCapacity is the size a payload buffer starts with. It applies until
+// the channel sends a batch that can size the next one.
+const streamV2MinBatchCapacity = 8 * 1024
+
+// startBatch opens the payload of a new batch. The size is a little over the batch
+// before it. A full batch then does not grow and copy a dozen times on its way to 8
+// MiB. The buffer is always a new one, because the batch before it owns the bytes it
+// received.
+func (c *streamV2Channel) startBatch() {
+	c.buf = append(make([]byte, 0, max(c.bufHint+c.bufHint/8, streamV2MinBatchCapacity)), '[')
 }
 
 type streamV2Binding struct {
@@ -385,9 +460,8 @@ func (p *appendPipe) wait() error {
 	return err
 }
 
-// streamV2Manager is the Snowpipe Streaming write path. It owns the channels of
-// every binding and the sidecar process that holds the Snowflake SDK. Any failure
-// of the sidecar ends the connector.
+// streamV2Manager is the Snowpipe Streaming V2 write path. It owns the channels of
+// every binding and the sidecar process that holds the Snowflake SDK.
 //
 // A row's channel is chosen by the same key hash that chose the row's shard, so a
 // channel's contents depend only on the data and never on the shard topology.
@@ -507,25 +581,6 @@ func (m *streamV2Manager) addBinding(database, schema, table string, target sql.
 		columnNames:     columnNamesOf(names),
 		priorCheckpoint: prior,
 	}
-}
-
-// newStreamV2Channel builds the in-memory state of one opened, reconciled channel.
-func newStreamV2Channel(channelName string, keyRange streamV2Range, routed, committed int64) *streamV2Channel {
-	var c = &streamV2Channel{
-		channelName: channelName,
-		keyRange:    keyRange,
-		limiter:     rate.NewLimiter(streamV2PaceBytesPerSecond, 2*streamV2PaceBytesPerSecond),
-		progress: struct {
-			routed       int64
-			checkpointed int64
-			committed    int64
-		}{
-			routed:       routed,
-			checkpointed: routed,
-			committed:    committed,
-		},
-	}
-	return c
 }
 
 // ensureOpened opens the binding's channels on its first document. It builds the
@@ -661,26 +716,18 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 
 		if status.CommittedToken == nil {
 			if isTarget && sv2ChannelCheckpointItem.Routed == 0 {
-				// A declaration nothing was appended under. It stays dormant: the
-				// checkpoint item keeps the declaration durable, and the channel joins the
-				// layout when a switch converges to it.
+				// A declared target channel that took no rows has nothing to reconcile yet.
 				continue
 			}
 			if !isTarget && sv2ChannelCheckpointItem.Routed == 0 {
-				// A channel of another layout which holds nothing at all. A skewed
-				// transaction leaves one behind legitimately — a channel of the
-				// shard this one inherits from that took no rows — and so does a
-				// declaration the declaring shard never converged to before its
-				// range changed. Which of the two it is turns on the channels
-				// around it, so the decision waits for all of them.
+				// An empty channel of another layout may be inherited or orphaned, and only
+				// the channels around it can tell, so the decision waits for all of them.
 				candidates = append(candidates, newStreamV2Channel(sv2ChannelCheckpointItem.ChannelName, keyRange, 0, 0))
 				continue
 			}
 			if !isTarget && priorDeclaresTargets {
-				// A routed offset with the declaration in place: an interrupted switch
-				// already abandoned the channel — the open above re-created it
-				// empty — and only the deletion of its checkpoint item was lost. The deletion
-				// is re-recorded, and the sweep drops the empty channel.
+				// A non-target channel Snowflake no longer holds, under a declared target
+				// layout, was abandoned by a switch whose checkpoint deletion never landed.
 				b.abandonedRanges = append(b.abandonedRanges, keyRange)
 				log.WithFields(log.Fields{
 					"table":   b.table,
@@ -689,11 +736,9 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 				}).Info("re-recording the deletion of a channel an interrupted session abandoned")
 				continue
 			}
-			// A routed offset with no offset token and no declaration to explain it
-			// falls through to the reconciliation, which rejects it as a lost channel.
 		}
 
-		committedOffset, err := reconcileStreamV2Channel(sv2ChannelCheckpointItem.ChannelName, b.table, status.CommittedToken, sv2ChannelCheckpointItem, keyRange, len(b.priorCheckpoint))
+		committedOffset, err := streamV2ValidateCommittedToken(sv2ChannelCheckpointItem.ChannelName, b.table, status.CommittedToken, sv2ChannelCheckpointItem, keyRange, len(b.priorCheckpoint))
 		if err != nil {
 			return err
 		}
@@ -705,10 +750,8 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 		}
 	}
 
-	// Decide the candidates. One joins the inherited layout when live inherited
-	// channels exist and it overlaps none of them, because a layout has no
-	// overlaps and the empty channel still covers its share of the range.
-	// Otherwise it is abandoned.
+	// An empty channel joins the non-target layout when one exists and the channel
+	// fits a gap in it. Any other empty channel belongs to no layout this shard runs.
 	for _, c := range candidates {
 		var overlapsLive = false
 		for _, live := range append(liveNonTarget, liveTarget...) {
@@ -728,10 +771,8 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 		}).Info("abandoning an empty channel of a layout this shard does not continue")
 	}
 
-	// The open-time switch. The declaration is durable — it arrived with the
-	// recovered checkpoint — and every inherited channel is settled, so the
-	// convergence an interrupted session declared completes here: the
-	// inherited channels are abandoned, and the target layout takes over.
+	// A declared target layout alongside idle non-target channels is a switch a
+	// prior session declared and did not finish, so it finishes here.
 	if len(liveNonTarget) > 0 && priorDeclaresTargets {
 		var idle = true
 		for _, c := range liveNonTarget {
@@ -781,7 +822,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 			}
 
 			var sv2ChannelCheckpointItem = b.priorCheckpoint[keyRange]
-			committedOffset, err := reconcileStreamV2Channel(channelName, b.table, status.CommittedToken, sv2ChannelCheckpointItem, keyRange, len(b.priorCheckpoint))
+			committedOffset, err := streamV2ValidateCommittedToken(channelName, b.table, status.CommittedToken, sv2ChannelCheckpointItem, keyRange, len(b.priorCheckpoint))
 			if err != nil {
 				return err
 			}
@@ -920,92 +961,6 @@ func (m *streamV2Manager) sweep(ctx context.Context, database, schema, table, st
 	return nil
 }
 
-// reconcileStreamV2Channel compares Snowflake's committed offset token for one
-// channel against the routed offset that the driver checkpoint recorded for it. It
-// reports the committed offset, the highest offset that Snowflake already holds. A
-// replay must not append a document at or below that offset again.
-//
-// sv2ChannelCheckpointItem is the checkpoint item of this channel, or nil when the
-// checkpoint holds none. priorItems counts every checkpoint item the checkpoint holds
-// for the binding, across all of the task's channels; it is what tells a channel's
-// interrupted first transaction apart from an offset token nothing accounts for.
-func reconcileStreamV2Channel(channelName, table string, committedToken *string, sv2ChannelCheckpointItem *streamV2ChannelCheckpointItem, keyRange streamV2Range, priorItems int) (int64, error) {
-	var routed int64
-	if sv2ChannelCheckpointItem != nil {
-		routed = sv2ChannelCheckpointItem.Routed
-	}
-
-	// Snowflake holds nothing for this channel. With nothing routed to account for,
-	// there is nothing to skip. With routed documents, the channel that held them is
-	// gone, and the offset token that said which of them Snowflake holds went with
-	// it.
-	//
-	// The one drop this connector performs itself — a rebalance abandoning a channel
-	// it converges away from — is recognized before reconciliation reaches here, by
-	// the declaration its checkpoint carries. A missing offset token here has no
-	// such record, so it names an account Snowflake itself has lost.
-	if committedToken == nil {
-		if routed > 0 {
-			return 0, fmt.Errorf(
-				"channel %q reports no committed offset token while this task's checkpoint records offset %d for it: Snowflake has lost this channel's committed offset token, so this shard cannot identify which of its documents Snowflake still holds. Backfill this binding",
-				channelName, routed,
-			)
-		}
-		return 0, nil
-	}
-
-	committedOffset, appendedBy, ok := streamV2ParseOffsetToken(*committedToken)
-	if !ok {
-		return 0, fmt.Errorf(
-			"channel %q reports the committed offset token %q, which carries no offset: this channel was written by something other than this connector's snowpipe_streaming_v2 write path, and continuing could duplicate or drop rows",
-			channelName, *committedToken,
-		)
-	}
-
-	// The offset token's range must be the channel's own key range, always. The key
-	// range is in the channel's name, so every append this write path makes carries
-	// it. An offset token naming any other range was written under a channel scheme
-	// this write path never ran, and nothing up to its offset may be skipped.
-	if appendedBy != keyRange {
-		return 0, fmt.Errorf(
-			"channel %q covers %s but reports committed offset %d under key range %s: that offset token was not written against this channel's key range, so the documents up to its offset cannot be identified. Backfill this binding",
-			channelName, keyRange, committedOffset, appendedBy,
-		)
-	}
-
-	if committedOffset < routed {
-		return 0, fmt.Errorf(
-			"channel %q reports committed offset %d, below the offset %d this task's checkpoint records for it: the channel has lost committed data, so the missing rows cannot be identified. Backfill this binding",
-			channelName, committedOffset, routed,
-		)
-	}
-
-	if sv2ChannelCheckpointItem == nil && committedOffset > 0 && priorItems > 0 {
-		// An offset token with no checkpoint item to account for can be the interrupted
-		// first transaction of this channel. That reading holds only when the checkpoint
-		// holds nothing for the binding at all.
-		//
-		// When the checkpoint holds anything, this state should not exist, because
-		// flush writes a checkpoint item for every active channel of the binding, and
-		// it declares the target layout's checkpoint items before any switch routes
-		// rows to those channels. An offset token no checkpoint item accounts for is
-		// therefore something else appending under this binding's names, and its
-		// documents must not be skipped, or that many of the documents about to be
-		// materialized into the table are dropped instead.
-		return 0, fmt.Errorf(
-			"channel %q reports committed offset %d, which this task's checkpoint does not account for. Skipping the documents up to that offset would drop that many documents materialized into %s. Backfill this binding",
-			channelName, committedOffset, table,
-		)
-	}
-
-	// A committed offset equal to the routed offset is the clean boundary, and one
-	// above it is an interrupted attempt of the transaction now replayed. The replay
-	// produces the same documents in the same order, and the key hash is a
-	// function of each document alone, so this channel receives exactly the documents
-	// up to the committed offset, and skips them by offset.
-	return committedOffset, nil
-}
-
 // writeRow writes one converted document to the channel its key hash routes to, under
 // that channel's next offset. It sends the channel's batch once the batch reaches its
 // row or byte cap, and every channel's batch once the bytes buffered across the whole
@@ -1052,62 +1007,6 @@ func (m *streamV2Manager) writeRow(ctx context.Context, binding int, packedKey [
 	return nil
 }
 
-// bufferRow encodes the document at offset onto the payload of the channel's current
-// batch. When the payload is empty it starts the batch and records offset as the
-// batch's first. It reports how many bytes the payload grew by.
-//
-// A document that fails to encode leaves the payload exactly as it was, so the batch
-// keeps the rows before it and none of the failed row.
-func (c *streamV2Channel) bufferRow(offset int64, columnNames []columnName, converted []any) (int, error) {
-	var before = len(c.buf)
-	if c.bufRows == 0 {
-		c.startBatch()
-		c.bufFirst = offset
-	} else {
-		c.buf = append(c.buf, ',')
-	}
-
-	var payload, err = appendRowJSON(c.buf, columnNames, converted)
-	if err != nil {
-		c.buf = c.buf[:before]
-		return 0, err
-	}
-
-	c.buf = payload
-	c.bufRows++
-	return len(c.buf) - before, nil
-}
-
-// finishBatch closes the payload of the batch and gives up ownership of the buffer. It
-// reports the payload, the number of rows it holds, and the buffered bytes it releases.
-//
-// finishBatch counts those bytes before it writes the closing bracket, because that is
-// the byte total bufferRow reported as it built the batch. A count of the bracket here
-// as well leaves the total of buffered bytes one byte short of zero for every batch of
-// the session. That drifts the back-pressure ceiling away from the memory it stands
-// for.
-func (c *streamV2Channel) finishBatch() (payload []byte, rows int, released int) {
-	released = len(c.buf)
-	c.buf = append(c.buf, ']')
-
-	payload, rows = c.buf, c.bufRows
-	c.bufHint = len(c.buf)
-	c.buf, c.bufRows, c.bufFirst = nil, 0, 0
-	return payload, rows, released
-}
-
-// streamV2MinBatchCapacity is the size a payload buffer starts with. It applies until
-// the channel sends a batch that can size the next one.
-const streamV2MinBatchCapacity = 8 * 1024
-
-// startBatch opens the payload of a new batch. The size is a little over the batch
-// before it. A full batch then does not grow and copy a dozen times on its way to 8
-// MiB. The buffer is always a new one, because the batch before it owns the bytes it
-// received.
-func (c *streamV2Channel) startBatch() {
-	c.buf = append(make([]byte, 0, max(c.bufHint+c.bufHint/8, streamV2MinBatchCapacity)), '[')
-}
-
 // appendAllBatches appends the buffered documents of every channel of every binding.
 // This brings the total of buffered bytes back to zero.
 func (m *streamV2Manager) appendAllBatches(ctx context.Context) error {
@@ -1149,25 +1048,12 @@ func (m *streamV2Manager) appendBatch(ctx context.Context, c *streamV2Channel) e
 	return nil
 }
 
-// flush appends the remaining buffered documents of each channel. It waits for every
-// pending append, and then waits for Snowflake to durably commit them. It returns
-// the checkpoint entries of each binding that did anything this transaction, and it
-// reports them only after Snowflake holds the documents their checkpoint items
-// account for.
-//
-// The entries hold a checkpoint item for every active channel, advanced or not. This
-// is the declaration invariant: every channel rows can route to has a checkpoint item
-// in the checkpoint no later than the transaction that first routes to it, and the
-// target layout a rebalance converges to is declared — written as checkpoint items
-// with nothing routed — at least one durable checkpoint before the switch routes
-// anything there. An offset token with no checkpoint item to account for therefore
-// never has a benign reading.
-//
-// flush awaits the commit because the runtime's checkpoint is durable before
-// Acknowledge runs, so a commit failure surfaced there could no longer fail the
-// transaction that produced it. A failure here instead leaves the runtime to replay
-// the transaction, and the reconciliation of that Open skips the documents Snowflake
-// did commit.
+// flush appends every channel's remaining documents, waits for Snowflake to
+// commit them, and returns a checkpoint entry for each binding that stored,
+// abandoned, or declared anything. Each entry holds an item for every active
+// channel and for every target channel not yet in the layout. The wait is here
+// because a commit failure must fail the transaction that produced it, and
+// only flush can still do that.
 func (m *streamV2Manager) flush(ctx context.Context) (map[int]streamV2Checkpoint, error) {
 	var entries = make(map[int]streamV2Checkpoint)
 	type commitWait struct {
@@ -1266,18 +1152,13 @@ func (m *streamV2Manager) flush(ctx context.Context) (map[int]streamV2Checkpoint
 	return entries, nil
 }
 
-// acknowledged runs after the runtime durably committed the transaction whose
-// checkpoint the last flush produced. It is where a rebalance switches: the
-// declaration that flush wrote is durable now, every channel is settled, and the
-// boilerplate serializes this call before the next Store, so no row
-// routes anywhere while the layout changes.
+// acknowledged runs the channel rebalance switch once its declaration is durable.
+// It abandons every non-target channel, opens the target channels in their
+// place, and drops the abandoned channels.
 //
-// The switch abandons every non-target channel of the layout — recording each
-// deletion — opens the target channels in their place, and sweeps the abandoned
-// channels off the pipe. A crash between the switch and the durability of the
-// deletions restarts to a checkpoint that still holds the abandoned channels'
-// checkpoint items alongside the declaration, which is exactly the state
-// ensureOpened re-enters the switch from.
+// A crash between the switch and the durability of the resulting deletions
+// leaves a checkpoint that holds both the declaration and the abandoned
+// channels' items — the state this function resumes a switch from.
 func (m *streamV2Manager) acknowledged(ctx context.Context) error {
 	var indices = make([]int, 0, len(m.bindings))
 	for idx := range m.bindings {
@@ -1377,9 +1258,6 @@ func (m *streamV2Manager) waitCommit(ctx context.Context, b *streamV2Binding, c 
 		return err
 	}
 
-	// This wait happens before StartedCommit reaches the runtime. The runtime reports a
-	// commit in progress only after that, so nothing else accounts for this wait until it
-	// returns or times out.
 	log.WithFields(log.Fields{
 		"table":   b.table,
 		"channel": c.channelName,
@@ -1393,9 +1271,8 @@ func (m *streamV2Manager) waitCommit(ctx context.Context, b *streamV2Binding, c 
 		return fmt.Errorf("waiting for commit of offset token %s on channel %q: %w", token, c.channelName, err)
 	}
 
-	// The commit of the offset token is the earliest point where this transaction can
-	// see its own rejections. That point is before flush checkpoints its offset. A rejection
-	// therefore fails the transaction that produced it, and not a later one.
+	// Snowflake reports rejected rows only after the commit, and flush has not yet
+	// returned its checkpoint, so a rejection here fails the transaction that caused it.
 	if err := status.validateRejectedRows(c.channelName, b.table); err != nil {
 		return err
 	}
@@ -1417,4 +1294,53 @@ func (m *streamV2Manager) stop() {
 		m.sup.stop(m.client)
 	}
 	m.procCancel()
+}
+
+// streamV2ValidateCommittedToken checks Snowflake's committed offset token against the channel's checkpoint item and returns the committed offset, at or below which a replay must not append.
+func streamV2ValidateCommittedToken(channelName, table string, committedToken *string, sv2ChannelCheckpointItem *streamV2ChannelCheckpointItem, keyRange streamV2Range, priorItems int) (int64, error) {
+	var routed int64
+	if sv2ChannelCheckpointItem != nil {
+		routed = sv2ChannelCheckpointItem.Routed
+	}
+
+	if committedToken == nil {
+		if routed > 0 {
+			return 0, fmt.Errorf(
+				"channel %q reports no committed offset token while this task's checkpoint records offset %d for it: Snowflake has lost this channel's committed offset token, so this shard cannot identify which of its documents Snowflake still holds. Backfill this binding",
+				channelName, routed,
+			)
+		}
+		return 0, nil
+	}
+
+	committedOffset, appendedBy, ok := streamV2ParseOffsetToken(*committedToken)
+	if !ok {
+		return 0, fmt.Errorf(
+			"channel %q reports the committed offset token %q, which carries no offset: this channel was written by something other than this connector's snowpipe_streaming_v2 write path, and continuing could duplicate or drop rows",
+			channelName, *committedToken,
+		)
+	}
+
+	if appendedBy != keyRange {
+		return 0, fmt.Errorf(
+			"channel %q covers %s but reports committed offset %d under key range %s: that offset token was not written against this channel's key range, so the documents up to its offset cannot be identified. Backfill this binding",
+			channelName, keyRange, committedOffset, appendedBy,
+		)
+	}
+
+	if committedOffset < routed {
+		return 0, fmt.Errorf(
+			"channel %q reports committed offset %d, below the offset %d this task's checkpoint records for it: the channel has lost committed data, so the missing rows cannot be identified. Backfill this binding",
+			channelName, committedOffset, routed,
+		)
+	}
+
+	if sv2ChannelCheckpointItem == nil && committedOffset > 0 && priorItems > 0 {
+		return 0, fmt.Errorf(
+			"channel %q reports committed offset %d, which this task's checkpoint does not account for. Skipping the documents up to that offset would drop that many documents materialized into %s. Backfill this binding",
+			channelName, committedOffset, table,
+		)
+	}
+
+	return committedOffset, nil
 }
