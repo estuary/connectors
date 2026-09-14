@@ -64,7 +64,6 @@ Protobuf, W3C Extended Log, and Parquet.
 - [OneDrive](./onedrive.md)
 - [SFTP](./sftp.md)
 - [SharePoint](./sharepoint.md)
-- [Smartsheet](./smartsheet.md)
 
 ### Event connectors
 
@@ -157,7 +156,9 @@ Integrations with streaming systems, queue services, and webhooks.
 - [Google Play](./google-play.md)
 - [Iterate](./iterate.md)
 - [Pendo](./pendo.md)
+- [PostHog](./posthog.md)
 - [Qualtrics](./qualtrics.md)
+- [Smartsheet](./smartsheet.md)
 - [Twilio](./twilio.md)
 
 ### Third party connectors
