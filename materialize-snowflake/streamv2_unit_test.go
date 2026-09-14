@@ -464,7 +464,7 @@ func TestReconcileStreamV2Channel(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			committed, err := reconcileStreamV2Channel("chan", "WIDGETS", tt.committed, tt.sv2ChannelCheckpointItem, r, tt.priorItems)
+			committed, err := streamV2ValidateCommittedToken("chan", "WIDGETS", tt.committed, tt.sv2ChannelCheckpointItem, r, tt.priorItems)
 			if tt.wantErr != "" {
 				require.ErrorContains(t, err, tt.wantErr)
 				return
