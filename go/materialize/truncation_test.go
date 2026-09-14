@@ -282,3 +282,47 @@ func TestTruncateRecoversPendingRecord(t *testing.T) {
 		require.Empty(t, tr.truncates)
 	})
 }
+
+// firstRoundLine returns the health line covering round 0 alone.
+func firstRoundLine(t *testing.T, lines []healthLine) healthLine {
+	t.Helper()
+	for _, l := range lines {
+		if l.FirstRound == 0 && l.LastRound == 0 {
+			return l
+		}
+	}
+	t.Fatal("no health line covers round 0 alone")
+	return healthLine{}
+}
+
+func TestTruncateHealthBucket(t *testing.T) {
+	var fixedT = time.Date(2026, 9, 14, 21, 0, 0, 123456789, time.UTC)
+
+	t.Run("truncation is counted on expected and actual sides", func(t *testing.T) {
+		var tr = &scriptedTransactor{bindings: oneBinding, truncateReturns: 42, report: exactReport(1, 0, 0)}
+		var txns = []txn{
+			{flush: completeFlush(t, 0, fixedT), stores: []pm.Request{storeReq(0, "a", false, false)}},
+			{}, {},
+		}
+		var lines = runHealthScenario(t, tr, openRequest(oneBinding, nil), txns, nil, nil)
+
+		var l = firstRoundLine(t, lines)
+		require.Equal(t, "ok", l.Verdict)
+		require.Equal(t, int64(1), l.Expected.Truncated)
+		require.Equal(t, int64(42), l.Actual.Truncated)
+	})
+
+	t.Run("no truncation reports zero on both sides", func(t *testing.T) {
+		var tr = &scriptedTransactor{bindings: oneBinding, report: exactReport(1, 0, 0)}
+		var txns = []txn{
+			{stores: []pm.Request{storeReq(0, "a", false, false)}},
+			{}, {},
+		}
+		var lines = runHealthScenario(t, tr, openRequest(oneBinding, nil), txns, nil, nil)
+
+		var l = firstRoundLine(t, lines)
+		require.Equal(t, "ok", l.Verdict)
+		require.Equal(t, int64(0), l.Expected.Truncated)
+		require.Equal(t, int64(0), l.Actual.Truncated)
+	})
+}

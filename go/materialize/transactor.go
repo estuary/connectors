@@ -285,7 +285,9 @@ func RunTransactions(
 		if err != nil {
 			return err
 		}
-		if ackState, err = truncs.evaluate(ctx, transactor, ackState); err != nil {
+		if ackState, err = truncs.evaluate(ctx, transactor, ackState, func(deleted int64) {
+			health.truncated(committedRound, deleted)
+		}); err != nil {
 			return err
 		}
 		if committedRound < 0 {

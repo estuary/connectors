@@ -36,11 +36,11 @@ type healthLine struct {
 	LoadRequests     int64
 	Loaded           int64
 	Expected         struct {
-		Insert, Update, Delete, SoftDeleted, Skipped int64
+		Insert, Update, Delete, SoftDeleted, Skipped, Truncated int64
 	}
 	Actual struct {
-		Inserted, Updated, Deleted, Total int64
-		Staged, Loaded                    *int64
+		Inserted, Updated, Deleted, Total, Truncated int64
+		Staged, Loaded                               *int64
 	}
 	Pending    int
 	Recovery   bool
@@ -211,6 +211,8 @@ type scriptedTransactor struct {
 	// stream, when set, lets Truncate record how many responses the stream
 	// had already sent at call time.
 	stream *scriptedStream
+	// truncateReturns is the row count Truncate reports.
+	truncateReturns int64
 
 	mu        sync.Mutex
 	pending   []func()
@@ -303,7 +305,7 @@ func (t *scriptedTransactor) Truncate(_ context.Context, binding int, before tim
 		n = t.stream.responseCount()
 	}
 	t.truncates = append(t.truncates, truncateCall{binding: binding, before: before, responses: n})
-	return 0, nil
+	return t.truncateReturns, nil
 }
 
 // runHealthScenario drives RunTransactions over a scripted stream and returns

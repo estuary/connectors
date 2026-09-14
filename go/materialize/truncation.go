@@ -119,8 +119,9 @@ func (t *truncations) emit(state *pf.ConnectorState) (*pf.ConnectorState, error)
 // key matching no live binding is cleared without truncating. It is a
 // no-op for a non-primary shard (KeyBegin != 0), and folds any clearing
 // patch into state following the same merge-patch or full-replacement
-// shape state already carries.
-func (t *truncations) evaluate(ctx context.Context, transactor Transactor, state *pf.ConnectorState) (*pf.ConnectorState, error) {
+// shape state already carries. onTruncate, when non-nil, is called with the
+// row count of each successful Truncate.
+func (t *truncations) evaluate(ctx context.Context, transactor Transactor, state *pf.ConnectorState, onTruncate func(deleted int64)) (*pf.ConnectorState, error) {
 	if !t.primary {
 		return state, nil
 	}
@@ -164,6 +165,9 @@ func (t *truncations) evaluate(ctx context.Context, transactor Transactor, state
 			"boundary": before,
 			"deleted":  deleted,
 		}).Info("truncated backfill")
+		if onTruncate != nil {
+			onTruncate(deleted)
+		}
 
 		for _, e := range entries {
 			clearEntry(clear, e.rangeKey, sk)

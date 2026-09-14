@@ -199,6 +199,9 @@ type healthRound struct {
 	loaded           int64
 	expected         map[string]expectedCounts
 	actual           map[string]RowStats
+	// truncated counts Truncate calls attributed to this round; truncatedRows
+	// sums the rows they reported deleted.
+	truncated, truncatedRows int64
 }
 
 func newHealthRound(round int) *healthRound {
@@ -232,9 +235,12 @@ type healthWindow struct {
 	loadRequests, loaded  int64
 	expected              expectedCounts
 	actual                RowStats
-	pending               int
-	mismatches            []healthMismatch
-	fidelity              Fidelity
+	// truncated counts Truncate calls attributed to this window; truncatedRows
+	// sums the rows they reported deleted. Neither participates in a verdict.
+	truncated, truncatedRows int64
+	pending                  int
+	mismatches               []healthMismatch
+	fidelity                 Fidelity
 }
 
 func newHealthWindow() *healthWindow {
@@ -554,6 +560,31 @@ func (h *healthTracker) acknowledged(round int) {
 	}
 }
 
+// truncated attributes one successful Truncate call to round, or to the
+// recovery accounting when round is negative, adding deleted to its total.
+func (h *healthTracker) truncated(round int, deleted int64) {
+	defer recoverHealthPanic()
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	if round < 0 {
+		h.recoveryWindow.addRound(round)
+		h.recoveryWindow.truncated++
+		h.recoveryWindow.truncatedRows += deleted
+		return
+	}
+	if h.sharded {
+		h.shardedWindow.addRound(round)
+		h.shardedWindow.truncated++
+		h.shardedWindow.truncatedRows += deleted
+		h.maybeFlushWindows()
+		return
+	}
+	r := h.openRound(round)
+	r.truncated++
+	r.truncatedRows += deleted
+}
+
 func (h *healthTracker) openRound(round int) *healthRound {
 	r, ok := h.rounds[round]
 	if !ok {
@@ -572,6 +603,7 @@ func (h *healthTracker) evaluate(r *healthRound) {
 	w := newHealthWindow()
 	w.addRound(r.round)
 	w.loadRequests, w.loaded = r.loadRequests, r.loaded
+	w.truncated, w.truncatedRows = r.truncated, r.truncatedRows
 
 	keys := make(map[string]struct{})
 	for key := range r.expected {
@@ -664,6 +696,8 @@ func (h *healthTracker) mergeWindow(into, w *healthWindow) {
 	into.loaded += w.loaded
 	into.expected = into.expected.add(w.expected)
 	into.actual = into.actual.add(w.actual)
+	into.truncated += w.truncated
+	into.truncatedRows += w.truncatedRows
 	into.pending += w.pending
 	into.fidelity = minFidelity(into.fidelity, w.fidelity)
 	for _, m := range w.mismatches {
@@ -717,10 +751,11 @@ func (h *healthTracker) flushWindows() {
 
 func (h *healthTracker) emit(w *healthWindow, verdict string, extra log.Fields) {
 	actual := log.Fields{
-		"inserted": w.actual.Inserted,
-		"updated":  w.actual.Updated,
-		"deleted":  w.actual.Deleted,
-		"total":    w.actual.Total,
+		"inserted":  w.actual.Inserted,
+		"updated":   w.actual.Updated,
+		"deleted":   w.actual.Deleted,
+		"total":     w.actual.Total,
+		"truncated": w.truncatedRows,
 	}
 	if w.actual.Staged != nil {
 		actual["staged"] = *w.actual.Staged
@@ -751,6 +786,7 @@ func (h *healthTracker) emit(w *healthWindow, verdict string, extra log.Fields) 
 			"delete":      w.expected.delete,
 			"softDeleted": w.expected.softDeleted,
 			"skipped":     w.expected.skipped,
+			"truncated":   w.truncated,
 		},
 		"actual": actual,
 	}
