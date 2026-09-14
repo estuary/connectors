@@ -326,3 +326,32 @@ func TestTruncateHealthBucket(t *testing.T) {
 		require.Equal(t, int64(0), l.Actual.Truncated)
 	})
 }
+
+func TestTruncateSkipped(t *testing.T) {
+	var resourcePath = []string{"schema", "alpha"}
+	var before = time.Date(2026, 9, 14, 21, 0, 0, 0, time.UTC)
+	var reason = "no usable flow_published_at column"
+
+	var hook = logtest.NewGlobal()
+	defer hook.Reset()
+
+	TruncateSkipped(resourcePath, before, reason)
+
+	var entries = hook.AllEntries()
+	require.Len(t, entries, 2)
+
+	var warn = entries[0]
+	require.Equal(t, log.WarnLevel, warn.Level)
+	require.Equal(t, "backfill truncation skipped", warn.Message)
+	require.Equal(t, "schema.alpha", warn.Data["resourcePath"])
+	require.Equal(t, before, warn.Data["before"])
+	require.Equal(t, reason, warn.Data["reason"])
+
+	var status = entries[1]
+	require.Equal(t, log.InfoLevel, status.Level)
+	require.Equal(t, "connectorStatus", status.Data["eventType"])
+	require.Equal(t,
+		"Backfill truncation skipped for schema.alpha: no usable flow_published_at column. "+
+			"Rows published before 2026-09-14T21:00:00Z were not deleted.",
+		status.Message)
+}

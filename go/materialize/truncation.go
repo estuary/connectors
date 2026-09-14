@@ -289,3 +289,19 @@ func clearEntry(clear map[string]any, rangeKey, stateKey string) {
 	}
 	obj[stateKey] = nil
 }
+
+// TruncateSkipped records that a binding's backfill truncation was not
+// performed, so the rows published before `before` remain in the
+// destination.
+func TruncateSkipped(resourcePath []string, before time.Time, reason string) {
+	var path = strings.Join(resourcePath, ".")
+	log.WithFields(log.Fields{
+		"resourcePath": path,
+		"before":       before,
+		"reason":       reason,
+	}).Warn("backfill truncation skipped")
+
+	log.WithField("eventType", "connectorStatus").Infof(
+		"Backfill truncation skipped for %s: %s. Rows published before %s were not deleted.",
+		path, reason, before.Format(time.RFC3339))
+}
