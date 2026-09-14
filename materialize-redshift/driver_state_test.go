@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"testing"
 
-	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
+	m "github.com/estuary/connectors/go/materialize"
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/stretchr/testify/require"
 )
@@ -142,7 +142,7 @@ func TestEntryPatchReplacesPrevious(t *testing.T) {
 	require.NoError(t, json.Unmarshal(mustMarshal(t, connectorState{"a_table.v1": {fullRange: previous}}), &before))
 	require.NoError(t, json.Unmarshal(mustMarshal(t, connectorState{"a_table.v1": {fullRange: next}}), &patch))
 
-	reduced, err := json.Marshal(boilerplate.ApplyMergePatch(before, patch))
+	reduced, err := json.Marshal(m.ApplyMergePatch(before, patch))
 	require.NoError(t, err)
 
 	pending, err := parseState(reduced)

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/stretchr/testify/require"
@@ -107,7 +108,7 @@ func reduceConnectorState(t *testing.T, prior json.RawMessage, update *pf.Connec
 	var before, patch any
 	require.NoError(t, json.Unmarshal(prior, &before))
 	require.NoError(t, json.Unmarshal(update.UpdatedJson, &patch))
-	reduced, err := json.Marshal(boilerplate.ApplyMergePatch(before, patch))
+	reduced, err := json.Marshal(m.ApplyMergePatch(before, patch))
 	require.NoError(t, err)
 
 	return reduced

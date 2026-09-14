@@ -12,7 +12,6 @@ import (
 	"time"
 
 	m "github.com/estuary/connectors/go/materialize"
-	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/stretchr/testify/require"
@@ -57,7 +56,7 @@ func reduce(t *testing.T, doc string, update *pf.ConnectorState) string {
 	if !update.MergePatch {
 		before = nil
 	}
-	var out, err = json.Marshal(boilerplate.ApplyMergePatch(before, patch))
+	var out, err = json.Marshal(m.ApplyMergePatch(before, patch))
 	require.NoError(t, err)
 	return string(out)
 }

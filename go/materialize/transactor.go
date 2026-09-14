@@ -228,6 +228,11 @@ func RunTransactions(
 		}
 	}
 
+	var truncs *truncations
+	if truncs, err = newTruncations(open); err != nil {
+		return fmt.Errorf("initializing truncations: %w", err)
+	}
+
 	var txResponse pm.Response
 	var rxRequest = pm.Request{Open: open}
 	txResponse, err = writeOpened(stream, opened)
@@ -278,6 +283,9 @@ func RunTransactions(
 
 		ackState, err := transactor.Acknowledge(ctx, statePatches, nil)
 		if err != nil {
+			return err
+		}
+		if ackState, err = truncs.evaluate(ctx, transactor, ackState); err != nil {
 			return err
 		}
 		if committedRound < 0 {
@@ -359,6 +367,9 @@ func RunTransactions(
 		if statePatches, err = SplitStatePatches(rxRequest.Acknowledge.StatePatchesJson); err != nil {
 			return err
 		}
+		if err = truncs.absorb(statePatches); err != nil {
+			return err
+		}
 
 		// Await the commit of the prior transaction, then notify the runtime.
 		// On completion, Acknowledged has been written to the stream,
@@ -398,6 +409,19 @@ func RunTransactions(
 			return err
 		}
 		logBackfillSignals(open.Materialization, rxRequest.Flush)
+		var flushPatches []json.RawMessage
+		if flushPatches, err = SplitStatePatches(rxRequest.Flush.StatePatchesJson); err != nil {
+			return err
+		}
+		if err = truncs.absorb(flushPatches); err != nil {
+			return err
+		}
+		var hadCompletes = len(rxRequest.Flush.BackfillCompletes) > 0
+		if hadCompletes {
+			if err = truncs.recordCompletes(open.Materialization, rxRequest.Flush); err != nil {
+				return err
+			}
+		}
 		if err = writeFlushed(stream, &txResponse); err != nil {
 			return err
 		}
@@ -438,6 +462,11 @@ func RunTransactions(
 		default:
 		}
 
+		if hadCompletes {
+			if stateUpdate, err = truncs.emit(stateUpdate); err != nil {
+				return err
+			}
+		}
 		if err = writeStartedCommit(stream, &txResponse, stateUpdate); err != nil {
 			return err
 		}
