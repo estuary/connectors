@@ -9,6 +9,8 @@ import (
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	"github.com/gogo/protobuf/types"
+	log "github.com/sirupsen/logrus"
 	pc "go.gazette.dev/core/consumer/protocol"
 )
 
@@ -218,6 +220,28 @@ func validateIsFlush(request *pm.Request) error {
 		return fmt.Errorf("validation failed: %w", err)
 	}
 	return nil
+}
+
+// logBackfillSignals logs an INFO line for each backfill-begin and
+// backfill-complete signal carried by a Flush request.
+func logBackfillSignals(spec *pf.MaterializationSpec, flush *pm.Request_Flush) {
+	for _, b := range flush.BackfillBegins {
+		logBackfillSignal("backfill begins", spec, b.Binding, b.Timestamp)
+	}
+	for _, c := range flush.BackfillCompletes {
+		logBackfillSignal("backfill completes", spec, c.Binding, c.Timestamp)
+	}
+}
+
+func logBackfillSignal(message string, spec *pf.MaterializationSpec, binding uint32, ts *types.Timestamp) {
+	var fields = log.Fields{"binding": binding}
+	if int(binding) < len(spec.Bindings) {
+		fields["stateKey"] = spec.Bindings[binding].StateKey
+	}
+	if t, err := types.TimestampFromProto(ts); err == nil {
+		fields["timestamp"] = t
+	}
+	log.WithFields(fields).Info(message)
 }
 
 func checkpointFromStartCommit(request *pm.Request) (*pc.Checkpoint, error) {
