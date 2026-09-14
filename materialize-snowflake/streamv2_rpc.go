@@ -329,6 +329,18 @@ func (s *channelStatusResult) committedToken() any {
 	return *s.CommittedToken
 }
 
+// validateRejectedRows fails a channel on which Snowflake has ever rejected a row,
+// because those rows are gone and only a backfill resets the count.
+func (s *channelStatusResult) validateRejectedRows(channelName, table string) error {
+	if s.RowsErrorCount == 0 {
+		return nil
+	}
+	return fmt.Errorf(
+		"channel %q had %d row(s) rejected and discarded by Snowflake, which reported: %s. Those rows are not in %s, and Snowflake's committed offset token has advanced past them, so they cannot be identified and re-sent. Backfill this binding",
+		channelName, s.RowsErrorCount, s.LastErrorMessage, table,
+	)
+}
+
 func (c *sidecarClient) ChannelStatus(ctx context.Context, channelName string) (*channelStatusResult, error) {
 	var res channelStatusResult
 	if err := c.call(ctx, "channel_status", struct {

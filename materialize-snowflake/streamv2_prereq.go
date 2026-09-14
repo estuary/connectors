@@ -113,7 +113,7 @@ func missingRuntimeV2Warning(configJson json.RawMessage, last *pf.Materializatio
 
 // rejectOrphanedStreamV2Bindings rejects a publication which moves a binding
 // off the snowpipe_streaming_v2 write path, other than by the one exit this
-// connector supports — see streamV2PathOrphaned for what an unsupported
+// connector supports — see streamV2Checkpoint.validateNotOrphaned for what an unsupported
 // departure costs the binding, and streamV2Downgrade for the one it allows.
 //
 // The transactor rejects the same thing, and has to, because the connector state
@@ -157,7 +157,7 @@ func rejectOrphanedStreamV2Bindings(spec *pf.MaterializationSpec, stateJson json
 			}
 			continue
 		}
-		if err := streamV2PathOrphaned(table, item.StreamV2); err != nil {
+		if err := item.StreamV2.validateNotOrphaned(table); err != nil {
 			return err
 		}
 	}
@@ -221,7 +221,7 @@ func requireStreamingV2RuntimeForState(spec *pf.MaterializationSpec, stateJson j
 		if item == nil {
 			continue
 		}
-		var channels = streamV2ChannelNames(item.StreamV2)
+		var channels = item.StreamV2.channelNames()
 		if len(channels) == 0 {
 			continue
 		}
