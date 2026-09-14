@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 	"text/template"
+	"time"
 
 	"cloud.google.com/go/bigquery"
 	"github.com/estuary/connectors/go/blob"
@@ -80,6 +81,22 @@ func loadResultsTableName(materialization, rangeKey string) string {
 	return loadResultsTablePrefix + translateFlowIdentifier(materialization) + "_" + rangeKey + "_" + uuid.NewString()
 }
 
+// loadResultsTableTTL bounds how long a load results table survives a crash
+// that prevents its deletion.
+const loadResultsTableTTL = 24 * time.Hour
+
+// deleteLoadResultsTable deletes a load results table under a context that
+// survives cancellation of the transaction, so that a shard shutting down
+// mid-transaction still cleans up. A failure is only logged, because the
+// table's expiration removes it regardless.
+func deleteLoadResultsTable(ctx context.Context, table *bigquery.Table) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Minute)
+	defer cancel()
+	if err := table.Delete(ctx); err != nil {
+		log.WithFields(log.Fields{"results_table": table.TableID, "error": err}).Warn("deleting load results table failed; it will expire on its own")
+	}
+}
+
 func isJSONNull(data json.RawMessage) bool {
 	return bytes.Equal(bytes.TrimSpace(data), []byte("null"))
 }
@@ -87,10 +104,11 @@ func isJSONNull(data json.RawMessage) bool {
 var _ m.Transactor = (*transactor)(nil)
 
 type transactor struct {
-	runtimeCheckpoint m.RuntimeCheckpoint
-	cfg               config
-	dialect           sql.Dialect
-	templates         templates
+	runtimeCheckpoint   m.RuntimeCheckpoint
+	materializationName string
+	cfg                 config
+	dialect             sql.Dialect
+	templates           templates
 
 	client     *client
 	storeFiles *boilerplate.StagedFiles
@@ -154,6 +172,7 @@ func prepareNewTransactor(
 
 		t := &transactor{
 			runtimeCheckpoint:     fence.Checkpoint,
+			materializationName:   materializationName,
 			cfg:                   cfg,
 			dialect:               ep.Dialect,
 			templates:             templates,
@@ -397,7 +416,17 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	queryStr := strings.Join(subqueries, "\nUNION ALL\n") + ";"
 	query := t.client.newQuery(queryStr)
 	query.TableDefinitions = edcTableDefs // Tell bigquery where to get the external references in gcs.
-	ll := log.WithFields(log.Fields{"query": queryStr, "external_data": externalData})
+
+	// A query with no destination table caps its response at 10 GB, so the
+	// results are written to a table created for this transaction.
+	dst := t.client.bigqueryClient.DatasetInProject(t.cfg.ProjectID, t.cfg.Dataset).Table(loadResultsTableName(t.materializationName, t.rangeKey))
+	ll := log.WithFields(log.Fields{"query": queryStr, "external_data": externalData, "results_table": dst.TableID})
+	if err := dst.Create(ctx, &bigquery.TableMetadata{ExpirationTime: time.Now().Add(loadResultsTableTTL)}); err != nil {
+		return fmt.Errorf("creating load results table: %w", err)
+	}
+	defer deleteLoadResultsTable(ctx, dst)
+	query.Dst = dst
+	query.WriteDisposition = bigquery.WriteTruncate
 
 	t.be.StartedEvaluatingLoads()
 	job, err := t.client.runQuery(ctx, query)

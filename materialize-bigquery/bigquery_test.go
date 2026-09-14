@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"cloud.google.com/go/bigquery"
 	"github.com/estuary/connectors/go/blob"
 	m "github.com/estuary/connectors/go/materialize"
 	testutil "github.com/estuary/connectors/materialize-boilerplate/testutil"
@@ -17,6 +18,7 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/api/iterator"
 )
 
 func TestIntegration(t *testing.T) {
@@ -40,8 +42,43 @@ func TestIntegration(t *testing.T) {
 	}
 
 	t.Run("materialize", func(t *testing.T) {
+		started := time.Now()
 		sql.RunMaterializationTest(t, NewDriver(), "testdata/materialize.flow.yaml", makeResourceFn, actionDescSanitizers,
 			sql.RuntimeConfig{Shards: 1, Fidelity: m.FidelityExact})
+
+		// Every load results table created by this run must be deleted after
+		// read-back. Tables older than this run belong to another run and are
+		// ignored.
+		testutil.RunTestAllTasks(t, "testdata/materialize.flow.yaml", func(t *testing.T, _ []byte, taskName string, cfg config) {
+			credOption, err := cfg.CredentialsClientOption()
+			require.NoError(t, err)
+			bq, err := bigquery.NewClient(t.Context(), cfg.ProjectID, credOption)
+			require.NoError(t, err)
+			t.Cleanup(func() { bq.Close() })
+
+			prefix := loadResultsTablePrefix + translateFlowIdentifier(taskName)
+			cutoff := started.Add(-time.Minute) // Tolerates skew between this clock and BigQuery's.
+			var leaked []string
+			it := bq.DatasetInProject(cfg.ProjectID, cfg.Dataset).Tables(t.Context())
+			for {
+				tbl, err := it.Next()
+				if err == iterator.Done {
+					break
+				}
+				require.NoError(t, err)
+				if !strings.HasPrefix(tbl.TableID, prefix) {
+					continue
+				}
+				md, err := tbl.Metadata(t.Context(), bigquery.WithMetadataView(bigquery.BasicMetadataView))
+				require.NoError(t, err)
+				if md.CreationTime.Before(cutoff) {
+					t.Logf("ignoring load results table %s from an earlier run", tbl.TableID)
+					continue
+				}
+				leaked = append(leaked, tbl.TableID)
+			}
+			require.Empty(t, leaked, "leaked load results tables")
+		})
 	})
 
 	t.Run("apply", func(t *testing.T) {
