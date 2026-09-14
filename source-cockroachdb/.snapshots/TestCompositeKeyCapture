@@ -1,0 +1,145 @@
+sql> CREATE TABLE test.compositekeycapture_129883 (order_id INTEGER, sku TEXT, quantity INTEGER, PRIMARY KEY (order_id, sku))
+=== Discover: Discover ===
+acmeCo/test_capture/test/compositekeycapture_129883
+sql> INSERT INTO test.compositekeycapture_129883 VALUES (100, 'AAA', 3), (100, 'BBB', 1), (200, 'AAA', 5)
+=== Run: Initial Backfill ===
+[
+  "acmeCo/test_capture/test/compositekeycapture_129883",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "compositekeycapture_129883"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "order_id": 100,
+    "quantity": 3,
+    "sku": "AAA"
+  }
+]
+[
+  "acmeCo/test_capture/test/compositekeycapture_129883",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "compositekeycapture_129883"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "order_id": 100,
+    "quantity": 1,
+    "sku": "BBB"
+  }
+]
+[
+  "acmeCo/test_capture/test/compositekeycapture_129883",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "compositekeycapture_129883"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "order_id": 200,
+    "quantity": 5,
+    "sku": "AAA"
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fcompositekeycapture_129883": {
+      "backfilled": 3,
+      "key_columns": [
+        "order_id",
+        "sku"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO test.compositekeycapture_129883 VALUES (300, 'CCC', 7)
+sql> UPDATE test.compositekeycapture_129883 SET quantity = 42 WHERE order_id = 100 AND sku = 'AAA'
+sql> DELETE FROM test.compositekeycapture_129883 WHERE order_id = 200 AND sku = 'AAA'
+=== Run: Replication ===
+[
+  "acmeCo/test_capture/test/compositekeycapture_129883",
+  {
+    "_meta": {
+      "op": "u",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "compositekeycapture_129883",
+        "ts_ms": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "order_id": 100,
+    "quantity": 42,
+    "sku": "AAA"
+  }
+]
+[
+  "acmeCo/test_capture/test/compositekeycapture_129883",
+  {
+    "_meta": {
+      "op": "d",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "compositekeycapture_129883",
+        "ts_ms": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "order_id": 200,
+    "sku": "AAA"
+  }
+]
+[
+  "acmeCo/test_capture/test/compositekeycapture_129883",
+  {
+    "_meta": {
+      "op": "u",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "compositekeycapture_129883",
+        "ts_ms": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "order_id": 300,
+    "quantity": 7,
+    "sku": "CCC"
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fcompositekeycapture_129883": {
+      "backfilled": 3,
+      "key_columns": [
+        "order_id",
+        "sku"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

@@ -1,0 +1,16 @@
+captures:
+  acmeCo/test_capture/source-cockroachdb:
+    endpoint:
+      local:
+        command: ["go", "run", "./source-cockroachdb"]
+        config:
+          address: "localhost:26257"
+          database: defaultdb
+          user: root
+          password: dummy
+          advanced:
+            sslmode: disable
+            resolved_interval: "1s"
+            backfill_chunk_size: 1
+        protobuf: true
+    bindings: []
