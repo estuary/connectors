@@ -113,14 +113,12 @@ func (t *truncations) emit(state *pf.ConnectorState) (*pf.ConnectorState, error)
 	return t.mergeInto(state, map[string]any{t.ownRange: t.tree[t.ownRange]})
 }
 
-// evaluate runs the shard-zero truncation election: for every binding state
-// key whose reported ranges fully cover the key space at a single boundary,
-// it calls transactor.Truncate and clears those ranges' entries. A state
-// key matching no live binding is cleared without truncating. It is a
-// no-op for a non-primary shard (KeyBegin != 0), and folds any clearing
-// patch into state following the same merge-patch or full-replacement
-// shape state already carries. onTruncate, when non-nil, is called with the
-// row count of each successful Truncate.
+// evaluate runs the shard-zero truncation election. For every binding state
+// key whose reported ranges tile the key space at a single boundary, it
+// calls transactor.Truncate, then folds a patch clearing those ranges'
+// entries into state. A state key matching no live binding is cleared
+// without truncating. onTruncate, when non-nil, receives the row count of
+// each successful Truncate.
 func (t *truncations) evaluate(ctx context.Context, transactor Transactor, state *pf.ConnectorState, onTruncate func(deleted int64)) (*pf.ConnectorState, error) {
 	if !t.primary {
 		return state, nil

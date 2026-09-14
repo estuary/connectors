@@ -236,7 +236,7 @@ type healthWindow struct {
 	expected              expectedCounts
 	actual                RowStats
 	// truncated counts Truncate calls attributed to this window; truncatedRows
-	// sums the rows they reported deleted. Neither participates in a verdict.
+	// sums the rows they reported deleted.
 	truncated, truncatedRows int64
 	pending                  int
 	mismatches               []healthMismatch

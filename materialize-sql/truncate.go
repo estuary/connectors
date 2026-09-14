@@ -19,8 +19,8 @@ func TruncationBoundary(before time.Time) time.Time {
 }
 
 // FlowPublishedAtColumn returns the table's column materialized from the
-// document's /_meta/flow_published_at location when that column holds a
-// date-time, and an explanatory reason when it does not.
+// document's UUID projection when that column holds a date-time, and an
+// explanatory reason when it does not.
 func (t *Table) FlowPublishedAtColumn() (*Column, string) {
 	for _, col := range t.Columns() {
 		if col.Ptr != flowPublishedAtPtr {
