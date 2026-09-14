@@ -1,0 +1,24 @@
+info:
+  name: Report Metric Legality (BASIC bundle)
+  type: http
+  seq: 5
+
+http:
+  method: GET
+  url: '{{base_url}}/report/integrated/get/?advertiser_id={{advertiser_id}}&report_type=BASIC&data_level=AUCTION_CAMPAIGN&dimensions=["campaign_id","stat_time_day"]&metrics=["spend","cpc","cpm","impressions","clicks","ctr","reach","cost_per_1000_reached","frequency","conversion","cost_per_conversion","conversion_rate","conversion_rate_v2","real_time_conversion","real_time_cost_per_conversion","real_time_conversion_rate","real_time_conversion_rate_v2","result","cost_per_result","result_rate","real_time_result","real_time_cost_per_result","real_time_result_rate","secondary_goal_result","cost_per_secondary_goal_result","secondary_goal_result_rate","average_video_play","average_video_play_per_user","video_play_actions","video_watched_2s","video_watched_6s","video_views_p25","video_views_p50","video_views_p75","video_views_p100","comments","likes","shares","follows","profile_visits","profile_visits_rate"]&start_date=2026-07-01&end_date=2026-07-30&page=1&page_size=1000'
+
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  Requests the connector's exact default BASIC metric bundle, to establish that the
+  combination TikTok will actually accept matches the one the prebuilt reports ship with.
+
+  Validity is checked before any data is looked up, so `code: 0` with an empty row list
+  proves the bundle is legal even on an account with no spend. A `40002` names the
+  offending fields in its message, which is the only way TikTok reports them.

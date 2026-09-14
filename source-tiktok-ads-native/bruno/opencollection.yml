@@ -1,0 +1,177 @@
+opencollection: 1.0.0
+
+info:
+  name: TikTok Ads
+
+docs: |-
+  Probes for the TikTok Business API v1.3, backing `source-tiktok-ads-native`.
+
+  The connector was built without TikTok credentials, so most findings here are classified
+  `**DOCUMENTED**` — taken from TikTok's official docs or their official SDK's OpenAPI
+  definitions — rather than `**VERIFIED**`.
+
+  Credentials for the `Estuary0822` ad account arrived on 2026-08-13 and promoted a number of
+  findings to VERIFIED, including one that was **wrong in a connector-breaking way** — see the
+  `buying_types` note on `Campaigns (GET campaign get).yml`.
+
+  The account holds no campaigns, ad groups, ads or report rows. That is enough to settle
+  request *validity* — TikTok checks a request's shape before it looks up data, so `code: 0`
+  on an empty result proves the parameters are legal — but it cannot settle anything that
+  needs rows back: page-size clamping, the 20,000-ad truncation, response field shapes, or
+  whether report timestamps are really advertiser-local.
+
+  ## Verified against the live API (2026-08-13)
+
+  - **Authentication end to end.** `code: 0` from `/oauth2/advertiser/get/` with the app id and
+    secret as query parameters and the bare token in an `Access-Token` header.
+  - **The success envelope is `{code, data, message, request_id}`**, with account lists at
+    `data.list` — a name that shadows the Python builtin, hence the alias in the models.
+  - **The `Etc/GMT` sign-inversion trap is real.** `Estuary0822` reports
+    `timezone: "Etc/GMT+5"` alongside `display_timezone: "America/New_York"`. Reading the
+    former as UTC+5 would put report dates 10 hours out, and being a fixed offset it would also
+    be an hour wrong through daylight saving. `display_timezone` is the correct field.
+  - **Both default metric bundles are legal.** The 41-metric BASIC bundle at
+    `AUCTION_CAMPAIGN`/daily and the 22-metric AUDIENCE bundle with a `country_code` breakdown
+    each returned `code: 0`.
+  - **`total_page` is `0` when a result set is empty**, which the connector's pagination loop
+    terminates on correctly.
+
+  ## Sandbox
+
+  Sandbox ad accounts are free, need no approval or payment, and are created from the
+  developer portal ("Create a Sandbox Ad Account"), where the account's name, country,
+  currency and **timezone** are chosen and a token generated directly. Set `base_url` in the
+  environment to `https://sandbox-ads.tiktok.com/open_api/v1.3` to probe one; the connector
+  reaches the same host via `advanced.is_sandbox`.
+
+  Sandbox constraints, all **DOCUMENTED**
+  (https://business-api.tiktok.com/portal/docs?id=1738855331457026):
+
+  - 14 endpoints only, though reporting is among them.
+  - **1 QPS / 30 QPM / 1000 QPD** — far tighter than production. Prefer single probes here
+    over a full `flowctl preview`, which would exhaust the daily allowance walking empty
+    windows.
+  - Mock report data covers **2020-12-08 to 2020-12-19** only, for BASIC and AUDIENCE types.
+    "Some metrics may return 0 or -", which is the cheapest way to exercise the `"-"`-to-null
+    mapping.
+  - No asynchronous reports; `order_field` / `order_type` are ignored.
+  - Mock data does not reflect real campaign settings.
+
+  Because the account's timezone is chosen at creation, a sandbox account created outside UTC
+  is the one practical way to settle whether `stat_time_day` is advertiser-local without a
+  production account. Sandbox will **not** settle metric legality — it accepts all dimensions
+  and metrics, so a green run there does not imply production accepts the same request.
+
+  ## API constraints (account-wide)
+
+  **VERIFIED (2026-08-12): errors arrive inside HTTP 200.** A request with a placeholder
+  token returned HTTP 200 carrying `{"code": 40105, "message": "Access token is incorrect or
+  has been revoked.", "request_id": "2026081307345051AF1D9A80D26E08033C"}`. TikTok states
+  this explicitly: "These return codes take precedence over HTTP status codes in determining
+  whether a call is successful." Any retry or auth policy keyed on HTTP status is a silent
+  no-op — dispatch on `code`.
+  Evidence: the connector's own `validate_credentials` surfaced this through
+  `flowctl preview`; see `Auth Sanity (GET oauth2 advertiser get).yml`.
+
+  **VERIFIED (2026-08-12): base URL, API version, and auth header placement.** The same
+  response proves `https://business-api.tiktok.com/open_api/v1.3` is reachable and that the
+  bare token belongs in an `Access-Token` header — TikTok parsed the request and rejected the
+  token's *value*, not its shape. It is not `Authorization: Bearer`.
+
+  **DOCUMENTED: rate limits are per developer app, not per advertiser.** Basic (the default
+  tier) is 10 QPS / 600 QPM / 864,000 QPD; Advanced 20/1200/1.7M; Premium 30/1800/2.6M;
+  Ultimate 50/3000/4.3M. Upgrades are granted one tier at a time on written application.
+  QPM recovery is 5 minutes; QPD resets at 00:00:00 UTC.
+  https://business-api.tiktok.com/portal/docs/rate-limits/v1.3
+
+  **DOCUMENTED: a second, unpublished per-advertiser limit exists.** Code `40133` reports
+  "Advertiser ({ID})'s QPS ({current}) reaches QPS limit {limit} for current path". TikTok
+  publishes no number for it. Fanning out across many advertisers trips the app limit;
+  hammering one large advertiser trips this one.
+
+  **DOCUMENTED: retrying a failing request is actively punished.** "If your developer app has
+  frequent timeouts, we will dynamically lower your QPS limit": 10 timeouts in 10s drops the
+  app to 5 QPS for 5 minutes, 20 drops it to 1 QPS, 30 drops it to 0 QPS. Retrying *the same*
+  request with 3+ timeouts in 10 minutes blocks that request for 10 minutes. TikTok's own
+  instruction: "please do not retry with the same request."
+  https://business-api.tiktok.com/portal/docs/reporting-performance-improvements/v1.3
+
+  **DOCUMENTED: reports silently truncate at 20,000 ads.** Above that, only the most recently
+  created 20,000 ads are processed, `code` stays 0, and the sole signal is the
+  `X-Tt-Ads-Throttle` response header. TikTok's worked example: querying 30,000 ads where
+  2,000 have cost data may return just 1,356. The lost ads are the oldest, and the loss set
+  drifts as new ads are created.
+  https://business-api.tiktok.com/portal/docs/reporting-faqs/v1.3
+
+  **DOCUMENTED: report dates are in the ad account's timezone, not UTC.** `advertiser/info`
+  returns both `timezone` (which may be a POSIX name like `Etc/GMT+8`, whose sign is inverted
+  — that is UTC−8) and `display_timezone` (a real IANA name). Use `display_timezone`; reading
+  `Etc/GMT+8` as UTC+8 is a 16-hour error.
+
+  **DOCUMENTED: `advertiser_ids` from the token exchange goes stale.** TikTok grants the app
+  access to newly shared accounts without re-authorization, so the authoritative list must be
+  re-read from `/oauth2/advertiser/get/` rather than cached from the token response.
+  https://business-api.tiktok.com/portal/docs?id=1766041812130817
+
+  **DOCUMENTED: Marketing API access tokens never expire and cannot be refreshed.** Code
+  `40107` is returned for attempting to refresh one. They do become invalid if the advertiser
+  revokes authorization. (The Accounts / Creator Marketplace APIs differ — do not conflate.)
+
+  **DOCUMENTED: the OAuth authorize URL is `https://ads.tiktok.com/marketing_api/auth`.**
+  TikTok generates this per-app in its developer portal rather than publishing a template, so
+  it cannot be derived from the docs. Taken from the `oauth2.patch.json` of the existing
+  `source-tiktok-marketing` connector, which runs in production under the same
+  `provider: "tiktok"` — meaning the Estuary-side OAuth app registration already exists and
+  this connector needs no new one. That connector exchanges tokens against **v1.2** with the
+  credentials as query parameters and an empty body; v1.2 was retired in August 2023, so this
+  connector uses the v1.3 endpoint and its documented JSON body instead. The
+  `accessTokenResponseMap` pointer `/data/access_token` is identical in both.
+  https://github.com/estuary/airbyte/tree/master/airbyte-integrations/connectors/source-tiktok-marketing
+
+request:
+  scripts:
+    - type: before-request
+      code: |-
+        // TikTok auth via the connector's sops-encrypted config.yaml. The token is
+        // re-derived from sops on every request and lives only on `req` — it is never
+        // persisted to a var or env file. Requires the developer JS sandbox:
+        //   CLI: `bru run <request>.yml --env TikTok --sandbox developer`
+        //   GUI: jsSandboxMode "developer" in ~/.config/bruno/collection-security.json
+        const { execFileSync } = require('child_process');
+        const path = require('path');
+        const configured = bru.getEnvVar('config_path');
+        if (!configured) throw new Error('config_path env var is not set');
+        // Resolve relative to the collection root, not the process cwd — the GUI's cwd is
+        // wherever Bruno was launched from, only the CLI runs from bruno/.
+        const configPath = path.isAbsolute(configured)
+          ? configured
+          : path.resolve(bru.cwd(), configured);
+        const decrypted = execFileSync(
+          'sops', ['-d', '--output-type=json', configPath], { encoding: 'utf8' },
+        );
+        // Raw `sops -d` keeps the `_sops` encrypted-suffix on key names (the platform
+        // strips it at runtime, sops itself does not) — accept both spellings.
+        const creds = JSON.parse(decrypted)?.credentials;
+        const accessToken = creds?.access_token ?? creds?.access_token_sops;
+        if (!accessToken) {
+          throw new Error('credentials.access_token(_sops) missing from decrypted config');
+        }
+
+        // The token goes in TikTok's own header, bare. It is NOT `Authorization: Bearer`.
+        req.setHeader('Access-Token', accessToken);
+
+        // `/oauth2/advertiser/get/` additionally authenticates with the app id and secret as
+        // query parameters. Only that endpoint needs them, so they are attached on demand.
+        const url = req.getUrl();
+        if (url.includes('/oauth2/advertiser/get/')) {
+          const appId = creds?.client_id ?? creds?.client_id_sops;
+          const secret = creds?.client_secret ?? creds?.client_secret_sops;
+          if (!appId || !secret) {
+            throw new Error('client_id/client_secret required for /oauth2/advertiser/get/');
+          }
+          const separator = url.includes('?') ? '&' : '?';
+          req.setUrl(
+            `${url}${separator}app_id=${encodeURIComponent(appId)}` +
+            `&secret=${encodeURIComponent(secret)}`,
+          );
+        }

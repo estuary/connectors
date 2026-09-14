@@ -1,0 +1,65 @@
+info:
+  name: Reports (GET report integrated get)
+  type: http
+  seq: 3
+
+http:
+  method: GET
+  url: "{{base_url}}/report/integrated/get/?advertiser_id={{advertiser_id}}&report_type=BASIC&data_level=AUCTION_CAMPAIGN&dimensions=[\"campaign_id\",\"stat_time_day\"]&metrics=[\"spend\",\"impressions\"]&start_date=2026-07-01&end_date=2026-07-30&page=1&page_size=1000"
+
+  auth: inherit
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  The synchronous reporting endpoint, backing every report stream.
+
+  Array parameters are JSON-encoded inside the query string. `filtering` is doubly encoded —
+  its `filter_value` is itself a JSON string containing a JSON array.
+
+  **LIMITATION — silent truncation above 20,000 ads.** "When you want to run a report for
+  over 20,000 ads, only the data of the recent 20,000 ads (according to ad creation time)
+  will be processed." The response still carries `code: 0`; the only signal is the
+  `X-Tt-Ads-Throttle` response header. TikTok's worked example: 30,000 ads with 2,000 having
+  cost data may yield 1,356 rows. The dropped ads are the oldest, and which ones drop drifts
+  over time. The connector logs a warning whenever the header is present; the documented
+  remedy is to shard by `campaign_ids` / `adgroup_ids` / `ad_ids`. **DOCUMENTED.**
+  https://business-api.tiktok.com/portal/docs/reporting-faqs/v1.3
+
+  **LIMITATION — the date span cap depends on the time dimension.** With `stat_time_hour`
+  the span is 1 day; with `stat_time_day`, 30 days; with no time dimension, 365 days.
+  Asynchronous reports have no cap. The connector windows accordingly. **DOCUMENTED.**
+
+  **LIMITATION — dimension combinations are rule-constrained, not count-constrained.** A
+  basic report accepts one id dimension, at most one time dimension, and at most one
+  breakdown. An audience report requires exactly one audience dimension, with `age` + `gender`
+  the only permitted pair. `interest_category*` and `device_brand_id` admit no time dimension
+  at all; `country_code` cannot be combined with `stat_time_hour`. Violations return HTTP 200
+  with `code: 40002` and the generic message "Conflict occurs. The input params including
+  metrics and dimensions have no relation." — which is why the connector validates these at
+  config time. **DOCUMENTED.**
+  https://business-api.tiktok.com/portal/docs/basic-reports-supported-dimensions/v1.3
+
+  **LIMITATION — at most 100 metrics per request**, and a further unpublished query-size
+  budget over metrics x dimensions x days surfaces as `code: 40067` "Your query is too large".
+  `40067` is absent from TikTok's return-code appendix. **DOCUMENTED.**
+  https://business-api.tiktok.com/portal/docs/best-practices-to-reduce-timeouts-in-synchronous-reports/v1.3
+
+  **DOCUMENTED — response shaping that makes row counts differ from the UI.** Metric values
+  are returned as strings; an absent value is the literal `"-"` rather than null (the
+  connector maps it to null). Ads with no spend are filtered out by an internal algorithm,
+  while ads created after `end_date` are returned with zero-valued metrics. With
+  `search_keyword` / `match_type`, an impression count below 5 renders as the string `"<5"`.
+
+  **DOCUMENTED — single-advertiser responses omit `advertiser_id`.** It is echoed only when
+  the request used `advertiser_ids` (max 5). The connector stamps it on from request scope;
+  omitting it is a long-standing open bug in both Singer taps and Airbyte, where distinct
+  report rows collapse into one another.
+
+  Probe to run when credentials exist: confirm the `stat_time_day` value is expressed in the
+  ad account's timezone rather than UTC, by comparing a row against the same figure in TikTok
+  Ads Manager for an account not on UTC. The connector's date arithmetic depends on it.

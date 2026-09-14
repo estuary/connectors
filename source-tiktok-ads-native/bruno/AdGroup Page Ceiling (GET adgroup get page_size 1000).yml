@@ -1,0 +1,22 @@
+info:
+  name: AdGroup Page Ceiling (GET adgroup get page_size 1000)
+  type: http
+  seq: 8
+
+http:
+  method: GET
+  url: '{{base_url}}/adgroup/get/?advertiser_id={{advertiser_id}}&filtering={"buying_types":["AUCTION","RESERVATION_RF","RESERVATION_TOP_VIEW"],"primary_status":"STATUS_ALL"}&page=1&page_size=1000'
+
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  Same filtering, at `page_size=1000`, against the endpoint documented to drop its ceiling
+  to 100 once RESERVATION_TOP_VIEW is among the requested buying types. The connector caps
+  ad groups at 100 on that basis; this establishes whether the cap is real, and whether
+  TikTok hard-rejects or silently clamps when it is exceeded.

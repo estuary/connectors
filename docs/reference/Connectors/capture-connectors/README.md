@@ -93,6 +93,7 @@ Integrations with streaming systems, queue services, and webhooks.
 - [Klaviyo](./klaviyo-native.md)
 - [LinkedIn Pages](./linkedin-pages.md)
 - [Mailchimp](./mailchimp-native.md)
+- [TikTok Ads](./tiktok-ads-native.md)
 
 #### BI and analytics
 
@@ -194,6 +195,5 @@ Typically, we enable SaaS connectors from third parties to allow more diverse da
 - [Slack](./slack.md)
 - [Snapchat](./snapchat.md)
 - [SurveyMonkey](./survey-monkey.md)
-- [TikTok Marketing](./tiktok.md)
 - [WooCommerce](./woocommerce.md)
 - [YouTube Analytics](./youtube-analytics.md)

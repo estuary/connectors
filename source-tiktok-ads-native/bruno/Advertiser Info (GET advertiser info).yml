@@ -1,0 +1,30 @@
+info:
+  name: Advertiser Info (GET advertiser info)
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: '{{base_url}}/advertiser/info/?advertiser_ids=["{{advertiser_id}}"]'
+
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  Fetches ad account details. The connector reads this for the timezone that report dates are
+  expressed in, and uses it as the second half of `validate_credentials` — listing authorized
+  ids proves the token works, but not that the configured advertisers are readable.
+
+  `advertiser_ids` is a JSON-encoded array in the query string. TikTok documents no maximum
+  for it, but rejects oversized id lists with code `40011`, so the connector batches at 100.
+
+  **The timezone question this probe exists to answer:** the response carries both `timezone`
+  and `display_timezone`. `timezone` may hold a POSIX-style name such as `Etc/GMT+8`, whose
+  sign is inverted relative to the offset it appears to name — `Etc/GMT+8` is UTC-8. Reading
+  it naively puts report dates 16 hours out. The connector prefers `display_timezone`, which
+  is a real IANA zone name, and falls back to `timezone` only through a tz-aware parser.

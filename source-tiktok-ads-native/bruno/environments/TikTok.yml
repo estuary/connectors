@@ -1,0 +1,12 @@
+variables:
+  # Swap for https://sandbox-ads.tiktok.com/open_api/v1.3 when probing a sandbox ad account.
+  # Sandbox tokens are not valid against production, so the token in config.yaml must match
+  # whichever host is set here.
+  - name: base_url
+    value: https://business-api.tiktok.com/open_api/v1.3
+  # Path to the connector's sops-encrypted config, relative to the collection root.
+  - name: config_path
+    value: ../config.yaml
+  # Filled in from the Auth Sanity probe's response.
+  - name: advertiser_id
+    value: "7134800444051701762"

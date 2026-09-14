@@ -1,0 +1,78 @@
+info:
+  name: Campaigns (GET campaign get)
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/campaign/get/?advertiser_id={{advertiser_id}}&page=1&page_size=1000"
+
+  auth: inherit
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  Lists campaigns for one advertiser.
+
+  **LIMITATION — no server-side modify-time filter.** `/campaign/get/` and `/adgroup/get/`
+  expose only `creation_filter_start_time` / `creation_filter_end_time`, which filter on
+  *creation* time and so cannot surface an edit to an older object: a campaign created in
+  2023 and renamed yesterday is invisible to any creation-time window. Only `/ad/get/` has
+  `modified_after`. The connector therefore re-lists campaigns and ad groups in full each
+  poll and narrows on `modify_time` client-side.
+  Confirmed two ways: `modified_after` appears zero times on the campaign and ad group doc
+  pages, and TikTok's own SDK models `FilteringCampaignGet` / `FilteringAdgroupGet` without
+  it while `FilteringAdGet` has it. **DOCUMENTED.**
+  https://business-api.tiktok.com/portal/docs?id=1739315828649986
+  https://github.com/tiktok/tiktok-business-api-sdk/blob/main/python_sdk/docs/FilteringCampaignGet.md
+
+  **LIMITATION — deleted objects are hidden by default.** `/adgroup/get/` and `/ad/get/`
+  default `filtering.primary_status` to `STATUS_NOT_DELETE`. `STATUS_ALL` is required to see
+  deletions, and TikTok also removes old ads over time, so omitting it lets a long-lived
+  account accumulate silent gaps. The connector passes `STATUS_ALL`. **DOCUMENTED.**
+
+  **VERIFIED (2026-08-13) — `RESERVATION_TOP_VIEW` cannot share a request.** Sending all three
+  buying types together, as Fivetran is documented to do, is rejected:
+
+      {"code": 40002,
+       "message": "Invalid param: 'filtering.buying_types'. The value
+                   'RESERVATION_TOP_VIEW' cannot be combined with other enum values
+                   for this parameter. Please check and try again."}
+
+  Probed one combination at a time (`BuyingTypes A/B/C`): omitting `buying_types` is accepted,
+  `["AUCTION","RESERVATION_RF"]` is accepted, and `["RESERVATION_TOP_VIEW"]` alone is accepted.
+  The connector therefore sweeps each group as its own request and unions the results, rather
+  than dropping the value — dropping it would silently lose reservation top-view entities,
+  which is what the filter exists to prevent.
+
+  This also explains the documented page ceiling: it applies when `RESERVATION_TOP_VIEW` is the
+  sole buying type, not to every ad group request. The cap is applied to that group only.
+
+  **UNOBSERVABLE — whether the ceiling is a hard reject or a silent clamp.** The
+  `RESERVATION_TOP_VIEW` probe sent `page_size=1000` and TikTok echoed 1000 back with `code:
+  0`, but the account holds no campaigns, so a honoured page size and a silently clamped one
+  are indistinguishable. The documented 100 is applied rather than assumed away. Re-probe on an
+  account with more than 100 reservation top-view objects to settle it.
+  https://business-api.tiktok.com/portal/docs?id=1739314558673922
+
+  **LIMITATION — GMV Max entities are excluded entirely.** Verbatim on both `/adgroup/get/`
+  and `/ad/get/`: "The data for Product GMV max ads and LIVE GMV max ads created from TikTok
+  Shop is excluded from the response." Reaching them needs the separate `/campaign/gmv_max/*`
+  and `/gmv_max/*` endpoints, which this connector does not yet cover. **DOCUMENTED.**
+
+  **DOCUMENTED — ordering is fixed and unstable for paging.** The returned list is sorted by
+  id descending with no `sort_field` override. Since TikTok ids increase monotonically this is
+  newest-first, so an object created mid-walk shifts every later page. The connector keeps
+  paging offsets inside a single invocation and never checkpoints one.
+
+  **DOCUMENTED — `page_size` ranges 1–1000 (default 10)**, and `campaign_ids` / `adgroup_ids`
+  / `ad_ids` filters cap at 100 ids, enforced by code `40011`.
+
+  Probe to run when credentials exist: request `page_size=1001` and record whether TikTok
+  hard-rejects or silently clamps. The connector currently assumes a short page is a
+  trustworthy end-of-pagination signal, which a silent clamp would not break but a silent
+  truncation would.

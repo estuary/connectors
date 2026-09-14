@@ -1,0 +1,151 @@
+collections:
+  acmeCo/ad_age_gender_report:
+    schema: ad_age_gender_report.schema.yaml
+    key:
+    - /advertiser_id
+    - /ad_id
+    - /stat_time_day
+    - /age
+    - /gender
+  acmeCo/ad_country_report:
+    schema: ad_country_report.schema.yaml
+    key:
+    - /advertiser_id
+    - /ad_id
+    - /stat_time_day
+    - /country_code
+  acmeCo/ad_groups:
+    schema: ad_groups.schema.yaml
+    key:
+    - /adgroup_id
+  acmeCo/ad_language_report:
+    schema: ad_language_report.schema.yaml
+    key:
+    - /advertiser_id
+    - /ad_id
+    - /stat_time_day
+    - /language
+  acmeCo/ad_platform_report:
+    schema: ad_platform_report.schema.yaml
+    key:
+    - /advertiser_id
+    - /ad_id
+    - /stat_time_day
+    - /platform
+  acmeCo/ad_report_daily:
+    schema: ad_report_daily.schema.yaml
+    key:
+    - /advertiser_id
+    - /ad_id
+    - /stat_time_day
+  acmeCo/ad_report_hourly:
+    schema: ad_report_hourly.schema.yaml
+    key:
+    - /advertiser_id
+    - /ad_id
+    - /stat_time_hour
+  acmeCo/ad_report_lifetime:
+    schema: ad_report_lifetime.schema.yaml
+    key:
+    - /advertiser_id
+    - /ad_id
+  acmeCo/adgroup_report_daily:
+    schema: adgroup_report_daily.schema.yaml
+    key:
+    - /advertiser_id
+    - /adgroup_id
+    - /stat_time_day
+  acmeCo/adgroup_report_hourly:
+    schema: adgroup_report_hourly.schema.yaml
+    key:
+    - /advertiser_id
+    - /adgroup_id
+    - /stat_time_hour
+  acmeCo/adgroup_report_lifetime:
+    schema: adgroup_report_lifetime.schema.yaml
+    key:
+    - /advertiser_id
+    - /adgroup_id
+  acmeCo/ads:
+    schema: ads.schema.yaml
+    key:
+    - /ad_id
+  acmeCo/advertisers:
+    schema: advertisers.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/campaign_age_gender_report:
+    schema: campaign_age_gender_report.schema.yaml
+    key:
+    - /advertiser_id
+    - /campaign_id
+    - /stat_time_day
+    - /age
+    - /gender
+  acmeCo/campaign_country_report:
+    schema: campaign_country_report.schema.yaml
+    key:
+    - /advertiser_id
+    - /campaign_id
+    - /stat_time_day
+    - /country_code
+  acmeCo/campaign_language_report:
+    schema: campaign_language_report.schema.yaml
+    key:
+    - /advertiser_id
+    - /campaign_id
+    - /stat_time_day
+    - /language
+  acmeCo/campaign_platform_report:
+    schema: campaign_platform_report.schema.yaml
+    key:
+    - /advertiser_id
+    - /campaign_id
+    - /stat_time_day
+    - /platform
+  acmeCo/campaign_report_daily:
+    schema: campaign_report_daily.schema.yaml
+    key:
+    - /advertiser_id
+    - /campaign_id
+    - /stat_time_day
+  acmeCo/campaign_report_hourly:
+    schema: campaign_report_hourly.schema.yaml
+    key:
+    - /advertiser_id
+    - /campaign_id
+    - /stat_time_hour
+  acmeCo/campaign_report_lifetime:
+    schema: campaign_report_lifetime.schema.yaml
+    key:
+    - /advertiser_id
+    - /campaign_id
+  acmeCo/campaigns:
+    schema: campaigns.schema.yaml
+    key:
+    - /campaign_id
+  acmeCo/gmv_advertiser_country_report_daily:
+    schema: gmv_advertiser_country_report_daily.schema.yaml
+    key:
+    - /advertiser_id
+    - /stat_time_day
+    - /country_code
+  acmeCo/gmv_campaign_country_report_daily:
+    schema: gmv_campaign_country_report_daily.schema.yaml
+    key:
+    - /advertiser_id
+    - /campaign_id
+    - /stat_time_day
+    - /country_code
+  acmeCo/images:
+    schema: images.schema.yaml
+    key:
+    - /image_id
+  acmeCo/locations:
+    schema: locations.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/videos:
+    schema: videos.schema.yaml
+    key:
+    - /video_id

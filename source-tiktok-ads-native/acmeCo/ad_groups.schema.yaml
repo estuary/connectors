@@ -1,0 +1,60 @@
+$defs:
+  Meta:
+    properties:
+      op:
+        default: u
+        description: 'Operation type (c: Create, u: Update, d: Delete)'
+        enum:
+        - c
+        - u
+        - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: Row ID of the Document, counting up from zero, or -1 if not known
+        title: Row Id
+        type: integer
+    title: Meta
+    type: object
+additionalProperties: true
+properties:
+  _meta:
+    $ref: '#/$defs/Meta'
+    description: Document metadata
+  advertiser_id:
+    title: Advertiser Id
+    type: string
+  create_time:
+    format: date-time
+    title: Create Time
+    type: string
+  modify_time:
+    format: date-time
+    title: Modify Time
+    type: string
+  adgroup_id:
+    title: Adgroup Id
+    type: string
+required:
+- advertiser_id
+- create_time
+- modify_time
+- adgroup_id
+title: AdGroup
+type: object
+x-infer-schema: true
+if:
+  required:
+  - _meta
+  properties:
+    _meta:
+      required:
+      - op
+      properties:
+        op:
+          const: d
+then:
+  reduce:
+    strategy: merge
+    delete: true

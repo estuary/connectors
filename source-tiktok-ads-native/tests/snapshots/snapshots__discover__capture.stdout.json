@@ -1,0 +1,2355 @@
+[
+  {
+    "recommendedName": "advertisers",
+    "resourceConfig": {
+      "name": "advertisers",
+      "interval": "PT12H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        }
+      },
+      "title": "BaseDocument",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "locations",
+    "resourceConfig": {
+      "name": "locations",
+      "interval": "PT12H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        }
+      },
+      "title": "BaseDocument",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "campaigns",
+    "resourceConfig": {
+      "name": "campaigns",
+      "interval": "PT30M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "advertiser_id": {
+          "title": "Advertiser Id",
+          "type": "string"
+        },
+        "create_time": {
+          "format": "date-time",
+          "title": "Create Time",
+          "type": "string"
+        },
+        "modify_time": {
+          "format": "date-time",
+          "title": "Modify Time",
+          "type": "string"
+        },
+        "campaign_id": {
+          "title": "Campaign Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "advertiser_id",
+        "create_time",
+        "modify_time",
+        "campaign_id"
+      ],
+      "title": "Campaign",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/campaign_id"
+    ]
+  },
+  {
+    "recommendedName": "ad_groups",
+    "resourceConfig": {
+      "name": "ad_groups",
+      "interval": "PT30M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "advertiser_id": {
+          "title": "Advertiser Id",
+          "type": "string"
+        },
+        "create_time": {
+          "format": "date-time",
+          "title": "Create Time",
+          "type": "string"
+        },
+        "modify_time": {
+          "format": "date-time",
+          "title": "Modify Time",
+          "type": "string"
+        },
+        "adgroup_id": {
+          "title": "Adgroup Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "advertiser_id",
+        "create_time",
+        "modify_time",
+        "adgroup_id"
+      ],
+      "title": "AdGroup",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/adgroup_id"
+    ]
+  },
+  {
+    "recommendedName": "ads",
+    "resourceConfig": {
+      "name": "ads",
+      "interval": "PT30M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "advertiser_id": {
+          "title": "Advertiser Id",
+          "type": "string"
+        },
+        "create_time": {
+          "format": "date-time",
+          "title": "Create Time",
+          "type": "string"
+        },
+        "modify_time": {
+          "format": "date-time",
+          "title": "Modify Time",
+          "type": "string"
+        },
+        "ad_id": {
+          "title": "Ad Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "advertiser_id",
+        "create_time",
+        "modify_time",
+        "ad_id"
+      ],
+      "title": "Ad",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/ad_id"
+    ]
+  },
+  {
+    "recommendedName": "videos",
+    "resourceConfig": {
+      "name": "videos",
+      "interval": "PT30M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "advertiser_id": {
+          "title": "Advertiser Id",
+          "type": "string"
+        },
+        "video_id": {
+          "title": "Video Id",
+          "type": "string"
+        },
+        "modify_time": {
+          "format": "date-time",
+          "title": "Modify Time",
+          "type": "string"
+        }
+      },
+      "required": [
+        "advertiser_id",
+        "video_id",
+        "modify_time"
+      ],
+      "title": "Video",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/video_id"
+    ]
+  },
+  {
+    "recommendedName": "images",
+    "resourceConfig": {
+      "name": "images",
+      "interval": "PT30M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "advertiser_id": {
+          "title": "Advertiser Id",
+          "type": "string"
+        },
+        "image_id": {
+          "title": "Image Id",
+          "type": "string"
+        },
+        "modify_time": {
+          "format": "date-time",
+          "title": "Modify Time",
+          "type": "string"
+        }
+      },
+      "required": [
+        "advertiser_id",
+        "image_id",
+        "modify_time"
+      ],
+      "title": "Image",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/image_id"
+    ]
+  },
+  {
+    "recommendedName": "campaign_report_daily",
+    "resourceConfig": {
+      "name": "campaign_report_daily",
+      "interval": "PT12H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "campaign_id": {
+          "title": "Campaign Id",
+          "type": "string"
+        },
+        "stat_time_day": {
+          "format": "date-time",
+          "title": "Stat Time Day",
+          "type": "string"
+        },
+        "advertiser_id": {
+          "title": "Advertiser Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "campaign_id",
+        "stat_time_day",
+        "advertiser_id"
+      ],
+      "title": "campaign_report_daily",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/advertiser_id",
+      "/campaign_id",
+      "/stat_time_day"
+    ]
+  },
+  {
+    "recommendedName": "campaign_report_hourly",
+    "resourceConfig": {
+      "name": "campaign_report_hourly",
+      "interval": "PT12H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "campaign_id": {
+          "title": "Campaign Id",
+          "type": "string"
+        },
+        "stat_time_hour": {
+          "format": "date-time",
+          "title": "Stat Time Hour",
+          "type": "string"
+        },
+        "advertiser_id": {
+          "title": "Advertiser Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "campaign_id",
+        "stat_time_hour",
+        "advertiser_id"
+      ],
+      "title": "campaign_report_hourly",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/advertiser_id",
+      "/campaign_id",
+      "/stat_time_hour"
+    ]
+  },
+  {
+    "recommendedName": "campaign_report_lifetime",
+    "resourceConfig": {
+      "name": "campaign_report_lifetime",
+      "interval": "PT12H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "campaign_id": {
+          "title": "Campaign Id",
+          "type": "string"
+        },
+        "advertiser_id": {
+          "title": "Advertiser Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "campaign_id",
+        "advertiser_id"
+      ],
+      "title": "campaign_report_lifetime",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/advertiser_id",
+      "/campaign_id"
+    ]
+  },
+  {
+    "recommendedName": "adgroup_report_daily",
+    "resourceConfig": {
+      "name": "adgroup_report_daily",
+      "interval": "PT12H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "adgroup_id": {
+          "title": "Adgroup Id",
+          "type": "string"
+        },
+        "stat_time_day": {
+          "format": "date-time",
+          "title": "Stat Time Day",
+          "type": "string"
+        },
+        "advertiser_id": {
+          "title": "Advertiser Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "adgroup_id",
+        "stat_time_day",
+        "advertiser_id"
+      ],
+      "title": "adgroup_report_daily",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/advertiser_id",
+      "/adgroup_id",
+      "/stat_time_day"
+    ]
+  },
+  {
+    "recommendedName": "adgroup_report_hourly",
+    "resourceConfig": {
+      "name": "adgroup_report_hourly",
+      "interval": "PT12H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "adgroup_id": {
+          "title": "Adgroup Id",
+          "type": "string"
+        },
+        "stat_time_hour": {
+          "format": "date-time",
+          "title": "Stat Time Hour",
+          "type": "string"
+        },
+        "advertiser_id": {
+          "title": "Advertiser Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "adgroup_id",
+        "stat_time_hour",
+        "advertiser_id"
+      ],
+      "title": "adgroup_report_hourly",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/advertiser_id",
+      "/adgroup_id",
+      "/stat_time_hour"
+    ]
+  },
+  {
+    "recommendedName": "adgroup_report_lifetime",
+    "resourceConfig": {
+      "name": "adgroup_report_lifetime",
+      "interval": "PT12H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "adgroup_id": {
+          "title": "Adgroup Id",
+          "type": "string"
+        },
+        "advertiser_id": {
+          "title": "Advertiser Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "adgroup_id",
+        "advertiser_id"
+      ],
+      "title": "adgroup_report_lifetime",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/advertiser_id",
+      "/adgroup_id"
+    ]
+  },
+  {
+    "recommendedName": "ad_report_daily",
+    "resourceConfig": {
+      "name": "ad_report_daily",
+      "interval": "PT12H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "ad_id": {
+          "title": "Ad Id",
+          "type": "string"
+        },
+        "stat_time_day": {
+          "format": "date-time",
+          "title": "Stat Time Day",
+          "type": "string"
+        },
+        "advertiser_id": {
+          "title": "Advertiser Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ad_id",
+        "stat_time_day",
+        "advertiser_id"
+      ],
+      "title": "ad_report_daily",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/advertiser_id",
+      "/ad_id",
+      "/stat_time_day"
+    ]
+  },
+  {
+    "recommendedName": "ad_report_hourly",
+    "resourceConfig": {
+      "name": "ad_report_hourly",
+      "interval": "PT12H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "ad_id": {
+          "title": "Ad Id",
+          "type": "string"
+        },
+        "stat_time_hour": {
+          "format": "date-time",
+          "title": "Stat Time Hour",
+          "type": "string"
+        },
+        "advertiser_id": {
+          "title": "Advertiser Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ad_id",
+        "stat_time_hour",
+        "advertiser_id"
+      ],
+      "title": "ad_report_hourly",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/advertiser_id",
+      "/ad_id",
+      "/stat_time_hour"
+    ]
+  },
+  {
+    "recommendedName": "ad_report_lifetime",
+    "resourceConfig": {
+      "name": "ad_report_lifetime",
+      "interval": "PT12H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "ad_id": {
+          "title": "Ad Id",
+          "type": "string"
+        },
+        "advertiser_id": {
+          "title": "Advertiser Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ad_id",
+        "advertiser_id"
+      ],
+      "title": "ad_report_lifetime",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/advertiser_id",
+      "/ad_id"
+    ]
+  },
+  {
+    "recommendedName": "campaign_age_gender_report",
+    "resourceConfig": {
+      "name": "campaign_age_gender_report",
+      "interval": "PT12H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "campaign_id": {
+          "title": "Campaign Id",
+          "type": "string"
+        },
+        "age": {
+          "title": "Age",
+          "type": "string"
+        },
+        "gender": {
+          "title": "Gender",
+          "type": "string"
+        },
+        "stat_time_day": {
+          "format": "date-time",
+          "title": "Stat Time Day",
+          "type": "string"
+        },
+        "advertiser_id": {
+          "title": "Advertiser Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "campaign_id",
+        "age",
+        "gender",
+        "stat_time_day",
+        "advertiser_id"
+      ],
+      "title": "campaign_age_gender_report",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/advertiser_id",
+      "/campaign_id",
+      "/stat_time_day",
+      "/age",
+      "/gender"
+    ]
+  },
+  {
+    "recommendedName": "campaign_country_report",
+    "resourceConfig": {
+      "name": "campaign_country_report",
+      "interval": "PT12H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "campaign_id": {
+          "title": "Campaign Id",
+          "type": "string"
+        },
+        "country_code": {
+          "title": "Country Code",
+          "type": "string"
+        },
+        "stat_time_day": {
+          "format": "date-time",
+          "title": "Stat Time Day",
+          "type": "string"
+        },
+        "advertiser_id": {
+          "title": "Advertiser Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "campaign_id",
+        "country_code",
+        "stat_time_day",
+        "advertiser_id"
+      ],
+      "title": "campaign_country_report",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/advertiser_id",
+      "/campaign_id",
+      "/stat_time_day",
+      "/country_code"
+    ]
+  },
+  {
+    "recommendedName": "campaign_language_report",
+    "resourceConfig": {
+      "name": "campaign_language_report",
+      "interval": "PT12H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "campaign_id": {
+          "title": "Campaign Id",
+          "type": "string"
+        },
+        "language": {
+          "title": "Language",
+          "type": "string"
+        },
+        "stat_time_day": {
+          "format": "date-time",
+          "title": "Stat Time Day",
+          "type": "string"
+        },
+        "advertiser_id": {
+          "title": "Advertiser Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "campaign_id",
+        "language",
+        "stat_time_day",
+        "advertiser_id"
+      ],
+      "title": "campaign_language_report",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/advertiser_id",
+      "/campaign_id",
+      "/stat_time_day",
+      "/language"
+    ]
+  },
+  {
+    "recommendedName": "campaign_platform_report",
+    "resourceConfig": {
+      "name": "campaign_platform_report",
+      "interval": "PT12H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "campaign_id": {
+          "title": "Campaign Id",
+          "type": "string"
+        },
+        "platform": {
+          "title": "Platform",
+          "type": "string"
+        },
+        "stat_time_day": {
+          "format": "date-time",
+          "title": "Stat Time Day",
+          "type": "string"
+        },
+        "advertiser_id": {
+          "title": "Advertiser Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "campaign_id",
+        "platform",
+        "stat_time_day",
+        "advertiser_id"
+      ],
+      "title": "campaign_platform_report",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/advertiser_id",
+      "/campaign_id",
+      "/stat_time_day",
+      "/platform"
+    ]
+  },
+  {
+    "recommendedName": "ad_age_gender_report",
+    "resourceConfig": {
+      "name": "ad_age_gender_report",
+      "interval": "PT12H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "ad_id": {
+          "title": "Ad Id",
+          "type": "string"
+        },
+        "age": {
+          "title": "Age",
+          "type": "string"
+        },
+        "gender": {
+          "title": "Gender",
+          "type": "string"
+        },
+        "stat_time_day": {
+          "format": "date-time",
+          "title": "Stat Time Day",
+          "type": "string"
+        },
+        "advertiser_id": {
+          "title": "Advertiser Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ad_id",
+        "age",
+        "gender",
+        "stat_time_day",
+        "advertiser_id"
+      ],
+      "title": "ad_age_gender_report",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/advertiser_id",
+      "/ad_id",
+      "/stat_time_day",
+      "/age",
+      "/gender"
+    ]
+  },
+  {
+    "recommendedName": "ad_country_report",
+    "resourceConfig": {
+      "name": "ad_country_report",
+      "interval": "PT12H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "ad_id": {
+          "title": "Ad Id",
+          "type": "string"
+        },
+        "country_code": {
+          "title": "Country Code",
+          "type": "string"
+        },
+        "stat_time_day": {
+          "format": "date-time",
+          "title": "Stat Time Day",
+          "type": "string"
+        },
+        "advertiser_id": {
+          "title": "Advertiser Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ad_id",
+        "country_code",
+        "stat_time_day",
+        "advertiser_id"
+      ],
+      "title": "ad_country_report",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/advertiser_id",
+      "/ad_id",
+      "/stat_time_day",
+      "/country_code"
+    ]
+  },
+  {
+    "recommendedName": "ad_language_report",
+    "resourceConfig": {
+      "name": "ad_language_report",
+      "interval": "PT12H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "ad_id": {
+          "title": "Ad Id",
+          "type": "string"
+        },
+        "language": {
+          "title": "Language",
+          "type": "string"
+        },
+        "stat_time_day": {
+          "format": "date-time",
+          "title": "Stat Time Day",
+          "type": "string"
+        },
+        "advertiser_id": {
+          "title": "Advertiser Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ad_id",
+        "language",
+        "stat_time_day",
+        "advertiser_id"
+      ],
+      "title": "ad_language_report",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/advertiser_id",
+      "/ad_id",
+      "/stat_time_day",
+      "/language"
+    ]
+  },
+  {
+    "recommendedName": "ad_platform_report",
+    "resourceConfig": {
+      "name": "ad_platform_report",
+      "interval": "PT12H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "ad_id": {
+          "title": "Ad Id",
+          "type": "string"
+        },
+        "platform": {
+          "title": "Platform",
+          "type": "string"
+        },
+        "stat_time_day": {
+          "format": "date-time",
+          "title": "Stat Time Day",
+          "type": "string"
+        },
+        "advertiser_id": {
+          "title": "Advertiser Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ad_id",
+        "platform",
+        "stat_time_day",
+        "advertiser_id"
+      ],
+      "title": "ad_platform_report",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/advertiser_id",
+      "/ad_id",
+      "/stat_time_day",
+      "/platform"
+    ]
+  },
+  {
+    "recommendedName": "gmv_advertiser_country_report_daily",
+    "resourceConfig": {
+      "name": "gmv_advertiser_country_report_daily",
+      "interval": "PT12H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "advertiser_id": {
+          "title": "Advertiser Id",
+          "type": "string"
+        },
+        "country_code": {
+          "title": "Country Code",
+          "type": "string"
+        },
+        "stat_time_day": {
+          "format": "date-time",
+          "title": "Stat Time Day",
+          "type": "string"
+        }
+      },
+      "required": [
+        "advertiser_id",
+        "country_code",
+        "stat_time_day"
+      ],
+      "title": "gmv_advertiser_country_report_daily",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/advertiser_id",
+      "/stat_time_day",
+      "/country_code"
+    ]
+  },
+  {
+    "recommendedName": "gmv_campaign_country_report_daily",
+    "resourceConfig": {
+      "name": "gmv_campaign_country_report_daily",
+      "interval": "PT12H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "campaign_id": {
+          "title": "Campaign Id",
+          "type": "string"
+        },
+        "country_code": {
+          "title": "Country Code",
+          "type": "string"
+        },
+        "stat_time_day": {
+          "format": "date-time",
+          "title": "Stat Time Day",
+          "type": "string"
+        },
+        "advertiser_id": {
+          "title": "Advertiser Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "campaign_id",
+        "country_code",
+        "stat_time_day",
+        "advertiser_id"
+      ],
+      "title": "gmv_campaign_country_report_daily",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/advertiser_id",
+      "/campaign_id",
+      "/stat_time_day",
+      "/country_code"
+    ]
+  }
+]

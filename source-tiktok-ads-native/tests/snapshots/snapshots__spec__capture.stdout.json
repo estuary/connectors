@@ -1,0 +1,186 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$defs": {
+        "AccessToken": {
+          "properties": {
+            "credentials_title": {
+              "const": "Private App Credentials",
+              "default": "Private App Credentials",
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "access_token": {
+              "secret": true,
+              "title": "Access Token",
+              "type": "string"
+            }
+          },
+          "required": [
+            "access_token"
+          ],
+          "title": "AccessToken",
+          "type": "object"
+        },
+        "Advanced": {
+          "properties": {
+            "is_sandbox": {
+              "default": false,
+              "description": "Read from a TikTok sandbox ad account instead of production. Sandbox accounts are served from a separate host, hold only mock data, and their access tokens are not valid against production.",
+              "title": "Use Sandbox",
+              "type": "boolean"
+            },
+            "lookback_window_days": {
+              "default": 7,
+              "description": "Number of days of already-captured report data to re-read on each sync. TikTok attributes a conversion to the day of the ad interaction rather than the day it happened, so past report rows keep changing until every ad group's attribution window closes. Raise this to match your longest click attribution window: TikTok allows up to 28 days, and the default of 7 only covers accounts left on TikTok's own 7-day default.",
+              "maximum": 365,
+              "minimum": 0,
+              "title": "Lookback Window (days)",
+              "type": "integer"
+            }
+          },
+          "title": "Advanced",
+          "type": "object"
+        },
+        "LongLivedClientCredentialsOAuth2Credentials": {
+          "properties": {
+            "credentials_title": {
+              "const": "OAuth Credentials",
+              "default": "OAuth Credentials",
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "client_id": {
+              "secret": true,
+              "title": "Client Id",
+              "type": "string"
+            },
+            "client_secret": {
+              "secret": true,
+              "title": "Client Secret",
+              "type": "string"
+            },
+            "access_token": {
+              "secret": true,
+              "title": "Access Token",
+              "type": "string"
+            }
+          },
+          "required": [
+            "client_id",
+            "client_secret",
+            "access_token"
+          ],
+          "title": "OAuth",
+          "type": "object",
+          "x-oauth2-provider": "tiktok"
+        }
+      },
+      "properties": {
+        "credentials": {
+          "discriminator": {
+            "mapping": {
+              "OAuth Credentials": "#/$defs/LongLivedClientCredentialsOAuth2Credentials",
+              "Private App Credentials": "#/$defs/AccessToken"
+            },
+            "propertyName": "credentials_title"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/LongLivedClientCredentialsOAuth2Credentials"
+            },
+            {
+              "$ref": "#/$defs/AccessToken"
+            }
+          ],
+          "title": "Authentication"
+        },
+        "start_date": {
+          "description": "UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated. If left blank, the start date will be set to 30 days before the present.",
+          "format": "date-time",
+          "title": "Start Date",
+          "type": "string"
+        },
+        "advertiser_ids": {
+          "description": "Advertiser accounts to capture. Leave empty to capture every account the credentials can access. Required when authenticating with an access token, since discovering accounts automatically needs the app id and secret that only OAuth provides.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Advertiser IDs",
+          "type": "array"
+        },
+        "custom_reports": {
+          "default": "",
+          "description": "A JSON array describing additional reports to sync beyond the prebuilt ones. Reference this connector's documentation for the format: https://go.estuary.dev/source-tiktok-ads-native",
+          "title": "Custom Reports",
+          "type": "string"
+        },
+        "advanced": {
+          "$ref": "#/$defs/Advanced",
+          "advanced": true,
+          "description": "Advanced settings for the connector.",
+          "title": "Advanced Config"
+        }
+      },
+      "required": [
+        "credentials"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "description": "ResourceConfig is a common resource configuration shape.",
+      "properties": {
+        "_meta": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Meta"
+        },
+        "name": {
+          "description": "Name of this resource",
+          "title": "Name",
+          "type": "string"
+        },
+        "interval": {
+          "default": "PT0S",
+          "description": "Interval between updates for this resource",
+          "format": "duration",
+          "nonsensitive": true,
+          "title": "Interval",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ResourceConfig",
+      "type": "object"
+    },
+    "documentationUrl": "https://go.estuary.dev/source-tiktok-ads-native",
+    "oauth2": {
+      "provider": "tiktok",
+      "authUrlTemplate": "https://ads.tiktok.com/marketing_api/auth?app_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&response_type=code&state={{#urlencode}}{{{ state }}}{{/urlencode}}",
+      "accessTokenUrlTemplate": "https://business-api.tiktok.com/open_api/v1.3/oauth2/access_token/",
+      "accessTokenBody": "{\"app_id\": \"{{{ client_id }}}\", \"secret\": \"{{{ client_secret }}}\", \"auth_code\": \"{{{ code }}}\"}",
+      "accessTokenHeaders": {
+        "Content-Type": "application/json"
+      },
+      "accessTokenResponseMap": {
+        "access_token": "/data/access_token"
+      }
+    },
+    "resourcePathPointers": [
+      "/name"
+    ]
+  }
+]

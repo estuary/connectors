@@ -1,0 +1,20 @@
+info:
+  name: BuyingTypes A none
+  type: http
+  seq: 9
+
+http:
+  method: GET
+  url: '{{base_url}}/campaign/get/?advertiser_id={{advertiser_id}}&filtering={"primary_status":"STATUS_ALL"}&page=1&page_size=1000'
+
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  One arm of establishing which `buying_types` combinations TikTok accepts, after it rejected
+  all three values together with code 40002. This arm omits `buying_types` entirely.

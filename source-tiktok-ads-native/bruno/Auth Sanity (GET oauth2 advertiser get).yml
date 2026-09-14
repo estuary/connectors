@@ -1,0 +1,70 @@
+info:
+  name: Auth Sanity (GET oauth2 advertiser get)
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/oauth2/advertiser/get/"
+
+  auth: inherit
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - credentials valid, but no advertiser accounts authorized
+    request:
+      url: "{{base_url}}/oauth2/advertiser/get/"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "code": 0,
+            "message": "OK",
+            "request_id": "REDACTED",
+            "data": {
+              "list": []
+            }
+          }
+
+docs: |-
+  Lists every advertiser account the credentials can read. This is the connector's
+  `validate_credentials` probe, and the one endpoint that authenticates with the app id and
+  secret as well as the token — which is why an access-token-only configuration cannot
+  discover accounts and must list `advertiser_ids` explicitly.
+
+  The `app_id` and `secret` query parameters are attached by the collection's pre-request
+  script; they are not in the URL above, so the secret never lands in a committed file.
+
+  **VERIFIED (2026-08-13): the success envelope is `{code, data, message, request_id}`**, with
+  the account list at `data.list`. Confirmed against real credentials — see the saved example.
+  The field really is named `list`, which shadows the Python builtin, so the connector's
+  response model aliases it.
+
+  The probed account had **no authorized advertisers**, so `data.list` came back empty. That
+  exercises the connector's "no advertiser accounts" validation path but leaves the per-account
+  shape — `{advertiser_id, advertiser_name}` — still **DOCUMENTED**. Re-run this once an ad
+  account is authorized to promote it.
+
+  **VERIFIED (2026-08-13): the credential triple authenticates.** `code: 0` proves the app id
+  and secret (sent as query parameters by the pre-request script) and the bare token in the
+  `Access-Token` header are all accepted together on a successful call.
+
+  **VERIFIED (2026-08-12): TikTok reports failure inside an HTTP 200 body.** Reached earlier
+  with a placeholder token, this same endpoint returned `{"code": 40105, "message": "Access
+  token is incorrect or has been revoked."}` under HTTP 200. Together with the success case
+  above, both branches of the envelope are now confirmed: dispatch on `code`, never on status.
+
+  **DOCUMENTED:** the response is not paginated; it returns the full list.
+  https://business-api.tiktok.com/portal/docs?id=1738455508553729
