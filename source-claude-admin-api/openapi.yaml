@@ -1,0 +1,525 @@
+openapi: 3.1.0
+info:
+  title: Claude Admin API
+  version: "2023-06-01"
+  description: >-
+    P0 read endpoints of the Claude Admin API. The Admin API is not published in
+    the official Anthropic SDKs; this spec was assembled from the public docs.
+    Field descriptions are flagged [CONFIRMED] (stated in docs) or [INFERRED]
+    (deduced, e.g. nullability/format). Authentication uses an Admin API key
+    (x-api-key) plus a required anthropic-version header.
+servers:
+  - url: https://api.anthropic.com
+
+security:
+  - adminApiKey: []
+
+paths:
+  /v1/organizations/me:
+    get:
+      operationId: getOrganizationInfo
+      summary: Get current organization
+      description: >-
+        Retrieve information about the organization associated with the
+        authenticated Admin API key. Useful for programmatically determining
+        which organization an Admin API key belongs to.
+      parameters:
+        - $ref: '#/components/parameters/AnthropicVersion'
+      responses:
+        '200':
+          description: Organization object.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Organization'
+
+  /v1/organizations/users:
+    get:
+      operationId: listUsers
+      summary: List Users
+      description: List all Users in the Organization, with cursor-based pagination.
+      parameters:
+        - $ref: '#/components/parameters/AnthropicVersion'
+        - $ref: '#/components/parameters/PaginationLimit'
+        - $ref: '#/components/parameters/PaginationBeforeId'
+        - $ref: '#/components/parameters/PaginationAfterId'
+        - name: email
+          in: query
+          required: false
+          description: Filter by user email.
+          schema:
+            type: string
+            format: email        # [INFERRED] docs say "user email"; format not stated
+      responses:
+        '200':
+          description: A paginated list of Users.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserList'
+
+  /v1/organizations/users/{user_id}:
+    get:
+      operationId: getUser
+      summary: Get User
+      description: Get a single User in the Organization by ID.
+      parameters:
+        - $ref: '#/components/parameters/AnthropicVersion'
+        - name: user_id
+          in: path
+          required: true          # [CONFIRMED] path param is always required
+          description: ID of the User.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The requested User.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+  /v1/organizations/usage_report/claude_code:
+    get:
+      operationId: getClaudeCodeUsageReport
+      summary: Get Claude Code Usage Report
+      description: >-
+        Retrieve daily aggregated usage metrics for Claude Code users.
+        Enables organizations to analyze developer productivity and build custom dashboards.
+        Returns metrics for the single UTC day specified by `starting_at`. Uses cursor-based
+        pagination. Data is available with up to a 1-hour delay; only data older than 1 hour
+        is included to ensure stable pagination. [CONFIRMED]
+      tags:
+        - Claude Code
+      parameters:
+        - $ref: '#/components/parameters/AnthropicVersion'
+        - name: starting_at
+          in: query
+          required: true
+          description: >-
+            UTC date in YYYY-MM-DD format. Returns metrics for this single day only.
+            Represents UTC midnight for that day. [CONFIRMED]
+          schema:
+            type: string
+            format: date
+            example: "2025-09-08"
+        - name: limit
+          in: query
+          required: false
+          description: "Number of records per page (default: 20, max: 1000). [CONFIRMED]"
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 1000
+        - name: page
+          in: query
+          required: false
+          description: >-
+            Opaque cursor token from a previous response's `next_page` field. [CONFIRMED]
+          schema:
+            type: string
+            example: "page_MjAyNS0wNS0xNFQwMDowMDowMFo="
+      # NOTE: ending_at and bucket_width DO NOT exist for this endpoint. [CONFIRMED — single-day only]
+      responses:
+        "200":
+          description: A page of Claude Code usage records for the requested date.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClaudeCodeUsageReport"
+
+components:
+  securitySchemes:
+    adminApiKey:
+      type: apiKey
+      in: header
+      name: x-api-key
+
+  parameters:
+    AnthropicVersion:
+      in: header
+      name: anthropic-version
+      required: true
+      description: Anthropic API version header.
+      schema:
+        type: string
+        default: "2023-06-01"
+    # Shared cursor pagination params for the Admin API. Referenced from listUsers.
+    # The analytics endpoint uses a different contract (starting_at + page) and keeps
+    # its params inline.
+    PaginationLimit:
+      name: limit
+      in: query
+      required: false
+      description: Number of items to return per page. Defaults to 20. Ranges from 1 to 1000.
+      schema:
+        type: integer
+        minimum: 1          # [CONFIRMED]
+        maximum: 1000        # [CONFIRMED]
+        default: 20          # [CONFIRMED]
+    PaginationBeforeId:
+      name: before_id
+      in: query
+      required: false
+      description: >-
+        ID of the object to use as a cursor for pagination. When provided, returns the
+        page of results immediately before this object.
+      schema:
+        type: string
+    PaginationAfterId:
+      name: after_id
+      in: query
+      required: false
+      description: >-
+        ID of the object to use as a cursor for pagination. When provided, returns the
+        page of results immediately after this object.
+      schema:
+        type: string
+
+  schemas:
+    Organization:
+      type: object
+      description: Information about an organization.
+      required:
+        - id
+        - name
+        - type
+      properties:
+        id:
+          type: string
+          # Docs type the field as plain `string`. The example value
+          # "12345678-1234-5678-1234-567812345678" is a UUID, so format is
+          # inferred but not asserted by the docs.
+          format: uuid # [INFERRED] from example value shape
+          description: ID of the Organization. # [CONFIRMED]
+        name:
+          type: string
+          description: Name of the Organization. # [CONFIRMED]
+        type:
+          type: string
+          enum:
+            - organization
+          description: >-
+            Object type. For Organizations, this is always "organization".
+          # [CONFIRMED] single-value enum
+
+    User:
+      type: object
+      description: A member (User) of the Organization.
+      # [CONFIRMED] field set is exactly: id, added_at, email, name, role, type.
+      # [INFERRED] all six are marked required: docs show every field on every example
+      # with no nullable markers; treated as always-present and non-null.
+      required:
+        - id
+        - added_at
+        - email
+        - name
+        - role
+        - type
+      properties:
+        id:
+          type: string            # [CONFIRMED] type string
+          description: ID of the User.
+          example: user_01WCz1FkmYMm4gnmykNKUu3Q
+          # [INFERRED] no uuid format: IDs are prefixed (user_...), so NOT format: uuid.
+        added_at:
+          type: string
+          format: date-time        # [CONFIRMED] docs state "RFC 3339 datetime string"
+          description: RFC 3339 datetime string indicating when the User joined the Organization.
+          example: '2024-10-30T23:58:27.427722Z'
+        email:
+          type: string
+          format: email            # [INFERRED] docs say "Email of the User"; format not stated
+          description: Email of the User.
+        name:
+          type: string             # [CONFIRMED]
+          description: Name of the User.
+        role:
+          type: string
+          description: Organization role of the User.
+          enum:                    # [CONFIRMED] all five enum values listed in docs
+            - user
+            - developer
+            - billing
+            - admin
+            - claude_code_user
+        type:
+          type: string
+          description: Object type. For Users, this is always "user".
+          enum:                    # [CONFIRMED] always "user"
+            - user
+
+    UserList:
+      type: object
+      description: Paginated list response wrapper for Users.
+      required:
+        - data
+        - has_more
+        - first_id          # [INFERRED] required: shown in every example, no null marker
+        - last_id           # [INFERRED] required: shown in every example, no null marker
+      properties:
+        data:
+          type: array            # [CONFIRMED] array of User
+          items:
+            $ref: '#/components/schemas/User'
+          description: List of Users.
+        has_more:
+          type: boolean          # [CONFIRMED]
+          description: Indicates if there are more results in the requested page direction.
+        first_id:
+          # type [CONFIRMED]. [INFERRED] nullable: cursors are conventionally null on empty
+          # pages; docs do not state nullability. Marked nullable as a defensive guess.
+          type: [string, "null"]
+          description: First ID in the data list. Can be used as the before_id for the previous page.
+        last_id:
+          type: [string, "null"] # type [CONFIRMED]; [INFERRED] nullable, same reasoning as first_id
+          description: Last ID in the data list. Can be used as the after_id for the next page.
+
+    ClaudeCodeUsageReport:
+      type: object
+      description: Response wrapper for the Claude Code usage report. [CONFIRMED]
+      required:
+        - data
+        - has_more
+        - next_page
+      properties:
+        data:
+          type: array
+          description: List of Claude Code usage records for the requested date. [CONFIRMED]
+          items:
+            $ref: "#/components/schemas/ClaudeCodeUsageRecord"
+        has_more:
+          type: boolean
+          description: True if there are more records available beyond the current page. [CONFIRMED]
+        next_page:
+          type: [string, "null"]
+          description: >-
+            Opaque cursor token for fetching the next page of results, or null if no more
+            pages are available. [CONFIRMED]
+          example: "page_MjAyNS0wNS0xNFQwMDowMDowMFo="
+
+    ClaudeCodeUsageRecord:
+      type: object
+      description: >-
+        Claude Code usage metrics for a single actor on a single day. [CONFIRMED]
+      required:
+        - actor
+        - core_metrics
+        - customer_type
+        - date
+        - model_breakdown
+        - organization_id
+        - terminal_type
+        - tool_actions
+      properties:
+        date:
+          type: string
+          format: date-time
+          description: >-
+            UTC date for the usage metrics. Documented as YYYY-MM-DD format, but example
+            responses return an RFC 3339 timestamp at UTC midnight (e.g. "2025-09-08T00:00:00Z").
+            [CONFIRMED — examples show RFC3339]
+          example: "2025-09-08T00:00:00Z"
+        actor:
+          $ref: "#/components/schemas/Actor"
+        organization_id:
+          type: string
+          description: >-
+            ID of the organization that owns the Claude Code usage. UUID in example responses.
+            [CONFIRMED]
+          example: "dc9f6c26-b22c-4831-8d01-0446bada88f1"
+        customer_type:
+          type: string
+          description: >-
+            Type of customer account (api for API customers, subscription for Pro/Team
+            customers). [CONFIRMED]
+          enum:
+            - api
+            - subscription
+        subscription_type:
+          type: [string, "null"]
+          description: >-
+            Subscription tier for subscription customers. null for API customers. [CONFIRMED]
+          enum:
+            - enterprise
+            - team
+            - null
+        terminal_type:
+          type: string
+          description: >-
+            Type of terminal or environment where Claude Code was used (e.g., vscode,
+            iTerm.app, tmux). [CONFIRMED]
+          example: "vscode"
+        core_metrics:
+          $ref: "#/components/schemas/CoreMetrics"
+        tool_actions:
+          type: object
+          description: >-
+            Breakdown of tool action acceptance and rejection rates by tool type. Map of
+            tool name -> ToolAction. Documented keys: edit_tool, multi_edit_tool, write_tool,
+            notebook_edit_tool. Modeled as an open map since the key set may grow. [CONFIRMED — map shape]
+          additionalProperties:
+            $ref: "#/components/schemas/ToolAction"
+          example:
+            edit_tool: { accepted: 45, rejected: 5 }
+            multi_edit_tool: { accepted: 12, rejected: 2 }
+            write_tool: { accepted: 8, rejected: 1 }
+            notebook_edit_tool: { accepted: 3, rejected: 0 }
+        model_breakdown:
+          type: array
+          description: Token usage and cost breakdown by AI model used. [CONFIRMED]
+          items:
+            $ref: "#/components/schemas/ModelBreakdown"
+
+    Actor:
+      description: >-
+        The user or API key that performed the Claude Code actions. Discriminated union on
+        the `type` field. [CONFIRMED]
+      oneOf:
+        - $ref: "#/components/schemas/UserActor"
+        - $ref: "#/components/schemas/APIActor"
+      discriminator:
+        propertyName: type
+        mapping:
+          user_actor: "#/components/schemas/UserActor"
+          api_actor: "#/components/schemas/APIActor"
+
+    UserActor:
+      type: object
+      description: An actor representing a human user (OAuth-authenticated, most common). [CONFIRMED]
+      required:
+        - email_address
+        - type
+      properties:
+        type:
+          type: string
+          enum:
+            - user_actor
+          description: Discriminator value identifying a user actor. [CONFIRMED]
+        email_address:
+          type: string
+          format: email
+          description: Email address of the user who performed Claude Code actions. [CONFIRMED]
+          example: "developer@company.com"
+
+    APIActor:
+      type: object
+      description: An actor representing an API key. [CONFIRMED]
+      required:
+        - api_key_name
+        - type
+      properties:
+        type:
+          type: string
+          enum:
+            - api_actor
+          description: Discriminator value identifying an API key actor. [CONFIRMED]
+        api_key_name:
+          type: string
+          description: Name of the API key used to perform Claude Code actions. [CONFIRMED]
+
+    CoreMetrics:
+      type: object
+      description: Core productivity metrics measuring Claude Code usage and impact. [CONFIRMED]
+      required:
+        - commits_by_claude_code
+        - lines_of_code
+        - num_sessions
+        - pull_requests_by_claude_code
+      properties:
+        num_sessions:
+          type: integer
+          description: Number of distinct Claude Code sessions initiated by this actor. [CONFIRMED]
+        lines_of_code:
+          $ref: "#/components/schemas/LinesOfCode"
+        commits_by_claude_code:
+          type: integer
+          description: Number of git commits created through Claude Code's commit functionality. [CONFIRMED]
+        pull_requests_by_claude_code:
+          type: integer
+          description: Number of pull requests created through Claude Code's PR functionality. [CONFIRMED]
+
+    LinesOfCode:
+      type: object
+      description: Statistics on code changes made through Claude Code. [CONFIRMED]
+      required:
+        - added
+        - removed
+      properties:
+        added:
+          type: integer
+          description: Total number of lines of code added across all files by Claude Code. [CONFIRMED]
+        removed:
+          type: integer
+          description: Total number of lines of code removed across all files by Claude Code. [CONFIRMED]
+
+    ToolAction:
+      type: object
+      description: Acceptance and rejection counts for a single tool type. [CONFIRMED]
+      required:
+        - accepted
+        - rejected
+      properties:
+        accepted:
+          type: integer
+          description: Number of tool action proposals that the user accepted. [CONFIRMED]
+        rejected:
+          type: integer
+          description: Number of tool action proposals that the user rejected. [CONFIRMED]
+
+    ModelBreakdown:
+      type: object
+      description: Token usage and estimated cost for a single AI model. [CONFIRMED]
+      required:
+        - estimated_cost
+        - model
+        - tokens
+      properties:
+        model:
+          type: string
+          description: Name of the AI model used for Claude Code interactions. [CONFIRMED]
+          example: "claude-sonnet-4-20250514"
+        tokens:
+          $ref: "#/components/schemas/ModelTokens"
+        estimated_cost:
+          $ref: "#/components/schemas/EstimatedCost"
+
+    ModelTokens:
+      type: object
+      description: Token usage breakdown for this model. [CONFIRMED]
+      required:
+        - cache_creation
+        - cache_read
+        - input
+        - output
+      properties:
+        input:
+          type: integer
+          description: Number of input tokens consumed by this model. [CONFIRMED]
+        output:
+          type: integer
+          description: Number of output tokens generated by this model. [CONFIRMED]
+        cache_read:
+          type: integer
+          description: Number of cache read tokens consumed by this model. [CONFIRMED]
+        cache_creation:
+          type: integer
+          description: Number of cache creation tokens consumed by this model. [CONFIRMED]
+
+    EstimatedCost:
+      type: object
+      description: Estimated cost for using this model. [CONFIRMED]
+      required:
+        - amount
+        - currency
+      properties:
+        amount:
+          type: integer
+          description: >-
+            Estimated cost amount in minor currency units (e.g., cents for USD). [CONFIRMED]
+          example: 186
+        currency:
+          type: string
+          description: Currency code for the estimated cost (e.g., 'USD'); currently always USD. [CONFIRMED]
+          example: "USD"
