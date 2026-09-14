@@ -871,6 +871,29 @@ func (s *replicationStream) decodeMessage(lsn pglogrepl.LSN, data []byte) (sqlca
 		}
 		return nil, nil
 
+	// Streaming: Stream Abort
+	case pglogrepl.MessageTypeStreamAbort:
+		// Stream Abort
+		//   Byte1('A')    Identifies the message as a stream abort message.
+		//   Int32 (XID)   XID of the top-level transaction.
+		//   Int32 (XID)   XID of the aborted subtransaction (same as above for a top-level abort).
+		//
+		// We never request streaming of in-progress transactions (we use protocol version 1),
+		// so we should never receive any streaming messages. However PostgreSQL 18 introduced
+		// a regression in which the server may send a Stream Abort for a subtransaction of a
+		// large, already rolled back transaction, even when streaming is disabled. Since we
+		// were never sent any changes for that transaction there is nothing to undo, so we
+		// just log the event and ignore it.
+		if len(data) < 9 {
+			return nil, fmt.Errorf("STREAM ABORT message too short: %d bytes", len(data))
+		}
+		logrus.WithFields(logrus.Fields{
+			"xid":    binary.BigEndian.Uint32(data[1:5]),
+			"subxid": binary.BigEndian.Uint32(data[5:9]),
+			"inTxn":  s.nextTxnFinalLSN != 0,
+		}).Warn("ignoring STREAM ABORT message for a transaction which was never streamed")
+		return nil, nil
+
 	default:
 		// There shouldn't be any other message types in the replication stream,
 		// but we might as well handle them gracefully if they show up.
