@@ -51,6 +51,11 @@ jobs:
     needs: classify_changes
     if: needs.classify_changes.outputs.run == 'true'
     runs-on: ubuntu-24.04
+    outputs:
+      # PRs from outside forks, such as dependabot, cannot push new images.  In
+      # that case dependant jobs should use the existing tagged base-image,
+      # otherwise they should use the base-image built in this job.
+      tag: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork) && steps.prep.outputs.version || steps.prep.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -86,6 +91,7 @@ jobs:
           tags: ghcr.io/estuary/base-image:local
 
       - name: Push base-image image
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -94,7 +100,7 @@ jobs:
           tags: ghcr.io/estuary/base-image:${{ steps.prep.outputs.tag }}
 
       - name: Push base-image image with 'dev' tag
-        if: ${{ github.event_name == 'push' }}
+        if: github.event_name == 'push'
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -343,7 +349,7 @@ jobs:
           file: ${{ matrix.connector }}/Dockerfile
           load: true
           build-args: |
-            BASE_IMAGE=ghcr.io/estuary/base-image:${{ steps.prep.outputs.tag }}
+            BASE_IMAGE=ghcr.io/estuary/base-image:${{ needs.build_base_image.outputs.tag }}
             CONNECTOR_VERSION=${{ steps.prep.outputs.version }}-${{ steps.prep.outputs.tag }}
           tags: ghcr.io/estuary/${{ matrix.connector }}:local
 
