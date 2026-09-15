@@ -1,6 +1,8 @@
 url: http://localhost:9802/api/catalog
 warehouse: quickstart_catalog
-namespace: flow
+# A namespace of its own: the two local tasks run in parallel, and sharing one
+# would make which of them records "created namespace" a race.
+namespace: flow_spark4
 base_location: s3://warehouse/
 hard_delete: true
 credentials:
