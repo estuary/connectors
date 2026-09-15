@@ -30,6 +30,7 @@ const (
 
 type binding struct {
 	index        string
+	path         []string
 	deltaUpdates bool
 
 	// Ordered list of field names included in the field selection for the binding, which are used
@@ -63,6 +64,7 @@ type transactor struct {
 	client       *client
 	bindings     []binding
 	isServerless bool
+	be           *m.BindingEvents
 
 	// Used to correlate the binding number for loaded documents from Elasticsearch.
 	indexToBinding map[string]int
@@ -71,8 +73,10 @@ type transactor struct {
 func (t *transactor) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, range_ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
 	return nil, nil
 }
-func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
-func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) { return nil, nil }
+func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
+	return nil, nil
+}
 
 func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	ctx := it.Context()
@@ -162,8 +166,8 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		// document line for index/create actions, each terminated by '\n').
 		// Keeping items separate rather than as one flat buffer lets doStore
 		// re-send an exact subset of items when only some of them fail.
-		items [][]byte
-		index string
+		items   [][]byte
+		binding int
 	}
 
 	batchCh := make(chan storeBatch)
@@ -177,7 +181,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 				case batch, ok := <-batchCh:
 					if !ok {
 						return nil
-					} else if err := t.doStore(groupCtx, batch.items, batch.index); err != nil {
+					} else if err := t.doStore(groupCtx, batch.items, batch.binding, it.Round); err != nil {
 						return err
 					}
 				}
@@ -185,30 +189,30 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		})
 	}
 
-	sendBatch := func(items [][]byte, index string) error {
+	sendBatch := func(items [][]byte, binding int) error {
 		select {
 		case <-groupCtx.Done():
 			return group.Wait()
-		case batchCh <- storeBatch{items: items, index: index}:
+		case batchCh <- storeBatch{items: items, binding: binding}:
 			return nil
 		}
 	}
 
 	var batch [][]byte
 	var batchBytes int
-	var lastIndex string
+	lastBinding := -1
 	// Skip deleted, non-existent documents iff HardDelete is enabled.
 	for it.Next(t.cfg.HardDelete) {
 		b := t.bindings[it.Binding]
 
-		if batchBytes > storeBatchSize || (lastIndex != b.index && lastIndex != "") {
-			if err := sendBatch(batch, lastIndex); err != nil {
+		if lastBinding != -1 && (batchBytes > storeBatchSize || lastBinding != it.Binding) {
+			if err := sendBatch(batch, lastBinding); err != nil {
 				return nil, err
 			}
 			batch = nil
 			batchBytes = 0
 		}
-		lastIndex = b.index
+		lastBinding = it.Binding
 
 		id := base64.RawStdEncoding.EncodeToString(it.PackedKey)
 
@@ -275,7 +279,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}
 
 	if len(batch) > 0 {
-		if err := sendBatch(batch, lastIndex); err != nil {
+		if err := sendBatch(batch, lastBinding); err != nil {
 			return nil, err
 		}
 	}
@@ -436,7 +440,8 @@ var retryableBulkErrorTypes = map[string]bool{
 
 type bulkResponse struct {
 	Items []map[string]struct {
-		Status int `json:"status"`
+		Status int    `json:"status"`
+		Result string `json:"result"`
 		Error  struct {
 			Type   string `json:"type"`
 			Reason string `json:"reason"`
@@ -465,6 +470,28 @@ func (b bulkResponse) classify() (terminal error, retryableIdx []int) {
 	return terminal, retryableIdx
 }
 
+// rowCounts tallies the results of the successful items. A "noop" update counts
+// as updated: the document existed and was matched, it just wasn't changed. A
+// "not_found" delete is not counted, since nothing was affected.
+func (b bulkResponse) rowCounts() (inserted, updated, deleted int64) {
+	for _, item := range b.Items {
+		for _, res := range item {
+			if res.Error.Type != "" {
+				continue
+			}
+			switch res.Result {
+			case "created":
+				inserted++
+			case "updated", "noop":
+				updated++
+			case "deleted":
+				deleted++
+			}
+		}
+	}
+	return inserted, updated, deleted
+}
+
 // itemError returns the formatted error for the first errored item at one of
 // the given indices, for use when retries are exhausted.
 func (b bulkResponse) itemError(idx []int) error {
@@ -491,10 +518,10 @@ func (t *transactor) sendBulk(ctx context.Context, body []byte, index string) (*
 		t.client.es.Bulk.WithIndex(index),
 		// Without this filter, the response body will contain a bit of metadata
 		// for every single item in the bulk request. We only care about each
-		// item's error and status, which keeps the response small in the common
+		// item's error, status and result, which keeps the response small in the common
 		// case of no or few errors while still returning one entry per item (so
 		// response item i aligns with request item i).
-		t.client.es.Bulk.WithFilterPath("items.*.error", "items.*.status"),
+		t.client.es.Bulk.WithFilterPath("items.*.error", "items.*.status", "items.*.result"),
 	}
 
 	if !t.isServerless {
@@ -525,13 +552,16 @@ func (t *transactor) sendBulk(ctx context.Context, body []byte, index string) (*
 	return &parsed, nil
 }
 
-func (t *transactor) doStore(ctx context.Context, items [][]byte, index string) error {
-	if err := retryBulkStore(ctx, items, maxStoreRetries,
-		func(body []byte) (*bulkResponse, error) { return t.sendBulk(ctx, body, index) },
+func (t *transactor) doStore(ctx context.Context, items [][]byte, binding int, round int) error {
+	b := t.bindings[binding]
+	stats, err := retryBulkStore(ctx, items, maxStoreRetries,
+		func(body []byte) (*bulkResponse, error) { return t.sendBulk(ctx, body, b.index) },
 		storeRetryDelay,
-	); err != nil {
-		return fmt.Errorf("bulk request to index %q failed: %w", index, err)
+	)
+	if err != nil {
+		return fmt.Errorf("bulk request to index %q failed: %w", b.index, err)
 	}
+	t.be.ReportRowStats(round, b.path, stats)
 	return nil
 }
 
@@ -539,30 +569,35 @@ func (t *transactor) doStore(ctx context.Context, items [][]byte, index string) 
 // with a retryable per-item error, re-sends only those items after a delay,
 // up to maxAttempts times. Re-sending only the failed items is safe for both
 // standard and delta-updates bindings: a failed item did not land, so it is
-// never duplicated, and items that succeeded are never re-sent.
+// never duplicated, and items that succeeded are never re-sent. The returned
+// stats tally the items that succeeded across all attempts.
 func retryBulkStore(
 	ctx context.Context,
 	items [][]byte,
 	maxAttempts int,
 	send func(body []byte) (*bulkResponse, error),
 	delay func(ctx context.Context, attempt int) error,
-) error {
+) (m.RowStats, error) {
 	pending := items
+	var inserted, updated, deleted int64
+	stats := func() m.RowStats { return m.ExactRowStats(inserted, updated, deleted) }
 	for attempt := 0; ; attempt++ {
 		resp, err := send(bytes.Join(pending, nil))
 		if err != nil {
-			return err
+			return stats(), err
 		}
+		i, u, d := resp.rowCounts()
+		inserted, updated, deleted = inserted+i, updated+u, deleted+d
 
 		terminal, retryableIdx := resp.classify()
 		if terminal != nil {
-			return terminal
+			return stats(), terminal
 		}
 		if len(retryableIdx) == 0 {
-			return nil
+			return stats(), nil
 		}
 		if attempt+1 >= maxAttempts {
-			return fmt.Errorf("%d items still failing after %d attempts: %w",
+			return stats(), fmt.Errorf("%d items still failing after %d attempts: %w",
 				len(retryableIdx), attempt+1, resp.itemError(retryableIdx))
 		}
 
@@ -573,7 +608,7 @@ func retryBulkStore(
 		pending = next
 
 		if err := delay(ctx, attempt); err != nil {
-			return err
+			return stats(), err
 		}
 	}
 }

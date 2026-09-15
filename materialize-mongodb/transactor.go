@@ -68,10 +68,12 @@ type transactor struct {
 	cfg      *config
 	client   *mongo.Client
 	bindings []*binding
+	be       *m.BindingEvents
 }
 
 type binding struct {
 	collection   *mongo.Collection
+	path         []string
 	deltaUpdates bool
 	// keyRestorations holds, for each of the binding's key fields declared as
 	// JSON-schema integer (the only type whose stored precision needs
@@ -94,8 +96,10 @@ func (t *transactor) RecoverCheckpoint(ctx context.Context, spec pf.Materializat
 	return nil, nil
 }
 
-func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
-func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) { return nil, nil }
+func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
+	return nil, nil
+}
 
 func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	ctx := it.Context()
@@ -180,7 +184,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		select {
 		case <-groupCtx.Done():
 			return group.Wait()
-		case sendBatches <- storeBatch{binding: lastBinding, models: batch}:
+		case sendBatches <- storeBatch{binding: lastBinding, round: it.Round, models: batch}:
 			batch = nil
 			batchSize = 0
 			return nil
@@ -258,7 +262,8 @@ func (t *transactor) loadWorker(
 			}
 
 			if err := func() error { // Closure for the deferred cur.Close()
-				collection := t.bindings[batch.binding].collection
+				b := t.bindings[batch.binding]
+				collection := b.collection
 				cur, err := collection.Find(ctx, bson.D{{
 					Key:   idField,
 					Value: bson.D{{Key: "$in", Value: batch.keys}},
@@ -292,6 +297,7 @@ func (t *transactor) loadWorker(
 
 type storeBatch struct {
 	binding int
+	round   int
 	models  []mongo.WriteModel
 }
 
@@ -322,7 +328,8 @@ func (t *transactor) storeWorker(
 				}
 			}
 
-			collection := t.bindings[batch.binding].collection
+			b := t.bindings[batch.binding]
+			collection := b.collection
 
 			// Ordered operations are not needed since each key can only be seen a single time in a
 			// Flow transaction. Turning this off supposedly allows for optimizations by the server.
@@ -337,6 +344,11 @@ func (t *transactor) storeWorker(
 			if err != nil {
 				return fmt.Errorf("bulk write for collection %s: %w", collection.Name(), err)
 			}
+
+			// Updates are reported as matched rather than modified for the same
+			// reason the sanity check below uses MatchedCount.
+			t.be.ReportRowStats(batch.round, b.path, m.ExactRowStats(
+				res.InsertedCount+res.UpsertedCount, res.MatchedCount, res.DeletedCount))
 
 			// Sanity check the result of the bulk write operation. For updated documents, we check
 			// MatchedCount instead of ModifiedCount since certain Flow reduction strategies can

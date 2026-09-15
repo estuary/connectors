@@ -124,6 +124,7 @@ incremental_chunk_size
 incremental_scn_range
 backfillSegments
 scanLimit
+idleBackoffMax
 rcuAllocation
 priority
 node_id

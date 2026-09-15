@@ -368,6 +368,7 @@ func (d *materialization) NewTransactor(
 	bindings := make([]bindingState, 0, len(mappedBindings))
 	for _, b := range mappedBindings {
 		bindings = append(bindings, bindingState{
+			path:       b.ResourcePath,
 			source:     b.Config.Source,
 			detailType: b.Config.DetailType,
 		})
@@ -377,6 +378,7 @@ func (d *materialization) NewTransactor(
 		client:       d.client,
 		eventBusName: d.cfg.EventBusName,
 		bindings:     bindings,
+		be:           be,
 	}, nil
 }
 

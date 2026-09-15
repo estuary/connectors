@@ -1,5 +1,24 @@
 # materialize-bigquery
 
+## 2026-09-14
+
+### Fixed
+- A transaction whose load query returns more than 10 GB of documents no longer
+  fails with `responseTooLarge`. Load results are now written to a
+  per-transaction table in the endpoint dataset, named
+  `flow_load_results_<materialization>_<range>_<uuid>`, which is deleted after
+  read-back and expires after one day if a crash prevents the deletion.
+
+### Changed
+- Load results were previously held in an anonymous table in the billing
+  project. They are now briefly stored in the endpoint dataset of the
+  configured project, so that storage is attributed there.
+
+## 2026-08-31
+
+### Added
+- Support for tasks scaled out to multiple shards.
+
 ## 2026-08-25
 
 ### Added

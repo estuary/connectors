@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import datetime, timedelta, UTC
+from datetime import datetime, UTC
 
 import pytest
 
@@ -25,7 +25,6 @@ _LOG = logging.getLogger(__name__)
 
 START_DATE = datetime(1999, 2, 3, tzinfo=UTC)
 CUTOFF = datetime(2026, 7, 1, tzinfo=UTC)
-WINDOW_SIZE = timedelta(days=18250)
 MODSTAMP = "2026-06-01T00:00:00.000Z"
 INSTANCE_URL = "https://instance.example.com"
 
@@ -196,7 +195,6 @@ def _backfill(http, is_supported_by_bulk_api, bulk_manager, rest_manager, page):
         "Account",
         FIELDS,
         MODEL,
-        WINDOW_SIZE,
         START_DATE,
         _LOG,
         page,
@@ -233,22 +231,6 @@ async def test_backfill_id_page_cursor_resumes_id_pagination():
     assert len(manager.queries) == 1
     assert f"AND Id > '{_id(1)}'" in manager.queries[0]
     assert "ORDER BY Id ASC" in manager.queries[0]
-
-
-@pytest.mark.asyncio
-async def test_backfill_datetime_page_cursor_uses_date_windows():
-    manager = FakeBulkManager([_record(1), _record(2)])
-    page = dt_to_str(datetime(2026, 1, 1, tzinfo=UTC))
-
-    items = await _collect(_bulk_backfill(manager, page=page))
-
-    assert manager.queries == [
-        "SELECT Id,SystemModstamp,Name FROM Account"
-        " WHERE SystemModstamp > 2026-01-01T00:00:00.000Z AND SystemModstamp <= 2026-07-01T00:00:00.000Z"
-        " ORDER BY SystemModstamp ASC"
-    ]
-    # The legacy strategy checkpoints datetime cursors.
-    assert items[-1] == MODSTAMP
 
 
 @pytest.mark.asyncio

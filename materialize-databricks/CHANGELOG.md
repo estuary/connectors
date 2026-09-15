@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-09-02
+
+### Changed
+- The connector checkpoint now groups each table's pending work under its
+  binding first and the staging shard's key range second, so a task can find
+  everything staged for a table across all of its shards in one place.
+  Checkpoints written by earlier versions are still recovered and cleared.
+  Note for downgrades: versions predating this change refuse to parse the new
+  layout — drain the task (let it idle at an acknowledged commit) before
+  pinning an older image.
+
 ## 2026-08-26
 
 ### Fixed

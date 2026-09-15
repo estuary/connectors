@@ -598,8 +598,10 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 	return nil
 }
 
-func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
-func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) { return nil, nil }
+func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
+	return nil, nil
+}
 
 // timedSpannerApply wraps spanner.Client.Apply with timing instrumentation
 func (t *transactor) timedSpannerApply(ctx context.Context, mutations []*spanner.Mutation, operation string) (time.Time, time.Duration, error) {
@@ -833,6 +835,10 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	storeStart := time.Now()
 	var storeCount int
 	var storeBytes int
+	// stored counts the mutations applied per binding, for the transaction
+	// health report: Apply returns no counts, and partitions mix bindings.
+	stored := make([]int64, len(t.bindings))
+	round := it.Round
 
 	ctx := it.Context()
 
@@ -854,6 +860,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	// Skip deleted, non-existent documents iff HardDelete is enabled.
 	for it.Next(t.cfg.HardDelete) {
 		storeCount++
+		stored[it.Binding]++
 		b := t.bindings[it.Binding]
 
 		var mutation *spanner.Mutation
@@ -1054,6 +1061,12 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			return nil, m.FinishedOperation(fmt.Errorf("applying fence checkpoint: %w", err))
 		}
 
+		for i, b := range t.bindings {
+			if stored[i] > 0 {
+				t.be.ReportRowStats(round, b.target.Path, m.TotalRowStats(stored[i]))
+			}
+		}
+
 		log.WithField("batches", flusher.getBatchCount()).Info("store: completed all mutation batches")
 
 		return nil, nil
@@ -1064,4 +1077,3 @@ func (t *transactor) Destroy() {
 	t.client.Close()
 	t.adminClient.Close()
 }
-

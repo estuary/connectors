@@ -38,6 +38,9 @@ ENV PATH="/connector:$PATH"
 
 COPY --from=builder /builder/connector ./materialize-s3-iceberg
 
+ARG CONNECTOR_VERSION=dev
+ENV CONNECTOR_VERSION="${CONNECTOR_VERSION}"
+
 LABEL FLOW_RUNTIME_PROTOCOL=materialize
 
 ENTRYPOINT ["/connector/materialize-s3-iceberg"]

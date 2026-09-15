@@ -70,6 +70,7 @@ from .api import (
     snapshot_cursor_paginated_resources,
     url_base,
     _dt_to_s,
+    INCREMENTAL_LAG,
     TIME_PARAMETER_DELAY,
 )
 
@@ -203,7 +204,7 @@ def audit_logs(
             )
         )
 
-    cutoff = datetime.now(tz=UTC)
+    cutoff = datetime.now(tz=UTC) - INCREMENTAL_LAG
 
     return common.Resource(
         name="audit_logs",
@@ -529,7 +530,7 @@ def satisfaction_ratings(
             )
         )
 
-    cutoff = datetime.now(tz=UTC) - TIME_PARAMETER_DELAY
+    cutoff = datetime.now(tz=UTC) - max(INCREMENTAL_LAG, TIME_PARAMETER_DELAY)
 
     return common.Resource(
         name="satisfaction_ratings",
@@ -588,7 +589,7 @@ def incremental_cursor_paginated_resources(
             )
         )
 
-    cutoff = datetime.now(tz=UTC)
+    cutoff = datetime.now(tz=UTC) - max(INCREMENTAL_LAG, TIME_PARAMETER_DELAY)
 
     resources = [
             common.Resource(
@@ -649,7 +650,7 @@ def incremental_time_export_resources(
             )
         )
 
-    cutoff = datetime.now(tz=UTC) - TIME_PARAMETER_DELAY
+    cutoff = datetime.now(tz=UTC) - max(INCREMENTAL_LAG, TIME_PARAMETER_DELAY)
 
     resources = [
             common.Resource(
@@ -710,7 +711,7 @@ def talk_incremental_export_resources(
             )
         )
 
-    cutoff = datetime.now(tz=UTC) - TIME_PARAMETER_DELAY
+    cutoff = datetime.now(tz=UTC) - max(INCREMENTAL_LAG, TIME_PARAMETER_DELAY)
 
     resources = [
             common.Resource(

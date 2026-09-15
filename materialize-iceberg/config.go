@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -22,6 +24,7 @@ import (
 	"github.com/estuary/connectors/materialize-iceberg/catalog"
 	"github.com/invopop/jsonschema"
 	"github.com/segmentio/encoding/json"
+	orderedmap "github.com/wk8/go-ordered-map/v2"
 )
 
 var featureFlagDefaults = map[string]bool{
@@ -32,6 +35,16 @@ var featureFlagDefaults = map[string]bool{
 	//   <base_location>/<namespace>/<table>.<hash>
 	"nested_dot_hash_location_style": false,
 }
+
+var (
+	sparkJobPropertyRegex = regexp.MustCompile(`^[0-9A-Za-z]+$`)
+
+	validSparkJobPropertyKeys = []string{
+		"spark.dynamicAllocation.initialExecutors",
+		"spark.dynamicAllocation.maxExecutors",
+		"spark.executor.instances",
+	}
+)
 
 // TODO(whb): It would be nice to have a configuration for making the table use
 // "Merge on Read" when performing DML, but that is broken in the latest version
@@ -528,16 +541,64 @@ func (emrCredentials) JSONSchema() *jsonschema.Schema {
 	)
 }
 
+type sparkJobProperty struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
+func (sparkJobProperty) JSONSchema() *jsonschema.Schema {
+	properties := make([]any, 0, len(validSparkJobPropertyKeys))
+	for _, key := range validSparkJobPropertyKeys {
+		properties = append(properties, key)
+	}
+	return &jsonschema.Schema{
+		Type: "object",
+		Properties: orderedmap.New[string, *jsonschema.Schema](orderedmap.WithInitialData[string, *jsonschema.Schema](
+			orderedmap.Pair[string, *jsonschema.Schema]{
+				Key: "key",
+				Value: &jsonschema.Schema{
+					Type:        "string",
+					Title:       "Key",
+					Description: "Spark Job Property Key.",
+					Enum:        properties,
+					Extras: map[string]any{
+						"order":        1,
+						"nonsensitive": true,
+					},
+				},
+			},
+			orderedmap.Pair[string, *jsonschema.Schema]{
+				Key: "value",
+				Value: &jsonschema.Schema{
+					Type:        "string",
+					Title:       "Value",
+					Description: "Spark Job Property Value.",
+					Pattern:     "^[0-9A-Za-z]+$",
+					Extras: map[string]any{
+						"order":        2,
+						"nonsensitive": true,
+					},
+				},
+			},
+		)),
+		Required: []string{
+			"key",
+			"value",
+		},
+	}
+}
+
 type emrConfig struct {
-	AWSAccessKeyID       string          `json:"aws_access_key_id" jsonschema:"-"`
-	AWSSecretAccessKey   string          `json:"aws_secret_access_key" jsonschema:"-" jsonschema_extras:"secret=true"`
-	Region               string          `json:"region" jsonschema:"title=Region,description=Region of the EMR application and staging bucket." jsonschema_extras:"order=3"`
-	ApplicationId        string          `json:"application_id" jsonschema:"title=Application ID,description=ID of the EMR serverless application." jsonschema_extras:"order=4"`
-	ExecutionRoleArn     string          `json:"execution_role_arn" jsonschema:"title=Execution Role ARN,description=ARN of the EMR serverless execution role used to run jobs." jsonschema_extras:"order=5"`
-	Bucket               string          `json:"bucket" jsonschema:"title=Bucket,description=Bucket to store staged data files." jsonschema_extras:"order=6"`
-	BucketPath           string          `json:"bucket_path,omitempty" jsonschema:"title=Bucket Path,description=Optional prefix that will be used to store staged data files." jsonschema_extras:"order=7"`
-	SystemsManagerPrefix string          `json:"systems_manager_prefix,omitempty" jsonschema:"title=System Manager Prefix,description=Prefix for parameters in Systems Manager as an absolute directory path (must start and end with /). This is required when using Client Credentials for catalog authentication." jsonschema_extras:"pattern=^/.+/$,order=8"`
-	Credentials          *emrCredentials `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"order=9"`
+	AWSAccessKeyID       string             `json:"aws_access_key_id" jsonschema:"-"`
+	AWSSecretAccessKey   string             `json:"aws_secret_access_key" jsonschema:"-" jsonschema_extras:"secret=true"`
+	Region               string             `json:"region" jsonschema:"title=Region,description=Region of the EMR application and staging bucket." jsonschema_extras:"order=3"`
+	ApplicationId        string             `json:"application_id" jsonschema:"title=Application ID,description=ID of the EMR serverless application." jsonschema_extras:"order=4"`
+	ExecutionRoleArn     string             `json:"execution_role_arn" jsonschema:"title=Execution Role ARN,description=ARN of the EMR serverless execution role used to run jobs." jsonschema_extras:"order=5"`
+	Bucket               string             `json:"bucket" jsonschema:"title=Bucket,description=Bucket to store staged data files." jsonschema_extras:"order=6"`
+	BucketPath           string             `json:"bucket_path,omitempty" jsonschema:"title=Bucket Path,description=Optional prefix that will be used to store staged data files." jsonschema_extras:"order=7"`
+	SystemsManagerPrefix string             `json:"systems_manager_prefix,omitempty" jsonschema:"title=System Manager Prefix,description=Prefix for parameters in Systems Manager as an absolute directory path (must start and end with /). This is required when using Client Credentials for catalog authentication." jsonschema_extras:"pattern=^/.+/$,order=8"`
+	Credentials          *emrCredentials    `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"order=9"`
+	SparkJobProperties   []sparkJobProperty `json:"spark_job_properties,omitempty" jsonschema:"title=Spark Job Properties,description=Override Spark Job Properties" jsonschema_extras:"order=10,nonsensitive=true"`
 }
 
 func (c emrConfig) Validate() error {
@@ -573,6 +634,15 @@ func (c emrConfig) Validate() error {
 	if c.SystemsManagerPrefix != "" {
 		if !strings.HasPrefix(c.SystemsManagerPrefix, "/") || !strings.HasSuffix(c.SystemsManagerPrefix, "/") {
 			return fmt.Errorf("systems manager prefix %q must start and end with /", c.SystemsManagerPrefix)
+		}
+	}
+
+	for _, property := range c.SparkJobProperties {
+		if !slices.Contains(validSparkJobPropertyKeys, property.Key) {
+			return fmt.Errorf("spark job property key %q is not supported", property.Key)
+		}
+		if !sparkJobPropertyRegex.MatchString(property.Value) {
+			return fmt.Errorf("spark job property value %q is invalid", property.Value)
 		}
 	}
 

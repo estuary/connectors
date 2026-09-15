@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"sync/atomic"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
@@ -27,15 +28,19 @@ const maxMessageBytes = 256 * 1024
 type transactor struct {
 	client   *sns.Client
 	bindings []*topicBinding
+	be       *materialize.BindingEvents
 }
 
 type topicBinding struct {
+	path     []string
 	topicARN string
 	isFifo   bool
 }
 
-func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
-func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) { return nil, nil }
+func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
+	return nil, nil
+}
 
 // SNS is delta-update only.
 func (t *transactor) Load(it *materialize.LoadIterator, _ func(int, json.RawMessage) error) error {
@@ -48,12 +53,16 @@ func (t *transactor) Load(it *materialize.LoadIterator, _ func(int, json.RawMess
 func (t *transactor) Store(it *materialize.StoreIterator) (materialize.StartCommitFunc, error) {
 	errGroup, ctx := errgroup.WithContext(it.Context())
 	errGroup.SetLimit(publishConcurrency)
+	round := it.Round
+	// published counts the messages SNS accepted per binding, for the
+	// transaction health report.
+	published := make([]atomic.Int64, len(t.bindings))
 
 	for it.Next(false) {
 		bindingIdx := it.Binding
 		packedKey := it.PackedKey
 		doc := it.RawJSON
-		if err := t.publishOne(ctx, errGroup, bindingIdx, packedKey, doc); err != nil {
+		if err := t.publishOne(ctx, errGroup, bindingIdx, packedKey, doc, &published[bindingIdx]); err != nil {
 			return nil, err
 		}
 	}
@@ -61,14 +70,23 @@ func (t *transactor) Store(it *materialize.StoreIterator) (materialize.StartComm
 		return nil, err
 	}
 
-	return nil, errGroup.Wait()
+	if err := errGroup.Wait(); err != nil {
+		return nil, err
+	}
+	for i, b := range t.bindings {
+		if n := published[i].Load(); n > 0 {
+			t.be.ReportRowStats(round, b.path, materialize.TotalRowStats(n))
+		}
+	}
+	return nil, nil
 }
 
 // publishOne is the per-document publish path, extracted so integration tests can drive it without
 // having to synthesize an unexported *materialize.StoreIterator. Synchronous validation errors
 // (e.g. oversize document) are returned directly; the Publish RPC itself is dispatched on
-// errGroup, so its result is observed via errGroup.Wait().
-func (t *transactor) publishOne(ctx context.Context, errGroup *errgroup.Group, bindingIdx int, packedKey []byte, doc json.RawMessage) error {
+// errGroup, so its result is observed via errGroup.Wait(). A successful publish
+// increments published when it is given.
+func (t *transactor) publishOne(ctx context.Context, errGroup *errgroup.Group, bindingIdx int, packedKey []byte, doc json.RawMessage, published *atomic.Int64) error {
 	binding := t.bindings[bindingIdx]
 	if len(doc) > maxMessageBytes {
 		return fmt.Errorf(
@@ -89,6 +107,9 @@ func (t *transactor) publishOne(ctx context.Context, errGroup *errgroup.Group, b
 	errGroup.Go(func() error {
 		if _, err := t.client.Publish(ctx, input); err != nil {
 			return fmt.Errorf("publishing document for binding [%d]: %w", bindingIdx, err)
+		}
+		if published != nil {
+			published.Add(1)
 		}
 		return nil
 	})

@@ -1,4 +1,5 @@
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
+from enum import StrEnum, auto
 from logging import Logger
 from typing import (
     Any,
@@ -19,6 +20,175 @@ from .shared import (
     HUB,
 )
 
+# HubSpot's Search API serves at most this many results for one query; paging
+# past it returns a 400.
+SEARCH_RESULT_CAP = 10_000
+SEARCH_PAGE_LIMIT = 200
+# Offset of the last page a query can serve. Its records show where the cap
+# falls in time.
+PEEK_OFFSET = SEARCH_RESULT_CAP - SEARCH_PAGE_LIMIT
+
+ONE_MS = timedelta(milliseconds=1)
+
+
+class _CapReached(Exception):
+    """Paging a chunk would cross the offset cap despite its reported total."""
+
+
+class _SplitMethod(StrEnum):
+    """How a chunk's end was chosen from the page at the cap."""
+
+    # The earliest in-window timestamp at the cap, less one millisecond.
+    PEEK = auto()
+    # Fewer than SEARCH_PAGE_LIMIT records sit at the cap, so the rest of the
+    # window fits in one search.
+    FITS = auto()
+    # The peek offered no usable timestamp, or a peeked chunk still overflowed,
+    # so the range is halved.
+    HALVE = auto()
+    # Every record at the cap shares the window's first millisecond; drain it.
+    CYCLE = auto()
+
+
+def _floor_to_ms(dt: datetime) -> datetime:
+    """`dt` with its sub-millisecond part removed. HubSpot compares timestamps
+    at millisecond resolution and ignores the microseconds in a request's
+    bounds, so flooring ours keeps every comparison here consistent with what
+    the search actually returns."""
+    return dt - timedelta(microseconds=dt.microsecond % 1000)
+
+
+def _midpoint(start: datetime, end: datetime) -> datetime:
+    """The whole millisecond halfway from `start` to `end`; `start` itself when
+    they are a millisecond or less apart."""
+    return start + ONE_MS * ((end - start) // ONE_MS // 2)
+
+
+def _choose_chunk_end(
+    start: datetime, end: datetime, peeked_timestamps: list[datetime]
+) -> tuple[_SplitMethod, datetime]:
+    """Decide where a chunk ends from the last-modified timestamps HubSpot
+    reports for the records at the cap. A short page means fewer than the cap
+    remain, so the whole window fits. Otherwise only a timestamp inside the
+    window can end a chunk. For CYCLE the returned end is the window's start."""
+    if len(peeked_timestamps) < SEARCH_PAGE_LIMIT:
+        return _SplitMethod.FITS, end
+
+    in_window_timestamps = [ts for ts in peeked_timestamps if start < ts <= end]
+    if in_window_timestamps:
+        return _SplitMethod.PEEK, min(in_window_timestamps) - ONE_MS
+    if all(ts <= start for ts in peeked_timestamps):
+        return _SplitMethod.CYCLE, start
+    return _SplitMethod.HALVE, _midpoint(start, end)
+
+
+async def _request_search_page(
+    log: Logger,
+    http: HTTPSession,
+    object_name: str,
+    last_modified_property_name: str,
+    start: datetime,
+    end: datetime | None,
+    after: int | None,
+) -> SearchPageResult[CustomObjectSearchResult]:
+    """Request one page of Search API results for records whose last-modified
+    property is in [start, end], or at or after `start` when `end` is None,
+    sorted ascending, SEARCH_PAGE_LIMIT per page. `after` is HubSpot's offset
+    for the page; None requests the first."""
+    filter = (
+        {
+            "propertyName": last_modified_property_name,
+            "operator": "BETWEEN",
+            "value": dt_to_str(start),
+            "highValue": dt_to_str(end),
+        }
+        if end
+        else {
+            "propertyName": last_modified_property_name,
+            "operator": "GTE",
+            "value": dt_to_str(start),
+        }
+    )
+
+    input: dict[str, Any] = {
+        "filters": [filter],
+        "sorts": [
+            {"propertyName": last_modified_property_name, "direction": "ASCENDING"}
+        ],
+        "limit": SEARCH_PAGE_LIMIT,
+    }
+    if after is not None:
+        input["after"] = after
+
+    url = f"{HUB}/crm/v3/objects/{object_name}/search"
+    return SearchPageResult[CustomObjectSearchResult].model_validate_json(
+        await http.request(log, url, method="POST", json=input)
+    )
+
+
+async def _fetch_all_ids_between(
+    log: Logger,
+    http: HTTPSession,
+    object_name: str,
+    last_modified_property_name: str,
+    start: datetime,
+    end: datetime | None,
+    first_page: SearchPageResult[CustomObjectSearchResult],
+) -> tuple[list[TimestampedId], int]:
+    """Fetch the id and last-modified timestamp of every record HubSpot returns
+    for [start, end], paging until it reports no more. The caller has already
+    requested `first_page` to check the range's total, so reading continues
+    from it. The range must hold at most SEARCH_RESULT_CAP records: if paging
+    would cross the cap, raise _CapReached so the caller can narrow it. Returns
+    the records sorted by timestamp and the number of pages read."""
+    output_items: set[TimestampedId] = set()
+    pages = 0
+    result = first_page
+
+    while True:
+        pages += 1
+
+        for r in result.results:
+            this_mod_time = r.properties.hs_lastmodifieddate
+
+            if this_mod_time < start or (end and this_mod_time > end):
+                # HubSpot's filter placed this record in the window although the
+                # timestamp it reports lies outside it. The filter decides
+                # membership, so the record is kept and its timestamp treated
+                # as payload. One cause is HubSpot matching at millisecond
+                # resolution while the reported value carries microseconds;
+                # another is the filter and the reported property disagreeing
+                # about when the record changed.
+                log.info(
+                    "search result reports a modification time outside its search window",
+                    {
+                        "id": r.id,
+                        "this_mod_time": this_mod_time,
+                        "start": start,
+                        "end": end,
+                    },
+                )
+
+            output_items.add(TimestampedId(this_mod_time, str(r.id)))
+
+        if not result.paging:
+            return sorted(output_items), pages
+
+        after = int(result.paging.next.after)
+        # The caller should have already bounded the search so there are
+        # at most SEARCH_RESULT_CAP results returned by the search, but this
+        # sanity check covers the case where HubSpot's `total` under-reported
+        # the range or where records joined the result set while we paged: a
+        # record indexed late, or one modified during an open-ended realtime
+        # search. Requesting an offset at or past the cap gets a 400, so raise
+        # instead and let the caller narrow the range.
+        if after + SEARCH_PAGE_LIMIT > SEARCH_RESULT_CAP:
+            raise _CapReached()
+
+        result = await _request_search_page(
+            log, http, object_name, last_modified_property_name, start, end, after
+        )
+
 
 async def fetch_search_objects(
     object_name: str,
@@ -28,173 +198,143 @@ async def fetch_search_objects(
     until: datetime | None,
     page: PageCursor,
     last_modified_property_name: str = "hs_lastmodifieddate",
-    should_crash_on_unordered_results: bool = True,
 ) -> tuple[Iterable[TimestampedId], PageCursor]:
     """
-    Retrieve a single chunk of records modified at or after 'since' and at or
-    before 'until' if provided, in ascending order of last-modified time.
+    Retrieve one chunk of the records modified in [since, until] (or from
+    `since` onward when `until` is None), plus a resume PageCursor for the rest
+    of the window, or None once the window has been read.
 
-    The HubSpot Search API has an undocumented maximum offset of 10,000 items.
-    Rather than enumerate the whole window in one call, this returns one chunk
-    that ends at the offset boundary, along with a resume PageCursor (a
-    last-modified timestamp string) to continue from on the next call. When the
-    whole window has been read, the returned PageCursor is None.
+    HubSpot's Search API serves at most 10,000 results per query. Rather than
+    page up to that cap and rely on result order to know what was covered, a
+    window holding more records is split by time into chunks the API can return
+    completely, and every record in a chunk is read in whatever order it comes.
+    HubSpot's filter decides which records a chunk holds: a record is returned
+    even when the timestamp it reports falls outside the chunk.
 
-    Chunks never leave gaps. A chunk contains every record in the window
-    modified at or before the chunk's newest timestamp, except records already
-    returned by an earlier chunk. The returned cursor is the first millisecond the
-    chunk does NOT cover. Records the search read at that millisecond are
-    withheld from the chunk, since the offset cap may have cut that millisecond
-    off partway. Passing the cursor back as 'page' starts a fresh search at
-    that millisecond, which re-reads it in full and continues on.
+                 start          chunk_end          until
+    ───────────────┼────────────────┼────────────────┼──▶ time (1 ms ticks)
+                   │                │                │
+    emitted ───────[════════════════]                │
+    resume ────────┼────────────────(════════════════]
+                   │                └─ chosen so the chunk holds at most
+                   │                   10,000 records; equals until when
+                   │                   the whole window fits
+                   └─ inclusive; page replaces since when resuming
 
-    Multiple records can have the same "last modified" property value, and
-    indeed large runs of these may have the same value. When more than 10,000
-    records share a single millisecond (a "cycle"), the whole instant is drained
-    via fetch_search_objects_modified_at and the resume cursor steps forward by
-    one millisecond.
+    `emitted` is what this call returns: the records HubSpot's filter
+    matches in [start, chunk_end], inclusive at both ends at its millisecond
+    resolution. `resume` is what the next call covers: its cursor is
+    chunk_end + 1 ms, the first millisecond this chunk did not cover, and is
+    None once the chunk reaches until.
+
+    A chunk end is found by peeking at the last page the cap allows (offset
+    9,800): the earliest timestamp there that lies inside the window, less one
+    millisecond, bounds a chunk of at most 9,800 records. A fresh search then
+    confirms the chunk's total before it is read, so the peek only sizes the
+    chunk and never decides completeness. When the peek offers no usable
+    timestamp the window is halved instead, and a chunk that is a single
+    millisecond yet still exceeds the cap is drained with
+    fetch_search_objects_modified_at.
     """
+    start = _floor_to_ms(str_to_dt(page) if isinstance(page, str) else since)
+    until = _floor_to_ms(until) if until is not None else None
+    # Realtime callers pass no `until`. The present bounds any splitting they need.
+    end = until if until is not None else _floor_to_ms(datetime.now(tz=UTC))
 
-    if isinstance(page, str):
-        since = str_to_dt(page)
+    async def request_page(chunk_end: datetime | None, after: int | None):
+        return await _request_search_page(
+            log, http, object_name, last_modified_property_name, start, chunk_end, after
+        )
 
-    url = f"{HUB}/crm/v3/objects/{object_name}/search"
-    limit = 200
-    output_items: set[TimestampedId] = set()
-    cursor: int | None = None
-    max_updated: datetime = since
-    original_total: int | None = None
+    async def fetch_all_ids(
+        chunk_end: datetime | None,
+        first_page: SearchPageResult[CustomObjectSearchResult],
+    ) -> tuple[list[TimestampedId], int]:
+        return await _fetch_all_ids_between(
+            log, http, object_name, last_modified_property_name, start, chunk_end, first_page
+        )
+
+    def resume_after(chunk_end: datetime) -> PageCursor:
+        resume = chunk_end + ONE_MS
+        return dt_to_str(resume) if resume <= end else None
+
+    async def drain_instant() -> tuple[Iterable[TimestampedId], PageCursor]:
+        # More than 10,000 records share a single millisecond, so splitting by
+        # time can't make progress. Drain every record at that instant and step
+        # the resume cursor forward by the minimum (1ms) amount.
+        log.info(
+            "cycle detected for lastmodifieddate, fetching all ids for records modified at that instant",
+            {"object_name": object_name, "instant": start},
+        )
+        items = await fetch_search_objects_modified_at(
+            object_name, log, http, start, last_modified_property_name
+        )
+        return sorted(items), resume_after(start)
+
+    if page is None:
+        # A fresh window. Its first page is needed regardless and carries the
+        # window's total.
+        first_page = await request_page(until, None)
+        if first_page.total <= SEARCH_RESULT_CAP:
+            try:
+                items, _ = await fetch_all_ids(until, first_page)
+                return items, None
+            except _CapReached:
+                log.warning(
+                    "search paged past the cap despite its total; splitting the window",
+                    {"object_name": object_name, "start": start, "total": first_page.total},
+                )
+
+    # The window contains over SEARCH_RESULT_CAP records or we're resuming
+    # inside one that was. Peek at the last page the cap allows to see
+    # where the cap falls in time.
+    peek = await request_page(until, PEEK_OFFSET)
+    method, chunk_end = _choose_chunk_end(
+        start, end, [r.properties.hs_lastmodifieddate for r in peek.results]
+    )
+    if method is _SplitMethod.CYCLE:
+        return await drain_instant()
 
     while True:
-        filter = (
-            {
-                "propertyName": last_modified_property_name,
-                "operator": "BETWEEN",
-                "value": dt_to_str(since),
-                "highValue": dt_to_str(until),
-            }
-            if until
-            else {
-                "propertyName": last_modified_property_name,
-                "operator": "GTE",
-                "value": dt_to_str(since),
-            }
-        )
-
-        input = {
-            "filters": [filter],
-            "sorts": [
-                {"propertyName": last_modified_property_name, "direction": "ASCENDING"}
-            ],
-            "limit": limit,
-        }
-        if cursor:
-            input["after"] = cursor
-
-        result: SearchPageResult[CustomObjectSearchResult] = SearchPageResult[
-            CustomObjectSearchResult
-        ].model_validate_json(await http.request(log, url, method="POST", json=input))
-
-        if not original_total:
-            # Record the total from the original entire request range for
-            # logging.
-            original_total = result.total
-
-        for r in result.results:
-            this_mod_time = r.properties.hs_lastmodifieddate
-
-            if this_mod_time < since:
-                # The search API will return records with a modification time
-                # before the requested "since" (the start of the window) if
-                # their updatedAt timestamp is within the same millisecond,
-                # effectively ignoring the microseconds part of the range
-                # criteria. These spurious results can be safely ignored in the
-                # rare case that there is a record with a modification time
-                # within the same millisecond as requested at the start of the
-                # time window, but some smaller fraction of a second earlier.
-                log.info(
-                    "ignoring search result with record modification time that is earlier than minimum search window",
-                    {"id": r.id, "this_mod_time": this_mod_time, "since": since},
-                )
-                continue
-
-            if until and this_mod_time > until:
-                log.info(
-                    "ignoring search result with record modification time that is later than maximum search window",
-                    {"id": r.id, "this_mod_time": this_mod_time, "until": until},
-                )
-                continue
-
-            if this_mod_time < max_updated:
-                if should_crash_on_unordered_results:
-                    log.error("search query input", input)
-                    raise Exception(
-                        f"search query returned records out of order for {r.id} with {this_mod_time} < {max_updated}"
-                    )
-                # The realtime stream is best-effort and allowed to be
-                # incomplete, so an out-of-order result is skipped rather
-                # than treated as fatal. The delayed stream will capture
-                # any records the realtime stream skips.
-                continue
-
-            max_updated = this_mod_time
-            output_items.add(TimestampedId(this_mod_time, str(r.id)))
-
-        if not result.paging:
-            # The whole window has been read and no more chunks remain.
-            return sorted(output_items), None
-
-        cursor = int(result.paging.next.after)
-        if cursor + limit <= 10_000:
-            # Still within the offset cap; keep paginating this same search.
-            continue
-
-        # Hit the 10,000-offset cap. End this chunk here and return a resume
-        # cursor so the caller can continue with a fresh search.
-        if since == max_updated:
-            # More than 10,000 records share a single millisecond, so paginating
-            # by time can't make progress. Drain every record at that instant
-            # and step the resume cursor forward by the minimum (1ms) amount.
+        if chunk_end < end:
             log.info(
-                "cycle detected for lastmodifieddate, fetching all ids for records modified at that instant",
-                {"object_name": object_name, "instant": since},
+                "search window split",
+                {
+                    "object_name": object_name,
+                    "start": start,
+                    "end": end,
+                    "chunk_end": chunk_end,
+                    "method": method,
+                },
             )
-            output_items.update(
-                await fetch_search_objects_modified_at(
-                    object_name, log, http, max_updated, last_modified_property_name
+
+        first_page = await request_page(chunk_end, None)
+        if first_page.total <= SEARCH_RESULT_CAP:
+            try:
+                items, pages = await fetch_all_ids(chunk_end, first_page)
+            except _CapReached:
+                # The chunk held more than the cap after all, so it needs
+                # narrowing just as if its total had said so. Fall through to
+                # the same halving (or drain) below.
+                pass
+            else:
+                log.info(
+                    "search window chunk complete",
+                    {
+                        "object_name": object_name,
+                        "start": start,
+                        "chunk_end": chunk_end,
+                        "count": len(items),
+                        "pages": pages,
+                        "total": first_page.total,
+                    },
                 )
-            )
+                return items, resume_after(chunk_end)
 
-            # HubSpot APIs use millisecond resolution, so move the time cursor
-            # forward by that minimum amount now that we know we have all of the
-            # records modified at the common `max_updated` time.
-            max_updated = max_updated + timedelta(milliseconds=1)
+        if chunk_end <= start:
+            return await drain_instant()
 
-            chunk = sorted(output_items)
-
-            if until and max_updated > until:
-                # Unlikely edge case, but resuming past `until` would otherwise
-                # result in an error from the API. The window is fully read.
-                return chunk, None
-        else:
-            # Withhold the in-progress `max_updated` millisecond from the chunk;
-            # the offset cap may have cut it off partway, so the next call
-            # re-reads it.
-            chunk = sorted(item for item in output_items if item.ts < max_updated)
-
-        log.info(
-            "search window chunk complete; resuming with a new search",
-            {
-                "object_name": object_name,
-                "since": since,
-                "until": until,
-                "max_updated": dt_to_str(max_updated),
-                "count": len(output_items),
-                "total": original_total,
-            },
-        )
-
-        return chunk, dt_to_str(max_updated)
+        chunk_end, method = _midpoint(start, chunk_end), _SplitMethod.HALVE
 
 
 async def fetch_search_objects_modified_at(

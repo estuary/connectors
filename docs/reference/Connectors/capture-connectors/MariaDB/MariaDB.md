@@ -121,7 +121,6 @@ See [connectors](/concepts/connectors.md#using-connectors) to learn more about u
 | --------------------------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | -------------------------- |
 | **`/address`**                          | Server Address                     | The host or host:port at which the database can be reached.                                                                                                                                                                                                                                                                                                                             | string  | Required                   |
 | **`/user`**                             | Login User                         | The database user to authenticate as.                                                                                                                                                                                                                                                                                                                                                   | string  | Required, `"flow_capture"` |
-| **`/password`**                         | Login Password                     | Password for the specified database user.                                                                                                                                                                                                                                                                                                                                               | string  | Required                   |
 | `/timezone`                             | Timezone                           | Timezone to use when capturing datetime columns. Should normally be left blank to use the database's `'time_zone'` system variable. Only required if the `'time_zone'` system variable cannot be read and columns with type datetime are being captured. Must be a valid IANA time zone name or +HH:MM offset. Takes precedence over the `'time_zone'` system variable if both are set. | string  |                            |
 | `/historyMode` | History Mode | Capture each change event, without merging. | boolean | `false` |
 | `/advanced/dbname`                      | Database Name                      | The name of database to connect to. In general this shouldn&#x27;t matter. The connector can discover and capture from all databases it&#x27;s authorized to access.                                                                                                                                                                                                                    | string  | `"mysql"`                  |
@@ -133,6 +132,14 @@ See [connectors](/concepts/connectors.md#using-connectors) to learn more about u
 | `/advanced/source_tag` | Source Tag | This value is added as the property 'tag' in the source metadata of each document. | string |  |
 | `/advanced/statement_timeout` | Statement Timeout | Overrides the default statement timeout used by the connector. Allowed values: `30s`, `1m`, `5m`, `30m`, or empty to disable. | string |  |
 | `/advanced/rediscovery_interval` | Rediscovery Interval | How often the connector re-runs discovery while a capture is running, in order to notice schema changes and newly added tables. Accepts duration strings like `15m` or `1h`, from `1m` up to `8760h`. | string | `"15m"` |
+
+##### Authentication
+
+| Property | Title | Description | Type | Required/Default |
+| --- | --- | --- | --- | --- |
+| **`/credentials`** | Authentication | Authentication method and credentials that provide access to the database. | object | Required |
+| `/credentials/auth_type` | Auth Type | The authentication method to use. MariaDB supports `UserPassword`. | string |  |
+| `/credentials/password` | Password | Password for the specified database user. | string | Required for `UserPassword` auth |
 
 #### Bindings
 
@@ -164,7 +171,9 @@ captures:
         config:
           address: "127.0.0.1:3306"
           user: "flow_capture"
-          password: "secret"
+          credentials:
+            auth_type: UserPassword
+            password: "secret"
     bindings:
       - resource:
           namespace: ${TABLE_NAMESPACE}

@@ -1,5 +1,37 @@
 # source-mysql
 
+## 2026-09-04
+
+### Added
+- MariaDB system-versioned tables can be discovered and captured, including
+  historical row versions, when the `system_versioned_tables` feature flag
+  is set.
+
+## 2026-09-03
+
+### Added
+- The `credentials` configuration union now also supports Google Cloud IAM
+  authentication, for Cloud SQL for MySQL instances with the
+  `cloudsql_iam_authentication` flag enabled. The access token obtained through
+  the workload identity pool is presented as the database password.
+
+## 2026-09-01
+
+### Added
+- The `credentials` configuration union now also supports AWS IAM
+  authentication, for Amazon RDS and Aurora instances with IAM database
+  authentication enabled. A fresh RDS auth token is minted from the assumed
+  role's session credentials for each connection attempt.
+
+## 2026-08-28
+
+### Added
+- New `credentials` configuration union supporting username/password and Azure
+  IAM authentication, the latter using an Entra access token obtained through
+  an Azure App Registration. Existing configs with the legacy top-level
+  `password` field keep working and are folded into the new shape
+  automatically.
+
 ## 2026-08-18
 
 ### Added

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	m "github.com/estuary/connectors/go/materialize"
 	testutil "github.com/estuary/connectors/materialize-boilerplate/testutil"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -37,7 +38,7 @@ func TestIntegration(t *testing.T) {
 	// runs with two shards.
 	t.Run("materialize", func(t *testing.T) {
 		sql.RunMaterializationTest(t, NewDriver(), "testdata/materialize.flow.yaml", makeResourceFn, sanitizers,
-			sql.RuntimeConfig{Shards: 2})
+			sql.RuntimeConfig{Shards: 2, Fidelity: m.FidelityExact})
 	})
 	t.Run("apply", func(t *testing.T) {
 		sql.RunApplyTest(t, NewDriver(), "testdata/apply.flow.yaml", makeResourceFn)
@@ -49,12 +50,15 @@ func TestIntegration(t *testing.T) {
 
 			seedPending := func(t *testing.T, appliedSpec *pf.MaterializationSpec) json.RawMessage {
 				// A staged transaction is a set of queries persisted in the
-				// connector state, keyed by the binding's state key.
+				// connector state under the binding's state key and the
+				// staging shard's key range.
 				query := sql.DrainSeedInsertQuery(t, NewDriver(), cfg, appliedSpec, "'{}'")
 				state, err := json.Marshal(map[string]any{
 					appliedSpec.Bindings[0].StateKey: map[string]any{
-						"Queries":  []string{query},
-						"ToDelete": []string{},
+						"00000000-ffffffff": map[string]any{
+							"Queries":  []string{query},
+							"ToDelete": []string{},
+						},
 					},
 				})
 				require.NoError(t, err)

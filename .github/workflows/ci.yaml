@@ -2,7 +2,9 @@ name: CI
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Don't cancel in progress builds of main, since that can result in connector
+  # specs not being updated.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 on:
   push:
@@ -340,7 +342,9 @@ jobs:
           context: .
           file: ${{ matrix.connector }}/Dockerfile
           load: true
-          build-args: BASE_IMAGE=ghcr.io/estuary/base-image:${{ steps.prep.outputs.tag }}
+          build-args: |
+            BASE_IMAGE=ghcr.io/estuary/base-image:${{ steps.prep.outputs.tag }}
+            CONNECTOR_VERSION=${{ steps.prep.outputs.version }}-${{ steps.prep.outputs.tag }}
           tags: ghcr.io/estuary/${{ matrix.connector }}:local
 
       # Fetch the spec from the built image, to catch images which are entirely
@@ -419,6 +423,31 @@ jobs:
         run: |
           CONNECTOR=${{ matrix.connector }} VERSION=local tests/materialize/run.sh;
 
+      # The step above drives the connector through runtime-next. This one checks
+      # runtime v1 liveness: the same tests through legacy `flowctl preview` as a
+      # single session with no drain, requiring every binding to hold data after
+      # it. Runtime v1's Acknowledge never carries statePatches, so a connector
+      # that only learns its own staged work from that echo applies nothing
+      # within a v1 session -- while every runtime-next test passes. It uses
+      # `flowctl-v1`, a tagged release pinned in fetch-flow.sh, because the
+      # rolling `dev-next` flowctl tracks runtime-next and legacy preview is
+      # slated to be rewired onto it. The liveness check needs no golden, so this
+      # runs for every materialization connector; a drained run is then required
+      # to match the runtime-next snapshot with its output-only lines removed --
+      # both runtimes must leave the same destination -- and is snapshotted as
+      # `<test>-runtime-v1` where the connector has one (see testutil's
+      # runtimeV1Liveness, requireMatchesRuntimeNextSnapshot, runtimeV1SnapshotName).
+      - name: Materialization connector ${{ matrix.connector }} integration tests (runtime v1)
+        if: startsWith(matrix.connector, 'materialize-')
+        env:
+          FLOW_TEST_RUNTIME: v1
+          FLOW_TEST_FLOWCTL: flowctl-v1
+        run: |
+          cd ${{ matrix.connector }}
+          # Rust connectors have no Go packages to drive; run.sh skips them the same way.
+          if [ -f Cargo.toml ]; then echo "Rust connector; no runtime v1 pass"; exit 0; fi
+          go test -v ./... -timeout 20m
+
       # On a snapshot mismatch the harness writes this run's value beside the
       # snapshot as `<name>.actual`. Hand it back: a cloud-credentialed
       # connector's snapshot can only be regenerated where its endpoint is
@@ -442,6 +471,7 @@ jobs:
             echo "Building and pushing ${VARIANT}:${{ steps.prep.outputs.tag }}...";
             docker build --build-arg BASE_CONNECTOR=ghcr.io/estuary/${{ matrix.connector }}:local \
                          --build-arg DOCS_URL=https://go.estuary.dev/${VARIANT} \
+                         --build-arg CONNECTOR_NAME=${VARIANT} \
                          --tag ghcr.io/estuary/${VARIANT}:${{ steps.prep.outputs.tag }} \
                          --label org.opencontainers.image.revision=$GITHUB_SHA \
                          --file connector-variant.Dockerfile .;

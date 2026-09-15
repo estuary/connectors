@@ -146,6 +146,7 @@ def incremental_table(
                     http,
                     path,
                     record_cls,
+                    table.fields,
                     REALTIME_LAG,
                 ),
                 LOOKBACK: functools.partial(
@@ -153,6 +154,7 @@ def incremental_table(
                     http,
                     path,
                     record_cls,
+                    table.fields,
                     LOOKBACK_LAG,
                 )
             },

@@ -319,6 +319,9 @@ type stateItem struct {
 	// happens before the checkpoint carrying this state is durable. State
 	// without it was written by a connector version predating that check.
 	Verified bool
+	// Round is the transaction round that staged the rows, for reporting the
+	// commit's row stats when the move runs in Acknowledge.
+	Round int
 	// MovePartitions is the set of partitions the commit must move, snapshotted
 	// when the staged rows were verified. The per-partition counts are what let
 	// recovery distinguish a partition a prior process already moved (absent
@@ -808,7 +811,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			// partition moves.
 			stateKey := t.bindings[it.Binding].target.StateKey
 			if _, found := t.state[stateKey]; !found {
-				t.state[stateKey] = &stateItem{}
+				t.state[stateKey] = &stateItem{Round: it.Round}
 				storedKeys = append(storedKeys, stateKey)
 			}
 		}
@@ -1137,6 +1140,14 @@ func (t *transactor) moveStorePartitionsToTarget(ctx context.Context, b *binding
 			"store table still contains %d rows after moving %d partition(s)",
 			remainingRows, len(toMove))
 	}
+
+	// totalRows is the authoritative count of what the moves carried into
+	// the target; StoredRows is what Store inserted (zero when unknown).
+	stats := m.TotalRowStats(totalRows)
+	if si.StoredRows > 0 {
+		stats = stats.WithStaged(si.StoredRows)
+	}
+	t.be.ReportRowStats(si.Round, b.target.Path, stats)
 
 	return nil
 }

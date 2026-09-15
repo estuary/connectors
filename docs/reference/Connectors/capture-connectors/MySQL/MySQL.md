@@ -1,6 +1,6 @@
 ---
 sidebar_position: 5
-description: Set up Estuary's MySQL capture connector with CDC, binlog configuration, and time zone settings using self-hosted and cloud platform guides.
+description: Set up Estuary's MySQL capture connector with CDC, binlog configuration, IAM authentication, and time zone settings using self-hosted and cloud platform guides.
 ---
 
 # MySQL
@@ -172,6 +172,78 @@ GRANT SELECT ON *.* TO 'flow_capture';
 4. Note the instance's host under Server name, and the port under Connection Strings (usually `3306`).
    Together, you'll use the host:port as the `address` property when you configure the connector.
 
+### IAM Authentication
+
+On Amazon Aurora, Google Cloud SQL, and Azure Database for MySQL you can authenticate with a cloud IAM identity instead of a password. IAM authentication always connects over TLS and never falls back to an unencrypted connection.
+
+#### AWS IAM
+
+For Amazon Aurora MySQL clusters, you can authenticate with an AWS IAM role instead of a password.
+
+Follow the steps in the [AWS IAM guide][aws-iam] to create a role for Estuary to assume, and make note of its ARN and your cluster's region to use when configuring the connector's authentication options.
+
+[Enable IAM database authentication](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.IAMDBAuth.Enabling.html) on the cluster, then run the following commands to create a database user which authenticates through the RDS plugin, granting it the same permissions as the `flow_capture` user in the [Amazon Aurora](#amazon-aurora) setup instructions above:
+
+```sql
+CREATE USER IF NOT EXISTS flow_capture
+  IDENTIFIED WITH AWSAuthenticationPlugin AS 'RDS'
+  REQUIRE SSL
+  COMMENT 'User account for Estuary MySQL data capture';
+GRANT REPLICATION CLIENT, REPLICATION SLAVE ON *.* TO 'flow_capture';
+GRANT SELECT ON *.* TO 'flow_capture';
+```
+
+Finally, [attach a policy](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.IAMDBAuth.IAMPolicy.html) to the role granting it `rds-db:connect` on that user, substituting your own region, account ID, and the cluster's resource ID:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["rds-db:connect"],
+      "Resource": ["arn:aws:rds-db:us-east-1:123456789012:dbuser:cluster-ABCDEFGHIJKL01234/flow_capture"]
+    }
+  ]
+}
+```
+
+#### Google Cloud IAM
+
+For Google Cloud SQL for MySQL instances, you can authenticate with a Google Cloud service account instead of a password.
+
+Follow the steps in the [GCP IAM guide][gcp-iam] to set up a workload identity pool for Estuary, and make note of the pool audience and the service account email to use when configuring the connector's authentication options.
+
+Set the instance's `cloudsql_iam_authentication` flag to `on`, then [add the service account as an IAM database user](https://cloud.google.com/sql/docs/mysql/add-manage-iam-users#creating-database-user) and grant it the `roles/cloudsql.instanceUser` role. Cloud SQL logs the service account in under its email address with the `@PROJECT_ID.iam.gserviceaccount.com` suffix removed, and MySQL usernames are limited to 32 characters, so pick a service account name that fits. Grant that user the same permissions as the `flow_capture` user in the [Google Cloud SQL](./google-cloud-sql-mysql/) setup instructions:
+
+```sql
+GRANT REPLICATION CLIENT, REPLICATION SLAVE ON *.* TO 'flow-capture';
+GRANT SELECT ON *.* TO 'flow-capture';
+```
+
+Use the same truncated name as the connector's `user` property.
+
+#### Azure IAM
+
+For Azure Database for MySQL flexible servers, you can authenticate with an Azure App Registration instead of a password.
+
+Follow the steps in the [Azure IAM guide][azure-iam] to create an App Registration and make note of the Application ID and Tenant ID to use when configuring the connector's authentication options.
+
+Ensure that the flexible server has [Microsoft Entra authentication](https://learn.microsoft.com/en-us/azure/mysql/flexible-server/how-to-azure-ad) enabled and connect to it as the Entra admin. Run the following commands to create a database user for the App Registration, granting it the same permissions as the `flow_capture` user in the [Azure Database for MySQL](#azure-database-for-mysql) setup instructions above:
+
+```sql
+SET aad_auth_validate_oids_in_tenant = OFF;
+CREATE AADUSER 'flow_capture' IDENTIFIED BY 'application-id-of-app-registration';
+GRANT REPLICATION CLIENT, REPLICATION SLAVE ON *.* TO 'flow_capture';
+GRANT SELECT ON *.* TO 'flow_capture';
+```
+
+Use the name given in the `CREATE AADUSER` statement as the connector's `user` property.
+
+[aws-iam]: /guides/iam-auth/aws/
+[gcp-iam]: /guides/iam-auth/gcp/
+[azure-iam]: /guides/iam-auth/azure/
+
 ## Capturing from Read Replicas
 
 This connector supports capturing from a read replica of your database, provided that
@@ -232,7 +304,6 @@ See [connectors](/concepts/connectors.md#using-connectors) to learn more about u
 | --------------------------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | -------------------------- |
 | **`/address`**                          | Server Address                     | The host or host:port at which the database can be reached.                                                                                                                                                                                                                                                                                                                             | string  | Required                   |
 | **`/user`**                             | Login User                         | The database user to authenticate as.                                                                                                                                                                                                                                                                                                                                                   | string  | Required, `"flow_capture"` |
-| **`/password`**                         | Login Password                     | Password for the specified database user.                                                                                                                                                                                                                                                                                                                                               | string  | Required                   |
 | `/timezone`                             | Timezone                           | Timezone to use when capturing datetime columns. Should normally be left blank to use the database's `'time_zone'` system variable. Only required if the `'time_zone'` system variable cannot be read and columns with type datetime are being captured. Must be a valid IANA time zone name or +HH:MM offset. Takes precedence over the `'time_zone'` system variable if both are set. | string  |                            |
 | `/historyMode` | History Mode | Capture each change event, without merging. | boolean | `false` |
 | `/advanced/dbname`                      | Database Name                      | The name of the database to connect to. In general this shouldn't matter. The connector can discover and capture from all databases it's authorized to access.                                                                                                                                                                                                                    | string  | `"mysql"`                  |
@@ -244,6 +315,20 @@ See [connectors](/concepts/connectors.md#using-connectors) to learn more about u
 | `/advanced/source_tag` | Source Tag | This value is added as the property 'tag' in the source metadata of each document. | string |  |
 | `/advanced/statement_timeout` | Statement Timeout | Overrides the default statement timeout used by the connector. Allowed values: `30s`, `1m`, `5m`, `30m`, or empty to disable. | string |  |
 | `/advanced/rediscovery_interval` | Rediscovery Interval | How often the connector re-runs discovery while a capture is running, in order to notice schema changes and newly added tables. Accepts duration strings like `15m` or `1h`, from `1m` up to `8760h`. | string | `"15m"` |
+
+##### Authentication
+
+| Property | Title | Description | Type | Required/Default |
+| --- | --- | --- | --- | --- |
+| **`/credentials`** | Authentication | Authentication method and credentials that provide access to the database. | object | Required |
+| `/credentials/auth_type` | Auth Type | The authentication method to use. One of `UserPassword`, `AWSIAM`, `GCPIAM`, or `AzureIAM`. | string |  |
+| `/credentials/password` | Password | Password for the specified database user. | string | Required for `UserPassword` auth |
+| `/credentials/aws_region` | AWS Region | AWS region of your resource. | string | Required for `AWSIAM` auth |
+| `/credentials/aws_role_arn` | AWS Role ARN | AWS role for Estuary to use that has access to the resource. | string | Required for `AWSIAM` auth |
+| `/credentials/gcp_service_account_to_impersonate` | Service Account | GCP service account email for Cloud SQL IAM authentication. | string | Required for `GCPIAM` auth |
+| `/credentials/gcp_workload_identity_pool_audience` | Workload Identity Pool Audience | GCP workload identity pool audience. The format should be similar to: `//iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/test-pool/providers/test-provider`. | string | Required for `GCPIAM` auth |
+| `/credentials/azure_client_id` | Azure Client ID | Application (client) ID of the App Registration. | string | Required for `AzureIAM` auth |
+| `/credentials/azure_tenant_id` | Azure Tenant ID | Directory (tenant) ID of the App Registration. | string | Required for `AzureIAM` auth |
 
 ##### Discovery Filters
 
@@ -288,12 +373,41 @@ captures:
         config:
           address: "127.0.0.1:3306"
           user: "flow_capture"
-          password: "secret"
+          credentials:
+            auth_type: UserPassword
+            password: "secret"
     bindings:
       - resource:
           namespace: ${TABLE_NAMESPACE}
           stream: ${TABLE_NAME}
         target: ${PREFIX}/${COLLECTION_NAME}
+```
+
+To authenticate to an Amazon Aurora MySQL cluster with [AWS IAM](#aws-iam) instead, replace the credentials block:
+
+```yaml
+          credentials:
+            auth_type: AWSIAM
+            aws_region: "us-east-1"
+            aws_role_arn: "arn:aws:iam::123456789012:role/flow-capture"
+```
+
+To authenticate to a Google Cloud SQL for MySQL instance with [Google Cloud IAM](#google-cloud-iam) instead, replace the credentials block:
+
+```yaml
+          credentials:
+            auth_type: GCPIAM
+            gcp_service_account_to_impersonate: "flow-capture@example-project.iam.gserviceaccount.com"
+            gcp_workload_identity_pool_audience: "//iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/test-pool/providers/test-provider"
+```
+
+To authenticate to an Azure Database for MySQL flexible server with [Azure IAM](#azure-iam) instead, replace the credentials block:
+
+```yaml
+          credentials:
+            auth_type: AzureIAM
+            azure_client_id: "11111111-2222-3333-4444-555555555555"
+            azure_tenant_id: "66666666-7777-8888-9999-000000000000"
 ```
 
 Your capture definition will likely be more complex, with additional bindings for each table in the source database.

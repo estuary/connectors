@@ -45,6 +45,13 @@ MAX_SATISFACTION_RATINGS_WINDOW_SIZE = timedelta(days=30)
 MIN_PAGE_SIZE = 1
 # Zendesk errors out if a start or end time parameter is 60 seconds or less in the past. 
 TIME_PARAMETER_DELAY = timedelta(seconds=61)
+# Zendesk's API is eventually consistent: a record can become queryable seconds or
+# minutes after its timestamp, after we've already seen records with later timestamps.
+# Since incremental cursors are high-water marks, anything that surfaces below one
+# would be filtered out and lost forever. To avoid that, we never advance a cursor
+# over records younger than INCREMENTAL_LAG, giving late arrivals time to appear
+# before the cursor moves past their timestamp.
+INCREMENTAL_LAG = timedelta(minutes=5)
 
 DATETIME_STRING_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 INCREMENTAL_TIME_EXPORT_REQ_PER_MIN_LIMIT = 10
@@ -180,6 +187,10 @@ async def fetch_client_side_incremental_offset_paginated_resources(
     }
 
     last_seen = log_cursor
+    horizon = datetime.now(tz=UTC) - INCREMENTAL_LAG
+
+    if horizon <= log_cursor:
+        return
 
     while True:
         response = response_model.model_validate_json(
@@ -187,6 +198,10 @@ async def fetch_client_side_incremental_offset_paginated_resources(
         )
 
         for resource in response.resources:
+            # Skip records Zendesk may not have finished making visible.
+            if resource.updated_at >= horizon:
+                continue
+
             if resource.updated_at > log_cursor:
                 yield resource
 
@@ -224,6 +239,10 @@ async def fetch_client_side_incremental_cursor_paginated_resources(
         params.update(additional_query_params)
 
     last_seen = log_cursor
+    horizon = datetime.now(tz=UTC) - INCREMENTAL_LAG
+
+    if horizon <= log_cursor:
+        return
 
     while True:
         response = response_model.model_validate_json(
@@ -231,6 +250,10 @@ async def fetch_client_side_incremental_cursor_paginated_resources(
         )
 
         for resource in response.resources:
+            # Skip records Zendesk may not have finished making visible.
+            if resource.updated_at >= horizon:
+                continue
+
             if resource.updated_at > log_cursor:
                 yield resource
 
@@ -280,6 +303,11 @@ async def fetch_incremental_cursor_paginated_resources(
     }
 
     last_seen_dt = log_cursor
+    last_checkpointed = log_cursor
+    horizon = datetime.now(tz=UTC) - INCREMENTAL_LAG
+
+    if horizon <= log_cursor:
+        return
 
     while True:
         response = response_model.model_validate_json(
@@ -287,15 +315,20 @@ async def fetch_incremental_cursor_paginated_resources(
         )
 
         if (
-            last_seen_dt > log_cursor
+            last_seen_dt > last_checkpointed
             and response.resources
             and _str_to_dt(getattr(response.resources[0], cursor_field)) > last_seen_dt
         ):
             yield last_seen_dt
+            last_checkpointed = last_seen_dt
 
 
         for resource in response.resources:
             resource_dt = _str_to_dt(getattr(resource, cursor_field))
+            # Skip records Zendesk may not have finished making visible.
+            if resource_dt >= horizon:
+                continue
+
             if resource_dt > last_seen_dt:
                 last_seen_dt = resource_dt
 
@@ -303,7 +336,7 @@ async def fetch_incremental_cursor_paginated_resources(
                 yield resource
 
         if not response.meta.has_more:
-            if last_seen_dt > log_cursor:
+            if last_seen_dt > last_checkpointed:
                 yield last_seen_dt
             break
 
@@ -392,7 +425,13 @@ async def fetch_satisfaction_ratings(
 ) -> AsyncGenerator[ZendeskResource | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
 
-    end = min(datetime.now(tz=UTC) - TIME_PARAMETER_DELAY, log_cursor + MAX_SATISFACTION_RATINGS_WINDOW_SIZE)
+    end = min(
+        datetime.now(tz=UTC) - INCREMENTAL_LAG,
+        log_cursor + MAX_SATISFACTION_RATINGS_WINDOW_SIZE,
+    )
+
+    if end <= log_cursor:
+        return
 
     generator = _fetch_satisfaction_ratings_between(
         http=http,
@@ -452,6 +491,7 @@ async def _fetch_incremental_time_export_resources(
     response_model: type[IncrementalTimeExportResponse],
     start_date: datetime,
     log: Logger,
+    horizon: datetime | None = None,
 ) -> AsyncGenerator[TimestampedResource | datetime, None]:
     # Docs: https://developer.zendesk.com/documentation/ticketing/managing-tickets/using-the-incremental-export-api/#time-based-incremental-exports
     # Incremental time export streams use timestamps for pagination that correlate to the updated_at timestamp for each record.
@@ -477,6 +517,16 @@ async def _fetch_incremental_time_export_resources(
             )
 
             async for resource in processor:
+                # Stop at the first record Zendesk may not have finished making visible.
+                # Results are ordered ascending by updated_at, so every later record is
+                # unsettled too. This stops rather than skips because the loop advances
+                # start_time to fetch the next page — skipping would just walk further
+                # into the unsettled window.
+                if horizon is not None and resource.updated_at >= horizon:
+                    if last_seen_dt > start_date:
+                        yield last_seen_dt
+                    return
+
                 # Ignore duplicate results that were yielded on the previous sweep.
                 if resource.updated_at <= start_date:
                     continue
@@ -532,7 +582,10 @@ async def fetch_incremental_time_export_resources(
 ) -> AsyncGenerator[TimestampedResource | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
 
-    generator = _fetch_incremental_time_export_resources(http, subdomain, name, path, response_model, log_cursor, log)
+    generator = _fetch_incremental_time_export_resources(
+        http, subdomain, name, path, response_model, log_cursor, log,
+        datetime.now(tz=UTC) - INCREMENTAL_LAG,
+    )
 
     async for result in generator:
         yield result
@@ -582,6 +635,7 @@ async def _fetch_talk_incremental_export_resources(
     response_model: type[TalkIncrementalExportResponse],
     start_date: datetime,
     log: Logger,
+    horizon: datetime | None = None,
 ) -> AsyncGenerator[TimestampedResource | datetime, None]:
     # Talk API incremental exports use timestamps for pagination similar to other time-based exports.
     # The end_time returned in the response is the updated_at timestamp of the last record.
@@ -606,6 +660,16 @@ async def _fetch_talk_incremental_export_resources(
             )
 
             async for resource in processor:
+                # Stop at the first record Zendesk may not have finished making visible.
+                # Results are ordered ascending by updated_at, so every later record is
+                # unsettled too. This stops rather than skips because the loop advances
+                # start_time to fetch the next page — skipping would just walk further
+                # into the unsettled window.
+                if horizon is not None and resource.updated_at >= horizon:
+                    if last_seen_dt > start_date:
+                        yield last_seen_dt
+                    return
+
                 # Ignore duplicate results that were yielded on the previous sweep.
                 if resource.updated_at <= start_date:
                     continue
@@ -661,7 +725,10 @@ async def fetch_talk_incremental_export_resources(
 ) -> AsyncGenerator[TimestampedResource | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
 
-    generator = _fetch_talk_incremental_export_resources(http, subdomain, name, path, response_model, log_cursor, log)
+    generator = _fetch_talk_incremental_export_resources(
+        http, subdomain, name, path, response_model, log_cursor, log,
+        datetime.now(tz=UTC) - INCREMENTAL_LAG,
+    )
 
     async for result in generator:
         yield result
@@ -1115,8 +1182,13 @@ async def fetch_audit_logs(
 
     url = f"{url_base(subdomain)}/audit_logs"
 
+    horizon = datetime.now(tz=UTC) - INCREMENTAL_LAG
+
+    if horizon <= log_cursor:
+        return
+
     start = _dt_to_str(log_cursor)
-    end = _dt_to_str(datetime.now(tz=UTC))
+    end = _dt_to_str(horizon)
 
     params = {
         "page[size]": CURSOR_PAGINATION_PAGE_SIZE,

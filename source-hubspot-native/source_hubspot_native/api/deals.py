@@ -76,5 +76,5 @@ def fetch_delayed_deals(
         return await fetch_search_objects(Names.deals, log, http, since, until, page)
 
     return fetch_chunked_changes_with_associations(
-        Names.deals, Deal, do_fetch, log, http, with_history, since, until
+        Names.deals, Deal, do_fetch, log, http, with_history
     )

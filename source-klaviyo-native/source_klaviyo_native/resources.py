@@ -38,7 +38,7 @@ from .models import (
 # Klaviyo doesn't use the standard "Bearer" token type in the Authorization
 # header. Instead, it uses "Klaviyo-API-Key" as the token type.
 AUTHORIZATION_TOKEN_TYPE = "Klaviyo-API-Key"
-EVENTS_EVENTUAL_CONSISTENCY_HORIZON = timedelta(days=4)
+EVENTS_EVENTUAL_CONSISTENCY_HORIZON = timedelta(days=7)
 
 
 async def validate_credentials(

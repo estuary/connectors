@@ -454,6 +454,7 @@ func (d *materialization) NewTransactor(
 		tablesToBindings[b.ResourcePath[0]] = idx
 		bindings = append(bindings, binding{
 			tableName: b.ResourcePath[0],
+			path:      b.ResourcePath,
 			fields:    mappedFields,
 			docField:  b.Document.Field,
 		})
@@ -462,6 +463,7 @@ func (d *materialization) NewTransactor(
 	return &transactor{
 		client:           d.client,
 		bindings:         bindings,
+		be:               be,
 		tablesToBindings: tablesToBindings,
 	}, nil
 }

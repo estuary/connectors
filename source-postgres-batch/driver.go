@@ -873,6 +873,8 @@ func (c *capture) pollIncremental(ctx context.Context, binding *bindingInfo) err
 	}
 
 	// Iterate over CTID range chunks until we reach the maximum possible CTID page for this table
+	var chunkCount int
+	var sweepResultCount int64
 	for int64(afterCTID.BlockNumber) < maximumPageID {
 		var untilCTID = pgtype.TID{BlockNumber: afterCTID.BlockNumber + pagesPerChunk, Valid: true}
 		var resultCount, err = c.pollIncrementalChunk(ctx, &incrementalChunkDescription{
@@ -895,10 +897,24 @@ func (c *capture) pollIncremental(ctx context.Context, binding *bindingInfo) err
 		afterCTID = untilCTID
 		state.ScanTID = fmt.Sprintf("(%d,%d)", afterCTID.BlockNumber, afterCTID.OffsetNumber)
 		state.DocumentCount += resultCount
+		chunkCount++
+		sweepResultCount += resultCount
 		if err := c.streamStateCheckpoint(stateKey, state); err != nil {
 			return err
 		}
 	}
+
+	// Summarize the polling operation.
+	var summaryEntry = log.WithFields(log.Fields{
+		"name":   res.Name,
+		"chunks": chunkCount,
+		"count":  sweepResultCount,
+		"total":  state.DocumentCount,
+	})
+	if state.BaseXID != 0 {
+		summaryEntry = summaryEntry.WithField("txids", fmt.Sprintf("%d to %d", state.BaseXID, state.NextXID))
+	}
+	summaryEntry.Info("incremental polling complete")
 
 	// Reset scanning state for the next incremental table update
 	state.ScanTID = ""
@@ -951,7 +967,7 @@ func (c *capture) pollIncrementalChunk(ctx context.Context, chunk *incrementalCh
 	if chunk.BaseXID != 0 {
 		logEntry = logEntry.WithField("txids", fmt.Sprintf("%d to %d", chunk.BaseXID, chunk.NextXID))
 	}
-	logEntry.Info("polling incremental chunk")
+	logEntry.Debug("polling incremental chunk")
 
 	// Set up a watchdog timeout which will terminate the capture task if no data is
 	// received after a long period of time. The deferred stop ensures that the timeout
@@ -1085,7 +1101,7 @@ func (c *capture) pollIncrementalChunk(ctx context.Context, chunk *incrementalCh
 		"query": query,
 		"count": queryResultsCount,
 		"total": chunk.DocumentCount + queryResultsCount,
-	}).Info("chunk query complete")
+	}).Debug("chunk query complete")
 
 	return queryResultsCount, nil
 }

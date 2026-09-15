@@ -9,7 +9,7 @@ solidify.
 In order to support rapid connector development, we would like to include encrypted credentials alongside each connector wherever feasible. This allows both easily automated testing, as well as allowing other people to quickly run all connectors that have credentials. Fortunately, Flow has built-in support for encrypted credentials through the use of [`sops`](https://github.com/getsops/sops).
 
 Instead of defining connector configuration in `test.flow.yaml`, the `config` field can also take a filename containing an optionally `sops`-encrypted file. To create one from scratch:
-1. Create a new `connector_config.yaml`
+1. Create a new `config.yaml`
   ```yaml
   client_id: exctatic_emu@service-accounts.estuary.dev
   client_secret_sops: super_secret_password
@@ -17,27 +17,27 @@ Instead of defining connector configuration in `test.flow.yaml`, the `config` fi
   > **Note**: the `_sops` suffix for encrypted field is convention here. Whatever you pick for the encrypted suffix, Flow will strip that suffix out of the decrypted config object to provide to the connector.
 2. Run `sops` and overwrite the file you just created with the encrypted version:
   ``` bash
-  $ sops --encrypt --input-type yaml --output-type yaml --gcp-kms projects/helpful-kingdom-273219/locations/us-central1/keyRings/dev/cryptoKeys/CI-estuary-flow --encrypted-suffix _sops path/to/connector_config.yaml
+  $ sops --encrypt --input-type yaml --output-type yaml --gcp-kms projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository --encrypted-suffix _sops path/to/config.yaml
   ```
   ```yaml
-  client_id: exctatic_emu@service-accounts.estuary.dev
-  client_secret_sops: ENC[AES256_GCM,data:c3BEsuHJLjIt7+G1hwb6x29BU7CK,iv:6LfUthR8c5DFTmucFC5NnMiOGal7v+PYixadovIm2gw=,tag:uHtTuPXLxEi4HLunVeLjkQ==,type:str]
-  sops:
-    kms: []
-    gcp_kms:
-        - resource_id: projects/helpful-kingdom-273219/locations/us-central1/keyRings/dev/cryptoKeys/CI-estuary-flow
-          created_at: "2023-11-06T22:16:37Z"
-          enc: CiQAW8BC2JnhfMjWVLeRYPPQgnzBVM2MtLMlh/84pcfCRbQExBcSSQBgR/fKuXztEtnXLcNceSt9XGDi0A/9nqYQrFFqTD5d0R2HEATmH4Fyqg/Gn5/sYAdDegI0g3hHYZd91rJir0TaljFQ2YRAnYw=
-    azure_kv: []
-    hc_vault: []
-    age: []
-    lastmodified: "2023-11-06T22:16:37Z"
-    mac: ENC[AES256_GCM,data:LzU+fTji6MHPFjXMNqnQAizwL3jBCvt9zltFz291u81ocIMSkdFiff+KRoTHz8kYvdoBVfJt8CesdCOqGiTgLKmea7teKiJuK5bBEOuzEY4lfC1fRYVkX+Dw6t1Mx5CvlLlS3ioisVtPG53eAGMcZDhZ7iJt7nm7qvo3Tkq7pSU=,iv:1OI2BJIyxo8DNnJmGn4lqU8TlFcdG9R9GhognGyyNY8=,tag:fPjklOLlS7OzDFszFK75hg==,type:str]
-    pgp: []
-    encrypted_suffix: _sops
-    version: 3.7.3
+    client_id: exctatic_emu@service-accounts.estuary.dev
+    client_secret_sops: ENC[AES256_GCM,data:Va8E8XVrZuqtq6M1gkC9xeXMgZqu,iv:+KZd8QwB6sl1XglQkV+Utka7I9JvKtRFYPeM4eDKx6I=,tag:XyGLMTIA44bDfdT2g7TYgQ==,type:str]
+    sops:
+        kms: []
+        gcp_kms:
+            - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+            created_at: "2026-09-14T20:16:06Z"
+            enc: CiUAdmEdwvAzpeqhs3jyQ2B7SQ8tX6t/3wyQizC+W7d/+E59Jqw4EkkAvE+nk9znJYU6zs/jNjfDNKke9MUVHfe09C+vT5y17LFIpSwPA+PxLN2NRogZFg5ok/bWpjh+YRreROJV00R6aKyArXGRi9Kg
+        azure_kv: []
+        hc_vault: []
+        age: []
+        lastmodified: "2026-09-14T20:16:07Z"
+        mac: ENC[AES256_GCM,data:iH/mwJXl2dADaelwdKJpjvgscjBWSvz3PffvOMaeiRPQaK+OsVAnb4+Bu8nZ5xzVBu5gy56gsUqt8NDn6CBL89HRBP8WJGP1ReA1g1XKmBRFApOpdSMoMt5Mu4jARtlkPrXw8Y06VjjfVd0VdvtIx39M/kvHz51BZsQBGk+B+B0=,iv:EuYtNKOhDvoLn5EA5TwsUF2fEK7079HpSFBnw13SEmo=,tag:SE0Kltr1t8T5yYRp3Kgqyg==,type:str]
+        pgp: []
+        encrypted_suffix: _sops
+        version: 3.9.0
   ```
-3. From here on, you must use sops to edit this encrypted file. Even if you only change an unencrypted field, the `mac` will no longer be valid and the file will fail to decrypt. To edit the file using your terminal's built-in editor, simply run `sops path/to/connector_config.yaml`, make changes, save, and `sops` will re-encrypt the file for you.
+3. From here on, you must use sops to edit this encrypted file. Even if you only change an unencrypted field, the `mac` will no longer be valid and the file will fail to decrypt. To edit the file using your terminal's built-in editor, simply run `sops path/to/config.yaml`, make changes, save, and `sops` will re-encrypt the file for you.
 
 ## Changelog entries
 

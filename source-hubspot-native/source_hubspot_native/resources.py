@@ -18,8 +18,10 @@ from estuary_cdk.http import HTTPError, HTTPMixin, HTTPSession, TokenSource
 
 from .api import (
     DELAYED_LAG,
+    FORM_SUBMISSIONS_LAG,
     FetchDelayedFn,
     FetchRecentFn,
+    FormIdCache,
     check_campaigns_access,
     fetch_campaigns,
     fetch_campaigns_page,
@@ -27,6 +29,7 @@ from .api import (
     fetch_contact_lists_page,
     check_contact_list_memberships_access,
     check_contact_lists_access,
+    dt_to_ms,
     fetch_contact_list_memberships_page,
     fetch_contact_lists,
     fetch_deal_pipelines,
@@ -48,6 +51,7 @@ from .api import (
     fetch_delayed_workflows,
     fetch_email_events_page,
     fetch_form_submissions,
+    fetch_form_submissions_page,
     fetch_forms,
     fetch_marketing_emails_page,
     fetch_marketing_event_participants,
@@ -738,7 +742,14 @@ def form_submissions(http: HTTPSession) -> Resource:
                 fetch_form_submissions,
                 http,
             ),
+            fetch_page=functools.partial(
+                fetch_form_submissions_page,
+                http,
+                FormIdCache(),
+            ),
         )
+
+    cutoff = dt_to_ms(datetime.now(tz=UTC) - FORM_SUBMISSIONS_LAG)
 
     return Resource(
         name=Names.form_submissions,
@@ -746,7 +757,8 @@ def form_submissions(http: HTTPSession) -> Resource:
         model=FormSubmission,
         open=open,
         initial_state=ResourceState(
-            inc=ResourceState.Incremental(cursor=0),
+            inc=ResourceState.Incremental(cursor=cutoff),
+            backfill=ResourceState.Backfill(next_page=None, cutoff=cutoff),
         ),
         initial_config=ResourceConfig(
             name=Names.form_submissions, interval=timedelta(minutes=5)

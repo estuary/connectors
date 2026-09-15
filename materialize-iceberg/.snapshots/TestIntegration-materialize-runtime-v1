@@ -1,0 +1,55 @@
+Task: acmeCo/tests/materialize-iceberg/rest-local
+
+Resource: flow.simple_standard
+
+{"Name":"_meta/op","Nullable":false,"Type":"string"}
+{"Name":"canary","Nullable":false,"Type":"string"}
+{"Name":"flow_document","Nullable":false,"Type":"string"}
+{"Name":"flow_published_at","Nullable":false,"Type":"timestamptz"}
+{"Name":"id","Nullable":false,"Type":"long"}
+{"Name":"val","Nullable":true,"Type":"long"}
+
+Table Data:
+
+Resource: flow.data_types
+
+{"Name":"arrayField","Nullable":true,"Type":"string"}
+{"Name":"boolField","Nullable":true,"Type":"boolean"}
+{"Name":"enumField","Nullable":true,"Type":"string"}
+{"Name":"enumNullableField","Nullable":true,"Type":"string"}
+{"Name":"flow_document","Nullable":false,"Type":"string"}
+{"Name":"flow_published_at","Nullable":false,"Type":"timestamptz"}
+{"Name":"id","Nullable":false,"Type":"long"}
+{"Name":"intField","Nullable":true,"Type":"long"}
+{"Name":"multipleField","Nullable":true,"Type":"string"}
+{"Name":"numField","Nullable":true,"Type":"double"}
+{"Name":"stringAndIntegerField","Nullable":true,"Type":"decimal(38, 0)"}
+{"Name":"stringAndNumberField","Nullable":true,"Type":"double"}
+{"Name":"stringDateField","Nullable":true,"Type":"date"}
+{"Name":"stringDateTimeField","Nullable":true,"Type":"timestamptz"}
+{"Name":"stringDurationField","Nullable":true,"Type":"string"}
+{"Name":"stringEmailField","Nullable":true,"Type":"string"}
+{"Name":"stringField","Nullable":true,"Type":"string"}
+{"Name":"stringHostnameField","Nullable":true,"Type":"string"}
+{"Name":"stringIntegerField","Nullable":true,"Type":"decimal(38, 0)"}
+{"Name":"stringIpv4Field","Nullable":true,"Type":"string"}
+{"Name":"stringIpv6Field","Nullable":true,"Type":"string"}
+{"Name":"stringIriField","Nullable":true,"Type":"string"}
+{"Name":"stringIriReferenceField","Nullable":true,"Type":"string"}
+{"Name":"stringJsonPointerField","Nullable":true,"Type":"string"}
+{"Name":"stringMacAddr8Field","Nullable":true,"Type":"string"}
+{"Name":"stringMacAddrField","Nullable":true,"Type":"string"}
+{"Name":"stringNumberField","Nullable":true,"Type":"double"}
+{"Name":"stringRegexField","Nullable":true,"Type":"string"}
+{"Name":"stringRelativeJsonPointerField","Nullable":true,"Type":"string"}
+{"Name":"stringTimeField","Nullable":true,"Type":"string"}
+{"Name":"stringUint32Field","Nullable":true,"Type":"decimal(38, 0)"}
+{"Name":"stringUint64Field","Nullable":true,"Type":"decimal(38, 0)"}
+{"Name":"stringUriField","Nullable":true,"Type":"string"}
+{"Name":"stringUriReferenceField","Nullable":true,"Type":"string"}
+{"Name":"stringUriTemplateField","Nullable":true,"Type":"string"}
+{"Name":"stringUuidField","Nullable":true,"Type":"string"}
+
+Table Data:
+
+

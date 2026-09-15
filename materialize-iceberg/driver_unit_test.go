@@ -15,8 +15,8 @@ import (
 
 func TestAcknowledgeSubsetLeavesOtherKeysPending(t *testing.T) {
 	tr := &transactor{
-		cp: map[string]*python.MergeBinding{
-			"a_table.v1": {Binding: 0, Query: "MERGE INTO a"},
+		cp: map[string]*pendingMerge{
+			"a_table.v1": {MergeBinding: python.MergeBinding{Binding: 0, Query: "MERGE INTO a"}},
 		},
 		bindings: []binding{{Mapped: &boilerplate.MappedBinding[config, resource, mapped]{
 			MaterializationSpec_Binding: pf.MaterializationSpec_Binding{StateKey: "a_table.v1"},

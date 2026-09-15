@@ -20,10 +20,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	m "github.com/estuary/connectors/go/materialize"
 	"github.com/estuary/connectors/go/writer"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate/testutil"
 	"github.com/estuary/connectors/materialize-iceberg/catalog"
 	"github.com/estuary/connectors/materialize-iceberg/python"
-	boilerplate "github.com/estuary/connectors/materialize-boilerplate/testutil"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/google/uuid"
 	"github.com/segmentio/encoding/json"
@@ -155,6 +156,9 @@ func TestIntegration(t *testing.T) {
 		func(s string) string {
 			return regexp.MustCompile(`"s3://[^"]+\.csv\.gz"`).ReplaceAllString(s, `"s3://<bucket>/<uuid>.csv.gz"`)
 		},
+		func(s string) string {
+			return regexp.MustCompile(`"idempotency_token":\s*"[^"]*"`).ReplaceAllString(s, `"idempotency_token": "<uuid>"`)
+		},
 	}
 
 	all := *testAll || os.Getenv("ICEBERG_TEST_ALL") != ""
@@ -170,7 +174,7 @@ func TestIntegration(t *testing.T) {
 
 	t.Run("materialize", func(t *testing.T) {
 		boilerplate.RunMaterializationTestParallel(t, NewMaterializer, materializeSpec, makeResourceFn, actionDescSanitizers,
-			boilerplate.RuntimeConfig{Shards: 1})
+			boilerplate.RuntimeConfig{Shards: 1, Fidelity: m.FidelityTotal})
 	})
 
 	t.Run("apply", func(t *testing.T) {
@@ -388,7 +392,7 @@ func runTimestampOverflowRegression(t *testing.T) {
 		}},
 	}
 	body, err := json.Marshal(struct {
-		Action string             `json:"action"`
+		Action string            `json:"action"`
 		Input  python.MergeInput `json:"input"`
 	}{Action: "merge", Input: mergeInput})
 	require.NoError(t, err)

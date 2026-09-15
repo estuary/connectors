@@ -6,8 +6,8 @@ import (
 	stdsql "database/sql"
 	"encoding/json"
 	"fmt"
-	"math"
 	"maps"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -132,10 +132,12 @@ var _ m.Transactor = (*transactor)(nil)
 type transactor struct {
 	runtimeCheckpoint m.RuntimeCheckpoint
 	cfg               config
-	cp                checkpoint
-	// Pending entries of other shards, of sessions predating the range-scoped
-	// checkpoint format (legacyRangeKey), and of stale ranges from previous
-	// shard topologies. Only the primary shard tracks and executes these.
+	// Every shard's pending entries; non-primary shards hold only their own.
+	cp connectorState
+	// Pending entries in the layouts of earlier connector versions: range-first
+	// buckets, and flat items under legacyRangeKey. Only the primary shard
+	// tracks and executes these.
+	// TODO(#5176): remove in about January 2027, after checkpoints have all migrated
 	peerShardsCheckpoints rangeCheckpoints
 	cpRecovery            bool // is this checkpoint a recovered checkpoint?
 	primary               bool // does this shard's range begin at key 0?
@@ -163,34 +165,76 @@ func (d *transactor) UnmarshalState(state json.RawMessage) error {
 		return nil
 	}
 
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(state, &raw); err != nil {
+	if err := d.absorbState(state, false); err != nil {
 		return err
-	}
-
-	for key, val := range raw {
-		if bucket, ok := parseRangeBucket(key, val); ok {
-			if key == d.rangeKey {
-				d.cp = bucket
-			} else {
-				d.peerShardsCheckpoints[key] = bucket
-			}
-		} else if item, err := parseCheckpointItem(val); err != nil {
-			return fmt.Errorf("parsing checkpoint entry %q: %w", key, err)
-		} else {
-			d.legacyBucket()[key] = item
-		}
 	}
 	d.cpRecovery = true
 
 	return nil
 }
 
-func (d *transactor) legacyBucket() checkpoint {
-	if d.peerShardsCheckpoints[legacyRangeKey] == nil {
-		d.peerShardsCheckpoints[legacyRangeKey] = make(checkpoint)
+// TODO(#5176): remove in about January 2027, after checkpoints have all migrated
+func (d *transactor) legacyBucket(rangeKey string) checkpoint {
+	if d.peerShardsCheckpoints[rangeKey] == nil {
+		d.peerShardsCheckpoints[rangeKey] = make(checkpoint)
 	}
-	return d.peerShardsCheckpoints[legacyRangeKey]
+	return d.peerShardsCheckpoints[rangeKey]
+}
+
+// absorbState folds a state document into the pending entries. Earlier
+// connector versions wrote {rangeKey: {stateKey: item}}, and before that flat
+// {stateKey: item}, which can share a state key with a current bucket: the
+// bucket's non-range keys are then the flat item's fields. skipOwnRange drops
+// this shard's own entries, which the runtime echoes back in peer patches.
+func (d *transactor) absorbState(doc json.RawMessage, skipOwnRange bool) error {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(doc, &raw); err != nil {
+		return err
+	}
+
+	for key, val := range raw {
+		var bucket map[string]json.RawMessage
+		if err := json.Unmarshal(val, &bucket); err != nil {
+			return fmt.Errorf("parsing checkpoint entry %q: %w", key, err)
+		}
+
+		// TODO(#5176): remove in about January 2027, after checkpoints have all migrated
+		if rangeKeyRe.MatchString(key) {
+			for stateKey, itemRaw := range bucket {
+				if item, err := parseCheckpointItem(itemRaw); err != nil {
+					return fmt.Errorf("parsing checkpoint entry %q of %q: %w", stateKey, key, err)
+				} else {
+					d.legacyBucket(key)[stateKey] = item
+				}
+			}
+			continue
+		}
+
+		var flat = make(map[string]json.RawMessage)
+		for rangeKey, itemRaw := range bucket {
+			// TODO(#5176): remove in about January 2027, after checkpoints have all migrated
+			if !rangeKeyRe.MatchString(rangeKey) {
+				flat[rangeKey] = itemRaw
+			} else if skipOwnRange && rangeKey == d.rangeKey {
+				continue
+			} else if item, err := parseCheckpointItem(itemRaw); err != nil {
+				return fmt.Errorf("parsing checkpoint entry %q of %q: %w", rangeKey, key, err)
+			} else {
+				d.cp.add(key, rangeKey, item)
+			}
+		}
+		// TODO(#5176): remove in about January 2027, after checkpoints have all migrated
+		if len(flat) > 0 {
+			var flatRaw, _ = json.Marshal(flat)
+			if item, err := parseCheckpointItem(flatRaw); err != nil {
+				return fmt.Errorf("parsing checkpoint entry %q: %w", key, err)
+			} else {
+				d.legacyBucket(legacyRangeKey)[key] = item
+			}
+		}
+	}
+
+	return nil
 }
 
 // mergePeerStatePatches folds the aggregated StartedCommit state patches of
@@ -206,49 +250,14 @@ func (d *transactor) mergePeerStatePatches(patches []json.RawMessage) error {
 		if isJSONNull(patch) {
 			// The runtime encodes a full-replace (non-merge-patch) state
 			// update as a literal null reset patch followed by the new state
-			// document. No shard emits full replacements in the range-scoped
-			// checkpoint format, so a reset means a peer (e.g. one running an
-			// older connector image) just clobbered the consolidated state.
+			// document. No shard emits full replacements, so a reset means a
+			// peer (e.g. one running an older connector image) just clobbered
+			// the consolidated state.
 			return fmt.Errorf("unexpected state reset patch in aggregated shard state")
 		}
 
-		var raw map[string]json.RawMessage
-		if err := json.Unmarshal(patch, &raw); err != nil {
+		if err := d.absorbState(patch, true); err != nil {
 			return fmt.Errorf("parsing aggregated state patch: %w", err)
-		}
-
-		for key, val := range raw {
-			if key == d.rangeKey {
-				// Our own contribution, echoed back by the runtime. It's
-				// already tracked in d.cp.
-				continue
-			}
-
-			if !rangeKeyRe.MatchString(key) {
-				// Top-level stateKeys are never emitted by range-scoped peers,
-				// but route them as legacy entries rather than dropping them.
-				if item, err := parseCheckpointItem(val); err != nil {
-					return fmt.Errorf("parsing aggregated state patch entry %q: %w", key, err)
-				} else {
-					d.legacyBucket()[key] = item
-				}
-				continue
-			}
-
-			var bucket map[string]json.RawMessage
-			if err := json.Unmarshal(val, &bucket); err != nil {
-				return fmt.Errorf("parsing aggregated state patch bucket %q: %w", key, err)
-			}
-			for stateKey, itemRaw := range bucket {
-				if item, err := parseCheckpointItem(itemRaw); err != nil {
-					return fmt.Errorf("parsing aggregated state patch entry %q of %q: %w", stateKey, key, err)
-				} else {
-					if d.peerShardsCheckpoints[key] == nil {
-						d.peerShardsCheckpoints[key] = make(checkpoint)
-					}
-					d.peerShardsCheckpoints[key][stateKey] = item
-				}
-			}
 		}
 	}
 
@@ -286,7 +295,7 @@ func newTransactor(
 	var d = &transactor{
 		runtimeCheckpoint:     fence.Checkpoint,
 		cfg:                   cfg,
-		cp:                    make(checkpoint),
+		cp:                    make(connectorState),
 		peerShardsCheckpoints: make(rangeCheckpoints),
 		primary:               keyBegin == 0,
 		rangeKey:              fmt.Sprintf("%08x-%08x", keyBegin, keyEnd),
@@ -508,6 +517,11 @@ type checkpointItem struct {
 	// NeedsMerge marks entries whose files must MERGE into the target table;
 	// otherwise a direct COPY INTO suffices.
 	NeedsMerge bool `json:",omitempty"`
+
+	// round is the transaction round this session staged the entry in, for
+	// attributing its commit's row stats. Recovered and peer entries are
+	// reported outside of round pairing, so theirs is left zero.
+	round int
 }
 
 // mergeBoundLiterals is the serialized form of a key column's sql.MergeBound:
@@ -533,16 +547,34 @@ func (c *checkpoint) Validate() error {
 	return nil
 }
 
-// rangeCheckpoints maps shard range keys ("%08x-%08x" of key_begin-key_end)
-// to that shard's per-stateKey checkpoint. Range keys are disjoint across the
-// shards of a task, which is what lets each shard's StartedCommit merge patch
-// commute with its peers' when the runtime consolidates connector state.
+// connectorState is the persisted layout: entries by binding state key, then
+// by the range key ("%08x-%08x" of key_begin-key_end) of the shard that staged
+// them. Range keys are disjoint across shards, so their StartedCommit merge
+// patches commute when the runtime consolidates connector state.
+type connectorState map[string]checkpoint
+
+func (s connectorState) add(stateKey, rangeKey string, item *checkpointItem) {
+	if s[stateKey] == nil {
+		s[stateKey] = make(checkpoint)
+	}
+	s[stateKey][rangeKey] = item
+}
+
+// rangeCheckpoints is the range-first layout of earlier connector versions.
+// TODO(#5176): remove in about January 2027, after checkpoints have all migrated
 type rangeCheckpoints map[string]checkpoint
 
-// legacyRangeKey is the in-memory bucket holding top-level per-stateKey
-// entries written by connector versions predating the range-scoped checkpoint
-// format. Its entries clear with top-level nulls rather than nested ones.
+// legacyRangeKey is the in-memory bucket of flat per-stateKey entries written
+// before range scoping. A current bucket may since have been merged onto the
+// same state key, so these clear by nulling the item's fields, not the key.
+// TODO(#5176): remove in about January 2027, after checkpoints have all migrated
 const legacyRangeKey = ""
+
+// TODO(#5176): remove in about January 2027, after checkpoints have all migrated
+var legacyItemClear = map[string]any{
+	"Query": nil, "Queries": nil, "ToDelete": nil,
+	"StagedFiles": nil, "Bounds": nil, "NeedsMerge": nil,
+}
 
 var rangeKeyRe = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{8}$`)
 
@@ -562,22 +594,6 @@ func parseCheckpointItem(data json.RawMessage) (*checkpointItem, error) {
 		return nil, err
 	}
 	return &item, nil
-}
-
-// parseRangeBucket decodes val as a per-stateKey checkpoint when key names a
-// shard key-range. A key matching the range pattern whose value doesn't
-// decode as a bucket falls through to legacy entry parsing, which fails
-// loudly. StateKeys cannot collide with range keys: they are URL-encoded
-// resource paths carrying a ".vN" backfill counter suffix.
-func parseRangeBucket(key string, val json.RawMessage) (checkpoint, bool) {
-	if !rangeKeyRe.MatchString(key) {
-		return nil, false
-	}
-	var bucket checkpoint
-	if err := unmarshalStrict(val, &bucket); err != nil {
-		return nil, false
-	}
-	return bucket, true
 }
 
 func (d *transactor) deleteFiles(ctx context.Context, files []string) {
@@ -642,12 +658,13 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		// given that COPY INTO is idempotent by default: files that have already been loaded into a table will
 		// not be loaded again
 		// see https://docs.databricks.com/en/sql/language-manual/delta-copy-into.html
-		d.cp[b.target.StateKey] = &checkpointItem{
+		d.cp.add(b.target.StateKey, d.rangeKey, &checkpointItem{
 			ToDelete:    pathsWithRoot(b.rootStagingPath, toCopy),
 			StagedFiles: toCopy,
 			Bounds:      boundsLiterals(b.storeMergeBounds.Build()),
 			NeedsMerge:  !b.target.DeltaUpdates && b.needsMerge,
-		}
+			round:       it.Round,
+		})
 		b.needsMerge = false // reset for next round
 	}
 
@@ -661,11 +678,18 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 }
 
 func (d *transactor) startCommitState() (*pf.ConnectorState, error) {
-	// Emit only this shard's range bucket as a merge patch: range keys are
+	// Emit only this shard's own entries as a merge patch: range keys are
 	// disjoint across shards, so concurrent patches never clobber when the
 	// runtime consolidates connector state. A single-shard task uses the same
-	// format, with one bucket covering the full key range.
-	var patch, err = json.Marshal(rangeCheckpoints{d.rangeKey: d.cp})
+	// format, with one entry covering the full key range.
+	var own = make(connectorState)
+	for stateKey, bucket := range d.cp {
+		if item := bucket[d.rangeKey]; item != nil {
+			own.add(stateKey, d.rangeKey, item)
+		}
+	}
+
+	var patch, err = json.Marshal(own)
 	if err != nil {
 		return nil, fmt.Errorf("creating checkpoint patch json: %w", err)
 	}
@@ -714,22 +738,17 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 // the time those per-shard queries take back to back.
 func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB, shouldProcess func(string) bool) (*pf.ConnectorState, error) {
 	// The clearing state update, nulling each executed entry at the state-
-	// document path it occupies: nested under a range key, or top-level
-	// (legacyRangeKey) for entries predating the range-scoped checkpoint
-	// format. Clearing is a best-
-	// effort attempt to spare a restart from running the same queries again —
-	// there is no guarantee this checkpoint update can actually be committed.
-	var clear = make(map[string]interface{})
-	var clearEntry = func(rangeKey, stateKey string) {
-		if rangeKey == legacyRangeKey {
-			clear[stateKey] = nil
-		} else {
-			if clear[rangeKey] == nil {
-				clear[rangeKey] = make(map[string]interface{})
-			}
-			clear[rangeKey].(map[string]interface{})[stateKey] = nil
+	// document path it occupies. Clearing is a best-effort attempt to spare a
+	// restart from running the same queries again; there is no guarantee this
+	// checkpoint update can actually be committed.
+	var clear = make(map[string]any)
+	var clearAt = func(key string) map[string]any {
+		if clear[key] == nil {
+			clear[key] = make(map[string]any)
 		}
+		return clear[key].(map[string]any)
 	}
+	// TODO(#5176): remove in about January 2027, after checkpoints have all migrated
 	var peerRangeKeys = slices.Sorted(maps.Keys(d.peerShardsCheckpoints))
 
 	// Everything else pending — entries of other state keys, and entries whose
@@ -741,12 +760,13 @@ func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB, should
 			continue
 		}
 
-		// The binding's pending entries: this shard's own, then those of
-		// legacy sessions and peer shards.
+		// The binding's pending entries: every shard's, then those written by
+		// earlier connector versions.
 		var items []*checkpointItem
-		if item := d.cp[sk]; item != nil {
-			items = append(items, item)
+		for _, rk := range slices.Sorted(maps.Keys(d.cp[sk])) {
+			items = append(items, d.cp[sk][rk])
 		}
+		// TODO(#5176): remove in about January 2027, after checkpoints have all migrated
 		for _, rk := range peerRangeKeys {
 			if item := d.peerShardsCheckpoints[rk][sk]; item != nil {
 				items = append(items, item)
@@ -760,14 +780,19 @@ func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB, should
 			return nil, err
 		}
 
-		if d.cp[sk] != nil {
-			delete(d.cp, sk)
-			clearEntry(d.rangeKey, sk)
+		for rk := range d.cp[sk] {
+			clearAt(sk)[rk] = nil
 		}
+		delete(d.cp, sk)
+		// TODO(#5176): remove in about January 2027, after checkpoints have all migrated
 		for rk, cp := range d.peerShardsCheckpoints {
 			if cp[sk] != nil {
 				delete(cp, sk)
-				clearEntry(rk, sk)
+				if rk == legacyRangeKey {
+					maps.Copy(clearAt(sk), legacyItemClear)
+				} else {
+					clearAt(rk)[sk] = nil
+				}
 			}
 			if len(cp) == 0 {
 				delete(d.peerShardsCheckpoints, rk)
@@ -800,6 +825,10 @@ func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB, should
 func (d *transactor) commitBindingCheckpointItems(ctx context.Context, db *stdsql.DB, b *binding, items []*checkpointItem) error {
 	var coalesce []*checkpointItem
 	d.be.StartedResourceCommit(b.target.Path)
+	// items[0] is this shard's own entry when it has one.
+	var report = func(stats m.RowStats) {
+		d.be.ReportRowStats(items[0].round, b.target.Path, stats)
+	}
 	for _, item := range items {
 		if len(item.StagedFiles) > 0 {
 			coalesce = append(coalesce, item)
@@ -813,7 +842,7 @@ func (d *transactor) commitBindingCheckpointItems(ctx context.Context, db *stdsq
 			}
 			queries = []string{item.Query}
 		}
-		if err := d.execQueries(ctx, db, queries, d.cpRecovery); err != nil {
+		if err := d.execQueries(ctx, db, queries, d.cpRecovery, report); err != nil {
 			return err
 		}
 	}
@@ -830,7 +859,7 @@ func (d *transactor) commitBindingCheckpointItems(ctx context.Context, db *stdsq
 		if err != nil {
 			return err
 		}
-		if err := d.execQueries(ctx, db, queries, d.cpRecovery); err != nil {
+		if err := d.execQueries(ctx, db, queries, d.cpRecovery, report); err != nil {
 			return err
 		}
 	}
@@ -843,18 +872,20 @@ func (d *transactor) commitBindingCheckpointItems(ctx context.Context, db *stdsq
 	return nil
 }
 
-// execQueries runs the given queries in order. tolerateMissing is set when
-// recovering entries which may already have been applied by a previous
-// session whose state clearing didn't commit: their staged files (and
-// possibly their target table) were already deleted, and it is okay to skip
-// them in this case.
-func (d *transactor) execQueries(ctx context.Context, db *stdsql.DB, queries []string, tolerateMissing bool) error {
+// execQueries runs the given queries in order, passing each one's row stats
+// to report. tolerateMissing is set when recovering entries which may already
+// have been applied by a previous session whose state clearing didn't commit:
+// their staged files (and possibly their target table) were already deleted,
+// and it is okay to skip them in this case.
+func (d *transactor) execQueries(ctx context.Context, db *stdsql.DB, queries []string, tolerateMissing bool, report func(m.RowStats)) error {
 	for _, query := range queries {
-		if err := d.execQuery(ctx, db, query); err != nil {
+		if stats, err := d.execQuery(ctx, db, query); err != nil {
 			if tolerateMissing && (strings.Contains(err.Error(), "PATH_NOT_FOUND") || strings.Contains(err.Error(), "Path does not exist") || strings.Contains(err.Error(), "Table doesn't exist") || strings.Contains(err.Error(), "TABLE_OR_VIEW_NOT_FOUND")) {
 				continue
 			}
 			return fmt.Errorf("query %q failed: %w", query, err)
+		} else {
+			report(stats)
 		}
 	}
 	return nil
@@ -885,11 +916,14 @@ func isRetriableError(err error) bool {
 	})
 }
 
-func (d *transactor) execQuery(ctx context.Context, db *stdsql.DB, query string) error {
+// execQuery runs a commit query and returns the row counts of its result row.
+func (d *transactor) execQuery(ctx context.Context, db *stdsql.DB, query string) (m.RowStats, error) {
 	for attempt := 0; ; attempt++ {
-		var _, err = db.ExecContext(ctx, query)
-		if err == nil || !isRetriableError(err) || attempt >= maxQueryRetries {
-			return err
+		var rows, err = db.QueryContext(ctx, query)
+		if err == nil {
+			return scanRowStats(rows), nil
+		} else if !isRetriableError(err) || attempt >= maxQueryRetries {
+			return m.RowStats{}, err
 		}
 
 		var delay = queryRetryDelay(attempt)
@@ -901,10 +935,39 @@ func (d *transactor) execQuery(ctx context.Context, db *stdsql.DB, query string)
 
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return m.RowStats{}, ctx.Err()
 		case <-time.After(delay):
 		}
 	}
+}
+
+// scanRowStats reads the result row of MERGE INTO (num_affected_rows,
+// num_updated_rows, num_deleted_rows, num_inserted_rows) or COPY INTO
+// (num_affected_rows, num_inserted_rows, num_skipped_corrupt_files). The
+// query has already succeeded, so any other result yields the zero stats.
+func scanRowStats(rows *stdsql.Rows) m.RowStats {
+	defer rows.Close()
+
+	cols, err := rows.Columns()
+	if err != nil || !slices.Contains(cols, "num_affected_rows") || !rows.Next() {
+		return m.RowStats{}
+	}
+	var vals = make([]int64, len(cols))
+	var dest = make([]any, len(cols))
+	for i := range vals {
+		dest[i] = &vals[i]
+	}
+	if err := rows.Scan(dest...); err != nil {
+		return m.RowStats{}
+	}
+	var count = func(col string) int64 {
+		if i := slices.Index(cols, col); i >= 0 {
+			return vals[i]
+		}
+		return 0
+	}
+	return m.ExactRowStats(count("num_inserted_rows"), count("num_updated_rows"), count("num_deleted_rows")).
+		WithTotal(count("num_affected_rows"))
 }
 
 // renderCommitQueries renders the queries which commit a set of staged files

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -38,6 +39,7 @@ const (
 type transactor struct {
 	client   *client
 	bindings []binding
+	be       *m.BindingEvents
 
 	// Allows for correlating a table name back into a binding number. This is needed for loads
 	// since DynamoDB allows for "get" batches to include different tables, and the results will
@@ -48,6 +50,7 @@ type transactor struct {
 
 type binding struct {
 	tableName string
+	path      []string
 	fields    []mappedType
 	docField  string
 }
@@ -97,8 +100,10 @@ func (t *transactor) RecoverCheckpoint(ctx context.Context, spec pf.Materializat
 	return nil, nil
 }
 
-func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
-func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) { return nil, nil }
+func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
+	return nil, nil
+}
 
 func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	ctx := it.Context()
@@ -175,9 +180,13 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 	batches := make(chan map[string][]types.WriteRequest)
 	group, groupCtx := errgroup.WithContext(ctx)
+	round := it.Round
+	// stored counts the items DynamoDB accepted per binding, for the
+	// transaction health report.
+	stored := make([]atomic.Int64, len(t.bindings))
 
 	group.Go(func() error {
-		return t.storeWorker(groupCtx, batches)
+		return t.storeWorker(groupCtx, batches, stored)
 	})
 
 	batch := make(map[string][]types.WriteRequest)
@@ -219,7 +228,15 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}
 
 	close(batches)
-	return nil, group.Wait()
+	if err := group.Wait(); err != nil {
+		return nil, err
+	}
+	for i, b := range t.bindings {
+		if n := stored[i].Load(); n > 0 {
+			t.be.ReportRowStats(round, b.path, m.TotalRowStats(n))
+		}
+	}
+	return nil, nil
 }
 
 func (t *transactor) Destroy() {}
@@ -289,7 +306,7 @@ func (t *transactor) loadWorker(ctx context.Context, loaded func(i int, doc json
 	}
 }
 
-func (t *transactor) storeWorker(ctx context.Context, batches <-chan map[string][]types.WriteRequest) error {
+func (t *transactor) storeWorker(ctx context.Context, batches <-chan map[string][]types.WriteRequest, stored []atomic.Int64) error {
 	for {
 		select {
 		case <-ctx.Done():
@@ -307,6 +324,11 @@ func (t *transactor) storeWorker(ctx context.Context, batches <-chan map[string]
 				if err != nil {
 					log.WithField("batch", batch).Error("failed batch write")
 					return err
+				}
+
+				// Everything not handed back as unprocessed was written.
+				for table, reqs := range batch {
+					stored[t.tablesToBindings[table]].Add(int64(len(reqs) - len(res.UnprocessedItems[table])))
 				}
 
 				if len(res.UnprocessedItems) == 0 {

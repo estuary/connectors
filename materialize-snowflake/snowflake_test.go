@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	m "github.com/estuary/connectors/go/materialize"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/google/uuid"
@@ -133,8 +134,12 @@ func TestIntegration(t *testing.T) {
 	}
 
 	t.Run("materialize", func(t *testing.T) {
+		// MERGE INTO and COPY INTO bindings report exact row stats, but the
+		// fixture's delta binding uses Snowpipe Streaming, which reports none,
+		// and a round's fidelity is the lowest of its bindings. Mismatches on
+		// the exact bindings still fail the suite.
 		sql.RunMaterializationTest(t, NewDriver(), "testdata/materialize.flow.yaml", makeResourceFn, actionDescSanitizers,
-			sql.RuntimeConfig{Shards: 1})
+			sql.RuntimeConfig{Shards: 1, Fidelity: m.FidelityNone})
 	})
 
 	t.Run("apply", func(t *testing.T) {

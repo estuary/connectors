@@ -498,8 +498,10 @@ func (t *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSp
 	return t.store.fence.Checkpoint, nil
 }
 
-func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
-func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) { return nil, nil }
+func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
+	return nil, nil
+}
 
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
@@ -534,7 +536,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		}
 
 		if batchBytes >= batchBytesLimit || batch.Len() > batchSizeLimit {
-			if err := sendBatch(ctx, txn, &batch); err != nil {
+			if _, err := sendBatch(ctx, txn, &batch); err != nil {
 				return fmt.Errorf("sending load batch: %w", err)
 			}
 			batchBytes = 0
@@ -548,7 +550,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 	// Send any remaining keys for this load.
 	if batch.Len() > 0 {
-		if err := sendBatch(ctx, txn, &batch); err != nil {
+		if _, err := sendBatch(ctx, txn, &batch); err != nil {
 			return fmt.Errorf("sending final load batch: %w", err)
 		}
 	}
@@ -630,10 +632,24 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	defer defuser.MaybeRollback()
 
 	var batch pgx.Batch
+	var batchBindings []int // Binding of each queued statement, parallel to batch.
 	batchBytes := 0
+
+	var round = it.Round
+	var rowsAffected = make([]int64, len(d.bindings))
+	var stored = make([]bool, len(d.bindings))
+	countRows := func(rows []int64) {
+		for i, n := range rows {
+			rowsAffected[batchBindings[i]] += n
+		}
+		batchBindings = batchBindings[:0]
+	}
+
 	// Skip deleted, non-existent documents iff HardDelete is enabled.
 	for it.Next(d.cfg.HardDelete) {
 		var b = d.bindings[it.Binding]
+		batchBindings = append(batchBindings, it.Binding)
+		stored[it.Binding] = true
 
 		if it.Delete && d.cfg.HardDelete {
 			if converted, err := b.target.ConvertKey(it.Key); err != nil {
@@ -658,8 +674,10 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		}
 
 		if batchBytes >= batchBytesLimit || batch.Len() > batchSizeLimit {
-			if err := sendBatch(ctx, txn, &batch); err != nil {
+			if rows, err := sendBatch(ctx, txn, &batch); err != nil {
 				return nil, fmt.Errorf("sending store batch: %w", err)
+			} else {
+				countRows(rows)
 			}
 			batchBytes = 0
 		}
@@ -688,8 +706,10 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 		// Execute all remaining doc inserts & updates.
 		for i := 0; i < batch.Len()-1; i++ {
-			if _, err := results.Exec(); err != nil {
+			if tag, err := results.Exec(); err != nil {
 				return nil, m.FinishedOperation(fmt.Errorf("store at index %d: %w", i, err))
+			} else {
+				rowsAffected[batchBindings[i]] += tag.RowsAffected()
 			}
 		}
 
@@ -702,6 +722,12 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			return nil, m.FinishedOperation(fmt.Errorf("this instance was fenced off by another"))
 		} else if err = results.Close(); err != nil {
 			return nil, m.FinishedOperation(fmt.Errorf("results.Close(): %w", err))
+		}
+
+		for i, b := range d.bindings {
+			if stored[i] {
+				d.be.ReportRowStats(round, b.target.Path, m.TotalRowStats(rowsAffected[i]))
+			}
 		}
 
 		commitCtx, cancel := ctxWithQueryTimeout(ctx)
@@ -733,25 +759,27 @@ func (d *transactor) Destroy() {
 	d.store.conn.Close(context.Background())
 }
 
-
-// Send a single batch of queries with the given transaction, discarding any results. The batch is
-// zero'd upon completion.
-func sendBatch(ctx context.Context, txn pgx.Tx, batch *pgx.Batch) error {
+// Send a single batch of queries with the given transaction, returning the rows affected by each
+// statement in order. The batch is zero'd upon completion.
+func sendBatch(ctx context.Context, txn pgx.Tx, batch *pgx.Batch) ([]int64, error) {
 	ctx, cancel := ctxWithQueryTimeout(ctx)
 	defer cancel()
 
 	results := txn.SendBatch(ctx, batch)
+	rows := make([]int64, 0, batch.Len())
 	for i := range batch.Len() {
-		if _, err := results.Exec(); err != nil {
-			return fmt.Errorf("exec at index %d: %w", i, err)
+		if tag, err := results.Exec(); err != nil {
+			return nil, fmt.Errorf("exec at index %d: %w", i, err)
+		} else {
+			rows = append(rows, tag.RowsAffected())
 		}
 	}
 	if err := results.Close(); err != nil {
-		return fmt.Errorf("closing batch: %w", err)
+		return nil, fmt.Errorf("closing batch: %w", err)
 	}
 
 	var newBatch pgx.Batch
 	*batch = newBatch
 
-	return nil
+	return rows, nil
 }

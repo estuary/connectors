@@ -1,0 +1,12 @@
+# ================================
+# Collection "acmeCo/test/test/mariadbtemporaltables_systemversionedexplicitrenamed_223724": 4 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"MariaDBTemporalTables_SystemVersionedExplicitRenamed_223724","cursor":"backfill:0"}},"data":"one","id":1,"sys_end":"<TIMESTAMP>","sys_start":"<TIMESTAMP>"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"MariaDBTemporalTables_SystemVersionedExplicitRenamed_223724","cursor":"backfill:1"}},"data":"two","id":2,"sys_end":"<TIMESTAMP>","sys_start":"<TIMESTAMP>"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"MariaDBTemporalTables_SystemVersionedExplicitRenamed_223724","cursor":"backfill:2"}},"data":"two-v2","id":2,"sys_end":"<TIMESTAMP>","sys_start":"<TIMESTAMP>"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"MariaDBTemporalTables_SystemVersionedExplicitRenamed_223724","cursor":"backfill:3"}},"data":"three","id":3,"sys_end":"<TIMESTAMP>","sys_start":"<TIMESTAMP>"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FMariaDBTemporalTables_SystemVersionedExplicitRenamed_223724":{"backfilled":4,"key_columns":["id","sys_end"],"metadata":{"charset":"utf8mb4","schema":{"columns":["id","data","sys_start","sys_end"],"types":{"data":{"charset":"utf8mb4","type":"text"},"id":{"type":"int"},"sys_end":"timestamp","sys_start":"timestamp"}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+

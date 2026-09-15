@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	m "github.com/estuary/connectors/go/materialize"
 	sql "github.com/estuary/connectors/materialize-sql"
 )
 
@@ -33,7 +34,7 @@ func TestIntegration(t *testing.T) {
 
 	t.Run("materialize", func(t *testing.T) {
 		sql.RunMaterializationTest(t, NewDriver(), "testdata/materialize.flow.yaml", makeResourceFn, nil,
-			sql.RuntimeConfig{Shards: 1})
+			sql.RuntimeConfig{Shards: 1, Fidelity: m.FidelityTotal})
 	})
 
 	t.Run("apply", func(t *testing.T) {
@@ -61,4 +62,3 @@ func TestIntegration(t *testing.T) {
 		)
 	})
 }
-

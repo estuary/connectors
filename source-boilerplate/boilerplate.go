@@ -31,7 +31,15 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-const outputWriteBuffer = 1 * 1024 * 1024 // 1MiB output buffer to amortize write syscall overhead
+const (
+	// requestedOutputPipeSize is the kernel pipe capacity we ask for on stdout.
+	requestedOutputPipeSize = 1 * 1024 * 1024
+
+	// outputWriteBuffer amortizes the cost of a write syscall across multiple documents.
+	// It needs to be smaller than the output pipe so that flushes only block due to
+	// runtime backpressure.
+	outputWriteBuffer = 64 * 1024
+)
 
 // StateKey is used to key binding-specific state a connector's driver checkpoint. It's just a type
 // alias for a string to help differentiate any old string from where a specific state key from the
@@ -92,6 +100,10 @@ func RunMain(connector Connector) {
 // It omits portions of setup which are only appropriate for a standalone binary.
 func InnerMain(ctx context.Context, connector Connector, r io.Reader, w io.Writer) error {
 	log.WithField("eventType", "connectorStatus").Info("Initializing connector")
+
+	if f, ok := w.(*os.File); ok {
+		enlargeOutputPipe(f, requestedOutputPipeSize)
+	}
 
 	var stream streamCodec
 	switch codec := getEnvDefault("FLOW_RUNTIME_CODEC", "proto"); codec {

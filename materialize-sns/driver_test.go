@@ -337,7 +337,7 @@ func TestIntegration(t *testing.T) {
 		eg, egCtx := errgroup.WithContext(ctx)
 		eg.SetLimit(publishConcurrency)
 		for i, doc := range docs {
-			require.NoError(t, tx.publishOne(egCtx, eg, 0, []byte(fmt.Sprintf("k%d", i)), doc))
+			require.NoError(t, tx.publishOne(egCtx, eg, 0, []byte(fmt.Sprintf("k%d", i)), doc, nil))
 		}
 		require.NoError(t, eg.Wait())
 
@@ -362,7 +362,7 @@ func TestIntegration(t *testing.T) {
 		eg, egCtx := errgroup.WithContext(ctx)
 		eg.SetLimit(publishConcurrency)
 		for i, doc := range docs {
-			require.NoError(t, tx.publishOne(egCtx, eg, 0, keys[i], doc))
+			require.NoError(t, tx.publishOne(egCtx, eg, 0, keys[i], doc, nil))
 		}
 		require.NoError(t, eg.Wait())
 
@@ -373,9 +373,9 @@ func TestIntegration(t *testing.T) {
 		eg2, egCtx2 := errgroup.WithContext(ctx)
 		eg2.SetLimit(publishConcurrency)
 		dup := json.RawMessage(`{"i":"dup"}`)
-		require.NoError(t, tx.publishOne(egCtx2, eg2, 0, keyA, dup))
-		require.NoError(t, tx.publishOne(egCtx2, eg2, 0, keyA, dup))
-		require.NoError(t, tx.publishOne(egCtx2, eg2, 0, keyA, dup))
+		require.NoError(t, tx.publishOne(egCtx2, eg2, 0, keyA, dup, nil))
+		require.NoError(t, tx.publishOne(egCtx2, eg2, 0, keyA, dup, nil))
+		require.NoError(t, tx.publishOne(egCtx2, eg2, 0, keyA, dup, nil))
 		require.NoError(t, eg2.Wait())
 
 		afterDedup := drainQueue(t, ctx, sqsClient, queueURL, 1)
@@ -401,7 +401,7 @@ func TestIntegration(t *testing.T) {
 
 		eg, egCtx := errgroup.WithContext(ctx)
 		eg.SetLimit(publishConcurrency)
-		err := tx.publishOne(egCtx, eg, 0, []byte("k"), json.RawMessage(oversize))
+		err := tx.publishOne(egCtx, eg, 0, []byte("k"), json.RawMessage(oversize), nil)
 		require.NoError(t, eg.Wait())
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "exceeds the SNS")

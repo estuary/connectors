@@ -153,7 +153,7 @@ func (db *mysqlDatabase) DiscoverTableDetails(ctx context.Context, requested []s
 // merges the results into dst. The collision check against dst spans chunks,
 // so duplicate-after-normalization StreamIDs are caught even across batches.
 func (db *mysqlDatabase) extendTableDetails(ctx context.Context, dst map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, schema string, requested []string) error {
-	var tables, err = getTables(ctx, db.conn, schema, requested)
+	var tables, err = getTables(ctx, db.conn, schema, requested, db.featureFlags["system_versioned_tables"])
 	if err != nil {
 		return fmt.Errorf("error discovering tables: %w", err)
 	}
@@ -262,7 +262,117 @@ func (db *mysqlDatabase) extendTableDetails(ctx context.Context, dst map[sqlcapt
 		}
 	}
 
+	// MariaDB system-versioned tables in implicit form have hidden row_start
+	// and row_end columns that are not present in information_schema. Detect
+	// them and synthesize the appropriate column and primary-key metadata.
+	if db.versionProduct == "MariaDB" && db.featureFlags["system_versioned_tables"] {
+		if err := db.applySystemVersioning(ctx, dst, schema, requested); err != nil {
+			return fmt.Errorf("error applying system-versioning metadata: %w", err)
+		}
+	}
+
 	return nil
+}
+
+// Implicit system-versioning column names used by MariaDB when a table is
+// declared `WITH SYSTEM VERSIONING` without an explicit `PERIOD FOR SYSTEM_TIME`
+// clause. The lowercase forms match what MariaDB emits in binlog row metadata,
+// which is the case-sensitive consumer of these names.
+const (
+	implicitSystemVersioningStartColumn = "row_start"
+	implicitSystemVersioningEndColumn   = "row_end"
+)
+
+// applySystemVersioning fills in the system-versioning details of any MariaDB
+// tables in the current chunk which were reported as `SYSTEM VERSIONED` by
+// getTables. Tables in implicit form (declared `WITH SYSTEM VERSIONING` but
+// without an explicit `PERIOD FOR SYSTEM_TIME` clause) have hidden row_start
+// and row_end columns which information_schema omits entirely, so for those we
+// synthesize the column and primary-key metadata here.
+func (db *mysqlDatabase) applySystemVersioning(ctx context.Context, dst map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, schema string, requested []string) error {
+	var versioned []string
+	for _, table := range requested {
+		if info, ok := dst[sqlcapture.JoinStreamID(schema, table)]; ok {
+			if details, ok := info.ExtraDetails.(*mysqlTableDiscoveryDetails); ok && details.SystemVersioned {
+				versioned = append(versioned, table)
+			}
+		}
+	}
+	if len(versioned) == 0 {
+		return nil
+	}
+	explicit, err := getExplicitSystemTimePeriods(ctx, db.conn, schema, versioned)
+	if err != nil {
+		return err
+	}
+	for _, table := range versioned {
+		var streamID = sqlcapture.JoinStreamID(schema, table)
+		if explicit[streamID] {
+			continue
+		}
+		var info = dst[streamID]
+		info.ExtraDetails.(*mysqlTableDiscoveryDetails).ImplicitSystemVersioning = true
+
+		// Synthesize the hidden columns. MariaDB always assigns them type
+		// TIMESTAMP(6) NOT NULL and places them at the end of the column list.
+		var startCol = sqlcapture.ColumnInfo{
+			TableSchema: info.Schema,
+			TableName:   info.Name,
+			Index:       len(info.ColumnNames),
+			Name:        implicitSystemVersioningStartColumn,
+			DataType:    "timestamp",
+		}
+		var endCol = sqlcapture.ColumnInfo{
+			TableSchema: info.Schema,
+			TableName:   info.Name,
+			Index:       len(info.ColumnNames) + 1,
+			Name:        implicitSystemVersioningEndColumn,
+			DataType:    "timestamp",
+		}
+		if info.Columns == nil {
+			info.Columns = make(map[string]sqlcapture.ColumnInfo)
+		}
+		info.Columns[startCol.Name] = startCol
+		info.Columns[endCol.Name] = endCol
+		info.ColumnNames = append(info.ColumnNames, startCol.Name, endCol.Name)
+		// MariaDB implicitly extends the primary key of a system-versioned table
+		// by the row_end column, but this extension is not reflected in
+		// information_schema.statistics for the implicit form, so we mirror it
+		// when the table has a usable key. A table without a primary or suitable
+		// fallback key must remain keyless because row_end alone is not unique.
+		if len(info.PrimaryKey) > 0 {
+			info.PrimaryKey = append(info.PrimaryKey, endCol.Name)
+		}
+	}
+	return nil
+}
+
+// getExplicitSystemTimePeriods reports which of the listed system-versioned
+// tables declare an explicit `PERIOD FOR SYSTEM_TIME`, and therefore have
+// their versioning columns visible in information_schema like any other
+// column. Tables absent from the result are in implicit form.
+//
+// The declared period columns are identified by their `ROW START` and `ROW END`
+// generation expressions rather than via information_schema.periods, which only
+// exists as of MariaDB 11.4 while system versioning dates back to 10.3.
+func getExplicitSystemTimePeriods(_ context.Context, conn mysqlClient, schema string, tables []string) (map[sqlcapture.StreamID]bool, error) {
+	var filter, args = schemaTablesFilter(schema, tables)
+	var query = fmt.Sprintf(
+		`SELECT DISTINCT table_schema, table_name`+
+			`  FROM information_schema.columns`+
+			`  WHERE generation_expression IN ('ROW START', 'ROW END') AND %s;`, filter)
+
+	var results, err = conn.Execute(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("error querying system-versioning columns: %w", err)
+	}
+	defer results.Close()
+
+	var explicit = make(map[sqlcapture.StreamID]bool, len(results.Values))
+	for _, row := range results.Values {
+		explicit[sqlcapture.JoinStreamID(string(row[0].AsString()), string(row[1].AsString()))] = true
+	}
+	return explicit, nil
 }
 
 // Returns true if the bytewise lexicographic ordering of serialized row keys for
@@ -434,7 +544,7 @@ func schemaTablesFilter(schema string, tables []string) (string, []any) {
 	return fmt.Sprintf("table_schema = ? AND table_name IN (%s)", placeholders), args
 }
 
-func getTables(_ context.Context, conn mysqlClient, schema string, requested []string) ([]*sqlcapture.DiscoveryInfo, error) {
+func getTables(_ context.Context, conn mysqlClient, schema string, requested []string, includeSystemVersioned bool) ([]*sqlcapture.DiscoveryInfo, error) {
 	if len(requested) == 0 {
 		return nil, nil
 	}
@@ -455,13 +565,17 @@ func getTables(_ context.Context, conn mysqlClient, schema string, requested []s
 		var tableSchema = string(row[0].AsString())
 		var tableName = string(row[1].AsString())
 		var collation = string(row[4].AsString())
+		var tableType = string(row[2].AsString())
+		var isBaseTable = strings.EqualFold(tableType, "BASE TABLE")
+		var isSystemVersioned = strings.EqualFold(tableType, "SYSTEM VERSIONED")
 		tables = append(tables, &sqlcapture.DiscoveryInfo{
 			Schema:    tableSchema,
 			Name:      tableName,
-			BaseTable: strings.EqualFold(string(row[2].AsString()), "BASE TABLE"),
+			BaseTable: isBaseTable || (isSystemVersioned && includeSystemVersioned),
 			ExtraDetails: &mysqlTableDiscoveryDetails{
-				StorageEngine:  string(row[3].AsString()),
-				DefaultCharset: charsetFromCollation(collation),
+				StorageEngine:   string(row[3].AsString()),
+				DefaultCharset:  charsetFromCollation(collation),
+				SystemVersioned: isSystemVersioned,
 			},
 		})
 	}
@@ -496,6 +610,12 @@ func charsetFromCollation(name string) string {
 type mysqlTableDiscoveryDetails struct {
 	StorageEngine  string
 	DefaultCharset string
+	// SystemVersioned is set for any MariaDB table declared `WITH SYSTEM
+	// VERSIONING`, in either implicit or explicit form.
+	SystemVersioned bool
+	// ImplicitSystemVersioning is set for the subset of SystemVersioned tables
+	// declared without an explicit `PERIOD FOR SYSTEM_TIME` clause.
+	ImplicitSystemVersioning bool
 }
 
 func (db *mysqlDatabase) getColumns(_ context.Context, conn mysqlClient, schema string, requested []string) ([]sqlcapture.ColumnInfo, error) {

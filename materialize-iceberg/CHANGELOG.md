@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-09-09
+
+### Added
+- Add support for overriding Spark executor defaults for jobs started by
+  EMR.
+
+## 2026-09-03
+
+### Changed
+- Use a client idempotency token to avoid duplicate merge jobs caused by
+  connector restarts when possible.
+
 ## 2026-08-28
 
 ### Changed

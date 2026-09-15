@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync/atomic"
 
 	"cloud.google.com/go/pubsub"
 	"github.com/estuary/connectors/go/keyhash"
@@ -14,15 +15,19 @@ import (
 
 type transactor struct {
 	bindings []*topicBinding
+	be       *m.BindingEvents
 }
 
 type topicBinding struct {
+	path       []string
 	identifier string
 	topic      *pubsub.Topic
 }
 
-func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
-func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) { return nil, nil }
+func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
+	return nil, nil
+}
 
 // PubSub is delta-update only.
 func (t *transactor) Load(it *m.LoadIterator, _ func(int, json.RawMessage) error) error {
@@ -34,9 +39,12 @@ func (t *transactor) Load(it *m.LoadIterator, _ func(int, json.RawMessage) error
 
 func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	errGroup, ctx := errgroup.WithContext(it.Context())
+	round := it.Round
+	published := make([]atomic.Int64, len(t.bindings))
 
 	for it.Next(false) {
 		binding := t.bindings[it.Binding]
+		bindingIdx := it.Binding
 
 		msg := &pubsub.Message{
 			Data:        it.RawJSON,
@@ -60,8 +68,9 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 				// publishing (see https://cloud.google.com/pubsub/docs/publisher#retry_ordering), but
 				// since returning an error here will cause the connector to exit, we don't need to
 				// worry about resuming publishing from the same client.
-				return fmt.Errorf("error publishing document for binding [%d]: %w", it.Binding, err)
+				return fmt.Errorf("error publishing document for binding [%d]: %w", bindingIdx, err)
 			}
+			published[bindingIdx].Add(1)
 
 			return nil
 		})
@@ -71,7 +80,15 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}
 
 	// Wait for all messages to be delivered.
-	return nil, errGroup.Wait()
+	if err := errGroup.Wait(); err != nil {
+		return nil, err
+	}
+	for i, b := range t.bindings {
+		if n := published[i].Load(); n > 0 {
+			t.be.ReportRowStats(round, b.path, m.TotalRowStats(n))
+		}
+	}
+	return nil, nil
 }
 
 func (t *transactor) Destroy() {

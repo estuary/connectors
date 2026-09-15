@@ -37,6 +37,9 @@ ENV PATH="/connector:$PATH"
 # Bring in the compiled connector artifact from the builder.
 COPY --from=builder /builder/connector ./materialize-bigquery
 
+ARG CONNECTOR_VERSION=dev
+ENV CONNECTOR_VERSION="${CONNECTOR_VERSION}"
+
 LABEL FLOW_RUNTIME_PROTOCOL=materialize
 
 ENTRYPOINT ["/connector/materialize-bigquery"]

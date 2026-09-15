@@ -220,6 +220,7 @@ func (m *materialization) NewTransactor(
 
 		bindings = append(bindings, &binding{
 			object:     mapped.object,
+			path:       []string{"crm", mapped.object.String()},
 			properties: properties,
 			idProperty: idProperty,
 			fields:     mapped.fields,
@@ -230,6 +231,7 @@ func (m *materialization) NewTransactor(
 	return &transactor{
 		client:   m.client,
 		bindings: bindings,
+		be:       be,
 	}, nil
 }
 

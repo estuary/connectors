@@ -149,12 +149,17 @@ type binding struct {
 	nullFieldsToStrip []string
 	mustMerge         bool
 	expectedInserts   int
-	loadMergeBounds   *sql.MergeBoundsBuilder
-	storeMergeBounds  *sql.MergeBoundsBuilder
+	// updates is the number of stored documents that replace an existing
+	// row, for the transaction health report.
+	updates          int64
+	loadMergeBounds  *sql.MergeBoundsBuilder
+	storeMergeBounds *sql.MergeBoundsBuilder
 }
 
-func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
-func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) { return nil, nil }
+func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
+	return nil, nil
+}
 
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
@@ -319,6 +324,9 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 		if it.Exists {
 			b.mustMerge = true
+			if !flowDelete {
+				b.updates++
+			}
 		}
 		if !flowDelete {
 			b.expectedInserts++
@@ -336,6 +344,8 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		return nil, it.Err()
 	}
 
+	round := it.Round
+
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
 		var err error
 		if d.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
@@ -347,7 +357,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil, m.FinishedOperation(fmt.Errorf("evaluating fence template: %w", err))
 		}
 
-		if err := d.commit(ctx, fenceUpdate.String()); err != nil {
+		if err := d.commit(ctx, fenceUpdate.String(), round); err != nil {
 			return nil, m.FinishedOperation(err)
 		}
 
@@ -369,9 +379,10 @@ type bindingCommit struct {
 	// (the INSERT) to affect. Verified after execution to catch silent
 	// row drops in the read_json → INSERT pipeline.
 	expectedInserts int
+	updates         int64
 }
 
-func (d *transactor) commit(ctx context.Context, fenceUpdate string) error {
+func (d *transactor) commit(ctx context.Context, fenceUpdate string, round int) error {
 	defer d.storeFiles.CleanupCurrentTransaction(ctx)
 
 	var commits []bindingCommit
@@ -406,15 +417,17 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string) error {
 			path:            b.target.Path,
 			queries:         append(queries, storeQuery.String()),
 			expectedInserts: b.expectedInserts,
+			updates:         b.updates,
 		})
 
 		// Reset for next round.
 		b.mustMerge = false
 		b.expectedInserts = 0
+		b.updates = 0
 	}
 
 	for attempt := 1; ; attempt++ {
-		if err := d.commitBindings(ctx, commits, fenceUpdate); err != nil {
+		if err := d.commitBindings(ctx, commits, fenceUpdate, round); err != nil {
 			var duckdbErr *duckdb.Error
 			if attempt <= 3 && errors.As(err, &duckdbErr) && slices.Contains(retryableDuckdbErrors, duckdbErr.Type) {
 				log.WithError(err).WithField("attempt", attempt).Warn("retrying commit due to retryable duckdb error")
@@ -434,7 +447,7 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string) error {
 	return nil
 }
 
-func (d *transactor) commitBindings(ctx context.Context, bindings []bindingCommit, fenceUpdate string) error {
+func (d *transactor) commitBindings(ctx context.Context, bindings []bindingCommit, fenceUpdate string, round int) error {
 	// TODO(whb): Motherduck has occasional issues where queries hang forever,
 	// never completing but also never erroring out. A 4 hour timeout is quite
 	// generous but should allow the connector to restart rather than getting
@@ -450,12 +463,19 @@ func (d *transactor) commitBindings(ctx context.Context, bindings []bindingCommi
 	}
 	defer txn.Rollback()
 
-	for _, b := range bindings {
+	// Target rows affected per binding, reported only once the transaction
+	// commits so that a retried attempt is not counted twice.
+	affected := make([]int64, len(bindings))
+	for idx, b := range bindings {
 		d.be.StartedResourceCommit(b.path)
 		for i, query := range b.queries {
 			res, err := txn.ExecContext(txnCtx, query)
 			if err != nil {
 				return fmt.Errorf("executing store query for %s: %w", b.path, err)
+			}
+			rows, err := res.RowsAffected()
+			if err == nil {
+				affected[idx] += rows
 			}
 			// The final query is always the INSERT (storeQuery). Verify
 			// it affected exactly the expected number of rows so a silent
@@ -465,7 +485,6 @@ func (d *transactor) commitBindings(ctx context.Context, bindings []bindingCommi
 			if i != len(b.queries)-1 {
 				continue
 			}
-			rows, err := res.RowsAffected()
 			if err != nil {
 				return fmt.Errorf("getting rows affected for %s: %w", b.path, err)
 			}
@@ -484,6 +503,12 @@ func (d *transactor) commitBindings(ctx context.Context, bindings []bindingCommi
 		return fmt.Errorf("this instance was fenced off by another")
 	} else if err := txn.Commit(); err != nil {
 		return fmt.Errorf("committing store transaction: %w", err)
+	}
+
+	for idx, b := range bindings {
+		// An update is a DELETE of the old row plus an INSERT of the new one,
+		// so it counts twice; subtract it once so the total counts documents.
+		d.be.ReportRowStats(round, b.path, m.TotalRowStats(affected[idx]-b.updates))
 	}
 
 	return nil

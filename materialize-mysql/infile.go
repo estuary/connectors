@@ -42,45 +42,49 @@ func newInfile(readerName string) *infile {
 }
 
 // write writes a single row to the infile buffer. If the buffer is sufficiently larger after the
-// write, it will flush the batch to MySQL per `drainQuery`.
+// write, it will flush the batch to MySQL per `drainQuery` and return the rows affected by it.
 //
 // Rows are encoded with backslash escaping rather than RFC4180-style doubled
 // quotes because SingleStore's LOAD DATA does not recognize "" as an escape for
 // a literal " inside an enclosed field when ESCAPED BY is empty. The matching
 // SQL template uses `ESCAPED BY '\\'` and no `ENCLOSED BY`, which both MySQL
 // and SingleStore parse identically.
-func (i *infile) write(ctx context.Context, converted []any, txn *stdsql.Tx, drainQuery string) error {
+func (i *infile) write(ctx context.Context, converted []any, txn *stdsql.Tx, drainQuery string) (int64, error) {
 	for j, v := range converted {
 		if j > 0 {
 			i.buff.WriteByte(',')
 		}
 		if err := writeInfileField(i.buff, v); err != nil {
-			return fmt.Errorf("encoding row to infile: %w", err)
+			return 0, fmt.Errorf("encoding row to infile: %w", err)
 		}
 	}
 	i.buff.WriteByte('\n')
 
 	if i.buff.Len() > batchSizeThreshold {
-		if err := i.drain(ctx, txn, drainQuery); err != nil {
-			return fmt.Errorf("draining infile after write: %w", err)
+		n, err := i.drain(ctx, txn, drainQuery)
+		if err != nil {
+			return 0, fmt.Errorf("draining infile after write: %w", err)
 		}
+		return n, nil
 	}
 
-	return nil
+	return 0, nil
 }
 
-func (i *infile) drain(ctx context.Context, txn *stdsql.Tx, drainQuery string) error {
+// drain flushes the buffer per `drainQuery` and returns the rows affected.
+func (i *infile) drain(ctx context.Context, txn *stdsql.Tx, drainQuery string) (int64, error) {
 	if i.buff.Len() == 0 {
 		// Simplification for callers when there is nothing to drain, which would happen if the
 		// infile was drained based on size just prior to cycling through to a different binding.
-		return nil
+		return 0, nil
 	}
 
-	if _, err := txn.ExecContext(ctx, drainQuery); err != nil {
-		return fmt.Errorf("executing infile drain query: %w", err)
+	res, err := txn.ExecContext(ctx, drainQuery)
+	if err != nil {
+		return 0, fmt.Errorf("executing infile drain query: %w", err)
 	}
-
-	return nil
+	n, _ := res.RowsAffected()
+	return n, nil
 }
 
 func writeInfileField(buf *bytes.Buffer, v any) error {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -66,6 +67,7 @@ const (
 )
 
 type bindingState struct {
+	path       []string
 	source     string
 	detailType string
 }
@@ -74,13 +76,16 @@ type transactor struct {
 	client       *eventbridge.Client
 	eventBusName string
 	bindings     []bindingState
+	be           *m.BindingEvents
 }
 
 var _ m.Transactor = (*transactor)(nil)
 
-func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
-func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) { return nil, nil }
-func (t *transactor) Destroy()                                                    {}
+func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
+	return nil, nil
+}
+func (t *transactor) Destroy() {}
 
 func (t *transactor) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, rangeSpec pf.RangeSpec) (m.RuntimeCheckpoint, error) {
 	return nil, nil
@@ -98,19 +103,32 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	errGroup, ctx := errgroup.WithContext(it.Context())
 	errGroup.SetLimit(storeConcurrency)
 
+	round := it.Round
+	// published counts the entries EventBridge accepted per binding, for the
+	// transaction health report. A batch mixes bindings, so each entry's
+	// binding rides alongside it.
+	published := make([]atomic.Int64, len(t.bindings))
+
 	var (
-		batch      []types.PutEventsRequestEntry
-		batchBytes int
+		batch         []types.PutEventsRequestEntry
+		batchBindings []int
+		batchBytes    int
 	)
 	flush := func() {
 		if len(batch) == 0 {
 			return
 		}
-		entries := batch
-		batch = nil
+		entries, bindings := batch, batchBindings
+		batch, batchBindings = nil, nil
 		batchBytes = 0
 		errGroup.Go(func() error {
-			return t.putEvents(ctx, entries)
+			if err := t.putEvents(ctx, entries); err != nil {
+				return err
+			}
+			for _, b := range bindings {
+				published[b].Add(1)
+			}
+			return nil
 		})
 	}
 
@@ -137,6 +155,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			DetailType:   aws.String(b.detailType),
 			Detail:       aws.String(string(it.RawJSON)),
 		})
+		batchBindings = append(batchBindings, it.Binding)
 		batchBytes += entrySize
 	}
 	flush()
@@ -146,6 +165,11 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}
 	if err := it.Err(); err != nil {
 		return nil, err
+	}
+	for i, b := range t.bindings {
+		if n := published[i].Load(); n > 0 {
+			t.be.ReportRowStats(round, b.path, m.TotalRowStats(n))
+		}
 	}
 	return nil, nil
 }

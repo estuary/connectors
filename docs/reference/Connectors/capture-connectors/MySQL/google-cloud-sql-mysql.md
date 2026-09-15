@@ -1,6 +1,6 @@
 ---
 sidebar_position: 5
-description: Capture MySQL changes from Google Cloud SQL instances with Estuary’s CDC connector. Setup guide includes binlog handling, read replicas, and backfills.
+description: Capture MySQL changes from Google Cloud SQL instances with Estuary’s CDC connector. Setup guide includes binlog handling, IAM authentication, read replicas, and backfills.
 ---
 
 # Google Cloud SQL for MySQL
@@ -21,6 +21,7 @@ To use this connector, you'll need a MySQL database setup with the following.
   - Permission to read from `information_schema` tables, if automatic discovery is used.
 - If the table(s) to be captured include columns of type `DATETIME`, the `time_zone` system variable
   must be set to an IANA zone name or numerical offset or the capture configured with a `timezone` to use by default.
+- When using [IAM authentication](#iam-authentication), the `cloudsql_iam_authentication` flag enabled on the instance and the service account added as an IAM database user.
 
 ## Setup
 
@@ -53,6 +54,27 @@ GRANT SELECT ON *.* TO 'flow_capture';
 
 5. In the Cloud Console, note the instance's host under Public IP Address. Its port will always be `3306`.
    Together, you'll use the host:port as the `address` property when you configure the connector.
+
+### IAM Authentication
+
+Instead of a password, you can authenticate to your instance with a Google Cloud service account.
+
+Follow the steps in the [GCP IAM guide][gcp-iam] to set up a workload identity pool for Estuary, and make note of the pool audience and the service account email to use when configuring the connector's authentication options.
+
+[Enable IAM database authentication](https://cloud.google.com/sql/docs/mysql/create-edit-iam-instances) on the instance by setting the `cloudsql_iam_authentication` flag to `on`, then [add the service account as an IAM database user](https://cloud.google.com/sql/docs/mysql/add-manage-iam-users#creating-database-user) and grant it the `roles/cloudsql.instanceUser` role.
+
+Cloud SQL for MySQL logs the service account in under its email address with the `@PROJECT_ID.iam.gserviceaccount.com` suffix removed, and MySQL usernames are limited to 32 characters, so pick a service account name that fits. Using [Google Cloud Shell](https://cloud.google.com/sql/docs/mysql/connect-instance-cloud-shell) or your preferred client, grant that user the same permissions as the `flow_capture` user in the [setup instructions](#setup) above:
+
+```sql
+GRANT REPLICATION CLIENT, REPLICATION SLAVE ON *.* TO 'flow-capture';
+GRANT SELECT ON *.* TO 'flow-capture';
+```
+
+Use the same truncated name as the connector's `user` property.
+
+IAM authentication always connects over TLS and never falls back to an unencrypted connection.
+
+[gcp-iam]: /guides/iam-auth/gcp/
 
 ## Capturing from Read Replicas
 
@@ -113,7 +135,6 @@ See [connectors](/concepts/connectors.md#using-connectors) to learn more about u
 | --------------------------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | -------------------------- |
 | **`/address`**                          | Server Address                     | The host or host:port at which the database can be reached.                                                                                                                                                                                                                                                                                                                             | string  | Required                   |
 | **`/user`**                             | Login User                         | The database user to authenticate as.                                                                                                                                                                                                                                                                                                                                                   | string  | Required, `"flow_capture"` |
-| **`/password`**                         | Login Password                     | Password for the specified database user.                                                                                                                                                                                                                                                                                                                                               | string  | Required                   |
 | `/timezone`                             | Timezone                           | Timezone to use when capturing datetime columns. Should normally be left blank to use the database's `'time_zone'` system variable. Only required if the `'time_zone'` system variable cannot be read and columns with type datetime are being captured. Must be a valid IANA time zone name or +HH:MM offset. Takes precedence over the `'time_zone'` system variable if both are set. | string  |                            |
 | `/historyMode` | History Mode | Capture each change event, without merging. | boolean | `false` |
 | `/advanced/dbname`                      | Database Name                      | The name of database to connect to. In general this shouldn&#x27;t matter. The connector can discover and capture from all databases it&#x27;s authorized to access.                                                                                                                                                                                                                    | string  | `"mysql"`                  |
@@ -125,6 +146,16 @@ See [connectors](/concepts/connectors.md#using-connectors) to learn more about u
 | `/advanced/source_tag` | Source Tag | This value is added as the property 'tag' in the source metadata of each document. | string |  |
 | `/advanced/statement_timeout` | Statement Timeout | Overrides the default statement timeout used by the connector. Allowed values: `30s`, `1m`, `5m`, `30m`, or empty to disable. | string |  |
 | `/advanced/rediscovery_interval` | Rediscovery Interval | How often the connector re-runs discovery while a capture is running, in order to notice schema changes and newly added tables. Accepts duration strings like `15m` or `1h`, from `1m` up to `8760h`. | string | `"15m"` |
+
+##### Authentication
+
+| Property | Title | Description | Type | Required/Default |
+| --- | --- | --- | --- | --- |
+| **`/credentials`** | Authentication | Authentication method and credentials that provide access to the database. | object | Required |
+| `/credentials/auth_type` | Auth Type | The authentication method to use. One of `UserPassword` or `GCPIAM`. | string |  |
+| `/credentials/password` | Password | Password for the specified database user. | string | Required for `UserPassword` auth |
+| `/credentials/gcp_service_account_to_impersonate` | Service Account | GCP service account email for Cloud SQL IAM authentication. | string | Required for `GCPIAM` auth |
+| `/credentials/gcp_workload_identity_pool_audience` | Workload Identity Pool Audience | GCP workload identity pool audience. The format should be similar to: `//iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/test-pool/providers/test-provider`. | string | Required for `GCPIAM` auth |
 
 ##### Discovery Filters
 
@@ -169,12 +200,23 @@ captures:
         config:
           address: "127.0.0.1:3306"
           user: "flow_capture"
-          password: "secret"
+          credentials:
+            auth_type: UserPassword
+            password: "secret"
     bindings:
       - resource:
           namespace: ${TABLE_NAMESPACE}
           stream: ${TABLE_NAME}
         target: ${PREFIX}/${COLLECTION_NAME}
+```
+
+To authenticate with [Google Cloud IAM](#iam-authentication) instead, replace the credentials block:
+
+```yaml
+          credentials:
+            auth_type: GCPIAM
+            gcp_service_account_to_impersonate: "flow-capture@example-project.iam.gserviceaccount.com"
+            gcp_workload_identity_pool_audience: "//iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/test-pool/providers/test-provider"
 ```
 
 Your capture definition will likely be more complex, with additional bindings for each table in the source database.

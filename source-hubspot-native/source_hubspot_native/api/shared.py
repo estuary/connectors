@@ -60,15 +60,18 @@ stream of not-so-recent documents. The key is used for seeing if a more recent
 change event document has already been emitted by the FetchRecentFn.
 
 A bare datetime may be interleaved between tuples to mark an intermediate
-checkpoint boundary: every document at or before that timestamp has already
-been yielded, so fetch_delayed_changes can safely checkpoint there. Chunked
-delayed fetchers use this to checkpoint progress within a large window.
+checkpoint boundary: every document the window holds at or before that
+timestamp has already been yielded, so fetch_delayed_changes can safely
+checkpoint there. Chunked delayed fetchers use this to checkpoint progress
+within a large window.
 
-Similar to FetchRecentFn, documents may be returned in any order and iteration
-stops when seeing an entry that's as-old or older than the "since" datetime
-cursor, which is the first datetime parameter. The second datetime parameter
-represents an "until" value, and documents more recent than this are discarded
-and should usually not even be retrieved if possible.
+Documents may be returned in any order, and a document's timestamp may fall
+outside the requested window when the provider's own notion of the document's
+modification time disagrees with the timestamp it reports. Every document is
+emitted regardless; fetch_delayed_changes checkpoints on the window's bounds,
+not on document timestamps. The first datetime parameter is the "since" value
+and the second is the "until" value; documents outside them should not be
+retrieved where the API allows it.
 """
 
 
@@ -173,6 +176,11 @@ async def fetch_delayed_changes(
     This function uses consistent APIs to ensure all documents are
     captured. It uses cache.should_yield() to skip documents that were already
     emitted by the REALTIME subtask with the same or newer timestamp.
+
+    Every document the FetchDelayedFn yields is emitted, whatever timestamp it
+    carries. Checkpoints come from the window's bounds, never from a document:
+    the datetimes the fetcher interleaves mark intermediate progress, and the
+    window's upper bound is the final checkpoint.
     """
     assert isinstance(log_cursor, datetime)
 
@@ -195,8 +203,8 @@ async def fetch_delayed_changes(
     if lower_bound >= upper_bound:
         return
 
-    max_ts = lower_bound
     last_checkpoint = lower_bound
+    saw_anything = False
     cache_hits = 0
     emitted = 0
 
@@ -222,6 +230,8 @@ async def fetch_delayed_changes(
         lower_bound,
         upper_bound,
     ):
+        saw_anything = True
+
         if isinstance(item, datetime):
             # An intermediate checkpoint boundary yielded by a chunked
             # fetcher. Every document at or before this timestamp has
@@ -233,23 +243,18 @@ async def fetch_delayed_changes(
             continue
 
         ts, key, obj = item
-        if ts > upper_bound:
-            # In case the FetchDelayedFn is unable to filter based on upper_bound.
-            continue
-        elif ts > lower_bound:
-            max_ts = max(max_ts, ts)
-            if cache.should_yield(object_name, key, ts):
-                emitted += 1
-                yield obj
-            else:
-                cache_hits += 1
+        if cache.should_yield(object_name, key, ts):
+            emitted += 1
+            yield obj
         else:
-            break
+            cache_hits += 1
 
-    # If we limited the window, advance cursor to upper_bound.
-    if upper_bound < horizon:
-        max_ts = upper_bound
+    is_catching_up = upper_bound < horizon
 
-    if max_ts > last_checkpoint:
-        _log_progress(max_ts)
-        yield max_ts
+    # A catch-up window always checkpoints so progress is made even through
+    # an empty hour. A caught-up window that returned nothing leaves the
+    # cursor where it is so idle streams don't checkpoint on every poll;
+    # the next poll just reads a slightly wider window.
+    if (saw_anything or is_catching_up) and upper_bound > last_checkpoint:
+        _log_progress(upper_bound)
+        yield upper_bound

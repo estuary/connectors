@@ -42,6 +42,7 @@ import (
 	sqstypes "github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/bradleyjkemp/cupaloy"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
+	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	bptest "github.com/estuary/connectors/materialize-boilerplate/testutil"
 	pm "github.com/estuary/flow/go/protocols/materialize"
@@ -112,7 +113,7 @@ func TestIntegration(t *testing.T) {
 
 	t.Run("materialize", func(t *testing.T) {
 		bptest.RunMaterializationTestParallel(t, newMaterializerUnderTest, materializeSpec, makeResourceFn, nil,
-			bptest.RuntimeConfig{Shards: 1})
+			bptest.RuntimeConfig{Shards: 1, Fidelity: m.FidelityTotal})
 	})
 
 	t.Run("apply", func(t *testing.T) {
