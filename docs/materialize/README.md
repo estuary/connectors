@@ -740,7 +740,9 @@ fails the `insert`/`update` checks since it expects only inserts.
   and is `ok` at fidelity `none`.
 - `mismatch`: at least one check failed. The round is logged on its own,
   immediately, with a `mismatches` array of `{check, resourcePath, expected,
-  actual}` entries.
+  actual}` entries and a flat `mismatchSummary` string rendering the same
+  (`update[schema.table] expected=5 actual=7; ...`) for log pipelines that
+  flatten fields and drop arrays of objects.
 - `unchecked`: nothing could be compared, because fidelity was `none`, a
   binding that stored documents never reported before the window flushed
   (`pending` counts them), the line is a recovery replay (`recovery: true`),

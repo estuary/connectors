@@ -662,6 +662,20 @@ func (h *healthTracker) flushWindows() {
 	}
 }
 
+// summarizeMismatches renders mismatches as one string, e.g.
+// "update[schema.table] expected=5 actual=7; loadResponses expected=1 actual=2".
+func summarizeMismatches(mismatches []healthMismatch) string {
+	parts := make([]string, 0, len(mismatches))
+	for _, mm := range mismatches {
+		check := mm.Check
+		if len(mm.ResourcePath) > 0 {
+			check += "[" + strings.Join(mm.ResourcePath, ".") + "]"
+		}
+		parts = append(parts, fmt.Sprintf("%s expected=%d actual=%d", check, mm.Expected, mm.Actual))
+	}
+	return strings.Join(parts, "; ")
+}
+
 func (h *healthTracker) emit(w *healthWindow, verdict string, extra log.Fields) {
 	actual := log.Fields{
 		"inserted": w.actual.Inserted,
@@ -704,6 +718,9 @@ func (h *healthTracker) emit(w *healthWindow, verdict string, extra log.Fields) 
 	}
 	if len(w.mismatches) > 0 {
 		fields["mismatches"] = w.mismatches
+		// Log pipelines flatten nested fields but drop arrays of objects, so
+		// the operator-facing view keeps the detail through this flat string.
+		fields["mismatchSummary"] = summarizeMismatches(w.mismatches)
 	}
 	if h.sharded {
 		fields["sharded"] = true

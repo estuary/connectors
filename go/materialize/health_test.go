@@ -39,10 +39,11 @@ type healthLine struct {
 		Inserted, Updated, Deleted, Total int64
 		Staged, Loaded                    *int64
 	}
-	Pending    int
-	Recovery   bool
-	Sharded    bool
-	Mismatches []healthMismatch
+	Pending         int
+	Recovery        bool
+	Sharded         bool
+	Mismatches      []healthMismatch
+	MismatchSummary string `json:"mismatchSummary"`
 }
 
 func decodeHealthLines(t *testing.T, hook *logtest.Hook) []healthLine {
@@ -460,6 +461,8 @@ func TestHealthMismatchFastPath(t *testing.T) {
 		{Check: "insert", ResourcePath: []string{"schema", "beta"}, Expected: 0, Actual: 2},
 		{Check: "update", ResourcePath: []string{"schema", "beta"}, Expected: 2, Actual: 0},
 	}, m.Mismatches)
+	// The flat rendering survives log pipelines that drop arrays of objects.
+	require.Equal(t, "insert[schema.beta] expected=0 actual=2; update[schema.beta] expected=2 actual=0", m.MismatchSummary)
 
 	require.Equal(t, "ok", lines[3].Verdict)
 	require.Equal(t, 1, lines[3].Rounds)
@@ -575,6 +578,7 @@ func TestHealthLoadResponses(t *testing.T) {
 	require.Equal(t, int64(1), lines[0].LoadRequests)
 	require.Equal(t, int64(2), lines[0].Loaded)
 	require.Equal(t, []healthMismatch{{Check: "loadResponses", Expected: 1, Actual: 2}}, lines[0].Mismatches)
+	require.Equal(t, "loadResponses expected=1 actual=2", lines[0].MismatchSummary)
 }
 
 func TestHealthFidelityNone(t *testing.T) {
