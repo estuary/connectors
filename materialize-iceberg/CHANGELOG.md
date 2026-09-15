@@ -10,11 +10,8 @@
   format v3, and an existing v2 table is upgraded to v3 when its first variant
   column is added. Collection keys stay string columns, `castToString` still
   forces a JSON string column, and string-encoded numbers keep their numeric
-  columns. Inside a variant field, a top-level `format: date-time` or
-  `format: date` string is stored as a variant timestamp (microseconds) or
-  date, and base64 binary content as variant binary; a value that does not
-  parse is stored as a string, and values nested inside objects and arrays
-  keep their JSON types.
+  columns. Values inside a variant keep their JSON types: strings stay
+  strings, including those with a `format` annotation.
 - Variant columns need the EMR Serverless application to run Spark 4 (release
   `emr-spark-8.0.0` or later); this is checked when the materialization is
   published. Set the `no_variant_columns` feature flag to keep JSON strings on

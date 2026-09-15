@@ -684,9 +684,8 @@ func (d *materialization) NewTransactor(
 
 		for _, p := range mapped.SelectedProjections() {
 			pyField := python.NestedField{
-				Name:          p.Field,
-				Type:          p.Mapped.type_.Type(),
-				VariantFormat: p.Mapped.VariantFormat,
+				Name: p.Field,
+				Type: p.Mapped.type_.Type(),
 			}
 			if m, ok := p.Mapped.type_.(*iceberg.ListType); ok {
 				pyField.Element = m.Element.Type()

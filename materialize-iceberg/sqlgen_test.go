@@ -107,7 +107,7 @@ func TestTemplates(t *testing.T) {
 	// comparison and the load's document output change.
 	variantValues := []boilerplate.MappedProjection[mapped]{
 		{Projection: makeProjection("first-val"), Mapped: mapped{type_: iceberg.VariantType{}, Name: "first-val"}},
-		{Projection: makeProjection("second-val"), Mapped: mapped{type_: iceberg.VariantType{}, Name: "second-val", VariantFormat: "date-time"}},
+		{Projection: makeProjection("second-val"), Mapped: mapped{type_: iceberg.VariantType{}, Name: "second-val"}},
 		{Projection: makeProjection("third-val"), Mapped: mapped{type_: iceberg.BinaryType{}, Name: "third-val"}},
 	}
 	variantDoc := &boilerplate.MappedProjection[mapped]{Projection: makeProjection("flow_document"), Mapped: mapped{type_: iceberg.VariantType{}, Name: "flow_document"}}

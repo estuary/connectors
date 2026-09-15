@@ -330,8 +330,9 @@ func TestIntegration(t *testing.T) {
 	// write variant columns. Their specs reference the spark4 config directly.
 	t.Run("variant-materialize", func(t *testing.T) {
 		// A single phase with a two-transaction fixture: v3 table creation,
-		// typed top-level variant values, loads of variant documents through
-		// JSON, and hard deletes, with the table read back through Spark.
+		// multi-type values kept as their JSON types, loads of variant
+		// documents through JSON, and hard deletes, with the table read back
+		// through Spark.
 		boilerplate.RunFeatureFlagMigrationTest(t, NewMaterializer, "testdata/materialize-variant-rest-local.flow.yaml", makeResourceFn, []boilerplate.FeatureFlagMigrationPhase{
 			{FeatureFlags: "variant_columns", Fixture: "testdata/fixture.variant.json"},
 		}, actionDescSanitizers)

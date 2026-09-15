@@ -31,11 +31,6 @@ type mapped struct {
 	// nullable even if the collection schema says it's always present and
 	// non-null. Primary key fields are always required regardless of this flag.
 	Nullable bool
-	// VariantFormat hints how a top-level string value written into a variant
-	// column is typed by the Spark job: "date-time", "date", or "binary". It
-	// is empty for columns that are not variant and for variants whose string
-	// values carry no such annotation.
-	VariantFormat string
 }
 
 func (m mapped) isVariant() bool { return m.type_.Equals(iceberg.VariantType{}) }
@@ -71,24 +66,6 @@ func jsonColumnType(variant bool) iceberg.Type {
 	return iceberg.StringType{}
 }
 
-// variantFormatHint is the type a top-level string value of a variant column
-// is stored as, from the projection's string inference: the same resolution a
-// string column of its own would get, limited to the types a variant can hold.
-func variantFormatHint(p boilerplate.Projection) string {
-	s := p.Inference.String_
-	if s == nil {
-		return ""
-	} else if boilerplate.IsBinaryInference(s) {
-		return "binary"
-	}
-	switch s.Format {
-	case "date-time", "date":
-		return s.Format
-	default:
-		return ""
-	}
-}
-
 var migrateFieldSuffix = "_flow_tmp"
 
 // mapProjection maps a projection to its Iceberg column type. With
@@ -122,9 +99,6 @@ func mapProjection(p boilerplate.Projection, translateField boilerplate.Translat
 		}
 	case boilerplate.FlatTypeMultiple:
 		m.type_ = jsonColumnType(useVariant)
-		if useVariant {
-			m.VariantFormat = variantFormatHint(p)
-		}
 	case boilerplate.FlatTypeNumber:
 		m.type_ = iceberg.Float64Type{}
 	case boilerplate.FlatTypeObject:
