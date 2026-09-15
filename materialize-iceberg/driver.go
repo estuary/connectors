@@ -455,11 +455,21 @@ func checkFormatVersionProperty(props map[string]string) error {
 	return nil
 }
 
+// withVariantHint appends the remedy to a catalog error from a request that
+// carried a variant column, when the error itself is about the variant type
+// or the table's format version; other errors on such requests are left as
+// they are.
 func withVariantHint(err error, hasVariant bool) error {
 	if err == nil || !hasVariant {
 		return err
 	}
-	return fmt.Errorf("%w (%s)", err, variantRemedyHint)
+	msg := strings.ToLower(err.Error())
+	for _, marker := range []string{"variant", "format-version", "format version"} {
+		if strings.Contains(msg, marker) {
+			return fmt.Errorf("%w (%s)", err, variantRemedyHint)
+		}
+	}
+	return err
 }
 
 // defaultTableProperties returns the Iceberg table properties this connector

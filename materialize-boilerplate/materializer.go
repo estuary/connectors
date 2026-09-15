@@ -914,7 +914,7 @@ func buildMappedBinding[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, 
 				}
 			}
 
-			mp := mapProjection(*p, fieldCfg)
+			mp := MapProjection(*p, fieldCfg)
 			mt, converter := materializer.MapType(mp, fieldCfg)
 			*dst = append(*dst, MappedProjection[MT]{
 				Projection: mp,
@@ -995,7 +995,7 @@ func (c *constrainterAdapter[EC, FC, RC, MT]) Compatible(existing ExistingField,
 		}
 	}
 
-	mt, _ := c.m.MapType(mapProjection(*p, fieldCfg), fieldCfg)
+	mt, _ := c.m.MapType(MapProjection(*p, fieldCfg), fieldCfg)
 	return mustRecreateTypeChange(p, mt, existing), nil
 }
 
@@ -1024,7 +1024,7 @@ func (c *constrainterAdapter[EC, FC, RC, MT]) DescriptionForType(p *pf.Projectio
 		}
 	}
 
-	mt, _ := c.m.MapType(mapProjection(*p, fieldCfg), fieldCfg)
+	mt, _ := c.m.MapType(MapProjection(*p, fieldCfg), fieldCfg)
 	return mt.String(), nil
 }
 
