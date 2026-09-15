@@ -407,7 +407,7 @@ func (d *materialization) CreateResource(ctx context.Context, res boilerplate.Ma
 		// Collection keys are never allowed to change, and neither are the keys
 		// that were initially selected for a materialization.
 		if err := d.catalog.CreateTable(ctx, ns, name, schema, schema.IdentifierFieldIDs, location, properties); err != nil {
-			return withVariantHint(err, hasVariant)
+			return errorWithVariantHint(err, hasVariant)
 		}
 
 		if d.cfg.GlueOptimizers.anyEnabled() {
@@ -449,11 +449,11 @@ func checkFormatVersionProperty(props map[string]string) error {
 	return nil
 }
 
-// withVariantHint appends the remedy to a catalog error from a request that
+// errorWithVariantHint appends the remedy to a catalog error from a request that
 // carried a variant column, when the error itself is about the variant type
 // or the table's format version; other errors on such requests are left as
 // they are.
-func withVariantHint(err error, hasVariant bool) error {
+func errorWithVariantHint(err error, hasVariant bool) error {
 	if err == nil || !hasVariant {
 		return err
 	}
@@ -587,7 +587,7 @@ func (d *materialization) UpdateResource(
 
 	return action, func(ctx context.Context) error {
 		if err := d.catalog.UpdateTable(ctx, ns, name, reqs, upds); err != nil {
-			return withVariantHint(err, schemaHasVariant(next))
+			return errorWithVariantHint(err, schemaHasVariant(next))
 		}
 
 		if len(update.FieldsToMigrate) > 0 {
