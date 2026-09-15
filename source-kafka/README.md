@@ -4,7 +4,7 @@ This is a flow connector that reads from Kafka topics/partitions.
 
 ## Getting Started
 
-To get started using this connector with Estuary Flow, run `flowctl-go discover --image ghcr.io/estuary/source-kafka:TAG`.
+To get started using this connector with Estuary, run `flowctl-go discover --image ghcr.io/estuary/source-kafka:TAG`.
 
 The remainder of this README is geared toward developers who wish to contribute or integrate the connector in other projects.
 
