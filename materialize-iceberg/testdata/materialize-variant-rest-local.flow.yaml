@@ -1,8 +1,9 @@
 # Variant-only scenario, run against the Spark 4 set: a table created as
-# format v3 with variant columns, typed top-level variant values (date-time,
-# date, binary) with their fall-back-to-string and non-string cases, a
-# castToString escape hatch, a string-encoded number keeping its numeric
-# column, loads of variant documents through JSON, and hard deletes.
+# format v3 with variant columns, multi-type fields whose values keep their
+# JSON types (strings inside a variant stay strings, even with a format
+# annotation), a castToString escape hatch, a string-encoded number keeping
+# its numeric column, loads of variant documents through JSON, and hard
+# deletes.
 collections:
   tests/variant:
     schema:
