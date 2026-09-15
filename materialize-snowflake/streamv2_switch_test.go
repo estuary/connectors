@@ -747,7 +747,7 @@ func TestStreamV2SweepDropsTheStreamingChannel(t *testing.T) {
 			account:  "TEST_ACCOUNT",
 		},
 		tableStreams: map[int]*tableStream{},
-		channelName:  channelName("test/onto", 0),
+		channelName:  newChannelName("test/onto", 0),
 	}
 
 	// The lower shard of two. Snowflake lists the names upper-cased. Only the first
@@ -757,7 +757,7 @@ func TestStreamV2SweepDropsTheStreamingChannel(t *testing.T) {
 	m.dropStreamingChannel = sm.dropChannel
 	var listed = strings.ToUpper(sm.channelName)
 	m.listChannels = func(context.Context, string, string, string) ([]string, error) {
-		return []string{listed, strings.ToUpper(channelName("test/onto", 0x80000000)), strings.ToUpper(channelName("other/task", 0))}, nil
+		return []string{listed, strings.ToUpper(newChannelName("test/onto", 0x80000000)), strings.ToUpper(newChannelName("other/task", 0))}, nil
 	}
 
 	// Held open, to register blobs through: it stands.
