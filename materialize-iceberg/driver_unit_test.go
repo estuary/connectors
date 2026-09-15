@@ -3,6 +3,7 @@ package connector
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
@@ -208,4 +209,15 @@ func TestValidateFieldNameCase(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestWithVariantHint(t *testing.T) {
+	variantErr := errors.New("failed to POST: 400 Bad Request (Message: Unsupported type: variant)")
+	otherErr := errors.New("failed to POST: 403 Forbidden (Message: not authorized)")
+
+	require.ErrorContains(t, withVariantHint(variantErr, true), variantRemedy)
+	require.ErrorContains(t, withVariantHint(errors.New("format-version 3 is not supported"), true), variantRemedy)
+	require.Equal(t, otherErr, withVariantHint(otherErr, true))
+	require.Equal(t, variantErr, withVariantHint(variantErr, false))
+	require.NoError(t, withVariantHint(nil, true))
 }

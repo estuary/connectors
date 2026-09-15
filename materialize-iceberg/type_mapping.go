@@ -48,17 +48,12 @@ func (m mapped) CanMigrate(existing boilerplate.ExistingField) bool {
 }
 
 var allowedMigrations = boilerplate.TypeMigrations[iceberg.Type]{
-	"long":           {iceberg.DecimalTypeOf(38, 0), iceberg.Float64Type{}},
-	"decimal(38, 0)": {iceberg.Float64Type{}},
-	"string":         {iceberg.BinaryType{}},
-	// Any column can become a string (JSON text) or a variant: with
-	// variant_columns on, variant takes the role string has as the
-	// catch-all for fields that evolve to multiple types.
+	"long":                      {iceberg.DecimalTypeOf(38, 0), iceberg.Float64Type{}},
+	"decimal(38, 0)":            {iceberg.Float64Type{}},
+	"string":                    {iceberg.BinaryType{}},
 	boilerplate.AnyExistingType: {iceberg.StringType{}, iceberg.VariantType{}},
 }
 
-// jsonColumnType is the column type of a JSON-shaped projection: variant with
-// variant_columns on, otherwise a string holding JSON text.
 func jsonColumnType(variant bool) iceberg.Type {
 	if variant {
 		return iceberg.VariantType{}
@@ -71,10 +66,6 @@ var migrateFieldSuffix = "_flow_tmp"
 // mapProjection maps a projection to its Iceberg column type. With
 // variantColumns set, JSON-shaped projections (objects, arrays, multi-type
 // fields, and the root document) map to variant instead of a JSON string.
-// Collection keys keep their string mapping regardless: Iceberg forbids
-// variant as an identifier field, and keys are joined and filtered on across
-// engines. A castToString field config arrives here already flattened to a
-// plain string type, and string-encoded numbers keep their numeric mapping.
 func mapProjection(p boilerplate.Projection, translateField boilerplate.TranslateFieldFn, variantColumns bool) (mapped, boilerplate.ElementConverter) {
 	var m mapped
 	var converter boilerplate.ElementConverter
