@@ -458,7 +458,9 @@ func checkFormatVersionProperty(props map[string]string) error {
 // withVariantHint appends the remedy to a catalog error from a request that
 // carried a variant column, when the error itself is about the variant type
 // or the table's format version; other errors on such requests are left as
-// they are.
+// they are. The markers match Iceberg Java's messages, which Polaris returns
+// verbatim ("variant is not supported until v3", "Unsupported format
+// version: v3"); other catalog implementations' wording is unverified.
 func withVariantHint(err error, hasVariant bool) error {
 	if err == nil || !hasVariant {
 		return err
