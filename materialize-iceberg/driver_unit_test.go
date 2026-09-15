@@ -212,11 +212,14 @@ func TestValidateFieldNameCase(t *testing.T) {
 }
 
 func TestWithVariantHint(t *testing.T) {
-	variantErr := errors.New("failed to POST: 400 Bad Request (Message: Unsupported type: variant)")
+	// Polaris 1.4 (Iceberg Java) rejecting a variant column in a v2 table.
+	variantErr := errors.New("failed to POST .../tables: 500 Internal Server Error (Code: 500, Message: Invalid schema for v2:\n- Invalid type for doc: variant is not supported until v3, Type: IllegalStateException)")
+	// Iceberg Java's TableMetadata message for a version the library predates.
+	versionErr := errors.New("failed to POST .../tables: 400 Bad Request (Code: 400, Message: Unsupported format version: v3 (supported: v2), Type: IllegalArgumentException)")
 	otherErr := errors.New("failed to POST: 403 Forbidden (Message: not authorized)")
 
 	require.ErrorContains(t, withVariantHint(variantErr, true), variantRemedy)
-	require.ErrorContains(t, withVariantHint(errors.New("format-version 3 is not supported"), true), variantRemedy)
+	require.ErrorContains(t, withVariantHint(versionErr, true), variantRemedy)
 	require.Equal(t, otherErr, withVariantHint(otherErr, true))
 	require.Equal(t, variantErr, withVariantHint(variantErr, false))
 	require.NoError(t, withVariantHint(nil, true))
