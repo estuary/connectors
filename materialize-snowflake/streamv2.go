@@ -623,8 +623,8 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 		return err
 	}
 
-	var shard = m.shardRange()
-	targets, err := streamV2TargetLayout(m.keyBegin, m.keyEnd)
+	var shardKeyRange = m.shardRange()
+	targetChannelKeyRanges, err := streamV2TargetLayout(m.keyBegin, m.keyEnd)
 	if err != nil {
 		return err
 	}
@@ -642,10 +642,10 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 
 	// The target epoch. A target range that already has a checkpoint item sets it,
 	// so a restart continues the channels it already ran. Otherwise it is one past
-	// the highest epoch among the items nested in this shard's range, so the new
-	// names collide with no channel a sweep has yet to drop.
+	// the highest epoch among the channels this shard owns, so the new names
+	// collide with no channel a sweep has yet to drop.
 	b.targetEpoch = -1
-	for _, keyRange := range targets {
+	for _, keyRange := range targetChannelKeyRanges {
 		if sv2ChannelCheckpointItem := b.priorCheckpoint[keyRange]; sv2ChannelCheckpointItem != nil {
 			if epoch, _, ok := m.parseChannelName(sv2ChannelCheckpointItem.ChannelName, b.stateKey); ok {
 				b.targetEpoch = epoch
@@ -657,59 +657,60 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 		var maxEpoch = -1
 		for _, sv2ChannelCheckpointItem := range b.priorCheckpoint {
 			if epoch, keyRange, ok := m.parseChannelName(sv2ChannelCheckpointItem.ChannelName, b.stateKey); ok &&
-				keyRange.keyBegin >= shard.keyBegin && keyRange.keyEnd <= shard.keyEnd {
+				keyRange.keyBegin >= shardKeyRange.keyBegin && keyRange.keyEnd <= shardKeyRange.keyEnd {
 				maxEpoch = max(maxEpoch, epoch)
 			}
 		}
 		b.targetEpoch = maxEpoch + 1
 	}
 
-	// Bucket the checkpoint items by where their key range falls relative to this
-	// shard. Nested items are this shard's channels to open. A sibling's are left
-	// alone. A straddling range is rejected, because the rows that channel holds
-	// belong to both sides of the boundary.
-	var nested []streamV2Range
-	var targetItems int
+	// Bucket the prior checkpoint's channels by where each one's key range falls
+	// relative to this shard. Owned channels, those whose range lies inside this
+	// shard's, are this shard's to open. A sibling's are left alone. A straddling
+	// range is rejected, because the rows that channel holds belong to both sides
+	// of the boundary.
+	var ownedKeyRanges []streamV2Range
+	var targetKeyRangeCount int
 	for keyRange, sv2ChannelCheckpointItem := range b.priorCheckpoint {
-		switch classifyKeyRange(keyRange, shard, targets) {
+		switch classifyKeyRange(keyRange, shardKeyRange, targetChannelKeyRanges) {
 		case streamV2KeyRangeTarget:
-			targetItems++
-			nested = append(nested, keyRange)
+			targetKeyRangeCount++
+			ownedKeyRanges = append(ownedKeyRanges, keyRange)
 		case streamV2KeyRangeInherited:
-			nested = append(nested, keyRange)
+			ownedKeyRanges = append(ownedKeyRanges, keyRange)
 		case streamV2KeyRangeSibling:
 		case streamV2KeyRangeStraddling:
 			return fmt.Errorf(
 				"channel %q covers %s, which crosses the boundary of this shard's range %s: the shard was split off a boundary its channels do not subdivide along, so the rows that channel holds cannot be attributed to either side. Restore the task's shard key ranges to the topology which appended them, or backfill this binding",
-				sv2ChannelCheckpointItem.ChannelName, keyRange, shard,
+				sv2ChannelCheckpointItem.ChannelName, keyRange, shardKeyRange,
 			)
 		}
 	}
-	slices.SortFunc(nested, func(a, b streamV2Range) int {
+	slices.SortFunc(ownedKeyRanges, func(a, b streamV2Range) int {
 		return cmp.Or(cmp.Compare(a.keyBegin, b.keyBegin), cmp.Compare(a.keyEnd, b.keyEnd))
 	})
 
 	// priorDeclaresTargets reports that the prior checkpoint holds an item for every
 	// target range. The declaration is written before any switch, so when it holds,
 	// every non-target channel is one a switch was about to abandon.
-	var priorDeclaresTargets = targetItems == len(targets)
+	var priorDeclaresTargets = targetKeyRangeCount == len(targetChannelKeyRanges)
 
-	// Open every nested channel and reconcile it. Each becomes a live channel, a
+	// Open every owned channel and reconcile it. Each becomes a live channel, a
 	// range to abandon, or a candidate, and an empty target channel is left for a
 	// later switch. A candidate is an empty non-target channel. The next loop
 	// decides those, because whether one is inherited or orphaned depends on what
 	// the other channels hold.
-	var liveNonTarget, liveTarget, candidates []*streamV2Channel
-	var statuses = make(map[string]*channelStatusResult)
-	for _, keyRange := range nested {
+	var liveNonTargetChannels, liveTargetChannels, candidateChannels []*streamV2Channel
+	var channelStatusByName = make(map[string]*channelStatusResult)
+	for _, keyRange := range ownedKeyRanges {
 		var sv2ChannelCheckpointItem = b.priorCheckpoint[keyRange]
-		var isTarget = classifyKeyRange(keyRange, shard, targets) == streamV2KeyRangeTarget
+		var isTarget = classifyKeyRange(keyRange, shardKeyRange, targetChannelKeyRanges) == streamV2KeyRangeTarget
 
 		status, err := client.OpenChannel(ctx, b.database, b.schema, b.table, sv2ChannelCheckpointItem.ChannelName)
 		if err != nil {
 			return fmt.Errorf("opening channel %q: %w", sv2ChannelCheckpointItem.ChannelName, err)
 		}
-		statuses[sv2ChannelCheckpointItem.ChannelName] = status
+		channelStatusByName[sv2ChannelCheckpointItem.ChannelName] = status
 		if err := status.validateRejectedRows(sv2ChannelCheckpointItem.ChannelName, b.table); err != nil {
 			return err
 		}
@@ -722,7 +723,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 			if !isTarget && sv2ChannelCheckpointItem.Routed == 0 {
 				// An empty channel of another layout may be inherited or orphaned, and only
 				// the channels around it can tell, so the decision waits for all of them.
-				candidates = append(candidates, newStreamV2Channel(sv2ChannelCheckpointItem.ChannelName, keyRange, 0, 0))
+				candidateChannels = append(candidateChannels, newStreamV2Channel(sv2ChannelCheckpointItem.ChannelName, keyRange, 0, 0))
 				continue
 			}
 			if !isTarget && priorDeclaresTargets {
@@ -744,24 +745,24 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 		}
 		var c = newStreamV2Channel(sv2ChannelCheckpointItem.ChannelName, keyRange, sv2ChannelCheckpointItem.Routed, committedOffset)
 		if isTarget {
-			liveTarget = append(liveTarget, c)
+			liveTargetChannels = append(liveTargetChannels, c)
 		} else {
-			liveNonTarget = append(liveNonTarget, c)
+			liveNonTargetChannels = append(liveNonTargetChannels, c)
 		}
 	}
 
 	// An empty channel joins the non-target layout when one exists and the channel
 	// fits a gap in it. Any other empty channel belongs to no layout this shard runs.
-	for _, c := range candidates {
+	for _, c := range candidateChannels {
 		var overlapsLive = false
-		for _, live := range append(liveNonTarget, liveTarget...) {
+		for _, live := range append(liveNonTargetChannels, liveTargetChannels...) {
 			if c.keyRange.keyBegin <= live.keyRange.keyEnd && live.keyRange.keyBegin <= c.keyRange.keyEnd {
 				overlapsLive = true
 				break
 			}
 		}
-		if len(liveNonTarget) > 0 && !overlapsLive {
-			liveNonTarget = append(liveNonTarget, c)
+		if len(liveNonTargetChannels) > 0 && !overlapsLive {
+			liveNonTargetChannels = append(liveNonTargetChannels, c)
 			continue
 		}
 		b.abandonedRanges = append(b.abandonedRanges, c.keyRange)
@@ -773,19 +774,15 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 
 	// A declared target layout alongside idle non-target channels is a switch a
 	// prior session declared and did not finish, so it finishes here.
-	if len(liveNonTarget) > 0 && priorDeclaresTargets {
-		var idle = true
-		for _, c := range liveNonTarget {
-			if c.progress.routed != c.progress.committed {
-				idle = false
-				break
-			}
-		}
+	if len(liveNonTargetChannels) > 0 && priorDeclaresTargets {
+		var idle = !slices.ContainsFunc(liveNonTargetChannels, func(ch *streamV2Channel) bool {
+			return ch.progress.routed != ch.progress.committed
+		})
 		if idle {
-			for _, c := range liveNonTarget {
+			for _, c := range liveNonTargetChannels {
 				b.abandonedRanges = append(b.abandonedRanges, c.keyRange)
 			}
-			liveNonTarget = nil
+			liveNonTargetChannels = nil
 		}
 	}
 
@@ -793,25 +790,18 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 	// replayed transaction must skip, so while any of them stands undropped it is
 	// the layout — mixed subdivision depths included, as a join of children that
 	// converged unevenly leaves. Otherwise the layout is the target layout.
-	var active []*streamV2Channel
-	if len(liveNonTarget) > 0 {
-		active = append(liveNonTarget, liveTarget...)
+	var activeChannels []*streamV2Channel
+	if len(liveNonTargetChannels) > 0 {
+		activeChannels = append(liveNonTargetChannels, liveTargetChannels...)
 	} else {
-		for _, keyRange := range targets {
-			var have *streamV2Channel
-			for _, c := range liveTarget {
-				if c.keyRange == keyRange {
-					have = c
-					break
-				}
-			}
-			if have != nil {
-				active = append(active, have)
+		for _, keyRange := range targetChannelKeyRanges {
+			if i := slices.IndexFunc(liveTargetChannels, func(ch *streamV2Channel) bool { return ch.keyRange == keyRange }); i >= 0 {
+				activeChannels = append(activeChannels, liveTargetChannels[i])
 				continue
 			}
 
 			var channelName = streamV2FormatChannelName(m.materialization, b.targetEpoch, keyRange, b.stateKey)
-			var status = statuses[channelName]
+			var status = channelStatusByName[channelName]
 			if status == nil {
 				if status, err = client.OpenChannel(ctx, b.database, b.schema, b.table, channelName); err != nil {
 					return fmt.Errorf("opening channel %q: %w", channelName, err)
@@ -830,11 +820,11 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 			if sv2ChannelCheckpointItem != nil {
 				routed = sv2ChannelCheckpointItem.Routed
 			}
-			active = append(active, newStreamV2Channel(channelName, keyRange, routed, committedOffset))
+			activeChannels = append(activeChannels, newStreamV2Channel(channelName, keyRange, routed, committedOffset))
 		}
 	}
 
-	slices.SortFunc(active, func(a, b *streamV2Channel) int {
+	slices.SortFunc(activeChannels, func(a, b *streamV2Channel) int {
 		return cmp.Compare(a.keyRange.keyBegin, b.keyRange.keyBegin)
 	})
 
@@ -842,31 +832,31 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 	// documents the runtime delivers have no channel and some key hashes have two.
 	// No topology this connector participates in produces such a layout, so
 	// reaching here means the checkpoint and the shard ranges disagree about history.
-	var ranges = make([]streamV2Range, len(active))
-	for i, c := range active {
+	var ranges = make([]streamV2Range, len(activeChannels))
+	for i, c := range activeChannels {
 		ranges[i] = c.keyRange
 	}
-	if !streamV2LayoutCovers(ranges, shard) {
-		var described = make([]string, len(active))
-		for i, c := range active {
+	if !streamV2LayoutCovers(ranges, shardKeyRange) {
+		var described = make([]string, len(activeChannels))
+		for i, c := range activeChannels {
 			described[i] = c.keyRange.String()
 		}
 		return fmt.Errorf(
 			"the channels this task's checkpoint records for this binding cover %s, which does not cover this shard's range %s with no gaps or overlaps: the checkpoint and the shard topology disagree about the ranges that have been appended under. Restore the task's shard key ranges to the topology which appended them, or backfill this binding",
-			strings.Join(described, " "), shard,
+			strings.Join(described, " "), shardKeyRange,
 		)
 	}
 
-	b.activeChannels, b.targetRanges, b.opened = active, targets, true
+	b.activeChannels, b.targetRanges, b.opened = activeChannels, targetChannelKeyRanges, true
 
-	var layout = make(log.Fields, len(active))
-	for _, c := range active {
+	var layout = make(log.Fields, len(activeChannels))
+	for _, c := range activeChannels {
 		layout[c.keyRange.String()] = fmt.Sprintf("routed %d committed %d", c.progress.routed, c.progress.committed)
 	}
 	log.WithFields(log.Fields{
 		"table":           b.table,
-		"shardRange":      shard.String(),
-		"activeChannels":  len(active),
+		"shardRange":      shardKeyRange.String(),
+		"activeChannels":  len(activeChannels),
 		"layout":          layout,
 		"abandonedRanges": b.abandonedRanges,
 	}).Info("opened snowpipe streaming v2 channels")
