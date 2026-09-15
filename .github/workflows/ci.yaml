@@ -52,10 +52,10 @@ jobs:
     if: needs.classify_changes.outputs.run == 'true'
     runs-on: ubuntu-24.04
     outputs:
-      # PRs from outside forks, such as dependabot, cannot push new images.  In
-      # that case dependant jobs should use the existing tagged base-image,
-      # otherwise they should use the base-image built in this job.
-      tag: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork) && steps.prep.outputs.version || steps.prep.outputs.tag }}
+      # PRs from dependabot don't have access to repository secrets and cannot
+      # push new images.  In that case dependant jobs should use the existing
+      # tagged base-image instead of the base-image built in this job.
+      tag: ${{ github.actor == 'dependabot[bot]' && steps.prep.outputs.version || steps.prep.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -91,7 +91,7 @@ jobs:
           tags: ghcr.io/estuary/base-image:local
 
       - name: Push base-image image
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false
+        if: ${{ github.actor != 'dependabot[bot]' }}
         uses: docker/build-push-action@v6
         with:
           context: .
