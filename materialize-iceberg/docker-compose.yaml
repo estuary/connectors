@@ -211,9 +211,6 @@ services:
       - /bin/bash
       - -lc
       - /opt/spark/bin/spark-submit --master spark://spark-master:7077 /opt/jobs/daemon.py
-    # The daemon answers 503 on /health until its SparkSession is up, which
-    # takes several seconds; failures inside start_period do not count toward
-    # retries, so `up --wait` doesn't declare it unhealthy while it boots.
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:9806/health || exit 1"]
       interval: 1s
@@ -312,9 +309,6 @@ services:
       - /bin/bash
       - -lc
       - /opt/spark/bin/spark-submit --master spark://spark4-master:7077 /opt/jobs/daemon.py
-    # The daemon answers 503 on /health until its SparkSession is up, which
-    # takes several seconds; failures inside start_period do not count toward
-    # retries, so `up --wait` doesn't declare it unhealthy while it boots.
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:9807/health || exit 1"]
       interval: 1s
