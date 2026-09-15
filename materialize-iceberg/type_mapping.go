@@ -63,9 +63,6 @@ func jsonColumnType(variant bool) iceberg.Type {
 
 var migrateFieldSuffix = "_flow_tmp"
 
-// mapProjection maps a projection to its Iceberg column type. With
-// variantColumns set, JSON-shaped projections (objects, arrays, multi-type
-// fields, and the root document) map to variant instead of a JSON string.
 func mapProjection(p boilerplate.Projection, translateField boilerplate.TranslateFieldFn, variantColumns bool) (mapped, boilerplate.ElementConverter) {
 	var m mapped
 	var converter boilerplate.ElementConverter
@@ -130,10 +127,6 @@ func mapProjection(p boilerplate.Projection, translateField boilerplate.Translat
 	return m, converter
 }
 
-// variantConverter makes every staged value of a variant column valid JSON
-// text for parse_json. Objects, arrays, and the root document already arrive
-// as JSON, and numbers and booleans are written as their JSON literals, but a
-// string value of a multi-type field would be written bare.
 func variantConverter(te tuple.TupleElement) (any, error) {
 	if s, ok := te.(string); ok {
 		return json.Marshal(s)

@@ -432,12 +432,8 @@ func (d *materialization) CreateResource(ctx context.Context, res boilerplate.Ma
 
 const formatVersionProperty = "format-version"
 
-// variantRemedy tells the user how to fall back to JSON string columns; it is
-// appended to every error a task can only hit because variant columns are on.
 const variantRemedy = "set the 'no_variant_columns' feature flag in the endpoint's advanced configuration to materialize these fields as JSON strings instead"
 
-// variantRemedyHint is appended to catalog errors from requests that carried a
-// variant column or format version 3, which not every catalog accepts.
 const variantRemedyHint = "the catalog may not support Iceberg format v3 or variant columns; " + variantRemedy
 
 func schemaHasVariant(schema *iceberg.Schema) bool {
@@ -446,8 +442,6 @@ func schemaHasVariant(schema *iceberg.Schema) bool {
 	})
 }
 
-// checkFormatVersionProperty rejects a user-supplied format-version other than
-// 3 on a binding that needs variant columns, rather than silently overriding it.
 func checkFormatVersionProperty(props map[string]string) error {
 	if v, ok := props[formatVersionProperty]; ok && v != "3" {
 		return fmt.Errorf("table property %s=%q conflicts with variant columns, which require format version 3: remove the property, or %s", formatVersionProperty, v, variantRemedy)
@@ -458,9 +452,7 @@ func checkFormatVersionProperty(props map[string]string) error {
 // withVariantHint appends the remedy to a catalog error from a request that
 // carried a variant column, when the error itself is about the variant type
 // or the table's format version; other errors on such requests are left as
-// they are. The markers match Iceberg Java's messages, which Polaris returns
-// verbatim ("variant is not supported until v3", "Unsupported format
-// version: v3"); other catalog implementations' wording is unverified.
+// they are.
 func withVariantHint(err error, hasVariant bool) error {
 	if err == nil || !hasVariant {
 		return err

@@ -153,10 +153,7 @@ type upgradeFormatVersionUpdateReq struct {
 
 func (upgradeFormatVersionUpdateReq) isTableUpdate() {}
 
-// UpgradeFormatVersionUpdate raises the table's Iceberg format version. It is
-// committed in the same request as a schema change that needs the newer
-// version (a variant column needs v3), so the table is never left at a
-// version that cannot describe its own schema.
+// UpgradeFormatVersionUpdate raises the table's Iceberg format version.
 func UpgradeFormatVersionUpdate(version int) TableUpdate {
 	return &upgradeFormatVersionUpdateReq{
 		baseUpdate:    baseUpdate{Action: "upgrade-format-version"},
