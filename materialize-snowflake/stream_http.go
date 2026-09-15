@@ -60,7 +60,7 @@ type channelMetadata struct {
 }
 
 type uploadChunkChannelMetadata struct {
-	Channel         string `json:"channel_name"`
+	ChannelName     string `json:"channel_name"`
 	ClientSequencer int    `json:"client_sequencer"`
 	RowSequencer    int    `json:"row_sequencer"`
 	OffsetToken     string `json:"offset_token"`
@@ -123,7 +123,7 @@ type streamConfig struct {
 }
 
 type channel struct {
-	Channel         string        `json:"channel"`
+	ChannelName     string        `json:"channel"`
 	Database        string        `json:"database"`
 	Schema          string        `json:"schema"`
 	Table           string        `json:"table"`
@@ -218,23 +218,23 @@ func (s *streamClient) configure(ctx context.Context) (*streamConfig, error) {
 	return res, nil
 }
 
-func (s *streamClient) openChannel(ctx context.Context, schema, table, name string) (*channel, error) {
+func (s *streamClient) openChannel(ctx context.Context, schema, table, channelName string) (*channel, error) {
 	type req struct {
-		Role      *string `json:"role,omitempty"`
-		Database  string  `json:"database"`
-		Schema    string  `json:"schema"`
-		Table     string  `json:"table"`
-		Channel   string  `json:"channel"`
-		WriteMode string  `json:"write_mode"`
+		Role        *string `json:"role,omitempty"`
+		Database    string  `json:"database"`
+		Schema      string  `json:"schema"`
+		Table       string  `json:"table"`
+		ChannelName string  `json:"channel"`
+		WriteMode   string  `json:"write_mode"`
 	}
 
 	res, err := post[channel](ctx, s, "/channels/open", req{
-		Role:      s.role,
-		Database:  s.database,
-		Schema:    schema,
-		Table:     table,
-		Channel:   name,
-		WriteMode: "CLOUD_STORAGE",
+		Role:        s.role,
+		Database:    s.database,
+		Schema:      schema,
+		Table:       table,
+		ChannelName: channelName,
+		WriteMode:   "CLOUD_STORAGE",
 	})
 	if err != nil && res == nil {
 		return nil, err
@@ -247,6 +247,42 @@ func (s *streamClient) openChannel(ctx context.Context, schema, table, name stri
 	}
 
 	return res, nil
+}
+
+// dropChannel drops a channel of a table. A channel Snowflake no longer holds
+// counts as dropped, since the drop exists to leave none standing.
+func (s *streamClient) dropChannel(ctx context.Context, schema, table, channelName string) error {
+	type req struct {
+		Role        *string `json:"role,omitempty"`
+		Database    string  `json:"database"`
+		Schema      string  `json:"schema"`
+		Table       string  `json:"table"`
+		ChannelName string  `json:"channel"`
+	}
+	type dropResponse struct {
+		StatusCode int    `json:"status_code"`
+		Message    string `json:"message"`
+	}
+
+	res, err := post[dropResponse](ctx, s, "/channels/drop", req{
+		Role:        s.role,
+		Database:    s.database,
+		Schema:      schema,
+		Table:       table,
+		ChannelName: channelName,
+	})
+	var apiErr *streamingApiError
+	if errors.As(err, &apiErr) && (apiErr.Code == 19 || apiErr.Code == 25) {
+		return nil
+	} else if err != nil {
+		return err
+	} else if codeErr := getErrorByCode(res.StatusCode); codeErr != nil {
+		return fmt.Errorf("request returned error code: %w", codeErr)
+	} else if res.Message != "Success" {
+		return fmt.Errorf("unexpected response message: %s", res.Message)
+	}
+
+	return nil
 }
 
 func (s *streamClient) write(ctx context.Context, blob *blobMetadata) error {
@@ -292,12 +328,12 @@ func (s *streamClient) write(ctx context.Context, blob *blobMetadata) error {
 	return nil
 }
 
-func (s *streamClient) channelStatus(ctx context.Context, clientSeq int, schema, table, name string) (*channelStatusResponse, error) {
+func (s *streamClient) channelStatus(ctx context.Context, clientSeq int, schema, table, channelName string) (*channelStatusResponse, error) {
 	type channelReq struct {
 		Table           string `json:"table"`
 		Database        string `json:"database"`
 		Schema          string `json:"schema"`
-		Name            string `json:"channel_name"`
+		ChannelName     string `json:"channel_name"`
 		ClientSequencer int    `json:"client_sequencer"`
 	}
 
@@ -313,7 +349,7 @@ func (s *streamClient) channelStatus(ctx context.Context, clientSeq int, schema,
 				Table:           table,
 				Database:        s.database,
 				Schema:          schema,
-				Name:            name,
+				ChannelName:     channelName,
 				ClientSequencer: clientSeq,
 			},
 		},
@@ -335,13 +371,13 @@ func (s *streamClient) channelStatus(ctx context.Context, clientSeq int, schema,
 	return res, nil
 }
 
-func (s *streamClient) waitForTokenPersisted(ctx context.Context, token string, clientSeq int, schema, table, name string) error {
+func (s *streamClient) waitForTokenPersisted(ctx context.Context, token string, clientSeq int, schema, table, channelName string) error {
 	logger := Logger(ctx)
 	maxBackoff := 2 * time.Second
 	backoff := 100 * time.Millisecond
 	ts := time.Now()
 	for n := 1; ; n++ {
-		if status, err := s.channelStatus(ctx, clientSeq, schema, table, name); err != nil {
+		if status, err := s.channelStatus(ctx, clientSeq, schema, table, channelName); err != nil {
 			if !errors.Is(err, ErrTemporary) {
 				return err
 			}
@@ -534,7 +570,7 @@ func generateBlobMetadata(
 		ChunkLengthUncompressed: tracked.lengthUncompressed,
 		Channels: []uploadChunkChannelMetadata{
 			{
-				Channel:         channel.Channel,
+				ChannelName:     channel.ChannelName,
 				ClientSequencer: 0, // not checkpointed
 				RowSequencer:    0, // not checkpointed
 				OffsetToken:     token,

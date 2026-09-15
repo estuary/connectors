@@ -118,7 +118,7 @@ func TestValidWriteBlobs(t *testing.T) {
 			Database: db,
 			Schema:   sch,
 			Table:    tbl,
-			Channels: []uploadChunkChannelMetadata{{Channel: ch, OffsetToken: tok}},
+			Channels: []uploadChunkChannelMetadata{{ChannelName: ch, OffsetToken: tok}},
 		}
 	}
 
@@ -185,8 +185,8 @@ func TestValidWriteBlobs(t *testing.T) {
 						Schema:   sch,
 						Table:    tbl,
 						Channels: []uploadChunkChannelMetadata{
-							{Channel: ch, OffsetToken: "token:1"},
-							{Channel: ch, OffsetToken: "token:2"},
+							{ChannelName: ch, OffsetToken: "token:1"},
+							{ChannelName: ch, OffsetToken: "token:2"},
 						},
 					},
 				}},
