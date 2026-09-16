@@ -390,6 +390,8 @@ func RunTransactions(
 
 		if err = validateIsFlush(&rxRequest); err != nil {
 			return err
+		} else if err = logBackfillSignals(open.Materialization, rxRequest.Flush); err != nil {
+			return err
 		} else if err = writeFlushed(stream, &txResponse); err != nil {
 			return err
 		}

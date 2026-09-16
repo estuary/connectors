@@ -106,6 +106,8 @@ func (s *scriptedStream) RecvMsg(m *pm.Request) error {
 type txn struct {
 	loads  []pm.Request
 	stores []pm.Request
+	// flush, when set, replaces the empty Flush that separates loads from stores.
+	flush *pm.Request_Flush
 }
 
 func loadReq(binding int, key string) pm.Request {
@@ -131,7 +133,11 @@ func scriptRequests(txns []txn) []pm.Request {
 	for _, tx := range txns {
 		out = append(out, pm.Request{Acknowledge: &pm.Request_Acknowledge{}})
 		out = append(out, tx.loads...)
-		out = append(out, pm.Request{Flush: &pm.Request_Flush{}})
+		var flush = tx.flush
+		if flush == nil {
+			flush = &pm.Request_Flush{}
+		}
+		out = append(out, pm.Request{Flush: flush})
 		out = append(out, tx.stores...)
 		out = append(out, pm.Request{StartCommit: &pm.Request_StartCommit{RuntimeCheckpoint: &pc.Checkpoint{}}})
 	}
