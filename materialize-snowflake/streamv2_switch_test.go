@@ -587,7 +587,7 @@ func TestStreamV2WritePathSwitch(t *testing.T) {
 		var m = newV2(t, tgt, nil)
 		storeV2(t, m, 0, 3)
 		var c = m.bindings[0].activeChannels[0]
-		require.NoError(t, c.pipe.wait())
+		require.NoError(t, c.wait())
 		_, err := m.client.WaitCommit(ctx, c.channelName, c.offsetToken(3))
 		require.NoError(t, err)
 		require.Equal(t, 3, countRows())

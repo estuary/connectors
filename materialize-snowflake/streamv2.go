@@ -284,16 +284,18 @@ type streamV2Channel struct {
 	}
 
 	// buf is the payload of the batch under construction
-	buf      []byte
-	bufRows  int
-	bufFirst int64
+	buf            []byte
+	bufRows        int
+	bufFirstOffset int64
 	// bufHint is the size of the batch handed off before this one, and it sizes the next
 	// buffer.
 	bufHint int
 
-	// pipe carries one append at a time. Store can buffer more rows while a batch is on
-	// the wire, and the batches keep their order.
-	pipe appendPipe
+	// appends runs the channel's appends one at a time, so Store can buffer more rows
+	// while a batch is on the wire and the batches keep their order. It is nil between
+	// transactions, and appendsCtx is cancelled once an appendBatch has failed.
+	appends    *errgroup.Group
+	appendsCtx context.Context
 
 	// limiter meters the uncompressed bytes this channel hands to Snowflake. One limiter
 	// per channel, because Snowflake meters each channel independently.
@@ -334,7 +336,7 @@ func (c *streamV2Channel) bufferRow(offset int64, columnNames []columnName, conv
 	var before = len(c.buf)
 	if c.bufRows == 0 {
 		c.startBatch()
-		c.bufFirst = offset
+		c.bufFirstOffset = offset
 	} else {
 		c.buf = append(c.buf, ',')
 	}
@@ -350,6 +352,34 @@ func (c *streamV2Channel) bufferRow(offset int64, columnNames []columnName, conv
 	return len(c.buf) - before, nil
 }
 
+// wait waits for the channel's in-flight appendBatch and returns the first error
+// of the appends since the last wait.
+func (c *streamV2Channel) wait() error {
+	if c.appends == nil {
+		return nil
+	}
+	var err = c.appends.Wait()
+	c.appends, c.appendsCtx = nil, nil
+	return err
+}
+
+func (c *streamV2Channel) appendBatch(ctx context.Context, client *sidecarClient, firstOffset, lastOffset int64, payload []byte, rows int) error {
+	if c.appends == nil {
+		c.appends, c.appendsCtx = errgroup.WithContext(ctx)
+		c.appends.SetLimit(1)
+	} else if c.appendsCtx.Err() != nil {
+		return fmt.Errorf("appending to channel %q: %w", c.channelName, c.appends.Wait())
+	}
+
+	c.appends.Go(func() error {
+		if err := c.limiter.WaitN(ctx, len(payload)); err != nil {
+			return fmt.Errorf("pacing channel %q: %w", c.channelName, err)
+		}
+		return client.Append(ctx, c.channelName, c.offsetToken(firstOffset), c.offsetToken(lastOffset), payload, rows)
+	})
+	return nil
+}
+
 // finishBatch closes the payload of the batch and gives up ownership of the buffer. It
 // reports the payload, the number of rows it holds, and the buffered bytes it releases.
 //
@@ -358,13 +388,13 @@ func (c *streamV2Channel) bufferRow(offset int64, columnNames []columnName, conv
 // as well leaves the total of buffered bytes one byte short of zero for every batch of
 // the session. That drifts the back-pressure ceiling away from the memory it stands
 // for.
-func (c *streamV2Channel) finishBatch() (payload []byte, rows int, released int) {
+func (c *streamV2Channel) finishBatch() (payload []byte, rows, released int) {
 	released = len(c.buf)
 	c.buf = append(c.buf, ']')
 
 	payload, rows = c.buf, c.bufRows
 	c.bufHint = len(c.buf)
-	c.buf, c.bufRows, c.bufFirst = nil, 0, 0
+	c.buf, c.bufRows, c.bufFirstOffset = nil, 0, 0
 	return payload, rows, released
 }
 
@@ -433,31 +463,6 @@ func (b *streamV2Binding) route(keyHash uint32) *streamV2Channel {
 		}
 	}
 	return nil
-}
-
-// appendPipe runs one append at a time, on a goroutine of its own. A submit of the
-// next append reports the result of the previous one. A failure therefore surfaces at
-// the next batch boundary or at flush, and nothing drops it.
-type appendPipe struct {
-	pending chan error
-}
-
-func (p *appendPipe) submit(fn func() error) error {
-	if err := p.wait(); err != nil {
-		return err
-	}
-	p.pending = make(chan error, 1)
-	go func(done chan error) { done <- fn() }(p.pending)
-	return nil
-}
-
-func (p *appendPipe) wait() error {
-	if p.pending == nil {
-		return nil
-	}
-	var err = <-p.pending
-	p.pending = nil
-	return err
 }
 
 // streamV2Manager is the Snowpipe Streaming V2 write path. It owns the channels of
@@ -1016,26 +1021,16 @@ func (m *streamV2Manager) appendAllBatches(ctx context.Context) error {
 // channel. Ownership of the buffer passes to the append, so the next batch starts a
 // buffer of its own.
 func (m *streamV2Manager) appendBatch(ctx context.Context, c *streamV2Channel) error {
-	var first, last = c.bufFirst, c.progress.routed
+	var firstOffset, lastOffset = c.bufFirstOffset, c.progress.routed
 	payload, rows, released := c.finishBatch()
 	m.bufBytes -= released
 
-	// Back-pressure is implicit. A saturated pipe blocks the append. The blocked append
-	// blocks the next submit, and that blocks Store.
-	var err = c.pipe.submit(func() error {
-		if err := c.limiter.WaitN(ctx, len(payload)); err != nil {
-			return fmt.Errorf("pacing channel %q: %w", c.channelName, err)
-		}
-		client, err := m.ensureStarted(ctx)
-		if err != nil {
-			return err
-		}
-		return client.Append(ctx, c.channelName, c.offsetToken(first), c.offsetToken(last), payload, rows)
-	})
+	client, err := m.ensureStarted(ctx)
 	if err != nil {
-		return fmt.Errorf("appending to channel %q: %w", c.channelName, err)
+		return err
 	}
-	return nil
+
+	return c.appendBatch(ctx, client, firstOffset, lastOffset, payload, rows)
 }
 
 // flush appends every channel's remaining documents, waits for Snowflake to
@@ -1065,7 +1060,7 @@ func (m *streamV2Manager) flush(ctx context.Context) (map[int]streamV2Checkpoint
 					return nil, err
 				}
 			}
-			if err := c.pipe.wait(); err != nil {
+			if err := c.wait(); err != nil {
 				return nil, fmt.Errorf("appending to channel %q: %w", c.channelName, err)
 			}
 

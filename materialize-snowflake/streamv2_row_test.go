@@ -252,7 +252,7 @@ func TestStreamV2BatchPayload(t *testing.T) {
 
 		// The batch's own first offset, which its offset token is rendered
 		// from, is the one the batch's first row was buffered under.
-		require.Equal(t, int64(100), b.bufFirst)
+		require.Equal(t, int64(100), b.bufFirstOffset)
 
 		// The payload wants only its closing bracket, which appendBatch adds as it
 		// hands the buffer off.

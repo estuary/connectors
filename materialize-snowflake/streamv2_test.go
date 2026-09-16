@@ -226,7 +226,7 @@ func TestStreamV2Manager(t *testing.T) {
 	// documents committed beyond what any checkpoint records.
 	var commitOutstanding = func(t *testing.T, m *streamV2Manager) {
 		for _, c := range m.bindings[0].activeChannels {
-			require.NoError(t, c.pipe.wait())
+			require.NoError(t, c.wait())
 			if c.progress.routed > c.progress.committed {
 				_, err := m.client.WaitCommit(ctx, c.channelName, c.offsetToken(c.progress.routed))
 				require.NoError(t, err)
@@ -335,7 +335,7 @@ func TestStreamV2Manager(t *testing.T) {
 
 		writeRows(m1, 0, 5)
 		var c1 = m1.bindings[0].activeChannels[0]
-		require.NoError(t, c1.pipe.wait())
+		require.NoError(t, c1.wait())
 		_, err = m1.client.WaitCommit(ctx, c1.channelName, c1.offsetToken(4))
 		require.NoError(t, err)
 		require.Equal(t, 4, countRows())
@@ -358,7 +358,7 @@ func TestStreamV2Manager(t *testing.T) {
 		// committed token against.
 		var checkpointed = soleCheckpointItem(t, entries, 0)
 		writeRows(m2, 5, 8)
-		require.NoError(t, c2.pipe.wait())
+		require.NoError(t, c2.wait())
 		_, err = m2.client.WaitCommit(ctx, c2.channelName, c2.offsetToken(7))
 		require.NoError(t, err)
 		require.Equal(t, 7, countRows())
@@ -883,7 +883,7 @@ func TestStreamV2Manager(t *testing.T) {
 
 		writeRows(m, 2, 4)
 		var c = m.bindings[0].activeChannels[0]
-		require.NoError(t, c.pipe.wait())
+		require.NoError(t, c.wait())
 		_, err = m.client.WaitCommit(ctx, c.channelName, c.offsetToken(4))
 		require.NoError(t, err)
 		m.stop()
