@@ -322,3 +322,5 @@ func backoff(attempt int) time.Duration {
 }
 
 func main() { boilerplate.RunMain(new(driver)) }
+
+func (t *transactor) Truncate(context.Context, int, time.Time) (int64, error) { return 0, nil }

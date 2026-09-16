@@ -520,3 +520,5 @@ func StdConstraints(p *pf.Projection) *pm.Response_Validated_Constraint {
 
 	return constraint
 }
+
+func (t *transactor[T]) Truncate(context.Context, int, time.Time) (int64, error) { return 0, nil }

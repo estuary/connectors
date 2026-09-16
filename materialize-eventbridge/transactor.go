@@ -243,3 +243,5 @@ func retryableCode(code string) bool {
 	}
 	return false
 }
+
+func (t *transactor) Truncate(context.Context, int, time.Time) (int64, error) { return 0, nil }

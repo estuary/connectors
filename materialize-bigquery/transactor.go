@@ -812,3 +812,5 @@ func extremumExpr(fn string, literals []string, key sql.Column) string {
 	}
 	return fmt.Sprintf("%s(%s)", fn, strings.Join(cast, ", "))
 }
+
+func (t *transactor) Truncate(context.Context, int, time.Time) (int64, error) { return 0, nil }

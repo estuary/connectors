@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	m "github.com/estuary/connectors/go/materialize"
 	"github.com/estuary/connectors/materialize-pinecone/client"
@@ -213,3 +214,5 @@ func (t *transactor) Destroy() {}
 func (t *transactor) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, rangeSpec pf.RangeSpec) (m.RuntimeCheckpoint, error) {
 	return nil, nil
 }
+
+func (t *transactor) Truncate(context.Context, int, time.Time) (int64, error) { return 0, nil }

@@ -711,3 +711,5 @@ func sanitizeArrayInner(arr []interface{}) []interface{} {
 	}
 	return arr
 }
+
+func (t *transactor) Truncate(context.Context, int, time.Time) (int64, error) { return 0, nil }

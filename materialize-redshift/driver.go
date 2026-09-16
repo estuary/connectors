@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
@@ -1306,3 +1307,5 @@ func handleCopyIntoErr(ctx context.Context, txn pgx.Tx, bucket string, files []s
 }
 
 func (d *transactor) Destroy() {}
+
+func (d *transactor) Truncate(context.Context, int, time.Time) (int64, error) { return 0, nil }

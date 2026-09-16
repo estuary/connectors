@@ -626,3 +626,5 @@ func storeRetryDelay(ctx context.Context, attempt int) error {
 		return nil
 	}
 }
+
+func (t *transactor) Truncate(context.Context, int, time.Time) (int64, error) { return 0, nil }

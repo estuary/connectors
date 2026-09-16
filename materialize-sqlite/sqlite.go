@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	m "github.com/estuary/connectors/go/materialize"
@@ -444,3 +445,5 @@ func main() {
 }
 
 var sqliteOpenMu sync.Mutex
+
+func (t *transactor) Truncate(context.Context, int, time.Time) (int64, error) { return 0, nil }

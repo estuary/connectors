@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/estuary/connectors/go/blob"
 	m "github.com/estuary/connectors/go/materialize"
@@ -400,3 +401,5 @@ func (t *transactor) Destroy() {}
 func redactedQuery(query strings.Builder, storageAccountKey string) string {
 	return strings.ReplaceAll(query.String(), storageAccountKey, "REDACTED")
 }
+
+func (t *transactor) Truncate(context.Context, int, time.Time) (int64, error) { return 0, nil }

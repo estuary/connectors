@@ -783,3 +783,5 @@ func sendBatch(ctx context.Context, txn pgx.Tx, batch *pgx.Batch) ([]int64, erro
 
 	return rows, nil
 }
+
+func (t *transactor) Truncate(context.Context, int, time.Time) (int64, error) { return 0, nil }

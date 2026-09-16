@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	m "github.com/estuary/connectors/go/materialize"
@@ -651,3 +652,7 @@ func (t *drainTestTransactor) Acknowledge(ctx context.Context, statePatches []js
 func (t *drainTestTransactor) Destroy() {
 	t.rec.destroyed = true
 }
+
+func (t *testTransactor) Truncate(context.Context, int, time.Time) (int64, error) { return 0, nil }
+
+func (t *drainTestTransactor) Truncate(context.Context, int, time.Time) (int64, error) { return 0, nil }

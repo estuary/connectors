@@ -899,3 +899,5 @@ func TestHealthTrackerPanicSafety(t *testing.T) {
 	h.acknowledged(0) // Evaluates and logs; the panic is contained.
 	h.close()
 }
+
+func (t *scriptedTransactor) Truncate(context.Context, int, time.Time) (int64, error) { return 0, nil }

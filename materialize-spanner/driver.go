@@ -1077,3 +1077,5 @@ func (t *transactor) Destroy() {
 	t.client.Close()
 	t.adminClient.Close()
 }
+
+func (t *transactor) Truncate(context.Context, int, time.Time) (int64, error) { return 0, nil }

@@ -1052,3 +1052,5 @@ func pathsWithRoot(root string, paths []string) []string {
 
 func (d *transactor) Destroy() {
 }
+
+func (d *transactor) Truncate(context.Context, int, time.Time) (int64, error) { return 0, nil }

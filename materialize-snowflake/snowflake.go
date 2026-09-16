@@ -1564,3 +1564,5 @@ func (d *transactor) logAllClusteringInfo(ctx context.Context) {
 		logClusteringInfo(ctx, d.db, b.target.Identifier, b.clusteringExpr)
 	}
 }
+
+func (d *transactor) Truncate(context.Context, int, time.Time) (int64, error) { return 0, nil }

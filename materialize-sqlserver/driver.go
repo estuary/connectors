@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/feature/rds/auth"
 	"github.com/estuary/connectors/go/auth/iam"
@@ -773,3 +774,5 @@ func (d *transactor) Destroy() {
 	d.load.conn.Close()
 	d.store.conn.Close()
 }
+
+func (t *transactor) Truncate(context.Context, int, time.Time) (int64, error) { return 0, nil }

@@ -297,3 +297,5 @@ func (t *transactor) RecoverCheckpoint(ctx context.Context, spec pf.Materializat
 }
 
 func (t *transactor) Destroy() {}
+
+func (t *transactor) Truncate(context.Context, int, time.Time) (int64, error) { return 0, nil }

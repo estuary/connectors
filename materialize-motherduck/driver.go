@@ -515,3 +515,5 @@ func (d *transactor) commitBindings(ctx context.Context, bindings []bindingCommi
 }
 
 func (d *transactor) Destroy() {}
+
+func (t *transactor) Truncate(context.Context, int, time.Time) (int64, error) { return 0, nil }

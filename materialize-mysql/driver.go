@@ -952,3 +952,5 @@ func (d *transactor) Destroy() {
 	d.load.conn.Close()
 	d.store.conn.Close()
 }
+
+func (t *transactor) Truncate(context.Context, int, time.Time) (int64, error) { return 0, nil }

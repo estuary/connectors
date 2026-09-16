@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"cloud.google.com/go/bigtable"
 	m "github.com/estuary/connectors/go/materialize"
@@ -336,3 +337,5 @@ func (t *transactor) storeWorker(ctx context.Context, batches <-chan storeBatch,
 }
 
 func (t *transactor) Destroy() {}
+
+func (t *transactor) Truncate(context.Context, int, time.Time) (int64, error) { return 0, nil }

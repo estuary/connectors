@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"iter"
 	"sync/atomic"
+	"time"
 
 	"github.com/estuary/connectors/go/materialize"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
@@ -366,3 +367,5 @@ func (t *transactor) storeBatches(it *materialize.StoreIterator, size int) iter.
 		}
 	}
 }
+
+func (t *transactor) Truncate(context.Context, int, time.Time) (int64, error) { return 0, nil }

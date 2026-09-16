@@ -91,6 +91,14 @@ type Transactor interface {
 	// the runtime, allowing the next pipelined transaction to begin to close.
 	Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error)
 
+	// Truncate deletes the rows of `binding` whose flow_published_at predates
+	// `boundary`, returning how many rows were deleted. Those rows were
+	// superseded by a completed backfill, and every document stored since the
+	// boundary is at or after it, so the predicate is idempotent and safe to
+	// re-run. A connector that cannot truncate a destination returns 0 and no
+	// error to leave the superseded rows in place.
+	Truncate(ctx context.Context, binding int, boundary time.Time) (int64, error)
+
 	// Destroy the Transactor, releasing any held resources.
 	Destroy()
 }
