@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-09-01
+
+### Added
+- `product_variants` variants now include `media`, the media attached to each
+  variant, with each entry's `id`, `alt` and `mediaContentType`, plus `image`
+  (`url`, `width`, `height`) for image media. Shopify offers no media type
+  filter at the variant level, so videos and 3D models appear here too,
+  carrying no `image`.
+
 ## 2026-08-27
 
 ### Added
