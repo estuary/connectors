@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-09-16
+
+### Added
+- The `properties` binding now captures property metadata for the `products`,
+  `line_items`, `goals`, `leads`, `feedback_submissions`, and `orders` objects.
+
+### Fixed
+- The `properties` binding no longer fails when the connector cannot access a single
+  object type.
+
 ## 2026-09-02
 ### Fixed
 - CRM object bindings no longer fail when the HubSpot Search API returns records out
