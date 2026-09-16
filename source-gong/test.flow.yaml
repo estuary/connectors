@@ -1,3 +1,5 @@
+import:
+- acmeCo/flow.yaml
 captures:
   acmeCo/source-gong:
     endpoint:
@@ -6,11 +8,22 @@ captures:
         - python
         - -m
         - source_gong
-        config:
-          credentials:
-            credentials_title: API Key
-            access_key: notanaccesskey
-            access_key_secret: notanaccesskeysecret
-          region: us-55616
-          start_date: 2024-01-01T00:00:00Z
-    bindings: []
+        config: config.yaml
+    bindings:
+    - resource:
+        name: scorecard_definitions
+        interval: PT1H
+      target: acmeCo/scorecard_definitions
+    - resource:
+        name: calls
+        interval: PT2M
+      target: acmeCo/calls
+    - resource:
+        name: users
+        interval: PT2M
+        schedule: 0 0 * * *
+      target: acmeCo/users
+    - resource:
+        name: scorecards
+        interval: PT2M
+      target: acmeCo/scorecards

@@ -1,0 +1,17 @@
+collections:
+  acmeCo/calls:
+    schema: calls.schema.yaml
+    key:
+    - /id
+  acmeCo/scorecard_definitions:
+    schema: scorecard_definitions.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/scorecards:
+    schema: scorecards.schema.yaml
+    key:
+    - /scorecardId
+  acmeCo/users:
+    schema: users.schema.yaml
+    key:
+    - /id

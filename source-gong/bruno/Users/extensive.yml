@@ -1,0 +1,67 @@
+info:
+  name: extensive
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{base_url}}/v2/users/extensive"
+  headers:
+    - name: content-type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "filter": {
+          "createdFromDateTime": "2026-08-01T00:00:00Z",
+          "createdToDateTime": "2026-10-01T00:00:00Z"
+        }
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://gong.app.gong.io/settings/api/documentation#post-/v2/users/extensive
+
+  **WHY:** the endpoint actually backing the `users` stream. Proves the
+  `filter`-wrapped body shape (`FILTER_WRAPPER = True` on the `User` model),
+  the `created` cursor field, and the extended field set.
+
+  **VERIFIED (2026-08-31):** returns `200`; this is the one stream with data on
+  the sandbox — a live capture produced user documents carrying `id`,
+  `created`, `active`, `emailAddress`, `settings`, `spokenLanguages`, and
+  `personalMeetingUrls`. Contact fields are redacted by the collection's
+  after-response script.
+
+  **VERIFIED (2026-08-31) — this is the diagnostic for uploaded calls that
+  never become recordings.** Gong only processes an uploaded call if its
+  primary user is set to be recorded, and this endpoint is where that is
+  visible: each user's `settings` carries `telephonyCallsImported`,
+  `webConferencesRecorded`, `preventWebConferenceRecording`, and
+  `gongConnectEnabled`. On this sandbox all three human users have
+  `telephonyCallsImported: true`, so a seeded call showing "Not recorded" in
+  the UI is **not** explained by user settings — look at the media instead
+  (see `Seeding / A2`). The `Estuary Partnerships` collaborator account has
+  every flag `false` and would be the wrong choice of `primaryUser`.
+
+  Use this to confirm a newly created seed account before seeding against it:
+  it needs `active: true` and `telephonyCallsImported: true`.
+
+  **VERIFIED (2026-09-01) — the exclusive upper bound bites in practice.** The
+  seed account was created on 2026-09-01 and did not appear in this request
+  while `createdToDateTime` was `2026-09-01T00:00:00Z`, though `GET /v2/users`
+  listed it immediately. An exclusive bound plus a same-day record reads
+  exactly like "the account was never created". The window now ends
+  2026-10-01; widen it again rather than trusting an empty result.
+
+  **LIMITATION:** the window here is inclusive on `createdFromDateTime` and
+  exclusive on `createdToDateTime`, matching the account-wide rule in the
+  collection root. Widen the window if the sandbox's users predate 2026-08-01
+  — they were created when the instance was provisioned, so a narrow window
+  silently returns the 404-empty shape rather than an error.

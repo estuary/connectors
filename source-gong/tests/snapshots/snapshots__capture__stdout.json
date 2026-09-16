@@ -1,0 +1,209 @@
+[
+  [
+    "acmeCo/calls",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "calendarEventId": null,
+      "clientUniqueId": "estuary-seed-a1f-20260828",
+      "customData": null,
+      "direction": "Outbound",
+      "duration": 784,
+      "id": 7022652889306584427,
+      "isPrivate": false,
+      "language": "eng",
+      "media": "Audio",
+      "meetingUrl": "https://gong-pre-redaction-media-gpe-nam-02-1-us-west-2.s3.amazonaws.com/public-api-upload/153365637041284604/7022652889306584427/14wcw7md838zlbb0ca4/media.mp3",
+      "primaryUserId": "4164091100197006958",
+      "purpose": "Connector integration test",
+      "scheduled": "2026-08-28T08:00:00-07:00",
+      "scope": "External",
+      "sdrDisposition": null,
+      "started": "2026-08-28T08:00:00-07:00",
+      "system": "Upload API",
+      "title": "Estuary seed call A",
+      "url": "https://us02-16381.app.gong.io/call?id=7022652889306584427",
+      "workspaceId": "4042227664642553970"
+    }
+  ],
+  [
+    "acmeCo/scorecard_definitions",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "created": "2026-09-02T01:37:45-07:00",
+      "enabled": true,
+      "questions": [
+        {
+          "answerGuide": "<div>Scoring Guide</div><div><br></div><div>3 = Fully achieved: The behavior or outcome was clearly demonstrated and meets all key criteria.</div><div>2 = Partially achieved: The behavior or outcome was demonstrated, but only partially or with missing elements.</div><div>1 = Not achieved: The behavior or outcome was not demonstrated, or no clear evidence was observed.</div>",
+          "answerOptions": [],
+          "created": "2026-09-02T01:37:45-07:00",
+          "isOverall": false,
+          "maxRange": "3",
+          "minRange": "1",
+          "questionId": "3958478970626784536",
+          "questionRevisionId": "4054703307027216225",
+          "questionText": "How well did the team member demonstrate understanding of the prospect's business?",
+          "questionType": "RANGE",
+          "updated": "2026-09-02T01:45:29-07:00",
+          "updaterUserId": "8409349990268814433"
+        },
+        {
+          "answerGuide": "",
+          "answerOptions": [],
+          "created": "2026-09-02T01:37:45-07:00",
+          "isOverall": false,
+          "maxRange": null,
+          "minRange": null,
+          "questionId": "638759739501417620",
+          "questionRevisionId": "5891307062426449750",
+          "questionText": "Did the team member clearly identify the prospect's pain points or current challenge?",
+          "questionType": "BOOLEAN",
+          "updated": "2026-09-02T01:45:29-07:00",
+          "updaterUserId": "8409349990268814433"
+        },
+        {
+          "answerGuide": "<div>Scoring Guide</div><div><br></div><div>3 = Fully achieved: The behavior or outcome was clearly demonstrated and meets all key criteria.</div><div>2 = Partially achieved: The behavior or outcome was demonstrated, but only partially or with missing elements.</div><div>1 = Not achieved: The behavior or outcome was not demonstrated, or no clear evidence was observed.</div>",
+          "answerOptions": [],
+          "created": "2026-09-02T01:37:45-07:00",
+          "isOverall": false,
+          "maxRange": "3",
+          "minRange": "1",
+          "questionId": "245333955930326169",
+          "questionRevisionId": "4680479293241477909",
+          "questionText": "How well did the team member connect the problem to business impact or consequences?",
+          "questionType": "RANGE",
+          "updated": "2026-09-02T01:45:29-07:00",
+          "updaterUserId": "8409349990268814433"
+        },
+        {
+          "answerGuide": "<div>Scoring Guide</div><div><br></div><div>5 = Fully achieved: The behavior was consistently demonstrated and meets all key criteria.</div><div>4 = Mostly achieved: The behavior was demonstrated in most relevant situations, with only minor gaps.</div><div>3 = Partially achieved: The behavior was demonstrated, but important elements were missing or inconsistently applied.</div><div>2 = Minimally achieved: Limited evidence of the behavior was observed.</div><div>1 = Not achieved: The behavior was not demonstrated, or no clear evidence was observed.</div>",
+          "answerOptions": [],
+          "created": "2026-09-02T01:37:45-07:00",
+          "isOverall": false,
+          "maxRange": "5",
+          "minRange": "1",
+          "questionId": "1723781937606562914",
+          "questionRevisionId": "7806745554733927597",
+          "questionText": "How well did the team member ask effective, open-ended questions?",
+          "questionType": "RANGE",
+          "updated": "2026-09-02T01:45:29-07:00",
+          "updaterUserId": "8409349990268814433"
+        },
+        {
+          "answerGuide": "<div>Scoring Guide</div><div><br></div><div>3 = Fully achieved: The behavior or outcome was clearly demonstrated and meets all key criteria.</div><div>2 = Partially achieved: The behavior or outcome was demonstrated, but only partially or with missing elements.</div><div>1 = Not achieved: The behavior or outcome was not demonstrated, or no clear evidence was observed.</div>",
+          "answerOptions": [],
+          "created": "2026-09-02T01:37:45-07:00",
+          "isOverall": false,
+          "maxRange": "3",
+          "minRange": "1",
+          "questionId": "4739217131237266817",
+          "questionRevisionId": "1917626410700158293",
+          "questionText": "How well did the team member identify the decision process (stakeholders, approval steps, timeline)?",
+          "questionType": "RANGE",
+          "updated": "2026-09-02T01:45:29-07:00",
+          "updaterUserId": "8409349990268814433"
+        },
+        {
+          "answerGuide": "",
+          "answerOptions": [],
+          "created": "2026-09-02T01:37:45-07:00",
+          "isOverall": false,
+          "maxRange": null,
+          "minRange": null,
+          "questionId": "4444325794356053101",
+          "questionRevisionId": "8941572868935127141",
+          "questionText": "Were clear and actionable next steps defined with ownership and timing?",
+          "questionType": "BOOLEAN",
+          "updated": "2026-09-02T01:45:29-07:00",
+          "updaterUserId": "8409349990268814433"
+        },
+        {
+          "answerGuide": "<div>Identify behaviors observed from the call that positively contributed to the conversation.</div>",
+          "answerOptions": [],
+          "created": "2026-09-02T01:37:45-07:00",
+          "isOverall": false,
+          "maxRange": null,
+          "minRange": null,
+          "questionId": "7940141605666430215",
+          "questionRevisionId": "8850491118552831554",
+          "questionText": "What did the team member do well?",
+          "questionType": "OPEN",
+          "updated": "2026-09-02T01:45:29-07:00",
+          "updaterUserId": "8409349990268814433"
+        },
+        {
+          "answerGuide": "<div>Identify behaviors observed from the call that were missing, incomplete, or could have been explored further.</div>",
+          "answerOptions": [],
+          "created": "2026-09-02T01:37:45-07:00",
+          "isOverall": false,
+          "maxRange": null,
+          "minRange": null,
+          "questionId": "190140606896333955",
+          "questionRevisionId": "1241807234865461760",
+          "questionText": "What could the team member have done better in this call?",
+          "questionType": "OPEN",
+          "updated": "2026-09-02T01:45:29-07:00",
+          "updaterUserId": "8409349990268814433"
+        },
+        {
+          "answerGuide": "Weighted average of the scored questions.",
+          "answerOptions": [],
+          "created": "2026-09-02T01:37:45-07:00",
+          "isOverall": true,
+          "maxRange": "5",
+          "minRange": "1",
+          "questionId": "7099900930941536391",
+          "questionRevisionId": "2864748300809329462",
+          "questionText": "Overall Score",
+          "questionType": "RANGE",
+          "updated": "2026-09-02T01:45:29-07:00",
+          "updaterUserId": "8409349990268814433"
+        }
+      ],
+      "reviewMethod": "AUTOMATIC",
+      "scorecardId": "6617040866921841803",
+      "scorecardName": "Discovery and qualification",
+      "updated": "2026-09-02T01:45:29-07:00",
+      "updaterUserId": "8409349990268814433",
+      "workspaceId": "4042227664642553970"
+    }
+  ],
+  [
+    "acmeCo/users",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "active": true,
+      "conferencingProviders": null,
+      "created": "2026-08-30T09:39:01.383-07:00",
+      "emailAddress": "redacted",
+      "emailAliases": "redacted",
+      "extension": null,
+      "firstName": "Se\u00e1n",
+      "id": 8409349990268814433,
+      "lastName": "Whelan",
+      "managerId": null,
+      "meetingConsentPageUrl": "redacted",
+      "personalMeetingUrls": "redacted",
+      "phoneNumber": "redacted",
+      "settings": {
+        "emailsImported": true,
+        "gongConnectEnabled": true,
+        "nonRecordedMeetingsImported": true,
+        "preventEmailImport": false,
+        "preventWebConferenceRecording": false,
+        "telephonyCallsImported": true,
+        "webConferencesRecorded": true
+      },
+      "spokenLanguages": [],
+      "title": null,
+      "trustedEmailAddress": "redacted"
+    }
+  ]
+]
