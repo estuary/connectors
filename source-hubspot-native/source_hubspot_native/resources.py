@@ -2,7 +2,7 @@ import functools
 import itertools
 from datetime import UTC, datetime, timedelta
 from logging import Logger
-from typing import AsyncGenerator, Iterable
+from typing import AsyncGenerator, Iterable, NamedTuple
 
 from estuary_cdk.capture import Task
 from estuary_cdk.capture.common import (
@@ -80,6 +80,7 @@ from .api import (
 )
 from .models import (
     OAUTH2_SPEC,
+    BaseCRMObject,
     Campaign,
     Company,
     Contact,
@@ -117,6 +118,33 @@ from .models import (
 # Subtask identifiers for incremental capture.
 REALTIME = "realtime"
 DELAYED = "delayed"
+
+
+class StandardCRMObject(NamedTuple):
+    cls: type[BaseCRMObject]
+    name: str
+    fetch_recent: FetchRecentFn
+    fetch_delayed: FetchDelayedFn
+
+
+STANDARD_CRM_OBJECTS: list[StandardCRMObject] = [
+    StandardCRMObject(Company, Names.companies, fetch_recent_companies, fetch_delayed_companies),
+    StandardCRMObject(Contact, Names.contacts, fetch_recent_contacts, fetch_delayed_contacts),
+    StandardCRMObject(Deal, Names.deals, fetch_recent_deals, fetch_delayed_deals),
+    StandardCRMObject(Engagement, Names.engagements, fetch_recent_engagements, fetch_delayed_engagements),
+    StandardCRMObject(Ticket, Names.tickets, fetch_recent_tickets, fetch_delayed_tickets),
+    StandardCRMObject(Product, Names.products, fetch_recent_products, fetch_delayed_products),
+    StandardCRMObject(LineItem, Names.line_items, fetch_recent_line_items, fetch_delayed_line_items),
+    StandardCRMObject(Goals, Names.goals, fetch_recent_goals, fetch_delayed_goals),
+    StandardCRMObject(Lead, Names.leads, fetch_recent_leads, fetch_delayed_leads),
+    StandardCRMObject(
+        FeedbackSubmission,
+        Names.feedback_submissions,
+        fetch_recent_feedback_submissions,
+        fetch_delayed_feedback_submissions,
+    ),
+    StandardCRMObject(Order, Names.orders, fetch_recent_orders, fetch_delayed_orders),
+]
 
 
 async def _can_access_endpoint(
@@ -256,14 +284,6 @@ async def all_resources(
         oauth_spec=OAUTH2_SPEC, credentials=config.credentials
     )
 
-    standard_object_names: list[str] = [
-        Names.companies,
-        Names.contacts,
-        Names.deals,
-        Names.engagements,
-        Names.tickets,
-    ]
-
     custom_object_names = await list_custom_objects(log, http)
     # Some HubSpot endpoints like /v3/properties/{objectType} do not work for every custom object type.
     # However, these endpoints do work if we prepend a "p_" to the beginning of the custom object name
@@ -291,89 +311,24 @@ async def all_resources(
     ]
 
     standard_object_resources = [
-        crm_object_with_associations(
-            Company,
-            Names.companies,
-            Names.companies,
-            http,
-            with_history,
-            fetch_recent_companies,
-            fetch_delayed_companies,
-        ),
-        crm_object_with_associations(
-            Contact,
-            Names.contacts,
-            Names.contacts,
-            http,
-            with_history,
-            fetch_recent_contacts,
-            fetch_delayed_contacts,
-        ),
-        crm_object_with_associations(
-            Deal,
-            Names.deals,
-            Names.deals,
-            http,
-            with_history,
-            fetch_recent_deals,
-            fetch_delayed_deals,
-        ),
-        crm_object_with_associations(
-            Engagement,
-            Names.engagements,
-            Names.engagements,
-            http,
-            with_history,
-            fetch_recent_engagements,
-            fetch_delayed_engagements,
-        ),
-        crm_object_with_associations(
-            Ticket,
-            Names.tickets,
-            Names.tickets,
-            http,
-            with_history,
-            fetch_recent_tickets,
-            fetch_delayed_tickets,
-        ),
-        crm_object_with_associations(
-            Product,
-            Names.products,
-            Names.products,
-            http,
-            with_history,
-            fetch_recent_products,
-            fetch_delayed_products,
-        ),
-        crm_object_with_associations(
-            LineItem,
-            Names.line_items,
-            Names.line_items,
-            http,
-            with_history,
-            fetch_recent_line_items,
-            fetch_delayed_line_items,
-        ),
-        crm_object_with_associations(
-            Goals,
-            Names.goals,
-            Names.goals,
-            http,
-            with_history,
-            fetch_recent_goals,
-            fetch_delayed_goals,
-        ),
-        crm_object_with_associations(
-            Lead,
-            Names.leads,
-            Names.leads,
-            http,
-            with_history,
-            fetch_recent_leads,
-            fetch_delayed_leads,
+        *(
+            crm_object_with_associations(
+                obj.cls,
+                obj.name,
+                obj.name,
+                http,
+                with_history,
+                obj.fetch_recent,
+                obj.fetch_delayed,
+            )
+            for obj in STANDARD_CRM_OBJECTS
         ),
         properties(
-            http, itertools.chain(standard_object_names, custom_object_path_components)
+            http,
+            itertools.chain(
+                (obj.name for obj in STANDARD_CRM_OBJECTS),
+                custom_object_path_components,
+            ),
         ),
         deal_pipelines(http),
         owners(http),
@@ -383,12 +338,10 @@ async def all_resources(
         marketing_emails(http),
         marketing_events(http),
         marketing_event_participants(http),
-        feedback_submissions(http, with_history),
         contact_lists(http),
         contact_list_memberships(http),
         workflows(http),
         campaigns(http),
-        orders(http, with_history),
     ]
 
     if should_check_permissions:
@@ -824,18 +777,6 @@ def marketing_emails(http: HTTPSession) -> Resource:
     )
 
 
-def feedback_submissions(http: HTTPSession, with_history: bool) -> Resource:
-    return crm_object_with_associations(
-        FeedbackSubmission,
-        Names.feedback_submissions,
-        Names.feedback_submissions,
-        http,
-        with_history,
-        fetch_recent_feedback_submissions,
-        fetch_delayed_feedback_submissions,
-    )
-
-
 def contact_lists(http: HTTPSession) -> Resource:
     def open(
         binding: CaptureBinding[ResourceConfig],
@@ -958,18 +899,6 @@ def workflows(http: HTTPSession) -> Resource:
         ),
         initial_config=ResourceConfig(name=Names.workflows),
         schema_inference=True,
-    )
-
-
-def orders(http: HTTPSession, with_history: bool) -> Resource:
-    return crm_object_with_associations(
-        Order,
-        Names.orders,
-        Names.orders,
-        http,
-        with_history,
-        fetch_recent_orders,
-        fetch_delayed_orders,
     )
 
 
