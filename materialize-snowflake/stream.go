@@ -35,12 +35,12 @@ func Logger(ctx context.Context) log.FieldLogger {
 	return log.StandardLogger()
 }
 
-// channelName produces a reasonably readable channel name that is globally
+// newChannelName produces a reasonably readable channel name that is globally
 // unique per materialization and shard. Channels are specific to a table, so
 // there is no need to include the database or schema in the name, and they can
 // be at least 1000 characters long. It's important for the channel name to
 // never change to maintain data consistency.
-func channelName(materialization string, keyBegin uint32) string {
+func newChannelName(materialization string, keyBegin uint32) string {
 	return sanitizeAndAppendHash(materialization) + "_" + fmt.Sprintf("%08x", keyBegin)
 }
 
@@ -83,7 +83,7 @@ func newStreamManager(cfg *config, materialization string, account string, keyBe
 		c:            c,
 		tableStreams: make(map[int]*tableStream),
 		keyBegin:     keyBegin,
-		channelName:  channelName(materialization, keyBegin),
+		channelName:  newChannelName(materialization, keyBegin),
 		lastBinding:  -1,
 		blobStats:    make(map[int][]*blobStatsTracker),
 		counter:      -1,
@@ -234,10 +234,10 @@ func (sm *streamManager) write(ctx context.Context, blobs []*blobMetadata, decry
 
 	var schema = blobs[0].Chunks[0].Schema
 	var table = blobs[0].Chunks[0].Table
-	var channelName = blobs[0].Chunks[0].Channels[0].Channel
+	var channelName = blobs[0].Chunks[0].Channels[0].ChannelName
 	var thisChannel *channel
 	for _, v := range sm.tableStreams {
-		matches := v.channel.Schema == schema && v.channel.Table == table && v.channel.Channel == channelName
+		matches := v.channel.Schema == schema && v.channel.Table == table && v.channel.ChannelName == channelName
 		if matches && thisChannel != nil {
 			return fmt.Errorf("internal error: found duplicate channel %s in tableStreams", channelName)
 		} else if matches {
@@ -579,7 +579,7 @@ func validWriteBlobs(blobs []*blobMetadata) error {
 
 		if baseToken == "" {
 			baseToken = token
-			channelName = blob.Chunks[0].Channels[0].Channel
+			channelName = blob.Chunks[0].Channels[0].ChannelName
 			schema = blob.Chunks[0].Schema
 			table = blob.Chunks[0].Table
 			database = blob.Chunks[0].Database
@@ -589,8 +589,8 @@ func validWriteBlobs(blobs []*blobMetadata) error {
 
 		if baseToken != token {
 			return fmt.Errorf("expected all blobs to have the same base token %q but got %q", baseToken, token)
-		} else if channelName != blob.Chunks[0].Channels[0].Channel {
-			return fmt.Errorf("expected all blobs to have the same channel %q but got %q", channelName, blob.Chunks[0].Channels[0].Channel)
+		} else if channelName != blob.Chunks[0].Channels[0].ChannelName {
+			return fmt.Errorf("expected all blobs to have the same channel %q but got %q", channelName, blob.Chunks[0].Channels[0].ChannelName)
 		} else if schema != blob.Chunks[0].Schema {
 			return fmt.Errorf("expected all blobs to have the same schema %q but got %q", schema, blob.Chunks[0].Schema)
 		} else if table != blob.Chunks[0].Table {

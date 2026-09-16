@@ -120,7 +120,7 @@ func TestStreamingMemoryClimbRepro(t *testing.T) {
 
 	// Transaction commit: blob metadata is generated and the trackers are
 	// released, as streamManager.flush does.
-	ch := &channel{Database: "DB", Schema: "S", Table: "T", Channel: "C"}
+	ch := &channel{Database: "DB", Schema: "S", Table: "T", ChannelName: "C"}
 	for i, tr := range trackers {
 		_ = generateBlobMetadata(tr, ch, blobToken("basetoken", i))
 	}
