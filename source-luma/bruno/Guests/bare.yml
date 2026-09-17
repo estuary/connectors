@@ -1,0 +1,33 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/events/guests/list?event_id={{event_id}}"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://docs.luma.com/reference/get_v1-events-guests-list
+  
+  **WHY:** backs the `guests` stream; confirms the envelope and the per-guest
+  field set for one event pinned from `Events / bare`.
+  
+  **LIMITATION (VERIFIED 2026-09-17):** guest objects do **not** carry the
+  `event_id` they belong to — it exists only in the request. The connector
+  stamps `event_id` onto each document while parsing (`Guest` model in
+  `source_luma/models.py`) so guests of different events remain distinguishable.
+  
+  **VERIFIED (2026-09-17):** `200`, `{entries, has_more, next_cursor}`
+  envelope. Guests carry `id` (`gst-` prefix), `user_id`, `user_email`,
+  `approval_status`, `registered_at`, `invited_at`, `joined_at`,
+  `registration_answers[]`, `event_tickets[{id, checked_in_at, ...}]`. No
+  `updated_at`; check-ins mutate `event_tickets[].checked_in_at` in place, so
+  the stream must re-list to observe them.

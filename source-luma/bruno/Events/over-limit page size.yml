@@ -1,0 +1,28 @@
+info:
+  name: over-limit page size
+  type: http
+  seq: 5
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/calendars/events/list?pagination_limit=1001"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://docs.luma.com/reference/get_v1-calendars-events-list
+  
+  **WHY:** the docs say only "The server will enforce a maximum number" for
+  `pagination_limit`, without naming it. This probe learns the enforcement mode
+  for an absurd value so the connector knows whether it must clamp.
+  
+  **VERIFIED (2026-09-17):** `200` — the over-limit value is silently accepted
+  and all 12 events return with `has_more: false`. **UNOBSERVABLE:** the actual
+  ceiling and whether it clamps or truncates; the calendar has fewer events than
+  any plausible cap. The connector requests a modest `pagination_limit` and
+  always follows `has_more`, so a clamp costs extra requests, never data.
