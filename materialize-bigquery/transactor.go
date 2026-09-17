@@ -200,7 +200,7 @@ func prepareNewTransactor(
 				return nil, fmt.Errorf("could not get metadata for table %s: verify that the table exists and that the connector service account user is authorized for it", binding.Identifier)
 			}
 
-			schema := res.Meta.(bigquery.Schema)
+			schema := res.Meta.(*bigquery.TableMetadata).Schema
 
 			log.WithFields(log.Fields{
 				"table":      binding.Path,

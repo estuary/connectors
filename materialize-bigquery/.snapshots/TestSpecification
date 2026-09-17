@@ -293,6 +293,13 @@
         "default": false,
         "nonsensitive": true,
         "x-delta-updates": true
+      },
+      "partition_by": {
+        "type": "string",
+        "title": "Partition By",
+        "description": "Optional expression to use as the table's PARTITION BY clause, for example DATE(created_at), TIMESTAMP_TRUNC(updated_at, MONTH), _PARTITIONDATE or RANGE_BUCKET(id, GENERATE_ARRAY(0, 1000, 10)). Columns must be referenced by their BigQuery column names. Leave blank for an unpartitioned table. Changing this value requires backfilling the binding, which drops and re-creates the table.",
+        "advanced": true,
+        "nonsensitive": true
       }
     },
     "type": "object",

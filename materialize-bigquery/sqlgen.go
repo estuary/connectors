@@ -230,6 +230,8 @@ flow_temp_table_{{ $.Binding }}
 
 -- Templated creation of a materialized table definition and comments.
 -- Note: BigQuery only allows a maximum of 4 columns for clustering.
+-- The PARTITION BY expression comes verbatim from the binding's partition_by
+-- resource config, and is omitted when that is empty.
 
 {{ define "createTargetTable" -}}
 CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
@@ -238,6 +240,9 @@ CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
 		{{$col.Identifier}} {{$col.DDL}}
 	{{- end }}
 )
+{{ with PartitionExpr $.ResourceConfigJson -}}
+PARTITION BY {{ . }}
+{{ end -}}
 CLUSTER BY {{ range $ind, $key := $.Keys }}
 	{{- if lt $ind 4 -}}
 		{{- if $ind }}, {{end -}}
@@ -447,7 +452,7 @@ UPDATE {{ Identifier $.TablePath }}
 	AND key_end={{ $.KeyEnd }}
 	AND fence={{ $.Fence }};
 {{ end }}
-`)
+`, template.FuncMap{"PartitionExpr": partitionExpr})
 
 	return templates{
 		tempTableName:           tplAll.Lookup("tempTableName"),

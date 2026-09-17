@@ -1,5 +1,22 @@
 # materialize-bigquery
 
+## 2026-09-17
+
+### Added
+- New optional `partition_by` field on each table's resource configuration sets
+  the table's
+  [partitioning](https://cloud.google.com/bigquery/docs/partitioned-tables), for
+  example `DATE(created_at)`, `TIMESTAMP_TRUNC(updated_at, MONTH)`,
+  `_PARTITIONDATE` or `RANGE_BUCKET(id, GENERATE_ARRAY(0, 1000, 10))`. The
+  expression is verified against BigQuery when the materialization is published,
+  and is applied every time the connector creates the table, so partitioning now
+  survives backfills that drop and re-create it. Because BigQuery only accepts
+  partitioning at table creation, changing `partition_by` on an existing table
+  requires backfilling the binding, which drops and re-creates the table. An
+  existing table whose partitioning does not match `partition_by` is rejected at
+  publish, and a partitioned table with no `partition_by` set logs a warning
+  suggesting the expression to record.
+
 ## 2026-09-14
 
 ### Fixed
