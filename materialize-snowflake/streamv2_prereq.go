@@ -16,8 +16,7 @@ import (
 
 // runtimePrereqDriver rejects the RPCs that carry a materialization spec when the spec
 // asks for a write path the task's runtime cannot support, then delegates to the
-// wrapped driver. Validate, which carries no spec of the task being published,
-// warns instead.
+// wrapped driver.
 //
 // The runtime prerequisite check lives here rather than in a Materializer method
 // because the runtime is a property of the task, and Apply and Open are the only
@@ -37,18 +36,6 @@ var _ boilerplate.Connector = runtimePrereqDriver{}
 // materialize-sql take the concrete driver.
 func NewRuntimePrereqDriver() boilerplate.Connector {
 	return runtimePrereqDriver{NewDriver()}
-}
-
-// Validate warns while the operator is still making the change, which is the most
-// a publication can do about the runtime: see missingRuntimeV2Warning for what the
-// request does and does not carry. The warning is logged rather than returned
-// because it cannot be told apart from a publish which is correct.
-func (d runtimePrereqDriver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
-	if warning := missingRuntimeV2Warning(req.ConfigJson, req.LastMaterialization); warning != "" {
-		log.Warn(warning)
-	}
-
-	return d.Driver.Validate(ctx, req)
 }
 
 // Apply rejects ahead of the first session of a new specification, so a task
@@ -78,37 +65,6 @@ func (d runtimePrereqDriver) NewTransactor(ctx context.Context, req pm.Request_O
 	}
 
 	return d.Driver.NewTransactor(ctx, req, be)
-}
-
-// missingRuntimeV2Warning reports what to tell an operator who is publishing the
-// snowpipe_streaming_v2 write path onto a task which has not been running the v2
-// runtime, and "" where there is nothing to tell them.
-//
-// Publication invokes Validate, whose request carries the endpoint configuration
-// and the last published spec but no shard template of its own: the runtime the
-// task is *about* to run under is not in it, and neither is anything else which
-// implies it. So the only shard template a publish can be read against is the
-// last one, which says what the task has been running rather than what it will
-// run — enough to recognise a task being moved onto this write path, and not
-// enough to reject one. A publish which adds the runtime flag and the feature
-// flag together is indistinguishable here from one which forgets the runtime
-// flag, and rejecting would break the first.
-func missingRuntimeV2Warning(configJson json.RawMessage, last *pf.MaterializationSpec) string {
-	var cfg config
-	if err := json.Unmarshal(configJson, &cfg); err != nil {
-		return ""
-	}
-
-	if !boilerplate.ParseFlags(cfg)[flagSnowpipeStreamingV2] {
-		return ""
-	} else if last == nil || boilerplate.IsMaterializationSpecRuntimeV2(last) {
-		return ""
-	}
-
-	return fmt.Sprintf(
-		"this task's last published specification did not run the v2 materialization runtime, which the %q feature flag requires: unless this publication also adds %q to the task's shards.flags, the task will be rejected at startup",
-		flagSnowpipeStreamingV2, boilerplate.RuntimeV2FlagName,
-	)
 }
 
 // rejectOrphanedStreamV2Bindings rejects a publication which moves a binding
