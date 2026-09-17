@@ -242,10 +242,9 @@ func (c tableConfig) Parameters() ([]string, bool, error) {
 	return []string{c.projectID, c.Dataset, c.Table}, c.Delta, nil
 }
 
-// driver wraps the generic SQL driver to customize Validate and Apply: a
-// changed partition_by requires re-creating the table, partition expressions
-// are verified with a dry-run CREATE TABLE, and existing tables are checked
-// against the configured partitioning. See partition_by.go.
+// driver wraps the generic SQL driver to customize Validate: a changed
+// partition_by requires re-creating the table, and partition expressions are
+// verified with a dry-run CREATE TABLE. See partition_by.go.
 type driver struct {
 	sqlDriver *sql.Driver[config, tableConfig]
 }

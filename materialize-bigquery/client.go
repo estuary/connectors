@@ -80,10 +80,8 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 				mu.Lock()
 				defer mu.Unlock()
 
-				// The full metadata is retained so Apply can inspect the
-				// table's partitioning, not just its columns.
 				res := is.PushResource(table.DatasetID, table.TableID)
-				res.Meta = md
+				res.Meta = md.Schema
 				for _, f := range md.Schema {
 					res.PushField(boilerplate.ExistingField{
 						Name:               f.Name,

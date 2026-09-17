@@ -12,10 +12,7 @@
   and is applied every time the connector creates the table, so partitioning now
   survives backfills that drop and re-create it. Because BigQuery only accepts
   partitioning at table creation, changing `partition_by` on an existing table
-  requires backfilling the binding, which drops and re-creates the table. An
-  existing table whose partitioning does not match `partition_by` is rejected at
-  publish, and a partitioned table with no `partition_by` set logs a warning
-  suggesting the expression to record.
+  requires backfilling the binding, which drops and re-creates the table.
 
 ## 2026-09-14
 

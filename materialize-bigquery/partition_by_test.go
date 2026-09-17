@@ -3,16 +3,13 @@ package connector
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"os"
-	"strings"
 	"testing"
 
 	"cloud.google.com/go/bigquery"
 	testutil "github.com/estuary/connectors/materialize-boilerplate/testutil"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
-	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/require"
 )
 
@@ -250,16 +247,6 @@ func TestApplyPartitionBy(t *testing.T) {
 			md = tableMetadata(t, bq, cfg, tableName)
 			require.Equal(t, created, md.CreationTime, "an unchanged expression must keep the existing table")
 			require.Equal(t, bigquery.MonthPartitioningType, md.TimePartitioning.Type)
-
-			// A truncating backfill against a table whose partitioning has
-			// drifted from the unchanged expression cannot be fixed by
-			// another backfill, so the remedy names the feature flag that
-			// forces a drop instead.
-			var driftedLast = specWithPartitionBy(t, cfg, tableName, "DATE(flow_published_at)", 2)
-			var driftedNext = specWithPartitionBy(t, cfg, tableName, "DATE(flow_published_at)", 3)
-			_, err = NewDriver().Apply(ctx, applyReq(driftedNext, driftedLast))
-			require.ErrorContains(t, err, `is partitioned by "TIMESTAMP_TRUNC(flow_published_at, MONTH)"`)
-			require.ErrorContains(t, err, "always_drop_tables_on_backfill")
 		})
 
 		t.Run("delta-updates binding is created partitioned", func(t *testing.T) {
@@ -274,81 +261,5 @@ func TestApplyPartitionBy(t *testing.T) {
 			require.NotNil(t, md.TimePartitioning)
 			require.Equal(t, "flow_published_at", md.TimePartitioning.Field)
 		})
-
-		t.Run("existing table is checked against the configured expression", func(t *testing.T) {
-			var tableName = "partition_by_test_existing"
-			bqTestClient(t, cfg, tableName)
-
-			// Adopting a pre-created table: the binding is new to the
-			// materialization but its table already exists.
-			_, err := NewDriver().Apply(ctx, applyReq(specWithPartitionBy(t, cfg, tableName, "DATE(flow_published_at)", 0), nil))
-			require.NoError(t, err)
-
-			t.Run("matching expression", func(t *testing.T) {
-				_, err := NewDriver().Apply(ctx, applyReq(specWithPartitionBy(t, cfg, tableName, " date( flow_published_at ) ", 0), nil))
-				require.NoError(t, err)
-			})
-
-			t.Run("different expression", func(t *testing.T) {
-				_, err := NewDriver().Apply(ctx, applyReq(specWithPartitionBy(t, cfg, tableName, "TIMESTAMP_TRUNC(flow_published_at, MONTH)", 0), nil))
-				require.ErrorContains(t, err, `is partitioned by "DATE(flow_published_at)"`)
-				require.ErrorContains(t, err, `'partition_by' is "TIMESTAMP_TRUNC(flow_published_at, MONTH)"`)
-				require.ErrorContains(t, err, "Backfill the binding")
-			})
-
-			t.Run("partitioned table without partition_by warns", func(t *testing.T) {
-				var hook = logtest.NewGlobal()
-				defer hook.Reset()
-				_, err := NewDriver().Apply(ctx, applyReq(specWithPartitionBy(t, cfg, tableName, "", 0), nil))
-				require.NoError(t, err)
-
-				var warned bool
-				for _, e := range hook.AllEntries() {
-					if strings.Contains(e.Message, "partition_by") && e.Data["field"] == "flow_published_at" {
-						warned = true
-					}
-				}
-				require.True(t, warned, "expected a warning naming the partitioning field")
-			})
-		})
-
-		t.Run("unpartitioned table with partition_by is rejected", func(t *testing.T) {
-			var tableName = "partition_by_test_unpartitioned"
-			bqTestClient(t, cfg, tableName)
-
-			_, err := NewDriver().Apply(ctx, applyReq(specWithPartitionBy(t, cfg, tableName, "", 0), nil))
-			require.NoError(t, err)
-
-			_, err = NewDriver().Apply(ctx, applyReq(specWithPartitionBy(t, cfg, tableName, "DATE(flow_published_at)", 0), nil))
-			require.ErrorContains(t, err, "is not partitioned")
-			require.ErrorContains(t, err, "Backfill the binding")
-		})
-
-		// BigQuery reports each of these canonically in INFORMATION_SCHEMA
-		// DDL; a re-Apply of the same expression must compare equal to it.
-		for _, expr := range []string{
-			"_PARTITIONDATE",
-			"DATE(_PARTITIONTIME)",
-			"RANGE_BUCKET(requiredInteger, GENERATE_ARRAY(0, 1000, 10))",
-			"DATETIME_TRUNC(DATETIME(flow_published_at), DAY)",
-		} {
-			t.Run(fmt.Sprintf("round-trips %s", expr), func(t *testing.T) {
-				var tableName = "partition_by_test_roundtrip"
-				bqTestClient(t, cfg, tableName)
-
-				_, err := NewDriver().Apply(ctx, applyReq(specWithPartitionBy(t, cfg, tableName, expr, 0), nil))
-				if strings.HasPrefix(expr, "DATETIME_TRUNC") {
-					// Not a valid BigQuery partitioning expression: only a
-					// bare column or one of the documented functions of a
-					// column is accepted. It is here to pin that BigQuery's
-					// own error reaches the user.
-					require.Error(t, err)
-					return
-				}
-				require.NoError(t, err)
-				_, err = NewDriver().Apply(ctx, applyReq(specWithPartitionBy(t, cfg, tableName, expr, 0), nil))
-				require.NoError(t, err)
-			})
-		}
 	})
 }
