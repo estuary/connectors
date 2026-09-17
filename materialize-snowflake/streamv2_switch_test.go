@@ -375,7 +375,7 @@ func TestStreamV2SwitchIsRejectedAtPublication(t *testing.T) {
 	t.Run("the downgrade must keep the v2 runtime", func(t *testing.T) {
 		var spec = specOfRuntime(t, "snowpipe_streaming", true, false)
 
-		var err = requireStreamingV2RuntimeForState(spec, state)
+		var err = requireStreamingV2Runtime(spec, state)
 		require.ErrorContains(t, err, boilerplate.RuntimeV2FlagName)
 		require.ErrorContains(t, err, channel)
 
@@ -390,7 +390,7 @@ func TestStreamV2SwitchIsRejectedAtPublication(t *testing.T) {
 		}})
 		require.NoError(t, err)
 
-		require.NoError(t, requireStreamingV2RuntimeForState(specOfRuntime(t, "snowpipe_streaming", true, false), dropped))
+		require.NoError(t, requireStreamingV2Runtime(specOfRuntime(t, "snowpipe_streaming", true, false), dropped))
 	})
 
 	t.Run("the downgrade to standard updates is still rejected", func(t *testing.T) {

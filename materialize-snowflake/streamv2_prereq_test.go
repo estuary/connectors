@@ -172,7 +172,7 @@ func TestValidateStreamingV2Auth(t *testing.T) {
 		// the runtime it implies.
 		var spec = testStreamingSpec(t, "snowpipe_streaming_v2", false)
 		spec.ConfigJson = configJson
-		err = requireStreamingV2Runtime(spec)
+		err = requireStreamingV2Runtime(spec, nil)
 		require.ErrorContains(t, err, "key-pair")
 		require.NotContains(t, err.Error(), boilerplate.RuntimeV2FlagName)
 	})
@@ -180,7 +180,7 @@ func TestValidateStreamingV2Auth(t *testing.T) {
 	t.Run("a configuration carrying no credentials at all is rejected rather than panicking", func(t *testing.T) {
 		var spec = testStreamingSpec(t, "snowpipe_streaming_v2", true)
 		spec.ConfigJson = json.RawMessage(`{"host":"h.snowflakecomputing.com","advanced":{"feature_flags":"snowpipe_streaming_v2"}}`)
-		require.ErrorContains(t, requireStreamingV2Runtime(spec), "key-pair")
+		require.ErrorContains(t, requireStreamingV2Runtime(spec, nil), "key-pair")
 	})
 }
 
@@ -203,33 +203,33 @@ func testStreamingSpec(t *testing.T, featureFlags string, runtimeV2 bool) *pf.Ma
 
 func TestRequireStreamingV2Runtime(t *testing.T) {
 	t.Run("v2 write path on the v2 runtime is allowed", func(t *testing.T) {
-		require.NoError(t, requireStreamingV2Runtime(testStreamingSpec(t, "snowpipe_streaming_v2", true)))
+		require.NoError(t, requireStreamingV2Runtime(testStreamingSpec(t, "snowpipe_streaming_v2", true), nil))
 	})
 
 	t.Run("v2 write path without the v2 runtime is rejected", func(t *testing.T) {
-		var err = requireStreamingV2Runtime(testStreamingSpec(t, "snowpipe_streaming_v2", false))
+		var err = requireStreamingV2Runtime(testStreamingSpec(t, "snowpipe_streaming_v2", false), nil)
 		require.ErrorContains(t, err, "snowpipe_streaming_v2")
 		// The operator's remedy is the shard flag, so the message must name it.
 		require.ErrorContains(t, err, boilerplate.RuntimeV2FlagName)
 	})
 
 	t.Run("v2 write path disabled is allowed off the v2 runtime", func(t *testing.T) {
-		require.NoError(t, requireStreamingV2Runtime(testStreamingSpec(t, "", false)))
-		require.NoError(t, requireStreamingV2Runtime(testStreamingSpec(t, "no_snowpipe_streaming_v2", false)))
+		require.NoError(t, requireStreamingV2Runtime(testStreamingSpec(t, "", false), nil))
+		require.NoError(t, requireStreamingV2Runtime(testStreamingSpec(t, "no_snowpipe_streaming_v2", false), nil))
 	})
 
 	t.Run("v2 write path disabled is allowed on the v2 runtime", func(t *testing.T) {
-		require.NoError(t, requireStreamingV2Runtime(testStreamingSpec(t, "", true)))
+		require.NoError(t, requireStreamingV2Runtime(testStreamingSpec(t, "", true), nil))
 	})
 
 	t.Run("a nil shard template is rejected", func(t *testing.T) {
 		var spec = testStreamingSpec(t, "snowpipe_streaming_v2", false)
 		spec.ShardTemplate = nil
-		require.ErrorContains(t, requireStreamingV2Runtime(spec), boilerplate.RuntimeV2FlagName)
+		require.ErrorContains(t, requireStreamingV2Runtime(spec, nil), boilerplate.RuntimeV2FlagName)
 	})
 
 	t.Run("conflicting flags are reported ahead of the runtime mismatch", func(t *testing.T) {
-		var err = requireStreamingV2Runtime(testStreamingSpec(t, "snowpipe_streaming,snowpipe_streaming_v2", false))
+		var err = requireStreamingV2Runtime(testStreamingSpec(t, "snowpipe_streaming,snowpipe_streaming_v2", false), nil)
 		require.ErrorContains(t, err, "cannot both be enabled")
 		require.NotContains(t, err.Error(), boilerplate.RuntimeV2FlagName)
 	})
@@ -237,11 +237,11 @@ func TestRequireStreamingV2Runtime(t *testing.T) {
 	t.Run("an unparseable endpoint config is surfaced", func(t *testing.T) {
 		var spec = testStreamingSpec(t, "", false)
 		spec.ConfigJson = json.RawMessage(`{"host":`)
-		require.ErrorContains(t, requireStreamingV2Runtime(spec), "parsing endpoint config")
+		require.ErrorContains(t, requireStreamingV2Runtime(spec, nil), "parsing endpoint config")
 	})
 
 	t.Run("a missing spec is an error rather than a panic", func(t *testing.T) {
-		require.ErrorContains(t, requireStreamingV2Runtime(nil), "no materialization spec")
+		require.ErrorContains(t, requireStreamingV2Runtime(nil, nil), "no materialization spec")
 	})
 }
 
@@ -261,7 +261,7 @@ func TestRuntimePrereqDriverRejections(t *testing.T) {
 	})
 }
 
-func TestRequireStreamingV2RuntimeForState(t *testing.T) {
+func TestRequireStreamingV2RuntimeWithState(t *testing.T) {
 	const stateKey, channel = "sk.v1", "chan-1"
 
 	var specOf = func(t *testing.T, runtimeV2 bool) *pf.MaterializationSpec {
@@ -277,32 +277,28 @@ func TestRequireStreamingV2RuntimeForState(t *testing.T) {
 		return out
 	}
 
-	t.Run("a nil spec is allowed", func(t *testing.T) {
-		require.NoError(t, requireStreamingV2RuntimeForState(nil, stateWith(t, nil)))
-	})
-
 	t.Run("no state carried is allowed", func(t *testing.T) {
-		require.NoError(t, requireStreamingV2RuntimeForState(specOf(t, false), nil))
+		require.NoError(t, requireStreamingV2Runtime(specOf(t, false), nil))
 	})
 
 	t.Run("the v2 runtime is already running is allowed", func(t *testing.T) {
 		var sv2Checkpoint = streamV2Checkpoint{fullKeyRange: {ChannelName: channel, Routed: 3}}
-		require.NoError(t, requireStreamingV2RuntimeForState(specOf(t, true), stateWith(t, sv2Checkpoint)))
+		require.NoError(t, requireStreamingV2Runtime(specOf(t, true), stateWith(t, sv2Checkpoint)))
 	})
 
 	t.Run("nil items name nothing to drop", func(t *testing.T) {
 		var sv2Checkpoint = streamV2Checkpoint{fullKeyRange: nil}
-		require.NoError(t, requireStreamingV2RuntimeForState(specOf(t, false), stateWith(t, sv2Checkpoint)))
+		require.NoError(t, requireStreamingV2Runtime(specOf(t, false), stateWith(t, sv2Checkpoint)))
 	})
 
 	t.Run("an item off the v2 runtime is rejected", func(t *testing.T) {
 		var sv2Checkpoint = streamV2Checkpoint{fullKeyRange: {ChannelName: channel, Routed: 3}}
-		var err = requireStreamingV2RuntimeForState(specOf(t, false), stateWith(t, sv2Checkpoint))
+		var err = requireStreamingV2Runtime(specOf(t, false), stateWith(t, sv2Checkpoint))
 		require.ErrorContains(t, err, boilerplate.RuntimeV2FlagName)
 		require.ErrorContains(t, err, channel)
 	})
 
 	t.Run("an unreadable state document is tolerated", func(t *testing.T) {
-		require.NoError(t, requireStreamingV2RuntimeForState(specOf(t, false), json.RawMessage(`not json`)))
+		require.NoError(t, requireStreamingV2Runtime(specOf(t, false), json.RawMessage(`not json`)))
 	})
 }
