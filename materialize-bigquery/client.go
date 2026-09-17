@@ -80,8 +80,10 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 				mu.Lock()
 				defer mu.Unlock()
 
+				// The full metadata is retained so Apply can inspect the
+				// table's partitioning, not just its columns.
 				res := is.PushResource(table.DatasetID, table.TableID)
-				res.Meta = md.Schema
+				res.Meta = md
 				for _, f := range md.Schema {
 					res.PushField(boilerplate.ExistingField{
 						Name:               f.Name,
@@ -275,8 +277,22 @@ func (c *client) InstallFence(ctx context.Context, _ sql.Table, fence sql.Fence)
 
 }
 
-func (c *client) MustRecreateResource(req *pm.Request_Apply, lastBinding, newBinding *pf.MaterializationSpec_Binding) (bool, error) {
-	return false, nil
+// MustRecreateResource reports a changed partition_by, which can only be
+// applied by dropping and re-creating the table: BigQuery never accepts
+// PARTITION BY via ALTER, and TRUNCATE preserves the partitioning.
+func (c *client) MustRecreateResource(_ *pm.Request_Apply, lastBinding, newBinding *pf.MaterializationSpec_Binding) (bool, error) {
+	if lastBinding == nil || newBinding == nil {
+		return false, nil
+	}
+	lastExpr, err := partitionExpr(lastBinding.ResourceConfigJson)
+	if err != nil {
+		return false, fmt.Errorf("parsing last binding resource config: %w", err)
+	}
+	newExpr, err := partitionExpr(newBinding.ResourceConfigJson)
+	if err != nil {
+		return false, fmt.Errorf("parsing new binding resource config: %w", err)
+	}
+	return lastExpr != newExpr, nil
 }
 
 func (c *client) ListCheckpointsEntries(ctx context.Context) ([]string, error) {
