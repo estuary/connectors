@@ -1,0 +1,19 @@
+# ================================
+# Collection "acmeCo/test/test/activatestreamsbeforecatchup_enabled_89725316": 11 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ActivateStreamsBeforeCatchup_Enabled_89725316","cursor":"backfill:0"}},"data":"one","id":1}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ActivateStreamsBeforeCatchup_Enabled_89725316","cursor":"backfill:1"}},"data":"two","id":2}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ActivateStreamsBeforeCatchup_Enabled_89725316","cursor":"backfill:2"}},"data":"three","id":3}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ActivateStreamsBeforeCatchup_Enabled_89725316","cursor":"backfill:3"}},"data":"four","id":4}
+{"_meta":{"op":"u","source":{"ts_ms":1111111111111,"schema":"test","table":"ActivateStreamsBeforeCatchup_Enabled_89725316","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"},"before":{"data":"one","id":1}},"data":"one-updated","id":1}
+{"_meta":{"op":"u","source":{"ts_ms":1111111111111,"schema":"test","table":"ActivateStreamsBeforeCatchup_Enabled_89725316","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"},"before":{"data":"three","id":3}},"data":"three-updated","id":3}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"ActivateStreamsBeforeCatchup_Enabled_89725316","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"five","id":5}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"ActivateStreamsBeforeCatchup_Enabled_89725316","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"six","id":6}
+{"_meta":{"op":"d","source":{"ts_ms":1111111111111,"schema":"test","table":"ActivateStreamsBeforeCatchup_Enabled_89725316","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"four","id":4}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ActivateStreamsBeforeCatchup_Enabled_89725316","cursor":"backfill:0"}},"data":"one-updated","id":1}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ActivateStreamsBeforeCatchup_Enabled_89725316","cursor":"backfill:1"}},"data":"two","id":2}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FActivateStreamsBeforeCatchup_Enabled_89725316":{"backfilled":0,"mode":"Ignore"},"test%2FActivateStreamsBeforeCatchup_Enabled_89725316.v1":{"backfilled":2,"key_columns":["id"],"metadata":{"charset":"utf8mb4","schema":{"columns":["id","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"id":{"type":"int"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+

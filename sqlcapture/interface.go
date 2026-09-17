@@ -304,6 +304,9 @@ type Database interface {
 	ShouldBackfill(streamID StreamID) bool
 	// HistoryMode returns whether history mode (non-associative reduction of events) is enabled
 	HistoryMode() bool
+	// ActivateStreamsBeforeCatchup returns true if pending streams should be activated for
+	// replication before the initial catch-up stream rather than after it.
+	ActivateStreamsBeforeCatchup() bool
 
 	// RediscoveryInterval returns how long the capture should wait between mid-capture
 	// rediscovery passes, or zero to use the default interval. Rediscovery costs a handful of

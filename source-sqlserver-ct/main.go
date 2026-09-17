@@ -297,6 +297,10 @@ func (db *sqlserverDatabase) HistoryMode() bool {
 	return db.config.HistoryMode
 }
 
+func (db *sqlserverDatabase) ActivateStreamsBeforeCatchup() bool {
+	return false
+}
+
 func (db *sqlserverDatabase) connect(ctx context.Context) error {
 	log.WithFields(log.Fields{
 		"address": db.config.Address,

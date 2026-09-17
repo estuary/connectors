@@ -342,6 +342,11 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 			return fmt.Errorf("error activating table %q: %w", streamID, err)
 		}
 	}
+	if c.Database.ActivateStreamsBeforeCatchup() {
+		if err := c.activatePendingStreams(ctx); err != nil {
+			return fmt.Errorf("error activating pending streams before catch-up: %w", err)
+		}
+	}
 	if err := c.replStream.StartReplication(ctx, c.lastDiscovery); err != nil {
 		return fmt.Errorf("error starting replication: %w", err)
 	}
@@ -534,12 +539,15 @@ func (c *Capture) reconcileStateWithBindings(_ context.Context) error {
 	// interest when the replication stream jumps ahead, and doing this allows the user an easy
 	// recovery path after WAL deletion, just hit the "Backfill Everything" button in the UI.
 	if allStreamsAreNew {
-		if len(c.Bindings) > 0 {
-			log.Info("all bindings are new, resetting replication cursor")
-		} else {
+		if len(c.Bindings) == 0 {
 			log.Info("capture has no bindings, resetting replication cursor")
+			c.State.Cursor = nil
+		} else if c.Database.ActivateStreamsBeforeCatchup() && len(c.State.Cursor) > 0 {
+			log.Info("all bindings are new, preserving replication cursor for early activation")
+		} else {
+			log.Info("all bindings are new, resetting replication cursor")
+			c.State.Cursor = nil
 		}
-		c.State.Cursor = nil
 	}
 
 	// Seed the backfilling-streams set from the reconciled state. Stream states

@@ -845,3 +845,52 @@ func TestSpatialTypes(t *testing.T) {
 
 	cupaloy.SnapshotT(t, cs.Summary())
 }
+
+// TestActivateStreamsBeforeCatchup re-backfills a binding with a backfill filter after
+// rows outside the filter were modified while the capture was stopped. Without the flag
+// those modifications are lost, since the re-backfilled binding is only activated after
+// the catch-up stream. With it they are replicated.
+func TestActivateStreamsBeforeCatchup(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		uniqueID string
+		flags    string
+	}{
+		{"Disabled", "31804127", ""},
+		{"Enabled", "89725316", "activate_streams_before_catchup"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var tb, ctx = mysqlTestBackend(t), context.Background()
+			var tableName = tb.CreateTable(ctx, t, tc.uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
+			tb.Insert(ctx, t, tableName, [][]any{{1, "one"}, {2, "two"}, {3, "three"}, {4, "four"}})
+
+			var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(tc.uniqueID))
+			cs.EndpointSpec.(*Config).Advanced.FeatureFlags = tc.flags
+			cs.Validator = &st.OrderedCaptureValidator{}
+			sqlcapture.TestShutdownAfterCaughtUp = true
+			t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = false })
+
+			// Initial backfill
+			cs.Capture(ctx, t, nil)
+
+			// Changes to rows both inside and outside the upcoming backfill filter
+			tb.Update(ctx, t, tableName, "id", 1, "data", "one-updated")
+			tb.Update(ctx, t, tableName, "id", 3, "data", "three-updated")
+			tb.Insert(ctx, t, tableName, [][]any{{5, "five"}, {6, "six"}})
+			tb.Delete(ctx, t, tableName, "id", 4)
+
+			// Re-backfill with a filter, which gives the binding a new state key
+			var res sqlcapture.Resource
+			require.NoError(t, json.Unmarshal(cs.Bindings[0].ResourceConfigJson, &res))
+			res.Advanced = &sqlcapture.AdvancedResourceOptions{AdditionalBackfillFilter: "id <= 2"}
+			resJSON, err := json.Marshal(res)
+			require.NoError(t, err)
+			cs.Bindings[0].ResourceConfigJson = resJSON
+			cs.Bindings[0].StateKey += ".v1"
+			cs.Bindings[0].Backfill = 1
+			cs.Capture(ctx, t, nil)
+
+			cupaloy.SnapshotT(t, cs.Summary())
+		})
+	}
+}
