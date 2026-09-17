@@ -1,6 +1,7 @@
 package connector
 
 import (
+	"cmp"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
@@ -10,16 +11,15 @@ import (
 	"math"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	snowflake_auth "github.com/estuary/connectors/go/auth/snowflake"
-	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
-	pm "github.com/estuary/flow/go/protocols/materialize"
 	jsonpatch "github.com/evanphx/json-patch/v5"
 	"github.com/stretchr/testify/require"
 	"resty.dev/v3"
@@ -27,7 +27,7 @@ import (
 
 // TestStreamV2CheckpointDoesNotSurviveAnotherWritePath establishes what moving a
 // binding off the streaming v2 write path costs it, which is the whole reason
-// the move is rejected.
+// the move sweeps the binding's channels.
 //
 // Every other write path treats a state key's checkpoint item as pending work:
 // Acknowledge applies it and then patches the key to null, which takes the whole
@@ -130,11 +130,13 @@ func TestStreamV2ReturningToTheWritePathSkipsNewDocuments(t *testing.T) {
 	require.Equal(t, int64(3), after.bindings[0].activeChannels[0].progress.committed)
 }
 
-// TestStreamV2SwitchOffTheWritePathIsRejected covers the switch itself, which is
-// where it has to be caught: a feature-flag edit is reversible on its face,
-// while what it does to this binding is not.
-func TestStreamV2SwitchOffTheWritePathIsRejected(t *testing.T) {
+// TestStreamV2LeavingTheWritePathSweepsItsChannels covers the switch itself, which
+// is where the channels have to go: a binding that leaves this write path with its
+// channels standing is the binding the two tests above describe.
+func TestStreamV2LeavingTheWritePathSweepsItsChannels(t *testing.T) {
 	var ctx = context.Background()
+	const task = "test/switch"
+	singleChannelLayout(t)
 
 	var target = func(stateKey string, delta bool) sql.Table {
 		return sql.Table{
@@ -144,6 +146,26 @@ func TestStreamV2SwitchOffTheWritePathIsRejected(t *testing.T) {
 			Values:     []sql.Column{{Identifier: `VAL`}},
 			StateKey:   stateKey,
 		}
+	}
+
+	// seed runs one streaming v2 session of a binding through the fake sidecar,
+	// whose state file then holds the committed channel the way Snowflake would,
+	// and returns the checkpoint that session flushed.
+	var seed = func(t *testing.T, stateKey string) (streamV2Checkpoint, string) {
+		t.Helper()
+		var m = newStreamV2Manager(ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, task, "acct",
+			&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
+		m.argv = fakeSidecarArgv(t)
+		m.addBinding("DB", "SCH", "TBL", target(stateKey, true), nil)
+		for i := range 3 {
+			require.NoError(t, testWriteRow(ctx, m, 0, []any{"k", i}))
+		}
+		entries, err := m.flush(ctx)
+		require.NoError(t, err)
+		var channel = m.bindings[0].activeChannels[0].channelName
+		m.stop()
+		require.Contains(t, fakeCommittedTokens(t, os.Getenv("FAKE_SIDECAR_STATE")), channel)
+		return entries[0], channel
 	}
 
 	var newTransactor = func(t *testing.T, stateKey string, prior streamV2Checkpoint) *transactor {
@@ -158,261 +180,140 @@ func TestStreamV2SwitchOffTheWritePathIsRejected(t *testing.T) {
 			_range:              &pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32},
 			version:             "v1",
 			cp:                  checkpoint{stateKey: &checkpointItem{StreamV2: prior}},
-			snowpipeStreamingV2: newStreamV2Manager(ctx, &cfg, "test/switch", "acct", &pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32}),
+			snowpipeStreamingV2: newStreamV2Manager(ctx, &cfg, task, "acct", &pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32}),
 		}
-		// The downgrade drops this shard's streaming v2 channels through the sidecar.
 		d.snowpipeStreamingV2.argv = fakeSidecarArgv(t)
+		d.snowpipeStreamingV2.listChannels = fakeListChannels
 		t.Cleanup(d.snowpipeStreamingV2.stop)
 		return d
 	}
 
-	// checkpointFor wraps a single-channel item as the checkpoint of a binding on an
-	// unsplit task, keyed the way the driver checkpoint keys it.
-	var checkpointFor = func(sv2ChannelCheckpointItem *streamV2ChannelCheckpointItem) streamV2Checkpoint {
-		return streamV2Checkpoint{fullKeyRange: sv2ChannelCheckpointItem}
+	// openChannelServer answers every "POST /channels/open" the way status tells
+	// it to, and every other route with a bare success — enough for the stream
+	// manager's addBinding to reach a verdict.
+	var openChannelServer = func(t *testing.T, status int) *streamManager {
+		t.Helper()
+		var mux = http.NewServeMux()
+		mux.HandleFunc("POST /v1/streaming/channels/open", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprintf(w, `{"message":"Success","status_code":%d,"table_columns":[]}`, status)
+		})
+		var ts = httptest.NewServer(mux)
+		t.Cleanup(ts.Close)
+
+		pkey, err := rsa.GenerateKey(rand.Reader, 1024)
+		require.NoError(t, err)
+		var role = "TEST_ROLE"
+
+		return &streamManager{
+			c: &streamClient{
+				r:        resty.New().SetBaseURL(ts.URL + "/v1/streaming").SetDisableWarn(true),
+				key:      pkey,
+				user:     "TEST_USER",
+				database: "TEST_DB",
+				account:  "TEST_ACCOUNT",
+				role:     &role,
+			},
+			tableStreams: map[int]*tableStream{},
+			channelName:  "x",
+			lastBinding:  -1,
+			blobStats:    map[int][]*blobStatsTracker{},
+			counter:      -1,
+		}
+	}
+
+	var lastBinding = func(d *transactor) *binding {
+		return d.bindings[len(d.bindings)-1]
 	}
 
 	t.Run("a binding which has never streamed v2 is added as usual", func(t *testing.T) {
+		t.Setenv("FAKE_SIDECAR_STATE", filepath.Join(t.TempDir(), "channels.json"))
 		var d = newTransactor(t, "fresh.v1", nil)
-		require.NoError(t, d.addBinding(ctx, target("fresh.v1", false), false))
+		require.NoError(t, d.addBinding(ctx, target("fresh.v1", false), *d.cp["fresh.v1"]))
 	})
 
-	t.Run("turning the feature flag off is rejected", func(t *testing.T) {
-		const stateKey = "flag.v1"
-		var d = newTransactor(t, stateKey, checkpointFor(&streamV2ChannelCheckpointItem{
-			ChannelName: "task_00000000_flag_v1", Routed: 3,
-		}))
-
-		var err = d.addBinding(ctx, target(stateKey, true), false)
-		require.ErrorContains(t, err, "snowpipe_streaming_v2")
-		require.ErrorContains(t, err, "task_00000000_flag_v1")
-		require.ErrorContains(t, err, "backfill")
-	})
-
-	t.Run("moving the binding to standard updates is rejected", func(t *testing.T) {
-		const stateKey = "delta.v1"
-		var d = newTransactor(t, stateKey, checkpointFor(&streamV2ChannelCheckpointItem{
-			ChannelName: "task_00000000_delta_v1", Routed: 3,
-		}))
-
+	t.Run("staying on the write path keeps the channel", func(t *testing.T) {
+		t.Setenv("FAKE_SIDECAR_STATE", filepath.Join(t.TempDir(), "channels.json"))
+		const stateKey = "stay.v1"
+		var prior, channel = seed(t, stateKey)
+		var d = newTransactor(t, stateKey, prior)
 		d.cfg.Advanced.FeatureFlags = "snowpipe_streaming_v2"
 
-		require.Error(t, d.addBinding(ctx, target(stateKey, false), false))
+		require.NoError(t, d.addBinding(ctx, target(stateKey, true), *d.cp[stateKey]))
+		require.True(t, lastBinding(d).streamingV2)
+		require.Contains(t, fakeCommittedTokens(t, os.Getenv("FAKE_SIDECAR_STATE")), channel)
 	})
 
-	t.Run("moving the binding to the snowpipe_streaming path", func(t *testing.T) {
-		// openChannelServer answers every "POST /channels/open" the way status
-		// tells it to, and every other route with a bare success — enough for the
-		// stream manager's addBinding to reach a verdict.
-		var openChannelServer = func(t *testing.T, status int) *streamManager {
-			t.Helper()
-			var mux = http.NewServeMux()
-			mux.HandleFunc("POST /v1/streaming/channels/open", func(w http.ResponseWriter, r *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusOK)
-				fmt.Fprintf(w, `{"message":"Success","status_code":%d,"table_columns":[]}`, status)
-			})
-			var ts = httptest.NewServer(mux)
-			t.Cleanup(ts.Close)
+	t.Run("turning the feature flag off downgrades to snowpipe_streaming and sweeps the channel", func(t *testing.T) {
+		t.Setenv("FAKE_SIDECAR_STATE", filepath.Join(t.TempDir(), "channels.json"))
+		const stateKey = "flag.v1"
+		var prior, channel = seed(t, stateKey)
+		var d = newTransactor(t, stateKey, prior)
+		// snowpipe_streaming is enabled by default, so dropping the v2 flag alone
+		// is the downgrade.
+		d.cfg.Advanced.FeatureFlags = ""
+		d.snowpipeStreaming = openChannelServer(t, 0)
 
-			pkey, err := rsa.GenerateKey(rand.Reader, 1024)
-			require.NoError(t, err)
-			var role = "TEST_ROLE"
-
-			return &streamManager{
-				c: &streamClient{
-					r:        resty.New().SetBaseURL(ts.URL + "/v1/streaming").SetDisableWarn(true),
-					key:      pkey,
-					user:     "TEST_USER",
-					database: "TEST_DB",
-					account:  "TEST_ACCOUNT",
-					role:     &role,
-				},
-				tableStreams: map[int]*tableStream{},
-				channelName:  "x",
-				lastBinding:  -1,
-				blobStats:    map[int][]*blobStatsTracker{},
-				counter:      -1,
-			}
-		}
-
-		t.Run("without naming snowpipe_streaming is rejected", func(t *testing.T) {
-			const stateKey = "streaming.v1"
-			var d = newTransactor(t, stateKey, checkpointFor(&streamV2ChannelCheckpointItem{
-				ChannelName: "task_00000000_streaming_v1", Routed: 3,
-			}))
-			d.cfg.Advanced.FeatureFlags = ""
-
-			// The v1 streaming path would open a channel of its own against the
-			// same table, so the rejection must come before the stream manager is
-			// reached — this transactor has none.
-			var err = d.addBinding(ctx, target(stateKey, true), true)
-			require.Error(t, err)
-			require.ErrorContains(t, err, "backfill")
-		})
-
-		t.Run("by naming snowpipe_streaming is allowed as the downgrade", func(t *testing.T) {
-			const stateKey = "downgrade.v1"
-			var d = newTransactor(t, stateKey, checkpointFor(&streamV2ChannelCheckpointItem{
-				ChannelName: "task_00000000_downgrade_v1", Routed: 3,
-			}))
-			d.cfg.Advanced.FeatureFlags = "snowpipe_streaming"
-			d.snowpipeStreaming = openChannelServer(t, 0)
-
-			// The binding leaves for the snowpipe_streaming path. With no listing
-			// here, the sweep drops nothing.
-			require.NoError(t, d.addBinding(ctx, target(stateKey, true), true))
-			require.True(t, d.bindings[len(d.bindings)-1].streaming)
-		})
-
-		t.Run("the downgrade rejects a table the snowpipe_streaming path cannot open", func(t *testing.T) {
-			const stateKey = "rejected.v1"
-			var d = newTransactor(t, stateKey, checkpointFor(&streamV2ChannelCheckpointItem{
-				ChannelName: "task_00000000_rejected_v1", Routed: 3,
-			}))
-			d.cfg.Advanced.FeatureFlags = "snowpipe_streaming"
-			d.snowpipeStreaming = openChannelServer(t, 6)
-
-			var err = d.addBinding(ctx, target(stateKey, true), true)
-			require.Error(t, err)
-			require.ErrorContains(t, err, "staged files")
-		})
+		require.NoError(t, d.addBinding(ctx, target(stateKey, true), *d.cp[stateKey]))
+		require.True(t, lastBinding(d).streaming)
+		require.NotContains(t, fakeCommittedTokens(t, os.Getenv("FAKE_SIDECAR_STATE")), channel)
 	})
 
-	t.Run("channels the task has already dropped do not hold the binding to the path", func(t *testing.T) {
+	t.Run("a table the snowpipe_streaming path cannot open falls back to staged files after the sweep", func(t *testing.T) {
+		t.Setenv("FAKE_SIDECAR_STATE", filepath.Join(t.TempDir(), "channels.json"))
+		const stateKey = "fallback.v1"
+		var prior, channel = seed(t, stateKey)
+		var d = newTransactor(t, stateKey, prior)
+		d.cfg.Advanced.FeatureFlags = "snowpipe_streaming"
+		d.snowpipeStreaming = openChannelServer(t, 6)
+
+		require.NoError(t, d.addBinding(ctx, target(stateKey, true), *d.cp[stateKey]))
+		require.NotContains(t, fakeCommittedTokens(t, os.Getenv("FAKE_SIDECAR_STATE")), channel)
+	})
+
+	t.Run("moving the binding to standard updates sweeps the channel", func(t *testing.T) {
+		t.Setenv("FAKE_SIDECAR_STATE", filepath.Join(t.TempDir(), "channels.json"))
+		const stateKey = "delta.v1"
+		var prior, channel = seed(t, stateKey)
+		var d = newTransactor(t, stateKey, prior)
+		d.cfg.Advanced.FeatureFlags = "snowpipe_streaming_v2"
+
+		require.NoError(t, d.addBinding(ctx, target(stateKey, false), *d.cp[stateKey]))
+		require.False(t, lastBinding(d).streaming)
+		require.False(t, lastBinding(d).streamingV2)
+		require.NotContains(t, fakeCommittedTokens(t, os.Getenv("FAKE_SIDECAR_STATE")), channel)
+	})
+
+	t.Run("a binding which leaves and returns starts its channel afresh", func(t *testing.T) {
+		t.Setenv("FAKE_SIDECAR_STATE", filepath.Join(t.TempDir(), "channels.json"))
+		const stateKey = "roundtrip.v1"
+		var prior, channel = seed(t, stateKey)
+
+		var away = newTransactor(t, stateKey, prior)
+		away.cfg.Advanced.FeatureFlags = "snowpipe_streaming_v2"
+		require.NoError(t, away.addBinding(ctx, target(stateKey, false), *away.cp[stateKey]))
+
+		// The return derives the same channel name and finds nothing under it, so
+		// the documents it is about to materialize are not skipped: compare
+		// TestStreamV2ReturningToTheWritePathSkipsNewDocuments.
+		var back = newTransactor(t, stateKey, nil)
+		back.cfg.Advanced.FeatureFlags = "snowpipe_streaming_v2"
+		require.NoError(t, back.addBinding(ctx, target(stateKey, true), *back.cp[stateKey]))
+		require.NoError(t, testWriteRow(ctx, back.snowpipeStreamingV2, 0, []any{"k", "new"}))
+		var c = back.snowpipeStreamingV2.bindings[0].activeChannels[0]
+		require.Equal(t, channel, c.channelName)
+		require.Zero(t, c.progress.committed)
+	})
+
+	t.Run("channels the task has already dropped need no sweep", func(t *testing.T) {
+		t.Setenv("FAKE_SIDECAR_STATE", filepath.Join(t.TempDir(), "channels.json"))
 		// A nil item is the deletion of a channel this task dropped, which the
 		// runtime has not yet reduced away. It records nothing.
 		const stateKey = "dropped.v1"
 		var d = newTransactor(t, stateKey, streamV2Checkpoint{streamV2Range{keyBegin: 0x80000000, keyEnd: math.MaxUint32}: nil})
 
-		require.NoError(t, d.addBinding(ctx, target(stateKey, false), false))
-	})
-
-	t.Run("staying on the write path is not rejected", func(t *testing.T) {
-		const stateKey = "stay.v1"
-		var d = newTransactor(t, stateKey, checkpointFor(&streamV2ChannelCheckpointItem{
-			ChannelName: "task_00000000_stay_v1", Routed: 3,
-		}))
-
-		d.cfg.Advanced.FeatureFlags = "snowpipe_streaming_v2"
-
-		require.NoError(t, d.addBinding(ctx, target(stateKey, true), false))
-	})
-}
-
-// TestStreamV2SwitchIsRejectedAtPublication covers the same switch one step
-// earlier, where the operator is still making it.
-//
-// Apply is the first RPC of a publication which carries both the specification
-// being published and the connector state the task has accumulated, so it is the
-// first point at which a binding's departure from this write path can be seen at
-// all. Rejecting here fails the publication rather than the task it would leave
-// behind, which is the difference between an operator reading this message and
-// an operator reading it from a task that has already stopped.
-func TestStreamV2SwitchIsRejectedAtPublication(t *testing.T) {
-	var ctx = context.Background()
-	const stateKey, channel = "publish.v1", "task_00000000_publish_v1"
-
-	var state, err = json.Marshal(checkpoint{stateKey: &checkpointItem{
-		StreamV2: streamV2Checkpoint{fullKeyRange: {ChannelName: channel, Routed: 3}},
-	}})
-	require.NoError(t, err)
-
-	var specOf = func(t *testing.T, featureFlags string, delta bool) *pf.MaterializationSpec {
-		var spec = testStreamingSpec(t, featureFlags, true)
-		spec.Bindings = []*pf.MaterializationSpec_Binding{{
-			ResourcePath: []string{"mydb", "myschema", "TBL"},
-			StateKey:     stateKey,
-			DeltaUpdates: delta,
-		}}
-		return spec
-	}
-
-	t.Run("a publication which keeps the binding on the path is allowed", func(t *testing.T) {
-		require.NoError(t, rejectOrphanedStreamV2Bindings(specOf(t, "snowpipe_streaming_v2", true), state))
-	})
-
-	t.Run("a publication which turns the feature flag off is rejected", func(t *testing.T) {
-		var err = rejectOrphanedStreamV2Bindings(specOf(t, "", true), state)
-		require.ErrorContains(t, err, channel)
-		require.ErrorContains(t, err, "backfill")
-	})
-
-	t.Run("a publication which moves the binding to standard updates is rejected", func(t *testing.T) {
-		require.Error(t, rejectOrphanedStreamV2Bindings(specOf(t, "snowpipe_streaming_v2", false), state))
-	})
-
-	t.Run("a binding the state records nothing for is allowed", func(t *testing.T) {
-		var spec = specOf(t, "", true)
-		spec.Bindings[0].StateKey = "other.v1"
-		require.NoError(t, rejectOrphanedStreamV2Bindings(spec, state))
-	})
-
-	t.Run("a publication carrying no connector state is allowed", func(t *testing.T) {
-		require.NoError(t, rejectOrphanedStreamV2Bindings(specOf(t, "", true), nil))
-	})
-
-	t.Run("a binding dropped from the specification is allowed", func(t *testing.T) {
-		var spec = specOf(t, "", true)
-		spec.Bindings = nil
-		require.NoError(t, rejectOrphanedStreamV2Bindings(spec, state))
-	})
-
-	var specOfRuntime = func(t *testing.T, featureFlags string, delta, runtimeV2 bool) *pf.MaterializationSpec {
-		var spec = testStreamingSpec(t, featureFlags, runtimeV2)
-		spec.Bindings = []*pf.MaterializationSpec_Binding{{
-			ResourcePath: []string{"mydb", "myschema", "TBL"},
-			StateKey:     stateKey,
-			DeltaUpdates: delta,
-		}}
-		return spec
-	}
-
-	t.Run("the downgrade to snowpipe_streaming is allowed", func(t *testing.T) {
-		require.NoError(t, rejectOrphanedStreamV2Bindings(specOf(t, "snowpipe_streaming", true), state))
-	})
-
-	t.Run("the downgrade must keep the v2 runtime", func(t *testing.T) {
-		var spec = specOfRuntime(t, "snowpipe_streaming", true, false)
-
-		var err = requireStreamingV2Runtime(spec, state)
-		require.ErrorContains(t, err, boilerplate.RuntimeV2FlagName)
-		require.ErrorContains(t, err, channel)
-
-		// The rejection precedes any DB use.
-		_, applyErr := NewRuntimePrereqDriver().Apply(ctx, &pm.Request_Apply{Materialization: spec, StateJson: state})
-		require.ErrorContains(t, applyErr, boilerplate.RuntimeV2FlagName)
-	})
-
-	t.Run("a checkpoint of only dropped channels does not need the v2 runtime", func(t *testing.T) {
-		var dropped, err = json.Marshal(checkpoint{stateKey: &checkpointItem{
-			StreamV2: streamV2Checkpoint{fullKeyRange: nil},
-		}})
-		require.NoError(t, err)
-
-		require.NoError(t, requireStreamingV2Runtime(specOfRuntime(t, "snowpipe_streaming", true, false), dropped))
-	})
-
-	t.Run("the downgrade to standard updates is still rejected", func(t *testing.T) {
-		require.Error(t, rejectOrphanedStreamV2Bindings(specOf(t, "snowpipe_streaming", false), state))
-	})
-
-	t.Run("Open rejects the downgrade without the v2 runtime", func(t *testing.T) {
-		_, _, _, err := NewRuntimePrereqDriver().NewTransactor(ctx, pm.Request_Open{
-			Materialization: specOfRuntime(t, "snowpipe_streaming", true, false),
-			StateJson:       state,
-		}, nil)
-		require.ErrorContains(t, err, boilerplate.RuntimeV2FlagName)
-	})
-
-	// The runtime prerequisite check is what puts this ahead of the wrapped driver,
-	// so the rejection reaches the operator without Snowflake being touched at all.
-	t.Run("publishing is rejected", func(t *testing.T) {
-		_, err := NewRuntimePrereqDriver().Apply(ctx, &pm.Request_Apply{
-			Materialization: specOf(t, "", true),
-			StateJson:       state,
-		})
-		require.ErrorContains(t, err, channel)
+		require.NoError(t, d.addBinding(ctx, target(stateKey, false), *d.cp[stateKey]))
 	})
 }
 
@@ -549,27 +450,55 @@ func TestStreamV2WritePathSwitch(t *testing.T) {
 		require.Equal(t, 3, countRows())
 	})
 
-	t.Run("a binding moved off this write path leaves its channel behind", func(t *testing.T) {
+	t.Run("a binding moved off this write path drops its channel", func(t *testing.T) {
 		truncate(t)
 
 		var tgt = target("off.v1")
 		var m = newV2(t, tgt, nil)
 		storeV2(t, m, 0, 3)
 		var c = m.bindings[0].activeChannels[0]
-		_, err := m.flush(ctx)
+		entries, err := m.flush(ctx)
 		require.NoError(t, err)
 		require.Equal(t, 3, countRows())
 		m.stop()
 
-		// Nothing drops a shard's own channel, so Snowflake goes on reporting
-		// its committed offset token — to this binding's next session on this
-		// path, whenever that is and whatever ran in between.
+		// The manager alone drops nothing of its own, so Snowflake goes on
+		// reporting the committed offset token to whoever opens the channel next.
 		var later = newV2(t, tgt, nil)
 		client, err := later.ensureStarted(ctx)
 		require.NoError(t, err)
 		status, err := client.OpenChannel(ctx, cfg.Database, cfg.Schema, tableName, c.channelName)
 		require.NoError(t, err)
 		require.Equal(t, c.offsetToken(3), status.committedToken())
+		later.stop()
+
+		// The transactor is what moves a binding off the path, and it sweeps the
+		// channel as it does, so a return to the path starts from no token.
+		// The transactor locates the table from the resource path, which names the
+		// schema and table only.
+		var off = tgt
+		off.DeltaUpdates = false
+		off.Path = []string{cfg.Schema, tableName}
+		var d = &transactor{
+			cfg:                 cfg,
+			ep:                  &sql.Endpoint[config]{Dialect: testDialect},
+			_range:              fullRange,
+			version:             "v1",
+			cp:                  checkpoint{tgt.StateKey: &checkpointItem{StreamV2: entries[0]}},
+			snowpipeStreamingV2: newStreamV2Manager(ctx, &cfg, testMaterialization, accountName, fullRange),
+		}
+		d.snowpipeStreamingV2.listChannels = func(ctx context.Context, database, schema, table string) ([]string, error) {
+			return streamV2ListChannels(ctx, db, testDialect, database, schema, table)
+		}
+		t.Cleanup(d.snowpipeStreamingV2.stop)
+		require.NoError(t, d.addBinding(ctx, off, *d.cp[tgt.StateKey]))
+
+		var back = newV2(t, tgt, nil)
+		client, err = back.ensureStarted(ctx)
+		require.NoError(t, err)
+		status, err = client.OpenChannel(ctx, cfg.Database, cfg.Schema, tableName, c.channelName)
+		require.NoError(t, err)
+		require.Nil(t, status.committedToken())
 	})
 
 	t.Run("a binding moved off this write path with rows pending duplicates them", func(t *testing.T) {
@@ -659,7 +588,7 @@ func TestStreamV2SwitchOntoTheWritePathWithPendingWorkIsRejected(t *testing.T) {
 	// The configuration enables the streaming v2 flag throughout, which is what
 	// routes the binding to the streaming v2 manager.
 	var addBinding = func(d *transactor) error {
-		return d.addBinding(ctx, target, true)
+		return d.addBinding(ctx, target, *cmp.Or(d.cp[target.StateKey], &checkpointItem{}))
 	}
 
 	// The transactor of this test carries no bdec manager, which stands for every

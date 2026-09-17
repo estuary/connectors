@@ -268,4 +268,19 @@ func TestRequireStreamingV2RuntimeWithState(t *testing.T) {
 		require.NoError(t, requireStreamingV2Runtime(specOf(t, false), json.RawMessage(`not json`)))
 	})
 
+	// The runtime prerequisite check is what puts this ahead of the wrapped driver,
+	// so the rejection reaches the operator without Snowflake being touched at all.
+	t.Run("publishing an item off the v2 runtime is rejected", func(t *testing.T) {
+		var state = stateWith(t, streamV2Checkpoint{fullKeyRange: {ChannelName: channel, Routed: 3}})
+		_, err := NewRuntimePrereqDriver().Apply(context.Background(), &pm.Request_Apply{Materialization: specOf(t, false), StateJson: state})
+		require.ErrorContains(t, err, boilerplate.RuntimeV2FlagName)
+		require.ErrorContains(t, err, channel)
+	})
+
+	t.Run("opening an item off the v2 runtime is rejected", func(t *testing.T) {
+		var state = stateWith(t, streamV2Checkpoint{fullKeyRange: {ChannelName: channel, Routed: 3}})
+		_, _, _, err := NewRuntimePrereqDriver().NewTransactor(context.Background(), pm.Request_Open{Materialization: specOf(t, false), StateJson: state}, nil)
+		require.ErrorContains(t, err, boilerplate.RuntimeV2FlagName)
+		require.ErrorContains(t, err, channel)
+	})
 }

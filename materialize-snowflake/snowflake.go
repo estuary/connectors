@@ -1,11 +1,13 @@
 package connector
 
 import (
+	"cmp"
 	"context"
 	stdsql "database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"slices"
 	"strconv"
@@ -278,16 +280,6 @@ func (d *transactor) UnmarshalState(state json.RawMessage) error {
 	return nil
 }
 
-// priorStreamV2 returns the streaming v2 items the checkpoint holds for a binding,
-// one per channel, or nil when it holds none. "Prior" means written by a session
-// before this one.
-func (d *transactor) priorStreamV2(stateKey string) streamV2Checkpoint {
-	if item, ok := d.cp[stateKey]; ok {
-		return item.StreamV2
-	}
-	return nil
-}
-
 func newTransactor(
 	ctx context.Context,
 	materializationName string,
@@ -354,6 +346,7 @@ func newTransactor(
 			return nil, fmt.Errorf("unmarshalling connector state: %w", err)
 		}
 	}
+	priorCheckpoint := maps.Clone(d.cp)
 
 	if db, err := stdsql.Open("snowflake", dsn); err != nil {
 		return nil, fmt.Errorf("load stdsql.Open: %w", err)
@@ -373,7 +366,8 @@ func newTransactor(
 	}
 
 	for _, binding := range bindings {
-		if err = d.addBinding(ctx, binding, featureFlags[flagSnowpipeStreaming]); err != nil {
+		priorCheckpointItem, _ := priorCheckpoint[binding.StateKey]
+		if err = d.addBinding(ctx, binding, *cmp.Or(priorCheckpointItem, &checkpointItem{})); err != nil {
 			return nil, fmt.Errorf("adding binding for %s: %w", binding.Path, err)
 		}
 	}
@@ -416,68 +410,59 @@ type binding struct {
 	}
 }
 
-func (d *transactor) addBinding(ctx context.Context, target sql.Table, streamingEnabled bool) error {
-	var streamingV2 = d.cfg.isStreamsV2(target.DeltaUpdates)
-	var prior = d.priorStreamV2(target.StateKey)
-	var held = prior.validateNotOrphaned(target.Identifier) // non-nil iff any non-nil item
-	var downgrade = !streamingV2 && held != nil && d.cfg.isStreamsDowngradeV2ToV1(target.DeltaUpdates)
-
-	// Ahead of everything else, so that a binding which may not leave the
-	// streaming v2 write path is rejected before another path opens anything of
-	// its own against the same table.
-	if !streamingV2 && !downgrade && held != nil {
-		return held
-	}
-
+func (d *transactor) addBinding(ctx context.Context, target sql.Table, priorCheckpointItem checkpointItem) error {
 	var b = new(binding)
 	b.target = target
 	b.nullFieldsToStrip = target.NullableFieldsToStrip()
 	b.load.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
 	b.store.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
+	var loc = d.ep.Dialect.TableLocator(b.target.Path)
 
-	if streamingV2 {
-		// The checkpoint may still hold work that the write path this binding is
-		// leaving staged into the table and did not finish. Acknowledge drains it
-		// through the manager of the path which staged it. Of the three kinds of
-		// staged work, only Snowpipe Streaming blobs need anything of this binding:
-		// a staged-file query runs on the transactor's connection, and pipe files go
-		// through its pipe client, while blobs are registered against a channel the
-		// bdec manager holds per table. So the binding is registered there for the
-		// drain, and its rows still go to streaming v2.
-		if prior := d.cp[target.StateKey]; prior != nil && len(prior.StreamBlobs) > 0 {
-			var loc = d.ep.Dialect.TableLocator(target.Path)
+	if d.cfg.isStreamsV2(b.target.DeltaUpdates) {
+		if len(priorCheckpointItem.StreamBlobs) > 0 {
+			// We're upgrading from streams v1, and the v1 path left behind some
+			// blobs that only it can drain.
+
 			const remedy = "Restore the snowpipe_streaming write path for one transaction before moving the binding onto snowpipe_streaming_v2, or backfill the binding, which discards those blobs and materializes their documents again"
 			if d.snowpipeStreaming == nil {
 				return fmt.Errorf(
 					"the task's checkpoint records %d Snowpipe Streaming blob(s) staged into %s that only the snowpipe_streaming write path can finish, and that path is not available. %s",
-					len(prior.StreamBlobs), target.Identifier, remedy,
+					len(priorCheckpointItem.StreamBlobs), b.target.Identifier, remedy,
 				)
-			} else if err := d.snowpipeStreaming.addBinding(ctx, loc.TableSchema, d.ep.Identifier(loc.TableName), target); err != nil {
+			} else if err := d.snowpipeStreaming.addBinding(ctx, loc.TableSchema, d.ep.Identifier(loc.TableName), b.target); err != nil {
 				return fmt.Errorf(
 					"opening the snowpipe_streaming channel on %s to finish %d staged blob(s): %w. %s",
-					target.Identifier, len(prior.StreamBlobs), err, remedy,
+					b.target.Identifier, len(priorCheckpointItem.StreamBlobs), err, remedy,
 				)
 			}
 
 			log.WithFields(log.Fields{
-				"table": target.Identifier,
-				"blobs": len(prior.StreamBlobs),
+				"table": b.target.Identifier,
+				"blobs": len(priorCheckpointItem.StreamBlobs),
 			}).Info("opened a snowpipe_streaming channel to finish the blobs that path staged")
 		}
 
-		var loc = d.ep.Dialect.TableLocator(b.target.Path)
-		d.snowpipeStreamingV2.addBinding(d.cfg.Database, loc.TableSchema, d.ep.Identifier(loc.TableName), target, d.priorStreamV2(target.StateKey))
+		d.snowpipeStreamingV2.addBinding(d.cfg.Database, loc.TableSchema, d.ep.Identifier(loc.TableName), b.target, priorCheckpointItem.StreamV2)
 		b.streamingV2 = true
 		d.bindings = append(d.bindings, b)
 		return nil
 	}
 
-	if b.target.DeltaUpdates && d.cfg.Credentials.AuthType == snowflake_auth.JWT && streamingEnabled {
-		loc := d.ep.Dialect.TableLocator(b.target.Path)
-		if err := d.snowpipeStreaming.addBinding(ctx, loc.TableSchema, d.ep.Identifier(loc.TableName), target); err != nil {
-			if downgrade {
-				return fmt.Errorf("this binding is leaving the snowpipe_streaming_v2 write path for snowpipe_streaming, but the snowpipe_streaming path cannot open its channel on %s, and the binding may not fall back to staged files while its snowpipe_streaming_v2 channels stand: %w", target.Identifier, err)
-			}
+	if len(priorCheckpointItem.StreamV2.channelNames()) > 0 {
+		// We're switching away from streams v2, and the v2 path left behind
+		// some channels that only it can clean up.
+
+		if err := d.snowpipeStreamingV2.sweep(ctx, d.cfg.Database, loc.TableSchema, d.ep.Identifier(loc.TableName), b.target.StateKey, nil); err != nil {
+			return fmt.Errorf("dropping the snowpipe_streaming_v2 channels of %s: %w", b.target.Identifier, err)
+		}
+		log.WithFields(log.Fields{
+			"table":    b.target.Identifier,
+			"channels": priorCheckpointItem.StreamV2.channelNames(),
+		}).Warn("this binding is leaving the snowpipe_streaming_v2 write path; documents its channels committed beyond the checkpoint will be materialized again; with delta updates these duplicates would be permanent")
+	}
+
+	if d.cfg.isStreamsV1(b.target.DeltaUpdates) {
+		if err := d.snowpipeStreaming.addBinding(ctx, loc.TableSchema, d.ep.Identifier(loc.TableName), b.target); err != nil {
 			var apiError *streamingApiError
 			var colError *unhandledColError
 			if errors.As(err, &apiError) && (apiError.Code == 6 || apiError.Code == 55) {
@@ -492,23 +477,10 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, streaming
 				return fmt.Errorf("adding binding to stream manager: %w", err)
 			}
 			log.WithError(err).WithField("table", b.target.Path).Info("not using Snowpipe Streaming for table")
-		} else {
-			if downgrade {
-				// Drop this shard's streaming v2 channels as it leaves the path, so a
-				// return to it cannot read their committed offset tokens as documents
-				// to skip.
-				if err := d.snowpipeStreamingV2.sweep(ctx, d.cfg.Database, loc.TableSchema, d.ep.Identifier(loc.TableName), target.StateKey, nil); err != nil {
-					return fmt.Errorf("dropping the snowpipe_streaming_v2 channels of %s as it downgrades to snowpipe_streaming: %w", target.Identifier, err)
-				}
-				log.WithFields(log.Fields{
-					"table":    target.Identifier,
-					"channels": prior.channelNames(),
-				}).Warn("this binding is leaving the snowpipe_streaming_v2 write path for snowpipe_streaming; documents its channels committed beyond the checkpoint will be materialized again")
-			}
-			b.streaming = true
-			d.bindings = append(d.bindings, b)
-			return nil
 		}
+		b.streaming = true
+		d.bindings = append(d.bindings, b)
+		return nil
 	}
 
 	b.load.stage = newStagedFile(os.TempDir())

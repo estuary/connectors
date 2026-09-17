@@ -66,20 +66,6 @@ func (cp streamV2Checkpoint) channelNames() []string {
 	return channelNames
 }
 
-// validateNotOrphaned fails a binding that leaves this write path while the
-// checkpoint still records channels for it.
-func (cp streamV2Checkpoint) validateNotOrphaned(table string) error {
-	var channelNames = cp.channelNames()
-	if len(channelNames) == 0 {
-		return nil
-	}
-
-	return fmt.Errorf(
-		"this binding materialized into %s through the snowpipe_streaming_v2 write path, which this task's specification no longer selects for it, and the task's checkpoint still records its channel(s) %s. Leaving this path discards that record, and returning later would skip the documents those channels already hold. Restore the snowpipe_streaming_v2 write path — it needs the feature flag, delta updates, and key-pair authentication — or backfill this binding",
-		table, strings.Join(channelNames, ", "),
-	)
-}
-
 type streamV2Range struct {
 	keyBegin, keyEnd uint32
 }
