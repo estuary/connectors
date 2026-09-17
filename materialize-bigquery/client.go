@@ -275,9 +275,6 @@ func (c *client) InstallFence(ctx context.Context, _ sql.Table, fence sql.Fence)
 
 }
 
-// MustRecreateResource reports a changed partition_by, which can only be
-// applied by dropping and re-creating the table: BigQuery never accepts
-// PARTITION BY via ALTER, and TRUNCATE preserves the partitioning.
 func (c *client) MustRecreateResource(_ *pm.Request_Apply, lastBinding, newBinding *pf.MaterializationSpec_Binding) (bool, error) {
 	if lastBinding == nil || newBinding == nil {
 		return false, nil
