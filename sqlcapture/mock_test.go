@@ -104,6 +104,7 @@ func (db *mockDatabase) SourceMetadataSchema(writeSchema bool) *jsonschema.Schem
 }
 
 func (db *mockDatabase) HistoryMode() bool                         { return false }
+func (db *mockDatabase) ActivateStreamsBeforeCatchup() bool        { return false }
 func (db *mockDatabase) RediscoveryInterval() time.Duration        { return 0 }
 func (db *mockDatabase) ReplicationPollingInterval() time.Duration { return 0 }
 func (db *mockDatabase) FallbackCollectionKey() []string           { return db.FallbackKey }

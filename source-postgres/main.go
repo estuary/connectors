@@ -435,6 +435,10 @@ func (db *postgresDatabase) HistoryMode() bool {
 	return db.config.HistoryMode
 }
 
+func (db *postgresDatabase) ActivateStreamsBeforeCatchup() bool {
+	return false
+}
+
 // The statement timeout applied to database connections when none is configured.
 const defaultStatementTimeout = 2 * time.Minute
 
