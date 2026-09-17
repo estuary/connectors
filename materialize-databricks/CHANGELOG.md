@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-17
+### Fixed
+- Fixed escaping of identifiers containing backslash character.
+
 ## 2026-09-02
 
 ### Changed
