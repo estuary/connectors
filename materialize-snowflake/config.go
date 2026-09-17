@@ -241,47 +241,16 @@ func (c config) Validate() error {
 		return err
 	}
 
-	if err := c.validateStreamingFlags(); err != nil {
-		return err
-	}
-
 	return validHost(c.Host)
 }
 
-// validateStreamingFlags rejects a configuration that asks for both Snowpipe
-// Streaming write paths, or that asks for the v2 path without the credentials it
-// authenticates its sidecar with.
-//
-// Only the flags the configuration sets are consulted, because
-// flagSnowpipeStreaming is enabled by default: an operator opting into v2
-// selects it by naming v2 alone, and that is the ordinary v2 configuration.
-func (c config) validateStreamingFlags() error {
-	// Nil defaults make the result contain exactly the flags this configuration
-	// sets, with the values it sets them to.
-	var configured = common.ParseFeatureFlags(c.Advanced.FeatureFlags, nil)
-
-	if configured[flagSnowpipeStreaming] && configured[flagSnowpipeStreamingV2] {
-		return fmt.Errorf(
-			"the %q and %q feature flags select different write paths for the same rows and cannot both be enabled: keep whichever one you intend and remove the other from the endpoint configuration's feature_flags",
-			flagSnowpipeStreaming, flagSnowpipeStreamingV2,
-		)
-	}
-
-	// The v2 sidecar authenticates to Snowflake with JWT credentials carry, so
-	// an endpoint authenticating any other way cannot run this write path.
-	if configured[flagSnowpipeStreamingV2] && (c.Credentials == nil || c.Credentials.AuthType != snowflake_auth.JWT) {
-		return fmt.Errorf(
-			"the %q feature flag requires key-pair (JWT) authentication, which this endpoint is not configured for: switch the endpoint's authentication to a key pair, or remove %q from the endpoint configuration's feature_flags",
-			flagSnowpipeStreamingV2, flagSnowpipeStreamingV2,
-		)
-	}
-
-	return nil
+func (c config) isStreamsV2(deltaUpdates bool) bool {
+	return c.isStreamsV1(deltaUpdates) && boilerplate.ParseFlags(c)[flagSnowpipeStreamingV2]
 }
 
-func (c config) isStreamsV2(deltaUpdates bool) bool {
+func (c config) isStreamsV1(deltaUpdates bool) bool {
 	return deltaUpdates && c.Credentials != nil && c.Credentials.AuthType == snowflake_auth.JWT &&
-		boilerplate.ParseFlags(c)[flagSnowpipeStreamingV2]
+		boilerplate.ParseFlags(c)[flagSnowpipeStreaming]
 }
 
 // isStreamsDowngradeV2ToV1 reports whether a binding leaves the snowpipe streaming

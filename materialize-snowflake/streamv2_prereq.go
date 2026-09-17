@@ -113,23 +113,17 @@ func requireStreamingV2Runtime(spec *pf.MaterializationSpec, stateJson json.RawM
 	if spec == nil {
 		return fmt.Errorf("request carries no materialization spec")
 	}
+	if boilerplate.IsMaterializationSpecRuntimeV2(spec) {
+		return nil
+	} // else runtime is v1
+
 	var cfg config
 	if err := json.Unmarshal(spec.ConfigJson, &cfg); err != nil {
 		return fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	// A configuration asking for both write paths is reported as such even when
-	// the runtime is also wrong, so that the operator is told about the mistake
-	// they made rather than the one it implies.
-	if err := cfg.validateStreamingFlags(); err != nil {
-		return err
-	}
-
-	if boilerplate.IsMaterializationSpecRuntimeV2(spec) {
-		return nil
-	}
-
-	if boilerplate.ParseFlags(cfg)[flagSnowpipeStreamingV2] {
+	flags := boilerplate.ParseFlags(cfg)
+	if flags[flagSnowpipeStreaming] && flags[flagSnowpipeStreamingV2] {
 		return fmt.Errorf(
 			"the %q feature flag requires the v2 materialization runtime, which this task is not running: add %q to the task's shards.flags, or remove %q from the endpoint configuration's feature_flags",
 			flagSnowpipeStreamingV2, boilerplate.RuntimeV2FlagName, flagSnowpipeStreamingV2,

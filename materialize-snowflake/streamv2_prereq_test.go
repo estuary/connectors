@@ -22,8 +22,8 @@ import (
 
 // testJWTPrivateKey is a throwaway key pair in the PKCS#8 PEM form credentials
 // carry, generated once for the whole package because the v2 write path is
-// rejected outright without JWT credentials, and those only validate against a
-// key which really parses.
+// selected only with JWT credentials, and those only validate against a key
+// which really parses.
 var testJWTPrivateKey = sync.OnceValue(func() string {
 	var key, err = rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -68,11 +68,13 @@ func testStreamingConfigAuth(t *testing.T, featureFlags string, authType string)
 	}
 }
 
+// TestValidateStreamingFlags pins that no combination of the two streaming flags is
+// rejected by configuration validation: naming both selects the v2 write path,
+// since that path implies the v1 flag.
 func TestValidateStreamingFlags(t *testing.T) {
 	for _, tt := range []struct {
 		name         string
 		featureFlags string
-		wantErr      bool
 	}{
 		{
 			name:         "no flags",
@@ -108,53 +110,37 @@ func TestValidateStreamingFlags(t *testing.T) {
 		{
 			name:         "both explicitly enabled",
 			featureFlags: "snowpipe_streaming,snowpipe_streaming_v2",
-			wantErr:      true,
 		},
 		{
 			name:         "both explicitly enabled in the opposite order",
 			featureFlags: "snowpipe_streaming_v2,snowpipe_streaming",
-			wantErr:      true,
 		},
 		{
 			name:         "both explicitly enabled among unrelated flags",
 			featureFlags: "snowpipe_streaming,allow_existing_tables_for_new_bindings,snowpipe_streaming_v2",
-			wantErr:      true,
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			var err = testStreamingConfig(t, tt.featureFlags).Validate()
-
-			if !tt.wantErr {
-				require.NoError(t, err)
-				return
-			}
-
-			require.ErrorContains(t, err, "snowpipe_streaming")
-			require.ErrorContains(t, err, "snowpipe_streaming_v2")
-			// The conflicting-flags rejection must be distinguishable from the
-			// runtime-mismatch rejection, which is the only other reason this
-			// write path is rejected.
-			require.NotContains(t, err.Error(), boilerplate.RuntimeV2FlagName)
+			require.NoError(t, testStreamingConfig(t, tt.featureFlags).Validate())
 		})
 	}
 }
 
-// TestValidateStreamingV2Auth covers the v2 write path's requirement of key-pair
-// credentials. Rejecting the combination is what keeps the flag from being silently
-// ignored: streamsV2 would decline the path for want of a key pair while the
-// runtime prerequisite check went on holding the task to the v2 runtime for having
-// named the flag, leaving it on the staged path the operator asked it to leave.
+// TestValidateStreamingV2Auth pins that credentials never fail configuration
+// validation on account of the v2 flag: the v2 write path is selected only with
+// key-pair credentials, and a configuration naming the flag with any other
+// credentials falls through to the write path those credentials support.
 func TestValidateStreamingV2Auth(t *testing.T) {
 	t.Run("the v2 write path with key-pair credentials is allowed", func(t *testing.T) {
-		require.NoError(t, testStreamingConfigAuth(t, "snowpipe_streaming_v2", snowflake_auth.JWT).Validate())
+		var cfg = testStreamingConfigAuth(t, "snowpipe_streaming_v2", snowflake_auth.JWT)
+		require.NoError(t, cfg.Validate())
+		require.True(t, cfg.isStreamsV2(true))
 	})
 
-	t.Run("the v2 write path without key-pair credentials is rejected", func(t *testing.T) {
-		var err = testStreamingConfigAuth(t, "snowpipe_streaming_v2", snowflake_auth.UserPass).Validate()
-		require.ErrorContains(t, err, flagSnowpipeStreamingV2)
-		// The operator's remedies are the authentication method and the flag, so
-		// the message must name both.
-		require.ErrorContains(t, err, "key-pair")
+	t.Run("the v2 flag without key-pair credentials is allowed and does not select the path", func(t *testing.T) {
+		var cfg = testStreamingConfigAuth(t, "snowpipe_streaming_v2", snowflake_auth.UserPass)
+		require.NoError(t, cfg.Validate())
+		require.False(t, cfg.isStreamsV2(true))
 	})
 
 	t.Run("user-password credentials are allowed without the v2 write path", func(t *testing.T) {
@@ -163,24 +149,10 @@ func TestValidateStreamingV2Auth(t *testing.T) {
 		}
 	})
 
-	t.Run("the runtime prerequisite check rejects the same configuration", func(t *testing.T) {
-		configJson, err := json.Marshal(testStreamingConfigAuth(t, "snowpipe_streaming_v2", snowflake_auth.UserPass))
-		require.NoError(t, err)
-
-		// Reported ahead of the runtime mismatch, as the conflicting-flags rejection
-		// is: the operator is told about the configuration they wrote rather than
-		// the runtime it implies.
-		var spec = testStreamingSpec(t, "snowpipe_streaming_v2", false)
-		spec.ConfigJson = configJson
-		err = requireStreamingV2Runtime(spec, nil)
-		require.ErrorContains(t, err, "key-pair")
-		require.NotContains(t, err.Error(), boilerplate.RuntimeV2FlagName)
-	})
-
-	t.Run("a configuration carrying no credentials at all is rejected rather than panicking", func(t *testing.T) {
+	t.Run("a configuration carrying no credentials at all does not panic", func(t *testing.T) {
 		var spec = testStreamingSpec(t, "snowpipe_streaming_v2", true)
 		spec.ConfigJson = json.RawMessage(`{"host":"h.snowflakecomputing.com","advanced":{"feature_flags":"snowpipe_streaming_v2"}}`)
-		require.ErrorContains(t, requireStreamingV2Runtime(spec, nil), "key-pair")
+		require.NoError(t, requireStreamingV2Runtime(spec, nil))
 	})
 }
 
@@ -226,12 +198,6 @@ func TestRequireStreamingV2Runtime(t *testing.T) {
 		var spec = testStreamingSpec(t, "snowpipe_streaming_v2", false)
 		spec.ShardTemplate = nil
 		require.ErrorContains(t, requireStreamingV2Runtime(spec, nil), boilerplate.RuntimeV2FlagName)
-	})
-
-	t.Run("conflicting flags are reported ahead of the runtime mismatch", func(t *testing.T) {
-		var err = requireStreamingV2Runtime(testStreamingSpec(t, "snowpipe_streaming,snowpipe_streaming_v2", false), nil)
-		require.ErrorContains(t, err, "cannot both be enabled")
-		require.NotContains(t, err.Error(), boilerplate.RuntimeV2FlagName)
 	})
 
 	t.Run("an unparseable endpoint config is surfaced", func(t *testing.T) {
@@ -301,4 +267,5 @@ func TestRequireStreamingV2RuntimeWithState(t *testing.T) {
 	t.Run("an unreadable state document is tolerated", func(t *testing.T) {
 		require.NoError(t, requireStreamingV2Runtime(specOf(t, false), json.RawMessage(`not json`)))
 	})
+
 }
