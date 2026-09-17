@@ -212,13 +212,10 @@ func (c config) FeatureFlags() (string, map[string]bool) {
 }
 
 type tableConfig struct {
-	Table   string `json:"table" jsonschema:"title=Table,description=Table in the BigQuery dataset to store materialized result in." jsonschema_extras:"x-collection-name=true"`
-	Dataset string `json:"dataset,omitempty" jsonschema:"title=Alternative Dataset,description=Alternative dataset for this table (optional). Must be located in the region set in the endpoint configuration." jsonschema_extras:"x-schema-name=true"`
-	Delta   bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Defaults is false." jsonschema_extras:"x-delta-updates=true,nonsensitive=true"`
-	// PartitionBy is spliced verbatim into the table's PARTITION BY clause. It
-	// runs as DDL under the user's own credentials, so it is the same trust
-	// plane as the rest of the config; BigQuery validates it at dry-run time.
-	PartitionBy string `json:"partition_by,omitempty" jsonschema:"title=Partition By,description=Optional expression to use as the table's PARTITION BY clause\\, for example DATE(created_at)\\, TIMESTAMP_TRUNC(updated_at\\, MONTH)\\, _PARTITIONDATE or RANGE_BUCKET(id\\, GENERATE_ARRAY(0\\, 1000\\, 10)). Columns must be referenced by their BigQuery column names. Leave blank for an unpartitioned table. Changing this value requires backfilling the binding\\, which drops and re-creates the table." jsonschema_extras:"advanced=true,nonsensitive=true"`
+	Table       string `json:"table" jsonschema:"title=Table,description=Table in the BigQuery dataset to store materialized result in." jsonschema_extras:"x-collection-name=true"`
+	Dataset     string `json:"dataset,omitempty" jsonschema:"title=Alternative Dataset,description=Alternative dataset for this table (optional). Must be located in the region set in the endpoint configuration." jsonschema_extras:"x-schema-name=true"`
+	Delta       bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Defaults is false." jsonschema_extras:"x-delta-updates=true,nonsensitive=true"`
+	PartitionBy string `json:"partition_by,omitempty" jsonschema:"title=Partition By,description=Optional expression to use as the table's PARTITION BY clause\\, for example DATE(created_at). Changing this value requires backfilling the binding\\, which drops and re-creates the table." jsonschema_extras:"advanced=true,nonsensitive=true"`
 	projectID   string
 }
 
@@ -240,25 +237,6 @@ func (c tableConfig) Validate() error {
 
 func (c tableConfig) Parameters() ([]string, bool, error) {
 	return []string{c.projectID, c.Dataset, c.Table}, c.Delta, nil
-}
-
-// driver wraps the generic SQL driver to customize Validate: a changed
-// partition_by requires re-creating the table, and partition expressions are
-// verified with a dry-run CREATE TABLE. See partition_by.go.
-type driver struct {
-	sqlDriver *sql.Driver[config, tableConfig]
-}
-
-var _ boilerplate.Connector = &driver{}
-
-func NewDriver() *driver {
-	return &driver{sqlDriver: newSQLDriver()}
-}
-
-// NewMaterializer opens a Materializer for the endpoint through the wrapped
-// SQL driver's entry point, for callers such as test harnesses.
-func NewMaterializer(ctx context.Context, materializationName string, cfg config, featureFlags map[string]bool) (boilerplate.Materializer[config, sql.FieldConfig, tableConfig, sql.MappedType], error) {
-	return newSQLDriver().NewMaterializer(ctx, materializationName, cfg, featureFlags)
 }
 
 func newSQLDriver() *sql.Driver[config, tableConfig] {
