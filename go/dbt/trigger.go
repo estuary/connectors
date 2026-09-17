@@ -17,7 +17,7 @@ type JobConfig struct {
 	AccessURL     string `json:"access_url,omitempty" jsonschema:"title=Access URL,description=dbt access URL can be found in your Account Settings. See go.estuary.dev/dbt-cloud-trigger" jsonschema_extras:"pattern=^https://.+$"`
 	AccountPrefix string `json:"account_prefix" jsonschema:"-"`
 	APIKey        string `json:"api_key" jsonschema:"title=API Key,description=dbt API Key" jsonschema_extras:"secret=true"`
-	Cause         string `json:"cause,omitempty" jsonschema:"title=Cause Message,description=You can set a custom 'cause' message for the job trigger. Defaults to 'Estuary Flow'."`
+	Cause         string `json:"cause,omitempty" jsonschema:"title=Cause Message,description=You can set a custom 'cause' message for the job trigger. Defaults to 'Estuary'."`
 	Mode          string `json:"mode,omitempty" jsonschema:"title=Job Trigger Mode,description=Specifies how should already-running jobs be treated. Defaults to 'skip' which skips the trigger if a job is already running; 'replace' cancels the running job and runs a new one; while 'ignore' triggers a new job regardless of existing jobs.,enum=skip,enum=replace,enum=ignore,default=skip" jsonschema_extras:"nonsensitive=true"`
 	Interval      string `json:"interval,omitempty" jsonschema:"title=Minimum Run Interval,description=Minimum time between dbt job triggers. This interval is only triggered if data has been materialized by your task.,default=30m" jsonschema_extras:"nonsensitive=true"`
 }
@@ -114,7 +114,7 @@ func JobTrigger(config JobConfig) error {
 
 	var cause = config.Cause
 	if cause == "" {
-		cause = "Estuary Flow"
+		cause = "Estuary"
 	}
 	var url = fmt.Sprintf("%s/api/v2/accounts/%s/jobs/%s/run", config.accessURL(), config.AccountID, config.JobID)
 	var reqBodyJson = fmt.Sprintf(`{"cause": "%s"}`, cause)

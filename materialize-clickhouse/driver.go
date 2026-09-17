@@ -143,12 +143,12 @@ func (c config) newClickhouseOptions() *clickhouse.Options {
 	}
 	return &clickhouse.Options{
 		Addr: []string{c.resolvedAddress()},
-		// Identify Estuary Flow in the client name reported to ClickHouse
+		// Identify Estuary in the client name reported to ClickHouse
 		// (system.query_log, system.processes, etc.), which otherwise only
 		// shows the generic clickhouse-go driver.
 		ClientInfo: clickhouse.ClientInfo{
 			Products: []struct{ Name, Version string }{
-				{Name: "EstuaryFlow", Version: strings.TrimSpace(connectorVersion)},
+				{Name: "Estuary", Version: strings.TrimSpace(connectorVersion)},
 			},
 			Comment: []string{"materialize-clickhouse"},
 		},
