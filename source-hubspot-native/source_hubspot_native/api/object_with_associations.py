@@ -15,7 +15,7 @@ from estuary_cdk.capture.common import (
     LogCursor,
     PageCursor,
 )
-from estuary_cdk.http import HTTPSession
+from estuary_cdk.http import HTTPError, HTTPSession
 
 from ..models import (
     Association,
@@ -30,6 +30,7 @@ from .properties import fetch_properties
 from .shared import (
     chunk_props,
     HUB,
+    is_missing_scope_error,
     str_to_dt,
 )
 
@@ -66,6 +67,55 @@ contract.
 """
 
 
+# HubSpot grants scopes when the app is installed, so a token's answer cannot
+# change while the connector runs.
+readable_associations_cache: dict[str, tuple[str, ...]] = {}
+
+
+async def probe_associations(
+    log: Logger,
+    cls: type[CRMObject],
+    http: HTTPSession,
+    object_name: str,
+) -> tuple[str, ...]:
+    """Entities absent from the result are never populated on emitted documents."""
+    if object_name in readable_associations_cache:
+        return readable_associations_cache[object_name]
+
+    async def probe(associated_entity: str) -> bool:
+        url = f"{HUB}/crm/v4/associations/{object_name}/{associated_entity}/batch/read"
+
+        try:
+            # A well-formed read for an ID that won't exist, so the probe reaches
+            # HubSpot's scope check without depending on the account holding any
+            # particular record.
+            await http.request(log, url, method="POST", json={"inputs": [{"id": "0"}]})
+        except HTTPError as err:
+            if is_missing_scope_error(log, err):
+                return False
+
+        return True
+
+    results = await asyncio.gather(
+        *(probe(entity) for entity in cls.ASSOCIATED_ENTITIES)
+    )
+    readable = tuple(
+        entity
+        for entity, is_readable in zip(cls.ASSOCIATED_ENTITIES, results)
+        if is_readable
+    )
+
+    blocked = [e for e in cls.ASSOCIATED_ENTITIES if e not in readable]
+    if blocked:
+        log.debug("Omitting associated entities the token cannot read.", {
+            "object": object_name,
+            "associated_entities": blocked,
+        })
+
+    readable_associations_cache[object_name] = readable
+    return readable
+
+
 async def fetch_page_with_associations(
     # Closed over via functools.partial:
     cls: type[CRMObject],
@@ -84,6 +134,7 @@ async def fetch_page_with_associations(
     url = f"{HUB}/crm/v3/objects/{object_name}"
     output: list[CRMObject] = []
     properties = await fetch_properties(log, http, object_name)
+    associations = await probe_associations(log, cls, http, object_name)
 
     # On connector initiated backfills, only capture calculated properties and rely
     # on the merge reduction strategies to merge in partial documents containing
@@ -122,8 +173,8 @@ async def fetch_page_with_associations(
         if with_history:
             input["propertiesWithHistory"] = property_names
             input["limit"] = 50
-        if len(cls.ASSOCIATED_ENTITIES) > 0:
-            input["associations"] = ",".join(cls.ASSOCIATED_ENTITIES)
+        if associations:
+            input["associations"] = ",".join(associations)
         if page:
             input["after"] = page
 
@@ -198,13 +249,31 @@ async def fetch_association(
     object_name: str,
     ids: Iterable[str],
     associated_entity: str,
-) -> BatchResult[Association]:
+) -> BatchResult[Association] | None:
+    """None if the token wasn't granted a scope covering associated_entity."""
     url = f"{HUB}/crm/v4/associations/{object_name}/{associated_entity}/batch/read"
     input = {"inputs": [{"id": id} for id in ids]}
 
-    return BatchResult[Association].model_validate_json(
-        await http.request(log, url, method="POST", json=input)
-    )
+    try:
+        response = await http.request(log, url, method="POST", json=input)
+    except HTTPError as err:
+        if not is_missing_scope_error(log, err):
+            raise
+
+        # Reading one associated entity must not fail the whole batch.
+        cached = readable_associations_cache.get(object_name)
+        if cached is not None and associated_entity in cached:
+            readable_associations_cache[object_name] = tuple(
+                e for e in cached if e != associated_entity
+            )
+            log.debug("Omitting an associated entity the token cannot read.", {
+                "object": object_name,
+                "associated_entity": associated_entity,
+            })
+
+        return None
+
+    return BatchResult[Association].model_validate_json(response)
 
 
 async def fetch_batch_with_associations(
@@ -216,19 +285,24 @@ async def fetch_batch_with_associations(
     ids: list[str],
 ) -> BatchResult[CRMObject]:
 
+    associations = await probe_associations(log, cls, http, object_name)
+
     batch, all_associated = await asyncio.gather(
         _fetch_batch(log, cls, http, with_history, object_name, ids),
         asyncio.gather(
             *(
                 fetch_association(log, cls, http, object_name, ids, e)
-                for e in cls.ASSOCIATED_ENTITIES
+                for e in associations
             )
         ),
     )
     # Index CRM records so we can attach associations.
     index = {r.id: r for r in batch.results}
 
-    for associated_entity, associated in zip(cls.ASSOCIATED_ENTITIES, all_associated):
+    for associated_entity, associated in zip(associations, all_associated):
+        if associated is None:
+            continue
+
         for result in associated.results:
             setattr(
                 index[result.from_.id],

@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-09-17
+
+### Changed
+- The `forms`, `tickets`, and `e-commerce` OAuth scopes are now requested as optional
+  rather than required.
+- The `tickets`, `products`, and `line_items` bindings are now omitted during discovery
+  when the connector wasn't granted the scope they need.
+
+### Fixed
+- Associations pointing at objects the connector cannot read are now omitted from
+  captured documents instead of failing the binding outright.
+
 ## 2026-09-16
 
 ### Added

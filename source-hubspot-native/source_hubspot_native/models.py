@@ -42,9 +42,6 @@ scopes = [
     "crm.schemas.companies.read",
     "crm.schemas.contacts.read",
     "crm.schemas.deals.read",
-    "e-commerce",
-    "forms",
-    "tickets",
 ]
 
 optional_scopes = [
@@ -57,7 +54,10 @@ optional_scopes = [
     "crm.objects.marketing_events.read",
     "crm.objects.orders.read",
     "crm.schemas.custom.read",
+    "e-commerce",
+    "forms",
     "marketing.campaigns.read",
+    "tickets",
 ]
 
 # TODO(johnny): Lift this string building into higher-order helpers.

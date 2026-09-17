@@ -69,6 +69,7 @@ from .leads import (
     fetch_recent_leads,
 )
 from .line_items import (
+    check_line_items_access,
     fetch_delayed_line_items,
     fetch_recent_line_items,
 )
@@ -81,18 +82,23 @@ from .marketing_events import (
     fetch_marketing_event_participants,
     fetch_marketing_events,
 )
-from .object_with_associations import fetch_page_with_associations
+from .object_with_associations import (
+    fetch_page_with_associations,
+    probe_associations,
+)
 from .orders import (
     fetch_delayed_orders,
     fetch_recent_orders,
 )
 from .owners import fetch_owners
 from .products import (
+    check_products_access,
     fetch_delayed_products,
     fetch_recent_products,
 )
 from .properties import fetch_properties
 from .tickets import (
+    check_tickets_access,
     fetch_delayed_tickets,
     fetch_recent_tickets,
 )
@@ -111,6 +117,9 @@ __all__ = [
     "check_campaigns_access",
     "check_contact_list_memberships_access",
     "check_contact_lists_access",
+    "check_line_items_access",
+    "check_products_access",
+    "check_tickets_access",
     "dt_to_ms",
     "fetch_campaigns",
     "fetch_campaigns_page",
@@ -161,6 +170,7 @@ __all__ = [
     "fetch_recent_workflows",
     "fetch_workflows_page",
     "is_missing_scope_error",
+    "probe_associations",
     "fetch_delayed_changes",
     "fetch_realtime_changes",
     "list_custom_objects",
