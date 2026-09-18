@@ -26,7 +26,7 @@ const (
 )
 
 type config struct {
-	Scale float64 `json:"scale" jsonschema:"title=Scale Factor,description=TPC-DS scale factor. Values of 1 and above should be one of the benchmark's official factors (1 3 10 30 100 300 1000 3000 10000 30000 100000) and give roughly that many GB of raw data. Values from 0.01 up to 1 produce a proportionally smaller dataset for smoke tests and demos; fixed-size tables such as date_dim and time_dim keep their full size.,default=1" jsonschema_extras:"nonsensitive=true"`
+	Scale float64 `json:"scale" jsonschema:"title=Scale Factor,default=1" jsonschema_description:"TPC-DS scale factor. Values of 1 and above should be one of the benchmark's official factors (1, 3, 10, 30, 100, 300, 1000, 3000, 10000, 30000, 100000) and give roughly that many GB of raw data. Values from 0.01 up to 1 produce a proportionally smaller dataset for smoke tests and demos; fixed-size tables such as date_dim and time_dim keep their full size. Values below 0.01 are rejected." jsonschema_extras:"nonsensitive=true"`
 }
 
 func (c config) Validate() error {

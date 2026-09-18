@@ -1,7 +1,9 @@
-# source-tpc-ds
+# Changelog
 
-## v1, 2026-09-18
+## 2026-09-18
 
-- Initial release: emits the TPC-DS dataset for a configurable scale factor,
-  one binding per table, by streaming rows from a patched dsdgen
-  (https://github.com/estuary/tpcds-kit).
+### Added
+- Initial release. Emits the TPC-DS benchmark dataset at a configurable
+  `scale` factor, one binding per table (24 tables), with integer, exact
+  decimal and date typing so SQL destinations create the column types the
+  benchmark expects.

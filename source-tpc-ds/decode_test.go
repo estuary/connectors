@@ -100,7 +100,7 @@ func TestTables(t *testing.T) {
 }
 
 func TestPlanChunks(t *testing.T) {
-	require.Equal(t, 1, planChunks(0))
+	require.Equal(t, 1, planChunks(1))
 	require.Equal(t, 1, planChunks(chunkTargetRows))
 	require.Equal(t, 2, planChunks(chunkTargetRows+1))
 	require.Equal(t, 3, planChunks(2_500_000))

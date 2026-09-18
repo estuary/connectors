@@ -21,8 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// The dataset is generated in-process, so nothing external is needed beyond
-// the dsdgen binary; tests that need it skip when it is absent.
+// Tests that drive the real generator skip when the dsdgen binary is absent.
 func requireDsdgen(t *testing.T) {
 	if _, err := newGenerator("1"); err != nil {
 		t.Skipf("skipping: %v", err)
@@ -322,4 +321,35 @@ func digestsOf(summary string) map[string]string {
 		out[m[1]] = m[2] + " " + m[3]
 	}
 	return out
+}
+
+// A returns binding works without its sales parent enabled and yields exactly
+// the rows the full capture gave it.
+func TestReturnsWithoutParent(t *testing.T) {
+	t.Setenv("TEST_DATABASE", "yes")
+	requireDsdgen(t)
+
+	var bindings []*flow.CaptureSpec_Binding
+	for _, b := range allBindings(t) {
+		if b.StateKey == "store_returns" {
+			bindings = append(bindings, b)
+		}
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var validator = &digestValidator{onAllDone: cancel, bindings: 1}
+	var cs = &st.CaptureSpec{
+		Driver:       new(driver),
+		EndpointSpec: &config{Scale: 0.01},
+		Bindings:     bindings,
+		Validator:    validator,
+	}
+	cs.Capture(ctx, t, nil)
+	require.Empty(t, cs.Errors)
+
+	var w strings.Builder
+	require.NoError(t, validator.Summarize(&w))
+	var got = digestsOf(w.String())
+	require.Len(t, got, 1)
+	require.Equal(t, captureSnapshotDigests(t)["acmeCo/tpcds/store_returns"], got["acmeCo/tpcds/store_returns"])
 }
