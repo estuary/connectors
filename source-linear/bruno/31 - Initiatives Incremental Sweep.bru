@@ -1,0 +1,100 @@
+meta {
+  name: 31 - Initiatives Incremental Sweep
+  type: graphql
+  seq: 31
+}
+
+post {
+  url: {{base_url}}
+  body: graphql
+  auth: inherit
+}
+
+body:graphql {
+  query InitiativesIncrementalSweep {
+    initiatives(
+      first: 250
+      includeArchived: true
+      sort: [{updatedAt: {order: Ascending}}]
+      filter: {updatedAt: {gt: "2026-07-30T00:00:00Z"}}
+    ) {
+      nodes { id updatedAt archivedAt }
+      pageInfo { hasNextPage endCursor }
+    }
+  }
+}
+
+docs {
+  Reference: https://linear.app/developers/filtering
+
+  The exact incremental query the connector will issue for Initiatives. Same shape as
+  `21 - Projects Incremental Sweep`, with `InitiativeFilter` in place of `ProjectFilter`.
+
+  **Limitation / observed finding** (2026-08-04, after `Seeding/A2`): returns **1 row** —
+  the seeded initiative. This also resolves the earlier ambiguity about whether emptiness
+  reflected missing paid-plan entitlement: `initiativeCreate` succeeded, so **Initiatives are
+  enabled on this workspace** and the previous zero-row result simply meant no data.
+
+  As with `21 - Projects Incremental Sweep`, a single row cannot demonstrate partial
+  narrowing (any bound either includes it or excludes it). `gte` semantics are carried over
+  from `07 - Cursor Filter Boundary`.
+}
+
+example {
+  name: 200 — updatedAt filter + sort accepted, 1 row
+
+  request: {
+    url: https://api.linear.app/graphql
+    method: POST
+    mode: graphql
+
+    body:graphql: {
+      query InitiativesIncrementalSweep {
+        initiatives(
+          first: 250
+          includeArchived: true
+          sort: [{updatedAt: {order: Ascending}}]
+          filter: {updatedAt: {gt: "2026-07-30T00:00:00Z"}}
+        ) {
+          nodes { id updatedAt archivedAt }
+          pageInfo { hasNextPage endCursor }
+        }
+      }
+    }
+  }
+
+  response: {
+    headers: {
+      x-complexity: 625
+      x-ratelimit-requests-limit: 2500
+      x-ratelimit-requests-remaining: 2482
+      x-ratelimit-complexity-limit: 3000000
+      x-ratelimit-complexity-remaining: 2999360
+    }
+
+    status: {
+      code: 200
+      text: OK
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "data": {
+            "initiatives": {
+              "count": 1,
+              "rows": [
+                {
+                  "id": "44f4e104-762d-43b3-a154-78fa72567bdb",
+                  "updatedAt": "2026-08-04T18:35:04.260Z",
+                  "archivedAt": null
+                }
+              ]
+            }
+          }
+        }
+      '''
+    }
+  }
+}
