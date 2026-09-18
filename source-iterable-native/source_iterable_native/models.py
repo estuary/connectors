@@ -251,6 +251,11 @@ class Campaigns(ResourceWithId):
 
     createdAt: int
     updatedAt: int
+    startAt: int = Field(
+        default=None,
+        # Don't schematize the default value.
+        json_schema_extra=lambda x: x.pop('default') # type: ignore
+    )
     endedAt: int = Field(
         default=None,
         # Don't schematize the default value.
@@ -263,6 +268,22 @@ class Campaigns(ResourceWithId):
         if self.endedAt is not None:
             return max(self.updatedAt, self.endedAt)
         return self.updatedAt
+
+    @property
+    def change_timestamps(self) -> list[int]:
+        """The timestamps that move when a campaign changes.
+
+        `updatedAt` tracks edits only; Iterable leaves it at the last edit when a
+        campaign starts or finishes.
+        `startAt` is the scheduled start, so it enters a poll's window exactly
+        when that start elapses.
+        `endedAt` is stamped on completion.
+        `createdAt` never exceeds `updatedAt` and is omitted.
+        """
+        return [
+            ts for ts in (self.updatedAt, self.startAt, self.endedAt)
+            if ts is not None
+        ]
 
 
 class CampaignsResponse(BaseModel):
