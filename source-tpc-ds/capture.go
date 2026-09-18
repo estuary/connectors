@@ -1,0 +1,256 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"strconv"
+
+	boilerplate "github.com/estuary/connectors/source-boilerplate"
+	log "github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
+)
+
+// chunkTargetRows is the number of dsdgen rows per work item. For the sales
+// tables a dsdgen row is a ticket or order that expands to several line items.
+// A variable so tests can exercise chunking at small scale.
+var chunkTargetRows int64 = 1_000_000
+
+// checkpointEvery is the number of stdout lines a stream buffers before it
+// writes them out together with a checkpoint. Documents only ever leave a
+// stream alongside the checkpoint that accounts for them; otherwise a sibling
+// stream's checkpoint could commit them, and a restart would emit them twice.
+const checkpointEvery = 10_000
+
+type state struct {
+	Bindings map[boilerplate.StateKey]*bindingState `json:"bindingStateV1,omitempty"`
+}
+
+// bindingState is one binding's checkpoint. A returns binding reads the same
+// dsdgen stream as its sales parent, so the two record identical progress.
+type bindingState struct {
+	Scale     string           `json:"scale,omitempty"`     // scale factor the rows were generated at
+	Chunks    int              `json:"chunks,omitempty"`    // work items the stream is split into
+	Completed int              `json:"completed,omitempty"` // chunks 1..Completed are fully emitted
+	InFlight  map[string]int64 `json:"inFlight,omitempty"`  // chunk -> stdout lines already emitted
+	Done      bool             `json:"done,omitempty"`
+}
+
+type binding struct {
+	index    int
+	table    *tableDef
+	stateKey boilerplate.StateKey
+	state    *bindingState
+}
+
+type capture struct {
+	out      *boilerplate.PullOutput
+	gen      *generator
+	bindings []*binding
+}
+
+// planChunks splits rows dsdgen rows into work items of about chunkTargetRows.
+func planChunks(rows int64) int {
+	if rows <= chunkTargetRows {
+		return 1
+	}
+	return max(2, int((rows+chunkTargetRows-1)/chunkTargetRows))
+}
+
+func (c *capture) run() error {
+	for _, b := range c.bindings {
+		if b.state.Scale != "" && b.state.Scale != c.gen.scale {
+			return fmt.Errorf("binding %s holds data generated at scale factor %s but the endpoint is now configured for %s; backfill the bindings to regenerate the dataset at the new scale", b.table.Name, b.state.Scale, c.gen.scale)
+		}
+	}
+	if err := c.out.Ready(false); err != nil {
+		return err
+	}
+	var ctx = c.out.Context()
+
+	// One dsdgen stream per enabled parent table; a returns binding joins its
+	// parent's stream whether or not the parent is enabled.
+	var streams []*streamRun
+	var byParent = map[string]*streamRun{}
+	for _, b := range c.bindings {
+		var parent = streamOf(b.table)
+		s, ok := byParent[parent.Name]
+		if !ok {
+			s = &streamRun{c: c, parent: parent}
+			byParent[parent.Name] = s
+			streams = append(streams, s)
+		}
+		s.members = append(s.members, b)
+	}
+
+	group, gctx := errgroup.WithContext(ctx)
+	for _, s := range streams {
+		group.Go(func() error { return s.run(gctx) })
+	}
+	if err := group.Wait(); err != nil {
+		return err
+	}
+	log.WithFields(log.Fields{
+		"eventType": "connectorStatus",
+		"bindings":  len(c.bindings),
+	}).Info("Every binding has emitted its full dataset; idling")
+	<-ctx.Done()
+	return nil
+}
+
+// streamRun drives one parent table's dsdgen work items and fans rows out to
+// the bindings reading that stream.
+type streamRun struct {
+	c       *capture
+	parent  *tableDef
+	members []*binding
+}
+
+func (s *streamRun) run(ctx context.Context) error {
+	var chunks int
+	for _, m := range s.members {
+		if m.state.Chunks > 0 {
+			chunks = m.state.Chunks
+			break
+		}
+	}
+	if chunks == 0 {
+		rows, err := s.c.gen.rowCount(ctx, s.parent.Name)
+		if err != nil {
+			return err
+		}
+		chunks = planChunks(rows)
+		log.WithFields(log.Fields{"table": s.parent.Name, "rows": rows, "chunks": chunks}).Info("planned generation")
+	}
+
+	// Resume from the lowest chunk any member still needs. Members past that
+	// point drop rows they already emitted, so a binding added later catches
+	// up without duplicating its siblings.
+	var start = chunks + 1
+	for _, m := range s.members {
+		m.state.Scale = s.c.gen.scale
+		m.state.Chunks = chunks
+		if !m.state.Done && m.state.Completed+1 < start {
+			start = m.state.Completed + 1
+		}
+	}
+	if start > chunks {
+		return nil
+	}
+	if err := s.checkpoint(func(m *binding) map[string]any {
+		return map[string]any{"scale": m.state.Scale, "chunks": m.state.Chunks}
+	}); err != nil {
+		return err
+	}
+	for k := start; k <= chunks; k++ {
+		if err := s.runChunk(ctx, k, chunks); err != nil {
+			return err
+		}
+	}
+	log.WithField("table", s.parent.Name).Info("stream complete")
+	return nil
+}
+
+func (s *streamRun) runChunk(ctx context.Context, chunk, chunks int) error {
+	var key = strconv.Itoa(chunk)
+	type target struct {
+		b    *binding
+		skip int64 // stdout lines of this chunk already emitted before a restart
+		docs []json.RawMessage
+	}
+	var targets []*target
+	for _, m := range s.members {
+		if chunk > m.state.Completed {
+			targets = append(targets, &target{b: m, skip: m.state.InFlight[key]})
+		}
+	}
+	if len(targets) == 0 {
+		return nil
+	}
+	log.WithFields(log.Fields{"table": s.parent.Name, "chunk": chunk, "chunks": chunks}).Info("generating chunk")
+
+	var lines int64
+	// emit writes every buffered document and then the checkpoint fn builds,
+	// atomically with respect to other streams.
+	var emit = func(fn func(m *binding) map[string]any) error {
+		var batches []boilerplate.DocumentBatch
+		for _, t := range targets {
+			if len(t.docs) > 0 {
+				batches = append(batches, boilerplate.DocumentBatch{Binding: t.b.index, Docs: t.docs})
+				t.docs = nil
+			}
+		}
+		patch, err := s.patch(fn)
+		if err != nil {
+			return err
+		}
+		return s.c.out.DocumentBatchesAndCheckpoint(patch, true, batches...)
+	}
+	var progress = func(m *binding) map[string]any {
+		if chunk <= m.state.Completed {
+			return nil
+		}
+		if m.state.InFlight == nil {
+			m.state.InFlight = map[string]int64{}
+		}
+		// Never lower a member's mark: rows below a pre-restart mark were
+		// committed by the earlier run and are being skipped, not re-emitted.
+		m.state.InFlight[key] = max(m.state.InFlight[key], lines)
+		return map[string]any{"inFlight": map[string]int64{key: m.state.InFlight[key]}}
+	}
+
+	err := s.c.gen.stream(ctx, s.parent.Name, chunks, chunk, func(line []byte) error {
+		table, err := routeLine(s.parent, line)
+		if err != nil {
+			return err
+		}
+		var idx = lines
+		lines++
+		for _, t := range targets {
+			if t.b.table != table || idx < t.skip {
+				continue
+			}
+			doc, err := decodeLine(table, line)
+			if err != nil {
+				return err
+			}
+			t.docs = append(t.docs, doc)
+		}
+		if lines%checkpointEvery == 0 {
+			return emit(progress)
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	return emit(func(m *binding) map[string]any {
+		if chunk <= m.state.Completed {
+			return nil
+		}
+		m.state.Completed = chunk
+		m.state.InFlight = nil
+		m.state.Done = chunk == chunks
+		return map[string]any{"completed": chunk, "inFlight": nil, "done": m.state.Done}
+	})
+}
+
+// patch builds a merge patch from fn's per-member patches.
+func (s *streamRun) patch(fn func(m *binding) map[string]any) (json.RawMessage, error) {
+	var patches = map[boilerplate.StateKey]any{}
+	for _, m := range s.members {
+		if p := fn(m); p != nil {
+			patches[m.stateKey] = p
+		}
+	}
+	return json.Marshal(map[string]any{"bindingStateV1": patches})
+}
+
+// checkpoint emits a merge patch built from fn's per-member patches.
+func (s *streamRun) checkpoint(fn func(m *binding) map[string]any) error {
+	patch, err := s.patch(fn)
+	if err != nil {
+		return err
+	}
+	return s.c.out.Checkpoint(patch, true)
+}

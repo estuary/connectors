@@ -1,0 +1,161 @@
+# ================================
+# Collection "acmeCo/tpcds/call_center": 1 Documents
+# ================================
+Digest: 6591ab0b70de42006054fe9b0094b5317158a874813c5d259add000c55beb18a
+{"cc_call_center_sk":1,"cc_call_center_id":"AAAAAAAABAAAAAAA","cc_rec_start_date":"1998-01-01","cc_open_date_sk":2450952,"cc_name":"NY Metro","cc_class":"large","cc_employees":2,"cc_sq_ft":1138,"cc_hours":"8AM-4PM","cc_manager":"Bob Belcher","cc_mkt_id":6,"cc_mkt_class":"More than other authori","cc_mkt_desc":"Shared others could not count fully dollars. New members ca","cc_market_manager":"Julius Tran","cc_division":3,"cc_division_name":"pri","cc_company":6,"cc_company_name":"cally","cc_street_number":"730","cc_street_name":"Ash Hill","cc_street_type":"Boulevard","cc_suite_number":"Suite 0","cc_city":"Midway","cc_county":"Williamson County","cc_state":"TN","cc_zip":"31904","cc_country":"United States","cc_gmt_offset":"-5","cc_tax_percentage":"0.11"}
+# ================================
+# Collection "acmeCo/tpcds/catalog_page": 11718 Documents
+# ================================
+Digest: 6690a20fe1096eab9186b17b965d8f2f2cb5e3325ae8699384be2646d0998e44
+{"cp_catalog_page_sk":1,"cp_catalog_page_id":"AAAAAAAABAAAAAAA","cp_start_date_sk":2450815,"cp_end_date_sk":2450996,"cp_department":"DEPARTMENT","cp_catalog_number":1,"cp_catalog_page_number":1,"cp_description":"In general basic characters welcome. Clearly lively friends conv","cp_type":"bi-annual"}
+{"cp_catalog_page_sk":2,"cp_catalog_page_id":"AAAAAAAACAAAAAAA","cp_start_date_sk":2450815,"cp_end_date_sk":2450996,"cp_department":"DEPARTMENT","cp_catalog_number":1,"cp_catalog_page_number":2,"cp_description":"English areas will leave prisoners. Too public countries ought to become beneath the years. ","cp_type":"bi-annual"}
+{"cp_catalog_page_sk":3,"cp_catalog_page_id":"AAAAAAAADAAAAAAA","cp_start_date_sk":2450815,"cp_end_date_sk":2450996,"cp_department":"DEPARTMENT","cp_catalog_number":1,"cp_catalog_page_number":3,"cp_description":"Times could not address disabled indians. Effectively public ports c","cp_type":"bi-annual"}
+# ================================
+# Collection "acmeCo/tpcds/catalog_returns": 1377 Documents
+# ================================
+Digest: 4c1fc78d75d26052a184eaa21b15606cd63e6462cb0db8d99c787d10ca1ce74e
+{"cr_returned_date_sk":2450926,"cr_returned_time_sk":45816,"cr_item_sk":49,"cr_refunded_customer_sk":601,"cr_refunded_cdemo_sk":10467,"cr_refunded_hdemo_sk":6189,"cr_refunded_addr_sk":83,"cr_returning_customer_sk":601,"cr_returning_cdemo_sk":10467,"cr_returning_hdemo_sk":4703,"cr_returning_addr_sk":83,"cr_call_center_sk":1,"cr_catalog_page_sk":106,"cr_ship_mode_sk":2,"cr_warehouse_sk":1,"cr_reason_sk":1,"cr_order_number":2,"cr_return_quantity":47,"cr_return_amount":"3888.31","cr_return_tax":"233.29","cr_return_amt_inc_tax":"4121.60","cr_fee":"91.23","cr_return_ship_cost":"1348.90","cr_refunded_cash":"3577.24","cr_reversed_charge":"186.64","cr_store_credit":"124.43","cr_net_loss":"1673.42"}
+{"cr_returned_date_sk":2450946,"cr_returned_time_sk":74710,"cr_item_sk":116,"cr_refunded_customer_sk":601,"cr_refunded_cdemo_sk":10467,"cr_refunded_hdemo_sk":6189,"cr_refunded_addr_sk":83,"cr_returning_customer_sk":809,"cr_returning_cdemo_sk":12478,"cr_returning_hdemo_sk":991,"cr_returning_addr_sk":332,"cr_call_center_sk":1,"cr_catalog_page_sk":17,"cr_ship_mode_sk":2,"cr_warehouse_sk":1,"cr_reason_sk":1,"cr_order_number":2,"cr_return_quantity":49,"cr_return_amount":"2490.18","cr_return_tax":"99.60","cr_return_amt_inc_tax":"2589.78","cr_fee":"52.54","cr_return_ship_cost":"1867.39","cr_refunded_cash":"323.72","cr_reversed_charge":"931.57","cr_store_credit":"1234.89","cr_net_loss":"2019.53"}
+{"cr_returned_date_sk":2451067,"cr_returned_time_sk":71104,"cr_item_sk":8,"cr_refunded_customer_sk":383,"cr_refunded_cdemo_sk":3755,"cr_refunded_hdemo_sk":2480,"cr_refunded_addr_sk":152,"cr_returning_customer_sk":311,"cr_returning_cdemo_sk":9216,"cr_returning_hdemo_sk":5571,"cr_returning_addr_sk":485,"cr_call_center_sk":1,"cr_catalog_page_sk":7,"cr_ship_mode_sk":13,"cr_warehouse_sk":1,"cr_reason_sk":1,"cr_order_number":4,"cr_return_quantity":12,"cr_return_amount":"64.32","cr_return_tax":"4.50","cr_return_amt_inc_tax":"68.82","cr_fee":"22.97","cr_return_ship_cost":"78.60","cr_refunded_cash":"1.28","cr_reversed_charge":"55.47","cr_store_credit":"7.57","cr_net_loss":"106.07"}
+# ================================
+# Collection "acmeCo/tpcds/catalog_sales": 14313 Documents
+# ================================
+Digest: a9340d8e5ff4154435edb522072253658b31b848b8c2c9ba93ada97bcda6a6c2
+{"cs_sold_date_sk":2450815,"cs_sold_time_sk":38212,"cs_ship_date_sk":2450886,"cs_bill_customer_sk":153,"cs_bill_cdemo_sk":17212,"cs_bill_hdemo_sk":5775,"cs_bill_addr_sk":486,"cs_ship_customer_sk":153,"cs_ship_cdemo_sk":17212,"cs_ship_hdemo_sk":5775,"cs_ship_addr_sk":486,"cs_call_center_sk":1,"cs_catalog_page_sk":62,"cs_ship_mode_sk":3,"cs_warehouse_sk":1,"cs_item_sk":58,"cs_promo_sk":1,"cs_order_number":1,"cs_quantity":47,"cs_wholesale_cost":"27.70","cs_list_price":"44.32","cs_sales_price":"42.99","cs_ext_discount_amt":"62.51","cs_ext_sales_price":"2020.53","cs_ext_wholesale_cost":"1301.90","cs_ext_list_price":"2083.04","cs_ext_tax":"101.02","cs_coupon_amt":"0.00","cs_ext_ship_cost":"1041.52","cs_net_paid":"2020.53","cs_net_paid_inc_tax":"2121.55","cs_net_paid_inc_ship":"3062.05","cs_net_paid_inc_ship_tax":"3163.07","cs_net_profit":"718.63"}
+{"cs_sold_date_sk":2450815,"cs_sold_time_sk":38212,"cs_ship_date_sk":2450846,"cs_bill_customer_sk":153,"cs_bill_cdemo_sk":17212,"cs_bill_hdemo_sk":5775,"cs_bill_addr_sk":486,"cs_ship_customer_sk":153,"cs_ship_cdemo_sk":17212,"cs_ship_hdemo_sk":5775,"cs_ship_addr_sk":486,"cs_call_center_sk":1,"cs_catalog_page_sk":31,"cs_ship_mode_sk":8,"cs_warehouse_sk":1,"cs_item_sk":25,"cs_promo_sk":3,"cs_order_number":1,"cs_quantity":20,"cs_wholesale_cost":"87.55","cs_list_price":"260.89","cs_sales_price":"153.92","cs_ext_discount_amt":"2139.40","cs_ext_sales_price":"3078.40","cs_ext_wholesale_cost":"1751.00","cs_ext_list_price":"5217.80","cs_ext_tax":"71.41","cs_coupon_amt":"1292.92","cs_ext_ship_cost":"1356.60","cs_net_paid":"1785.48","cs_net_paid_inc_tax":"1856.89","cs_net_paid_inc_ship":"3142.08","cs_net_paid_inc_ship_tax":"3213.49","cs_net_profit":"34.48"}
+{"cs_sold_date_sk":2450815,"cs_sold_time_sk":38212,"cs_ship_date_sk":2450868,"cs_bill_customer_sk":153,"cs_bill_cdemo_sk":17212,"cs_bill_hdemo_sk":5775,"cs_bill_addr_sk":486,"cs_ship_customer_sk":153,"cs_ship_cdemo_sk":17212,"cs_ship_hdemo_sk":5775,"cs_ship_addr_sk":486,"cs_call_center_sk":1,"cs_catalog_page_sk":76,"cs_ship_mode_sk":2,"cs_warehouse_sk":1,"cs_item_sk":62,"cs_promo_sk":1,"cs_order_number":1,"cs_quantity":19,"cs_wholesale_cost":"69.86","cs_list_price":"88.72","cs_sales_price":"29.27","cs_ext_discount_amt":"1129.55","cs_ext_sales_price":"556.13","cs_ext_wholesale_cost":"1327.34","cs_ext_list_price":"1685.68","cs_ext_tax":"33.36","cs_coupon_amt":"0.00","cs_ext_ship_cost":"168.53","cs_net_paid":"556.13","cs_net_paid_inc_tax":"589.49","cs_net_paid_inc_ship":"724.66","cs_net_paid_inc_ship_tax":"758.02","cs_net_profit":"-771.21"}
+# ================================
+# Collection "acmeCo/tpcds/customer": 1000 Documents
+# ================================
+Digest: 552b4240dce513c240ea0b7a1bdf00f255ae68917350f6fb280b2a6e5f605f08
+{"c_customer_sk":1,"c_customer_id":"AAAAAAAABAAAAAAA","c_current_cdemo_sk":516,"c_current_hdemo_sk":7135,"c_current_addr_sk":446,"c_first_shipto_date_sk":2452238,"c_first_sales_date_sk":2452208,"c_salutation":"Mr.","c_first_name":"Javier","c_last_name":"Lewis","c_preferred_cust_flag":"Y","c_birth_day":9,"c_birth_month":12,"c_birth_year":1936,"c_birth_country":"CHILE","c_email_address":"Javier.Lewis@VFAxlnZEvOx.org","c_last_review_date_sk":2452508}
+{"c_customer_sk":2,"c_customer_id":"AAAAAAAACAAAAAAA","c_current_cdemo_sk":12931,"c_current_hdemo_sk":1461,"c_current_addr_sk":155,"c_first_shipto_date_sk":2452318,"c_first_sales_date_sk":2452288,"c_salutation":"Dr.","c_first_name":"Amy","c_last_name":"Moses","c_preferred_cust_flag":"Y","c_birth_day":9,"c_birth_month":4,"c_birth_year":1966,"c_birth_country":"TOGO","c_email_address":"Amy.Moses@Ovk9KjHH.com","c_last_review_date_sk":2452318}
+{"c_customer_sk":3,"c_customer_id":"AAAAAAAADAAAAAAA","c_current_cdemo_sk":13714,"c_current_hdemo_sk":6247,"c_current_addr_sk":72,"c_first_shipto_date_sk":2449130,"c_first_sales_date_sk":2449100,"c_salutation":"Miss","c_first_name":"Latisha","c_last_name":"Hamilton","c_preferred_cust_flag":"N","c_birth_day":18,"c_birth_month":9,"c_birth_year":1979,"c_birth_country":"NIUE","c_email_address":"Latisha.Hamilton@V.com","c_last_review_date_sk":2452313}
+# ================================
+# Collection "acmeCo/tpcds/customer_address": 500 Documents
+# ================================
+Digest: 9c8c746770430e677d1806cd382543367cba690c08f3cf8e471a7b7cb335f43f
+{"ca_address_sk":1,"ca_address_id":"AAAAAAAABAAAAAAA","ca_street_number":"18","ca_street_name":"Jackson ","ca_street_type":"Parkway","ca_suite_number":"Suite 280","ca_city":"Fairfield","ca_county":"Maricopa County","ca_state":"AZ","ca_zip":"86192","ca_country":"United States","ca_gmt_offset":"-7","ca_location_type":"condo"}
+{"ca_address_sk":2,"ca_address_id":"AAAAAAAACAAAAAAA","ca_street_number":"362","ca_street_name":"Washington 6th","ca_street_type":"RD","ca_suite_number":"Suite 80","ca_city":"Fairview","ca_county":"Taos County","ca_state":"NM","ca_zip":"85709","ca_country":"United States","ca_gmt_offset":"-7","ca_location_type":"condo"}
+{"ca_address_sk":3,"ca_address_id":"AAAAAAAADAAAAAAA","ca_street_number":"585","ca_street_name":"Dogwood Washington","ca_street_type":"Circle","ca_suite_number":"Suite Q","ca_city":"Pleasant Valley","ca_county":"York County","ca_state":"PA","ca_zip":"12477","ca_country":"United States","ca_gmt_offset":"-5","ca_location_type":"single family"}
+# ================================
+# Collection "acmeCo/tpcds/customer_demographics": 19208 Documents
+# ================================
+Digest: 5afbd82cbcdc5b6277f694d0f7c80a7d40a88d9187af3300fedd09fce981bcac
+{"cd_demo_sk":1,"cd_gender":"M","cd_marital_status":"M","cd_education_status":"Primary","cd_purchase_estimate":500,"cd_credit_rating":"Good","cd_dep_count":0,"cd_dep_employed_count":0,"cd_dep_college_count":0}
+{"cd_demo_sk":2,"cd_gender":"F","cd_marital_status":"M","cd_education_status":"Primary","cd_purchase_estimate":500,"cd_credit_rating":"Good","cd_dep_count":0,"cd_dep_employed_count":0,"cd_dep_college_count":0}
+{"cd_demo_sk":3,"cd_gender":"M","cd_marital_status":"S","cd_education_status":"Primary","cd_purchase_estimate":500,"cd_credit_rating":"Good","cd_dep_count":0,"cd_dep_employed_count":0,"cd_dep_college_count":0}
+# ================================
+# Collection "acmeCo/tpcds/date_dim": 73049 Documents
+# ================================
+Digest: 8729bd4ac439c27aed178759a8504c418d0df948ca90b40aeefba1d9b14690f6
+{"d_date_sk":2415022,"d_date_id":"AAAAAAAAOKJNECAA","d_date":"1900-01-02","d_month_seq":0,"d_week_seq":1,"d_quarter_seq":1,"d_year":1900,"d_dow":1,"d_moy":1,"d_dom":2,"d_qoy":1,"d_fy_year":1900,"d_fy_quarter_seq":1,"d_fy_week_seq":1,"d_day_name":"Monday","d_quarter_name":"1900Q1","d_holiday":"N","d_weekend":"N","d_following_holiday":"Y","d_first_dom":2415021,"d_last_dom":2415020,"d_same_day_ly":2414657,"d_same_day_lq":2414930,"d_current_day":"N","d_current_week":"N","d_current_month":"N","d_current_quarter":"N","d_current_year":"N"}
+{"d_date_sk":2415023,"d_date_id":"AAAAAAAAPKJNECAA","d_date":"1900-01-03","d_month_seq":0,"d_week_seq":1,"d_quarter_seq":1,"d_year":1900,"d_dow":2,"d_moy":1,"d_dom":3,"d_qoy":1,"d_fy_year":1900,"d_fy_quarter_seq":1,"d_fy_week_seq":1,"d_day_name":"Tuesday","d_quarter_name":"1900Q1","d_holiday":"N","d_weekend":"N","d_following_holiday":"N","d_first_dom":2415021,"d_last_dom":2415020,"d_same_day_ly":2414658,"d_same_day_lq":2414931,"d_current_day":"N","d_current_week":"N","d_current_month":"N","d_current_quarter":"N","d_current_year":"N"}
+{"d_date_sk":2415024,"d_date_id":"AAAAAAAAALJNECAA","d_date":"1900-01-04","d_month_seq":0,"d_week_seq":1,"d_quarter_seq":1,"d_year":1900,"d_dow":3,"d_moy":1,"d_dom":4,"d_qoy":1,"d_fy_year":1900,"d_fy_quarter_seq":1,"d_fy_week_seq":1,"d_day_name":"Wednesday","d_quarter_name":"1900Q1","d_holiday":"N","d_weekend":"N","d_following_holiday":"N","d_first_dom":2415021,"d_last_dom":2415020,"d_same_day_ly":2414659,"d_same_day_lq":2414932,"d_current_day":"N","d_current_week":"N","d_current_month":"N","d_current_quarter":"N","d_current_year":"N"}
+# ================================
+# Collection "acmeCo/tpcds/household_demographics": 7200 Documents
+# ================================
+Digest: 9131edacd487f95b7844930078e99978dc3b3e6930621ee9baf99c2ef6002e40
+{"hd_demo_sk":1,"hd_income_band_sk":2,"hd_buy_potential":"0-500","hd_dep_count":0,"hd_vehicle_count":0}
+{"hd_demo_sk":2,"hd_income_band_sk":3,"hd_buy_potential":"0-500","hd_dep_count":0,"hd_vehicle_count":0}
+{"hd_demo_sk":3,"hd_income_band_sk":4,"hd_buy_potential":"0-500","hd_dep_count":0,"hd_vehicle_count":0}
+# ================================
+# Collection "acmeCo/tpcds/income_band": 20 Documents
+# ================================
+Digest: 409be26e3f691914be845e0bf47aa01dfcf660aa87348ff77aaa77efbde2c11a
+{"ib_income_band_sk":1,"ib_lower_bound":0,"ib_upper_bound":10000}
+{"ib_income_band_sk":2,"ib_lower_bound":10001,"ib_upper_bound":20000}
+{"ib_income_band_sk":3,"ib_lower_bound":20001,"ib_upper_bound":30000}
+# ================================
+# Collection "acmeCo/tpcds/inventory": 23490 Documents
+# ================================
+Digest: 80a359b29f4c41322f7ff947078cae5af947c27f161246bf6979ab318fe056d0
+{"inv_date_sk":2450815,"inv_item_sk":1,"inv_warehouse_sk":1,"inv_quantity_on_hand":211}
+{"inv_date_sk":2450815,"inv_item_sk":2,"inv_warehouse_sk":1,"inv_quantity_on_hand":235}
+{"inv_date_sk":2450815,"inv_item_sk":4,"inv_warehouse_sk":1,"inv_quantity_on_hand":859}
+# ================================
+# Collection "acmeCo/tpcds/item": 180 Documents
+# ================================
+Digest: 08e894c6fb4f44cc74bc438e8989cf666d33b7f2287424ed3fd4fb0f84f78cdb
+{"i_item_sk":1,"i_item_id":"AAAAAAAABAAAAAAA","i_rec_start_date":"1997-10-27","i_item_desc":"Powers will not get influences. Electoral ports should show low, annual chains. Now young visitors may pose now however final pages. Bitterly right children suit increasing, leading el","i_current_price":"27.02","i_wholesale_cost":"23.23","i_brand_id":5003002,"i_brand":"exportischolar #2","i_class_id":3,"i_class":"pop","i_category_id":5,"i_category":"Music","i_manufact_id":52,"i_manufact":"ableanti","i_size":"N/A","i_formulation":"3663peru009490160959","i_color":"spring","i_units":"Tsp","i_container":"Unknown","i_manager_id":6,"i_product_name":"ought"}
+{"i_item_sk":2,"i_item_id":"AAAAAAAACAAAAAAA","i_rec_start_date":"1997-10-27","i_rec_end_date":"2000-10-26","i_item_desc":"False opportunities would run alone with a views. Early approaches would show inc, european intentions; important, main passages shall know urban, ","i_current_price":"1.12","i_wholesale_cost":"0.38","i_brand_id":1001001,"i_brand":"amalgamalg #1","i_class_id":1,"i_class":"dresses","i_category_id":1,"i_category":"Women","i_manufact_id":294,"i_manufact":"esen stable","i_size":"petite","i_formulation":"516steel060826230906","i_color":"rosy","i_units":"Bunch","i_container":"Unknown","i_manager_id":98,"i_product_name":"able"}
+{"i_item_sk":3,"i_item_id":"AAAAAAAACAAAAAAA","i_rec_start_date":"2000-10-27","i_item_desc":"False opportunities would run alone with a views. Early approaches would show inc, european intentions; important, main passages shall know urban, ","i_current_price":"7.11","i_wholesale_cost":"0.38","i_brand_id":1001001,"i_brand":"brandbrand #4","i_class_id":7,"i_class":"decor","i_category_id":7,"i_category":"Home","i_manufact_id":294,"i_manufact":"esen stable","i_size":"N/A","i_formulation":"516steel060826230906","i_color":"sienna","i_units":"Cup","i_container":"Unknown","i_manager_id":18,"i_product_name":"pri"}
+# ================================
+# Collection "acmeCo/tpcds/promotion": 3 Documents
+# ================================
+Digest: c8efaa99f33b66f82511c6646347f461524dd87c41fcb1186092d5cca514bd65
+{"p_promo_sk":1,"p_promo_id":"AAAAAAAABAAAAAAA","p_start_date_sk":2450164,"p_end_date_sk":2450185,"p_item_sk":122,"p_cost":"1000.00","p_response_target":1,"p_promo_name":"ought","p_channel_dmail":"Y","p_channel_email":"N","p_channel_catalog":"N","p_channel_tv":"N","p_channel_radio":"N","p_channel_press":"N","p_channel_event":"N","p_channel_demo":"N","p_channel_details":"Men will not say merely. Old, available ","p_purpose":"Unknown","p_discount_active":"N"}
+{"p_promo_sk":2,"p_promo_id":"AAAAAAAACAAAAAAA","p_start_date_sk":2450118,"p_end_date_sk":2450150,"p_item_sk":70,"p_cost":"1000.00","p_response_target":1,"p_promo_name":"able","p_channel_dmail":"Y","p_channel_email":"N","p_channel_catalog":"N","p_channel_tv":"N","p_channel_radio":"N","p_channel_press":"N","p_channel_event":"N","p_channel_demo":"N","p_channel_details":"So willing buildings coul","p_purpose":"Unknown","p_discount_active":"N"}
+{"p_promo_sk":3,"p_promo_id":"AAAAAAAADAAAAAAA","p_start_date_sk":2450675,"p_end_date_sk":2450712,"p_item_sk":43,"p_cost":"1000.00","p_response_target":1,"p_promo_name":"pri","p_channel_dmail":"Y","p_channel_email":"N","p_channel_catalog":"N","p_channel_tv":"N","p_channel_radio":"N","p_channel_press":"N","p_channel_event":"N","p_channel_demo":"N","p_channel_details":"Companies shall not pr","p_purpose":"Unknown","p_discount_active":"N"}
+# ================================
+# Collection "acmeCo/tpcds/reason": 1 Documents
+# ================================
+Digest: 3738f0d22ddd47d44b12e754ffd2375d7422cb8962000b692983d8c55949fb3b
+{"r_reason_sk":1,"r_reason_id":"AAAAAAAABAAAAAAA","r_reason_desc":"Package was damaged"}
+# ================================
+# Collection "acmeCo/tpcds/ship_mode": 20 Documents
+# ================================
+Digest: b5e20fa84e8984eb5a129cde96c4ab39f2d831b19eac34e954ea89bb9313a340
+{"sm_ship_mode_sk":1,"sm_ship_mode_id":"AAAAAAAABAAAAAAA","sm_type":"EXPRESS","sm_code":"AIR","sm_carrier":"UPS","sm_contract":"YvxVaJI10"}
+{"sm_ship_mode_sk":2,"sm_ship_mode_id":"AAAAAAAACAAAAAAA","sm_type":"NEXT DAY","sm_code":"AIR","sm_carrier":"FEDEX","sm_contract":"ldhM8IvpzHgdbBgDfI"}
+{"sm_ship_mode_sk":3,"sm_ship_mode_id":"AAAAAAAADAAAAAAA","sm_type":"OVERNIGHT","sm_code":"AIR","sm_carrier":"AIRBORNE","sm_contract":"6Hzzp4JkzjqD8MGXLCDa"}
+# ================================
+# Collection "acmeCo/tpcds/store": 1 Documents
+# ================================
+Digest: 5e88ad7efd3862607dbe59bc66d7d73b437861a050c1faa2b37a32c83ed4abd0
+{"s_store_sk":1,"s_store_id":"AAAAAAAABAAAAAAA","s_rec_start_date":"1997-03-13","s_closed_date_sk":2451189,"s_store_name":"ought","s_number_employees":245,"s_floor_space":5250760,"s_hours":"8AM-4PM","s_manager":"William Ward","s_market_id":2,"s_geography_class":"Unknown","s_market_desc":"Enough high areas stop expectations. Elaborate, local is","s_market_manager":"Charles Bartley","s_division_id":1,"s_division_name":"Unknown","s_company_id":1,"s_company_name":"Unknown","s_street_number":"767","s_street_name":"Spring ","s_street_type":"Wy","s_suite_number":"Suite 250","s_city":"Midway","s_county":"Williamson County","s_state":"TN","s_zip":"31904","s_country":"United States","s_gmt_offset":"-5","s_tax_precentage":"0.03"}
+# ================================
+# Collection "acmeCo/tpcds/store_returns": 2829 Documents
+# ================================
+Digest: 7c9bd107e2078740641fe173b5575046d2bf16e6e50dda24bdd40e305cd04bc2
+{"sr_returned_date_sk":2451984,"sr_return_time_sk":46418,"sr_item_sk":115,"sr_customer_sk":6,"sr_cdemo_sk":5494,"sr_hdemo_sk":4033,"sr_addr_sk":397,"sr_store_sk":1,"sr_reason_sk":1,"sr_ticket_number":1,"sr_return_quantity":51,"sr_return_amt":"37.23","sr_return_tax":"3.35","sr_return_amt_inc_tax":"40.58","sr_fee":"55.28","sr_return_ship_cost":"714.00","sr_refunded_cash":"0.74","sr_reversed_charge":"17.51","sr_store_credit":"18.98","sr_net_loss":"772.63"}
+{"sr_returned_date_sk":2451822,"sr_return_time_sk":47480,"sr_item_sk":104,"sr_customer_sk":6,"sr_cdemo_sk":6515,"sr_hdemo_sk":7157,"sr_addr_sk":251,"sr_store_sk":1,"sr_reason_sk":1,"sr_ticket_number":1,"sr_return_quantity":43,"sr_return_amt":"4009.32","sr_return_tax":"120.27","sr_return_amt_inc_tax":"4129.59","sr_fee":"28.23","sr_return_ship_cost":"0.00","sr_refunded_cash":"3448.01","sr_reversed_charge":"5.61","sr_store_credit":"555.70","sr_net_loss":"148.50"}
+{"sr_returned_date_sk":2451653,"sr_return_time_sk":37700,"sr_item_sk":4,"sr_customer_sk":284,"sr_cdemo_sk":1348,"sr_hdemo_sk":3067,"sr_addr_sk":319,"sr_store_sk":1,"sr_reason_sk":1,"sr_ticket_number":2,"sr_return_quantity":7,"sr_return_amt":"249.48","sr_return_tax":"2.49","sr_return_amt_inc_tax":"251.97","sr_fee":"11.50","sr_return_ship_cost":"6.23","sr_refunded_cash":"234.51","sr_reversed_charge":"8.83","sr_store_credit":"6.14","sr_net_loss":"20.22"}
+# ================================
+# Collection "acmeCo/tpcds/store_sales": 28810 Documents
+# ================================
+Digest: c7b94962c6ae9dd7e92b239d0e220c9bb495a9010a00d6123d34d7a04aeefb56
+{"ss_sold_date_sk":2451813,"ss_sold_time_sk":65495,"ss_item_sk":128,"ss_customer_sk":6,"ss_cdemo_sk":15377,"ss_hdemo_sk":3428,"ss_addr_sk":339,"ss_store_sk":1,"ss_promo_sk":2,"ss_ticket_number":1,"ss_quantity":79,"ss_wholesale_cost":"11.41","ss_list_price":"18.71","ss_sales_price":"2.80","ss_ext_discount_amt":"99.54","ss_ext_sales_price":"221.20","ss_ext_wholesale_cost":"901.39","ss_ext_list_price":"1478.09","ss_ext_tax":"6.08","ss_coupon_amt":"99.54","ss_net_paid":"121.66","ss_net_paid_inc_tax":"127.74","ss_net_profit":"-779.73"}
+{"ss_sold_date_sk":2451813,"ss_sold_time_sk":65495,"ss_item_sk":113,"ss_customer_sk":6,"ss_cdemo_sk":15377,"ss_hdemo_sk":3428,"ss_addr_sk":339,"ss_store_sk":1,"ss_promo_sk":1,"ss_ticket_number":1,"ss_quantity":37,"ss_wholesale_cost":"63.63","ss_list_price":"101.17","ss_sales_price":"41.47","ss_ext_discount_amt":"46.03","ss_ext_sales_price":"1534.39","ss_ext_wholesale_cost":"2354.31","ss_ext_list_price":"3743.29","ss_ext_tax":"59.53","ss_coupon_amt":"46.03","ss_net_paid":"1488.36","ss_net_paid_inc_tax":"1547.89","ss_net_profit":"-865.95"}
+{"ss_sold_date_sk":2451813,"ss_sold_time_sk":65495,"ss_item_sk":62,"ss_customer_sk":6,"ss_cdemo_sk":15377,"ss_hdemo_sk":3428,"ss_addr_sk":339,"ss_store_sk":1,"ss_promo_sk":1,"ss_ticket_number":1,"ss_quantity":99,"ss_wholesale_cost":"80.52","ss_list_price":"137.68","ss_sales_price":"83.98","ss_ext_discount_amt":"0.00","ss_ext_sales_price":"8314.02","ss_ext_wholesale_cost":"7971.48","ss_ext_list_price":"13630.32","ss_ext_tax":"0.00","ss_coupon_amt":"0.00","ss_net_paid":"8314.02","ss_net_paid_inc_tax":"8314.02","ss_net_profit":"342.54"}
+# ================================
+# Collection "acmeCo/tpcds/time_dim": 86400 Documents
+# ================================
+Digest: 788e7b42d20efb50a484d10b5102db812744f6ef1db42481e3e6dcaf99333a37
+{"t_time_sk":0,"t_time_id":"AAAAAAAABAAAAAAA","t_time":0,"t_hour":0,"t_minute":0,"t_second":0,"t_am_pm":"AM","t_shift":"third","t_sub_shift":"night"}
+{"t_time_sk":1,"t_time_id":"AAAAAAAACAAAAAAA","t_time":1,"t_hour":0,"t_minute":0,"t_second":1,"t_am_pm":"AM","t_shift":"third","t_sub_shift":"night"}
+{"t_time_sk":2,"t_time_id":"AAAAAAAADAAAAAAA","t_time":2,"t_hour":0,"t_minute":0,"t_second":2,"t_am_pm":"AM","t_shift":"third","t_sub_shift":"night"}
+# ================================
+# Collection "acmeCo/tpcds/warehouse": 1 Documents
+# ================================
+Digest: 926d8723deddb2ef931dc5c69d5055fa65f79df44d6b7bf03524aaa3fb063905
+{"w_warehouse_sk":1,"w_warehouse_id":"AAAAAAAABAAAAAAA","w_warehouse_name":"Conventional childr","w_warehouse_sq_ft":977787,"w_street_number":"651","w_street_name":"6th ","w_street_type":"Parkway","w_suite_number":"Suite 470","w_city":"Midway","w_county":"Williamson County","w_state":"TN","w_zip":"31904","w_country":"United States","w_gmt_offset":"-5"}
+# ================================
+# Collection "acmeCo/tpcds/web_page": 1 Documents
+# ================================
+Digest: 6b14f5688b6109fe838237d3631e34bacabf0d3771fe9789af50536e6cf74e6e
+{"wp_web_page_sk":1,"wp_web_page_id":"AAAAAAAABAAAAAAA","wp_rec_start_date":"1997-09-03","wp_creation_date_sk":2450810,"wp_access_date_sk":2452620,"wp_autogen_flag":"Y","wp_customer_sk":539,"wp_url":"http://www.foo.com","wp_type":"welcome","wp_char_count":2531,"wp_link_count":8,"wp_image_count":3,"wp_max_ad_count":4}
+# ================================
+# Collection "acmeCo/tpcds/web_returns": 685 Documents
+# ================================
+Digest: fb2ae23acb9e961452df743f925345c69b6454b3bd8eacb898df0d7d25ff5858
+{"wr_returned_date_sk":2451653,"wr_returned_time_sk":7022,"wr_item_sk":2,"wr_refunded_customer_sk":224,"wr_refunded_cdemo_sk":12819,"wr_refunded_hdemo_sk":3446,"wr_refunded_addr_sk":57,"wr_returning_customer_sk":224,"wr_returning_cdemo_sk":12819,"wr_returning_hdemo_sk":3446,"wr_returning_addr_sk":57,"wr_web_page_sk":1,"wr_reason_sk":1,"wr_order_number":1,"wr_return_quantity":10,"wr_return_amt":"698.20","wr_return_tax":"13.96","wr_return_amt_inc_tax":"712.16","wr_fee":"18.63","wr_return_ship_cost":"820.30","wr_refunded_cash":"300.22","wr_reversed_charge":"382.06","wr_account_credit":"15.92","wr_net_loss":"852.89"}
+{"wr_returned_date_sk":2451627,"wr_returned_time_sk":64915,"wr_item_sk":146,"wr_refunded_customer_sk":811,"wr_refunded_cdemo_sk":18405,"wr_refunded_hdemo_sk":199,"wr_refunded_addr_sk":293,"wr_returning_customer_sk":811,"wr_returning_cdemo_sk":18405,"wr_returning_hdemo_sk":199,"wr_returning_addr_sk":293,"wr_web_page_sk":1,"wr_reason_sk":1,"wr_order_number":1,"wr_return_quantity":47,"wr_return_amt":"1248.79","wr_return_tax":"49.95","wr_return_amt_inc_tax":"1298.74","wr_fee":"61.81","wr_return_ship_cost":"709.23","wr_refunded_cash":"262.24","wr_reversed_charge":"128.25","wr_account_credit":"858.30","wr_net_loss":"820.99"}
+{"wr_returned_date_sk":2452798,"wr_item_sk":138,"wr_refunded_cdemo_sk":12431,"wr_refunded_addr_sk":290,"wr_returning_cdemo_sk":12431,"wr_returning_hdemo_sk":2038,"wr_returning_addr_sk":290,"wr_reason_sk":1,"wr_order_number":2,"wr_return_quantity":11,"wr_return_tax":"25.52","wr_return_ship_cost":"16.72","wr_reversed_charge":"16.36","wr_account_credit":"165.47"}
+# ================================
+# Collection "acmeCo/tpcds/web_sales": 7212 Documents
+# ================================
+Digest: f2467abd390f309300bfe36f6b7e34f2a6ef480329d5f0c621fec255f605c44b
+{"ws_sold_date_sk":2451383,"ws_sold_time_sk":73313,"ws_ship_date_sk":2451482,"ws_item_sk":14,"ws_bill_customer_sk":74,"ws_bill_cdemo_sk":1037,"ws_bill_hdemo_sk":1096,"ws_bill_addr_sk":407,"ws_ship_customer_sk":919,"ws_ship_cdemo_sk":2913,"ws_ship_hdemo_sk":1140,"ws_ship_addr_sk":351,"ws_web_page_sk":1,"ws_web_site_sk":1,"ws_ship_mode_sk":4,"ws_warehouse_sk":1,"ws_promo_sk":3,"ws_order_number":1,"ws_quantity":57,"ws_wholesale_cost":"33.59","ws_list_price":"59.45","ws_sales_price":"38.04","ws_ext_discount_amt":"1220.37","ws_ext_sales_price":"2168.28","ws_ext_wholesale_cost":"1914.63","ws_ext_list_price":"3388.65","ws_ext_tax":"50.95","ws_coupon_amt":"1149.18","ws_ext_ship_cost":"575.70","ws_net_paid":"1019.10","ws_net_paid_inc_tax":"1070.05","ws_net_paid_inc_ship":"1594.80","ws_net_paid_inc_ship_tax":"1645.75","ws_net_profit":"-895.53"}
+{"ws_sold_date_sk":2451383,"ws_sold_time_sk":73313,"ws_ship_date_sk":2451411,"ws_item_sk":86,"ws_bill_customer_sk":74,"ws_bill_cdemo_sk":1037,"ws_bill_hdemo_sk":1096,"ws_bill_addr_sk":407,"ws_ship_customer_sk":919,"ws_ship_cdemo_sk":2913,"ws_ship_hdemo_sk":1140,"ws_ship_addr_sk":351,"ws_web_page_sk":1,"ws_web_site_sk":1,"ws_ship_mode_sk":3,"ws_warehouse_sk":1,"ws_promo_sk":1,"ws_order_number":1,"ws_quantity":38,"ws_wholesale_cost":"29.83","ws_list_price":"48.92","ws_sales_price":"26.41","ws_ext_discount_amt":"855.38","ws_ext_sales_price":"1003.58","ws_ext_wholesale_cost":"1133.54","ws_ext_list_price":"1858.96","ws_ext_tax":"30.10","ws_coupon_amt":"0.00","ws_ext_ship_cost":"910.86","ws_net_paid":"1003.58","ws_net_paid_inc_tax":"1033.68","ws_net_paid_inc_ship":"1914.44","ws_net_paid_inc_ship_tax":"1944.54","ws_net_profit":"-129.96"}
+{"ws_sold_date_sk":2451383,"ws_sold_time_sk":73313,"ws_ship_date_sk":2451413,"ws_item_sk":109,"ws_bill_customer_sk":74,"ws_bill_cdemo_sk":1037,"ws_bill_hdemo_sk":1096,"ws_bill_addr_sk":407,"ws_ship_customer_sk":919,"ws_ship_cdemo_sk":2913,"ws_ship_hdemo_sk":1140,"ws_ship_addr_sk":351,"ws_web_page_sk":1,"ws_web_site_sk":1,"ws_ship_mode_sk":10,"ws_warehouse_sk":1,"ws_promo_sk":3,"ws_order_number":1,"ws_quantity":32,"ws_wholesale_cost":"49.72","ws_list_price":"107.89","ws_sales_price":"97.10","ws_ext_discount_amt":"345.28","ws_ext_sales_price":"3107.20","ws_ext_wholesale_cost":"1591.04","ws_ext_list_price":"3452.48","ws_ext_tax":"124.28","ws_coupon_amt":"0.00","ws_ext_ship_cost":"828.48","ws_net_paid":"3107.20","ws_net_paid_inc_tax":"3231.48","ws_net_paid_inc_ship":"3935.68","ws_net_paid_inc_ship_tax":"4059.96","ws_net_profit":"1516.16"}
+# ================================
+# Collection "acmeCo/tpcds/web_site": 1 Documents
+# ================================
+Digest: b890c6e7db35c9f97ff63cb17f47fa2f1068fcd2bdebceaaf69a7282e131ab82
+{"web_site_sk":1,"web_site_id":"AAAAAAAABAAAAAAA","web_rec_start_date":"1997-08-16","web_name":"site_0","web_open_date_sk":2450807,"web_class":"Unknown","web_manager":"Ronald Shaffer","web_mkt_id":4,"web_mkt_class":"Grey lines ought to result indeed centres. Tod","web_mkt_desc":"Well similar decisions used to keep hardly democratic, personal priorities.","web_market_manager":"Joe George","web_company_id":6,"web_company_name":"cally","web_street_number":"51","web_street_name":"Dogwood Sunset","web_street_type":"Ln","web_suite_number":"Suite 330","web_city":"Midway","web_county":"Williamson County","web_state":"TN","web_zip":"31904","web_country":"United States","web_gmt_offset":"-5","web_tax_percentage":"0.10"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"call_center":{"chunks":1,"completed":1,"done":true,"scale":"0.01"},"catalog_page":{"chunks":1,"completed":1,"done":true,"scale":"0.01"},"catalog_returns":{"chunks":1,"completed":1,"done":true,"scale":"0.01"},"catalog_sales":{"chunks":1,"completed":1,"done":true,"scale":"0.01"},"customer":{"chunks":1,"completed":1,"done":true,"scale":"0.01"},"customer_address":{"chunks":1,"completed":1,"done":true,"scale":"0.01"},"customer_demographics":{"chunks":1,"completed":1,"done":true,"scale":"0.01"},"date_dim":{"chunks":1,"completed":1,"done":true,"scale":"0.01"},"household_demographics":{"chunks":1,"completed":1,"done":true,"scale":"0.01"},"income_band":{"chunks":1,"completed":1,"done":true,"scale":"0.01"},"inventory":{"chunks":1,"completed":1,"done":true,"scale":"0.01"},"item":{"chunks":1,"completed":1,"done":true,"scale":"0.01"},"promotion":{"chunks":1,"completed":1,"done":true,"scale":"0.01"},"reason":{"chunks":1,"completed":1,"done":true,"scale":"0.01"},"ship_mode":{"chunks":1,"completed":1,"done":true,"scale":"0.01"},"store":{"chunks":1,"completed":1,"done":true,"scale":"0.01"},"store_returns":{"chunks":1,"completed":1,"done":true,"scale":"0.01"},"store_sales":{"chunks":1,"completed":1,"done":true,"scale":"0.01"},"time_dim":{"chunks":1,"completed":1,"done":true,"scale":"0.01"},"warehouse":{"chunks":1,"completed":1,"done":true,"scale":"0.01"},"web_page":{"chunks":1,"completed":1,"done":true,"scale":"0.01"},"web_returns":{"chunks":1,"completed":1,"done":true,"scale":"0.01"},"web_sales":{"chunks":1,"completed":1,"done":true,"scale":"0.01"},"web_site":{"chunks":1,"completed":1,"done":true,"scale":"0.01"}}}
+
