@@ -62,6 +62,10 @@ func (g *generator) rowCount(ctx context.Context, table string) (int64, error) {
 
 func (g *generator) stream(ctx context.Context, table string, chunks, chunk int, fn func(line []byte) error) error {
 	var args = g.args(table, "-_FILTER", "Y")
+	// To split each binding's work into resumable chunks, the only mechanism
+	// dsdgen offers is to divide a table's whole row space into N parts. So we
+	// take the table's row count, split it by our chunk size, pass that as
+	// -PARALLEL N, and to resume from the kth part add -CHILD k.
 	if chunks > 1 {
 		args = append(args, "-PARALLEL", strconv.Itoa(chunks), "-CHILD", strconv.Itoa(chunk))
 	}
