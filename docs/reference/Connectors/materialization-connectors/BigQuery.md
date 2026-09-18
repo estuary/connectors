@@ -66,7 +66,7 @@ For a complete introduction to resource organization in Bigquery, see the [BigQu
 |---|---|---|---|---|
 | **`/project_id`**| Project ID | The project ID for the Google Cloud Storage bucket and BigQuery dataset.| String | Required |
 | **`/region`** | Region | The GCS region. | String | Required |
-| **`/dataset`** | Dataset | BigQuery dataset for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables. | String | Required |
+| **`/dataset`** | Dataset | BigQuery dataset for bound collection tables (unless overridden within the binding resource configuration). | String | Required |
 | **`/bucket`** | Bucket | Name of the GCS bucket. | String | Required |
 | **`/credentials`** | Credentials | Credentials for authentication. | [Credentials](#credentials) | Required |
 | `/bucket_path` | Bucket path | Base path within the GCS bucket. Also called "Folder" in the GCS console. | String | |
