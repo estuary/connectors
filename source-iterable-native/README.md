@@ -59,6 +59,12 @@ Iterable's mobile SDKs queue events when offline, sending them later with two ti
 
 Reference: https://support.iterable.com/hc/en-us/articles/360035395671-Tracking-Events-and-Purchases-with-Iterable-s-Mobile-SDKs#offline-events-processing
 
+### Campaign Change Detection
+
+Iterable leaves a campaign's `updatedAt` at its last edit when the campaign starts or finishes. A campaign scheduled at 19:04 and sent at 23:00 still reports an `updatedAt` of 19:04 once it is `Finished`, so an `updatedAt` watermark never re-reads campaigns after they send.
+
+Each poll of the `campaigns` stream instead scans every campaign and emits those with any of `updatedAt`, `startAt`, or `endedAt` inside `(cursor, horizon]`. The scan is sorted by the immutable `id` so pages stay stable while campaigns change underneath it. The horizon is fixed when the scan starts and trails the current time by `CAMPAIGNS_HORIZON_MARGIN`, so a change made mid-scan lands in the next poll's window rather than being lost. The cursor advances to the newest of the emitted campaigns' timestamps, never to the horizon: if Iterable serves a stale view of the list, the cursor waits with it instead of moving past changes the view has yet to show. The `/campaigns` API has no timestamp filter and cannot sort by `endedAt`, which is why the window is applied client-side over a full scan.
+
 ### Campaign Metrics Filtering
 
 The connector conditionally fetches metrics for campaigns depending on the campaign's state:
