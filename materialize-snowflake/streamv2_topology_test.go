@@ -28,11 +28,9 @@ import (
 // sessions share whatever FAKE_SIDECAR_STATE names.
 func newTopologyManager(t *testing.T, task string, keyBegin, keyEnd uint32, prior streamV2Checkpoint) *streamV2Manager {
 	t.Helper()
-	var m = newStreamV2Manager(context.Background(),
-		&config{Credentials: &snowflake_auth.CredentialConfig{}}, task, "acct",
+	var m = newFakeStreamV2Manager(t, context.Background(),
+		&config{Credentials: &snowflake_auth.CredentialConfig{}}, task,
 		&pf.RangeSpec{KeyBegin: keyBegin, KeyEnd: keyEnd, RClockEnd: math.MaxUint32})
-	m.argv = fakeSidecarArgv(t)
-	t.Cleanup(m.stop)
 
 	m.addBinding("DB", "SCH", "TBL", sql.Table{
 		TableShape: sql.TableShape{Binding: 0, DeltaUpdates: true},
@@ -41,36 +39,7 @@ func newTopologyManager(t *testing.T, task string, keyBegin, keyEnd uint32, prio
 		Values:     []sql.Column{{Identifier: `VAL`}},
 		StateKey:   "topology.v1",
 	}, prior)
-	// The fake sidecar's committed map stands in for the channels on the pipe, so
-	// the manager can mint epochs and sweep abandoned channels as it would live.
-	m.listChannels = fakeListChannels
 	return m
-}
-
-// fakeListChannels reports the channels the fake sidecar holds committed offset
-// tokens for, which stands in for the channels standing on a table's default pipe.
-func fakeListChannels(context.Context, string, string, string) ([]string, error) {
-	var path = os.Getenv("FAKE_SIDECAR_STATE")
-	if path == "" {
-		return nil, nil
-	}
-	raw, err := os.ReadFile(path)
-	if os.IsNotExist(err) {
-		return nil, nil
-	} else if err != nil {
-		return nil, err
-	}
-	var state struct {
-		Committed map[string]string `json:"committed"`
-	}
-	if err := json.Unmarshal(raw, &state); err != nil {
-		return nil, err
-	}
-	var names []string
-	for name := range state.Committed {
-		names = append(names, name)
-	}
-	return names, nil
 }
 
 // keysHashingTo returns n distinct keys whose packed-key hash falls inside r.

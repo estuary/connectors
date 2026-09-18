@@ -316,13 +316,7 @@ func newTransactor(
 			return nil, fmt.Errorf("NewPipeClient: %w", err)
 		}
 
-		sv2 = newStreamV2Manager(ctx, &cfg, open.Materialization.TaskName(), accountName, open.Range)
-		// The manager holds no SQL connection of its own, so the listing runs on the
-		// transactor's.
-		sv2.listChannels = func(ctx context.Context, database, schema, table string) ([]string, error) {
-			return streamV2ListChannels(ctx, db, ep.Dialect, database, schema, table)
-		}
-		sv2.dropStreamingChannel = sm.dropChannel
+		sv2 = newStreamV2Manager(ctx, &cfg, db, ep.Dialect, sm, open.Materialization.TaskName(), accountName, open.Range)
 	}
 
 	var d = &transactor{

@@ -101,10 +101,8 @@ func TestStreamV2ReturningToTheWritePathSkipsNewDocuments(t *testing.T) {
 	}
 
 	var newSession = func(t *testing.T, prior streamV2Checkpoint) *streamV2Manager {
-		var m = newStreamV2Manager(ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/roundTrip", "acct",
+		var m = newFakeStreamV2Manager(t, ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/roundTrip",
 			&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
-		m.argv = fakeSidecarArgv(t)
-		t.Cleanup(m.stop)
 		m.addBinding("DB", "SCH", "TBL", target, prior)
 		return m
 	}
@@ -188,9 +186,8 @@ func TestStreamV2LeavingTheWritePathSweepsItsChannels(t *testing.T) {
 	// and returns the checkpoint that session flushed.
 	var seed = func(t *testing.T, stateKey string) (streamV2Checkpoint, string) {
 		t.Helper()
-		var m = newStreamV2Manager(ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, task, "acct",
+		var m = newFakeStreamV2Manager(t, ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, task,
 			&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
-		m.argv = fakeSidecarArgv(t)
 		m.addBinding("DB", "SCH", "TBL", target(stateKey, true), nil)
 		for i := range 3 {
 			require.NoError(t, testWriteRow(ctx, m, 0, []any{"k", i}))
@@ -215,11 +212,8 @@ func TestStreamV2LeavingTheWritePathSweepsItsChannels(t *testing.T) {
 			_range:              &pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32},
 			version:             "v1",
 			cp:                  checkpoint{stateKey: &checkpointItem{StreamV2: prior}},
-			snowpipeStreamingV2: newStreamV2Manager(ctx, &cfg, task, "acct", &pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32}),
+			snowpipeStreamingV2: newFakeStreamV2Manager(t, ctx, &cfg, task, &pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32}),
 		}
-		d.snowpipeStreamingV2.argv = fakeSidecarArgv(t)
-		d.snowpipeStreamingV2.listChannels = fakeListChannels
-		t.Cleanup(d.snowpipeStreamingV2.stop)
 		return d
 	}
 
@@ -364,6 +358,11 @@ func TestStreamV2WritePathSwitch(t *testing.T) {
 
 	var fullRange = &pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32}
 
+	// The snowpipe_streaming manager of the same task, which the streaming v2
+	// managers below drop that path's channel through.
+	sm, err := newStreamManager(&cfg, testMaterialization, accountName, 0)
+	require.NoError(t, err)
+
 	var countRows = func() int {
 		var count int
 		require.NoError(t, db.QueryRowContext(ctx, fmt.Sprintf("SELECT COUNT(*) FROM %s;", tableName)).Scan(&count))
@@ -392,10 +391,7 @@ func TestStreamV2WritePathSwitch(t *testing.T) {
 	}
 
 	var newV2 = func(t *testing.T, tgt sql.Table, prior streamV2Checkpoint) *streamV2Manager {
-		var m = newStreamV2Manager(ctx, &cfg, testMaterialization, accountName, fullRange)
-		m.listChannels = func(ctx context.Context, database, schema, table string) ([]string, error) {
-			return streamV2ListChannels(ctx, db, testDialect, database, schema, table)
-		}
+		var m = newStreamV2Manager(ctx, &cfg, db, testDialect, sm, testMaterialization, accountName, fullRange)
 		t.Cleanup(m.stop)
 		m.addBinding(cfg.Database, cfg.Schema, tableName, tgt, prior)
 		return m
@@ -485,10 +481,7 @@ func TestStreamV2WritePathSwitch(t *testing.T) {
 			_range:              fullRange,
 			version:             "v1",
 			cp:                  checkpoint{tgt.StateKey: &checkpointItem{StreamV2: entries[0]}},
-			snowpipeStreamingV2: newStreamV2Manager(ctx, &cfg, testMaterialization, accountName, fullRange),
-		}
-		d.snowpipeStreamingV2.listChannels = func(ctx context.Context, database, schema, table string) ([]string, error) {
-			return streamV2ListChannels(ctx, db, testDialect, database, schema, table)
+			snowpipeStreamingV2: newStreamV2Manager(ctx, &cfg, db, testDialect, sm, testMaterialization, accountName, fullRange),
 		}
 		t.Cleanup(d.snowpipeStreamingV2.stop)
 		require.NoError(t, d.addBinding(ctx, off, *d.cp[tgt.StateKey]))
@@ -579,9 +572,8 @@ func TestStreamV2SwitchOntoTheWritePathWithPendingWorkIsRejected(t *testing.T) {
 			_range:              rng,
 			version:             "v1",
 			cp:                  checkpoint{target.StateKey: item},
-			snowpipeStreamingV2: newStreamV2Manager(ctx, &cfg, "test/onto", "acct", rng),
+			snowpipeStreamingV2: newFakeStreamV2Manager(t, ctx, &cfg, "test/onto", rng),
 		}
-		t.Cleanup(d.snowpipeStreamingV2.stop)
 		return d
 	}
 
@@ -649,51 +641,24 @@ func TestStreamV2SwitchOntoTheWritePathWithPendingWorkIsRejected(t *testing.T) {
 // holds it open, and is dropped once it does not.
 func TestStreamV2SweepDropsTheStreamingChannel(t *testing.T) {
 	var ctx = context.Background()
-
-	var drops []string
-	var mux = http.NewServeMux()
-	mux.HandleFunc("POST /v1/streaming/channels/drop", func(w http.ResponseWriter, r *http.Request) {
-		var req struct {
-			Channel string `json:"channel"`
-		}
-		require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
-		drops = append(drops, req.Channel)
-		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprint(w, `{"message":"Success","status_code":0}`)
-	})
-	var ts = httptest.NewServer(mux)
-	t.Cleanup(ts.Close)
-	pkey, err := rsa.GenerateKey(rand.Reader, 1024)
-	require.NoError(t, err)
-	var sm = &streamManager{
-		c: &streamClient{
-			r:        resty.New().SetBaseURL(ts.URL + "/v1/streaming").SetDisableWarn(true),
-			key:      pkey,
-			user:     "TEST_USER",
-			database: "DB",
-			account:  "TEST_ACCOUNT",
-		},
-		tableStreams: map[int]*tableStream{},
-		channelName:  newChannelName("test/onto", 0),
-	}
+	t.Setenv("FAKE_SIDECAR_STATE", filepath.Join(t.TempDir(), "channels.json"))
 
 	// The lower shard of two. Snowflake lists the names upper-cased. Only the first
 	// channel is this shard's to drop.
-	var m = newStreamV2Manager(ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/onto", "acct",
+	sm, drops := fakeStreamManager(t, "test/onto")
+	var m = newStreamV2Manager(ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, fakeSnowflakeDB(t), testDialect, sm, "test/onto", "acct",
 		&pf.RangeSpec{KeyEnd: 0x7fffffff, RClockEnd: math.MaxUint32})
-	m.dropStreamingChannel = sm.dropChannel
 	var listed = strings.ToUpper(sm.channelName)
-	m.listChannels = func(context.Context, string, string, string) ([]string, error) {
-		return []string{listed, strings.ToUpper(newChannelName("test/onto", 0x80000000)), strings.ToUpper(newChannelName("other/task", 0))}, nil
-	}
+	require.NoError(t, os.WriteFile(os.Getenv("FAKE_SIDECAR_STATE"), fmt.Appendf(nil, `{"committed":{%q:"1",%q:"1",%q:"1"},"errors":{}}`,
+		listed, strings.ToUpper(newChannelName("test/onto", 0x80000000)), strings.ToUpper(newChannelName("other/task", 0))), 0o644))
 
 	// Held open, to register blobs through: it stands.
 	sm.tableStreams[0] = &tableStream{channel: &channel{ChannelName: sm.channelName}}
 	require.NoError(t, m.sweep(ctx, "DB", "SCH", "TBL", "sk.v1", nil))
-	require.Empty(t, drops)
+	require.Empty(t, drops())
 
 	// Let go of: it is dropped, and nothing else is.
 	delete(sm.tableStreams, 0)
 	require.NoError(t, m.sweep(ctx, "DB", "SCH", "TBL", "sk.v1", nil))
-	require.Equal(t, []string{listed}, drops)
+	require.Equal(t, []string{listed}, drops())
 }

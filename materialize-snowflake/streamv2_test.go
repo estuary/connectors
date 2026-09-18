@@ -110,6 +110,11 @@ func TestStreamV2Manager(t *testing.T) {
 
 	var fullRange = &pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32}
 
+	// The snowpipe_streaming manager of the same task, which the streaming v2
+	// managers below drop that path's channel through.
+	sm, err := newStreamManager(&cfg, testMaterialization, accountName, 0)
+	require.NoError(t, err)
+
 	// These subtests follow a single channel's counter, committed offset, and token
 	// against live Snowflake; the multi-channel routing and the split/join
 	// inheritance have fake-sidecar suites of their own.
@@ -122,10 +127,7 @@ func TestStreamV2Manager(t *testing.T) {
 	}
 
 	var newManager = func(keyRange *pf.RangeSpec) *streamV2Manager {
-		var m = newStreamV2Manager(ctx, &cfg, testMaterialization, accountName, keyRange)
-		m.listChannels = func(ctx context.Context, database, schema, table string) ([]string, error) {
-			return streamV2ListChannels(ctx, db, testDialect, database, schema, table)
-		}
+		var m = newStreamV2Manager(ctx, &cfg, db, testDialect, sm, testMaterialization, accountName, keyRange)
 		t.Cleanup(m.stop)
 		return m
 	}
@@ -843,8 +845,7 @@ func TestStreamV2Manager(t *testing.T) {
 		require.Equal(t, 3, countRowsIn(sharedTable))
 		var firstChannel = first.bindings[0].activeChannels[0].channelName
 
-		var second = newStreamV2Manager(ctx, &cfg, testMaterialization+"-second", accountName, fullRange)
-		second.listChannels = first.listChannels
+		var second = newStreamV2Manager(ctx, &cfg, db, testDialect, sm, testMaterialization+"-second", accountName, fullRange)
 		t.Cleanup(second.stop)
 		second.addBinding(cfg.Database, cfg.Schema, sharedTable, tgt, nil)
 		var rejection = testWriteRow(ctx, second, 0, []any{"k", 1, json.RawMessage(`{}`)})
@@ -1045,7 +1046,9 @@ func TestStreamV2Datatypes(t *testing.T) {
 
 	// One manager, and so one sidecar, serves every type: each type is a binding
 	// of its own, with a state key of its own and therefore a channel of its own.
-	var m = newStreamV2Manager(ctx, &cfg, "test/streamV2Datatypes", accountName,
+	sm, err := newStreamManager(&cfg, "test/streamV2Datatypes", accountName, 0)
+	require.NoError(t, err)
+	var m = newStreamV2Manager(ctx, &cfg, db, testDialect, sm, "test/streamV2Datatypes", accountName,
 		&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
 	t.Cleanup(m.stop)
 
@@ -1221,15 +1224,18 @@ func TestStreamV2ListChannels(t *testing.T) {
 	// manager while the table it holds a channel on still exists.
 	t.Cleanup(cleanup)
 
+	sm, err := newStreamManager(&cfg, "test/streamV2List", accountName, 0)
+	require.NoError(t, err)
+	var m = newStreamV2Manager(ctx, &cfg, db, testDialect, sm, "test/streamV2List", accountName,
+		&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
+	t.Cleanup(m.stop)
+
 	// A table nothing has streamed into has no default pipe, so no channels.
-	names, err := streamV2ListChannels(ctx, db, testDialect, cfg.Database, cfg.Schema, tableName)
+	names, err := m.listChannels(ctx, cfg.Database, cfg.Schema, tableName)
 	require.NoError(t, err)
 	require.Empty(t, names)
 
 	// Stream one row, which opens a channel on the table's default pipe.
-	var m = newStreamV2Manager(ctx, &cfg, "test/streamV2List", accountName,
-		&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
-	t.Cleanup(m.stop)
 	m.addBinding(cfg.Database, cfg.Schema, tableName, sql.Table{
 		TableShape: sql.TableShape{Binding: 0, DeltaUpdates: true},
 		Identifier: tableName,
@@ -1248,7 +1254,7 @@ func TestStreamV2ListChannels(t *testing.T) {
 	// runs its condition off the test goroutine, so the error is carried out and
 	// checked here rather than failing inside.
 	require.Eventually(t, func() bool {
-		names, err = streamV2ListChannels(ctx, db, testDialect, cfg.Database, cfg.Schema, tableName)
+		names, err = m.listChannels(ctx, cfg.Database, cfg.Schema, tableName)
 		return err != nil || slices.Contains(names, opened)
 	}, 3*time.Minute, 5*time.Second)
 	require.NoError(t, err)
@@ -1256,11 +1262,9 @@ func TestStreamV2ListChannels(t *testing.T) {
 
 	// The table's snowpipe_streaming channel is listed too, upper-cased as Snowflake
 	// holds it, and the drop accepts the listed name.
-	sm, err := newStreamManager(&cfg, "test/streamV2List", accountName, 0)
-	require.NoError(t, err)
 	_, err = sm.c.openChannel(ctx, cfg.Schema, tableName, sm.channelName)
 	require.NoError(t, err)
-	names, err = streamV2ListChannels(ctx, db, testDialect, cfg.Database, cfg.Schema, tableName)
+	names, err = m.listChannels(ctx, cfg.Database, cfg.Schema, tableName)
 	require.NoError(t, err)
 	require.Contains(t, names, opened)
 	var listed = slices.IndexFunc(names, func(n string) bool { return strings.EqualFold(n, sm.channelName) })
@@ -1270,7 +1274,7 @@ func TestStreamV2ListChannels(t *testing.T) {
 	require.Zero(t, keyBegin)
 
 	require.NoError(t, sm.dropChannel(ctx, cfg.Schema, tableName, names[listed]))
-	names, err = streamV2ListChannels(ctx, db, testDialect, cfg.Database, cfg.Schema, tableName)
+	names, err = m.listChannels(ctx, cfg.Database, cfg.Schema, tableName)
 	require.NoError(t, err)
 	require.Equal(t, []string{opened}, names)
 }

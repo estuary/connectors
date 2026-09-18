@@ -70,10 +70,8 @@ func TestStreamV2CommitPrecedesCheckpoint(t *testing.T) {
 	// rows Snowflake accepted but never committed would report.
 	t.Setenv("FAKE_SIDECAR_MODE", "commit_never_lands")
 
-	var m = newStreamV2Manager(ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/commitFirst", "acct",
+	var m = newFakeStreamV2Manager(t, ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/commitFirst",
 		&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
-	m.argv = fakeSidecarArgv(t)
-	t.Cleanup(m.stop)
 
 	m.addBinding("DB", "SCH", "TBL", sql.Table{
 		TableShape: sql.TableShape{Binding: 0, DeltaUpdates: true},
@@ -103,10 +101,8 @@ func TestStreamV2RejectedRows(t *testing.T) {
 		streamV2Range{keyBegin: 0, keyEnd: math.MaxUint32}, "rejected.v1")
 
 	var newManager = func(t *testing.T, prior *streamV2ChannelCheckpointItem) *streamV2Manager {
-		var m = newStreamV2Manager(ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/rejectedRows", "acct",
+		var m = newFakeStreamV2Manager(t, ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/rejectedRows",
 			&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
-		m.argv = fakeSidecarArgv(t)
-		t.Cleanup(m.stop)
 
 		// The fake sidecar rejects a row which carries the REJECT column, as
 		// Snowflake rejects one it cannot store: the append and the commit both
@@ -178,10 +174,8 @@ func TestStreamV2DropChannel(t *testing.T) {
 	// task does — which is the point: a name derived from a key-begin is
 	// derived again, identically, by whichever shard next holds that key-begin.
 	var newSession = func(t *testing.T) *streamV2Manager {
-		var m = newStreamV2Manager(ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/channel-drop", "acct",
+		var m = newFakeStreamV2Manager(t, ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/channel-drop",
 			&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
-		m.argv = fakeSidecarArgv(t)
-		t.Cleanup(m.stop)
 		m.addBinding("DB", "SCH", "TBL", target, nil)
 		return m
 	}
@@ -252,11 +246,8 @@ func TestStreamV2RejectsForeignTask(t *testing.T) {
 	var unattributable = "someone_elses_channel"
 
 	var newSession = func(t *testing.T, task string) *streamV2Manager {
-		var m = newStreamV2Manager(ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, task, "acct",
+		var m = newFakeStreamV2Manager(t, ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, task,
 			&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
-		m.argv = fakeSidecarArgv(t)
-		m.listChannels = fakeListChannels
-		t.Cleanup(m.stop)
 		m.addBinding("DB", "SCH", "TBL", sql.Table{
 			TableShape: sql.TableShape{Binding: 0, DeltaUpdates: true},
 			Identifier: "TBL",
@@ -290,7 +281,7 @@ func TestStreamV2RejectsForeignTask(t *testing.T) {
 	require.NotContains(t, err.Error(), unattributable)
 	require.Empty(t, rejected.bindings[0].activeChannels)
 
-	names, err := fakeListChannels(ctx, "", "", "")
+	names, err := fakeSidecarChannels()
 	require.NoError(t, err)
 	require.ElementsMatch(t, []string{unattributable, foreignChannel}, names)
 
@@ -327,7 +318,7 @@ func TestStreamV2SweepsBackfilledChannels(t *testing.T) {
 	require.NoError(t, err)
 	hi.stop()
 
-	names, err := fakeListChannels(ctx, "", "", "")
+	names, err := fakeSidecarChannels()
 	require.NoError(t, err)
 	require.Contains(t, names, staleFull)
 	require.NotContains(t, names, staleUpper)
@@ -339,7 +330,7 @@ func TestStreamV2SweepsBackfilledChannels(t *testing.T) {
 	_, err = lo.flush(ctx)
 	require.NoError(t, err)
 
-	names, err = fakeListChannels(ctx, "", "", "")
+	names, err = fakeSidecarChannels()
 	require.NoError(t, err)
 	require.NotContains(t, names, staleFull)
 	require.Len(t, names, 2)

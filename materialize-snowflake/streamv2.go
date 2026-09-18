@@ -189,18 +189,20 @@ const streamV2DefaultPipeSuffix = "-STREAMING"
 // does not tell the two apart.
 const streamV2ErrObjectNotExistOrAuthorized = 2003
 
-// streamV2ListChannels reports, sorted, the channels on a table and on its default
-// pipe. A table nothing has streamed into has no default pipe and lists no channels
-// for it.
+// listChannels reports, sorted, the names of channels on a table and on its
+// default pipe. A table nothing has streamed into has no default pipe and lists
+// no channels.
 //
 // database, schema, and table are the unquoted names Snowflake stores.
-func streamV2ListChannels(ctx context.Context, db *stdsql.DB, dialect sql.Dialect, database, schema, table string) ([]string, error) {
+//
+// Returned channel names are sorted.
+func (m *streamV2Manager) listChannels(ctx context.Context, database, schema, table string) ([]string, error) {
 	var channelNames []string
 	for _, in := range []string{
-		"TABLE " + dialect.Identifier(database, schema, table),
-		"PIPE " + dialect.Identifier(database, schema, table+streamV2DefaultPipeSuffix),
+		"TABLE " + m.dialect.Identifier(database, schema, table),
+		"PIPE " + m.dialect.Identifier(database, schema, table+streamV2DefaultPipeSuffix),
 	} {
-		rows, err := db.QueryContext(ctx, fmt.Sprintf("SHOW CHANNELS IN %s;", in))
+		rows, err := m.db.QueryContext(ctx, fmt.Sprintf("SHOW CHANNELS IN %s;", in))
 		if err != nil {
 			// Snowflake reports an absent pipe with the same error as one the role
 			// may not see, so the miss is logged.
@@ -464,12 +466,9 @@ type streamV2Manager struct {
 	keyBegin        uint32
 	keyEnd          uint32
 
-	// listChannels reports the channels on a table and its default pipe. It is nil
-	// when no connection backs the manager.
-	listChannels func(ctx context.Context, database, schema, table string) ([]string, error)
-	// dropStreamingChannel drops a snowpipe_streaming channel. It is nil when that
-	// path is unavailable.
-	dropStreamingChannel func(ctx context.Context, schema, table, name string) error
+	db        *stdsql.DB
+	dialect   sql.Dialect
+	streaming *streamManager
 
 	// procCtx bounds the lifetime of the sidecar process to the transactor session.
 	procCtx    context.Context
@@ -483,7 +482,16 @@ type streamV2Manager struct {
 	bufBytes int
 }
 
-func newStreamV2Manager(ctx context.Context, cfg *config, materialization string, accountName string, keyRange *pf.RangeSpec) *streamV2Manager {
+func newStreamV2Manager(
+	ctx context.Context,
+	cfg *config,
+	db *stdsql.DB,
+	dialect sql.Dialect,
+	streaming *streamManager,
+	materialization string,
+	accountName string,
+	keyRange *pf.RangeSpec,
+) *streamV2Manager {
 	procCtx, procCancel := context.WithCancel(ctx)
 	return &streamV2Manager{
 		cfg:             cfg,
@@ -492,6 +500,9 @@ func newStreamV2Manager(ctx context.Context, cfg *config, materialization string
 		argv:            defaultSidecarArgv(),
 		keyBegin:        keyRange.KeyBegin,
 		keyEnd:          keyRange.KeyEnd,
+		db:              db,
+		dialect:         dialect,
+		streaming:       streaming,
 		procCtx:         procCtx,
 		procCancel:      procCancel,
 		bindings:        make(map[int]*streamV2Binding),
@@ -584,29 +595,26 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 
 	// A table another task streams into is rejected before this shard creates any
 	// channel of its own. A name of no v2 shape is left alone here.
-	if m.listChannels != nil {
-		channelNames, err := m.listChannels(ctx, b.database, b.schema, unquotedIdentifier(b.table))
-		if err != nil {
-			return err
-		}
+	channelNames, err := m.listChannels(ctx, b.database, b.schema, unquotedIdentifier(b.table))
+	if err != nil {
+		return err
+	}
 
-		var own = sanitizeAndAppendHash(m.materialization)
-		var foreignChannelNames []string
-		for _, channelName := range channelNames {
-			if parts, ok := streamV2SplitChannelName(channelName); !ok {
-				log.WithFields(log.Fields{"table": b.table, "channel": channelName}).Info("a channel of no snowpipe streaming v2 shape stands on the table")
-				continue
-			} else if parts.materialization != own {
-				foreignChannelNames = append(foreignChannelNames, channelName)
-			}
+	var own = sanitizeAndAppendHash(m.materialization)
+	var foreignChannelNames []string
+	for _, channelName := range channelNames {
+		if parts, ok := streamV2SplitChannelName(channelName); !ok {
+			log.WithFields(log.Fields{"table": b.table, "channel": channelName}).Info("a channel of no snowpipe streaming v2 shape stands on the table")
+			continue
+		} else if parts.materialization != own {
+			foreignChannelNames = append(foreignChannelNames, channelName)
 		}
-		if len(foreignChannelNames) > 0 {
-			slices.Sort(foreignChannelNames)
-			return fmt.Errorf(
-				"table %s already receives snowpipe streaming v2 rows from another Flow task through channel(s) %s. Two tasks may not stream into one table. If that task still exists, materialize this binding into a table of its own, or remove this table from that task. If that task was deleted or renamed, its channels have outlived it: backfill this binding with the always_drop_tables_on_backfill feature flag set, which drops the table and every channel standing on it",
-				b.table, strings.Join(foreignChannelNames, ", "),
-			)
-		}
+	}
+	if len(foreignChannelNames) > 0 {
+		return fmt.Errorf(
+			"table %s already receives snowpipe streaming v2 rows from another Flow task through channel(s) %s. Two tasks may not stream into one table. If that task still exists, materialize this binding into a table of its own, or remove this table from that task. If that task was deleted or renamed, its channels have outlived it: backfill this binding with the always_drop_tables_on_backfill feature flag set, which drops the table and every channel standing on it",
+			b.table, strings.Join(foreignChannelNames, ", "),
+		)
 	}
 
 	client, err := m.ensureStarted(ctx)
@@ -871,13 +879,9 @@ func (m *streamV2Manager) layoutNames(b *streamV2Binding) map[string]bool {
 // sweep drops the channels this task derived for the binding that it no longer uses:
 // the snowpipe_streaming_v2 channels of stateKey not in keep, those of a state key a
 // backfill rotated away, and the snowpipe_streaming channel of this shard. Only
-// channels within this shard's range are its to drop. Without a listing it does
-// nothing.
+// channels within this shard's range are its to drop.
 func (m *streamV2Manager) sweep(ctx context.Context, database, schema, table, stateKey string, keep map[string]bool) error {
-	if m.listChannels == nil {
-		return nil
-	}
-	names, err := m.listChannels(ctx, database, schema, unquotedIdentifier(table))
+	channelNames, err := m.listChannels(ctx, database, schema, unquotedIdentifier(table))
 	if err != nil {
 		return err
 	}
@@ -885,15 +889,15 @@ func (m *streamV2Manager) sweep(ctx context.Context, database, schema, table, st
 	var shard = m.shardRange()
 	var own, ownStateKey = sanitizeAndAppendHash(m.materialization), sanitizeAndAppendHash(stateKey)
 	var client *sidecarClient
-	for _, channelName := range names {
+	for _, channelName := range channelNames {
 		if keep[channelName] {
 			continue
 		}
 		if keyBegin, ok := m.streamingChannelKeyBegin(channelName); ok {
-			if keyBegin < shard.keyBegin || keyBegin > shard.keyEnd || m.dropStreamingChannel == nil {
+			if keyBegin < shard.keyBegin || keyBegin > shard.keyEnd {
 				continue
 			}
-			if err := m.dropStreamingChannel(ctx, schema, table, channelName); err != nil {
+			if err := m.streaming.dropChannel(ctx, schema, table, channelName); err != nil {
 				return err
 			}
 			continue
