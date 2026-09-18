@@ -417,6 +417,9 @@ func (c *Config) usesBearerToken() bool {
 func (c *Config) sslSettings() mysqltls.Settings {
 	var mode = c.Advanced.SSLMode
 	if mode == "" {
+		// TODO: We eventually want to make `ModeRequired` the global default.
+		// We'll have to set up a feature flag so we don't break any existing
+		// captures that do not support SSL
 		mode = mysqltls.ModePreferred
 		if c.usesBearerToken() {
 			mode = mysqltls.ModeRequired
@@ -525,6 +528,14 @@ func (db *mysqlDatabase) connect(ctx context.Context) error {
 		"user":     db.config.User,
 		"serverID": db.config.Advanced.NodeID,
 	}).Info("connecting to database")
+
+	if settings := db.config.sslSettings(); db.config.Advanced.SSLMode == "" {
+		var msg = "'sslmode' is not set, defaulting to %q"
+		if settings.AllowsPlaintextFallback() {
+			msg += "; traffic may travel unencrypted if the server does not offer TLS"
+		}
+		logrus.WithField("sslmode", settings.Mode).Warnf(msg, settings.Mode)
+	}
 
 	var address = db.config.Address
 	// If SSH Tunnel is configured, we are going to create a tunnel from localhost:5432
