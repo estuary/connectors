@@ -465,7 +465,8 @@ func TestStreamV2WritePathSwitch(t *testing.T) {
 		require.NoError(t, err)
 		status, err := client.OpenChannel(ctx, cfg.Database, cfg.Schema, tableName, c.channelName)
 		require.NoError(t, err)
-		require.Equal(t, c.offsetToken(3), status.committedToken())
+		require.NotNil(t, status.CommittedToken)
+		require.Equal(t, c.offsetToken(3), *status.CommittedToken)
 		later.stop()
 
 		// The transactor is what moves a binding off the path, and it sweeps the
@@ -491,7 +492,7 @@ func TestStreamV2WritePathSwitch(t *testing.T) {
 		require.NoError(t, err)
 		status, err = client.OpenChannel(ctx, cfg.Database, cfg.Schema, tableName, c.channelName)
 		require.NoError(t, err)
-		require.Nil(t, status.committedToken())
+		require.Nil(t, status.CommittedToken)
 	})
 
 	t.Run("a binding moved off this write path with rows pending duplicates them", func(t *testing.T) {

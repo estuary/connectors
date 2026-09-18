@@ -706,11 +706,9 @@ func TestStreamV2Manager(t *testing.T) {
 			// have, and the one the channel-drop design was provisionally built on.
 			require.NoError(t, client.CloseChannel(ctx, channel, false))
 			var afterClose = reopen()
-			t.Logf("reopened %s after a close: committed token %v", channel, afterClose.committedToken())
 
 			require.NoError(t, client.CloseChannel(ctx, channel, true))
 			var afterDrop = reopen()
-			t.Logf("reopened %s after a drop: committed token %v", channel, afterDrop.committedToken())
 
 			// A close only releases the local handle: Snowflake still holds the
 			// channel, and hands its committed offset token to the next opener.
@@ -766,8 +764,6 @@ func TestStreamV2Manager(t *testing.T) {
 
 			afterRejection, err := rejectingClient.OpenChannel(ctx, cfg.Database, cfg.Schema, notNullTable, rejected)
 			require.NoError(t, err)
-			t.Logf("reopened %s after a drop: committed token %v, %d row(s) rejected",
-				rejected, afterRejection.committedToken(), afterRejection.RowsErrorCount)
 			require.Zero(t, afterRejection.RowsErrorCount)
 			require.Nil(t, afterRejection.CommittedToken)
 		})
@@ -810,7 +806,8 @@ func TestStreamV2Manager(t *testing.T) {
 		// on appending as though nothing happened to the table.
 		status, err := m.client.ChannelStatus(ctx, c.channelName)
 		require.NoError(t, err)
-		require.Equal(t, c.offsetToken(3), status.committedToken())
+		require.NotNil(t, status.CommittedToken)
+		require.Equal(t, c.offsetToken(3), *status.CommittedToken)
 
 		writeRows(m, 3, 5)
 		entries, err = m.flush(ctx)

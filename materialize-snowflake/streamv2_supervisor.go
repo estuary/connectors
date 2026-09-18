@@ -20,27 +20,12 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// sidecarReadyTimeout is a var so tests can shorten it.
-var sidecarReadyTimeout = 30 * time.Second
-
-// sidecarStopTimeout is a var so tests can shorten it.
-var sidecarStopTimeout = 10 * time.Second
-
-// sidecarKillTimeout bounds how long kill waits for a SIGKILLed sidecar's exit
-// to be observed. It is a var so tests can shorten it.
-var sidecarKillTimeout = 30 * time.Second
-
-// sidecarExitGrace bounds how long exitError waits for an imminent exit to be
-// observed before describing the failure without one. It is a var so tests can
-// shorten it.
-var sidecarExitGrace = 2 * time.Second
-
-const (
-
-	// stderrTailLines/Bytes bound the ring buffer of recent sidecar stderr
-	// retained for inclusion in fatal errors.
-	stderrTailLines = 64
-	stderrTailBytes = 16 * 1024
+// These are vars so that tests can adjust.
+var (
+	sidecarReadyTimeout = 30 * time.Second
+	sidecarStopTimeout  = 10 * time.Second
+	sidecarKillTimeout  = 30 * time.Second
+	sidecarExitGrace    = 2 * time.Second
 )
 
 // defaultSidecarArgv locates the sidecar as installed in the connector image.
@@ -53,11 +38,8 @@ func defaultSidecarArgv() []string {
 	return []string{python, "-m", "snowpipe_sidecar"}
 }
 
-// sidecarSupervisor owns the lifecycle of the Python sidecar process: spawn,
-// readiness, connection, failure detection, and teardown. The
-// failure policy is crash-only: the supervisor never restarts the sidecar;
-// callers surface its errors up the transactor, exiting the connector so that
-// the runtime restarts it and recovery replays via offset tokens.
+// sidecarSupervisor owns the lifecycle of the Python sidecar process. The
+// failure policy is crash-only.
 type sidecarSupervisor struct {
 	cmd    *exec.Cmd
 	conn   net.Conn
@@ -67,8 +49,8 @@ type sidecarSupervisor struct {
 
 	tail *tailBuffer
 
-	died    chan struct{} // closed when the process has exited
-	waitErr error         // cmd.Wait result, valid once died is closed
+	done    chan struct{} // closed when the process has exited
+	waitErr error         // cmd.Wait result, valid once done is closed
 
 	stopOnce sync.Once
 }
@@ -88,7 +70,7 @@ func startSidecar(ctx context.Context, argv []string) (*sidecarSupervisor, *side
 	var s = &sidecarSupervisor{
 		tmpDir: tmpDir,
 		tail:   newTailBuffer(stderrTailLines, stderrTailBytes),
-		died:   make(chan struct{}),
+		done:   make(chan struct{}),
 	}
 
 	var token [32]byte
@@ -100,8 +82,6 @@ func startSidecar(ctx context.Context, argv []string) (*sidecarSupervisor, *side
 	var sockPath = filepath.Join(tmpDir, "rpc.sock")
 	s.cmd = exec.CommandContext(ctx, argv[0], append(argv[1:], "--uds", sockPath)...)
 	s.cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pdeathsig: syscall.SIGKILL}
-	// On ctx cancellation ask politely first; WaitDelay bounds how long we
-	// wait before the runtime force-kills and closes the pipes.
 	s.cmd.Cancel = func() error { return s.signal(syscall.SIGTERM) }
 	s.cmd.WaitDelay = sidecarStopTimeout
 
@@ -138,15 +118,11 @@ func startSidecar(ctx context.Context, argv []string) (*sidecarSupervisor, *side
 	// The auth token travels over stdin so it appears in no argv or environ;
 	// the sidecar must echo it in the configure RPC.
 	go func() {
-		// A token the sidecar never receives makes every RPC fail authentication,
-		// so naming this failure is what makes the configure error below
-		// diagnosable rather than an unexplained rejection.
 		if _, err := io.WriteString(stdin, s.authToken+"\n"); err != nil {
 			log.WithError(err).Warn("could not write auth token to sidecar stdin")
 		}
 	}()
 
-	// readyCh receives the single ready line the sidecar prints to stdout.
 	var readyCh = make(chan struct{}, 1)
 	var readyErrCh = make(chan error, 1)
 	pipesDone.Add(1)
@@ -172,7 +148,7 @@ func startSidecar(ctx context.Context, argv []string) (*sidecarSupervisor, *side
 	go func() {
 		pipesDone.Wait()
 		s.waitErr = s.cmd.Wait()
-		close(s.died)
+		close(s.done)
 	}()
 
 	select {
@@ -180,7 +156,7 @@ func startSidecar(ctx context.Context, argv []string) (*sidecarSupervisor, *side
 	case err := <-readyErrCh:
 		s.killAfterFailure()
 		return nil, nil, s.exitError(err)
-	case <-s.died:
+	case <-s.done:
 		return nil, nil, s.exitError(fmt.Errorf("sidecar exited before becoming ready"))
 	case <-time.After(sidecarReadyTimeout):
 		s.killAfterFailure()
@@ -196,7 +172,7 @@ func startSidecar(ctx context.Context, argv []string) (*sidecarSupervisor, *side
 	}
 	log.Debug("connected to snowpipe streaming sidecar")
 
-	return s, newSidecarClient(s.conn, s.died, func() error { return s.exitError(nil) }), nil
+	return s, newSidecarClient(s.conn, s.done, func() error { return s.exitError(nil) }), nil
 }
 
 func sidecarCoreLogLevel() string {
@@ -206,12 +182,10 @@ func sidecarCoreLogLevel() string {
 	return "warn"
 }
 
-// relayStderr forwards the sidecar's stderr to the connector's stderr, which
-// the runtime collects as ops logs. Lines that are already structured ops-log
-// JSON pass through verbatim; anything else (native-core log lines, stray
-// tracebacks, partial lines) is wrapped in a structured log so that raw text
-// can never corrupt the ops-log stream. Every line is also retained in a
-// bounded tail for inclusion in fatal errors.
+// relayStderr copies each line of the sidecar's stderr to the connector's
+// stderr and into the bounded tail. A line that is already ops-log JSON is
+// written verbatim. Any other line is wrapped in a structured log record, so
+// raw text never reaches the ops-log stream unframed.
 func (s *sidecarSupervisor) relayStderr(stderr io.Reader) {
 	var scanner = bufio.NewScanner(stderr)
 	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
@@ -254,23 +228,15 @@ func (s *sidecarSupervisor) exitError(cause error) error {
 		parts = append(parts, cause.Error())
 	}
 
-	// Both the exit status and the stderr tail below become available only once
-	// cmd.Wait has been observed, which the close of died announces after the pipe
-	// relays have drained. A caller arriving here has just killed the process or
-	// watched it die, so that close is imminent rather than hypothetical — and it
-	// races this description: the process group can already be gone while died is
-	// still open, which is how a kill comes to report that it could not signal
-	// anything and leaves a fatal error naming neither the status nor the output
-	// which explains it. Waiting the moment out is what keeps the error
-	// diagnosable. A process which really is still running costs this grace and is
-	// then described without an exit, as before.
+	// waitErr and the stderr tail are populated only once done is closed, so
+	// give an imminent exit a moment to land before describing the failure.
 	select {
-	case <-s.died:
+	case <-s.done:
 	case <-time.After(sidecarExitGrace):
 	}
 
 	select {
-	case <-s.died:
+	case <-s.done:
 		if s.waitErr != nil {
 			parts = append(parts, fmt.Sprintf("sidecar process: %s", s.waitErr))
 		} else if cause == nil {
@@ -298,12 +264,10 @@ func (s *sidecarSupervisor) signal(sig syscall.Signal) error {
 }
 
 // kill force-kills the sidecar's process group and waits for its exit to be
-// observed. Both the signal and the wait are bounded: the exit can only be
-// observed once cmd.Wait returns, which a failed signal would leave waiting for
-// a process that is never going to die.
+// observed.
 func (s *sidecarSupervisor) kill() error {
 	select {
-	case <-s.died:
+	case <-s.done:
 		return nil
 	default:
 	}
@@ -313,7 +277,7 @@ func (s *sidecarSupervisor) kill() error {
 	}
 
 	select {
-	case <-s.died:
+	case <-s.done:
 		return nil
 	case <-time.After(sidecarKillTimeout):
 		return fmt.Errorf("sidecar did not exit within %s of SIGKILL", sidecarKillTimeout)
@@ -329,14 +293,14 @@ func (s *sidecarSupervisor) killAfterFailure() {
 	}
 }
 
-// stop tears the sidecar down gracefully: shutdown RPC, then SIGTERM, then
-// SIGKILL. It is safe to call multiple times and with a nil client.
+// stop tears the sidecar down gracefully. It is safe to call multiple times and
+// with a nil client.
 func (s *sidecarSupervisor) stop(client *sidecarClient) {
 	s.stopOnce.Do(func() {
 		defer os.RemoveAll(s.tmpDir)
 
 		select {
-		case <-s.died:
+		case <-s.done:
 			return // already gone
 		default:
 		}
@@ -356,7 +320,7 @@ func (s *sidecarSupervisor) stop(client *sidecarClient) {
 			log.WithError(err).Debug("could not SIGTERM sidecar; awaiting the kill escalation")
 		}
 		select {
-		case <-s.died:
+		case <-s.done:
 		case <-time.After(sidecarStopTimeout):
 			log.Warn("sidecar did not exit after SIGTERM; killing")
 			s.killAfterFailure()
@@ -372,6 +336,11 @@ type tailBuffer struct {
 	maxBytes int
 	bytes    int
 }
+
+const (
+	stderrTailLines = 64
+	stderrTailBytes = 16 * 1024
+)
 
 func newTailBuffer(maxLines, maxBytes int) *tailBuffer {
 	return &tailBuffer{maxLines: maxLines, maxBytes: maxBytes}

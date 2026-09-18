@@ -50,7 +50,6 @@ func TestSidecarHappyPath(t *testing.T) {
 	opened, err := client.OpenChannel(ctx, "DB", "SCHEMA", "TBL", "chan_0")
 	require.NoError(t, err)
 	require.Nil(t, opened.CommittedToken)
-	require.Nil(t, opened.committedToken())
 
 	require.NoError(t, client.Append(ctx, "chan_0", "1", "2", []byte(`[{"ID":1},{"ID":2}]`), 2))
 
@@ -64,9 +63,6 @@ func TestSidecarHappyPath(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, status.CommittedToken)
 	require.Equal(t, "2", *status.CommittedToken)
-	// The log field carries the token itself, not the address of the pointer
-	// holding it.
-	require.Equal(t, "2", status.committedToken())
 
 	// Reopen reports the committed token.
 	opened, err = client.OpenChannel(ctx, "DB", "SCHEMA", "TBL", "chan_0")
@@ -76,7 +72,7 @@ func TestSidecarHappyPath(t *testing.T) {
 
 	sup.stop(client)
 	select {
-	case <-sup.died:
+	case <-sup.done:
 	case <-time.After(5 * time.Second):
 		t.Fatal("sidecar did not exit after stop")
 	}
@@ -235,7 +231,7 @@ func TestSidecarCrashMidRPC(t *testing.T) {
 	require.NoError(t, client.Configure(ctx, sidecarProfile{}, sup.authToken))
 
 	select {
-	case <-sup.died:
+	case <-sup.done:
 	case <-time.After(5 * time.Second):
 		t.Fatal("sidecar did not crash as instructed")
 	}
@@ -285,7 +281,7 @@ func TestSidecarStopEscalatesToKill(t *testing.T) {
 		t.Fatal("stop did not complete")
 	}
 	select {
-	case <-sup.died:
+	case <-sup.done:
 	default:
 		t.Fatal("sidecar still running after stop")
 	}
@@ -300,7 +296,7 @@ func TestSidecarKillReportsSignalFailure(t *testing.T) {
 		// A pid far above any this system has allocated, so that signalling its
 		// process group fails with ESRCH.
 		cmd:  &exec.Cmd{Process: &os.Process{Pid: 1 << 30}},
-		died: make(chan struct{}),
+		done: make(chan struct{}),
 		tail: newTailBuffer(stderrTailLines, stderrTailBytes),
 	}
 
@@ -326,7 +322,7 @@ func TestSidecarKillTimesOutAwaitingExit(t *testing.T) {
 		// Signalling our own process group would succeed but kill the test
 		// binary, so signal nothing at all and let the wait do the work.
 		cmd:  &exec.Cmd{},
-		died: make(chan struct{}),
+		done: make(chan struct{}),
 		tail: newTailBuffer(stderrTailLines, stderrTailBytes),
 	}
 

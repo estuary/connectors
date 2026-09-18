@@ -10,9 +10,6 @@ import (
 	"time"
 )
 
-// Default timeouts for sidecar RPCs. wait_commit is bounded by how long the
-// high-performance streaming backend may take to durably commit a batch, so it
-// is much longer than the others.
 const (
 	rpcTimeoutConfigure   = 60 * time.Second
 	rpcTimeoutOpenChannel = 60 * time.Second
@@ -21,8 +18,6 @@ const (
 	rpcTimeoutShutdown    = 5 * time.Second
 )
 
-// sidecarError is a structured error returned by the sidecar. Code carries the
-// sidecar's error classification (e.g. "auth") for logging and diagnostics.
 type sidecarError struct {
 	Code    string
 	Message string
@@ -47,9 +42,8 @@ type rpcResponse struct {
 }
 
 // sidecarClient is an NDJSON request/response client for the Python sidecar.
-// Requests may be issued concurrently from multiple goroutines; responses are
-// correlated by id. Any transport-level failure poisons the client and fails
-// all pending and future calls.
+// Requests may be issued concurrently from multiple goroutines. Responses are
+// correlated by id.
 //
 // An append is the one op whose request is not a single line: its rows follow
 // the header line as an opaque payload, so that the sidecar can hand them to the
@@ -114,7 +108,7 @@ func (c *sidecarClient) readLoop() {
 	c.fail(err)
 }
 
-// fail poisons the client: all pending calls fail immediately and future
+// fail poisons the client so that all pending calls fail immediately and future
 // calls fail without touching the connection.
 func (c *sidecarClient) fail(err error) {
 	c.mu.Lock()
@@ -195,8 +189,8 @@ func (c *sidecarClient) callWithPayload(ctx context.Context, op string, params a
 	}
 }
 
-// decodeReply turns the sidecar's reply to op into the call's outcome, decoding
-// its result into result when the call asked for one.
+// decodeReply unmarshals a successful reply's result. If result is nil, then
+// no-op. A failed reply is returned as an error without touching result.
 func decodeReply(op string, res *rpcResponse, result any) error {
 	if !res.OK {
 		return &sidecarError{Code: res.Code, Message: res.Error}
@@ -209,9 +203,7 @@ func decodeReply(op string, res *rpcResponse, result any) error {
 }
 
 // write frames one request onto the connection: its header as a JSON line, then
-// the payload whose length its header states, if any. The write lock spans both,
-// since a payload separated from its header by another request's line would be
-// read as that request's own.
+// the payload whose length its header states, if any.
 func (c *sidecarClient) write(req rpcRequest, payload []byte) error {
 	var line, err = json.Marshal(req)
 	if err != nil {
@@ -261,9 +253,7 @@ func (c *sidecarClient) Configure(ctx context.Context, profile sidecarProfile, a
 }
 
 // OpenChannel opens (or reopens) a channel on the auto-created default pipe of
-// the given table, returning Snowflake's authoritative status for it: the latest
-// committed offset token, nil if the channel has never committed, and the
-// row-error statistics accumulated over the channel's life so far.
+// the given table.
 func (c *sidecarClient) OpenChannel(ctx context.Context, database, schema, table, channelName string) (*channelStatusResult, error) {
 	var res channelStatusResult
 	if err := c.call(ctx, "open_channel", struct {
@@ -277,12 +267,10 @@ func (c *sidecarClient) OpenChannel(ctx context.Context, database, schema, table
 	return &res, nil
 }
 
-// Append sends a batch of rows spanning the offset tokens of its first and last
-// row. Snowflake's committed token for the channel advances to endToken once the
-// batch is durable. The payload is the batch's rows as a JSON array of objects
-// keyed by column name; rowCount travels in the header so that a payload holding
-// a different number of rows than the batch it claims to be is rejected rather
-// than committed under this batch's offset token.
+// Append sends one batch of rows to the channel. startToken and endToken are
+// the offset tokens of the batch's first and last rows. payload is the rows
+// as a JSON array of objects keyed by column name, and rowCount is how many
+// rows it holds, so the sidecar can check the payload against the batch.
 func (c *sidecarClient) Append(ctx context.Context, channelName, startToken, endToken string, payload []byte, rowCount int) error {
 	return c.callWithPayload(ctx, "append", struct {
 		ChannelName string `json:"channel"`
@@ -294,10 +282,7 @@ func (c *sidecarClient) Append(ctx context.Context, channelName, startToken, end
 }
 
 // WaitCommit blocks until the channel's committed offset token equals token, and
-// reports the channel's status as of that moment. A committed token says nothing
-// about the rows Snowflake rejected along the way, so the caller must also consult
-// the returned RowsErrorCount to know whether the commit delivered everything it
-// was given.
+// reports the channel's status as of that moment.
 func (c *sidecarClient) WaitCommit(ctx context.Context, channelName, token string) (*channelStatusResult, error) {
 	var res channelStatusResult
 	if err := c.call(ctx, "wait_commit", struct {
@@ -311,22 +296,13 @@ func (c *sidecarClient) WaitCommit(ctx context.Context, channelName, token strin
 }
 
 // channelStatusResult is Snowflake's status for a channel. RowsErrorCount counts
-// the rows Snowflake's ingestion rejected over the whole life of the channel: it
-// is cumulative, is not reset by a subsequent clean commit, and survives both a
+// the rows Snowflake's ingestion rejected over the whole life of the channel. It
+// is cumulative, is not reset by a subsequent clean commit. It survives both a
 // channel reopen and a new client session.
 type channelStatusResult struct {
 	CommittedToken   *string `json:"committed_token"`
 	RowsErrorCount   int64   `json:"rows_error_count"`
 	LastErrorMessage string  `json:"last_error_message"`
-}
-
-// committedToken renders the token for a log field, since logging the pointer
-// itself prints an address rather than the token.
-func (s *channelStatusResult) committedToken() any {
-	if s.CommittedToken == nil {
-		return nil
-	}
-	return *s.CommittedToken
 }
 
 // validateRejectedRows fails a channel on which Snowflake has ever rejected a row,
@@ -354,9 +330,6 @@ func (c *sidecarClient) ChannelStatus(ctx context.Context, channelName string) (
 // CloseChannel closes an open channel. With drop set, the channel is also
 // dropped in Snowflake, which is what discards its committed offset token
 // instead of leaving it for a later open of the same name to inherit.
-//
-// The channel must be open in this session, since dropping one is expressed
-// through the handle an open produced.
 func (c *sidecarClient) CloseChannel(ctx context.Context, channelName string, drop bool) error {
 	return c.call(ctx, "close_channel", struct {
 		ChannelName string `json:"channel"`
@@ -364,8 +337,6 @@ func (c *sidecarClient) CloseChannel(ctx context.Context, channelName string, dr
 	}{channelName, drop}, rpcTimeoutOpenChannel, nil)
 }
 
-// Shutdown asks the sidecar to drain and exit cleanly. Errors are expected if
-// the process is already gone.
 func (c *sidecarClient) Shutdown(ctx context.Context) error {
 	return c.call(ctx, "shutdown", nil, rpcTimeoutShutdown, nil)
 }
