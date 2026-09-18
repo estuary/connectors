@@ -52,8 +52,9 @@ Tables over about one million dsdgen rows (for the sales tables a dsdgen row is
 a ticket or order of several line items) are split into chunks with dsdgen's
 `-PARALLEL`/`-CHILD` mode, which the fork makes byte-identical to a serial
 run. Each stream buffers up to 10,000 generated rows (a few megabytes) and
-writes them out together with a checkpoint, and again at every chunk boundary;
-documents never leave a stream without the checkpoint that accounts for them.
+writes them out together with a checkpoint under one lock, and again at every
+chunk boundary; documents never leave a stream without the checkpoint that
+accounts for them.
 Per binding the checkpoint records the scale factor, the number of chunks,
 the highest completed chunk, the rows already emitted from the in-flight chunk
 and a done flag; a returns binding shares its parent's progress. On restart,

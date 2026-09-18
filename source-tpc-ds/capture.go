@@ -7,6 +7,8 @@ import (
 	"strconv"
 
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
+	pc "github.com/estuary/flow/go/protocols/capture"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
@@ -173,10 +175,10 @@ func (s *streamRun) runChunk(ctx context.Context, chunk, chunks int) error {
 	var lines int64
 	// emit writes the buffered documents and then the checkpoint fn builds.
 	var emit = func(fn func(m *binding) map[string]any) error {
-		var batches []boilerplate.DocumentBatch
+		var batches = map[int][]json.RawMessage{}
 		for _, t := range targets {
 			if len(t.docs) > 0 {
-				batches = append(batches, boilerplate.DocumentBatch{Binding: t.b.index, Docs: t.docs})
+				batches[t.b.index] = t.docs
 				t.docs = nil
 			}
 		}
@@ -184,7 +186,7 @@ func (s *streamRun) runChunk(ctx context.Context, chunk, chunks int) error {
 		if err != nil {
 			return err
 		}
-		return s.capture.out.DocumentBatchesAndCheckpoint(patch, true, batches...)
+		return emitWithCheckpoint(s.capture.out, batches, patch)
 	}
 	var progress = func(m *binding) map[string]any {
 		if chunk <= m.state.Completed {
@@ -233,6 +235,29 @@ func (s *streamRun) runChunk(ctx context.Context, chunk, chunks int) error {
 		m.state.Done = chunk == chunks
 		return map[string]any{"completed": chunk, "inFlight": nil, "done": m.state.Done}
 	})
+}
+
+// emitWithCheckpoint writes every batch of documents and then a merge-patch
+// checkpoint under one lock acquisition on out, so a checkpoint from another
+// stream's goroutine cannot commit these documents before the checkpoint that
+// accounts for them (PullOutput.DocumentsAndCheckpoint offers this for a
+// single binding only).
+func emitWithCheckpoint(out *boilerplate.PullOutput, batches map[int][]json.RawMessage, checkpoint json.RawMessage) error {
+	out.Lock()
+	defer out.Unlock()
+	for binding, docs := range batches {
+		for _, doc := range docs {
+			if err := out.Send(&pc.Response{Captured: &pc.Response_Captured{Binding: uint32(binding), DocJson: doc}}); err != nil {
+				return fmt.Errorf("writing captured documents: %w", err)
+			}
+		}
+	}
+	if err := out.Send(&pc.Response{Checkpoint: &pc.Response_Checkpoint{
+		State: &pf.ConnectorState{UpdatedJson: checkpoint, MergePatch: true},
+	}}); err != nil {
+		return fmt.Errorf("writing checkpoint: %w", err)
+	}
+	return nil
 }
 
 // patch builds a merge patch from fn's per-member patches.

@@ -275,22 +275,28 @@ func (out *PullOutput) Checkpoint(checkpoint json.RawMessage, merge bool) error 
 	return nil
 }
 
-// DocumentsAndCheckpoint emits documents for one binding and then a checkpoint
-// under a single lock acquisition, so goroutines feeding separate bindings
-// only ever checkpoint their own documents.
+// Emit documents and checkpoints with a common lock, this is useful if there
+// are multiple threads (goroutines) processing documents and emitting
+// checkpoints. In those instances using this method can allow each thread to
+// ensure that they only checkpoint their own documents
 func (out *PullOutput) DocumentsAndCheckpoint(checkpoint json.RawMessage, merge bool, binding int, docs ...json.RawMessage) error {
-	return out.DocumentBatchesAndCheckpoint(checkpoint, merge, DocumentBatch{Binding: binding, Docs: docs})
-}
+	log.WithField("count", len(docs)).Trace("emitting documents")
 
-// DocumentBatch is a set of documents destined for one binding.
-type DocumentBatch struct {
-	Binding int
-	Docs    []json.RawMessage
-}
+	var messages []*pc.Response
+	for _, doc := range docs {
+		messages = append(messages, &pc.Response{
+			Captured: &pc.Response_Captured{
+				Binding: uint32(binding),
+				DocJson: doc,
+			},
+		})
+	}
 
-// DocumentBatchesAndCheckpoint is DocumentsAndCheckpoint for documents spanning
-// several bindings.
-func (out *PullOutput) DocumentBatchesAndCheckpoint(checkpoint json.RawMessage, merge bool, batches ...DocumentBatch) error {
+	log.WithFields(log.Fields{
+		"checkpoint": checkpoint,
+		"merge":      merge,
+	}).Trace("emitting checkpoint")
+
 	var cp = &pc.Response{
 		Checkpoint: &pc.Response_Checkpoint{
 			State: &pf.ConnectorState{
@@ -302,15 +308,9 @@ func (out *PullOutput) DocumentBatchesAndCheckpoint(checkpoint json.RawMessage, 
 
 	out.Lock()
 	defer out.Unlock()
-	for _, batch := range batches {
-		for _, doc := range batch.Docs {
-			out.reused.msg.Reset()
-			out.reused.msg.Captured = &out.reused.doc
-			out.reused.doc.Binding = uint32(batch.Binding)
-			out.reused.doc.DocJson = doc
-			if err := out.Send(&out.reused.msg); err != nil {
-				return fmt.Errorf("writing captured documents: %w", err)
-			}
+	for _, msg := range messages {
+		if err := out.Send(msg); err != nil {
+			return fmt.Errorf("writing captured documents: %w", err)
 		}
 	}
 	if err := out.Send(cp); err != nil {
