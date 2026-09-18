@@ -18,6 +18,16 @@ func trimTerminator(line []byte) []byte {
 	return line
 }
 
+// A line is one dsdgen row, pipe-delimited with a trailing delimiter. This
+// customer_address row at scale 0.01:
+//
+//	7|AAAAAAAAHAAAAAAA||Hill 7th|Road|Suite U|Farmington|||39145|United States|||
+//
+// decodes to
+//
+//	{"ca_address_sk":7,"ca_address_id":"AAAAAAAAHAAAAAAA","ca_street_name":"Hill 7th","ca_street_type":"Road","ca_suite_number":"Suite U","ca_city":"Farmington","ca_zip":"39145","ca_country":"United States"}
+//
+// with the empty fields (NULLs) left out.
 func decodeLine(t *tableDef, line []byte) ([]byte, error) {
 	var fields = bytes.Split(trimTerminator(line), []byte{'|'})
 	if len(fields) != len(t.Columns) {
