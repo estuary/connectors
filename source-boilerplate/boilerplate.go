@@ -319,6 +319,45 @@ func (out *PullOutput) DocumentsAndCheckpoint(checkpoint json.RawMessage, merge 
 	return nil
 }
 
+// DocumentBatch is a set of documents destined for one binding.
+type DocumentBatch struct {
+	Binding int
+	Docs    []json.RawMessage
+}
+
+// DocumentBatchesAndCheckpoint is DocumentsAndCheckpoint for documents spanning
+// several bindings: every batch and then the checkpoint go out under one lock
+// acquisition, so a checkpoint from another goroutine cannot commit these
+// documents before the checkpoint that accounts for them.
+func (out *PullOutput) DocumentBatchesAndCheckpoint(checkpoint json.RawMessage, merge bool, batches ...DocumentBatch) error {
+	var cp = &pc.Response{
+		Checkpoint: &pc.Response_Checkpoint{
+			State: &pf.ConnectorState{
+				UpdatedJson: checkpoint,
+				MergePatch:  merge,
+			},
+		},
+	}
+
+	out.Lock()
+	defer out.Unlock()
+	for _, batch := range batches {
+		for _, doc := range batch.Docs {
+			out.reused.msg.Reset()
+			out.reused.msg.Captured = &out.reused.doc
+			out.reused.doc.Binding = uint32(batch.Binding)
+			out.reused.doc.DocJson = doc
+			if err := out.Send(&out.reused.msg); err != nil {
+				return fmt.Errorf("writing captured documents: %w", err)
+			}
+		}
+	}
+	if err := out.Send(cp); err != nil {
+		return fmt.Errorf("writing checkpoint: %w", err)
+	}
+	return nil
+}
+
 func (out *PullOutput) SourcedSchema(binding int, schema json.RawMessage) error {
 	out.Lock()
 	defer out.Unlock()
