@@ -1,10 +1,28 @@
+import:
+- acmeCo/flow.yaml
 captures:
   acmeCo/source-linear:
     endpoint:
       local:
         command:
-          - python
-          - "-m"
-          - source_linear
+        - python
+        - -m
+        - source_linear
         config: config.yaml
-    bindings: []
+    bindings:
+    - resource:
+        name: issues
+        interval: PT5M
+      target: acmeCo/issues
+    - resource:
+        name: projects
+        interval: PT5M
+      target: acmeCo/projects
+    - resource:
+        name: initiatives
+        interval: PT5M
+      target: acmeCo/initiatives
+    - resource:
+        name: labels
+        interval: PT5M
+      target: acmeCo/labels

@@ -1,0 +1,165 @@
+[
+  [
+    "acmeCo/issues",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "addedToCycleAt": null,
+      "addedToProjectAt": null,
+      "addedToTeamAt": "2026-07-30T21:35:04.127Z",
+      "archivedAt": "2026-08-04T18:13:09.393000Z",
+      "assignee": null,
+      "autoArchivedAt": null,
+      "autoClosedAt": null,
+      "branchName": "jonathan/est-2-connect-your-tools",
+      "canceledAt": null,
+      "completedAt": null,
+      "createdAt": "2026-07-30T21:35:03.808000Z",
+      "creator": null,
+      "customerTicketCount": 0,
+      "cycle": null,
+      "delegate": null,
+      "description": "Integrations turn Linear into your source of truth around product development. Keep data in sync, and eliminate manual updates between tools.\n\n![connect-your-tools.png](https://uploads.linear.app/fe63b3e2-bf87-46c0-8784-cd7d639287c8/c2eae035-37e2-4754-adcb-b8305431aa1f/c92d70c7-e6d0-4fa2-a0fd-78f6e780993a)\n\n### **Key integrations**\n\n* [**Slack**](<https://linear.app/settings/integrations/slack>)\n  Create issues from Slack messages and sync threads\n* **[GitHub](<https://linear.app/settings/integrations/github>) / [GitLab](<https://linear.app/settings/integrations/gitlab>)**\n  Automate your pull request, commit workflows, and keep issues synced both ways\n* [**Agents**](<https://linear.app/integrations/agents>)\n  Deploy AI agents that work alongside you as teammates\n\n### **Browse all integrations**\n\nDiscover 150+ available connections in our [integration directory](<https://linear.app/integrations>) \u2013 from bug creation via support tools (Intercom, Zendesk), to issues created from design explorations (Figma).\n\n### **Linear API**\n\nIf you need something more custom, you can build directly on the Linear API (built on GraphQL). [See our Dev Docs to learn more](<https://linear.app/developers>).",
+      "dueDate": null,
+      "estimate": null,
+      "id": "431c9f95-fe23-44cb-9391-f4880c51bede",
+      "identifier": "EST-2",
+      "lastAppliedTemplate": null,
+      "number": 2,
+      "parent": null,
+      "priority": 0,
+      "priorityLabel": "No priority",
+      "prioritySortOrder": "-3485.39",
+      "project": null,
+      "projectMilestone": null,
+      "slaBreachesAt": null,
+      "slaStartedAt": null,
+      "slaType": "all",
+      "snoozedBy": null,
+      "snoozedUntilAt": null,
+      "sortOrder": -2005,
+      "startedAt": null,
+      "startedTriageAt": null,
+      "state": {
+        "id": "c69eb093-d5ab-42b7-a54d-0c8ed98c9ee0"
+      },
+      "subIssueSortOrder": null,
+      "team": {
+        "id": "ae4e7ae3-6e8b-4528-a1eb-4d77ce563971"
+      },
+      "title": "Connect your tools",
+      "trashed": null,
+      "triagedAt": null,
+      "updatedAt": "2026-07-30T21:35:03.808000Z",
+      "url": "https://linear.app/estuary-test/issue/EST-2/connect-your-tools"
+    }
+  ],
+  [
+    "acmeCo/projects",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "archivedAt": null,
+      "autoArchivedAt": null,
+      "canceledAt": null,
+      "color": "#5e6ad2",
+      "completedAt": null,
+      "content": null,
+      "convertedFromIssue": null,
+      "createdAt": "2026-08-04T18:35:04.021000Z",
+      "creator": {
+        "id": "8ef0e033-440f-4809-b0ff-6a68821fc413"
+      },
+      "description": "Temporary record created to verify source-linear Projects stream. Safe to delete.",
+      "health": null,
+      "healthUpdatedAt": null,
+      "icon": null,
+      "id": "1904e338-af08-4cbb-aacd-033e8845e3c0",
+      "lastAppliedTemplate": null,
+      "lead": null,
+      "leadTeam": {
+        "id": "ae4e7ae3-6e8b-4528-a1eb-4d77ce563971"
+      },
+      "name": "estuary-connector-verification",
+      "priority": 0,
+      "priorityLabel": "No priority",
+      "prioritySortOrder": -31,
+      "progress": 0,
+      "scope": 0,
+      "slackChannelId": null,
+      "slugId": "6beb53347968",
+      "sortOrder": -31,
+      "startDate": null,
+      "startedAt": null,
+      "status": {
+        "id": "5c520723-dcc9-42d2-8127-5d759c43e256"
+      },
+      "targetDate": null,
+      "trashed": null,
+      "updatedAt": "2026-08-04T18:35:04.021000Z",
+      "url": "https://linear.app/estuary-test/project/estuary-connector-verification-6beb53347968"
+    }
+  ],
+  [
+    "acmeCo/initiatives",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "archivedAt": null,
+      "canceledAt": null,
+      "color": "#95a2b3",
+      "completedAt": null,
+      "content": null,
+      "createdAt": "2026-08-04T18:35:04.260000Z",
+      "creator": {
+        "id": "8ef0e033-440f-4809-b0ff-6a68821fc413"
+      },
+      "description": "Temporary record created to verify source-linear Initiatives stream. Safe to delete.",
+      "healthUpdatedAt": null,
+      "icon": null,
+      "id": "44f4e104-762d-43b3-a154-78fa72567bdb",
+      "leadTeam": null,
+      "name": "estuary-connector-verification",
+      "organization": {
+        "id": "14d2f26b-c26d-45e5-ada9-96636caa48be"
+      },
+      "owner": null,
+      "parentInitiative": null,
+      "priority": 0,
+      "prioritySortOrder": 0,
+      "slugId": "ba21ab221cce",
+      "sortOrder": 0,
+      "startedAt": null,
+      "status": "Active",
+      "targetDate": null,
+      "trashed": null,
+      "updatedAt": "2026-08-04T18:35:04.260000Z",
+      "url": "https://linear.app/estuary-test/initiative/estuary-connector-verification-ba21ab221cce"
+    }
+  ],
+  [
+    "acmeCo/labels",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "archivedAt": null,
+      "color": "#4EA7FC",
+      "createdAt": "2026-07-30T21:35:03.808000Z",
+      "creator": null,
+      "description": null,
+      "id": "274d6628-3101-41c1-96bd-27241c8301b5",
+      "inheritedFrom": null,
+      "isGroup": false,
+      "lastAppliedAt": null,
+      "name": "Improvement",
+      "parent": null,
+      "retiredAt": null,
+      "team": null,
+      "updatedAt": "2026-07-30T21:35:03.808000Z"
+    }
+  ]
+]
