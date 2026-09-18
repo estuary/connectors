@@ -272,13 +272,8 @@ type streamV2Channel struct {
 		committed int64
 	}
 
-	// buf is the payload of the batch under construction
-	buf            []byte
-	bufRows        int
-	bufFirstOffset int64
-	// bufHint is the size of the batch handed off before this one, and it sizes the next
-	// buffer.
-	bufHint int
+	// batch is the append under construction.
+	batch streamV2Batch
 
 	// appends runs the channel's appends one at a time, so Store can buffer more rows
 	// while a batch is on the wire and the batches keep their order. It is nil between
@@ -292,10 +287,11 @@ type streamV2Channel struct {
 }
 
 // newStreamV2Channel builds the in-memory state of one opened, reconciled channel.
-func newStreamV2Channel(channelName string, keyRange streamV2Range, routed, committed int64) *streamV2Channel {
+func newStreamV2Channel(channelName string, keyRange streamV2Range, enc *streamV2RowEncoder, routed, committed int64) *streamV2Channel {
 	var c = &streamV2Channel{
 		channelName: channelName,
 		keyRange:    keyRange,
+		batch:       newStreamV2Batch(enc),
 		limiter:     rate.NewLimiter(streamV2PaceBytesPerSecond, 2*streamV2PaceBytesPerSecond),
 		progress: struct {
 			routed       int64
@@ -313,32 +309,6 @@ func newStreamV2Channel(channelName string, keyRange streamV2Range, routed, comm
 // offsetToken renders the offset token for an offset on this channel.
 func (c *streamV2Channel) offsetToken(offset int64) string {
 	return streamV2FormatOffsetToken(offset, c.keyRange)
-}
-
-// bufferRow encodes the document at offset onto the payload of the channel's current
-// batch. When the payload is empty it starts the batch and records offset as the
-// batch's first. It reports how many bytes the payload grew by.
-//
-// A document that fails to encode leaves the payload exactly as it was, so the batch
-// keeps the rows before it and none of the failed row.
-func (c *streamV2Channel) bufferRow(offset int64, columnNames []columnName, converted []any) (int, error) {
-	var before = len(c.buf)
-	if c.bufRows == 0 {
-		c.startBatch()
-		c.bufFirstOffset = offset
-	} else {
-		c.buf = append(c.buf, ',')
-	}
-
-	var payload, err = appendRowJSON(c.buf, columnNames, converted)
-	if err != nil {
-		c.buf = c.buf[:before]
-		return 0, err
-	}
-
-	c.buf = payload
-	c.bufRows++
-	return len(c.buf) - before, nil
 }
 
 // wait waits for the channel's in-flight appendBatch and returns the first error
@@ -369,42 +339,12 @@ func (c *streamV2Channel) appendBatch(ctx context.Context, client *sidecarClient
 	return nil
 }
 
-// finishBatch closes the payload of the batch and gives up ownership of the buffer. It
-// reports the payload, the number of rows it holds, and the buffered bytes it releases.
-//
-// finishBatch counts those bytes before it writes the closing bracket, because that is
-// the byte total bufferRow reported as it built the batch. A count of the bracket here
-// as well leaves the total of buffered bytes one byte short of zero for every batch of
-// the session. That drifts the back-pressure ceiling away from the memory it stands
-// for.
-func (c *streamV2Channel) finishBatch() (payload []byte, rows, released int) {
-	released = len(c.buf)
-	c.buf = append(c.buf, ']')
-
-	payload, rows = c.buf, c.bufRows
-	c.bufHint = len(c.buf)
-	c.buf, c.bufRows, c.bufFirstOffset = nil, 0, 0
-	return payload, rows, released
-}
-
-// streamV2MinBatchCapacity is the size a payload buffer starts with. It applies until
-// the channel sends a batch that can size the next one.
-const streamV2MinBatchCapacity = 8 * 1024
-
-// startBatch opens the payload of a new batch. The size is a little over the batch
-// before it. A full batch then does not grow and copy a dozen times on its way to 8
-// MiB. The buffer is always a new one, because the batch before it owns the bytes it
-// received.
-func (c *streamV2Channel) startBatch() {
-	c.buf = append(make([]byte, 0, max(c.bufHint+c.bufHint/8, streamV2MinBatchCapacity)), '[')
-}
-
 type streamV2Binding struct {
-	database    string
-	schema      string
-	table       string
-	stateKey    string
-	columnNames []columnName
+	database string
+	schema   string
+	table    string
+	stateKey string
+	encoder  *streamV2RowEncoder
 
 	// priorCheckpoint is the streaming v2 state that the driver checkpoint recorded for this
 	// binding. The map key is the channel's key range, and the map covers every shard
@@ -575,7 +515,7 @@ func (m *streamV2Manager) addBinding(database, schema, table string, target sql.
 		schema:          schema,
 		table:           table,
 		stateKey:        target.StateKey,
-		columnNames:     columnNamesOf(names),
+		encoder:         newStreamV2RowEncoder(names),
 		priorCheckpoint: maps.Clone(prior),
 	}
 }
@@ -739,7 +679,7 @@ func (m *streamV2Manager) openChannel(
 	if err != nil {
 		return nil, err
 	}
-	return newStreamV2Channel(channelName, keyRange, routed, committedOffset), nil
+	return newStreamV2Channel(channelName, keyRange, b.encoder, routed, committedOffset), nil
 }
 
 // sweep drops the channels this task derived for the binding's table that it no
@@ -828,13 +768,13 @@ func (m *streamV2Manager) writeRow(ctx context.Context, binding int, packedKey [
 		return nil
 	}
 
-	var grew, err = c.bufferRow(offset, b.columnNames, converted)
+	var grew, err = c.batch.addRow(offset, converted)
 	if err != nil {
 		return fmt.Errorf("encoding row for %s: %w", b.table, err)
 	}
 	m.bufBytes += grew
 
-	if c.bufRows >= streamV2BatchRows || len(c.buf) >= streamV2BatchBytes {
+	if c.batch.rows >= streamV2BatchRows || c.batch.size() >= streamV2BatchBytes {
 		return m.appendBatch(ctx, c)
 	} else if m.bufBytes >= streamV2MaxBufferedBytes {
 		return m.appendAllBatches(ctx)
@@ -847,7 +787,7 @@ func (m *streamV2Manager) writeRow(ctx context.Context, binding int, packedKey [
 func (m *streamV2Manager) appendAllBatches(ctx context.Context) error {
 	for _, b := range m.bindings {
 		for _, c := range b.activeChannels {
-			if c.bufRows == 0 {
+			if c.batch.empty() {
 				continue
 			} else if err := m.appendBatch(ctx, c); err != nil {
 				return err
@@ -861,8 +801,8 @@ func (m *streamV2Manager) appendAllBatches(ctx context.Context) error {
 // channel. Ownership of the buffer passes to the append, so the next batch starts a
 // buffer of its own.
 func (m *streamV2Manager) appendBatch(ctx context.Context, c *streamV2Channel) error {
-	var firstOffset, lastOffset = c.bufFirstOffset, c.progress.routed
-	payload, rows, released := c.finishBatch()
+	var firstOffset, lastOffset = c.batch.firstOffset, c.progress.routed
+	payload, rows, released := c.batch.finish()
 	m.bufBytes -= released
 
 	client, err := m.ensureStarted(ctx)
@@ -978,7 +918,7 @@ func (m *streamV2Manager) flush(ctx context.Context) (map[int]streamV2Checkpoint
 func (m *streamV2Manager) settle(ctx context.Context, b *streamV2Binding) (bool, error) {
 	var advanced = false
 	for _, c := range b.activeChannels {
-		if c.bufRows > 0 {
+		if !c.batch.empty() {
 			if err := m.appendBatch(ctx, c); err != nil {
 				return false, err
 			}
