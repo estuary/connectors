@@ -684,12 +684,6 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 		)
 	}
 
-	// A live layout that is already the target layout keeps its epoch, so that a
-	// restart continues the channels it already ran.
-	if slices.Equal(liveKeyRanges, targetChannelKeyRanges) && len(owned) > 0 {
-		b.targetEpoch, _, _ = m.parseChannelName(owned[liveKeyRanges[0]].ChannelName, b.stateKey)
-	}
-
 	var activeChannels = make([]*streamV2Channel, 0, len(liveKeyRanges))
 	var keep = make(map[string]bool, len(liveKeyRanges))
 	for _, keyRange := range liveKeyRanges {

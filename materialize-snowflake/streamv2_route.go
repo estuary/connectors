@@ -84,16 +84,3 @@ func streamV2LayoutCovers(layout []streamV2Range, shard streamV2Range) bool {
 	}
 	return layout[len(layout)-1].keyEnd == shard.keyEnd
 }
-
-// streamV2RouteKeyHash reports the index of the layout key range that covers a key
-// hash, or -1 when none does. Under a layout that covers the shard range, -1
-// means the key hash lies outside the shard entirely — a disagreement with the
-// runtime's routing that the caller must reject.
-func streamV2RouteKeyHash(layout []streamV2Range, keyHash uint32) int {
-	for i, r := range layout {
-		if r.contains(keyHash) {
-			return i
-		}
-	}
-	return -1
-}
