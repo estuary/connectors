@@ -1,0 +1,47 @@
+meta {
+  name: A2 - Create Initiative
+  type: graphql
+  seq: 2
+}
+
+post {
+  url: {{base_url}}
+  body: graphql
+  auth: inherit
+}
+
+body:graphql {
+  mutation SeedInitiative {
+    initiativeCreate(input: {
+      name: "estuary-connector-verification"
+      description: "Temporary record created to verify source-linear's Initiatives stream. Safe to delete."
+    }) {
+      success
+      initiative { id name createdAt updatedAt archivedAt status }
+    }
+  }
+}
+
+docs {
+  Reference: https://linear.app/developers/graphql
+
+  **Only the user runs this. Never the assistant.** This is a state-mutating call.
+
+  Creates one throwaway initiative so the Initiatives stream can be observed with real
+  data. Same rationale as `A1 - Create Project`.
+
+  Closes: the Initiatives stream has NO observed response body
+  (`30 - Initiatives Bare` and `31 - Initiatives Incremental Sweep` both return zero rows).
+
+  **This request doubles as an ENTITLEMENT check, which is the more valuable outcome.**
+  Initiatives are a paid-plan feature, so "zero initiatives" is currently ambiguous — it
+  may mean the workspace has none, or that the plan does not include them. If this mutation
+  fails with a feature/permission error rather than succeeding, that resolves the ambiguity
+  and the Initiatives stream needs a different treatment (graceful degradation when the
+  workspace lacks entitlement, rather than assuming an empty-but-available collection).
+  Please report the error verbatim if it fails.
+
+  **Re-run after:** `30 - Initiatives Bare`, then `31 - Initiatives Incremental Sweep`.
+
+  Cleanup: archive or delete the initiative from the Linear UI once verification is done.
+}

@@ -1,0 +1,186 @@
+meta {
+  name: 02 - Introspect Pagination Args
+  type: graphql
+  seq: 2
+}
+
+post {
+  url: {{base_url}}
+  body: graphql
+  auth: inherit
+}
+
+body:graphql {
+  query IntrospectPaginationArgs {
+    orderBy: __type(name: "PaginationOrderBy") {
+      name
+      description
+      enumValues {
+        name
+        description
+      }
+    }
+    issuesArgs: __type(name: "Query") {
+      fields(includeDeprecated: false) {
+        name
+        args {
+          name
+          description
+          type {
+            name
+            kind
+            ofType { name kind }
+          }
+        }
+      }
+    }
+  }
+}
+
+docs {
+  Reference: https://linear.app/developers/pagination
+
+  Settles two things the prose docs leave undefined:
+
+  1. The exact member list of `PaginationOrderBy` and, critically, each member's
+     DESCRIPTION — Linear documents the sort DIRECTION only in the enum value
+     description, and direction determines whether an `updatedAt` cursor can be
+     checkpointed mid-pagination or only at end-of-sweep.
+  2. The full argument set on the four root connection fields (`issues`, `projects`,
+     `initiatives`, `issueLabels`), to confirm the grouping hypothesis that all four
+     take an identical `filter` / `first` / `after` / `before` / `last` /
+     `includeArchived` / `orderBy` signature.
+
+  The `issuesArgs` alias pulls every field on `Query`; filter the response client-side
+  to the four root fields of interest. Introspection is a large response but a cheap
+  one — it does not touch the data plane.
+}
+
+example {
+  name: 200 — projection: PaginationOrderBy + cluster root-field args
+
+  request: {
+    url: https://api.linear.app/graphql
+    method: POST
+    mode: graphql
+
+    body:graphql: {
+      query IntrospectPaginationArgs {
+        orderBy: __type(name: "PaginationOrderBy") {
+          name
+          description
+          enumValues {
+            name
+            description
+          }
+        }
+        issuesArgs: __type(name: "Query") {
+          fields(includeDeprecated: false) {
+            name
+            args {
+              name
+              description
+              type {
+                name
+                kind
+                ofType { name kind }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  response: {
+    headers: {
+      x-complexity: 10
+      x-ratelimit-requests-limit: 2500
+      x-ratelimit-requests-remaining: 2498
+      x-ratelimit-complexity-limit: 3000000
+      x-ratelimit-complexity-remaining: 2999987
+    }
+
+    status: {
+      code: 200
+      text: OK
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "data": {
+            "orderBy": {
+              "name": "PaginationOrderBy",
+              "description": "By which field should the pagination order by",
+              "enumValues": [
+                {
+                  "name": "createdAt",
+                  "description": null
+                },
+                {
+                  "name": "updatedAt",
+                  "description": null
+                }
+              ]
+            },
+            "rootFields": [
+              {
+                "name": "projects",
+                "args": [
+                  "filter",
+                  "before",
+                  "after",
+                  "first",
+                  "last",
+                  "includeArchived",
+                  "orderBy",
+                  "sort"
+                ]
+              },
+              {
+                "name": "initiatives",
+                "args": [
+                  "filter",
+                  "before",
+                  "after",
+                  "first",
+                  "last",
+                  "includeArchived",
+                  "orderBy",
+                  "sort"
+                ]
+              },
+              {
+                "name": "issueLabels",
+                "args": [
+                  "filter",
+                  "before",
+                  "after",
+                  "first",
+                  "last",
+                  "includeArchived",
+                  "orderBy"
+                ]
+              },
+              {
+                "name": "issues",
+                "args": [
+                  "filter",
+                  "before",
+                  "after",
+                  "first",
+                  "last",
+                  "includeArchived",
+                  "orderBy",
+                  "sort"
+                ]
+              }
+            ]
+          }
+        }
+      '''
+    }
+  }
+}

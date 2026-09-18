@@ -1,0 +1,162 @@
+headers {
+  Content-Type: application/json
+}
+
+auth {
+  mode: none
+}
+
+script:pre-request {
+  // Linear expects the personal API key as a BARE `Authorization: <key>` value with no
+  // `Bearer` prefix — this mirrors source_linear/resources.py:11-29, where the CDK
+  // TokenSource is built with authorization_token_type="".
+  //
+  // The decrypted key lives on `req` for this one in-flight request only. Never
+  // bru.setVar / bru.setEnvVar it: that would persist the secret into a committed file.
+  const { execFileSync } = require('child_process');
+
+  const configPath = bru.getEnvVar('config_path');
+  if (!configPath) throw new Error('config_path env var is not set');
+
+  const decrypted = execFileSync(
+    'sops', ['-d', '--output-type=json', configPath], { encoding: 'utf8' },
+  );
+  const token = JSON.parse(decrypted)?.credentials?.access_token_sops;
+  if (!token) throw new Error('credentials.access_token_sops missing from decrypted config');
+
+  req.setHeader('Authorization', token);
+}
+
+script:post-response {
+  // Linear meters two independent budgets and reports both on EVERY response, including
+  // errors. Echo them so each run records what the query actually cost — `X-Complexity`
+  // is the number the 10,000-point per-query cap is measured against, and it is the only
+  // way to size `first` per stream.
+  //
+  // No body redaction is configured. Linear returns no HATEOAS envelope and no volatile
+  // per-request ids, and the fields that do churn (`updatedAt`, cursors) are exactly the
+  // ones these probes exist to observe. If snapshot tests later redact fields, mirror
+  // that list here and cross-reference it from the test's REDACTED_FIELDS.
+  const h = res.getHeaders();
+  console.log(JSON.stringify({
+    status: res.getStatus(),
+    complexity: h['x-complexity'],
+    requests_remaining: h['x-ratelimit-requests-remaining'],
+    requests_limit: h['x-ratelimit-requests-limit'],
+    complexity_remaining: h['x-ratelimit-complexity-remaining'],
+    complexity_limit: h['x-ratelimit-complexity-limit'],
+    complexity_reset: h['x-ratelimit-complexity-reset'],
+  }));
+}
+
+docs {
+  Bruno collection for `source-linear`, verifying the Issues / Projects / Initiatives /
+  Labels cluster against the live Linear GraphQL API.
+
+  Reference: https://linear.app/developers/graphql
+
+  Linear exposes a SINGLE GraphQL endpoint (`https://api.linear.app/graphql`). Every
+  request in this collection POSTs a different query document to that same URL; there
+  are no per-resource REST paths.
+
+  ## API constraints (account-wide)
+
+  All figures below were confirmed live against the Estuary workspace on 2026-07-30
+  unless marked otherwise.
+
+  - **Two independent hourly budgets, both metered per user.** Requests and complexity
+    points are counted separately; exhausting either one rate-limits you.
+    - Requests: `X-RateLimit-Requests-Limit` / `-Remaining` / `-Reset`.
+    - Complexity: `X-RateLimit-Complexity-Limit` / `-Remaining` / `-Reset`.
+  - **The request budget is 2,500/hour, NOT 5,000.** Observed live on every response from
+    this account: `X-RateLimit-Requests-Limit: 2500`. The rate-limiting docs page leads
+    with "up to 5,000 requests per hour" for API-key auth but its own table says 2,500 per
+    user per hour; the table is right. Budget against **2,500**. The complexity ceiling
+    does match the docs: `X-RateLimit-Complexity-Limit: 3000000`.
+  - **Complexity is effectively a non-constraint; REQUESTS are the binding budget.** With
+    the connector's real selection sets at `first: 250`, one full page costs at most ~2,225
+    points (Projects — the priciest of the four). Exhausting 3,000,000 points/hour would
+    take ~1,348 such pages, but the 2,500-request ceiling stops you first. Pace the
+    connector on requests/hour and treat complexity as a guardrail, not a scheduler input.
+  - **Reset headers are UTC epoch MILLISECONDS**, not seconds and not a delta. Dividing
+    by 1000 before converting is required; treating the value as seconds yields a
+    timestamp in 1970.
+  - **Hard per-query complexity cap of 10,000 points.** Quoting
+    https://linear.app/developers/rate-limiting: "We also enforce a maximum complexity
+    of a single query at any time to 10,000 points."
+  - **The documented complexity formula is NOT what the API charges.** Docs say cost is
+    static — "Each property is 0.1 point, each object is 1 point and any connection
+    multiplies its children's points based on the given pagination argument, or the default
+    50." Measured behavior diverges per root field, which matters because it decides
+    whether page size can be sized up front:
+    - `projects`, `initiatives`, `issueLabels` — cost scales LINEARLY with the requested
+      `first` and is INDEPENDENT of rows returned. `projects(first: N) { nodes { id } }`
+      measured 2 / 10 / 50 points at N = 10 / 50 / 250 while returning ZERO rows. Cost here
+      is static and therefore predictable in production.
+    - `issues` — cost does NOT scale with `first` at all. The same query measured a flat
+      2 points at N = 10, 50 and 250. Even a deliberately absurd
+      `issues(first: 250) { nodes { comments(first: 250) { … } } }` — ~87,750 points under
+      the documented formula — returned HTTP 200 at `X-Complexity: 6` (see
+      `05 - Complexity Envelope`). The 10,000 cap is evidently enforced against actual
+      executed cost for this field, not the static estimate.
+    Consequence: the three static-cost streams can be sized with confidence, but `issues`
+    cost cannot be predicted from this workspace and the connector should degrade
+    gracefully (halve `first`, retry) if it ever meets a complexity rejection in the wild.
+  - **Measured cost of the connector's REAL selection sets at `first: 250`** (see each
+    stream's `x0 - … Bare` request): Issues **10**, Projects **2,225**, Initiatives
+    **1,801**, Labels **1,000**. All four sit inside the 10,000-point cap, so
+    **`first: 250` — the maximum — is safe for every stream in this cluster.**
+  - **A rate-limited response is HTTP 400, NOT HTTP 429.** The body carries a top-level
+    `errors` array whose entry has `extensions.code == "RATELIMITED"`. This is the single
+    most important constraint for the connector: the CDK's default retry logic treats
+    4xx-other-than-429 as terminal, so a `RATELIMITED` 400 must be detected by INSPECTING
+    THE RESPONSE BODY and retried explicitly. Status code alone is not sufficient.
+    UNVERIFIED: not reproduced live — provoking it would mean burning the account's full
+    2,500-request hourly budget, which is out of proportion to the evidence gained. Taken
+    from the docs. The surrounding behavior IS verified, and it corroborates the claim:
+    HTTP 400 is demonstrably a generic error channel here, not a rate-limit signal (see
+    `42 - Labels Sort Rejected`, a permanent schema error returned as 400).
+  - **HTTP status carries NO reliable success/failure signal in either direction.**
+    Verified live, and worse than the usual GraphQL caveat — Linear splits failures across
+    both status codes with no discernible rule:
+    - `06 - Page Size Over Limit`: `first: 251` -> **HTTP 200**, `data: null`,
+      `errors[0].extensions.code == "INVALID_INPUT"`. A hard rejection served as a 200.
+    - `42 - Labels Sort Rejected`: unknown argument -> **HTTP 400**,
+      `errors[0].extensions.code == "GRAPHQL_VALIDATION_FAILED"`.
+    So a 200 may be a total failure, and a 400 may be permanent (schema) or transient
+    (rate limit). **`extensions.code` is the only reliable discriminator**; every response
+    must be parsed for a top-level `errors` array regardless of status. A connector that
+    branches on status alone would read the `first: 251` failure as an empty page and
+    silently declare the stream exhausted.
+  - **Archived records are hidden by default.** Quoting
+    https://linear.app/developers/graphql: "Archived resources are hidden by default from
+    the paginated responses. They can be included by passing optional `includeArchived:
+    true` as a query parameter for pagination." Omitting it silently drops a partition —
+    see the `includeArchived` probes per stream.
+  - **Default page size is 50; MAXIMUM is 250.** The docs state the default ("The first 50
+    results are returned by default without query arguments") but never the ceiling. Found
+    live: `first: 251` is rejected with `first must not be greater than 250` — rejected,
+    not clamped, and `data` comes back null. The connector must clamp to <= 250 itself.
+    See `06 - Page Size Over Limit`.
+  - **`orderBy` is DESCENDING-only, for both `createdAt` and `updatedAt`.** Undocumented in
+    the prose docs, and the `PaginationOrderBy` enum values carry null descriptions in the
+    schema. Established live in `04 - OrderBy Direction Probe`. Three of the four cluster
+    root fields (`issues`, `projects`, `initiatives`) also accept a richer
+    `sort: [<Entity>SortInput!]` argument with an explicit
+    `order: Ascending | Descending`; `issueLabels` does NOT (`42 - Labels Sort Rejected`).
+    Ascending order is what allows safe per-page cursor checkpointing, so this asymmetry
+    drives the per-stream checkpoint policy.
+  - **Pagination cursors are keyset values derived from the document, not opaque server
+    tokens** — despite one of the two encodings looking opaque. Under `orderBy`,
+    `pageInfo.endCursor` is the last node's raw UUID. Under `sort`, it is a base64 blob
+    that decodes to `{"key": "<last node uuid>", "groups": [...]}`. Neither holds
+    server-side state or has a lifetime, so neither carries the durability risk of a true
+    continuation token. The connector nonetheless persists only `updatedAt` between sync
+    cycles and uses `after` strictly within a single sweep.
+  - **`updatedAt` ties are common and are the cluster's main correctness hazard.** Bulk
+    operations stamp identical `updatedAt` across many rows — in this workspace all 4
+    issues, all 3 labels and all 6 workflow states share one millisecond. Verified in
+    `07 - Cursor Filter Boundary`: `gt` is strictly exclusive and `gte` inclusive at 1 ms
+    resolution, so a cursor landing inside a tie group either skips the remainder (`gt`) or
+    re-reads it forever (`gte`). Cursor policy must address this explicitly.
+}
