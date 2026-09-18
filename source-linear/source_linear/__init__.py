@@ -27,7 +27,7 @@ class Connector(
     def request_class(self):
         return Request[EndpointConfig, ResourceConfig, ConnectorState]
 
-    async def spec(self, _: request.Spec, logger: Logger) -> ConnectorSpec:
+    async def spec(self, log: Logger, _: request.Spec) -> ConnectorSpec:
         return ConnectorSpec(
             configSchema=EndpointConfig.model_json_schema(),
             documentationUrl="https://go.estuary.dev/source-linear",
