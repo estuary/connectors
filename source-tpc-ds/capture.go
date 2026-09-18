@@ -178,11 +178,11 @@ func (s *streamRun) runChunk(ctx context.Context, chunk, chunks int) error {
 				t.docs = nil
 			}
 		}
-		patch, err := s.patch(fn)
+		checkpoint, err := s.buildCheckpoint(fn)
 		if err != nil {
 			return err
 		}
-		return emitWithCheckpoint(s.capture.out, batches, patch)
+		return emitWithCheckpoint(s.capture.out, batches, checkpoint)
 	}
 	var progress = func(m *binding) map[string]any {
 		if chunk <= m.state.Completed {
@@ -253,20 +253,20 @@ func emitWithCheckpoint(out *boilerplate.PullOutput, batches map[int][]json.RawM
 	return nil
 }
 
-func (s *streamRun) patch(fn func(m *binding) map[string]any) (json.RawMessage, error) {
-	var patches = map[boilerplate.StateKey]any{}
+func (s *streamRun) buildCheckpoint(fn func(m *binding) map[string]any) (json.RawMessage, error) {
+	var states = map[boilerplate.StateKey]any{}
 	for _, m := range s.members {
-		if p := fn(m); p != nil {
-			patches[m.stateKey] = p
+		if state := fn(m); state != nil {
+			states[m.stateKey] = state
 		}
 	}
-	return json.Marshal(map[string]any{"bindingStateV1": patches})
+	return json.Marshal(map[string]any{"bindingStateV1": states})
 }
 
 func (s *streamRun) checkpoint(fn func(m *binding) map[string]any) error {
-	patch, err := s.patch(fn)
+	checkpoint, err := s.buildCheckpoint(fn)
 	if err != nil {
 		return err
 	}
-	return s.capture.out.Checkpoint(patch, true)
+	return s.capture.out.Checkpoint(checkpoint, true)
 }
