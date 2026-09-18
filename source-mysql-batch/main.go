@@ -96,6 +96,9 @@ func (c *Config) Validate() error {
 // falling back to an unencrypted connection.
 func (c *Config) sslSettings() mysqltls.Settings {
 	var mode = c.Advanced.SSLMode
+	// TODO: We eventually want to make `ModeRequired` the global default.
+	// We'll have to set up a feature flag so we don't break any existing
+	// captures that do not support SSL
 	if mode == "" {
 		mode = mysqltls.ModePreferred
 	}
@@ -202,6 +205,13 @@ func connectMySQL(ctx context.Context, cfg *Config) (*client.Conn, error) {
 	}
 
 	var settings = cfg.sslSettings()
+	if cfg.Advanced.SSLMode == "" {
+		var msg = "'sslmode' is not set, defaulting to %q"
+		if settings.AllowsPlaintextFallback() {
+			msg += "; traffic may travel unencrypted if the server does not offer TLS"
+		}
+		log.WithField("sslmode", settings.Mode).Warnf(msg, settings.Mode)
+	}
 	tlsConfig, err := settings.Config(cfg.serverHost())
 	if err != nil {
 		return nil, err
