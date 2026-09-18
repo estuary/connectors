@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -126,6 +125,11 @@ func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursorJSON 
 	if err != nil {
 		return nil, err
 	}
+	var sslSettings = db.config.sslSettings()
+	tlsConfig, err := sslSettings.Config(db.config.serverHost())
+	if err != nil {
+		return nil, err
+	}
 
 	var syncConfig = replication.BinlogSyncerConfig{
 		ServerID: uint32(db.config.Advanced.NodeID),
@@ -134,9 +138,11 @@ func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursorJSON 
 		Port:     uint16(port),
 		User:     db.config.User,
 		Password: password,
-		// TODO(wgd): Maybe add 'serverName' checking as described over in Connect()
-		// Must stay non-nil: under IAM auth the Password above is a bearer token.
-		TLSConfig: &tls.Config{InsecureSkipVerify: true},
+		// Nil only when 'sslmode' is disabled. When the Password above is a bearer
+		// token rather than a user-chosen secret, Config.Validate rejects every mode
+		// that would leave it unencrypted, so neither this nor the plaintext retry
+		// below is reachable for those auth types.
+		TLSConfig: tlsConfig,
 		// Request that timestamp values coming via replication be interpreted as UTC.
 		TimestampStringLocation: time.UTC,
 
@@ -167,13 +173,17 @@ func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursorJSON 
 	var syncer = replication.NewBinlogSyncer(syncConfig)
 	var errWithTLS error
 	if streamer, errWithTLS = syncer.StartSync(pos); errWithTLS == nil {
-		logrus.Debug("replication connected with TLS")
-	} else if db.config.requiresTLS() {
+		if tlsConfig != nil {
+			logrus.WithField("sslmode", sslSettings.Mode).Debug("replication connected with TLS")
+		} else {
+			logrus.Debug("replication connected without TLS")
+		}
+	} else if tlsConfig == nil || !sslSettings.AllowsPlaintextFallback() {
 		syncer.Close()
 		if userErr := wrapMySQLReplicationError(errWithTLS); userErr != nil {
 			return nil, userErr
 		}
-		return nil, fmt.Errorf("error starting binlog sync over TLS: %w", errWithTLS)
+		return nil, fmt.Errorf("error starting binlog sync (sslmode %q): %w", sslSettings.Mode, errWithTLS)
 	} else {
 		syncer.Close()
 		syncConfig.TLSConfig = nil

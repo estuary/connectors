@@ -264,6 +264,40 @@
             "default": "",
             "nonsensitive": true
           },
+          "sslmode": {
+            "type": "string",
+            "enum": [
+              "disabled",
+              "preferred",
+              "required",
+              "verify_ca",
+              "verify_identity"
+            ],
+            "title": "SSL Mode",
+            "description": "Whether to use TLS and how strictly to verify the server certificate. Defaults to 'preferred' for password authentication and 'required' for IAM authentication. See the connector documentation for details.",
+            "nonsensitive": true
+          },
+          "ssl_server_ca": {
+            "type": "string",
+            "title": "SSL Server CA",
+            "description": "PEM-encoded CA certificate the server certificate must chain to. Required for 'verify_ca'; optional for 'verify_identity'.",
+            "multiline": true,
+            "secret": true
+          },
+          "ssl_client_cert": {
+            "type": "string",
+            "title": "SSL Client Certificate",
+            "description": "Optional PEM-encoded client certificate for mutual TLS.",
+            "multiline": true,
+            "secret": true
+          },
+          "ssl_client_key": {
+            "type": "string",
+            "title": "SSL Client Key",
+            "description": "PEM-encoded private key for the client certificate.",
+            "multiline": true,
+            "secret": true
+          },
           "watermarks_table": {
             "type": "string",
             "title": "Watermarks Table Name",
