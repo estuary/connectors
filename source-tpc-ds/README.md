@@ -85,7 +85,7 @@ tools v2.10.0), carrying these patches, one commit each:
 
 The fork publishes `ghcr.io/estuary/dsdgen:<commit>`
 containing the static binary and its `tpcds.idx` distributions file; the
-Dockerfile here pins tag `a0d4ada` and copies both into the build stage (so the
+Dockerfile here pins tag `e73c527` and copies both into the build stage (so the
 tests run against the real generator) and the runtime image. The dsdgen
 source is distributed under TPC's legal notice, which the fork keeps intact.
 
