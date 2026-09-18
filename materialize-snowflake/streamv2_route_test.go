@@ -105,19 +105,15 @@ func TestStreamV2LayoutCovers(t *testing.T) {
 
 func TestClassifyKeyRange(t *testing.T) {
 	var shard = streamV2Range{keyBegin: 0x40000000, keyEnd: 0x7fffffff}
-	targets, err := streamV2TargetLayout(shard.keyBegin, shard.keyEnd)
-	require.NoError(t, err)
-
 	var cases = []struct {
 		name   string
 		item   streamV2Range
 		expect streamV2KeyRangeClass
 	}{
-		{"first target", targets[0], streamV2KeyRangeTarget},
-		{"last target", targets[3], streamV2KeyRangeTarget},
-		{"half of the shard", streamV2Range{keyBegin: 0x40000000, keyEnd: 0x5fffffff}, streamV2KeyRangeInherited},
-		{"eighth of the shard", streamV2Range{keyBegin: 0x40000000, keyEnd: 0x47ffffff}, streamV2KeyRangeInherited},
-		{"the whole shard range", shard, streamV2KeyRangeInherited},
+		{"a quarter of the shard", streamV2Range{keyBegin: 0x40000000, keyEnd: 0x4fffffff}, streamV2KeyRangeOwned},
+		{"half of the shard", streamV2Range{keyBegin: 0x40000000, keyEnd: 0x5fffffff}, streamV2KeyRangeOwned},
+		{"eighth of the shard", streamV2Range{keyBegin: 0x40000000, keyEnd: 0x47ffffff}, streamV2KeyRangeOwned},
+		{"the whole shard range", shard, streamV2KeyRangeOwned},
 		{"below the shard", streamV2Range{keyBegin: 0x00000000, keyEnd: 0x3fffffff}, streamV2KeyRangeSibling},
 		{"above the shard", streamV2Range{keyBegin: 0x80000000, keyEnd: 0xffffffff}, streamV2KeyRangeSibling},
 		{"adjacent below", streamV2Range{keyBegin: 0x30000000, keyEnd: 0x3fffffff}, streamV2KeyRangeSibling},
@@ -127,7 +123,7 @@ func TestClassifyKeyRange(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.expect, classifyKeyRange(tc.item, shard, targets))
+			require.Equal(t, tc.expect, classifyKeyRange(tc.item, shard))
 		})
 	}
 }

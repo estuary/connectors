@@ -2,7 +2,6 @@ package connector
 
 import (
 	"fmt"
-	"slices"
 
 	"github.com/estuary/connectors/go/keyhash"
 )
@@ -42,17 +41,14 @@ func streamV2TargetLayout(keyBegin, keyEnd uint32) ([]streamV2Range, error) {
 	return layout, nil
 }
 
-// streamV2KeyRangeClass classifies a checkpoint item's channel key range against the
-// range of the shard reading it.
+// streamV2KeyRangeClass places a channel's key range relative to the range of
+// the shard reading it.
 type streamV2KeyRangeClass int
 
 const (
-	// streamV2KeyRangeTarget is a key range of the shard's own target layout.
-	streamV2KeyRangeTarget streamV2KeyRangeClass = iota
-	// streamV2KeyRangeInherited lies within the shard's range but is not a target
-	// key range: it belonged to a shard this topology replaced, and this shard
-	// continues it until a rebalance drops it.
-	streamV2KeyRangeInherited
+	// streamV2KeyRangeOwned lies within the shard's range, so the channel is the
+	// shard's to open, continue, or abandon.
+	streamV2KeyRangeOwned streamV2KeyRangeClass = iota
 	// streamV2KeyRangeSibling lies entirely outside the shard's range. It belongs
 	// to a live sibling and is none of this shard's business.
 	streamV2KeyRangeSibling
@@ -62,14 +58,10 @@ const (
 	streamV2KeyRangeStraddling
 )
 
-// classifyKeyRange places one channel key range relative to a shard range and the
-// shard's target layout.
-func classifyKeyRange(item streamV2Range, shard streamV2Range, targets []streamV2Range) streamV2KeyRangeClass {
-	if slices.Contains(targets, item) {
-		return streamV2KeyRangeTarget
-	}
+// classifyKeyRange places one channel key range relative to a shard range.
+func classifyKeyRange(item streamV2Range, shard streamV2Range) streamV2KeyRangeClass {
 	if shard.keyBegin <= item.keyBegin && item.keyEnd <= shard.keyEnd {
-		return streamV2KeyRangeInherited
+		return streamV2KeyRangeOwned
 	}
 	if item.keyEnd < shard.keyBegin || item.keyBegin > shard.keyEnd {
 		return streamV2KeyRangeSibling

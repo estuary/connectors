@@ -584,6 +584,16 @@ func TestStreamV2MisalignedSplitRejected(t *testing.T) {
 	require.ErrorContains(t, err, name)
 }
 
+// fullLayoutCheckpoint is the checkpoint of a binding whose four epoch-zero
+// channels have routed nothing.
+func fullLayoutCheckpoint(task string, layout []streamV2Range) streamV2Checkpoint {
+	var cp = make(streamV2Checkpoint, len(layout))
+	for _, keyRange := range layout {
+		cp[keyRange] = &streamV2ChannelCheckpointItem{ChannelName: streamV2FormatChannelName(task, 0, keyRange, "topology.v1")}
+	}
+	return cp
+}
+
 // TestStreamV2LostChannelRejected pins the reading of a channel that reports no
 // committed offset token while the checkpoint records documents appended to it,
 // with no declaration to explain the loss as an interrupted switch: the
@@ -594,11 +604,10 @@ func TestStreamV2LostChannelRejected(t *testing.T) {
 
 	quarters, err := streamV2TargetLayout(0, math.MaxUint32)
 	require.NoError(t, err)
-	var name = streamV2FormatChannelName(task, 0, quarters[1], "topology.v1")
 
-	var m = newTopologyManager(t, task, 0, math.MaxUint32, streamV2Checkpoint{
-		quarters[1]: {ChannelName: name, Routed: 5},
-	})
+	var prior = fullLayoutCheckpoint(task, quarters)
+	prior[quarters[1]].Routed = 5
+	var m = newTopologyManager(t, task, 0, math.MaxUint32, prior)
 
 	err = testWriteRow(context.Background(), m, 0, []any{"any", "v"})
 	require.ErrorContains(t, err, "reports no committed offset token while this task's checkpoint records")
@@ -627,9 +636,9 @@ func TestStreamV2ForeignTokenRejected(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(statePath, raw, 0o644))
 
-	var m = newTopologyManager(t, task, 0, math.MaxUint32, streamV2Checkpoint{
-		quarters[0]: {ChannelName: name, Routed: 5},
-	})
+	var prior = fullLayoutCheckpoint(task, quarters)
+	prior[quarters[0]].Routed = 5
+	var m = newTopologyManager(t, task, 0, math.MaxUint32, prior)
 
 	err = testWriteRow(context.Background(), m, 0, []any{"any", "v"})
 	require.ErrorContains(t, err, "was not written against this channel's key range")

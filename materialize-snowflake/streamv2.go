@@ -74,6 +74,11 @@ func (r streamV2Range) contains(keyHash uint32) bool {
 	return r.keyBegin <= keyHash && keyHash <= r.keyEnd
 }
 
+// overlaps reports whether two key ranges share any key hash.
+func (r streamV2Range) overlaps(o streamV2Range) bool {
+	return r.keyBegin <= o.keyEnd && o.keyBegin <= r.keyEnd
+}
+
 func (r streamV2Range) String() string {
 	return fmt.Sprintf("[%08x, %08x]", r.keyBegin, r.keyEnd)
 }
@@ -585,16 +590,10 @@ func (m *streamV2Manager) addBinding(database, schema, table string, target sql.
 	}
 }
 
-// ensureOpened opens the binding's channels on its first document. It builds the
-// active layout, reconciles each channel against Snowflake, and captures each
-// committed offset before anything is appended.
-func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) error {
-	if b.opened {
-		return nil
-	}
-
-	// A table another task streams into is rejected before this shard creates any
-	// channel of its own. A name of no v2 shape is left alone here.
+// rejectForeignChannels fails when another task streams into the binding's table
+// through channels of this write path's shape. Two tasks may not stream into one
+// table. A channel of no v2 shape is left alone.
+func (m *streamV2Manager) rejectForeignChannels(ctx context.Context, b *streamV2Binding) error {
 	channelNames, err := m.listChannels(ctx, b.database, b.schema, unquotedIdentifier(b.table))
 	if err != nil {
 		return err
@@ -616,6 +615,20 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 			b.table, strings.Join(foreignChannelNames, ", "),
 		)
 	}
+	return nil
+}
+
+// ensureOpened opens the binding's channels on its first document. It builds the
+// active layout, reconciles each channel against Snowflake, and captures each
+// committed offset before anything is appended.
+func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) error {
+	if b.opened {
+		return nil
+	}
+
+	if err := m.rejectForeignChannels(ctx, b); err != nil {
+		return err
+	}
 
 	client, err := m.ensureStarted(ctx)
 	if err != nil {
@@ -628,222 +641,113 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 		return err
 	}
 
-	// A nil checkpoint item is a channel this binding abandoned. Drop them, so that
-	// the loops below need no nil checks and len(b.priorCheckpoint) counts only live
-	// channels.
-	var priorCheckpoint = make(streamV2Checkpoint, len(b.priorCheckpoint))
-	for keyRange, sv2ChannelCheckpointItem := range b.priorCheckpoint {
-		if sv2ChannelCheckpointItem != nil {
-			priorCheckpoint[keyRange] = sv2ChannelCheckpointItem
-		}
+	// The checkpoint items whose channels this shard owns, keyed by range, with
+	// the epoch each channel name carries. A nil item is a channel this binding
+	// already abandoned. A sibling's channel is left alone, and a straddling one is
+	// rejected because the rows it holds belong to both sides of the boundary.
+	type ownedItem struct {
+		item  *streamV2ChannelCheckpointItem
+		epoch int
 	}
-	b.priorCheckpoint = priorCheckpoint
-
-	// The target epoch. A target range that already has a checkpoint item sets it,
-	// so a restart continues the channels it already ran. Otherwise it is one past
-	// the highest epoch among the channels this shard owns, so the new names
-	// collide with no channel a sweep has yet to drop.
-	b.targetEpoch = -1
-	for _, keyRange := range targetChannelKeyRanges {
-		if sv2ChannelCheckpointItem := b.priorCheckpoint[keyRange]; sv2ChannelCheckpointItem != nil {
-			if epoch, _, ok := m.parseChannelName(sv2ChannelCheckpointItem.ChannelName, b.stateKey); ok {
-				b.targetEpoch = epoch
-				break
-			}
+	var owned = make(map[streamV2Range]ownedItem)
+	var maxEpoch, priorItems = -1, 0
+	for keyRange, item := range b.priorCheckpoint {
+		if item == nil {
+			continue
 		}
-	}
-	if b.targetEpoch < 0 {
-		var maxEpoch = -1
-		for _, sv2ChannelCheckpointItem := range b.priorCheckpoint {
-			if epoch, keyRange, ok := m.parseChannelName(sv2ChannelCheckpointItem.ChannelName, b.stateKey); ok &&
-				keyRange.keyBegin >= shardKeyRange.keyBegin && keyRange.keyEnd <= shardKeyRange.keyEnd {
-				maxEpoch = max(maxEpoch, epoch)
-			}
-		}
-		b.targetEpoch = maxEpoch + 1
-	}
-
-	// Bucket the prior checkpoint's channels by where each one's key range falls
-	// relative to this shard. Owned channels, those whose range lies inside this
-	// shard's, are this shard's to open. A sibling's are left alone. A straddling
-	// range is rejected, because the rows that channel holds belong to both sides
-	// of the boundary.
-	var ownedKeyRanges []streamV2Range
-	var targetKeyRangeCount int
-	for keyRange, sv2ChannelCheckpointItem := range b.priorCheckpoint {
-		switch classifyKeyRange(keyRange, shardKeyRange, targetChannelKeyRanges) {
-		case streamV2KeyRangeTarget:
-			targetKeyRangeCount++
-			ownedKeyRanges = append(ownedKeyRanges, keyRange)
-		case streamV2KeyRangeInherited:
-			ownedKeyRanges = append(ownedKeyRanges, keyRange)
+		priorItems++
+		switch classifyKeyRange(keyRange, shardKeyRange) {
 		case streamV2KeyRangeSibling:
+			continue
 		case streamV2KeyRangeStraddling:
 			return fmt.Errorf(
 				"channel %q covers %s, which crosses the boundary of this shard's range %s: the shard was split off a boundary its channels do not subdivide along, so the rows that channel holds cannot be attributed to either side. Restore the task's shard key ranges to the topology which appended them, or backfill this binding",
-				sv2ChannelCheckpointItem.ChannelName, keyRange, shardKeyRange,
+				item.ChannelName, keyRange, shardKeyRange,
 			)
 		}
-	}
-	slices.SortFunc(ownedKeyRanges, func(a, b streamV2Range) int {
-		return cmp.Or(cmp.Compare(a.keyBegin, b.keyBegin), cmp.Compare(a.keyEnd, b.keyEnd))
-	})
-
-	// priorDeclaresTargets reports that the prior checkpoint holds an item for every
-	// target range. The declaration is written before any switch, so when it holds,
-	// every non-target channel is one a switch was about to abandon.
-	var priorDeclaresTargets = targetKeyRangeCount == len(targetChannelKeyRanges)
-
-	// Open every owned channel and reconcile it. Each becomes a live channel, a
-	// range to abandon, or a candidate, and an empty target channel is left for a
-	// later switch. A candidate is an empty non-target channel. The next loop
-	// decides those, because whether one is inherited or orphaned depends on what
-	// the other channels hold.
-	var liveNonTargetChannels, liveTargetChannels, candidateChannels []*streamV2Channel
-	var channelStatusByName = make(map[string]*channelStatusResult)
-	for _, keyRange := range ownedKeyRanges {
-		var sv2ChannelCheckpointItem = b.priorCheckpoint[keyRange]
-		var isTarget = classifyKeyRange(keyRange, shardKeyRange, targetChannelKeyRanges) == streamV2KeyRangeTarget
-
-		status, err := client.OpenChannel(ctx, b.database, b.schema, b.table, sv2ChannelCheckpointItem.ChannelName)
-		if err != nil {
-			return fmt.Errorf("opening channel %q: %w", sv2ChannelCheckpointItem.ChannelName, err)
+		epoch, _, ok := m.parseChannelName(item.ChannelName, b.stateKey)
+		if !ok {
+			return fmt.Errorf("channel %q recorded for key range %s is not a channel this task derived for this binding", item.ChannelName, keyRange)
 		}
-		channelStatusByName[sv2ChannelCheckpointItem.ChannelName] = status
-		if err := status.validateRejectedRows(sv2ChannelCheckpointItem.ChannelName, b.table); err != nil {
-			return err
-		}
-
-		if status.CommittedToken == nil {
-			if isTarget && sv2ChannelCheckpointItem.Routed == 0 {
-				// A declared target channel that took no rows has nothing to reconcile yet.
-				continue
-			}
-			if !isTarget && sv2ChannelCheckpointItem.Routed == 0 {
-				// An empty channel of another layout may be inherited or orphaned, and only
-				// the channels around it can tell, so the decision waits for all of them.
-				candidateChannels = append(candidateChannels, newStreamV2Channel(sv2ChannelCheckpointItem.ChannelName, keyRange, 0, 0))
-				continue
-			}
-			if !isTarget && priorDeclaresTargets {
-				// A non-target channel Snowflake no longer holds, under a declared target
-				// layout, was abandoned by a switch whose checkpoint deletion never landed.
-				b.abandonedRanges = append(b.abandonedRanges, keyRange)
-				log.WithFields(log.Fields{
-					"table":   b.table,
-					"channel": sv2ChannelCheckpointItem.ChannelName,
-					"routed":  sv2ChannelCheckpointItem.Routed,
-				}).Info("re-recording the deletion of a channel an interrupted session abandoned")
-				continue
-			}
-		}
-
-		committedOffset, err := streamV2ValidateCommittedToken(sv2ChannelCheckpointItem.ChannelName, b.table, status.CommittedToken, sv2ChannelCheckpointItem, keyRange, len(b.priorCheckpoint))
-		if err != nil {
-			return err
-		}
-		var c = newStreamV2Channel(sv2ChannelCheckpointItem.ChannelName, keyRange, sv2ChannelCheckpointItem.Routed, committedOffset)
-		if isTarget {
-			liveTargetChannels = append(liveTargetChannels, c)
-		} else {
-			liveNonTargetChannels = append(liveNonTargetChannels, c)
-		}
+		owned[keyRange] = ownedItem{item: item, epoch: epoch}
+		maxEpoch = max(maxEpoch, epoch)
 	}
 
-	// An empty channel joins the non-target layout when one exists and the channel
-	// fits a gap in it. Any other empty channel belongs to no layout this shard runs.
-	for _, c := range candidateChannels {
-		var overlapsLive = false
-		for _, live := range append(liveNonTargetChannels, liveTargetChannels...) {
-			if c.keyRange.keyBegin <= live.keyRange.keyEnd && live.keyRange.keyBegin <= c.keyRange.keyEnd {
-				overlapsLive = true
+	// A channel is live unless a channel of a higher epoch overlaps it. A higher
+	// epoch is a layout declared after the channel's own, and a declaration is only
+	// written once every channel it overlaps has committed all it routed, so the
+	// channels it overlaps are abandoned whether or not Snowflake still holds them.
+	var liveKeyRanges []streamV2Range
+	for keyRange, o := range owned {
+		var superseded = false
+		for other, oo := range owned {
+			if oo.epoch > o.epoch && keyRange.overlaps(other) {
+				superseded = true
 				break
 			}
 		}
-		if len(liveNonTargetChannels) > 0 && !overlapsLive {
-			liveNonTargetChannels = append(liveNonTargetChannels, c)
-			continue
-		}
-		b.abandonedRanges = append(b.abandonedRanges, c.keyRange)
-		log.WithFields(log.Fields{
-			"table":   b.table,
-			"channel": c.channelName,
-		}).Info("abandoning an empty channel of a layout this shard does not continue")
-	}
-
-	// A declared target layout alongside idle non-target channels is a switch a
-	// prior session declared and did not finish, so it finishes here.
-	if len(liveNonTargetChannels) > 0 && priorDeclaresTargets {
-		var idle = !slices.ContainsFunc(liveNonTargetChannels, func(ch *streamV2Channel) bool {
-			return ch.progress.routed != ch.progress.committed
-		})
-		if idle {
-			for _, c := range liveNonTargetChannels {
-				b.abandonedRanges = append(b.abandonedRanges, c.keyRange)
-			}
-			liveNonTargetChannels = nil
+		if superseded {
+			b.abandonedRanges = append(b.abandonedRanges, keyRange)
+		} else {
+			liveKeyRanges = append(liveKeyRanges, keyRange)
 		}
 	}
 
-	// The active layout. Channels inherited from another topology carry rows the
-	// replayed transaction must skip, so while any of them stands undropped it is
-	// the layout — mixed subdivision depths included, as a join of children that
-	// converged unevenly leaves. Otherwise the layout is the target layout.
-	var activeChannels []*streamV2Channel
-	if len(liveNonTargetChannels) > 0 {
-		activeChannels = append(liveNonTargetChannels, liveTargetChannels...)
-	} else {
-		for _, keyRange := range targetChannelKeyRanges {
-			if i := slices.IndexFunc(liveTargetChannels, func(ch *streamV2Channel) bool { return ch.keyRange == keyRange }); i >= 0 {
-				activeChannels = append(activeChannels, liveTargetChannels[i])
-				continue
-			}
-
-			var channelName = streamV2FormatChannelName(m.materialization, b.targetEpoch, keyRange, b.stateKey)
-			var status = channelStatusByName[channelName]
-			if status == nil {
-				if status, err = client.OpenChannel(ctx, b.database, b.schema, b.table, channelName); err != nil {
-					return fmt.Errorf("opening channel %q: %w", channelName, err)
-				}
-				if err := status.validateRejectedRows(channelName, b.table); err != nil {
-					return err
-				}
-			}
-
-			var sv2ChannelCheckpointItem = b.priorCheckpoint[keyRange]
-			committedOffset, err := streamV2ValidateCommittedToken(channelName, b.table, status.CommittedToken, sv2ChannelCheckpointItem, keyRange, len(b.priorCheckpoint))
-			if err != nil {
-				return err
-			}
-			var routed int64
-			if sv2ChannelCheckpointItem != nil {
-				routed = sv2ChannelCheckpointItem.Routed
-			}
-			activeChannels = append(activeChannels, newStreamV2Channel(channelName, keyRange, routed, committedOffset))
-		}
+	// A binding with no channels of its own starts on the target layout.
+	b.targetEpoch = maxEpoch + 1
+	if len(liveKeyRanges) == 0 {
+		liveKeyRanges = targetChannelKeyRanges
 	}
-
-	slices.SortFunc(activeChannels, func(a, b *streamV2Channel) int {
-		return cmp.Compare(a.keyRange.keyBegin, b.keyRange.keyBegin)
+	slices.SortFunc(liveKeyRanges, func(a, b streamV2Range) int {
+		return cmp.Compare(a.keyBegin, b.keyBegin)
 	})
 
 	// The layout must cover the shard's range with no gaps or overlaps, or some
 	// documents the runtime delivers have no channel and some key hashes have two.
 	// No topology this connector participates in produces such a layout, so
 	// reaching here means the checkpoint and the shard ranges disagree about history.
-	var ranges = make([]streamV2Range, len(activeChannels))
-	for i, c := range activeChannels {
-		ranges[i] = c.keyRange
-	}
-	if !streamV2LayoutCovers(ranges, shardKeyRange) {
-		var described = make([]string, len(activeChannels))
-		for i, c := range activeChannels {
-			described[i] = c.keyRange.String()
+	if !streamV2LayoutCovers(liveKeyRanges, shardKeyRange) {
+		var described = make([]string, len(liveKeyRanges))
+		for i, keyRange := range liveKeyRanges {
+			described[i] = keyRange.String()
 		}
 		return fmt.Errorf(
 			"the channels this task's checkpoint records for this binding cover %s, which does not cover this shard's range %s with no gaps or overlaps: the checkpoint and the shard topology disagree about the ranges that have been appended under. Restore the task's shard key ranges to the topology which appended them, or backfill this binding",
 			strings.Join(described, " "), shardKeyRange,
 		)
+	}
+
+	// A live layout that is already the target layout keeps its epoch, so that a
+	// restart continues the channels it already ran.
+	if slices.Equal(liveKeyRanges, targetChannelKeyRanges) && len(owned) > 0 {
+		b.targetEpoch = owned[liveKeyRanges[0]].epoch
+	}
+
+	// Open every live channel and capture its committed offset.
+	var activeChannels = make([]*streamV2Channel, 0, len(liveKeyRanges))
+	for _, keyRange := range liveKeyRanges {
+		var item = owned[keyRange].item
+		var channelName = streamV2FormatChannelName(m.materialization, b.targetEpoch, keyRange, b.stateKey)
+		if item != nil {
+			channelName = item.ChannelName
+		}
+
+		status, err := client.OpenChannel(ctx, b.database, b.schema, b.table, channelName)
+		if err != nil {
+			return fmt.Errorf("opening channel %q: %w", channelName, err)
+		}
+		if err := status.validateRejectedRows(channelName, b.table); err != nil {
+			return err
+		}
+		committedOffset, err := streamV2ValidateCommittedToken(channelName, b.table, status.CommittedToken, item, keyRange, priorItems)
+		if err != nil {
+			return err
+		}
+		var routed int64
+		if item != nil {
+			routed = item.Routed
+		}
+		activeChannels = append(activeChannels, newStreamV2Channel(channelName, keyRange, routed, committedOffset))
 	}
 
 	b.activeChannels, b.targetRanges, b.opened = activeChannels, targetChannelKeyRanges, true
