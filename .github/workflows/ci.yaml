@@ -271,6 +271,12 @@ jobs:
         run: |
           bash source-mongodb/docker-compose-init.sh
 
+      # The snowflake tests build a venv for the Snowpipe Streaming sidecar
+      # with poetry, so the venv holds the sidecar's locked dependencies.
+      - name: Install poetry for the sidecar test venv
+        if: matrix.connector == 'materialize-snowflake'
+        run: pipx install poetry
+
       # Run the tests of every in-repo helper package which this connector
       # transitively depends on. This list is computed on the fly so that we
       # don't have to keep an explicit list up-to-date. Likewise instead of

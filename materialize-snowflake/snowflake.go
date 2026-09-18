@@ -1,11 +1,13 @@
 package connector
 
 import (
+	"cmp"
 	"context"
 	stdsql "database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"slices"
 	"strconv"
@@ -236,12 +238,13 @@ func getTimestampTypeMapping(ctx context.Context, db *stdsql.DB) (timestampTypeM
 var _ m.Transactor = (*transactor)(nil)
 
 type transactor struct {
-	runtimeCheckpoint m.RuntimeCheckpoint
-	cfg               config
-	ep                *sql.Endpoint[config]
-	db                *stdsql.DB
-	streamManager     *streamManager
-	pipeClient        *PipeClient
+	runtimeCheckpoint   m.RuntimeCheckpoint
+	cfg                 config
+	ep                  *sql.Endpoint[config]
+	db                  *stdsql.DB
+	snowpipeStreaming   *streamManager
+	snowpipeStreamingV2 *streamV2Manager
+	pipeClient          *PipeClient
 
 	// Variables exclusively used by Load.
 	load struct {
@@ -301,6 +304,7 @@ func newTransactor(
 	}
 
 	var sm *streamManager
+	var sv2 *streamV2Manager
 	var pipeClient *PipeClient
 	if cfg.Credentials.AuthType == snowflake_auth.JWT {
 		var accountName string
@@ -312,20 +316,31 @@ func newTransactor(
 			return nil, fmt.Errorf("NewPipeClient: %w", err)
 		}
 
+		sv2 = newStreamV2Manager(ctx, &cfg, db, ep.Dialect, sm, open.Materialization.TaskName(), accountName, open.Range)
 	}
 
 	var d = &transactor{
-		runtimeCheckpoint: fence.Checkpoint,
-		cfg:               cfg,
-		ep:                ep,
-		templates:         renderTemplates(ep.Dialect),
-		db:                db,
-		streamManager:     sm,
-		pipeClient:        pipeClient,
-		_range:            open.Range,
-		version:           open.Version,
-		be:                be,
+		runtimeCheckpoint:   fence.Checkpoint,
+		cfg:                 cfg,
+		ep:                  ep,
+		templates:           renderTemplates(ep.Dialect),
+		db:                  db,
+		snowpipeStreaming:   sm,
+		snowpipeStreamingV2: sv2,
+		pipeClient:          pipeClient,
+		_range:              open.Range,
+		version:             open.Version,
+		be:                  be,
+		cp:                  make(checkpoint),
 	}
+
+	// Streaming v2 needs its part of the checkpoint state sooner than usual.
+	if len(open.StateJson) > 0 {
+		if err := d.UnmarshalState(open.StateJson); err != nil {
+			return nil, fmt.Errorf("unmarshalling connector state: %w", err)
+		}
+	}
+	priorCheckpoint := maps.Clone(d.cp)
 
 	if db, err := stdsql.Open("snowflake", dsn); err != nil {
 		return nil, fmt.Errorf("load stdsql.Open: %w", err)
@@ -345,7 +360,8 @@ func newTransactor(
 	}
 
 	for _, binding := range bindings {
-		if err = d.addBinding(ctx, binding, featureFlags["snowpipe_streaming"]); err != nil {
+		priorCheckpointItem, _ := priorCheckpoint[binding.StateKey]
+		if err = d.addBinding(ctx, binding, *cmp.Or(priorCheckpointItem, &checkpointItem{})); err != nil {
 			return nil, fmt.Errorf("adding binding for %s: %w", binding.Path, err)
 		}
 	}
@@ -364,8 +380,9 @@ func newTransactor(
 type binding struct {
 	target sql.Table
 
-	streaming bool
-	pipeName  string
+	streaming   bool
+	streamingV2 bool
+	pipeName    string
 	// clusteringExpr is the parenthesized CLUSTER BY expression for this
 	// binding, or empty if clustering is not configured.
 	clusteringExpr string
@@ -387,16 +404,52 @@ type binding struct {
 	}
 }
 
-func (d *transactor) addBinding(ctx context.Context, target sql.Table, streamingEnabled bool) error {
+func (d *transactor) addBinding(ctx context.Context, target sql.Table, priorCheckpointItem checkpointItem) error {
 	var b = new(binding)
 	b.target = target
 	b.nullFieldsToStrip = target.NullableFieldsToStrip()
 	b.load.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
 	b.store.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
+	var loc = d.ep.Dialect.TableLocator(b.target.Path)
 
-	if b.target.DeltaUpdates && d.cfg.Credentials.AuthType == snowflake_auth.JWT && streamingEnabled {
-		loc := d.ep.Dialect.TableLocator(b.target.Path)
-		if err := d.streamManager.addBinding(ctx, loc.TableSchema, d.ep.Identifier(loc.TableName), target); err != nil {
+	if d.cfg.isStreamsV2(b.target.DeltaUpdates) {
+		if len(priorCheckpointItem.StreamBlobs) > 0 {
+			// We're upgrading from streams v1, and the v1 path left behind some
+			// blobs that only it can drain.
+
+			if err := d.snowpipeStreaming.addBinding(ctx, loc.TableSchema, d.ep.Identifier(loc.TableName), b.target); err != nil {
+				return fmt.Errorf(
+					"opening the snowpipe_streaming channel on %s to finish %d staged blob(s): %w. Restore the snowpipe_streaming write path for one transaction before moving the binding onto snowpipe_streaming_v2, or backfill the binding, which discards those blobs and materializes their documents again",
+					b.target.Identifier, len(priorCheckpointItem.StreamBlobs), err)
+			}
+
+			log.WithFields(log.Fields{
+				"table": b.target.Identifier,
+				"blobs": len(priorCheckpointItem.StreamBlobs),
+			}).Info("opened a snowpipe_streaming channel to finish the blobs that path staged")
+		}
+
+		d.snowpipeStreamingV2.addBinding(d.cfg.Database, loc.TableSchema, d.ep.Identifier(loc.TableName), b.target, priorCheckpointItem.StreamV2)
+		b.streamingV2 = true
+		d.bindings = append(d.bindings, b)
+		return nil
+	}
+
+	if len(priorCheckpointItem.StreamV2.channelNames()) > 0 {
+		// We're switching away from streams v2, and the v2 path left behind
+		// some channels that only it can clean up.
+
+		if err := d.snowpipeStreamingV2.sweep(ctx, d.cfg.Database, loc.TableSchema, d.ep.Identifier(loc.TableName), nil); err != nil {
+			return fmt.Errorf("dropping the snowpipe_streaming_v2 channels of %s: %w", b.target.Identifier, err)
+		}
+		log.WithFields(log.Fields{
+			"table":    b.target.Identifier,
+			"channels": priorCheckpointItem.StreamV2.channelNames(),
+		}).Warn("this binding is leaving the snowpipe_streaming_v2 write path; documents its channels committed beyond the checkpoint will be materialized again; with delta updates these duplicates would be permanent")
+	}
+
+	if d.cfg.isStreamsV1(b.target.DeltaUpdates) {
+		if err := d.snowpipeStreaming.addBinding(ctx, loc.TableSchema, d.ep.Identifier(loc.TableName), b.target); err != nil {
 			var apiError *streamingApiError
 			var colError *unhandledColError
 			if errors.As(err, &apiError) && (apiError.Code == 6 || apiError.Code == 55) {
@@ -411,11 +464,10 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, streaming
 				return fmt.Errorf("adding binding to stream manager: %w", err)
 			}
 			log.WithError(err).WithField("table", b.target.Path).Info("not using Snowpipe Streaming for table")
-		} else {
-			b.streaming = true
-			d.bindings = append(d.bindings, b)
-			return nil
 		}
+		b.streaming = true
+		d.bindings = append(d.bindings, b)
+		return nil
 	}
 
 	b.load.stage = newStagedFile(os.TempDir())
@@ -469,9 +521,13 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	var subqueries = make(map[int]string)
 	var filesToCleanup []string
 	for i, b := range d.bindings {
-		if b.streaming || !b.load.stage.started {
-			// Pass.
-		} else if dir, err := b.load.stage.flush(); err != nil {
+		if b.streaming || b.streamingV2 || !b.load.stage.started {
+			// Streaming bindings have no load stage at all, so they must be
+			// excluded before the stage is dereferenced.
+			continue
+		}
+
+		if dir, err := b.load.stage.flush(); err != nil {
 			return fmt.Errorf("load.stage(): %w", err)
 		} else {
 			// Choose appropriate load query template based on configuration
@@ -621,6 +677,7 @@ type checkpointItem struct {
 	Query         string
 	StagedDir     string
 	StreamBlobs   []*blobMetadata
+	StreamV2      streamV2Checkpoint `json:",omitempty"`
 	PipeName      string
 	PipeFiles     []fileRecord
 	Version       string
@@ -632,6 +689,12 @@ type checkpointItem struct {
 }
 
 type checkpoint = map[string]*checkpointItem
+
+// streamV2Only reports whether the item holds streaming v2 channel state and no
+// staged work.
+func (item *checkpointItem) streamV2Only() bool {
+	return len(item.StreamV2) > 0 && len(item.Query) == 0 && len(item.StreamBlobs) == 0 && len(item.PipeFiles) == 0
+}
 
 func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var ctx = it.Context()
@@ -645,15 +708,19 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			b.store.mustMerge = true
 		}
 
-		if !b.streaming {
+		if !b.streaming && !b.streamingV2 {
 			if err := b.store.stage.start(ctx, d.db); err != nil {
 				return nil, err
 			}
 		}
 		if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
 			return nil, fmt.Errorf("converting Store: %w", err)
+		} else if b.streamingV2 {
+			if err := d.snowpipeStreamingV2.writeRow(ctx, it.Binding, it.PackedKey, converted); err != nil {
+				return nil, fmt.Errorf("appending Store to stream for resource %s: %w", b.target.Path, err)
+			}
 		} else if b.streaming {
-			if err := d.streamManager.writeRow(ctx, it.Binding, converted); err != nil {
+			if err := d.snowpipeStreaming.writeRow(ctx, it.Binding, converted); err != nil {
 				return nil, fmt.Errorf("encoding Store to stream for resource %s: %w", b.target.Path, err)
 			}
 		} else if err = b.store.stage.writeRow(append(converted, d.cfg.HardDelete && it.Delete)); err != nil {
@@ -680,19 +747,37 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, round int) (json.RawMessage, error) {
 	streamBlobs := make(map[int][]*blobMetadata)
 	keys := make(map[int]string)
-	if d.streamManager != nil {
+	if d.snowpipeStreaming != nil {
 		// The "base token" only really needs to be sufficiently random that it
 		// doesn't collide with the prior or next transaction's value. Deriving
 		// it from the runtime checkpoint is not absolutely necessary, but it's
 		// convenient to make testing outputs consistent.
 		if mcp, err := runtimeCheckpoint.Marshal(); err != nil {
 			return nil, fmt.Errorf("marshalling checkpoint: %w", err)
-		} else if streamBlobs, keys, err = d.streamManager.flush(fmt.Sprintf("%016x", xxhash.Sum64(mcp))); err != nil {
+		} else if streamBlobs, keys, err = d.snowpipeStreaming.flush(fmt.Sprintf("%016x", xxhash.Sum64(mcp))); err != nil {
 			return nil, fmt.Errorf("flushing stream manager: %w", err)
 		}
 	}
 
+	streamV2Entries := make(map[int]streamV2Checkpoint)
+	if d.snowpipeStreamingV2 != nil {
+		var err error
+		if streamV2Entries, err = d.snowpipeStreamingV2.flush(ctx); err != nil {
+			return nil, fmt.Errorf("committing stream v2 rows: %w", err)
+		}
+	}
+
 	for idx, b := range d.bindings {
+		if b.streamingV2 {
+			if entries, ok := streamV2Entries[idx]; ok {
+				d.cp[b.target.StateKey] = &checkpointItem{
+					Table:    b.target.Identifier,
+					StreamV2: entries,
+				}
+			}
+			continue
+		}
+
 		rows := b.store.rows
 		b.store.rows = 0
 
@@ -900,8 +985,13 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	var drained []string
 	var pipes = make(map[string]*pipeRecord)
 	for stateKey, item := range d.cp {
-		// only process the state keys we've been asked to; other pending work
-		// remains staged in the persisted state
+		if item.streamV2Only() {
+			// The checkpoint item for this state key was written by the streaming
+			// v2 write path. The next Open reads this item, so it stays in the
+			// checkpoint.
+			continue
+		}
+
 		if !shouldProcess(stateKey) {
 			continue
 		}
@@ -936,7 +1026,7 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 		} else if len(item.StreamBlobs) > 0 {
 			group.Go(func() error {
 				d.be.StartedResourceCommit(path)
-				if err := d.streamManager.write(groupCtx, item.StreamBlobs, item.EncryptionKey, !d.didRecovery); err != nil {
+				if err := d.snowpipeStreaming.write(groupCtx, item.StreamBlobs, item.EncryptionKey, !d.didRecovery); err != nil {
 					return fmt.Errorf("writing streaming blobs for %s: %w", path, err)
 				}
 				d.be.FinishedResourceCommit(path)
@@ -1362,6 +1452,9 @@ func (d *transactor) cleanupPipes(ctx context.Context, currentPipeNames []string
 }
 
 func (d *transactor) Destroy() {
+	if d.snowpipeStreamingV2 != nil {
+		d.snowpipeStreamingV2.stop()
+	}
 	d.load.conn.Close()
 	d.store.conn.Close()
 	d.db.Close()
