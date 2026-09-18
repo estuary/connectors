@@ -152,6 +152,7 @@ jobs:
           - source-sqlserver-ct
           - source-sqs
           - source-test
+          - source-tpc-ds
           - source-azure-blob-storage
           - materialize-azure-blob-parquet
           - materialize-azure-fabric-warehouse
@@ -210,6 +211,14 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
+
+      # tables_gen.go is generated from the TPC-DS DDL; a stale copy would let
+      # column types or keys drift from the spec.
+      - name: Verify generated table definitions for ${{ matrix.connector }}
+        if: matrix.connector == 'source-tpc-ds'
+        run: |
+          go generate ./source-tpc-ds/...
+          git diff --exit-code -- source-tpc-ds
 
       - name: Restore Flow binaries
         uses: ./.github/actions/restore-flow-binaries
