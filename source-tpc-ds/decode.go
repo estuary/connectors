@@ -6,8 +6,7 @@ import (
 	"strconv"
 )
 
-// countFields is the number of pipe-delimited fields on a line, ignoring the
-// trailing delimiter dsdgen emits (-TERMINATE Y, its default).
+// dsdgen ends every line with a delimiter (-TERMINATE Y, its default).
 func countFields(line []byte) int {
 	return bytes.Count(trimTerminator(line), []byte{'|'}) + 1
 }
@@ -19,8 +18,6 @@ func trimTerminator(line []byte) []byte {
 	return line
 }
 
-// decodeLine turns one dsdgen output line for table t into a JSON document.
-// Empty fields are NULLs and are omitted.
 func decodeLine(t *tableDef, line []byte) ([]byte, error) {
 	var fields = bytes.Split(trimTerminator(line), []byte{'|'})
 	if len(fields) != len(t.Columns) {
@@ -120,8 +117,8 @@ func isDate(f []byte) bool {
 	return true
 }
 
-// appendJSONString appends f as a JSON string literal. dsdgen emits ASCII, so
-// only the quote, backslash and control characters need escaping.
+// dsdgen only emits ASCII, so quote, backslash and control characters are the
+// only escapes needed.
 func appendJSONString(out, f []byte) []byte {
 	out = append(out, '"')
 	var start int

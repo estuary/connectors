@@ -20,8 +20,8 @@ func main() {
 const (
 	// dsdgen rejects scale factors above this.
 	maxScale = 100000
-	// Below this, dsdgen's day-by-day search for the next sales date spins
-	// through many empty days per ticket and a sales table takes minutes.
+	// Below this dsdgen walks through many empty days to find each sale's
+	// date, and a sales table takes minutes.
 	minScale = 0.01
 )
 
@@ -42,7 +42,6 @@ func (c config) Validate() error {
 	return nil
 }
 
-// scaleString is the scale as passed to dsdgen and recorded in checkpoints.
 func (c config) scaleString() string {
 	return strconv.FormatFloat(c.Scale, 'f', -1, 64)
 }
@@ -124,8 +123,6 @@ func (driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Respo
 	return &pc.Response_Discovered{Bindings: out}, nil
 }
 
-// documentSchema is the JSON schema of documents for table t. NULL-able
-// columns are simply not required; a NULL is an absent field.
 func documentSchema(t *tableDef) map[string]any {
 	var props = make(map[string]any, len(t.Columns))
 	var required []string

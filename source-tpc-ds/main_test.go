@@ -21,7 +21,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Tests that drive the real generator skip when the dsdgen binary is absent.
 func requireDsdgen(t *testing.T) {
 	if _, err := newGenerator("1"); err != nil {
 		t.Skipf("skipping: %v", err)
@@ -78,9 +77,6 @@ func TestValidate(t *testing.T) {
 	require.ErrorContains(t, err, "scale factor must be at least 0.01")
 }
 
-// TestCapture runs a full load of all 24 tables at a fractional scale and
-// records, per binding, the document count, a digest of every document in
-// emission order, and the first few documents verbatim.
 func TestCapture(t *testing.T) {
 	t.Setenv("TEST_DATABASE", "yes")
 	requireDsdgen(t)
@@ -98,7 +94,6 @@ func TestCapture(t *testing.T) {
 	cupaloy.SnapshotT(t, cs.Summary())
 }
 
-// A restart after every binding has finished emits nothing.
 func TestRestartAfterCompletion(t *testing.T) {
 	t.Setenv("TEST_DATABASE", "yes")
 	requireDsdgen(t)
@@ -145,8 +140,6 @@ func TestScaleChangeFails(t *testing.T) {
 	require.ErrorContains(t, cs.Errors[0], "generated at scale factor 1 but the endpoint is now configured for 0.5; backfill")
 }
 
-// digestValidator summarizes each collection as a count, an order-sensitive
-// digest and its first documents, and reports when every binding is done.
 type digestValidator struct {
 	collections map[string]*digestState
 	bindings    int
@@ -223,8 +216,6 @@ func (v *digestValidator) Reset() {
 	v.allDone = false
 }
 
-// Splitting every stream into small chunks must reproduce the unchunked
-// dataset exactly: same counts, same documents, same order.
 func TestChunkedMatchesUnchunked(t *testing.T) {
 	t.Setenv("TEST_DATABASE", "yes")
 	requireDsdgen(t)
@@ -255,8 +246,6 @@ func TestChunkedMatchesUnchunked(t *testing.T) {
 	require.Equal(t, captureSnapshotDigests(t), digestsOf(w.String()))
 }
 
-// Interrupting a chunked capture and resuming from its checkpoint must yield
-// the uninterrupted dataset: no gaps and no duplicates.
 func TestResume(t *testing.T) {
 	t.Setenv("TEST_DATABASE", "yes")
 	requireDsdgen(t)
@@ -273,7 +262,6 @@ func TestResume(t *testing.T) {
 		Validator:    validator,
 	}
 
-	// First run: stop once a good share of the documents has been committed.
 	ctx, cancel := context.WithCancel(context.Background())
 	var seen int
 	cs.Capture(ctx, t, func(json.RawMessage) {
@@ -292,7 +280,6 @@ func TestResume(t *testing.T) {
 	}
 	require.Greater(t, partial, 0, "interruption happened after everything completed")
 
-	// Second run: resume and finish. The validator keeps accumulating.
 	ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
 	validator.onAllDone = cancel
@@ -304,7 +291,6 @@ func TestResume(t *testing.T) {
 	require.Equal(t, captureSnapshotDigests(t), digestsOf(w.String()))
 }
 
-// captureSnapshotDigests reads TestCapture's committed snapshot as the oracle.
 func captureSnapshotDigests(t *testing.T) map[string]string {
 	bs, err := os.ReadFile(".snapshots/TestCapture")
 	require.NoError(t, err)
@@ -323,8 +309,6 @@ func digestsOf(summary string) map[string]string {
 	return out
 }
 
-// A returns binding works without its sales parent enabled and yields exactly
-// the rows the full capture gave it.
 func TestReturnsWithoutParent(t *testing.T) {
 	t.Setenv("TEST_DATABASE", "yes")
 	requireDsdgen(t)
