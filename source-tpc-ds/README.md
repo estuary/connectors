@@ -51,10 +51,15 @@ its stdout, and routed to their own binding by field count.
 Tables over about one million dsdgen rows (for the sales tables a dsdgen row is
 a ticket or order of several line items) are split into chunks with dsdgen's
 `-PARALLEL`/`-CHILD` mode, which the fork makes byte-identical to a serial
-run. Progress is checkpointed every 10,000 rows and at every chunk boundary.
-On restart, completed chunks are skipped and the in-flight chunk is regenerated
-with the rows already emitted discarded, so the destination ends up identical
-to an uninterrupted run and restart cost is bounded to one chunk. Once every
+run. Each stream buffers up to 10,000 generated rows (a few megabytes) and
+writes them out together with a checkpoint, and again at every chunk boundary;
+documents never leave a stream without the checkpoint that accounts for them.
+Per binding the checkpoint records the scale factor, the number of chunks,
+the highest completed chunk, the rows already emitted from the in-flight chunk
+and a done flag; a returns binding shares its parent's progress. On restart,
+completed chunks are skipped and the in-flight chunk is regenerated with the
+rows already emitted discarded, so the destination ends up identical to an
+uninterrupted run and restart cost is bounded to one chunk. Once every
 binding has emitted its dataset the connector logs completion and idles; a
 restart in that state emits nothing.
 
@@ -62,10 +67,23 @@ restart in that state emits nothing.
 
 The generator is built from [estuary/tpcds-kit](https://github.com/estuary/tpcds-kit),
 a fork of [gregrahn/tpcds-kit](https://github.com/gregrahn/tpcds-kit) (TPC-DS
-tools v2.10.0). Its README lists every patch, one commit each: working stdout
-mode, chunking for tables under 1M rows and exact chunk boundaries, a hidden
-row-count flag used to plan chunks, fractional scale factors, and build fixes
-for current compilers. The fork publishes `ghcr.io/estuary/dsdgen:<commit>`
+tools v2.10.0), carrying these patches, one commit each:
+
+1. stdout mode (`-_FILTER Y`) was checked under the wrong option name and
+   never engaged;
+2. stdout mode then overwrote its handle with a NULL file pointer;
+3. `-PARALLEL`/`-CHILD` chunking ignored tables under 1M rows;
+4. a hidden `-_ROWCOUNT Y` flag prints a table's row count at a scale, used
+   here to plan chunks;
+5. prototypes and single definitions so the tree compiles under gcc 14 and
+   current clang;
+6. fractional scale factors below 1 (DuckDB's row-count semantics);
+7. parameter values were copied into 80-byte buffers, truncating long paths;
+8. command lines over 200 characters crashed in error reporting;
+9. a chunk starting exactly on a day boundary was dated one day late, so
+   chunked output differed from a serial run.
+
+The fork publishes `ghcr.io/estuary/dsdgen:<commit>`
 containing the static binary and its `tpcds.idx` distributions file; the
 Dockerfile here pins tag `5ea1641` and copies both into the build stage (so the
 tests run against the real generator) and the runtime image. The dsdgen

@@ -275,48 +275,11 @@ func (out *PullOutput) Checkpoint(checkpoint json.RawMessage, merge bool) error 
 	return nil
 }
 
-// Emit documents and checkpoints with a common lock, this is useful if there
-// are multiple threads (goroutines) processing documents and emitting
-// checkpoints. In those instances using this method can allow each thread to
-// ensure that they only checkpoint their own documents
+// DocumentsAndCheckpoint emits documents for one binding and then a checkpoint
+// under a single lock acquisition, so goroutines feeding separate bindings
+// only ever checkpoint their own documents.
 func (out *PullOutput) DocumentsAndCheckpoint(checkpoint json.RawMessage, merge bool, binding int, docs ...json.RawMessage) error {
-	log.WithField("count", len(docs)).Trace("emitting documents")
-
-	var messages []*pc.Response
-	for _, doc := range docs {
-		messages = append(messages, &pc.Response{
-			Captured: &pc.Response_Captured{
-				Binding: uint32(binding),
-				DocJson: doc,
-			},
-		})
-	}
-
-	log.WithFields(log.Fields{
-		"checkpoint": checkpoint,
-		"merge":      merge,
-	}).Trace("emitting checkpoint")
-
-	var cp = &pc.Response{
-		Checkpoint: &pc.Response_Checkpoint{
-			State: &pf.ConnectorState{
-				UpdatedJson: checkpoint,
-				MergePatch:  merge,
-			},
-		},
-	}
-
-	out.Lock()
-	defer out.Unlock()
-	for _, msg := range messages {
-		if err := out.Send(msg); err != nil {
-			return fmt.Errorf("writing captured documents: %w", err)
-		}
-	}
-	if err := out.Send(cp); err != nil {
-		return fmt.Errorf("writing checkpoint: %w", err)
-	}
-	return nil
+	return out.DocumentBatchesAndCheckpoint(checkpoint, merge, DocumentBatch{Binding: binding, Docs: docs})
 }
 
 // DocumentBatch is a set of documents destined for one binding.
@@ -326,9 +289,7 @@ type DocumentBatch struct {
 }
 
 // DocumentBatchesAndCheckpoint is DocumentsAndCheckpoint for documents spanning
-// several bindings: every batch and then the checkpoint go out under one lock
-// acquisition, so a checkpoint from another goroutine cannot commit these
-// documents before the checkpoint that accounts for them.
+// several bindings.
 func (out *PullOutput) DocumentBatchesAndCheckpoint(checkpoint json.RawMessage, merge bool, batches ...DocumentBatch) error {
 	var cp = &pc.Response{
 		Checkpoint: &pc.Response_Checkpoint{

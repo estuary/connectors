@@ -72,9 +72,9 @@ func (g *generator) stream(ctx context.Context, table string, chunks, chunk int,
 	if chunks > 1 {
 		args = append(args, "-PARALLEL", strconv.Itoa(chunks), "-CHILD", strconv.Itoa(chunk))
 	}
-	ctx, cancel := context.WithCancel(ctx)
+	cctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	var cmd = exec.CommandContext(ctx, g.bin, args...)
+	var cmd = exec.CommandContext(cctx, g.bin, args...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	stdout, err := cmd.StdoutPipe()

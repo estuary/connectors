@@ -16,10 +16,9 @@ import (
 // A variable so tests can exercise chunking at small scale.
 var chunkTargetRows int64 = 1_000_000
 
-// checkpointEvery is the number of stdout lines a stream buffers before it
-// writes them out together with a checkpoint. Documents only ever leave a
-// stream alongside the checkpoint that accounts for them; otherwise a sibling
-// stream's checkpoint could commit them, and a restart would emit them twice.
+// checkpointEvery is the number of stdout lines a stream buffers before writing
+// them out with the checkpoint that accounts for them. Emitting documents alone
+// would let a sibling stream's checkpoint commit them, and a restart repeat them.
 const checkpointEvery = 10_000
 
 type state struct {
@@ -51,10 +50,7 @@ type capture struct {
 
 // planChunks splits rows dsdgen rows into work items of about chunkTargetRows.
 func planChunks(rows int64) int {
-	if rows <= chunkTargetRows {
-		return 1
-	}
-	return max(2, int((rows+chunkTargetRows-1)/chunkTargetRows))
+	return int((rows + chunkTargetRows - 1) / chunkTargetRows)
 }
 
 func (c *capture) run() error {
@@ -76,7 +72,7 @@ func (c *capture) run() error {
 		var parent = streamOf(b.table)
 		s, ok := byParent[parent.Name]
 		if !ok {
-			s = &streamRun{c: c, parent: parent}
+			s = &streamRun{capture: c, parent: parent}
 			byParent[parent.Name] = s
 			streams = append(streams, s)
 		}
@@ -88,6 +84,10 @@ func (c *capture) run() error {
 		group.Go(func() error { return s.run(gctx) })
 	}
 	if err := group.Wait(); err != nil {
+		if ctx.Err() != nil {
+			log.Info("shutting down due to context cancellation")
+			return nil
+		}
 		return err
 	}
 	log.WithFields(log.Fields{
@@ -95,13 +95,14 @@ func (c *capture) run() error {
 		"bindings":  len(c.bindings),
 	}).Info("Every binding has emitted its full dataset; idling")
 	<-ctx.Done()
+	log.Info("shutting down due to context cancellation")
 	return nil
 }
 
 // streamRun drives one parent table's dsdgen work items and fans rows out to
 // the bindings reading that stream.
 type streamRun struct {
-	c       *capture
+	capture *capture
 	parent  *tableDef
 	members []*binding
 }
@@ -115,7 +116,7 @@ func (s *streamRun) run(ctx context.Context) error {
 		}
 	}
 	if chunks == 0 {
-		rows, err := s.c.gen.rowCount(ctx, s.parent.Name)
+		rows, err := s.capture.gen.rowCount(ctx, s.parent.Name)
 		if err != nil {
 			return err
 		}
@@ -128,7 +129,7 @@ func (s *streamRun) run(ctx context.Context) error {
 	// up without duplicating its siblings.
 	var start = chunks + 1
 	for _, m := range s.members {
-		m.state.Scale = s.c.gen.scale
+		m.state.Scale = s.capture.gen.scale
 		m.state.Chunks = chunks
 		if !m.state.Done && m.state.Completed+1 < start {
 			start = m.state.Completed + 1
@@ -170,8 +171,7 @@ func (s *streamRun) runChunk(ctx context.Context, chunk, chunks int) error {
 	log.WithFields(log.Fields{"table": s.parent.Name, "chunk": chunk, "chunks": chunks}).Info("generating chunk")
 
 	var lines int64
-	// emit writes every buffered document and then the checkpoint fn builds,
-	// atomically with respect to other streams.
+	// emit writes the buffered documents and then the checkpoint fn builds.
 	var emit = func(fn func(m *binding) map[string]any) error {
 		var batches []boilerplate.DocumentBatch
 		for _, t := range targets {
@@ -184,7 +184,7 @@ func (s *streamRun) runChunk(ctx context.Context, chunk, chunks int) error {
 		if err != nil {
 			return err
 		}
-		return s.c.out.DocumentBatchesAndCheckpoint(patch, true, batches...)
+		return s.capture.out.DocumentBatchesAndCheckpoint(patch, true, batches...)
 	}
 	var progress = func(m *binding) map[string]any {
 		if chunk <= m.state.Completed {
@@ -199,7 +199,7 @@ func (s *streamRun) runChunk(ctx context.Context, chunk, chunks int) error {
 		return map[string]any{"inFlight": map[string]int64{key: m.state.InFlight[key]}}
 	}
 
-	err := s.c.gen.stream(ctx, s.parent.Name, chunks, chunk, func(line []byte) error {
+	err := s.capture.gen.stream(ctx, s.parent.Name, chunks, chunk, func(line []byte) error {
 		table, err := routeLine(s.parent, line)
 		if err != nil {
 			return err
@@ -252,5 +252,5 @@ func (s *streamRun) checkpoint(fn func(m *binding) map[string]any) error {
 	if err != nil {
 		return err
 	}
-	return s.c.out.Checkpoint(patch, true)
+	return s.capture.out.Checkpoint(patch, true)
 }

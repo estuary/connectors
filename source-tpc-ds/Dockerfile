@@ -41,7 +41,6 @@ COPY --from=busybox:latest /bin/sh /bin/sh
 # The generator and its distributions file sit next to the connector, on PATH.
 COPY --from=dsdgen /dsdgen /tpcds.idx ./
 
-# Bring in the compiled connector artifact from the builder.
 COPY --from=builder /builder/connector ./source-tpc-ds
 
 LABEL FLOW_RUNTIME_PROTOCOL=capture
