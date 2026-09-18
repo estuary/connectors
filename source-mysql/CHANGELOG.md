@@ -1,5 +1,15 @@
 # source-mysql
 
+## 2026-09-17
+
+### Added
+- New `sslmode` advanced option (`disabled`, `preferred`, `required`,
+  `verify_ca`, `verify_identity`) with accompanying `ssl_server_ca`,
+  `ssl_client_cert`, and `ssl_client_key` options, so that the server's TLS
+  certificate can be verified against a CA and, with `verify_identity`, the
+  configured hostname. Verification applies to both query and binlog
+  replication connections and works through SSH network tunnels.
+
 ## 2026-09-04
 
 ### Added
