@@ -648,17 +648,19 @@ func TestStreamV2SweepDropsTheStreamingChannel(t *testing.T) {
 	sm, drops := fakeStreamManager(t, "test/onto")
 	var m = newStreamV2Manager(ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, fakeSnowflakeDB(t), testDialect, sm, "test/onto", "acct",
 		&pf.RangeSpec{KeyEnd: 0x7fffffff, RClockEnd: math.MaxUint32})
+	m.argv = fakeSidecarArgv(t)
+	t.Cleanup(m.stop)
 	var listed = strings.ToUpper(sm.channelName)
 	require.NoError(t, os.WriteFile(os.Getenv("FAKE_SIDECAR_STATE"), fmt.Appendf(nil, `{"committed":{%q:"1",%q:"1",%q:"1"},"errors":{}}`,
 		listed, strings.ToUpper(newChannelName("test/onto", 0x80000000)), strings.ToUpper(newChannelName("other/task", 0))), 0o644))
 
 	// Held open, to register blobs through: it stands.
 	sm.tableStreams[0] = &tableStream{channel: &channel{ChannelName: sm.channelName}}
-	require.NoError(t, m.sweep(ctx, "DB", "SCH", "TBL", "sk.v1", nil))
+	require.NoError(t, m.sweep(ctx, "DB", "SCH", "TBL", nil))
 	require.Empty(t, drops())
 
 	// Let go of: it is dropped, and nothing else is.
 	delete(sm.tableStreams, 0)
-	require.NoError(t, m.sweep(ctx, "DB", "SCH", "TBL", "sk.v1", nil))
+	require.NoError(t, m.sweep(ctx, "DB", "SCH", "TBL", nil))
 	require.Equal(t, []string{listed}, drops())
 }

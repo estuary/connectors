@@ -363,8 +363,8 @@ func TestReconcileStreamV2Channel(t *testing.T) {
 			// binding is what does that — it re-creates the table, taking every
 			// channel bound to it — so this is what a shard of the last
 			// specification finds when it restarts into a backfill. The one drop this
-			// connector makes itself is recognized before reconciliation, by the
-			// declaration in the checkpoint, so it never reaches here.
+			// connector makes itself follows a checkpoint that deleted the channel's
+			// item, so it never reaches here.
 			name:                     "nothing committed with a checkpointed routed offset is rejected",
 			committed:                nil,
 			sv2ChannelCheckpointItem: sv2ChannelCheckpointItem(42),
@@ -399,7 +399,7 @@ func TestReconcileStreamV2Channel(t *testing.T) {
 		},
 		{
 			// The binding holds state, so its channels' items are maintained by
-			// every flush and its target channels are declared before anything
+			// every flush and its target channels are recorded before anything
 			// routes to them. A token no item accounts for is something else
 			// appending under this binding's names.
 			name:       "committed ahead with no item beside a sibling's is rejected",

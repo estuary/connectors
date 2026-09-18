@@ -439,7 +439,7 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, priorChec
 		// We're switching away from streams v2, and the v2 path left behind
 		// some channels that only it can clean up.
 
-		if err := d.snowpipeStreamingV2.sweep(ctx, d.cfg.Database, loc.TableSchema, d.ep.Identifier(loc.TableName), b.target.StateKey, nil); err != nil {
+		if err := d.snowpipeStreamingV2.sweep(ctx, d.cfg.Database, loc.TableSchema, d.ep.Identifier(loc.TableName), nil); err != nil {
 			return fmt.Errorf("dropping the snowpipe_streaming_v2 channels of %s: %w", b.target.Identifier, err)
 		}
 		log.WithFields(log.Fields{
@@ -975,15 +975,6 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	defer func() {
 		d.didRecovery = true
 	}()
-
-	// The runtime durably committed the transaction whose checkpoint the last flush
-	// produced, and the next Store phase has not begun, so this is where a streaming
-	// v2 channel rebalance may cut over.
-	if d.snowpipeStreamingV2 != nil {
-		if err := d.snowpipeStreamingV2.acknowledged(ctx); err != nil {
-			return nil, fmt.Errorf("converging streaming v2 channels: %w", err)
-		}
-	}
 
 	// Run store queries concurrently, as each independently operates on a separate table.
 	group, groupCtx := errgroup.WithContext(ctx)

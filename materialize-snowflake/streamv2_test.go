@@ -390,7 +390,7 @@ func TestStreamV2Manager(t *testing.T) {
 		// A midpoint split lands on the boundary between the parent's second
 		// and third channels, so each child inherits two whole channels with
 		// their committed offset tokens, keeps routing to them, and converges
-		// to four channels of its own at the first acknowledged boundary.
+		// to four channels of its own at its first flush.
 		truncate(t)
 		channelsPerShard(t, 4)
 		var tgt = target("split.v1")
@@ -420,53 +420,43 @@ func TestStreamV2Manager(t *testing.T) {
 		parent.stop()
 
 		// The low child. Its own targets are the low half's quarters, so the
-		// two channels it inherits are not targets: its first flush writes
-		// their advanced routed offsets and declares the layout it converges to.
+		// two channels it inherits are not targets: its first flush deletes
+		// their items and records the layout it switches to, at zero.
 		var low = newManager(lowHalf)
 		low.addBinding(cfg.Database, cfg.Schema, tableName, tgt, parentEntries[0])
 
 		storeKeys(t, low, keysHashingInto(lowShard, "split-low-new", 6))
 		require.Len(t, low.bindings[0].activeChannels, 2, "the low child inherits the two nested channels")
-		lowEntries, err := low.flush(ctx)
-		require.NoError(t, err)
-		require.Len(t, lowEntries[0], 6, "two inherited channels and four declared targets")
-		var declaredCount int
-		var advanced int64
-		for keyRange, sv2ChannelCheckpointItem := range lowEntries[0] {
-			require.NotNil(t, sv2ChannelCheckpointItem)
-			if slices.Contains(lowTargets, keyRange) {
-				require.Zero(t, sv2ChannelCheckpointItem.Routed, "a declaration is durable before anything routes to its channel")
-				declaredCount++
-			} else {
-				advanced += sv2ChannelCheckpointItem.Routed
-			}
-		}
-		require.Equal(t, 4, declaredCount)
-		require.Equal(t, int64(16), advanced, "ten inherited documents and six new ones")
-		require.Equal(t, 26, countRows())
-
-		// The acknowledged boundary: the declaration is durable, so the child
-		// converges — the inherited channels are dropped and the targets take over.
 		var inherited []string
-		var inheritedKeys []streamV2Range
 		for _, c := range low.bindings[0].activeChannels {
 			inherited = append(inherited, c.channelName)
-			inheritedKeys = append(inheritedKeys, c.keyRange)
 		}
-		require.NoError(t, low.acknowledged(ctx))
+		lowEntries, err := low.flush(ctx)
+		require.NoError(t, err)
+		require.Len(t, lowEntries[0], 6, "two inherited channels deleted and four targets recorded")
+		for keyRange, sv2ChannelCheckpointItem := range lowEntries[0] {
+			if slices.Contains(lowTargets, keyRange) {
+				require.NotNil(t, sv2ChannelCheckpointItem)
+				require.Zero(t, sv2ChannelCheckpointItem.Routed, "the switch is durable before anything routes to its channel")
+			} else {
+				require.Nil(t, sv2ChannelCheckpointItem, "the drop of %s must ride the switch checkpoint", keyRange)
+			}
+		}
+		require.Equal(t, 26, countRows())
+		require.Empty(t, low.bindings[0].activeChannels, "the binding reopens at its next document")
+
+		// The next document reopens the binding on the target layout and drops
+		// the inherited channels.
+		storeKeys(t, low, keysHashingInto(lowShard, "split-low-post", 4))
 		require.Len(t, low.bindings[0].activeChannels, 4)
 		for i, c := range low.bindings[0].activeChannels {
 			require.Equal(t, lowTargets[i], c.keyRange)
-			require.Zero(t, c.progress.routed)
 		}
-
-		storeKeys(t, low, keysHashingInto(lowShard, "split-low-post", 4))
 		post, err := low.flush(ctx)
 		require.NoError(t, err)
-		for _, key := range inheritedKeys {
-			del, ok := post[0][key]
-			require.True(t, ok, "the drop of %s must ride the checkpoint", key)
-			require.Nil(t, del)
+		require.Len(t, post[0], 4)
+		for _, sv2ChannelCheckpointItem := range post[0] {
+			require.NotNil(t, sv2ChannelCheckpointItem)
 		}
 		require.Equal(t, 30, countRows())
 
@@ -537,19 +527,17 @@ func TestStreamV2Manager(t *testing.T) {
 			}
 			entries, err := m.flush(ctx)
 			require.NoError(t, err)
-			var caughtUp, declared int
+			var deleted, recorded int
 			for _, sv2ChannelCheckpointItem := range entries[0] {
-				switch sv2ChannelCheckpointItem.Routed {
-				case 4:
-					caughtUp++
-				case 0:
-					declared++
-				default:
-					t.Fatalf("channel %s reports routed %d, want 4 (inherited) or 0 (declared)", sv2ChannelCheckpointItem.ChannelName, sv2ChannelCheckpointItem.Routed)
+				if sv2ChannelCheckpointItem == nil {
+					deleted++
+				} else {
+					require.Zero(t, sv2ChannelCheckpointItem.Routed, "channel %s is a target, and nothing has routed to it", sv2ChannelCheckpointItem.ChannelName)
+					recorded++
 				}
 			}
-			require.Equal(t, 2, caughtUp)
-			require.Equal(t, 4, declared)
+			require.Equal(t, 2, deleted)
+			require.Equal(t, 4, recorded)
 			m.stop()
 		}
 		require.Equal(t, 16, countRows(), "the replays appended nothing Snowflake already held")
@@ -622,26 +610,25 @@ func TestStreamV2Manager(t *testing.T) {
 		}
 
 		storeKeys(t, parent, keysHashingInto(fullShard, "join-new", 4))
-		parentEntries, err := parent.flush(ctx)
-		require.NoError(t, err)
-		require.Len(t, parentEntries[0], 12, "eight inherited channels and four declared quarters")
-		require.Equal(t, 22, countRows())
-
 		var inheritedKeys []streamV2Range
 		for _, c := range parent.bindings[0].activeChannels {
 			inheritedKeys = append(inheritedKeys, c.keyRange)
 		}
-		require.NoError(t, parent.acknowledged(ctx))
-		require.Len(t, parent.bindings[0].activeChannels, 4)
-
-		storeKeys(t, parent, keysHashingInto(fullShard, "join-post", 4))
-		final, err := parent.flush(ctx)
+		parentEntries, err := parent.flush(ctx)
 		require.NoError(t, err)
+		require.Len(t, parentEntries[0], 12, "eight inherited channels deleted and four quarters recorded")
 		for _, key := range inheritedKeys {
-			del, ok := final[0][key]
-			require.True(t, ok, "the drop of %s must ride the checkpoint", key)
+			del, ok := parentEntries[0][key]
+			require.True(t, ok, "the drop of %s must ride the switch checkpoint", key)
 			require.Nil(t, del)
 		}
+		require.Equal(t, 22, countRows())
+
+		storeKeys(t, parent, keysHashingInto(fullShard, "join-post", 4))
+		require.Len(t, parent.bindings[0].activeChannels, 4)
+		final, err := parent.flush(ctx)
+		require.NoError(t, err)
+		require.Len(t, final[0], 4)
 		require.Equal(t, 26, countRows())
 		parent.stop()
 
@@ -649,10 +636,9 @@ func TestStreamV2Manager(t *testing.T) {
 	})
 
 	t.Run("a joined task splits back onto the pivot the join removed", func(t *testing.T) {
-		// Each child's targets are the very names the join's convergence
-		// dropped. The switch rejects a declared channel which reports a
-		// token, so its success is the proof the drop reached Snowflake and
-		// the re-created boundary starts from fresh channels.
+		// Each child's targets are the very key ranges the join's switch
+		// dropped, under a fresh epoch, so the re-created boundary starts from
+		// channels which hold nothing.
 		if joinConverged == nil {
 			t.Skip("the join subtest did not run to completion")
 		}
@@ -665,12 +651,13 @@ func TestStreamV2Manager(t *testing.T) {
 		require.Len(t, low.bindings[0].activeChannels, 2, "the low child inherits two of the parent's quarters")
 		lowEntries, err := low.flush(ctx)
 		require.NoError(t, err)
-		require.Len(t, lowEntries[0], 6, "two inherited channels and four declared targets")
-
-		require.NoError(t, low.acknowledged(ctx))
-		require.Len(t, low.bindings[0].activeChannels, 4)
+		require.Len(t, lowEntries[0], 6, "two inherited channels deleted and four targets recorded")
 
 		storeKeys(t, low, keysHashingInto(lowShard, "pivot-post", 2))
+		require.Len(t, low.bindings[0].activeChannels, 4)
+		for _, c := range low.bindings[0].activeChannels {
+			require.Zero(t, c.progress.committed, "a target channel of a fresh epoch holds nothing")
+		}
 		_, err = low.flush(ctx)
 		require.NoError(t, err)
 		require.Equal(t, joinRows+4, countRows())

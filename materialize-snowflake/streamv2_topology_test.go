@@ -188,8 +188,8 @@ func TestStreamV2SteadyStateRouting(t *testing.T) {
 // shard is interrupted mid-transaction, its range is split at the midpoint, and
 // each child inherits the two whole channels nested in its half — committed
 // offset tokens and all, the interrupted transaction's unaccounted rows
-// included. The replay skips by offset per channel, the first flush declares
-// the child's own layout, and the acknowledged switching converges to it.
+// included. The replay skips by offset per channel, the first flush switches to
+// the child's own layout, and the next document reopens on it.
 func TestStreamV2SplitInheritsChannels(t *testing.T) {
 	var ctx = context.Background()
 	const task = "test/topologySplit"
@@ -255,31 +255,31 @@ func TestStreamV2SplitInheritsChannels(t *testing.T) {
 				require.Equal(t, int64(5), c.progress.routed)
 			}
 
-			// The first flush is the declaration: the inherited items, plus
-			// the child's own four channels at zero, written one durable
+			// The first flush switches the layout: it deletes the inherited items
+			// and records the child's own four channels at zero, one durable
 			// checkpoint ahead of any row routing to them.
 			entries, err := m.flush(ctx)
 			require.NoError(t, err)
-			var declared = mergeCheckpoints(entries)
-			require.Len(t, declared, 6)
+			require.ElementsMatch(t, child.inheritedKeys, deletionsOf(entries))
+			var switched = mergeCheckpoints(entries)
+			require.Len(t, switched, 4)
 			for _, key := range rangeKeys(targets) {
-				require.Contains(t, declared, key)
-				require.Zero(t, declared[key].Routed)
+				require.Contains(t, switched, key)
+				require.Zero(t, switched[key].Routed)
 			}
+			require.Empty(t, activeNames(m), "the binding reopens at its next document")
 
-			// The runtime made that checkpoint durable, so the switch runs:
-			// the inherited channels are dropped and the target layout takes over.
-			require.NoError(t, m.acknowledged(ctx))
-			require.Equal(t, channelNames(task, 1, targets), activeNames(m))
-
+			// The next document reopens the binding on the target layout, and the
+			// inherited channels are dropped.
 			var fresh []string
 			for _, r := range targets {
 				fresh = append(fresh, keysHashingTo(r, 2, child.salt)...)
 			}
 			storeKeys(t, m, fresh)
+			require.Equal(t, channelNames(task, 1, targets), activeNames(m))
 			entries, err = m.flush(ctx)
 			require.NoError(t, err)
-			require.ElementsMatch(t, child.inheritedKeys, deletionsOf(entries))
+			require.Empty(t, deletionsOf(entries))
 			for _, sv2ChannelCheckpointItem := range mergeCheckpoints(entries) {
 				require.Equal(t, int64(2), sv2ChannelCheckpointItem.Routed)
 			}
@@ -360,19 +360,19 @@ func TestStreamV2JoinInheritsChannels(t *testing.T) {
 
 	entries, err := joined.flush(ctx)
 	require.NoError(t, err)
-	require.Len(t, mergeCheckpoints(entries), 12) // eight inherited items, four declared at zero
-
-	require.NoError(t, joined.acknowledged(ctx))
-	require.Equal(t, channelNames(task, 1, quarters), activeNames(joined))
+	require.ElementsMatch(t, rangeKeys(eighths), deletionsOf(entries))
+	require.Len(t, mergeCheckpoints(entries), 4) // the four quarters, at zero
+	require.Empty(t, activeNames(joined))
 
 	var fresh []string
 	for _, r := range quarters {
 		fresh = append(fresh, keysHashingTo(r, 2, "join-c")...)
 	}
 	storeKeys(t, joined, fresh)
+	require.Equal(t, channelNames(task, 1, quarters), activeNames(joined))
 	entries, err = joined.flush(ctx)
 	require.NoError(t, err)
-	require.ElementsMatch(t, rangeKeys(eighths), deletionsOf(entries))
+	require.Empty(t, deletionsOf(entries))
 
 	var tokens = fakeCommittedTokens(t, statePath)
 	for _, name := range channelNames(task, 0, eighths) {
@@ -383,11 +383,11 @@ func TestStreamV2JoinInheritsChannels(t *testing.T) {
 	}
 }
 
-// TestStreamV2RebalanceCrashWindows walks one binding through every crash
-// window a rebalance has, in the order a crashing task would meet them. The
-// declaration is what makes each window recoverable: it is durable before
-// anything else happens, so every later session can tell a converging layout
-// from a lost one.
+// TestStreamV2RebalanceCrashWindows walks one binding through the crash windows a
+// rebalance has, in the order a crashing task would meet them. The switch is one
+// checkpoint, durable before anything routes to a target channel, so a session
+// either finds the inherited layout and switches again, or finds the target layout
+// and skips by whatever tokens its channels already hold.
 func TestStreamV2RebalanceCrashWindows(t *testing.T) {
 	var ctx = context.Background()
 	const task = "test/topologyWindows"
@@ -428,57 +428,60 @@ func TestStreamV2RebalanceCrashWindows(t *testing.T) {
 		}
 	}
 
-	// The child replays, declares, and dies before the switch. Its flush
-	// entries are the declaration checkpoint every later session recovers.
-	var declaring = newTopologyManager(t, task, loBegin, loEnd, parentItems)
-	storeKeys(t, declaring, replay)
-	entries, err = declaring.flush(ctx)
-	require.NoError(t, err)
-	var declaration = mergeCheckpoints(entries)
-	require.Len(t, declaration, 6)
-	declaring.stop()
+	// Window one: the child replays and switches, and the switch checkpoint never
+	// lands. The next session finds the same inherited channels, replays into
+	// them by offset again, and produces the same switch.
+	var switched streamV2Checkpoint
+	for range 2 {
+		var switching = newTopologyManager(t, task, loBegin, loEnd, parentItems)
+		storeKeys(t, switching, replay)
+		require.Equal(t, parentNames[:2], activeNames(switching))
+		for _, c := range switching.bindings[0].activeChannels {
+			require.Equal(t, int64(5), c.progress.committed)
+			require.Equal(t, int64(5), c.progress.routed)
+		}
+		entries, err = switching.flush(ctx)
+		require.NoError(t, err)
+		require.ElementsMatch(t, rangeKeys(quarters)[:2], deletionsOf(entries))
+		switched = mergeCheckpoints(entries)
+		require.Len(t, switched, 4)
+		switching.stop()
+	}
+	var tokens = fakeCommittedTokens(t, statePath)
+	require.Contains(t, tokens, parentNames[0])
+	require.Contains(t, tokens, parentNames[1])
 
-	// Window one: declaration durable, switch never ran. The next session
-	// finds the inherited channels idle beside a full declaration and
-	// completes the switching at open.
+	// Window two: the switch checkpoint is durable. The next session opens the
+	// target channels, drops the inherited ones, appends, and dies before its
+	// own checkpoint lands.
 	var fresh []string
 	for _, r := range targets {
 		fresh = append(fresh, keysHashingTo(r, 2, "win-c")...)
 	}
-
-	var switching = newTopologyManager(t, task, loBegin, loEnd, declaration)
-	storeKeys(t, switching, fresh)
-	require.Equal(t, targetNames, activeNames(switching))
-	require.ElementsMatch(t, rangeKeys(quarters)[:2], switching.bindings[0].abandonedRanges)
-	entries, err = switching.flush(ctx)
+	var appending = newTopologyManager(t, task, loBegin, loEnd, switched)
+	storeKeys(t, appending, fresh)
+	require.Equal(t, targetNames, activeNames(appending))
+	_, err = appending.flush(ctx)
 	require.NoError(t, err)
-	require.ElementsMatch(t, rangeKeys(quarters)[:2], deletionsOf(entries))
-	// The crash lands here: the inherited channels are dropped and the target
-	// channels hold this transaction's appends, but neither the deletions nor
-	// the items ever reach a durable checkpoint.
-	switching.stop()
+	appending.stop()
 
-	var tokens = fakeCommittedTokens(t, statePath)
+	tokens = fakeCommittedTokens(t, statePath)
 	require.NotContains(t, tokens, parentNames[0])
 	require.NotContains(t, tokens, parentNames[1])
 
-	// Windows two and three together: the recovered checkpoint still carries
-	// the declaration and the inherited items, the channels behind those items
-	// are gone, and the target channels hold appends their zero-routed items
-	// do not account for. The deletions are re-recorded, and the replay skips
-	// per channel — through tokens standing on zero-routed items, which only
-	// the declaration makes safe to honor.
-	var resumed = newTopologyManager(t, task, loBegin, loEnd, declaration)
+	// The recovered checkpoint holds zero-routed items for channels that hold two
+	// documents each. The switch was durable before anything routed to them, so
+	// those documents are this shard's own, and the replay skips them.
+	var resumed = newTopologyManager(t, task, loBegin, loEnd, switched)
 	storeKeys(t, resumed, fresh)
 	require.Equal(t, targetNames, activeNames(resumed))
-	require.ElementsMatch(t, rangeKeys(quarters)[:2], resumed.bindings[0].abandonedRanges)
 	for _, c := range resumed.bindings[0].activeChannels {
 		require.Equal(t, int64(2), c.progress.committed)
 		require.Equal(t, int64(2), c.progress.routed)
 	}
 	entries, err = resumed.flush(ctx)
 	require.NoError(t, err)
-	require.ElementsMatch(t, rangeKeys(quarters)[:2], deletionsOf(entries))
+	require.Empty(t, deletionsOf(entries))
 	var converged = mergeCheckpoints(entries)
 	require.Len(t, converged, 4)
 	for _, sv2ChannelCheckpointItem := range converged {
@@ -491,7 +494,6 @@ func TestStreamV2RebalanceCrashWindows(t *testing.T) {
 	var steady = newTopologyManager(t, task, loBegin, loEnd, converged)
 	storeKeys(t, steady, keysHashingTo(targets[0], 1, "win-d"))
 	require.Equal(t, targetNames, activeNames(steady))
-	require.Empty(t, steady.bindings[0].abandonedRanges)
 	for _, c := range steady.bindings[0].activeChannels {
 		require.Equal(t, int64(2), c.progress.committed)
 	}
@@ -552,14 +554,15 @@ func TestStreamV2SplitThenJoinBack(t *testing.T) {
 
 	entries, err := joined.flush(ctx)
 	require.NoError(t, err)
-	require.Len(t, mergeCheckpoints(entries), 12)
-	require.NoError(t, joined.acknowledged(ctx))
-	require.Equal(t, channelNames(task, 1, quarters), activeNames(joined))
+	require.ElementsMatch(t, rangeKeys(eighths), deletionsOf(entries))
+	require.Len(t, mergeCheckpoints(entries), 4)
 
 	storeKeys(t, joined, keysHashingTo(quarters[0], 1, "rejoin-c"))
+	require.Equal(t, channelNames(task, 1, quarters), activeNames(joined))
 	entries, err = joined.flush(ctx)
 	require.NoError(t, err)
-	require.ElementsMatch(t, rangeKeys(eighths), deletionsOf(entries))
+	require.Empty(t, deletionsOf(entries))
+	require.Len(t, mergeCheckpoints(entries), 4)
 }
 
 // TestStreamV2MisalignedSplitRejected pins the one topology change the channels
@@ -595,9 +598,8 @@ func fullLayoutCheckpoint(task string, layout []streamV2Range) streamV2Checkpoin
 }
 
 // TestStreamV2LostChannelRejected pins the reading of a channel that reports no
-// committed offset token while the checkpoint records documents appended to it,
-// with no declaration to explain the loss as an interrupted switch: the
-// account of what Snowflake holds is gone, so the binding is rejected.
+// committed offset token while the checkpoint records documents appended to it:
+// the account of what Snowflake holds is gone, so the binding is rejected.
 func TestStreamV2LostChannelRejected(t *testing.T) {
 	t.Setenv("FAKE_SIDECAR_STATE", filepath.Join(t.TempDir(), "channels.json"))
 	const task = "test/topologyLost"
@@ -648,9 +650,8 @@ func TestStreamV2ForeignTokenRejected(t *testing.T) {
 // leaves for a later split: a channel of the parent's layout that took no rows
 // legitimately stands in the checkpoint with nothing routed and no committed
 // offset token. The child that inherits it must adopt it as a fresh channel of
-// the inherited layout — not read it as an orphaned declaration to drop,
-// which leaves the surviving layout unable to cover the child's range and
-// wedges the binding over rows that never existed.
+// the inherited layout, which then covers the child's range and switches as
+// any inherited layout does.
 func TestStreamV2SplitInheritsAnEmptyChannel(t *testing.T) {
 	var ctx = context.Background()
 	const task = "test/topologyEmptyInherit"
@@ -689,16 +690,15 @@ func TestStreamV2SplitInheritsAnEmptyChannel(t *testing.T) {
 	storeKeys(t, child, fresh)
 	require.Equal(t, parentNames[:2], activeNames(child))
 
-	// The child converges as any inheriting shard does, and the formerly
-	// empty channel's rows survive to its target channels.
-	entries, err = child.flush(ctx)
-	require.NoError(t, err)
-	require.Equal(t, int64(2), mergeCheckpoints(entries)[quarters[0]].Routed)
-	require.NoError(t, child.acknowledged(ctx))
-	require.Equal(t, channelNames(task, 1, targets), activeNames(child))
+	// The child switches as any inheriting shard does, and the formerly empty
+	// channel commits its rows before its item is deleted.
+	require.Equal(t, int64(2), child.bindings[0].activeChannels[0].progress.routed)
 	entries, err = child.flush(ctx)
 	require.NoError(t, err)
 	require.ElementsMatch(t, rangeKeys(quarters)[:2], deletionsOf(entries))
+	require.Equal(t, streamV2FormatOffsetToken(2, quarters[0]), fakeCommittedTokens(t, statePath)[parentNames[0]])
+	storeKeys(t, child, keysHashingTo(targets[0], 1, "empty-inherit-post"))
+	require.Equal(t, channelNames(task, 1, targets), activeNames(child))
 	child.stop()
 }
 
@@ -730,17 +730,16 @@ func TestStreamV2SweepDropsAPriorSessionsOrphan(t *testing.T) {
 		require.Contains(t, fakeCommittedTokens(t, statePath), name)
 	}
 
-	// The checkpoint a later session recovers declares the same layout at epoch
+	// The checkpoint a later session recovers records the same layout at epoch
 	// one and names nothing at epoch zero, so the epoch-zero channels stand on the
 	// pipe as orphans of this shard's range.
-	var declaration = make(streamV2Checkpoint, len(quarters))
+	var recorded = make(streamV2Checkpoint, len(quarters))
 	for i, q := range quarters {
-		declaration[q] = &streamV2ChannelCheckpointItem{ChannelName: channelNames(task, 1, quarters)[i]}
+		recorded[q] = &streamV2ChannelCheckpointItem{ChannelName: channelNames(task, 1, quarters)[i]}
 	}
-	var second = newTopologyManager(t, task, 0, math.MaxUint32, declaration)
+	var second = newTopologyManager(t, task, 0, math.MaxUint32, recorded)
 	storeKeys(t, second, keysHashingTo(quarters[0], 1, "orphan-later"))
 	require.Equal(t, channelNames(task, 1, quarters), activeNames(second))
-	require.Empty(t, second.bindings[0].abandonedRanges)
 
 	// The orphans are swept off the pipe before the first append, and the epoch-one
 	// layout is untouched.
