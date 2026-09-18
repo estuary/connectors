@@ -423,17 +423,10 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, priorChec
 			// We're upgrading from streams v1, and the v1 path left behind some
 			// blobs that only it can drain.
 
-			const remedy = "Restore the snowpipe_streaming write path for one transaction before moving the binding onto snowpipe_streaming_v2, or backfill the binding, which discards those blobs and materializes their documents again"
-			if d.snowpipeStreaming == nil {
+			if err := d.snowpipeStreaming.addBinding(ctx, loc.TableSchema, d.ep.Identifier(loc.TableName), b.target); err != nil {
 				return fmt.Errorf(
-					"the task's checkpoint records %d Snowpipe Streaming blob(s) staged into %s that only the snowpipe_streaming write path can finish, and that path is not available. %s",
-					len(priorCheckpointItem.StreamBlobs), b.target.Identifier, remedy,
-				)
-			} else if err := d.snowpipeStreaming.addBinding(ctx, loc.TableSchema, d.ep.Identifier(loc.TableName), b.target); err != nil {
-				return fmt.Errorf(
-					"opening the snowpipe_streaming channel on %s to finish %d staged blob(s): %w. %s",
-					b.target.Identifier, len(priorCheckpointItem.StreamBlobs), err, remedy,
-				)
+					"opening the snowpipe_streaming channel on %s to finish %d staged blob(s): %w. Restore the snowpipe_streaming write path for one transaction before moving the binding onto snowpipe_streaming_v2, or backfill the binding, which discards those blobs and materializes their documents again",
+					b.target.Identifier, len(priorCheckpointItem.StreamBlobs), err)
 			}
 
 			log.WithFields(log.Fields{

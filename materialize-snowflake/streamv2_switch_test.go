@@ -130,6 +130,41 @@ func TestStreamV2ReturningToTheWritePathSkipsNewDocuments(t *testing.T) {
 	require.Equal(t, int64(3), after.bindings[0].activeChannels[0].progress.committed)
 }
 
+// openChannelServer answers every "POST /channels/open" the way status tells
+// it to, and every other route with a bare success — enough for the stream
+// manager's addBinding to reach a verdict.
+func openChannelServer(t *testing.T, status int) *streamManager {
+	t.Helper()
+	var mux = http.NewServeMux()
+	mux.HandleFunc("POST /v1/streaming/channels/open", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, `{"message":"Success","status_code":%d,"table_columns":[]}`, status)
+	})
+	var ts = httptest.NewServer(mux)
+	t.Cleanup(ts.Close)
+
+	pkey, err := rsa.GenerateKey(rand.Reader, 1024)
+	require.NoError(t, err)
+	var role = "TEST_ROLE"
+
+	return &streamManager{
+		c: &streamClient{
+			r:        resty.New().SetBaseURL(ts.URL + "/v1/streaming").SetDisableWarn(true),
+			key:      pkey,
+			user:     "TEST_USER",
+			database: "TEST_DB",
+			account:  "TEST_ACCOUNT",
+			role:     &role,
+		},
+		tableStreams: map[int]*tableStream{},
+		channelName:  "x",
+		lastBinding:  -1,
+		blobStats:    map[int][]*blobStatsTracker{},
+		counter:      -1,
+	}
+}
+
 // TestStreamV2LeavingTheWritePathSweepsItsChannels covers the switch itself, which
 // is where the channels have to go: a binding that leaves this write path with its
 // channels standing is the binding the two tests above describe.
@@ -186,41 +221,6 @@ func TestStreamV2LeavingTheWritePathSweepsItsChannels(t *testing.T) {
 		d.snowpipeStreamingV2.listChannels = fakeListChannels
 		t.Cleanup(d.snowpipeStreamingV2.stop)
 		return d
-	}
-
-	// openChannelServer answers every "POST /channels/open" the way status tells
-	// it to, and every other route with a bare success — enough for the stream
-	// manager's addBinding to reach a verdict.
-	var openChannelServer = func(t *testing.T, status int) *streamManager {
-		t.Helper()
-		var mux = http.NewServeMux()
-		mux.HandleFunc("POST /v1/streaming/channels/open", func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			fmt.Fprintf(w, `{"message":"Success","status_code":%d,"table_columns":[]}`, status)
-		})
-		var ts = httptest.NewServer(mux)
-		t.Cleanup(ts.Close)
-
-		pkey, err := rsa.GenerateKey(rand.Reader, 1024)
-		require.NoError(t, err)
-		var role = "TEST_ROLE"
-
-		return &streamManager{
-			c: &streamClient{
-				r:        resty.New().SetBaseURL(ts.URL + "/v1/streaming").SetDisableWarn(true),
-				key:      pkey,
-				user:     "TEST_USER",
-				database: "TEST_DB",
-				account:  "TEST_ACCOUNT",
-				role:     &role,
-			},
-			tableStreams: map[int]*tableStream{},
-			channelName:  "x",
-			lastBinding:  -1,
-			blobStats:    map[int][]*blobStatsTracker{},
-			counter:      -1,
-		}
 	}
 
 	var lastBinding = func(d *transactor) *binding {
@@ -591,14 +591,12 @@ func TestStreamV2SwitchOntoTheWritePathWithPendingWorkIsRejected(t *testing.T) {
 		return d.addBinding(ctx, target, *cmp.Or(d.cp[target.StateKey], &checkpointItem{}))
 	}
 
-	// The transactor of this test carries no bdec manager, which stands for every
-	// reason the drain cannot be arranged: the manager is absent, or it cannot open
-	// a channel on the table.
-	t.Run("pending blobs with no way to drain them are rejected", func(t *testing.T) {
+	t.Run("pending blobs whose channel cannot be opened are rejected", func(t *testing.T) {
 		var d = newTransactor(t, &checkpointItem{
 			Table:       "TBL",
 			StreamBlobs: []*blobMetadata{{Path: "one.bdec"}, {Path: "two.bdec"}},
 		})
+		d.snowpipeStreaming = openChannelServer(t, 6)
 
 		var err = addBinding(d)
 		require.ErrorContains(t, err, "TBL")
