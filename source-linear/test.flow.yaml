@@ -1,0 +1,10 @@
+captures:
+  acmeCo/source-linear:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_linear
+        config: config.yaml
+    bindings: []
