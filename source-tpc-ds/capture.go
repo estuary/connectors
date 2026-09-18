@@ -13,22 +13,22 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// chunkTargetRows is the number of dsdgen rows per work item. For the sales
-// tables a dsdgen row is a ticket or order that expands to several line items.
-// A variable so tests can exercise chunking at small scale.
+// dsdgen rows per work item. For the sales tables a dsdgen row is a ticket or
+// order, which expands to several line items. Tests lower this to exercise
+// chunking at small scale.
 var chunkTargetRows int64 = 1_000_000
 
-// checkpointEvery is the number of stdout lines a stream buffers before writing
-// them out with the checkpoint that accounts for them. Emitting documents alone
-// would let a sibling stream's checkpoint commit them, and a restart repeat them.
+// Stdout lines a stream buffers before writing them out with their checkpoint.
+// If documents went out on their own, another stream's checkpoint could commit
+// them and a restart would emit them again.
 const checkpointEvery = 10_000
 
 type state struct {
 	Bindings map[boilerplate.StateKey]*bindingState `json:"bindingStateV1,omitempty"`
 }
 
-// bindingState is one binding's checkpoint. A returns binding reads the same
-// dsdgen stream as its sales parent, so the two record identical progress.
+// A returns binding reads the same dsdgen stream as its sales parent, so the
+// two record the same progress.
 type bindingState struct {
 	Scale     string           `json:"scale,omitempty"`     // scale factor the rows were generated at
 	Chunks    int              `json:"chunks,omitempty"`    // work items the stream is split into
@@ -50,7 +50,6 @@ type capture struct {
 	bindings []*binding
 }
 
-// planChunks splits rows dsdgen rows into work items of about chunkTargetRows.
 func planChunks(rows int64) int {
 	return int((rows + chunkTargetRows - 1) / chunkTargetRows)
 }
@@ -66,8 +65,8 @@ func (c *capture) run() error {
 	}
 	var ctx = c.out.Context()
 
-	// One dsdgen stream per enabled parent table; a returns binding joins its
-	// parent's stream whether or not the parent is enabled.
+	// One dsdgen stream per parent table. A returns binding joins its parent's
+	// stream even when the parent itself is disabled.
 	var streams []*streamRun
 	var byParent = map[string]*streamRun{}
 	for _, b := range c.bindings {
@@ -101,8 +100,6 @@ func (c *capture) run() error {
 	return nil
 }
 
-// streamRun drives one parent table's dsdgen work items and fans rows out to
-// the bindings reading that stream.
 type streamRun struct {
 	capture *capture
 	parent  *tableDef
@@ -126,9 +123,9 @@ func (s *streamRun) run(ctx context.Context) error {
 		log.WithFields(log.Fields{"table": s.parent.Name, "rows": rows, "chunks": chunks}).Info("planned generation")
 	}
 
-	// Resume from the lowest chunk any member still needs. Members past that
-	// point drop rows they already emitted, so a binding added later catches
-	// up without duplicating its siblings.
+	// Resume from the lowest chunk any member still needs. Members further
+	// along drop the rows they already emitted, so a binding added later
+	// catches up without its siblings repeating anything.
 	var start = chunks + 1
 	for _, m := range s.members {
 		m.state.Scale = s.capture.gen.scale
@@ -173,7 +170,6 @@ func (s *streamRun) runChunk(ctx context.Context, chunk, chunks int) error {
 	log.WithFields(log.Fields{"table": s.parent.Name, "chunk": chunk, "chunks": chunks}).Info("generating chunk")
 
 	var lines int64
-	// emit writes the buffered documents and then the checkpoint fn builds.
 	var emit = func(fn func(m *binding) map[string]any) error {
 		var batches = map[int][]json.RawMessage{}
 		for _, t := range targets {
@@ -195,8 +191,8 @@ func (s *streamRun) runChunk(ctx context.Context, chunk, chunks int) error {
 		if m.state.InFlight == nil {
 			m.state.InFlight = map[string]int64{}
 		}
-		// Never lower a member's mark: rows below a pre-restart mark were
-		// committed by the earlier run and are being skipped, not re-emitted.
+		// Never lower a member's mark. The earlier run committed the rows below
+		// it, and this run skips them rather than emitting them again.
 		m.state.InFlight[key] = max(m.state.InFlight[key], lines)
 		return map[string]any{"inFlight": map[string]int64{key: m.state.InFlight[key]}}
 	}
@@ -237,11 +233,8 @@ func (s *streamRun) runChunk(ctx context.Context, chunk, chunks int) error {
 	})
 }
 
-// emitWithCheckpoint writes every batch of documents and then a merge-patch
-// checkpoint under one lock acquisition on out, so a checkpoint from another
-// stream's goroutine cannot commit these documents before the checkpoint that
-// accounts for them (PullOutput.DocumentsAndCheckpoint offers this for a
-// single binding only).
+// Holds the lock across the documents and their checkpoint so another stream's
+// checkpoint cannot commit these documents first.
 func emitWithCheckpoint(out *boilerplate.PullOutput, batches map[int][]json.RawMessage, checkpoint json.RawMessage) error {
 	out.Lock()
 	defer out.Unlock()
@@ -260,7 +253,6 @@ func emitWithCheckpoint(out *boilerplate.PullOutput, batches map[int][]json.RawM
 	return nil
 }
 
-// patch builds a merge patch from fn's per-member patches.
 func (s *streamRun) patch(fn func(m *binding) map[string]any) (json.RawMessage, error) {
 	var patches = map[boilerplate.StateKey]any{}
 	for _, m := range s.members {
@@ -271,7 +263,6 @@ func (s *streamRun) patch(fn func(m *binding) map[string]any) (json.RawMessage, 
 	return json.Marshal(map[string]any{"bindingStateV1": patches})
 }
 
-// checkpoint emits a merge patch built from fn's per-member patches.
 func (s *streamRun) checkpoint(fn func(m *binding) map[string]any) error {
 	patch, err := s.patch(fn)
 	if err != nil {

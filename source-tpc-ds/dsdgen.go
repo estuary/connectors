@@ -14,15 +14,12 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// generator runs the patched dsdgen from the estuary/tpcds-kit fork.
 type generator struct {
 	bin   string // dsdgen binary
 	idx   string // tpcds.idx distributions file, passed on every invocation
 	scale string // scale factor as given to -SCALE
 }
 
-// newGenerator locates dsdgen: $DSDGEN, else the first dsdgen on $PATH. The
-// distributions file is $DSDGEN_IDX or tpcds.idx next to the binary.
 func newGenerator(scale string) (*generator, error) {
 	var bin = os.Getenv("DSDGEN")
 	if bin == "" {
@@ -47,9 +44,7 @@ func (g *generator) args(table string, extra ...string) []string {
 	return append([]string{"-SCALE", g.scale, "-TABLE", table, "-DISTRIBUTIONS", g.idx}, extra...)
 }
 
-// rowCount asks dsdgen how many rows (for the sales tables: tickets or orders,
-// each of which expands to several line items) table has at the configured
-// scale.
+// For the sales tables dsdgen counts tickets or orders, not line items.
 func (g *generator) rowCount(ctx context.Context, table string) (int64, error) {
 	var stderr bytes.Buffer
 	var cmd = exec.CommandContext(ctx, g.bin, g.args(table, "-_ROWCOUNT", "Y")...)
@@ -65,8 +60,6 @@ func (g *generator) rowCount(ctx context.Context, table string) (int64, error) {
 	return n, nil
 }
 
-// stream runs dsdgen for one work item and calls fn with every output line,
-// in order. With chunks > 1 the item is -CHILD chunk of -PARALLEL chunks.
 func (g *generator) stream(ctx context.Context, table string, chunks, chunk int, fn func(line []byte) error) error {
 	var args = g.args(table, "-_FILTER", "Y")
 	if chunks > 1 {

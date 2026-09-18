@@ -91,7 +91,7 @@ func TestTables(t *testing.T) {
 		}
 	}
 	require.Equal(t, map[string]int{"store_sales": 1, "catalog_sales": 1, "web_sales": 1}, parents)
-	// Routing by field count needs distinct counts within a stream.
+	// routeLine relies on a parent and its children having different field counts.
 	for _, tbl := range tables {
 		for _, c := range children(tbl) {
 			require.NotEqual(t, len(tbl.Columns), len(c.Columns), "%s and %s have the same field count", tbl.Name, c.Name)

@@ -1,7 +1,7 @@
 //go:build ignore
 
-// gen_tables.go writes tables_gen.go from tpcds.sql, the TPC-DS DDL shipped in
-// the dsdgen fork. Run with `go generate`.
+// Writes tables_gen.go from tpcds.sql, the TPC-DS DDL from the dsdgen fork.
+// Run with `go generate`.
 package main
 
 import (
@@ -14,8 +14,8 @@ import (
 	"strings"
 )
 
-// Returns tables are emitted by their sales parent's dsdgen process. This is
-// generator behaviour, not DDL, so it lives here.
+// The sales parent's dsdgen process emits the returns tables. The DDL says
+// nothing about this, so it lives here.
 var parents = map[string]string{
 	"store_returns":   "store_sales",
 	"catalog_returns": "catalog_sales",
@@ -132,8 +132,8 @@ func stripComments(s string) string {
 	return strings.Join(lines, "\n")
 }
 
-// splitTopLevel splits a CREATE TABLE body on commas outside parentheses, so
-// decimal(p,s) and primary key (a, b) stay whole.
+// Splits on commas outside parentheses so decimal(p,s) and primary key (a, b)
+// stay whole.
 func splitTopLevel(body string) []string {
 	var out []string
 	var depth int

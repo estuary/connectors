@@ -4,7 +4,6 @@ import "fmt"
 
 //go:generate go run gen_tables.go
 
-// columnKind is how a dsdgen output field is typed in emitted documents.
 type columnKind int
 
 const (
@@ -27,7 +26,6 @@ type tableDef struct {
 	Parent  string   // sales table whose dsdgen process emits this returns table, or ""
 }
 
-// tableByName is the definition for a TPC-DS table, or nil.
 func tableByName(name string) *tableDef {
 	for _, t := range tables {
 		if t.Name == name {
@@ -37,7 +35,6 @@ func tableByName(name string) *tableDef {
 	return nil
 }
 
-// streamOf is the table whose dsdgen process emits rows of t.
 func streamOf(t *tableDef) *tableDef {
 	if t.Parent == "" {
 		return t
@@ -45,7 +42,6 @@ func streamOf(t *tableDef) *tableDef {
 	return tableByName(t.Parent)
 }
 
-// children are the returns tables emitted by parent's process.
 func children(parent *tableDef) []*tableDef {
 	var out []*tableDef
 	for _, t := range tables {
@@ -56,8 +52,8 @@ func children(parent *tableDef) []*tableDef {
 	return out
 }
 
-// routeLine picks, among the parent table and its children, the table whose
-// column count matches the line. Field counts are distinct within a stream.
+// Field counts differ between a parent and its children, so the count alone
+// identifies the table.
 func routeLine(parent *tableDef, line []byte) (*tableDef, error) {
 	var n = countFields(line)
 	if n == len(parent.Columns) {
