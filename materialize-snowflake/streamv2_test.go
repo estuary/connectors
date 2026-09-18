@@ -92,8 +92,10 @@ func TestStreamV2Manager(t *testing.T) {
 	// The columns writeRows stores, shared by every table this test appends to.
 	const testTableColumns = "(KEY TEXT, INTCOL NUMBER, DOC VARIANT)"
 
-	// The task every manager here stands for a shard of.
-	const testMaterialization = "test/streamV2Materialization"
+	// The task every manager here stands for a shard of. The run nonce keeps a
+	// concurrent run of the suite from sweeping this run's channels off the shared
+	// table, since a manager sweeps every channel that names its materialization.
+	var testMaterialization = "test/streamV2Materialization-" + testRunNonce
 
 	var tableName = "STREAMV2_TEST"
 	var cleanup = func() {
