@@ -1,6 +1,6 @@
 ARG BASE_IMAGE=ghcr.io/estuary/base-image:v2
 # Patched TPC-DS generator from https://github.com/estuary/tpcds-kit, pinned by commit.
-ARG DSDGEN_IMAGE=ghcr.io/estuary/dsdgen:5ea1641
+ARG DSDGEN_IMAGE=ghcr.io/estuary/dsdgen:a0d4ada
 
 FROM ${DSDGEN_IMAGE} AS dsdgen
 
