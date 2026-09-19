@@ -10,6 +10,8 @@ This connector captures data from an SFTP server.
 
 You'll need an SFTP server that can accept connections from the [Estuary IP addresses](/reference/allow-ip-addresses) using password or SSH key authentication.
 
+You should also have the server's SSH host key at hand, so the connector can verify it is talking to your server. See [Host key verification](#host-key-verification).
+
 ## Subdirectories and Symbolic Links
 
 The connector must be configured with a `Directory` to capture files from. It will also descend into and capture files in normal subdirectories of the configured `Directory`.
@@ -44,6 +46,30 @@ Setting `Ascending Keys` is only recommended if you have strict control over the
 This connector supports multiple bindings to capture from different directories within a single capture task. See [Capture Multiple Paths with File Source Connectors](/guides/flowctl/multiple-file-source-bindings) for a step-by-step guide.
 :::
 
+## Host key verification
+
+Set `SSH Known Hosts` to the public host key(s) of your SFTP server. When it is set, the connector refuses to connect if the server presents a key that is not listed, which protects the capture against man-in-the-middle attacks. When it is left empty the connector connects to whatever server answers at the address.
+
+The field takes OpenSSH `known_hosts` lines, one per line, as printed by `ssh-keyscan`. Run it against your server from a machine you trust, and paste the output:
+
+```
+ssh-keyscan -p 2222 myserver.com
+```
+
+```
+[myserver.com]:2222 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXamPle...
+```
+
+The host column must name the configured `Address` in `known_hosts` form: the bare hostname for port 22, `[host]:port` for any other port. `ssh-keyscan -p` prints it in the right form. The usual OpenSSH `known_hosts` syntax is accepted: hashed hosts, `*` and `?` wildcards in the host part, `!` negation, several keys for the same host, `@cert-authority` lines that trust every host certificate signed by an SSH certificate authority, and `@revoked` lines. The port is matched literally, so a wildcard for a server on a port other than 22 must carry it: `[*.example.com]:2222`, not `*.example.com`.
+
+If the field has text but no host key entries (only comments, for example), the connector refuses the configuration rather than silently connecting unverified.
+
+If your server's operator publishes only a fingerprint (AWS Transfer Family, for example), run `ssh-keyscan` as above and check that the fingerprint of the scanned key matches the published one before pasting it:
+
+```
+ssh-keyscan -p 2222 myserver.com | ssh-keygen -lf -
+```
+
 ## Configuration
 
 You configure connectors either in the Estuary web app, or by directly editing the catalog specification file. See [connectors](../../../concepts/connectors.md#using-connectors) to learn more about using connectors. The values and specification sample below provide configuration details specific to the SFTP source connector.
@@ -53,6 +79,7 @@ You configure connectors either in the Estuary web app, or by directly editing t
 | Property                    | Title                 | Description                                                                                                                                                                                                                                                                                              | Type         | Required/Default  |
 | --------------------------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ----------------- |
 | **`/address`**              | Address               | Host and port of the SFTP server. Example: `myserver.com:22`                                                                                                                                                                                                                                             | string       | Required          |
+| `/knownHosts`               | SSH Known Hosts       | Host keys of the SFTP server in OpenSSH `known_hosts` format, one per line.                                                                                                                                                                                                                              | string       |                   |
 | **`/credentials`**          | Credentials           | Credentials for authentication                                                                                                                                                                                                                                                                           | object       | Required          |
 | **`/credentials/type`**     | Authentication Method | Set to `sshKey` to authenticate with an SSH key, or `password` to authenticate with a password.                                                                                                                                                                                                          | string       | Required          |
 | **`/credentials/username`** | Username              | Username for authentication.                                                                                                                                                                                                                                                                             | string       | Required          |
@@ -82,6 +109,7 @@ captures:
         image: "ghcr.io/estuary/source-sftp:v1"
         config:
           address: myserver.com:22
+          knownHosts: myserver.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXamPle...
           credentials:
             type: password
             username: <SECRET>

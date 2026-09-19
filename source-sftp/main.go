@@ -25,6 +25,7 @@ import (
 
 type config struct {
 	Address     string            `json:"address" jsonschema:"title=Address" jsonschema_extras:"order=0"`
+	KnownHosts  string            `json:"knownHosts,omitempty" jsonschema:"title=SSH Known Hosts" jsonschema_extras:"order=1,multiline=true"`
 	Username    string            `json:"username" jsonschema:"-"`
 	Password    string            `json:"password" jsonschema:"-"`
 	Directory   string            `json:"directory" jsonschema:"title=Directory" jsonschema_extras:"order=4"`
@@ -34,10 +35,14 @@ type config struct {
 	Parser      *parser.Config    `json:"parser,omitempty"`
 }
 
+const knownHostsDescription = "Host keys of the SFTP server in OpenSSH known_hosts format, one per line: the output of `ssh-keyscan -p 2222 myserver.com`, for example `[myserver.com]:2222 ssh-ed25519 AAAA...`."
+
 func (config) GetFieldDocString(fieldName string) string {
 	switch fieldName {
 	case "Address":
 		return "Host and port of the SFTP server. Example: myserver.com:22"
+	case "KnownHosts":
+		return knownHostsDescription
 	case "Credentials":
 		return "Credentials for authentication"
 	case "Directory":
@@ -110,6 +115,10 @@ func (c config) Validate() error {
 		}
 	}
 
+	if _, err := parseKnownHosts(c.KnownHosts); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -152,12 +161,23 @@ func newSftpSource(ctx context.Context, cfg config) (filesource.Store, error) {
 	}
 
 	sshConfig := ssh.ClientConfig{
-		User:            user,
-		Auth:            []ssh.AuthMethod{},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		User: user,
+		Auth: []ssh.AuthMethod{},
 	}
 
-	// Extend the default list of key-exchange algorithms with a few additional ones we want to support.
+	if pins, err := parseKnownHosts(cfg.KnownHosts); err != nil {
+		return nil, err
+	} else if pins == nil {
+		log.WithField("address", cfg.Address).Warn("no SSH Known Hosts are configured, so the identity of the SFTP server is not verified.")
+		sshConfig.HostKeyCallback = ssh.InsecureIgnoreHostKey()
+	} else {
+		sshConfig.HostKeyCallback = pins.callback(cfg.Address)
+		sshConfig.HostKeyAlgorithms = pins.hostKeyAlgorithms(cfg.Address)
+	}
+
+	// Extend the default list of key-exchange algorithms with a few additional ones we want to
+	// support. This is safe to run after setting HostKeyAlgorithms above: SetDefaults only fills in
+	// Ciphers, KeyExchanges and MACs and leaves HostKeyAlgorithms as set.
 	sshConfig.SetDefaults()
 	sshConfig.KeyExchanges = append(sshConfig.KeyExchanges, additionalKexAlgos...)
 
@@ -457,6 +477,7 @@ func main() {
 }
 
 func configSchema(parserSchema json.RawMessage) json.RawMessage {
+	knownHostsDescriptionJSON, _ := json.Marshal(knownHostsDescription)
 	return json.RawMessage(`{
         "$schema": "http://json-schema.org/draft-07/schema#",
         "properties": {
@@ -465,6 +486,13 @@ func configSchema(parserSchema json.RawMessage) json.RawMessage {
             "title": "Address",
             "description": "Host and port of the SFTP server. Example: myserver.com:22",
             "order": 0
+          },
+          "knownHosts": {
+            "type": "string",
+            "title": "SSH Known Hosts",
+            "description": ` + string(knownHostsDescriptionJSON) + `,
+            "multiline": true,
+            "order": 1
           },
           "credentials": {
             "type": "object",
