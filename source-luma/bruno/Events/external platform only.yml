@@ -1,0 +1,31 @@
+info:
+  name: external platform only
+  type: http
+  seq: 6
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/calendars/events/list?platforms=external"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://docs.luma.com/reference/get_v1-calendars-events-list
+
+  **WHY:** isolates what `platforms=external` adds to the listing, because the
+  first live capture failed with `403 {"message":"You don't have access to
+  this event"}` when listing guests of an event that only appeared in the
+  external sweep.
+
+  **LIMITATION (VERIFIED 2026-09-17):** external events carry `platform:
+  "external"` and a `calev-`-prefixed `id` instead of `evt-`; they are
+  calendar listings of events hosted off Luma, so they have no Luma guest list
+  and `GET /v1/events/guests/list?event_id=calev-…` answers `403`. The
+  connector keeps external events in the `events` stream but only fans out to
+  guests for `platform == "luma"` events (`snapshot_guests` in
+  `source_luma/api.py`).

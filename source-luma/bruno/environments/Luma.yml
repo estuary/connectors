@@ -1,0 +1,7 @@
+variables:
+  - name: base_url
+    value: https://public-api.luma.com
+  - name: config_path
+    value: ../config.yaml
+  - name: event_id
+    value: evt-k0ZMKv8mVCBHUBP

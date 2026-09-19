@@ -1,0 +1,29 @@
+info:
+  name: all platforms and pending
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/calendars/events/list?platforms=luma&platforms=external&status=pending"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://docs.luma.com/reference/get_v1-calendars-events-list
+  
+  **WHY:** proves the repeated-param form `platforms=luma&platforms=external`
+  and the `status=pending` value are both accepted, since the connector sends
+  them to escape the defaults called out in `Events / bare`.
+  
+  **VERIFIED (2026-09-17):** `200`. The account has no pending submissions
+  (`entries: []`, `has_more: false`), so the request shape is proven while the
+  populated shape of a pending event is **UNOBSERVABLE** here — the connector
+  assumes pending events share the approved event schema (they are the same
+  object in the OpenAPI spec) and, being a snapshot stream with inferred
+  schema, tolerates any difference.
