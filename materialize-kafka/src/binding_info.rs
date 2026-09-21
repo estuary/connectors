@@ -286,7 +286,9 @@ fn field_to_shape(
             shape.string.content_encoding = Some(inf.content_type.clone().into());
         }
         if !inf.format.is_empty() {
-            shape.string.content_encoding = Some(inf.format.clone().into());
+            shape.string.format =
+                serde_json::from_value(serde_json::Value::String(inf.format.clone()))
+                    .expect("projection format must be a known JSON Schema format");
         }
         if inf.max_length > 0 {
             shape.string.max_length = Some(inf.max_length);
