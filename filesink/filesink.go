@@ -440,6 +440,10 @@ func (t *transactor[T]) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}, nil
 }
 
+func (t *transactor[T]) Flush(context.Context, []json.RawMessage, map[int]time.Time, map[int]time.Time) error {
+	return nil
+}
+
 // Acknowledge completes all staged uploads and removes them from the
 // checkpoint, so that the checkpoint contains only the list of file counts.
 func (t *transactor[T]) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {

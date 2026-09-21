@@ -250,6 +250,10 @@ func (t *scriptedTransactor) Store(it *StoreIterator) (StartCommitFunc, error) {
 	}, nil
 }
 
+func (t *scriptedTransactor) Flush(context.Context, []json.RawMessage, map[int]time.Time, map[int]time.Time) error {
+	return nil
+}
+
 func (t *scriptedTransactor) Acknowledge(context.Context, []json.RawMessage, []string) (*pf.ConnectorState, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()

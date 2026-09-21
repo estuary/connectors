@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync/atomic"
+	"time"
 
 	"cloud.google.com/go/pubsub"
 	"github.com/estuary/connectors/go/keyhash"
@@ -25,6 +26,10 @@ type topicBinding struct {
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
+func (t *transactor) Flush(context.Context, []json.RawMessage, map[int]time.Time, map[int]time.Time) error {
+	return nil
+}
+
 func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
 	return nil, nil
 }

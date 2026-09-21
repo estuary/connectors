@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"cloud.google.com/go/bigtable"
 	m "github.com/estuary/connectors/go/materialize"
@@ -65,6 +66,10 @@ func (t *transactor) UnmarshalState(raw json.RawMessage) error {
 		return fmt.Errorf("unmarshalling connector state: %w", err)
 	}
 
+	return nil
+}
+
+func (t *transactor) Flush(context.Context, []json.RawMessage, map[int]time.Time, map[int]time.Time) error {
 	return nil
 }
 

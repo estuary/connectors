@@ -9,6 +9,7 @@ import (
 
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	"github.com/gogo/protobuf/types"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	pc "go.gazette.dev/core/consumer/protocol"
@@ -50,6 +51,25 @@ type Transactor interface {
 	// updates of that prior transaction, and thus meet the formal "read-committed"
 	// guarantee required by the runtime.
 	Load(_ *LoadIterator, loaded func(binding int, doc json.RawMessage) error) error
+
+	// Flush ends the load phase of a transaction, so it is called after Load
+	// returns and before the first Store.
+	//
+	// `statePatches` holds the state patches that every shard, including this
+	// one, returned in its Acknowledged response for the prior transaction.
+	// Those patches are non-transactional, so they are not part of any commit.
+	//
+	// `begins` and `completes` map a binding index to its truncation boundary
+	// for each backfill that began or completed in this transaction. The
+	// boundary is the publication time of the backfill's begin signal. A
+	// stored document whose `flow_published_at` is earlier than the boundary
+	// predates the backfill. Once its binding appears in `completes`, that
+	// document is stale and may be deleted. A binding in `begins` needs no
+	// action.
+	//
+	// Runtime v1 does not populate these fields.
+	Flush(ctx context.Context, statePatches []json.RawMessage, begins map[int]time.Time, completes map[int]time.Time) error
+
 	// Store consumes Store requests from the StoreIterator and returns
 	// a StartCommitFunc which is used to commit the stored transaction.
 	// StartCommitFunc may be nil, which indicate that commits are a
@@ -390,6 +410,26 @@ func RunTransactions(
 
 		if err = validateIsFlush(&rxRequest); err != nil {
 			return err
+		}
+		if statePatches, err = SplitStatePatches(rxRequest.Flush.StatePatchesJson); err != nil {
+			return err
+		}
+		var backfillBegins = make(map[int]time.Time, len(rxRequest.Flush.BackfillBegins))
+		for _, bb := range rxRequest.Flush.BackfillBegins {
+			backfillBegins[int(bb.Binding)], err = types.TimestampFromProto(bb.Timestamp)
+			if err != nil {
+				return fmt.Errorf("invalid timestamp in Flush.BackfillBegins: %w", err)
+			}
+		}
+		var backfillCompletes = make(map[int]time.Time, len(rxRequest.Flush.BackfillCompletes))
+		for _, bc := range rxRequest.Flush.BackfillCompletes {
+			backfillCompletes[int(bc.Binding)], err = types.TimestampFromProto(bc.Timestamp)
+			if err != nil {
+				return fmt.Errorf("invalid timestamp in Flush.BackfillCompletes: %w", err)
+			}
+		}
+		if err = transactor.Flush(ctx, statePatches, backfillBegins, backfillCompletes); err != nil {
+			return fmt.Errorf("transactor.Flush: %w", err)
 		} else if err = writeFlushed(stream, &txResponse); err != nil {
 			return err
 		}
