@@ -30,11 +30,14 @@ MAX_PAGE_SIZE = 250
 # Linear stamps timestamps at millisecond resolution, so one tick is one millisecond.
 TICK = timedelta(milliseconds=1)
 
-# Requests, not complexity, is the binding budget: 2,500 requests/hour against 3,000,000
-# complexity points/hour, and a full page of the widest stream costs well under 5,000
-# points. Pause before the request budget is spent, because a rate-limited response cannot
-# be retried by the framework (see `_execute`).
+# Linear meters two independent hourly budgets — 2,500 requests and 3,000,000 complexity
+# points — and either can bind first, because complexity is charged per row returned rather
+# than per request. Pause before either is spent, since a rate-limited response cannot be
+# retried by the framework (see `_execute`).
 _REQUESTS_REMAINING_FLOOR = 50
+# A full 250-row page costs on the order of a thousand points, so hold back several pages'
+# worth rather than a fixed small count.
+_COMPLEXITY_REMAINING_FLOOR = 20_000
 # Bound a single pre-emptive sleep so a malformed or stale reset header cannot park the
 # connector indefinitely.
 _MAX_SLEEP_SECONDS = 60 * 60
@@ -64,7 +67,6 @@ def _connection_query(
     entity: type[LinearResource],
     *,
     paginated: bool,
-    ascending: bool,
     archival: bool = False,
 ) -> str:
     """Build the document for one page of `entity`'s Relay connection."""
@@ -84,8 +86,7 @@ def _connection_query(
     # The archival pass cannot be sorted — `IssueSortInput` exposes no `archivedAt` member —
     # so it always walks in the connection's default order.
     if entity.supports_sort and not archival:
-        order = "Ascending" if ascending else "Descending"
-        args.append(f"sort: [{{{cursor_field}: {{order: {order}}}}}]")
+        args.append(f"sort: [{{{cursor_field}: {{order: Ascending}}}}]")
     elif not entity.supports_sort:
         args.append(f"orderBy: {cursor_field}")
 
@@ -103,18 +104,14 @@ query Fetch({declarations}) {{
 """
 
 
-async def _throttle(log: Logger, headers: Mapping[str, str]) -> None:
-    """Sleep when the hourly request budget is nearly spent.
-
-    Guarantees the connector stays under the request limit. This is the only reliable
-    defence: Linear signals exhaustion as HTTP 400 with a `RATELIMITED` code, and the CDK
-    raises 4xx immediately without consulting `should_retry`, so the framework cannot retry
-    one. `_execute` keeps a backstop for the race.
-    """
-    raw_remaining = headers.get("x-ratelimit-requests-remaining")
-    raw_reset = headers.get("x-ratelimit-requests-reset")
+def _budget_delay(
+    log: Logger, headers: Mapping[str, str], budget: str, floor: int
+) -> float:
+    """Seconds to wait for `budget` to reset, or 0 while it still has headroom."""
+    raw_remaining = headers.get(f"x-ratelimit-{budget}-remaining")
+    raw_reset = headers.get(f"x-ratelimit-{budget}-reset")
     if raw_remaining is None or raw_reset is None:
-        return
+        return 0.0
 
     try:
         remaining = int(raw_remaining)
@@ -123,22 +120,48 @@ async def _throttle(log: Logger, headers: Mapping[str, str]) -> None:
     except (TypeError, ValueError):
         log.warning(
             "could not parse Linear rate limit headers; continuing without throttling",
-            {"remaining": raw_remaining, "reset": raw_reset},
+            {"budget": budget, "remaining": raw_remaining, "reset": raw_reset},
         )
-        return
+        return 0.0
 
-    if remaining > _REQUESTS_REMAINING_FLOOR:
-        return
+    if remaining > floor:
+        return 0.0
 
     delay = min((reset_at - datetime.now(tz=UTC)).total_seconds(), _MAX_SLEEP_SECONDS)
     if delay <= 0:
-        return
+        return 0.0
 
     log.info(
-        "Linear request budget nearly exhausted; sleeping until the window resets",
-        {"remaining": remaining, "reset_at": reset_at.isoformat(), "sleep_seconds": delay},
+        "Linear budget nearly exhausted; sleeping until the window resets",
+        {
+            "budget": budget,
+            "remaining": remaining,
+            "reset_at": reset_at.isoformat(),
+            "sleep_seconds": delay,
+        },
     )
-    await asyncio.sleep(delay)
+    return delay
+
+
+async def _throttle(log: Logger, headers: Mapping[str, str]) -> None:
+    """Sleep until whichever hourly budget is nearly spent has reset.
+
+    Guarantees the connector stays under both limits. This is the only reliable defence:
+    Linear signals exhaustion as HTTP 400 with a `RATELIMITED` code, and the CDK raises 4xx
+    immediately without consulting `should_retry`, so the framework cannot retry one.
+    `_execute` keeps a backstop for the race.
+
+    Both budgets are checked because which one binds depends on the workspace, not on the
+    connector. Requests bind when rows are sparse, but complexity is charged per row
+    returned, so a workspace whose records have many populated relations can exhaust the
+    complexity budget while thousands of requests remain.
+    """
+    delay = max(
+        _budget_delay(log, headers, "requests", _REQUESTS_REMAINING_FLOOR),
+        _budget_delay(log, headers, "complexity", _COMPLEXITY_REMAINING_FLOOR),
+    )
+    if delay > 0:
+        await asyncio.sleep(delay)
 
 
 def _check_errors(
@@ -225,7 +248,6 @@ async def _walk_pages(
     after_ts: datetime,
     through: datetime,
     *,
-    ascending: bool = True,
     archival: bool = False,
 ) -> AsyncGenerator[list[LinearResource], None]:
     """Yield `(after_ts, through]` one page at a time, following `pageInfo.endCursor`.
@@ -245,7 +267,7 @@ async def _walk_pages(
             variables["after"] = after
 
         query = _connection_query(
-            entity, paginated=after is not None, ascending=ascending, archival=archival
+            entity, paginated=after is not None, archival=archival
         )
         nodes, page_info = await _execute(entity, http, log, query, variables)
 
@@ -264,12 +286,11 @@ async def _walk(
     after_ts: datetime,
     through: datetime,
     *,
-    ascending: bool = True,
     archival: bool = False,
 ) -> AsyncGenerator[LinearResource, None]:
     """Yield every row in `(after_ts, through]`."""
     async for nodes in _walk_pages(
-        entity, http, log, after_ts, through, ascending=ascending, archival=archival
+        entity, http, log, after_ts, through, archival=archival
     ):
         for node in nodes:
             yield node
@@ -309,9 +330,7 @@ async def _fetch_changes(
         return
 
     emitted = False
-    async for node in _walk(
-        entity, http, log, log_cursor, horizon, ascending=entity.supports_sort
-    ):
+    async for node in _walk(entity, http, log, log_cursor, horizon):
         yield node
         emitted = True
 
@@ -355,7 +374,7 @@ async def _fetch_issue_changes(
 
     emitted = False
 
-    async for node in _walk(Issue, http, log, log_cursor, horizon, ascending=True):
+    async for node in _walk(Issue, http, log, log_cursor, horizon):
         yield node
         emitted = True
 
@@ -403,9 +422,9 @@ async def _backfill(
     # Backfill owns everything strictly below the cutoff; incremental owns the cutoff tick
     # onward, so the two meet with no gap and no overlap.
     backfill_end = floor_to_tick(cutoff) - TICK
-    ascending = entity.supports_sort
     resume = datetime.fromisoformat(page) if isinstance(page, str) else None
 
+    ascending = entity.supports_sort
     after_ts = resume if (ascending and resume is not None) else start_date
     through = (resume - TICK) if (not ascending and resume is not None) else backfill_end
 
@@ -422,7 +441,7 @@ async def _backfill(
     previous: datetime | None = None
 
     async for nodes in _walk_pages(
-        entity, http, log, after_ts, through, ascending=ascending
+        entity, http, log, after_ts, through
     ):
         for node in nodes:
             yield node

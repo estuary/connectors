@@ -43,8 +43,7 @@ different consequence per stream, and it affects how you should interpret captur
 
 ## Rate limits
 
-Linear meters two independent hourly budgets per user. Requests, not complexity, is normally
-the binding constraint:
+Linear meters two independent hourly budgets per user:
 
 | Budget         | Limit                                 |
 | -------------- | ------------------------------------- |
@@ -52,10 +51,11 @@ the binding constraint:
 | Complexity     | 3,000,000 points per hour             |
 | Single query   | 10,000 points (hard cap)              |
 
-The connector reads the remaining request budget from every response and pauses until the
-window resets before the budget is exhausted, so a healthy capture should never be
-rate-limited. Reducing binding `interval`s across many bindings increases request consumption
-proportionally.
+Either can bind first, because complexity is charged per record returned rather than per
+request: workspaces whose records carry many populated relations spend complexity faster than
+requests. The connector reads both budgets from every response and pauses until the relevant
+window resets, so a healthy capture should not be rate-limited. Reducing binding `interval`s
+across many bindings increases consumption of both budgets proportionally.
 
 ## Prerequisites
 
