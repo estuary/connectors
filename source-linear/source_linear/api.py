@@ -218,7 +218,7 @@ async def _execute(
     return nodes, remainder.page_info(entity.root_field)
 
 
-async def _walk(
+async def _walk_pages(
     entity: type[LinearResource],
     http: HTTPSession,
     log: Logger,
@@ -227,11 +227,11 @@ async def _walk(
     *,
     ascending: bool = True,
     archival: bool = False,
-) -> AsyncGenerator[LinearResource, None]:
-    """Yield every row in `(after_ts, through]`, following `pageInfo.endCursor`.
+) -> AsyncGenerator[list[LinearResource], None]:
+    """Yield `(after_ts, through]` one page at a time, following `pageInfo.endCursor`.
 
-    The Relay cursor is used only within one walk and is never checkpointed; durable
-    position is always a timestamp.
+    Exposes page boundaries so a caller can checkpoint between them. The Relay cursor is
+    used only within one walk and is never checkpointed; durable position is a timestamp.
     """
     after: str | None = None
 
@@ -249,13 +249,30 @@ async def _walk(
         )
         nodes, page_info = await _execute(entity, http, log, query, variables)
 
-        for node in nodes:
-            yield node
+        yield nodes
 
         if not page_info.hasNextPage or not page_info.endCursor:
             return
 
         after = page_info.endCursor
+
+
+async def _walk(
+    entity: type[LinearResource],
+    http: HTTPSession,
+    log: Logger,
+    after_ts: datetime,
+    through: datetime,
+    *,
+    ascending: bool = True,
+    archival: bool = False,
+) -> AsyncGenerator[LinearResource, None]:
+    """Yield every row in `(after_ts, through]`."""
+    async for nodes in _walk_pages(
+        entity, http, log, after_ts, through, ascending=ascending, archival=archival
+    ):
+        for node in nodes:
+            yield node
 
 
 async def _fetch_changes(
@@ -358,11 +375,12 @@ async def _backfill(
     page: PageCursor,
     cutoff: LogCursor,
 ) -> AsyncGenerator[LinearResource | PageCursor, None]:
-    """Emit historical rows below the cutoff, checkpointing a timestamp watermark.
+    """Emit historical rows below the cutoff, checkpointing a timestamp watermark per page.
 
-    Guarantees resumption is deletion-proof: the checkpoint is the cursor value last
-    drained, not a positional offset, so a row removed mid-backfill renumbers nothing and
-    no untouched row can be skipped.
+    Guarantees the checkpoint never lands inside a tie group, and that resumption is
+    deletion-proof: it resumes by cursor value rather than by position, so a row deleted
+    mid-backfill renumbers nothing and cannot displace an untouched row past the resume
+    point.
 
                   start_date                   cutoff-1ms      cutoff
     ─────────────────┼──────────────────────────────┼────────────┼──▶ time
@@ -375,42 +393,52 @@ async def _backfill(
                      │                              └─ last backfilled tick
                      └─ start of history; boundary instant is not load-bearing
 
-    The watermark advances only when a page's cursor value strictly moves, so a tie group
-    wider than one page is drained within a single invocation rather than re-read forever.
-    Archived rows need no special handling: `includeArchived` is always set and an archived
-    row keeps the `updatedAt` of its last real edit, so the ordinary filter reaches it.
+    The walk consumes the window from whichever end it can sort from, so the resume value
+    bounds that end: an ascending walk raises `gt`, a descending one lowers `lte`.
+    Archived rows need no special handling — `includeArchived` is always set and an
+    archived row keeps the `updatedAt` of its last real edit.
     """
     assert isinstance(cutoff, datetime)
 
     # Backfill owns everything strictly below the cutoff; incremental owns the cutoff tick
     # onward, so the two meet with no gap and no overlap.
-    through = floor_to_tick(cutoff) - TICK
-
-    # Ascending streams resume forwards from the last drained value. Labels cannot sort, so
-    # its walk is descending and it simply restarts from `start_date`; label populations are
-    # small enough (tens to low hundreds) to drain in one page.
+    backfill_end = floor_to_tick(cutoff) - TICK
     ascending = entity.supports_sort
-    after_ts = start_date
-    if ascending and isinstance(page, str):
-        after_ts = datetime.fromisoformat(page)
+    resume = datetime.fromisoformat(page) if isinstance(page, str) else None
+
+    after_ts = resume if (ascending and resume is not None) else start_date
+    through = (resume - TICK) if (not ascending and resume is not None) else backfill_end
 
     if after_ts >= through:
         return
 
-    watermark = after_ts
-    advanced = False
+    # A cursor value is only safe to resume from once a DIFFERENT value has been seen:
+    # ordering then proves every row sharing it was already emitted. Checkpointing the
+    # last-seen value instead would split a tie group and permanently drop its remainder,
+    # and Linear ties are common — a bulk edit stamps one timestamp across every row it
+    # touches. A page that holds a single value therefore checkpoints nothing and the walk
+    # continues, so a tie group wider than one page cannot stall it.
+    boundary: datetime | None = None
+    previous: datetime | None = None
 
-    async for node in _walk(entity, http, log, after_ts, through, ascending=ascending):
-        yield node
+    async for nodes in _walk_pages(
+        entity, http, log, after_ts, through, ascending=ascending
+    ):
+        for node in nodes:
+            yield node
 
-        if ascending and node.get_cursor() > watermark:
-            watermark = node.get_cursor()
-            advanced = True
+            current = node.get_cursor()
+            if previous is not None and current != previous:
+                boundary = previous
+            previous = current
 
-    # Yielding a watermark asserts everything at or below it is captured, so it is only
-    # emitted once the walk has drained. Returning without one ends the backfill.
-    if advanced:
-        yield watermark.isoformat()
+        if boundary is not None:
+            yield boundary.isoformat()
+            return
+
+    # Falling out of the loop means the window drained, so the backfill is complete.
+    # Returning without a cursor ends it; checkpointing here would only buy one more
+    # invocation that observes an empty window.
 
 
 # The CDK's fetch contracts bind these by name, one public pair per stream over the shared
