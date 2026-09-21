@@ -1,0 +1,45 @@
+info:
+  name: B4 - Create a snippet
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{base_url}}/v1/snippets"
+  body:
+    type: json
+    json: |-
+      {
+        "name": "estuary_probe_snippet",
+        "value": "<strong>Estuary connector probe</strong><br/>Safe to delete."
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **ONLY THE USER RUNS THIS REQUEST. The assistant never runs it**
+    (`API-NEVER-MUTATE`).
+
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Snippets/operation/createSnippet
+
+    **WHY:** `Snapshots / snippets` returned `[]`. The one thing worth
+    confirming live is that a snippet really has **no `id`** — the plan keys
+    this stream's identity on `name`, on the strength of the spec and of the
+    `DELETE /v1/snippets/{snippet_name}` route, and a single created row
+    settles it.
+
+    Only `name` and `value` are accepted; `updated_at` appears in responses
+    only.
+
+    **After running,** re-run `Snapshots / snippets` and save the response as
+    a second example.
+
+    **Cleanup:** `DELETE /v1/snippets/estuary_probe_snippet`.
+
+    **Outcome:** not yet run.

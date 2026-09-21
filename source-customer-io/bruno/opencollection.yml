@@ -1,0 +1,221 @@
+opencollection: 1.0.0
+
+info:
+  name: Customer.io
+
+request:
+  scripts:
+    - type: before-request
+      code: |-
+        // Customer.io App API auth via the connector's sops-encrypted config.yaml.
+        // The key is re-derived from sops on every request and lives only on `req` —
+        // it is never persisted to a var or env file. Requires the developer JS sandbox:
+        //   CLI: `bru run <request>.yml --env CustomerIO --sandbox developer`
+        //   GUI: jsSandboxMode "developer" in ~/.config/bruno/collection-security.json
+        const { execFileSync } = require('child_process');
+        const path = require('path');
+        const configured = bru.getEnvVar('config_path');
+        if (!configured) throw new Error('config_path env var is not set');
+        // Resolve relative to the collection root, not the process cwd — the GUI's
+        // cwd is wherever Bruno was launched from, only the CLI runs from bruno/.
+        const configPath = path.isAbsolute(configured)
+          ? configured
+          : path.resolve(bru.cwd(), configured);
+        const decrypted = execFileSync(
+          'sops', ['-d', '--output-type=json', configPath], { encoding: 'utf8' },
+        );
+        // Raw `sops -d` keeps the `_sops` encrypted-suffix on key names (the platform
+        // strips it at runtime, sops itself does not) — accept both spellings.
+        const creds = JSON.parse(decrypted)?.credentials;
+        const token = creds?.access_token ?? creds?.access_token_sops;
+        if (!token) {
+          throw new Error('credentials.access_token(_sops) missing from decrypted config');
+        }
+
+        // The App API Key is a Bearer token. The region determines the host; this
+        // collection's environment pins the US base URL because the sandbox account
+        // is US. An EU account needs base_url = https://api-eu.customer.io — the
+        // wrong host returns 401, not a redirect (see `api.py`'s REGION_BASE_URLS).
+        req.setHeader('Authorization', `Bearer ${token}`);
+    - type: after-response
+      code: |-
+        // Redact recipient PII from responses so any Response Example saved from a run
+        // is already clean — no manual edit step, and no mailbox addresses land in the
+        // public estuary/connectors repo. Deliberately MINIMAL: this also hides these
+        // fields from live `bru run` output, and no finding in this collection depends
+        // on them (every finding keys off `id`, `created`, `metrics`, `deduplicate_id`
+        // and `next`). When the `messages` stream gains snapshot tests, keep this list
+        // covering that test's REDACTED_FIELDS, with the same "REDACTED" marker.
+        const REDACTED_FIELDS = ['recipient', 'email'];
+        function redact(v) {
+          if (Array.isArray(v)) return v.map(redact);
+          if (v && typeof v === 'object') {
+            const o = {};
+            for (const k of Object.keys(v)) {
+              o[k] = REDACTED_FIELDS.includes(k) ? 'REDACTED' : redact(v[k]);
+            }
+            return o;
+          }
+          return v;
+        }
+        const body = res.getBody();
+        // Only touch JSON object/array bodies; leave throttle errors and empty bodies
+        // alone — never parse a 429 body as JSON.
+        if (body && typeof body === 'object') res.setBody(redact(body));
+
+docs:
+  content: |-
+    ## API constraints (account-wide)
+
+    Facts that hold for the whole Customer.io App API, not any single endpoint.
+    This block is the collection root, so it is the first thing read when
+    surveying the API — treat it as the canonical home for cross-cutting limits.
+
+    - **Base URL (region-dependent):** `https://api.customer.io` (US) /
+      `https://api-eu.customer.io` (EU). The region is **not** derivable from the
+      App API Key and requests are not routed across regions — the wrong host
+      returns 401, indistinguishable from a bad key. The connector takes it from
+      config (`api.py`'s `REGION_BASE_URLS` / `base_url`). Endpoint paths carry a
+      `/v1/` prefix that is not part of the base URL.
+    - **Auth:** App API Key as `Authorization: Bearer <key>`. No OAuth exists for
+      this API. App API Keys are distinct from Track API and Pipelines API
+      credentials and are shown only once at creation.
+    - **Rate limit:** 10 requests/second for most App API endpoints —
+      DOCUMENTED (2026-09-10),
+      https://docs.customer.io/integrations/api/app/ ("Rate Limits": "Most
+      endpoints on this page are limited to 10 requests per second.").
+      Tighter buckets, both on endpoints this connector does not read:
+      - `POST /v1/campaigns/{id}/triggers` (API-triggered broadcast): 1 req / 10 s.
+      - `POST /v1/send/*` (transactional): soft 3000 req / 3 s, not strictly enforced.
+      Well above the 20 req/hr floor in `API-BUDGET-20RPH`, so preview/discover/
+      pytest runs need no per-run consent on budget grounds.
+    - **Throttling (429):** carries `Retry-After` in **seconds**. Honor it.
+    - **Additive schema policy:** Customer.io adds fields to existing endpoints
+      without advance notice and explicitly asks integrators not to reject unknown
+      keys — DOCUMENTED (2026-09-10), same page, "We may add to these APIs":
+      "Build your integration to ignore fields it doesn't recognize. If you
+      validate responses against a schema, make sure the schema accepts unknown
+      keys." Consequence: never set `additionalProperties: false`; prefer schema
+      inference and `extra="allow"` models.
+    - **OpenAPI spec:** https://docs.customer.io/files/journeys-app.json
+      (OpenAPI 3.1.0, ~12 MB). Richer than the rendered docs — the rendered page
+      truncates the `type` and `metric` enums. The spec is **not** authoritative
+      about response envelopes: it omits `next` from the `GET /v1/messages` 200
+      schema even though the field is always returned (see
+      `Messages / bare`).
+
+    ## Docs conventions
+
+    Request docs follow the `bruno-probe-endpoint` skill's conventions: a
+    `**WHY:**` opener plus dated, classified findings (`**VERIFIED
+    (YYYY-MM-DD):**` / `**PENDING:**` / `**UNOBSERVABLE:**` /
+    `**DOCUMENTED (YYYY-MM-DD):**` for doc-sourced facts), with `**LIMITATION**`
+    marking endpoint-specific constraints that carry connector consequences. The
+    conventions themselves live in the skill; this file only indexes what is here.
+
+    ### Per-endpoint limitations
+
+    - `Messages / bare` — terminal page is `next: ""` (empty string), never null
+      and never an absent key; a `while next is not None` loop never terminates.
+    - `Messages / page walk continued` — the `start` token is **not opaque**: it
+      base64-decodes to `v20:<offset>`, a positional offset. An out-of-range
+      offset is **silently ignored** and the walk restarts at page 1 (no error);
+      a malformed token 400s. Never checkpoint this token.
+    - `Messages / six month clamp` — `/v1/messages` clamps any requested window to
+      6 months, and defaults to the most recent 6 months when `start_ts`/`end_ts`
+      are omitted. An over-wide window is accepted with a 200, never rejected, so
+      the connector must clamp and warn itself. Sibling per-parent variants clamp
+      to 12 months instead.
+    - `Messages / limit over max` — `limit=1001` is accepted with a 200, not
+      rejected; the connector must enforce the 1000 ceiling itself.
+    - `Messages / start_ts boundary`, `Messages / end_ts boundary` — **both bounds
+      are inclusive** (each confirmed with a negative control), and both filter on
+      delivery **creation** time only, never on send or engagement time.
+    - `Messages / drafts partition` — `drafts` is a partition switch, not an
+      include flag: the default response excludes drafted deliveries entirely.
+    - `Messages / tracked responses` — `get_tracked_responses` defaults to false
+      and suppresses the `tracked_responses` field; the key is absent rather than
+      null when empty.
+    - `Messages / by id` — `deduplicate_id`'s suffix advances to track
+      `max(metrics.values())` as engagement lands; it is a de-facto `updated_at`,
+      but no query parameter filters on it.
+    - `Messages Per Parent / newsletter` — the per-parent `*/messages` endpoints
+      are filtered views over the same delivery corpus `/v1/messages` returns.
+    - `Messages Per Parent / customer` — `/v1/customers/{id}/messages` **omits
+      `next` entirely** rather than returning `""`. Three terminal conventions
+      exist across the family; test falsiness, not `is not None`.
+
+    ### Cluster B — the unfiltered list endpoints (`Snapshots/`)
+
+    - **Empty state is not uniform.** `Snapshots / collections`,
+      `Snapshots / exports` and `Snapshots / reporting_webhooks` return the
+      item array as JSON **`null`**; the other nine Cluster B endpoints return
+      `[]`. The OpenAPI spec declares `type: "array"` — not nullable — for all
+      of them. A pydantic field written `items: list[T] = []` raises
+      `ValidationError` on `null`, because a default applies only to an absent
+      key. Model every envelope's item list as `list[T] | None = None` and
+      normalise at the read site. Which handler returns which is a provider
+      serializer artifact, not a contract; do not special-case the three.
+    - **Envelope keys are not derivable from the path.** `/v1/transactional`
+      returns `messages` (colliding by name with `/v1/messages`, which carries
+      a completely different document), `/v1/object_types` returns `types`,
+      `/v1/subscription_topics` returns `topics`,
+      `/v1/subscription_channels` returns `channels`. The other eight match
+      their path segment.
+    - **`limit` / `start` / `sort` are silently ignored** on these endpoints
+      — established on `/v1/segments` with 9 rows (`Snapshots / segments limit
+      ignored`) against a positive control on `/v1/newsletters`
+      (`Snapshots / newsletters positive control`). No response carries
+      `next`, `total` or `has_more`. Send no query parameters.
+    - **Timestamp field names differ within the cluster.** `segments`,
+      `transactional`, `collections`, `snippets` and `exports` use
+      `created_at`/`updated_at`; `campaigns` and `broadcasts` use bare
+      `created`/`updated`; `object_types`, `subscription_topics`,
+      `subscription_channels`, `reporting_webhooks` and `workspaces` carry no
+      timestamps at all. `deduplicate_id` is likewise present on only five of
+      the twelve.
+    - **No endpoint in this cluster accepts a time filter**, which is what
+      forces the snapshot strategy: `updated`/`updated_at` exist on the
+      documents but nothing filters on them.
+    - `Snapshots / newsletters positive control` — `/v1/newsletters` returns
+      `next` **non-empty even when the walk is exhausted**, and its token
+      base64-decodes to a bare positional offset (`1`), not the `v20:<n>` form
+      `/v1/messages` uses. Following it once yields `{"newsletters": [],
+      "next": ""}` and terminates. Tokens are per-endpoint; never reuse one
+      across endpoints.
+    - `Snapshots / workspaces` — every field except `id` and `name` is a live
+      counter, so a snapshot binding's digest changes on most polls and the
+      single row is re-emitted indefinitely.
+
+    ### Probe authorization
+
+    The live runs recorded here — Cluster A's 18 GETs and Cluster B's 16 — were
+    all made on **2026-09-14 under explicit user authorization**, not under a
+    satisfied `API-CONFIG-GATE`. `config.yaml` is
+    untracked (the connector is new and nothing has been committed), so the
+    rule's "tracked, with empty porcelain" precondition cannot be met. The user
+    authorized the specific set of read-only GETs in this collection; that
+    authorization did **not** extend to `Seeding/`, which remains unrun in
+    full — `A1`-`A2` and `B3`-`B8` alike.
+
+    ## Format
+
+    This collection is stored in Bruno's OpenCollection YAML format
+    (`opencollection.yml` + one `.yml` per request) — it requires Bruno / bru
+    CLI >= 3.0.0. Run requests with:
+    `bru run <request>.yml --env CustomerIO --sandbox developer`
+    (the developer sandbox is required by the sops pre-request script above).
+
+    ## Redaction
+
+    The `after-response` script above redacts `recipient` and `email` from every
+    response so saved examples carry no mailbox addresses into the public repo.
+    The list is deliberately minimal — it also hides those fields from live
+    `bru run` output, and no finding here depends on them.
+  type: text/markdown
+bundled: false
+extensions:
+  bruno:
+    ignore:
+      - node_modules
+      - .git

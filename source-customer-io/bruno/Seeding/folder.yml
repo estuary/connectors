@@ -1,0 +1,81 @@
+info:
+  name: Seeding
+  type: folder
+  seq: 9
+
+docs:
+  content: |-
+    **Nothing in this folder has been run, and the assistant never runs any of
+    it** (`API-NEVER-MUTATE`). Each request is authored so the user can run it
+    deliberately, one at a time, and then re-run the matching read probe.
+
+    `A*` requests seed Cluster A (`messages`). `B*` requests seed Cluster B —
+    the snapshot streams.
+
+    **`B1`, `B2`, `B6` and `B7` have no request file** — the objects they seed
+    have no POST route in the App API and can only be created in the UI. They
+    are click-paths, below, and they keep their letters so the B-sequence reads
+    in one order whether a step is a request or a click-path. `info.seq` stays
+    contiguous across the files that do exist.
+
+    ## Cluster B objects that have no API route at all
+
+    Four Cluster B endpoints are read-only in the App API: there is no POST for
+    automations, API-triggered broadcasts, subscription topics/channels, or
+    object types. They can only be created in the Customer.io UI. Click-paths
+    below are current as of the 2026-07-15 navigation rename
+    (https://docs.customer.io/release-notes/2026-07-15-navigation-terminology/),
+    which renamed Campaigns to **Automations**, People to **Profiles**,
+    Newsletters to **One-time sends**, and Deliveries & drafts to **Message
+    activity**. **The API names did not change** — `/v1/campaigns` still backs
+    Automations, `/v1/newsletters` still backs One-time sends.
+
+    ### B1 — an automation, for `GET /v1/campaigns`
+
+    1. Left nav > **Automations** > **Create Automation**.
+    2. Pick trigger **Segment** ("People enter a segment") and choose the
+       existing sample segment **All Users**.
+    3. Add one **Email** action; any subject and body will do.
+    4. Name it `estuary_probe_automation` and **Save as draft** — do *not*
+       activate it. A draft is enough: `GET /v1/campaigns` lists automations in
+       `state: "draft"`, and a draft cannot send anything to the two real
+       profiles in the workspace.
+    5. Re-run `Snapshots / campaigns`.
+
+    Highest-value seed in Cluster B by a distance: `campaigns` is the only
+    endpoint whose *document* the OpenAPI spec cannot pin down (a `oneOf` over
+    seven trigger variants), so it is the only one where live data tells us
+    something the spec does not. A **Segment**-triggered automation exercises
+    the variant carrying `trigger_segment_ids`.
+
+    ### B2 — an API-triggered broadcast, for `GET /v1/broadcasts`
+
+    1. Left nav > **Broadcasts** > **Messages triggered by API**.
+    2. **Create Broadcast**; add one **Email** action.
+    3. Name it `estuary_probe_broadcast` and save. **Do not trigger it** —
+       listing does not require it to have run, and triggering sends real mail.
+    4. Re-run `Snapshots / broadcasts`.
+
+    ### B6 — an object type, for `GET /v1/object_types`
+
+    1. **Settings** > **Workspace Settings** > **Custom Objects**.
+    2. **Create Custom Object**; name it `estuary_probe_object`, singular form
+       `Probe Object`.
+    3. Re-run `Snapshots / object_types`.
+
+    Worth doing mainly to confirm the documented **string** `id` — every other
+    id in Cluster B is an integer, and that is the sort of detail this API has
+    already been observed to get wrong in its own spec.
+
+    ### B7 — a subscription topic and channel, for `GET
+    /v1/subscription_topics` and `GET /v1/subscription_channels`
+
+    1. **Settings** > **Workspace Settings** > **Subscription Center** >
+       **Subscriptions** tab.
+    2. **Add Topic**: name `Estuary probe topic`, any description, leave
+       "subscribed by default" **On**.
+    3. **Add Channel**: name `Estuary probe channel`.
+    4. Re-run `Snapshots / subscription_topics` and
+       `Snapshots / subscription_channels`.
+
+    Two endpoints closed by one settings page — the cheapest seed here.

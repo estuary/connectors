@@ -1,0 +1,61 @@
+info:
+  name: snippets
+  type: http
+  seq: 6
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/snippets"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Snippets/operation/listSnippets
+
+    **WHY:** Establishes envelope key and shape, and settles what a snippet is
+    keyed on — it is the one Cluster B object with no `id`.
+
+    **VERIFIED (2026-09-14):** 200, envelope key `snippets`, value `[]`.
+
+        **VERIFIED (2026-09-14):** No pagination field of any kind in the response —
+        no `next`, no `total`, no `has_more`. The array is the whole result set.
+        See `segments limit ignored` for the negative control and
+        `newsletters positive control` for the contrast.
+
+    **UNOBSERVABLE (2026-09-14):** No snippets exist in the sandbox. Shape below is
+    DOCUMENTED. `Seeding/B4` is an authored (unrun) `POST /v1/snippets`.
+
+    **DOCUMENTED (2026-09-14):** A snippet object carries only `name`, `value` and
+    `updated_at` (unix int). **There is no `id`** — the sibling route is
+    `DELETE /v1/snippets/{snippet_name}`, confirming `name` is the provider's
+    identity for the object. `value` is the snippet's raw template body and can
+    be arbitrarily large HTML/Liquid.
+
+    **LIMITATION:** `name` is user-editable, so it is an unstable natural key: a
+    rename presents as a delete plus an insert. This is harmless under the
+    snapshot strategy — snapshot bindings key on `/_meta/row_id` and infer the
+    deletion — but it rules out ever promoting this stream to a keyed incremental
+    one without a provider-side id.
+examples:
+  - name: 200 - empty array (sandbox has no snippets)
+    request:
+      url: "https://api.customer.io/v1/snippets"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "snippets": []
+          }

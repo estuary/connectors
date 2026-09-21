@@ -1,0 +1,67 @@
+info:
+  name: object_types
+  type: http
+  seq: 8
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/object_types"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Objects/operation/getObjectTypes
+
+    **WHY:** Establishes the envelope key — which is the surprise here — and the
+    shape of the dimension that decodes `object_type_id` elsewhere in the API.
+
+    **VERIFIED (2026-09-14):** 200, **envelope key is `types`**, not
+    `object_types`. Third envelope key in this cluster that cannot be derived from
+    the endpoint path (`transactional` -> `messages`, `subscription_topics` ->
+    `topics`, `object_types` -> `types`).
+
+        **VERIFIED (2026-09-14):** No pagination field of any kind in the response —
+        no `next`, no `total`, no `has_more`. The array is the whole result set.
+        See `segments limit ignored` for the negative control and
+        `newsletters positive control` for the contrast.
+
+    **VERIFIED (2026-09-14):** `GET /v1/workspaces` reports `object_types: 0` and
+    `objects: 0` for this workspace, independently corroborating that the empty
+    array is a genuinely empty workspace rather than a permissions or plan issue.
+
+    **UNOBSERVABLE (2026-09-14):** Shape below is DOCUMENTED. `Seeding/B6` carries
+    the UI click-path — there is **no POST route** for object types, so this one
+    cannot be seeded from the API at all.
+
+    **DOCUMENTED (2026-09-14):** An object type carries `id` (**string**, unlike every
+    other id in this cluster, which are ints), `name`, `singular_name`, `slug`,
+    `singular_slug`, `icon`, `enabled` (bool). No timestamps of any kind — no
+    `created`, no `updated`, no `deduplicate_id`.
+
+    **Why it may still earn a binding:** `object_type_id` appears on campaign
+    objects, on `/v1/objects/{object_type_id}/{object_id}/attributes`, and inside
+    the `_o:<object_type_id>` / `_r:<object_type_id>` activity type codes. This
+    stream is the only thing that turns those ids into names.
+examples:
+  - name: 200 - empty array; envelope key is `types`
+    request:
+      url: "https://api.customer.io/v1/object_types"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "types": []
+          }

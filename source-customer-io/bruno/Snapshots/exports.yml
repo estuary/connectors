@@ -1,0 +1,66 @@
+info:
+  name: exports
+  type: http
+  seq: 7
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/exports"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Exports/operation/listExports
+
+    **WHY:** Establishes envelope key and empty-state representation, and informs
+    whether a job-status list deserves a binding at all.
+
+    **VERIFIED (2026-09-14):** 200 with body `{"exports": null}` — **`null`, not
+    `[]`**. Second of the three null-returning endpoints; see `collections` for
+    the full consequence and the required model shape.
+
+        **VERIFIED (2026-09-14):** No pagination field of any kind in the response —
+        no `next`, no `total`, no `has_more`. The array is the whole result set.
+        See `segments limit ignored` for the negative control and
+        `newsletters positive control` for the contrast.
+
+    **UNOBSERVABLE (2026-09-14):** No exports have ever been requested in this
+    workspace. Shape below is DOCUMENTED. `Seeding/B5` is an authored (unrun)
+    `POST /v1/exports/customers`.
+
+    **DOCUMENTED (2026-09-14):** An export object carries `id` (int), `type`,
+    `status`, `failed` (bool), `total` (int), `downloads` (int), `description`,
+    `user_id` (int), `user_email`, `deduplicate_id`, `created_at` (unix int),
+    `updated_at` (unix int).
+
+    **LIMITATION:** `user_email` is the email address of the Customer.io *account
+    user* who requested the export — internal staff PII, not customer data, and
+    it would land in the capture. Factor this into whether the stream is worth a
+    binding.
+
+    **LIMITATION:** Exports are transient job records that age out of the list.
+    Under a snapshot binding each expiry produces tombstones, so this stream
+    churns by design rather than accumulating a stable history.
+examples:
+  - name: 200 - null item array (no exports ever requested)
+    request:
+      url: "https://api.customer.io/v1/exports"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "exports": null
+          }

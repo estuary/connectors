@@ -1,0 +1,96 @@
+info:
+  name: newsletter
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/newsletters/{{newsletter_id}}/messages?limit=5"
+  params:
+    - name: limit
+      value: "5"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Newsletters/operation/listNewsletterMessages
+
+    **WHY:** Decides whether the five per-parent `*/messages` variants belong in
+    the `messages` cluster as a polymorphic extension, or are dropped. They share
+    `/v1/messages`' response envelope and query params, which is what made them
+    look like a natural parametrization — but sharing a shape is not a reason to
+    build a stream. The question this request answers is whether they return any
+    delivery that `/v1/messages` does not.
+
+    **DOCUMENTED (2026-09-10):** They do not. `/v1/messages` is the superset:
+    its response object "contains keys for all possible parents of the message
+    (`newsletter_id`, `broadcast_id`, etc)", and it accepts `campaign_id`,
+    `newsletter_id` and `action_id` as query filters directly. So
+    `/v1/campaigns/{id}/messages`, `/v1/newsletters/{id}/messages` and the
+    `action_id` view are exactly `/v1/messages` plus a filter the parent
+    endpoint already offers. Building them as separate streams would re-capture
+    the same deliveries under a second binding, multiplying API spend against a
+    10 req/s budget for zero new rows.
+
+    **LIMITATION (DOCUMENTED 2026-09-10):** Three genuine asymmetries, none of
+    which yields new deliveries:
+
+    - `/v1/messages` has **no** `broadcast_id` or `transactional_id` query
+      filter, so those two per-parent endpoints are the only *filtered* route to
+      those deliveries — but the deliveries themselves still appear in the
+      unfiltered `/v1/messages` sweep, carrying populated `broadcast_id` /
+      `transactional_message_id`. A downstream consumer filters on the column.
+    - The per-parent variants clamp to **12 months** where `/v1/messages` clamps
+      to 6 (see `Messages / six month clamp`). Deliveries between 6 and 12 months
+      old are reachable *only* through a per-parent endpoint. This is the one real
+      capability `/v1/messages` lacks, and it costs a parent-iterating child
+      stream to exploit.
+    - `/v1/broadcasts/{id}/messages` and `/v1/transactional/{id}/messages` add
+      a `state` param and `/v1/customers/{id}/messages` adds `id_type`;
+      `/v1/newsletters/{id}/messages` drops `type` and `drafts`. So the
+      params are *near*-identical, not identical — one parametrized fetch function
+      would need per-variant param sets anyway.
+
+    **VERIFIED (2026-09-14):** Confirmed. `/v1/newsletters/1/messages` returns
+    exactly the same two delivery documents, with the same ids, `created` and
+    `deduplicate_id` values, that `Messages / bare` returns — and the same
+    `next: ""` terminal. It is a filtered view, not a separate corpus. Zero new
+    rows, so building it as its own stream would double API spend for nothing.
+    See `plan.md` §8.
+
+examples:
+  - name: 200 - same two deliveries as Messages / bare (projection)
+    request:
+      url: "https://api.customer.io/v1/newsletters/1/messages?limit=5"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "messages": [
+              {
+                "id": "dgSKmQ4DAAIBAaCNESMVaO-6zjnpCeH1pQ==",
+                "created": 1789073105,
+                "deduplicate_id": "dgSKmQ4DAAIBAaCNESMVaO-6zjnpCeH1pQ==:1789073290"
+              },
+              {
+                "id": "dgSKmQ4DAAEAAaCNESMPgKzJ2JjWbxaoqw==",
+                "created": 1789073105,
+                "deduplicate_id": "dgSKmQ4DAAEAAaCNESMPgKzJ2JjWbxaoqw==:1789073112"
+              }
+            ],
+            "next": ""
+          }

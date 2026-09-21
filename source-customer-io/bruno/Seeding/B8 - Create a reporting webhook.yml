@@ -1,0 +1,48 @@
+info:
+  name: B8 - Create a reporting webhook
+  type: http
+  seq: 6
+
+http:
+  method: POST
+  url: "{{base_url}}/v1/reporting_webhooks"
+  body:
+    type: json
+    json: |-
+      {
+        "name": "estuary_probe_webhook",
+        "endpoint": "https://example.com/estuary-probe",
+        "events": ["email_sent", "email_delivered"],
+        "disabled": true
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **ONLY THE USER RUNS THIS REQUEST. The assistant never runs it**
+    (`API-NEVER-MUTATE`).
+
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Reporting-Webhooks/operation/createWebhook
+
+    **WHY:** `Snapshots / reporting_webhooks` returned
+    `{"reporting_webhooks": null}`. One webhook makes the document observable
+    and confirms whether the array flips to `[]` when non-empty.
+
+    `disabled: true` is deliberate — it registers the configuration without
+    Customer.io actually posting anything to the endpoint.
+
+    **Only run this if the stream is being kept.** The current recommendation
+    is to drop `reporting_webhooks` (§3 of the plan).
+
+    **After running,** re-run `Snapshots / reporting_webhooks` and save the
+    response.
+
+    **Cleanup:** `DELETE /v1/reporting_webhooks/{webhook_id}`.
+
+    **Outcome:** not yet run.

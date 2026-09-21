@@ -1,0 +1,17 @@
+variables:
+  - name: base_url
+    value: https://api.customer.io
+  - name: config_path
+    value: ../config.yaml
+  # Pinned from `Messages / bare`. `message_created` is that delivery's `created`
+  # value verbatim (unix seconds) — the boundary probes query it exactly.
+  - name: message_id
+    value: dgSKmQ4DAAIBAaCNESMVaO-6zjnpCeH1pQ==
+  - name: message_created
+    value: "1789073105"
+  # The sandbox's single one-time send (API `newsletter`, UI "Broadcasts >
+  # One-time sends" since the July 2026 rename).
+  - name: newsletter_id
+    value: "1"
+  - name: customer_id
+    value: example_person_1

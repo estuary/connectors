@@ -1,0 +1,109 @@
+info:
+  name: start_ts boundary
+  type: http
+  seq: 3
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/messages?limit=100&start_ts={{message_created}}"
+  params:
+    - name: limit
+      value: "100"
+      type: query
+    - name: start_ts
+      value: "{{message_created}}"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Messages/operation/listMessages
+
+    **WHY:** Pins the **inclusivity** of `start_ts` by querying it at a known
+    delivery's exact `created` second (pinned as `message_created` by
+    `Messages / bare`). If that delivery comes back, `start_ts` is inclusive
+    (`>=`); if it does not, exclusive (`>`). `FETCH-SERVER-SIDE-BOUNDARIES`
+    requires this be probed rather than assumed, because it decides whether the
+    connector's incremental window is `(cursor, horizon]` with
+    `start_ts = cursor + 1` or `start_ts = cursor`. Getting it wrong by one
+    second either drops a delivery or re-emits one every poll.
+
+    **LIMITATION (DOCUMENTED 2026-09-10):** `start_ts`/`end_ts` are unix
+    **seconds** and filter on the delivery's **creation** time only. Verbatim from
+    https://docs.customer.io/integrations/api/app/#tag/Messages/operation/listMessages: "Timestamps reflect when deliveries were created in our system, not
+    when they were actually sent to recipients. There may be a delay between
+    creation and sending." There is no filter of any kind on send time or on
+    engagement time, and no `updated`-style field is filterable. This is the
+    root cause of the connector's re-scan requirement: a high-watermark on
+    `created` advances past a delivery forever, while its `metrics` map keeps
+    accreting timestamps for weeks afterwards.
+
+    **VERIFIED (2026-09-14):** `start_ts` is **inclusive** — the filter selects
+    `created >= start_ts`.
+
+    | Query | Result |
+    |---|---|
+    | `start_ts = 1789073105` (exact `created`) | 2 deliveries returned |
+    | `start_ts = 1789073106` (`created + 1s`) | **0 deliveries** |
+
+    The negative control is what makes this conclusive: a server that ignored
+    `start_ts` would have returned both deliveries in both cases. It returned
+    none at `created + 1s`, so the parameter is genuinely applied and its bound
+    is inclusive.
+
+    Connector consequence: the incremental window `(cursor, horizon]` is sent as
+    `start_ts = cursor + 1s`, so the cursor second is not re-read. See
+    `plan.md` §5b.
+
+examples:
+  - name: 200 - start_ts at exact created (projection)
+    request:
+      url: "https://api.customer.io/v1/messages?limit=100&start_ts=1789073105"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "messages": [
+              {
+                "id": "dgSKmQ4DAAIBAaCNESMVaO-6zjnpCeH1pQ==",
+                "created": 1789073105,
+                "deduplicate_id": "dgSKmQ4DAAIBAaCNESMVaO-6zjnpCeH1pQ==:1789073290"
+              },
+              {
+                "id": "dgSKmQ4DAAEAAaCNESMPgKzJ2JjWbxaoqw==",
+                "created": 1789073105,
+                "deduplicate_id": "dgSKmQ4DAAEAAaCNESMPgKzJ2JjWbxaoqw==:1789073112"
+              }
+            ],
+            "next": ""
+          }
+  - name: 200 - negative control, start_ts = created + 1s (projection)
+    request:
+      url: "https://api.customer.io/v1/messages?limit=100&start_ts=1789073106"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "messages": [],
+            "next": ""
+          }

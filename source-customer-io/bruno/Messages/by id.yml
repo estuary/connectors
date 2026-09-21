@@ -1,0 +1,128 @@
+info:
+  name: by id
+  type: http
+  seq: 9
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/messages/{{message_id}}"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Messages/operation/getMessage
+
+    **WHY:** This is the instrument for the collection's most consequential open
+    question: **does `deduplicate_id` advance when a new metric lands on an
+    already-created delivery?** Single-delivery reads make the before/after
+    comparison exact, with no pagination or window semantics in the way.
+
+    If `deduplicate_id` does advance, it is a de-facto `updated_at` for
+    deliveries. That does **not** make incremental sync possible — there is no
+    filter on it, and `start_ts`/`end_ts` still only see creation time — but it
+    makes the connector's trailing re-scan far cheaper, because the re-scan can
+    compare `deduplicate_id` against the last emitted value and skip unchanged
+    deliveries instead of re-emitting them. It is also why the collection key
+    must be `/id` and **not** `/deduplicate_id`: keying on a value that changes
+    on every metric would turn each delivery into an unbounded stream of rows
+    rather than one reduced row.
+
+    Procedure (the `A`-group experiment):
+
+    1. Run this request. Record `message.deduplicate_id` and
+       `message.metrics` — save as example `200 - before engagement`.
+    2. Run `Seeding / A1 - Send tracked transactional email` (the user runs it,
+       never the assistant) and open + **click a link in** the resulting email, so
+       a `clicked` metric lands at a strictly later second than any existing
+       metric on that delivery.
+    3. Re-point `message_id` at that delivery and re-run this request. Save as
+       `200 - after engagement`.
+    4. Compare: did the `{id}:{timestamp}` suffix move to the new
+       `max(metrics.values())`?
+
+    **VERIFIED (2026-09-14):** Closed — and without needing `Seeding / A1` after
+    all. A click landed on the sandbox delivery at 1789073290, between the
+    2026-09-10 and 2026-09-14 reads, giving a genuine before/after on one
+    delivery id. `deduplicate_id`'s suffix advanced 1789073113 to 1789073290,
+    tracking the new `max(metrics.values())`. The full table is on
+    `Messages / bare`.
+
+    The 2026-09-14 read also shows the single-message endpoint and the list
+    endpoint agreeing exactly on `metrics` and `deduplicate_id` for the same
+    delivery, so the list endpoint is not serving a staler projection.
+
+    `Seeding / A1` and `A2` remain authored and unrun. They are no longer needed
+    for this finding; they stay useful for a multi-second-spread paging walk if
+    anyone wants to close `Messages / page walk`'s UNOBSERVABLE ordering key.
+
+    **DOCUMENTED (2026-09-10):** The OpenAPI spec's field description asserts
+    the same behavior — `deduplicate_id` is "an identifier in the format
+    `id:timestamp` [...] the timestamp is the last time the object was updated."
+    Docs and observation now agree.
+
+    Note the design does **not** depend on this: nothing in the fetch logic
+    branches on `deduplicate_id` (skipping unchanged rows would need unbounded
+    per-delivery state and would not save the API reads anyway). It is captured
+    as a field for downstream consumers. See `plan.md` §4.
+
+    **VERIFIED (2026-09-10):** Envelope here is `{"message": {...}}` — singular
+    key, unlike the list endpoint's `{"messages": [...], "next": ...}`.
+
+examples:
+  - name: 200 - single-message envelope, after engagement
+    request:
+      url: "https://api.customer.io/v1/messages/dgSKmQ4DAAIBAaCNESMVaO-6zjnpCeH1pQ=="
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "message": {
+              "id": "dgSKmQ4DAAIBAaCNESMVaO-6zjnpCeH1pQ==",
+              "deduplicate_id": "dgSKmQ4DAAIBAaCNESMVaO-6zjnpCeH1pQ==:1789073290",
+              "msg_template_id": 2,
+              "action_id": null,
+              "parent_action_id": null,
+              "transactional_message_id": null,
+              "customer_id": "example_person_1",
+              "customer_identifiers": {
+                "cio_id": "a1b2c3000001",
+                "email": "REDACTED",
+                "id": "example_person_1"
+              },
+              "trigger_event_id": null,
+              "recipient": "REDACTED",
+              "subject": "Testing Customer.io",
+              "metrics": {
+                "clicked": 1789073290,
+                "delivered": 1789073113,
+                "human_clicked": 1789073290,
+                "human_link:2": 1789073290,
+                "human_opened": 1789073290,
+                "link:2": 1789073290,
+                "opened": 1789073113,
+                "prefetch_opened": 1789073113,
+                "sent": 1789073107
+              },
+              "created": 1789073105,
+              "failure_message": null,
+              "newsletter_id": 1,
+              "content_id": 2,
+              "campaign_id": null,
+              "broadcast_id": null,
+              "type": "email",
+              "forgotten": false
+            }
+          }

@@ -70,6 +70,10 @@ jobs:
             type: capture
             version: v1
             usage_rate: "1.0"
+          - name: source-customer-io
+            type: capture
+            version: v1
+            usage_rate: "1.0"
           - name: source-gladly
             type: capture
             version: v1

@@ -1,0 +1,10 @@
+captures:
+  acmeCo/source-customer-io:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_customer_io
+        config: config.yaml
+    bindings: []

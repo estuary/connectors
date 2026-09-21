@@ -1,0 +1,454 @@
+info:
+  name: segments limit ignored
+  type: http
+  seq: 13
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/segments?limit=1&start=MTox&sort=desc"
+  params:
+    - name: limit
+      value: "1"
+      type: query
+    - name: start
+      value: "MTox"
+      type: query
+    - name: sort
+      value: "desc"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Segments/operation/listSegments
+
+    **WHY:** Negative control for the entire Cluster B grouping. `/v1/segments`
+    is the only Cluster B endpoint this sandbox populates with more than one
+    row, so it is the only place where "the paging parameters are ignored" can
+    be demonstrated rather than assumed from an empty array. Sends the three
+    parameters that the paginated endpoints in this API *do* accept (`limit`,
+    `start`, `sort` — see `/v1/newsletters` and `/v1/sender_identities`)
+    against an endpoint the OpenAPI spec declares parameterless.
+
+    **VERIFIED (2026-09-14):** All three parameters are **silently ignored**.
+    `limit=1` returned all **9** segments; `sort=desc` left them in ascending
+    id order 1..9; `start=MTox` (a well-formed continuation token for the
+    paginated endpoints) neither advanced nor errored. Status 200, response
+    byte-identical in structure to the bare `segments` request, and still no
+    `next` key.
+
+    Note the three-way contrast with `/v1/messages`, established by Cluster A:
+    there an over-max `limit` is accepted-and-clamped, and a malformed `start`
+    400s. Here the parameters do not exist at all.
+
+    **Consequence:** the Cluster B fetch function must send **no query
+    parameters**. Sending `limit` would be inert here but is a live hazard if
+    the endpoint ever gains pagination, because a silently-ignored `limit`
+    today would become a silently-truncating `limit` tomorrow.
+
+examples:
+  - name: 200 - all 9 segments despite limit=1
+    request:
+      url: "https://api.customer.io/v1/segments?limit=1&start=MTox&sort=desc"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "segments": [
+              {
+                "id": 1,
+                "deduplicate_id": "1:1789071557",
+                "name": "All Users",
+                "description": "Includes all the people in your workspace.",
+                "state": "finished",
+                "progress": null,
+                "type": "dynamic",
+                "tags": [
+                  "Sample"
+                ],
+                "conditions": {
+                  "and": [
+                    {
+                      "event": {
+                        "filters": {
+                          "and": [
+                            {
+                              "field": "to",
+                              "inverse": false,
+                              "operator": "exists",
+                              "value": ""
+                            },
+                            {
+                              "field": "from",
+                              "inverse": true,
+                              "operator": "exists",
+                              "value": ""
+                            }
+                          ]
+                        },
+                        "id": 1,
+                        "name": "cio_id",
+                        "type": "attribute_change"
+                      },
+                      "inverse": false,
+                      "times": 1,
+                      "within": 0
+                    }
+                  ]
+                },
+                "created_at": 1789071557,
+                "updated_at": 1789071557
+              },
+              {
+                "id": 2,
+                "deduplicate_id": "2:1789071557",
+                "name": "Have not logged in recently",
+                "description": "People who have been in Customer.io for at least 30 days, but have not viewed any pages in this time.",
+                "state": "finished",
+                "progress": null,
+                "type": "dynamic",
+                "tags": [
+                  "Sample"
+                ],
+                "conditions": {
+                  "and": [
+                    {
+                      "event": {
+                        "filters": {},
+                        "id": 1,
+                        "name": "*",
+                        "type": "page",
+                        "ui_type": ""
+                      },
+                      "inverse": true,
+                      "times": 1,
+                      "within": 2592000
+                    }
+                  ]
+                },
+                "created_at": 1789071557,
+                "updated_at": 1789071557
+              },
+              {
+                "id": 3,
+                "deduplicate_id": "3:1789071557",
+                "name": "Paying Customers",
+                "description": "People with the \"plan_name\" attribute set to \"premium\". Edit this segment to match your customer data!",
+                "state": "finished",
+                "progress": null,
+                "type": "dynamic",
+                "tags": [
+                  "Sample"
+                ],
+                "conditions": {
+                  "and": [
+                    {
+                      "event": {
+                        "filters": {
+                          "and": [
+                            {
+                              "field": "to",
+                              "inverse": false,
+                              "operator": "eq",
+                              "value": "premium"
+                            },
+                            {
+                              "field": "from",
+                              "inverse": true,
+                              "operator": "eq",
+                              "value": "premium"
+                            }
+                          ]
+                        },
+                        "id": 3,
+                        "name": "plan_name",
+                        "type": "attribute_change"
+                      },
+                      "inverse": false,
+                      "times": 1,
+                      "within": 0
+                    }
+                  ]
+                },
+                "created_at": 1789071557,
+                "updated_at": 1789071557
+              },
+              {
+                "id": 4,
+                "deduplicate_id": "4:1789071557",
+                "name": "Free Customers",
+                "description": "People with the \"plan_name\" attribute set to \"free\". Edit this segment to match your customer data!",
+                "state": "finished",
+                "progress": null,
+                "type": "dynamic",
+                "tags": [
+                  "Sample"
+                ],
+                "conditions": {
+                  "and": [
+                    {
+                      "event": {
+                        "filters": {
+                          "and": [
+                            {
+                              "field": "to",
+                              "inverse": false,
+                              "operator": "eq",
+                              "value": "free"
+                            },
+                            {
+                              "field": "from",
+                              "inverse": true,
+                              "operator": "eq",
+                              "value": "free"
+                            }
+                          ]
+                        },
+                        "id": 4,
+                        "name": "plan_name",
+                        "type": "attribute_change"
+                      },
+                      "inverse": false,
+                      "times": 1,
+                      "within": 0
+                    }
+                  ]
+                },
+                "created_at": 1789071557,
+                "updated_at": 1789071557
+              },
+              {
+                "id": 5,
+                "deduplicate_id": "5:1789071557",
+                "name": "Unsubscribed",
+                "description": "People who have unsubscribed from your messages. We don't send emails to unsubscribed customers, except for event-triggered campaigns.",
+                "state": "finished",
+                "progress": null,
+                "type": "dynamic",
+                "tags": [
+                  "Sample"
+                ],
+                "conditions": {
+                  "and": [
+                    {
+                      "event": {
+                        "filters": {
+                          "and": [
+                            {
+                              "field": "to",
+                              "inverse": false,
+                              "operator": "eq",
+                              "value": "true"
+                            },
+                            {
+                              "field": "from",
+                              "inverse": true,
+                              "operator": "eq",
+                              "value": "true"
+                            }
+                          ]
+                        },
+                        "id": 5,
+                        "name": "unsubscribed",
+                        "type": "attribute_change"
+                      },
+                      "inverse": false,
+                      "times": 1,
+                      "within": 0
+                    }
+                  ]
+                },
+                "created_at": 1789071557,
+                "updated_at": 1789071557
+              },
+              {
+                "id": 6,
+                "deduplicate_id": "6:1789071557",
+                "name": "Valid Email Address",
+                "description": "People with an RFC 5322 compliant email address.",
+                "state": "finished",
+                "progress": null,
+                "type": "dynamic",
+                "tags": [
+                  "Sample"
+                ],
+                "conditions": {
+                  "and": [
+                    {
+                      "event": {
+                        "filters": {
+                          "and": [
+                            {
+                              "field": "to",
+                              "inverse": false,
+                              "operator": "email_valid",
+                              "value": ""
+                            },
+                            {
+                              "field": "from",
+                              "inverse": true,
+                              "operator": "email_valid",
+                              "value": ""
+                            }
+                          ]
+                        },
+                        "id": 6,
+                        "name": "email",
+                        "type": "attribute_change"
+                      },
+                      "inverse": false,
+                      "times": 1,
+                      "within": 0
+                    }
+                  ]
+                },
+                "created_at": 1789071557,
+                "updated_at": 1789071557
+              },
+              {
+                "id": 7,
+                "deduplicate_id": "7:1789071557",
+                "name": "Invalid Email Address",
+                "description": "People without an RFC 5322 compliant email address.",
+                "state": "finished",
+                "progress": null,
+                "type": "dynamic",
+                "tags": [
+                  "Sample"
+                ],
+                "conditions": {
+                  "and": [
+                    {
+                      "event": {
+                        "filters": {
+                          "and": [
+                            {
+                              "field": "to",
+                              "inverse": true,
+                              "operator": "email_valid",
+                              "value": ""
+                            },
+                            {
+                              "field": "from",
+                              "inverse": false,
+                              "operator": "email_valid",
+                              "value": ""
+                            }
+                          ]
+                        },
+                        "id": 7,
+                        "name": "email",
+                        "type": "attribute_change"
+                      },
+                      "inverse": false,
+                      "times": 1,
+                      "within": 0
+                    }
+                  ]
+                },
+                "created_at": 1789071557,
+                "updated_at": 1789071557
+              },
+              {
+                "id": 8,
+                "deduplicate_id": "8:1789071557",
+                "name": "Have a Mobile Device",
+                "description": "People who have at least one mobile device registered.",
+                "state": "finished",
+                "progress": null,
+                "type": "dynamic",
+                "tags": [
+                  "Sample"
+                ],
+                "conditions": {
+                  "and": [
+                    {
+                      "event": {
+                        "filters": {
+                          "and": [
+                            {
+                              "field": "to",
+                              "inverse": false,
+                              "operator": "exists",
+                              "value": ""
+                            },
+                            {
+                              "field": "from",
+                              "inverse": true,
+                              "operator": "exists",
+                              "value": ""
+                            }
+                          ]
+                        },
+                        "id": 8,
+                        "name": "id",
+                        "type": "device_change"
+                      },
+                      "inverse": false,
+                      "times": 1,
+                      "within": 0
+                    }
+                  ]
+                },
+                "created_at": 1789071557,
+                "updated_at": 1789071557
+              },
+              {
+                "id": 9,
+                "deduplicate_id": "9:1789071557",
+                "name": "Doesn't have a Mobile Device",
+                "description": "People without any mobile devices registered.",
+                "state": "finished",
+                "progress": null,
+                "type": "dynamic",
+                "tags": [
+                  "Sample"
+                ],
+                "conditions": {
+                  "and": [
+                    {
+                      "event": {
+                        "filters": {
+                          "and": [
+                            {
+                              "field": "to",
+                              "inverse": true,
+                              "operator": "exists",
+                              "value": ""
+                            },
+                            {
+                              "field": "from",
+                              "inverse": false,
+                              "operator": "exists",
+                              "value": ""
+                            }
+                          ]
+                        },
+                        "id": 9,
+                        "name": "id",
+                        "type": "device_change"
+                      },
+                      "inverse": false,
+                      "times": 1,
+                      "within": 0
+                    }
+                  ]
+                },
+                "created_at": 1789071557,
+                "updated_at": 1789071557
+              }
+            ]
+          }

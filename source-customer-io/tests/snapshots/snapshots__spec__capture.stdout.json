@@ -1,0 +1,138 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$defs": {
+        "Advanced": {
+          "properties": {
+            "window_size": {
+              "default": "P1D",
+              "description": "Time window size for each backfill and incremental request, in ISO 8601 format. ex: P1D means 1 day, PT6H means 6 hours.",
+              "format": "duration",
+              "title": "Window size",
+              "type": "string"
+            },
+            "metrics_rescan_window": {
+              "default": "P7D",
+              "description": "How far behind the present to trail a second pass over deliveries, re-reading them once their engagement metrics have settled. Customer.io deliveries have no updated-at field and cannot be filtered by engagement time, so this trailing pass is the only way opens, clicks, bounces and unsubscribes recorded after a delivery was created are captured. Larger values catch more of the long tail at the cost of a longer delay before metrics are final.",
+              "format": "duration",
+              "title": "Metrics re-scan window",
+              "type": "string"
+            }
+          },
+          "title": "Advanced",
+          "type": "object"
+        },
+        "ApiKey": {
+          "properties": {
+            "credentials_title": {
+              "const": "App API Key",
+              "default": "App API Key",
+              "enum": [
+                "App API Key"
+              ],
+              "order": 0,
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "access_token": {
+              "description": "Your Customer.io App API Key, generated under Account Settings > API Credentials. Note that App API Keys are shown only once, and are distinct from Track API and Pipelines API credentials.",
+              "order": 1,
+              "secret": true,
+              "title": "App API Key",
+              "type": "string"
+            }
+          },
+          "required": [
+            "access_token"
+          ],
+          "title": "ApiKey",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "start_date": {
+          "description": "UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated. If left blank, the start date will be set to 30 days before the present.",
+          "format": "date-time",
+          "title": "Start Date",
+          "type": "string"
+        },
+        "region": {
+          "default": "us",
+          "description": "The Customer.io data region hosting your account, which determines the API base URL. Account Admins can find this under Settings > Account Settings > Data and Privacy. Using the wrong region returns a 401 that is indistinguishable from an invalid key.",
+          "enum": [
+            "us",
+            "eu"
+          ],
+          "title": "Region",
+          "type": "string"
+        },
+        "credentials": {
+          "discriminator": {
+            "mapping": {
+              "App API Key": "#/$defs/ApiKey"
+            },
+            "propertyName": "credentials_title"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ApiKey"
+            }
+          ],
+          "title": "Authentication"
+        },
+        "advanced": {
+          "$ref": "#/$defs/Advanced",
+          "advanced": true,
+          "description": "Advanced settings for the connector.",
+          "title": "Advanced Config"
+        }
+      },
+      "required": [
+        "credentials"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "description": "ResourceConfig is a common resource configuration shape.",
+      "properties": {
+        "_meta": {
+          "anyOf": [
+            {
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Meta"
+        },
+        "name": {
+          "description": "Name of this resource",
+          "title": "Name",
+          "type": "string"
+        },
+        "interval": {
+          "default": "PT0S",
+          "description": "Interval between updates for this resource",
+          "format": "duration",
+          "nonsensitive": true,
+          "title": "Interval",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ResourceConfig",
+      "type": "object"
+    },
+    "documentationUrl": "https://go.estuary.dev/source-customer-io",
+    "resourcePathPointers": [
+      "/name"
+    ]
+  }
+]

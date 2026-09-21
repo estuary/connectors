@@ -1,0 +1,85 @@
+info:
+  name: tracked responses
+  type: http
+  seq: 8
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/messages?limit=5&get_tracked_responses=true"
+  params:
+    - name: limit
+      value: "5"
+      type: query
+    - name: get_tracked_responses
+      value: "true"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Messages/operation/listMessages
+
+    **WHY:** The second defaulted parameter on this endpoint that suppresses data.
+    `get_tracked_responses` defaults to `false`, and when false the
+    `tracked_responses` field is omitted from every delivery. Unlike `drafts`
+    this is a genuine include flag (it adds a field rather than swapping the
+    population), so the connector can simply always send `true` — this request
+    establishes whether doing so is free.
+
+    **DOCUMENTED (2026-09-10):** From the OpenAPI spec: `get_tracked_responses`
+    — "If true, the response includes `tracked_responses` for each message—an
+    object containing tracked response option names for in-app survey responses."
+    Field description: "Tracked in-app survey responses, keyed by response option
+    name. Present only when `get_tracked_responses` is `true`."
+
+    **VERIFIED (2026-09-14):** Setting it `true` is **free and non-destructive**.
+    The response is identical to `Messages / bare`'s for these deliveries, and
+    `tracked_responses` is **absent from the item entirely** — not `null`, not
+    `{}` — when there are no survey responses. The item key set is unchanged.
+
+    Connector consequence: the connector may send `get_tracked_responses=true`
+    unconditionally to pick up in-app survey data where it exists, with no shape
+    change elsewhere. Because the key is absent rather than null, the field must
+    be **optional** on the document model; schema inference handles it.
+
+    **UNOBSERVABLE:** A *populated* `tracked_responses` object. It requires in-app
+    survey messaging, which this workspace does not have and which cannot be
+    seeded by an API call. We rely on the spec's description of the shape ("an
+    object containing tracked response option names"); since the field is
+    optional and inferred, a shape surprise cannot break the capture.
+
+examples:
+  - name: 200 - tracked_responses key absent for email deliveries (projection)
+    request:
+      url: "https://api.customer.io/v1/messages?limit=5&get_tracked_responses=true"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "messages": [
+              {
+                "id": "dgSKmQ4DAAIBAaCNESMVaO-6zjnpCeH1pQ==",
+                "created": 1789073105,
+                "deduplicate_id": "dgSKmQ4DAAIBAaCNESMVaO-6zjnpCeH1pQ==:1789073290"
+              },
+              {
+                "id": "dgSKmQ4DAAEAAaCNESMPgKzJ2JjWbxaoqw==",
+                "created": 1789073105,
+                "deduplicate_id": "dgSKmQ4DAAEAAaCNESMPgKzJ2JjWbxaoqw==:1789073112"
+              }
+            ],
+            "next": ""
+          }
