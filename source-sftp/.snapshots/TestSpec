@@ -14,6 +14,15 @@
       "multiline": true,
       "order": 1
     },
+    "skipHostKeyVerification": {
+      "type": "boolean",
+      "title": "Skip Host Key Verification",
+      "description": "Connect without verifying the SFTP server's host key.",
+      "default": false,
+      "order": 2,
+      "nonsensitive": true,
+      "x-hidden-field": true
+    },
     "credentials": {
       "type": "object",
       "discriminator": {

@@ -353,7 +353,8 @@ func TestHostKeyCallbackRevokedThroughCertificate(t *testing.T) {
 }
 
 // TestConfigValidateKnownHosts pins the wiring of the knownHosts field into config.Validate, which
-// is where a user first hears about a bad paste.
+// is where a user first hears about a bad paste. It also covers the Skip Host Key Verification
+// opt-out.
 func TestConfigValidateKnownHosts(t *testing.T) {
 	edKey, _ := newEd25519Key(t)
 	valid := config{
@@ -370,6 +371,15 @@ func TestConfigValidateKnownHosts(t *testing.T) {
 	cfg = valid
 	cfg.KnownHosts = "[myserver.com]:2222 " + keyLine(edKey) + "\nnot a host key"
 	require.ErrorContains(t, cfg.Validate(), "knownHosts line 2")
+
+	cfg = valid
+	cfg.SkipHostKeyVerification = true
+	require.NoError(t, cfg.Validate())
+
+	cfg = valid
+	cfg.SkipHostKeyVerification = true
+	cfg.KnownHosts = "[myserver.com]:2222 " + keyLine(edKey)
+	require.ErrorContains(t, cfg.Validate(), "not both")
 }
 
 func TestHostKeyAlgorithms(t *testing.T) {

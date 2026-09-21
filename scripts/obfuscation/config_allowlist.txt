@@ -159,6 +159,7 @@ ascendingKeys
 
 # --- connection behaviour (non-identifying) ---
 sslmode
+skipHostKeyVerification
 dictionary_mode
 api_version
 
