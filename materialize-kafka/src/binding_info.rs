@@ -32,10 +32,11 @@ pub async fn get_binding_info(
     bindings: &[Binding],
     message_format: &MessageFormat,
     schema_registry_config: Option<&SchemaRegistryConfig>,
+    avro_logical_types: bool,
 ) -> Result<Vec<BindingInfo>> {
     let computed = bindings
         .iter()
-        .map(binding_info)
+        .map(|binding| binding_info(binding, avro_logical_types))
         .collect::<Result<Vec<_>>>()?;
 
     if matches!(message_format, MessageFormat::JSON) {
@@ -76,9 +77,13 @@ pub async fn get_binding_info(
                     let mut key_and_sch = [0; 2];
                     for (idx, sch) in [key_schema, schema].iter().enumerate() {
                         // Parsing Canonical Form strips logicalType
-                        // annotations, so the schema is registered as
-                        // serialized.
-                        let schema_str = serde_json::to_string(sch)?;
+                        // annotations, so a schema carrying them is
+                        // registered as serialized.
+                        let schema_str = if avro_logical_types {
+                            serde_json::to_string(sch)?
+                        } else {
+                            sch.canonical_form()
+                        };
                         let subject = subject_for_schema(&binding.topic, &schema_str);
                         let schema_id = upsert_schema(
                             http.clone(),
@@ -174,7 +179,7 @@ struct ComputedBinding {
     field_names: Vec<String>,
 }
 
-fn binding_info(binding: &Binding) -> Result<ComputedBinding> {
+fn binding_info(binding: &Binding, avro_logical_types: bool) -> Result<ComputedBinding> {
     let field_selection = binding.field_selection.to_owned().unwrap();
     let mut fields: Vec<String> = field_selection
         .keys
@@ -212,8 +217,12 @@ fn binding_info(binding: &Binding) -> Result<ComputedBinding> {
     shape.object.properties = fields_sorted
         .iter()
         .map(|field| {
-            let (shape, is_required) =
-                field_to_shape(field, &collection_projections, &collection_locations);
+            let (shape, is_required) = field_to_shape(
+                field,
+                &collection_projections,
+                &collection_locations,
+                avro_logical_types,
+            );
 
             ObjProperty {
                 name: field.clone().into(),
@@ -254,6 +263,7 @@ fn field_to_shape(
     field: &str,
     collection_projections: &[Projection],
     collection_locations: &[(Pointer, bool, &Shape, doc::shape::location::Exists)],
+    avro_logical_types: bool,
 ) -> (Shape, bool) {
     let ptr = Pointer::from_str(field);
 
@@ -289,7 +299,7 @@ fn field_to_shape(
         if !inf.content_type.is_empty() {
             shape.string.content_encoding = Some(inf.content_type.clone().into());
         }
-        if !inf.format.is_empty() {
+        if avro_logical_types && !inf.format.is_empty() {
             shape.string.format =
                 serde_json::from_value(serde_json::Value::String(inf.format.clone()))
                     .expect("projection format must be a known JSON Schema format");

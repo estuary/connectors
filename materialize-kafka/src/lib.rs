@@ -3,10 +3,13 @@ use apply::do_apply;
 use bytes::BytesMut;
 use configuration::{schema_for, EndpointConfig, Resource};
 use prost::Message;
+use proto_flow::flow;
 use proto_flow::materialize::{
+    request,
     response::{Applied, Spec, Validated},
     Request, Response,
 };
+use state::ConnectorState;
 use std::io::{self, BufRead, BufReader, Read, StdoutLock, Write};
 use transactor::run_transactions;
 use validate::do_validate;
@@ -14,6 +17,7 @@ use validate::do_validate;
 pub mod apply;
 pub mod binding_info;
 pub mod configuration;
+pub mod state;
 pub mod transactor;
 pub mod validate;
 
@@ -44,10 +48,11 @@ pub async fn run_connector(mut input: Input, mut output: Output) -> Result<()> {
 
             output.send(res)?;
         } else if let Some(apply) = request.apply {
+            let state = decide_state(&apply)?;
             let res = Response {
                 applied: Some(Applied {
                     action_description: do_apply(apply).await?,
-                    state: None,
+                    state,
                 }),
                 ..Default::default()
             };
@@ -61,6 +66,25 @@ pub async fn run_connector(mut input: Input, mut output: Output) -> Result<()> {
     }
 
     Ok(())
+}
+
+// A task whose state has not yet decided how Avro schemas are registered
+// decides it now. A task with no previously applied spec is new and takes
+// logical types; any other task keeps the string encoding its topics already
+// carry.
+fn decide_state(apply: &request::Apply) -> Result<Option<flow::ConnectorState>> {
+    let state = ConnectorState::parse(&apply.state_json)?;
+    if state.avro_logical_types.is_some() {
+        return Ok(None);
+    }
+
+    let decided = ConnectorState {
+        avro_logical_types: Some(apply.last_materialization.is_none()),
+    };
+    Ok(Some(flow::ConnectorState {
+        updated_json: serde_json::to_vec(&decided)?.into(),
+        merge_patch: true,
+    }))
 }
 
 pub struct Input {
