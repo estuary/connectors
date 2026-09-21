@@ -75,14 +75,18 @@ pub async fn get_binding_info(
                 async move {
                     let mut key_and_sch = [0; 2];
                     for (idx, sch) in [key_schema, schema].iter().enumerate() {
-                        let subject = subject_for_schema(&binding.topic, &sch.canonical_form());
+                        // Parsing Canonical Form strips logicalType
+                        // annotations, so the schema is registered as
+                        // serialized.
+                        let schema_str = serde_json::to_string(sch)?;
+                        let subject = subject_for_schema(&binding.topic, &schema_str);
                         let schema_id = upsert_schema(
                             http.clone(),
                             &endpoint,
                             &username,
                             &password,
                             &subject,
-                            &sch.canonical_form(),
+                            &schema_str,
                         )
                         .await?;
 
