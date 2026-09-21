@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -48,8 +48,8 @@ type config struct {
 	User       string `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
 	Password   string `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
 	Database   string `json:"database" jsonschema:"title=Database,description=Name of the logical database to materialize to." jsonschema_extras:"order=3"`
-	Timezone   string `json:"timezone,omitempty" jsonschema:"title=Timezone,description=Timezone to use when materializing datetime columns. Should normally be left blank to use the database's 'time_zone' system variable. Only required if the 'time_zone' system variable cannot be read. Must be a valid IANA time zone name or +HH:MM offset. Takes precedence over the 'time_zone' system variable if both are set." jsonschema_extras:"order=4"`
-	HardDelete bool   `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=5"`
+	Timezone   string `json:"timezone,omitempty" jsonschema:"title=Timezone,description=Timezone to use when materializing datetime columns. Should normally be left blank to use the database's 'time_zone' system variable. Only required if the 'time_zone' system variable cannot be read. Must be a valid IANA time zone name or +HH:MM offset. Takes precedence over the 'time_zone' system variable if both are set." jsonschema_extras:"order=4,nonsensitive=true"`
+	HardDelete bool   `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=5,nonsensitive=true"`
 
 	DBTJobTrigger dbt.JobConfig `json:"dbt_job_trigger,omitempty" jsonschema:"title=dbt Cloud Job Trigger,description=Trigger a dbt Job when new data is available"`
 
@@ -65,8 +65,8 @@ type advancedConfig struct {
 	SSLClientCert string `json:"ssl_client_cert,omitempty" jsonschema:"title=SSL Client Certificate,description=Optional client certificate to use when connecting with custom SSL mode." jsonschema_extras:"secret=true,multiline=true"`
 	SSLClientKey  string `json:"ssl_client_key,omitempty" jsonschema:"title=SSL Client Key,description=Optional client key to use when connecting with custom SSL mode." jsonschema_extras:"secret=true,multiline=true"`
 
-	NoFlowDocument bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false"`
-	FeatureFlags   string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	NoFlowDocument bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false" jsonschema_extras:"nonsensitive=true"`
+	FeatureFlags   string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
 }
 
 func (c config) Validate() error {
@@ -216,7 +216,7 @@ func (c config) ToURI() string {
 type tableConfig struct {
 	Table         string `json:"table" jsonschema:"title=Table,description=Name of the database table" jsonschema_extras:"x-collection-name=true"`
 	AdditionalSql string `json:"additional_table_create_sql,omitempty" jsonschema:"title=Additional Table Create SQL,description=Additional SQL statement(s) to be run after the table is created." jsonschema_extras:"multiline=true"`
-	Delta         bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false." jsonschema_extras:"x-delta-updates=true"`
+	Delta         bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false." jsonschema_extras:"x-delta-updates=true,nonsensitive=true"`
 }
 
 func (r tableConfig) Validate() error {
@@ -234,7 +234,7 @@ func (r tableConfig) Parameters() ([]string, bool, error) {
 	return []string{translateFlowIdentifier(r.Table)}, r.Delta, nil
 }
 
-func newMysqlDriver() *sql.Driver[config, tableConfig] {
+func NewDriver() *sql.Driver[config, tableConfig] {
 	return &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-mysql",
 		StartTunnel: func(ctx context.Context, cfg config) error {
@@ -435,8 +435,10 @@ func (t *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSp
 	return t.store.fence.Checkpoint, nil
 }
 
-func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
-func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) { return nil, nil }
+func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
+	return nil, nil
+}
 
 func prepareNewTransactor(
 	templates templates,
@@ -525,6 +527,12 @@ type binding struct {
 
 	mustMerge  bool
 	mustDelete bool
+
+	// Per-round counts for the transaction health report: rows LOAD DATA
+	// inserted straight into the target, and rows staged for REPLACE.
+	hasData      bool
+	insertRows   int64
+	updateStaged int64
 }
 
 func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boilerplate.InfoSchema) error {
@@ -644,7 +652,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		if lastBinding != it.Binding {
 			var b = d.bindings[lastBinding]
 			// Drain the prior binding as naturally-ordered key groupings are cycled through.
-			if err := d.load.infile.drain(ctx, txn, b.loadLoadSQL); err != nil {
+			if _, err := d.load.infile.drain(ctx, txn, b.loadLoadSQL); err != nil {
 				return fmt.Errorf("load infile drain on %q: %w", b.target.Identifier, err)
 			}
 			lastBinding = it.Binding
@@ -680,7 +688,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			}
 		}
 
-		if err := d.load.infile.write(ctx, converted, txn, b.loadLoadSQL); err != nil {
+		if _, err := d.load.infile.write(ctx, converted, txn, b.loadLoadSQL); err != nil {
 			return fmt.Errorf("load writing to infile: %w", err)
 		}
 	}
@@ -691,7 +699,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	// Drain the final binding if we processed any loads.
 	if lastBinding != -1 {
 		var b = d.bindings[lastBinding]
-		if err := d.load.infile.drain(ctx, txn, b.loadLoadSQL); err != nil {
+		if _, err := d.load.infile.drain(ctx, txn, b.loadLoadSQL); err != nil {
 			return fmt.Errorf("load infile drain on %q: %w", b.target.Identifier, err)
 		}
 	}
@@ -755,15 +763,22 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	defer defuser.MaybeRollback()
 
 	drainBinding := func(b *binding) error {
-		if err := d.store.insertInfile.drain(ctx, txn, b.storeInsertSQL); err != nil {
+		n, err := d.store.insertInfile.drain(ctx, txn, b.storeInsertSQL)
+		if err != nil {
 			return fmt.Errorf("store writing to insert infile for %q: %w", b.target.Identifier, err)
-		} else if err := d.store.updateInfile.drain(ctx, txn, b.storeUpdateSQL); err != nil {
+		}
+		b.insertRows += n
+		if n, err = d.store.updateInfile.drain(ctx, txn, b.storeUpdateSQL); err != nil {
 			return fmt.Errorf("store writing to update infile for %q: %w", b.target.Identifier, err)
-		} else if err := d.store.deleteInfile.drain(ctx, txn, b.loadDeleteSQL); err != nil {
+		}
+		b.updateStaged += n
+		if _, err = d.store.deleteInfile.drain(ctx, txn, b.loadDeleteSQL); err != nil {
 			return fmt.Errorf("store writing to delete infile for %q: %w", b.target.Identifier, err)
 		}
 		return nil
 	}
+
+	round := it.Round
 
 	// The StoreIterator iterates over documents ordered by their binding, so we
 	// can keep track of the last binding that we have seen, and if we have moved
@@ -827,7 +842,9 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 		var inf *infile
 		var drainQuery string
+		var flushed *int64 // receives rows affected by a mid-store flush
 
+		b.hasData = true
 		if it.Delete && d.cfg.HardDelete {
 			b.mustDelete = true
 			inf = d.store.deleteInfile
@@ -836,13 +853,17 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			b.mustMerge = true
 			inf = d.store.updateInfile
 			drainQuery = b.storeUpdateSQL
+			flushed = &b.updateStaged
 		} else {
 			inf = d.store.insertInfile
 			drainQuery = b.storeInsertSQL
+			flushed = &b.insertRows
 		}
 
-		if err := inf.write(ctx, converted, txn, drainQuery); err != nil {
+		if n, err := inf.write(ctx, converted, txn, drainQuery); err != nil {
 			return nil, fmt.Errorf("store writing to infile for %q: %w", b.target.Identifier, err)
+		} else if flushed != nil {
+			*flushed += n
 		}
 	}
 
@@ -859,11 +880,20 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 		for _, b := range d.bindings {
 			d.be.StartedResourceCommit(b.target.Path)
+			// Target rows affected this round. LOAD DATA and DELETE report
+			// one per row; REPLACE reports 2 per replaced row and 1 per row
+			// that did not exist, so subtracting the staged rows leaves the
+			// rows that were actually updated. None of these counts depend
+			// on CLIENT_FOUND_ROWS (which the DSN sets regardless).
+			affected := b.insertRows
 			if b.mustDelete {
 				// Apply any deletions
-				if _, err := txn.ExecContext(ctx, b.deleteQuerySQL); err != nil {
+				if res, err := txn.ExecContext(ctx, b.deleteQuerySQL); err != nil {
 					return nil, m.FinishedOperation(fmt.Errorf("running DELETE USING for %q: %w", b.target.Identifier, err))
-				} else if _, err := txn.ExecContext(ctx, b.deleteTruncateSQL); err != nil {
+				} else if n, err := res.RowsAffected(); err == nil {
+					affected += n
+				}
+				if _, err := txn.ExecContext(ctx, b.deleteTruncateSQL); err != nil {
 					return nil, m.FinishedOperation(fmt.Errorf("truncating delete table for %q: %w", b.target.Identifier, err))
 				}
 
@@ -873,15 +903,22 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			if b.mustMerge {
 				// Merge data from the temporary staging table into the target table, replacing keys
 				// that already exist.
-				if _, err := txn.ExecContext(ctx, b.updateReplaceSQL); err != nil {
+				if res, err := txn.ExecContext(ctx, b.updateReplaceSQL); err != nil {
 					return nil, m.FinishedOperation(fmt.Errorf("running REPLACE INTO for %q: %w", b.target.Identifier, err))
-				} else if _, err := txn.ExecContext(ctx, b.updateTruncateSQL); err != nil {
+				} else if n, err := res.RowsAffected(); err == nil {
+					affected += n - b.updateStaged
+				}
+				if _, err := txn.ExecContext(ctx, b.updateTruncateSQL); err != nil {
 					return nil, m.FinishedOperation(fmt.Errorf("truncating update table for %q: %w", b.target.Identifier, err))
 				}
 
 				// Reset for the next round.
 				b.mustMerge = false
 			}
+			if b.hasData {
+				d.be.ReportRowStats(round, b.target.Path, m.TotalRowStats(affected))
+			}
+			b.hasData, b.insertRows, b.updateStaged = false, 0, 0
 			d.be.FinishedResourceCommit(b.target.Path)
 		}
 
@@ -914,8 +951,4 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 func (d *transactor) Destroy() {
 	d.load.conn.Close()
 	d.store.conn.Close()
-}
-
-func main() {
-	boilerplate.RunMain(newMysqlDriver())
 }

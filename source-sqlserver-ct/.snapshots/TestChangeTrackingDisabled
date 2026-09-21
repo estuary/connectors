@@ -129,7 +129,7 @@ sql> INSERT INTO dbo.ChangeTrackingDisabled_568912 VALUES (3, 'three'), (4, 'fou
 }
 sql> ALTER TABLE dbo.ChangeTrackingDisabled_568912 DISABLE CHANGE_TRACKING
 === Run: After CT Disabled ===
-error: flowctl preview failed:
+error: flowctl raw preview-next failed:
 the capture cannot run due to the following error(s):
  - Change Tracking is not enabled for table "dbo.changetrackingdisabled_568912" and user "flow_capture" cannot enable it
 

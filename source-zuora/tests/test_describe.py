@@ -199,8 +199,10 @@ class _FakeHTTP:
 @pytest.mark.asyncio
 async def test_describe_object_returns_exportable_and_joined_field_names():
     http = _FakeHTTP(_DESCRIBE_XML)
-    fields = await api.fetch_object_fields("https://rest.zuora.com", http, _LOG, "Account")
-    assert fields == ["Id", "UpdatedDate", "Contact.Id"]
+    described = await api.fetch_object_metadata(
+        "https://rest.zuora.com", http, _LOG, "Account"
+    )
+    assert described.query_field_names == ["Id", "UpdatedDate", "Contact.Id"]
     assert http.urls == ["https://rest.zuora.com/v1/describe/Account"]
 
 
@@ -209,7 +211,7 @@ async def test_describe_requests_pin_api_version_header():
     from source_zuora.shared import ZUORA_API_VERSION
 
     http = _FakeHTTP(_DESCRIBE_XML)
-    await api.fetch_object_fields("https://rest.zuora.com", http, _LOG, "Account")
+    await api.fetch_object_metadata("https://rest.zuora.com", http, _LOG, "Account")
     assert http.headers[0].get("Zuora-Version") == ZUORA_API_VERSION
 
 

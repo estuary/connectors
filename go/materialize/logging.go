@@ -25,6 +25,13 @@ const (
 )
 
 // loggerAtLevel wraps a logrus logger to always log at the configured level.
+//
+// Every write here takes logrus's process-global mutex and blocks until the sink
+// accepts it, so a stdout pipe that stops draining halts every goroutine that
+// logs, the data path included. A task in that state presents only as slow, and
+// its logs go quiet at the same time, which makes the cause hard to see from the
+// outside. Log sites on this path must therefore stay bounded: per-transaction or
+// periodic, never per-document or per-batch.
 type loggerAtLevel struct {
 	lvl log.Level
 }
@@ -365,6 +372,7 @@ func (l *extendedLogger) finishedWaitingForDocsLogFn(round int) func() {
 // ExtendedLogging, or unless debug logging is enabled for the task.
 type BindingEvents struct {
 	enabled              bool
+	health               *healthTracker
 	log                  func(log.Fields, string)
 	wg                   sync.WaitGroup
 	stopLogger           chan struct{}
@@ -461,6 +469,16 @@ func (l *BindingEvents) FinishedResourceCommit(path []string) {
 			"took":         took.String(),
 		}, "finished committing documents for resource")
 	})
+}
+
+// ReportRowStats reports what the destination did for one binding's stores of
+// a round (StoreIterator.Round), for the "transaction health" line; see
+// docs/materialize/README.md. Goroutine-safe, sums repeated reports, never
+// fails or blocks, and is active regardless of extended logging.
+func (l *BindingEvents) ReportRowStats(round int, path []string, stats RowStats) {
+	if l != nil && l.health != nil {
+		l.health.report(round, path, stats)
+	}
 }
 
 func repeatAsync(repeat func(), every time.Duration) (stop func(onStop func())) {

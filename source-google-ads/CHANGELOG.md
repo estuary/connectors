@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-08-10
+
+### Fixed
+- The `geo_target_constant` stream is now read once per sync instead of once per configured customer ID.
+
 ## 2026-07-22
 
 ### Changed

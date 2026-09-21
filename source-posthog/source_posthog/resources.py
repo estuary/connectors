@@ -10,6 +10,7 @@ from estuary_cdk.capture.common import (
     BaseDocument,
     ConnectorState,
     Resource,
+    SnapshotResource,
     open_binding,
 )
 from estuary_cdk.flow import CaptureBinding, ValidationError
@@ -62,6 +63,10 @@ RESOURCE_REQUIRED_SCOPES: dict[str, str] = {
 
 PostHogResource = Resource[
     BasePostHogEntity[str] | BasePostHogEntity[int], ResourceConfig, ResourceState
+]
+
+PostHogSnapshotResource = SnapshotResource[
+    BasePostHogEntity[str] | BasePostHogEntity[int], ResourceConfig
 ]
 
 
@@ -170,17 +175,13 @@ def snapshot_resources(
         )
 
     return [
-        PostHogResource(
+        PostHogSnapshotResource(
             name=model.resource_name,
-            key=["/_meta/row_id"],
-            model=model,
             open=functools.partial(open, model.resource_name),
-            initial_state=ResourceState(),
             initial_config=ResourceConfig(
                 name=model.resource_name,
                 interval=timedelta(minutes=5),
             ),
-            schema_inference=True,
         )
         for model in SNAPSHOT_RESOURCES
     ]

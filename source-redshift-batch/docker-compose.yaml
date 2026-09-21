@@ -11,8 +11,14 @@ services:
         "POSTGRES_PASSWORD": "postgres"
       }
     healthcheck:
-      test: "true"
-      interval: 3s
+      # Probe over TCP rather than the unix socket. The entrypoint runs the
+      # docker-entrypoint-initdb.d scripts against a temporary server which
+      # listens on the socket only, so a socket probe goes green while
+      # initialization is still in flight and the port isn't accepting yet.
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "postgres", "-d", "postgres"]
+      interval: 1s
+      timeout: 5s
+      retries: 60
     networks:
       - flow-test
     volumes:

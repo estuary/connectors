@@ -164,7 +164,11 @@ async def fetch_incremental(
             # Emit documents if we haven't seen them.
             if event_ts >= log_cursor:
                 if cls == Events:
-                    doc = cls.model_validate(event.model_dump())
+                    # exclude_unset keeps the document identical in shape to the
+                    # raw event, and to what fetch_backfill emits. Without it,
+                    # CLSDATA's `previous_attributes` default adds a null the
+                    # API didn't send for *.created events.
+                    doc = cls.model_validate(event.model_dump(exclude_unset=True))
                     doc.meta_ = cls.Meta(op="c")
                 else:
                     doc = cls.model_validate(event.data.object)
@@ -272,6 +276,9 @@ async def fetch_backfill(
 
             if account_id:
                 doc.account_id = account_id
+
+            if cls == Events:
+                doc.meta_ = cls.Meta(op="c")
 
             if doc_ts == start_date:
                 # Yield final document for reference

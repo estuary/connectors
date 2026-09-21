@@ -23,6 +23,7 @@ func TestCapture(t *testing.T, setup testSetupFunc) {
 }
 
 func testColumnNameQuoting(t *testing.T, setup testSetupFunc) {
+	t.Parallel()
 	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `([id] INTEGER, [data] INTEGER, [CAPITALIZED] INTEGER, [unique] INTEGER, [type] INTEGER, PRIMARY KEY ([id], [data], [CAPITALIZED], [unique], [type]))`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 0, 0, 0, 0), (1, 1, 1, 1, 1), (2, 2, 2, 2, 2)`)
@@ -32,6 +33,7 @@ func testColumnNameQuoting(t *testing.T, setup testSetupFunc) {
 }
 
 func testTextCollation(t *testing.T, setup testSetupFunc) {
+	t.Parallel()
 	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(id VARCHAR(8) PRIMARY KEY, data TEXT)`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES ('AAA', '1'), ('BBB', '2'), ('-J C', '3'), ('H R', '4')`)
@@ -43,6 +45,7 @@ func testTextCollation(t *testing.T, setup testSetupFunc) {
 // TestDiscoveryIrrelevantConstraints verifies that discovery works correctly
 // even when there are other non-primary-key constraints on a table.
 func testDiscoveryIrrelevantConstraints(t *testing.T, setup testSetupFunc) {
+	t.Parallel()
 	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(id VARCHAR(8) PRIMARY KEY, foo INTEGER UNIQUE, data TEXT)`)
 	tc.DiscoverFull("Discover Tables")
@@ -50,6 +53,7 @@ func testDiscoveryIrrelevantConstraints(t *testing.T, setup testSetupFunc) {
 }
 
 func testUUIDCaptureOrder(t *testing.T, setup testSetupFunc) {
+	t.Parallel()
 	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(id UNIQUEIDENTIFIER PRIMARY KEY, data TEXT)`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES
@@ -79,6 +83,7 @@ func testManyTables(t *testing.T, setup testSetupFunc) {
 		t.Skip("skipping test in short mode.")
 	}
 
+	t.Parallel()
 	var db, tc = setup(t)
 
 	// Create 20 tables
@@ -108,6 +113,7 @@ func testManyTables(t *testing.T, setup testSetupFunc) {
 }
 
 func testDeletedTextColumn(t *testing.T, setup testSetupFunc) {
+	t.Parallel()
 	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, v_text TEXT NOT NULL, v_varchar VARCHAR(32), v_int INTEGER)`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'zero', 'zero', 100), (1, 'one', 'one', 101)`)
@@ -121,6 +127,7 @@ func testDeletedTextColumn(t *testing.T, setup testSetupFunc) {
 }
 
 func testComputedColumn(t *testing.T, setup testSetupFunc) {
+	t.Parallel()
 	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, a VARCHAR(32), b VARCHAR(32), computed AS ISNULL(a, ISNULL(b, 'default')))`)
 	tc.DiscoverFull("Discover Table Schema")
@@ -137,6 +144,13 @@ func testComputedColumn(t *testing.T, setup testSetupFunc) {
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
+// testDroppedAndRecreatedTable deliberately omits t.Parallel(). It asserts that a
+// recreated table's change history is still readable, which holds only while nothing else
+// is writing: under source-sqlserver-ct the change tracking version is database-wide, so a
+// concurrent writer advances it past the capture's saved cursor and the recreated table
+// reads as expired instead. source-sqlserver's CDC retention is per-capture-instance and
+// time-based, so it could parallelize this safely, but the suite takes the more
+// conservative of the two.
 func testDroppedAndRecreatedTable(t *testing.T, setup testSetupFunc) {
 	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data TEXT)`)
@@ -159,6 +173,7 @@ func testDroppedAndRecreatedTable(t *testing.T, setup testSetupFunc) {
 }
 
 func testPrimaryKeyUpdate(t *testing.T, setup testSetupFunc) {
+	t.Parallel()
 	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data TEXT)`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'zero'), (1, 'one'), (2, 'two')`)
@@ -173,6 +188,7 @@ func testPrimaryKeyUpdate(t *testing.T, setup testSetupFunc) {
 }
 
 func testComputedPrimaryKey(t *testing.T, setup testSetupFunc) {
+	t.Parallel()
 	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(actual_id INTEGER NOT NULL, data VARCHAR(32), id AS actual_id PRIMARY KEY)`)
 	tc.DiscoverFull("Discover Table Schema")
@@ -187,6 +203,7 @@ func testComputedPrimaryKey(t *testing.T, setup testSetupFunc) {
 
 // TestSourceTag verifies the output of a capture with /advanced/source_tag set
 func testSourceTag(t *testing.T, setup testSetupFunc) {
+	t.Parallel()
 	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data TEXT)`)
 	require.NoError(t, tc.Capture.EditConfig("advanced.source_tag", "example_source_tag_1234"))

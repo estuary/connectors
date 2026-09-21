@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"fmt"
@@ -117,7 +117,7 @@ func createDatabricksDialect(featureFlags map[string]bool) sql.Dialect {
 				return sql.JoinTransform(".", sql.PassThroughTransform(notQuoted, quoteTf))(path...)
 			}
 		}),
-		Literaler: sql.ToLiteralFn(sql.QuoteTransform("'", "\\'")),
+		Literaler: sql.ToLiteralFn(sql.QuoteTransformEscapedBackslash("'", "\\'")),
 		Placeholderer: sql.PlaceholderFn(func(_ int) string {
 			return "?"
 		}),

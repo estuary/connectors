@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 
 	jsonpatch "github.com/evanphx/json-patch/v5"
 	"github.com/tidwall/gjson"
@@ -27,6 +28,17 @@ type Capture struct {
 	Checkpoint      json.RawMessage // Persistent checkpoint state between captures
 	DiscoveryFilter *regexp.Regexp  // Filter for discovered bindings (nil = no filtering)
 	Logger          func(...any)    // Log function (defaults to stderr, set to t.Log in tests)
+
+	// Timeout bounds a single capture run, and is enforced by the harness rather
+	// than by flowctl. Exceeding it is an error. Zero means the default.
+	Timeout time.Duration
+
+	// Env holds environment variables applied to each flowctl invocation, and so inherited
+	// by the connector process flowctl spawns. Settings which alter connector behavior have
+	// to live here rather than in the test process' own environment, because a test which
+	// mutated os.Environ() would alter the behavior of every other test running at the
+	// same time.
+	Env map[string]string
 }
 
 func New(baseYAML string) (*Capture, error) {
@@ -67,6 +79,7 @@ func New(baseYAML string) (*Capture, error) {
 		Catalog:    catalog,
 		Checkpoint: json.RawMessage(`{}`),
 		Logger:     defaultLogger,
+		Env:        make(map[string]string),
 	}, nil
 }
 
@@ -92,6 +105,9 @@ func (c *Capture) startFlowctl(ctx context.Context, args ...string) (*flowctlCmd
 	cmd := exec.CommandContext(ctx, "flowctl", append([]string{"--profile=testing"}, args...)...)
 	cmd.Dir = c.runRoot
 	cmd.Env = append(os.Environ(), "NO_COLOR=1", "LOG_FORMAT=json")
+	for name, value := range c.Env {
+		cmd.Env = append(cmd.Env, name+"="+value)
+	}
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -159,12 +175,54 @@ func (c *Capture) writeCatalog() (catalogFile, catalogDir string, err error) {
 	if err != nil {
 		return "", "", fmt.Errorf("creating temp directory: %w", err)
 	}
+	catalog, err := withLockstepTransactions(c.Catalog)
+	if err != nil {
+		os.RemoveAll(catalogDir)
+		return "", "", err
+	}
 	catalogFile = catalogDir + "/flow.json"
-	if err := os.WriteFile(catalogFile, c.Catalog, 0644); err != nil {
+	if err := os.WriteFile(catalogFile, catalog, 0644); err != nil {
 		os.RemoveAll(catalogDir)
 		return "", "", fmt.Errorf("writing catalog: %w", err)
 	}
 	return catalogFile, catalogDir, nil
+}
+
+// withLockstepTransactions returns the catalog with every capture's transaction
+// duration window collapsed, so that each connector checkpoint sequence commits
+// as exactly one runtime transaction.
+//
+// The runtime otherwise batches checkpoints into larger transactions, which
+// emits documents in collection-key order rather than connector-emission order,
+// and reduces repeated changes to a key into a single document.
+func withLockstepTransactions(catalog json.RawMessage) (json.RawMessage, error) {
+	var parsed map[string]any
+	if err := json.Unmarshal(catalog, &parsed); err != nil {
+		return nil, fmt.Errorf("parsing catalog: %w", err)
+	}
+	captures, ok := parsed["captures"].(map[string]any)
+	if !ok {
+		return catalog, nil // No captures to pin, so nothing to do.
+	}
+	for name, spec := range captures {
+		capture, ok := spec.(map[string]any)
+		if !ok {
+			continue
+		}
+		shards, ok := capture["shards"].(map[string]any)
+		if !ok {
+			shards = make(map[string]any)
+			capture["shards"] = shards
+		}
+		shards["minTxnDuration"] = "0s"
+		shards["maxTxnDuration"] = "1ns"
+		captures[name] = capture
+	}
+	result, err := json.Marshal(parsed)
+	if err != nil {
+		return nil, fmt.Errorf("encoding catalog: %w", err)
+	}
+	return result, nil
 }
 
 func (c *Capture) Spec() (json.RawMessage, error) {
@@ -281,7 +339,7 @@ func (c *Capture) Discover() (json.RawMessage, error) {
 					}
 					// Sort filtered bindings by target name. Sometimes `flowctl raw discover`
 					// will yield bindings in different orders, and that seems to influence the
-					// ordering of `flowctl preview` documents within a single transaction, so
+					// ordering of `flowctl raw preview-next` documents within a single transaction, so
 					// sorting by name here improves test stability.
 					sort.Slice(filtered, func(i, j int) bool {
 						return filtered[i]["target"].(string) < filtered[j]["target"].(string)
@@ -317,6 +375,18 @@ func (c *Capture) Discover() (json.RawMessage, error) {
 	return c.Catalog, nil
 }
 
+// defaultRunTimeout bounds a capture run which never ends on its own. A deadline
+// can only truncate a capture mid-stream, so it's set far longer than any test's
+// expected runtime.
+const defaultRunTimeout = 2 * time.Minute
+
+func (c *Capture) timeout() time.Duration {
+	if c.Timeout != 0 {
+		return c.Timeout
+	}
+	return defaultRunTimeout
+}
+
 func (c *Capture) Run(sessions int) ([]byte, error) {
 	return c.RunWithContext(context.Background(), sessions)
 }
@@ -331,11 +401,16 @@ func (c *Capture) RunWithContext(ctx context.Context, sessions int) ([]byte, err
 	}
 	defer os.RemoveAll(tempdir)
 
-	fc, err := c.startFlowctl(ctx, "preview",
+	// The run is bounded here rather than with preview-next's --timeout, which
+	// stops the capture gracefully: flowctl would exit zero having dropped
+	// whatever it hadn't reached.
+	runCtx, cancelRun := context.WithTimeout(ctx, c.timeout())
+	defer cancelRun()
+
+	fc, err := c.startFlowctl(runCtx, "raw", "preview-next",
 		"--log-json",
 		"--source", path,
 		fmt.Sprintf("--sessions=%d", sessions),
-		"--timeout=30s",
 		"--output-state",
 		"--initial-state", string(c.Checkpoint),
 	)
@@ -398,13 +473,34 @@ func (c *Capture) RunWithContext(ctx context.Context, sessions int) ([]byte, err
 		return nil, fmt.Errorf("scanning output: %w", err)
 	}
 	if err := fc.Wait(); err != nil {
-		if fc.lastError != "" {
-			return nil, fmt.Errorf("flowctl preview failed:\n%s", fc.lastError)
+		if runCtx.Err() == context.DeadlineExceeded {
+			return nil, fmt.Errorf("capture did not finish within %s", c.timeout())
 		}
-		return nil, fmt.Errorf("flowctl preview failed: %w", err)
+		if fc.lastError != "" {
+			return nil, fmt.Errorf("flowctl raw preview-next failed:\n%s", fc.lastError)
+		}
+		return nil, fmt.Errorf("flowctl raw preview-next failed: %w", err)
 	}
 
 	return documents, nil
+}
+
+// SetLocalCommand replaces the command used to invoke local-endpoint captures in the
+// catalog. Tests use this to run a connector binary built once up front, rather than
+// having each of the hundreds of flowctl invocations in a suite re-link it via `go run`.
+func (c *Capture) SetLocalCommand(argv ...string) error {
+	for _, captureName := range gjson.GetBytes(c.Catalog, "captures.@keys").Array() {
+		var fullPath = `captures.` + captureName.String() + `.endpoint.local`
+		if !gjson.GetBytes(c.Catalog, fullPath).Exists() {
+			continue // Not a local endpoint, nothing to override
+		}
+		var result, err = sjson.SetBytes(c.Catalog, fullPath+`.command`, argv)
+		if err != nil {
+			return err
+		}
+		c.Catalog = result
+	}
+	return nil
 }
 
 // EditConfig modifies a property of the endpoint config(s) of all captures in the catalog.
@@ -455,6 +551,42 @@ func (c *Capture) EditBinding(index int, path string, val any) error {
 		return err
 	}
 	c.Catalog = result
+	return nil
+}
+
+// EditCapture modifies a property of the first capture in the catalog.
+// The path is relative to the capture, e.g. "shards.flags.indirect-specs".
+func (c *Capture) EditCapture(path string, val any) error {
+	var captureName = gjson.GetBytes(c.Catalog, "captures.@keys.0").String()
+	var fullPath = fmt.Sprintf("captures.%s.%s", captureName, path)
+	var result, err = sjson.SetBytes(c.Catalog, fullPath, val)
+	if err != nil {
+		return err
+	}
+	c.Catalog = result
+	return nil
+}
+
+// BindingTarget returns the target collection name of the indexed binding of
+// the first capture in the catalog.
+func (c *Capture) BindingTarget(index int) string {
+	var captureName = gjson.GetBytes(c.Catalog, "captures.@keys.0").String()
+	var fullPath = fmt.Sprintf("captures.%s.bindings.%d.target", captureName, index)
+	return gjson.GetBytes(c.Catalog, fullPath).String()
+}
+
+// DeleteCollection removes collections whose names contain the filter substring.
+func (c *Capture) DeleteCollection(filter string) error {
+	for _, name := range gjson.GetBytes(c.Catalog, "collections.@keys").Array() {
+		if !strings.Contains(name.String(), filter) {
+			continue
+		}
+		var result, err = sjson.DeleteBytes(c.Catalog, "collections."+name.String())
+		if err != nil {
+			return err
+		}
+		c.Catalog = result
+	}
 	return nil
 }
 

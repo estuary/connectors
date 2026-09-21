@@ -4,7 +4,7 @@ from logging import Logger
 
 from estuary_cdk.flow import CaptureBinding, ValidationError
 from estuary_cdk.capture import Task
-from estuary_cdk.capture.common import BaseDocument, Resource, open_binding
+from estuary_cdk.capture.common import BaseDocument, Resource, SnapshotResource, open_binding
 from estuary_cdk.http import HTTPMixin, TokenSource, HTTPError
 
 from .models import (
@@ -72,16 +72,12 @@ def full_refresh_resources(
         )
 
     resources = [
-        Resource(
+        SnapshotResource(
             name=stream.name,
-            key=["/_meta/row_id"],
-            model=BaseDocument,
             open=functools.partial(open, stream),
-            initial_state=ResourceState(),
             initial_config=ResourceConfig(
                 name=stream.name, interval=timedelta(minutes=15)
             ),
-            schema_inference=True,
         )
         for stream in FULL_REFRESH_RESOURCES
     ]

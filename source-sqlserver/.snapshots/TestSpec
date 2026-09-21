@@ -16,11 +16,99 @@
         "default": "flow_capture",
         "order": 1
       },
-      "password": {
-        "type": "string",
-        "description": "Password for the specified database user.",
+      "credentials": {
+        "oneOf": [
+          {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "properties": {
+              "auth_type": {
+                "type": "string",
+                "const": "UserPassword",
+                "default": "UserPassword",
+                "order": 0
+              },
+              "password": {
+                "type": "string",
+                "title": "Password",
+                "description": "Password for the specified database user.",
+                "order": 1,
+                "secret": true
+              }
+            },
+            "type": "object",
+            "required": [
+              "password"
+            ],
+            "title": "Password"
+          },
+          {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/go/auth/iam/aws-config",
+            "properties": {
+              "auth_type": {
+                "type": "string",
+                "const": "AWSIAM",
+                "default": "AWSIAM",
+                "order": 0
+              },
+              "aws_region": {
+                "type": "string",
+                "title": "AWS Region",
+                "description": "AWS Region of your resource"
+              },
+              "aws_role_arn": {
+                "type": "string",
+                "title": "AWS Role ARN",
+                "description": "AWS Role which has access to the resource which will be assumed by Flow"
+              }
+            },
+            "type": "object",
+            "required": [
+              "aws_region",
+              "aws_role_arn"
+            ],
+            "title": "AWS IAM"
+          },
+          {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/go/auth/iam/azure-config",
+            "properties": {
+              "auth_type": {
+                "type": "string",
+                "const": "AzureIAM",
+                "default": "AzureIAM",
+                "order": 0
+              },
+              "azure_client_id": {
+                "type": "string",
+                "title": "Azure Client ID",
+                "description": "Azure App Registration Client ID for Azure Active Directory authentication"
+              },
+              "azure_tenant_id": {
+                "type": "string",
+                "title": "Azure Tenant ID",
+                "description": "Azure Tenant ID for Azure Active Directory authentication"
+              }
+            },
+            "type": "object",
+            "required": [
+              "azure_client_id",
+              "azure_tenant_id"
+            ],
+            "title": "Azure IAM"
+          }
+        ],
+        "type": "object",
+        "title": "Authentication",
+        "default": {
+          "auth_type": "UserPassword"
+        },
+        "discriminator": {
+          "propertyName": "auth_type"
+        },
         "order": 2,
-        "secret": true
+        "x-iam-auth": true,
+        "x-iam-azure-scope": "https://database.windows.net/.default"
       },
       "database": {
         "type": "string",
@@ -32,12 +120,14 @@
         "title": "Time Zone",
         "description": "The IANA timezone name in which datetime columns will be converted to RFC3339 timestamps. Defaults to UTC if left blank.",
         "default": "UTC",
+        "nonsensitive": true,
         "order": 4
       },
       "historyMode": {
         "type": "boolean",
         "description": "Capture change events without reducing them to a final state.",
         "default": false,
+        "nonsensitive": true,
         "order": 5
       },
       "discoveryFilters": {
@@ -48,7 +138,8 @@
             },
             "type": "array",
             "title": "Include Schemas",
-            "description": "If specified only tables in the listed schemas will be discovered."
+            "description": "If specified only tables in the listed schemas will be discovered.",
+            "nonsensitive": true
           },
           "exclude_schemas": {
             "items": {
@@ -56,7 +147,8 @@
             },
             "type": "array",
             "title": "Exclude Schemas",
-            "description": "Tables in the listed schemas will be excluded from discovery."
+            "description": "Tables in the listed schemas will be excluded from discovery.",
+            "nonsensitive": true
           },
           "table_patterns": {
             "items": {
@@ -64,12 +156,14 @@
             },
             "type": "array",
             "title": "Table Patterns",
-            "description": "If specified only tables matching at least one of these glob patterns will be discovered. A pattern containing a '.' matches against the qualified 'schema.table' name. A pattern without a '.' matches the unqualified table name in any schema. Use '*' or '?' as wildcards."
+            "description": "If specified only tables matching at least one of these glob patterns will be discovered. A pattern containing a '.' matches against the qualified 'schema.table' name. A pattern without a '.' matches the unqualified table name in any schema. Use '*' or '?' as wildcards.",
+            "nonsensitive": true
           },
           "discover_only_enabled": {
             "type": "boolean",
             "title": "Discover Only CDC-Enabled Tables",
-            "description": "When set the connector will only discover tables which have already had CDC capture instances enabled. Combined as a union with the equivalent setting under Advanced Options."
+            "description": "When set the connector will only discover tables which have already had CDC capture instances enabled. Combined as a union with the equivalent setting under Advanced Options.",
+            "nonsensitive": true
           }
         },
         "additionalProperties": false,
@@ -82,7 +176,8 @@
           "discover_only_enabled": {
             "type": "boolean",
             "title": "Discover Only CDC-Enabled Tables",
-            "description": "When set the connector will only discover tables which have already had CDC capture instances enabled."
+            "description": "When set the connector will only discover tables which have already had CDC capture instances enabled.",
+            "nonsensitive": true
           },
           "skip_backfills": {
             "type": "string",
@@ -93,13 +188,15 @@
             "type": "integer",
             "title": "Backfill Chunk Size",
             "description": "The number of rows which should be fetched from the database in a single backfill query.",
-            "default": 50000
+            "default": 50000,
+            "nonsensitive": true
           },
           "polling_interval": {
             "type": "string",
             "title": "CDC Polling Interval",
             "description": "The interval at which the connector polls for CDC changes. Accepts duration strings like '500ms' or '30s' or '1m'. Defaults to 500ms when unspecified.",
             "default": "500ms",
+            "nonsensitive": true,
             "pattern": "^[0-9]+(ms|s|m|h)$"
           },
           "change_table_cleanup": {
@@ -127,7 +224,8 @@
           "source_tag": {
             "type": "string",
             "title": "Source Tag",
-            "description": "When set the capture will add this value as the property 'tag' in the source metadata of each document."
+            "description": "When set the capture will add this value as the property 'tag' in the source metadata of each document.",
+            "nonsensitive": true
           },
           "rediscovery_interval": {
             "type": "string",
@@ -139,7 +237,8 @@
           "feature_flags": {
             "type": "string",
             "title": "Feature Flags",
-            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."
+            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.",
+            "nonsensitive": true
           },
           "watermarksTable": {
             "type": "string",
@@ -190,7 +289,7 @@
     "required": [
       "address",
       "user",
-      "password",
+      "credentials",
       "database",
       "historyMode"
     ],
@@ -229,6 +328,20 @@
         "type": "integer",
         "title": "Backfill Priority",
         "description": "An optional integer priority for this binding. The highest priority binding(s) will be backfilled completely before any others. The default priority is zero. Negative priorities are allowed and will cause a binding to be backfilled after others."
+      },
+      "advanced": {
+        "properties": {
+          "additional_backfill_filter": {
+            "type": "string",
+            "title": "Additional Backfill Filter",
+            "description": "Optional filter clause which will be applied to all backfill queries for this binding. Contact Estuary support for assistance before using this option."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Advanced Options",
+        "description": "Options for advanced users. You should not typically need to modify these.",
+        "advanced": true
       }
     },
     "type": "object",

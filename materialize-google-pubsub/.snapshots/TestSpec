@@ -100,7 +100,8 @@
         "type": "boolean",
         "title": "Create with Default Subscription",
         "description": "Create a default subscription when creating the topic. Will be created as \"\u003ctopic\u003e-sub\". Has no effect if the topic already exists.",
-        "default": true
+        "default": true,
+        "nonsensitive": true
       }
     },
     "type": "object",

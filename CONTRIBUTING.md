@@ -4,6 +4,41 @@ This file collects the conventions a contributor needs to know when
 submitting a PR. It's intentionally short; expand sections as patterns
 solidify.
 
+## Encrypting test credentials
+
+In order to support rapid connector development, we would like to include encrypted credentials alongside each connector wherever feasible. This allows both easily automated testing, as well as allowing other people to quickly run all connectors that have credentials. Fortunately, Flow has built-in support for encrypted credentials through the use of [`sops`](https://github.com/getsops/sops).
+
+Instead of defining connector configuration in `test.flow.yaml`, the `config` field can also take a filename containing an optionally `sops`-encrypted file. To create one from scratch:
+1. Create a new `config.yaml`
+  ```yaml
+  client_id: exctatic_emu@service-accounts.estuary.dev
+  client_secret_sops: super_secret_password
+  ```
+  > **Note**: the `_sops` suffix for encrypted field is convention here. Whatever you pick for the encrypted suffix, Flow will strip that suffix out of the decrypted config object to provide to the connector.
+2. Run `sops` and overwrite the file you just created with the encrypted version:
+  ``` bash
+  $ sops --encrypt --input-type yaml --output-type yaml --gcp-kms projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository --encrypted-suffix _sops path/to/config.yaml
+  ```
+  ```yaml
+    client_id: exctatic_emu@service-accounts.estuary.dev
+    client_secret_sops: ENC[AES256_GCM,data:Va8E8XVrZuqtq6M1gkC9xeXMgZqu,iv:+KZd8QwB6sl1XglQkV+Utka7I9JvKtRFYPeM4eDKx6I=,tag:XyGLMTIA44bDfdT2g7TYgQ==,type:str]
+    sops:
+        kms: []
+        gcp_kms:
+            - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+            created_at: "2026-09-14T20:16:06Z"
+            enc: CiUAdmEdwvAzpeqhs3jyQ2B7SQ8tX6t/3wyQizC+W7d/+E59Jqw4EkkAvE+nk9znJYU6zs/jNjfDNKke9MUVHfe09C+vT5y17LFIpSwPA+PxLN2NRogZFg5ok/bWpjh+YRreROJV00R6aKyArXGRi9Kg
+        azure_kv: []
+        hc_vault: []
+        age: []
+        lastmodified: "2026-09-14T20:16:07Z"
+        mac: ENC[AES256_GCM,data:iH/mwJXl2dADaelwdKJpjvgscjBWSvz3PffvOMaeiRPQaK+OsVAnb4+Bu8nZ5xzVBu5gy56gsUqt8NDn6CBL89HRBP8WJGP1ReA1g1XKmBRFApOpdSMoMt5Mu4jARtlkPrXw8Y06VjjfVd0VdvtIx39M/kvHz51BZsQBGk+B+B0=,iv:EuYtNKOhDvoLn5EA5TwsUF2fEK7079HpSFBnw13SEmo=,tag:SE0Kltr1t8T5yYRp3Kgqyg==,type:str]
+        pgp: []
+        encrypted_suffix: _sops
+        version: 3.9.0
+  ```
+3. From here on, you must use sops to edit this encrypted file. Even if you only change an unencrypted field, the `mac` will no longer be valid and the file will fail to decrypt. To edit the file using your terminal's built-in editor, simply run `sops path/to/config.yaml`, make changes, save, and `sops` will re-encrypt the file for you.
+
 ## Changelog entries
 
 Each connector has its own `CHANGELOG.md` at the root of its directory
@@ -59,26 +94,13 @@ as integer" is a good one.
 
 If a connector doesn't have a `CHANGELOG.md` yet, create the file with a
 single header (`# Changelog`) alongside your first user-visible change to
-it. The CI check below will prompt you when that's warranted.
+it. The PR template checklist below will prompt you when that's warranted.
 
-## Docs / CHANGELOG CI check
+## Docs / CHANGELOG checklist
 
-PRs that change connector code run an automated review
-(`.github/workflows/docs-changelog-check.yaml`). It uses Claude to judge
-whether the change is user-visible enough to warrant a documentation
-update and/or a `CHANGELOG.md` entry, then verifies the PR contains them.
-The check fails when it believes something is missing.
-
-It's a model making a judgment call, so it will sometimes be wrong.
-To dismiss it, apply the **`docs-check-skip`** label to the PR — the
-check re-runs and passes. Use the label when:
-
-- The verdict is a false positive (the change isn't actually user-visible)
-- The docs update is tracked in a separate linked PR (e.g. the connector's
-  docs still live in `estuary/flow`)
-
-Fork PRs can't access the API key; the check passes with a notice and
-reviewers judge manually.
+The PR template carries a checklist item for `CHANGELOG.md` and one for
+documentation. There's no automated check: whether an entry is warranted
+is a judgment call for the author, backstopped by whoever reviews the PR.
 
 ### Claude Code skill
 

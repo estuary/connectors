@@ -2,7 +2,7 @@ sql> CREATE TABLE dbo.CaptureInstanceCleanup_WithoutDBO_648852 (id INTEGER PRIMA
 === Discover: Discover Tables ===
 acmeCo/test_capture/dbo/captureinstancecleanup_withoutdbo_648852
 === Run: Initial Backfill ===
-error: flowctl preview failed:
+error: flowctl raw preview-next failed:
 the capture cannot run due to the following error(s):
  - user "flow_capture" does not have the "db_owner" role which is required for automatic change table cleanup
 

@@ -8,6 +8,7 @@ import (
 
 func TestPrerequisites(t *testing.T) {
 	t.Run("validateExistingTables", func(t *testing.T) {
+		t.Parallel()
 		var db, tc = blackboxTestSetup(t)
 		// Create tables A and B - both exist and can be validated
 		db.CreateTable(t, `<NAME>_a`, `(id INTEGER PRIMARY KEY, data TEXT)`)
@@ -19,6 +20,7 @@ func TestPrerequisites(t *testing.T) {
 	})
 
 	t.Run("captureMissingTable", func(t *testing.T) {
+		t.Parallel()
 		var db, tc = blackboxTestSetup(t)
 		// Create tables A and B, but drop B after discovery
 		db.CreateTable(t, `<NAME>_a`, `(id INTEGER PRIMARY KEY, data TEXT)`)

@@ -208,6 +208,7 @@ See [connectors](../../../concepts/connectors.md#using-connectors) to learn more
 | `/advanced/task_limit`       | Task Limit       | The maximum number of concurrent tasks to run at once. A task is either a backfill or incremental load. Backfills can load multiple chunks in parallel, so this must be strictly &lt;= `/advanced/connection_limit` | int  | 5 Tasks          |
 | `/advanced/start_date`       | Start Date       | The date that we should attempt to start backfilling from. If not provided, backfill from the beginning.                                                                                                            | date | Not Required     |
 | `/advanced/query_idle_timeout_seconds` | Query Idle Timeout | Maximum time to wait for the next row during query execution. Query will timeout if no rows are received within this duration. | [`ISO8601` Duration](https://www.digi.com/resources/documentation/digidocs/90001488-13/reference/r_iso_8601_duration_format.htm) | `PT30M` |
+| `/advanced/metadata_read_method` | Metadata Read Method | How table and column metadata is read. `Full Catalog Scan` reads each `OA_*` system table in a single query, which is fastest on a healthy account. `Per-Table Batches` reads metadata a table at a time, stitched together with `UNION ALL`. `Per-Table Batches` is slower, but it works when NetSuite cannot serve metadata for some table in the account. | string | `Full Catalog Scan` |
 
 #### Bindings
 
@@ -268,6 +269,7 @@ captures:
                      start_date: null
                      task_limit: 10
                      query_idle_timeout_seconds: PT30M
+                     metadata_read_method: Full Catalog Scan
       bindings:
          - resource:
             associations:

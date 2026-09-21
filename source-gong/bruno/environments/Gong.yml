@@ -1,0 +1,9 @@
+variables:
+  - name: base_url
+    value: https://us02-16381.api.gong.io
+  - name: config_path
+    value: ../config.yaml
+  - name: primary_user_id
+    value: "4164091100197006958"
+  - name: seed_call_id
+    value: PIN_FROM_SEEDING_A1

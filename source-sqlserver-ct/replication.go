@@ -570,7 +570,7 @@ func ctGetChangedTables(ctx context.Context, conn *sql.DB, candidates []*ctTable
 	// Sort candidates by name so the query is stable across polling cycles
 	var sorted = slices.Clone(candidates)
 	slices.SortFunc(sorted, func(a, b *ctTablePollInfo) int {
-		return strings.Compare(a.StreamID.String(), b.StreamID.String())
+		return a.StreamID.Compare(b.StreamID)
 	})
 
 	var args = make([]any, 0, len(sorted))

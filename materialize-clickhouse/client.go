@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -61,11 +61,14 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 	var database = c.ep.Config.Database
 
 	// Query tables from system.tables.
-	var tableRows, err = c.db.QueryContext(ctx, fmt.Sprintf(
-		"SELECT database, name FROM system.tables WHERE database = %s",
-		c.ep.Dialect.Literal(database),
-	))
-	if err != nil {
+	var tableRows *stdsql.Rows
+	if err := transientRetryPolicy.retry(ctx, "querying system.tables", isTransientErr, func() (err error) {
+		tableRows, err = c.db.QueryContext(ctx, fmt.Sprintf(
+			"SELECT database, name FROM system.tables WHERE database = %s",
+			c.ep.Dialect.Literal(database),
+		))
+		return err
+	}); err != nil {
 		return fmt.Errorf("querying system.tables: %w", err)
 	}
 	defer tableRows.Close()
@@ -82,8 +85,7 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 	}
 
 	// Query columns from system.columns.
-	var colRows *stdsql.Rows
-	colRows, err = c.db.QueryContext(ctx, fmt.Sprintf(
+	var colRows, err = c.db.QueryContext(ctx, fmt.Sprintf(
 		"SELECT database, table, name, type, default_expression, is_in_sorting_key, is_in_partition_key FROM system.columns WHERE database = %s",
 		c.ep.Dialect.Literal(database),
 	))
@@ -253,18 +255,25 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	// column (code 524), so such a column cannot be widened to Nullable. It
 	// doesn't need to be: inserts name their columns explicitly, and a
 	// non-nullable column omitted from an insert receives the type's zero value.
+	// Writes keep working and the sorting key cannot be altered, so there is
+	// nothing here for a user to act on -- which is why this is a debug line and
+	// not surfaced through validation like a key that destroys rows.
 	var dropNotNulls []boilerplate.ExistingField
+	var skippedKeyColumns []string
 	for _, col := range ta.DropNotNulls {
 		if meta, ok := col.Meta.(existingFieldMeta); ok && meta.isKeyColumn {
-			log.WithFields(log.Fields{
-				"table":  ta.Identifier,
-				"column": col.Name,
-			}).Warn("not making key column nullable because ClickHouse forbids ALTER of sorting-key and partition-key columns")
+			skippedKeyColumns = append(skippedKeyColumns, col.Name)
 			continue
 		}
 		dropNotNulls = append(dropNotNulls, col)
 	}
 	ta.DropNotNulls = dropNotNulls
+	if len(skippedKeyColumns) > 0 {
+		log.WithFields(log.Fields{
+			"table":   ta.Identifier,
+			"columns": skippedKeyColumns,
+		}).Debug("not making key columns nullable because ClickHouse forbids ALTER of sorting-key and partition-key columns")
+	}
 
 	if len(ta.AddColumns) > 0 || len(ta.DropNotNulls) > 0 {
 		var alterStmtBuilder strings.Builder

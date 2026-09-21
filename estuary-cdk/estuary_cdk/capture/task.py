@@ -13,7 +13,7 @@ import xxhash
 from pydantic import Field
 
 from estuary_cdk.capture.connector_status import ConnectorStatus
-from estuary_cdk.capture.document import AssociatedDocument
+from estuary_cdk.capture.document import AssociatedDocument, BaseDocument
 
 from ..flow import (
     ConnectorSpec,
@@ -47,6 +47,112 @@ class Response(GenericModel, Generic[EndpointConfig, ResourceConfig, ConnectorSt
     captured: response.Captured | None = None
     sourcedSchema: response.SourcedSchema | None = None
     checkpoint: response.Checkpoint[ConnectorState] | None = None
+
+
+# Bounds applied to SourcedSchema locations that don't declare their own. They
+# start deliberately tight because inference widens them to fit real data
+# (maxLength and maximum grow, minLength and minimum shrink).
+DEFAULT_STRING_BOUNDS = {"minLength": 1, "maxLength": 1}
+DEFAULT_NUMERIC_BOUNDS = {"minimum": 1, "maximum": 1}
+
+
+def with_sourced_schema_defaults(schema: dict[str, Any]) -> dict[str, Any]:
+    """Fill in everything a SourcedSchema must state but a connector may have left out.
+
+    The runtime unions a SourcedSchema into the collection's inferred schema, and
+    that union only ever widens. A constraint the SourcedSchema doesn't assert is
+    dropped from the result rather than treated as unknown. SourcedSchemas
+    therefore have to be maximally restrictive. That's easy to get subtly wrong by
+    hand, so defaults are applied centrally:
+
+    - `_meta` and its subfields that are common across all capture connectors.
+    - `type: object` and `additionalProperties: False` on the root and wherever
+      properties are declared. The runtime rejects a SourcedSchema that isn't
+      closed, and a captured document is always an object.
+    - `required`, covering every declared property. Inference relaxes this for real
+      when a document turns up without the field.
+    - length and range bounds, which materializations size columns from.
+
+    Whatever the connector already declared wins, so one that knows better - a truer
+    bound, its own `_meta` - keeps it. The input is left unmodified.
+    """
+
+    def normalize(location: dict[str, Any]) -> dict[str, Any]:
+        out = dict(location)
+
+        for keyword in ("properties", "patternProperties", "$defs", "definitions"):
+            if isinstance(subschemas := out.get(keyword), dict):
+                out[keyword] = {
+                    name: normalize(s) if isinstance(s, dict) else s
+                    for name, s in subschemas.items()
+                }
+
+        for keyword in ("oneOf", "anyOf", "allOf", "prefixItems"):
+            if isinstance(subschemas := out.get(keyword), list):
+                out[keyword] = [
+                    normalize(s) if isinstance(s, dict) else s for s in subschemas
+                ]
+
+        # `items` may be a single schema or a tuple of them, and
+        # `additionalProperties` is usually the boolean False.
+        for keyword in ("items", "additionalProperties"):
+            match out.get(keyword):
+                case dict() as subschema:
+                    out[keyword] = normalize(subschema)
+                case list() as subschemas:
+                    out[keyword] = [
+                        normalize(s) if isinstance(s, dict) else s for s in subschemas
+                    ]
+
+        # A location declaring properties is an object, and must be a closed one.
+        if out.get("properties") or out.get("patternProperties"):
+            out = {"type": "object", **out, "additionalProperties": False}
+
+        if properties := out.get("properties"):
+            required = out.get("required", [])
+            out["required"] = [
+                *required,
+                *(name for name in properties if name not in required),
+            ]
+
+        declared = out.get("type", [])
+        types = {declared} if isinstance(declared, str) else set(declared)
+
+        # Length bounds constrain only string values and range bounds only numeric
+        # ones, so a union of both types carries both sets.
+        if "string" in types:
+            out = {**DEFAULT_STRING_BOUNDS, **out}
+        if types & {"integer", "number"}:
+            out = {**DEFAULT_NUMERIC_BOUNDS, **out}
+
+        return out
+
+    # The root-only defaults are applied before the walk so that the `_meta` they add
+    # is treated like any other location. Captured documents are always objects, so
+    # the root's type is forced rather than defaulted.
+    root = dict(schema)
+    root["type"] = "object"
+
+    # `_meta` is a shared location. `uuid` is stamped onto every captured document by
+    # the runtime. `op` and `row_id` are added by the CDK, and a connector
+    # may carry its own fields alongside them. So the standard subfields are merged
+    # in one by one.
+    default_meta = BaseDocument.Meta.sourced_schema()
+    properties = root.get("properties", {})
+    declared_meta = properties.get("_meta", {})
+    root["properties"] = {
+        **properties,
+        "_meta": {
+            **default_meta,
+            **declared_meta,
+            "properties": {
+                **default_meta["properties"],
+                **declared_meta.get("properties", {}),
+            },
+        },
+    }
+
+    return normalize(root)
 
 
 def orjson_default(obj):
@@ -180,7 +286,7 @@ class _BaseTask:
         b = (
             Response(
                 sourcedSchema=response.SourcedSchema(
-                    binding=binding_index, schema_json=schema
+                    binding=binding_index, schema_json=with_sourced_schema_defaults(schema)
                 )
             )
             .model_dump_json(by_alias=True, exclude_unset=True)

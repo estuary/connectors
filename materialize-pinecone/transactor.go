@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync/atomic"
 
 	m "github.com/estuary/connectors/go/materialize"
 	"github.com/estuary/connectors/materialize-pinecone/client"
@@ -23,13 +24,18 @@ var (
 type transactor struct {
 	openAiClient *client.OpenAiClient
 	bindings     []binding
+	be           *m.BindingEvents
 
 	group    *errgroup.Group
 	groupCtx context.Context
+	// upserted is the number of vectors Pinecone reports having upserted per
+	// binding in the current Store, for the transaction health report.
+	upserted []atomic.Int64
 }
 
 type binding struct {
 	conn        *pinecone.IndexConnection
+	path        []string
 	dataHeaders []string
 }
 
@@ -39,8 +45,10 @@ type upsertDoc struct {
 	metadata map[string]interface{}
 }
 
-func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
-func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) { return nil, nil }
+func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
+	return nil, nil
+}
 
 func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	for it.Next() {
@@ -54,6 +62,8 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 	t.group, t.groupCtx = errgroup.WithContext(ctx)
 	t.group.SetLimit(concurrentWorkers)
+	t.upserted = make([]atomic.Int64, len(t.bindings))
+	round := it.Round
 
 	var batch []upsertDoc
 
@@ -64,7 +74,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 
 		if it.Binding != lastBinding {
-			if err := t.sendBatch(t.bindings[lastBinding], batch); err != nil {
+			if err := t.sendBatch(lastBinding, batch); err != nil {
 				return nil, fmt.Errorf("sending batch of documents: %w", err)
 			}
 			batch = nil
@@ -97,7 +107,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		})
 
 		if len(batch) >= batchSize {
-			if err := t.sendBatch(b, batch); err != nil {
+			if err := t.sendBatch(it.Binding, batch); err != nil {
 				return nil, fmt.Errorf("sending batch of documents: %w", err)
 			}
 			batch = nil
@@ -105,12 +115,20 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}
 
 	if len(batch) != 0 {
-		if err := t.sendBatch(t.bindings[lastBinding], batch); err != nil {
+		if err := t.sendBatch(lastBinding, batch); err != nil {
 			return nil, fmt.Errorf("sending batch of documents: %w", err)
 		}
 	}
 
-	return nil, t.group.Wait()
+	if err := t.group.Wait(); err != nil {
+		return nil, err
+	}
+	for i, b := range t.bindings {
+		if n := t.upserted[i].Load(); n > 0 {
+			t.be.ReportRowStats(round, b.path, m.TotalRowStats(n))
+		}
+	}
+	return nil, nil
 }
 
 // The embedding input is an aggregate string of all included keys and values of the
@@ -142,7 +160,8 @@ func makeInput(fields map[string]interface{}) (string, error) {
 	return out.String(), nil
 }
 
-func (t *transactor) sendBatch(b binding, batch []upsertDoc) error {
+func (t *transactor) sendBatch(idx int, batch []upsertDoc) error {
+	b := t.bindings[idx]
 	select {
 	case <-t.groupCtx.Done():
 		return t.group.Wait()
@@ -179,6 +198,8 @@ func (t *transactor) sendBatch(b binding, batch []upsertDoc) error {
 				return fmt.Errorf("pinecone upserting batch: %w", err)
 			} else if int(count) != len(batch) {
 				return fmt.Errorf("pinecone upserted %d vectors vs. expected %d", count, len(batch))
+			} else {
+				t.upserted[idx].Add(int64(count))
 			}
 			return nil
 		})

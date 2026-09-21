@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"encoding/json"
@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	m "github.com/estuary/connectors/go/materialize"
 	testutil "github.com/estuary/connectors/materialize-boilerplate/testutil"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -34,13 +35,13 @@ func TestIntegration(t *testing.T) {
 	}
 
 	// Databricks supports runtime-v2 scale-out, so its integration test always
-	// runs with two shards, which requires its scale_out feature flag.
+	// runs with two shards.
 	t.Run("materialize", func(t *testing.T) {
-		sql.RunMaterializationTest(t, newDatabricksDriver(), "testdata/materialize.flow.yaml", makeResourceFn, sanitizers,
-			sql.RuntimeV2Config{Shards: 2, ExtraFeatureFlags: []string{"scale_out"}})
+		sql.RunMaterializationTest(t, NewDriver(), "testdata/materialize.flow.yaml", makeResourceFn, sanitizers,
+			sql.RuntimeConfig{Shards: 2, Fidelity: m.FidelityExact})
 	})
 	t.Run("apply", func(t *testing.T) {
-		sql.RunApplyTest(t, newDatabricksDriver(), "testdata/apply.flow.yaml", makeResourceFn)
+		sql.RunApplyTest(t, NewDriver(), "testdata/apply.flow.yaml", makeResourceFn)
 	})
 	t.Run("apply-drain", func(t *testing.T) {
 		testutil.RunTestAllTasks(t, "testdata/apply.flow.yaml", func(t *testing.T, bundled []byte, taskName string, cfg config) {
@@ -49,12 +50,15 @@ func TestIntegration(t *testing.T) {
 
 			seedPending := func(t *testing.T, appliedSpec *pf.MaterializationSpec) json.RawMessage {
 				// A staged transaction is a set of queries persisted in the
-				// connector state, keyed by the binding's state key.
-				query := sql.DrainSeedInsertQuery(t, newDatabricksDriver(), cfg, appliedSpec, "'{}'")
+				// connector state under the binding's state key and the
+				// staging shard's key range.
+				query := sql.DrainSeedInsertQuery(t, NewDriver(), cfg, appliedSpec, "'{}'")
 				state, err := json.Marshal(map[string]any{
 					appliedSpec.Bindings[0].StateKey: map[string]any{
-						"Queries":  []string{query},
-						"ToDelete": []string{},
+						"00000000-ffffffff": map[string]any{
+							"Queries":  []string{query},
+							"ToDelete": []string{},
+						},
 					},
 				})
 				require.NoError(t, err)
@@ -65,10 +69,10 @@ func TestIntegration(t *testing.T) {
 				require.Len(t, rows, 1, "the staged transaction's row must have been committed")
 			}
 
-			sql.RunApplyDrainTest(t, newDatabricksDriver(), cfg, res, seedPending, verifyDrained)
+			sql.RunApplyDrainTest(t, NewDriver(), cfg, res, seedPending, verifyDrained)
 		})
 	})
 	t.Run("migrate", func(t *testing.T) {
-		sql.RunMigrationTest(t, newDatabricksDriver(), "testdata/migrate.flow.yaml", makeResourceFn, sanitizers)
+		sql.RunMigrationTest(t, NewDriver(), "testdata/migrate.flow.yaml", makeResourceFn, sanitizers)
 	})
 }

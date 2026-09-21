@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -275,8 +275,19 @@ func (c *client) InstallFence(ctx context.Context, _ sql.Table, fence sql.Fence)
 
 }
 
-func (c *client) MustRecreateResource(req *pm.Request_Apply, lastBinding, newBinding *pf.MaterializationSpec_Binding) (bool, error) {
-	return false, nil
+func (c *client) MustRecreateResource(_ *pm.Request_Apply, lastBinding, newBinding *pf.MaterializationSpec_Binding) (bool, error) {
+	if lastBinding == nil || newBinding == nil {
+		return false, nil
+	}
+	lastExpr, err := partitionExpr(lastBinding.ResourceConfigJson)
+	if err != nil {
+		return false, fmt.Errorf("parsing last binding resource config: %w", err)
+	}
+	newExpr, err := partitionExpr(newBinding.ResourceConfigJson)
+	if err != nil {
+		return false, fmt.Errorf("parsing new binding resource config: %w", err)
+	}
+	return lastExpr != newExpr, nil
 }
 
 func (c *client) ListCheckpointsEntries(ctx context.Context) ([]string, error) {

@@ -6,12 +6,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"sync/atomic"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
+	"github.com/estuary/connectors/go/keyhash"
 	"github.com/estuary/connectors/go/materialize"
 	pf "github.com/estuary/flow/go/protocols/flow"
-	"github.com/minio/highwayhash"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -27,15 +28,19 @@ const maxMessageBytes = 256 * 1024
 type transactor struct {
 	client   *sns.Client
 	bindings []*topicBinding
+	be       *materialize.BindingEvents
 }
 
 type topicBinding struct {
+	path     []string
 	topicARN string
 	isFifo   bool
 }
 
-func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
-func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) { return nil, nil }
+func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
+	return nil, nil
+}
 
 // SNS is delta-update only.
 func (t *transactor) Load(it *materialize.LoadIterator, _ func(int, json.RawMessage) error) error {
@@ -45,23 +50,19 @@ func (t *transactor) Load(it *materialize.LoadIterator, _ func(int, json.RawMess
 	return nil
 }
 
-// PackedKeyHash_HH64 and highwayHashKey are copied verbatim from materialize-google-pubsub so SNS
-// FIFO MessageGroupId values match Flow's internal key-hash ordering scheme.
-func PackedKeyHash_HH64(packedKey []byte) uint32 {
-	return uint32(highwayhash.Sum64(packedKey, highwayHashKey) >> 32)
-}
-
-var highwayHashKey, _ = hex.DecodeString("ba737e89155238d47d8067c35aad4d25ecdd1c3488227e011ffa480c022bd3ba")
-
 func (t *transactor) Store(it *materialize.StoreIterator) (materialize.StartCommitFunc, error) {
 	errGroup, ctx := errgroup.WithContext(it.Context())
 	errGroup.SetLimit(publishConcurrency)
+	round := it.Round
+	// published counts the messages SNS accepted per binding, for the
+	// transaction health report.
+	published := make([]atomic.Int64, len(t.bindings))
 
 	for it.Next(false) {
 		bindingIdx := it.Binding
 		packedKey := it.PackedKey
 		doc := it.RawJSON
-		if err := t.publishOne(ctx, errGroup, bindingIdx, packedKey, doc); err != nil {
+		if err := t.publishOne(ctx, errGroup, bindingIdx, packedKey, doc, &published[bindingIdx]); err != nil {
 			return nil, err
 		}
 	}
@@ -69,14 +70,23 @@ func (t *transactor) Store(it *materialize.StoreIterator) (materialize.StartComm
 		return nil, err
 	}
 
-	return nil, errGroup.Wait()
+	if err := errGroup.Wait(); err != nil {
+		return nil, err
+	}
+	for i, b := range t.bindings {
+		if n := published[i].Load(); n > 0 {
+			t.be.ReportRowStats(round, b.path, materialize.TotalRowStats(n))
+		}
+	}
+	return nil, nil
 }
 
 // publishOne is the per-document publish path, extracted so integration tests can drive it without
 // having to synthesize an unexported *materialize.StoreIterator. Synchronous validation errors
 // (e.g. oversize document) are returned directly; the Publish RPC itself is dispatched on
-// errGroup, so its result is observed via errGroup.Wait().
-func (t *transactor) publishOne(ctx context.Context, errGroup *errgroup.Group, bindingIdx int, packedKey []byte, doc json.RawMessage) error {
+// errGroup, so its result is observed via errGroup.Wait(). A successful publish
+// increments published when it is given.
+func (t *transactor) publishOne(ctx context.Context, errGroup *errgroup.Group, bindingIdx int, packedKey []byte, doc json.RawMessage, published *atomic.Int64) error {
 	binding := t.bindings[bindingIdx]
 	if len(doc) > maxMessageBytes {
 		return fmt.Errorf(
@@ -89,7 +99,7 @@ func (t *transactor) publishOne(ctx context.Context, errGroup *errgroup.Group, b
 		Message:  aws.String(string(doc)),
 	}
 	if binding.isFifo {
-		input.MessageGroupId = aws.String(fmt.Sprintf("%08x", PackedKeyHash_HH64(packedKey)))
+		input.MessageGroupId = aws.String(fmt.Sprintf("%08x", keyhash.PackedKeyHash_HH64(packedKey)))
 		sum := sha256.Sum256(append(append([]byte{}, packedKey...), doc...))
 		input.MessageDeduplicationId = aws.String(hex.EncodeToString(sum[:]))
 	}
@@ -97,6 +107,9 @@ func (t *transactor) publishOne(ctx context.Context, errGroup *errgroup.Group, b
 	errGroup.Go(func() error {
 		if _, err := t.client.Publish(ctx, input); err != nil {
 			return fmt.Errorf("publishing document for binding [%d]: %w", bindingIdx, err)
+		}
+		if published != nil {
+			published.Add(1)
 		}
 		return nil
 	})

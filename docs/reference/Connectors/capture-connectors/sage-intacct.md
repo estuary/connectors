@@ -29,6 +29,11 @@ updated documents:
 The incremental strategy for the above objects captures deletions by querying the AUDITHISTORY object.
 If the credentials provided to the connector do not have permission to query the AUDITHISTORY object,
 deletions will not be captured.
+
+Collections are keyed on `RECORDNO`, and a deletion can only be captured when Sage's audit entry
+identifies the deleted record by its `RECORDNO`. For some objects Sage instead records the object's
+user-facing ID (for example `VENDORID` for VENDOR or `CUSTOMERID` for CUSTOMER). Those deletions
+are skipped and the deleted record remains in the collection.
 :::
 
 These objects support capturing via periodic snapshotting:
@@ -69,7 +74,7 @@ configuration details specific to the Sage Intacct source connector.
 | Property    | Title    | Description                 | Type   | Required/Default |
 |-------------|----------|-----------------------------|--------|------------------|
 | **`/name`** | Name     | Name of this resource       | string | Required         |
-| `/interval` | Interval | Interval between data syncs | string | PT5M             |
+| `/interval` | Interval | Interval between data syncs | string | PT6H             |
 
 ### Sample
 
@@ -88,7 +93,7 @@ captures:
     bindings:
       - resource:
           name: CUSTOMER
-          interval: PT5M
+          interval: PT6H
         target: ${PREFIX}/CUSTOMER
       {...}
 ```

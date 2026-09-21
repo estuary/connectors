@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"sync"
 	"time"
 
 	m "github.com/estuary/connectors/go/materialize"
@@ -26,9 +27,22 @@ var (
 )
 
 type changeStream struct {
+	// mu guards ms, which the producer goroutine replaces when it repositions
+	// the stream, while the consumer goroutine may be closing it. Every other
+	// access to ms is from the producer alone and needs no lock.
+	mu                 sync.Mutex
 	ms                 *mongo.ChangeStream
 	db                 string
 	lastPbrtCheckpoint time.Time
+	// midSplit is true when the last event consumed from this stream was a
+	// non-final fragment of a split event, meaning the stream's current
+	// position is not a safe place to checkpoint. Checkpoints are suppressed
+	// for as long as it is set. The fragments of one event are delivered back
+	// to back, so that is only ever briefly.
+	midSplit bool
+	// reopenAt reopens this stream at a cluster time, used to reposition a
+	// stream which resumed partway through a split event.
+	reopenAt func(ctx context.Context, at primitive.Timestamp) (*mongo.ChangeStream, error)
 }
 
 type streamEvent struct {
@@ -111,14 +125,21 @@ func (c *capture) initializeStreams(
 			logEntry.Info("using fullDocument 'whenAvailable' mode (changeStreamPreAndPostImages enabled on all collections)")
 			fullDocOpt = options.WhenAvailable
 		}
-		opts := options.ChangeStream().SetFullDocument(fullDocOpt)
-		if maxAwaitTime != nil {
-			opts = opts.SetMaxAwaitTime(*maxAwaitTime)
+		baseOpts := func() *options.ChangeStreamOptions {
+			opts := options.ChangeStream().SetFullDocument(fullDocOpt)
+			if maxAwaitTime != nil {
+				opts = opts.SetMaxAwaitTime(*maxAwaitTime)
+			}
+			if requestPreImages {
+				opts = opts.SetFullDocumentBeforeChange(options.WhenAvailable)
+			}
+			return opts
 		}
+
 		if requestPreImages {
-			opts = opts.SetFullDocumentBeforeChange(options.WhenAvailable)
 			pl = append(pl, bson.D{{Key: "$changeStreamSplitLargeEvent", Value: bson.D{}}}) // must be the last stage in the pipeline
 		}
+		opts := baseOpts()
 
 		if t, ok := c.state.DatabaseResumeTokens[db]; ok {
 			logEntry = logEntry.WithField("resumeToken", t)
@@ -139,6 +160,12 @@ func (c *capture) initializeStreams(
 		out = append(out, &changeStream{
 			ms: ms,
 			db: db,
+			// Reopening uses the same pipeline and options, so a repositioned
+			// stream delivers events exactly as the original would have,
+			// pre-images included.
+			reopenAt: func(ctx context.Context, at primitive.Timestamp) (*mongo.ChangeStream, error) {
+				return c.client.Database(db).Watch(ctx, pl, baseOpts().SetStartAtOperationTime(&at))
+			},
 		})
 	}
 
@@ -173,7 +200,7 @@ func (c *capture) streamChanges(
 
 	for _, s := range streams {
 		group.Go(func() error {
-			defer s.ms.Close(groupCtx)
+			defer s.closeStream(groupCtx)
 
 			// Channel for batches with buffer size 4. This allows prefetching up to 4
 			// MongoDB batches while the consumer processes.
@@ -198,7 +225,7 @@ func (c *capture) streamChanges(
 					return fmt.Errorf("processing batch for %q: %w", s.db, err)
 				}
 
-				if coordinator.gotCaughtUp(s.db, opTime) && catchup {
+				if !s.midSplit && coordinator.gotCaughtUp(s.db, opTime) && catchup {
 					cancelProducer()
 					<-producerDone
 					return nil
@@ -279,6 +306,79 @@ func (c *capture) streamChanges(
 	}
 }
 
+// rewindToSplitEvent repositions a stream which resumed partway through a split
+// event back to the event itself, so that MongoDB delivers it whole. It reports
+// whether the stream was repositioned, and errors if it should not continue.
+//
+// Every fragment carries the cluster time of the event it belongs to, so a
+// fragment which arrives without the ones before it names the position to
+// return to. The event itself is never captured twice: fragments emit no
+// document until the last one arrives, so an event interrupted partway was
+// never emitted, and neither was anything after it.
+//
+// Events sharing that cluster time are re-delivered, since a position is only
+// precise to a timestamp and its increment: the other writes of a transaction
+// or of a batched insert are captured again. Documents reduce last-write-wins,
+// so re-capturing one already captured is absorbed.
+//
+// A reopen which fails, for any reason, fails the capture. Fragments are only
+// ever delivered from an oplog entry which still exists, so if the oplog has
+// moved past the event the capture fails on resume before a fragment arrives,
+// as it does for any other position the oplog no longer reaches. A failure here
+// is therefore transient, and a restart re-runs this recovery from the same
+// checkpoint. Skipping the event instead would be silent data loss.
+//
+// This rewindToSplitEvent functionality should only be needed for recovery of
+// a capture that checkpointed a mid-split resume token prior to that being
+// prevented. Once that recovery is completed, we could remove all this handling
+// since the situation it addresses will no longer be possible.
+func (c *capture) rewindToSplitEvent(ctx context.Context, s *changeStream) (bool, error) {
+	if s.reopenAt == nil {
+		return false, nil
+	}
+
+	at, err := extractTimestamp(getToken(s))
+	if err != nil {
+		return false, fmt.Errorf("reading the cluster time of a split event which resumed partway through, for %q: %w", s.db, err)
+	}
+
+	ms, err := s.reopenAt(ctx, at)
+	if err != nil {
+		return false, fmt.Errorf("repositioning change stream for %q to recover a split event: %w", s.db, err)
+	}
+
+	if previous := s.replaceStream(ms); previous != nil {
+		if err := previous.Close(ctx); err != nil {
+			log.WithField("db", s.db).WithError(err).Debug("error closing change stream which was repositioned")
+		}
+	}
+
+	log.WithFields(log.Fields{
+		"db":          s.db,
+		"clusterTime": at,
+	}).Info("repositioned change stream to recover a split event it had resumed partway through")
+
+	return true, nil
+}
+
+// closeStream closes the stream's current cursor. This is the only access to ms
+// from outside the producer goroutine.
+func (s *changeStream) closeStream(ctx context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.ms.Close(ctx)
+}
+
+// replaceStream swaps in a repositioned cursor, returning the one it replaced
+// so the caller can close it.
+func (s *changeStream) replaceStream(ms *mongo.ChangeStream) *mongo.ChangeStream {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	previous := s.ms
+	s.ms = ms
+	return previous
+}
+
 func getToken(s *changeStream) bson.Raw {
 	tok := s.ms.ResumeToken()
 	if tok == nil {
@@ -301,6 +401,13 @@ func (c *capture) produceStreamBatches(
 ) {
 	defer close(batches)
 
+	// A stream which resumed from a position partway through a split event
+	// delivers that event's remaining fragments first, and they cannot be
+	// reassembled without the fragments which preceded them. Only the first
+	// event read after opening can be affected.
+	var checkedResumePosition bool
+
+outer:
 	for {
 		var events []streamEvent
 		var batchBytes int64
@@ -310,6 +417,22 @@ func (c *capture) produceStreamBatches(
 		// to exactly one MongoDB cursor batch.
 		readStart := time.Now()
 		for s.ms.TryNext(ctx) {
+			if !checkedResumePosition {
+				checkedResumePosition = true
+				if fragment, _, ok := splitEventFragment(s.ms.Current); ok && fragment > 1 {
+					rewound, err := c.rewindToSplitEvent(ctx, s)
+					if err != nil {
+						select {
+						case batches <- streamBatch{err: err}:
+						case <-ctx.Done():
+						}
+						return
+					} else if rewound {
+						continue outer
+					}
+				}
+			}
+
 			rawCopy := make(bson.Raw, len(s.ms.Current))
 			copy(rawCopy, s.ms.Current)
 			batchBytes += int64(len(rawCopy))
@@ -370,9 +493,10 @@ type processedEvent struct {
 }
 
 // handleIdleBatch processes an empty batch (idle signal), emitting a PBRT checkpoint
-// if enough time has passed. Returns the opTime extracted from the resume token.
+// if enough time has passed and the stream is not parked mid-split. Returns the
+// opTime extracted from the resume token.
 func (c *capture) handleIdleBatch(s *changeStream, token bson.Raw) (primitive.Timestamp, error) {
-	if time.Since(s.lastPbrtCheckpoint) > pbrtCheckpointInterval {
+	if !s.midSplit && time.Since(s.lastPbrtCheckpoint) > pbrtCheckpointInterval {
 		if err := c.emitPbrtCheckpoint(s, token); err != nil {
 			return primitive.Timestamp{}, err
 		}
@@ -421,6 +545,8 @@ func (c *capture) processBatch(
 
 	for i, resp := range responses {
 		ev := batch.events[i]
+
+		s.midSplit = isMidSplitEvent(ev.raw)
 
 		c.mu.Lock()
 		c.processedStreamEvents++
@@ -502,7 +628,7 @@ func (c *capture) processBatch(
 			c.lastEventClusterTime[s.db] = lastOpTime
 		}
 		c.mu.Unlock()
-	} else if time.Since(s.lastPbrtCheckpoint) > pbrtCheckpointInterval {
+	} else if !s.midSplit && time.Since(s.lastPbrtCheckpoint) > pbrtCheckpointInterval {
 		// No documents emitted, but we can still emit a PBRT checkpoint
 		lastEvent := batch.events[len(batch.events)-1]
 		if err := c.emitPbrtCheckpoint(s, lastEvent.resumeToken); err != nil {
@@ -576,4 +702,38 @@ func extractTimestamp(token bson.Raw) (primitive.Timestamp, error) {
 	increment := binary.BigEndian.Uint32(payloadBytes[5:9])
 
 	return primitive.Timestamp{T: timestampSeconds, I: increment}, nil
+}
+
+// isMidSplitEvent reports whether a change event is a non-final fragment of an
+// event split by $changeStreamSplitLargeEvent. A resume token for such an event
+// must never be checkpointed: resuming from a fragment's token delivers the
+// *next* fragment, and the fragments already consumed live only in the
+// transcoder's memory, which does not survive a restart.
+//
+// An event carrying a splitEvent which cannot be read is reported as mid-split.
+// The two outcomes are not symmetric: suppressing a checkpoint costs nothing
+// more than a delayed resume token, while checkpointing a fragment position
+// wedges the capture in a way it cannot recover from on its own.
+func isMidSplitEvent(raw bson.Raw) bool {
+	if _, err := raw.LookupErr("splitEvent"); err != nil {
+		return false
+	}
+
+	fragment, of, ok := splitEventFragment(raw)
+	if !ok {
+		return true
+	}
+	return fragment < of
+}
+
+// splitEventFragment reports an event's position within an event split by
+// $changeStreamSplitLargeEvent. ok is false when the event is not a fragment,
+// and also when it carries a splitEvent which cannot be read.
+func splitEventFragment(raw bson.Raw) (fragment int32, of int32, ok bool) {
+	fragment, fragmentOk := raw.Lookup("splitEvent", "fragment").Int32OK()
+	of, ofOk := raw.Lookup("splitEvent", "of").Int32OK()
+	if !fragmentOk || !ofOk {
+		return 0, 0, false
+	}
+	return fragment, of, true
 }

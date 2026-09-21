@@ -1,9 +1,10 @@
-package main
+package connector
 
 import (
 	"os/exec"
 	"testing"
 
+	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate/testutil"
 	"github.com/stretchr/testify/require"
 )
@@ -49,14 +50,15 @@ func TestIntegration(t *testing.T) {
 	})
 
 	t.Run("materialize", func(t *testing.T) {
-		boilerplate.RunMaterializationTest(t, newMaterialization, "testdata/materialize.flow.yaml", makeResourceFn, nil)
+		boilerplate.RunMaterializationTest(t, NewMaterializer, "testdata/materialize.flow.yaml", makeResourceFn, nil,
+			boilerplate.RuntimeConfig{Shards: 1, Fidelity: m.FidelityExact})
 	})
 
 	t.Run("apply", func(t *testing.T) {
-		boilerplate.RunApplyTest(t, &driver{}, newMaterialization, "testdata/apply.flow.yaml", makeResourceFn)
+		boilerplate.RunApplyTest(t, &driver{}, NewMaterializer, "testdata/apply.flow.yaml", makeResourceFn)
 	})
 
 	t.Run("migrate", func(t *testing.T) {
-		boilerplate.RunMigrationTest(t, newMaterialization, "testdata/migrate.flow.yaml", makeResourceFn, nil)
+		boilerplate.RunMigrationTest(t, NewMaterializer, "testdata/migrate.flow.yaml", makeResourceFn, nil)
 	})
 }

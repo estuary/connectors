@@ -112,6 +112,7 @@ pub async fn run_server(
         router = router.layer(cors);
     }
 
+    let num_bindings = bindings.len();
     let handler = Handler::try_new(stdin, stdout, endpoint_config, bindings)?;
     let router = router.with_state(Arc::new(handler));
 
@@ -119,7 +120,19 @@ pub async fn run_server(
     let listener = tokio::net::TcpListener::bind(address)
         .await
         .context("listening on port")?;
-    tracing::info!(eventType = "connectorStatus", "listening for connections");
+
+    if num_bindings == 0 {
+        tracing::info!(
+            eventType = "connectorStatus",
+            "listening for connections, no bindings are enabled"
+        );
+    } else {
+        tracing::info!(
+            eventType = "connectorStatus",
+            bindings = num_bindings,
+            "listening for connections"
+        );
+    }
     axum::serve(listener, router.into_make_service())
         .await
         .context("running server")?;

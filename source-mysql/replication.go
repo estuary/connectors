@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -119,15 +118,31 @@ func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursorJSON 
 		flavor = mysql.MariaDBFlavor
 	}
 
+	// The syncer keeps this password for its entire lifetime, so under AWS IAM auth an
+	// internal reconnect attempted more than fifteen minutes from now will be denied.
+	// That failure terminates the capture and the restarted connector mints a fresh token.
+	password, err := db.config.EffectivePassword(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var sslSettings = db.config.sslSettings()
+	tlsConfig, err := sslSettings.Config(db.config.serverHost())
+	if err != nil {
+		return nil, err
+	}
+
 	var syncConfig = replication.BinlogSyncerConfig{
 		ServerID: uint32(db.config.Advanced.NodeID),
 		Flavor:   flavor,
 		Host:     host,
 		Port:     uint16(port),
 		User:     db.config.User,
-		Password: db.config.Password,
-		// TODO(wgd): Maybe add 'serverName' checking as described over in Connect()
-		TLSConfig: &tls.Config{InsecureSkipVerify: true},
+		Password: password,
+		// Nil only when 'sslmode' is disabled. When the Password above is a bearer
+		// token rather than a user-chosen secret, Config.Validate rejects every mode
+		// that would leave it unencrypted, so neither this nor the plaintext retry
+		// below is reachable for those auth types.
+		TLSConfig: tlsConfig,
 		// Request that timestamp values coming via replication be interpreted as UTC.
 		TimestampStringLocation: time.UTC,
 
@@ -156,19 +171,30 @@ func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursorJSON 
 	logrus.WithFields(logrus.Fields{"pos": pos}).Info("starting replication")
 	var streamer *replication.BinlogStreamer
 	var syncer = replication.NewBinlogSyncer(syncConfig)
-	if streamer, err = syncer.StartSync(pos); err == nil {
-		logrus.Debug("replication connected with TLS")
+	var errWithTLS error
+	if streamer, errWithTLS = syncer.StartSync(pos); errWithTLS == nil {
+		if tlsConfig != nil {
+			logrus.WithField("sslmode", sslSettings.Mode).Debug("replication connected with TLS")
+		} else {
+			logrus.Debug("replication connected without TLS")
+		}
+	} else if tlsConfig == nil || !sslSettings.AllowsPlaintextFallback() {
+		syncer.Close()
+		if userErr := wrapMySQLReplicationError(errWithTLS); userErr != nil {
+			return nil, userErr
+		}
+		return nil, fmt.Errorf("error starting binlog sync (sslmode %q): %w", sslSettings.Mode, errWithTLS)
 	} else {
 		syncer.Close()
 		syncConfig.TLSConfig = nil
 		syncer = replication.NewBinlogSyncer(syncConfig)
 		if streamer, err = syncer.StartSync(pos); err == nil {
-			logrus.Info("replication connected without TLS")
+			logrus.WithField("errWithTLS", errWithTLS).Info("replication connected without TLS")
 		} else {
 			if userErr := wrapMySQLReplicationError(err); userErr != nil {
 				return nil, userErr
 			}
-			return nil, fmt.Errorf("error starting binlog sync: %w", err)
+			return nil, fmt.Errorf("error starting binlog sync: failed both with TLS (%w) and without TLS (%w)", errWithTLS, err)
 		}
 	}
 
@@ -287,6 +313,26 @@ type mysqlTableMetadata struct {
 type mysqlTableSchema struct {
 	Columns     []string               `json:"columns"`
 	ColumnTypes map[string]interface{} `json:"types"`
+
+	// ImplicitSystemVersioning is set for MariaDB tables declared `WITH SYSTEM
+	// VERSIONING` without an explicit `PERIOD FOR SYSTEM_TIME` clause. Such tables
+	// have hidden row_start and row_end columns which always follow the visible
+	// columns in binlog row images, and which MariaDB keeps at the end even when
+	// columns are added later. They are deliberately left out of Columns, so that
+	// DDL handling only ever manipulates visible columns, and this flag is the
+	// sole source of their presence when decoding row images.
+	ImplicitSystemVersioning bool `json:"implicit_system_versioning,omitempty"`
+}
+
+// rowImageColumns returns the names of every column present in binlog row images
+// for the table, in row image order.
+func (s *mysqlTableSchema) rowImageColumns() []string {
+	if !s.ImplicitSystemVersioning {
+		return s.Columns
+	}
+	var names = make([]string, 0, len(s.Columns)+2)
+	names = append(names, s.Columns...)
+	return append(names, implicitSystemVersioningStartColumn, implicitSystemVersioningEndColumn)
 }
 
 func (rs *mysqlReplicationStream) StartReplication(ctx context.Context, _ map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo) error {
@@ -575,7 +621,7 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 	var columnTypes = metadata.Schema.ColumnTypes
 	var columnNames = data.Table.ColumnNameString()
 	if len(columnNames) == 0 {
-		columnNames = metadata.Schema.Columns
+		columnNames = metadata.Schema.rowImageColumns()
 	}
 
 	keyColumns, ok := rs.keyColumns(streamID)
@@ -1424,6 +1470,15 @@ func (rs *mysqlReplicationStream) ActivateTable(ctx context.Context, streamID sq
 		metadata.Schema.ColumnTypes = colTypes
 		if extraDetails, ok := discovery.ExtraDetails.(*mysqlTableDiscoveryDetails); ok {
 			metadata.DefaultCharset = extraDetails.DefaultCharset
+			if extraDetails.ImplicitSystemVersioning {
+				// Discovery synthesizes the hidden row_start and row_end columns so that
+				// they appear in the generated schema and key, but the tracked column
+				// list should only hold visible columns so DDL tracking works properly.
+				metadata.Schema.ImplicitSystemVersioning = true
+				metadata.Schema.Columns = slices.DeleteFunc(slices.Clone(discovery.ColumnNames), func(name string) bool {
+					return name == implicitSystemVersioningStartColumn || name == implicitSystemVersioningEndColumn
+				})
+			}
 		}
 
 		logrus.WithFields(logrus.Fields{

@@ -18,6 +18,8 @@ from pydantic import (
     model_validator,
 )
 
+SENTINEL_ACCESS_TOKEN = "dummy_token"
+
 
 class ApiAccessToken(AccessToken):
     credentials_title: Literal["API Access Token"] = Field(

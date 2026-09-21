@@ -44,6 +44,7 @@ func TestColumnCollations(t *testing.T) {
 	} {
 		var subtestName = fmt.Sprintf("%s_%s", tc.ColumnType, tc.CollationName)
 		t.Run(subtestName, func(t *testing.T) {
+			t.Parallel()
 			var db, _ = blackboxTestSetup(t)
 			var ctx = context.Background()
 			db.CreateTable(t, `<NAME>`, fmt.Sprintf(`(id %s(32) COLLATE %s PRIMARY KEY, data TEXT)`, tc.ColumnType, tc.CollationName))

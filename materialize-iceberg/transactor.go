@@ -26,6 +26,20 @@ import (
 
 var _ m.Transactor = (*transactor)(nil)
 
+var IdempotencyTokenNamespace = uuid.MustParse("6f6e5e0a-6bfa-4f47-9d16-3a475cc6a204")
+
+// mergeIdempotencyTokens combines the binding's idempotency tokens so that the
+// set of bindings will produce a unique value.  If the bindings are changed,
+// perhaps a partial Acknowledge, the token will change.
+func mergeIdempotencyTokens(bindings []python.MergeBinding) string {
+	var buf bytes.Buffer
+	for _, b := range bindings {
+		buf.WriteString(b.IdempotencyToken)
+		buf.WriteByte(0)
+	}
+	return uuid.NewSHA1(IdempotencyTokenNamespace, buf.Bytes()).String()
+}
+
 type binding struct {
 	Idx    int
 	Mapped *boilerplate.MappedBinding[config, resource, mapped]
@@ -39,8 +53,16 @@ type binding struct {
 	}
 }
 
+// pendingMerge is a checkpointed merge together with what Acknowledge reports
+// for it once the job has run.
+type pendingMerge struct {
+	python.MergeBinding
+	Round int   `json:"round"`
+	Rows  int64 `json:"rows"`
+}
+
 type transactor struct {
-	cp                  map[string]*python.MergeBinding
+	cp                  map[string]*pendingMerge
 	recovery            bool
 	materializationName string
 
@@ -62,7 +84,7 @@ func (t *transactor) RecoverCheckpoint(ctx context.Context, spec pf.Materializat
 }
 
 func (t *transactor) UnmarshalState(raw json.RawMessage) error {
-	t.cp = make(map[string]*python.MergeBinding)
+	t.cp = make(map[string]*pendingMerge)
 	if err := json.Unmarshal(raw, &t.cp); err != nil {
 		return err
 	}
@@ -138,7 +160,14 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(binding int, doc json.
 	defer cleanupResults()
 
 	t.be.StartedEvaluatingLoads()
-	if err := t.compute.runJob(ctx, loadInput, t.pyFiles.load, t.pyFiles.common, fmt.Sprintf("load for: %s", t.materializationName), outputPrefix); err != nil {
+	if err := t.compute.runJob(ctx, computeJob{
+		Input:              loadInput,
+		EntryPointURI:      t.pyFiles.load,
+		PyFilesCommonURI:   t.pyFiles.common,
+		Name:               fmt.Sprintf("load for: %s", t.materializationName),
+		WorkingPrefix:      outputPrefix,
+		SparkJobProperties: t.cfg.Compute.SparkJobProperties,
+	}); err != nil {
 		return fmt.Errorf("load job failed: %w", err)
 	} else if err := t.loadFiles.CleanupCurrentTransaction(ctx); err != nil {
 		return fmt.Errorf("cleaning up load files: %w", err)
@@ -157,10 +186,13 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(binding int, doc json.
 func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	ctx := it.Context()
 
+	rows := make(map[int]int64)
+
 	// Skip deleted, non-existent documents iff HardDelete is enabled.
 	for it.Next(t.cfg.HardDelete) {
 
 		b := t.bindings[it.Binding]
+		rows[it.Binding]++
 
 		flowDocument := it.RawJSON
 		if t.cfg.HardDelete && it.Delete {
@@ -178,9 +210,10 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	if it.Err() != nil {
 		return nil, it.Err()
 	}
+	round := it.Round
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
-		pyBindings := make(map[string]*python.MergeBinding)
+		pyBindings := make(map[string]*pendingMerge)
 		for idx, b := range t.bindings {
 			if !t.storeFiles.Started(idx) {
 				continue
@@ -199,11 +232,16 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 				return nil, m.FinishedOperation(fmt.Errorf("rendering mergeQuery template: %w", err))
 			}
 
-			pyBindings[b.Mapped.StateKey] = &python.MergeBinding{
-				Binding: idx,
-				Query:   mergeQuery.String(),
-				Columns: b.store.columns,
-				Files:   files,
+			pyBindings[b.Mapped.StateKey] = &pendingMerge{
+				MergeBinding: python.MergeBinding{
+					Binding:          idx,
+					Query:            mergeQuery.String(),
+					Columns:          b.store.columns,
+					Files:            files,
+					IdempotencyToken: uuid.NewString(),
+				},
+				Round: round,
+				Rows:  rows[idx],
 			}
 		}
 
@@ -221,10 +259,13 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 }
 
 func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
-	outputPrefix := path.Join(t.cfg.Compute.BucketPath, uuid.NewString())
-	checkpointClear := make(map[string]*python.MergeBinding)
+	checkpointClear := make(map[string]*pendingMerge)
 	var mergeInput python.MergeInput
 	var allFileUris []string
+	var merged []struct {
+		path []string
+		*pendingMerge
+	}
 
 	shouldProcess := m.StateKeyFilter(stateKeys)
 
@@ -266,20 +307,46 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 				}
 			}
 
-			mergeInput.Bindings = append(mergeInput.Bindings, *pyMergeBinding)
+			mergeInput.Bindings = append(mergeInput.Bindings, pyMergeBinding.MergeBinding)
 			allFileUris = append(allFileUris, pyMergeBinding.Files...)
+			merged = append(merged, struct {
+				path []string
+				*pendingMerge
+			}{b.Mapped.ResourcePath, pyMergeBinding})
 		}
 	}
 
 	var stateUpdate *pf.ConnectorState
 	if len(mergeInput.Bindings) > 0 {
+		token := mergeIdempotencyTokens(mergeInput.Bindings)
+
 		// Make sure the job status output file gets cleaned up.
+		outputPrefix := path.Join(t.cfg.Compute.BucketPath, token)
 		cleanupStatus := cleanPrefixOnceFn(ctx, t.bucket, outputPrefix)
 		defer cleanupStatus()
 
-		if err := t.compute.runJob(ctx, mergeInput, t.pyFiles.merge, t.pyFiles.common, fmt.Sprintf("store for: %s", t.materializationName), outputPrefix); err != nil {
+		if err := t.compute.runJob(ctx, computeJob{
+			Input:              mergeInput,
+			EntryPointURI:      t.pyFiles.merge,
+			PyFilesCommonURI:   t.pyFiles.common,
+			Name:               fmt.Sprintf("store for: %s", t.materializationName),
+			WorkingPrefix:      outputPrefix,
+			IdempotencyToken:   token,
+			SparkJobProperties: t.cfg.Compute.SparkJobProperties,
+		}); err != nil {
 			return nil, fmt.Errorf("store merge job failed: %w", err)
-		} else if err := cleanupStatus(); err != nil {
+		}
+
+		// The job reports only success or failure, so the staged row counts
+		// stand in for what it merged. Checkpoints from before Rows was
+		// recorded have nothing to report.
+		for _, p := range merged {
+			if p.Rows > 0 {
+				t.be.ReportRowStats(p.Round, p.path, m.TotalRowStats(p.Rows).WithStaged(p.Rows))
+			}
+		}
+
+		if err := cleanupStatus(); err != nil {
 			return nil, fmt.Errorf("cleaning up generated job status file: %w", err)
 		} else if err := t.storeFiles.CleanupCheckpoint(ctx, allFileUris); err != nil {
 			return nil, fmt.Errorf("cleaning up store files: %w", err)

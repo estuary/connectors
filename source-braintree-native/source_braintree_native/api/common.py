@@ -74,17 +74,37 @@ async def process_completed_fetches(
     If one fetch raises or the consumer stops iterating early, the remaining in-flight
     fetches are cancelled so they don't outlive this generator and emit "Session is closed"
     warnings when they touch the torn-down HTTP session.
+
+    A completed `asyncio.Task` holds onto its return value, so any collection of tasks that
+    stays alive for the whole fan-out pins every page of parsed resources - including pages
+    already yielded. Backfill windows are bisected to just under Braintree's search limit, so
+    that amounts to tens of thousands of resources resident at once. `asyncio.wait` hands back
+    the still-pending tasks each round, which is all the cancellation above needs, and lets each
+    task be dropped once its page has been drained.
     """
-    tasks = [asyncio.ensure_future(coro) for coro in fetch_coroutines]
+    pending = {asyncio.ensure_future(coro) for coro in fetch_coroutines}
+    completed: set[asyncio.Task[list[dict[str, Any]]]] = set()
+
     try:
-        for task in asyncio.as_completed(tasks):
-            result = await task
-            for resource in result:
+        # asyncio.wait reports every fetch that has finished, so `completed` must be drained
+        # before waiting again, and it can still hold pages once `pending` is empty.
+        while pending or completed:
+            if not completed:
+                completed, pending = await asyncio.wait(
+                    pending, return_when=asyncio.FIRST_COMPLETED
+                )
+
+            task = completed.pop()
+            for resource in task.result():
                 yield resource
+
+            # Release the page before awaiting the next fetch.
+            del task
     finally:
-        for task in tasks:
+        outstanding = completed | pending
+        for task in outstanding:
             task.cancel()
-        await asyncio.gather(*tasks, return_exceptions=True)
+        await asyncio.gather(*outstanding, return_exceptions=True)
 
 
 def braintree_xml_to_dict(xml_data):

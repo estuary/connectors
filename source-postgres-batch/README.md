@@ -34,7 +34,7 @@ env UPDATE_SNAPSHOTS=1 go test -timeout=10m ./source-postgres-batch
 
 ### Flowctl Preview
 
-You can run the connector under `flowctl preview` and `flowctl raw discover`
+You can run the connector under `flowctl raw preview-next` and `flowctl raw discover`
 without building a Docker image:
 
 ```bash
@@ -54,5 +54,5 @@ captures:
 EOF
 
 flowctl raw discover --source acmeCo/flow.yaml
-flowctl preview --source acmeCo/flow.yaml
+flowctl raw preview-next --source acmeCo/flow.yaml
 ```

@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"fmt"
@@ -281,7 +281,7 @@ ALTER TABLE {{$.Identifier}} ALTER COLUMN
 
 {{ define "loadQuery" }}
 {{ if $.Table.Document -}}
-SELECT {{ $.Table.Binding }}, TO_JSON({{ $.Table.Identifier }}.{{ $.Table.Document.Identifier }})
+SELECT {{ $.Table.Binding }}, {{ if eq $.Table.Document.BareDDL "VARIANT" }}TO_JSON({{ $.Table.Identifier }}.{{ $.Table.Document.Identifier }}){{ else }}{{ $.Table.Identifier }}.{{ $.Table.Document.Identifier }}{{ end }}
 	FROM {{ $.Table.Identifier }}
 	JOIN (
 		SELECT {{ range $ind, $bound := $.Bounds }}
@@ -416,7 +416,7 @@ WHEN NOT MATCHED AND r._flow_delete=false THEN
 
 
 {{ define "copyHistory" }}
-SELECT FILE_NAME, STATUS, FIRST_ERROR_MESSAGE FROM TABLE(INFORMATION_SCHEMA.COPY_HISTORY(
+SELECT FILE_NAME, STATUS, FIRST_ERROR_MESSAGE, ROW_COUNT FROM TABLE(INFORMATION_SCHEMA.COPY_HISTORY(
   TABLE_NAME=>'{{ $.TableName }}',
   START_TIME=>DATEADD(DAY, -14, CURRENT_TIMESTAMP())
 )) WHERE

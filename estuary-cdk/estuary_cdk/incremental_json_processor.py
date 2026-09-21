@@ -62,6 +62,25 @@ class IncrementalJsonProcessor(Generic[StreamedItem, Remainder]):
     do_something_with(processor.get_remainder())
     ```
 
+    `validation_context` is forwarded as Pydantic's validation context to every
+    streamed item, so a `@model_validator(mode="before")` on `streamed_item_cls`
+    can read it off `info.context`. The canonical use is stamping a value the
+    response body doesn't carry onto each document as it streams — a parent id,
+    when the child endpoint requires the parent in the request path but omits it
+    from the payload:
+    ```python
+    processor = IncrementalJsonProcessor(
+        input,
+        prefix="data.items",
+        streamed_item_cls=MyChildItem,
+        validation_context=ParentIdContext(parent_id=parent_id),
+    )
+    ```
+
+    Note it is **not** forwarded to `remainder_cls` — `get_remainder()` validates
+    without a context, so a context-dependent validator on the remainder model
+    silently sees `None`. Keep remainder models context-free.
+
     See the tests file `test_incremental_json_processor.py` for more examples,
     including various formulations of the prefix to support more complex data
     structures.

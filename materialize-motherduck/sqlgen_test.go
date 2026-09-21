@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"maps"
@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var testDialect = createDuckDialect(featureFlagDefaults)
+var testDialect = createDuckDialect(featureFlagDefaults, false)
 var testTemplates = renderTemplates(testDialect)
 
 func flagsWithoutNativeBinary() map[string]bool {
@@ -24,7 +24,7 @@ func TestSQLGeneration(t *testing.T) {
 }
 
 func TestSQLGeneration_NoNativeBinaryColumnType(t *testing.T) {
-	dialect := createDuckDialect(flagsWithoutNativeBinary())
+	dialect := createDuckDialect(flagsWithoutNativeBinary(), false)
 	tpls := renderTemplates(dialect)
 	runSQLGen(t, dialect, tpls)
 }

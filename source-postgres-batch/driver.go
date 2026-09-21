@@ -85,7 +85,7 @@ type Resource struct {
 	TableName  string   `json:"table,omitempty" jsonschema:"title=Table Name,description=The name of the table to be captured. The query template must be overridden if this is unset."  jsonschema_extras:"order=2"`
 	Cursor     []string `json:"cursor,omitempty" jsonschema:"title=Cursor Columns,description=The names of columns which should be persisted between query executions as a cursor." jsonschema_extras:"order=3"`
 
-	PollSchedule string `json:"poll,omitempty" jsonschema:"title=Polling Schedule,description=When and how often to execute the fetch query (overrides the connector default setting). Accepts a Go duration string like '5m' or '6h' for frequency-based polling or a string like 'daily at 12:34Z' to poll at a specific time (specified in UTC) every day." jsonschema_extras:"order=4,pattern=^([-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+|daily at [0-9][0-9]?:[0-9]{2}Z)$"`
+	PollSchedule string `json:"poll,omitempty" jsonschema:"title=Polling Schedule,description=When and how often to execute the fetch query (overrides the connector default setting). Accepts a Go duration string like '5m' or '6h' for frequency-based polling or a string like 'daily at 12:34Z' to poll at a specific time (specified in UTC) every day." jsonschema_extras:"order=4,pattern=^([-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+|daily at [0-9][0-9]?:[0-9]{2}Z)$,nonsensitive=true"`
 	Template     string `json:"template,omitempty" jsonschema:"title=Query Template Override,description=Optionally overrides the query template which will be rendered and then executed. Consult documentation for examples." jsonschema_extras:"multiline=true,order=5"`
 }
 
@@ -388,6 +388,14 @@ func (s *captureState) Validate() error {
 }
 
 func (c *capture) Run(ctx context.Context) error {
+	// With no enabled bindings there are no polling workers, so we'd fall through the
+	// empty worker group and exit silently. This connector normally runs forever, so
+	// report the reason.
+	if len(c.Bindings) == 0 {
+		log.Info("capture has no enabled bindings, shutting down")
+		return nil
+	}
+
 	// Always discover and output SourcedSchemas once at startup.
 	if err := c.emitSourcedSchemas(ctx); err != nil {
 		return err
@@ -865,6 +873,8 @@ func (c *capture) pollIncremental(ctx context.Context, binding *bindingInfo) err
 	}
 
 	// Iterate over CTID range chunks until we reach the maximum possible CTID page for this table
+	var chunkCount int
+	var sweepResultCount int64
 	for int64(afterCTID.BlockNumber) < maximumPageID {
 		var untilCTID = pgtype.TID{BlockNumber: afterCTID.BlockNumber + pagesPerChunk, Valid: true}
 		var resultCount, err = c.pollIncrementalChunk(ctx, &incrementalChunkDescription{
@@ -887,10 +897,24 @@ func (c *capture) pollIncremental(ctx context.Context, binding *bindingInfo) err
 		afterCTID = untilCTID
 		state.ScanTID = fmt.Sprintf("(%d,%d)", afterCTID.BlockNumber, afterCTID.OffsetNumber)
 		state.DocumentCount += resultCount
+		chunkCount++
+		sweepResultCount += resultCount
 		if err := c.streamStateCheckpoint(stateKey, state); err != nil {
 			return err
 		}
 	}
+
+	// Summarize the polling operation.
+	var summaryEntry = log.WithFields(log.Fields{
+		"name":   res.Name,
+		"chunks": chunkCount,
+		"count":  sweepResultCount,
+		"total":  state.DocumentCount,
+	})
+	if state.BaseXID != 0 {
+		summaryEntry = summaryEntry.WithField("txids", fmt.Sprintf("%d to %d", state.BaseXID, state.NextXID))
+	}
+	summaryEntry.Info("incremental polling complete")
 
 	// Reset scanning state for the next incremental table update
 	state.ScanTID = ""
@@ -943,7 +967,7 @@ func (c *capture) pollIncrementalChunk(ctx context.Context, chunk *incrementalCh
 	if chunk.BaseXID != 0 {
 		logEntry = logEntry.WithField("txids", fmt.Sprintf("%d to %d", chunk.BaseXID, chunk.NextXID))
 	}
-	logEntry.Info("polling incremental chunk")
+	logEntry.Debug("polling incremental chunk")
 
 	// Set up a watchdog timeout which will terminate the capture task if no data is
 	// received after a long period of time. The deferred stop ensures that the timeout
@@ -1077,7 +1101,7 @@ func (c *capture) pollIncrementalChunk(ctx context.Context, chunk *incrementalCh
 		"query": query,
 		"count": queryResultsCount,
 		"total": chunk.DocumentCount + queryResultsCount,
-	}).Info("chunk query complete")
+	}).Debug("chunk query complete")
 
 	return queryResultsCount, nil
 }

@@ -17,13 +17,14 @@ func BuildBackfillQuery(
 	schema, table string,
 	columnTypes map[string]any,
 	chunkSize int,
+	backfillFilter string,
 ) (string, []any, error) {
 	var streamID = sqlcapture.JoinStreamID(schema, table)
 	var keyColumns = state.KeyColumns
 
 	switch state.Mode {
 	case sqlcapture.TableStateKeylessBackfill:
-		var query = keylessScanQuery(schema, table, chunkSize)
+		var query = keylessScanQuery(schema, table, chunkSize, backfillFilter)
 		var args = []any{state.BackfilledCount}
 		return query, args, nil
 
@@ -43,10 +44,10 @@ func BuildBackfillQuery(
 				}
 				resumeKey[idx] = retyped
 			}
-			var query = buildScanQuery(false, keyColumns, columnTypes, schema, table, chunkSize)
+			var query = buildScanQuery(false, keyColumns, columnTypes, schema, table, chunkSize, backfillFilter)
 			return query, resumeKey, nil
 		}
-		var query = buildScanQuery(true, keyColumns, columnTypes, schema, table, chunkSize)
+		var query = buildScanQuery(true, keyColumns, columnTypes, schema, table, chunkSize, backfillFilter)
 		return query, nil, nil
 
 	default:
@@ -101,9 +102,18 @@ func retypeResumeKey(value any, columnType any) (any, error) {
 
 // keylessScanQuery builds a query for scanning a table without a primary key.
 // It uses %%physloc%% ordering and OFFSET/FETCH for pagination.
-func keylessScanQuery(schemaName, tableName string, chunkSize int) string {
+func keylessScanQuery(schemaName, tableName string, chunkSize int, backfillFilter string) string {
+	// Generate a list of individual WHERE clauses which should be ANDed together
+	var whereClauses []string
+	if backfillFilter != "" {
+		whereClauses = append(whereClauses, fmt.Sprintf("(%s)", backfillFilter))
+	}
+
 	var query = new(strings.Builder)
 	fmt.Fprintf(query, "SELECT * FROM [%s].[%s]", schemaName, tableName)
+	if len(whereClauses) > 0 {
+		fmt.Fprintf(query, " WHERE %s", strings.Join(whereClauses, " AND "))
+	}
 	fmt.Fprintf(query, " ORDER BY %%%%physloc%%%%")
 	fmt.Fprintf(query, " OFFSET @p1 ROWS FETCH FIRST %d ROWS ONLY;", chunkSize)
 	return query.String()
@@ -112,7 +122,7 @@ func keylessScanQuery(schemaName, tableName string, chunkSize int) string {
 // buildScanQuery builds a query for scanning a table with a primary key.
 // If start is true, scans from the beginning; otherwise resumes after the given key values.
 // The columnTypes map is used to determine which columns need special text collation handling.
-func buildScanQuery(start bool, keyColumns []string, columnTypes map[string]any, schemaName, tableName string, chunkSize int) string {
+func buildScanQuery(start bool, keyColumns []string, columnTypes map[string]any, schemaName, tableName string, chunkSize int, backfillFilter string) string {
 	var pkey []string
 	var args []string
 	for idx, colName := range keyColumns {
@@ -125,6 +135,29 @@ func buildScanQuery(start bool, keyColumns []string, columnTypes map[string]any,
 		pkey = append(pkey, quotedName)
 	}
 
+	// Generate a list of individual WHERE clauses which should be ANDed together
+	var whereClauses []string
+	if !start {
+		var predicate = new(strings.Builder)
+		for i := range len(pkey) {
+			if i == 0 {
+				predicate.WriteString("(")
+			} else {
+				predicate.WriteString(") OR (")
+			}
+
+			for j := 0; j < i; j++ {
+				fmt.Fprintf(predicate, "%s = %s AND ", pkey[j], args[j])
+			}
+			fmt.Fprintf(predicate, "%s > %s", pkey[i], args[i])
+		}
+		predicate.WriteString(")")
+		whereClauses = append(whereClauses, fmt.Sprintf("(%s)", predicate.String()))
+	}
+	if backfillFilter != "" {
+		whereClauses = append(whereClauses, fmt.Sprintf("(%s)", backfillFilter))
+	}
+
 	var query = new(strings.Builder)
 	fmt.Fprintf(query, "BEGIN ")
 	if !start {
@@ -135,20 +168,8 @@ func buildScanQuery(start bool, keyColumns []string, columnTypes map[string]any,
 		}
 	}
 	fmt.Fprintf(query, "SELECT * FROM [%s].[%s]", schemaName, tableName)
-	if !start {
-		for i := range len(pkey) {
-			if i == 0 {
-				fmt.Fprintf(query, " WHERE (")
-			} else {
-				fmt.Fprintf(query, ") OR (")
-			}
-
-			for j := 0; j < i; j++ {
-				fmt.Fprintf(query, "%s = %s AND ", pkey[j], args[j])
-			}
-			fmt.Fprintf(query, "%s > %s", pkey[i], args[i])
-		}
-		fmt.Fprintf(query, ")")
+	if len(whereClauses) > 0 {
+		fmt.Fprintf(query, " WHERE %s", strings.Join(whereClauses, " AND "))
 	}
 	fmt.Fprintf(query, " ORDER BY %s", strings.Join(pkey, ", "))
 	fmt.Fprintf(query, " OFFSET 0 ROWS FETCH FIRST %d ROWS ONLY;", chunkSize)

@@ -41,6 +41,11 @@ services:
       SCHEMA_REGISTRY_HOST_NAME: schema-registry
       SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'db:29092'
       SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+    healthcheck:
+      test: curl --fail --silent http://localhost:8081/subjects || exit 1
+      interval: 1s
+      timeout: 1s
+      retries: 60
     networks:
       - flow-test
 

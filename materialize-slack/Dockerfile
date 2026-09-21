@@ -28,11 +28,14 @@ WORKDIR /connector
 ENV PATH="/connector:$PATH"
 
 # Bring in the compiled connector artifact from the builder.
-COPY --from=builder /builder/connector ./connector
+COPY --from=builder /builder/connector ./materialize-slack
 
 # Avoid running the connector as root.
 USER nonroot:nonroot
 
+ARG CONNECTOR_VERSION=dev
+ENV CONNECTOR_VERSION="${CONNECTOR_VERSION}"
+
 LABEL FLOW_RUNTIME_PROTOCOL=materialize
 
-ENTRYPOINT ["/connector/connector"]
+ENTRYPOINT ["/connector/materialize-slack"]

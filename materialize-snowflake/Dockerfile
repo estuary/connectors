@@ -18,12 +18,11 @@ COPY go                      ./go
 COPY materialize-boilerplate ./materialize-boilerplate
 COPY materialize-snowflake   ./materialize-snowflake
 COPY materialize-sql         ./materialize-sql
-COPY testsupport             ./testsupport
 
 # Test and build the connector.
 RUN go test  -tags nozstd -v ./materialize-sql/...
 RUN go test  -tags nozstd -short -v ./materialize-snowflake/...
-RUN go build -tags nozstd -v -o ./connector ./materialize-snowflake/...
+RUN go build -tags nozstd -v -o ./connector ./materialize-snowflake/cmd/connector
 
 # Runtime Stage
 ################################################################################
@@ -44,6 +43,9 @@ ENV PATH="/connector:$PATH"
 
 # Bring in the compiled connector artifact from the builder.
 COPY --from=builder /builder/connector ./materialize-snowflake
+
+ARG CONNECTOR_VERSION=dev
+ENV CONNECTOR_VERSION="${CONNECTOR_VERSION}"
 
 LABEL FLOW_RUNTIME_PROTOCOL=materialize
 

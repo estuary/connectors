@@ -5,7 +5,7 @@ materializations:
   acmeCo/tests/materialize-bigtable:
     endpoint:
       local:
-        command: ["go", "run", "."]
+        command: ["go", "run", "./cmd/connector"]
         protobuf: true
         config: config.local.yaml
     bindings: &bindings
@@ -28,7 +28,7 @@ materializations:
   acmeCo/tests/materialize-bigtable-hard-delete:
     endpoint:
       local:
-        command: ["go", "run", "."]
+        command: ["go", "run", "./cmd/connector"]
         protobuf: true
         config: config.local.hard-delete.yaml
     bindings: *bindings

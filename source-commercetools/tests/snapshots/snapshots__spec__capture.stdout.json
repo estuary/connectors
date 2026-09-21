@@ -1,0 +1,113 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$defs": {
+        "ClientCredentialsOAuth2Credentials": {
+          "properties": {
+            "credentials_title": {
+              "const": "OAuth Credentials",
+              "default": "OAuth Credentials",
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "client_id": {
+              "secret": true,
+              "title": "Client Id",
+              "type": "string"
+            },
+            "client_secret": {
+              "secret": true,
+              "title": "Client Secret",
+              "type": "string"
+            }
+          },
+          "required": [
+            "client_id",
+            "client_secret"
+          ],
+          "title": "OAuth",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "region": {
+          "description": "The region hosting your commercetools Project. Visible in the API URL shown in the Merchant Center under Settings > Developer settings.",
+          "enum": [
+            "us-central1.gcp",
+            "us-east-2.aws",
+            "europe-west1.gcp",
+            "eu-central-1.aws",
+            "australia-southeast1.gcp"
+          ],
+          "title": "Region",
+          "type": "string"
+        },
+        "project_key": {
+          "description": "The key of your commercetools Project. Visible in the Merchant Center under Settings > Project settings.",
+          "title": "Project Key",
+          "type": "string"
+        },
+        "start_date": {
+          "description": "UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data modified before this date will not be replicated. If left blank, all available data will be captured.",
+          "format": "date-time",
+          "title": "Start Date",
+          "type": "string"
+        },
+        "credentials": {
+          "$ref": "#/$defs/ClientCredentialsOAuth2Credentials",
+          "description": "commercetools API Client credentials, created in the Merchant Center under Settings > Developer settings.",
+          "title": "Authentication"
+        }
+      },
+      "required": [
+        "region",
+        "project_key",
+        "credentials"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "description": "ResourceConfig is a common resource configuration shape.",
+      "properties": {
+        "_meta": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Meta"
+        },
+        "name": {
+          "description": "Name of this resource",
+          "title": "Name",
+          "type": "string"
+        },
+        "interval": {
+          "default": "PT0S",
+          "description": "Interval between updates for this resource",
+          "format": "duration",
+          "nonsensitive": true,
+          "title": "Interval",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ResourceConfig",
+      "type": "object"
+    },
+    "documentationUrl": "https://go.estuary.dev/source-commercetools",
+    "resourcePathPointers": [
+      "/name"
+    ]
+  }
+]

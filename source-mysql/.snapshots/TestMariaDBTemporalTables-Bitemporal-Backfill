@@ -1,0 +1,12 @@
+# ================================
+# Collection "acmeCo/test/test/mariadbtemporaltables_bitemporal_175197": 4 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"MariaDBTemporalTables_Bitemporal_175197","cursor":"backfill:0"}},"data":"one","id":1,"row_end":"<TIMESTAMP>","row_start":"<TIMESTAMP>","valid_from":"<TIMESTAMP>","valid_to":"<TIMESTAMP>"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"MariaDBTemporalTables_Bitemporal_175197","cursor":"backfill:1"}},"data":"two","id":2,"row_end":"<TIMESTAMP>","row_start":"<TIMESTAMP>","valid_from":"<TIMESTAMP>","valid_to":"<TIMESTAMP>"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"MariaDBTemporalTables_Bitemporal_175197","cursor":"backfill:2"}},"data":"two-v2","id":2,"row_end":"<TIMESTAMP>","row_start":"<TIMESTAMP>","valid_from":"<TIMESTAMP>","valid_to":"<TIMESTAMP>"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"MariaDBTemporalTables_Bitemporal_175197","cursor":"backfill:3"}},"data":"three","id":3,"row_end":"<TIMESTAMP>","row_start":"<TIMESTAMP>","valid_from":"<TIMESTAMP>","valid_to":"<TIMESTAMP>"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FMariaDBTemporalTables_Bitemporal_175197":{"backfilled":4,"key_columns":["id","row_end"],"metadata":{"charset":"utf8mb4","schema":{"columns":["id","valid_from","valid_to","data"],"implicit_system_versioning":true,"types":{"data":{"charset":"utf8mb4","type":"text"},"id":{"type":"int"},"row_end":"timestamp","row_start":"timestamp","valid_from":"datetime","valid_to":"datetime"}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+

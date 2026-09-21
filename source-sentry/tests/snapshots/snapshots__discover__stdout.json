@@ -38,7 +38,7 @@
           "description": "Document metadata"
         }
       },
-      "title": "Environment",
+      "title": "BaseDocument",
       "type": "object",
       "x-infer-schema": true,
       "if": {
@@ -189,27 +189,9 @@
         "_meta": {
           "$ref": "#/$defs/Meta",
           "description": "Document metadata"
-        },
-        "access": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Access",
-          "type": "array"
-        },
-        "features": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Features",
-          "type": "array"
         }
       },
-      "required": [
-        "access",
-        "features"
-      ],
-      "title": "Project",
+      "title": "BaseDocument",
       "type": "object",
       "x-infer-schema": true,
       "if": {
@@ -279,7 +261,7 @@
           "description": "Document metadata"
         }
       },
-      "title": "Release",
+      "title": "BaseDocument",
       "type": "object",
       "x-infer-schema": true,
       "if": {
@@ -347,19 +329,9 @@
         "_meta": {
           "$ref": "#/$defs/Meta",
           "description": "Document metadata"
-        },
-        "access": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Access",
-          "type": "array"
         }
       },
-      "required": [
-        "access"
-      ],
-      "title": "Team",
+      "title": "BaseDocument",
       "type": "object",
       "x-infer-schema": true,
       "if": {

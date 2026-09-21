@@ -22,20 +22,7 @@ properties:
   _meta:
     $ref: '#/$defs/Meta'
     description: Document metadata
-  access:
-    items:
-      type: string
-    title: Access
-    type: array
-  features:
-    items:
-      type: string
-    title: Features
-    type: array
-required:
-- access
-- features
-title: Project
+title: BaseDocument
 type: object
 x-infer-schema: true
 if:

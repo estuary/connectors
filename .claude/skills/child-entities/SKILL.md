@@ -1,3 +1,10 @@
+---
+name: child-entities
+description: Implement the child-entity pattern for an estuary-cdk connector — children that need a parent ID to list AND independent incremental sync per parent (separate cursor, composite key including the parent ID). Use when the parent ID is absent from the child's response body and must be stamped onto each document during validation; for children that can be re-snapshotted in full every interval, use the simpler snapshot-child approach instead.
+argument-hint: "[connector-name] [child-stream-name]"
+allowed-tools: Bash Read Write Edit Glob Grep
+---
+
 # Child Entity Pattern for estuary-cdk Connectors
 
 Use this when an API endpoint requires a parent ID to list child records, AND those children need independent incremental sync per parent (separate cursor, composite key including the parent ID). The canonical reference is `source-posthog`.
@@ -11,6 +18,8 @@ Check whether the parent ID is already in the child's response body. If it is, y
 ## Drain parents first, with the minimum data possible
 
 Before iterating to fetch children, drain the parent stream into a list of **only** the fields you actually need downstream — typically just `id`, plus any filter fields like `updated_at`. Do **not** interleave streaming a parent response with per-parent child requests. Holding a parent HTTP response open while fetching children for each parent leaves the parent connection idle long enough to trigger timeout errors. Don't buffer the full parent records — define a small dataclass or extract just `parent.id` (and the filter fields you need) to save on memory.
+
+**Reject empty parent IDs at the drain step.** An empty parent ID templates a malformed child path (e.g. `parents//children`) that typically returns nothing, silently orphaning every child instead of failing. Reject only the empty string, not every falsy value: integer IDs can legitimately be `0`.
 
 ## Pattern
 
@@ -109,6 +118,14 @@ Two things to notice:
 
 - **Key is composite**: `["/_meta/project_id", "/id"]`.
 - **Newly-added parents between runs**: `_patch_missing_project_states` adds cursor state entries for projects that appear after the capture first opened. Without this, a new project would have no cursor slot and be silently skipped. Mirror this if parents can be added after initial sync.
+
+## Backfilling children whose events accrue after the parent is created
+
+Scope such a backfill by an **activity signal, not by parent age.** When a child record is an _event_ that can attach to its parent long after the parent was created or sent — email opens/clicks/bounces on a campaign, comments on an issue, status changes on an order — the parent's own creation time tells you nothing about when its children arrive. Bounding the backfill on the parent's `since_create_time` (or skipping "old" parents) silently drops in-window activity on older parents: a parent created before the backfill's `start_date` can still have children inside `[start_date, cutoff]`, and only a freshness signal reveals that.
+
+Scope instead on a per-parent freshness field that reflects real activity in the window — a report/rollup value like `last_activity_at` / `last_open` / a bounce count — thresholded at `start_date`. That is the same recency gate the incremental phase uses, just thresholded at `start_date` rather than the live cursor.
+
+This is a **third variant** beyond the two in the table below: instead of one persisted cursor per parent (source-posthog) or a full re-snapshot every interval (source-ashby), you run a single **global** event-time cursor plus a recency gate that selects which parents to descend into each sweep — keeping state O(1) rather than O(parents). Use it when parents are numerous and only a few are active per sweep. The canonical reference is `source-mailchimp-native`'s `email_activity` (campaigns → per-campaign email-activity, gated on `/reports` recency fields). Its backfill still keys resumption on an immutable ordering field per `add-stream`'s house rule on backfill resumption keys.
 
 ## When to pick this vs. the snapshot-child shortcut
 

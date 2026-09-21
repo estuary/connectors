@@ -48,12 +48,34 @@ const (
 	statusFile = "status.json"
 )
 
+// computeJob is the fields required to start a compute job.
+type computeJob struct {
+	Input            any
+	EntryPointURI    string
+	PyFilesCommonURI string
+	Name             string
+	WorkingPrefix    string
+	// IdempotencyToken is used to avoid starting duplicate jobs.  If a job
+	// with this token is already started the computeRunner will attempt to
+	// adopt it and not start a new job.  If the job cannot be adopted, a new
+	// job will be created.
+	//
+	// Not all computeRunner implementations support this, in this case a new
+	// job will be started.
+	//
+	// This is a resource saving device, it cannot be relied on for
+	// correctness.  The token has a limited lifetime, and after it expires a
+	// new job would be created even with the same token.
+	IdempotencyToken   string
+	SparkJobProperties []sparkJobProperty
+}
+
 // computeRunner abstracts the execution backend that runs the materialization's
 // PySpark jobs. emrClient submits to AWS EMR Serverless for production
 // deployments; sparkClient shells out to a local Spark standalone cluster
 // running in docker-compose for integration tests.
 type computeRunner interface {
-	runJob(ctx context.Context, input any, entryPointURI, pyFilesCommonURI, jobName, workingPrefix string) error
+	runJob(ctx context.Context, job computeJob) error
 	checkPrereqs(ctx context.Context, errs *cerrors.PrereqErr)
 	ensureSecret(ctx context.Context, wantCred string) error
 }
@@ -77,15 +99,15 @@ func (Driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec
 }
 
 func (Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
-	return boilerplate.RunValidate(ctx, req, newMaterialization)
+	return boilerplate.RunValidate(ctx, req, NewMaterializer)
 }
 
 func (Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
-	return boilerplate.RunApply(ctx, req, newMaterialization)
+	return boilerplate.RunApply(ctx, req, NewMaterializer)
 }
 
 func (Driver) NewTransactor(ctx context.Context, req pm.Request_Open, be *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
-	return boilerplate.RunNewTransactor(ctx, req, be, newMaterialization)
+	return boilerplate.RunNewTransactor(ctx, req, be, NewMaterializer)
 }
 
 type materialization struct {
@@ -97,11 +119,15 @@ type materialization struct {
 	templates           templates
 	pyFiles             *pyFileURIs // populated in Setup and NewTransactor
 	locationStyle       LocationStyle
+	// variantColumns is the resolved variant_columns feature flag: JSON-shaped
+	// fields are materialized as Iceberg format v3 variant columns rather
+	// than JSON strings.
+	variantColumns bool
 }
 
 var _ boilerplate.Materializer[config, fieldConfig, resource, mapped] = &materialization{}
 
-func newMaterialization(ctx context.Context, materializationName string, cfg config, featureFlags map[string]bool) (boilerplate.Materializer[config, fieldConfig, resource, mapped], error) {
+func NewMaterializer(ctx context.Context, materializationName string, cfg config, featureFlags map[string]bool) (boilerplate.Materializer[config, fieldConfig, resource, mapped], error) {
 	catalog, err := cfg.toCatalog(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("creating catalog: %w", err)
@@ -138,6 +164,7 @@ func newMaterialization(ctx context.Context, materializationName string, cfg con
 			bucket:              bucket,
 			ssmClient:           ssmClient,
 			tokenURL:            catalog.TokenURL(),
+			variantColumns:      featureFlags["variant_columns"],
 		}
 	case computeTypeSparkStandalone:
 		compute = &sparkClient{
@@ -163,6 +190,7 @@ func newMaterialization(ctx context.Context, materializationName string, cfg con
 		compute:             compute,
 		templates:           parseTemplates(),
 		locationStyle:       locationStyle,
+		variantColumns:      featureFlags["variant_columns"],
 	}, nil
 }
 
@@ -177,7 +205,7 @@ func (d *materialization) Config() boilerplate.MaterializeCfg {
 			ExtendedLogging: true,
 			AckSchedule: &m.AckScheduleOption{
 				Config: d.cfg.Schedule,
-				Jitter: []byte(d.cfg.Compute.ApplicationId),
+				Jitter: []byte(d.materializationName),
 			},
 			DBTJobTrigger: &d.cfg.DBTJobTrigger,
 		},
@@ -315,7 +343,7 @@ func (d *materialization) NewConstraint(p pf.Projection, deltaUpdates bool, fc f
 }
 
 func (d *materialization) MapType(p boilerplate.Projection, fc fieldConfig) (mapped, boilerplate.ElementConverter) {
-	m, converter := mapProjection(p, d.cfg.Advanced.translateFieldName)
+	m, converter := mapProjection(p, d.cfg.Advanced.translateFieldName, d.variantColumns)
 	m.Nullable = fc.Nullable
 	return m, converter
 }
@@ -365,13 +393,21 @@ func (d *materialization) CreateResource(ctx context.Context, res boilerplate.Ma
 		properties[k] = v
 	}
 
+	hasVariant := schemaHasVariant(schema)
+	if hasVariant {
+		if err := checkFormatVersionProperty(res.Config.AdditionalTableProperties); err != nil {
+			return "", nil, err
+		}
+		properties[formatVersionProperty] = "3"
+	}
+
 	return fmt.Sprintf("created table %q.%q as %s", ns, name, schema.String()), func(ctx context.Context) error {
 		// The list of IdentifierFieldIDs will be empty for delta updates
 		// tables. For standard updates it is populated in collection key order.
 		// Collection keys are never allowed to change, and neither are the keys
 		// that were initially selected for a materialization.
 		if err := d.catalog.CreateTable(ctx, ns, name, schema, schema.IdentifierFieldIDs, location, properties); err != nil {
-			return err
+			return errorWithVariantHint(err, hasVariant)
 		}
 
 		if d.cfg.GlueOptimizers.anyEnabled() {
@@ -392,6 +428,42 @@ func (d *materialization) CreateResource(ctx context.Context, res boilerplate.Ma
 
 		return nil
 	}, nil
+}
+
+const formatVersionProperty = "format-version"
+
+const variantRemedy = "set the 'no_variant_columns' feature flag in the endpoint's advanced configuration to materialize these fields as JSON strings instead"
+
+const variantRemedyHint = "the catalog may not support Iceberg format v3 or variant columns; " + variantRemedy
+
+func schemaHasVariant(schema *iceberg.Schema) bool {
+	return slices.ContainsFunc(schema.Fields(), func(f iceberg.NestedField) bool {
+		return f.Type.Equals(iceberg.VariantType{})
+	})
+}
+
+func checkFormatVersionProperty(props map[string]string) error {
+	if v, ok := props[formatVersionProperty]; ok && v != "3" {
+		return fmt.Errorf("table property %s=%q conflicts with variant columns, which require format version 3: remove the property, or %s", formatVersionProperty, v, variantRemedy)
+	}
+	return nil
+}
+
+// errorWithVariantHint appends the remedy to a catalog error from a request that
+// carried a variant column, when the error itself is about the variant type
+// or the table's format version; other errors on such requests are left as
+// they are.
+func errorWithVariantHint(err error, hasVariant bool) error {
+	if err == nil || !hasVariant {
+		return err
+	}
+	msg := strings.ToLower(err.Error())
+	for _, marker := range []string{"variant", "format-version", "format version"} {
+		if strings.Contains(msg, marker) {
+			return fmt.Errorf("%w (%s)", err, variantRemedyHint)
+		}
+	}
+	return err
 }
 
 // defaultTableProperties returns the Iceberg table properties this connector
@@ -477,7 +549,19 @@ func (d *materialization) UpdateResource(
 	current := table.CurrentSchema()
 	next := computeSchemaForUpdatedTable(table.LastColumnID(), current, update)
 	reqs := []catalog.TableRequirement{catalog.AssertCurrentSchemaID(current.ID)}
-	upds := []catalog.TableUpdate{catalog.AddSchemaUpdate(next), catalog.SetCurrentSchemaUpdate(next.ID)}
+	var upds []catalog.TableUpdate
+	// A variant column is only valid in format v3. Upgrading in the same
+	// request as the schema change keeps the table valid throughout.
+	introducesVariant := schemaHasVariant(next) && !schemaHasVariant(current)
+	if introducesVariant {
+		if err := checkFormatVersionProperty(update.Binding.Config.AdditionalTableProperties); err != nil {
+			return "", nil, err
+		}
+		if table.Version() < 3 {
+			upds = append(upds, catalog.UpgradeFormatVersionUpdate(3))
+		}
+	}
+	upds = append(upds, catalog.AddSchemaUpdate(next), catalog.SetCurrentSchemaUpdate(next.ID))
 	action := fmt.Sprintf("updated table %q.%q schema from %s to %s", ns, name, current.String(), next.String())
 
 	var afterMigrateReqs []catalog.TableRequirement
@@ -503,7 +587,7 @@ func (d *materialization) UpdateResource(
 
 	return action, func(ctx context.Context) error {
 		if err := d.catalog.UpdateTable(ctx, ns, name, reqs, upds); err != nil {
-			return err
+			return errorWithVariantHint(err, schemaHasVariant(next))
 		}
 
 		if len(update.FieldsToMigrate) > 0 {
@@ -537,14 +621,13 @@ func (d *materialization) UpdateResource(
 			})
 			ll.Info("running column migration job")
 			ts := time.Now()
-			if err := d.compute.runJob(
-				ctx,
-				python.ExecInput{Query: q.String()},
-				d.pyFiles.exec,
-				d.pyFiles.common,
-				fmt.Sprintf("column migration for: %s", d.materializationName),
-				outputPrefix,
-			); err != nil {
+			if err := d.compute.runJob(ctx, computeJob{
+				Input:            python.ExecInput{Query: q.String()},
+				EntryPointURI:    d.pyFiles.exec,
+				PyFilesCommonURI: d.pyFiles.common,
+				Name:             fmt.Sprintf("column migration for: %s", d.materializationName),
+				WorkingPrefix:    outputPrefix,
+			}); err != nil {
 				return fmt.Errorf("failed to run column migration job: %w", err)
 			}
 			ll.WithField("took", time.Since(ts).String()).Info("column migration job complete")
@@ -635,8 +718,47 @@ func (d *materialization) CleanupTestTask(ctx context.Context, taskName string) 
 	return nil
 }
 
+// SnapshotTestResource reads a table back through the local Spark daemon,
+// which is the only compute backend that returns query results. Variant
+// columns are rendered as JSON text so their contents can be compared.
 func (d *materialization) SnapshotTestResource(ctx context.Context, path []string) ([]string, [][]any, error) {
-	return nil, nil, nil
+	querier, ok := d.compute.(rowQuerier)
+	if !ok {
+		return nil, nil, nil
+	}
+
+	ns, name := path[0], path[1]
+	tbl, err := d.catalog.GetTable(ctx, ns, name)
+	if err != nil {
+		return nil, nil, fmt.Errorf("getting table %s.%s: %w", ns, name, err)
+	}
+	schema := tbl.Metadata.CurrentSchema()
+
+	var selects, idents, orderBy []string
+	for _, f := range schema.Fields() {
+		ident := quoteIdentifier(f.Name)
+		idents = append(idents, ident)
+		if f.Type.Equals(iceberg.VariantType{}) {
+			selects = append(selects, fmt.Sprintf("TO_JSON(%s) AS %s", ident, ident))
+		} else {
+			selects = append(selects, ident)
+		}
+	}
+	for _, id := range schema.IdentifierFieldIDs {
+		if f, ok := schema.FindFieldByID(id); ok {
+			orderBy = append(orderBy, quoteIdentifier(f.Name))
+		}
+	}
+	if len(orderBy) == 0 {
+		// A delta-updates table has no identifier fields; its first column
+		// is the first key.
+		orderBy = idents[:1]
+	}
+
+	fqn := fmt.Sprintf("`estuary`.%s.%s", quoteIdentifier(ns), quoteIdentifier(name))
+	query := fmt.Sprintf("SELECT %s FROM %s ORDER BY %s", strings.Join(selects, ", "), fqn, strings.Join(orderBy, ", "))
+
+	return querier.queryRows(ctx, query)
 }
 
 func (d *materialization) Close(ctx context.Context) {}

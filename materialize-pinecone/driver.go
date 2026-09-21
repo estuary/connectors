@@ -242,7 +242,7 @@ func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_
 	}, nil
 }
 
-func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
+func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open, be *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
 	var cfg, err = resolveEndpointConfig(open.Materialization.ConfigJson)
 	if err != nil {
 		return nil, nil, nil, err
@@ -272,6 +272,7 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *m.Bi
 
 		bindings = append(bindings, binding{
 			conn:        conn,
+			path:        b.ResourcePath,
 			dataHeaders: b.FieldSelection.AllFields(),
 		})
 	}
@@ -279,6 +280,7 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *m.Bi
 	return &transactor{
 		openAiClient: cfg.openAiClient(),
 		bindings:     bindings,
+		be:           be,
 	}, &pm.Response_Opened{}, nil, nil
 }
 

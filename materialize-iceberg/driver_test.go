@@ -20,10 +20,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/estuary/connectors/go/common"
+	m "github.com/estuary/connectors/go/materialize"
 	"github.com/estuary/connectors/go/writer"
+	realBoilerplate "github.com/estuary/connectors/materialize-boilerplate"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate/testutil"
 	"github.com/estuary/connectors/materialize-iceberg/catalog"
 	"github.com/estuary/connectors/materialize-iceberg/python"
-	boilerplate "github.com/estuary/connectors/materialize-boilerplate/testutil"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/google/uuid"
 	"github.com/segmentio/encoding/json"
@@ -43,9 +46,15 @@ const (
 	composeFile    = "docker-compose.yaml"
 	composeProject = "materialize-iceberg"
 	credsPath      = "testdata/.local/polaris-creds.json"
-	configTemplate = "testdata/config.rest-local.yaml"
 	localConfig    = "testdata/.local/config.rest-local.yaml"
 )
+
+// localConfigTemplates are rendered with the bootstrapped Polaris credentials
+// into testdata/.local: one config per Spark set in the compose stack.
+var localConfigTemplates = map[string]string{
+	"testdata/config.rest-local.yaml":        localConfig,
+	"testdata/config.rest-local-spark4.yaml": "testdata/.local/config.rest-local-spark4.yaml",
+}
 
 var (
 	dockerOnce sync.Once
@@ -88,15 +97,16 @@ func composeUpAndBootstrap() error {
 		return fmt.Errorf("reading polaris bootstrap credentials: %w", err)
 	}
 
-	tmpl, err := os.ReadFile(configTemplate)
-	if err != nil {
-		return fmt.Errorf("reading %s: %w", configTemplate, err)
-	}
-
 	credential := creds.ClientID + ":" + creds.ClientSecret
-	rendered := strings.ReplaceAll(string(tmpl), "CREDENTIAL_PLACEHOLDER", credential)
-	if err := os.WriteFile(localConfig, []byte(rendered), 0o600); err != nil {
-		return fmt.Errorf("writing %s: %w", localConfig, err)
+	for template, out := range localConfigTemplates {
+		tmpl, err := os.ReadFile(template)
+		if err != nil {
+			return fmt.Errorf("reading %s: %w", template, err)
+		}
+		rendered := strings.ReplaceAll(string(tmpl), "CREDENTIAL_PLACEHOLDER", credential)
+		if err := os.WriteFile(out, []byte(rendered), 0o600); err != nil {
+			return fmt.Errorf("writing %s: %w", out, err)
+		}
 	}
 
 	return nil
@@ -155,6 +165,9 @@ func TestIntegration(t *testing.T) {
 		func(s string) string {
 			return regexp.MustCompile(`"s3://[^"]+\.csv\.gz"`).ReplaceAllString(s, `"s3://<bucket>/<uuid>.csv.gz"`)
 		},
+		func(s string) string {
+			return regexp.MustCompile(`"idempotency_token":\s*"[^"]*"`).ReplaceAllString(s, `"idempotency_token": "<uuid>"`)
+		},
 	}
 
 	all := *testAll || os.Getenv("ICEBERG_TEST_ALL") != ""
@@ -169,11 +182,12 @@ func TestIntegration(t *testing.T) {
 	}
 
 	t.Run("materialize", func(t *testing.T) {
-		boilerplate.RunMaterializationTestParallel(t, newMaterialization, materializeSpec, makeResourceFn, actionDescSanitizers)
+		boilerplate.RunMaterializationTestParallel(t, NewMaterializer, materializeSpec, makeResourceFn, actionDescSanitizers,
+			boilerplate.RuntimeConfig{Shards: 1, Fidelity: m.FidelityTotal})
 	})
 
 	t.Run("apply", func(t *testing.T) {
-		boilerplate.RunApplyTestParallel(t, &Driver{}, newMaterialization, applySpec, makeResourceFn)
+		boilerplate.RunApplyTestParallel(t, &Driver{}, NewMaterializer, applySpec, makeResourceFn)
 	})
 
 	t.Run("apply-drain", func(t *testing.T) {
@@ -199,7 +213,7 @@ func TestIntegration(t *testing.T) {
 				}{Action: "exec", Input: python.ExecInput{Query: query}})
 				require.NoError(t, err)
 
-				resp, err := http.Post("http://localhost:9806/run", "application/json", bytes.NewReader(body))
+				resp, err := http.Post(strings.TrimSuffix(cfg.Compute.DaemonURL, "/")+"/run", "application/json", bytes.NewReader(body))
 				require.NoError(t, err)
 				defer resp.Body.Close()
 				respBody, err := io.ReadAll(resp.Body)
@@ -237,7 +251,12 @@ func TestIntegration(t *testing.T) {
 				}
 
 				// Literals for the fields of the drain fixture specs; the key
-				// is read from the staged file's temporary view.
+				// is read from the staged file's temporary view. JSON-shaped
+				// fields are variant columns when the flag is on.
+				jsonLiteral := "'{}'"
+				if common.ParseFeatureFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults)["variant_columns"] {
+					jsonLiteral = "parse_json('{}')"
+				}
 				literals := map[string]string{
 					"key":                  "r.`key`",
 					"flow_published_at":    "current_timestamp()",
@@ -248,10 +267,10 @@ func TestIntegration(t *testing.T) {
 					"requiredInteger":      "1",
 					"optionalString":       "'opt'",
 					"requiredString":       "'req'",
-					"optionalObject":       "'{}'",
-					"requiredObject":       "'{}'",
-					"second_root":          "'{}'",
-					"flow_document":        "'{}'",
+					"optionalObject":       jsonLiteral,
+					"requiredObject":       jsonLiteral,
+					"second_root":          jsonLiteral,
+					"flow_document":        jsonLiteral,
 				}
 				fields := append(append([]string{}, b.FieldSelection.Keys...), b.FieldSelection.Values...)
 				if b.FieldSelection.Document != "" {
@@ -299,12 +318,38 @@ func TestIntegration(t *testing.T) {
 				require.NoError(t, sparkExec(t, fmt.Sprintf("DROP TABLE IF EXISTS %s", verifyFQN)))
 			}
 
-			boilerplate.RunApplyDrainTest(t, &Driver{}, newMaterialization, cfg, res, seedPending, verifyDrained)
+			boilerplate.RunApplyDrainTest(t, &Driver{}, NewMaterializer, cfg, res, seedPending, verifyDrained)
 		})
 	})
 
 	t.Run("migrate", func(t *testing.T) {
-		boilerplate.RunMigrationTestParallel(t, newMaterialization, migrateSpec, makeResourceFn, nil)
+		boilerplate.RunMigrationTestParallel(t, NewMaterializer, migrateSpec, makeResourceFn, nil)
+	})
+
+	// Variant scenarios run against the Spark 4 set only; Spark 3.5 cannot
+	// write variant columns. Their specs reference the spark4 config directly.
+	t.Run("variant-materialize", func(t *testing.T) {
+		// A single phase with a two-transaction fixture: v3 table creation,
+		// multi-type values kept as their JSON types, loads of variant
+		// documents through JSON, and hard deletes, with the table read back
+		// through Spark.
+		boilerplate.RunFeatureFlagMigrationTest(t, NewMaterializer, "testdata/materialize-variant-rest-local.flow.yaml", makeResourceFn, []boilerplate.FeatureFlagMigrationPhase{
+			{FeatureFlags: "variant_columns", Fixture: "testdata/fixture.variant.json"},
+		}, actionDescSanitizers)
+	})
+
+	t.Run("variant-migrate", func(t *testing.T) {
+		boilerplate.RunFeatureFlagMigrationTest(t, NewMaterializer, "testdata/migrate-variant-rest-local.flow.yaml", makeResourceFn, []boilerplate.FeatureFlagMigrationPhase{
+			{FeatureFlags: "no_variant_columns", Fixture: "testdata/fixture.variant-migrate.json"}, // materialize as JSON strings in a v2 table
+			{FeatureFlags: "variant_columns", Fixture: "testdata/fixture.variant-migrate.json"},    // migrate string -> variant, upgrading to v3
+			{FeatureFlags: "no_variant_columns", Fixture: "testdata/fixture.variant-migrate.json"}, // migrate variant -> string
+		}, actionDescSanitizers)
+	})
+
+	t.Run("variant-create-v3", func(t *testing.T) {
+		boilerplate.RunTestAllTasks(t, "testdata/materialize-variant-rest-local.flow.yaml", func(t *testing.T, _ []byte, taskName string, cfg config) {
+			runVariantCreateV3(t, taskName, cfg)
+		})
 	})
 
 	t.Run("ts-overflow-regression", func(t *testing.T) {
@@ -314,6 +359,112 @@ func TestIntegration(t *testing.T) {
 	t.Run("date-overflow-regression", func(t *testing.T) {
 		runDateOverflowRegression(t)
 	})
+}
+
+// runVariantCreateV3 pins what the migration snapshots only show indirectly: a
+// table created with variant columns is Iceberg format v3; a binding whose
+// additional table properties pin another format version is rejected rather
+// than silently overridden; and a format v2 table gains v3 in the same commit
+// that migrates its first column to variant.
+func runVariantCreateV3(t *testing.T, taskName string, cfg config) {
+	ctx := context.Background()
+
+	flags := common.ParseFeatureFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults)
+	require.True(t, flags["variant_columns"], "the spark4 config must enable variant_columns")
+	newMaterialization := func(variant bool) *materialization {
+		f := make(map[string]bool, len(flags))
+		for k, v := range flags {
+			f[k] = v
+		}
+		f["variant_columns"] = variant
+		mat, err := NewMaterializer(ctx, taskName, cfg, f)
+		require.NoError(t, err)
+		return mat.(*materialization)
+	}
+	on, off := newMaterialization(true), newMaterialization(false)
+
+	suffix := fmt.Sprintf("_flow_test_%d", time.Now().Unix())
+	newBinding := func(d *materialization, table string) (realBoilerplate.MappedBinding[config, resource, mapped], []string) {
+		res := resource{Table: table}.WithDefaults(cfg)
+		path, _, err := res.Parameters()
+		require.NoError(t, err)
+
+		project := func(field, ptr string, types []string, isKey bool) realBoilerplate.MappedProjection[mapped] {
+			p := realBoilerplate.MapProjection(pf.Projection{
+				Field:        field,
+				Ptr:          ptr,
+				IsPrimaryKey: isKey,
+				Inference:    pf.Inference{Types: types, Exists: pf.Inference_MUST},
+			}, fieldConfig{})
+			mt, _ := d.MapType(p, fieldConfig{})
+			return realBoilerplate.MappedProjection[mapped]{Projection: p, Mapped: mt}
+		}
+		doc := project("flow_document", "", []string{"object"}, false)
+		return realBoilerplate.MappedBinding[config, resource, mapped]{
+			MaterializationSpec_Binding: pf.MaterializationSpec_Binding{ResourcePath: path},
+			Config:                      res,
+			Keys:                        []realBoilerplate.MappedProjection[mapped]{project("id", "/id", []string{"integer"}, true)},
+			Values:                      []realBoilerplate.MappedProjection[mapped]{project("obj", "/obj", []string{"object"}, false)},
+			Document:                    &doc,
+		}, path
+	}
+	create := func(d *materialization, binding realBoilerplate.MappedBinding[config, resource, mapped], path []string) {
+		_, err := d.CreateNamespace(ctx, path[0])
+		require.NoError(t, err)
+		_, apply, err := d.CreateResource(ctx, binding)
+		require.NoError(t, err)
+		require.NoError(t, apply(ctx))
+		t.Cleanup(func() {
+			_, del, err := d.DeleteResource(context.Background(), path)
+			require.NoError(t, err)
+			_ = del(context.Background())
+		})
+	}
+	requireVariantV3 := func(path []string) {
+		tbl, err := on.catalog.GetTable(ctx, path[0], path[1])
+		require.NoError(t, err)
+		require.Equal(t, 3, tbl.Metadata.Version())
+		for _, name := range []string{"obj", "flow_document"} {
+			f, ok := tbl.Metadata.CurrentSchema().FindFieldByName(name)
+			require.True(t, ok, name)
+			require.Equal(t, "variant", f.Type.String(), name)
+		}
+	}
+
+	// A conflicting format-version property is rejected before anything is
+	// created; a clean create yields a v3 table with variant columns.
+	binding, path := newBinding(on, "variant_create"+suffix)
+	conflicting := binding
+	conflicting.Config.AdditionalTableProperties = map[string]string{formatVersionProperty: "2"}
+	_, _, err := on.CreateResource(ctx, conflicting)
+	require.ErrorContains(t, err, "require format version 3")
+	create(on, binding, path)
+	requireVariantV3(path)
+
+	// A table created without variant columns is format v2. Migrating its
+	// JSON string columns to variant upgrades it to v3 in the same request
+	// as the schema change.
+	v2Binding, v2Path := newBinding(off, "variant_upgrade"+suffix)
+	create(off, v2Binding, v2Path)
+	v2Table, err := off.catalog.GetTable(ctx, v2Path[0], v2Path[1])
+	require.NoError(t, err)
+	require.Equal(t, 2, v2Table.Metadata.Version())
+
+	upgraded, _ := newBinding(on, "variant_upgrade"+suffix)
+	update := realBoilerplate.BindingUpdate[config, resource, mapped]{Binding: upgraded}
+	for _, mp := range []realBoilerplate.MappedProjection[mapped]{upgraded.Values[0], *upgraded.Document} {
+		update.FieldsToMigrate = append(update.FieldsToMigrate, realBoilerplate.MigrateField[mapped]{
+			From: realBoilerplate.ExistingField{Name: mp.Mapped.Name, Type: "string"},
+			To:   mp,
+		})
+	}
+	// Setup stages the PySpark scripts the migration job runs.
+	_, err = on.Setup(ctx, nil)
+	require.NoError(t, err)
+	_, apply, err := on.UpdateResource(ctx, v2Path, realBoilerplate.ExistingResource{Meta: v2Table.Metadata}, update)
+	require.NoError(t, err)
+	require.NoError(t, apply(ctx))
+	requireVariantV3(v2Path)
 }
 
 // runTimestampOverflowRegression checks whether a year-10000 timestamp - the
@@ -387,7 +538,7 @@ func runTimestampOverflowRegression(t *testing.T) {
 		}},
 	}
 	body, err := json.Marshal(struct {
-		Action string             `json:"action"`
+		Action string            `json:"action"`
 		Input  python.MergeInput `json:"input"`
 	}{Action: "merge", Input: mergeInput})
 	require.NoError(t, err)

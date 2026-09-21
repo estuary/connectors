@@ -1078,7 +1078,7 @@
       "cancelReason": null,
       "cancelledAt": null,
       "clientIp": "76.182.0.22",
-      "closedAt": "2026-06-15T13:21:57Z",
+      "closedAt": "2026-08-18T17:51:39Z",
       "confirmationNumber": "ULEG58LMN",
       "confirmed": true,
       "createdAt": "2026-06-11T17:33:51Z",
@@ -1195,6 +1195,7 @@
           },
           "isGiftCard": false,
           "lineItemGroup": null,
+          "name": "Oatmeal",
           "nonFulfillableQuantity": 0,
           "originalTotalSet": {
             "presentmentMoney": {
@@ -1307,6 +1308,7 @@
           },
           "isGiftCard": false,
           "lineItemGroup": null,
+          "name": "The Collection Snowboard: Hydrogen",
           "nonFulfillableQuantity": 0,
           "originalTotalSet": {
             "presentmentMoney": {
@@ -1419,6 +1421,7 @@
           },
           "isGiftCard": false,
           "lineItemGroup": null,
+          "name": "The Collection Snowboard: Liquid",
           "nonFulfillableQuantity": 0,
           "originalTotalSet": {
             "presentmentMoney": {
@@ -1531,6 +1534,7 @@
           },
           "isGiftCard": false,
           "lineItemGroup": null,
+          "name": "The Collection Snowboard: Oxygen",
           "nonFulfillableQuantity": 0,
           "originalTotalSet": {
             "presentmentMoney": {
@@ -1643,6 +1647,7 @@
           },
           "isGiftCard": false,
           "lineItemGroup": null,
+          "name": "The Compare at Price Snowboard",
           "nonFulfillableQuantity": 0,
           "originalTotalSet": {
             "presentmentMoney": {
@@ -1755,6 +1760,7 @@
           },
           "isGiftCard": false,
           "lineItemGroup": null,
+          "name": "The Complete Snowboard - Ice",
           "nonFulfillableQuantity": 0,
           "originalTotalSet": {
             "presentmentMoney": {
@@ -1867,6 +1873,7 @@
           },
           "isGiftCard": false,
           "lineItemGroup": null,
+          "name": "The Complete Snowboard - Dawn",
           "nonFulfillableQuantity": 0,
           "originalTotalSet": {
             "presentmentMoney": {
@@ -1979,6 +1986,7 @@
           },
           "isGiftCard": false,
           "lineItemGroup": null,
+          "name": "The Complete Snowboard - Powder",
           "nonFulfillableQuantity": 0,
           "originalTotalSet": {
             "presentmentMoney": {
@@ -2091,6 +2099,7 @@
           },
           "isGiftCard": false,
           "lineItemGroup": null,
+          "name": "The Complete Snowboard - Electric",
           "nonFulfillableQuantity": 0,
           "originalTotalSet": {
             "presentmentMoney": {
@@ -2203,6 +2212,7 @@
           },
           "isGiftCard": false,
           "lineItemGroup": null,
+          "name": "The Complete Snowboard - Sunset",
           "nonFulfillableQuantity": 0,
           "originalTotalSet": {
             "presentmentMoney": {
@@ -2315,6 +2325,7 @@
           },
           "isGiftCard": false,
           "lineItemGroup": null,
+          "name": "The Videographer Snowboard",
           "nonFulfillableQuantity": 0,
           "originalTotalSet": {
             "presentmentMoney": {
@@ -6220,6 +6231,12 @@
             {
               "__parentId": "gid://shopify/Return/18804736045",
               "customerNote": null,
+              "fulfillmentLineItem": {
+                "id": "gid://shopify/FulfillmentLineItem/18166932996141",
+                "lineItem": {
+                  "id": "gid://shopify/LineItem/50297223512109"
+                }
+              },
               "id": "gid://shopify/ReturnLineItem/27743977517",
               "quantity": 5,
               "refundedQuantity": 5,
@@ -6234,6 +6251,12 @@
             {
               "__parentId": "gid://shopify/Return/18804736045",
               "customerNote": null,
+              "fulfillmentLineItem": {
+                "id": "gid://shopify/FulfillmentLineItem/18166933028909",
+                "lineItem": {
+                  "id": "gid://shopify/LineItem/50297223544877"
+                }
+              },
               "id": "gid://shopify/ReturnLineItem/27744010285",
               "quantity": 5,
               "refundedQuantity": 5,
@@ -6248,6 +6271,12 @@
             {
               "__parentId": "gid://shopify/Return/18804736045",
               "customerNote": null,
+              "fulfillmentLineItem": {
+                "id": "gid://shopify/FulfillmentLineItem/18166933061677",
+                "lineItem": {
+                  "id": "gid://shopify/LineItem/50297223577645"
+                }
+              },
               "id": "gid://shopify/ReturnLineItem/27744043053",
               "quantity": 5,
               "refundedQuantity": 5,
@@ -6262,6 +6291,12 @@
             {
               "__parentId": "gid://shopify/Return/18804736045",
               "customerNote": null,
+              "fulfillmentLineItem": {
+                "id": "gid://shopify/FulfillmentLineItem/18166933094445",
+                "lineItem": {
+                  "id": "gid://shopify/LineItem/50297223610413"
+                }
+              },
               "id": "gid://shopify/ReturnLineItem/27744075821",
               "quantity": 5,
               "refundedQuantity": 5,
@@ -6276,6 +6311,12 @@
             {
               "__parentId": "gid://shopify/Return/18804736045",
               "customerNote": null,
+              "fulfillmentLineItem": {
+                "id": "gid://shopify/FulfillmentLineItem/18166933127213",
+                "lineItem": {
+                  "id": "gid://shopify/LineItem/50297223643181"
+                }
+              },
               "id": "gid://shopify/ReturnLineItem/27744108589",
               "quantity": 5,
               "refundedQuantity": 5,
@@ -6290,6 +6331,12 @@
             {
               "__parentId": "gid://shopify/Return/18804736045",
               "customerNote": null,
+              "fulfillmentLineItem": {
+                "id": "gid://shopify/FulfillmentLineItem/18166933159981",
+                "lineItem": {
+                  "id": "gid://shopify/LineItem/50297223675949"
+                }
+              },
               "id": "gid://shopify/ReturnLineItem/27744141357",
               "quantity": 5,
               "refundedQuantity": 5,
@@ -6304,6 +6351,12 @@
             {
               "__parentId": "gid://shopify/Return/18804736045",
               "customerNote": null,
+              "fulfillmentLineItem": {
+                "id": "gid://shopify/FulfillmentLineItem/18166933192749",
+                "lineItem": {
+                  "id": "gid://shopify/LineItem/50297223708717"
+                }
+              },
               "id": "gid://shopify/ReturnLineItem/27744174125",
               "quantity": 5,
               "refundedQuantity": 5,
@@ -6318,6 +6371,12 @@
             {
               "__parentId": "gid://shopify/Return/18804736045",
               "customerNote": null,
+              "fulfillmentLineItem": {
+                "id": "gid://shopify/FulfillmentLineItem/18166933225517",
+                "lineItem": {
+                  "id": "gid://shopify/LineItem/50297223741485"
+                }
+              },
               "id": "gid://shopify/ReturnLineItem/27744206893",
               "quantity": 5,
               "refundedQuantity": 5,
@@ -6332,6 +6391,12 @@
             {
               "__parentId": "gid://shopify/Return/18804736045",
               "customerNote": null,
+              "fulfillmentLineItem": {
+                "id": "gid://shopify/FulfillmentLineItem/18166933258285",
+                "lineItem": {
+                  "id": "gid://shopify/LineItem/50297223774253"
+                }
+              },
               "id": "gid://shopify/ReturnLineItem/27744239661",
               "quantity": 5,
               "refundedQuantity": 5,
@@ -6346,6 +6411,12 @@
             {
               "__parentId": "gid://shopify/Return/18804736045",
               "customerNote": null,
+              "fulfillmentLineItem": {
+                "id": "gid://shopify/FulfillmentLineItem/18166933291053",
+                "lineItem": {
+                  "id": "gid://shopify/LineItem/50297223807021"
+                }
+              },
               "id": "gid://shopify/ReturnLineItem/27744272429",
               "quantity": 5,
               "refundedQuantity": 5,
@@ -6358,6 +6429,7 @@
               "returnReasonNote": "test reason"
             }
           ],
+          "returnShippingFees": [],
           "status": "CLOSED",
           "totalQuantity": 50
         }
@@ -6576,14 +6648,6 @@
             "name": "Point of Sale"
           },
           "publishDate": "2025-01-14T15:09:43Z"
-        },
-        {
-          "__parentId": "gid://shopify/Collection/295442513965",
-          "publication": {
-            "id": "gid://shopify/Publication/204831391789",
-            "name": "Microsoft Copilot"
-          },
-          "publishDate": "2026-06-26T04:37:46Z"
         }
       ],
       "sortOrder": "BEST_SELLING",
@@ -6658,14 +6722,6 @@
             "name": "Online Store"
           },
           "publishDate": "2025-01-14T15:10:14Z"
-        },
-        {
-          "__parentId": "gid://shopify/Collection/295442612269",
-          "publication": {
-            "id": "gid://shopify/Publication/204831391789",
-            "name": "Microsoft Copilot"
-          },
-          "publishDate": "2026-06-26T04:37:46Z"
         }
       ],
       "sortOrder": "BEST_SELLING",
@@ -6748,6 +6804,44 @@
       "legacyResourceId": "73871392813",
       "metafields": [],
       "updatedAt": "redacted"
+    }
+  ],
+  [
+    "acmeCo/markets",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "store": "estuary-alex-testing",
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "catalogs": [],
+      "catalogsCount": {
+        "count": 0,
+        "precision": "EXACT"
+      },
+      "conditions": {
+        "conditionTypes": [
+          "REGION"
+        ]
+      },
+      "currencySettings": {
+        "baseCurrency": {
+          "currencyCode": "USD",
+          "currencyName": "US Dollar",
+          "enabled": true,
+          "manualRate": null,
+          "rateUpdatedAt": null
+        },
+        "localCurrencies": false,
+        "roundingEnabled": true
+      },
+      "handle": "international",
+      "id": "gid://shopify/Market/45947256877",
+      "name": "International",
+      "priceInclusions": null,
+      "status": "ACTIVE",
+      "type": "REGION"
     }
   ]
 ]

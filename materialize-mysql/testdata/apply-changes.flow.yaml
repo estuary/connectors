@@ -11,7 +11,7 @@ materializations:
   acmeCo/tests/materialize-mysql/mysql:
     endpoint:
       local:
-        command: ["go", "run", "."]
+        command: ["go", "run", "./cmd/connector"]
         protobuf: true
         config: config.mysql.yaml
     bindings: &bindings
@@ -23,7 +23,7 @@ materializations:
   acmeCo/tests/materialize-mysql/mariadb:
     endpoint:
       local:
-        command: ["go", "run", "."]
+        command: ["go", "run", "./cmd/connector"]
         protobuf: true
         config: config.mariadb.yaml
     bindings: *bindings

@@ -65,11 +65,18 @@ def job_manager(
 
 @pytest.fixture
 def mock_model() -> MagicMock:
-    """Create mock insights model with minimal required attributes."""
+    """Create mock insights model with minimal required attributes.
+
+    `fields` carries the primary key columns because field splitting requests
+    them in every part so the parts can be re-joined.
+    """
     model = MagicMock()
+    model.name = "ads_insights"
     model.level = ApiLevel.AD
-    model.fields = ["impressions", "clicks"]
-    model.breakdowns = None
+    model.fields = ["account_id", "ad_id", "date_start", "impressions", "clicks"]
+    model.primary_keys = ["/account_id", "/ad_id", "/date_start"]
+    # A real model's `breakdowns` ClassVar defaults to [], never None.
+    model.breakdowns = []
     model.action_breakdowns = None
     model.action_attribution_windows = None
     return model

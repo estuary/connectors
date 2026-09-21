@@ -46,3 +46,4 @@ ENTRYPOINT ["/connector/source-onedrive"]
 
 LABEL FLOW_RUNTIME_PROTOCOL=capture
 LABEL CONNECTOR_PROTOCOL=flow-capture
+LABEL dev.estuary.usage-rate=0.33

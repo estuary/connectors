@@ -12,13 +12,17 @@ import pytest
 from estuary_cdk.capture import common
 from estuary_cdk.flow import ValidationError
 from estuary_cdk.http import HTTPError
-from estuary_cdk.incremental_csv_processor import BaseCSVRow
 
 from source_zuora import resources
 from source_zuora.models import (
+    DescribeField,
+    DescribeObject,
     EndpointConfig,
     TransactionDateDocument,
     UpdatedDateDocument,
+    UpdatedOnDocument,
+    ZuoraRow,
+    ZuoraType,
 )
 
 _LOG = logging.getLogger(__name__)
@@ -38,20 +42,35 @@ def _binding(name: str) -> SimpleNamespace:
     return SimpleNamespace(resourceConfig=SimpleNamespace(name=name))
 
 
+def _described(name: str, field_names: list[str]) -> DescribeObject:
+    """A describe response where every named field is exportable."""
+    return DescribeObject(
+        name=name,
+        fields=[
+            DescribeField(
+                name=field, selectable=True, contexts=["soap", "export"], type="text"
+            )
+            for field in field_names
+        ],
+    )
+
+
 # --- _describe_one -------------------------------------------------------------
 
 
 @pytest.mark.asyncio
 async def test_describe_one_success_returns_described_object():
     async def fake(base_url, http, log, name):
-        return ["Id", "UpdatedDate"]
+        return _described(name, ["Id", "UpdatedDate"])
 
-    with patch("source_zuora.resources.fetch_object_fields", fake):
+    with patch("source_zuora.resources.fetch_object_metadata", fake):
         result = await resources._describe_object(
             "Account", "u", AsyncMock(), _LOG
         )
     assert result is not None
     assert result.name == "Account" and result.fields == ["Id", "UpdatedDate"]
+    # Each column's declared type comes along, for the binding's sourced schema.
+    assert result.field_types == {"Id": ZuoraType.TEXT, "UpdatedDate": ZuoraType.TEXT}
 
 
 @pytest.mark.asyncio
@@ -59,7 +78,7 @@ async def test_describe_one_http_error_is_skipped():
     async def fake(base_url, http, log, name):
         raise HTTPError("nope", 500)
 
-    with patch("source_zuora.resources.fetch_object_fields", fake):
+    with patch("source_zuora.resources.fetch_object_metadata", fake):
         assert await resources._describe_object(
             "Account", "u", AsyncMock(), _LOG
         ) is None
@@ -70,7 +89,7 @@ async def test_describe_one_generic_error_is_skipped():
     async def fake(base_url, http, log, name):
         raise ValueError("bad xml")
 
-    with patch("source_zuora.resources.fetch_object_fields", fake):
+    with patch("source_zuora.resources.fetch_object_metadata", fake):
         assert await resources._describe_object(
             "Account", "u", AsyncMock(), _LOG
         ) is None
@@ -79,9 +98,9 @@ async def test_describe_one_generic_error_is_skipped():
 @pytest.mark.asyncio
 async def test_describe_one_no_exportable_fields_is_skipped():
     async def fake(base_url, http, log, name):
-        return []
+        return _described(name, [])
 
-    with patch("source_zuora.resources.fetch_object_fields", fake):
+    with patch("source_zuora.resources.fetch_object_metadata", fake):
         assert await resources._describe_object(
             "Account", "u", AsyncMock(), _LOG
         ) is None
@@ -94,7 +113,13 @@ def test_incremental_resource_shape_and_boundary_ownership():
     start = datetime(2020, 1, 1, tzinfo=UTC)
     cutoff = datetime(2024, 1, 1, tzinfo=UTC)
     r = resources._incremental_resource(
-        "Account", ["Id", "UpdatedDate"], UpdatedDateDocument, object(), start, cutoff
+        "Account",
+        ["Id", "UpdatedDate"],
+        {"Id": ZuoraType.TEXT, "UpdatedDate": ZuoraType.DATETIME},
+        UpdatedDateDocument,
+        object(),
+        start,
+        cutoff,
     )
     assert r.key == ["/Id"]
     assert r.model is UpdatedDateDocument
@@ -107,11 +132,87 @@ def test_incremental_resource_shape_and_boundary_ownership():
 
 
 def test_snapshot_resource_shape():
-    r = resources._snapshot_resource("Product", ["Id", "Name"], object())
+    r = resources._snapshot_resource(
+        "Product", ["Id", "Name"], {"Id": ZuoraType.TEXT, "Name": ZuoraType.TEXT}, object()
+    )
     assert isinstance(r, common.SnapshotResource)
     assert r.key == ["/_meta/row_id"]
-    assert r.model is BaseCSVRow
+    # ZuoraRow rather than BaseCSVRow: snapshots declare no fields either, but their
+    # boolean and datetime cells still need converting to match the sourced schema.
+    assert r.model is ZuoraRow
     assert r.schema_inference is True
+
+
+# --- open() emits the sourced schema -------------------------------------------
+
+
+class _FakeTask:
+    def __init__(self):
+        self.schemas: list[tuple[int, dict]] = []
+        self.checkpoints = 0
+
+    def sourced_schema(self, binding_index: int, schema: dict) -> None:
+        self.schemas.append((binding_index, schema))
+
+    async def checkpoint(self, state, merge_patch: bool = True) -> None:
+        self.checkpoints += 1
+
+
+@pytest.mark.asyncio
+async def test_incremental_open_emits_a_sourced_schema_and_flushes_it():
+    types = {"Id": ZuoraType.TEXT, "UpdatedDate": ZuoraType.DATETIME, "AutoPay": ZuoraType.BOOLEAN}
+    r = resources._incremental_resource(
+        "Account",
+        list(types),
+        types,
+        UpdatedDateDocument,
+        object(),
+        datetime(2020, 1, 1, tzinfo=UTC),
+        datetime(2024, 1, 1, tzinfo=UTC),
+    )
+    task = _FakeTask()
+    with patch.object(resources.common, "open_binding") as open_binding:
+        await r.open(SimpleNamespace(), 7, SimpleNamespace(), task, [])
+
+    assert len(task.schemas) == 1
+    index, schema = task.schemas[0]
+    assert index == 7
+    properties = schema["properties"]
+    assert properties["AutoPay"] == {"type": "boolean"}
+    assert properties["UpdatedDate"] == {"type": "string", "format": "date-time"}
+    # A binding with no new data would never checkpoint on its own, so the schema has
+    # to be flushed here or it is never emitted.
+    assert task.checkpoints == 1
+    assert open_binding.called
+
+
+@pytest.mark.asyncio
+async def test_open_passes_the_type_map_to_both_fetch_paths():
+    types = {"Id": ZuoraType.TEXT, "UpdatedDate": ZuoraType.DATETIME}
+    r = resources._incremental_resource(
+        "Account", list(types), types, UpdatedDateDocument, object(),
+        datetime(2020, 1, 1, tzinfo=UTC), datetime(2024, 1, 1, tzinfo=UTC),
+    )
+    with patch.object(resources.common, "open_binding") as open_binding:
+        await r.open(SimpleNamespace(), 0, SimpleNamespace(), _FakeTask(), [])
+
+    kwargs = open_binding.call_args.kwargs
+    # Without the type map reaching the fetch functions, documents would keep their raw
+    # cells and contradict the schema just declared.
+    assert types in kwargs["fetch_changes"].args
+    assert types in kwargs["fetch_page"].args
+
+
+@pytest.mark.asyncio
+async def test_snapshot_open_emits_a_sourced_schema_too():
+    types = {"Id": ZuoraType.TEXT, "CreatedOn": ZuoraType.DATETIME}
+    r = resources._snapshot_resource("EmailHistory", list(types), types, object())
+    task = _FakeTask()
+    with patch.object(resources.common, "open_binding") as open_binding:
+        await r.open(SimpleNamespace(), 3, SimpleNamespace(), task, [])
+
+    assert [i for i, _ in task.schemas] == [3]
+    assert types in open_binding.call_args.kwargs["fetch_snapshot"].args
 
 
 # --- all_resources / enabled_resources dispatch --------------------------------
@@ -121,12 +222,12 @@ def test_snapshot_resource_shape():
 async def test_all_resources_enumerates_catalog_and_dispatches_by_updated_date():
     async def fake_describe(base_url, http, log, name):
         # Account is incremental (has UpdatedDate); Product is a snapshot.
-        return ["Id", "UpdatedDate"] if name == "Account" else ["Id"]
+        return _described(name, ["Id", "UpdatedDate"] if name == "Account" else ["Id"])
 
     async def fake_catalog(base_url, http, log):
         return ["Account", "Product"]
 
-    with patch("source_zuora.resources.fetch_object_fields", fake_describe), patch(
+    with patch("source_zuora.resources.fetch_object_metadata", fake_describe), patch(
         "source_zuora.resources.discover_object_names", fake_catalog
     ), patch.object(resources, "_attach_token_source"):
         res = await resources.all_resources(_LOG, AsyncMock(), _config())
@@ -145,15 +246,19 @@ async def test_all_resources_classifies_by_cursor_field_priority():
         "PaymentTransactionLog": ["Id", "TransactionDate"],
         "Product": ["Id", "Name"],
         "Invoice": ["Id", "UpdatedDate", "TransactionDate"],
+        # AchNocEventLog spells its timestamps UpdatedOn/CreatedOn. Its
+        # PaymentMethodUpdatedDate must not be mistaken for a cursor: matching is by
+        # exact field name, not by suffix.
+        "AchNocEventLog": ["Id", "UpdatedOn", "CreatedOn", "PaymentMethodUpdatedDate"],
     }
 
     async def fake_describe(base_url, http, log, name):
-        return fields_by_object[name]
+        return _described(name, fields_by_object[name])
 
     async def fake_catalog(base_url, http, log):
         return list(fields_by_object)
 
-    with patch("source_zuora.resources.fetch_object_fields", fake_describe), patch(
+    with patch("source_zuora.resources.fetch_object_metadata", fake_describe), patch(
         "source_zuora.resources.discover_object_names", fake_catalog
     ), patch.object(resources, "_attach_token_source"):
         res = await resources.all_resources(_LOG, AsyncMock(), _config())
@@ -162,6 +267,9 @@ async def test_all_resources_classifies_by_cursor_field_priority():
     assert by_name["PaymentTransactionLog"].model is TransactionDateDocument
     assert by_name["Product"].key == ["/_meta/row_id"]  # snapshot
     assert by_name["Invoice"].model is UpdatedDateDocument  # UpdatedDate wins
+    # Incremental on UpdatedOn, keyed on /Id -- not a full-table snapshot.
+    assert by_name["AchNocEventLog"].model is UpdatedOnDocument
+    assert by_name["AchNocEventLog"].key == ["/Id"]
 
 
 @pytest.mark.asyncio
@@ -171,13 +279,13 @@ async def test_enabled_resources_describes_only_bound_objects():
 
     async def fake_describe(base_url, http, log, name):
         described.append(name)
-        return ["Id", "UpdatedDate"]
+        return _described(name, ["Id", "UpdatedDate"])
 
     async def fake_catalog(base_url, http, log):
         catalog_calls["n"] += 1
         return ["A", "B", "C"]
 
-    with patch("source_zuora.resources.fetch_object_fields", fake_describe), patch(
+    with patch("source_zuora.resources.fetch_object_metadata", fake_describe), patch(
         "source_zuora.resources.discover_object_names", fake_catalog
     ), patch.object(resources, "_attach_token_source"):
         await resources.enabled_resources(

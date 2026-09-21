@@ -58,14 +58,11 @@ def sheet(http: HTTPSession, spreadsheet_id: str, sheet: Sheet):
             tombstone=Row(_meta=Row.Meta(op="d")),
         )
 
-    return common.Resource(
+    return common.SnapshotResource(
         name=sheet.properties.title,
-        key=["/_meta/row_id"],
         model=Row,
         open=open,
-        initial_state=ResourceState(),
         initial_config=ResourceConfig(
             name=sheet.properties.title, interval=timedelta(seconds=30)
         ),
-        schema_inference=True,
     )

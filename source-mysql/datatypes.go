@@ -448,6 +448,14 @@ func encodeKeyFDB(key, ktype any) (tuple.TupleElement, error) {
 				// this is a viable placeholder solution.
 				return strconv.ParseFloat(string(val), 64)
 			}
+		case "date", "datetime", "time", "timestamp":
+			// Backfills return temporal values as []byte while binlog replication
+			// returns them as string. Normalize to the backfill representation so
+			// the same database key always has the same FDB tuple type. Retaining
+			// the []byte representation also keeps existing backfill cursors valid.
+			if val, ok := key.(string); ok {
+				return []byte(val), nil
+			}
 		}
 	}
 	return key, nil

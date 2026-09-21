@@ -31,10 +31,23 @@ _init_error: str | None = None
 # invocations.
 _run_lock = threading.Lock()
 
+def run_query(spark, input) -> dict:
+    """Test-only: return the rows of a query so the Go test harness can snapshot
+    table contents. Each row is the JSON Spark renders for it, which handles
+    timestamps, dates, decimals, and binary (as base64); null fields are
+    omitted."""
+    df = spark.sql(input["query"])
+    return {
+        "columns": df.columns,
+        "rows": [json.loads(r) for r in df.toJSON().collect()],
+    }
+
+
 ACTIONS = {
     "load": load_module.run,
     "merge": merge_module.run,
     "exec": exec_module.run,
+    "query": run_query,
 }
 
 
@@ -89,8 +102,8 @@ class Handler(BaseHTTPRequestHandler):
 
         try:
             with _run_lock:
-                fn(_session, input_data)
-            self._respond(200, {"success": True})
+                result = fn(_session, input_data)
+            self._respond(200, {"success": True, **(result or {})})
         except Exception as e:
             err = f"{e}\n{traceback.format_exc()}"
             print(f"spark daemon: job error: {err}", file=sys.stderr, flush=True)

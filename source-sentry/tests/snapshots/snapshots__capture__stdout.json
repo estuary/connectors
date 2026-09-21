@@ -89,55 +89,6 @@
     }
   ],
   [
-    "acmeCo/Releases",
-    {
-      "_meta": {
-        "op": "c",
-        "row_id": 0,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "authors": [],
-      "commitCount": 0,
-      "currentProjectMeta": {},
-      "data": {},
-      "dateCreated": "2026-05-18T18:26:30.511703Z",
-      "dateReleased": null,
-      "deployCount": 0,
-      "firstEvent": "redacted",
-      "id": 1788166050,
-      "lastCommit": null,
-      "lastDeploy": null,
-      "lastEvent": "redacted",
-      "newGroups": 1,
-      "owner": null,
-      "projects": [
-        {
-          "hasHealthData": false,
-          "id": 4509990551814144,
-          "name": "test-project",
-          "newGroups": 1,
-          "platform": "python",
-          "platforms": [],
-          "slug": "test-project"
-        }
-      ],
-      "ref": null,
-      "shortVersion": "4207f22a318401f6721384d51acd662be89109ed",
-      "status": "open",
-      "url": null,
-      "userAgent": null,
-      "version": "4207f22a318401f6721384d51acd662be89109ed",
-      "versionInfo": {
-        "buildHash": "4207f22a318401f6721384d51acd662be89109ed",
-        "description": "4207f22a3184",
-        "package": null,
-        "version": {
-          "raw": "4207f22a318401f6721384d51acd662be89109ed"
-        }
-      }
-    }
-  ],
-  [
     "acmeCo/Teams",
     {
       "_meta": {

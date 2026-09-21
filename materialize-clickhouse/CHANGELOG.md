@@ -1,5 +1,78 @@
 # Changelog
 
+## 2026-09-04
+
+### Changed
+- The client name the connector reports to ClickHouse is now `Estuary`, was
+  `EstuaryFlow`. This is the value shown in `system.query_log`,
+  `system.processes`, and similar tables. If you filter or group on that name,
+  update the value you match on. Historical rows keep the old name.
+
+## 2026-08-26
+
+### Fixed
+- A ClickHouse Cloud service waking up from idle scaling could take longer to
+  respond than the connector's retry budget allowed, failing the shard with a
+  handshake timeout instead of waiting it out. The retry budget is now wider
+  (16 attempts over up to 10 minutes, up from 8 over 5). A separate query run
+  while recovering from a restart was not retried at all and has the same
+  protection now.
+
+## 2026-08-25
+
+### Added
+- `1m`, `2m30s`, and `20m` are now valid `Sync Frequency` values, filling the
+  gaps between `30s`-`5m` and `15m`-`30m`.
+
+## 2026-08-11
+
+### Fixed
+- Materializing into an existing table whose `ORDER BY` does not cover the
+  binding's key fields destroyed rows: ClickHouse combines rows that share a
+  sorting key, so a table keyed on fewer columns than the collection discarded
+  rows that were not duplicates. A table like this is now rejected when the
+  materialization is published and when the task starts, naming the table's
+  `ORDER BY`, the binding's key fields, and how to resolve it. To resolve it, drop
+  or rename the table and backfill the binding, or point the binding at a
+  different table; ClickHouse cannot change a table's sorting key in place. A
+  sorting key that lists the same fields in a different order still works. One
+  with extra fields also still works but is reported as a warning: no rows are
+  lost, but the table keeps superseded versions of a key, so reads that do not use
+  `FINAL` can return more than one row per key.
+- A transaction that could not account for all of the rows it wrote failed after
+  the fact and then committed anyway on the next restart, silently losing the rows
+  that were missing. Such a transaction is now failed before it is committed and is
+  retried in full.
+- Recovering an interrupted transaction that is missing rows for no discoverable
+  reason now fails with an error naming the table and both row counts, instead of
+  committing what remains. Backfill the binding if its table is missing rows.
+  This only affects transactions interrupted while running a version of the
+  connector released before this one.
+
+## 2026-08-10
+
+### Fixed
+- The load query joined the target table against the staging table of keys,
+  which read every row of the target -- including the whole `flow_document`
+  column -- for each transaction. On a large binding this could exceed the
+  ClickHouse driver's read deadline, failing the query and restarting the
+  transaction without it ever committing. The load query now restricts the
+  target to the staged keys directly, so ClickHouse resolves them through the
+  table's primary key index and reads only the rows being loaded.
+
+## 2026-08-06
+
+### Fixed
+- Load waited for the prior transaction's acknowledgment before it could begin
+  staging keys, which could force transactions to be smaller than necessary.
+  Load now only waits for its persistent staging tables to be established, so
+  staging can proceed concurrently with the prior transaction's acknowledgment.
+
+### Changed
+- Load batches are sent once a full batch is collected, instead of when the
+  load binding changes.  On tasks with many active bindings, this should
+  generally result in larger batch sizes.
+
 ## 2026-07-29
 
 ### Fixed

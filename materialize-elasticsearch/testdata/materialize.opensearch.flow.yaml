@@ -5,7 +5,7 @@ materializations:
   acmeCo/tests/materialize-elasticsearch:
     endpoint:
       local:
-        command: ["go", "run", "."]
+        command: ["go", "run", "./cmd/connector"]
         protobuf: true
         config: config.opensearch.local.yaml
     bindings:

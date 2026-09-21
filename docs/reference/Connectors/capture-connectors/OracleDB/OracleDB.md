@@ -160,6 +160,7 @@ To allow secure connections via SSH tunneling:
 | `/advanced/discover_schemas`       | Discover Schemas       | If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas.                                                                                                                                                                                              | string  |                                |
 | `/advanced/node_id`                | Node ID                | Node ID for the capture. Each node in a replication cluster must have a unique 32-bit ID. The specific value doesn't matter so long as it is unique. If unset or zero the connector will pick a value.                                                                                                                                          | integer |                                |
 | `/advanced/source_tag` | Source Tag | This value is added as the property 'tag' in the source metadata of each document. | string |  |
+| `/advanced/rediscovery_interval` | Rediscovery Interval | How often the connector re-runs discovery while a capture is running, in order to notice schema changes and newly added tables. Accepts duration strings like `15m` or `1h`, from `1m` up to `8760h`. | string | `"15m"` |
 
 
 #### Bindings
@@ -168,6 +169,9 @@ To allow secure connections via SSH tunneling:
 |------------------|-----------|--------------------------------------------------------------------------------------------|--------|------------------|
 | **`/namespace`** | Namespace | The [owner/schema](https://docs.oracle.com/database/121/CNCPT/intro.htm#CNCPT940) of the table.                                                         | string | Required         |
 | **`/stream`**    | Stream    | Table name.                                                                                | string | Required         |
+| `/mode` | [Backfill Mode](/reference/backfilling-data/#resource-configuration-backfill-modes) | How the preexisting contents of the table should be backfilled. This should generally not be changed. | string | `""` |
+| `/priority` | Backfill Priority | Optional priority for this binding. The highest priority binding(s) will be backfilled completely before any others. Negative priorities are allowed and will cause a binding to be backfilled after others. | integer | `0` |
+| `/advanced/additional_backfill_filter` | Additional Backfill Filter | Optional filter clause which will be applied to all backfill queries for this binding. Contact Estuary support for assistance before using this option. | string | |
 
 
 ### Sample

@@ -38,7 +38,7 @@ type config struct {
 }
 
 type advancedConfig struct {
-	AscendingKeys bool `json:"ascendingKeys,omitempty"`
+	AscendingKeys bool `json:"ascendingKeys,omitempty" jsonschema_extras:"nonsensitive=true"`
 }
 
 func (c config) Validate() error {

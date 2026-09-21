@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -77,7 +77,7 @@ func TestDatabricksConfig(t *testing.T) {
 }
 
 func TestSpecification(t *testing.T) {
-	var resp, err = newDatabricksDriver().
+	var resp, err = NewDriver().
 		Spec(context.Background(), &pm.Request_Spec{})
 	require.NoError(t, err)
 

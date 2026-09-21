@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -109,7 +109,7 @@ type config struct {
 	Password   string `json:"password,omitempty" jsonschema:"-"`
 	Database   string `json:"database,omitempty" jsonschema:"title=Database,description=Name of the logical database to materialize to." jsonschema_extras:"order=2"`
 	Schema     string `json:"schema,omitempty" jsonschema:"title=Database Schema,default=public,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables" jsonschema_extras:"order=3"`
-	HardDelete bool   `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=4"`
+	HardDelete bool   `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=4,nonsensitive=true"`
 
 	Credentials *credentialConfig `json:"credentials" jsonschema_extras:"x-iam-auth=true,x-iam-azure-scope=https://ossrdbms-aad.database.windows.net/.default,order=5"`
 
@@ -122,8 +122,8 @@ type config struct {
 
 type advancedConfig struct {
 	SSLMode        string `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Overrides SSL connection behavior by setting the 'sslmode' parameter.,enum=disable,enum=allow,enum=prefer,enum=require,enum=verify-ca,enum=verify-full"`
-	NoFlowDocument bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false"`
-	FeatureFlags   string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	NoFlowDocument bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false" jsonschema_extras:"nonsensitive=true"`
+	FeatureFlags   string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
 }
 
 func (c config) DefaultNamespace() string {
@@ -263,7 +263,7 @@ type tableConfig struct {
 	Table         string `json:"table" jsonschema:"title=Table,description=Name of the database table" jsonschema_extras:"x-collection-name=true"`
 	Schema        string `json:"schema,omitempty" jsonschema:"title=Alternative Schema,description=Alternative schema for this table (optional)" jsonschema_extras:"x-schema-name=true"`
 	AdditionalSql string `json:"additional_table_create_sql,omitempty" jsonschema:"title=Additional Table Create SQL,description=Additional SQL statement(s) to be run in the same transaction that creates the table." jsonschema_extras:"multiline=true"`
-	Delta         bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false." jsonschema_extras:"x-delta-updates=true"`
+	Delta         bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false." jsonschema_extras:"x-delta-updates=true,nonsensitive=true"`
 }
 
 func (c tableConfig) WithDefaults(cfg config) tableConfig {
@@ -291,7 +291,7 @@ func (c tableConfig) Parameters() ([]string, bool, error) {
 	return path, c.Delta, nil
 }
 
-func newPostgresDriver() *sql.Driver[config, tableConfig] {
+func NewDriver() *sql.Driver[config, tableConfig] {
 	return &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-postgresql",
 		StartTunnel: func(ctx context.Context, cfg config) error {
@@ -498,8 +498,10 @@ func (t *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSp
 	return t.store.fence.Checkpoint, nil
 }
 
-func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
-func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) { return nil, nil }
+func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
+	return nil, nil
+}
 
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
@@ -534,7 +536,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		}
 
 		if batchBytes >= batchBytesLimit || batch.Len() > batchSizeLimit {
-			if err := sendBatch(ctx, txn, &batch); err != nil {
+			if _, err := sendBatch(ctx, txn, &batch); err != nil {
 				return fmt.Errorf("sending load batch: %w", err)
 			}
 			batchBytes = 0
@@ -548,7 +550,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 	// Send any remaining keys for this load.
 	if batch.Len() > 0 {
-		if err := sendBatch(ctx, txn, &batch); err != nil {
+		if _, err := sendBatch(ctx, txn, &batch); err != nil {
 			return fmt.Errorf("sending final load batch: %w", err)
 		}
 	}
@@ -630,10 +632,24 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	defer defuser.MaybeRollback()
 
 	var batch pgx.Batch
+	var batchBindings []int // Binding of each queued statement, parallel to batch.
 	batchBytes := 0
+
+	var round = it.Round
+	var rowsAffected = make([]int64, len(d.bindings))
+	var stored = make([]bool, len(d.bindings))
+	countRows := func(rows []int64) {
+		for i, n := range rows {
+			rowsAffected[batchBindings[i]] += n
+		}
+		batchBindings = batchBindings[:0]
+	}
+
 	// Skip deleted, non-existent documents iff HardDelete is enabled.
 	for it.Next(d.cfg.HardDelete) {
 		var b = d.bindings[it.Binding]
+		batchBindings = append(batchBindings, it.Binding)
+		stored[it.Binding] = true
 
 		if it.Delete && d.cfg.HardDelete {
 			if converted, err := b.target.ConvertKey(it.Key); err != nil {
@@ -658,8 +674,10 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		}
 
 		if batchBytes >= batchBytesLimit || batch.Len() > batchSizeLimit {
-			if err := sendBatch(ctx, txn, &batch); err != nil {
+			if rows, err := sendBatch(ctx, txn, &batch); err != nil {
 				return nil, fmt.Errorf("sending store batch: %w", err)
+			} else {
+				countRows(rows)
 			}
 			batchBytes = 0
 		}
@@ -688,8 +706,10 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 		// Execute all remaining doc inserts & updates.
 		for i := 0; i < batch.Len()-1; i++ {
-			if _, err := results.Exec(); err != nil {
+			if tag, err := results.Exec(); err != nil {
 				return nil, m.FinishedOperation(fmt.Errorf("store at index %d: %w", i, err))
+			} else {
+				rowsAffected[batchBindings[i]] += tag.RowsAffected()
 			}
 		}
 
@@ -702,6 +722,12 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			return nil, m.FinishedOperation(fmt.Errorf("this instance was fenced off by another"))
 		} else if err = results.Close(); err != nil {
 			return nil, m.FinishedOperation(fmt.Errorf("results.Close(): %w", err))
+		}
+
+		for i, b := range d.bindings {
+			if stored[i] {
+				d.be.ReportRowStats(round, b.target.Path, m.TotalRowStats(rowsAffected[i]))
+			}
 		}
 
 		commitCtx, cancel := ctxWithQueryTimeout(ctx)
@@ -733,28 +759,27 @@ func (d *transactor) Destroy() {
 	d.store.conn.Close(context.Background())
 }
 
-func main() {
-	boilerplate.RunMain(newPostgresDriver())
-}
-
-// Send a single batch of queries with the given transaction, discarding any results. The batch is
-// zero'd upon completion.
-func sendBatch(ctx context.Context, txn pgx.Tx, batch *pgx.Batch) error {
+// Send a single batch of queries with the given transaction, returning the rows affected by each
+// statement in order. The batch is zero'd upon completion.
+func sendBatch(ctx context.Context, txn pgx.Tx, batch *pgx.Batch) ([]int64, error) {
 	ctx, cancel := ctxWithQueryTimeout(ctx)
 	defer cancel()
 
 	results := txn.SendBatch(ctx, batch)
+	rows := make([]int64, 0, batch.Len())
 	for i := range batch.Len() {
-		if _, err := results.Exec(); err != nil {
-			return fmt.Errorf("exec at index %d: %w", i, err)
+		if tag, err := results.Exec(); err != nil {
+			return nil, fmt.Errorf("exec at index %d: %w", i, err)
+		} else {
+			rows = append(rows, tag.RowsAffected())
 		}
 	}
 	if err := results.Close(); err != nil {
-		return fmt.Errorf("closing batch: %w", err)
+		return nil, fmt.Errorf("closing batch: %w", err)
 	}
 
 	var newBatch pgx.Batch
 	*batch = newBatch
 
-	return nil
+	return rows, nil
 }

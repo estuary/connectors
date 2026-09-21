@@ -1,5 +1,30 @@
 # materialize-snowflake
 
+## 2026-09-12
+
+### Fixed
+- Support loading the `flow_document` from non-variant columns.  This can be
+  used along with a custom DDL and castToString to store the flow_document as a
+  string, which may be required if the document contains certain values.
+
+## 2026-09-11
+
+### Fixed
+- Fix channel closed panic when debug logging is enabled.
+
+## 2026-08-25
+
+### Added
+- `1m`, `2m30s`, and `20m` are now valid `Sync Frequency` values, filling the
+  gaps between `30s`-`5m` and `15m`-`30m`.
+
+## 2026-08-24
+
+### Fixed
+- A `number` column no longer fails the transaction when it receives a whole
+  number larger than the `int64` maximum. These values arrive as `uint64` or
+  `big.Int`, and the connector now converts them to a float.
+
 ## 2026-07-23
 
 ### Changed

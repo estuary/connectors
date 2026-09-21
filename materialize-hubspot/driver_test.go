@@ -684,7 +684,7 @@ func runMaterializationTestForTask(
 
 	actionDescription := testutil.RunFlowctl(
 		t,
-		"preview",
+		"raw", "preview-next",
 		"--name", task.Name,
 		"--source", task.Source,
 		"--fixture", "testdata/fixture.materialize.json",
@@ -787,6 +787,6 @@ func TestIntegration(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("materialize", func(t *testing.T) {
-		RunMaterializationTest(t, newMaterialization, "testdata/materialize.flow.yaml", config, configFile, nil)
+		RunMaterializationTest(t, NewMaterializer, "testdata/materialize.flow.yaml", config, configFile, nil)
 	})
 }

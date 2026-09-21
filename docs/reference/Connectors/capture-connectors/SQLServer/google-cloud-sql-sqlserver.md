@@ -108,17 +108,39 @@ See [connectors](/concepts/connectors.md#using-connectors) to learn more about u
 | **`/address`**                  | Server Address      | The host or host:port at which the database can be reached.                                                                                 | string  | Required                   |
 | **`/database`**                 | Database            | Logical database name to capture from.                                                                                                      | string  | Required                   |
 | **`/user`**                     | User                | The database user to authenticate as.                                                                                                       | string  | Required, `"flow_capture"` |
-| **`/password`**                 | Password            | Password for the specified database user.                                                                                                   | string  | Required                   |
 | `/historyMode` | History Mode | Capture each change event, without merging. | boolean | `false` |
+
+##### Authentication
+
+| Property | Title | Description | Type | Required/Default |
+| --- | --- | --- | --- | --- |
+| **`/credentials`** | Authentication | Authentication method and credentials that provide access to the database. | object | Required |
+| `/credentials/auth_type` | Auth Type | The authentication method to use. Google Cloud SQL for SQL Server supports `UserPassword`. | string |  |
+| `/credentials/password` | Password | Password for the specified database user. | string | Required for `UserPassword` auth |
+
+##### Discovery Filters
+
+Options that restrict which tables are surfaced by discovery. These take effect
+when discovery runs. If your capture has automatic discovery enabled, a table
+these filters exclude will be deactivated the next time discovery runs.
+
+| Property | Title | Description | Type | Required/Default |
+| --- | --- | --- | --- | --- |
 | `/discoveryFilters` | Discovery Filters | Options that restrict which tables are visible to discovery. | object |  |
 | `/discoveryFilters/include_schemas` | Include Schemas | If specified, only tables in the listed schemas are discovered. | string array |  |
 | `/discoveryFilters/exclude_schemas` | Exclude Schemas | Tables in the listed schemas are excluded from discovery. | string array |  |
 | `/discoveryFilters/table_patterns` | Table Patterns | If specified, only tables matching at least one of these glob patterns are discovered. A pattern containing a `.` matches against the qualified `schema.table` name. A pattern without a `.` matches the unqualified table name in any schema. Use `*` or `?` as wildcards. | string array |  |
 | `/discoveryFilters/discover_only_enabled` | Discover Only CDC-Enabled Tables | When set, the connector only discovers tables which already have CDC capture instances enabled. Combined as a union with the equivalent setting under Advanced Options. | boolean |  |
+
+##### Advanced options
+
+| Property | Title | Description | Type | Required/Default |
+| --- | --- | --- | --- | --- |
 | `/advanced`                     | Advanced Options    | Options for advanced users. You should not typically need to modify these.                                                                  | object  |                            |
 | `/advanced/backfill_chunk_size` | Backfill Chunk Size | The number of rows which should be fetched from the database in a single backfill query.                                                    | integer | `4096`                     |
 | `/advanced/skip_backfills`      | Skip Backfills      | A comma-separated list of fully-qualified table names which should not be backfilled.                                                       | string  |                            |
 | `/advanced/source_tag` | Source Tag | This value is added as the property 'tag' in the source metadata of each document. | string |  |
+| `/advanced/rediscovery_interval` | Rediscovery Interval | How often the connector re-runs discovery while a capture is running, in order to notice schema changes and newly added tables. Accepts duration strings like `15m` or `1h`, from `1m` up to `8760h`. | string | `"15m"` |
 
 #### Bindings
 
@@ -126,7 +148,10 @@ See [connectors](/concepts/connectors.md#using-connectors) to learn more about u
 | ---------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- | ---------------- |
 | **`/namespace`** | Namespace           | The [namespace/schema](https://learn.microsoft.com/en-us/sql/relational-databases/databases/databases?view=sql-server-ver16#basic-information-about-databases) of the table. | string                                                        | Required         |
 | **`/stream`**    | Stream              | Table name.                                                                                                                                                                  | string                                                        | Required         |
-| `/primary_key`   | Primary Key Columns | array                                                                                                                                                                        | The columns which together form the primary key of the table. |                  |
+| `/primary_key`   | Primary Key Columns | The columns which together form the primary key of the table.                                                                                                                | array                                                          |                  |
+| `/mode` | [Backfill Mode](/reference/backfilling-data/#resource-configuration-backfill-modes) | How the preexisting contents of the table should be backfilled. This should generally not be changed. | string | `""` |
+| `/priority` | Backfill Priority | Optional priority for this binding. The highest priority binding(s) will be backfilled completely before any others. Negative priorities are allowed and will cause a binding to be backfilled after others. | integer | `0` |
+| `/advanced/additional_backfill_filter` | Additional Backfill Filter | Optional filter clause which will be applied to all backfill queries for this binding. Contact Estuary support for assistance before using this option. | string | |
 
 ### Sample
 
@@ -140,7 +165,9 @@ captures:
           address: "<host>:1433"
           database: "my_db"
           user: "flow_capture"
-          password: "secret"
+          credentials:
+            auth_type: UserPassword
+            password: "secret"
     bindings:
       - resource:
           stream: ${TABLE_NAME}

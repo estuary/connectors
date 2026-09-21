@@ -9,28 +9,32 @@ from estuary_cdk.capture.common import CaptureBinding, ResourceConfig, ResourceS
 from estuary_cdk.flow import OAuth2TokenFlowSpec, ValidationError
 from estuary_cdk.http import HTTPError, HTTPMixin, TokenSource
 
-from estuary_cdk.incremental_csv_processor import BaseCSVRow
-
 from .api import (
     LAG,
     discover_object_names,
     fetch_changes,
-    fetch_object_fields,
+    fetch_object_metadata,
     fetch_page,
     fetch_snapshot,
 )
 from .export_manager import ExportManager
 from .models import (
+    ConnectorState,
     EndpointConfig,
     TransactionDateDocument,
     UpdatedDateDocument,
+    UpdatedOnDocument,
     ZuoraDocument,
+    ZuoraRow,
+    ZuoraType,
+    sourced_schema,
 )
 
 
 DOCUMENT_MODELS: list[type[ZuoraDocument]] = [
     UpdatedDateDocument,
     TransactionDateDocument,
+    UpdatedOnDocument,
 ]
 
 
@@ -49,9 +53,11 @@ def _attach_token_source(http: HTTPMixin, config: EndpointConfig) -> None:
 
 @dataclass(frozen=True)
 class DescribedObject:
-    """A queryable Zuora object and its exportable field names."""
+    """A queryable Zuora object, the field names its export selects, and the Zuora
+    type of each column those fields produce."""
     name: str
     fields: list[str]
+    field_types: dict[str, ZuoraType]
 
 
 async def validate_credentials(
@@ -78,33 +84,41 @@ async def _describe_object(
 ) -> DescribedObject | None:
     async with _DISCOVER_SEM:
         try:
-            fields = await fetch_object_fields(base_url, http, log, object_name)
+            described = await fetch_object_metadata(base_url, http, log, object_name)
         except Exception as err:
             detail = {"http_code": err.code} if isinstance(err, HTTPError) else {"error": str(err)}
             log.warning("Skipping object: describe failed", {"object": object_name, **detail})
             return None
 
-    if not fields:
+    if not described.query_field_names:
         log.warning("Skipping object: no selectable fields", {"object": object_name})
         return None
-    return DescribedObject(name=object_name, fields=fields)
+    return DescribedObject(
+        name=object_name,
+        fields=described.query_field_names,
+        field_types=described.query_field_types,
+    )
 
 
 def _incremental_resource(
     object_name: str,
     fields: list[str],
+    field_types: dict[str, ZuoraType],
     model: type[ZuoraDocument],
     manager: ExportManager,
     start_date: datetime,
     cutoff: datetime,
 ) -> common.Resource:
-    def open(
+    async def open(
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
         state: ResourceState,
         task: Task,
         all_bindings,
     ) -> None:
+        task.sourced_schema(binding_index, sourced_schema(field_types))
+        await task.checkpoint(state=ConnectorState())
+
         common.open_binding(
             binding,
             binding_index,
@@ -114,6 +128,7 @@ def _incremental_resource(
                 fetch_changes,
                 object_name,
                 fields,
+                field_types,
                 model,
                 manager,
             ),
@@ -121,6 +136,7 @@ def _incremental_resource(
                 fetch_page,
                 object_name,
                 fields,
+                field_types,
                 model,
                 manager,
                 start_date,
@@ -144,15 +160,19 @@ def _incremental_resource(
 def _snapshot_resource(
     object_name: str,
     fields: list[str],
+    field_types: dict[str, ZuoraType],
     manager: ExportManager,
 ) -> common.SnapshotResource:
-    def open(
+    async def open(
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
         state: ResourceState,
         task: Task,
         all_bindings,
     ) -> None:
+        task.sourced_schema(binding_index, sourced_schema(field_types))
+        await task.checkpoint(state=ConnectorState())
+
         common.open_binding(
             binding,
             binding_index,
@@ -162,13 +182,14 @@ def _snapshot_resource(
                 fetch_snapshot,
                 object_name,
                 fields,
+                field_types,
                 manager,
             ),
         )
 
     return common.SnapshotResource(
         name=object_name,
-        model=BaseCSVRow,
+        model=ZuoraRow,
         open=open,
         initial_config=ResourceConfig(name=object_name, interval=timedelta(hours=4)),
     )
@@ -199,11 +220,21 @@ async def _build_resources(
         if model is not None:
             resources.append(
                 _incremental_resource(
-                    described.name, described.fields, model, manager, config.start_date, cutoff
+                    described.name,
+                    described.fields,
+                    described.field_types,
+                    model,
+                    manager,
+                    config.start_date,
+                    cutoff,
                 )
             )
         else:
-            resources.append(_snapshot_resource(described.name, described.fields, manager))
+            resources.append(
+                _snapshot_resource(
+                    described.name, described.fields, described.field_types, manager
+                )
+            )
 
     return resources
 
@@ -227,6 +258,3 @@ async def enabled_resources(
     _attach_token_source(http, config)
     object_names = [binding.resourceConfig.name for binding in bindings]
     return await _build_resources(log, http, config, object_names)
-
-
-

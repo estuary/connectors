@@ -152,6 +152,7 @@ You configure connectors either in the Estuary web app, or by directly editing t
 | **`/credentials`**                   | Credentials             | Credentials for authentication.                                                                               | [Credentials](#credentials) | Required |
 | `advanced/backfillSegments`          | Backfill Table Segments | Number of segments to use for backfill table scans. Has no effect if changed after the backfill has started.  | integer |                  |
 | `advanced/endpoint`                  | AWS Endpoint            | The AWS endpoint URI to connect to. Use if you're capturing from a compatible API that isn't provided by AWS. | string  |                  |
+| `advanced/idleBackoffMax`            | Idle Poll Backoff Maximum | Maximum wait between polls of an open stream shard whose reads keep returning no records. Polling returns to once per second as soon as records appear. Accepts Go duration strings between `1s` and `10m`. | string  | `1s`             |
 | `advanced/scanLimit`                 | Scan Limit              | Limit the number of items to evaluate for each table backfill scan request.                                   | integer |                  |
 
 #### Credentials
@@ -224,6 +225,10 @@ If your DynamoDB tables don't appear when configuring the capture:
 - Verify DynamoDB Streams is enabled on the table
 - Verify the stream view type is set to "New and old images"
 - Verify your IAM policy includes `ListTables` permission on `table/*`
+
+### High DynamoDB Streams request charges on low-traffic tables
+
+DynamoDB bills every `GetRecords` request the capture makes, even when no records are returned, and open stream shards are polled once per second by default. On tables with many shards and few writes, these polls can make up most of the stream's cost. Set `advanced/idleBackoffMax` (for example, `1m`) to let polling slow down on shards that keep returning no records. Polling returns to once per second as soon as records appear, so new data is delayed by at most the configured value.
 
 ### "dynamodb:ListTables... AccessDeniedException"
 

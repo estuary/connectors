@@ -1,27 +1,40 @@
----
+import:
+- acmeCo/flow.yaml
 captures:
   acmeCo/source-brevo:
     endpoint:
       local:
         command:
-          - python
-          - "-m"
-          - source_brevo
-        config:
-          api-key: not_a_real_api_key
-          start_date: "2023-01-01T00:00:00.000Z"
+        - python
+        - -m
+        - source_brevo
+        config: config.yaml
     bindings:
-      - resource:
-          stream: Contacts
-          syncMode: incremental
-          cursorField:
-            - modifiedSince
-        target: acmeCo/Contacts
-      - resource:
-          stream: ContactsAttributes
-          syncMode: full_refresh
-        target: acmeCo/ContactsAttributes
-      - resource:
-          stream: ContactsLists
-          syncMode: full_refresh
-        target: acmeCo/ContactsLists
+    - resource:
+        name: contacts_attributes
+        interval: PT1H
+      target: acmeCo/contacts_attributes
+    - resource:
+        name: contacts_lists
+        interval: PT1H
+      target: acmeCo/contacts_lists
+    - resource:
+        name: contacts_folders
+        interval: PT1H
+      target: acmeCo/contacts_folders
+    - resource:
+        name: contacts_segments
+        interval: PT1H
+      target: acmeCo/contacts_segments
+    - resource:
+        name: senders
+        interval: PT1H
+      target: acmeCo/senders
+    - resource:
+        name: webhooks
+        interval: PT1H
+      target: acmeCo/webhooks
+    - resource:
+        name: contacts
+        interval: PT5M
+      target: acmeCo/contacts

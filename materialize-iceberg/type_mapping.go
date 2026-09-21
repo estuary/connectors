@@ -1,6 +1,7 @@
 package connector
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"slices"
@@ -32,6 +33,8 @@ type mapped struct {
 	Nullable bool
 }
 
+func (m mapped) isVariant() bool { return m.type_.Equals(iceberg.VariantType{}) }
+
 func (m mapped) String() string {
 	return m.type_.String()
 }
@@ -48,45 +51,30 @@ var allowedMigrations = boilerplate.TypeMigrations[iceberg.Type]{
 	"long":                      {iceberg.DecimalTypeOf(38, 0), iceberg.Float64Type{}},
 	"decimal(38, 0)":            {iceberg.Float64Type{}},
 	"string":                    {iceberg.BinaryType{}},
-	boilerplate.AnyExistingType: {iceberg.StringType{}},
+	boilerplate.AnyExistingType: {iceberg.StringType{}, iceberg.VariantType{}},
+}
+
+func jsonColumnType(variant bool) iceberg.Type {
+	if variant {
+		return iceberg.VariantType{}
+	}
+	return iceberg.StringType{}
 }
 
 var migrateFieldSuffix = "_flow_tmp"
 
-func mapProjection(p boilerplate.Projection, translateField boilerplate.TranslateFieldFn) (mapped, boilerplate.ElementConverter) {
+func mapProjection(p boilerplate.Projection, translateField boilerplate.TranslateFieldFn, variantColumns bool) (mapped, boilerplate.ElementConverter) {
 	var m mapped
 	var converter boilerplate.ElementConverter
 
 	m.Name = translateField(p.Field)
+	useVariant := variantColumns && !p.IsPrimaryKey
 
 	switch ft := p.FlatType.(type) {
 	case boilerplate.FlatTypeArray:
-		if len(ft.ItemTypesWithoutNull) == 1 {
-			// NB: ElementID must be populated when creating/updating a table
-			// with a column that has a ListType.
-			switch ft.ItemTypesWithoutNull[0] {
-			case "integer":
-				m.type_ = &iceberg.ListType{Element: iceberg.Int64Type{}, ElementRequired: !ft.NullableItems}
-			case "number":
-				m.type_ = &iceberg.ListType{Element: iceberg.Float64Type{}, ElementRequired: !ft.NullableItems}
-			case "boolean":
-				m.type_ = &iceberg.ListType{Element: iceberg.BooleanType{}, ElementRequired: !ft.NullableItems}
-			case "string":
-				m.type_ = &iceberg.ListType{Element: iceberg.StringType{}, ElementRequired: !ft.NullableItems}
-			default:
-				m.type_ = iceberg.StringType{}
-			}
-		} else {
-			m.type_ = iceberg.StringType{}
-		}
-
-		// TODO(whb): If we want to support arrays with a single element type as
-		// Iceberg lists, remove this line which unconditionally makes them
-		// strings. I'm not doing that right now since it is a big pain reading
-		// from CSV as strings and then parsing to the specific list type in the
-		// queries. V3 of the Iceberg spec includes a VARIANT type which is
-		// probably what we'll use for all arrays when that is widely supported.
-		m.type_ = iceberg.StringType{}
+		// Arrays are always JSON text (or variant): reading typed lists out
+		// of the staged CSV files would need per-type parsing in the queries.
+		m.type_ = jsonColumnType(useVariant)
 	case boilerplate.FlatTypeBinary:
 		m.type_ = iceberg.BinaryType{}
 	case boilerplate.FlatTypeBoolean:
@@ -98,11 +86,11 @@ func mapProjection(p boilerplate.Projection, translateField boilerplate.Translat
 			m.type_ = iceberg.Int64Type{}
 		}
 	case boilerplate.FlatTypeMultiple:
-		m.type_ = iceberg.StringType{}
+		m.type_ = jsonColumnType(useVariant)
 	case boilerplate.FlatTypeNumber:
 		m.type_ = iceberg.Float64Type{}
 	case boilerplate.FlatTypeObject:
-		m.type_ = iceberg.StringType{}
+		m.type_ = jsonColumnType(useVariant)
 	case boilerplate.FlatTypeString:
 		switch ft.InferenceString.Format {
 		case "date":
@@ -132,7 +120,18 @@ func mapProjection(p boilerplate.Projection, translateField boilerplate.Translat
 		panic(fmt.Sprintf("unhandled flat type: %T", p.FlatType))
 	}
 
+	if m.isVariant() {
+		converter = variantConverter
+	}
+
 	return m, converter
+}
+
+func variantConverter(te tuple.TupleElement) (any, error) {
+	if s, ok := te.(string); ok {
+		return json.Marshal(s)
+	}
+	return te, nil
 }
 
 func computeSchemaForNewTable(res boilerplate.MappedBinding[config, resource, mapped]) *iceberg.Schema {

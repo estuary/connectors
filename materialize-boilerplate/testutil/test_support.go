@@ -75,6 +75,114 @@ func taskNames(bundled []byte) []string {
 	return names
 }
 
+// snapshotT is cupaloy.SnapshotT which, on a mismatch, also writes this run's
+// value beside the snapshot as `<name>.actual`. CI uploads that file: a
+// cloud-credentialed connector's snapshot can only be regenerated where its
+// endpoint is reachable, and the job log is no substitute, since GitHub's secret
+// redaction rewrites the connector state these snapshots embed.
+func snapshotT(t *testing.T, got string) {
+	t.Helper()
+
+	name := strings.ReplaceAll(t.Name(), "/", "-")
+	path := filepath.Join(".snapshots", name)
+
+	// cupaloy writes a lone string verbatim with a trailing newline, so this
+	// reproduces exactly what it would compare against.
+	if prev, err := os.ReadFile(path); err == nil && string(prev) != got+"\n" {
+		if err := os.WriteFile(path+".actual", []byte(got+"\n"), 0o644); err != nil {
+			t.Logf("failed to write %s.actual: %s", path, err)
+		} else {
+			t.Logf("wrote %s.actual with this run's value", path)
+		}
+	}
+
+	cupaloy.SnapshotT(t, got)
+}
+
+// snapshotNamed is snapshotT against the snapshot file `name`. cupaloy derives
+// the file name from the calling test, so a differently named snapshot is
+// compared here directly, in cupaloy's format: the string verbatim with a
+// trailing newline, written (or rewritten) when UPDATE_SNAPSHOTS is set. On a
+// mismatch the diff is `.snapshots/<name>` against `<name>.actual`.
+func snapshotNamed(t *testing.T, name string, got string) {
+	t.Helper()
+
+	path := filepath.Join(".snapshots", name)
+	want := got + "\n"
+
+	prev, err := os.ReadFile(path)
+	if err == nil && string(prev) == want {
+		return
+	}
+	if err == nil {
+		if err := os.WriteFile(path+".actual", []byte(want), 0o644); err != nil {
+			t.Logf("failed to write %s.actual: %s", path, err)
+		} else {
+			t.Logf("wrote %s.actual with this run's value", path)
+		}
+	}
+	if os.Getenv("UPDATE_SNAPSHOTS") != "" {
+		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+		require.NoError(t, os.WriteFile(path, []byte(want), 0o644))
+		t.Logf("snapshot %s %s", path, map[bool]string{true: "updated", false: "created"}[err == nil])
+		return
+	}
+	if err != nil {
+		t.Errorf("snapshot %s does not exist; run with UPDATE_SNAPSHOTS=true to create it", path)
+		return
+	}
+	t.Errorf("snapshot %s not equal; this run's value is in %s.actual", path, path)
+}
+
+// runtimeV1SnapshotName is the runtime v1 pass's snapshot file for this test:
+// a table-only golden, since the pass omits the apply/state output. Its content
+// is what a runtime-next run leaves in the destination, so a connector's first
+// one is generated like any other, with UPDATE_SNAPSHOTS=true against its
+// endpoint. Until then the pass logs and enforces liveness alone.
+func runtimeV1SnapshotName(t *testing.T) (name string, exists bool) {
+	name = strings.ReplaceAll(t.Name(), "/", "-") + "-runtime-v1"
+	if _, err := os.Stat(filepath.Join(".snapshots", name)); err == nil || os.Getenv("UPDATE_SNAPSHOTS") != "" {
+		return name, true
+	}
+	t.Logf("no runtime v1 snapshot .snapshots/%s; run with UPDATE_SNAPSHOTS=true to create it", name)
+	return name, false
+}
+
+// stripRuntimeNextOutput removes from a runtime-next snapshot the lines only a
+// runtime-next run produces: flowctl's `--output-apply` / `--output-state`
+// records, which single-shard runs capture under each resource. What remains
+// is the destination alone, in the shape the runtime v1 pass snapshots.
+func stripRuntimeNextOutput(snapshot string) string {
+	var out []string
+	for _, line := range strings.Split(snapshot, "\n") {
+		if strings.HasPrefix(line, `["applied.actionDescription",`) || strings.HasPrefix(line, `["connectorState",`) {
+			continue
+		}
+		out = append(out, line)
+	}
+	return strings.Join(out, "\n")
+}
+
+// requireMatchesRuntimeNextSnapshot requires the runtime v1 pass's value to
+// equal this test's runtime-next golden with the runtime-next-only output
+// lines removed: both runtimes must leave the same destination behind.
+func requireMatchesRuntimeNextSnapshot(t *testing.T, got string) {
+	t.Helper()
+
+	path := filepath.Join(".snapshots", strings.ReplaceAll(t.Name(), "/", "-"))
+	golden, err := os.ReadFile(path)
+	require.NoErrorf(t, err, "reading the runtime-next snapshot to compare the runtime v1 run against")
+
+	want := strings.TrimSuffix(stripRuntimeNextOutput(string(golden)), "\n")
+	if want == got {
+		return
+	}
+	if err := os.WriteFile(path+".runtime-v1.actual", []byte(got+"\n"), 0o644); err == nil {
+		t.Logf("wrote %s.runtime-v1.actual with the runtime v1 run's value", path)
+	}
+	t.Errorf("runtime v1 run does not match the runtime-next snapshot %s with its output lines removed; the run's value is in %s.runtime-v1.actual", path, path)
+}
+
 // RunTestAllTasks calls testFn for each materialization task found in the spec
 // at sourcePath. The endpoint configuration for the task is decrypted and
 // unmarshalled into EC.
@@ -147,7 +255,7 @@ func RunMaterializationTest[EC boilerplate.EndpointConfiger, FC boilerplate.Fiel
 	sourcePath string,
 	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
 	actionDescSanitizers []func(string) string,
-	v2 ...RuntimeV2Config,
+	runtime RuntimeConfig,
 ) {
 	ctx := context.Background()
 	var snap strings.Builder
@@ -155,14 +263,17 @@ func RunMaterializationTest[EC boilerplate.EndpointConfiger, FC boilerplate.Fiel
 
 	RunTestAllTasks(t, sourcePath, func(t *testing.T, bundled []byte, taskName string, cfg EC) {
 		snap.WriteString(fmt.Sprintf("Task: %s\n\n", taskName))
-		if len(v2) > 0 {
-			snap.WriteString(runMaterializationTestForTaskV2(t, ctx, newMaterializer, taskName, bundled, tsSuffix, makeResourceFn, actionDescSanitizers, v2[0]))
-		} else {
-			snap.WriteString(runMaterializationTestForTask(t, ctx, newMaterializer, taskName, bundled, tsSuffix, makeResourceFn, actionDescSanitizers))
-		}
+		snap.WriteString(runMaterializationTestForTask(t, ctx, newMaterializer, taskName, bundled, tsSuffix, makeResourceFn, actionDescSanitizers, runtime))
 	})
 
-	cupaloy.SnapshotT(t, snap.String())
+	if !RuntimeV1() {
+		snapshotT(t, snap.String())
+	} else {
+		if name, ok := runtimeV1SnapshotName(t); ok {
+			snapshotNamed(t, name, snap.String())
+		}
+		requireMatchesRuntimeNextSnapshot(t, snap.String())
+	}
 }
 
 // RunMaterializationTestParallel is like RunMaterializationTest but runs tasks
@@ -174,16 +285,13 @@ func RunMaterializationTestParallel[EC boilerplate.EndpointConfiger, FC boilerpl
 	sourcePath string,
 	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
 	actionDescSanitizers []func(string) string,
-	v2 ...RuntimeV2Config,
+	runtime RuntimeConfig,
 ) {
 	ctx := context.Background()
 	tsSuffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
 
 	names, results := RunTestAllTasksParallel(t, sourcePath, func(t *testing.T, bundled []byte, taskName string, cfg EC) string {
-		if len(v2) > 0 {
-			return runMaterializationTestForTaskV2(t, ctx, newMaterializer, taskName, bundled, tsSuffix, makeResourceFn, actionDescSanitizers, v2[0])
-		}
-		return runMaterializationTestForTask(t, ctx, newMaterializer, taskName, bundled, tsSuffix, makeResourceFn, actionDescSanitizers)
+		return runMaterializationTestForTask(t, ctx, newMaterializer, taskName, bundled, tsSuffix, makeResourceFn, actionDescSanitizers, runtime)
 	})
 
 	var snap strings.Builder
@@ -192,7 +300,14 @@ func RunMaterializationTestParallel[EC boilerplate.EndpointConfiger, FC boilerpl
 		snap.WriteString(results[name])
 	}
 
-	cupaloy.SnapshotT(t, snap.String())
+	if !RuntimeV1() {
+		snapshotT(t, snap.String())
+	} else {
+		if name, ok := runtimeV1SnapshotName(t); ok {
+			snapshotNamed(t, name, snap.String())
+		}
+		requireMatchesRuntimeNextSnapshot(t, snap.String())
+	}
 }
 
 // RunApplyTest tests a variety of scenarios involving changes to materialized
@@ -206,7 +321,7 @@ func RunMaterializationTestParallel[EC boilerplate.EndpointConfiger, FC boilerpl
 // `testdata/validate_apply_test_cases/generated_specs`. Ideally we'd figure out
 // a way to use `flowctl` commands instead of generating the binary spec files -
 // the main blocker for this is that there is not a way to simulate a previously
-// applied materialization spec via `flowctl preview` etc.
+// applied materialization spec via `flowctl raw preview-next` etc.
 func RunApplyTest[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
 	t *testing.T,
 	driver boilerplate.Connector,
@@ -262,7 +377,7 @@ func RunApplyTest[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger,
 		}
 	}
 
-	cupaloy.SnapshotT(t, snap.String())
+	snapshotT(t, snap.String())
 }
 
 // RunApplyTestParallel is like RunApplyTest but runs tasks concurrently (up to
@@ -327,7 +442,7 @@ func RunApplyTestParallel[EC boilerplate.EndpointConfiger, FC boilerplate.FieldC
 		snap.WriteString(results[name])
 	}
 
-	cupaloy.SnapshotT(t, snap.String())
+	snapshotT(t, snap.String())
 }
 
 // RunMigrationTest tests migrations of all known schema widening scenarios.
@@ -362,7 +477,7 @@ func RunMigrationTest[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfi
 		snap.WriteString(runMigrationTestForTask(t, ctx, newMaterializer, taskName, bundled, suffix, makeResourceFn, actionDescSanitizers))
 	}
 
-	cupaloy.SnapshotT(t, snap.String())
+	snapshotT(t, snap.String())
 }
 
 // FeatureFlagMigrationPhase is a single apply within a
@@ -407,7 +522,7 @@ func RunFeatureFlagMigrationTest[EC boilerplate.EndpointConfiger, FC boilerplate
 		snap.WriteString(runFeatureFlagMigrationForTask(t, ctx, newMaterializer, taskName, bundled, suffix, makeResourceFn, phases, actionDescSanitizers))
 	}
 
-	cupaloy.SnapshotT(t, snap.String())
+	snapshotT(t, snap.String())
 }
 
 func runFeatureFlagMigrationForTask[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
@@ -468,7 +583,11 @@ func runFeatureFlagMigrationForTask[EC boilerplate.EndpointConfiger, FC boilerpl
 		cleanupTestTasks(t, ctx, materializer, suffix)
 	})
 
-	for _, phase := range phases {
+	for idx, phase := range phases {
+		if idx > 0 {
+			clearTaskCheckpointBetweenPhases(t, ctx, materializer, workingTaskName)
+		}
+
 		phaseFlags := phase.FeatureFlags
 		if baseFlags != "" {
 			phaseFlags = baseFlags + "," + phaseFlags
@@ -488,7 +607,7 @@ func runFeatureFlagMigrationForTask[EC boilerplate.EndpointConfiger, FC boilerpl
 
 		actionDescription := RunFlowctl(
 			t,
-			"preview",
+			"raw", "preview-next",
 			"--name", workingTaskName,
 			"--source", source,
 			"--fixture", phase.Fixture,
@@ -529,52 +648,7 @@ func RunMigrationTestParallel[EC boilerplate.EndpointConfiger, FC boilerplate.Fi
 		snap.WriteString(results[name])
 	}
 
-	cupaloy.SnapshotT(t, snap.String())
-}
-
-func runMaterializationTestForTask[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
-	t *testing.T,
-	ctx context.Context,
-	newMaterializer boilerplate.NewMaterializerFn[EC, FC, RC, MT],
-	taskName string,
-	bundled []byte,
-	tsSuffix string,
-	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
-	actionDescSanitizers []func(string) string,
-) string {
-	var snap strings.Builder
-
-	cfg := decryptConfig[EC](t, bundled, taskName)
-	rt := rewriteTaskForTest[EC, RC](t, bundled, taskName, tsSuffix, cfg, makeResourceFn)
-
-	materializer, err := newMaterializer(ctx, taskName, cfg, boilerplate.ParseFlags(cfg))
-	require.NoError(t, err)
-
-	t.Cleanup(func() {
-		CleanupTestResources(t, ctx, materializer, rt.resourcePaths, tsSuffix)
-		cleanupTestTasks(t, ctx, materializer, tsSuffix)
-	})
-
-	// Drive task with the data from the fixture.
-	actionDescription := RunFlowctl(
-		t,
-		"preview",
-		"--name", rt.workingTaskName,
-		"--source", rt.sourcePath,
-		"--fixture", relativePath(t, "testdata/integration/fixture.materialize.json"),
-		"--network", "flow-test",
-		"--output-apply",
-		"--output-state",
-	)
-	for _, sanitize := range actionDescSanitizers {
-		actionDescription = []byte(sanitize(string(actionDescription)))
-	}
-
-	for _, res := range rt.resources {
-		snap.WriteString(snapshotTestTable(t, ctx, materializer, res, actionDescription, rt.rndSuffix, true))
-	}
-
-	return snap.String()
+	snapshotT(t, snap.String())
 }
 
 func snapshotTestTable[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
@@ -605,28 +679,14 @@ func snapshotTestTable[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConf
 	snap.WriteString(schema)
 	snap.WriteString("\n")
 	if withTableData {
-		columnNames, rows, err := m.SnapshotTestResource(ctx, path)
+		data, err := SnapshotResource(ctx, m, path)
 		require.NoError(t, err)
 		snap.WriteString("Table Data:\n")
-		snap.WriteString(renderTestTableData(t, columnNames, rows))
+		snap.WriteString(data)
 		snap.WriteString("\n")
 	}
 
 	return snap.String()
-}
-
-func renderTestTableData(t *testing.T, columnNames []string, rows [][]any) string {
-	var data strings.Builder
-	enc := json.NewEncoder(&data)
-	for _, r := range rows {
-		doc := make(map[string]any, len(columnNames))
-		for i, col := range columnNames {
-			doc[col] = r[i]
-		}
-		require.NoError(t, enc.Encode(doc))
-	}
-
-	return data.String()
 }
 
 // decryptConfigRaw returns a task's endpoint config as raw JSON. If the config
@@ -829,6 +889,25 @@ func runChallengingNamesApplyTests[EC boilerplate.EndpointConfiger, FC boilerpla
 	snap.WriteString(dumpSchema(t, ctx, m, res))
 }
 
+// clearTaskCheckpointBetweenPhases drops the connector's persisted checkpoint
+// for a task between two preview runs of it.
+//
+// Each phase is a separate `flowctl raw preview-next` invocation starting from
+// an empty recovery log, so a connector reporting back a checkpoint of its own
+// -- every materialization with a fenced checkpoints table -- makes the runtime
+// refuse to open. Clearing it makes each phase start as the fresh task run it
+// actually is, which costs the migration tests nothing: Apply migrates columns
+// by comparing the spec against the live table, not from the checkpoint.
+func clearTaskCheckpointBetweenPhases[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
+	t *testing.T,
+	ctx context.Context,
+	m boilerplate.Materializer[EC, FC, RC, MT],
+	workingTaskName string,
+) {
+	t.Helper()
+	require.NoError(t, m.CleanupTestTask(ctx, workingTaskName))
+}
+
 func runMigrationTestForTask[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
 	t *testing.T,
 	ctx context.Context,
@@ -898,14 +977,17 @@ func runMigrationTestForTask[EC boilerplate.EndpointConfiger, FC boilerplate.Fie
 	// state. The second one will both cause the columns to be migrated, as well
 	// as put some more data in the new form into the table to make sure it
 	// works.
-	for _, tc := range []struct{ source, fixture string }{
+	for idx, tc := range []struct{ source, fixture string }{
 		{source: initialSource, fixture: relativePath(t, "testdata/integration/fixture.migrate-base.json")},
 		{source: migratedSource, fixture: relativePath(t, "testdata/integration/fixture.migrate-migrated.json")},
 	} {
+		if idx > 0 {
+			clearTaskCheckpointBetweenPhases(t, ctx, materializer, workingTaskName)
+		}
 
 		actionDescription := RunFlowctl(
 			t,
-			"preview",
+			"raw", "preview-next",
 			"--name", workingTaskName,
 			"--source", tc.source,
 			"--fixture", tc.fixture,
@@ -1122,18 +1204,9 @@ func cleanupTestTasks[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfi
 ) {
 	t.Helper()
 
-	tasks, err := m.ListTestTasks(ctx)
+	outcomes, err := SweepTestTasks(ctx, m, tsSuffix, false)
 	require.NoError(t, err)
-	now := time.Now()
-	for _, task := range tasks {
-		if shouldCleanup(t, now, task, tsSuffix) {
-			if err := m.CleanupTestTask(ctx, task); err != nil {
-				t.Log("failed to clean up task", err)
-			} else {
-				t.Log("cleaned up task", task)
-			}
-		}
-	}
+	logSweep(t, "task", outcomes)
 }
 
 func CleanupTestResources[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
@@ -1145,65 +1218,72 @@ func CleanupTestResources[EC boilerplate.EndpointConfiger, FC boilerplate.FieldC
 ) {
 	t.Helper()
 
-	is := boilerplate.InitInfoSchema(m.Config())
-	require.NoError(t, m.PopulateInfoSchema(ctx, is, paths))
-	now := time.Now()
+	outcomes, err := SweepTestResources(ctx, m, paths, tsSuffix, false)
+	require.NoError(t, err)
+	logSweep(t, "resource", outcomes)
+}
 
-	for _, r := range is.Resources() {
-		if shouldCleanup(t, now, r.Location()[len(r.Location())-1], tsSuffix) {
-			_, fn, err := m.DeleteResource(ctx, r.Location())
-			require.NoError(t, err)
+func logSweep(t *testing.T, kind string, outcomes []SweepOutcome) {
+	t.Helper()
 
-			if err := fn(ctx); err != nil {
-				t.Log("failed to clean up resource", err)
-			} else {
-				t.Log("cleaned up resource", r.Location())
-			}
+	for _, o := range outcomes {
+		if o.Err != nil {
+			t.Logf("failed to clean up %s %s: %s", kind, o.Item, o.Err)
+		} else if o.Swept {
+			t.Logf("cleaned up %s %s (%s)", kind, o.Item, o.Reason)
+		} else {
+			t.Logf("did not clean up %s %s (%s)", kind, o.Item, o.Reason)
 		}
 	}
 }
 
-func shouldCleanup(t *testing.T, now time.Time, item string, suffix string) bool {
+// shouldCleanup reports whether a test resource or task should be removed, along
+// with the reason, which callers log.
+func shouldCleanup(now time.Time, item string, suffix string) (bool, string) {
 	if item == flowCheckpointsTableName {
 		// Never cleanup the meta checkpoints table: leaving it in place keeps
 		// it out of the next run's Apply action description (so snapshots stay
 		// stable), and prevents parallel test runs sharing a database from
 		// racing to delete each other's checkpoints table.
-		return false
+		return false, "is the meta checkpoints table"
 	}
 	if !strings.Contains(item, testItemIdentifier) {
-		// Not created for testing.
-		return false
-	} else if strings.HasSuffix(item, suffix) {
-		// Created specifically by this test run.
-		return true
+		return false, "not created for testing"
+		// A caller with no run of its own passes an empty suffix, which must not
+		// match here: it would otherwise claim every test item, including those
+		// a concurrent run is still using.
+	} else if suffix != "" && strings.HasSuffix(item, suffix) {
+		return true, "created by this test run"
 	} else if parts := strings.Split(item, "_"); len(parts) < 2 {
-		t.Log("malformed test item name", item)
+		return false, "malformed test item name"
 	} else if seconds, err := strconv.Atoi(parts[len(parts)-1]); err != nil {
-		t.Log("failed to parse timestamp from test item name", item, err)
+		return false, fmt.Sprintf("failed to parse timestamp from test item name: %s", err)
 	} else if timestamp := time.Unix(int64(seconds), 0); now.Sub(timestamp) > 60*time.Minute {
 		// The threshold must comfortably exceed the longest single test run,
 		// since concurrent CI jobs sharing a database will otherwise drop each
 		// other's in-use tables mid-test.
-		t.Log("will cleanup old test item", item)
-		return true
+		return true, "left over from an old test run"
 	}
 
-	t.Log("will not cleanup recent test item", item)
-	return false
+	return false, "from a recent test run"
 }
 
-// RunFlowctl runs the flowctl command with the given arguments, and returns its
-// stdout output. The command is expected to succeed, and any stderr output is
-// logged to the test log.
-func RunFlowctl(t *testing.T, args ...string) []byte {
-	t.Helper()
-
+// flowctlCommand builds a flowctl invocation whose behavior does not vary with
+// the machine running it.
+func flowctlCommand(args ...string) *exec.Cmd {
 	// Set TZ=UTC to make tests always run as if the machine
 	// has UTC timezone, consisent across contributors' machines
 	// and the CI
 	os.Setenv("TZ", "UTC")
-	cmd := exec.Command("flowctl", args...)
+
+	// FLOW_TEST_FLOWCTL names the flowctl binary to drive tests with; CI points
+	// the runtime v1 pass at a pinned release whose `flowctl preview` is still
+	// the legacy runtime (see fetch-flow.sh).
+	flowctl := os.Getenv("FLOW_TEST_FLOWCTL")
+	if flowctl == "" {
+		flowctl = "flowctl"
+	}
+	cmd := exec.Command(flowctl, args...)
 	cmd.Env = append(cmd.Environ(),
 		// Set the LOG_FORMAT to text instead of color for better to avoid
 		// escaping of ansi control characters and better compatibility with
@@ -1211,30 +1291,54 @@ func RunFlowctl(t *testing.T, args ...string) []byte {
 		"LOG_FORMAT=text",
 	)
 
-	stdout, err := cmd.StdoutPipe()
+	return cmd
+}
+
+// RunFlowctl runs the flowctl command with the given arguments, and returns its
+// stdout output. The command is expected to succeed, and any stderr output is
+// logged to the test log.
+func RunFlowctl(t *testing.T, args ...string) []byte {
+	t.Helper()
+	stdout, _ := runFlowctl(t, args...)
+	return stdout
+}
+
+// runFlowctl is RunFlowctl, also returning the captured stderr. Task logs of a
+// preview run land there, and are the observable output of the boilerplate's
+// transaction health check.
+func runFlowctl(t *testing.T, args ...string) (stdout, stderr []byte) {
+	t.Helper()
+
+	cmd := flowctlCommand(args...)
+
+	stdoutPipe, err := cmd.StdoutPipe()
 	require.NoError(t, err)
-	stderr, err := cmd.StderrPipe()
+	stderrPipe, err := cmd.StderrPipe()
 	require.NoError(t, err)
 	require.NoError(t, cmd.Start())
 
+	var stderrBuf bytes.Buffer
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		scanner := bufio.NewScanner(stderr)
+		scanner := bufio.NewScanner(stderrPipe)
+		scanner.Buffer(make([]byte, 0, 1<<20), 1<<24)
 		for scanner.Scan() {
 			t.Log(scanner.Text())
+			stderrBuf.Write(scanner.Bytes())
+			stderrBuf.WriteByte('\n')
 		}
 	}()
 
 	var stdoutBuf bytes.Buffer
-	_, err = io.Copy(&stdoutBuf, stdout)
+	_, err = io.Copy(&stdoutBuf, stdoutPipe)
 	require.NoError(t, err)
 
 	require.NoError(t, cmd.Wait())
 	wg.Wait()
 
-	return stdoutBuf.Bytes()
+	return stdoutBuf.Bytes(), stderrBuf.Bytes()
 }
 
 func dumpSchema[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](

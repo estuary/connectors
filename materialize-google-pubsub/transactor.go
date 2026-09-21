@@ -2,28 +2,32 @@ package connector
 
 import (
 	"context"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"sync/atomic"
 
 	"cloud.google.com/go/pubsub"
+	"github.com/estuary/connectors/go/keyhash"
 	m "github.com/estuary/connectors/go/materialize"
 	pf "github.com/estuary/flow/go/protocols/flow"
-	"github.com/minio/highwayhash"
 	"golang.org/x/sync/errgroup"
 )
 
 type transactor struct {
 	bindings []*topicBinding
+	be       *m.BindingEvents
 }
 
 type topicBinding struct {
+	path       []string
 	identifier string
 	topic      *pubsub.Topic
 }
 
-func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
-func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) { return nil, nil }
+func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
+	return nil, nil
+}
 
 // PubSub is delta-update only.
 func (t *transactor) Load(it *m.LoadIterator, _ func(int, json.RawMessage) error) error {
@@ -33,29 +37,18 @@ func (t *transactor) Load(it *m.LoadIterator, _ func(int, json.RawMessage) error
 	return nil
 }
 
-// The hash function and hash key below are copied directly from the Flow repo, go/flow/mapping.go.
-// In the future if the hashed value of the packedKey is added to the materialization connector
-// protocol, the PubSub materialization can be converted to using the hashed value directly instead
-// of computing it separately.
-
-// PackedKeyHash_HH64 builds a packed key hash from the top 32-bits of a
-// HighwayHash 64-bit checksum computed using a fixed key.
-func PackedKeyHash_HH64(packedKey []byte) uint32 {
-	return uint32(highwayhash.Sum64(packedKey, highwayHashKey) >> 32)
-}
-
-// highwayHashKey is a fixed 32 bytes (as required by HighwayHash) read from /dev/random.
-var highwayHashKey, _ = hex.DecodeString("ba737e89155238d47d8067c35aad4d25ecdd1c3488227e011ffa480c022bd3ba")
-
 func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	errGroup, ctx := errgroup.WithContext(it.Context())
+	round := it.Round
+	published := make([]atomic.Int64, len(t.bindings))
 
 	for it.Next(false) {
 		binding := t.bindings[it.Binding]
+		bindingIdx := it.Binding
 
 		msg := &pubsub.Message{
 			Data:        it.RawJSON,
-			OrderingKey: fmt.Sprintf("%08x", PackedKeyHash_HH64(it.PackedKey)),
+			OrderingKey: fmt.Sprintf("%08x", keyhash.PackedKeyHash_HH64(it.PackedKey)),
 		}
 		// Only include an identifier attribute if an identifier has been configured.
 		if binding.identifier != "" {
@@ -75,8 +68,9 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 				// publishing (see https://cloud.google.com/pubsub/docs/publisher#retry_ordering), but
 				// since returning an error here will cause the connector to exit, we don't need to
 				// worry about resuming publishing from the same client.
-				return fmt.Errorf("error publishing document for binding [%d]: %w", it.Binding, err)
+				return fmt.Errorf("error publishing document for binding [%d]: %w", bindingIdx, err)
 			}
+			published[bindingIdx].Add(1)
 
 			return nil
 		})
@@ -86,7 +80,15 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}
 
 	// Wait for all messages to be delivered.
-	return nil, errGroup.Wait()
+	if err := errGroup.Wait(); err != nil {
+		return nil, err
+	}
+	for i, b := range t.bindings {
+		if n := published[i].Load(); n > 0 {
+			t.be.ReportRowStats(round, b.path, m.TotalRowStats(n))
+		}
+	}
+	return nil, nil
 }
 
 func (t *transactor) Destroy() {

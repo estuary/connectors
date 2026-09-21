@@ -316,16 +316,13 @@ def full_refresh_resources(
 
     for stream in FULL_REFRESH_STREAMS:
         resources.append(
-            common.Resource(
+            common.SnapshotResource(
                 name=stream.name,
-                key=["/_meta/row_id"],
                 model=FullRefreshResource,
                 open=functools.partial(open, stream),
-                initial_state=ResourceState(),
                 initial_config=ResourceConfigWithSchedule(
                     name=stream.name, interval=timedelta(minutes=60)
                 ),
-                schema_inference=True,
                 disable=stream.disable,
             )
         )

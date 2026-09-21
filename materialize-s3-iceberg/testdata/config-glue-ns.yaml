@@ -1,11 +1,10 @@
 # AWS Glue integration-test config.
 #
-# Disabled by default: TestIntegrationGlue only runs with -s3iceberg.test-glue
-# (or S3_ICEBERG_TEST_GLUE set) and needs real AWS credentials with Glue Data
-# Catalog + S3 access. Replace the REPLACE_ME placeholders below and sops-encrypt
-# this file before enabling the test. The connector creates the `namespace`
-# (a Glue database) and its tables; the S3 `bucket` must already exist or be
-# creatable by the supplied credentials.
+# TestIntegrationGlue runs by default and needs real AWS credentials with Glue
+# Data Catalog + S3 access, which the sops-encrypted values below supply
+# (decrypting them requires GCP KMS access). The connector creates the
+# `namespace` (a Glue database) and its tables; the S3 `bucket` must already
+# exist or be creatable by the supplied credentials.
 # Shared test bucket + Glue account also used by materialize-iceberg. The prefix
 # and namespace are deliberately distinct from that connector's so the two do not
 # clobber each other's tables in the shared Glue catalog.

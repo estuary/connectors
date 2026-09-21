@@ -150,6 +150,20 @@ class InsightsJob:
 
 
 @dataclass
+class FieldSplitPart:
+    """
+    One chunk of a field-split job: what it asked for and what came back.
+
+    The requested fields have to travel with the rows, because an empty chunk
+    is only interpretable next to its field set - without it there is no way to
+    say which fields a chunk that returned nothing failed to produce.
+    """
+
+    fields: list[str]
+    records: list[InsightRecord]
+
+
+@dataclass
 class JobOutcome:
     """Base class for job execution outcomes."""
 
@@ -187,6 +201,7 @@ class AsyncJobStatusResponse(BaseModel):
     async_percent_completion: int
     error: FacebookError | None = None
     error_code: int | None = None
+    error_message: str | None = None
     error_subcode: int | None = None
     error_user_title: str | None = None
     error_user_msg: str | None = None

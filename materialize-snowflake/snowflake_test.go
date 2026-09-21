@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	m "github.com/estuary/connectors/go/materialize"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/google/uuid"
@@ -58,7 +59,7 @@ func TestIntegration(t *testing.T) {
 			// the query executes; a directory with no files under the
 			// connector's flow_v1 stage (created by Setup during the base
 			// Apply) stands in for one whose files were already consumed.
-			query := sql.DrainSeedInsertQuery(t, newSnowflakeDriver(), cfg, appliedSpec, "PARSE_JSON('{}')")
+			query := sql.DrainSeedInsertQuery(t, NewDriver(), cfg, appliedSpec, "PARSE_JSON('{}')")
 			state, err := json.Marshal(map[string]any{
 				appliedSpec.Bindings[0].StateKey: map[string]any{
 					"Table":     tableName,
@@ -74,7 +75,7 @@ func TestIntegration(t *testing.T) {
 			require.Len(t, rows, 1, "the staged transaction's row must have been committed")
 		}
 
-		sql.RunApplyDrainTest(t, newSnowflakeDriver(), cfg, res, seedPending, verifyDrained)
+		sql.RunApplyDrainTest(t, NewDriver(), cfg, res, seedPending, verifyDrained)
 	})
 
 	actionDescSanitizers := []func(string) string{
@@ -126,18 +127,27 @@ func TestIntegration(t *testing.T) {
 		func(s string) string {
 			return regexp.MustCompile(`"upload_duration_ms":\s*\d+`).ReplaceAllString(s, `"upload_duration_ms": "<upload_duration_ms>"`)
 		},
+		// The stream offset tokens are prefixed with a hash of the runtime
+		// checkpoint (see buildDriverCheckpoint), so they differ per transaction
+		// and per run. Their deterministic ":N" suffix is left intact.
+		sql.SanitizeCheckpointHashes(`"offset_token":"([0-9a-f]{16}):\d+"`, "offset-token"),
 	}
 
 	t.Run("materialize", func(t *testing.T) {
-		sql.RunMaterializationTest(t, newSnowflakeDriver(), "testdata/materialize.flow.yaml", makeResourceFn, actionDescSanitizers)
+		// MERGE INTO and COPY INTO bindings report exact row stats, but the
+		// fixture's delta binding uses Snowpipe Streaming, which reports none,
+		// and a round's fidelity is the lowest of its bindings. Mismatches on
+		// the exact bindings still fail the suite.
+		sql.RunMaterializationTest(t, NewDriver(), "testdata/materialize.flow.yaml", makeResourceFn, actionDescSanitizers,
+			sql.RuntimeConfig{Shards: 1, Fidelity: m.FidelityNone})
 	})
 
 	t.Run("apply", func(t *testing.T) {
-		sql.RunApplyTest(t, newSnowflakeDriver(), "testdata/apply.flow.yaml", makeResourceFn)
+		sql.RunApplyTest(t, NewDriver(), "testdata/apply.flow.yaml", makeResourceFn)
 	})
 
 	t.Run("migrate", func(t *testing.T) {
-		sql.RunMigrationTest(t, newSnowflakeDriver(), "testdata/migrate.flow.yaml", makeResourceFn, nil)
+		sql.RunMigrationTest(t, NewDriver(), "testdata/migrate.flow.yaml", makeResourceFn, nil)
 	})
 }
 

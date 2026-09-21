@@ -14,11 +14,17 @@ func OneOfSchema(title, description, discriminator, default_ string, inputs ...O
 
 	for _, input := range inputs {
 		config := GenerateSchema(input.title, input.configObj)
+
+		extras := map[string]any{"order": 0}
+		if discriminator != "auth_type" {
+			extras["nonsensitive"] = true
+		}
+
 		config.Properties.Set(discriminator, &jsonschema.Schema{
 			Type:    "string",
 			Default: input.default_,
 			Const:   input.default_,
-			Extras:  map[string]any{"order": 0},
+			Extras:  extras,
 		})
 		config.Properties.MoveToFront(discriminator)
 

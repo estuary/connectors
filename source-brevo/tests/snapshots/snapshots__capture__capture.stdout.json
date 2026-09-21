@@ -1,0 +1,87 @@
+[
+  [
+    "acmeCo/contacts_attributes",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "calculatedValue": "COUNT[BLACKLISTED,BLACKLISTED,<,NOW()]",
+      "category": "global",
+      "name": "BLACKLIST",
+      "type": "float"
+    }
+  ],
+  [
+    "acmeCo/contacts_lists",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "folderId": 1,
+      "id": 2,
+      "name": "Your first list",
+      "totalBlacklisted": 0,
+      "totalSubscribers": 0,
+      "uniqueSubscribers": 1
+    }
+  ],
+  [
+    "acmeCo/contacts_folders",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": 1,
+      "name": "Your first folder",
+      "totalBlacklisted": 0,
+      "totalSubscribers": 0,
+      "uniqueSubscribers": 0
+    }
+  ],
+  [
+    "acmeCo/senders",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "active": true,
+      "email": "alexb@estuary.dev",
+      "id": 1,
+      "ips": [],
+      "name": "Estuary Dev Account"
+    }
+  ],
+  [
+    "acmeCo/contacts",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "attributes": {
+        "FIRSTNAME": "Alex",
+        "LASTNAME": "Bair",
+        "SMS": "14196056306"
+      },
+      "createdAt": "2026-08-01T19:43:31.777+02:00",
+      "email": "alexb@estuary.dev",
+      "emailBlacklisted": false,
+      "id": 1,
+      "listIds": [
+        2
+      ],
+      "listUnsubscribed": null,
+      "modifiedAt": "2026-08-01T19:45:17.088000+02:00",
+      "smsBlacklisted": false,
+      "subscriptions": {},
+      "whatsappBlacklisted": false
+    }
+  ]
+]

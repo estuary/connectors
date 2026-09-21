@@ -1,7 +1,16 @@
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 from enum import StrEnum
-from typing import Any, Iterator, ClassVar, Literal
+from typing import Any, ClassVar, Iterator, Literal
 
+from estuary_cdk.capture.common import (
+    CRON_REGEX,
+    BaseDocument,
+    ResourceConfigWithSchedule,
+    ResourceState,
+)
+from estuary_cdk.capture.common import (
+    ConnectorState as GenericConnectorState,
+)
 from pydantic import (
     AwareDatetime,
     BaseModel,
@@ -11,19 +20,9 @@ from pydantic import (
     create_model,
     model_validator,
 )
-from estuary_cdk.capture.common import (
-    BaseDocument,
-    ResourceConfigWithSchedule,
-    CRON_REGEX,
-    ResourceState,
-)
-from estuary_cdk.capture.common import (
-    ConnectorState as GenericConnectorState,
-)
 
 from .auth import OAuth2Credentials, SalesforceClientCredentials, UserPass
 from .shared import dt_to_str, str_to_dt
-
 
 EARLIEST_VALID_DATE_IN_SALESFORCE = datetime(1700, 1, 1, tzinfo=UTC)
 # Salesforce was founded on 03FEB1999. As long as cursor values aren't backdated before this date (which only seems possible
@@ -37,7 +36,8 @@ class SalesforceResourceConfigWithSchedule(ResourceConfigWithSchedule):
         default="",
         title="Formula Field Refresh Schedule",
         description="Schedule to automatically refresh formula fields. Accepts a cron expression.",
-        pattern=CRON_REGEX
+        pattern=CRON_REGEX,
+        json_schema_extra={"nonsensitive": True},
     )
 
 
@@ -50,11 +50,11 @@ class WindowSizeInDays(BaseModel):
 
     window_type: Literal["days"] = Field(
         default="days",
-        json_schema_extra={"type": "string", "order": 0},
+        json_schema_extra={"nonsensitive": True, "type": "string", "order": 0},
     )
     days: int = Field(
         title="Days",
-        description="Window size as a whole number of days.",
+        description="Size of the date window each incremental query covers, in whole days.",
         gt=0,
         json_schema_extra={"order": 1},
     )
@@ -65,17 +65,20 @@ class WindowSizeInDays(BaseModel):
 
 
 class WindowSizeAsInterval(BaseModel):
-    model_config = ConfigDict(title="Interval")
+    model_config = ConfigDict(title="Duration")
 
     window_type: Literal["interval"] = Field(
         default="interval",
-        json_schema_extra={"type": "string", "order": 0},
+        json_schema_extra={"nonsensitive": True, "type": "string", "order": 0},
     )
     interval: timedelta = Field(
-        title="Interval",
-        description="Window size as an ISO 8601 duration, e.g. PT1H for one hour.",
+        title="Duration",
+        description=(
+            "Size of the date window each incremental query covers, as an ISO 8601 duration, "
+            "e.g. PT1H for one hour."
+        ),
         gt=MIN_INCREMENTAL_WINDOW_SIZE,
-        json_schema_extra={"order": 1},
+        json_schema_extra={"nonsensitive": True, "order": 1},
     )
 
     @property
@@ -119,7 +122,10 @@ class EndpointConfig(BaseModel):
         # Salesforce's Client Credentials flow must hit the org's My Domain token endpoint since
         # login.salesforce.com doesn't support the client_credentials grant. The other auth
         # methods can work with the standard login/test host, so My Domain stays optional for them.
-        if isinstance(self.credentials, SalesforceClientCredentials) and not self.my_domain:
+        if (
+            isinstance(self.credentials, SalesforceClientCredentials)
+            and not self.my_domain
+        ):
             raise ValueError(
                 "The My Domain field is required when using Client Credentials authentication."
             )
@@ -127,20 +133,45 @@ class EndpointConfig(BaseModel):
 
     class Advanced(BaseModel):
         window_size: WindowSizeAsInterval | WindowSizeInDays = Field(
-            description="Date window size for Bulk API 2.0 queries. Typically left as the default unless Estuary Support or the connector logs indicate otherwise.",
-            title="Window size",
+            description=(
+                "How much time a single incremental query covers when the connector sweeps for "
+                "changes. Typically left as the default unless Estuary Support or the connector "
+                "logs indicate otherwise."
+            ),
+            title="Incremental Query Window Size",
             default_factory=lambda: WindowSizeInDays(days=18250),
             discriminator="window_type",
+            json_schema_extra={"nonsensitive": True},
         )
 
         @model_validator(mode="before")
         @classmethod
-        def _coerce_legacy_window_size(cls, data: Any) -> Any:
+        def _coerce_untagged_window_size(cls, data: Any) -> Any:
             # Older configs stored window_size as a bare integer count of days, before it became a
             # discriminated union. Wrap that legacy form so running captures keep working without the
             # user re-saving their config.
-            if isinstance(data, dict) and isinstance(data.get("window_size"), int):
-                return {**data, "window_size": {"window_type": "days", "days": data["window_size"]}}
+            if not isinstance(data, dict):
+                return data
+
+            window_size = data.get("window_size")
+
+            if isinstance(window_size, int):
+                return {
+                    **data,
+                    "window_size": {"window_type": "days", "days": window_size},
+                }
+
+            # A window_size can also arrive untagged, since the UI only fills a union's hidden
+            # discriminator for required fields. Each variant's value key doubles as its
+            # window_type, so whichever key is present selects the tag.
+            if isinstance(window_size, dict) and "window_type" not in window_size:
+                for window_type in ("interval", "days"):
+                    if window_type in window_size:
+                        return {
+                            **data,
+                            "window_size": {**window_size, "window_type": window_type},
+                        }
+
             return data
 
     advanced: Advanced = Field(
@@ -199,11 +230,12 @@ SOAP_TYPES_NOT_SUPPORTED_BY_BULK_API = [
     SoapTypes.SEARCH_LAYOUT_FIELDS_DISPLAYED,
 ]
 
+
 # BaseFieldDetails represents field metadata returned from Salesforce.
 class BaseFieldDetails(BaseModel, extra="allow"):
-    soapType: SoapTypes # Type of field
-    calculated: bool # Indicates whether or not this is a formula field.
-    custom: bool # Indicates whether or not this is a custom field.
+    soapType: SoapTypes  # Type of field
+    calculated: bool  # Indicates whether or not this is a formula field.
+    custom: bool  # Indicates whether or not this is a custom field.
 
 
 class SObject(PartialSObject):
@@ -266,7 +298,9 @@ class CursorFields(StrEnum):
     CREATED_DATE = "CreatedDate"
     LOGIN_TIME = "LoginTime"
 
+
 # REST API Related Models
+
 
 class QueryResponse(BaseModel, extra="forbid"):
     totalSize: int
@@ -274,7 +308,9 @@ class QueryResponse(BaseModel, extra="forbid"):
     records: list[dict[str, Any]]
     nextRecordsUrl: str | None = None
 
+
 # Bulk Job Related Models
+
 
 class BulkJobStates(StrEnum):
     UPLOAD_COMPLETE = "UploadComplete"
@@ -302,14 +338,15 @@ class BulkJobCheckStatusResponse(BulkJobSubmitResponse):
 
 class BulkJobError(RuntimeError):
     """Exception raised for errors when executing a bulk query job."""
-    def __init__(self, message: str, query: str | None = None, error: str | None = None):
+
+    def __init__(
+        self, message: str, query: str | None = None, error: str | None = None
+    ):
         self.message = message
         self.query = query
         self.errors = error
 
-        self.details: dict[str, Any] = {
-            "message": self.message
-        }
+        self.details: dict[str, Any] = {"message": self.message}
 
         if self.errors:
             self.details["errors"] = self.errors
@@ -322,11 +359,7 @@ class BulkJobError(RuntimeError):
         return f"BulkJobError: {self.message}"
 
     def __repr__(self):
-        return (
-            f"BulkJobError: {self.message},"
-            f"query: {self.query},"
-            f"errors: {self.errors}"
-        )
+        return f"BulkJobError: {self.message},query: {self.query},errors: {self.errors}"
 
 
 class SalesforceDataSource(StrEnum):
@@ -339,6 +372,14 @@ class ValidationContext:
         self.data_source = data_source
 
 
+# Bounds that Salesforce's own semantics pin down more tightly than the defaults
+# the CDK injects for any unbounded string or number.
+# Salesforce IDs are always either 15 or 18 characters.
+ID_BOUNDS = {"minLength": 15, "maxLength": 18}
+LATITUDE_BOUNDS = {"minimum": -90, "maximum": 90}
+LONGITUDE_BOUNDS = {"minimum": -180, "maximum": 180}
+
+
 class SalesforceRecord(BaseDocument, extra="allow"):
     field_details: ClassVar[FieldDetailsDict]
 
@@ -347,21 +388,27 @@ class SalesforceRecord(BaseDocument, extra="allow"):
     # regular model attributes. This override enables easy access to these
     # extra fields with `getattr``.
     def __getattr__(self, name: str) -> Any:
-        extra = getattr(self, '__pydantic_extra__', None)
+        extra = getattr(self, "__pydantic_extra__", None)
         if extra is not None and name in extra:
             return extra[name]
-        raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
+        raise AttributeError(
+            f"'{self.__class__.__name__}' object has no attribute '{name}'"
+        )
 
     @model_validator(mode="before")
     @classmethod
-    def _transform_fields(cls, values: dict[str, Any], info: ValidationInfo) -> dict[str, Any]:
-        if not hasattr(cls, 'field_details'):
+    def _transform_fields(
+        cls, values: dict[str, Any], info: ValidationInfo
+    ) -> dict[str, Any]:
+        if not hasattr(cls, "field_details"):
             raise RuntimeError(
                 "field_details must be set on the SalesforceRecord subclass before validation."
             )
 
         if not info.context or not isinstance(info.context, ValidationContext):
-            raise RuntimeError(f"Validation context must be of type ValidationContext: {info.context}")
+            raise RuntimeError(
+                f"Validation context must be of type ValidationContext: {info.context}"
+            )
 
         data_source = info.context.data_source
 
@@ -382,7 +429,7 @@ class SalesforceRecord(BaseDocument, extra="allow"):
                     # This metadata isn't present in the Bulk API response, so we remove it from records fetched
                     # via the REST API.
                     if field_name == "attributes":
-                            continue
+                        continue
 
                     transformed_value = cls._transform_rest_value(
                         cls.field_details[field_name],
@@ -415,7 +462,14 @@ class SalesforceRecord(BaseDocument, extra="allow"):
 
         # Transform standard fields to the correct type.
         match field_details.soapType:
-            case SoapTypes.ID | SoapTypes.STRING | SoapTypes.DATE | SoapTypes.DATETIME | SoapTypes.TIME | SoapTypes.BASE64:
+            case (
+                SoapTypes.ID
+                | SoapTypes.STRING
+                | SoapTypes.DATE
+                | SoapTypes.DATETIME
+                | SoapTypes.TIME
+                | SoapTypes.BASE64
+            ):
                 transformed_value = value
             case SoapTypes.BOOLEAN:
                 transformed_value = cls._bool_str_to_bool(value)
@@ -428,7 +482,9 @@ class SalesforceRecord(BaseDocument, extra="allow"):
             case SoapTypes.ANY_TYPE:
                 transformed_value = cls._str_to_anytype(value)
             case _:
-                raise BulkJobError(f"Unanticipated field type {field_details.soapType} for field {name}. Please reach out to Estuary support for help resolving this issue.")
+                raise BulkJobError(
+                    f"Unanticipated field type {field_details.soapType} for field {name}. Please reach out to Estuary support for help resolving this issue."
+                )
 
         return transformed_value
 
@@ -508,41 +564,56 @@ class SalesforceRecord(BaseDocument, extra="allow"):
     # always schematized as & cast to strings.
     @classmethod
     def sourced_schema(cls) -> dict[str, Any]:
-        if not hasattr(cls, 'field_details'):
+        if not hasattr(cls, "field_details"):
             raise RuntimeError(
                 "field_details must be set on the SalesforceRecord subclass before generating a sourced schema."
             )
 
-        schema = {
+        schema: dict[str, Any] = {
             "additionalProperties": False,
             "type": "object",
-            "properties": {}
+            "properties": {},
         }
 
         for field, details in cls.field_details.items():
             field_schema: dict[str, Any] = {}
             match details.soapType:
-                case SoapTypes.ID | SoapTypes.BASE64 | SoapTypes.STRING:
+                case SoapTypes.ID:
+                    field_schema = {"type": "string", **ID_BOUNDS}
+                case SoapTypes.BASE64 | SoapTypes.STRING:
                     field_schema = {"type": "string"}
                 case SoapTypes.BOOLEAN:
                     if details.custom:
-                        field_schema = {"type": "string"}
+                        # Cast to the string "true" or "false".
+                        field_schema = {
+                            "type": "string",
+                            "minLength": 4,
+                            "maxLength": 5,
+                        }
                     else:
                         field_schema = {"type": "boolean"}
                 case SoapTypes.DATE:
                     field_schema = {
                         "type": "string",
-                        "format": "date"
+                        "format": "date",
+                        "minLength": 10,
+                        "maxLength": 10,
                     }
                 case SoapTypes.DATETIME:
+                    # Bulk API responses carry a +0000 offset (28 characters),
+                    # while REST values are normalized to .000Z (24).
                     field_schema = {
                         "type": "string",
                         "format": "date-time",
+                        "minLength": 24,
+                        "maxLength": 28,
                     }
                 case SoapTypes.TIME:
                     field_schema = {
                         "type": "string",
                         "format": "time",
+                        "minLength": 13,
+                        "maxLength": 13,
                     }
                 case SoapTypes.INTEGER:
                     if details.custom:
@@ -568,21 +639,21 @@ class SalesforceRecord(BaseDocument, extra="allow"):
                             "city": {"type": "string"},
                             "country": {"type": "string"},
                             "geocodeAccuracy": {"type": "string"},
-                            "latitude": {"type": "number"},
-                            "longitude": {"type": "number"},
+                            "latitude": {"type": "number", **LATITUDE_BOUNDS},
+                            "longitude": {"type": "number", **LONGITUDE_BOUNDS},
                             "postalCode": {"type": "string"},
                             "state": {"type": "string"},
                             "street": {"type": "string"},
-                        }
+                        },
                     }
                 case SoapTypes.LOCATION:
                     field_schema = {
                         "additionalProperties": False,
                         "type": "object",
                         "properties": {
-                            "latitude": {"type": "number"},
-                            "longitude": {"type": "number"},
-                        }
+                            "latitude": {"type": "number", **LATITUDE_BOUNDS},
+                            "longitude": {"type": "number", **LONGITUDE_BOUNDS},
+                        },
                     }
                 case SoapTypes.ANY_TYPE:
                     field_schema = {
@@ -604,7 +675,9 @@ class SalesforceRecord(BaseDocument, extra="allow"):
         return schema
 
 
-def create_salesforce_model(object_name: str, fields: FieldDetailsDict) -> type[SalesforceRecord]:
+def create_salesforce_model(
+    object_name: str, fields: FieldDetailsDict
+) -> type[SalesforceRecord]:
     field_defs = {}
 
     # No fields other than `Id` are included in the model by default since what fields should be included differ

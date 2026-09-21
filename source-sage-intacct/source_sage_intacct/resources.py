@@ -184,7 +184,7 @@ async def incremental_resource(
             },
             backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
         ),
-        initial_config=ResourceConfig(name=obj, interval=timedelta(minutes=5)),
+        initial_config=ResourceConfig(name=obj, interval=timedelta(hours=6)),
         schema_inference=True,
     )
 
@@ -218,7 +218,7 @@ async def snapshot_resource(sage: Sage, obj: str) -> common.Resource:
         model=SnapshotResource,
         open=functools.partial(open, obj),
         initial_state=ResourceState(),
-        initial_config=ResourceConfig(name=obj, interval=timedelta(minutes=5)),
+        initial_config=ResourceConfig(name=obj, interval=timedelta(hours=6)),
         schema_inference=True,
     )
 

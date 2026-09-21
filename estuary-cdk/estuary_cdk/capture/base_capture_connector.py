@@ -248,7 +248,12 @@ class BaseCaptureConnector(
                         self._transactor,
                         catalog_task_name=open.capture.name,
                     )
-                    log.event.status("Capture started")
+
+                    message = "Capture started."
+                    if len(open.capture.bindings) < 1:
+                        message += " No bindings are enabled."
+                    log.event.status(message)
+
                     await capture(task)
             except* TerminateTaskGroup:
                 pass  # Expected when enforce_shutdown terminates the task group

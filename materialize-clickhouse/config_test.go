@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"encoding/json"
@@ -73,14 +73,14 @@ func TestResolvedAddress(t *testing.T) {
 }
 
 func TestAcknowledge(t *testing.T) {
-	var tr transactor
+	tr := transactor{ensured: make(chan struct{})}
 	state, err := tr.Acknowledge(t.Context(), nil, nil)
 	require.NoError(t, err)
 	require.Nil(t, state)
 }
 
 func TestSpecification(t *testing.T) {
-	resp, err := newClickHouseDriver().
+	resp, err := NewDriver().
 		Spec(t.Context(), &pm.Request_Spec{})
 	require.NoError(t, err)
 

@@ -1,9 +1,5 @@
 $defs:
   Meta:
-    additionalProperties: true
-    description: |-
-      `extra="allow"` lets context-stamped parent IDs ride in `_meta`;
-      `BaseDocument.Meta` otherwise drops unknown keys.
     properties:
       op:
         default: u
@@ -26,16 +22,7 @@ properties:
   _meta:
     $ref: '#/$defs/Meta'
     description: Document metadata
-  id:
-    title: Id
-    type: string
-  list_id:
-    title: List Id
-    type: string
-required:
-- id
-- list_id
-title: InterestCategory
+title: BaseDocument
 type: object
 x-infer-schema: true
 if:

@@ -1,115 +1,199 @@
 [
-    {
-      "protocol": 3032023,
-      "configSchema": {
-        "type": "object",
-        "properties": {
-          "client_id": {
-            "type": [
-              "string"
-            ],
-            "secret": true,
-            "writeOnly": true
-          },
-          "client_secret": {
-            "type": [
-              "string"
-            ],
-            "secret": true,
-            "writeOnly": true
-          },
-          "advertiser_ids": {
-            "type": "array",
-            "items": {
-              "type": [
-                "string"
-              ]
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$defs": {
+        "Advanced": {
+          "properties": {
+            "report_window_size": {
+              "default": 4,
+              "description": "Number of days requested per statistics report call. Criteo caps a single report at 100,000 rows and recommends querying at most 4 consecutive days, so reports with high-cardinality dimensions need a small window.",
+              "maximum": 365,
+              "minimum": 1,
+              "title": "Report Window Size (Days)",
+              "type": "integer"
+            },
+            "report_lookback_days": {
+              "default": 30,
+              "description": "Number of days before the cursor that are re-queried on every sweep. Criteo restates statistics as attribution windows close, and the widest standard window is 30 days. At least one day is always re-read, so that a report timezone offset from UTC does not leave the tail of a day uncaptured.",
+              "maximum": 365,
+              "minimum": 1,
+              "title": "Report Lookback (Days)",
+              "type": "integer"
             }
           },
-          "start_date": {
-            "type": [
-              "string"
-            ],
-            "format": "date-time"
+          "title": "Advanced",
+          "type": "object"
+        },
+        "ClientCredentialsOAuth2Credentials": {
+          "properties": {
+            "credentials_title": {
+              "const": "OAuth Credentials",
+              "default": "OAuth Credentials",
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "client_id": {
+              "secret": true,
+              "title": "Client Id",
+              "type": "string"
+            },
+            "client_secret": {
+              "secret": true,
+              "title": "Client Secret",
+              "type": "string"
+            }
           },
-          "reports": {
-            "type": [
-              "array",
-              "null"
-            ],
-            "items": {
-              "type": "object",
-              "properties": {
-                "name": {
-                  "type": [
-                    "string"
-                  ]
-                },
-                "dimensions": {
-                  "type": "array",
-                  "items": {
-                    "type": [
-                      "string"
-                    ]
-                  }
-                },
-                "metrics": {
-                  "type": "array",
-                  "items": {
-                    "type": [
-                      "string"
-                    ]
-                  }
-                },
-                "currency": {
-                  "type": [
-                    "string",
-                    "null"
-                  ],
-                  "default": "USD"
-                }
+          "required": [
+            "client_id",
+            "client_secret"
+          ],
+          "title": "OAuth",
+          "type": "object"
+        },
+        "ReportConfig": {
+          "properties": {
+            "name": {
+              "description": "Name of this report. The collection it is captured into is named custom_report_<name>. Must be unique across reports.",
+              "title": "Report Name",
+              "type": "string"
+            },
+            "grain": {
+              "$ref": "#/$defs/ReportGrain",
+              "default": "Day",
+              "description": "Time granularity of the report. Each row covers one day or one hour, and the grain leads the collection's key.",
+              "title": "Time Grain"
+            },
+            "dimensions": {
+              "default": [],
+              "description": "Criteo statistics dimensions to group the report by beyond its time grain, for example CampaignId. These join the grain to form the collection's key.",
+              "items": {
+                "type": "string"
               },
-              "required": [
-                "name",
-                "dimensions",
-                "metrics"
-              ]
+              "title": "Additional Dimensions",
+              "type": "array"
+            },
+            "metrics": {
+              "description": "Criteo statistics metrics to report on, for example Clicks and AdvertiserCost.",
+              "items": {
+                "type": "string"
+              },
+              "title": "Metrics",
+              "type": "array"
+            },
+            "currency": {
+              "default": "USD",
+              "description": "ISO 4217 currency code (three capital letters) that monetary metrics are reported in.",
+              "title": "Currency",
+              "type": "string"
+            },
+            "timezone": {
+              "default": "UTC",
+              "description": "Timezone the report's date dimensions are computed in, as a tz database name such as UTC or America/New_York.",
+              "title": "Timezone",
+              "type": "string"
             }
-          }
+          },
+          "required": [
+            "name",
+            "metrics"
+          ],
+          "title": "ReportConfig",
+          "type": "object"
         },
-        "required": [
-          "client_id",
-          "client_secret",
-          "advertiser_ids",
-          "start_date"
-        ]
+        "ReportGrain": {
+          "description": "Time granularity of a report's rows.",
+          "enum": [
+            "Day",
+            "Hour"
+          ],
+          "title": "ReportGrain",
+          "type": "string"
+        }
       },
-      "resourceConfigSchema": {
-        "type": "object",
-        "properties": {
-          "stream": {
+      "properties": {
+        "credentials": {
+          "$ref": "#/$defs/ClientCredentialsOAuth2Credentials",
+          "description": "Criteo API client credentials.",
+          "title": "Authentication"
+        },
+        "start_date": {
+          "description": "UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Report data before this date will not be replicated. If left blank, the start date will be set to 30 days before the present. Criteo's statistics reports serve at most two years of history, so an earlier start date is clamped to that.",
+          "format": "date-time",
+          "title": "Start Date",
+          "type": "string"
+        },
+        "advertiser_ids": {
+          "default": [],
+          "description": "Advertiser IDs to capture. If left empty, every advertiser in the API client's portfolio is captured.",
+          "items": {
             "type": "string"
           },
-          "replication_method": {
-            "type": "string",
-            "enum": [
-              "INCREMENTAL",
-              "FULL_TABLE"
-            ]
-          },
-          "replication_key": {
-            "type": "string"
-          }
+          "title": "Advertiser IDs",
+          "type": "array"
         },
-        "required": [
-          "stream",
-          "replication_method"
-        ]
+        "reports": {
+          "default": [],
+          "description": "Statistics reports to capture.",
+          "items": {
+            "$ref": "#/$defs/ReportConfig"
+          },
+          "title": "Reports",
+          "type": "array"
+        },
+        "advanced": {
+          "$ref": "#/$defs/Advanced",
+          "advanced": true,
+          "description": "Advanced settings for the connector.",
+          "title": "Advanced Config"
+        }
       },
-      "documentationUrl": "https://docs.estuary.dev",
-      "resourcePathPointers": [
-        "/tap_stream_id"
-      ]
-    }
-  ]
-  
+      "required": [
+        "credentials"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "description": "ResourceConfig is a common resource configuration shape.",
+      "properties": {
+        "_meta": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Meta"
+        },
+        "name": {
+          "description": "Name of this resource",
+          "title": "Name",
+          "type": "string"
+        },
+        "interval": {
+          "default": "PT0S",
+          "description": "Interval between updates for this resource",
+          "format": "duration",
+          "nonsensitive": true,
+          "title": "Interval",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ResourceConfig",
+      "type": "object"
+    },
+    "documentationUrl": "https://go.estuary.dev/source-criteo",
+    "resourcePathPointers": [
+      "/name"
+    ]
+  }
+]

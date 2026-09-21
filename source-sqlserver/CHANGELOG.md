@@ -1,5 +1,33 @@
 # source-sqlserver
 
+## 2026-08-28
+
+### Added
+- Azure IAM authentication as a new branch of the `credentials` union, using an
+  Entra access token obtained through an Azure App Registration.
+
+### Fixed
+- Automatic capture instance management no longer rotates a table's capture
+  instance indefinitely when there are rows in `cdc.ddl_history` naming
+  a change table which no longer exists.
+
+## 2026-08-25
+
+### Added
+- New `credentials` configuration union supporting username/password and AWS IAM
+  authentication (RDS auth tokens, refreshed per connection). Existing configs
+  with the legacy top-level `password` field keep working and are folded into
+  the new shape automatically.
+
+## 2026-08-18
+
+### Added
+- New `additional_backfill_filter` advanced option on each binding. When set,
+  the filter clause is applied to all backfill queries for that table, so rows
+  which the filter excludes are never backfilled. Setting or changing the
+  filter requires re-backfilling the binding, while clearing it does not.
+  Filters cannot be combined with the `Precise` backfill mode.
+
 ## 2026-07-31
 
 ### Fixed

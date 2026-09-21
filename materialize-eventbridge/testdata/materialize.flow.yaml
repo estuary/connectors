@@ -5,7 +5,7 @@ materializations:
   acmeCo/tests/materialize-eventbridge/local:
     endpoint:
       local:
-        command: ["go", "run", "."]
+        command: ["go", "run", "./cmd/connector"]
         protobuf: true
         config: config.local.yaml
     bindings:
@@ -25,7 +25,7 @@ materializations:
   acmeCo/tests/materialize-eventbridge/aws:
     endpoint:
       local:
-        command: ["go", "run", "."]
+        command: ["go", "run", "./cmd/connector"]
         protobuf: true
         config: config.aws.yaml
     bindings:

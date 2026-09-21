@@ -1,6 +1,6 @@
 ---
 sidebar_position: 3
-description: Set up Estuary's Amazon RDS for MariaDB capture connector with CDC, binlog configuration, replication permissions, and backfill and time zone settings.
+description: Set up Estuary's Amazon RDS for MariaDB capture connector with CDC, binlog configuration, replication permissions, IAM authentication, and backfill and time zone settings.
 ---
 
 # Amazon RDS for MariaDB
@@ -26,6 +26,7 @@ To use this connector, you'll need a MariaDB database setup with the following.
   - Permission to read from `information_schema` tables, if automatic discovery is used.
 - If the table(s) to be captured include columns of type `DATETIME`, the `time_zone` system variable
   must be set to an IANA zone name or numerical offset or the capture configured with a `timezone` to use by default.
+- When using [IAM authentication](#iam-authentication), IAM database authentication enabled on the instance and a database user which authenticates through the RDS plugin.
 
 ### Setup
 
@@ -79,6 +80,42 @@ CALL mysql.rds_set_configuration('binlog retention hours', 168);
 
 5. In the [RDS console](https://console.aws.amazon.com/rds/), note the instance's Endpoint and Port. You'll need these for the `address` property when you configure the connector.
 
+### IAM Authentication
+
+Instead of a password, you can authenticate to your instance with an AWS IAM role.
+
+Follow the steps in the [AWS IAM guide][aws-iam] to create a role for Flow to assume, and make note of its ARN and your instance's region to use when configuring the connector's authentication options.
+
+[Enable IAM database authentication](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.IAMDBAuth.Enabling.html) on the instance, then switch to your MariaDB client and run the following commands to create a database user which authenticates through the RDS plugin, granting it the same permissions as the `flow_capture` user in the [setup instructions](#setup) above:
+
+```sql
+CREATE USER IF NOT EXISTS flow_capture
+  IDENTIFIED WITH AWSAuthenticationPlugin AS 'RDS'
+  REQUIRE SSL
+  COMMENT 'User account for Estuary MySQL data capture';
+GRANT REPLICATION CLIENT, REPLICATION SLAVE ON *.* TO 'flow_capture';
+GRANT SELECT ON *.* TO 'flow_capture';
+```
+
+Finally, [attach a policy](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.IAMDBAuth.IAMPolicy.html) to the role granting it `rds-db:connect` on that user, substituting your own region, account ID, and the instance's resource ID:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["rds-db:connect"],
+      "Resource": ["arn:aws:rds-db:us-east-1:123456789012:dbuser:db-ABCDEFGHIJKL01234/flow_capture"]
+    }
+  ]
+}
+```
+
+IAM authentication always connects over TLS and never falls back to an unencrypted connection.
+
+[aws-iam]: /guides/iam-auth/aws/
+
 ## Capturing from Read Replicas
 
 This connector supports capturing from a read replica of your database, provided that
@@ -119,7 +156,6 @@ See [connectors](/concepts/connectors.md#using-connectors) to learn more about u
 | --------------------------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | -------------------------- |
 | **`/address`**                          | Server Address                     | The host or host:port at which the database can be reached.                                                                                                                                                                                                                                                                                                                             | string  | Required                   |
 | **`/user`**                             | Login User                         | The database user to authenticate as.                                                                                                                                                                                                                                                                                                                                                   | string  | Required, `"flow_capture"` |
-| **`/password`**                         | Login Password                     | Password for the specified database user.                                                                                                                                                                                                                                                                                                                                               | string  | Required                   |
 | `/timezone`                             | Timezone                           | Timezone to use when capturing datetime columns. Should normally be left blank to use the database's `'time_zone'` system variable. Only required if the `'time_zone'` system variable cannot be read and columns with type datetime are being captured. Must be a valid IANA time zone name or +HH:MM offset. Takes precedence over the `'time_zone'` system variable if both are set. | string  |                            |
 | `/historyMode` | History Mode | Capture each change event, without merging. | boolean | `false` |
 | `/advanced/dbname`                      | Database Name                      | The name of database to connect to. In general this shouldn&#x27;t matter. The connector can discover and capture from all databases it&#x27;s authorized to access.                                                                                                                                                                                                                    | string  | `"mysql"`                  |
@@ -130,6 +166,21 @@ See [connectors](/concepts/connectors.md#using-connectors) to learn more about u
 | `/advanced/skip_binlog_retention_check` | Skip Binlog Retention Sanity Check | Bypasses the &#x27;dangerously short binlog retention&#x27; sanity check at startup. Only do this if you understand the danger and have a specific need.                                                                                                                                                                                                                                | boolean |                            |
 | `/advanced/source_tag` | Source Tag | This value is added as the property 'tag' in the source metadata of each document. | string |  |
 | `/advanced/statement_timeout` | Statement Timeout | Overrides the default statement timeout used by the connector. Allowed values: `30s`, `1m`, `5m`, `30m`, or empty to disable. | string |  |
+| `/advanced/rediscovery_interval` | Rediscovery Interval | How often the connector re-runs discovery while a capture is running, in order to notice schema changes and newly added tables. Accepts duration strings like `15m` or `1h`, from `1m` up to `8760h`. | string | `"15m"` |
+| `/advanced/sslmode` | SSL Mode | Controls whether connections use TLS and whether the server's certificate is verified. One of `disabled`, `preferred`, `required`, `verify_ca`, or `verify_identity`. See [TLS and certificate verification](#tls-and-certificate-verification). When unset the connector behaves as `preferred` for password authentication and `required` for IAM authentication. | string |  |
+| `/advanced/ssl_server_ca` | SSL Server CA | PEM-encoded certificate authority the server certificate must chain to. Required for `verify_ca`. Optional for `verify_identity`, where the system root certificates are used when unset. | string |  |
+| `/advanced/ssl_client_cert` | SSL Client Certificate | Optional PEM-encoded client certificate to present to the server for mutual TLS. | string |  |
+| `/advanced/ssl_client_key` | SSL Client Key | PEM-encoded private key for the SSL Client Certificate. | string |  |
+
+##### Authentication
+
+| Property | Title | Description | Type | Required/Default |
+| --- | --- | --- | --- | --- |
+| **`/credentials`** | Authentication | Authentication method and credentials that provide access to the database. | object | Required |
+| `/credentials/auth_type` | Auth Type | The authentication method to use. One of `UserPassword` or `AWSIAM`. | string |  |
+| `/credentials/password` | Password | Password for the specified database user. | string | Required for `UserPassword` auth |
+| `/credentials/aws_region` | AWS Region | AWS region of your resource. | string | Required for `AWSIAM` auth |
+| `/credentials/aws_role_arn` | AWS Role ARN | AWS role for Estuary to use that has access to the resource. | string | Required for `AWSIAM` auth |
 
 #### Bindings
 
@@ -137,6 +188,9 @@ See [connectors](/concepts/connectors.md#using-connectors) to learn more about u
 | ---------------- | --------- | ------------------------------------------------------------------------------------------------------------------- | ------ | ---------------- |
 | **`/namespace`** | Namespace | The [database](https://mariadb.com/kb/en/understanding-mariadb-architecture/#databases) in which the table resides. | string | Required         |
 | **`/stream`**    | Stream    | Name of the table to be captured from the database.                                                                 | string | Required         |
+| `/mode` | [Backfill Mode](/reference/backfilling-data/#resource-configuration-backfill-modes) | How the preexisting contents of the table should be backfilled. This should generally not be changed. | string | `""` |
+| `/priority` | Backfill Priority | Optional priority for this binding. The highest priority binding(s) will be backfilled completely before any others. Negative priorities are allowed and will cause a binding to be backfilled after others. | integer | `0` |
+| `/advanced/additional_backfill_filter` | Additional Backfill Filter | Optional filter clause which will be applied to all backfill queries for this binding. Contact Estuary support for assistance before using this option. | string | |
 
 :::info
 When you configure this connector in the web application, the automatic **discovery** process sets up a binding for _most_ tables it finds in your database, but there are exceptions.
@@ -158,7 +212,9 @@ captures:
         config:
           address: "127.0.0.1:3306"
           user: "flow_capture"
-          password: "secret"
+          credentials:
+            auth_type: UserPassword
+            password: "secret"
     bindings:
       - resource:
           namespace: ${TABLE_NAMESPACE}
@@ -166,9 +222,31 @@ captures:
         target: ${PREFIX}/${COLLECTION_NAME}
 ```
 
+To authenticate with [AWS IAM](#iam-authentication) instead, replace the credentials block:
+
+```yaml
+          credentials:
+            auth_type: AWSIAM
+            aws_region: "us-east-1"
+            aws_role_arn: "arn:aws:iam::123456789012:role/flow-capture"
+```
+
 Your capture definition will likely be more complex, with additional bindings for each table in the source database.
 
 [Learn more about capture definitions.](/concepts/captures.md)
+
+## TLS and certificate verification
+
+By default the connector encrypts its connection with TLS when the server supports it, but does not verify the server's certificate. To protect against an attacker impersonating your database server, set the `sslmode` advanced option to one of the verifying modes:
+
+- `verify_ca` checks that the server certificate is signed by the CA you paste into `ssl_server_ca`, without checking the hostname. Use this when connecting by IP address, or when the certificate's name doesn't match the address you connect to.
+- `verify_identity` additionally checks that the certificate is valid for the configured server hostname.
+
+Amazon RDS certificates are issued by Amazon's own CA rather than a public one, so either mode needs the [RDS certificate bundle for your region](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.SSL.html) pasted into `ssl_server_ca`. `verify_identity` works because the certificate is issued for your instance's `rds.amazonaws.com` endpoint.
+
+Both modes work when connecting through an SSH network tunnel, because the certificate is checked against the configured server address rather than the tunnel endpoint.
+
+`required` enforces TLS without verifying the server, `preferred` falls back to an unencrypted connection when TLS fails, and `disabled` never uses TLS. IAM authentication presents a bearer token as the password, which must never be sent unencrypted, so `disabled` and `preferred` are both rejected in that case.
 
 ## Troubleshooting Capture Errors
 

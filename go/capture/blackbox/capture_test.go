@@ -71,3 +71,40 @@ func TestInvalidConfig(t *testing.T) {
 	tc.Run("With Invalid Config", 1)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
+
+// TestLockstepTransactions covers the catalog rewrite which every capture
+// snapshot in this repository depends upon.
+func TestLockstepTransactions(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		catalog string
+		expect  string
+	}{
+		{
+			name:    "adds shards when absent",
+			catalog: `{"captures":{"acmeCo/test":{"bindings":[]}}}`,
+			expect:  `{"captures":{"acmeCo/test":{"bindings":[],"shards":{"minTxnDuration":"0s","maxTxnDuration":"1ns"}}}}`,
+		},
+		{
+			name:    "preserves other shard settings",
+			catalog: `{"captures":{"acmeCo/test":{"shards":{"logLevel":"debug"}}}}`,
+			expect:  `{"captures":{"acmeCo/test":{"shards":{"logLevel":"debug","minTxnDuration":"0s","maxTxnDuration":"1ns"}}}}`,
+		},
+		{
+			name:    "applies to every capture",
+			catalog: `{"captures":{"acmeCo/a":{},"acmeCo/b":{}}}`,
+			expect:  `{"captures":{"acmeCo/a":{"shards":{"minTxnDuration":"0s","maxTxnDuration":"1ns"}},"acmeCo/b":{"shards":{"minTxnDuration":"0s","maxTxnDuration":"1ns"}}}}`,
+		},
+		{
+			name:    "leaves a catalog without captures alone",
+			catalog: `{"collections":{"acmeCo/c":{}}}`,
+			expect:  `{"collections":{"acmeCo/c":{}}}`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := withLockstepTransactions([]byte(tc.catalog))
+			require.NoError(t, err)
+			require.JSONEq(t, tc.expect, string(result))
+		})
+	}
+}

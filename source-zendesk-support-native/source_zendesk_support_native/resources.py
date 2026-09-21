@@ -70,6 +70,7 @@ from .api import (
     snapshot_cursor_paginated_resources,
     url_base,
     _dt_to_s,
+    INCREMENTAL_LAG,
     TIME_PARAMETER_DELAY,
 )
 
@@ -203,7 +204,7 @@ def audit_logs(
             )
         )
 
-    cutoff = datetime.now(tz=UTC)
+    cutoff = datetime.now(tz=UTC) - INCREMENTAL_LAG
 
     return common.Resource(
         name="audit_logs",
@@ -300,16 +301,13 @@ def full_refresh_resources(
         )
 
     resources = [
-        common.Resource(
+        common.SnapshotResource(
             name=name,
-            key=["/_meta/row_id"],
             model=FullRefreshResource,
             open=functools.partial(open, path, response_model),
-            initial_state=ResourceState(),
             initial_config=ResourceConfig(
                 name=name, interval=timedelta(minutes=60)
             ),
-            schema_inference=True,
         )
         for (name, path, response_model) in FULL_REFRESH_RESOURCES
     ]
@@ -346,16 +344,13 @@ def full_refresh_offset_paginated_resources(
         )
 
     resources = [
-        common.Resource(
+        common.SnapshotResource(
             name=name,
-            key=["/_meta/row_id"],
             model=FullRefreshResource,
             open=functools.partial(open, path, response_model),
-            initial_state=ResourceState(),
             initial_config=ResourceConfig(
                 name=name, interval=timedelta(minutes=60)
             ),
-            schema_inference=True,
         )
         for (name, path, response_model) in FULL_REFRESH_OFFSET_PAGINATED_RESOURCES
     ]
@@ -392,16 +387,13 @@ def full_refresh_cursor_paginated_resources(
         )
 
     resources = [
-        common.Resource(
+        common.SnapshotResource(
             name=name,
-            key=["/_meta/row_id"],
             model=FullRefreshResource,
             open=functools.partial(open, path, response_model),
-            initial_state=ResourceState(),
             initial_config=ResourceConfig(
                 name=name, interval=timedelta(minutes=60)
             ),
-            schema_inference=True,
         )
         for (name, path, response_model) in FULL_REFRESH_CURSOR_PAGINATED_RESOURCES
     ]
@@ -538,7 +530,7 @@ def satisfaction_ratings(
             )
         )
 
-    cutoff = datetime.now(tz=UTC) - TIME_PARAMETER_DELAY
+    cutoff = datetime.now(tz=UTC) - max(INCREMENTAL_LAG, TIME_PARAMETER_DELAY)
 
     return common.Resource(
         name="satisfaction_ratings",
@@ -597,7 +589,7 @@ def incremental_cursor_paginated_resources(
             )
         )
 
-    cutoff = datetime.now(tz=UTC)
+    cutoff = datetime.now(tz=UTC) - max(INCREMENTAL_LAG, TIME_PARAMETER_DELAY)
 
     resources = [
             common.Resource(
@@ -658,7 +650,7 @@ def incremental_time_export_resources(
             )
         )
 
-    cutoff = datetime.now(tz=UTC) - TIME_PARAMETER_DELAY
+    cutoff = datetime.now(tz=UTC) - max(INCREMENTAL_LAG, TIME_PARAMETER_DELAY)
 
     resources = [
             common.Resource(
@@ -719,7 +711,7 @@ def talk_incremental_export_resources(
             )
         )
 
-    cutoff = datetime.now(tz=UTC) - TIME_PARAMETER_DELAY
+    cutoff = datetime.now(tz=UTC) - max(INCREMENTAL_LAG, TIME_PARAMETER_DELAY)
 
     resources = [
             common.Resource(

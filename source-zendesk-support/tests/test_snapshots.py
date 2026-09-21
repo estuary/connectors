@@ -12,6 +12,8 @@ FIELDS_TO_REDACT = [
     "last_login_at",
     "assignee_updated_at",
     "generated_timestamp",
+    "fields",
+    "custom_fields",
 ]
 
 
@@ -41,7 +43,8 @@ def test_capture(request, snapshot):
     result = subprocess.run(
         [
             "flowctl",
-            "preview",
+            "raw",
+            "preview-next",
             "--source",
             request.fspath.dirname + "/../test.flow.yaml",
             "--sessions",

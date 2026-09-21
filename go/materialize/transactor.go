@@ -185,6 +185,8 @@ func RunTransactions(
 	lvl log.Level,
 ) (_err error) {
 	be := NewBindingEvents()
+	health := newHealthTracker(open)
+	be.health = health
 
 	openStart := time.Now()
 	log.Info("requesting materialization Open")
@@ -228,6 +230,9 @@ func RunTransactions(
 	}
 	logrus.WithField("eventType", "connectorStatus").Info("Running")
 
+	health.start()
+	defer health.close()
+
 	var (
 		// awaitErr is the last await() result,
 		// and is readable upon its close of its parameter `awaitDoneCh`.
@@ -245,6 +250,7 @@ func RunTransactions(
 		awaitDoneCh chan<- struct{}, // To be closed upon return.
 		loadDoneCh <-chan struct{}, // Signaled when load() has completed.
 		statePatches []json.RawMessage, // This transaction's aggregated state patches.
+		committedRound int, // Round being acknowledged, or -1 for the recovery commit.
 	) (__out error) {
 
 		defer func() {
@@ -264,14 +270,25 @@ func RunTransactions(
 			return nil
 		}
 
-		if ackState, err := transactor.Acknowledge(ctx, statePatches, nil); err != nil {
+		ackState, err := transactor.Acknowledge(ctx, statePatches, nil)
+		if err != nil {
 			return err
-		} else if err := writeAcknowledged(stream, ackState, &txResponse); err != nil {
+		}
+		if committedRound < 0 {
+			health.endRecovery()
+		} else {
+			health.acknowledged(committedRound)
+		}
+		if err := writeAcknowledged(stream, ackState, &txResponse); err != nil {
 			return err
 		}
 
 		return nil
 	}
+
+	// loaded is the number of Loaded responses sent for the current round,
+	// written by load() and read only after loadDoneCh is closed.
+	var loaded int
 
 	// load is a closure for async execution of Transactor.Load.
 	var load = func(
@@ -279,7 +296,7 @@ func RunTransactions(
 		loadDoneCh chan<- struct{}, // To be closed upon return.
 	) (__out error) {
 
-		var loaded int
+		loaded = 0
 		defer func() {
 			loadErr = __out
 			close(loadDoneCh)
@@ -315,6 +332,9 @@ func RunTransactions(
 	var loadCtx, loadCancel = context.WithCancel(ctx)
 	defer loadCancel()
 
+	// round is the zero-based index of the transaction being processed.
+	var round int
+
 	for {
 		var (
 			awaitDoneCh = make(chan struct{}) // Signals await() is done.
@@ -338,7 +358,7 @@ func RunTransactions(
 		// On completion, Acknowledged has been written to the stream,
 		// and a concurrent load() phase may now begin to close.
 		// At exit, `awaitDoneCh` is closed and `awaitErr` is its status.
-		go await(lastCommitOp, awaitDoneCh, loadDoneCh, statePatches)
+		go await(lastCommitOp, awaitDoneCh, loadDoneCh, statePatches, round-1)
 
 		// Begin an async load of the current transaction.
 		// At exit, `loadDoneCh` is closed and `loadErr` is its status.
@@ -375,7 +395,7 @@ func RunTransactions(
 		}
 
 		// Process all Store requests until StartCommit is read.
-		var storeIt = StoreIterator{stream: stream, request: &rxRequest, ctx: ctx}
+		var storeIt = StoreIterator{stream: stream, request: &rxRequest, ctx: ctx, Round: round, health: health}
 		var startCommit, err = transactor.Store(&storeIt)
 		if storeIt.err != nil {
 			err = storeIt.err // Prefer an iterator error as it's more directly causal.
@@ -387,6 +407,7 @@ func RunTransactions(
 		if runtimeCheckpoint, err = checkpointFromStartCommit(&rxRequest); err != nil {
 			return err
 		}
+		health.recordExpected(round, int64(loadIt.Total), int64(loaded))
 
 		// `startCommit` may be nil to indicate a no-op commit.
 		var stateUpdate *pf.ConnectorState = nil
@@ -412,5 +433,6 @@ func RunTransactions(
 		if err = writeStartedCommit(stream, &txResponse, stateUpdate); err != nil {
 			return err
 		}
+		round++
 	}
 }

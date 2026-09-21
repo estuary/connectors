@@ -11,7 +11,6 @@ from estuary_cdk.capture.common import (
     SnapshotResource,
     open_binding,  # pyright: ignore[reportUnknownVariableType]
 )
-from estuary_cdk.capture.document import BaseDocument
 from estuary_cdk.flow import CaptureBinding, ValidationError
 from estuary_cdk.http import HTTPError, HTTPMixin, TokenSource
 
@@ -24,7 +23,15 @@ from .api import (
     snapshot_report_rows,
     snapshot_reports,
 )
-from .models import EndpointConfig, Report, ReportRow, Sheet, SheetRow, base_url
+from .models import (
+    SENTINEL_ACCESS_TOKEN,
+    EndpointConfig,
+    Report,
+    ReportRow,
+    Sheet,
+    SheetRow,
+    base_url,
+)
 
 # Daily reconciliation schedule for `sheet_rows` — its `rowsModifiedSince`
 # cursor has confirmed gaps (blank/never-cell-written rows are invisible to
@@ -158,10 +165,20 @@ async def sheets(http: HTTPMixin, config: EndpointConfig) -> SmartsheetResource:
     )
 
 
+async def _list_sheet_ids_for_discovery(
+    log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> list[int]:
+    if config.credentials.access_token == SENTINEL_ACCESS_TOKEN:
+        log.warning("Sentinel access token configured: skipping sheet enumeration.")
+        return []
+
+    return await list_all_sheet_ids(http, config.region, log)
+
+
 async def sheet_rows(
     log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> SmartsheetResource:
-    sheet_ids = await list_all_sheet_ids(http, config.region, log)
+    sheet_ids = await _list_sheet_ids_for_discovery(log, http, config)
     cutoff = _whole_second_cutoff()
 
     incremental_fetchers: dict[str, common.FetchChangesFn[SheetRow]] = {
@@ -224,19 +241,15 @@ async def reports(http: HTTPMixin, config: EndpointConfig) -> SmartsheetResource
             state,
             task,
             fetch_snapshot=functools.partial(snapshot_reports, http, config.region),
-            tombstone=BaseDocument(_meta=BaseDocument.Meta(op="d")),
         )
 
     return SnapshotResource(
         name=Report.resource_name,
-        key=["/id"],
-        model=Report,
         open=open,  # pyright: ignore[reportUnknownArgumentType]
         initial_config=common.ResourceConfig(
             name=Report.resource_name,
             interval=REPORTS_INTERVAL,
         ),
-        schema_inference=True,
     )
 
 
@@ -254,19 +267,15 @@ async def report_rows(http: HTTPMixin, config: EndpointConfig) -> SmartsheetReso
             state,
             task,
             fetch_snapshot=functools.partial(snapshot_report_rows, http, config.region),
-            tombstone=BaseDocument(_meta=BaseDocument.Meta(op="d")),
         )
 
     return SnapshotResource(
         name=ReportRow.resource_name,
-        key=["/_meta/report_id", "/id"],
-        model=ReportRow,
         open=open,  # pyright: ignore[reportUnknownArgumentType]
         initial_config=common.ResourceConfig(
             name=ReportRow.resource_name,
             interval=REPORTS_INTERVAL,
         ),
-        schema_inference=True,
     )
 
 

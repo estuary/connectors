@@ -15,7 +15,7 @@ import (
 
 var statementTimeoutRegexp = regexp.MustCompile(`maximum statement execution time exceeded`)
 
-func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, callback func(event sqlcapture.ChangeEvent) error) (bool, []byte, error) {
+func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, backfillFilter string, callback func(event sqlcapture.ChangeEvent) error) (bool, []byte, error) {
 	var keyColumns = state.KeyColumns
 	var resumeAfter = state.Scanned
 	var schema, table = info.Schema, info.Name
@@ -36,7 +36,7 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 			"stream": streamID,
 			"offset": state.BackfilledCount,
 		}).Debug("scanning keyless table chunk")
-		query = db.keylessScanQuery(info, schema, table)
+		query = db.keylessScanQuery(info, backfillFilter)
 		args = []any{state.BackfilledCount}
 	case sqlcapture.TableStatePreciseBackfill, sqlcapture.TableStateUnfilteredBackfill:
 		var isPrecise = (state.Mode == sqlcapture.TableStatePreciseBackfill)
@@ -62,13 +62,13 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 			for i := range resumeKey {
 				args = append(args, resumeKey[:i+1]...)
 			}
-			query = db.buildScanQuery(false, isPrecise, keyColumns, columnTypes, schema, table)
+			query = db.buildScanQuery(info, false, isPrecise, keyColumns, columnTypes, backfillFilter)
 		} else {
 			logrus.WithFields(logrus.Fields{
 				"stream":     streamID,
 				"keyColumns": keyColumns,
 			}).Debug("scanning initial table chunk")
-			query = db.buildScanQuery(true, isPrecise, keyColumns, columnTypes, schema, table)
+			query = db.buildScanQuery(info, true, isPrecise, keyColumns, columnTypes, backfillFilter)
 		}
 	default:
 		return false, nil, fmt.Errorf("invalid backfill mode %q", state.Mode)
@@ -215,15 +215,41 @@ var columnBinaryKeyComparison = map[string]bool{
 	"longtext":   true,
 }
 
-func (db *mysqlDatabase) keylessScanQuery(_ *sqlcapture.DiscoveryInfo, schemaName, tableName string) string {
+func (db *mysqlDatabase) keylessScanQuery(info *sqlcapture.DiscoveryInfo, backfillFilter string) string {
+	// Generate a list of individual WHERE clauses which should be ANDed together
+	var whereClauses []string
+	if backfillFilter != "" {
+		whereClauses = append(whereClauses, fmt.Sprintf("(%s)", backfillFilter))
+	}
+
 	var query = new(strings.Builder)
-	fmt.Fprintf(query, "SELECT * FROM `%s`.`%s`", schemaName, tableName)
+	query.WriteString(backfillSelectFrom(info))
+	if len(whereClauses) > 0 {
+		fmt.Fprintf(query, " WHERE %s", strings.Join(whereClauses, " AND "))
+	}
 	fmt.Fprintf(query, " LIMIT %d", db.config.Advanced.BackfillChunkSize)
 	fmt.Fprintf(query, " OFFSET ?;")
 	return query.String()
 }
 
-func (db *mysqlDatabase) buildScanQuery(start, isPrecise bool, keyColumns []string, columnTypes map[string]interface{}, schemaName, tableName string) string {
+// backfillSelectFrom returns the `SELECT ... FROM ...` prefix of a backfill query.
+// In the common case this is just `SELECT * FROM table`. MariaDB system-versioned
+// tables are scanned with `FOR SYSTEM_TIME ALL` so that historical row versions
+// are backfilled along with current ones, and when the system-versioning columns
+// are implicit (and thus omitted from `SELECT *`) they are listed explicitly.
+func backfillSelectFrom(info *sqlcapture.DiscoveryInfo) string {
+	var selectList = "*"
+	var suffix = ""
+	if details, ok := info.ExtraDetails.(*mysqlTableDiscoveryDetails); ok && details.SystemVersioned {
+		suffix = " FOR SYSTEM_TIME ALL"
+		if details.ImplicitSystemVersioning {
+			selectList = "*, row_start, row_end"
+		}
+	}
+	return fmt.Sprintf("SELECT %s FROM `%s`.`%s`%s", selectList, info.Schema, info.Name, suffix)
+}
+
+func (db *mysqlDatabase) buildScanQuery(info *sqlcapture.DiscoveryInfo, start, isPrecise bool, keyColumns []string, columnTypes map[string]interface{}, backfillFilter string) string {
 	// Construct lists of key specifiers and placeholders. They will be joined with commas and used in the query itself.
 	var pkey []string
 	for _, colName := range keyColumns {
@@ -237,24 +263,34 @@ func (db *mysqlDatabase) buildScanQuery(start, isPrecise bool, keyColumns []stri
 		}
 	}
 
-	// Construct the query itself.
-	var query = new(strings.Builder)
-	fmt.Fprintf(query, "SELECT * FROM `%s`.`%s`", schemaName, tableName)
-
+	// Generate a list of individual WHERE clauses which should be ANDed together
+	var whereClauses []string
 	if !start {
+		var predicate = new(strings.Builder)
 		for i := 0; i != len(pkey); i++ {
 			if i == 0 {
-				fmt.Fprintf(query, " WHERE (")
+				predicate.WriteString("(")
 			} else {
-				fmt.Fprintf(query, ") OR (")
+				predicate.WriteString(") OR (")
 			}
 
 			for j := 0; j != i; j++ {
-				fmt.Fprintf(query, "%s = ? AND ", pkey[j])
+				fmt.Fprintf(predicate, "%s = ? AND ", pkey[j])
 			}
-			fmt.Fprintf(query, "%s > ?", pkey[i])
+			fmt.Fprintf(predicate, "%s > ?", pkey[i])
 		}
-		fmt.Fprintf(query, ")")
+		predicate.WriteString(")")
+		whereClauses = append(whereClauses, fmt.Sprintf("(%s)", predicate.String()))
+	}
+	if backfillFilter != "" {
+		whereClauses = append(whereClauses, fmt.Sprintf("(%s)", backfillFilter))
+	}
+
+	// Construct the query itself.
+	var query = new(strings.Builder)
+	query.WriteString(backfillSelectFrom(info))
+	if len(whereClauses) > 0 {
+		fmt.Fprintf(query, " WHERE %s", strings.Join(whereClauses, " AND "))
 	}
 	fmt.Fprintf(query, " ORDER BY %s", strings.Join(pkey, ", "))
 	fmt.Fprintf(query, " LIMIT %d;", db.config.Advanced.BackfillChunkSize)

@@ -3,10 +3,18 @@ import subprocess
 
 
 def test_capture(request, snapshot):
+    OMITTED_STREAMS = [
+        # Sentry deletes Releases that don't have a deployment within the past 90 days.
+        # We aren't frequently deploying a Release just so it appears in the capture
+        # snapshot, so don't include any documents for it in the snapshot.
+        "acmeCo/Releases",
+    ]
+
     result = subprocess.run(
         [
             "flowctl",
-            "preview",
+            "raw",
+            "preview-next",
             "--source",
             request.fspath.dirname + "/../test.flow.yaml",
             "--sessions",
@@ -50,7 +58,7 @@ def test_capture(request, snapshot):
     seen = set()
     for line in lines:
         stream = line[0]
-        if stream in seen:
+        if stream in seen or stream in OMITTED_STREAMS:
             continue
         seen.add(stream)
         line[1] = redact(line[1])

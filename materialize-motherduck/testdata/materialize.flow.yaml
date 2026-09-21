@@ -5,7 +5,7 @@ materializations:
   acmeCo/tests/materialize-motherduck/s3:
     endpoint:
       local:
-        command: ["go", "run", "."]
+        command: ["go", "run", "./cmd/connector"]
         protobuf: true
         config: config.s3.yaml
     bindings: &bindings
@@ -37,7 +37,7 @@ materializations:
         command:
           - go
           - run
-          - .
+          - ./cmd/connector
         protobuf: true
         config: config.gcs.yaml
     bindings: *bindings

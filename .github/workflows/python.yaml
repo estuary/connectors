@@ -3,148 +3,58 @@ name: Python Connectors
 on:
   push:
     branches: [main]
-    paths:
-      - "estuary-cdk/**"
-      - "source-airtable/**"
-      - "source-asana/**"
-      - "source-facebook-marketing/**"
-      - "source-gladly/**"
-      - "source-google-ads/**"
-      - "source-google-sheets-native/**"
-      - "source-hubspot-native/**"
-      - "source-hubspot/**"
-      - "source-notion/**"
-      - "source-linkedin-pages/**"
-      - "source-linkedin-ads-v2/**"
-      - "source-klaviyo/**"
-      - "source-recharge/**"
-      - "source-stripe-native/**"
-      - "source-zendesk-support/**"
-      - "source-iterable/**"
-      - "source-pendo/**"
-      - "source-twilio/**"
-      - "source-jira-legacy/**"
-      - "source-mixpanel-native/**"
-      - "source-brevo/**"
-      - "source-impact-native/**"
-      - "source-front/**"
-      - "source-genesys/**"
-      - "source-braintree-native/**"
-      - "source-intercom-native/**"
-      - "source-shopify-native/**"
-      - "source-zendesk-support-native/**"
-      - "source-iterate/**"
-      - "source-google-analytics-data-api-native/**"
-      - "source-monday/**"
-      - "source-salesforce-native/**"
-      - "source-gainsight-nxt/**"
-      - "source-chargebee-native/**"
-      - "source-sage-intacct/**"
-      - "source-outreach/**"
-      - "source-jira-native/**"
-      - "source-looker/**"
-      - "source-qualtrics/**"
-      - "source-google-play/**"
-      - "source-apple-app-store/**"
-      - "source-datadog/**"
-      - "source-klaviyo-native/**"
-      - "source-sentry/**"
-      - "source-dynamics-365-finance-and-operations/**"
-      - "source-incident-io/**"
-      - "source-navan/**"
-      - "source-facebook-marketing-native/**"
-      - "source-quickbooks/**"
-      - "source-airtable-native/**"
-      - "source-ada/**"
-      - "source-zoho/**"
-      - "source-iterable-native/**"
-      - "source-ringcentral/**"
-      - "source-posthog/**"
-      - "source-ashby/**"
-      - "source-gong/**"
-      - "source-greenhouse-native/**"
-      - "source-calendly/**"
-      - "source-appsflyer/**"
-      - "source-zuora/**"
-      - "source-smartsheet/**"
-      - "source-mailchimp-native/**"
+    paths-ignore: &non_code_paths
+      - "**.md"
+      - "docs/**"
+      - ".claude/**"
+      - ".github/workflows/ci.yaml"
+      - ".github/workflows/estuary-cdk.yaml"
 
   pull_request:
     branches: [main]
-    paths:
-      - "estuary-cdk/**"
-      - "source-airtable/**"
-      - "source-asana/**"
-      - "source-facebook-marketing/**"
-      - "source-gladly/**"
-      - "source-google-ads/**"
-      - "source-google-sheets-native/**"
-      - "source-hubspot-native/**"
-      - "source-hubspot/**"
-      - "source-notion/**"
-      - "source-linkedin-pages/**"
-      - "source-linkedin-ads-v2/**"
-      - "source-recharge/**"
-      - "source-klaviyo/**"
-      - "source-recharge/**"
-      - "source-stripe-native/**"
-      - "source-zendesk-support/**"
-      - "source-iterable/**"
-      - "source-pendo/**"
-      - "source-twilio/**"
-      - "source-jira-legacy/**"
-      - "source-mixpanel-native/**"
-      - "source-brevo/**"
-      - "source-impact-native/**"
-      - "source-front/**"
-      - "source-genesys/**"
-      - "source-braintree-native/**"
-      - "source-intercom-native/**"
-      - "source-shopify-native/**"
-      - "source-zendesk-support-native/**"
-      - "source-iterate/**"
-      - "source-google-analytics-data-api-native/**"
-      - "source-monday/**"
-      - "source-salesforce-native/**"
-      - "source-gainsight-nxt/**"
-      - "source-chargebee-native/**"
-      - "source-sage-intacct/**"
-      - "source-outreach/**"
-      - "source-jira-native/**"
-      - "source-looker/**"
-      - "source-qualtrics/**"
-      - "source-google-play/**"
-      - "source-apple-app-store/**"
-      - "source-datadog/**"
-      - "source-klaviyo-native/**"
-      - "source-sentry/**"
-      - "source-dynamics-365-finance-and-operations/**"
-      - "source-incident-io/**"
-      - "source-navan/**"
-      - "source-facebook-marketing-native/**"
-      - "source-quickbooks/**"
-      - "source-airtable-native/**"
-      - "source-ada/**"
-      - "source-zoho/**"
-      - "source-iterable-native/**"
-      - "source-ringcentral/**"
-      - "source-posthog/**"
-      - "source-ashby/**"
-      - "source-gong/**"
-      - "source-greenhouse-native/**"
-      - "source-calendly/**"
-      - "source-appsflyer/**"
-      - "source-zuora/**"
-      - "source-smartsheet/**"
-      - "source-mailchimp-native/**"
+    paths-ignore: *non_code_paths
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  # Which connectors did this change touch? This job classifies every changed
+  # path, and the build jobs below gate on its answer.
+  #
+  # It can't be a `paths` filter because dynamically telling a Python connector
+  # from a Go or Rust one means looking for a pyproject.toml, which needs the
+  # checked out tree & nothing is checked out when `paths` filters are evaluated.
+  classify_changes:
+    runs-on: ubuntu-24.04
+    outputs:
+      run: ${{ steps.classify.outputs.python }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: classify
+        uses: ./.github/actions/classify-changes
+
+  fetch_flow:
+    needs: classify_changes
+    if: needs.classify_changes.outputs.run == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      # These tests only invoke flowctl, but flowctl shells out to sops to
+      # decrypt each test.flow.yaml's encrypted config, so both are uploaded.
+      - name: Fetch flowctl and sops
+        uses: ./.github/actions/fetch-flow-artifact
+        with:
+          paths: |
+            flow-bin/flowctl
+            flow-bin/sops
+
   py_connector:
     runs-on: ubuntu-24.04
+    needs: [classify_changes, fetch_flow]
+    if: needs.classify_changes.outputs.run == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -159,10 +69,6 @@ jobs:
           - name: source-asana
             type: capture
             version: v1
-            usage_rate: "1.0"
-          - name: source-facebook-marketing
-            type: capture
-            version: v4
             usage_rate: "1.0"
           - name: source-gladly
             type: capture
@@ -234,7 +140,7 @@ jobs:
             usage_rate: "1.0"
           - name: source-brevo
             type: capture
-            version: v1
+            version: v2
             usage_rate: "1.0"
           - name: source-impact-native
             type: capture
@@ -404,6 +310,14 @@ jobs:
             type: capture
             version: v1
             usage_rate: "1.0"
+          - name: source-criteo
+            type: capture
+            version: v2
+            usage_rate: "1.0"
+          - name: source-commercetools
+            type: capture
+            version: v1
+            usage_rate: "1.0"
 
     steps:
       - uses: actions/checkout@v4
@@ -415,6 +329,9 @@ jobs:
           docker cp $(docker create --name temp ghcr.io/estuary/network-tunnel:dev sh):/flow-network-tunnel ./network-tunnel/flow-network-tunnel
           docker rm temp
           echo "${PWD}/network-tunnel" >> $GITHUB_PATH
+
+      - name: Restore Flow binaries
+        uses: ./.github/actions/restore-flow-binaries
 
       - name: Common Setup
         id: setup

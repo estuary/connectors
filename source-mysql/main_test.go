@@ -85,9 +85,12 @@ func mysqlTestBackend(t testing.TB) *testBackend {
 
 	// Construct the capture config
 	var captureConfig = Config{
-		Address:  *dbCaptureAddress,
-		User:     *dbCaptureUser,
-		Password: *dbCapturePass,
+		Address: *dbCaptureAddress,
+		User:    *dbCaptureUser,
+		Credentials: &CredentialsConfig{
+			AuthType:           UserPassword,
+			UserPasswordConfig: UserPasswordConfig{Password: *dbCapturePass},
+		},
 		Advanced: advancedConfig{
 			DBName:                   *dbName,
 			SkipBinlogRetentionCheck: *skipBinlogRetentionCheck,
@@ -123,6 +126,7 @@ func (tb *testBackend) CaptureSpec(ctx context.Context, t testing.TB, streamMatc
 	sanitizers[`"cursor":"binlog.000123:56789"`] = regexp.MustCompile(`"cursor":"[^"]+\.[0-9]+:[0-9]+"`)
 	sanitizers[`"ts_ms":1111111111111`] = regexp.MustCompile(`"ts_ms":[0-9]+`)
 	sanitizers[`"txid":"11111111-1111-1111-1111-111111111111:111"`] = regexp.MustCompile(`"txid":"[0-9a-f-]+:[0-9]+"`)
+	sanitizers[`"txid":"0-1-111"`] = regexp.MustCompile(`"txid":"[0-9]+-[0-9]+-[0-9]+"`) // MariaDB GTIDs are domain-server-sequence
 
 	var cfg = tb.config
 	var cs = &st.CaptureSpec{

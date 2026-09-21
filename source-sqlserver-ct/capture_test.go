@@ -13,6 +13,7 @@ import (
 // interesting because the LEFT OUTER JOIN with the source table produces NULLs
 // for non-key columns when the row no longer exists.
 func TestNullHandling(t *testing.T) {
+	t.Parallel()
 	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data VARCHAR(32))`)
 
@@ -33,6 +34,7 @@ func TestNullHandling(t *testing.T) {
 }
 
 func TestChangeTrackingDisabled(t *testing.T) {
+	t.Parallel()
 	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data TEXT)`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'zero'), (1, 'one'), (2, 'two')`)
@@ -51,6 +53,7 @@ func TestChangeTrackingDisabled(t *testing.T) {
 // TestBackfillWithoutKey sets up a table with a primary key but configures
 // the binding to use the "Without Primary Key" backfill mode.
 func TestBackfillWithoutKey(t *testing.T) {
+	t.Parallel()
 	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data VARCHAR(2000))`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'A'), (1, 'bbb'), (2, 'CDEFGH')`)
@@ -65,6 +68,7 @@ func TestBackfillWithoutKey(t *testing.T) {
 // TestDiscoverOnlyEnabled tests discovery table filtering when only CT-enabled tables should be discovered.
 func TestDiscoverOnlyEnabled(t *testing.T) {
 	t.Run("Default", func(t *testing.T) {
+		t.Parallel()
 		var db, tc = blackboxTestSetup(t)
 		// Create three tables, one (table B) without change tracking
 		db.CreateTable(t, `<NAME>_a`, `(id INTEGER PRIMARY KEY, data TEXT)`)
@@ -76,6 +80,7 @@ func TestDiscoverOnlyEnabled(t *testing.T) {
 		cupaloy.SnapshotT(t, tc.Transcript.String())
 	})
 	t.Run("DiscoverWithoutCT", func(t *testing.T) {
+		t.Parallel()
 		var db, tc = blackboxTestSetup(t)
 		// Create three tables, one (table B) without change tracking
 		db.CreateTable(t, `<NAME>_a`, `(id INTEGER PRIMARY KEY, data TEXT)`)
@@ -90,6 +95,7 @@ func TestDiscoverOnlyEnabled(t *testing.T) {
 }
 
 func TestKeylessDiscovery(t *testing.T) {
+	t.Parallel()
 	var db, tc = blackboxTestSetup(t)
 	db.CreateTableWithoutCT(t, `<NAME>`, `(a INTEGER, b VARCHAR(2000), c REAL NOT NULL, d VARCHAR(255))`)
 	tc.DiscoverFull("Discover Tables")

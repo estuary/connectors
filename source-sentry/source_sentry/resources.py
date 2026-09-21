@@ -155,16 +155,12 @@ async def all_resources(
     explore_cutoff = cutoff - MAX_EXPLORE_FULL_FIDELITY_WINDOW + timedelta(minutes=1)
 
     return [
-        common.Resource(
+        common.SnapshotResource(
             name=resource.resource_name,
-            key=["/_meta/row_id"],
-            model=resource,
             open=functools.partial(open_full_refresh_bindings, resource),
-            initial_state=ResourceState(),
             initial_config=ResourceConfig(
                 name=resource.resource_name, interval=timedelta(minutes=5)
             ),
-            schema_inference=True,
         )
         for resource in FULL_REFRESH_RESOURCES
     ] + [

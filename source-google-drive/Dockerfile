@@ -42,3 +42,4 @@ USER nonroot:nonroot
 ENTRYPOINT ["/connector/source-google-drive"]
 
 LABEL FLOW_RUNTIME_PROTOCOL=capture
+LABEL dev.estuary.usage-rate=0

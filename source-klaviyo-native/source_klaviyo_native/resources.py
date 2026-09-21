@@ -38,7 +38,7 @@ from .models import (
 # Klaviyo doesn't use the standard "Bearer" token type in the Authorization
 # header. Instead, it uses "Klaviyo-API-Key" as the token type.
 AUTHORIZATION_TOKEN_TYPE = "Klaviyo-API-Key"
-EVENTS_EVENTUAL_CONSISTENCY_HORIZON = timedelta(days=4)
+EVENTS_EVENTUAL_CONSISTENCY_HORIZON = timedelta(days=7)
 
 
 async def validate_credentials(
@@ -93,16 +93,12 @@ def full_refresh_resources(
         )
 
     resources = [
-        common.Resource(
+        common.SnapshotResource(
             name=model.name,
-            key=["/_meta/row_id"],
-            model=common.BaseDocument,
             open=functools.partial(open, model),
-            initial_state=ResourceState(),
             initial_config=ResourceConfig(
                 name=model.name, interval=timedelta(minutes=60)
             ),
-            schema_inference=True,
         )
         for model in FULL_REFRESH_STREAMS
     ]

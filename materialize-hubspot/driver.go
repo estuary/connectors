@@ -56,7 +56,7 @@ func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 	}
 
 	parsedFlags := boilerplate.ParseFlags(cfg)
-	materializer, err := newMaterialization(ctx, req.Name.String(), cfg, parsedFlags)
+	materializer, err := NewMaterializer(ctx, req.Name.String(), cfg, parsedFlags)
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +118,7 @@ func (*Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_A
 	}
 
 	parsedFlags := boilerplate.ParseFlags(cfg)
-	materializer, err := newMaterialization(ctx, req.Materialization.Name.String(), cfg, parsedFlags)
+	materializer, err := NewMaterializer(ctx, req.Materialization.Name.String(), cfg, parsedFlags)
 	if err != nil {
 		return nil, err
 	}
@@ -220,6 +220,7 @@ func (m *materialization) NewTransactor(
 
 		bindings = append(bindings, &binding{
 			object:     mapped.object,
+			path:       []string{"crm", mapped.object.String()},
 			properties: properties,
 			idProperty: idProperty,
 			fields:     mapped.fields,
@@ -230,6 +231,7 @@ func (m *materialization) NewTransactor(
 	return &transactor{
 		client:   m.client,
 		bindings: bindings,
+		be:       be,
 	}, nil
 }
 
@@ -237,7 +239,7 @@ func (m *materialization) Close(context.Context) {
 	m.client.Close()
 }
 
-func newMaterialization(
+func NewMaterializer(
 	ctx context.Context,
 	materializationName string,
 	config *Config,
@@ -269,7 +271,7 @@ func (*Driver) NewTransactor(
 	}
 
 	featureFlags := boilerplate.ParseFlags(cfg)
-	materializer, err := newMaterialization(ctx, req.Materialization.Name.String(), cfg, featureFlags)
+	materializer, err := NewMaterializer(ctx, req.Materialization.Name.String(), cfg, featureFlags)
 	if err != nil {
 		return nil, nil, nil, err
 	}

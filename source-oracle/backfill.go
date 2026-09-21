@@ -15,7 +15,7 @@ import (
 )
 
 // ScanTableChunk fetches a chunk of rows from the specified table, resuming from `resumeKey` if non-nil.
-func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, callback func(event sqlcapture.ChangeEvent) error) (bool, []byte, error) {
+func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, backfillFilter string, callback func(event sqlcapture.ChangeEvent) error) (bool, []byte, error) {
 	logrus.WithField("state", state).Debug("backfill: ScanChunk")
 	var keyColumns = state.KeyColumns
 	var resumeAfter = state.Scanned
@@ -46,7 +46,7 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 
 		logEntry.WithField("rowid", afterRowID).Debug("backfill: scanning keyless table chunk")
 
-		query, rowidRangeEnd = db.keylessScanQuery(info, schema, table, afterRowID, db.backfillRowIDRanges[streamID])
+		query, rowidRangeEnd = db.keylessScanQuery(info, schema, table, afterRowID, db.backfillRowIDRanges[streamID], backfillFilter)
 
 	case sqlcapture.TableStatePreciseBackfill, sqlcapture.TableStateUnfilteredBackfill:
 		if resumeAfter != nil {
@@ -61,13 +61,13 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 				"keyColumns": keyColumns,
 				"resumeKey":  resumeKey,
 			}).Debug("backfill: scanning subsequent table chunk")
-			query = db.buildScanQuery(false, info, keyColumns, columnTypes, schema, table)
+			query = db.buildScanQuery(false, info, keyColumns, columnTypes, schema, table, backfillFilter)
 			for idx, k := range resumeKey {
 				args = append(args, sql.Named(fmt.Sprintf("p%d", idx+1), k))
 			}
 		} else {
 			logEntry.WithField("keyColumns", keyColumns).Debug("scanning initial table chunk")
-			query = db.buildScanQuery(true, info, keyColumns, columnTypes, schema, table)
+			query = db.buildScanQuery(true, info, keyColumns, columnTypes, schema, table, backfillFilter)
 		}
 	default:
 		return false, nil, fmt.Errorf("invalid backfill mode %q", state.Mode)
@@ -394,7 +394,7 @@ func base64cmp(a, b string) int {
 // Keyless scan uses ROWID to order the rows. Note that this only ensures eventual consistency
 // since ROWIDs are not always increasing (new rows can use smaller ROWIDs if space is available in an earlier block)
 // but since we will capture changes since the start of the backfill using SCN tracking, we will eventually be consistent
-func (db *oracleDatabase) keylessScanQuery(info *sqlcapture.DiscoveryInfo, schemaName, tableName, afterRowID string, rowidRanges []string) (string, string) {
+func (db *oracleDatabase) keylessScanQuery(info *sqlcapture.DiscoveryInfo, schemaName, tableName, afterRowID string, rowidRanges []string, backfillFilter string) (string, string) {
 	var query = new(strings.Builder)
 	var columnSelect []string
 	for _, col := range info.Columns {
@@ -426,15 +426,23 @@ func (db *oracleDatabase) keylessScanQuery(info *sqlcapture.DiscoveryInfo, schem
 	var rowidStart = rowidRanges[idx]
 	var rowidEnd = rowidRanges[idx+1]
 
+	// Generate a list of individual WHERE clauses which should be ANDed together
+	var whereClauses = []string{
+		fmt.Sprintf("ROWID >= '%s'", rowidStart),
+		fmt.Sprintf("ROWID <= '%s'", rowidEnd),
+	}
+	if backfillFilter != "" {
+		whereClauses = append(whereClauses, fmt.Sprintf("(%s)", backfillFilter))
+	}
+
 	// It is faster to first find the smallest and the largest ROWIDs of the range we want to cover and then query
 	// all of the data in that range, instead of ordering all rows based on ROWID and then filtering the ROWID
 	fmt.Fprintf(query, `SELECT ROWID, %s FROM "%s"."%s"`, strings.Join(columnSelect, ","), schemaName, tableName)
-	fmt.Fprintf(query, ` WHERE ROWID >= '%s'`, rowidStart)
-	fmt.Fprintf(query, ` AND ROWID <= '%s'`, rowidEnd)
+	fmt.Fprintf(query, ` WHERE %s`, strings.Join(whereClauses, " AND "))
 	return query.String(), rowidEnd
 }
 
-func (db *oracleDatabase) buildScanQuery(start bool, info *sqlcapture.DiscoveryInfo, keyColumns []string, columnTypes map[string]oracleColumnType, schemaName, tableName string) string {
+func (db *oracleDatabase) buildScanQuery(start bool, info *sqlcapture.DiscoveryInfo, keyColumns []string, columnTypes map[string]oracleColumnType, schemaName, tableName, backfillFilter string) string {
 	// Construct lists of key specifiers and placeholders. They will be joined with commas and used in the query itself.
 	var pkey []string
 	var args []string
@@ -463,21 +471,32 @@ func (db *oracleDatabase) buildScanQuery(start bool, info *sqlcapture.DiscoveryI
 	for _, col := range info.Columns {
 		columnSelect = append(columnSelect, castColumn(col))
 	}
-	fmt.Fprintf(query, `SELECT * FROM (SELECT ROWID, %s FROM "%s"."%s"`, strings.Join(columnSelect, ","), schemaName, tableName)
+	// Generate a list of individual WHERE clauses which should be ANDed together
+	var whereClauses []string
 	if !start {
+		var predicate = new(strings.Builder)
 		for i := 0; i != len(pkey); i++ {
 			if i == 0 {
-				fmt.Fprintf(query, " WHERE (")
+				predicate.WriteString("(")
 			} else {
-				fmt.Fprintf(query, ") OR (")
+				predicate.WriteString(") OR (")
 			}
 
 			for j := 0; j != i; j++ {
-				fmt.Fprintf(query, "%s = %s AND ", pkey[j], args[j])
+				fmt.Fprintf(predicate, "%s = %s AND ", pkey[j], args[j])
 			}
-			fmt.Fprintf(query, "%s > %s", pkey[i], args[i])
+			fmt.Fprintf(predicate, "%s > %s", pkey[i], args[i])
 		}
-		fmt.Fprintf(query, ")")
+		predicate.WriteString(")")
+		whereClauses = append(whereClauses, fmt.Sprintf("(%s)", predicate.String()))
+	}
+	if backfillFilter != "" {
+		whereClauses = append(whereClauses, fmt.Sprintf("(%s)", backfillFilter))
+	}
+
+	fmt.Fprintf(query, `SELECT * FROM (SELECT ROWID, %s FROM "%s"."%s"`, strings.Join(columnSelect, ","), schemaName, tableName)
+	if len(whereClauses) > 0 {
+		fmt.Fprintf(query, " WHERE %s", strings.Join(whereClauses, " AND "))
 	}
 	fmt.Fprintf(query, " ORDER BY %s ASC", strings.Join(pkey, ", "))
 	fmt.Fprintf(query, `) WHERE ROWNUM <= %d`, db.config.Advanced.BackfillChunkSize)

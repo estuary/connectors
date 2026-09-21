@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -22,6 +24,9 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// maxJobRunDuration is the limit for EMR job runtime.
+const maxJobRunDuration = 4 * time.Hour
+
 type emrClient struct {
 	cfg                 emrConfig
 	catalogAuth         catalogAuthConfig
@@ -32,6 +37,10 @@ type emrClient struct {
 	bucket              blob.Bucket
 	ssmClient           *ssm.Client
 	tokenURL            string
+	// variantColumns requires the application to run Spark 4, which is
+	// checked as a prerequisite so the problem surfaces at publish rather
+	// than as a failed background job.
+	variantColumns bool
 
 	// Set after StartJobRun fails with an access-denied error while passing
 	// Tags. Subsequent runs in this process will skip tagging to avoid
@@ -48,6 +57,12 @@ func (e *emrClient) checkPrereqs(ctx context.Context, errs *cerrors.PrereqErr) {
 		errs.Err(fmt.Errorf("failed to list job runs for application %q: %w", e.cfg.ApplicationId, err))
 	}
 
+	if e.variantColumns {
+		if err := checkVariantReleaseLabel(ctx, e.c, e.cfg.ApplicationId); err != nil {
+			errs.Err(err)
+		}
+	}
+
 	if e.catalogAuth.AuthType == catalogAuthTypeClientCredential {
 		testParameter := e.cfg.SystemsManagerPrefix + "test"
 		if err := ssmPutParameterWithRetry(ctx, e.ssmClient, testParameter, "test"); err != nil {
@@ -60,6 +75,59 @@ func (e *emrClient) checkPrereqs(ctx context.Context, errs *cerrors.PrereqErr) {
 			errs.Err(fmt.Errorf("failed to get secure string parameter %s: %w", testParameter, err))
 		}
 	}
+}
+
+// minVariantEMRMajor is the first EMR Serverless major release running Spark 4,
+// which is needed to write variant columns. Its release labels are of the form
+// "emr-spark-8.0.0"; earlier releases are "emr-7.9.0".
+const minVariantEMRMajor = 8
+
+type applicationGetter interface {
+	GetApplication(ctx context.Context, params *emr.GetApplicationInput, optFns ...func(*emr.Options)) (*emr.GetApplicationOutput, error)
+}
+
+// checkVariantReleaseLabel fails when the application's EMR release is too old
+// to write variant columns. A missing `emr-serverless:GetApplication`
+// permission is logged and tolerated, as with `TagResource`, since a
+// read-only permission gap should not block the task.
+func checkVariantReleaseLabel(ctx context.Context, c applicationGetter, applicationID string) error {
+	out, err := c.GetApplication(ctx, &emr.GetApplicationInput{ApplicationId: aws.String(applicationID)})
+	if err != nil {
+		if isAccessDeniedErr(err) {
+			log.WithError(err).Warn("could not check the EMR release of the application for variant column support; grant 'emr-serverless:GetApplication' to the execution role to enable this check. Variant columns need release emr-spark-8.0.0 or later.")
+			return nil
+		}
+		return fmt.Errorf("getting EMR application %q: %w", applicationID, err)
+	}
+
+	label := aws.ToString(out.Application.ReleaseLabel)
+	major, ok := emrReleaseMajor(label)
+	if !ok {
+		log.WithField("releaseLabel", label).Warn("could not parse the EMR release label to check for variant column support, which needs release emr-spark-8.0.0 or later")
+		return nil
+	}
+	if major < minVariantEMRMajor {
+		return fmt.Errorf("EMR application %q runs release %q, but variant columns need Spark 4 (release emr-spark-8.0.0 or later): upgrade the application, or %s", applicationID, label, variantRemedy)
+	}
+
+	return nil
+}
+
+// emrReleaseMajor extracts the major version from an EMR release label such
+// as "emr-7.9.0", "emr-spark-8.0.0", or "emr-7.0.0-preview": the first
+// dash-separated segment that starts with a digit.
+func emrReleaseMajor(label string) (int, bool) {
+	rest, ok := strings.CutPrefix(label, "emr-")
+	if !ok {
+		return 0, false
+	}
+	for _, segment := range strings.Split(rest, "-") {
+		majorStr, _, _ := strings.Cut(segment, ".")
+		if major, err := strconv.Atoi(majorStr); err == nil {
+			return major, true
+		}
+	}
+	return 0, false
 }
 
 func (e *emrClient) ensureSecret(ctx context.Context, wantCred string) error {
@@ -87,7 +155,38 @@ func (e *emrClient) ensureSecret(ctx context.Context, wantCred string) error {
 	return nil
 }
 
-func (e *emrClient) runJob(ctx context.Context, input any, entryPointUri, pyFilesCommonURI, jobName, workingPrefix string) error {
+func (e *emrClient) startJobRun(ctx context.Context, startInput *emr.StartJobRunInput) (*emr.StartJobRunOutput, error) {
+	start, err := e.c.StartJobRun(ctx, startInput)
+	if err == nil {
+		return start, nil
+	}
+
+	// AccessDenied likely means the execution role lacks
+	// `emr-serverless:TagResource`. Disable tagging for the lifetime of
+	// this client and retry without tags so the materialization can keep
+	// running on existing IAM policies.
+	if startInput.Tags != nil && isAccessDeniedErr(err) {
+		log.WithError(err).Warn("StartJobRun denied while passing tags; retrying without tags. Grant 'emr-serverless:TagResource' to the execution role to enable cost-allocation tagging.")
+		e.tagsDisabled = true
+		startInput.Tags = nil
+		start, err = e.c.StartJobRun(ctx, startInput)
+	}
+	if err == nil {
+		return start, nil
+	}
+
+	// When re-using a ClientToken, the job configuration must exactly match.
+	// We always ensure this is the case during normal operation.
+	if isConflictErr(err) {
+		log.Warn("job exists with conflicting definition; starting job with new ClientToken")
+		startInput.ClientToken = aws.String(uuid.NewString())
+		start, err = e.c.StartJobRun(ctx, startInput)
+	}
+
+	return start, err
+}
+
+func (e *emrClient) runJob(ctx context.Context, job computeJob) error {
 	/***
 	Available arguments to the pyspark script:
 	| --input-uri              | Input for the program, as an s3 URI, to be parsed by the script                      | Required |
@@ -102,7 +201,7 @@ func (e *emrClient) runJob(ctx context.Context, input any, entryPointUri, pyFile
 	***/
 	getStatus := func() (*python.StatusOutput, error) {
 		var status python.StatusOutput
-		statusKey := path.Join(workingPrefix, statusFile)
+		statusKey := path.Join(job.WorkingPrefix, statusFile)
 		if statusObj, err := e.bucket.NewReader(ctx, statusKey); err != nil {
 			return nil, fmt.Errorf("reading status object %q: %w", statusKey, err)
 		} else if err := json.NewDecoder(statusObj).Decode(&status); err != nil {
@@ -113,8 +212,8 @@ func (e *emrClient) runJob(ctx context.Context, input any, entryPointUri, pyFile
 		return &status, nil
 	}
 
-	inputKey := path.Join(workingPrefix, "input.json")
-	if inputBytes, err := encodeInput(input); err != nil {
+	inputKey := path.Join(job.WorkingPrefix, "input.json")
+	if inputBytes, err := encodeInput(job.Input); err != nil {
 		return fmt.Errorf("encoding input: %w", err)
 	} else if err := e.bucket.Upload(ctx, inputKey, bytes.NewReader(inputBytes)); err != nil {
 		return fmt.Errorf("putting input file object: %w", err)
@@ -122,7 +221,7 @@ func (e *emrClient) runJob(ctx context.Context, input any, entryPointUri, pyFile
 
 	args := []string{
 		"--input-uri", "s3://" + path.Join(e.cfg.Bucket, inputKey),
-		"--status-output", "s3://" + path.Join(e.cfg.Bucket, workingPrefix, statusFile),
+		"--status-output", "s3://" + path.Join(e.cfg.Bucket, job.WorkingPrefix, statusFile),
 		"--catalog-url", e.catalogURL,
 		"--warehouse", e.warehouse,
 		"--region", e.cfg.Region,
@@ -145,40 +244,69 @@ func (e *emrClient) runJob(ctx context.Context, input any, entryPointUri, pyFile
 		args = append(args, "--signing-name", signingName)
 	}
 
+	clientToken := job.IdempotencyToken
+	if clientToken == "" {
+		clientToken = uuid.NewString()
+	}
+
+	sparkParameters := []string{
+		"--py-files", job.PyFilesCommonURI,
+		"--conf", "spark.driver.maxResultSize=0",
+		"--conf", "spark.sql.iceberg.vectorization.enabled=false",
+	}
+	for _, property := range job.SparkJobProperties {
+		sparkParameters = append(sparkParameters, "--conf", fmt.Sprintf("%s=%s", property.Key, property.Value))
+	}
+
 	startInput := &emr.StartJobRunInput{
 		ApplicationId:    aws.String(e.cfg.ApplicationId),
-		ClientToken:      aws.String(uuid.NewString()),
+		ClientToken:      aws.String(clientToken),
 		ExecutionRoleArn: aws.String(e.cfg.ExecutionRoleArn),
 		JobDriver: &emrTypes.JobDriverMemberSparkSubmit{
 			Value: emrTypes.SparkSubmit{
-				SparkSubmitParameters: aws.String(fmt.Sprintf("--py-files %s --conf spark.driver.maxResultSize=0 --conf spark.sql.iceberg.vectorization.enabled=false", pyFilesCommonURI)),
-				EntryPoint:            aws.String(entryPointUri),
+				SparkSubmitParameters: aws.String(strings.Join(sparkParameters, " ")),
+				EntryPoint:            aws.String(job.EntryPointURI),
 				EntryPointArguments:   args,
 			},
 		},
-		Name: aws.String(jobName),
+		Name: aws.String(job.Name),
 	}
 	if !e.tagsDisabled {
 		startInput.Tags = map[string]string{"estuary:materialization": e.materializationName}
 	}
 
-	start, err := e.c.StartJobRun(ctx, startInput)
+	// Start the Job or adopt a existing run with the clientToken.
+	start, err := e.startJobRun(ctx, startInput)
 	if err != nil {
-		// AccessDenied likely means the execution role lacks
-		// `emr-serverless:TagResource`. Disable tagging for the lifetime of
-		// this client and retry without tags so the materialization can keep
-		// running on existing IAM policies.
-		if startInput.Tags != nil && isAccessDeniedErr(err) {
-			log.WithError(err).Warn("StartJobRun denied while passing tags; retrying without tags. Grant 'emr-serverless:TagResource' to the execution role to enable cost-allocation tagging.")
-			e.tagsDisabled = true
-			startInput.Tags = nil
-			startInput.ClientToken = aws.String(uuid.NewString())
-			start, err = e.c.StartJobRun(ctx, startInput)
-		}
+		return err
+	}
+	// If the job is immediately failed or cancelled, restart it.  This
+	// prevents a succesfully adopted job that that previously failed or was
+	// cancelled from blocking recovery.
+	//
+	// We initially always attempt to adopt the original job for a transaction,
+	// since we can't record an updated ClientToken jobs created later due to
+	// conflict errors.  This limits our ability to prevent duplicate jobs but
+	// still handles the common case of the connector restarting during a job
+	// run when the job is working.
+	jobRun, err := e.c.GetJobRun(ctx, &emr.GetJobRunInput{
+		ApplicationId: aws.String(e.cfg.ApplicationId),
+		JobRunId:      start.JobRunId,
+	})
+	if err != nil {
+		return err
+	}
+	switch jobRun.JobRun.State {
+	case emrTypes.JobRunStateFailed, emrTypes.JobRunStateCancelling, emrTypes.JobRunStateCancelled:
+		startInput.ClientToken = aws.String(uuid.NewString())
+		start, err = e.startJobRun(ctx, startInput)
 		if err != nil {
 			return err
 		}
 	}
+
+	jobCtx, cancelJobCtx := context.WithTimeout(ctx, maxJobRunDuration)
+	defer cancelJobCtx()
 
 	var runDetails string
 	for {
@@ -209,8 +337,23 @@ func (e *emrClient) runJob(ctx context.Context, input any, entryPointUri, pyFile
 			}
 		default:
 			select {
-			case <-ctx.Done():
-				return ctx.Err()
+			case <-jobCtx.Done():
+				cancelCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Minute)
+				defer cancel()
+
+				if _, err := e.c.CancelJobRun(cancelCtx, &emr.CancelJobRunInput{
+					ApplicationId: aws.String(e.cfg.ApplicationId),
+					JobRunId:      start.JobRunId,
+				}); err != nil {
+					log.WithError(err).WithField("runDetails", runDetails).Warn("failed to cancel EMR job run")
+				}
+
+				// If the parent context was cancelled we are stopping the job
+				// due to that, not due to the total job runtime limit.
+				if err := ctx.Err(); err != nil {
+					return err
+				}
+				return fmt.Errorf("job %s exceeded the maximum allowed duration of %s and was cancelled", *start.JobRunId, maxJobRunDuration)
 			case <-time.After(5 * time.Second):
 				continue
 			}
@@ -256,6 +399,11 @@ func isAccessDeniedErr(err error) bool {
 		return true
 	}
 	return false
+}
+
+func isConflictErr(err error) bool {
+	var conflictErr *emrTypes.ConflictException
+	return errors.As(err, &conflictErr)
 }
 
 func encodeInput(in any) ([]byte, error) {

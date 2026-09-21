@@ -4,6 +4,7 @@ Resource: Contacts
 ["applied.actionDescription", ""]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"city":"Gotham City","company":"Wayne Enterprises","email":"b.wayne@wayneent.com","firstname":"Bruce","followercount":"89","hs_lead_status":"OPEN","lastname":"Wayne"}
@@ -24,6 +25,7 @@ Resource: Companies
 ["applied.actionDescription", ""]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"city":"Upper Michigan","closedate":"2024-02-25T08:14:47.334Z","domain":"aperturescience.com","hs_current_customer":"yes","name":"Aperture Science","phone":"+19065550175"}
@@ -42,6 +44,7 @@ Resource: Line Items
 ["applied.actionDescription", ""]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"createdate":"2024-02-14T08:45:00Z","description":"Portable Bluetooth speaker waterproof","discount":null,"name":"BoomPod Mini","price":null,"quantity":"67","tax":null}
@@ -65,6 +68,7 @@ Resource: Deals
 ["applied.actionDescription", ""]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"amount":"45000","closedate":"2026-01-15T00:00:00Z","dealname":"Acme Corp Expansion","dealstage":"closedwon","description":"Upsell of additional licenses for Acme Corp"}
@@ -83,6 +87,7 @@ Resource: Meetings
 ["applied.actionDescription", ""]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"hs_include_description_in_reminder":"false","hs_meeting_body":"Review contract terms","hs_meeting_end_time":"2024-09-19T17:30:00Z","hs_meeting_external_url":"https://calendar.google.com/event/454880","hs_meeting_location":"Client Office","hs_meeting_location_type":"CUSTOM","hs_meeting_notetaker_selection":"deferred","hs_meeting_outcome":"CANCELED","hs_meeting_start_time":"2024-09-19T16:30:00Z","hs_meeting_title":"Check-in","hs_product_name":"Enterprise Plan","hs_timestamp":"2024-09-19T16:30:00Z","hs_unique_id":"01"}
@@ -117,6 +122,7 @@ Resource: Calls
 ["applied.actionDescription", ""]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"hs_call_body":"Intro call to discuss needs","hs_call_direction":"OUTBOUND","hs_call_disposition":"f240bbac-87c9-4f6e-bf70-924b57d47db7","hs_call_duration":"1245000","hs_call_from_number":"(800) 555-0100","hs_call_status":"COMPLETED","hs_call_title":"Discovery call","hs_call_to_number":"(877) 555-0101","hs_timestamp":"2026-06-01T14:32:00Z","hs_unique_id":"01"}

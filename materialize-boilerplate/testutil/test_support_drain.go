@@ -43,8 +43,8 @@ func RunApplyDrainTest[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConf
 	resourcePath, _, err := res.Parameters()
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		if _, fn, err := materializer.DeleteResource(ctx, resourcePath); err == nil && fn != nil {
-			_ = fn(ctx)
+		if _, err := DropResource(ctx, materializer, resourcePath); err != nil {
+			t.Log("failed to clean up resource:", err)
 		}
 	})
 

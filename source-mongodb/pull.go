@@ -99,7 +99,8 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		}
 
 		for _, coll := range collections {
-			if collectionType := mongoCollectionType(coll.Type); err != nil {
+			var collectionType = mongoCollectionType(coll.Type)
+			if err := collectionType.validate(); err != nil {
 				return fmt.Errorf("unsupported collection type: %w", err)
 			} else if collectionType == mongoCollectionTypeTimeseries {
 				timeseriesCollections[resourceId(db, coll.Name)] = true
@@ -166,6 +167,8 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		return fmt.Errorf("updating resource states: %w", err)
 	}
 
+	skipConfiguredBackfills(&prevState, changeStreamBindings, &cfg)
+
 	var c = capture{
 		client:                      client,
 		output:                      stream,
@@ -198,8 +201,10 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		return fmt.Errorf("outputting prevState checkpoint: %w", err)
 	}
 
+	// Nothing to stream or poll, so exit rather than idle forever. This connector
+	// normally runs indefinitely, so report the reason for an otherwise silent exit.
 	if len(allBindings) == 0 {
-		// No bindings to capture.
+		log.Info("capture has no enabled bindings, shutting down")
 		return nil
 	}
 
@@ -390,6 +395,44 @@ func updateResourceStates(prevState captureState, allBindings []bindingInfo) (ca
 	}
 
 	return newState, nil
+}
+
+func skipConfiguredBackfills(state *captureState, changeStreamBindings []bindingInfo, cfg *config) {
+	if cfg.Advanced.SkipBackfills == "" {
+		return
+	}
+
+	// Batch mode bindings are deliberately left alone: their backfill is the only
+	// way they capture anything, so marking one complete would capture nothing at
+	// all, and it would also leave `LastPollStart` unset for the polling loop.
+	// driver.Validate rejects a config which names a batch binding explicitly.
+	for _, b := range changeStreamBindings {
+		if cfg.shouldBackfill(b.resource.Database, b.resource.Collection) {
+			continue
+		}
+
+		resState := state.Resources[b.stateKey]
+		if resState.Backfill.done() {
+			continue
+		}
+
+		fields := log.Fields{
+			"database":       b.resource.Database,
+			"collection":     b.resource.Collection,
+			"backfilledDocs": resState.Backfill.BackfilledDocs,
+		}
+		if resState.Backfill.LastCursorValue != nil {
+			log.WithFields(fields).WithField(
+				"lastCursorValue", resState.Backfill.LastCursorValue,
+			).Warn("abandoning in-progress backfill for collection: documents after the last cursor position will not be captured")
+		} else {
+			log.WithFields(fields).Info("skipping backfill for collection")
+		}
+
+		resState.Backfill.Done = makePtr(true)
+		resState.Backfill.LastCursorValue = nil
+		state.Resources[b.stateKey] = resState
+	}
 }
 
 func (s *captureState) isChangeStreamBackfillComplete(changeStreamBindings []bindingInfo) bool {
@@ -606,12 +649,13 @@ func supportsPreImages(ctx context.Context, client *mongo.Client, database strin
 	// pipeline stage.
 	cs, err := client.Database(database).Watch(ctx, mongo.Pipeline{bson.D{{Key: "$changeStreamSplitLargeEvent", Value: bson.D{}}}})
 	if err != nil {
+		// Servers reject the stage with varying wording. Treat any command
+		// error naming the stage as meaning the server won't run it, and
+		// capture without pre-images.
 		var commandError mongo.CommandError
-		if errors.As(err, &commandError) {
-			if commandError.Name == "AtlasError" && strings.HasPrefix(commandError.Message, "$changeStreamSplitLargeEvent is not allowed") {
-				ll.WithField("atlasError", err).Info("not requesting pre-images because this MongoDB Atlas instance does not support the $changeStreamSplitLargeEvent stage")
-				return false, nil
-			}
+		if errors.As(err, &commandError) && strings.Contains(commandError.Message, "$changeStreamSplitLargeEvent") {
+			ll.WithField("error", err).Info("not requesting pre-images because this server does not support the $changeStreamSplitLargeEvent stage")
+			return false, nil
 		}
 		return false, fmt.Errorf("opening change stream to test for $changeStreamSplitLargeEvent support: %w", err)
 	}

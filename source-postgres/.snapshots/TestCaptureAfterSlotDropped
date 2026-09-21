@@ -54,12 +54,12 @@ sql> INSERT INTO test.captureafterslotdropped_144833 VALUES (2, 'two'), (3, 'thr
 sql> SELECT pg_drop_replication_slot('flow_slot')
 sql> INSERT INTO test.captureafterslotdropped_144833 VALUES (4, 'four'), (5, 'five')
 === Run: Capture After Slot Dropped (Should Fail) ===
-error: flowctl preview failed:
+error: flowctl raw preview-next failed:
 error starting replication: ERROR: replication slot "flow_slot" does not exist (SQLSTATE 42704)
 
 sql> INSERT INTO test.captureafterslotdropped_144833 VALUES (6, 'six'), (7, 'seven')
 === Run: Capture Still Failing ===
-error: flowctl preview failed:
+error: flowctl raw preview-next failed:
 error starting replication: ERROR: replication slot "flow_slot" does not exist (SQLSTATE 42704)
 
 === Run: Capture After Backfill Counter Bumped ===

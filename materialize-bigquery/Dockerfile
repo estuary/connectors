@@ -18,12 +18,11 @@ COPY go                      ./go
 COPY materialize-boilerplate ./materialize-boilerplate
 COPY materialize-bigquery    ./materialize-bigquery
 COPY materialize-sql         ./materialize-sql
-COPY testsupport             ./testsupport
 
 # Test and build the connector.
 RUN go test  -tags nozstd -v ./materialize-sql/...
 RUN go test  -tags nozstd -short -v ./materialize-bigquery/...
-RUN go build -tags nozstd -v -o ./connector ./materialize-bigquery/...
+RUN go build -tags nozstd -v -o ./connector ./materialize-bigquery/cmd/connector
 
 # Runtime Stage
 ################################################################################
@@ -37,6 +36,9 @@ ENV PATH="/connector:$PATH"
 
 # Bring in the compiled connector artifact from the builder.
 COPY --from=builder /builder/connector ./materialize-bigquery
+
+ARG CONNECTOR_VERSION=dev
+ENV CONNECTOR_VERSION="${CONNECTOR_VERSION}"
 
 LABEL FLOW_RUNTIME_PROTOCOL=materialize
 

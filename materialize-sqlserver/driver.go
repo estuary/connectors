@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -94,8 +94,8 @@ type tunnelConfig struct {
 }
 
 type advancedConfig struct {
-	NoFlowDocument bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false"`
-	FeatureFlags   string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	NoFlowDocument bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false" jsonschema_extras:"nonsensitive=true"`
+	FeatureFlags   string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
 }
 
 // config represents the endpoint configuration for sql server.
@@ -105,7 +105,7 @@ type config struct {
 	Password    string             `json:"password" jsonschema:"-" jsonschema_extras:"secret=true,order=2"`
 	Database    string             `json:"database" jsonschema:"title=Database,description=Name of the logical database to materialize to." jsonschema_extras:"order=3"`
 	Schema      string             `json:"schema,omitempty" jsonschema:"title=Database Schema,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables" jsonschema_extras:"order=4"`
-	HardDelete  bool               `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=5"`
+	HardDelete  bool               `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=5,nonsensitive=true"`
 	Credentials *CredentialsConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"x-iam-auth=true,x-iam-azure-scope=https://database.windows.net/.default,order=6"`
 
 	DBTJobTrigger dbt.JobConfig `json:"dbt_job_trigger,omitempty" jsonschema:"title=dbt Cloud Job Trigger,description=Trigger a dbt Job when new data is available"`
@@ -241,7 +241,7 @@ func (c *config) ToSQLConnector(ctx context.Context) (driver.Connector, error) {
 type tableConfig struct {
 	Table  string `json:"table" jsonschema:"title=Table,description=Name of the database table" jsonschema_extras:"x-collection-name=true"`
 	Schema string `json:"schema,omitempty" jsonschema:"title=Alternative Schema,description=Alternative schema for this table (optional)" jsonschema_extras:"x-schema-name=true"`
-	Delta  bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false." jsonschema_extras:"x-delta-updates=true"`
+	Delta  bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false." jsonschema_extras:"x-delta-updates=true,nonsensitive=true"`
 }
 
 // Validate the resource configuration.
@@ -270,7 +270,7 @@ func (c tableConfig) Parameters() ([]string, bool, error) {
 	return path, c.Delta, nil
 }
 
-func newSqlServerDriver() *sql.Driver[config, tableConfig] {
+func NewDriver() *sql.Driver[config, tableConfig] {
 	return &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-sqlserver",
 		StartTunnel: func(ctx context.Context, cfg config) error {
@@ -436,6 +436,7 @@ type binding struct {
 	// will always be false
 	needsMerge bool
 	hasData    bool
+	staged     int64 // rows bulk-copied into the store table this round
 
 	createLoadTableSQL string
 	loadQuerySQL       string
@@ -502,8 +503,10 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, featureFl
 	return nil
 }
 
-func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
-func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) { return nil, nil }
+func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
+	return nil, nil
+}
 
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
@@ -634,6 +637,23 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	// memory use
 	var lastBinding = -1
 
+	// Finishing a bulk insert reports the rows it copied.
+	finishBatch := func(idx int) error {
+		batch, ok := batches[idx]
+		if !ok {
+			return nil
+		}
+		var b = d.bindings[idx]
+		if res, err := batch.ExecContext(ctx); err != nil {
+			return fmt.Errorf("store batch insert on %q: %w", b.target.Identifier, err)
+		} else if n, err := res.RowsAffected(); err == nil {
+			b.staged += n
+		}
+		return nil
+	}
+
+	round := it.Round
+
 	// Skip deleted, non-existent documents iff HardDelete is enabled.
 	for it.Next(d.cfg.HardDelete) {
 		if lastBinding == -1 {
@@ -643,11 +663,8 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		// The last binding is fully processed for this RPC now, we can drain its
 		// remaining batches
 		if lastBinding != it.Binding {
-			if batch, ok := batches[lastBinding]; ok {
-				var b = d.bindings[lastBinding]
-				if _, err := batch.ExecContext(ctx); err != nil {
-					return nil, fmt.Errorf("store batch insert on %q: %w", b.target.Identifier, err)
-				}
+			if err := finishBatch(lastBinding); err != nil {
+				return nil, err
 			}
 			lastBinding = it.Binding
 		}
@@ -688,10 +705,8 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}
 
 	if lastBinding != -1 {
-		if batch, ok := batches[lastBinding]; ok {
-			if _, err := batch.ExecContext(ctx); err != nil {
-				return nil, fmt.Errorf("store batch insert on %q: %w", d.bindings[lastBinding].tempStoreTableName, err)
-			}
+		if err := finishBatch(lastBinding); err != nil {
+			return nil, err
 		}
 	}
 
@@ -705,14 +720,16 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			}
 
 			d.be.StartedResourceCommit(b.target.Path)
+			// A single-statement batch, so RowsAffected is the target rows
+			// this statement touched; MERGE counts every clause that fired.
+			stmt, what := b.directCopy, "direct insert"
 			if b.needsMerge {
-				if _, err := txn.ExecContext(ctx, b.mergeInto); err != nil {
-					return nil, m.FinishedOperation(fmt.Errorf("store batch merge on %q: %w", b.target.Identifier, err))
-				}
-			} else {
-				if _, err := txn.ExecContext(ctx, b.directCopy); err != nil {
-					return nil, m.FinishedOperation(fmt.Errorf("store batch direct insert on %q: %w", b.target.Identifier, err))
-				}
+				stmt, what = b.mergeInto, "merge"
+			}
+			if res, err := txn.ExecContext(ctx, stmt); err != nil {
+				return nil, m.FinishedOperation(fmt.Errorf("store batch %s on %q: %w", what, b.target.Identifier, err))
+			} else if n, err := res.RowsAffected(); err == nil {
+				d.be.ReportRowStats(round, b.target.Path, m.TotalRowStats(n).WithStaged(b.staged))
 			}
 
 			if _, err = txn.ExecContext(ctx, b.tempStoreTruncate); err != nil {
@@ -723,6 +740,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			// reset the value for next transaction
 			b.needsMerge = false
 			b.hasData = false
+			b.staged = 0
 		}
 
 		var err error
@@ -754,8 +772,4 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 func (d *transactor) Destroy() {
 	d.load.conn.Close()
 	d.store.conn.Close()
-}
-
-func main() {
-	boilerplate.RunMain(newSqlServerDriver())
 }

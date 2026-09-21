@@ -1,4 +1,4 @@
-from pydantic import BaseModel, NonNegativeInt
+from pydantic import BaseModel, NonNegativeInt, PositiveInt
 from typing import Generic, Any
 
 from ..flow import (
@@ -63,4 +63,4 @@ class Open(GenericModel, Generic[EndpointConfig, ResourceConfig, ConnectorState]
 
 
 class Acknowledge(BaseModel):
-    checkpoints: NonNegativeInt
+    checkpoints: PositiveInt

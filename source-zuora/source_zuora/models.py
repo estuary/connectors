@@ -1,8 +1,10 @@
+import re
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import ClassVar
+from typing import Any, ClassVar
 
-from pydantic import AwareDatetime, BaseModel, Field
+from pydantic import AwareDatetime, BaseModel, Field, ValidationInfo, model_validator
 
 from estuary_cdk.capture.common import (
     ResourceState,
@@ -52,7 +54,210 @@ class EndpointConfig(BaseModel):
 ConnectorState = GenericConnectorState[ResourceState]
 
 
-class ZuoraDocument(BaseCSVRow):
+class UnknownZuoraTypeError(Exception):
+    """Zuora described a field with a type this connector does not recognize.
+
+    Raised rather than degrading the field to an untyped string: a string declaration
+    would claim the connector knows the field's shape when it does not, and would strip
+    whatever format inference had established for that column. Discovery fails instead,
+    naming the field, so the type can be classified deliberately.
+    """
+
+
+class ZuoraType(StrEnum):
+    """A field's declared type, as `<type>` in a GET /v1/describe/{object} response."""
+    TEXT = "text"
+    PICKLIST = "picklist"
+    LONGTEXT = "longtext"
+    ZOQL = "ZOQL"
+    BOOLEAN = "boolean"
+    INTEGER = "integer"
+    DECIMAL = "decimal"
+    NUMBER = "number"
+    DATE = "date"
+    DATETIME = "datetime"
+    TIMESTAMP = "timestamp"
+
+    @classmethod
+    def parse(cls, raw: str | None, field_name: str) -> "ZuoraType":
+        """Classify a describe `<type>`, or fail naming the field it came from."""
+        try:
+            return cls(raw)
+        except ValueError:
+            raise UnknownZuoraTypeError(
+                f"{field_name}: Zuora declared the type {raw!r}, which this connector "
+                f"does not recognize. It must be added to ZuoraType and "
+                f"ZUORA_TYPE_SCHEMAS before this object can be captured."
+            ) from None
+
+
+# Zuora's declared type -> the JSON schema a SourcedSchema declares for that field.
+ZUORA_TYPE_SCHEMAS: dict[ZuoraType, dict[str, str]] = {
+    ZuoraType.TEXT: {"type": "string"},
+    ZuoraType.PICKLIST: {"type": "string"},
+    ZuoraType.LONGTEXT: {"type": "string"},
+    ZuoraType.ZOQL: {"type": "string"},
+    ZuoraType.BOOLEAN: {"type": "boolean"},
+    ZuoraType.INTEGER: {"type": "string", "format": "integer"},
+    ZuoraType.DECIMAL: {"type": "string", "format": "number"},
+    ZuoraType.NUMBER: {"type": "string", "format": "number"},
+    ZuoraType.DATE: {"type": "string", "format": "date"},
+    ZuoraType.DATETIME: {"type": "string", "format": "date-time"},
+    ZuoraType.TIMESTAMP: {"type": "string"},
+}
+
+# Make sure that every ZuoraType has an entry in ZUORA_TYPE_SCHEMAS.
+assert ZUORA_TYPE_SCHEMAS.keys() == set(ZuoraType), (
+    f"every ZuoraType needs a schema; missing {set(ZuoraType) - ZUORA_TYPE_SCHEMAS.keys()}"
+)
+
+# Types whose values the connector rewrites before emitting them in
+# order to align with the emitted sourced schemas. Every member
+# here needs a branch in ZuoraRow.transform_cells.
+CONVERTED_TYPES: frozenset[ZuoraType] = frozenset(
+    {
+        ZuoraType.BOOLEAN,
+        ZuoraType.DATETIME,
+    }
+)
+
+
+def sourced_schema(field_types: dict[str, ZuoraType]) -> dict[str, object]:
+    """Build a SourcedSchema value from an object's field name -> Zuora type map."""
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            name: ZUORA_TYPE_SCHEMAS[zuora_type]
+            for name, zuora_type in field_types.items()
+        },
+    }
+
+
+_BOOLEAN_TOKENS: dict[str, bool] = {"true": True, "false": False}
+
+
+# Already-compliant: a colon-separated offset, or Z.
+_RFC3339_DATETIME = re.compile(
+    r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$"
+)
+# What AQuA actually emits. Almost RFC3339 compliant, but the offset's colon is missing.
+_BASIC_OFFSET_DATETIME = re.compile(
+    r"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?)([+-]\d{2})(\d{2})$"
+)
+
+
+def normalize_datetime(field_name: str, value: str) -> str:
+    """Rewrite an export's datetime cell as RFC3339.
+
+    AQuA renders datetimes with an ISO 8601 basic offset -- `+0000`, no colon -- which
+    RFC3339 rejects. Inserting the colon is the whole transformation. Values that
+    already comply pass through, so this is idempotent.
+    """
+    if _RFC3339_DATETIME.match(value):
+        return value
+    basic = _BASIC_OFFSET_DATETIME.match(value)
+    if basic is None:
+        raise ValueError(
+            f"{field_name}: expected an RFC3339-convertible datetime, got {value!r}. "
+            f"Zuora's describe types this field as datetime. Reach out to Estuary "
+            f"support to update this connector to convert this datetime format to "
+            f"be RFC3339 compliant."
+        )
+    stamp, offset_hours, offset_minutes = basic.groups()
+    return f"{stamp}{offset_hours}:{offset_minutes}"
+
+
+def parse_boolean(field_name: str, value: str) -> bool:
+    """Convert an export's boolean cell to a real bool."""
+    parsed = _BOOLEAN_TOKENS.get(value.strip().lower())
+    if parsed is None:
+        raise ValueError(
+            f"{field_name}: expected a boolean, got {value!r}. Zuora's describe types "
+            f"this field as boolean. Reach out to Estuary support for help resolving "
+            f"this error."
+        )
+    return parsed
+
+
+@dataclass(frozen=True)
+class ValidationContext:
+    """What a row needs to know about its object in order to validate."""
+    object_name: str
+    field_types: dict[str, ZuoraType]
+
+
+def _column_to_field(column: str, object_name: str) -> str:
+    """Map an export CSV column header to the field name documents carry.
+
+    With useQueryLabels every header is "<Object>.<Field>", for both the exported
+    object's own columns and any joined related object's. An own column drops the
+    prefix so it matches its describe name ("Account.Id" of an Account export ->
+    "Id"), while a joined column keeps it as a flattened name ("Account.Id" of an
+    Invoice export -> "AccountId").
+    """
+    prefix, _, field = column.partition(".")
+    if not field:
+        return column
+    return field if prefix == object_name else f"{prefix}{field}"
+
+
+class ZuoraRow(BaseCSVRow):
+    """Every exported row, incremental or snapshot.
+
+    Renames each export column to the name documents carry, and rewrites the cells whose
+    declared type the raw CSV text does not satisfy: a boolean column holds "true", and a
+    datetime column holds an offset RFC3339 rejects.
+    """
+
+    @model_validator(mode="before")
+    @classmethod
+    def transform_cells(cls, data: Any, info: ValidationInfo) -> Any:
+        if not isinstance(info.context, ValidationContext):
+            # Every caller has the object's types to hand, and a row validated without
+            # them would keep its raw cells and contradict the schema the binding
+            # declares. Fail rather than convert nothing.
+            raise RuntimeError(
+                f"Implementation error: {cls.__name__} must be validated with a "
+                f"ValidationContext, got {info.context!r}, so its cells would not "
+                f"be converted."
+            )
+        if not isinstance(data, dict):
+            return data
+
+        # Rename first: field_types is keyed by the name the document carries, not the
+        # header the export sent.
+        converted = {
+            _column_to_field(column, info.context.object_name): value
+            for column, value in data.items()
+        }
+        field_types = info.context.field_types
+        for name, zuora_type in field_types.items():
+            if zuora_type not in CONVERTED_TYPES:
+                continue
+            value = converted.get(name)
+            # This validator runs ahead of BaseCSVRow's null handling -- pydantic runs a
+            # subclass's before-validator first -- so a raw export cell is still "" here.
+            # None turns up only when re-validating a document that has already been
+            # through it. Neither has anything to convert.
+            if value is None or value == "":
+                continue
+            if not isinstance(value, str):
+                continue  # already converted, e.g. a re-validated document
+            if zuora_type == ZuoraType.BOOLEAN:
+                converted[name] = parse_boolean(name, value)
+            elif zuora_type == ZuoraType.DATETIME:
+                converted[name] = normalize_datetime(name, value)
+            else:
+                raise RuntimeError(
+                    f"Implementation error: '{zuora_type}' is in CONVERTED_TYPES but "
+                    f"has no converter, so {name} would be declared as a type its "
+                    f"value does not satisfy."
+                )
+        return converted
+
+
+class ZuoraDocument(ZuoraRow):
     """Base for objects captured incrementally off a single date cursor.
     """
     CURSOR_FIELD: ClassVar[str]
@@ -68,6 +273,17 @@ class UpdatedDateDocument(ZuoraDocument):
 
     def get_cursor(self) -> AwareDatetime:
         return self.UpdatedDate
+
+
+class UpdatedOnDocument(ZuoraDocument):
+    """AchNocEventLog names its timestamps UpdatedOn/CreatedOn rather than
+    UpdatedDate/CreatedDate, and exports no UpdatedDate at all.
+    """
+    CURSOR_FIELD: ClassVar[str] = "UpdatedOn"
+    UpdatedOn: AwareDatetime
+
+    def get_cursor(self) -> AwareDatetime:
+        return self.UpdatedOn
 
 
 class TransactionDateDocument(ZuoraDocument):
@@ -127,6 +343,9 @@ class DescribeField(BaseModel, extra="allow"):
     name: str
     selectable: bool = False
     contexts: list[str] = Field(default_factory=list)
+    # Zuora's declared type, e.g. text/decimal/datetime/boolean. Absent in
+    # hand-written test fixtures, so optional.
+    type: str | None = None
 
     @property
     def is_exportable(self) -> bool:
@@ -185,6 +404,26 @@ class DescribeObject(BaseModel, extra="allow"):
         return self.exportable_field_names + [
             f"{name}.Id" for name in self.joinable_object_names
         ]
+
+    @property
+    def query_field_types(self) -> dict[str, ZuoraType]:
+        """Zuora's declared type for every column an export selects, keyed by the name
+        the *document* carries rather than the name the query selects: a joined
+        `<Related>.Id` arrives as `<Related>Id` (see _column_to_field).
+
+        This is where raw describe strings become ZuoraType, so nothing downstream has
+        to cope with an unrecognized one. Joined columns are always Zuora ids, hence
+        text; describe says nothing about them because they are relationships rather
+        than fields.
+        """
+        types = {
+            f.name: ZuoraType.parse(f.type, f.name)
+            for f in self.fields
+            if f.is_exportable
+        }
+        for related in self.joinable_object_names:
+            types[f"{related}Id"] = ZuoraType.TEXT
+        return types
 
 
 class CatalogObject(BaseModel, extra="allow"):

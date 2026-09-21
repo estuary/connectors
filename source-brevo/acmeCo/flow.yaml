@@ -1,0 +1,29 @@
+collections:
+  acmeCo/contacts:
+    schema: contacts.schema.yaml
+    key:
+    - /id
+  acmeCo/contacts_attributes:
+    schema: contacts_attributes.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/contacts_folders:
+    schema: contacts_folders.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/contacts_lists:
+    schema: contacts_lists.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/contacts_segments:
+    schema: contacts_segments.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/senders:
+    schema: senders.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/webhooks:
+    schema: webhooks.schema.yaml
+    key:
+    - /_meta/row_id

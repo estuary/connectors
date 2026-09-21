@@ -65,7 +65,7 @@ class FakeManager:
         self.too_large_over_rows = too_large_over_rows
         self.queries: list[str] = []
 
-    async def export_rows(self, query: str, object_name: str):
+    async def export_rows(self, query: str, model, context):
         self.queries.append(query)
         lo = re.search(rf"{self.cursor_field} >= '([^']+)'", query)
         hi = re.search(rf"{self.cursor_field} < '([^']+)'", query)
@@ -102,7 +102,11 @@ class FakeManager:
 
         out_fmt = "%Y-%m-%dT%H:%M:%S.%fZ" if self.emit_millis else _FMT
         for rid, dt in matching:
-            yield {"Id": rid, self.cursor_field: dt.astimezone(UTC).strftime(out_fmt)}
+            # Like the real manager, hand the row to the model with the caller's context.
+            yield model.model_validate(
+                {"Id": rid, self.cursor_field: dt.astimezone(UTC).strftime(out_fmt)},
+                context=context,
+            )
 
 
 async def _collect(agen) -> list:
@@ -196,10 +200,18 @@ def test_build_id_page_query_resume_adds_strict_id_bound():
 # --- fetch_changes -------------------------------------------------------------
 
 
-async def _run_changes(manager, cursor, model=UpdatedDateDocument, object_name="Account"):
+async def _run_changes(
+    manager, cursor, model=UpdatedDateDocument, object_name="Account", field_types=None
+):
     return await _collect(
         api.fetch_changes(
-            object_name, ["Id", model.CURSOR_FIELD], model, manager, _LOG, cursor
+            object_name,
+            ["Id", model.CURSOR_FIELD],
+            field_types or {},
+            model,
+            manager,
+            _LOG,
+            cursor,
         )
     )
 
@@ -325,10 +337,20 @@ async def test_fetch_changes_transaction_date_cursor():
 # --- fetch_page ----------------------------------------------------------------
 
 
-async def _run_page(manager, start_date, page, cutoff, model=UpdatedDateDocument):
+async def _run_page(
+    manager, start_date, page, cutoff, model=UpdatedDateDocument, field_types=None
+):
     return await _collect(
         api.fetch_page(
-            "Account", ["Id", model.CURSOR_FIELD], model, manager, start_date, _LOG, page, cutoff
+            "Account",
+            ["Id", model.CURSOR_FIELD],
+            field_types or {},
+            model,
+            manager,
+            start_date,
+            _LOG,
+            page,
+            cutoff,
         )
     )
 
@@ -415,9 +437,12 @@ async def test_fetch_page_id_engine_ordering_violation_raises():
     # `Id >` resume is only dupe-free if ORDER BY Id is a stable total order;
     # out-of-order rows must kill the backfill rather than risk skipped records.
     class UnorderedManager:
-        async def export_rows(self, query, object_name):
-            yield {"Id": "aa02", "UpdatedDate": "2020-01-02T00:00:00Z"}
-            yield {"Id": "aa01", "UpdatedDate": "2020-01-01T00:00:00Z"}
+        async def export_rows(self, query, model, context):
+            for row in (
+                {"Id": "aa02", "UpdatedDate": "2020-01-02T00:00:00Z"},
+                {"Id": "aa01", "UpdatedDate": "2020-01-01T00:00:00Z"},
+            ):
+                yield model.model_validate(row, context=context)
 
     start = datetime(2020, 1, 1, tzinfo=UTC)
     with pytest.raises(RuntimeError, match="ordering violation"):
@@ -485,7 +510,7 @@ async def test_fetch_changes_bisects_too_large_window():
 @pytest.mark.asyncio
 async def test_fetch_snapshot_full_table_no_bounds():
     manager = FakeManager([("1", datetime(2020, 1, 1, tzinfo=UTC))])
-    out = await _collect(api.fetch_snapshot("Product", ["Id", "Name"], manager, _LOG))  # type: ignore[arg-type]
+    out = await _collect(api.fetch_snapshot("Product", ["Id", "Name"], {}, manager, _LOG))  # type: ignore[arg-type]
     assert all(isinstance(d, BaseCSVRow) for d in out)
     assert "WHERE" not in manager.queries[0]  # full table, unbounded
 
@@ -495,9 +520,9 @@ async def test_fetch_snapshot_too_large_propagates():
     # A snapshot has no time cursor, so it can't be bisected — a too-large export
     # surfaces loudly rather than being silently truncated.
     class TooBig:
-        async def export_rows(self, query, object_name):
+        async def export_rows(self, query, model, context):
             raise ExportTooLargeError("too big")
             yield  # unreachable; makes this an async generator
 
     with pytest.raises(ExportTooLargeError):
-        await _collect(api.fetch_snapshot("Product", ["Id"], TooBig(), _LOG))  # type: ignore[arg-type]
+        await _collect(api.fetch_snapshot("Product", ["Id"], {}, TooBig(), _LOG))  # type: ignore[arg-type]

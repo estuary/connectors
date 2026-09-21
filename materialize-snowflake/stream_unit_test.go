@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"fmt"
@@ -10,11 +10,11 @@ import (
 )
 
 func TestChannelName(t *testing.T) {
-	require.Equal(t, "testing_4E7A62CBF3428987_00000000", channelName("testing", 0))
-	require.Equal(t, "testing_4E7A62CBF3428987_000004d2", channelName("testing", 1234))
-	require.Equal(t, "some_other_stuff__816D5E80F9E632A7_000004d2", channelName("some/other-stuff!", 1234))
-	require.Equal(t, "long_long_long_long_long_long_lo_05A28455EE5956EB_00000000", channelName(strings.Repeat("long/", 10), 0))
-	require.Equal(t, "long_long_long_long_long_long_lo_135047533004DC65_00000000", channelName(strings.Repeat("long!", 10), 0))
+	require.Equal(t, "testing_4E7A62CBF3428987_00000000", newChannelName("testing", 0))
+	require.Equal(t, "testing_4E7A62CBF3428987_000004d2", newChannelName("testing", 1234))
+	require.Equal(t, "some_other_stuff__816D5E80F9E632A7_000004d2", newChannelName("some/other-stuff!", 1234))
+	require.Equal(t, "long_long_long_long_long_long_lo_05A28455EE5956EB_00000000", newChannelName(strings.Repeat("long/", 10), 0))
+	require.Equal(t, "long_long_long_long_long_long_lo_135047533004DC65_00000000", newChannelName(strings.Repeat("long!", 10), 0))
 }
 
 func TestGetNextFileName(t *testing.T) {
@@ -118,7 +118,7 @@ func TestValidWriteBlobs(t *testing.T) {
 			Database: db,
 			Schema:   sch,
 			Table:    tbl,
-			Channels: []uploadChunkChannelMetadata{{Channel: ch, OffsetToken: tok}},
+			Channels: []uploadChunkChannelMetadata{{ChannelName: ch, OffsetToken: tok}},
 		}
 	}
 
@@ -185,8 +185,8 @@ func TestValidWriteBlobs(t *testing.T) {
 						Schema:   sch,
 						Table:    tbl,
 						Channels: []uploadChunkChannelMetadata{
-							{Channel: ch, OffsetToken: "token:1"},
-							{Channel: ch, OffsetToken: "token:2"},
+							{ChannelName: ch, OffsetToken: "token:1"},
+							{ChannelName: ch, OffsetToken: "token:2"},
 						},
 					},
 				}},

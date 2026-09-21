@@ -7,8 +7,13 @@ from datetime import datetime, UTC
 
 import pytest
 
+from source_shopify_native.graphql.collections.collections import (
+    CustomCollections,
+    SmartCollections,
+)
 from source_shopify_native.graphql.disputes import Disputes
 from source_shopify_native.graphql.orders.orders import Orders
+from source_shopify_native.graphql.products.products import Products
 from source_shopify_native.models import (
     ConditionalField,
     ShopifyGraphQLResource,
@@ -142,6 +147,33 @@ def test_disputes_evidence_included_only_with_evidence_scope():
     assert "disputeEvidence" not in without_evidence
     # The placeholder itself must not leak into the emitted query.
     assert "{{ disputeEvidence }}" not in without_evidence
+
+
+def test_products_resource_publications_included_only_with_read_publications():
+    with_scope = Products.build_query(
+        START, END, capabilities=StoreCapabilities(scopes=frozenset({"read_publications"}))
+    )
+    without_scope = Products.build_query(
+        START, END, capabilities=StoreCapabilities(scopes=frozenset({"read_products"}))
+    )
+
+    assert "resourcePublications" in with_scope
+    assert "resourcePublications" not in without_scope
+    assert "{{ resourcePublications }}" not in without_scope
+
+
+@pytest.mark.parametrize("collection_resource", [CustomCollections, SmartCollections])
+def test_collections_publications_included_only_with_read_publications(collection_resource):
+    with_scope = collection_resource.build_query(
+        START, END, capabilities=StoreCapabilities(scopes=frozenset({"read_publications"}))
+    )
+    without_scope = collection_resource.build_query(
+        START, END, capabilities=StoreCapabilities(scopes=frozenset({"read_products"}))
+    )
+
+    assert "publications" in with_scope
+    assert "publications" not in without_scope
+    assert "{{ publications }}" not in without_scope
 
 
 def test_predicate_can_gate_on_plan_tier():

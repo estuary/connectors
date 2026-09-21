@@ -11,6 +11,7 @@ from .inventory.inventory_items import InventoryItems
 from .inventory.inventory_levels import InventoryLevels
 from .locations.locations import Locations
 from .locations.metafields import LocationMetafields
+from .markets import Markets
 from .products.products import Products
 from .products.variants import ProductVariants
 from .products.media import ProductMedia
@@ -44,6 +45,7 @@ __all__ = [
     "InventoryLevels",
     "Locations",
     "LocationMetafields",
+    "Markets",
     "Products",
     "ProductVariants",
     "ProductMedia",

@@ -1,4 +1,4 @@
-package main
+package connector
 
 // Integration tests run against LocalStack EventBridge in docker compose.
 //
@@ -14,7 +14,7 @@ package main
 // rule + target are all provisioned up front by `provisionLocalStackInfra` since
 // `Setup()` is never invoked on the test-process materializer instance —
 // the boilerplate test rig drives the actual transactions through a
-// `flowctl preview` subprocess.
+// `flowctl raw preview-next` subprocess.
 //
 // Per project convention this file starts and stops docker compose itself;
 // callers should NOT run docker compose externally before invoking
@@ -42,6 +42,7 @@ import (
 	sqstypes "github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/bradleyjkemp/cupaloy"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
+	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	bptest "github.com/estuary/connectors/materialize-boilerplate/testutil"
 	pm "github.com/estuary/flow/go/protocols/materialize"
@@ -111,11 +112,12 @@ func TestIntegration(t *testing.T) {
 	}
 
 	t.Run("materialize", func(t *testing.T) {
-		bptest.RunMaterializationTestParallel(t, newMaterializationUnderTest, materializeSpec, makeResourceFn, nil)
+		bptest.RunMaterializationTestParallel(t, newMaterializerUnderTest, materializeSpec, makeResourceFn, nil,
+			bptest.RuntimeConfig{Shards: 1, Fidelity: m.FidelityTotal})
 	})
 
 	t.Run("apply", func(t *testing.T) {
-		bptest.RunApplyTestParallel(t, &driver{}, newMaterializationUnderTest, applySpec, makeResourceFn)
+		bptest.RunApplyTestParallel(t, &driver{}, newMaterializerUnderTest, applySpec, makeResourceFn)
 	})
 }
 
@@ -144,8 +146,8 @@ type materializationUnderTest struct {
 
 var _ boilerplate.Materializer[config, fieldConfig, resource, mappedType] = &materializationUnderTest{}
 
-func newMaterializationUnderTest(ctx context.Context, name string, cfg config, flags map[string]bool) (boilerplate.Materializer[config, fieldConfig, resource, mappedType], error) {
-	base, err := newMaterialization(ctx, name, cfg, flags)
+func newMaterializerUnderTest(ctx context.Context, name string, cfg config, flags map[string]bool) (boilerplate.Materializer[config, fieldConfig, resource, mappedType], error) {
+	base, err := NewMaterializer(ctx, name, cfg, flags)
 	if err != nil {
 		return nil, err
 	}

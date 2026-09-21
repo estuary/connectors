@@ -6,7 +6,6 @@ from typing import AsyncGenerator
 
 from estuary_cdk.capture.common import LogCursor, PageCursor
 from estuary_cdk.http import HTTPSession
-from estuary_cdk.incremental_csv_processor import BaseCSVRow
 
 from .export_manager import ExportManager, ExportTooLargeError
 from .models import (
@@ -15,6 +14,9 @@ from .models import (
     DescribeField,
     DescribeObject,
     ZuoraDocument,
+    ValidationContext,
+    ZuoraRow,
+    ZuoraType,
 )
 from .shared import VERSION_HEADERS
 
@@ -128,15 +130,18 @@ def _parse_catalog(response_bytes: bytes) -> DescribeCatalog:
     return DescribeCatalog(objects=objects)
 
 
-async def fetch_object_fields(
+async def fetch_object_metadata(
     base_url: str,
     http: HTTPSession,
     log: Logger,
     object_name: str,
-) -> list[str]:
-    """Return every field name to select when exporting a Zuora object. This includes
-    its own exportable fields plus the `<RelatedObject>.Id` joins that carry its foreign
-    keys.
+) -> DescribeObject:
+    """Describe a Zuora object.
+
+    The caller takes two things from the result: the field names to select when
+    exporting it (its own exportable fields plus the `<RelatedObject>.Id` joins that
+    carry its foreign keys), and each field's declared type, which becomes the binding's
+    sourced schema.
     """
     url = f"{base_url}/v1/describe/{object_name}"
     described = _parse_describe_object(
@@ -166,7 +171,7 @@ async def fetch_object_fields(
             },
         },
     )
-    return described.query_field_names
+    return described
 
 
 def _parse_describe_object(response_bytes: bytes) -> DescribeObject:
@@ -180,10 +185,12 @@ def _parse_describe_object(response_bytes: bytes) -> DescribeObject:
         if field_name_el is None or not field_name_el.text:
             continue
         selectable_el = field_el.find("selectable")
+        type_el = field_el.find("type")
         fields.append(
             DescribeField(
                 name=field_name_el.text,
                 selectable=selectable_el is not None and selectable_el.text == "true",
+                type=type_el.text if type_el is not None else None,
                 contexts=[
                     c.text for c in field_el.findall("./contexts/context") if c.text
                 ],
@@ -219,6 +226,7 @@ class _WindowEnd:
 async def _export_window(
     object_name: str,
     fields: list[str],
+    field_types: dict[str, ZuoraType],
     model: type[ZuoraDocument],
     manager: ExportManager,
     window_start: datetime,
@@ -236,6 +244,7 @@ async def _export_window(
     window still overflowing, raises ExportTooLargeError naming the object and
     window rather than the opaque Zuora file id.
     """
+    context = ValidationContext(object_name=object_name, field_types=field_types)
     max_cursor: datetime | None = None
     # count drives intermediate checkpoints and resets at each one; total is the
     # window's whole-lifetime document count, kept separately for the summary log.
@@ -247,8 +256,7 @@ async def _export_window(
             after=window_start, before=window_end,
         )
         try:
-            async for row in manager.export_rows(query, object_name):
-                doc = model.model_validate(row)
+            async for doc in manager.export_rows(query, model, context):
                 cursor = doc.get_cursor()
                 if (
                     max_cursor is not None
@@ -298,6 +306,7 @@ async def _export_window(
 async def fetch_changes(
     object_name: str,
     fields: list[str],
+    field_types: dict[str, ZuoraType],
     model: type[ZuoraDocument],
     manager: ExportManager,
     log: Logger,
@@ -311,7 +320,7 @@ async def fetch_changes(
     window_end = min(log_cursor + MAX_EXPORT_WINDOW, now)
 
     async for item in _export_window(
-        object_name, fields, model, manager, log_cursor, window_end, log
+        object_name, fields, field_types, model, manager, log_cursor, window_end, log
     ):
         if not isinstance(item, _WindowEnd):
             yield item  # a document or an intermediate datetime checkpoint
@@ -341,6 +350,7 @@ async def fetch_changes(
 async def fetch_page(
     object_name: str,
     fields: list[str],
+    field_types: dict[str, ZuoraType],
     model: type[ZuoraDocument],
     manager: ExportManager,
     start_date: datetime,
@@ -352,6 +362,7 @@ async def fetch_page(
     if page is not None:
         assert isinstance(page, str)
 
+    context = ValidationContext(object_name=object_name, field_types=field_types)
     resume_id: str | None = page
     limit = BACKFILL_PAGE_SIZE
     docs_since_checkpoint = 0
@@ -368,8 +379,7 @@ async def fetch_page(
         )
         count = 0
         try:
-            async for row in manager.export_rows(query, object_name):
-                doc = model.model_validate(row)
+            async for doc in manager.export_rows(query, model, context):
                 if resume_id is not None and doc.Id <= resume_id:
                     # `Id >` resume is only correct if ORDER BY Id is a stable
                     # total order. Fail loudly if a tenant violates that.
@@ -416,19 +426,22 @@ async def fetch_page(
 async def fetch_snapshot(
     object_name: str,
     fields: list[str],
+    field_types: dict[str, ZuoraType],
     manager: ExportManager,
     log: Logger,
-) -> AsyncGenerator[BaseCSVRow, None]:
+) -> AsyncGenerator[ZuoraRow, None]:
     """Full table export for objects with no usable incremental cursor field.
 
-    Snapshot objects have no cursor, so they use BaseCSVRow (empty cells -> None,
-    all fields inferred) rather than an incremental ZuoraDocument subclass.
+    Snapshot objects have no cursor, so they use ZuoraRow (empty cells -> None,
+    typed cells converted, all fields inferred) rather than an incremental
+    ZuoraDocument subclass.
 
     Note: without a time cursor there's no window to bisect, so a snapshot that
     exceeds Zuora's export size limit raises ExportTooLargeError and fails the
     binding. If that happens for a real object, we should paginate the export
     with Export ZOQL's LIMIT/OFFSET (first-N plus skip rows) to complete it in chunks.
     """
+    context = ValidationContext(object_name=object_name, field_types=field_types)
     query = build_query(object_name, fields)
-    async for row in manager.export_rows(query, object_name):
-        yield BaseCSVRow.model_validate(row)
+    async for row in manager.export_rows(query, ZuoraRow, context):
+        yield row

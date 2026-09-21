@@ -1,4 +1,4 @@
-package main
+package connector
 
 // https://docs.databricks.com/en/sql/language-manual/sql-ref-reserved-words.html
 var DATABRICKS_RESERVED_WORDS = []string{

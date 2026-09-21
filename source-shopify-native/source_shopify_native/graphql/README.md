@@ -25,4 +25,6 @@ Bulk operations reject a connection nested inside a list, so a `Refund`'s `refun
 
 The resolver flattens each connection into a plain list under the field name, stripping all `edges`/`pageInfo`/cursor metadata, and mutates the parent documents in place.
 
+Bulk rejection isn't the only reason to reach for this. A stream that is already on the non-bulk path for other reasons uses the same declaration to keep a connection from truncating - `markets` runs non-bulk because `Market` has no date cursor, and declares its `catalogs` connection so large markets drain rather than stopping at the inline page.
+
 Each `NestedConnection` declares a `parent_path` locating the parent object(s) carrying it, so a connection anywhere in the document can be resolved. For example, `["refunds"]` is each object in the `refunds` list, `[]` is the document node itself, and a multi-step path descends fields, fanning out over any list it meets. Two rules follow from the `node(id:)` drain: every parent must be a `Node` with an `id` and connections resolve in declaration order - resolving one flattens it to a list, so a connection nested inside another must be declared after the connection it sits within.

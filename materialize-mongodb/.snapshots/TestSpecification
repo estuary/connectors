@@ -33,6 +33,7 @@
         "title": "Hard Delete",
         "description": "If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).",
         "default": false,
+        "nonsensitive": true,
         "order": 4
       },
       "advanced": {
@@ -40,7 +41,8 @@
           "feature_flags": {
             "type": "string",
             "title": "Feature Flags",
-            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."
+            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.",
+            "nonsensitive": true
           }
         },
         "additionalProperties": false,
@@ -104,6 +106,7 @@
         "type": "boolean",
         "title": "Delta updates",
         "default": false,
+        "nonsensitive": true,
         "x-delta-updates": true
       }
     },

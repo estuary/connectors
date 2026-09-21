@@ -1,5 +1,43 @@
 # Changelog
 
+## 2026-09-16
+
+### Added
+- The `properties` binding now captures property metadata for the `products`,
+  `line_items`, `goals`, `leads`, `feedback_submissions`, and `orders` objects.
+
+### Fixed
+- The `properties` binding no longer fails when the connector cannot access a single
+  object type.
+
+## 2026-09-02
+### Fixed
+- CRM object bindings no longer fail when the HubSpot Search API returns records out
+  of order. Search windows holding more than 10,000 records are split by time into
+  chunks HubSpot can return completely, so result order is never relied on. Records
+  HubSpot returns for a window are now always captured, even when their reported
+  last-modified time falls outside it.
+- The `form_submissions` binding could permanently skip submissions that arrived on a
+  form while a sweep was still checking other forms. Each sweep now only emits
+  submissions made at least five minutes before it started and checkpoints the newest
+  one emitted, so anything newer is read by a later sweep.
+
+### Changed
+- The `form_submissions` binding now reads historical submissions through a dedicated
+  backfill task that checkpoints after each form, so a restart resumes from the last
+  completed form instead of re-reading every form's history in a single sweep.
+
+## 2026-08-27
+### Added
+- New `leads` binding for the HubSpot Leads object. Leads requires a Sales Hub
+  Professional or Enterprise subscription, and the binding is only discovered for accounts
+  that grant the `crm.objects.leads.read` scope. Because HubSpot grants optional scopes at
+  install time, existing OAuth captures must re-authorize before `leads` is discovered.
+
+## 2026-08-04
+### Fixed
+- Sourced schemas now describe the `_meta` field.
+
 ## 2026-07-29
 ### Fixed
 - The `forms` binding now captures `captured`, `flow`, and `blog_comment` forms in

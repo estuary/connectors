@@ -1,0 +1,62 @@
+{
+  "connector": "materialize-redshift",
+  "scenario": "small-docs.yaml",
+  "seed": 0,
+  "preview_exit_code": 0,
+  "apply_seconds": 3.792225024,
+  "wall_seconds": 974.761574144,
+  "timing_source": "flowctl-log",
+  "rounds_observed": 2,
+  "scenario_transactions": 2,
+  "total_docs": 50000000,
+  "total_bytes": 6400000000,
+  "observed_docs": 50000000,
+  "observed_bytes": 6400000000,
+  "docs_per_sec": 51294.59482838988,
+  "mb_per_sec": 6.261547220262437,
+  "transactions": [
+    {
+      "index": 0,
+      "collection": "bench/tiny",
+      "doc_count": 25000000,
+      "doc_size": 128,
+      "bytes": 3200000000,
+      "fresh": {
+        "start": 0,
+        "count": 25000000,
+        "op": "c"
+      },
+      "overlaps": [],
+      "wall_seconds": 475.962422016,
+      "mb_per_sec": 6.411762087380528,
+      "docs_per_sec": 52525.155019821286
+    },
+    {
+      "index": 1,
+      "collection": "bench/tiny",
+      "doc_count": 25000000,
+      "doc_size": 128,
+      "bytes": 3200000000,
+      "fresh": {
+        "start": 25000000,
+        "count": 21250000,
+        "op": "c"
+      },
+      "overlaps": [
+        {
+          "op": "u",
+          "with": 0,
+          "count": 2500000
+        },
+        {
+          "op": "d",
+          "with": 0,
+          "count": 1250000
+        }
+      ],
+      "wall_seconds": 498.799152128,
+      "mb_per_sec": 6.118209703205087,
+      "docs_per_sec": 50120.373888656075
+    }
+  ]
+}

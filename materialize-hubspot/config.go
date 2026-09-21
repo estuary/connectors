@@ -97,7 +97,7 @@ type AdvancedConfig struct {
 	SearchLimit float64 `json:"search_limit,omitempty" jsonschema:"title=Search Request Limit,description=Maximum search requests per second across all bindings.,default=5,exclusiveMinimum=0,maximum=250"`
 	SearchBurst int     `json:"search_burst,omitempty" jsonschema:"title=Search Request Burst Count,description=Burst search requests across all bindings.,default=5,minimum=1,maximum=1000"`
 
-	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
 }
 
 type Config struct {
@@ -133,7 +133,7 @@ type Resource struct {
 	// This connector always uses delta updates, we include this read-only
 	// option to draw attention to the behavior and be consistent with other
 	// materializations.
-	DeltaUpdates bool `json:"delta_updates"`
+	DeltaUpdates bool `json:"delta_updates" jsonschema_extras:"nonsensitive=true"`
 	// Object is the title case representation of the CRMObject.
 	Object string `json:"object"`
 }

@@ -1,4 +1,4 @@
-package main
+package connector
 
 // https://clickhouse.com/docs/en/sql-reference/statements/select
 var CLICKHOUSE_RESERVED_WORDS = []string{

@@ -102,16 +102,12 @@ async def full_refresh_resources(
         fields = await fetch_object_fields(http, log, str(config.domain), resource)
 
         resources.append(
-            common.Resource(
+            common.SnapshotResource(
                 name=name,
-                key=["/_meta/row_id"],
-                model=resource,
                 open=functools.partial(open, fields, resource),
-                initial_state=common.ResourceState(),
                 initial_config=common.ResourceConfig(
                     name=name, interval=timedelta(minutes=1)
                 ),
-                schema_inference=True,
             )
         )
 

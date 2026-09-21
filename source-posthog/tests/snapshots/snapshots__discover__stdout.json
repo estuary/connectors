@@ -32,21 +32,13 @@
         }
       },
       "additionalProperties": true,
-      "description": "PostHog annotation.",
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
           "description": "Document metadata"
-        },
-        "id": {
-          "title": "Id",
-          "type": "integer"
         }
       },
-      "required": [
-        "id"
-      ],
-      "title": "Annotation",
+      "title": "BaseDocument",
       "type": "object",
       "x-infer-schema": true,
       "if": {
@@ -110,21 +102,13 @@
         }
       },
       "additionalProperties": true,
-      "description": "PostHog cohort.",
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
           "description": "Document metadata"
-        },
-        "id": {
-          "title": "Id",
-          "type": "integer"
         }
       },
-      "required": [
-        "id"
-      ],
-      "title": "Cohort",
+      "title": "BaseDocument",
       "type": "object",
       "x-infer-schema": true,
       "if": {
@@ -370,26 +354,13 @@
         }
       },
       "additionalProperties": true,
-      "description": "PostHog organization.",
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
           "description": "Document metadata"
-        },
-        "id": {
-          "title": "Id",
-          "type": "string"
-        },
-        "name": {
-          "title": "Name",
-          "type": "string"
         }
       },
-      "required": [
-        "id",
-        "name"
-      ],
-      "title": "Organization",
+      "title": "BaseDocument",
       "type": "object",
       "x-infer-schema": true,
       "if": {
@@ -557,21 +528,13 @@
         }
       },
       "additionalProperties": true,
-      "description": "PostHog project.",
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
           "description": "Document metadata"
-        },
-        "id": {
-          "title": "Id",
-          "type": "integer"
         }
       },
-      "required": [
-        "id"
-      ],
-      "title": "Project",
+      "title": "BaseDocument",
       "type": "object",
       "x-infer-schema": true,
       "if": {

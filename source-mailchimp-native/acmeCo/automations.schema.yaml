@@ -18,20 +18,11 @@ $defs:
     title: Meta
     type: object
 additionalProperties: true
-description: |-
-  Classic automation workflow. The endpoint is feature-gated and empty on
-  the test account, so this shape is docs-based; the required `id` fails
-  loudly if a real payload disagrees.
 properties:
   _meta:
     $ref: '#/$defs/Meta'
     description: Document metadata
-  id:
-    title: Id
-    type: string
-required:
-- id
-title: Automation
+title: BaseDocument
 type: object
 x-infer-schema: true
 if:

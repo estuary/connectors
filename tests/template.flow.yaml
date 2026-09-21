@@ -18,14 +18,3 @@ captures:
       - resource:
           <<: ${RESOURCE}
         target: tests/${CONNECTOR}/data
-
-materializations:
-  tests/${CONNECTOR}/to-sqlite:
-    endpoint:
-      connector:
-        image: ghcr.io/estuary/materialize-sqlite:dev
-        config: {}
-    bindings:
-      - resource:
-          table: test_results
-        source: tests/${CONNECTOR}/data

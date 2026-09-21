@@ -74,6 +74,7 @@
             "ConnectionString": {
               "description": "The connection string used to authenticate with Azure Blob Storage.",
               "order": 0,
+              "secret": true,
               "title": "Connection String",
               "type": "string"
             },

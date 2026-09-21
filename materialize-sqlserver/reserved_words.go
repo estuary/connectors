@@ -1,4 +1,4 @@
-package main
+package connector
 
 // https://learn.microsoft.com/en-us/sql/t-sql/language-elements/reserved-keywords-transact-sql?view=sql-server-2017
 var SQLSERVER_RESERVED_WORDS = []string{

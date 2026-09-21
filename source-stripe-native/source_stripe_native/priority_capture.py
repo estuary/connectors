@@ -20,6 +20,7 @@ from estuary_cdk.capture.common import (
     ResourceConfig,
     FetchSnapshotFn,
 )
+from estuary_cdk.utils import format_error_message
 
 from .protocols import FetchChangesFnFactory, FetchPageFnFactory
 
@@ -268,14 +269,21 @@ class SubtaskExecutor:
         self.main_task = main_task
 
     async def _execute_incremental_subtask(self, work_item: WorkItem, task: Task):
-        await _binding_incremental_task_with_work_item(
-            self.binding,
-            self.binding_index,
-            work_item.incremental_fetch_fn,
-            work_item.incremental_state,
-            task,
-            work_item
-        )
+        try:
+            await _binding_incremental_task_with_work_item(
+                self.binding,
+                self.binding_index,
+                work_item.incremental_fetch_fn,
+                work_item.incremental_state,
+                task,
+                work_item
+            )
+        except Exception as exc:
+            task.log.error(
+                "incremental subtask failed",
+                {"subtask_id": work_item.account_id, "error": format_error_message(exc)},
+            )
+            raise
 
     async def _execute_backfill_subtask(self, work_item: WorkItem, task: Task):
         if not work_item.has_backfill_work():
@@ -284,38 +292,45 @@ class SubtaskExecutor:
         assert work_item.backfill_fetch_fn is not None
         assert work_item.backfill_state is not None
 
-        self.main_task.connector_status.inc_backfilling(self.binding_index)
+        try:
+            self.main_task.connector_status.inc_backfilling(self.binding_index)
 
-        await _binding_backfill_task_with_work_item(
-            self.binding,
-            self.binding_index,
-            work_item.backfill_fetch_fn,
-            work_item.backfill_state,
-            self.resource_state.last_initialized,
-            self.resource_state.is_connector_initiated,
-            task,
-            work_item
-        )
+            await _binding_backfill_task_with_work_item(
+                self.binding,
+                self.binding_index,
+                work_item.backfill_fetch_fn,
+                work_item.backfill_state,
+                self.resource_state.last_initialized,
+                self.resource_state.is_connector_initiated,
+                task,
+                work_item
+            )
 
-        # Update the resource state to reflect backfill completion.
-        # This ensures PriorityCalculator sees the completed backfill during periodic re-prioritization.
-        if isinstance(self.resource_state.backfill, dict):
-            self.resource_state.backfill[work_item.account_id] = None
+            # Update the resource state to reflect backfill completion.
+            # This ensures PriorityCalculator sees the completed backfill during periodic re-prioritization.
+            if isinstance(self.resource_state.backfill, dict):
+                self.resource_state.backfill[work_item.account_id] = None
 
-        self.main_task.connector_status.dec_backfilling(self.binding_index)
+            self.main_task.connector_status.dec_backfilling(self.binding_index)
+        except Exception as exc:
+            task.log.error(
+                "backfill subtask failed",
+                {"subtask_id": work_item.account_id, "error": format_error_message(exc)},
+            )
+            raise
 
     async def execute_work_item(self, work_item: WorkItem, task: Task):
         subtasks: list[asyncio.Task] = []
 
         if work_item.has_backfill_work():
             backfill_task = task.spawn_child(
-                f"backfill.{work_item.account_id}",
+                "backfill",
                 lambda t: self._execute_backfill_subtask(work_item, t)
             )
             subtasks.append(backfill_task)
 
         incremental_task = task.spawn_child(
-            f"incremental.{work_item.account_id}",
+            "incremental",
             lambda t: self._execute_incremental_subtask(work_item, t)
         )
         subtasks.append(incremental_task)

@@ -22,7 +22,7 @@ COPY materialize-sql         ./materialize-sql
 # Test and build the connector.
 RUN go test  -tags nozstd -v ./materialize-sql/...
 RUN go test  -tags nozstd -short -v ./materialize-motherduck/...
-RUN go build -tags nozstd -v -o ./connector ./materialize-motherduck/...
+RUN go build -tags nozstd -v -o ./connector ./materialize-motherduck/cmd/connector
 
 # Runtime Stage
 ################################################################################
@@ -35,6 +35,9 @@ COPY --from=builder /builder/connector ./materialize-motherduck
 
 # Avoid running the connector as root.
 USER nonroot:nonroot
+
+ARG CONNECTOR_VERSION=dev
+ENV CONNECTOR_VERSION="${CONNECTOR_VERSION}"
 
 LABEL FLOW_RUNTIME_PROTOCOL=materialize
 

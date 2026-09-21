@@ -11,6 +11,7 @@ from estuary_cdk.capture.common import (
     Resource,
     ResourceConfig,
     ResourceState,
+    SnapshotResource,
     open_binding,  # pyright: ignore[reportUnknownVariableType]
 )
 from estuary_cdk.flow import CaptureBinding
@@ -37,6 +38,8 @@ from .models import (
 )
 
 CalendlyResource = Resource[CalendlyEntity, ResourceConfig, ResourceState]
+
+CalendlySnapshotResource = SnapshotResource[CalendlyEntity, ResourceConfig]
 ScheduledEventFetchFn = Callable[
     [str, int, int, HTTPSession, Logger, LogCursor],
     AsyncGenerator[CalendlyEntity | LogCursor, None],
@@ -120,17 +123,13 @@ def _snapshot_resources(http: HTTPMixin, org_uri: str) -> list[CalendlyResource]
         )
 
     return [
-        Resource(
+        CalendlySnapshotResource(
             name=entity_cls.name,
-            key=["/_meta/row_id"],
-            model=entity_cls,
             open=functools.partial(open, entity_cls),
-            initial_state=ResourceState(),
             initial_config=ResourceConfig(
                 name=entity_cls.name,
                 interval=timedelta(minutes=5),
             ),
-            schema_inference=True,
         )
         for entity_cls in SNAPSHOT_STREAMS
     ]

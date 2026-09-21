@@ -1,5 +1,53 @@
 # materialize-bigquery
 
+## 2026-09-17
+
+### Added
+- New optional `partition_by` field on each table's resource configuration sets
+  the table's
+  [partitioning](https://cloud.google.com/bigquery/docs/partitioned-tables), for
+  example `DATE(created_at)`, `TIMESTAMP_TRUNC(updated_at, MONTH)`,
+  `_PARTITIONDATE` or `RANGE_BUCKET(id, GENERATE_ARRAY(0, 1000, 10))`. The
+  expression is verified against BigQuery when the materialization is published,
+  and is applied every time the connector creates the table, so partitioning now
+  survives backfills that drop and re-create it. Because BigQuery only accepts
+  partitioning at table creation, changing `partition_by` on an existing table
+  requires backfilling the binding, which drops and re-creates the table.
+
+## 2026-09-14
+
+### Fixed
+- A transaction whose load query returns more than 10 GB of documents no longer
+  fails with `responseTooLarge`. Load results are now written to a
+  per-transaction table in the endpoint dataset, named
+  `flow_load_results_<materialization>_<range>_<uuid>`, which is deleted after
+  read-back and expires after one day if a crash prevents the deletion.
+
+### Changed
+- Load results were previously held in an anonymous table in the billing
+  project. They are now briefly stored in the endpoint dataset of the
+  configured project, so that storage is attributed there.
+
+## 2026-08-31
+
+### Added
+- Support for tasks scaled out to multiple shards.
+
+## 2026-08-25
+
+### Added
+- `1m`, `2m30s`, and `20m` are now valid `Sync Frequency` values, filling the
+  gaps between `30s`-`5m` and `15m`-`30m`.
+
+## 2026-08-07
+
+### Fixed
+- A load query that reads a NULL `flow_document` now says so, and names the
+  `Exclude Flow Document` option that addresses it. It previously reported
+  `value[1] wrong type int64 expecting string`, giving the type of the binding
+  index rather than of the document, which made it the same message regardless
+  of cause.
+
 ## 2026-07-23
 
 ### Changed

@@ -76,12 +76,14 @@
         "capturePropertyHistory": {
           "default": false,
           "description": "Include historical data for changes to properties of HubSpot objects in captured documents.",
+          "nonsensitive": true,
           "title": "Capture Property History",
           "type": "boolean"
         },
         "useLegacyNamingForCustomObjects": {
           "default": false,
           "description": "If selected, the legacy naming convention for custom objects is used. Otherwise, all discovered bindings for custom objects will have 'custom_' prepended to their names.",
+          "nonsensitive": true,
           "title": "Use Legacy Naming for Custom Objects",
           "type": "boolean",
           "x-hidden-field": true
@@ -118,12 +120,14 @@
           "default": "PT0S",
           "description": "Interval between updates for this resource",
           "format": "duration",
+          "nonsensitive": true,
           "title": "Interval",
           "type": "string"
         },
         "schedule": {
           "default": "",
           "description": "Schedule to automatically refresh calculated properties. Accepts a cron expression.",
+          "nonsensitive": true,
           "pattern": "^((?:[0-5]?\\d(?:-[0-5]?\\d)?|\\*(?:/[0-5]?\\d)?)(?:,(?:[0-5]?\\d(?:-[0-5]?\\d)?|\\*(?:/[0-5]?\\d)?))*)\\s+((?:[01]?\\d|2[0-3]|(?:[01]?\\d|2[0-3])-(?:[01]?\\d|2[0-3])|\\*(?:/[01]?\\d|/2[0-3])?)(?:,(?:[01]?\\d|2[0-3]|(?:[01]?\\d|2[0-3])-(?:[01]?\\d|2[0-3])|\\*(?:/[01]?\\d|/2[0-3])?))*)\\s+((?:0?[1-9]|[12]\\d|3[01]|(?:0?[1-9]|[12]\\d|3[01])-(?:0?[1-9]|[12]\\d|3[01])|\\*(?:/[0-9]|/1[0-9]|/2[0-9]|/3[01])?)(?:,(?:0?[1-9]|[12]\\d|3[01]|(?:0?[1-9]|[12]\\d|3[01])-(?:0?[1-9]|[12]\\d|3[01])|\\*(?:/[0-9]|/1[0-9]|/2[0-9]|/3[01])?))*)\\s+((?:[1-9]|1[0-2]|(?:[1-9]|1[0-2])-(?:[1-9]|1[0-2])|\\*(?:/[1-9]|/1[0-2])?)(?:,(?:[1-9]|1[0-2]|(?:[1-9]|1[0-2])-(?:[1-9]|1[0-2])|\\*(?:/[1-9]|/1[0-2])?))*)\\s+((?:[0-6]|(?:[0-6])-(?:[0-6])|\\*(?:/[0-6])?)(?:,(?:[0-6]|(?:[0-6])-(?:[0-6])|\\*(?:/[0-6])?))*)$|^$",
           "title": "Calculated Property Refresh Schedule",
           "type": "string"
@@ -138,8 +142,8 @@
     "documentationUrl": "https://go.estuary.dev/hubspot-real-time",
     "oauth2": {
       "provider": "hubspot",
-      "authUrlTemplate": "https://app.hubspot.com/oauth/authorize?client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&scope=crm.lists.read%20crm.objects.companies.read%20crm.objects.contacts.read%20crm.objects.deals.read%20crm.objects.owners.read%20crm.schemas.companies.read%20crm.schemas.contacts.read%20crm.schemas.deals.read%20e-commerce%20forms%20tickets&optional_scope=automation%20content%20crm.objects.custom.read%20crm.objects.feedback_submissions.read%20crm.objects.goals.read%20crm.objects.marketing_events.read%20crm.objects.orders.read%20crm.schemas.custom.read%20marketing.campaigns.read&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&response_type=code&state={{#urlencode}}{{{ state }}}{{/urlencode}}",
-      "accessTokenUrlTemplate": "https://api.hubapi.com/oauth/v1/token",
+      "authUrlTemplate": "https://app.hubspot.com/oauth/authorize?client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&scope=crm.lists.read%20crm.objects.companies.read%20crm.objects.contacts.read%20crm.objects.deals.read%20crm.objects.owners.read%20crm.schemas.companies.read%20crm.schemas.contacts.read%20crm.schemas.deals.read%20e-commerce%20forms%20tickets&optional_scope=automation%20content%20crm.objects.custom.read%20crm.objects.feedback_submissions.read%20crm.objects.goals.read%20crm.objects.leads.read%20crm.objects.marketing_events.read%20crm.objects.orders.read%20crm.schemas.custom.read%20marketing.campaigns.read&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&response_type=code&state={{#urlencode}}{{{ state }}}{{/urlencode}}",
+      "accessTokenUrlTemplate": "https://api.hubapi.com/oauth/2026-09/token",
       "accessTokenBody": "grant_type=authorization_code&client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&client_secret={{#urlencode}}{{{ client_secret }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&code={{#urlencode}}{{{ code }}}{{/urlencode}}",
       "accessTokenHeaders": {
         "content-type": "application/x-www-form-urlencoded"

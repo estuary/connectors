@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-08-04
+
+### Fixed
+- Reduced memory use while backfilling. Pages of fetched records were held in memory for the duration of a date window instead of being released as they were emitted, which could exhaust a capture's memory on high volume streams.
+
 ## 2026-07-29
 
 ### Fixed

@@ -16,13 +16,12 @@ COPY flow-bin/flowctl-go /usr/local/bin/flowctl-go
 COPY go                        ./go
 COPY materialize-boilerplate   ./materialize-boilerplate
 COPY materialize-elasticsearch ./materialize-elasticsearch
-COPY testsupport               ./testsupport
 
 RUN go test -tags nozstd -v ./materialize-boilerplate/...
 RUN go test -tags nozstd -short -v ./materialize-elasticsearch/...
 
 # Build the connector.
-RUN go build -tags nozstd -v -o ./connector ./materialize-elasticsearch
+RUN go build -tags nozstd -v -o ./connector ./materialize-elasticsearch/cmd/connector
 
 # Runtime Stage
 ################################################################################
@@ -37,6 +36,9 @@ COPY --from=ghcr.io/estuary/network-tunnel:dev /flow-network-tunnel /usr/bin/flo
 
 # Avoid running the connector as root.
 USER nonroot:nonroot
+
+ARG CONNECTOR_VERSION=dev
+ENV CONNECTOR_VERSION="${CONNECTOR_VERSION}"
 
 LABEL FLOW_RUNTIME_PROTOCOL=materialize
 

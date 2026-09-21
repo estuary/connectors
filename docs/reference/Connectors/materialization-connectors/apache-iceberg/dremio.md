@@ -1,3 +1,7 @@
+---
+description: Materialize data into a Dremio data lake. This variation of Estuary's Apache Iceberg connector uses the Dremio Cloud catalog.
+---
+
 # Dremio
 
 [Dremio](https://www.dremio.com) is a lakehouse platform with a built-in
@@ -55,3 +59,36 @@ fail when the token expires. Use a service user for production deployments.
 For all other configuration options (EMR Serverless compute, staging bucket,
 IAM roles, bindings), refer to the [Apache Iceberg connector
 docs](./apache-iceberg.md).
+
+### Sample
+
+```yaml
+materializations:
+  ${PREFIX}/${mat_name}:
+    endpoint:
+      connector:
+        image: ghcr.io/estuary/materialize-dremio:v1
+        config:
+          url: https://catalog.dremio.cloud/api/iceberg
+          warehouse: <dremio-catalog-name>
+          namespace: <namespace>
+          base_location: s3://<bucket>
+          credentials:
+            auth_type: OAuth 2.0 Client Credentials
+            oauth2_server_uri: https://login.dremio.cloud/oauth/token
+            credential: <client-id>:<client-secret>
+            scope: dremio.all
+          compute:
+            region: us-east-1
+            application_id: <emr-app-id>
+            execution_role_arn: <emr-arn>
+            bucket: <bucket>
+            credentials:
+              auth_type: AWSAccessKey
+              aws_access_key_id: <aws-access-key-id>
+              aws_secret_access_key: <aws-secret-access-key>
+    bindings:
+      - resource:
+          table: ${COLLECTION_NAME}
+        source: ${PREFIX}/${COLLECTION_NAME}
+```

@@ -20,6 +20,7 @@ from estuary_cdk.capture.common import (
     BaseOAuth2Credentials,
     CRON_REGEX,
     OAuth2Spec,
+    PageCursor,
     ReductionStrategy,
     ResourceConfigWithSchedule,
     ResourceState,
@@ -52,6 +53,7 @@ optional_scopes = [
     "crm.objects.custom.read",
     "crm.objects.feedback_submissions.read",
     "crm.objects.goals.read",
+    "crm.objects.leads.read",
     "crm.objects.marketing_events.read",
     "crm.objects.orders.read",
     "crm.schemas.custom.read",
@@ -71,7 +73,7 @@ OAUTH2_SPEC = OAuth2Spec(
         + r"&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}"
         r"&response_type=code&state={{#urlencode}}{{{ state }}}{{/urlencode}}"
     ),
-    accessTokenUrlTemplate="https://api.hubapi.com/oauth/v1/token",
+    accessTokenUrlTemplate="https://api.hubapi.com/oauth/2026-09/token",
     accessTokenHeaders={"content-type": "application/x-www-form-urlencoded"},
     accessTokenBody=(
         "grant_type=authorization_code"
@@ -96,7 +98,8 @@ class HubspotResourceConfigWithSchedule(ResourceConfigWithSchedule):
         default="",
         title="Calculated Property Refresh Schedule",
         description="Schedule to automatically refresh calculated properties. Accepts a cron expression.",
-        pattern=CRON_REGEX
+        pattern=CRON_REGEX,
+        json_schema_extra={"nonsensitive": True},
     )
 
 
@@ -109,12 +112,13 @@ class EndpointConfig(BaseModel):
         title="Capture Property History",
         description="Include historical data for changes to properties of HubSpot objects in captured documents.",
         default=False,
+        json_schema_extra={"nonsensitive": True},
     )
     useLegacyNamingForCustomObjects: bool = Field(
         title="Use Legacy Naming for Custom Objects",
         description="If selected, the legacy naming convention for custom objects is used. Otherwise, all discovered bindings for custom objects will have 'custom_' prepended to their names.",
         default=False,
-        json_schema_extra={"x-hidden-field": True},
+        json_schema_extra={"nonsensitive": True, "x-hidden-field": True},
     )
 
     # In order to publish this connector in the HubSpot marketplace, HubSpot requires
@@ -187,6 +191,7 @@ class Names(StrEnum):
     contact_list_memberships = auto()
     feedback_submissions = auto()
     goals = auto()
+    leads = auto()
     workflows = auto()
     campaigns = auto()
 
@@ -372,13 +377,6 @@ class BaseCRMObject(BaseDocument, extra="allow"):
                     "type": "string"
                 },
             },
-            "required": [
-                "archived",
-                "createdAt",
-                "id",
-                "properties",
-                "updatedAt",
-            ]
         }
 
         properties_schema = {
@@ -386,8 +384,6 @@ class BaseCRMObject(BaseDocument, extra="allow"):
             "type": "object",
             "properties": {},
         }
-
-        required_properties: list[str] = []
 
         for prop in properties:
             property_schema: dict[str, Any] = {
@@ -425,10 +421,8 @@ class BaseCRMObject(BaseDocument, extra="allow"):
                     continue
 
             properties_schema["properties"][prop.name] = property_schema
-            required_properties.append(prop.name)
 
         schema["properties"]["properties"] = properties_schema
-        schema["properties"]["properties"]["required"] = required_properties
         return schema
 
 
@@ -445,11 +439,11 @@ class TimestampedId(NamedTuple):
 
 
 class IdChunk(NamedTuple):
-    """One page of TimestampedIds yielded by _fetch_id_chunks, plus whether the
-    underlying fetcher reports more pages remain."""
+    """One page of TimestampedIds yielded by _fetch_id_chunks, plus the
+    underlying fetcher's cursor for the page after it, falsy when none remains."""
 
     ids: list[TimestampedId]
-    has_more: bool
+    next_page: PageCursor
 
 
 # The document type carried by a TimestampedObject. Its bound is intentionally
@@ -501,7 +495,6 @@ class Engagement(BaseCRMObject):
         Names.notes,
         Names.tasks,
         Names.content,
-        Names.orders,
         Names.carts,
         Names.partner_clients,
         Names.marketing_events,
@@ -518,8 +511,6 @@ class Engagement(BaseCRMObject):
     meetings: list[int] = []
     notes: list[int] = []
     tasks: list[int] = []
-    content: list[int] = []
-    orders: list[int] = []
     carts: list[int] = []
     partner_clients: list[int] = []
     marketing_events: list[int] = []
@@ -562,6 +553,18 @@ class FeedbackSubmission(BaseCRMObject):
 
 class Goals(BaseCRMObject):
     ASSOCIATED_ENTITIES = []
+
+
+class Lead(BaseCRMObject):
+    ASSOCIATED_ENTITIES = [
+        Names.contacts,
+        Names.companies,
+        Names.deals,
+    ]
+
+    contacts: list[int] = []
+    companies: list[int] = []
+    deals: list[int] = []
 
 
 # An Association, as returned by the v4 associations API.

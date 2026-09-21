@@ -1,0 +1,30 @@
+name: Change Classifier
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [main]
+    paths: &classifier_paths
+      - ".github/scripts/classify-changed-paths.sh"
+      - ".github/scripts/test_classify_changed_paths.py"
+      - ".github/actions/classify-changes/action.yaml"
+      - ".github/workflows/classify-changes.yaml"
+
+  pull_request:
+    branches: [main]
+    paths: *classifier_paths
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Classifier unit tests
+        run: cd .github/scripts && python3 -m unittest test_classify_changed_paths -v

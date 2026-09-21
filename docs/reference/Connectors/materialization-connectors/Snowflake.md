@@ -60,23 +60,24 @@ use database identifier($database_name);
 create schema if not exists identifier($estuary_schema);
 -- create a user for Estuary
 create user if not exists identifier($estuary_user)
-default_role = $estuary_role
-default_warehouse = $warehouse_name;
+  type = service
+  default_role = $estuary_role
+  default_warehouse = $warehouse_name;
 grant role identifier($estuary_role) to user identifier($estuary_user);
 -- Estuary requires case-sensitive quoted identifiers (e.g. "_meta/op").
 alter user identifier($estuary_user) set QUOTED_IDENTIFIERS_IGNORE_CASE = FALSE;
 grant all on schema identifier($estuary_schema) to identifier($estuary_role);
 -- create a warehouse for estuary
 create warehouse if not exists identifier($warehouse_name)
-warehouse_size = xsmall
-warehouse_type = standard
-auto_suspend = 60
-auto_resume = true
-initially_suspended = true;
+  warehouse_size = xsmall
+  warehouse_type = standard
+  auto_suspend = 60
+  auto_resume = true
+  initially_suspended = true;
 -- grant Estuary role access to warehouse
 grant USAGE
-on warehouse identifier($warehouse_name)
-to role identifier($estuary_role);
+  on warehouse identifier($warehouse_name)
+  to role identifier($estuary_role);
 -- grant Estuary access to database
 grant CREATE SCHEMA, MONITOR, USAGE on database identifier($database_name) to role identifier($estuary_role);
 -- change role to ACCOUNTADMIN for STORAGE INTEGRATION support to Estuary (only needed for Snowflake on GCP)
@@ -161,6 +162,7 @@ Use the below properties to configure a Snowflake materialization, which will di
 | **`/table`** | Table | Table name | string | Required |
 | `/schema` | Alternative Schema | Alternative schema for this table | string |  |
 | `/delta_updates` | Delta updates | Whether to use standard or [delta updates](#delta-updates) | boolean |  |
+| `/clustering` | Clustering Keys | Comma-separated list of column names to use as the [clustering key](#clustering-keys) for Snowflake Automatic Clustering. Leave empty to disable clustering. | string |  |
 
 ### Sample
 
@@ -283,6 +285,26 @@ This is because most materializations tend to be roughly chronological over time
 
 This means that updates of keys `/date, /user_id` will need to physically read far fewer rows as compared to a key like `/user_id`,
 because those rows will tend to live in the same micro-partitions, and Snowflake is able to cheaply prune micro-partitions that aren't relevant to the transaction.
+
+### Clustering keys
+
+In addition to choosing a good collection key, you can explicitly enable [Snowflake Automatic Clustering](https://docs.snowflake.com/en/user-guide/tables-clustering-keys) on a per-binding basis using the `clustering` resource configuration property. This is an advanced option, recommended only for large tables that are queried with selective filters on the clustered columns, since automatic clustering consumes additional Snowflake credits.
+
+Set `clustering` to a comma-separated list of column names:
+
+```yaml
+bindings:
+  - resource:
+      table: ${table_name}
+      clustering: date, user_id
+    source: ${PREFIX}/${source_collection}
+```
+
+Keep in mind:
+
+* Only literal materialized column names are supported. SQL expressions or functions (for example `TRUNC(user_id, -5)`) are not accepted.
+* The clustering key is applied, and re-applied, every time the materialization restarts, republishes, or backfills, not only when the table is first created. You can add, change, or remove clustering at any time by updating this property and republishing.
+* If you leave `clustering` empty, the connector checks for an existing clustering key on the table and drops it. Clustering keys applied manually in Snowflake, outside this property, will be removed the next time the materialization restarts.
 
 ### Snowpipe Streaming
 

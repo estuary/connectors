@@ -1,0 +1,86 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/v2/calls?fromDateTime=2026-08-01T00:00:00Z&toDateTime=2026-09-01T00:00:00Z"
+  params:
+    - name: fromDateTime
+      value: "2026-08-01T00:00:00Z"
+      type: query
+    - name: toDateTime
+      value: "2026-09-01T00:00:00Z"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // Chain: pins the first call id for anything that needs an existing call.
+        const call = res.getBody()?.calls?.[0];
+        if (call?.id) bru.setVar('seed_call_id', call.id);
+
+docs: |-
+  **REFERENCE:** https://gong.app.gong.io/settings/api/documentation#get-/v2/calls
+
+  **WHY:** the read side of the `calls` stream — proves the envelope, the
+  `records.cursor` pagination shape, and the field set the connector's `Call`
+  model parses. Also the verification step after a seeding run.
+
+  **VERIFIED (2026-08-31):** the sandbox has no calls. A live
+  `flowctl preview` of the connector produced zero documents for this stream.
+
+  **VERIFIED (2026-08-31):** an empty result comes back as `404`, not `200`
+  with an empty array. Observed body:
+  `{"requestId":"…","errors":["No calls found corresponding to the provided
+  filters"]}`. This is the case `_NO_RESULTS_404_PATTERN` in
+  `source_gong/api.py` exists to absorb, and that pattern matches this string.
+
+  **VERIFIED (2026-08-31) — this endpoint does not list calls that have no
+  media attached.** Calls created by `Seeding/A1` were absent here (and from
+  `Calls / extensive`) both before their media upload and after uploads that
+  Gong later discarded. A call is visible only once Gong has accepted and
+  processed its recording.
+
+  **VERIFIED (2026-09-01) — populated field set.** A processed call returns:
+  `id`, `url` (its page in the Gong app), `title`, `scheduled`, `started`,
+  `duration`, `primaryUserId`, `direction`, `system`, `scope`, `media`,
+  `language`, `workspaceId`, `sdrDisposition`, `clientUniqueId`, `customData`,
+  `purpose`, `meetingUrl`, `isPrivate`, `calendarEventId`. Calls seeded
+  through the upload API carry `system: "Upload API"` and `media: "Audio"`.
+
+  **VERIFIED (2026-09-01) — `duration` is Gong's own measurement, not the one
+  you declared.** `POST /v2/calls` was sent `1790.74`; the call reads back
+  `1785`. Gong measures the media it received and overrides the request value,
+  so the field cannot be treated as caller-supplied.
+
+  **VERIFIED (2026-09-01) — `meetingUrl` carries the media location for
+  uploaded calls.** It holds an S3 object URL ending in `media.mp3` rather
+  than a conference link. That URL is **not** publicly fetchable: an unsigned
+  GET returns `403`. So the API references the audio without exposing it, and
+  nothing in the connector can follow that link.
+
+  **LIMITATION — calls appear one by one as analysis finishes, and
+  `records.totalRecords` runs ahead of what is returned.** Immediately after
+  seeding two calls, the list answered `200` with
+  `{"totalRecords": 2, "currentPageSize": 1}` and a single call; the second
+  appeared minutes later. `totalRecords` counts calls Gong knows about,
+  `currentPageSize` counts those actually returned — a gap between them means
+  analysis is still running, not that a page was truncated.
+
+  This has a real consequence for the incremental walk: a call's `started`
+  timestamp is its actual start time, but it only becomes visible once
+  analysis completes. A call can therefore surface *after* the cursor has
+  advanced past its own timestamp, and a fetch that trusted `started` alone
+  would skip it permanently. This is what `calls_lookback_window` (default 7
+  days, in `source_gong/models.py`) exists to absorb — and the first live
+  evidence that it is load-bearing rather than defensive.

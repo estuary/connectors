@@ -140,16 +140,13 @@ def non_paginated_full_refresh_resources(
         )
 
     return [
-        common.Resource(
+        common.SnapshotResource(
             name=name,
-            key=["/_meta/row_id"],
             model=FullRefreshResource,
             open=functools.partial(open, path, response_model, _create_gateway(config), braintree_class),
-            initial_state=ResourceState(),
             initial_config=ResourceConfig(
                 name=name, interval=timedelta(minutes=5), concurrency=DEFAULT_SNAPSHOT_CONCURRENCY
             ),
-            schema_inference=True,
         )
         for (name, path, response_model, braintree_class) in NON_PAGINATED_FULL_REFRESH_RESOURCES
     ]
@@ -183,16 +180,13 @@ def paginated_full_refresh_resources(
         )
 
     return [
-        common.Resource(
+        common.SnapshotResource(
             name=name,
-            key=["/_meta/row_id"],
             model=FullRefreshResource,
             open=functools.partial(open, snapshot_fn, _create_gateway(config)),
-            initial_state=ResourceState(),
             initial_config=ResourceConfig(
                 name=name, interval=timedelta(minutes=5), concurrency=DEFAULT_SNAPSHOT_CONCURRENCY
             ),
-            schema_inference=True,
         )
         for (name, snapshot_fn) in PAGINATED_FULL_REFRESH_RESOURCES
     ]

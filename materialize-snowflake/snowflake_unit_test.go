@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -31,7 +31,7 @@ func TestAcknowledgeSubsetLeavesOtherKeysPending(t *testing.T) {
 }
 
 func TestSpecification(t *testing.T) {
-	var resp, err = newSnowflakeDriver().
+	var resp, err = NewDriver().
 		Spec(context.Background(), &pm.Request_Spec{})
 	require.NoError(t, err)
 

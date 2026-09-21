@@ -1,6 +1,7 @@
 from logging import Logger
-from typing import Awaitable, Callable
+from typing import Any, Awaitable, Callable, override
 
+import aiohttp
 from estuary_cdk.capture import (
     BaseCaptureConnector,
     Request,
@@ -26,6 +27,33 @@ class Connector(
 ):
     def request_class(self):
         return Request[EndpointConfig, ResourceConfigWithSchedule, ConnectorState]
+
+    @override
+    async def _establish_connection_and_get_response(
+        self,
+        log: Logger,
+        url: str,
+        method: str,
+        params: dict[str, Any] | None,
+        json: dict[str, Any] | None,
+        form: dict[str, Any] | None,
+        with_token: bool,
+        headers: dict[str, Any],
+        timeout: aiohttp.ClientTimeout | None,
+    ) -> aiohttp.ClientResponse:
+        """Set `Accept-Encoding: identity` on every request."""
+
+        return await super()._establish_connection_and_get_response(
+            log,
+            url,
+            method,
+            params,
+            json,
+            form,
+            with_token,
+            {"Accept-Encoding": "identity", **headers},
+            timeout,
+        )
 
     async def spec(self, _: request.Spec, logger: Logger) -> ConnectorSpec:
         return ConnectorSpec(

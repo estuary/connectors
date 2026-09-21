@@ -4,6 +4,7 @@ from logging import Logger
 
 from estuary_cdk.capture import Task
 from estuary_cdk.capture.common import (
+    SnapshotResource,
     BaseDocument,
     Resource,
     open_binding,
@@ -27,6 +28,7 @@ from .models import (
     CampaignMetrics,
     Campaigns,
     Channels,
+    ConnectorState,
     EndpointConfig,
     EventTypes,
     Events,
@@ -42,6 +44,7 @@ from .models import (
     Templates,
     UsersWithEmails,
     UsersWithIds,
+    build_sourced_schema,
 )
 from .shared import EPOCH, now
 
@@ -106,7 +109,7 @@ def full_refresh_resources(
         log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[Resource]:
 
-    def open(
+    async def open(
             stream: type[IterableResource],
             binding: CaptureBinding[ResourceConfigWithSchedule],
             binding_index: int,
@@ -114,6 +117,9 @@ def full_refresh_resources(
             task: Task,
             all_bindings
     ):
+        task.sourced_schema(binding_index, build_sourced_schema(stream.KEY_PROPERTIES))
+        await task.checkpoint(state=ConnectorState())
+
         if issubclass(stream, Templates):
             snapshot_fn = functools.partial(snapshot_templates, http, stream)
         else:
@@ -129,16 +135,12 @@ def full_refresh_resources(
         )
 
     resources = [
-        Resource(
+        SnapshotResource(
             name=stream.name,
-            key=["/_meta/row_id"],
-            model=BaseDocument,
             open=functools.partial(open, stream),
-            initial_state=ResourceState(),
             initial_config=ResourceConfigWithSchedule(
                 name=stream.name, interval=stream.interval
             ),
-            schema_inference=True,
             disable=stream.disable
         )
         for stream in FULL_REFRESH_RESOURCES
@@ -153,7 +155,7 @@ def users(
         config: EndpointConfig,
         export_job_manager: ExportJobManager,
 ) -> Resource:
-    def open(
+    async def open(
             stream: type[BaseUsers],
             binding: CaptureBinding[ResourceConfigWithSchedule],
             binding_index: int,
@@ -161,6 +163,9 @@ def users(
             task: Task,
             all_bindings
     ):
+        task.sourced_schema(binding_index, build_sourced_schema(stream.KEY_PROPERTIES))
+        await task.checkpoint(state=ConnectorState())
+
         open_binding(
             binding,
             binding_index,
@@ -227,7 +232,7 @@ def events(
         config: EndpointConfig,
         export_job_manager: ExportJobManager,
 ) -> Resource:
-    def open(
+    async def open(
             stream: type[ExportResource],
             binding: CaptureBinding[ResourceConfigWithSchedule],
             binding_index: int,
@@ -235,6 +240,9 @@ def events(
             task: Task,
             all_bindings
     ):
+        task.sourced_schema(binding_index, build_sourced_schema(stream.KEY_PROPERTIES))
+        await task.checkpoint(state=ConnectorState())
+
         open_binding(
             binding,
             binding_index,
@@ -318,13 +326,16 @@ def campaigns(
         http: HTTPMixin,
         config: EndpointConfig,
 ) -> Resource:
-    def open(
+    async def open(
             binding: CaptureBinding[ResourceConfigWithSchedule],
             binding_index: int,
             state: ResourceState,
             task: Task,
             all_bindings
     ):
+        task.sourced_schema(binding_index, build_sourced_schema(Campaigns.KEY_PROPERTIES))
+        await task.checkpoint(state=ConnectorState())
+
         open_binding(
             binding,
             binding_index,
@@ -364,13 +375,16 @@ def campaign_metrics(
         http: HTTPMixin,
         config: EndpointConfig,
 ) -> Resource:
-    def open(
+    async def open(
             binding: CaptureBinding[ResourceConfigWithSchedule],
             binding_index: int,
             state: ResourceState,
             task: Task,
             all_bindings
     ):
+        task.sourced_schema(binding_index, build_sourced_schema(CampaignMetrics.KEY_PROPERTIES))
+        await task.checkpoint(state=ConnectorState())
+
         open_binding(
             binding,
             binding_index,
@@ -403,13 +417,16 @@ def list_users(
     http: HTTPMixin,
     config: EndpointConfig,
 ) -> Resource:
-    def open(
+    async def open(
             binding: CaptureBinding[ResourceConfigWithSchedule],
             binding_index: int,
             state: ResourceState,
             task: Task,
             all_bindings
     ):
+        task.sourced_schema(binding_index, build_sourced_schema(ListUsers.KEY_PROPERTIES))
+        await task.checkpoint(state=ConnectorState())
+
         open_binding(
             binding,
             binding_index,

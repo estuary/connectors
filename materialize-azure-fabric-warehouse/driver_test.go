@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	m "github.com/estuary/connectors/go/materialize"
 	sql "github.com/estuary/connectors/materialize-sql"
 )
 
@@ -32,21 +33,22 @@ func TestIntegration(t *testing.T) {
 	}
 
 	t.Run("materialize", func(t *testing.T) {
-		sql.RunMaterializationTest(t, newDriver(), "testdata/materialize.flow.yaml", makeResourceFn, nil)
+		sql.RunMaterializationTest(t, NewDriver(), "testdata/materialize.flow.yaml", makeResourceFn, nil,
+			sql.RuntimeConfig{Shards: 1, Fidelity: m.FidelityTotal})
 	})
 
 	t.Run("apply", func(t *testing.T) {
-		sql.RunApplyTest(t, newDriver(), "testdata/apply.flow.yaml", makeResourceFn)
+		sql.RunApplyTest(t, NewDriver(), "testdata/apply.flow.yaml", makeResourceFn)
 	})
 
 	t.Run("migrate", func(t *testing.T) {
-		sql.RunMigrationTest(t, newDriver(), "testdata/migrate.flow.yaml", makeResourceFn, actionDescSanitizers)
+		sql.RunMigrationTest(t, NewDriver(), "testdata/migrate.flow.yaml", makeResourceFn, actionDescSanitizers)
 	})
 
 	t.Run("fence", func(t *testing.T) {
 		sql.RunFencingTest(
 			t,
-			newDriver(),
+			NewDriver(),
 			"testdata/fence.flow.yaml",
 			makeResourceFn,
 			testTemplates.createTargetTable,
@@ -60,4 +62,3 @@ func TestIntegration(t *testing.T) {
 		)
 	})
 }
-

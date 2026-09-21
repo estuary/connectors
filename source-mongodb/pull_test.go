@@ -8,6 +8,87 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
+func TestSkipConfiguredBackfills(t *testing.T) {
+	// sk1 has never been backfilled, sk2 is partway through, and sk3 is finished.
+	initialState := func() captureState {
+		return captureState{
+			Resources: map[boilerplate.StateKey]resourceState{
+				"sk2": {Backfill: backfillState{Done: makePtr(false), LastCursorValue: &bson.RawValue{Value: []byte("second")}, BackfilledDocs: 100}},
+				"sk3": {Backfill: backfillState{Done: makePtr(true), LastCursorValue: &bson.RawValue{Value: []byte("third")}, BackfilledDocs: 300}},
+			},
+			DatabaseResumeTokens: map[string]bson.Raw{"db": bson.Raw("dbToken")},
+		}
+	}
+
+	changeStreamBindings := []bindingInfo{
+		{index: 0, stateKey: "sk1", resource: resource{Database: "db", Collection: "one"}},
+		{index: 1, stateKey: "sk2", resource: resource{Database: "db", Collection: "two"}},
+		{index: 2, stateKey: "sk3", resource: resource{Database: "db", Collection: "three"}},
+	}
+
+	t.Run("unset leaves state untouched", func(t *testing.T) {
+		state := initialState()
+		skipConfiguredBackfills(&state, changeStreamBindings, &config{})
+		require.Equal(t, initialState(), state)
+	})
+
+	t.Run("a never-started backfill is marked done", func(t *testing.T) {
+		state := initialState()
+		cfg := &config{Advanced: advancedConfig{SkipBackfills: "db:one"}}
+		skipConfiguredBackfills(&state, changeStreamBindings, cfg)
+
+		want := initialState()
+		want.Resources["sk1"] = resourceState{Backfill: backfillState{Done: makePtr(true)}}
+		require.Equal(t, want, state)
+	})
+
+	t.Run("an in-progress backfill is terminated and its resume position discarded", func(t *testing.T) {
+		state := initialState()
+		cfg := &config{Advanced: advancedConfig{SkipBackfills: "db:two"}}
+		skipConfiguredBackfills(&state, changeStreamBindings, cfg)
+
+		want := initialState()
+		// BackfilledDocs is retained as a record of what was already emitted.
+		want.Resources["sk2"] = resourceState{Backfill: backfillState{Done: makePtr(true), BackfilledDocs: 100}}
+		require.Equal(t, want, state)
+	})
+
+	t.Run("a completed backfill keeps its resume position", func(t *testing.T) {
+		state := initialState()
+		cfg := &config{Advanced: advancedConfig{SkipBackfills: "db:three"}}
+		skipConfiguredBackfills(&state, changeStreamBindings, cfg)
+		require.Equal(t, initialState(), state)
+	})
+
+	t.Run("the wildcard skips every binding", func(t *testing.T) {
+		state := initialState()
+		cfg := &config{Advanced: advancedConfig{SkipBackfills: skipAllBackfills}}
+		skipConfiguredBackfills(&state, changeStreamBindings, cfg)
+
+		want := initialState()
+		want.Resources["sk1"] = resourceState{Backfill: backfillState{Done: makePtr(true)}}
+		want.Resources["sk2"] = resourceState{Backfill: backfillState{Done: makePtr(true), BackfilledDocs: 100}}
+		require.Equal(t, want, state)
+		require.True(t, state.isChangeStreamBackfillComplete(changeStreamBindings))
+	})
+
+	t.Run("batch bindings are never skipped", func(t *testing.T) {
+		state := captureState{
+			Resources: map[boilerplate.StateKey]resourceState{
+				"sk4": {Backfill: backfillState{Done: makePtr(false), LastCursorValue: &bson.RawValue{Value: []byte("fourth")}}},
+			},
+		}
+		cfg := &config{Advanced: advancedConfig{SkipBackfills: skipAllBackfills}}
+		skipConfiguredBackfills(&state, nil, cfg)
+
+		require.Equal(t, captureState{
+			Resources: map[boilerplate.StateKey]resourceState{
+				"sk4": {Backfill: backfillState{Done: makePtr(false), LastCursorValue: &bson.RawValue{Value: []byte("fourth")}}},
+			},
+		}, state)
+	})
+}
+
 func TestUpdateResourceStates(t *testing.T) {
 	prevState := captureState{
 		Resources: map[boilerplate.StateKey]resourceState{

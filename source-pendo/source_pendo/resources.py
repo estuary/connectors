@@ -83,16 +83,13 @@ def full_refresh_resources(
         )
 
     resources = [
-        common.Resource(
+        common.SnapshotResource(
             name=stream.resource_name,
-            key=["/_meta/row_id"],
             model=FullRefreshResource,
             open=functools.partial(open, stream.entity_name),
-            initial_state=ResourceState(),
             initial_config=ResourceConfig(
                 name=stream.resource_name, interval=timedelta(minutes=5)
             ),
-            schema_inference=True,
         )
         for stream in FULL_REFRESH_RESOURCE_TYPES
     ]
@@ -193,16 +190,13 @@ def metadata(
         )
 
     metadata = [
-        common.Resource(
+        common.SnapshotResource(
             name=stream.resource_name,
-            key=["/_meta/row_id"],
             model=Metadata,
             open=functools.partial(open, stream.path),
-            initial_state=ResourceState(),
             initial_config=ResourceConfig(
                 name=stream.resource_name, interval=timedelta(minutes=5)
             ),
-            schema_inference=True,
         )
         for stream in METADATA_TYPES
     ]

@@ -1,4 +1,4 @@
-package main
+package connector
 
 // This list was obtained from this table [0]
 // [0]: https://docs.snowflake.com/en/sql-reference/reserved-keywords.html

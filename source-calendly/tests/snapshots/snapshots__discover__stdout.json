@@ -202,22 +202,9 @@
         "_meta": {
           "$ref": "#/$defs/Meta",
           "description": "Document metadata"
-        },
-        "uri": {
-          "title": "Uri",
-          "type": "string"
-        },
-        "updated_at": {
-          "format": "date-time",
-          "title": "Updated At",
-          "type": "string"
         }
       },
-      "required": [
-        "uri",
-        "updated_at"
-      ],
-      "title": "Group",
+      "title": "BaseDocument",
       "type": "object",
       "x-infer-schema": true,
       "if": {
@@ -285,22 +272,9 @@
         "_meta": {
           "$ref": "#/$defs/Meta",
           "description": "Document metadata"
-        },
-        "uri": {
-          "title": "Uri",
-          "type": "string"
-        },
-        "updated_at": {
-          "format": "date-time",
-          "title": "Updated At",
-          "type": "string"
         }
       },
-      "required": [
-        "uri",
-        "updated_at"
-      ],
-      "title": "OrganizationMembership",
+      "title": "BaseDocument",
       "type": "object",
       "x-infer-schema": true,
       "if": {
@@ -368,22 +342,9 @@
         "_meta": {
           "$ref": "#/$defs/Meta",
           "description": "Document metadata"
-        },
-        "uri": {
-          "title": "Uri",
-          "type": "string"
-        },
-        "updated_at": {
-          "format": "date-time",
-          "title": "Updated At",
-          "type": "string"
         }
       },
-      "required": [
-        "uri",
-        "updated_at"
-      ],
-      "title": "RoutingFormSubmission",
+      "title": "BaseDocument",
       "type": "object",
       "x-infer-schema": true,
       "if": {
@@ -451,22 +412,9 @@
         "_meta": {
           "$ref": "#/$defs/Meta",
           "description": "Document metadata"
-        },
-        "uri": {
-          "title": "Uri",
-          "type": "string"
-        },
-        "updated_at": {
-          "format": "date-time",
-          "title": "Updated At",
-          "type": "string"
         }
       },
-      "required": [
-        "uri",
-        "updated_at"
-      ],
-      "title": "RoutingForm",
+      "title": "BaseDocument",
       "type": "object",
       "x-infer-schema": true,
       "if": {

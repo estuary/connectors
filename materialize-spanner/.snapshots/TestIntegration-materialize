@@ -6,6 +6,7 @@ Resource: simple_standard
 ["connectorState",{}]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"Name":"c__meta","Nullable":false,"Type":"JSON"}
@@ -32,6 +33,7 @@ Resource: simple_delta
 ["connectorState",{}]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"Name":"c__meta","Nullable":false,"Type":"JSON"}
@@ -58,6 +60,7 @@ Resource: data_types
 ["connectorState",{}]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"Name":"arrayField","Nullable":true,"Type":"JSON"}

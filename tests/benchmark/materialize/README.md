@@ -1,10 +1,10 @@
 # Materialization benchmarks
 
 Drive any `materialize-*` connector with a configured-size workload and
-record throughput. Built on top of `flowctl preview --fixture`, mirroring
-the integration-test framework under `tests/materialize/` but designed
-for many-GB workloads with fine-grained control over transaction sizes,
-document sizes, and overlap (updates / deletes against earlier
+record throughput. Built on `flowctl raw preview-next --fixture`,
+mirroring the integration-test framework under `tests/materialize/` but
+designed for many-GB workloads with fine-grained control over transaction
+sizes, document sizes, and overlap (updates / deletes against earlier
 transactions).
 
 ## Quick start
@@ -23,7 +23,7 @@ This brings up the connector's existing
 `tests/materialize/<connector>/docker-compose.yaml`, generates a
 materialization spec from the connector's existing
 `<connector>/testdata/config.local.yaml`, streams a synthetic fixture
-through a FIFO into `flowctl preview`, and writes per-run artifacts
+through a FIFO into `flowctl raw preview-next`, and writes per-run artifacts
 (spec, generator state, preview log, `results.json`) to
 `tests/benchmark/materialize/runs/<timestamp>-<connector>/`.
 
@@ -31,6 +31,20 @@ For cloud-only endpoints (BigQuery, Snowflake, …) pass a `--config`
 pointing at a real credentials file. If no `docker-compose.yaml` is
 found for the connector, the script assumes the endpoint is already
 reachable.
+
+Check the config's feature flags before benchmarking. Integration-test
+configs often set `allow_existing_tables_for_new_bindings` (or
+`retain_existing_data_on_backfill`), and with either flag the connector
+tells the runtime to disable its load optimization, so the runtime issues a
+`Load` for every key in every transaction — even against a table the run
+just created. That load phase then dominates small-document runs and
+measures the runtime rather than the connector. Make a copy with the flag
+removed and pass it with `--config`; the copy stays encrypted:
+
+```bash
+cp materialize-redshift/testdata/config.local.yaml /tmp/config.bench.yaml
+sops set /tmp/config.bench.yaml '["advanced"]["feature_flags"]' '""'
+```
 
 ## Scenario file
 
@@ -144,9 +158,25 @@ Each run produces:
 | `flow.yaml`        | The materialization spec rendered from the scenario. |
 | `state.json`       | Per-tx fresh-key range and overlap counts (from the generator). |
 | `generator.stderr` | Generator stderr / errors. |
-| `preview.stdout`   | flowctl preview stdout (apply actions, connector state). |
-| `preview.log`      | flowctl preview stderr (per-tx commit boundaries live here). |
+| `preview.stdout`   | Preview stdout. |
+| `preview.log`      | Preview stderr (the per-tx timings are derived from here). |
 | `results.json`     | Aggregate `{ wall_seconds, total_docs, total_bytes, mb_per_sec, transactions: [...] }`. |
+
+## Cleanup
+
+A run names its task `bench/<connector>_flow_test_<timestamp>` and removes what
+it created.
+
+If a run is killed outright, its table survives until the next run of that
+scenario drops it, and its task metadata until swept:
+
+```bash
+go run ./tests/materialize/testctl \
+    -connector materialize-redshift \
+    -config materialize-redshift/testdata/config.local.yaml \
+    -resource <a resource config from a run directory> \
+    -mode sweep
+```
 
 ## Verifying overlap correctness
 

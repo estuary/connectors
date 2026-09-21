@@ -1,0 +1,32 @@
+url: http://localhost:9802/api/catalog
+warehouse: quickstart_catalog
+# A namespace of its own: the two local tasks run in parallel, and sharing one
+# would make which of them records "created namespace" a race.
+namespace: flow_spark4
+base_location: s3://warehouse/
+hard_delete: true
+credentials:
+    auth_type: "OAuth 2.0 Client Credentials"
+    oauth2_server_uri: "v1/oauth/tokens"
+    credential: "CREDENTIAL_PLACEHOLDER"
+    scope: "PRINCIPAL_ROLE:flow_user_role"
+advanced:
+    # Polaris enforces that tables live under the namespace's base location
+    # (e.g. s3://warehouse/flow/), so the table location must start with
+    # s3://warehouse/flow/ rather than s3://warehouse/flow_<table>_<hash>.
+    #
+    # variant_columns: this set runs Spark 4.0.2 + Iceberg 1.10.1 and covers
+    # the variant path. Once the flag's default becomes cutoff-gated, test
+    # specs carry no creation date and resolve it on, and the explicit entry
+    # can be dropped.
+    feature_flags: nested_dot_hash_location_style,allow_existing_tables_for_new_bindings,variant_columns
+compute:
+    compute_type: "Spark Standalone"
+    aws_access_key_id: "flow"
+    aws_secret_access_key: "flow"
+    region: "us-east-1"
+    bucket: "warehouse"
+    bucket_path: "staging/"
+    daemon_url: "http://localhost:9807"
+    s3_endpoint: "http://localhost:9800"
+    s3_path_style: true

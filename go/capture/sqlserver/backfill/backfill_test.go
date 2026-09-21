@@ -58,10 +58,55 @@ func TestResumeKeyBinding(t *testing.T) {
 				Mode:       sqlcapture.TableStatePreciseBackfill,
 				KeyColumns: []string{"k", "node"},
 				Scanned:    packed,
-			}, "dbo", "events", map[string]any{"k": tc.columnType, "node": "int"}, 1000)
+			}, "dbo", "events", map[string]any{"k": tc.columnType, "node": "int"}, 1000, "")
 			require.NoError(t, err)
 			require.Len(t, args, 2)
 			require.Equal(t, tc.wantBound, args[0])
+		})
+	}
+}
+
+// TestBackfillFilter checks that a user-provided backfill filter is ANDed into the
+// WHERE clause of every backfill query shape.
+func TestBackfillFilter(t *testing.T) {
+	var columnTypes = map[string]any{"k": "int"}
+	var packed, err = sqlcapture.PackTuple([]tuple.TupleElement{int64(7)})
+	require.NoError(t, err)
+
+	for _, tc := range []struct {
+		name      string
+		state     *sqlcapture.TableState
+		filter    string
+		wantQuery string
+	}{
+		{
+			name:      "keyless_without_filter",
+			state:     &sqlcapture.TableState{Mode: sqlcapture.TableStateKeylessBackfill},
+			wantQuery: "SELECT * FROM [dbo].[events] ORDER BY %%physloc%% OFFSET @p1 ROWS FETCH FIRST 1000 ROWS ONLY;",
+		},
+		{
+			name:      "keyless_with_filter",
+			state:     &sqlcapture.TableState{Mode: sqlcapture.TableStateKeylessBackfill},
+			filter:    "k > 123",
+			wantQuery: "SELECT * FROM [dbo].[events] WHERE (k > 123) ORDER BY %%physloc%% OFFSET @p1 ROWS FETCH FIRST 1000 ROWS ONLY;",
+		},
+		{
+			name:      "keyed_initial_with_filter",
+			state:     &sqlcapture.TableState{Mode: sqlcapture.TableStatePreciseBackfill, KeyColumns: []string{"k"}},
+			filter:    "a > 1 OR b > 2",
+			wantQuery: "BEGIN SELECT * FROM [dbo].[events] WHERE (a > 1 OR b > 2) ORDER BY [k] OFFSET 0 ROWS FETCH FIRST 1000 ROWS ONLY; END",
+		},
+		{
+			name:      "keyed_resume_with_filter",
+			state:     &sqlcapture.TableState{Mode: sqlcapture.TableStatePreciseBackfill, KeyColumns: []string{"k"}, Scanned: packed},
+			filter:    "a > 1 OR b > 2",
+			wantQuery: "BEGIN SELECT * FROM [dbo].[events] WHERE (([k] > @p1)) AND (a > 1 OR b > 2) ORDER BY [k] OFFSET 0 ROWS FETCH FIRST 1000 ROWS ONLY; END",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			query, _, err := BuildBackfillQuery(tc.state, "dbo", "events", columnTypes, 1000, tc.filter)
+			require.NoError(t, err)
+			require.Equal(t, tc.wantQuery, query)
 		})
 	}
 }

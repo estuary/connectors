@@ -30,6 +30,7 @@
               "description": "Maximum number of documents to request per API call during incremental replication. Defaults to 1,000.",
               "maximum": 50000,
               "minimum": 1,
+              "nonsensitive": true,
               "title": "Incremental Limit",
               "type": "integer"
             },
@@ -38,6 +39,7 @@
               "description": "Maximum number of documents to request per API call during historical backfills. Defaults to 50,000.",
               "maximum": 50000,
               "minimum": 1,
+              "nonsensitive": true,
               "title": "Backfill Limit",
               "type": "integer"
             }
@@ -117,6 +119,7 @@
           "default": "PT0S",
           "description": "Interval between updates for this resource",
           "format": "duration",
+          "nonsensitive": true,
           "title": "Interval",
           "type": "string"
         }

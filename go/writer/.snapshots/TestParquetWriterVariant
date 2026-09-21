@@ -1,0 +1,16 @@
+{"idField":0,"variantField":{"a":1,"b":{"c":[1,2,"three"],"d":null}},"reqVariantField":{"seq":0},"strField":"str_0","tsVariantField":"2023-01-15 10:30:00+00","tsNanosVariantField":"2023-01-15 10:30:00.123456+00"}
+{"idField":1,"variantField":[1,"two",3.5,false,null,{"nested":true}],"reqVariantField":{"seq":1},"strField":"str_1","tsVariantField":"2023-01-15 10:30:01+00","tsNanosVariantField":"2023-01-15 10:30:01.123456+00"}
+{"idField":2,"variantField":"just a string","reqVariantField":{"seq":2},"strField":"str_2","tsVariantField":"2023-01-15 10:30:02+00","tsNanosVariantField":"2023-01-15 10:30:02.123456+00"}
+{"idField":3,"variantField":12345.678,"reqVariantField":{"seq":3},"strField":"str_3","tsVariantField":"2023-01-15 10:30:03+00","tsNanosVariantField":"2023-01-15 10:30:03.123456+00"}
+{"idField":4,"variantField":true,"reqVariantField":{"seq":4},"strField":"str_4","tsVariantField":"2023-01-15 10:30:04+00","tsNanosVariantField":"2023-01-15 10:30:04.123456+00"}
+{"idField":5,"variantField":null,"reqVariantField":{"seq":5},"strField":"str_5","tsVariantField":"2023-01-15 10:30:05+00","tsNanosVariantField":"2023-01-15 10:30:05.123456+00"}
+{"idField":6,"variantField":null,"reqVariantField":{"seq":6},"strField":"str_6","tsVariantField":"2023-01-15 10:30:06+00","tsNanosVariantField":"2023-01-15 10:30:06.123456+00"}
+{"idField":7,"variantField":9223372036854775807,"reqVariantField":{"seq":7},"strField":"str_7","tsVariantField":"2023-01-15 10:30:07+00","tsNanosVariantField":"2023-01-15 10:30:07.123456+00"}
+{"idField":8,"variantField":{"marshalled":true},"reqVariantField":{"seq":8},"strField":"str_8","tsVariantField":"2023-01-15 10:30:08+00","tsNanosVariantField":"2023-01-15 10:30:08.123456+00"}
+{"idField":9,"variantField":"a Go string","reqVariantField":{"seq":9},"strField":"str_9","tsVariantField":"2023-01-15 10:30:09+00","tsNanosVariantField":"2023-01-15 10:30:09.123456+00"}
+{"idField":10,"variantField":-42,"reqVariantField":{"seq":10},"strField":"str_10","tsVariantField":"2023-01-15 10:30:10+00","tsNanosVariantField":"2023-01-15 10:30:10.123456+00"}
+{"idField":11,"variantField":3.5,"reqVariantField":{"seq":11},"strField":"str_11","tsVariantField":"2023-01-15 10:30:11+00","tsNanosVariantField":"2023-01-15 10:30:11.123456+00"}
+{"idField":12,"variantField":true,"reqVariantField":{"seq":12},"strField":"str_12","tsVariantField":"2023-01-15 10:30:12+00","tsNanosVariantField":"2023-01-15 10:30:12.123456+00"}
+{"idField":13,"variantField":18446744073709551615,"reqVariantField":{"seq":13},"strField":"str_13","tsVariantField":"2023-01-15 10:30:13+00","tsNanosVariantField":"2023-01-15 10:30:13.123456+00"}
+{"idField":14,"variantField":[1,"two",null],"reqVariantField":{"seq":14},"strField":"str_14","tsVariantField":"2023-01-15 10:30:14+00","tsNanosVariantField":"2023-01-15 10:30:14.123456+00"}
+

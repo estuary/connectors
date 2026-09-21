@@ -6,6 +6,7 @@ Resource: simple_standard
 ["connectorState",{}]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"Name":"_meta/op","Nullable":false,"Type":"longtext"}
@@ -32,6 +33,7 @@ Resource: simple_delta
 ["connectorState",{}]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"Name":"_meta/op","Nullable":false,"Type":"longtext"}
@@ -64,6 +66,7 @@ Resource: not_simple
 ["connectorState",{}]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"Name":" ,;{}().- problematicField ï¿½ ð ð¯§´_","Nullable":true,"Type":"longtext"}
@@ -97,6 +100,7 @@ Resource: data_types
 ["connectorState",{}]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"Name":"arrayField","Nullable":true,"Type":"longtext"}
@@ -151,6 +155,7 @@ Resource: simple_standard
 ["connectorState",{}]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"Name":"_meta/op","Nullable":false,"Type":"longtext"}
@@ -177,6 +182,7 @@ Resource: simple_delta
 ["connectorState",{}]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"Name":"_meta/op","Nullable":false,"Type":"longtext"}
@@ -209,6 +215,7 @@ Resource: not_simple
 ["connectorState",{}]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"Name":" ,;{}().- problematicField ï¿½ ð ð¯§´_","Nullable":true,"Type":"longtext"}
@@ -242,6 +249,7 @@ Resource: data_types
 ["connectorState",{}]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"Name":"arrayField","Nullable":true,"Type":"json"}
@@ -296,6 +304,7 @@ Resource: simple_standard
 ["connectorState",{}]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"Name":"_meta","Nullable":false,"Type":"json"}
@@ -322,6 +331,7 @@ Resource: simple_delta
 ["connectorState",{}]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"Name":"_meta/op","Nullable":false,"Type":"longtext"}
@@ -354,6 +364,7 @@ Resource: not_simple
 ["connectorState",{}]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"Name":" ,;{}().- problematicField ï¿½ ð ð¯§´_","Nullable":true,"Type":"longtext"}
@@ -386,6 +397,7 @@ Resource: data_types
 ["connectorState",{}]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"Name":"arrayField","Nullable":true,"Type":"json"}

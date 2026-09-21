@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -10,12 +10,15 @@ import (
 	"testing"
 	"time"
 
+	"cloud.google.com/go/bigquery"
 	"github.com/estuary/connectors/go/blob"
+	m "github.com/estuary/connectors/go/materialize"
 	testutil "github.com/estuary/connectors/materialize-boilerplate/testutil"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/api/iterator"
 )
 
 func TestIntegration(t *testing.T) {
@@ -39,11 +42,47 @@ func TestIntegration(t *testing.T) {
 	}
 
 	t.Run("materialize", func(t *testing.T) {
-		sql.RunMaterializationTest(t, newBigQueryDriver(), "testdata/materialize.flow.yaml", makeResourceFn, actionDescSanitizers)
+		started := time.Now()
+		sql.RunMaterializationTest(t, NewDriver().sqlDriver, "testdata/materialize.flow.yaml", makeResourceFn, actionDescSanitizers,
+			sql.RuntimeConfig{Shards: 1, Fidelity: m.FidelityExact})
+
+		// Every load results table created by this run must be deleted after
+		// read-back. Tables older than this run belong to another run and are
+		// ignored.
+		testutil.RunTestAllTasks(t, "testdata/materialize.flow.yaml", func(t *testing.T, _ []byte, taskName string, cfg config) {
+			credOption, err := cfg.CredentialsClientOption()
+			require.NoError(t, err)
+			bq, err := bigquery.NewClient(t.Context(), cfg.ProjectID, credOption)
+			require.NoError(t, err)
+			t.Cleanup(func() { bq.Close() })
+
+			prefix := loadResultsTablePrefix + translateFlowIdentifier(taskName)
+			cutoff := started.Add(-time.Minute) // Tolerates skew between this clock and BigQuery's.
+			var leaked []string
+			it := bq.DatasetInProject(cfg.ProjectID, cfg.Dataset).Tables(t.Context())
+			for {
+				tbl, err := it.Next()
+				if err == iterator.Done {
+					break
+				}
+				require.NoError(t, err)
+				if !strings.HasPrefix(tbl.TableID, prefix) {
+					continue
+				}
+				md, err := tbl.Metadata(t.Context(), bigquery.WithMetadataView(bigquery.BasicMetadataView))
+				require.NoError(t, err)
+				if md.CreationTime.Before(cutoff) {
+					t.Logf("ignoring load results table %s from an earlier run", tbl.TableID)
+					continue
+				}
+				leaked = append(leaked, tbl.TableID)
+			}
+			require.Empty(t, leaked, "leaked load results tables")
+		})
 	})
 
 	t.Run("apply", func(t *testing.T) {
-		sql.RunApplyTest(t, newBigQueryDriver(), "testdata/apply.flow.yaml", makeResourceFn)
+		sql.RunApplyTest(t, NewDriver().sqlDriver, "testdata/apply.flow.yaml", makeResourceFn)
 	})
 
 	t.Run("apply-drain", func(t *testing.T) {
@@ -66,7 +105,7 @@ func TestIntegration(t *testing.T) {
 				fileKey := path.Join(cfg.effectiveBucketPath(), fmt.Sprintf("applydrain-%s.json", uuid.NewString()))
 				require.NoError(t, bucket.Upload(ctx, fileKey, strings.NewReader("")))
 
-				query := sql.DrainSeedInsertQuery(t, newBigQueryDriver(), cfg, appliedSpec, "JSON '{}'")
+				query := sql.DrainSeedInsertQuery(t, NewDriver().sqlDriver, cfg, appliedSpec, "JSON '{}'")
 				state, err := json.Marshal(map[string]any{
 					appliedSpec.Bindings[0].StateKey: map[string]any{
 						"Query":         query,
@@ -83,12 +122,12 @@ func TestIntegration(t *testing.T) {
 				require.Len(t, rows, 1, "the staged transaction's row must have been committed")
 			}
 
-			sql.RunApplyDrainTest(t, newBigQueryDriver(), cfg, res, seedPending, verifyDrained)
+			sql.RunApplyDrainTest(t, NewDriver().sqlDriver, cfg, res, seedPending, verifyDrained)
 		})
 	})
 
 	t.Run("migrate", func(t *testing.T) {
-		sql.RunMigrationTest(t, newBigQueryDriver(), "testdata/migrate.flow.yaml", makeResourceFn, nil)
+		sql.RunMigrationTest(t, NewDriver().sqlDriver, "testdata/migrate.flow.yaml", makeResourceFn, nil)
 	})
 
 	// Toggling objects_and_arrays_as_json migrates the object column and the
@@ -96,11 +135,10 @@ func TestIntegration(t *testing.T) {
 	// root document JSON<->text migration end-to-end, the scenario that requires
 	// the root document to be migratable (rather than needing a backfill).
 	t.Run("flow_document-migration", func(t *testing.T) {
-		sql.RunFeatureFlagMigrationTest(t, newBigQueryDriver(), "testdata/migrate-doc.flow.yaml", makeResourceFn, []sql.FeatureFlagMigrationPhase{
+		sql.RunFeatureFlagMigrationTest(t, NewDriver().sqlDriver, "testdata/migrate-doc.flow.yaml", makeResourceFn, []sql.FeatureFlagMigrationPhase{
 			{FeatureFlags: "objects_and_arrays_as_json", Fixture: "testdata/fixture.doc-migrate.json"},    // materialize as JSON
 			{FeatureFlags: "no_objects_and_arrays_as_json", Fixture: "testdata/fixture.doc-migrate.json"}, // migrate JSON -> STRING
 			{FeatureFlags: "objects_and_arrays_as_json", Fixture: "testdata/fixture.doc-migrate.json"},    // migrate STRING -> JSON
 		}, actionDescSanitizers)
 	})
 }
-

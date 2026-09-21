@@ -70,7 +70,7 @@ acmeCo/test_capture/test/prerequisites_944868_c
 }
 sql> DROP TABLE test.prerequisites_944868_c
 === Run: Capture A+B+C (Table C Dropped) ===
-error: flowctl preview failed:
+error: flowctl raw preview-next failed:
 the capture cannot run due to the following error(s):
  - user "flow_capture" cannot read from table "test.prerequisites_944868_c"
 
