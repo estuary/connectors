@@ -1,0 +1,53 @@
+info:
+  name: C1 - Suppress an email at the ESP
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: "{{base_url}}/v1/esp/suppression/bounces/estuary-probe@example.com"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **ONLY THE USER RUNS THIS REQUEST. The assistant never runs it**
+    (`API-NEVER-MUTATE`).
+
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/ESP-Suppression
+
+    **WHY:** The highest-value seed in Cluster C by a wide margin.
+    `ESP Suppressions / offset pagination` shows that **nothing** is currently
+    known about whether `offset` actually advances a walk on this endpoint —
+    every offset returns the same empty body because the workspace holds zero
+    suppressions. That single unknown is what blocks the `esp_suppressions`
+    binding, and one suppressed address unblocks it.
+
+    Suppressing an address does **not** send mail: it writes a row to the ESP's
+    suppression list directly. `example.com` is IANA-reserved and cannot receive
+    mail, so nothing can be delivered to it even by accident.
+
+    **After running,** re-run in order and save each response as an example:
+
+    1. `ESP Suppressions / bounces` — captures the **document shape**, and
+       settles whether `suppressions` flips from `null` to `[]` once non-empty,
+       and whether the documented-but-absent `category` key appears with data.
+    2. `ESP Suppressions / offset pagination` with `limit=1&offset=0`, then
+       `offset=1`, then `offset=99999` — three requests against a one-row set.
+       This is the actual test: `offset=0` must return the row, `offset=1` must
+       return empty, and `offset=99999` must return empty **rather than
+       repeating the row**, which is the `/v1/messages` restart-at-page-1 cycle.
+
+    Seeding a **second** address makes the walk strictly more informative
+    (`offset=1` then returns a different row rather than nothing), and is worth
+    it if the first run is ambiguous. Use `estuary-probe-2@example.com`.
+
+    **Cleanup:** `DELETE /v1/esp/suppression/bounces/estuary-probe@example.com`
+    — the same path, same enum. Also user-run only.
+
+    **Outcome:** not yet run.

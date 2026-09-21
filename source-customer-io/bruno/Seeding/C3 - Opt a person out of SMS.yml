@@ -1,0 +1,64 @@
+info:
+  name: C3 - Opt a person out of SMS
+  type: http
+  seq: 6
+
+http:
+  method: PUT
+  url: "{{base_url}}/v1/customers/example_person_1/optouts"
+  body:
+    type: json
+    json: |-
+      {
+        "optouts": [
+          {
+            "channel": "sms",
+            "from": "+15551234567",
+            "optout": true
+          }
+        ]
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **ONLY THE USER RUNS THIS REQUEST. The assistant never runs it**
+    (`API-NEVER-MUTATE`).
+
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Opt-outs
+
+    **WHY:** `/v1/optouts` returned `{"optouts": []}` with **no `next` key at
+    all**, and because that is the only response ever seen, it is unknown
+    whether the key is omitted *always* or only when the page is terminal. That
+    distinction decides nothing about correctness — the connector tests
+    falsiness either way — but it is the one open question on the endpoint, and
+    it also buys the document shape, which is currently spec-only.
+
+    **`customer_id` is a placeholder.** `example_person_1` matches the
+    collection's `customer_id` environment variable, which is itself a scrubbed
+    placeholder — real sandbox identifiers were removed from this collection for
+    public-repo hygiene. **Substitute a real profile id before running**, and do
+    not commit it back. The sender `+15551234567` is the spec's own example
+    number.
+
+    This writes an opt-out preference to a profile; it sends nothing. Opting a
+    profile out of SMS from a sender the workspace does not use has no effect
+    on any live messaging.
+
+    **After running,** re-run `Paginated Snapshots / optouts bare` and save the
+    response as a second example — redact `customer_id` and `cio_id` before
+    saving. Note that the collection's `after-response` redactor covers
+    `recipient` and `email` only; **these two fields are not in its list**, so
+    this is a manual step, or extend `REDACTED_FIELDS` in `opencollection.yml`
+    first. Then re-run `optouts limit and from` with `limit=1` to see whether
+    `next` appears on a non-terminal page.
+
+    **Cleanup:** re-run this request with `"optout": false`.
+
+    **Outcome:** not yet run.

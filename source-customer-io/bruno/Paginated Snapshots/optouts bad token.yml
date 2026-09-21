@@ -1,0 +1,33 @@
+info:
+  name: optouts bad token
+  type: http
+  seq: 6
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/optouts?start=notbase64!!"
+  params:
+    - name: start
+      value: "notbase64!!"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **WHY:** Negative control for `optouts bare` and `optouts out of range
+    token`, both of which return an empty body that would look identical if the
+    endpoint ignored `start` outright — as every Cluster B endpoint ignores it.
+
+    **VERIFIED (2026-09-21):** 400,
+    `{"errors":[{"detail":"bad request (reference ...)","status":"400"}]}`.
+    `start` is parsed here, so `/v1/optouts` really is a paginated endpoint and
+    not a Cluster B-style unpaginated one that happens to accept the parameter
+    silently.
+
+    This is the probe that justifies placing `optouts` in Cluster C at all.

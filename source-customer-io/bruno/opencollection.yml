@@ -187,16 +187,77 @@ docs:
       counter, so a snapshot binding's digest changes on most polls and the
       single row is re-emitted indefinitely.
 
+    ### Cluster C — the paginated list endpoints (`Paginated Snapshots/`)
+
+    Endpoints that page with `start`/`limit` and return a `next` continuation
+    token, but expose **no server-side time filter**. `newsletters`,
+    `sender_identities`, `optouts`.
+
+    - **Three terminal conventions now exist in this API, two of them inside
+      this cluster.** `newsletters` and `sender_identities` return `next: ""`
+      on the last page; `optouts` **omits the key entirely**. With
+      `/v1/customers/{id}/messages` also omitting it, the only loop condition
+      correct everywhere is a falsiness test — never `is not None`, never
+      `"next" in body`.
+    - **Out-of-range continuation tokens are safe here, malformed ones 400.**
+      `/v1/newsletters` with a far out-of-range offset returns
+      `{"newsletters": [], "next": ""}` and does **not** restart the walk at
+      page 1 the way `/v1/messages` does (`Paginated Snapshots / newsletters
+      out of range token`, against a demonstrably non-empty page 1). All three
+      endpoints 400 on a malformed token. The connector still never checkpoints
+      a token.
+    - **Token formats are per-endpoint.** `/v1/newsletters` decodes to a bare
+      positional offset (`1`); `/v1/messages` uses `v20:<n>`. The
+      `sender_identities` and `optouts` formats were not observable. Never
+      carry a token across endpoints.
+    - **`sender_identities` has a default-on filter**, `hidden`, which is an
+      *include* flag — the default response omits hidden senders. The connector
+      must send `hidden=true`. Same trap class as `drafts` on `/v1/messages`.
+    - **`optouts` carries no timestamp of any kind** — no `created`, no
+      `updated`, and no `deduplicate_id` either. Snapshot is the only
+      representable strategy, not merely the preferred one.
+    - **`limit`'s documented maximum of 1000 is not enforced by rejection** on
+      `/v1/optouts` (`limit=100000` returns 200), matching `/v1/messages`.
+      `api.py:MAX_PAGE_SIZE` applies unchanged.
+
+    ### ESP suppressions (`ESP Suppressions/`) — split out of Cluster C
+
+    `/v1/esp/suppression/{suppression_type}` was grouped with Cluster C and does
+    not belong: it pages by **`offset`** with **no `next` field at all**, fans
+    out over a server-validated four-value path enum (`blocks`, `bounces`,
+    `spam_reports`, `invalid_emails` — probed exhaustively; the spec is correct
+    for once), and returns its item array as **`null`**. The by-domain route
+    `/v1/esp/domains/{domain}/suppression/{type}` pages by cursor instead — a
+    second mechanism over the same documents — and is redundant, because the
+    flat route takes a `domain` query filter.
+
+    A structured JSON 404 from this API means "route matched, resource absent";
+    an unrouted path returns the bare Go string `404 page not found` with no
+    JSON. That is how the by-domain route was confirmed to exist while
+    `/v1/esp/domains` and `/v1/sending_domains` were confirmed not to.
+
     ### Probe authorization
 
-    The live runs recorded here — Cluster A's 18 GETs and Cluster B's 16 — were
-    all made on **2026-09-14 under explicit user authorization**, not under a
-    satisfied `API-CONFIG-GATE`. `config.yaml` is
+    The live runs recorded here — Cluster A's 18 GETs and Cluster B's 16 on
+    2026-09-14, and Cluster C's 38 on 2026-09-21 — were all made under
+    **explicit user authorization**, not under a satisfied `API-CONFIG-GATE`. `config.yaml` is
     untracked (the connector is new and nothing has been committed), so the
     rule's "tracked, with empty porcelain" precondition cannot be met. The user
     authorized the specific set of read-only GETs in this collection; that
     authorization did **not** extend to `Seeding/`, which remains unrun in
-    full — `A1`-`A2` and `B3`-`B8` alike.
+    full — `A1`-`A2`, `B3`-`B8` and `C1`-`C3` alike.
+
+    By 2026-09-21 the precondition had also become unmeetable for a second
+    reason: `config.yaml` is now tracked, but the working tree carries
+    uncommitted connector work, so porcelain is not clean either way.
+
+    The Cluster C runs were made with `curl` rather than `bru`, which is not
+    installed on this machine. The auth path was the same — `sops -d` on the
+    same `config.yaml`, token never written to disk or to a shell variable that
+    outlives the command. The requests in `Paginated Snapshots/` and
+    `ESP Suppressions/` are the faithful Bruno transcription of what ran, and
+    re-running them under `bru` should reproduce the recorded findings
+    exactly.
 
     ## Format
 

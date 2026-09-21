@@ -10,7 +10,8 @@ docs:
     deliberately, one at a time, and then re-run the matching read probe.
 
     `A*` requests seed Cluster A (`messages`). `B*` requests seed Cluster B —
-    the snapshot streams.
+    the snapshot streams. `C*` requests seed Cluster C — the paginated
+    snapshots — and the ESP suppression endpoint split out of it.
 
     **`B1`, `B2`, `B6` and `B7` have no request file** — the objects they seed
     have no POST route in the App API and can only be created in the UI. They
@@ -79,3 +80,40 @@ docs:
        `Snapshots / subscription_channels`.
 
     Two endpoints closed by one settings page — the cheapest seed here.
+
+    ## Cluster C
+
+    `C1` (ESP suppression) and `C3` (opt-out) have request files. **`C2` has no
+    request file** — the App API declares no POST for sender identities, only
+    `GET /v1/sender_identities`, `GET /v1/sender_identities/{sender_id}` and
+    `GET /v1/sender_identities/{sender_id}/used_by`. It is a click-path,
+    keeping its letter so the C-sequence reads in one order.
+
+    ### C2 — a hidden sender identity, for `GET /v1/sender_identities`
+
+    1. **Settings** > **Workspace Settings** > **Email** > **Sender
+       Identities**.
+    2. **Add Sender Identity**; name `Estuary Probe Sender`, email
+       `estuary-probe@example.com`. Save.
+    3. Re-run `Paginated Snapshots / sender_identities bare` and save the
+       response as a second example. This alone closes the **document shape**,
+       which is currently spec-only, and shows whether `deduplicate_id` really
+       carries the `<id>:<unix seconds>` form the spec's example implies — the
+       only time-bearing value on this resource.
+    4. Then **hide** the sender (row overflow menu > **Hide**) and re-run *both*
+       `sender_identities bare` and `Paginated Snapshots / sender_identities
+       hidden`.
+
+    Step 4 is the one that matters and the reason to bother with a click-path
+    at all. `hidden` is an **include** flag, so the default response is a
+    filtered view — the same class of trap as `drafts` on `/v1/messages`. With
+    one sender hidden, the bare request must return **zero** rows and the
+    `hidden=true` request **one**. If both return one, the parameter is being
+    ignored the way every Cluster B endpoint ignores `limit`/`start`/`sort`,
+    and the connector's plan to always send it is merely harmless rather than
+    load-bearing. Either answer is worth having; right now neither is
+    established.
+
+    **Cleanup:** delete the sender identity from the same settings page.
+
+    **Outcome:** not yet run.

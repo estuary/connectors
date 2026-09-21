@@ -4,22 +4,45 @@ from logging import Logger
 
 from estuary_cdk.flow import CaptureBinding, ValidationError
 from estuary_cdk.capture import common, Task
-from estuary_cdk.capture.common import Resource, open_binding
+from estuary_cdk.capture.common import (
+    ResourceConfig,
+    SnapshotResource,
+    open_binding,
+)
 from estuary_cdk.http import HTTPMixin, TokenSource, HTTPError
 
 from .models import (
+    CONFIG_OBJECTS,
+    PAGINATED_OBJECTS,
+    ConfigObject,
     ConnectorState,
     Delivery,
     EndpointConfig,
+    PaginatedObject,
     ResourceConfigWithSchedule,
     ResourceState,
 )
-from .api import backfill_deliveries, backfill_floor, base_url, fetch_deliveries
+from .api import (
+    backfill_deliveries,
+    backfill_floor,
+    base_url,
+    fetch_deliveries,
+    snapshot_config_objects,
+    snapshot_paginated_objects,
+)
 
 # Tails new deliveries; RESCAN trails it by the configured window to re-read the
 # same deliveries once their engagement metrics have settled.
 REALTIME = "realtime"
 RESCAN = "rescan"
+
+DEFAULT_SNAPSHOT_INTERVAL = timedelta(minutes=5)
+
+# A snapshot buffers its whole result set to sort it, and opt-outs are the only
+# resource here that scales with the profile base rather than with how much a
+# workspace has been configured. It is also opt-out state, which does not need
+# minute-level freshness.
+SNAPSHOT_INTERVALS = {"optouts": timedelta(hours=1)}
 
 
 async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointConfig):
@@ -118,10 +141,82 @@ def deliveries(
     )
 
 
+def config_object(
+    http: HTTPMixin, config: EndpointConfig, model: type[ConfigObject]
+) -> common.Resource:
+    base = base_url(config.region)
+
+    def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings,
+    ):
+        open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_snapshot=functools.partial(
+                snapshot_config_objects, http, base, model
+            ),
+            tombstone=model(_meta=model.Meta(op="d")),
+        )
+
+    return SnapshotResource(
+        name=model.NAME,
+        open=open,
+        initial_config=ResourceConfig(
+            name=model.NAME,
+            interval=timedelta(minutes=5),
+        ),
+        schema_inference=True,
+    )
+
+
+def paginated_object(
+    http: HTTPMixin, config: EndpointConfig, model: type[PaginatedObject]
+) -> common.Resource:
+    base = base_url(config.region)
+
+    def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings,
+    ):
+        open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_snapshot=functools.partial(
+                snapshot_paginated_objects, http, base, model
+            ),
+            tombstone=model(_meta=model.Meta(op="d")),
+        )
+
+    return SnapshotResource(
+        name=model.NAME,
+        open=open,
+        initial_config=ResourceConfig(
+            name=model.NAME,
+            interval=SNAPSHOT_INTERVALS.get(model.NAME, DEFAULT_SNAPSHOT_INTERVAL),
+        ),
+        schema_inference=True,
+    )
+
+
 async def all_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
-    """Enumerate every stream the connector exposes."""
+    """Enumerate every resource the connector exposes."""
     http.token_source = TokenSource(oauth_spec=None, credentials=config.credentials)
 
-    return [deliveries(log, http, config)]
+    return [
+        deliveries(log, http, config),
+        *(config_object(http, config, model) for model in CONFIG_OBJECTS),
+        *(paginated_object(http, config, model) for model in PAGINATED_OBJECTS),
+    ]

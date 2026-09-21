@@ -1,11 +1,19 @@
 from collections.abc import AsyncGenerator
 from datetime import datetime, timedelta, UTC
 from logging import Logger
+from typing import Any
 
 from estuary_cdk.capture.common import LogCursor, PageCursor
 from estuary_cdk.http import HTTPSession
 
-from .models import DeliveriesResponse, Delivery
+from .models import (
+    ConfigObject,
+    DeliveriesResponse,
+    Delivery,
+    PaginatedObject,
+    SnapshotObject,
+    SnapshotPage,
+)
 
 # Customer.io App API base URLs. Every endpoint carries a `/v1/` path prefix that is
 # *not* part of the base URL, so per-endpoint paths look like
@@ -186,3 +194,102 @@ async def backfill_deliveries(
         yield delivery
 
     yield (window_end + timedelta(seconds=1)).isoformat()
+
+
+def _ordered(
+    model: type[SnapshotObject], items: list[dict[str, Any]], log: Logger
+) -> list[dict[str, Any]]:
+    """Sort rows by the model's ordering key, or warn and leave them alone.
+
+    Snapshot rows are addressed positionally, so a stable order is what keeps an
+    unchanged row on the same key between passes. The provider documents no
+    ordering of its own.
+    """
+    if not items:
+        return items
+
+    if not all(model.ORDER_KEY in item for item in items):
+        log.warning(
+            "Not every row carries the ordering key; emitting them in the "
+            "provider's order instead.",
+            {"resource": model.NAME, "order_key": model.ORDER_KEY},
+        )
+        return items
+
+    try:
+        return sorted(items, key=lambda item: item[model.ORDER_KEY])
+    except TypeError:
+        log.warning(
+            "Rows carry mixed types in their ordering key; emitting them in "
+            "the provider's order instead.",
+            {"resource": model.NAME, "order_key": model.ORDER_KEY},
+        )
+        return items
+
+
+async def snapshot_config_objects(
+    http: HTTPSession,
+    base: str,
+    model: type[ConfigObject],
+    log: Logger,
+) -> AsyncGenerator[ConfigObject, None]:
+    """Yield every row of one configuration endpoint.
+
+    These endpoints take no parameters and return the whole collection in a
+    single response, so each pass is a complete snapshot.
+
+    Rows are emitted in `ORDER_KEY` order where every row carries it. The
+    provider documents no ordering, and snapshot bindings address rows
+    positionally, so sorting is what stops an unchanged row from moving to a
+    different key when the provider reorders its response.
+    """
+    url = f"{base}{model.PATH}"
+    page = SnapshotPage.model_validate_json(await http.request(log, url))
+
+    for item in _ordered(model, page.items(model.ITEMS_KEY), log):
+        yield model.model_validate(item)
+
+
+async def snapshot_paginated_objects(
+    http: HTTPSession,
+    base: str,
+    model: type[PaginatedObject],
+    log: Logger,
+) -> AsyncGenerator[PaginatedObject, None]:
+    """Yield every row of one paginated endpoint, walking `start` to the end.
+
+    The whole result set is collected before anything is emitted, because
+    ordering has to be stable across the entire snapshot rather than within a
+    page -- rows are addressed positionally, so a row that moves between pages
+    would otherwise land on a different key.
+
+    The continuation token stays inside this call. It is a positional offset the
+    provider makes no promises about across a gap, so it is never checkpointed.
+    """
+    url = f"{base}{model.PATH}"
+    request_params: dict[str, str | int] = {
+        "limit": MAX_PAGE_SIZE,
+        **model.EXTRA_PARAMS,
+    }
+
+    items: list[dict[str, Any]] = []
+    for _ in range(MAX_PAGES_PER_WINDOW):
+        page = SnapshotPage.model_validate_json(
+            await http.request(log, url, params=request_params)
+        )
+        items.extend(page.items(model.ITEMS_KEY))
+
+        # Three terminal conventions exist across this API: an empty string, an
+        # absent key, and a populated token. Only a falsiness test covers all.
+        if not page.next:
+            break
+
+        request_params = {**request_params, "start": page.next}
+    else:
+        raise RuntimeError(
+            f"Pagination did not terminate within {MAX_PAGES_PER_WINDOW} pages "
+            f"for {model.NAME}."
+        )
+
+    for item in _ordered(model, items, log):
+        yield model.model_validate(item)
