@@ -17,6 +17,11 @@ format.
 
 For Avro messages, the connector must be configured to use a [schema
 registry](https://docs.confluent.io/platform/current/schema-registry/index.html).
+Registered schemas include Avro logical types, so a field with `format:
+date-time`, including the `flow_published_at` metadata field, is a `long` with
+`logicalType: timestamp-micros`. Materializations created before September 2026
+register these fields as plain `string` values and keep doing so; create a new
+materialization to use the timestamp encoding.
 
 JSON messages may be materialized without a schema registry.
 
