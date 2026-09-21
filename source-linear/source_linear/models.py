@@ -48,24 +48,10 @@ class EndpointConfig(BaseModel):
 ConnectorState = GenericConnectorState[ResourceState]
 
 
-# GraphQL selection sets are explicit and per-stream: GraphQL returns nothing that was not
-# asked for, so these cannot be inferred from the document models the way REST fields can.
-#
-# Three rules, applied uniformly (each verified against the live schema by the `x0 - … Bare`
-# requests in bruno/):
-#   1. Scalars are effectively free (~0.1 complexity points each).
-#   2. Relations are selected as `{ id }` only. A nested object costs 1 point, so ten
-#      relations cost as much as a hundred scalars.
-#   3. NO nested connections. A connection multiplies its children by its page size — a
-#      single `labels(first: 20)` on Issues adds ~22 pts/node, which would push a 250-row
-#      page from ~4,000 to ~9,500 against the hard 10,000 per-query cap. Issue<->label
-#      membership belongs in its own child stream, not widened into this selection set.
-#
-# Only universally-available fields may appear here. In GraphQL an un-entitled field does
-# not come back absent — it emits an error on *every* page for workspaces lacking the
-# add-on. `identifier` is therefore deliberately absent from Projects and Initiatives
-# (gated behind the paid 'Project IDs' / 'Initiative IDs' features); `id`, `slugId` and
-# `url` identify those records instead. `Issue.identifier` is core and is safe to select.
+# Selection sets are explicit because GraphQL returns nothing that was not asked for.
+# Relations are selected as `{ id }` and nested connections are excluded, which keeps a
+# 250-row page well inside the 10,000-point per-query cap. Fields gated behind paid add-ons
+# are excluded too: an un-entitled field errors on every page rather than arriving absent.
 
 ISSUE_SELECTION = """
     id createdAt updatedAt archivedAt
@@ -90,9 +76,8 @@ ISSUE_SELECTION = """
     lastAppliedTemplate { id }
 """
 
-# `progressHistory` / `currentProgress` are omitted: large, high-churn derived aggregates.
-# `status` is a ProjectStatus OBJECT here, unlike Initiative.status which is a bare enum —
-# the two streams look symmetrical but are not, so they cannot share a selection template.
+# `status` is a ProjectStatus object here but a bare enum on Initiative, so the two cannot
+# share a template. `progressHistory`/`currentProgress` are omitted as high-churn aggregates.
 PROJECT_SELECTION = """
     id createdAt updatedAt archivedAt
     name description slugId icon color health
@@ -108,8 +93,7 @@ PROJECT_SELECTION = """
     convertedFromIssue { id }
 """
 
-# `Initiative` has no `priorityLabel` (unlike Issue and Project) — selecting it is a live
-# HTTP 400. `status` is a bare enum here, not an object.
+# `Initiative` has no `priorityLabel`, unlike Issue and Project; selecting it is an error.
 INITIATIVE_SELECTION = """
     id createdAt updatedAt archivedAt
     name description slugId icon color status
@@ -137,30 +121,23 @@ LABEL_SELECTION = """
 class LinearResource(BaseDocument, extra="allow"):
     """One Relay connection on Linear's single GraphQL endpoint."""
 
-    # Per-stream identity as ClassVars rather than parallel registries, so a stream's
-    # name, root field, selection set and ordering capability travel with its model.
     name: ClassVar[str]
     root_field: ClassVar[str]
     selection: ClassVar[str]
-    # Name of the filter/sort field the incremental window is expressed over.
     CURSOR_FIELD: ClassVar[str] = "updatedAt"
-    # Second clock for streams whose archival is separately detectable. Only `IssueFilter`
-    # exposes an `archivedAt` comparator, so Issues is the sole stream that sets it.
+    # Second clock, set only where archival is separately detectable: `IssueFilter` is the
+    # one filter type exposing an `archivedAt` comparator.
     ARCHIVAL_CURSOR_FIELD: ClassVar[str | None] = None
-    # True  -> accepts `sort: [{updatedAt: {order: ...}}]`, so the walk direction is ours to
-    #          choose and a backfill can resume forwards from a value watermark.
-    # False -> `orderBy` only, which is DESCENDING-only. `issueLabels` is the one root field
-    #          that rejects `sort`.
+    # False means `orderBy` only, which is descending-only. `issueLabels` rejects `sort`.
     supports_sort: ClassVar[bool]
 
-    # Declared required rather than read defensively: the fetch and cursor logic depends on
-    # all of these, so a provider shape change must fail loudly at validation instead of
-    # silently yielding no documents. All three are NON_NULL in Linear's schema.
+    # Required rather than defensively read: the cursor logic depends on these, so a
+    # provider shape change should fail at validation rather than silently emit nothing.
     id: str
     createdAt: AwareDatetime
     updatedAt: AwareDatetime
-    # The tombstone. Nullable on all four types. NOTE: archiving does NOT advance
-    # `updatedAt`, so this field — not cursor movement — is the only archival signal.
+    # The tombstone. Archiving does not advance `updatedAt`, so this field — not cursor
+    # movement — is the only archival signal.
     archivedAt: AwareDatetime | None = None
 
     def get_cursor(self) -> AwareDatetime:
@@ -206,15 +183,12 @@ class PageInfo(BaseModel, extra="allow"):
 
 
 class Connection(BaseModel, extra="allow"):
-    """The envelope around `nodes`, carrying pagination state."""
-
     pageInfo: PageInfo = Field(default_factory=PageInfo)
 
 
 class GraphQLError(BaseModel, extra="allow"):
     class Extensions(BaseModel, extra="allow"):
-        # Linear omits `code` on some errors; default to the retryable class so an
-        # unlabelled server-side failure is retried rather than treated as fatal.
+        # Linear omits `code` on some errors; default to the retryable class.
         code: str = "INTERNAL_SERVER_ERROR"
 
     message: str
@@ -224,8 +198,7 @@ class GraphQLError(BaseModel, extra="allow"):
 class LinearGraphQLRemainder(BaseModel, extra="allow"):
     """Everything outside the streamed `data.<root>.nodes` array.
 
-    `data` is keyed by the stream's root field, which varies per stream, so it is typed as
-    a mapping to `Connection` rather than one model per root.
+    `data` is keyed by the stream's root field, which varies per stream.
     """
 
     data: dict[str, Connection] | None = None
