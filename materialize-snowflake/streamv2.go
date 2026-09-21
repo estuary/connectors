@@ -17,6 +17,7 @@ import (
 
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	"github.com/jmoiron/sqlx"
 	log "github.com/sirupsen/logrus"
 	sf "github.com/snowflakedb/gosnowflake/v2"
 	"golang.org/x/sync/errgroup"
@@ -198,13 +199,19 @@ const streamV2ErrObjectNotExistOrAuthorized = 2003
 //
 // Returned channel names are sorted.
 func (m *streamV2Manager) listChannels(ctx context.Context, database, schema, table string) ([]string, error) {
+	type channelRow struct {
+		Name string `db:"name"`
+	}
+	var xdb = sqlx.NewDb(m.db, "snowflake").Unsafe()
+
 	var channelNames []string
 	for _, in := range []string{
 		"TABLE " + m.dialect.Identifier(database, schema, table),
 		"PIPE " + m.dialect.Identifier(database, schema, table+streamV2DefaultPipeSuffix),
 	} {
-		rows, err := m.db.QueryContext(ctx, fmt.Sprintf("SHOW CHANNELS IN %s;", in))
-		if err != nil {
+		var query = fmt.Sprintf("SHOW CHANNELS IN %s;", in)
+		var channelRows []channelRow
+		if err := xdb.SelectContext(ctx, &channelRows, query); err != nil {
 			// Snowflake reports an absent pipe with the same error as one the role
 			// may not see, so the miss is logged.
 			var sfErr *sf.SnowflakeError
@@ -214,33 +221,9 @@ func (m *streamV2Manager) listChannels(ctx context.Context, database, schema, ta
 			}
 			return nil, fmt.Errorf("listing channels in %s: %w", in, err)
 		}
-		defer rows.Close()
 
-		// SHOW reports many columns; only "name" is read, and the rest are scanned
-		// into a sink, so the column order Snowflake chooses does not matter.
-		columns, err := rows.Columns()
-		if err != nil {
-			return nil, fmt.Errorf("reading columns of the channel listing in %s: %w", in, err)
-		}
-		var nameAt = slices.Index(columns, "name")
-		if nameAt < 0 {
-			return nil, fmt.Errorf("the channel listing in %s reports no \"name\" column", in)
-		}
-
-		for rows.Next() {
-			var channelName string
-			var dest = make([]any, len(columns))
-			for i := range dest {
-				dest[i] = new(any)
-			}
-			dest[nameAt] = &channelName
-			if err := rows.Scan(dest...); err != nil {
-				return nil, fmt.Errorf("scanning the channel listing in %s: %w", in, err)
-			}
-			channelNames = append(channelNames, channelName)
-		}
-		if err := rows.Err(); err != nil {
-			return nil, fmt.Errorf("iterating the channel listing in %s: %w", in, err)
+		for _, row := range channelRows {
+			channelNames = append(channelNames, row.Name)
 		}
 	}
 	slices.Sort(channelNames)
