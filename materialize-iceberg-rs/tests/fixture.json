@@ -1,0 +1,5 @@
+{"commit":true}
+["test/collection", { "id": 1, "value": "a"}]
+["test/collection", { "id": 2, "value": "b"}]
+["test/collection", { "id": 3, "value": "c"}]
+{"commit":true}
