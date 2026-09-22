@@ -280,7 +280,7 @@ func discoverColumns(ctx context.Context, db *bigquery.Client, dataset string) (
 		if err := rows.Next(&row); err == iterator.Done {
 			break
 		} else if err != nil {
-			return nil, fmt.Errorf("error discovering primary keys: %w", err)
+			return nil, fmt.Errorf("error discovering columns: %w", err)
 		}
 
 		var tableSchema = row[0].(string)
