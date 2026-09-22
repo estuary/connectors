@@ -1,7 +1,11 @@
 ---
 description: Deprecated Shopify REST capture connector. Use Estuary's Shopify GraphQL connector instead to sync orders, customers, products, and inventory.
-noindex: true
 ---
+
+<head>
+  <meta name="robots" content="noindex, follow" />
+</head>
+
 # Shopify (Deprecated)
 
 :::deprecated

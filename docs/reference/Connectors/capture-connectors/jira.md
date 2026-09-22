@@ -1,7 +1,11 @@
 ---
 description: Deprecated Jira capture connector. Use Estuary's native Jira connector instead to sync issues, projects, boards, and sprints.
-noindex: true
 ---
+
+<head>
+  <meta name="robots" content="noindex, follow" />
+</head>
+
 # Jira (Deprecated)
 
 This connector captures data from Jira into Estuary collections.

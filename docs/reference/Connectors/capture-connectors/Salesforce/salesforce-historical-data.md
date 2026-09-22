@@ -1,7 +1,11 @@
 ---
 description: Deprecated Salesforce historical capture connector. Use Estuary's native Salesforce connector instead for both historical and real-time data.
-noindex: true
 ---
+
+<head>
+  <meta name="robots" content="noindex, follow" />
+</head>
+
 # Salesforce — Historical data (deprecated)
 
 This connector captures data from Salesforce objects into Estuary collections.

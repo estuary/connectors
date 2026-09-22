@@ -1,7 +1,11 @@
 ---
 description: Deprecated HubSpot capture connector. Use Estuary's native HubSpot connector instead to sync contacts, companies, deals, engagements, and email events.
-noindex: true
 ---
+
+<head>
+  <meta name="robots" content="noindex, follow" />
+</head>
+
 # HubSpot (Deprecated)
 
 This connector captures data from a Hubspot account.

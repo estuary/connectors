@@ -1,7 +1,11 @@
 ---
 description: Deprecated Greenhouse capture connector. Use Estuary's native Greenhouse connector instead to sync candidates, applications, jobs, and interviews.
-noindex: true
 ---
+
+<head>
+  <meta name="robots" content="noindex, follow" />
+</head>
+
 # Greenhouse (Deprecated)
 
 This connector captures data from Greenhouse into Estuary collections.

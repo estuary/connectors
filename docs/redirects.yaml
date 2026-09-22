@@ -19,7 +19,7 @@
 # Only for pages that no longer exist. The redirect plugin silently ignores a
 # `from` that still resolves to a page, so an entry added for a deprecated page
 # whose .md file remains does nothing and the build still passes. Deprecated
-# pages that stay reachable use `noindex: true` front matter instead, which
-# keeps the URL working and drops it from search and the sitemap.
+# pages that stay reachable instead carry a `<head>` block with a robots
+# noindex meta tag, which keeps the URL working and drops it from the sitemap.
 - from: /reference/Connectors/capture-connectors/facebook-marketing/
   to: /reference/Connectors/capture-connectors/facebook-marketing-native/
