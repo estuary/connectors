@@ -255,12 +255,12 @@ func discoverTables(ctx context.Context, db *bigquery.Client, dataset string) ([
 }
 
 type discoveredColumn struct {
-	Schema      string              // The schema in which the table resides
-	Table       string              // The name of the table with this column
-	Name        string              // The name of the column
-	Index       int                 // The ordinal position of the column within a row
+	Schema      string               // The schema in which the table resides
+	Table       string               // The name of the table with this column
+	Name        string               // The name of the column
+	Index       int                  // The ordinal position of the column within a row
 	DataType    datatypes.ColumnType // The datatype of the column
-	Description *string             // The description of the column, if present and known
+	Description *string              // The description of the column, if present and known
 }
 
 const queryDiscoverColumns = `
