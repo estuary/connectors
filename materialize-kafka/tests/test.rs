@@ -48,10 +48,12 @@ async fn test_materialization() {
     drop_topics().await;
 
     // A task with no persisted state is new, and receives the current schema
-    // behaviour. The legacy task is seeded with the state that an existing
-    // task acquires at its first Apply after upgrade.
+    // behaviour unless its feature flags refuse it. The legacy task is seeded
+    // with the state that an existing task acquires at its first Apply after
+    // upgrade.
     for (name, initial_state) in [
         ("acmeCo/materialize-kafka/avro", None),
+        ("acmeCo/materialize-kafka/avro-flagged", None),
         (
             "acmeCo/materialize-kafka/avro-legacy",
             Some(r#"{"avro_logical_types":false}"#),

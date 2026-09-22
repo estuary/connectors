@@ -6,6 +6,21 @@ expression: "serde_json::to_string_pretty(&got).unwrap()"
   "configSchema": {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "properties": {
+      "advanced": {
+        "advanced": true,
+        "description": "Options for advanced users. You should not typically need to modify these.",
+        "order": 8,
+        "properties": {
+          "feature_flags": {
+            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.",
+            "nonsensitive": true,
+            "title": "Feature Flags",
+            "type": "string"
+          }
+        },
+        "title": "Advanced Options",
+        "type": "object"
+      },
       "bootstrap_servers": {
         "description": "The initial servers in the Kafka cluster to initially connect to, separated by commas. The Kafka client will be informed of the rest of the cluster nodes by connecting to one of these nodes.",
         "order": 0,

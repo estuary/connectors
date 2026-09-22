@@ -24,6 +24,27 @@ pub struct EndpointConfig {
     pub schema_registry: Option<SchemaRegistryConfig>,
     pub topic_partitions: i32,
     pub topic_replication_factor: i32,
+    #[serde(default)]
+    pub advanced: Advanced,
+}
+
+#[derive(Serialize, Deserialize, Default)]
+pub struct Advanced {
+    #[serde(default)]
+    pub feature_flags: String,
+}
+
+/// Feature flag that keeps a new materialization on the string encoding of
+/// date-time fields in registered Avro schemas.
+pub const NO_AVRO_LOGICAL_TYPES: &str = "no_avro_logical_types";
+
+impl Advanced {
+    pub fn has_flag(&self, flag: &str) -> bool {
+        self.feature_flags
+            .split(',')
+            .map(str::trim)
+            .any(|f| f == flag)
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -257,6 +278,21 @@ impl JsonSchema for EndpointConfig {
                     "default": 3,
                     "order": 7,
                     "nonsensitive": true
+                },
+                "advanced": {
+                    "title": "Advanced Options",
+                    "description": "Options for advanced users. You should not typically need to modify these.",
+                    "type": "object",
+                    "properties": {
+                        "feature_flags": {
+                            "title": "Feature Flags",
+                            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.",
+                            "type": "string",
+                            "nonsensitive": true
+                        }
+                    },
+                    "order": 8,
+                    "advanced": true
                 },
             }
         }))

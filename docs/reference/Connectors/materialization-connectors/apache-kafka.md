@@ -21,7 +21,9 @@ Registered schemas include Avro logical types, so a field with `format:
 date-time`, including the `flow_published_at` metadata field, is a `long` with
 `logicalType: timestamp-micros`. Materializations created before September 2026
 register these fields as plain `string` values and keep doing so; create a new
-materialization to use the timestamp encoding.
+materialization to use the timestamp encoding. To keep the `string` encoding on
+a new materialization instead, for example to match topics written by an older
+one, set `advanced.feature_flags` to `no_avro_logical_types` when creating it.
 
 JSON messages may be materialized without a schema registry.
 
@@ -104,6 +106,8 @@ Note that, by default, all top-level fields are recommended for materialization.
 | `/schema_registry/endpoint`     | Schema Registry Endpoint | Schema registry API endpoint. For example: `https://registry-id.us-east-2.aws.confluent.cloud`.                                                      | string  |                         |
 | `/schema_registry/username`     | Schema Registry Username | Schema registry username to use for authentication. If you are using Confluent Cloud, this will be the 'Key' from your schema registry API key.    | string  |                         |
 | `/schema_registry/password`     | Schema Registry Password | Schema registry password to use for authentication. If you are using Confluent Cloud, this will be the 'Secret' from your schema registry API key. | string  |                         |
+| `/advanced`                     | Advanced Options         | Options for advanced users. You should not typically need to modify these.                                                                         | object  |                         |
+| `/advanced/feature_flags`       | Feature Flags            | This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.                              | string  |                         |
 
 #### Bindings
 

@@ -1,7 +1,7 @@
 use anyhow::Result;
 use apply::do_apply;
 use bytes::BytesMut;
-use configuration::{schema_for, EndpointConfig, Resource};
+use configuration::{schema_for, EndpointConfig, Resource, NO_AVRO_LOGICAL_TYPES};
 use prost::Message;
 use proto_flow::flow;
 use proto_flow::materialize::{
@@ -70,16 +70,24 @@ pub async fn run_connector(mut input: Input, mut output: Output) -> Result<()> {
 
 // A task whose state has not yet decided how Avro schemas are registered
 // decides it now. A task with no previously applied spec is new and takes
-// logical types; any other task keeps the string encoding its topics already
-// carry.
+// logical types unless its feature flags refuse them; any other task keeps
+// the string encoding its topics already carry.
 fn decide_state(apply: &request::Apply) -> Result<Option<flow::ConnectorState>> {
     let state = ConnectorState::parse(&apply.state_json)?;
     if state.avro_logical_types.is_some() {
         return Ok(None);
     }
 
+    let spec = apply
+        .materialization
+        .as_ref()
+        .expect("must have a materialization spec");
+    let config: EndpointConfig = serde_json::from_slice(&spec.config_json)?;
+    let is_new = apply.last_materialization.is_none();
+    let refused = config.advanced.has_flag(NO_AVRO_LOGICAL_TYPES);
+
     let decided = ConnectorState {
-        avro_logical_types: Some(apply.last_materialization.is_none()),
+        avro_logical_types: Some(is_new && !refused),
     };
     Ok(Some(flow::ConnectorState {
         updated_json: serde_json::to_vec(&decided)?.into(),
