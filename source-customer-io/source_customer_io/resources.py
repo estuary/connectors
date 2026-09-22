@@ -13,10 +13,12 @@ from estuary_cdk.http import HTTPMixin, TokenSource, HTTPError
 
 from .models import (
     CONFIG_OBJECTS,
+    DESIGN_STUDIO_OBJECTS,
     PAGINATED_OBJECTS,
     ConfigObject,
     ConnectorState,
     Delivery,
+    DesignStudioObject,
     EndpointConfig,
     PaginatedObject,
     ResourceConfigWithSchedule,
@@ -24,9 +26,11 @@ from .models import (
 )
 from .api import (
     backfill_deliveries,
+    backfill_design_studio_objects,
     backfill_floor,
     base_url,
     fetch_deliveries,
+    fetch_design_studio_objects,
     snapshot_config_objects,
     snapshot_paginated_objects,
 )
@@ -209,6 +213,58 @@ def paginated_object(
     )
 
 
+def design_studio_object(
+    http: HTTPMixin, config: EndpointConfig, model: type[DesignStudioObject]
+) -> common.Resource:
+    base = base_url(config.region)
+    window_size = config.advanced.window_size
+
+    def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings,
+    ):
+        open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=functools.partial(
+                fetch_design_studio_objects, http, base, model, window_size
+            ),
+            fetch_page=functools.partial(
+                backfill_design_studio_objects, http, base, model, window_size
+            ),
+        )
+
+    cutoff = datetime.now(tz=UTC).replace(microsecond=0)
+
+    return common.Resource(
+        name=model.NAME,
+        key=["/id"],
+        model=model,
+        open=open,
+        initial_state=ResourceState(
+            # Seeded one tick behind the cutoff so the first emitted tick is
+            # exactly the cutoff, leaving no gap where the backfill ends.
+            inc=ResourceState.Incremental(cursor=cutoff - timedelta(seconds=1)),
+            backfill=ResourceState.Backfill(
+                # No floor clamp: the six-month limit is a `/v1/messages`
+                # property, and Design Studio documents no history limit.
+                next_page=config.start_date.isoformat(),
+                cutoff=cutoff,
+            ),
+        ),
+        initial_config=ResourceConfig(
+            name=model.NAME,
+            interval=timedelta(minutes=5),
+        ),
+        schema_inference=True,
+    )
+
+
 async def all_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
@@ -219,4 +275,5 @@ async def all_resources(
         deliveries(log, http, config),
         *(config_object(http, config, model) for model in CONFIG_OBJECTS),
         *(paginated_object(http, config, model) for model in PAGINATED_OBJECTS),
+        *(design_studio_object(http, config, model) for model in DESIGN_STUDIO_OBJECTS),
     ]

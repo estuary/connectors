@@ -15,3 +15,9 @@ variables:
     value: "1"
   - name: customer_id
     value: example_person_1
+  # Pinned from `Design Studio / emails bare`. Both sandbox emails share this
+  # `created` == `updated` instant, which is what the boundary probes bracket.
+  - name: design_studio_email_id
+    value: 3f7e2935-acdc-412e-8eaa-1e4b172a8008
+  - name: design_studio_email_updated
+    value: "1789071558"

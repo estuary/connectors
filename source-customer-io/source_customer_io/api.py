@@ -10,6 +10,8 @@ from .models import (
     ConfigObject,
     DeliveriesResponse,
     Delivery,
+    DesignStudioObject,
+    DesignStudioPage,
     PaginatedObject,
     SnapshotObject,
     SnapshotPage,
@@ -293,3 +295,154 @@ async def snapshot_paginated_objects(
 
     for item in _ordered(model, items, log):
         yield model.model_validate(item)
+
+
+# Design Studio pages by number rather than by token, and accepts up to 10000
+# rows per page. 1000 keeps a page's memory footprint in line with the rest of
+# the connector.
+DESIGN_STUDIO_MAX_PAGE_SIZE = 1000
+
+# Defensive only. Unlike `/v1/messages`, a page past the end here returns an
+# empty array with the true total rather than restarting the walk, so no cycle
+# is known -- but an unbounded loop over a remote paginator is not worth
+# shipping.
+DESIGN_STUDIO_MAX_PAGES = 10_000
+
+
+async def _drain_design_studio_window(
+    http: HTTPSession,
+    base: str,
+    model: type[DesignStudioObject],
+    log: Logger,
+    start: datetime,
+    end: datetime,
+) -> AsyncGenerator[DesignStudioObject, None]:
+    """Yield every row whose `updated` falls in [start, end], inclusive.
+
+    The queried instants sit one second outside that window on each side,
+    because Design Studio's bounds are exclusive -- the mirror of
+    `/v1/messages`, whose bounds are inclusive. Getting this backwards drops
+    every row landing exactly on a boundary second, silently.
+
+    The page number stays inside this call. It is a positional offset the
+    provider makes no promises about across a gap, so it is never checkpointed.
+    """
+    url = f"{base}{model.PATH}"
+
+    for page in range(1, DESIGN_STUDIO_MAX_PAGES + 1):
+        body = DesignStudioPage.model_validate_json(
+            await http.request(
+                log,
+                url,
+                params={
+                    "limit": DESIGN_STUDIO_MAX_PAGE_SIZE,
+                    model.SINCE_PARAM: _dt_to_ts(start) - 1,
+                    model.BEFORE_PARAM: _dt_to_ts(end) + 1,
+                    # Deterministic within one walk. Nothing depends on it:
+                    # the window is bounded by time, not by position.
+                    "sort_by": "updated",
+                    "sort_order": "asc",
+                    "page": page,
+                },
+            )
+        )
+
+        items = body.items(model.ITEMS_KEY)
+        # No continuation token exists in this family; an empty page is the end.
+        if not items:
+            return
+
+        for item in items:
+            yield model.model_validate(item)
+
+    raise RuntimeError(
+        f"Pagination did not terminate within {DESIGN_STUDIO_MAX_PAGES} pages "
+        f"for {model.NAME} window [{start}, {end}]."
+    )
+
+
+async def fetch_design_studio_objects(
+    http: HTTPSession,
+    base: str,
+    model: type[DesignStudioObject],
+    window_size: timedelta,
+    log: Logger,
+    log_cursor: LogCursor,
+) -> AsyncGenerator[DesignStudioObject | LogCursor, None]:
+    """Incrementally fetch Design Studio rows by their update time.
+
+                  cursor   cursor + 1s    horizon   horizon + 1s
+    ────────────────┼──────────┼────────────┼───────────┼──▶ time (1s ticks)
+                    │          │            │           │
+    updated_after ──(══════════╪════════════╪═══════════╪═▶
+    updated_before ═╪══════════╪════════════╪═══════════)
+    emitted ────────┼──────────[════════════]           │
+                    │          │            │           └─ queried one tick
+                    │          │            │              past the window,
+                    │          │            │              since it excludes
+                    │          │            └─ last fully-elapsed second
+                    │          └─ first emitted second
+                    └─ already emitted by the previous poll
+    Both provider bounds are exclusive, so each queried instant sits one tick
+    outside the window actually wanted.
+    """
+    assert isinstance(log_cursor, datetime)
+
+    horizon = datetime.now(tz=UTC).replace(microsecond=0) - timedelta(seconds=1)
+    if horizon <= log_cursor:
+        return
+
+    end = min(log_cursor + window_size, horizon)
+
+    async for row in _drain_design_studio_window(
+        http, base, model, log, log_cursor + timedelta(seconds=1), end
+    ):
+        yield row
+
+    yield end
+
+
+async def backfill_design_studio_objects(
+    http: HTTPSession,
+    base: str,
+    model: type[DesignStudioObject],
+    window_size: timedelta,
+    log: Logger,
+    page: PageCursor,
+    cutoff: datetime,
+) -> AsyncGenerator[DesignStudioObject | PageCursor, None]:
+    """Walk historical Design Studio rows in fixed forward windows to the cutoff.
+
+       window_start  window_start + W    cutoff - 1s    cutoff
+    ────────┼──────────────┼──────────────────┼────────────┼───▶ time (1s ticks)
+            │              │                  │            │
+    updated_after(══════════╪══════════════════╪════════════╪──▶
+    updated_before══════════)                  │            │
+    emitted [══════════════]                   │            │
+            │              │                   │           └─ incremental's
+            │              │                   │              first tick
+            │              │                   └─ backfill's last tick
+            │              └─ end of this window, inclusive
+            └─ resume point, carried as an RFC3339 PageCursor
+    One window drains per invocation.
+
+    The sweep walks `updated`, the same axis as the incremental task, rather
+    than the immutable `created`. On the `created` axis, editing a row the sweep
+    has already passed would strand the edit: the backfill never revisits it and
+    the incremental task starts after the cutoff. `updated` only moves forward,
+    so an edit relocates a row ahead of the sweep, never behind it.
+    """
+    assert isinstance(page, str)
+
+    window_start = datetime.fromisoformat(page)
+    if window_start >= cutoff:
+        return
+
+    window_end = min(window_start + window_size, cutoff) - timedelta(seconds=1)
+
+    async for row in _drain_design_studio_window(
+        http, base, model, log, window_start, window_end
+    ):
+        yield row
+
+    yield (window_end + timedelta(seconds=1)).isoformat()

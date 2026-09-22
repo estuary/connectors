@@ -236,6 +236,50 @@ docs:
     JSON. That is how the by-domain route was confirmed to exist while
     `/v1/esp/domains` and `/v1/sending_domains` were confirmed not to.
 
+    ### Cluster D — Design Studio (`Design Studio/`)
+
+    `/v1/design_studio/{emails,components,folders}` — the **only** family in
+    this API with working server-side time filtering, and the only one that
+    validates query parameters by rejection instead of ignoring them.
+
+    - **`updated_after` / `updated_before` are genuinely honoured**, established
+      by negative control: a bound set to a known row's own `updated` value
+      excludes that row, and `meta.pagination.total` moves with the filter
+      (2 -> 0). Both bounds are **exclusive**, the mirror of `/v1/messages`,
+      whose `start_ts`/`end_ts` are both inclusive. `created_after` /
+      `created_before` behave identically.
+    - **A third pagination mechanism.** Page-number based: `page` (1-indexed,
+      rejected below 1) and `limit` (1..10000, **rejected** above), with
+      `meta.pagination.{page,limit,total}` echoed. There is **no `next` field
+      anywhere in the family**, so the falsiness rule that covers the other
+      three clusters has nothing to test here; termination is an empty page.
+    - **Out-of-range pages are safe**, unlike `/v1/messages`: `page=99999`
+      returns an empty array and the true `total`, and does **not** restart the
+      walk at page one. The `/v1/messages` live-cycle bug has no counterpart
+      here.
+    - **`limit`'s real maximum is 10000**, ten times Cluster A's and C's, and it
+      is enforced by a 400 rather than silently clamped. `api.py:MAX_PAGE_SIZE`
+      must not be reused for this cluster.
+    - **Timestamps are bare `created`/`updated` unix seconds** (the
+      `campaigns`/`broadcasts` convention) and `id` is a **UUID string** — a
+      third id type in this API, alongside bare ints and `object_types`' quoted
+      int.
+    - **Item arrays are `[]`, never `null`**, across all three endpoints.
+    - **Envelope keys match their path segment** here, for once.
+    - `/emails` and `/components` each return a `folders[]` array alongside
+      their own collection, schema-identical to `/v1/design_studio/folders`'
+      items. Whether that is the same corpus is **UNOBSERVABLE** in this
+      workspace (zero folders) — see `Design Studio / folders array overlap`.
+    - **The list grain carries no template content.** An email row is 8 metadata
+      fields, ~180 bytes; `GET /v1/design_studio/emails/{id}` carries
+      `content.html` and was **15 KB** for a sample email. The connector
+      captures the list grain only.
+    - **Open, data-loss-class:** `parent_folder_id`'s spec text can be read as
+      "the default listing is scoped to the root directory". If that reading is
+      right, a flat listing silently omits every email filed in a folder. Not
+      discriminable in a workspace with zero folders — see `Design Studio /
+      parent folder scoping` and `Seeding / D1`.
+
     ### Probe authorization
 
     The live runs recorded here — Cluster A's 18 GETs and Cluster B's 16 on
@@ -251,8 +295,13 @@ docs:
     reason: `config.yaml` is now tracked, but the working tree carries
     uncommitted connector work, so porcelain is not clean either way.
 
-    The Cluster C runs were made with `curl` rather than `bru`, which is not
-    installed on this machine. The auth path was the same — `sops -d` on the
+    Cluster D's 24 GETs on 2026-09-22 were made on the same basis: the user
+    authorized this cluster's read-only GETs explicitly and directed it to
+    proceed. `Seeding / D1` was **not** run — it is a POST, and the nesting step
+    it describes is UI-only in any case.
+
+    The Cluster C and Cluster D runs were made with `curl` rather than `bru`,
+    which is not installed on this machine. The auth path was the same — `sops -d` on the
     same `config.yaml`, token never written to disk or to a shell variable that
     outlives the command. The requests in `Paginated Snapshots/` and
     `ESP Suppressions/` are the faithful Bruno transcription of what ran, and

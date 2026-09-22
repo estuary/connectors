@@ -1,0 +1,92 @@
+info:
+  name: page walk continued
+  type: http
+  seq: 7
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/design_studio/emails?page=2&limit=1"
+  params:
+    - name: page
+      value: "2"
+      type: query
+    - name: limit
+      value: "1"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Design-Studio-emails/operation/listEmails
+
+    **WHY:** Confirms `page` advances the window rather than being parsed and
+    discarded, and that page 2 holds a *different* row than page 1 — a paging
+    parameter that is read but ignored would return page 1's row again.
+
+    **VERIFIED (2026-09-22):** `page=2&limit=1` returns the **second** email
+    ("Example Visual Editor Email"), disjoint from page 1's row, with
+    `meta.pagination` echoing `{page: 2, limit: 1, total: 2}`.
+
+    **Contrast with `/v1/messages`:** that endpoint's continuation token is a
+    base64 `v20:<offset>`, a positional offset the connector must never
+    checkpoint. Here the offset is not even disguised — `page` is a plain
+    integer in the query string. The naked form does not make it any less
+    positional, and `FETCH-CHECKPOINT-STABLE-STATE` applies to it identically.
+    The connector keeps the page number **local to a single generator
+    invocation**; see `plan.md` for the argument.
+
+examples:
+  - name: 200 - page 2 holds the second row
+    request:
+      url: "https://api.customer.io/v1/design_studio/emails?page=2&limit=1"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "emails": [
+              {
+                "id": "22222222-2222-4222-8222-222222222222",
+                "name": "Example Visual Editor Email",
+                "is_template": false,
+                "is_linked": false,
+                "has_translations": false,
+                "parent_folder_id": null,
+                "created": 1789071558,
+                "updated": 1789071558
+              }
+            ],
+            "folders": [],
+            "meta": {
+              "pagination": {
+                "page": 2,
+                "limit": 1,
+                "total": 2
+              },
+              "filters": {
+                "parent_folder_id": null,
+                "direct_descendants_only": false,
+                "sort_by": "created",
+                "sort_order": "asc",
+                "created_before": null,
+                "created_after": null,
+                "updated_before": null,
+                "updated_after": null,
+                "is_template": null,
+                "has_translations": null,
+                "is_linked": null
+              }
+            }
+          }

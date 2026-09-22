@@ -16,6 +16,9 @@ The following data resources are supported:
 | [broadcasts](https://docs.customer.io/integrations/api/app/tag/Broadcasts/) | Full Refresh |
 | [campaigns](https://docs.customer.io/integrations/api/app/tag/Automations/) | Full Refresh |
 | [collections](https://docs.customer.io/integrations/api/app/tag/Collections/) | Full Refresh |
+| [design_studio_components](https://docs.customer.io/integrations/api/app/tag/Design-Studio/) | Incremental |
+| [design_studio_emails](https://docs.customer.io/integrations/api/app/tag/Design-Studio/) | Incremental |
+| [design_studio_folders](https://docs.customer.io/integrations/api/app/tag/Design-Studio/) | Incremental |
 | [newsletters](https://docs.customer.io/integrations/api/app/tag/Newsletters/operation/listNewsletters/) | Full Refresh |
 | [object_types](https://docs.customer.io/integrations/api/app/tag/Objects/) | Full Refresh |
 | [optouts](https://docs.customer.io/integrations/api/app/tag/Optouts/) | Full Refresh |
@@ -46,6 +49,21 @@ one-time sends.
 
 `optouts` covers SMS and WhatsApp opt-outs, which are workspace-wide. Email subscription
 state is per-profile and is not part of this resource.
+
+:::tip
+The Design Studio resources are the only ones Customer.io lets you filter by when a row
+last changed, so they sync incrementally rather than being re-read in full. One consequence
+follows from that: because the connector only asks for rows that changed, a template
+deleted in Customer.io is never reported as deleted and remains in the collection. The
+full-refresh resources do detect deletions.
+
+`design_studio_emails` captures template metadata — name, folder, timestamps — not the
+rendered email body. It is an inventory of what exists, not an archive of content.
+
+Folders are captured once, by the `design_studio_folders` resource. The emails and
+components responses also carry a folder list, which the connector ignores to avoid
+writing the same folder into two collections; use `parent_folder_id` to join.
+:::
 
 :::tip
 Collections are a paid Customer.io feature. On a plan that does not include them,

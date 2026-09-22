@@ -272,3 +272,68 @@ PAGINATED_OBJECTS: list[type[PaginatedObject]] = [
     SenderIdentities,
     Optouts,
 ]
+
+
+class DesignStudioPage(BaseModel, extra="allow"):
+    """One page of a Design Studio response.
+
+    This family returns no continuation token -- it pages by number, and a page
+    whose item array is empty is the end of the walk. The item key varies per
+    endpoint, so it is read by name rather than declared.
+    """
+
+    def items(self, items_key: str) -> list[dict[str, Any]]:
+        return (self.model_extra or {}).get(items_key) or []
+
+
+class DesignStudioObject(BaseDocument, extra="allow"):
+    """A Design Studio object, captured incrementally on its update time.
+
+    The only Customer.io family that can be filtered by when a row changed --
+    everywhere else the connector either re-reads in full or filters on creation
+    time. Note the filters are EXCLUSIVE at both ends, the mirror of
+    `/v1/messages`, so the queried instants sit one second outside the window
+    actually wanted.
+    """
+
+    NAME: ClassVar[str]
+    PATH: ClassVar[str]
+    ITEMS_KEY: ClassVar[str]
+    SINCE_PARAM: ClassVar[str] = "updated_after"
+    BEFORE_PARAM: ClassVar[str] = "updated_before"
+
+    # A UUID string here -- a third id shape in this API, alongside bare
+    # integers and the quoted integer `object_types` returns.
+    id: str
+    # Bare `created`/`updated`, not the `_at` suffixed pair `segments` uses.
+    # Epoch seconds; `get_cursor` is the only place they become a datetime.
+    created: int
+    updated: int
+
+    def get_cursor(self) -> datetime:
+        return datetime.fromtimestamp(self.updated, tz=UTC)
+
+
+class DesignStudioEmails(DesignStudioObject):
+    NAME = "design_studio_emails"
+    PATH = "/v1/design_studio/emails"
+    ITEMS_KEY = "emails"
+
+
+class DesignStudioComponents(DesignStudioObject):
+    NAME = "design_studio_components"
+    PATH = "/v1/design_studio/components"
+    ITEMS_KEY = "components"
+
+
+class DesignStudioFolders(DesignStudioObject):
+    NAME = "design_studio_folders"
+    PATH = "/v1/design_studio/folders"
+    ITEMS_KEY = "folders"
+
+
+DESIGN_STUDIO_OBJECTS: list[type[DesignStudioObject]] = [
+    DesignStudioEmails,
+    DesignStudioComponents,
+    DesignStudioFolders,
+]
