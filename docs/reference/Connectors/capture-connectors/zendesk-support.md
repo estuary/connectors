@@ -1,4 +1,5 @@
 ---
+title: Zendesk Support (Deprecated)
 description: Deprecated Zendesk Support capture connector. Use Estuary's native Zendesk Support connector instead to sync tickets, users, and organizations.
 ---
 

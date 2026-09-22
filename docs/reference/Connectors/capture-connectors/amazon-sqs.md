@@ -1,4 +1,5 @@
 ---
+title: Amazon SQS (deprecated)
 description: Deprecated Amazon SQS capture connector. Use Estuary's native Amazon SQS connector instead to capture messages from SQS queues.
 ---
 

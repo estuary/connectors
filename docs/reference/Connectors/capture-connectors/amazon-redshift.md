@@ -1,4 +1,5 @@
 ---
+title: Amazon Redshift (Deprecated)
 description: Deprecated Amazon Redshift capture connector. Use Estuary's Redshift batch connector instead to sync Redshift tables on a schedule.
 ---
 

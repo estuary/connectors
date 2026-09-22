@@ -1,4 +1,5 @@
 ---
+title: Klaviyo (Deprecated)
 description: Deprecated Klaviyo capture connector. Use Estuary's native Klaviyo connector instead to sync campaigns, events, lists, metrics, and profiles.
 ---
 

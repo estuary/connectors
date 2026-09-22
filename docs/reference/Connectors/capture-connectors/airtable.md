@@ -1,4 +1,5 @@
 ---
+title: Airtable (deprecated)
 description: Deprecated Airtable capture connector. Use Estuary's native Airtable connector instead to sync Airtable bases and tables.
 ---
 

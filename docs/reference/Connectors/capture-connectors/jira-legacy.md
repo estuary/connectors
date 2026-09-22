@@ -1,4 +1,5 @@
 ---
+title: Jira (legacy)
 description: Deprecated legacy Jira capture connector. Use Estuary's native Jira connector instead to sync issues, projects, boards, and sprints.
 ---
 

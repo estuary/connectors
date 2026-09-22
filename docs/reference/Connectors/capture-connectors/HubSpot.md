@@ -1,4 +1,5 @@
 ---
+title: HubSpot (Deprecated)
 description: Deprecated HubSpot capture connector. Use Estuary's native HubSpot connector instead to sync contacts, companies, deals, engagements, and email events.
 ---
 

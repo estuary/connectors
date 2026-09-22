@@ -1,4 +1,5 @@
 ---
+title: Rockset (Deprecated)
 description: Deprecated Rockset materialization connector. Rockset is no longer available to new customers; browse Estuary's other materialization connectors instead.
 ---
 

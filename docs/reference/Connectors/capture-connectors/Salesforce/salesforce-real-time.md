@@ -1,4 +1,5 @@
 ---
+title: Salesforce — Real-time data (deprecated)
 description: Deprecated Salesforce real-time capture connector. Use Estuary's native Salesforce connector instead for both real-time and historical data.
 ---
 
