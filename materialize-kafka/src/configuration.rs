@@ -24,6 +24,11 @@ pub struct EndpointConfig {
     pub schema_registry: Option<SchemaRegistryConfig>,
     pub topic_partitions: i32,
     pub topic_replication_factor: i32,
+    /// Absent from configurations written before the field existed, and
+    /// false then, so that those materializations keep the Avro schemas
+    /// their topics already carry. The JSON Schema default is true.
+    #[serde(default)]
+    pub avro_logical_types: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -256,6 +261,14 @@ impl JsonSchema for EndpointConfig {
                     "type": "integer",
                     "default": 3,
                     "order": 7,
+                    "nonsensitive": true
+                },
+                "avro_logical_types": {
+                    "title": "Avro Logical Types",
+                    "description": "Register Avro schemas with logical types, so that date-time fields such as flow_published_at are timestamps rather than strings. Changing this on an existing materialization changes the type of those fields in its topics.",
+                    "type": "boolean",
+                    "default": true,
+                    "order": 8,
                     "nonsensitive": true
                 },
             }

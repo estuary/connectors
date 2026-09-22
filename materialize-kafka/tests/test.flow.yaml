@@ -12,6 +12,7 @@ materializations:
           topic_replication_factor: 1
           message_format: Avro
           compression: none
+          avro_logical_types: true
           schema_registry:
             schema_registry_type: confluent_schema_registry
             endpoint: http://localhost:8081
@@ -20,6 +21,34 @@ materializations:
     bindings:
       - resource:
           topic: test_topic_avro
+        source: test/collection
+        fields:
+          recommended: true
+          include:
+            flow_document: {}
+            value/slash~1nested: {}
+
+  acmeCo/materialize-kafka/avro-legacy:
+    endpoint:
+      local:
+        command:
+          - cargo
+          - run
+        protobuf: true
+        config:
+          bootstrap_servers: "localhost:9092"
+          topic_partitions: 3
+          topic_replication_factor: 1
+          message_format: Avro
+          compression: none
+          schema_registry:
+            schema_registry_type: confluent_schema_registry
+            endpoint: http://localhost:8081
+            username: user
+            password: password
+    bindings:
+      - resource:
+          topic: test_topic_avro_legacy
         source: test/collection
         fields:
           recommended: true
