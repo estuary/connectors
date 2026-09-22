@@ -1,5 +1,14 @@
 # materialize-bigquery
 
+## 2026-09-22
+
+### Fixed
+- Publishing a materialization now fails with a clear error when the endpoint
+  `dataset` exists in a location other than the configured `region`. Since
+  2026-09-14, load results are written to the endpoint dataset even when every
+  binding overrides its dataset, so such a configuration made every
+  transaction fail with `Dataset ... was not found in location ...`.
+
 ## 2026-09-17
 
 ### Added

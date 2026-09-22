@@ -263,7 +263,38 @@ func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
 		errs.Err(err)
 	}
 
+	if err := checkDatasetLocation(ctx, cfg); err != nil {
+		errs.Err(err)
+	}
+
 	return errs
+}
+
+// checkDatasetLocation verifies that the endpoint dataset, if it already
+// exists, is located in the configured region. A dataset that does not exist
+// yet passes, since it will be created in the configured region.
+func checkDatasetLocation(ctx context.Context, cfg config) error {
+	bq, err := cfg.client(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("creating bigquery client: %w", err)
+	}
+	defer bq.Close()
+
+	md, err := bq.bigqueryClient.DatasetInProject(cfg.ProjectID, cfg.Dataset).Metadata(ctx)
+	var apiErr *googleapi.Error
+	if errors.As(err, &apiErr) && apiErr.Code == 404 {
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("getting metadata for dataset %q: %w", cfg.Dataset, err)
+	}
+
+	if !strings.EqualFold(md.Location, cfg.Region) {
+		return fmt.Errorf(
+			"dataset %q is located in %q but the configured region is %q; configure the region to match the dataset's location, or configure a dataset located in %q",
+			cfg.Dataset, md.Location, cfg.Region, cfg.Region,
+		)
+	}
+	return nil
 }
 
 func (c *client) ExecStatements(ctx context.Context, statements []string) error {
