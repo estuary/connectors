@@ -6,20 +6,13 @@ expression: "serde_json::to_string_pretty(&got).unwrap()"
   "configSchema": {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "properties": {
-      "advanced": {
-        "advanced": true,
-        "description": "Options for advanced users. You should not typically need to modify these.",
+      "avro_logical_types": {
+        "default": true,
+        "description": "Register Avro schemas with logical types, so that date-time fields such as flow_published_at are timestamps rather than strings. Changing this on an existing materialization changes the type of those fields in its topics.",
+        "nonsensitive": true,
         "order": 8,
-        "properties": {
-          "feature_flags": {
-            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.",
-            "nonsensitive": true,
-            "title": "Feature Flags",
-            "type": "string"
-          }
-        },
-        "title": "Advanced Options",
-        "type": "object"
+        "title": "Avro Logical Types",
+        "type": "boolean"
       },
       "bootstrap_servers": {
         "description": "The initial servers in the Kafka cluster to initially connect to, separated by commas. The Kafka client will be informed of the rest of the cluster nodes by connecting to one of these nodes.",

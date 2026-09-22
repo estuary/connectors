@@ -17,7 +17,6 @@ use tuple::Element;
 use crate::{
     binding_info::{get_binding_info, BindingInfo},
     configuration::{EndpointConfig, MessageFormat},
-    state::ConnectorState,
     Input, Output,
 };
 
@@ -27,7 +26,6 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
         .expect("must have a materialization spec");
 
     let config: EndpointConfig = serde_json::from_slice(&spec.config_json)?;
-    let state = ConnectorState::parse(&open.state_json)?;
     let producer = config.to_producer()?;
     let producer_context = producer.context();
 
@@ -43,7 +41,7 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
         &spec.bindings,
         &config.message_format,
         config.schema_registry.as_ref(),
-        state.avro_logical_types(),
+        config.avro_logical_types,
     )
     .await?;
 

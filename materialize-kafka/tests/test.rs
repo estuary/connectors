@@ -47,34 +47,24 @@ async fn test_materialization() {
     ensure_services_up();
     drop_topics().await;
 
-    // A task with no persisted state is new, and receives the current schema
-    // behaviour unless its feature flags refuse it. The legacy task is seeded
-    // with the state that an existing task acquires at its first Apply after
-    // upgrade.
-    for (name, initial_state) in [
-        ("acmeCo/materialize-kafka/avro", None),
-        ("acmeCo/materialize-kafka/avro-flagged", None),
-        (
-            "acmeCo/materialize-kafka/avro-legacy",
-            Some(r#"{"avro_logical_types":false}"#),
-        ),
-        ("acmeCo/materialize-kafka/json", None),
+    // The legacy task's configuration predates `avro_logical_types`, so it
+    // omits the field and keeps string-encoded date-times.
+    for name in [
+        "acmeCo/materialize-kafka/avro",
+        "acmeCo/materialize-kafka/avro-legacy",
+        "acmeCo/materialize-kafka/json",
     ] {
-        let mut args = vec![
-            "raw",
-            "preview-next",
-            "--source",
-            "tests/test.flow.yaml",
-            "--fixture",
-            "tests/fixture.json",
-            "--name",
-            name,
-        ];
-        if let Some(state) = initial_state {
-            args.extend(["--initial-state", state]);
-        }
         let output = std::process::Command::new("flowctl")
-            .args(&args)
+            .args([
+                "raw",
+                "preview-next",
+                "--source",
+                "tests/test.flow.yaml",
+                "--fixture",
+                "tests/fixture.json",
+                "--name",
+                name,
+            ])
             .output()
             .unwrap();
 
