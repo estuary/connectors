@@ -1,4 +1,7 @@
-
+---
+description: Deprecated Intercom capture connector. Use Estuary's native Intercom connector instead to sync contacts, conversations, companies, and segments.
+noindex: true
+---
 # Intercom (Deprecated)
 
 This connector captures data from Intercom into Estuary collections.

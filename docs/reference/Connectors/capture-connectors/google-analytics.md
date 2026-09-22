@@ -1,4 +1,7 @@
-
+---
+description: Deprecated Google Universal Analytics capture connector. Google retired Universal Analytics; use Estuary's Google Analytics 4 connector instead.
+noindex: true
+---
 # (Deprecated) Google Analytics UA
 
 This connector previously captured data from a view in Google Universal Analytics.

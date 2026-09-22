@@ -1,4 +1,7 @@
-
+---
+description: Deprecated legacy Jira capture connector. Use Estuary's native Jira connector instead to sync issues, projects, boards, and sprints.
+noindex: true
+---
 # Jira (legacy)
 
 This connector captures data from [Jira's REST API](https://developer.atlassian.com/cloud/jira/platform/rest/v3/intro/) into Estuary collections.

@@ -1,4 +1,7 @@
-
+---
+description: Deprecated Iterable capture connector. Use Estuary's native Iterable connector instead to sync campaigns, email events, lists, and templates.
+noindex: true
+---
 # Iterable (deprecated)
 
 This connector captures data from Iterable into Estuary collections.

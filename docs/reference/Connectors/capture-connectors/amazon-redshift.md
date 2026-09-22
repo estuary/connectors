@@ -1,3 +1,7 @@
+---
+description: Deprecated Amazon Redshift capture connector. Use Estuary's Redshift batch connector instead to sync Redshift tables on a schedule.
+noindex: true
+---
 # Amazon Redshift (Deprecated)
 
 This connector captures data from your Amazon Redshift cluster into Estuary collections.
