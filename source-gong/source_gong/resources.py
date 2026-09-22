@@ -9,9 +9,12 @@ from estuary_cdk.http import HTTPError, HTTPMixin, TokenSource
 
 from source_gong.models import (
     EndpointConfig,
+    FilteredGongResource,
     GongResource,
     IncrementalGongResource,
     Call,
+    CallTranscript,
+    ExtensiveCall,
     User,
     Scorecard,
     ScorecardDefinition,
@@ -21,11 +24,15 @@ from source_gong.api import (
     snapshot_resource,
     fetch_page,
     fetch_changes,
-    fetch_calls_changes,
+    fetch_changes_with_lookback,
 )
 
 FULL_REFRESH_MODELS: list[type[GongResource]] = [ScorecardDefinition]
 INCREMENTAL_MODELS: list[type[IncrementalGongResource]] = [User, Scorecard]
+
+# Filtered by call date. Gong lists these only once the recording is analysed,
+# so they share the calls lookback window.
+LOOKBACK_MODELS: list[type[FilteredGongResource]] = [Call, ExtensiveCall, CallTranscript]
 
 
 async def validate_credentials(
@@ -138,7 +145,8 @@ async def incremental_resources(
             ),
         )
 
-    def open_calls(
+    def open_lookback(
+        cls: type[FilteredGongResource],
         binding: CaptureBinding[ResourceConfigWithSchedule],
         binding_index: int,
         state: common.ResourceState,
@@ -152,14 +160,15 @@ async def incremental_resources(
             task,
             fetch_page=functools.partial(
                 fetch_page,
-                Call,
+                cls,
                 http,
                 rate_limiter,
                 config.base_url,
                 config.start_date,
             ),
             fetch_changes=functools.partial(
-                fetch_calls_changes,
+                fetch_changes_with_lookback,
+                cls,
                 http,
                 rate_limiter,
                 config.base_url,
@@ -171,20 +180,21 @@ async def incremental_resources(
 
     resources: list[common.Resource] = [
         common.Resource(
-            name=Call.NAME,
-            key=Call.KEY,
-            model=Call,
-            open=open_calls,
+            name=cls.NAME,
+            key=cls.KEY,
+            model=cls,
+            open=functools.partial(open_lookback, cls),
             initial_state=common.ResourceState(
                 inc=common.ResourceState.Incremental(cursor=int(cutoff.timestamp())),
                 backfill=common.ResourceState.Backfill(cutoff=cutoff, next_page=None),
             ),
             initial_config=ResourceConfigWithSchedule(
-                name=Call.NAME,
-                interval=timedelta(minutes=2),
+                name=cls.NAME,
+                interval=timedelta(minutes=2) if cls is Call else timedelta(minutes=15),
             ),
             schema_inference=True,
-        ),
+        )
+        for cls in LOOKBACK_MODELS
     ]
 
     for cls in INCREMENTAL_MODELS:
