@@ -268,6 +268,16 @@ SELECT table_schema, table_name, column_name, ordinal_position, is_nullable, dat
   FROM %[1]s.INFORMATION_SCHEMA.COLUMNS
   ORDER BY table_schema, table_name, ordinal_position;`
 
+// columnRow is one row of INFORMATION_SCHEMA.COLUMNS, loaded by column name.
+type columnRow struct {
+	TableSchema     string `bigquery:"table_schema"`
+	TableName       string `bigquery:"table_name"`
+	ColumnName      string `bigquery:"column_name"`
+	OrdinalPosition int    `bigquery:"ordinal_position"`
+	IsNullable      string `bigquery:"is_nullable"`
+	DataType        string `bigquery:"data_type"`
+}
+
 func discoverColumns(ctx context.Context, db *bigquery.Client, dataset string) ([]*discoveredColumn, error) {
 	var rows, err = db.Query(fmt.Sprintf(queryDiscoverColumns, bqclient.QuoteIdentifier(dataset))).Read(ctx)
 	if err != nil {
@@ -276,19 +286,15 @@ func discoverColumns(ctx context.Context, db *bigquery.Client, dataset string) (
 
 	var columns []*discoveredColumn
 	for {
-		var row []bigquery.Value
+		var row columnRow
 		if err := rows.Next(&row); err == iterator.Done {
 			break
 		} else if err != nil {
 			return nil, fmt.Errorf("error discovering columns: %w", err)
 		}
 
-		var tableSchema = row[0].(string)
-		var tableName = row[1].(string)
-		var columnName = row[2].(string)
-		var ordinalPosition = int(row[3].(int64))
-		var isNullable = row[4].(string) == "YES"
-		var fullType = row[5].(string)
+		var isNullable = row.IsNullable == "YES"
+		var fullType = row.DataType
 
 		// For parameterized types like STRING(50) we want to chop off the parameters
 		// and concern ourselves solely with the base type name for now. Likewise for
@@ -344,10 +350,10 @@ func discoverColumns(ctx context.Context, db *bigquery.Client, dataset string) (
 		dataType.Description += fmt.Sprintf("(source type: %s%s)", nullabilityDescription, fullType)
 
 		var column = &discoveredColumn{
-			Schema:   tableSchema,
-			Table:    tableName,
-			Name:     columnName,
-			Index:    ordinalPosition,
+			Schema:   row.TableSchema,
+			Table:    row.TableName,
+			Name:     row.ColumnName,
+			Index:    row.OrdinalPosition,
 			DataType: &dataType,
 		}
 		columns = append(columns, column)
