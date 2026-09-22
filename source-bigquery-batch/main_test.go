@@ -328,6 +328,38 @@ func TestSimpleCapture(t *testing.T) {
 	})
 }
 
+// TestIngestionTimePartitioning exercises discovery and capture of an ingestion-time
+// partitioned table. Such tables list a `_PARTITIONTIME` pseudo-column in
+// INFORMATION_SCHEMA.COLUMNS with a NULL ordinal position, which `SELECT *` never
+// returns, so it should be left out of the discovered schema.
+func TestIngestionTimePartitioning(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testBigQueryClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+
+	// Connector versions which can't handle the pseudo-column fail discovery of the
+	// entire dataset while this table exists, so it's dropped when the test ends and
+	// expires on its own in case the test dies before cleanup runs.
+	createTestTable(ctx, t, control, tableName, `(id INTEGER PRIMARY KEY NOT ENFORCED, data STRING)
+		PARTITION BY _PARTITIONDATE
+		OPTIONS (expiration_timestamp = TIMESTAMP_ADD(CURRENT_TIMESTAMP(), INTERVAL 30 MINUTE))`)
+	t.Cleanup(func() { _ = executeSetupQuery(ctx, t, control, fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName)) })
+
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+	setCursorColumns(t, cs.Bindings[0], "id")
+	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+
+	t.Run("Capture", func(t *testing.T) {
+		setShutdownAfterQuery(t, true)
+
+		require.NoError(t, parallelSetupQueries(ctx, t, control, fmt.Sprintf("INSERT INTO %s (id, data) VALUES (@p0, @p1)", tableName), [][]any{
+			{1, "Value for row 1"}, {2, "Value for row 2"},
+			{3, "Value for row 3"}, {4, "Value for row 4"},
+		}))
+		cs.Capture(ctx, t, nil)
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
+
 // TestIntegerTypes exercises discovery and capture of the integer types
 // INT, SMALLINT, INTEGER, BIGINT, TINYINT, and BYTEINT. In BigQuery these
 // types are all aliases for each other, but it's worth being thorough.

@@ -283,6 +283,12 @@ func discoverColumns(ctx context.Context, db *bigquery.Client, dataset string) (
 			return nil, fmt.Errorf("error discovering primary keys: %w", err)
 		}
 
+		// Pseudo-columns such as the `_PARTITIONTIME` of an ingestion-time partitioned
+		// table have no ordinal position, and `SELECT *` never returns them.
+		if row[3] == nil {
+			continue
+		}
+
 		var tableSchema = row[0].(string)
 		var tableName = row[1].(string)
 		var columnName = row[2].(string)
