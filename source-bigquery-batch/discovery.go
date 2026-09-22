@@ -264,18 +264,21 @@ type discoveredColumn struct {
 }
 
 const queryDiscoverColumns = `
-SELECT table_schema, table_name, column_name, ordinal_position, is_nullable, data_type
+SELECT table_schema, table_name, column_name, ordinal_position, is_nullable, data_type,
+       is_hidden, is_system_defined
   FROM %[1]s.INFORMATION_SCHEMA.COLUMNS
   ORDER BY table_schema, table_name, ordinal_position;`
 
 // columnRow is one row of INFORMATION_SCHEMA.COLUMNS, loaded by column name.
 type columnRow struct {
-	TableSchema     string `bigquery:"table_schema"`
-	TableName       string `bigquery:"table_name"`
-	ColumnName      string `bigquery:"column_name"`
-	OrdinalPosition int    `bigquery:"ordinal_position"`
-	IsNullable      string `bigquery:"is_nullable"`
-	DataType        string `bigquery:"data_type"`
+	TableSchema     string              `bigquery:"table_schema"`
+	TableName       string              `bigquery:"table_name"`
+	ColumnName      string              `bigquery:"column_name"`
+	OrdinalPosition bigquery.NullInt64  `bigquery:"ordinal_position"`
+	IsNullable      string              `bigquery:"is_nullable"`
+	DataType        string              `bigquery:"data_type"`
+	IsHidden        bigquery.NullString `bigquery:"is_hidden"`
+	IsSystemDefined bigquery.NullString `bigquery:"is_system_defined"`
 }
 
 func discoverColumns(ctx context.Context, db *bigquery.Client, dataset string) ([]*discoveredColumn, error) {
@@ -291,6 +294,23 @@ func discoverColumns(ctx context.Context, db *bigquery.Client, dataset string) (
 			break
 		} else if err != nil {
 			return nil, fmt.Errorf("error discovering columns: %w", err)
+		}
+
+		// Pseudo-columns like `_PARTITIONTIME` have no ordinal position, and `SELECT *`
+		// never returns them, so we skip them and leave them out of the schema. BigQuery marks
+		// pseudo-columns as both hidden and system-defined.
+		if !row.OrdinalPosition.Valid {
+			// If the column is not both hidden and system-defined, then it isn't a documented
+			// pseudo-column and we've encountered something unexpected that we'll need to investigate.
+			if row.IsHidden.StringVal != "YES" || row.IsSystemDefined.StringVal != "YES" {
+				return nil, fmt.Errorf("column %s.%s.%s has no ordinal position but is not flagged as a pseudo-column (is_hidden=%q, is_system_defined=%q)", row.TableSchema, row.TableName, row.ColumnName, row.IsHidden.StringVal, row.IsSystemDefined.StringVal)
+			}
+			log.WithFields(log.Fields{
+				"schema": row.TableSchema,
+				"table":  row.TableName,
+				"column": row.ColumnName,
+			}).Debug("skipping pseudo-column")
+			continue
 		}
 
 		var isNullable = row.IsNullable == "YES"
@@ -353,7 +373,7 @@ func discoverColumns(ctx context.Context, db *bigquery.Client, dataset string) (
 			Schema:   row.TableSchema,
 			Table:    row.TableName,
 			Name:     row.ColumnName,
-			Index:    row.OrdinalPosition,
+			Index:    int(row.OrdinalPosition.Int64),
 			DataType: &dataType,
 		}
 		columns = append(columns, column)
