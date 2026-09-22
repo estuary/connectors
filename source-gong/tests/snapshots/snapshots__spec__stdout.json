@@ -61,7 +61,7 @@
         },
         "calls_lookback_window": {
           "default": 7,
-          "description": "Number of days to look back when fetching calls to capture post-call enrichment. Applied once per day.",
+          "description": "Number of days to look back when fetching `calls`, `extensive_calls`, and `call_transcripts` to capture post-call enrichment. Applied once per day.",
           "maximum": 30,
           "minimum": 1,
           "nonsensitive": true,
