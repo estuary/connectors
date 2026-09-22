@@ -37,6 +37,8 @@ var (
 	logLevel   = flag.String("log_level", "info", "The log level to print at.")
 	configsDir = flag.String("dir", "./specs", "The directory beneath which to edit configs.")
 	setFlag    = flag.String("set_flag", "", "A feature-flag setting to add to every task.")
+	setPath    = flag.String("set_path", "", "A dotted config property path to set on every task, like 'advanced.sslmode'. Requires --set_value.")
+	setValue   = flag.String("set_value", "", "The value to set at --set_path.")
 )
 
 func main() {
@@ -395,13 +397,37 @@ func printYAMLDiff(old, new any, description string, colorize bool) error {
 	return nil
 }
 
-// computeEdits applies the desired edit(s) to the provided task config. Currently there
-// is only one edit type, but it should be reasonably clear how to add others.
+// computeEdits applies the desired edit(s) to the provided task config.
 func computeEdits(cfg any) ([]configEdit, error) {
 	if *setFlag != "" {
 		return addFeatureFlag(cfg, *setFlag)
 	}
+	if *setPath != "" {
+		// Unsetting is not supported (see the TODO in editEncryptedTaskConfig), and an
+		// empty value would be indistinguishable from unset to the guard below, so an
+		// omitted --set_value is an error rather than a write of "".
+		if *setValue == "" {
+			return nil, fmt.Errorf("--set_path requires a non-empty --set_value")
+		}
+		return setConfigPath(cfg, *setPath, *setValue)
+	}
 	return nil, fmt.Errorf("no edits specified on the command-line")
+}
+
+// setConfigPath constructs an edit which sets the property at the specified dotted path.
+// If the path already holds a value an error is returned instead, so that an explicit
+// operator setting is never silently overwritten.
+//
+// Note that this inspects the config as it appears on disk, which for an encrypted config
+// means only properties SOPS leaves in cleartext (those annotated 'nonsensitive') can be
+// seen. Setting a path whose prior value is encrypted will not be refused, because the
+// prior value is not visible here.
+func setConfigPath(cfg any, path, value string) ([]configEdit, error) {
+	var elems = strings.Split(path, ".")
+	if prior, ok := indexPath(cfg, elems...); ok && prior != nil && prior != "" {
+		return nil, fmt.Errorf("config already has %s = %v, doing nothing", path, prior)
+	}
+	return []configEdit{{Path: elems, Value: value}}, nil
 }
 
 // addFeatureFlag constructs an edit which sets the /advanced/feature_flags property to have

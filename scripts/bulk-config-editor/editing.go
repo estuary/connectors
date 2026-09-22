@@ -1,10 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -35,21 +38,19 @@ func editPlaintextTaskConfig(cfg any, edits []configEdit) (any, error) {
 }
 
 func editEncryptedTaskConfig(ctx context.Context, configFile string, edits []configEdit) error {
-	// Execute sops commands to perform the specified edits. Note that even though the input
-	// is typically YAML we're explicitly requesting JSON output from SOPS.
+	// Execute sops commands to perform the specified edits, asking for YAML output to match
+	// the YAML input that 'flowctl catalog pull-specs' writes.
 	//
-	// This is because SOPS handles unset properties in the SOPS stanza slightly differently
-	// in YAML vs JSON output formats. In JSON an unset property is like `kms: null` but in
-	// YAML it's like `kms: []`. Our config-encryption service produces JSON output which is
-	// only YAML here because that's what 'flowctl catalog pull-specs' writes, so to produce
-	// the most minimal diffs we need to mirror that "JSON from SOPS" behavior. Since YAML
-	// is a superset of JSON it's fine to just leave the file in JSON format after editing.
-	//
-	// We could in principle have the 'list-tasks' helper script output JSON instead, but that
-	// is surprisingly tricky. Just telling 'flowctl catalog pull-specs' to output JSON only
-	// seems to impact the 'flow.json' file and the broken-out configs are still YAML. Also
-	// it seemed better in general to make this script's behavior work with the default output
-	// of a 'flowctl draft develop' if possible.
+	// This previously requested JSON output on the theory that it mirrored our
+	// config-encryption service and so produced the most minimal diffs. On the YAML files
+	// flowctl actually writes it does the opposite: JSON output reserializes the whole file,
+	// rewriting every line and rendering unset key groups ('pgp', 'age', ...) differently
+	// than they appeared. Matching the input format keeps the diff to the edited property
+	// plus the 'lastmodified' and 'mac' that any edit necessarily changes.
+	if err := quoteSOPSTimestamps(configFile); err != nil {
+		return fmt.Errorf("error normalizing SOPS metadata: %w", err)
+	}
+
 	for _, edit := range edits {
 		log.WithField("edit", edit.String()).Debug("applying edit")
 
@@ -58,7 +59,7 @@ func editEncryptedTaskConfig(ctx context.Context, configFile string, edits []con
 		if err != nil {
 			return fmt.Errorf("error serializing edited value: %w", err)
 		}
-		var cmd = exec.CommandContext(ctx, "sops", "set", "--output-type", "json", configFile, asPyDictIndex(edit.Path), string(bs))
+		var cmd = exec.CommandContext(ctx, "sops", "set", "--output-type", "yaml", configFile, asPyDictIndex(edit.Path), string(bs))
 		if _, err = cmd.Output(); err != nil {
 			if err, ok := err.(*exec.ExitError); ok {
 				return fmt.Errorf("error editing with SOPS: %s", strings.TrimSpace(string(err.Stderr)))
@@ -66,6 +67,38 @@ func editEncryptedTaskConfig(ctx context.Context, configFile string, edits []con
 			return fmt.Errorf("error editing with SOPS: %w", err)
 		}
 	}
+	return nil
+}
+
+// sopsTimestampPattern matches the unquoted RFC3339 timestamps which 'flowctl catalog
+// pull-specs' writes into a config's SOPS metadata stanza. The optional list marker
+// covers the per-key 'created_at' entries under 'gcp_kms', 'kms', 'pgp' and friends.
+var sopsTimestampPattern = regexp.MustCompile(`(?m)^(\s*(?:- )?(?:created_at|lastmodified):[ \t]+)([0-9]{4}-[0-9]{2}-[0-9]{2}T[^"'\s#]+)[ \t]*$`)
+
+// quoteSOPSTimestamps rewrites those timestamps as quoted strings, and is a no-op on a
+// file which doesn't have any.
+//
+// YAML parses a bare RFC3339 timestamp into a native timestamp, but SOPS decodes its own
+// metadata into a struct whose 'created_at' and 'lastmodified' fields are strings. So
+// 'sops set' fails on the files flowctl writes, with "expected type 'string', got
+// unconvertible type 'time.Time'", before it even looks at the data we mean to edit.
+// Quoting forces those values to parse as the strings SOPS expects.
+//
+// Only the metadata stanza is affected: every value in an encrypted config is an
+// 'ENC[...]' string, so there are no bare timestamps elsewhere in the file to disturb.
+func quoteSOPSTimestamps(configFile string) error {
+	var original, err = os.ReadFile(configFile)
+	if err != nil {
+		return fmt.Errorf("error reading file: %w", err)
+	}
+	var quoted = sopsTimestampPattern.ReplaceAll(original, []byte(`${1}"${2}"`))
+	if bytes.Equal(quoted, original) {
+		return nil
+	}
+	if err := os.WriteFile(configFile, quoted, 0664); err != nil {
+		return fmt.Errorf("error writing file: %w", err)
+	}
+	log.WithField("name", configFile).Debug("quoted timestamps in SOPS metadata")
 	return nil
 }
 

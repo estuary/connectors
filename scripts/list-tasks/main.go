@@ -48,6 +48,7 @@ var (
 	imageName    = flag.String("connector", "", "The connector image name to filter on. Can be a full URL like 'ghcr.io/estuary/source-mysql' or a short name like 'source-mysql', and in the latter case the name will be expanded into a full URL including all variants. If unspecified the task list will not be filtered by connector.")
 	namePrefix   = flag.String("prefix", "", "The task name prefix to filter on. If unspecified the task listing will not be filtered by name.")
 	missingFlags = flag.String("missing", "", "A comma-separated list of feature flags. If specified only tasks with one or more flags unset will be listed/pulled.")
+	enabledOnly  = flag.Bool("enabled", false, "When true, tasks whose shards are disabled will be skipped rather than listed/pulled.")
 
 	addToDraft = flag.Bool("draft", false, "When true, all listed tasks will be added to the active flowctl draft.")
 
@@ -93,6 +94,10 @@ func performListing(ctx context.Context) error {
 	}
 	sort.Slice(tasks, func(i, j int) bool { return strings.Compare(tasks[i].CatalogName, tasks[j].CatalogName) < 0 })
 	for _, task := range tasks {
+		if *enabledOnly && taskIsDisabled(task.Spec) {
+			log.WithField("task", task.CatalogName).Info("task is disabled, skipping")
+			continue
+		}
 		if *missingFlags != "" {
 			// Check whether the task spec already has all of the specified settings, and if so skip this task.
 			var flagNames = strings.Split(*missingFlags, ",")
@@ -236,6 +241,34 @@ func hasSettingsForAllFlags(spec json.RawMessage, flagNames []string) (hasAllFla
 		}
 	}
 	return true, nil
+}
+
+// taskIsDisabled reports whether a task's shards are disabled, which is how a capture is
+// turned off without being deleted. Note that this is distinct from a task whose bindings
+// are individually disabled: those still have a running shard and are not skipped here.
+func taskIsDisabled(spec json.RawMessage) bool {
+	return extractBoolProperty(spec, "shards", "disable")
+}
+
+// extractBoolProperty returns the boolean at the given path, or false if the path is
+// absent or holds a non-boolean. An absent 'shards.disable' means enabled, so the
+// zero value is the right answer for every failure case here.
+func extractBoolProperty(obj json.RawMessage, pathComponents ...string) bool {
+	for _, component := range pathComponents {
+		var m map[string]json.RawMessage
+		if err := json.Unmarshal(obj, &m); err != nil {
+			return false
+		} else if next, ok := m[component]; !ok {
+			return false
+		} else {
+			obj = next
+		}
+	}
+	var b bool
+	if err := json.Unmarshal(obj, &b); err != nil {
+		return false
+	}
+	return b
 }
 
 func extractStringProperty(obj json.RawMessage, pathComponents ...string) string {

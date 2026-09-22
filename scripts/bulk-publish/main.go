@@ -219,6 +219,11 @@ func publishFile(ctx context.Context, file string) error {
 func flowctl(ctx context.Context, args ...string) error {
 	log.WithField("command", args).Debug("executing flowctl command")
 	var _, err = exec.CommandContext(ctx, "flowctl", args...).Output()
+	if err, ok := err.(*exec.ExitError); ok {
+		// Without this the caller only ever sees "exit status 1", and flowctl reports
+		// the actual reason a publish failed (validation errors and the like) on stderr.
+		return fmt.Errorf("%w: %s", err, strings.TrimSpace(string(err.Stderr)))
+	}
 	return err
 }
 
