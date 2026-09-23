@@ -374,6 +374,26 @@ func TestDefaultSSLMode(t *testing.T) {
 	})
 }
 
+// testCAPEM returns a throwaway self-signed CA certificate in PEM form, for
+// cases that need 'ssl_server_ca' to contain something that actually parses.
+func testCAPEM(t *testing.T) string {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	var tmpl = &x509.Certificate{
+		SerialNumber:          big.NewInt(1),
+		Subject:               pkix.Name{CommonName: "test-ca"},
+		NotBefore:             time.Now().Add(-time.Hour),
+		NotAfter:              time.Now().Add(time.Hour),
+		KeyUsage:              x509.KeyUsageCertSign,
+		IsCA:                  true,
+		BasicConstraintsValid: true,
+	}
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	require.NoError(t, err)
+	return string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}))
+}
+
 func TestSSLModeValidation(t *testing.T) {
 	var base = func() Config {
 		return Config{Address: "db.example.com:3306", User: "flow_capture", Password: "secret"}
@@ -484,24 +504,4 @@ func TestSSLModeValidation(t *testing.T) {
 		require.Equal(t, "db.example.com", cfg.serverHost())
 		require.Equal(t, "db.example.com", (&Config{Address: "db.example.com"}).serverHost())
 	})
-}
-
-// testCAPEM returns a throwaway self-signed CA certificate in PEM form, for
-// cases that need 'ssl_server_ca' to contain something that actually parses.
-func testCAPEM(t *testing.T) string {
-	t.Helper()
-	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	require.NoError(t, err)
-	var tmpl = &x509.Certificate{
-		SerialNumber:          big.NewInt(1),
-		Subject:               pkix.Name{CommonName: "test-ca"},
-		NotBefore:             time.Now().Add(-time.Hour),
-		NotAfter:              time.Now().Add(time.Hour),
-		KeyUsage:              x509.KeyUsageCertSign,
-		IsCA:                  true,
-		BasicConstraintsValid: true,
-	}
-	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
-	require.NoError(t, err)
-	return string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}))
 }
