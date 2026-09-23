@@ -65,7 +65,7 @@ def parse_count(value: Any) -> int:
 # ---------------------------------------------------------------------------
 
 
-_VALID_KEY_TYPES = ("integer", "uuid")
+_VALID_KEY_TYPES = ("integer", "uuid", "uuid_ordered")
 
 
 @dataclass
@@ -75,7 +75,7 @@ class CollectionSpec:
     key: list[str]
     key_field: str = "id"
     payload_field: str = "payload"
-    key_type: str = "integer"  # "integer" or "uuid"
+    key_type: str = "integer"  # "integer", "uuid" or "uuid_ordered"
 
 
 @dataclass
@@ -308,6 +308,31 @@ def _int_key_to_uuid(key: int) -> str:
     return str(uuid.uuid5(_UUID_NAMESPACE, key.to_bytes(8, "little", signed=True)))
 
 
+# Millisecond timestamp of the first uuid_ordered key: 2026-01-01T00:00:00Z.
+_UUID_ORDERED_EPOCH_MS = 1_767_225_600_000
+
+
+def _int_key_to_ordered_uuid(key: int) -> str:
+    """Deterministic UUIDv7-shaped key whose string order follows the integer
+    key: the 48-bit timestamp field is the epoch above plus the key, and the
+    remaining bits derive from the v5 UUID of the key. Consecutive keys are
+    consecutive in id space, like ids minted by a time-ordered generator, so
+    a sub-range of a transaction's keys is a contiguous slice of id space."""
+    ts = _UUID_ORDERED_EPOCH_MS + key
+    tail = uuid.uuid5(_UUID_NAMESPACE, key.to_bytes(8, "little", signed=True)).int
+    rand_a = (tail >> 64) & 0x0FFF
+    rand_b = tail & 0x3FFF_FFFF_FFFF_FFFF
+    value = (ts << 80) | (0x7 << 76) | (rand_a << 64) | (0x2 << 62) | rand_b
+    return str(uuid.UUID(int=value))
+
+
+_KEY_FORMATTERS = {
+    "integer": str,
+    "uuid": _int_key_to_uuid,
+    "uuid_ordered": _int_key_to_ordered_uuid,
+}
+
+
 def _fixed_scalar(prop: str, schema: dict) -> Any:
     """Deterministic schema-appropriate value for a non-key, non-payload,
     non-_meta scalar. Called once per scenario at template-build time, so
@@ -381,7 +406,7 @@ def _build_emit_template(
     enum_slots: list[tuple[list[Any], int]] = []
     first = True
 
-    key_is_string = col.key_type == "uuid"
+    key_is_string = col.key_type != "integer"
 
     for name in ordered:
         sep = "" if first else ","
@@ -685,7 +710,7 @@ def emit(
 
         write = out.write
         doc_size = tx.doc_size
-        format_key = _int_key_to_uuid if col.key_type == "uuid" else str
+        format_key = _KEY_FORMATTERS[col.key_type]
 
         def _emit_run(keys, op: str) -> None:
             variants = templates[(col.name, op)]
