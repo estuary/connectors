@@ -1,12 +1,14 @@
 from collections.abc import AsyncGenerator
+from itertools import groupby
 from datetime import datetime, timedelta, UTC
 from logging import Logger
 from typing import Any
 
 from estuary_cdk.capture.common import LogCursor, PageCursor
-from estuary_cdk.http import HTTPSession
+from estuary_cdk.http import HTTPError, HTTPSession
 
 from .models import (
+    ChildObject,
     ConfigObject,
     DeliveriesResponse,
     Delivery,
@@ -446,3 +448,97 @@ async def backfill_design_studio_objects(
         yield row
 
     yield (window_end + timedelta(seconds=1)).isoformat()
+
+
+async def _parent_ids(
+    http: HTTPSession,
+    base: str,
+    parent: type[SnapshotObject],
+    log: Logger,
+) -> list[int | str]:
+    """Collect every parent id, draining the parent listing completely first.
+
+    Interleaving per-parent child requests with a still-open parent response
+    risks timing the parent connection out, so the ids are materialised before
+    any child request goes out.
+    """
+    drain = (
+        snapshot_paginated_objects
+        if issubclass(parent, PaginatedObject)
+        else snapshot_config_objects
+    )
+
+    ids: list[int | str] = []
+    async for row in drain(http, base, parent, log):  # type: ignore[arg-type]
+        # Snapshot models declare no fields -- a required one would fail the
+        # bare tombstone the CDK writes on deletion -- so the id is read from
+        # the extras. Raise rather than skip: a parent without an id means the
+        # provider's shape changed, and silently dropping it would take every
+        # one of its children with it.
+        extra = row.model_extra or {}
+        if "id" not in extra:
+            raise ValueError(
+                f"A {parent.NAME} row carries no id, so its children cannot be listed."
+            )
+        ids.append(extra["id"])
+
+    return ids
+
+
+async def snapshot_child_objects(
+    http: HTTPSession,
+    base: str,
+    model: type[ChildObject],
+    log: Logger,
+) -> AsyncGenerator[ChildObject, None]:
+    """Yield every child row across every parent, one request per parent.
+
+    These routes accept no parameters -- `limit` is ignored on all of them and
+    `start` is a hard 400 on the actions routes -- so each parent is a single
+    request with no page walk.
+
+    Rows are buffered across all parents and ordered once, because snapshot
+    bindings address rows positionally: ordering has to be stable over the whole
+    pass, not within one parent, or a row moves to a different key whenever an
+    earlier parent gains or loses one.
+    """
+    parent_ids = await _parent_ids(http, base, model.PARENT, log)
+
+    rows: list[tuple[int | str, dict[str, Any]]] = []
+
+    for parent_id in parent_ids:
+        # An empty id templates a path the API answers with an unrouted 404,
+        # which would silently orphan every child of that parent. Integer 0 is
+        # a legitimate id, so only the empty string is rejected.
+        if parent_id == "":
+            log.warning(
+                "Skipping a parent with an empty id.",
+                {"resource": model.NAME, "parent": model.PARENT.NAME},
+            )
+            continue
+
+        url = f"{base}{model.PATH_TEMPLATE.format(parent_id=parent_id)}"
+
+        try:
+            page = SnapshotPage.model_validate_json(await http.request(log, url))
+        except HTTPError as err:
+            # A parent deleted between listing it and reading its children.
+            # Narrow on purpose: a blanket catch here would swallow the 401 a
+            # missing token source produces, which this connector shipped once.
+            if err.code != 404:
+                raise
+            log.warning(
+                "Parent disappeared while reading its children; skipping it.",
+                {"resource": model.NAME, "parent_id": parent_id},
+            )
+            continue
+
+        rows.extend((parent_id, item) for item in page.items(model.ITEMS_KEY))
+
+    # Parent id is the outer sort term and is always present, since the driver
+    # supplies it rather than reading it off the response.
+    for parent_id, group in groupby(rows, key=lambda row: row[0]):
+        for item in _ordered(model, [item for _, item in group], log):
+            yield model.model_validate(
+                {**item, "_meta": {**(item.get("_meta") or {}), "parent_id": parent_id}}
+            )

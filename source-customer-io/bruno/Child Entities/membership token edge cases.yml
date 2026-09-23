@@ -1,0 +1,94 @@
+info:
+  name: membership token edge cases
+  type: http
+  seq: 13
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/segments/{{segment_id}}/membership?limit=1&start=MDo5OTk5OTk="
+  params:
+    - name: limit
+      value: "1"
+      type: query
+    - name: start
+      value: MDo5OTk5OTk=
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/segments/operation/listSegmentCustomers
+
+    **WHY:** `/v1/messages` has a live-cycle bug — an out-of-range positional
+    offset is silently ignored, the walk restarts at page one, and page one's
+    `next` comes back, so a naive loop never terminates (`api.py:48-52` bounds
+    it with `MAX_PAGES_PER_WINDOW`). This endpoint's token is positional in
+    exactly the same way (`MDox` -> `0:1`), so the same failure mode has to be
+    ruled out rather than assumed absent. `MDo5OTk5OTk=` is base64 `0:999999`,
+    built by hand rather than minted by the API.
+
+    **VERIFIED (2026-09-22):** **Out-of-range offsets are safe here.** The
+    response is `{"segment_id": 1, "ids": null, "identifiers": null,
+    "next": ""}` — empty arrays and a terminal token. The walk does **not**
+    restart at page one; the defining symptom of the `/v1/messages` bug is
+    absent. Behaviour matches `/v1/newsletters` (`Paginated Snapshots /
+    newsletters out of range token`) rather than `/v1/messages`.
+
+    **VERIFIED (2026-09-22):** A malformed token (`start=not-a-token`, not valid
+    base64) returns a structured `400`
+    `{"errors":[{"detail":"bad request (reference ...)","status":"400"}]}`,
+    matching every other token-paged endpoint in this API.
+
+    **Connector consequence:** the `MAX_PAGES_PER_WINDOW` guard is defensive
+    only on this route, as it is for Design Studio — no cycle is reachable. The
+    rule that a continuation token is never checkpointed still applies, on the
+    separate grounds established in `Child Entities / membership token walk`
+    (the underlying row set is not frozen).
+
+examples:
+  - name: 200 - far out-of-range offset returns empty, no restart at page one
+    request:
+      url: "https://api.customer.io/v1/segments/1/membership?limit=1&start=MDo5OTk5OTk="
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "segment_id": 1,
+            "ids": null,
+            "identifiers": null,
+            "next": ""
+          }
+  - name: 400 - malformed token rejected
+    request:
+      url: "https://api.customer.io/v1/segments/1/membership?limit=1&start=not-a-token"
+      method: GET
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "errors": [
+              {
+                "detail": "bad request (reference REDACTED)",
+                "status": "400"
+              }
+            ]
+          }

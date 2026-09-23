@@ -1,0 +1,67 @@
+info:
+  name: Child Entities
+  type: folder
+  seq: 8
+
+docs:
+  content: |-
+    Cluster E — the four per-parent list endpoints that need a parent id in the
+    path: `/v1/campaigns/{id}/actions`, `/v1/broadcasts/{id}/actions`,
+    `/v1/newsletters/{id}/contents` and `/v1/segments/{id}/membership`.
+    `/v1/transactional/{id}/contents` was probed alongside them and belongs to
+    the same family; it was not in the cluster's original scope.
+
+    Unlike `Messages Per Parent/`, these are **not** filtered views over a
+    top-level corpus — no flat `/v1/actions`, `/v1/contents` or
+    `/v1/memberships` route exists. The parent id is the only way to reach them.
+
+    ## What holds across the three `actions` / `contents` endpoints
+
+    - **No usable pagination.** `limit` is accepted and **ignored** on all
+      three; `start` is **rejected with a 400** on both `actions` routes and
+      accepted-and-ignored on `contents`. Unknown parameters (`bogus_param=1`)
+      are ignored. Each is a single-response full-list read.
+    - **The item array is `[]`, never `null`**, in the empty case observed
+      (`campaign actions bare`, `broadcast actions bare`) — but only the empty
+      case was observable for `actions`, so nothing here narrows the
+      account-wide `_null_as_empty` rule.
+    - **Envelope keys match the last path segment** (`actions`, `contents`) —
+      the `/v1/transactional` -> `messages` surprise has no counterpart here.
+    - **A missing parent returns a structured `404`**, not an empty list:
+      `{"errors":[{"detail":"not found (reference ...)","status":"404"}]}`. A
+      parent-iterating fetch must tolerate this per parent, because the parent
+      list it iterates is a snapshot taken one request earlier.
+    - **Timestamps are bare `created` / `updated` unix seconds** and rows carry
+      `deduplicate_id` — but **no endpoint in this family accepts a time
+      filter**, so none of it is usable as a server-side cursor.
+    - **The parent id is present in the item body on some routes and absent on
+      others.** `newsletters/{id}/contents` items carry `newsletter_id`;
+      `transactional/{id}/contents` items carry **no parent id at all**. The
+      `actions` routes are DOCUMENTED to carry `campaign_id` / `broadcast_id`
+      but that is UNOBSERVABLE here (both parents have zero actions). A
+      connector must stamp the parent id from its own iteration rather than
+      read it off the document.
+
+    ## Segment membership is a different endpoint
+
+    `/v1/segments/{id}/membership` shares only the parent-in-path shape. It has
+    real cursor pagination, its item arrays come back **`null`** when empty, it
+    carries the parent id in the **envelope** rather than on the item, and it
+    is the only resource in this cluster sized by the **profile base** rather
+    than by how much the workspace has been configured. See
+    `membership bare` and its siblings.
+
+    ## Sandbox contents at probe time
+
+    1 draft automation (id 1, `actions: []`), 1 API-triggered broadcast (id 2,
+    `actions: []`), 1 one-time send (id 1, `content_ids: [2]`), 1 transactional
+    message (id 1, one content variant), 9 sample segments all in
+    `state: "finished"` — segment 1 with 2 members, the other 8 empty.
+
+    Both `actions` endpoints are therefore observable **only in their empty
+    state**. There is no `POST` anywhere under `/v1/campaigns/{id}/actions` or
+    `/v1/broadcasts/{id}/actions` in the provider's OpenAPI spec — only `GET`
+    and `PUT` on an already-existing `{action_id}` — so an action cannot be
+    seeded through this collection at all. The populated shape is recorded as
+    **UNOBSERVABLE** with the UI click-path in
+    `Seeding / E1 - UI click-path - add an Email action to automation 1`.

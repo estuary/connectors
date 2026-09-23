@@ -1,0 +1,89 @@
+info:
+  name: transactional contents bare
+  type: http
+  seq: 7
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/transactional/{{transactional_id}}/contents"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/transactional/operation/listTransactionalContents
+
+    **WHY:** Not in Cluster E's assigned scope. Probed because
+    `/v1/transactional/{id}/contents` is the structural twin of
+    `/v1/newsletters/{id}/contents`, its parent (`transactional_messages`) is
+    already a captured `ConfigObject`, and if the shapes match then one
+    parametrized child fetch covers a fourth resource for the price of a model
+    subclass. It also serves as the second data point for the cluster's
+    parent-id-in-body question, which one route cannot settle alone.
+
+    **VERIFIED (2026-09-22):** Same envelope key `contents`, same item shape,
+    same bare `created` / `updated` unix seconds. Confirms the `contents`
+    family is one shape, not two.
+
+    **VERIFIED (2026-09-22):** **The item carries no parent id.** There is no
+    `transactional_id` key, and no equivalent — where the newsletters route
+    supplies `newsletter_id`. This is what settles the cluster's design: the
+    connector must stamp the parent id from its own iteration context rather
+    than read it off the document, because the provider supplies it on some
+    routes in this family and not others.
+
+    **VERIFIED (2026-09-22):** `body` is `""` here and `recipient`, `bcc`, `cc`,
+    `preheader_text` come back **`null`** where the newsletters route returned
+    `""` for the same fields. Two null/empty conventions inside one response
+    family; another reason no field in this family may be typed non-optional.
+
+    **Not a Cluster E deliverable.** Recorded here as evidence for a
+    `transactional_contents` resource the orchestrator may choose to add on the
+    same fetch function. The full response is 338 bytes, so the size argument
+    that applies to newsletter contents does not apply to this one in the
+    sandbox — though it would for a workspace with real transactional templates.
+
+examples:
+  - name: 200 - single content variant, no parent id on the item
+    request:
+      url: "https://api.customer.io/v1/transactional/1/contents"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "contents": [
+              {
+                "id": 1,
+                "name": "All uncategorized email messages",
+                "body": "",
+                "created": 1789071557,
+                "updated": 1789071557,
+                "language": "",
+                "type": "email",
+                "from": "",
+                "from_id": null,
+                "reply_to": "",
+                "reply_to_id": null,
+                "preprocessor": "",
+                "recipient": null,
+                "subject": "",
+                "bcc": null,
+                "cc": null,
+                "fake_bcc": true,
+                "preheader_text": null,
+                "headers": "[]"
+              }
+            ]
+          }

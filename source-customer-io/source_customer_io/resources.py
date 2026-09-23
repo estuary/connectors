@@ -12,9 +12,11 @@ from estuary_cdk.capture.common import (
 from estuary_cdk.http import HTTPMixin, TokenSource, HTTPError
 
 from .models import (
+    CHILD_OBJECTS,
     CONFIG_OBJECTS,
     DESIGN_STUDIO_OBJECTS,
     PAGINATED_OBJECTS,
+    ChildObject,
     ConfigObject,
     ConnectorState,
     Delivery,
@@ -31,6 +33,7 @@ from .api import (
     base_url,
     fetch_deliveries,
     fetch_design_studio_objects,
+    snapshot_child_objects,
     snapshot_config_objects,
     snapshot_paginated_objects,
 )
@@ -47,6 +50,11 @@ DEFAULT_SNAPSHOT_INTERVAL = timedelta(minutes=5)
 # workspace has been configured. It is also opt-out state, which does not need
 # minute-level freshness.
 SNAPSHOT_INTERVALS = {"optouts": timedelta(hours=1)}
+
+# Child resources cost one request per parent on every poll, so their request
+# count grows with how much a workspace has been configured rather than being
+# fixed. They describe message structure, which changes rarely.
+CHILD_INTERVAL = timedelta(hours=1)
 
 
 async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointConfig):
@@ -265,6 +273,40 @@ def design_studio_object(
     )
 
 
+def child_object(
+    http: HTTPMixin, config: EndpointConfig, model: type[ChildObject]
+) -> common.Resource:
+    base = base_url(config.region)
+
+    def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings,
+    ):
+        open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_snapshot=functools.partial(
+                snapshot_child_objects, http, base, model
+            ),
+            tombstone=model(_meta=model.Meta(op="d")),
+        )
+
+    return SnapshotResource(
+        name=model.NAME,
+        open=open,
+        initial_config=ResourceConfig(
+            name=model.NAME,
+            interval=CHILD_INTERVAL,
+        ),
+        schema_inference=True,
+    )
+
+
 async def all_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
@@ -276,4 +318,5 @@ async def all_resources(
         *(config_object(http, config, model) for model in CONFIG_OBJECTS),
         *(paginated_object(http, config, model) for model in PAGINATED_OBJECTS),
         *(design_studio_object(http, config, model) for model in DESIGN_STUDIO_OBJECTS),
+        *(child_object(http, config, model) for model in CHILD_OBJECTS),
     ]

@@ -1,0 +1,90 @@
+info:
+  name: broadcast actions bare
+  type: http
+  seq: 3
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/broadcasts/{{broadcast_id}}/actions"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/broadcasts/operation/listBroadcastActions
+
+    **WHY:** Confirm this route is the same shape as
+    `Child Entities / campaign actions bare` rather than a second convention,
+    which is what decides whether one parametrized fetch covers both. The
+    provider has already shipped three different pagination mechanisms and four
+    different termination conventions across this API, so sibling routes are
+    never assumed to match.
+
+    **VERIFIED (2026-09-22):** Envelope key `actions`, empty array `[]`, and
+    **no `next` key** — identical to the campaigns route. The spec declares no
+    `next` for this operation and none appears, so here the spec is right.
+
+    **VERIFIED (2026-09-22):** **The spec is wrong about the parameters.** It
+    declares *no* query parameters for this operation, but `start=MDox` and a
+    freshly-built base64 `0:0` both return a structured `400`, so the route
+    parses and validates a `start` parameter the spec does not document.
+    `limit=1` is accepted and ignored, as on the campaigns route. Net effect for
+    the connector is the same on both: send no parameters.
+
+    **UNOBSERVABLE:** the populated shape and whether a `next` key appears once
+    the array is non-empty. Broadcast 2 is an API-triggered broadcast in `draft`
+    with `actions: []`, and as with campaigns there is **no `POST`** under
+    `/v1/broadcasts/{broadcast_id}/actions` — only `GET` and `PUT` on an
+    existing `{action_id}`. Proceeding on the falsiness termination test, which
+    is correct whether `next` is absent, `""`, or a token. See
+    `Seeding / E1 - UI click-path - add an Email action to automation 1` for the
+    only path that would populate an actions array in this workspace.
+
+    **VERIFIED (2026-09-22):** **No duplication with the parent document**, on
+    the same evidence as the campaigns route: a `broadcasts` list item's
+    `actions[]` is the two-field `{id, type}` stub, while this endpoint returns
+    the full action body.
+
+examples:
+  - name: 200 - empty actions array, no next key
+    request:
+      url: "https://api.customer.io/v1/broadcasts/2/actions"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "actions": []
+          }
+  - name: 400 - undocumented start parameter is parsed and rejected
+    request:
+      url: "https://api.customer.io/v1/broadcasts/2/actions?start=MDox"
+      method: GET
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "errors": [
+              {
+                "detail": "bad request (reference REDACTED)",
+                "status": "400"
+              }
+            ]
+          }

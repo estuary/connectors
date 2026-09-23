@@ -280,6 +280,52 @@ docs:
       discriminable in a workspace with zero folders — see `Design Studio /
       parent folder scoping` and `Seeding / D1`.
 
+    ### Cluster E — the per-parent child routes (`Child Entities/`)
+
+    `/v1/campaigns/{id}/actions`, `/v1/broadcasts/{id}/actions`,
+    `/v1/newsletters/{id}/contents`, `/v1/segments/{id}/membership`, plus the
+    out-of-scope sibling `/v1/transactional/{id}/contents`. Unlike
+    `Messages Per Parent/`, no flat top-level route exists for any of them.
+
+    - **A missing parent is a structured `404`, not an empty list**, on all four
+      routes. A parent-iterating fetch must skip per parent on 404 and let every
+      other status propagate — see `Child Entities / missing parent 404`.
+    - **The three `actions`/`contents` routes have no usable pagination.**
+      `limit` is accepted and ignored everywhere; `start` is **rejected with a
+      400** on both `actions` routes and accepted-and-ignored on `contents`.
+      Single-response full-list reads, no `next`/`total`/`has_more`.
+    - **A fourth `next` convention is now confirmed by absence.**
+      `/v1/campaigns/{id}/actions` omits `next` entirely, even though the spec
+      declares it on the 200 schema. The falsiness rule holds.
+    - **The parent id is on the item on some routes and not others.**
+      `newsletters/{id}/contents` items carry `newsletter_id`;
+      `transactional/{id}/contents` items carry no parent id at all;
+      `segments/{id}/membership` carries `segment_id` on the **envelope**. The
+      `actions` routes are DOCUMENTED to carry it but that is UNOBSERVABLE. A
+      connector must stamp the parent id from its own iteration.
+    - **Both `actions` routes are observable only empty**, and **no `POST`
+      exists** to create an action anywhere in this API — only `PUT` on an
+      existing `{action_id}`. The populated shape is UNOBSERVABLE, not PENDING;
+      the UI click-path is `Seeding / E1 - UI click-path - add an Email action
+      to automation 1`.
+    - **`/v1/newsletters/{id}/contents` has no metadata grain.** One content
+      variant is 13,446 bytes, of which `body` is 10,196 bytes of rendered HTML.
+      Unlike Design Studio, the body is not behind a separate per-row request —
+      the list endpoint is the only endpoint.
+    - **`/v1/segments/{id}/membership` is the only route here with real
+      pagination** (`start` + `limit`, honoured, `limit` default 1000 /
+      documented max 30000, over-max accepted with a 200). Its token is a fourth
+      format — base64 `0:<offset>`, positional, per-segment. Out-of-range
+      offsets are **safe** (no `/v1/messages`-style restart); malformed ones
+      400. Both item arrays come back **`null`** when a segment is empty.
+    - **Spec defects eight, nine and ten** were found in this cluster: `next`
+      declared but absent on campaign actions; `preprocessor` observed as
+      `"none"` against an `enum: ["premailer"]`; `identifiers`/`ids` declared
+      non-nullable `type: "array"` but returned as `null`. Plus four fields
+      (`created`, `updated`, `body_plain`, `test_group_id`) present on every
+      `contents` item and absent from the spec, and a `start` parameter parsed
+      by `/v1/broadcasts/{id}/actions` that the spec does not declare.
+
     ### Probe authorization
 
     The live runs recorded here — Cluster A's 18 GETs and Cluster B's 16 on
@@ -300,11 +346,19 @@ docs:
     proceed. `Seeding / D1` was **not** run — it is a POST, and the nesting step
     it describes is UI-only in any case.
 
-    The Cluster C and Cluster D runs were made with `curl` rather than `bru`,
+    Cluster E's 34 GETs on 2026-09-22 were made on the same basis. `config.yaml`
+    is now tracked and its own porcelain is clean, so `API-CONFIG-GATE`'s
+    read-only precondition is met for the first time; the working tree still
+    carries unrelated uncommitted work elsewhere in the repo, and the user
+    additionally authorized this cluster's reads explicitly and directed it to
+    proceed. No `Seeding/` request was run, and `Seeding / E1` is a read-back
+    GET whose seeding step is a manual UI click-path with no API equivalent.
+
+    The Cluster C, D and E runs were made with `curl` rather than `bru`,
     which is not installed on this machine. The auth path was the same — `sops -d` on the
     same `config.yaml`, token never written to disk or to a shell variable that
-    outlives the command. The requests in `Paginated Snapshots/` and
-    `ESP Suppressions/` are the faithful Bruno transcription of what ran, and
+    outlives the command. The requests in `Paginated Snapshots/`,
+    `ESP Suppressions/` and `Child Entities/` are the faithful Bruno transcription of what ran, and
     re-running them under `bru` should reproduce the recorded findings
     exactly.
 

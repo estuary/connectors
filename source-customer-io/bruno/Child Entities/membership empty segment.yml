@@ -1,0 +1,62 @@
+info:
+  name: membership empty segment
+  type: http
+  seq: 9
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/segments/{{segment_id_empty}}/membership"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/segments/operation/listSegmentCustomers
+
+    **WHY:** The account-wide rule from Cluster B is that several endpoints
+    serialise an empty item array as JSON `null`, and that a pydantic field
+    default applies only when a key is **absent** — an explicit `null` raises.
+    Which endpoints do it is a provider serializer artifact, so every new
+    endpoint's empty case is checked rather than inferred. Segment 7 ("Invalid
+    Email Address") has no members and provides the empty case for free.
+
+    **VERIFIED (2026-09-22):** **Both arrays come back `null`, not `[]`** —
+    `{"segment_id": 7, "ids": null, "identifiers": null, "next": ""}`. The
+    provider's OpenAPI spec declares both as `type: "array"`, not nullable; that
+    is the tenth observed spec defect in this API.
+
+    **Connector consequence:** `identifiers` must be read through
+    `models.py:_null_as_empty` (or `SnapshotPage.items()`, which already applies
+    `or []`). A bare `identifiers: list[Identifier] = []` would raise a
+    `ValidationError` on every empty segment — and in a real workspace most
+    segments in a poll are likely to be small or empty, so this would fire
+    constantly rather than as an edge case.
+
+    **VERIFIED (2026-09-22):** `next` is `""` even on a wholly empty response,
+    so the terminal test is uniform across empty and non-empty responses.
+
+examples:
+  - name: 200 - empty segment returns null arrays, not empty arrays
+    request:
+      url: "https://api.customer.io/v1/segments/7/membership"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "segment_id": 7,
+            "ids": null,
+            "identifiers": null,
+            "next": ""
+          }

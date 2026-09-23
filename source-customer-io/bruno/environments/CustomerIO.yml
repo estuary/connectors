@@ -21,3 +21,16 @@ variables:
     value: 3f7e2935-acdc-412e-8eaa-1e4b172a8008
   - name: design_studio_email_updated
     value: "1789071558"
+  # Cluster E parents. Pinned from the `Snapshots/` bare listings.
+  - name: campaign_id
+    value: "1"
+  - name: broadcast_id
+    value: "2"
+  - name: transactional_id
+    value: "1"
+  # Segment 1 ("All Users") has 2 members; segment 7 ("Invalid Email Address")
+  # has none, and is what makes the null-array empty case observable.
+  - name: segment_id
+    value: "1"
+  - name: segment_id_empty
+    value: "7"

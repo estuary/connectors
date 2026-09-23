@@ -1,0 +1,110 @@
+info:
+  name: membership bare
+  type: http
+  seq: 8
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/segments/{{segment_id}}/membership"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/segments/operation/listSegmentCustomers
+
+    **WHY:** Establish the envelope, the document grain, and where the parent id
+    lives — this is the only Cluster E route whose response is a pair of
+    parallel arrays rather than a list of objects, so "what is one document" is
+    a real question rather than a formality.
+
+    **VERIFIED (2026-09-22):** The envelope is
+    `{segment_id, ids[], identifiers[], next}`. **`segment_id` is on the
+    envelope, not on the items** — the only route in this cluster where that is
+    true, and the reason this resource needs the `child-entities` stamping
+    machinery that the `actions` / `contents` routes do not.
+
+    **VERIFIED (2026-09-22):** `identifiers[]` and `ids[]` are **parallel and
+    redundant**: `ids[i] == identifiers[i].id` for every element observed.
+    `identifiers[]` carries `{cio_id, email, id}`; `ids[]` carries only the `id`
+    string. The provider's own guidance agrees — "In general, we recommend that
+    you use `identifiers` rather than `ids` to find people, because it provides
+    more information." A connector should build documents from `identifiers[]`
+    and ignore `ids[]` entirely.
+
+    **DOCUMENTED (2026-09-22):** two ways `ids[]` is lossy, neither reproducible
+    here: "if your workspace uses both `email` and `id` as identifiers, it's
+    possible that a member of your segment does not have an `id` value,
+    resulting in an **empty string** in the `ids` array"; and "**If your
+    workspace does not use email as a unique identifier** for people,
+    `identifiers` does not contain `email` values." `cio_id` is the only
+    identifier present under every workspace configuration, which makes it the
+    only safe key component.
+
+    **VERIFIED (2026-09-22):** `next` is present and `""` on the terminal page
+    — the `/v1/messages` convention, not the absent-key convention the `actions`
+    routes use. Falsiness test, as everywhere.
+
+    **Document grain:** one person's membership of one segment, i.e.
+    `(segment_id, cio_id)`. The API's transport grouping is "one segment's whole
+    roster in one envelope"; that is not an atomic fact and is unbounded in
+    size.
+
+    **LIMITATION (DOCUMENTED 2026-09-22):** a segment carries
+    `state` in {`events`, `build`, `events_queued`, `build_queued`, `finished`}
+    and a `progress` percentage. Reading membership while `state != "finished"`
+    returns a **partial roster with a 200 and no warning**. **UNOBSERVABLE
+    here:** all 9 sandbox segments are `finished` and a rebuild cannot be
+    provoked read-only, so neither the partial response nor any signal
+    distinguishing it from a complete one could be captured. This is the finding
+    that drives the plan's recommendation to drop the resource from v1 — under a
+    snapshot binding a partial roster is indistinguishable from people having
+    genuinely left the segment, and the CDK would emit tombstones for all of
+    them (`estuary-cdk/estuary_cdk/capture/common.py:1133-1141`).
+
+    **Saved-example note:** identifiers are replaced with placeholders. The real
+    values are two live mailbox addresses and their customer ids; the
+    collection's `after-response` script redacts `email` automatically, and
+    `id` / `cio_id` / the `ids[]` strings are hand-scrubbed here because `id` is
+    load-bearing elsewhere in this collection and must not be added to the
+    global redaction list.
+
+examples:
+  - name: 200 - two members, parallel ids and identifiers (placeholder identities)
+    request:
+      url: "https://api.customer.io/v1/segments/1/membership"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "segment_id": 1,
+            "ids": [
+              "example_person_1",
+              "example_person_2"
+            ],
+            "identifiers": [
+              {
+                "cio_id": "aa0000000001",
+                "email": "REDACTED",
+                "id": "example_person_1"
+              },
+              {
+                "cio_id": "aa0000000002",
+                "email": "REDACTED",
+                "id": "example_person_2"
+              }
+            ],
+            "next": ""
+          }

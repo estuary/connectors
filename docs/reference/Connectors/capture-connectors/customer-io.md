@@ -13,18 +13,22 @@ The following data resources are supported:
 | Resource | Replication Mode |
 |----------|------------------|
 | [messages](https://docs.customer.io/integrations/api/app/tag/Messages/operation/listMessages/) | Incremental |
+| [broadcast_actions](https://docs.customer.io/integrations/api/app/tag/Broadcasts/) | Full Refresh |
 | [broadcasts](https://docs.customer.io/integrations/api/app/tag/Broadcasts/) | Full Refresh |
+| [campaign_actions](https://docs.customer.io/integrations/api/app/tag/Automations/) | Full Refresh |
 | [campaigns](https://docs.customer.io/integrations/api/app/tag/Automations/) | Full Refresh |
 | [collections](https://docs.customer.io/integrations/api/app/tag/Collections/) | Full Refresh |
 | [design_studio_components](https://docs.customer.io/integrations/api/app/tag/Design-Studio/) | Incremental |
 | [design_studio_emails](https://docs.customer.io/integrations/api/app/tag/Design-Studio/) | Incremental |
 | [design_studio_folders](https://docs.customer.io/integrations/api/app/tag/Design-Studio/) | Incremental |
+| [newsletter_contents](https://docs.customer.io/integrations/api/app/tag/Newsletters/) | Full Refresh |
 | [newsletters](https://docs.customer.io/integrations/api/app/tag/Newsletters/operation/listNewsletters/) | Full Refresh |
 | [object_types](https://docs.customer.io/integrations/api/app/tag/Objects/) | Full Refresh |
 | [optouts](https://docs.customer.io/integrations/api/app/tag/Optouts/) | Full Refresh |
 | [segments](https://docs.customer.io/integrations/api/app/tag/Segments/operation/listSegments/) | Full Refresh |
 | [sender_identities](https://docs.customer.io/integrations/api/app/tag/Senders/) | Full Refresh |
 | [subscription_topics](https://docs.customer.io/integrations/api/app/tag/Subscriptions/) | Full Refresh |
+| [transactional_contents](https://docs.customer.io/integrations/api/app/tag/Transactional/) | Full Refresh |
 | [transactional_messages](https://docs.customer.io/integrations/api/app/tag/Transactional/) | Full Refresh |
 
 By default, each resource is mapped to an Estuary collection through a separate binding.
@@ -63,6 +67,20 @@ rendered email body. It is an inventory of what exists, not an archive of conten
 Folders are captured once, by the `design_studio_folders` resource. The emails and
 components responses also carry a folder list, which the connector ignores to avoid
 writing the same folder into two collections; use `parent_folder_id` to join.
+:::
+
+:::tip
+Four resources list content under a parent: `campaign_actions`, `broadcast_actions`,
+`newsletter_contents` and `transactional_contents`. Each costs one request per parent on
+every sync, so they poll hourly rather than every five minutes — they describe how
+messages are structured, which changes rarely.
+
+Because Customer.io reports the parent inconsistently on these routes, the connector
+records it itself at `/_meta/parent_id`. Use that to join a child back to its parent
+rather than any parent field in the document body.
+
+`newsletter_contents` and `transactional_contents` include the rendered message body,
+which can be tens of kilobytes per variant. These routes offer no metadata-only view.
 :::
 
 :::tip

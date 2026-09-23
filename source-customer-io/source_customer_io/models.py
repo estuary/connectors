@@ -337,3 +337,70 @@ DESIGN_STUDIO_OBJECTS: list[type[DesignStudioObject]] = [
     DesignStudioComponents,
     DesignStudioFolders,
 ]
+
+
+class ChildObject(SnapshotObject):
+    """A snapshot object listed under a parent, one request per parent.
+
+    These routes accept no parameters at all -- `limit` is ignored on every one
+    of them and `start` is a hard 400 on the actions routes -- so each parent is
+    a single request and there is no page walk to write.
+    """
+
+    class Meta(BaseDocument.Meta):
+        # Namespaced under `_meta` rather than stamped at the top level, because
+        # the provider's own parent references are inconsistent and would
+        # collide: newsletter contents carry `newsletter_id`, transactional
+        # contents carry no parent reference at all, and the actions routes'
+        # are documented but have never been observed.
+        parent_id: int | str = Field(
+            default="",
+            description="Id of the parent this document was listed under.",
+        )
+
+    meta_: Meta = Field(
+        default_factory=Meta,
+        alias="_meta",
+        description="Document metadata",
+    )
+
+    # The model whose listing supplies parent ids.
+    PARENT: ClassVar[type[SnapshotObject]]
+    # Formatted with `parent_id`, e.g. "/v1/campaigns/{parent_id}/actions".
+    PATH_TEMPLATE: ClassVar[str]
+
+
+class CampaignActions(ChildObject):
+    NAME = "campaign_actions"
+    PARENT = Campaigns
+    PATH_TEMPLATE = "/v1/campaigns/{parent_id}/actions"
+    ITEMS_KEY = "actions"
+
+
+class BroadcastActions(ChildObject):
+    NAME = "broadcast_actions"
+    PARENT = Broadcasts
+    PATH_TEMPLATE = "/v1/broadcasts/{parent_id}/actions"
+    ITEMS_KEY = "actions"
+
+
+class NewsletterContents(ChildObject):
+    NAME = "newsletter_contents"
+    PARENT = Newsletters
+    PATH_TEMPLATE = "/v1/newsletters/{parent_id}/contents"
+    ITEMS_KEY = "contents"
+
+
+class TransactionalContents(ChildObject):
+    NAME = "transactional_contents"
+    PARENT = TransactionalMessages
+    PATH_TEMPLATE = "/v1/transactional/{parent_id}/contents"
+    ITEMS_KEY = "contents"
+
+
+CHILD_OBJECTS: list[type[ChildObject]] = [
+    CampaignActions,
+    BroadcastActions,
+    NewsletterContents,
+    TransactionalContents,
+]
