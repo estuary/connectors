@@ -247,6 +247,7 @@ class Campaigns(ResourceWithId):
     interval: ClassVar[timedelta] = timedelta(minutes=5)
     KEY_PROPERTIES: ClassVar[dict[str, Any]] = {
         "id": {"type": "integer"},
+        "campaignState": {"type": "string", "minLength": 0, "maxLength": 16},
     }
 
     createdAt: int
