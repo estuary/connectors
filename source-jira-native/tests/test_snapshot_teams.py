@@ -65,13 +65,13 @@ def test_cloud_id_is_looked_up_from_the_accounts_domain():
     assert http.requests[0][0] == f"https://{DOMAIN}/_edge/tenant_info"
 
 
-def test_teams_are_requested_through_the_site_gateway():
+def test_teams_are_requested_from_the_teams_api_host():
     http = StubSession([{"cursor": None, "entities": [{"teamId": "t1"}]}])
 
     run_snapshot(http)
 
     url = [url for url, _ in http.requests if "/teams" in urlparse(url).path][0]
-    assert url == f"https://{DOMAIN}/gateway/api/public/teams/v1/org/{ORG_ID}/teams"
+    assert url == f"https://api.atlassian.com/public/teams/v1/org/{ORG_ID}/teams"
 
 
 def test_pages_are_walked_until_the_cursor_is_null():

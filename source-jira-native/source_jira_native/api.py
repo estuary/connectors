@@ -79,8 +79,8 @@ NEXT_GEN_ISSUE = r"The request contains a next-gen issue"
 ALL_ISSUE_FIELDS = "*all"
 MINIMAL_ISSUE_FIELDS = "id,updated"
 
-# Atlassian's Teams component docs give 50 as the per-page maximum.
-TEAMS_PAGE_SIZE = 50
+# The Teams API's maximum page size.
+TEAMS_PAGE_SIZE = 300
 
 # HTTP timeout configuration with sock_read to prevent requests from hanging
 # indefinitely during body reading. Without sock_read, a stalled connection
@@ -110,9 +110,7 @@ def url_base(domain: str, api: JiraAPI) -> str:
         case JiraAPI.SERVICE_MANAGEMENT:
             return f"{common}/servicedeskapi"
         case JiraAPI.TEAMS:
-            # The site gateway keeps every request on the customer's own Jira
-            # host, which matters wherever egress is restricted to it.
-            return f"https://{domain}/gateway/api/public/teams/v1"
+            return "https://api.atlassian.com/public/teams/v1"
         case _:
             raise RuntimeError(f"Unknown JiraAPI {api}.")
 
@@ -197,8 +195,6 @@ async def snapshot_teams(
         for team in response.entities:
             yield FullRefreshResource.model_validate(team)
 
-        # The final page carries results *and* a null cursor, so entities must be
-        # yielded before the cursor is checked or that page would be dropped.
         if not response.cursor:
             break
 
