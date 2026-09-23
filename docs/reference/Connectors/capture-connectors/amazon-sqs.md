@@ -1,6 +1,11 @@
 ---
-description: Capture Amazon SQS messages into Estuary, using AWS IAM secret and access keys, with deletion configuration.
+title: Amazon SQS (deprecated)
+description: Deprecated Amazon SQS capture connector. Use Estuary's native Amazon SQS connector instead to capture messages from SQS queues.
 ---
+
+<head>
+  <meta name="robots" content="noindex, follow" />
+</head>
 
 # Amazon SQS (deprecated)
 

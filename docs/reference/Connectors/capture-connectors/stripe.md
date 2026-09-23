@@ -1,3 +1,12 @@
+---
+title: Stripe (Deprecated)
+description: Deprecated Stripe capture connector. Use Estuary's Stripe Real-time connector instead to stream charges, invoices, customers, and payment events.
+---
+
+<head>
+  <meta name="robots" content="noindex, follow" />
+</head>
+
 # Stripe (Deprecated)
 
 This connector captures data from Stripe into Estuary collections.
