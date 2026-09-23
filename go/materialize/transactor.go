@@ -420,6 +420,10 @@ func RunTransactions(
 			if err != nil {
 				return fmt.Errorf("invalid timestamp in Flush.BackfillBegins: %w", err)
 			}
+			log.WithFields(log.Fields{
+				"binding":  bb.Binding,
+				"boundary": backfillBegins[int(bb.Binding)],
+			}).Info("backfill began")
 		}
 		var backfillCompletes = make(map[int]time.Time, len(rxRequest.Flush.BackfillCompletes))
 		for _, bc := range rxRequest.Flush.BackfillCompletes {
@@ -427,6 +431,10 @@ func RunTransactions(
 			if err != nil {
 				return fmt.Errorf("invalid timestamp in Flush.BackfillCompletes: %w", err)
 			}
+			log.WithFields(log.Fields{
+				"binding":  bc.Binding,
+				"boundary": backfillCompletes[int(bc.Binding)],
+			}).Info("backfill completed")
 		}
 		if err = transactor.Flush(ctx, statePatches, backfillBegins, backfillCompletes); err != nil {
 			return fmt.Errorf("transactor.Flush: %w", err)
