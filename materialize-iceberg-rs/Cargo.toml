@@ -8,6 +8,7 @@ rust-version = "1.97"
 proto-flow = { git = "https://github.com/estuary/flow" }
 
 anyhow = "1.0"
+axum = "0.8"
 bytes = "1.11"
 prost = "0.14"
 schemars = "1.2"

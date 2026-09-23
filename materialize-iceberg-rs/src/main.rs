@@ -1,8 +1,14 @@
 use anyhow::Context;
-use materialize_iceberg_rs::{run_connector, Input, Output};
+use materialize_iceberg_rs::{Input, Output, run_connector, server};
 
 fn main() -> anyhow::Result<()> {
     let runtime = start_runtime()?;
+
+    runtime.spawn(async {
+        if let Err(err) = server::run_server().await {
+            tracing::error!(error = %err, "connector-networking server exited");
+        }
+    });
 
     let result = runtime.block_on(run_connector(Input::new(), Output::new()));
 

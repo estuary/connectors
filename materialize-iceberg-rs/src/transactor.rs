@@ -1,10 +1,9 @@
 use anyhow::Result;
 use proto_flow::materialize::{
-    request,
+    Response, request,
     request::Open,
     response,
     response::{Acknowledged, Flushed, Opened, StartedCommit},
-    Response,
 };
 
 use crate::{Input, Output};
