@@ -1,0 +1,143 @@
+name: MySQL cloud CA bundles
+
+# Keeps go/mysql/tls/cloudcas/ in step with what its update.sh fetches from
+# Amazon and Google.
+#
+# Why this is needed. source-mysql and source-mysql-batch default to
+# 'verify_identity', and when 'ssl_server_ca' is empty they trust these bundled
+# CAs on top of the system roots. The providers rotate their CAs on their own
+# schedule: a CA that a provider adds and that we don't bundle breaks every new
+# instance it signs, and a CA it withdraws stays trusted here until someone
+# notices. The bundles are embedded at build time, so nothing refreshes them
+# except a commit.
+#
+# What runs when.
+#   - Daily (and manually), the refresh job fetches the bundles and, if they
+#     changed, opens a PR with the new ones. .github/CODEOWNERS requests review
+#     from @estuary/capture, because this workflow's GITHUB_TOKEN cannot request
+#     a team. While that PR is open the job leaves it alone: the action that
+#     opens it force-pushes its branch, which would discard anything a reviewer
+#     committed to it, such as changelog entries.
+#   - On PRs that touch the bundles or this tooling, the check job fails if the
+#     bundles don't match upstream, so a hand-edited bundle or a stale refresh
+#     PR can't merge. It deliberately doesn't run on every PR: the upstream
+#     files change independently of this repo, and a provider's rotation would
+#     otherwise turn every unrelated PR red.
+#
+# GitHub doesn't start workflows for PRs opened with GITHUB_TOKEN, so CI stays
+# idle on the refresh PR until someone closes and reopens it, or pushes to it.
+
+on:
+  schedule:
+    - cron: "0 7 * * *"
+  pull_request:
+    paths:
+      - go/mysql/tls/cloudcas/**
+      - .github/scripts/cloudcas-diff-summary.sh
+      - .github/workflows/mysql-cloud-cas.yaml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CLOUDCAS_DIR: go/mysql/tls/cloudcas
+  REFRESH_BRANCH: automation/mysql-cloud-cas
+
+jobs:
+  check:
+    name: MySQL cloud CA bundles
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch the CA bundles
+        run: $CLOUDCAS_DIR/update.sh
+
+      - name: Fail if the fetched bundles differ from the committed ones
+        run: |
+          set -euo pipefail
+          # --porcelain also reports a bundle that update.sh newly writes and
+          # that isn't committed yet, which `git diff` would miss.
+          if [ -z "$(git status --porcelain -- "$CLOUDCAS_DIR")" ]; then
+            echo "CA bundles are up to date."
+            exit 0
+          fi
+          {
+            echo "### MySQL cloud CA bundles are out of date"
+            echo
+            echo "Run \`$CLOUDCAS_DIR/update.sh\` and commit the result."
+            echo
+            .github/scripts/cloudcas-diff-summary.sh
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+          git diff --stat -- "$CLOUDCAS_DIR"
+          echo "::error::The CA bundles in $CLOUDCAS_DIR differ from upstream. Run $CLOUDCAS_DIR/update.sh and commit the result."
+          exit 1
+
+  refresh:
+    name: Refresh MySQL cloud CA bundles
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Skip if a refresh PR is already open
+        id: open
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          url=$(gh pr list --head "$REFRESH_BRANCH" --state open --json url --jq '.[0].url // ""')
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          if [ -n "$url" ]; then
+            echo "A refresh PR is already open, so it is left untouched: $url" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Fetch the CA bundles
+        if: steps.open.outputs.url == ''
+        run: $CLOUDCAS_DIR/update.sh
+
+      - name: Describe the changes
+        id: diff
+        if: steps.open.outputs.url == ''
+        run: |
+          set -euo pipefail
+          if [ -z "$(git status --porcelain -- "$CLOUDCAS_DIR")" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "CA bundles are up to date." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          {
+            echo "The managed-database CA bundles that source-mysql and source-mysql-batch trust under \`verify_identity\` changed upstream. This PR is the output of \`$CLOUDCAS_DIR/update.sh\`, opened by the [MySQL cloud CA bundles workflow]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)."
+            echo
+            echo "### Certificates added (+) and removed (-)"
+            echo
+            .github/scripts/cloudcas-diff-summary.sh
+            echo "### Before merging"
+            echo
+            echo "- [ ] Check each added or removed CA against the provider's announcement. A removed CA breaks every server still using it."
+            echo "- [ ] Add CHANGELOG entries for source-mysql and source-mysql-batch. The workflow won't touch this branch while the PR is open, so commit them here."
+            echo "- [ ] Close and reopen this PR to start CI. GitHub doesn't run workflows for PRs opened by GitHub Actions."
+          } > "$RUNNER_TEMP/pr-body.md"
+          cat "$RUNNER_TEMP/pr-body.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Open the refresh PR
+        id: pr
+        if: steps.diff.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: ${{ env.REFRESH_BRANCH }}
+          delete-branch: true
+          add-paths: ${{ env.CLOUDCAS_DIR }}
+          commit-message: "go/mysql/tls: refresh managed-database CA bundles"
+          title: "go/mysql/tls: refresh managed-database CA bundles"
+          body-path: ${{ runner.temp }}/pr-body.md
+
+      - name: Link the PR
+        if: steps.pr.outputs.pull-request-url != ''
+        run: echo "Opened ${{ steps.pr.outputs.pull-request-url }}" | tee -a "$GITHUB_STEP_SUMMARY"
