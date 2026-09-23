@@ -58,6 +58,9 @@ from .models import (
     Sprints,
     Statuses,
     SystemAvatarsResponse,
+    Teams,
+    TeamsResponse,
+    TenantInfoResponse,
     EPOCH,
 )
 
@@ -75,6 +78,9 @@ NEXT_GEN_ISSUE = r"The request contains a next-gen issue"
 
 ALL_ISSUE_FIELDS = "*all"
 MINIMAL_ISSUE_FIELDS = "id,updated"
+
+# Atlassian's Teams component docs give 50 as the per-page maximum.
+TEAMS_PAGE_SIZE = 50
 
 # HTTP timeout configuration with sock_read to prevent requests from hanging
 # indefinitely during body reading. Without sock_read, a stalled connection
@@ -103,6 +109,10 @@ def url_base(domain: str, api: JiraAPI) -> str:
             return f"{common}/agile/1.0"
         case JiraAPI.SERVICE_MANAGEMENT:
             return f"{common}/servicedeskapi"
+        case JiraAPI.TEAMS:
+            # The site gateway keeps every request on the customer's own Jira
+            # host, which matters wherever egress is restricted to it.
+            return f"https://{domain}/gateway/api/public/teams/v1"
         case _:
             raise RuntimeError(f"Unknown JiraAPI {api}.")
 
@@ -135,6 +145,64 @@ async def fetch_timezone(
     log.info(f"Using timezone {response.timeZone} ({_format_utc_offset(timezone)}).")
 
     return timezone
+
+
+async def fetch_cloud_id(
+    http: HTTPSession,
+    domain: str,
+    log: Logger,
+) -> str:
+    """
+    Returns the account's cloud id, which the Teams API calls the site id.
+
+    Atlassian documents looking it up this way in
+    https://support.atlassian.com/jira/kb/retrieve-my-atlassian-sites-cloud-id/.
+    """
+    url = f"https://{domain}/_edge/tenant_info"
+
+    response = TenantInfoResponse.model_validate_json(
+        await http.request(log, url, timeout=HTTP_TIMEOUT)
+    )
+
+    return response.cloudId
+
+
+async def snapshot_teams(
+    http: HTTPSession,
+    domain: str,
+    organization_id: str,
+    stream: type[Teams],
+    log: Logger,
+) -> AsyncGenerator[FullRefreshResource, None]:
+    # Requests without siteId fail with 400 SITE_ID_REQUIRED_FOR_TEAM_API.
+    site_id = await fetch_cloud_id(http, domain, log)
+
+    url = f"{url_base(domain, stream.api)}/org/{organization_id}/{stream.path}"
+
+    params: dict[str, str | int] = {
+        "siteId": site_id,
+        "size": TEAMS_PAGE_SIZE,
+    }
+
+    while True:
+        response = TeamsResponse.model_validate_json(
+            await http.request(log, url, params=params, timeout=HTTP_TIMEOUT)
+        )
+
+        # Guards against an empty page arriving with a non-null cursor, which the
+        # documented "query until the cursor is null" loop would follow forever.
+        if not response.entities:
+            break
+
+        for team in response.entities:
+            yield FullRefreshResource.model_validate(team)
+
+        # The final page carries results *and* a null cursor, so entities must be
+        # yielded before the cursor is checked or that page would be dropped.
+        if not response.cursor:
+            break
+
+        params["cursor"] = response.cursor
 
 
 async def snapshot_nested_arrayed_resources(

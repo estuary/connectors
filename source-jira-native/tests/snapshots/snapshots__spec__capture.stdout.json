@@ -55,10 +55,17 @@
           "title": "Domain",
           "type": "string"
         },
+        "organization_id": {
+          "default": "",
+          "description": "The id of your Atlassian organization, found after /o/ in the address bar at https://admin.atlassian.com. Only required to capture the teams stream; leave blank otherwise.",
+          "order": 1,
+          "title": "Organization ID",
+          "type": "string"
+        },
         "start_date": {
           "description": "UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated. If left blank, the start date will be set to 30 days before the present.",
           "format": "date-time",
-          "order": 1,
+          "order": 2,
           "title": "Start Date",
           "type": "string"
         },
@@ -74,14 +81,14 @@
               "$ref": "#/$defs/ApiToken"
             }
           ],
-          "order": 2,
+          "order": 3,
           "title": "Authentication"
         },
         "advanced": {
           "$ref": "#/$defs/Advanced",
           "advanced": true,
           "description": "Advanced settings for the connector.",
-          "order": 3,
+          "order": 4,
           "title": "Advanced Config"
         }
       },
