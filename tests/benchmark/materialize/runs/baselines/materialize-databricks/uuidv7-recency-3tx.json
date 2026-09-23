@@ -3,16 +3,16 @@
   "scenario": "uuidv7-recency-3tx.yaml",
   "seed": 0,
   "preview_exit_code": 0,
-  "apply_seconds": 8.138917888,
-  "wall_seconds": 1212.702034944,
+  "apply_seconds": 7.335915008,
+  "wall_seconds": 885.017671936,
   "rounds_observed": 4,
   "scenario_transactions": 4,
   "total_docs": 7864330,
   "total_bytes": 32212295680,
   "observed_docs": 7864330,
   "observed_bytes": 32212295680,
-  "docs_per_sec": 6484.964792166081,
-  "mb_per_sec": 25.331893719398753,
+  "docs_per_sec": 8886.071147931505,
+  "mb_per_sec": 34.71121542160744,
   "transactions": [
     {
       "index": 0,
@@ -26,9 +26,9 @@
         "op": "c"
       },
       "overlaps": [],
-      "wall_seconds": 195.66400896,
-      "mb_per_sec": 52.3346120445349,
-      "docs_per_sec": 13397.660683400934
+      "wall_seconds": 144.292740096,
+      "mb_per_sec": 70.96684138915917,
+      "docs_per_sec": 18167.511395624748
     },
     {
       "index": 1,
@@ -53,9 +53,9 @@
           "count": 5243
         }
       ],
-      "wall_seconds": 384.106937088,
-      "mb_per_sec": 26.659242547483558,
-      "docs_per_sec": 6824.766092155791
+      "wall_seconds": 325.923098112,
+      "mb_per_sec": 31.41845441246123,
+      "docs_per_sec": 8043.124329590075
     },
     {
       "index": 2,
@@ -80,9 +80,9 @@
           "count": 5243
         }
       ],
-      "wall_seconds": 381.420098048,
-      "mb_per_sec": 26.847038350641245,
-      "docs_per_sec": 6872.841817764159
+      "wall_seconds": 288.765864704,
+      "mb_per_sec": 35.461255126178195,
+      "docs_per_sec": 9078.081312301618
     },
     {
       "index": 3,
@@ -96,9 +96,9 @@
         "op": "c"
       },
       "overlaps": [],
-      "wall_seconds": 251.510990848,
-      "mb_per_sec": 0.0001553113041632734,
-      "docs_per_sec": 0.03975969386579799
+      "wall_seconds": 126.035969024,
+      "mb_per_sec": 0.0003099313656450061,
+      "docs_per_sec": 0.07934242960512156
     }
   ]
 }
