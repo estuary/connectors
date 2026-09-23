@@ -18,6 +18,7 @@ import (
 	"github.com/databricks/databricks-sdk-go"
 	dbConfig "github.com/databricks/databricks-sdk-go/config"
 	"github.com/databricks/databricks-sdk-go/logger"
+	"github.com/databricks/databricks-sdk-go/service/files"
 	"github.com/databricks/databricks-sdk-go/useragent"
 	dbsqllog "github.com/databricks/databricks-sql-go/logger"
 	m "github.com/estuary/connectors/go/materialize"
@@ -33,6 +34,7 @@ import (
 
 const defaultPort = "443"
 const volumeName = "flow_staging"
+const stagingRootName = "flow_temp_tables"
 
 type tableConfig struct {
 	Table         string `json:"table" jsonschema:"title=Table,description=Name of the table" jsonschema_extras:"x-collection-name=true"`
@@ -362,6 +364,9 @@ type binding struct {
 
 	loadFile  *stagedFile
 	storeFile *stagedFile
+	// The schemas of the load and store files, as read_files DDL strings.
+	loadSchema  string
+	storeSchema string
 
 	// a binding needs to be merged if there are updates to existing documents
 	// otherwise we just do a direct copy by moving all data from temporary table
@@ -380,7 +385,7 @@ func (t *transactor) addBinding(target sql.Table) error {
 		b.nullFieldsToStrip = target.NullableFieldsToStrip()
 	}
 
-	b.rootStagingPath = fmt.Sprintf("/Volumes/%s/%s/%s/flow_temp_tables", t.cfg.CatalogName, target.Path[0], volumeName)
+	b.rootStagingPath = fmt.Sprintf("/Volumes/%s/%s/%s/%s", t.cfg.CatalogName, target.Path[0], volumeName, stagingRootName)
 
 	translatedFieldNames := func(in []string) []string {
 		out := make([]string, 0, len(in))
@@ -390,8 +395,13 @@ func (t *transactor) addBinding(target sql.Table) error {
 		return out
 	}
 
-	b.loadFile = newStagedFile(t.cfg, b.rootStagingPath, translatedFieldNames(target.KeyNames()))
-	b.storeFile = newStagedFile(t.cfg, b.rootStagingPath, append(translatedFieldNames(target.ColumnNames()), "_flow_delete"))
+	var mkdir = func(ctx context.Context, path string) error {
+		return t.wsClient.Files.CreateDirectory(ctx, files.CreateDirectoryRequest{DirectoryPath: path})
+	}
+	b.loadFile = newStagedFile(t.cfg, b.rootStagingPath, translatedFieldNames(target.KeyNames()), mkdir)
+	b.storeFile = newStagedFile(t.cfg, b.rootStagingPath, append(translatedFieldNames(target.ColumnNames()), "_flow_delete"), mkdir)
+	b.loadSchema = stagedSchemaDDL(target.KeyPtrs(), false)
+	b.storeSchema = stagedSchemaDDL(target.Columns(), true)
 	b.loadMergeBounds = sql.NewMergeBoundsBuilder(target.Keys, t.ep.Dialect.Literal)
 	b.storeMergeBounds = sql.NewMergeBoundsBuilder(target.Keys, t.ep.Dialect.Literal)
 
@@ -443,14 +453,14 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			loadTemplate = d.templates.loadQueryNoFlowDocument
 		}
 
-		if loadQuery, err := RenderTableWithFiles(b.target, fullPaths, b.rootStagingPath, loadTemplate, b.loadMergeBounds.Build()); err != nil {
+		if loadQuery, err := RenderTableWithStaged(b.target, []string{b.loadFile.remoteDir()}, nil, b.loadSchema, loadTemplate, b.loadMergeBounds.Build()); err != nil {
 			return fmt.Errorf("loadQuery template: %w", err)
 		} else {
 			queries = append(queries, loadQuery)
 			toDelete = append(toDelete, fullPaths...)
 		}
 	}
-	defer d.deleteFiles(ctx, toDelete)
+	defer d.deleteStaged(ctx, toDelete)
 
 	if it.Err() != nil {
 		return it.Err()
@@ -594,6 +604,24 @@ func parseCheckpointItem(data json.RawMessage) (*checkpointItem, error) {
 		return nil, err
 	}
 	return &item, nil
+}
+
+// deleteStaged deletes staged files and the transaction directories they were
+// uploaded into. A file staged at the root by an earlier version has no
+// directory of its own.
+func (d *transactor) deleteStaged(ctx context.Context, files []string) {
+	d.deleteFiles(ctx, files)
+	var dirs = make(map[string]struct{})
+	for _, f := range files {
+		if dir := filepath.Dir(f); filepath.Base(dir) != stagingRootName {
+			dirs[dir] = struct{}{}
+		}
+	}
+	for dir := range dirs {
+		if err := d.wsClient.Files.DeleteDirectoryByDirectoryPath(ctx, dir); err != nil {
+			log.WithFields(log.Fields{"dir": dir, "err": err}).Debug("deleting staging directory failed")
+		}
+	}
 }
 
 func (d *transactor) deleteFiles(ctx context.Context, files []string) {
@@ -866,7 +894,7 @@ func (d *transactor) commitBindingCheckpointItems(ctx context.Context, db *stdsq
 	d.be.FinishedResourceCommit(b.target.Path)
 
 	for _, item := range items {
-		d.deleteFiles(ctx, item.ToDelete)
+		d.deleteStaged(ctx, item.ToDelete)
 	}
 
 	return nil
@@ -974,21 +1002,49 @@ func scanRowStats(rows *stdsql.Rows) m.RowStats {
 // (named relative to the binding's staging root) into the binding's target
 // table: MERGE when any of the staged rows update existing documents, and a
 // direct COPY INTO otherwise, chunked to bound the size of any single query.
+//
+// A merge reads each transaction's staging directory as one relation. Files
+// staged at the root by earlier versions of the connector, and so possibly
+// pending in the checkpoint of a task that upgrades, are read one by one.
 func (d *transactor) renderCommitQueries(b *binding, files []string, bounds []sql.MergeBound, needsMerge bool) ([]string, error) {
 	var queries []string
-	for chunk := range slices.Chunk(files, queryBatchSize) {
-		if needsMerge {
-			if query, err := RenderTableWithFiles(b.target, pathsWithRoot(b.rootStagingPath, chunk), b.rootStagingPath, d.templates.mergeInto, bounds); err != nil {
-				return nil, fmt.Errorf("mergeInto template: %w", err)
-			} else {
-				queries = append(queries, query)
-			}
-		} else {
+	if !needsMerge {
+		for chunk := range slices.Chunk(files, queryBatchSize) {
 			if query, err := RenderTableWithFiles(b.target, chunk, b.rootStagingPath, d.templates.copyIntoDirect, bounds); err != nil {
 				return nil, fmt.Errorf("copyIntoDirect template: %w", err)
 			} else {
 				queries = append(queries, query)
 			}
+		}
+		return queries, nil
+	}
+
+	var dirs, rootFiles []string
+	for _, f := range files {
+		if dir := filepath.Dir(f); dir == "." {
+			rootFiles = append(rootFiles, filepath.Join(b.rootStagingPath, f))
+		} else if dir = filepath.Join(b.rootStagingPath, dir); !slices.Contains(dirs, dir) {
+			dirs = append(dirs, dir)
+		}
+	}
+	// The directories go with the first chunk of root files, if any.
+	var first = true
+	for chunk := range slices.Chunk(rootFiles, queryBatchSize) {
+		var chunkDirs []string
+		if first {
+			chunkDirs, first = dirs, false
+		}
+		if query, err := RenderTableWithStaged(b.target, chunkDirs, chunk, b.storeSchema, d.templates.mergeInto, bounds); err != nil {
+			return nil, fmt.Errorf("mergeInto template: %w", err)
+		} else {
+			queries = append(queries, query)
+		}
+	}
+	if first && len(dirs) > 0 {
+		if query, err := RenderTableWithStaged(b.target, dirs, nil, b.storeSchema, d.templates.mergeInto, bounds); err != nil {
+			return nil, fmt.Errorf("mergeInto template: %w", err)
+		} else {
+			queries = append(queries, query)
 		}
 	}
 	return queries, nil
