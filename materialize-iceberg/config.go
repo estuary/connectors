@@ -39,10 +39,10 @@ var featureFlagDefaults = map[string]common.FlagDefault{
 	// as Iceberg format v3 `variant` columns instead of JSON strings. Tables
 	// with a variant column are created as (or upgraded to) format v3, and
 	// the Spark job must run on Spark 4 (EMR release emr-spark-8.0.0 or
-	// later). Existing tasks keep their JSON string columns unless opted in;
-	// toggling the flag on an existing table migrates the affected columns in
-	// place, preserving rows.
-	"variant_columns": common.FlagDisabled,
+	// later). Tasks created before the cutoff keep their JSON string columns
+	// unless opted in; toggling the flag on an existing table migrates the
+	// affected columns in place, preserving rows.
+	"variant_columns": common.FlagEnabledForTasksCreatedAfter("2026-09-23"),
 }
 
 var (
