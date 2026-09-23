@@ -374,6 +374,9 @@ type transactor struct {
 	}
 	bindings []*binding
 	be       *m.BindingEvents
+	// truncations maps a binding index to the boundary of a completed
+	// backfill, for deletion in this transaction's commit.
+	truncations map[int]time.Time
 }
 
 func newTransactor(
@@ -440,6 +443,7 @@ type binding struct {
 	storeInsertSQL    string
 	deleteQuerySQL    string
 	loadQuerySQL      string
+	truncateSQL       string
 }
 
 func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boilerplate.InfoSchema) error {
@@ -473,6 +477,13 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 		}
 	}
 
+	for _, col := range target.Values {
+		if col.Ptr == "/_meta/uuid" && col.Inference.String_ != nil && col.Inference.String_.Format == "date-time" && col.Inference.String_.ContentEncoding == "uuid" && !col.UserDefinedDDL {
+			b.truncateSQL = fmt.Sprintf("DELETE FROM %s WHERE %s < $1;", target.Identifier, col.Identifier)
+			break
+		}
+	}
+
 	t.bindings = append(t.bindings, b)
 
 	// Create a binding-scoped temporary table for staged keys to load.
@@ -500,7 +511,24 @@ func (t *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSp
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
-func (t *transactor) Flush(context.Context, []json.RawMessage, map[int]time.Time, map[int]time.Time) error {
+
+func (t *transactor) Flush(_ context.Context, _ []json.RawMessage, _ map[int]time.Time, completes map[int]time.Time) error {
+	t.truncations = make(map[int]time.Time, len(completes))
+	for binding, boundary := range completes {
+		var b = t.bindings[binding]
+		if b.target.DeltaUpdates {
+			continue
+		}
+		if b.truncateSQL == "" {
+			log.WithFields(log.Fields{
+				"eventType": "connectorStatus",
+				"table":     b.target.Identifier,
+				"boundary":  boundary,
+			}).Warnf("Rows published before the backfill of table %s were not deleted because the binding excludes the flow_published_at field. Include that field to enable deletion after a backfill.", b.target.Identifier)
+			continue
+		}
+		t.truncations[binding] = boundary
+	}
 	return nil
 }
 
@@ -641,6 +669,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	batchBytes := 0
 
 	var round = it.Round
+	var truncations = d.truncations
 	var rowsAffected = make([]int64, len(d.bindings))
 	var stored = make([]bool, len(d.bindings))
 	countRows := func(rows []int64) {
@@ -729,10 +758,32 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			return nil, m.FinishedOperation(fmt.Errorf("results.Close(): %w", err))
 		}
 
-		for i, b := range d.bindings {
-			if stored[i] {
-				d.be.ReportRowStats(round, b.target.Path, m.TotalRowStats(rowsAffected[i]))
+		// Truncations run after the stores, because a store of an existing row
+		// is an UPDATE that would match nothing if its row were already
+		// deleted.
+		var truncated = make(map[int]int64, len(truncations))
+		for binding, boundary := range truncations {
+			var b = d.bindings[binding]
+			if tag, err := txn.Exec(ctx, b.truncateSQL, boundary); err != nil {
+				return nil, m.FinishedOperation(fmt.Errorf("truncating %s after backfill: %w", b.target.Identifier, err))
+			} else {
+				truncated[binding] = tag.RowsAffected()
+				log.WithFields(log.Fields{
+					"table":    b.target.Identifier,
+					"boundary": boundary,
+					"deleted":  tag.RowsAffected(),
+				}).Info("truncated rows published before the backfill")
 			}
+		}
+
+		for i, b := range d.bindings {
+			var stats = m.TotalRowStats(rowsAffected[i])
+			if n, ok := truncated[i]; ok {
+				stats = stats.WithTruncated(n)
+			} else if !stored[i] {
+				continue
+			}
+			d.be.ReportRowStats(round, b.target.Path, stats)
 		}
 
 		commitCtx, cancel := ctxWithQueryTimeout(ctx)
