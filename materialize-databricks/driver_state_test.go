@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -816,4 +817,35 @@ func TestCombineBounds(t *testing.T) {
 		require.Empty(t, out[1].LiteralLower)
 		require.Equal(t, keys[0].Identifier, out[0].Identifier)
 	})
+}
+
+// A task upgraded from a version that staged files at the root of the staging
+// path may still hold such files in its checkpoint. They commit in the same
+// merge as files staged in transaction directories, read one by one.
+func TestAcknowledgeMergesRootFilesWithDirectories(t *testing.T) {
+	var d = renderingTransactor(lowerRangeKey)
+	d.cp.add("a_table.v1", lowerRangeKey, structuredItem(true,
+		[]mergeBoundLiterals{bound("1", "10"), bound("'2024-01-01T00:00:00Z'", "'2024-01-02T00:00:00Z'")},
+		"old.json.gz"))
+	d.cp.add("a_table.v1", upperRangeKey, structuredItem(true,
+		[]mergeBoundLiterals{bound("5", "50"), bound("'2024-01-01T12:00:00Z'", "'2024-01-03T00:00:00Z'")},
+		"txn-2/a.json.gz", "txn-2/b.json.gz"))
+
+	state, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
+	require.NoError(t, err)
+
+	require.Len(t, recording.executed, 1)
+	var query = recording.executed[0]
+	require.Contains(t, query, "MERGE INTO `schema`.`a_table`")
+	require.Contains(t, query, "read_files('/Volumes/cat/schema/flow_staging/flow_temp_tables/txn-2', format => 'json', schema => ")
+	require.Equal(t, 1, strings.Count(query, "read_files("))
+	require.Contains(t, query, "FROM json.`/Volumes/cat/schema/flow_staging/flow_temp_tables/old.json.gz`")
+	require.NotContains(t, query, "a.json.gz")
+	require.Contains(t, query, "l.id >= LEAST(1::LONG, 5::LONG)")
+	require.Contains(t, query, "l.id <= GREATEST(10::LONG, 50::LONG)")
+
+	require.JSONEq(t, `{
+		"a_table.v1": {"00000000-7fffffff": null, "80000000-ffffffff": null}
+	}`, string(state.UpdatedJson))
+	require.Empty(t, d.cp)
 }
