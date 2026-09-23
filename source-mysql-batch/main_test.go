@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
+	mysqltls "github.com/estuary/connectors/go/mysql/tls"
 	st "github.com/estuary/connectors/source-boilerplate/testing"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -60,6 +61,9 @@ func testCaptureSpec(t testing.TB) *st.CaptureSpec {
 		Advanced: advancedConfig{
 			PollSchedule: "200ms",
 			FeatureFlags: *testFeatureFlags,
+			// The test database's auto-generated certificate names no host, so
+			// the default 'verify_identity' can't accept it.
+			SSLMode: mysqltls.ModeRequired,
 		},
 	}
 

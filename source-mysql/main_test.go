@@ -17,6 +17,7 @@ import (
 	"github.com/bradleyjkemp/cupaloy"
 	_ "github.com/go-mysql-org/go-mysql/driver"
 
+	mysqltls "github.com/estuary/connectors/go/mysql/tls"
 	st "github.com/estuary/connectors/source-boilerplate/testing"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/connectors/sqlcapture/tests"
@@ -94,6 +95,10 @@ func mysqlTestBackend(t testing.TB) *testBackend {
 		Advanced: advancedConfig{
 			DBName:                   *dbName,
 			SkipBinlogRetentionCheck: *skipBinlogRetentionCheck,
+			// The test database's auto-generated certificate names no host, so
+			// the default 'verify_identity' can't accept it. TestSSLModes covers
+			// the verifying modes.
+			SSLMode: mysqltls.ModeRequired,
 		},
 	}
 	captureConfig.Advanced.FeatureFlags = *testFeatureFlags
