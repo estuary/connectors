@@ -1,0 +1,58 @@
+# 30 GB across three equal transactions with keys that are uuid5 hashes of a
+# sequential counter, so keys are uniform over the whole UUID space in every
+# transaction. The connector's merge bounds (min/max key of a transaction's
+# stores) then span almost the entire key space and prune nothing: the load
+# JOIN and the MERGE have to be resolved by the target-side join itself. This
+# is the shape reported from production tables keyed by random UUIDs, and the
+# arm for comparing staging/write paths on the connector side.
+#
+# Updates are drawn uniformly from the previous transaction's fresh keys, so
+# neither recency nor clustering helps either. 4KB documents keep the fixture
+# feeder (which is bound by documents/second, not bytes) out of the way.
+#
+# Doc math (4KB docs, ~2.6M docs per 10GB):
+#   tx1: 40% of 2.6M = 1.05M loads and updates against tx0; 1.57M fresh.
+#   tx2: 40% of 2.6M = 1.05M loads and updates against tx1's fresh; 1.57M fresh.
+#   tx3: a trailer of 10 documents. The connector commits a transaction after
+#        the runtime's next round starts, so without it tx2's MERGE would fall
+#        outside the logged window (see phases.py).
+collections:
+  - name: bench/wide_uuid
+    schema:
+      type: object
+      if:
+        properties:
+          _meta:
+            properties: { op: { const: d } }
+      then:
+        reduce: { delete: true, strategy: lastWriteWins }
+      properties:
+        id:      { type: string }
+        val:     { type: integer }
+        payload: { type: string }
+        _meta:
+          type: object
+          properties: { op: { type: string } }
+          required: [op]
+      required: [id, _meta]
+    key: [/id]
+    key_type: uuid
+
+transactions:
+  - total_size: 10GB
+    doc_size:   4KB
+    op: c
+
+  - total_size: 10GB
+    doc_size:   4KB
+    overlaps:
+      - { with: 0, fraction: 0.40, op: u }
+
+  - total_size: 10GB
+    doc_size:   4KB
+    overlaps:
+      - { with: 1, fraction: 0.40, op: u }
+
+  - doc_count: 10
+    doc_size: 4KB
+    op: c
