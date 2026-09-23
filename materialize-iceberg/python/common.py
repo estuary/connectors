@@ -97,13 +97,20 @@ def with_variant_columns(df, cols: list[NestedField]):
     )
 
 
+CSV_NULL_VALUE = "\x00flow_null\x00"
+
+
 def read_csv_opts(files: list[str], cols: list[NestedField]):
     return {
         "path": files,
         "schema": fields_to_struct(cols),
         "quote": "`",
         "escape": "`",
-        "emptyValue": '""',
+        # The staged CSV writes a null as nothing between the separators and an
+        # empty string as an empty quoted field. Spark treats both as null when
+        # nullValue is the default "", so nulls are given a representation that
+        # no staged string is expected to equal.
+        "nullValue": CSV_NULL_VALUE,
         "header": False,
         "inferSchema": False,
         "enforceSchema": False,

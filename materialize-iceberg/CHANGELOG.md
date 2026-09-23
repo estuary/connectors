@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-09-23
+
+### Fixed
+- Empty string values were written to string columns as the two-character
+  string `""`. They are now written as empty strings. Null values are
+  unaffected.
+
 ## 2026-09-13
 
 ### Added
