@@ -32,7 +32,6 @@ func rewrite(t *testing.T, in string, disabled bool) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	deleteKey(task, "expectPubId")
 	if disabled {
 		setBool(mapChild(task, "shards", true), "disable", true)
 	} else if shards := mapChild(task, "shards", false); shards != nil {
@@ -52,7 +51,7 @@ func rewrite(t *testing.T, in string, disabled bool) string {
 
 func TestDisableEnableRoundTrip(t *testing.T) {
 	disabled := rewrite(t, sampleSpec, true)
-	if !strings.Contains(disabled, "disable: true") || strings.Contains(disabled, "expectPubId") {
+	if !strings.Contains(disabled, "disable: true") || !strings.Contains(disabled, "expectPubId: 00aa11bb22cc33dd") {
 		t.Fatalf("unexpected disabled spec:\n%s", disabled)
 	}
 	if !strings.Contains(disabled, "maxTxnDuration: 5m") {

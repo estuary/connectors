@@ -191,7 +191,14 @@ func restartOnce(ctx context.Context, logger *log.Entry, task string) error {
 		return fmt.Errorf("waiting for disable: %w", err)
 	}
 
+	// Re-pull so the enable publish carries the expectPubId of the current
+	// live spec (normally our disable publication). If anyone else published
+	// in between, that publish fails and the whole cycle is retried rather
+	// than overwriting their change.
 	logger.Info("re-enabling shards")
+	if specFile, err = pullSpec(ctx, task); err != nil {
+		return fmt.Errorf("re-pulling spec: %w", err)
+	}
 	if err := publishWithShardsDisabled(ctx, specFile, task, false); err != nil {
 		return fmt.Errorf("publishing enabled spec: %w", err)
 	}
@@ -214,8 +221,9 @@ func pullSpec(ctx context.Context, task string) (string, error) {
 }
 
 // publishWithShardsDisabled rewrites the task's spec so that shards.disable
-// is set (or removed, when disabled is false), strips any stale expectPubId,
-// and publishes it.
+// is set (or removed, when disabled is false) and publishes it. The pulled
+// expectPubId is kept so the publish is rejected if the live spec changed
+// since the pull.
 func publishWithShardsDisabled(ctx context.Context, specFile, task string, disabled bool) error {
 	bs, err := os.ReadFile(specFile)
 	if err != nil {
@@ -229,9 +237,6 @@ func publishWithShardsDisabled(ctx context.Context, specFile, task string, disab
 	if err != nil {
 		return err
 	}
-	// expectPubId reflects the publication at pull time and is stale after
-	// the first publish of the cycle.
-	deleteKey(taskNode, "expectPubId")
 	if disabled {
 		setBool(mapChild(taskNode, "shards", true), "disable", true)
 	} else if shards := mapChild(taskNode, "shards", false); shards != nil {
