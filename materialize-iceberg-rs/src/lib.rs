@@ -1,12 +1,11 @@
 use anyhow::Result;
 use apply::do_apply;
 use bytes::BytesMut;
-use configuration::{schema_for, EndpointConfig, Resource};
+use configuration::{EndpointConfig, Resource, schema_for};
 use prost::Message;
 use proto_flow::materialize::{
-    request, response,
+    Request, Response, request, response,
     response::{Applied, Spec, Validated},
-    Request, Response,
 };
 use std::io::{self, BufRead, BufReader, Read, StdoutLock, Write};
 use transactor::run_transactions;
@@ -14,6 +13,7 @@ use validate::do_validate;
 
 pub mod apply;
 pub mod configuration;
+pub mod server;
 pub mod transactor;
 pub mod validate;
 

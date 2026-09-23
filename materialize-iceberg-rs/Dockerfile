@@ -59,3 +59,6 @@ USER nonroot:nonroot
 ENTRYPOINT ["/connector/materialize-iceberg-rs"]
 
 LABEL FLOW_RUNTIME_PROTOCOL=materialize
+
+EXPOSE 8080
+LABEL dev.estuary.port-public.8080=true

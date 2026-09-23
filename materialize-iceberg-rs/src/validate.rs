@@ -3,7 +3,7 @@ use proto_flow::{
     flow::{Projection, SerPolicy},
     materialize::{
         request::Validate,
-        response::validated::{constraint, Binding, Constraint, ProjectionConstraint},
+        response::validated::{Binding, Constraint, ProjectionConstraint, constraint},
     },
 };
 
