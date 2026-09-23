@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-09-23
+
+### Fixed
+- The `campaigns` stream no longer fails materialization with `campaignState` "not allowed to exist" after a collection reset.
+
 ## 2026-09-21
 
 ### Fixed
