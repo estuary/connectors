@@ -52,8 +52,8 @@ type advancedConfig struct {
 	SourceTag       string   `json:"source_tag,omitempty" jsonschema:"title=Source Tag,description=When set the capture will add this value as the property 'tag' in the source metadata of each document." jsonschema_extras:"order=4,nonsensitive=true"`
 	FeatureFlags    string   `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"order=5,nonsensitive=true"`
 
-	SSLMode       string `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Whether to use TLS and how strictly to verify the server certificate. Defaults to 'preferred'. See the connector documentation for details.,enum=disabled,enum=preferred,enum=required,enum=verify_ca,enum=verify_identity" jsonschema_extras:"order=6,nonsensitive=true"`
-	SSLServerCA   string `json:"ssl_server_ca,omitempty" jsonschema:"title=SSL Server CA,description=PEM-encoded CA certificate the server certificate must chain to. Required for 'verify_ca'; optional for 'verify_identity'." jsonschema_extras:"order=7,secret=true,multiline=true"`
+	SSLMode       string `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Whether to use TLS and how strictly to verify the server certificate. Defaults to 'verify_identity'. See the connector documentation for details.,enum=disabled,enum=preferred,enum=required,enum=verify_ca,enum=verify_identity,default=verify_identity" jsonschema_extras:"order=6,nonsensitive=true"`
+	SSLServerCA   string `json:"ssl_server_ca,omitempty" jsonschema:"title=SSL Server CA,description=PEM-encoded CA certificate the server certificate must chain to. Required for 'verify_ca'. Optional for 'verify_identity'\\, which otherwise trusts public certificate authorities and the CAs of Amazon RDS and Google Cloud SQL (shared CA)." jsonschema_extras:"order=7,secret=true,multiline=true"`
 	SSLClientCert string `json:"ssl_client_cert,omitempty" jsonschema:"title=SSL Client Certificate,description=Optional PEM-encoded client certificate for mutual TLS." jsonschema_extras:"order=8,secret=true,multiline=true"`
 	SSLClientKey  string `json:"ssl_client_key,omitempty" jsonschema:"title=SSL Client Key,description=PEM-encoded private key for the client certificate." jsonschema_extras:"order=9,secret=true,multiline=true"`
 
@@ -77,10 +77,8 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("invalid default polling schedule %q: %w", c.Advanced.PollSchedule, err)
 		}
 	}
-	if c.Advanced.SSLMode != "" || c.Advanced.SSLServerCA != "" || c.Advanced.SSLClientCert != "" || c.Advanced.SSLClientKey != "" {
-		if err := c.sslSettings().Validate(); err != nil {
-			return err
-		}
+	if err := c.sslSettings().Validate(); err != nil {
+		return err
 	}
 	// Strictly speaking this feature-flag parsing isn't validation at all, but it's a convenient
 	// method that we can be sure always gets called before the config is used.
@@ -91,19 +89,11 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-// sslSettings returns the TLS settings for connections to the database. An unset
-// 'sslmode' preserves the connector's historical behaviour of attempting TLS and
-// falling back to an unencrypted connection.
+// sslSettings returns the TLS settings for connections to the database. An
+// unset 'sslmode' selects mysqltls.DefaultMode.
 func (c *Config) sslSettings() mysqltls.Settings {
-	var mode = c.Advanced.SSLMode
-	// TODO: We eventually want to make `ModeRequired` the global default.
-	// We'll have to set up a feature flag so we don't break any existing
-	// captures that do not support SSL
-	if mode == "" {
-		mode = mysqltls.ModePreferred
-	}
 	return mysqltls.Settings{
-		Mode:       mode,
+		Mode:       c.Advanced.SSLMode,
 		ServerCA:   c.Advanced.SSLServerCA,
 		ClientCert: c.Advanced.SSLClientCert,
 		ClientKey:  c.Advanced.SSLClientKey,
@@ -205,12 +195,8 @@ func connectMySQL(ctx context.Context, cfg *Config) (*client.Conn, error) {
 	}
 
 	var settings = cfg.sslSettings()
-	if cfg.Advanced.SSLMode == "" {
-		var msg = "'sslmode' is not set, defaulting to %q"
-		if settings.AllowsPlaintextFallback() {
-			msg += "; traffic may travel unencrypted if the server does not offer TLS"
-		}
-		log.WithField("sslmode", settings.Mode).Warnf(msg, settings.Mode)
+	if settings.Mode == "" {
+		log.WithField("sslmode", mysqltls.DefaultMode).Infof("'sslmode' is not set, defaulting to %q", mysqltls.DefaultMode)
 	}
 	tlsConfig, err := settings.Config(cfg.serverHost())
 	if err != nil {
@@ -237,12 +223,15 @@ func connectMySQL(ctx context.Context, cfg *Config) (*client.Conn, error) {
 			return nil, fmt.Errorf("unable to connect to database without TLS: %w", err)
 		}
 	} else if connWithTLS, errWithTLS := dial(tlsConfig); errWithTLS == nil {
-		log.WithFields(log.Fields{"addr": cfg.Address, "sslmode": settings.Mode}).Info("connected with TLS")
+		log.WithFields(log.Fields{"addr": cfg.Address, "sslmode": settings.EffectiveMode()}).Info("connected with TLS")
 		conn = connWithTLS
 	} else if errors.As(errWithTLS, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
 		return nil, cerrors.NewUserError(mysqlErr, "incorrect username or password")
 	} else if !settings.AllowsPlaintextFallback() {
-		return nil, fmt.Errorf("unable to connect to database with TLS (sslmode %q): %w", settings.Mode, errWithTLS)
+		if msg := settings.FailureMessage(errWithTLS, cfg.serverHost(), true); msg != "" {
+			return nil, cerrors.NewUserError(errWithTLS, "could not connect to the database over TLS: "+msg)
+		}
+		return nil, fmt.Errorf("unable to connect to database with TLS (sslmode %q): %w", settings.EffectiveMode(), errWithTLS)
 	} else if connWithoutTLS, errWithoutTLS := dial(nil); errWithoutTLS == nil {
 		// The TLS connection failed and 'preferred' mode permits falling back to an
 		// unencrypted one.
