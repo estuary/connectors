@@ -19,7 +19,7 @@ from .models import (
     ConnectorState,
     EndpointConfig,
 )
-from .resources import all_resources, validate_credentials
+from .resources import bound_resources, discovered_resources, validate_credentials
 
 
 def _validate_config(
@@ -136,7 +136,7 @@ class Connector(
     async def discover(
         self, log: FlowLogger, discover: request.Discover[EndpointConfig]
     ) -> response.Discovered[ResourceConfigWithSchedule]:
-        resources = await all_resources(log, self, discover.config)
+        resources = await discovered_resources(log, self, discover.config)
         return common.discovered(resources)
 
     async def validate(
@@ -147,7 +147,12 @@ class Connector(
         await validate_credentials(log, self, validate.config)
         _validate_config(validate)
 
-        resources = await all_resources(log, self, validate.config)
+        resources = await bound_resources(
+            log,
+            self,
+            validate.config,
+            {b.resourceConfig.name for b in validate.bindings},
+        )
         resolved = common.resolve_bindings(validate.bindings, resources)
         return common.validated(resolved)
 
@@ -167,8 +172,12 @@ class Connector(
     ) -> tuple[response.Opened, Callable[[Task], Awaitable[None]]]:
         config = open.capture.config
 
-        resources = await all_resources(
-            log, self, config, should_cancel_ongoing_job=True
+        resources = await bound_resources(
+            log,
+            self,
+            config,
+            {b.resourceConfig.name for b in open.capture.bindings},
+            should_cancel_ongoing_job=True,
         )
         resolved = common.resolve_bindings(open.capture.bindings, resources)
         return common.open(open, resolved)
