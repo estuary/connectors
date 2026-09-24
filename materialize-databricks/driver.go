@@ -365,7 +365,7 @@ type binding struct {
 
 	loadFile  *stagedFile
 	storeFile *stagedFile
-	// schema of load and store files rendered as a DDL and 
+	// schema of load and store files rendered as a DDL and
 	// passed to Databricks `read_files`
 	loadSchema  string
 	storeSchema string
@@ -1020,7 +1020,7 @@ func (d *transactor) renderCommitQueries(b *binding, items []*checkpointItem, bo
 	}
 
 	var queries []string
-	var render = func(query string, err error) error {
+	var addQuery = func(query string, err error) error {
 		if err != nil {
 			return err
 		}
@@ -1029,12 +1029,12 @@ func (d *transactor) renderCommitQueries(b *binding, items []*checkpointItem, bo
 	}
 	if !needsMerge {
 		for chunk := range slices.Chunk(rootFiles, queryBatchSize) {
-			if err := render(RenderTableWithFiles(b.target, chunk, b.rootStagingPath, d.templates.copyIntoDirect, bounds)); err != nil {
+			if err := addQuery(RenderTableWithFiles(b.target, chunk, b.rootStagingPath, d.templates.copyIntoDirect, bounds)); err != nil {
 				return nil, fmt.Errorf("copyIntoDirect template: %w", err)
 			}
 		}
 		for _, dir := range dirs {
-			if err := render(RenderTableWithFiles(b.target, nil, dir, d.templates.copyIntoDirect, bounds)); err != nil {
+			if err := addQuery(RenderTableWithFiles(b.target, nil, dir, d.templates.copyIntoDirect, bounds)); err != nil {
 				return nil, fmt.Errorf("copyIntoDirect template: %w", err)
 			}
 		}
@@ -1042,12 +1042,12 @@ func (d *transactor) renderCommitQueries(b *binding, items []*checkpointItem, bo
 	}
 
 	for chunk := range slices.Chunk(rootFiles, queryBatchSize) {
-		if err := render(RenderTableWithStaged(b.target, nil, pathsWithRoot(b.rootStagingPath, chunk), b.storeSchema, d.templates.mergeInto, bounds)); err != nil {
+		if err := addQuery(RenderTableWithStaged(b.target, nil, pathsWithRoot(b.rootStagingPath, chunk), b.storeSchema, d.templates.mergeInto, bounds)); err != nil {
 			return nil, fmt.Errorf("mergeInto template: %w", err)
 		}
 	}
 	if len(dirs) > 0 {
-		if err := render(RenderTableWithStaged(b.target, dirs, nil, b.storeSchema, d.templates.mergeInto, bounds)); err != nil {
+		if err := addQuery(RenderTableWithStaged(b.target, dirs, nil, b.storeSchema, d.templates.mergeInto, bounds)); err != nil {
 			return nil, fmt.Errorf("mergeInto template: %w", err)
 		}
 	}
