@@ -820,7 +820,7 @@ func TestCombineBounds(t *testing.T) {
 }
 
 // Root-level files from a checkpoint written before staging directories existed
-// merge alongside files in directories.
+// merge in their own query, ahead of the directories.
 func TestAcknowledgeMergesRootFilesWithDirectories(t *testing.T) {
 	var d = renderingTransactor(lowerRangeKey)
 	d.cp.add("a_table.v1", lowerRangeKey, structuredItem(true,
@@ -833,15 +833,18 @@ func TestAcknowledgeMergesRootFilesWithDirectories(t *testing.T) {
 	state, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
 	require.NoError(t, err)
 
-	require.Len(t, recording.executed, 1)
-	var query = recording.executed[0]
-	require.Contains(t, query, "MERGE INTO `schema`.`a_table`")
-	require.Contains(t, query, "read_files('/Volumes/cat/schema/flow_staging/flow_temp_tables/txn-2', format => 'json', schema => ")
-	require.Equal(t, 1, strings.Count(query, "read_files("))
-	require.Contains(t, query, "FROM json.`/Volumes/cat/schema/flow_staging/flow_temp_tables/old.json.gz`")
-	require.NotContains(t, query, "a.json.gz")
-	require.Contains(t, query, "l.id >= LEAST(1::LONG, 5::LONG)")
-	require.Contains(t, query, "l.id <= GREATEST(10::LONG, 50::LONG)")
+	require.Len(t, recording.executed, 2)
+	var rootQuery, dirQuery = recording.executed[0], recording.executed[1]
+	require.Contains(t, rootQuery, "FROM json.`/Volumes/cat/schema/flow_staging/flow_temp_tables/old.json.gz`")
+	require.NotContains(t, rootQuery, "read_files(")
+	require.Contains(t, dirQuery, "read_files('/Volumes/cat/schema/flow_staging/flow_temp_tables/txn-2', format => 'json', schema => ")
+	require.Equal(t, 1, strings.Count(dirQuery, "read_files("))
+	require.NotContains(t, dirQuery, "a.json.gz")
+	for _, query := range recording.executed {
+		require.Contains(t, query, "MERGE INTO `schema`.`a_table`")
+		require.Contains(t, query, "l.id >= LEAST(1::LONG, 5::LONG)")
+		require.Contains(t, query, "l.id <= GREATEST(10::LONG, 50::LONG)")
+	}
 
 	require.JSONEq(t, `{
 		"a_table.v1": {"00000000-7fffffff": null, "80000000-ffffffff": null}
