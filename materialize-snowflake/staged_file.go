@@ -208,7 +208,10 @@ func (f *stagedFile) putWorker(ctx context.Context, db *stdsql.DB, filePaths <-c
 		query := fmt.Sprintf(
 			// OVERWRITE=TRUE is set here not because we intend to overwrite anything, but rather to
 			// avoid an extra LIST query that setting OVERWRITE=FALSE incurs.
-			`PUT file://%s @flow_v1/%s AUTO_COMPRESS=FALSE SOURCE_COMPRESSION=GZIP OVERWRITE=TRUE;`,
+			// PARALLEL=1 because the driver preallocates PARALLEL+1 64 MiB
+			// part buffers for each multipart upload, and MaxConcurrentUploads
+			// of those run at once.
+			`PUT file://%s @flow_v1/%s AUTO_COMPRESS=FALSE SOURCE_COMPRESSION=GZIP OVERWRITE=TRUE PARALLEL=1;`,
 			file, f.uuid,
 		)
 		var source, target, sourceSize, targetSize, sourceCompression, targetCompression, status, message string
