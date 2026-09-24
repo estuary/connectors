@@ -281,6 +281,10 @@ class BulkOperationDetails(BaseModel, extra="allow"):
     errorCode: BulkOperationErrorCodes | None
 
 
+class BulkOperationWithQuery(BulkOperationDetails):
+    query: str
+
+
 class UserErrors(BaseModel, extra="allow"):
     field: str | list[str] | None
     message: str
@@ -313,7 +317,7 @@ class BulkSpecificData(BaseModel, extra="forbid"):
 
 
 class BulkOperationEdge(BaseModel, extra="forbid"):
-    node: BulkOperationDetails
+    node: BulkOperationWithQuery
 
 
 class BulkOperationsConnection(BaseModel, extra="forbid"):

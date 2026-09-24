@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-09-24
+
+### Changed
+- On startup, the connector now cancels only the bulk query operations it
+  submitted itself, which it marks with a `# Estuary Flow Managed Bulk Query`
+  comment. Bulk queries submitted by other systems through the same app are
+  left running. Bulk queries submitted by earlier connector versions carry
+  no marker, so the first restart after this release lets them run to
+  completion instead of cancelling them.
+
 ## 2026-08-27
 
 ### Added

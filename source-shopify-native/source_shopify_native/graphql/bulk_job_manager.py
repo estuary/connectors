@@ -13,6 +13,7 @@ from source_shopify_native.models import (
     BulkOperationsData,
     BulkOperationStatuses,
     BulkOperationUserErrors,
+    BulkOperationWithQuery,
     BulkSpecificData,
     BulkSubmitData,
     ShopifyGraphQLResource,
@@ -30,6 +31,10 @@ SIX_HOURS = 6 * 60 * 60
 MAX_CONCURRENT_BULK_OPS = 5
 MAX_QUERY_REQUEST_ATTEMPTS = 5
 MAX_QUERY_REQUEST_RETRY_INTERVAL = 60  # 1 minute
+# Prepended to every bulk query the connector submits. Shopify reports the submitted query back in
+# `BulkOperation.query`, which is how the connector tells its own running jobs apart from jobs other
+# systems submit with the same app credentials. Changing it orphans jobs submitted by prior versions.
+BULK_QUERY_MARKER = "# Estuary Flow Managed Bulk Query"
 
 
 class BulkJobError(RuntimeError):
@@ -74,7 +79,14 @@ class BulkJobManager:
         await self._get_running_jobs()
 
     async def cancel_current(self):
-        running_jobs = await self._get_running_jobs()
+        running_jobs: list[BulkOperationWithQuery] = []
+        for job_details in await self._get_running_jobs():
+            if BULK_QUERY_MARKER in job_details.query:
+                running_jobs.append(job_details)
+            else:
+                self.log.info(
+                    f"[{self.client.store}] Leaving bulk job {job_details.id} running since it was not submitted by this connector."
+                )
 
         if not running_jobs:
             return
@@ -175,7 +187,7 @@ class BulkJobManager:
         ) from last_exception
 
     # Get all running bulk query jobs using the new bulkOperations query (API 2026-01+)
-    async def _get_running_jobs(self) -> list[BulkOperationDetails]:
+    async def _get_running_jobs(self) -> list[BulkOperationWithQuery]:
         # Shopify allows max 5 concurrent bulk ops per store, so first:10 is sufficient
         # to capture all running query jobs without pagination.
         # Reference: https://shopify.dev/docs/api/usage/bulk-operations/queries#view-all-running-operations
@@ -419,7 +431,7 @@ class BulkJobManager:
         query = f"""
             mutation {{
             bulkOperationRunQuery(
-                query: \"\"\"{query}\"\"\",
+                query: \"\"\"{BULK_QUERY_MARKER}\n{query}\"\"\",
                 groupObjects: true
             ) {{
                 bulkOperation {{
