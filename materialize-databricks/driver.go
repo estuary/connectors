@@ -1020,35 +1020,36 @@ func (d *transactor) renderCommitQueries(b *binding, items []*checkpointItem, bo
 	}
 
 	var queries []string
-	var addQuery = func(query string, err error) error {
-		if err != nil {
-			return err
-		}
-		queries = append(queries, query)
-		return nil
-	}
 	if !needsMerge {
 		for chunk := range slices.Chunk(rootFiles, queryBatchSize) {
-			if err := addQuery(RenderTableWithFiles(b.target, chunk, b.rootStagingPath, d.templates.copyIntoDirect, bounds)); err != nil {
+			if query, err := RenderTableWithFiles(b.target, chunk, b.rootStagingPath, d.templates.copyIntoDirect, bounds); err != nil {
 				return nil, fmt.Errorf("copyIntoDirect template: %w", err)
+			} else {
+				queries = append(queries, query)
 			}
 		}
 		for _, dir := range dirs {
-			if err := addQuery(RenderTableWithFiles(b.target, nil, dir, d.templates.copyIntoDirect, bounds)); err != nil {
+			if query, err := RenderTableWithFiles(b.target, nil, dir, d.templates.copyIntoDirect, bounds); err != nil {
 				return nil, fmt.Errorf("copyIntoDirect template: %w", err)
+			} else {
+				queries = append(queries, query)
 			}
 		}
 		return queries, nil
 	}
 
 	for chunk := range slices.Chunk(rootFiles, queryBatchSize) {
-		if err := addQuery(RenderTableWithStaged(b.target, nil, pathsWithRoot(b.rootStagingPath, chunk), b.storeSchema, d.templates.mergeInto, bounds)); err != nil {
+		if query, err := RenderTableWithStaged(b.target, nil, pathsWithRoot(b.rootStagingPath, chunk), b.storeSchema, d.templates.mergeInto, bounds); err != nil {
 			return nil, fmt.Errorf("mergeInto template: %w", err)
+		} else {
+			queries = append(queries, query)
 		}
 	}
 	if len(dirs) > 0 {
-		if err := addQuery(RenderTableWithStaged(b.target, dirs, nil, b.storeSchema, d.templates.mergeInto, bounds)); err != nil {
+		if query, err := RenderTableWithStaged(b.target, dirs, nil, b.storeSchema, d.templates.mergeInto, bounds); err != nil {
 			return nil, fmt.Errorf("mergeInto template: %w", err)
+		} else {
+			queries = append(queries, query)
 		}
 	}
 	return queries, nil
