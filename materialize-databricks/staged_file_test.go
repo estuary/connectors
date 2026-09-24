@@ -11,9 +11,20 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/databricks/databricks-sdk-go/service/files"
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/stretchr/testify/require"
 )
+
+type fakeFiles struct {
+	files.FilesInterface
+	created []string
+}
+
+func (f *fakeFiles) CreateDirectory(_ context.Context, req files.CreateDirectoryRequest) error {
+	f.created = append(f.created, req.DirectoryPath)
+	return nil
+}
 
 // TestStagedFileCompression covers the local-file half of stagedFile: staged files are gzipped and
 // named so that Databricks decompresses them on read.
@@ -46,18 +57,15 @@ func TestStagedFileCompression(t *testing.T) {
 }
 
 func TestStagedFileStartCreatesDirectory(t *testing.T) {
-	var created []string
-	var f = newStagedFile(config{}, "/Volumes/c/s/v/root", []string{"id"}, func(_ context.Context, path string) error {
-		created = append(created, path)
-		return nil
-	})
+	var api = &fakeFiles{}
+	var f = newStagedFile(config{}, "/Volumes/c/s/v/root", []string{"id"}, api)
 	f.dir = filepath.Join(t.TempDir(), "local")
 
 	require.NoError(t, f.start(context.Background(), nil))
-	require.Len(t, created, 1)
-	require.Equal(t, f.remoteDir(), created[0])
-	require.True(t, strings.HasPrefix(created[0], "/Volumes/c/s/v/root/"), created[0])
-	require.NotEqual(t, "/Volumes/c/s/v/root", created[0])
+	require.Len(t, api.created, 1)
+	require.Equal(t, f.remoteDir(), api.created[0])
+	require.True(t, strings.HasPrefix(api.created[0], "/Volumes/c/s/v/root/"), api.created[0])
+	require.NotEqual(t, "/Volumes/c/s/v/root", api.created[0])
 	close(f.putFiles)
 	require.NoError(t, f.group.Wait())
 }

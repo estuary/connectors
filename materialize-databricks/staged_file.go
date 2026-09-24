@@ -10,6 +10,7 @@ import (
 
 	stdsql "database/sql"
 
+	"github.com/databricks/databricks-sdk-go/service/files"
 	driverctx "github.com/databricks/databricks-sql-go/driverctx"
 	"github.com/estuary/connectors/go/writer"
 	sql "github.com/estuary/connectors/materialize-sql"
@@ -101,7 +102,7 @@ type stagedFile struct {
 	// The remote root directory for uploading files
 	root   string
 	txnDir string
-	mkdir  func(ctx context.Context, path string) error
+	files  files.FilesInterface
 
 	// Indicates if the stagedFile has been initialized for this transaction yet. Set `true` by
 	// start() and `false` by flush().
@@ -123,7 +124,7 @@ type stagedFile struct {
 	groupCtx context.Context // Used to check for group cancellation upon the worker returning an error.
 }
 
-func newStagedFile(cfg config, root string, fields []string, mkdir func(ctx context.Context, path string) error) *stagedFile {
+func newStagedFile(cfg config, root string, fields []string, filesAPI files.FilesInterface) *stagedFile {
 	uuid := uuid.NewString()
 	var tempdir = os.TempDir()
 
@@ -131,7 +132,7 @@ func newStagedFile(cfg config, root string, fields []string, mkdir func(ctx cont
 		fields: fields,
 		dir:    filepath.Join(tempdir, uuid),
 		root:   root,
-		mkdir:  mkdir,
+		files:  filesAPI,
 		cfg:    cfg,
 	}
 }
@@ -158,7 +159,7 @@ func (f *stagedFile) start(ctx context.Context, db *stdsql.DB) error {
 	// Reset values used per-transaction.
 	f.uploaded = []string{}
 	f.txnDir = uuid.NewString()
-	if err := f.mkdir(ctx, f.remoteDir()); err != nil {
+	if err := f.files.CreateDirectory(ctx, files.CreateDirectoryRequest{DirectoryPath: f.remoteDir()}); err != nil {
 		return fmt.Errorf("creating staging directory %q: %w", f.remoteDir(), err)
 	}
 	f.group, f.groupCtx = errgroup.WithContext(ctx)
