@@ -15,9 +15,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestStagedFileCompression covers the local-file half of stagedFile: staged files are gzipped,
-// named so that Databricks decompresses them on read, and uploaded into the transaction's own
-// directory under the root.
+// TestStagedFileCompression covers the local-file half of stagedFile: staged files are gzipped and
+// named so that Databricks decompresses them on read.
 func TestStagedFileCompression(t *testing.T) {
 	var f = newStagedFile(config{}, "/Volumes/c/s/v/root", []string{"first", "second"}, nil)
 	f.dir = t.TempDir()
@@ -46,8 +45,6 @@ func TestStagedFileCompression(t *testing.T) {
 	require.Equal(t, map[string]any{"first": "hello", "second": float64(42)}, got)
 }
 
-// TestStagedFileStartCreatesDirectory covers start(): each transaction gets a
-// fresh remote directory, created before any upload.
 func TestStagedFileStartCreatesDirectory(t *testing.T) {
 	var created []string
 	var f = newStagedFile(config{}, "/Volumes/c/s/v/root", []string{"id"}, func(_ context.Context, path string) error {

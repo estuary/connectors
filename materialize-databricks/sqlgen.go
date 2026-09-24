@@ -218,11 +218,8 @@ JOIN ({{ template "loadSource" $ }}) AS r
 {{- end }}
 {{ end }}
 
--- The staged files of a transaction, read as one relation per staging
--- directory with the files' schema given, so nothing is inferred from them.
--- Files staged at the root by earlier versions of the connector are read one
--- by one. The load source selects the key columns; the store source, every
--- column and the delete flag.
+-- The staged files of a transaction: one relation per staging directory, and
+-- one scan per file for files staged at the root by earlier versions.
 
 {{ define "loadSource" }}
 {{- range $di, $dir := $.Directories }}
@@ -363,15 +360,12 @@ JOIN ({{ template "loadSource" $ }}) AS r
 }
 
 type tableWithFiles struct {
-	// Files are the staged files a query reads one by one: for COPY INTO,
-	// every file by its name relative to StagingPath; for loads and merges,
-	// the full paths of files staged at the root by earlier versions.
+	// Files are relative to StagingPath for COPY INTO and full paths otherwise.
 	Files       []string
 	StagingPath string
 	Table       *sql.Table
 	Bounds      []sql.MergeBound
-	// Directories are the staging directories a load or merge reads whole,
-	// each as one relation with Schema, the files' schema as a DDL string.
+	// Directories are each read as one relation with Schema, a DDL string.
 	Directories []string
 	Schema      string
 }
@@ -380,8 +374,7 @@ func RenderTableWithFiles(table sql.Table, files []string, stagingPath string, t
 	return renderTemplate(tpl, &tableWithFiles{Table: &table, Files: files, StagingPath: stagingPath, Bounds: bounds})
 }
 
-// RenderTableWithStaged renders a load or merge query over the staging
-// directories and the root-level files given.
+// RenderTableWithStaged renders a load or merge over staging directories and root-level files.
 func RenderTableWithStaged(table sql.Table, dirs, rootFiles []string, schema string, tpl *template.Template, bounds []sql.MergeBound) (string, error) {
 	return renderTemplate(tpl, &tableWithFiles{Table: &table, Directories: dirs, Files: rootFiles, Schema: schema, Bounds: bounds})
 }

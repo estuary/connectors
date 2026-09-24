@@ -819,9 +819,8 @@ func TestCombineBounds(t *testing.T) {
 	})
 }
 
-// A task upgraded from a version that staged files at the root of the staging
-// path may still hold such files in its checkpoint. They commit in the same
-// merge as files staged in transaction directories, read one by one.
+// Root-level files from a checkpoint written before staging directories existed
+// merge alongside files in directories.
 func TestAcknowledgeMergesRootFilesWithDirectories(t *testing.T) {
 	var d = renderingTransactor(lowerRangeKey)
 	d.cp.add("a_table.v1", lowerRangeKey, structuredItem(true,

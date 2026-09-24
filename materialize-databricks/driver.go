@@ -364,7 +364,7 @@ type binding struct {
 
 	loadFile  *stagedFile
 	storeFile *stagedFile
-	// The schemas of the load and store files, as read_files DDL strings.
+	// read_files schema DDL of the load and store files.
 	loadSchema  string
 	storeSchema string
 
@@ -606,13 +606,11 @@ func parseCheckpointItem(data json.RawMessage) (*checkpointItem, error) {
 	return &item, nil
 }
 
-// deleteStaged deletes staged files and the transaction directories they were
-// uploaded into. A file staged at the root by an earlier version has no
-// directory of its own.
 func (d *transactor) deleteStaged(ctx context.Context, files []string) {
 	d.deleteFiles(ctx, files)
 	var dirs = make(map[string]struct{})
 	for _, f := range files {
+		// Files staged at the root by earlier connector versions have no directory to delete.
 		if dir := filepath.Dir(f); filepath.Base(dir) != stagingRootName {
 			dirs[dir] = struct{}{}
 		}
@@ -1002,10 +1000,8 @@ func scanRowStats(rows *stdsql.Rows) m.RowStats {
 // (named relative to the binding's staging root) into the binding's target
 // table: MERGE when any of the staged rows update existing documents, and a
 // direct COPY INTO otherwise, chunked to bound the size of any single query.
-//
-// A merge reads each transaction's staging directory as one relation. Files
-// staged at the root by earlier versions of the connector, and so possibly
-// pending in the checkpoint of a task that upgrades, are read one by one.
+// Root-level files come from checkpoints written before staging directories
+// existed and are read one by one.
 func (d *transactor) renderCommitQueries(b *binding, files []string, bounds []sql.MergeBound, needsMerge bool) ([]string, error) {
 	var queries []string
 	if !needsMerge {
@@ -1027,7 +1023,6 @@ func (d *transactor) renderCommitQueries(b *binding, files []string, bounds []sq
 			dirs = append(dirs, dir)
 		}
 	}
-	// The directories go with the first chunk of root files, if any.
 	var first = true
 	for chunk := range slices.Chunk(rootFiles, queryBatchSize) {
 		var chunkDirs []string
