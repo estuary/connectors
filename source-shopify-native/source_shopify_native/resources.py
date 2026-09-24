@@ -481,6 +481,140 @@ async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointCon
         raise ValidationError(errors)
 
 
+def _build_incremental_resource(
+    model: type[ShopifyGraphQLResource],
+    stores_with_access: list[str],
+    store_contexts: dict[str, StoreContext],
+    config: EndpointConfig,
+) -> Resource:
+    """Build the incremental resource for `model`, with one subtask per store in `stores_with_access`."""
+    key = (
+        ["/_meta/store", "/id"]
+        if config.advanced.should_use_composite_key
+        else ["/id"]
+    )
+    use_backfill = not model.SHOULD_USE_BULK_QUERIES
+    initial_state = _create_initial_state(
+        stores_with_access, config.start_date, use_backfill
+    )
+    legacy_store_id = config._legacy_store or config.stores[0].store
+
+    async def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        _all_bindings,
+    ):
+        await _reconcile_connector_state(
+            stores_with_access,
+            binding,
+            state,
+            initial_state,
+            task,
+            legacy_store_id=legacy_store_id,
+        )
+
+        # Warn if FulfillmentOrders has partial scope coverage
+        if model == gql.FulfillmentOrders:
+            fo_scopes = gql.FulfillmentOrders.QUALIFYING_SCOPES
+            for store_id in stores_with_access:
+                granted = store_contexts[store_id].capabilities.scopes
+                if fo_scopes & granted and not fo_scopes <= granted:
+                    missing = fo_scopes - granted
+                    task.log.warning(
+                        f"Store '{store_id}': FulfillmentOrders has partial scopes. "
+                        f"Missing: {missing}. Only matching fulfillment orders will be captured."
+                    )
+
+        if not model.SHOULD_USE_BULK_QUERIES and "edges" in model.QUERY.lower():
+            raise RuntimeError(
+                "Non-bulk queries cannot contain nested connections."
+            )
+
+        data_model = create_response_data_model(model)
+
+        # Subtask creation is driven by fetch_changes/fetch_page dict keys
+        # (from stores_with_access), NOT by state keys. Orphaned state for
+        # removed stores is inert and intentionally preserved.
+        fetch_changes: dict[str, functools.partial] = {}
+        fetch_page: dict[str, functools.partial] = {}
+
+        for store_id in stores_with_access:
+            ctx = store_contexts[store_id]
+
+            if model.SHOULD_USE_BULK_QUERIES:
+                fetch_changes[store_id] = functools.partial(
+                    bulk_fetch_incremental,
+                    ctx.http,
+                    config.advanced.window_size,
+                    ctx.bulk_job_manager,
+                    model,
+                    store_id,
+                    ctx.capabilities,
+                )
+            elif model.SORT_KEY is None:
+                fetch_changes[store_id] = functools.partial(
+                    fetch_incremental_unsorted,
+                    ctx.client,
+                    model,
+                    data_model,
+                    store_id,
+                    ctx.capabilities,
+                )
+                fetch_page[store_id] = functools.partial(
+                    backfill_incremental_unsorted,
+                    ctx.client,
+                    model,
+                    data_model,
+                    store_id,
+                    ctx.capabilities,
+                    config.start_date,
+                )
+            else:
+                fetch_changes[store_id] = functools.partial(
+                    fetch_incremental,
+                    ctx.client,
+                    model,
+                    data_model,
+                    store_id,
+                    ctx.capabilities,
+                )
+                fetch_page[store_id] = functools.partial(
+                    backfill_incremental,
+                    ctx.client,
+                    model,
+                    data_model,
+                    store_id,
+                    ctx.capabilities,
+                    config.start_date,
+                )
+
+        open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=fetch_changes,
+            fetch_page=fetch_page if fetch_page else None,
+        )
+
+
+    return Resource(
+        name=model.NAME,
+        key=key,
+        model=ShopifyGraphQLResource,
+        open=open,
+        initial_state=initial_state,
+        schema_inference=True,
+        initial_config=ResourceConfigWithSchedule(
+            name=model.NAME,
+            interval=timedelta(minutes=5),
+            schedule=model.BACKFILL_SCHEDULE,
+        ),
+    )
+
+
 async def all_resources(
     log: Logger,
     http: HTTPMixin,
@@ -540,11 +674,6 @@ async def all_resources(
 
     # Build resources
     resources: list[Resource] = []
-    key = (
-        ["/_meta/store", "/id"]
-        if config.advanced.should_use_composite_key
-        else ["/id"]
-    )
 
     for model in INCREMENTAL_RESOURCES:
         stores_with_access = _stores_with_access_to(model, store_contexts)
@@ -552,136 +681,8 @@ async def all_resources(
         if not stores_with_access:
             continue
 
-        use_backfill = not model.SHOULD_USE_BULK_QUERIES
-        initial_state = _create_initial_state(
-            stores_with_access, config.start_date, use_backfill
-        )
-        legacy_store_id = config._legacy_store or config.stores[0].store
-
-        def create_open_fn(
-            model: type[ShopifyGraphQLResource],
-            stores_with_access: list[str],
-            initial_state: ResourceState,
-            legacy_store_id: str,
-        ):
-            async def open(
-                binding: CaptureBinding[ResourceConfig],
-                binding_index: int,
-                state: ResourceState,
-                task: Task,
-                _all_bindings,
-            ):
-                await _reconcile_connector_state(
-                    stores_with_access,
-                    binding,
-                    state,
-                    initial_state,
-                    task,
-                    legacy_store_id=legacy_store_id,
-                )
-
-                # Warn if FulfillmentOrders has partial scope coverage
-                if model == gql.FulfillmentOrders:
-                    fo_scopes = gql.FulfillmentOrders.QUALIFYING_SCOPES
-                    for store_id in stores_with_access:
-                        granted = store_contexts[store_id].capabilities.scopes
-                        if fo_scopes & granted and not fo_scopes <= granted:
-                            missing = fo_scopes - granted
-                            task.log.warning(
-                                f"Store '{store_id}': FulfillmentOrders has partial scopes. "
-                                f"Missing: {missing}. Only matching fulfillment orders will be captured."
-                            )
-
-                if not model.SHOULD_USE_BULK_QUERIES and "edges" in model.QUERY.lower():
-                    raise RuntimeError(
-                        "Non-bulk queries cannot contain nested connections."
-                    )
-
-                data_model = create_response_data_model(model)
-
-                # Subtask creation is driven by fetch_changes/fetch_page dict keys
-                # (from stores_with_access), NOT by state keys. Orphaned state for
-                # removed stores is inert and intentionally preserved.
-                fetch_changes: dict[str, functools.partial] = {}
-                fetch_page: dict[str, functools.partial] = {}
-
-                for store_id in stores_with_access:
-                    ctx = store_contexts[store_id]
-
-                    if model.SHOULD_USE_BULK_QUERIES:
-                        fetch_changes[store_id] = functools.partial(
-                            bulk_fetch_incremental,
-                            ctx.http,
-                            config.advanced.window_size,
-                            ctx.bulk_job_manager,
-                            model,
-                            store_id,
-                            ctx.capabilities,
-                        )
-                    elif model.SORT_KEY is None:
-                        fetch_changes[store_id] = functools.partial(
-                            fetch_incremental_unsorted,
-                            ctx.client,
-                            model,
-                            data_model,
-                            store_id,
-                            ctx.capabilities,
-                        )
-                        fetch_page[store_id] = functools.partial(
-                            backfill_incremental_unsorted,
-                            ctx.client,
-                            model,
-                            data_model,
-                            store_id,
-                            ctx.capabilities,
-                            config.start_date,
-                        )
-                    else:
-                        fetch_changes[store_id] = functools.partial(
-                            fetch_incremental,
-                            ctx.client,
-                            model,
-                            data_model,
-                            store_id,
-                            ctx.capabilities,
-                        )
-                        fetch_page[store_id] = functools.partial(
-                            backfill_incremental,
-                            ctx.client,
-                            model,
-                            data_model,
-                            store_id,
-                            ctx.capabilities,
-                            config.start_date,
-                        )
-
-                open_binding(
-                    binding,
-                    binding_index,
-                    state,
-                    task,
-                    fetch_changes=fetch_changes,
-                    fetch_page=fetch_page if fetch_page else None,
-                )
-
-            return open
-
         resources.append(
-            Resource(
-                name=model.NAME,
-                key=key,
-                model=ShopifyGraphQLResource,
-                open=create_open_fn(
-                    model, stores_with_access, initial_state, legacy_store_id
-                ),
-                initial_state=initial_state,
-                schema_inference=True,
-                initial_config=ResourceConfigWithSchedule(
-                    name=model.NAME,
-                    interval=timedelta(minutes=5),
-                    schedule=model.BACKFILL_SCHEDULE,
-                ),
-            )
+            _build_incremental_resource(model, stores_with_access, store_contexts, config)
         )
 
     # Build snapshot resources. Each is a single binding keyed on
