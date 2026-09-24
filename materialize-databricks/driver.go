@@ -363,7 +363,8 @@ type binding struct {
 
 	loadFile  *stagedFile
 	storeFile *stagedFile
-	// read_files schema DDL of the load and store files.
+	// schema of load and store files rendered as a DDL and 
+	// passed to Databricks `read_files`
 	loadSchema  string
 	storeSchema string
 
