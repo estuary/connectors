@@ -220,6 +220,8 @@ JOIN ({{ template "loadSource" $ }}) AS r
 
 -- The staged files of a transaction: one relation per staging directory, and
 -- one scan per file for files staged at the root by earlier versions.
+-- TODO: remove the per-file scans in about December 2026, with the root-level
+-- file path in renderCommitQueries.
 
 {{ define "loadSource" }}
 {{- range $di, $dir := $.Directories }}
