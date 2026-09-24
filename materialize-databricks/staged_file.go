@@ -21,11 +21,8 @@ import (
 const fileSizeLimit = 128 * 1024 * 1024
 const uploadConcurrency = 3
 
-// stagedSchemaDDL is the schema of a staged file as the DDL string read_files
-// takes, so that reading the file infers nothing. Integer and boolean columns
-// are written as JSON numbers and booleans and read as such; every other
-// column is written as a JSON string and cast by the query, as the string
-// forms of doubles include NaN and the infinities.
+// stagedSchemaDDL renders a read_files schema. Doubles stay STRING because
+// their JSON form may be "NaN" or "Inf", which the query's cast accepts.
 func stagedSchemaDDL(cols []*sql.Column, withDeleteFlag bool) string {
 	var out = make([]string, 0, len(cols)+1)
 	for _, col := range cols {
@@ -80,9 +77,8 @@ func (f *fileBuffer) Close() error {
 // disk file, but streaming PUTs do not currently work well and we have not been able to stream more than
 // 60MB of data for each upload, which is very small and leads to performance limitations
 //
-// Each transaction's files are uploaded into a directory of their own under
-// the root, so that a query can read the transaction's files as one relation.
-// Uploaded names are relative to the root and include that directory.
+// Each transaction's files go into their own directory under the root so a
+// query can read them as one relation.
 //
 // The lifecycle of a staged file for a transaction is as follows:
 //
@@ -102,12 +98,10 @@ type stagedFile struct {
 	// The full directory path of local files for this binding formed by joining tempdir and uuid.
 	dir string
 
-	// The remote root directory for uploading files, and the current
-	// transaction's directory under it.
+	// The remote root directory for uploading files
 	root   string
 	txnDir string
-	// mkdir creates a remote directory.
-	mkdir func(ctx context.Context, path string) error
+	mkdir  func(ctx context.Context, path string) error
 
 	// Indicates if the stagedFile has been initialized for this transaction yet. Set `true` by
 	// start() and `false` by flush().
@@ -142,7 +136,6 @@ func newStagedFile(cfg config, root string, fields []string, mkdir func(ctx cont
 	}
 }
 
-// remoteDir is the directory of the current transaction's uploads.
 func (f *stagedFile) remoteDir() string {
 	return filepath.Join(f.root, f.txnDir)
 }
@@ -261,9 +254,7 @@ func (f *stagedFile) putWorker(ctx context.Context, db *stdsql.DB, filePaths <-c
 }
 
 func (f *stagedFile) newFile() error {
-	// Databricks infers the codec of a staged file from its extension when reading it back. The
-	// uploaded name is relative to root and so includes the transaction's directory; the local
-	// file keeps only the base name.
+	// Databricks infers the codec of a staged file from its extension when reading it back.
 	var fName = filepath.Join(f.txnDir, uuid.NewString()+".json.gz")
 	filePath := filepath.Join(f.dir, filepath.Base(fName))
 
