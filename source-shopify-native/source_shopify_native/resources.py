@@ -487,7 +487,14 @@ def _build_incremental_resource(
     store_contexts: dict[str, StoreContext],
     config: EndpointConfig,
 ) -> Resource:
-    """Build the incremental resource for `model`, with one subtask per store in `stores_with_access`."""
+    """Build the incremental resource for `model`, with one subtask per store in `stores_with_access`.
+
+    State format is always dictionary-based: {"inc": {"store_id": {...}}}
+
+    Collection key format depends on config.advanced.should_use_composite_key:
+    - True: ["/_meta/store", "/id"]
+    - False: ["/id"]
+    """
     key = (
         ["/_meta/store", "/id"]
         if config.advanced.should_use_composite_key
@@ -620,7 +627,11 @@ def _build_snapshot_resource(
     stores_with_access: list[str],
     store_contexts: dict[str, StoreContext],
 ) -> SnapshotResource:
-    """Build the snapshot resource for `model`, with one subtask per store in `stores_with_access`."""
+    """Build the snapshot resource for `model`, with one subtask per store in `stores_with_access`.
+
+    Each is a single binding keyed on [/_meta/store, /_meta/row_id] whose snapshot
+    fans out into one per-store subtask.
+    """
     snapshot_key = ["/_meta/store", "/_meta/row_id"]
 
     async def open(
@@ -732,57 +743,65 @@ async def _initialize_store_contexts(
     return store_contexts
 
 
-async def all_resources(
+def _build_resource(
+    model: type[ShopifyGraphQLResource],
+    stores_with_access: list[str],
+    store_contexts: dict[str, StoreContext],
+    config: EndpointConfig,
+) -> Resource:
+    if model in FULL_REFRESH_RESOURCES:
+        return _build_snapshot_resource(model, stores_with_access, store_contexts)
+    elif model in INCREMENTAL_RESOURCES:
+        return _build_incremental_resource(model, stores_with_access, store_contexts, config)
+    raise RuntimeError(
+        f"Implementation error: {model.__name__} is in neither INCREMENTAL_RESOURCES nor FULL_REFRESH_RESOURCES."
+    )
+
+
+async def discovered_resources(
     log: Logger,
     http: HTTPMixin,
     config: EndpointConfig,
+) -> list[Resource]:
+    store_contexts = await _initialize_store_contexts(
+        log, http, config, should_cancel_ongoing_job=False
+    )
+
+    resources: list[Resource] = []
+    for model in INCREMENTAL_RESOURCES + FULL_REFRESH_RESOURCES:
+        stores_with_access = _stores_with_access_to(model, store_contexts)
+        if stores_with_access:
+            resources.append(
+                _build_resource(model, stores_with_access, store_contexts, config)
+            )
+
+    log.info(
+        f"Discovered {len(resources)} stream(s) across {len(store_contexts)} store(s)"
+    )
+
+    return resources
+
+
+async def bound_resources(
+    log: Logger,
+    http: HTTPMixin,
+    config: EndpointConfig,
+    bound_stream_names: set[str],
     should_cancel_ongoing_job: bool = False,
 ) -> list[Resource]:
-    """Discover all available resources across all configured stores.
-
-    State format is always dictionary-based: {"inc": {"store_id": {...}}}
-
-    Collection key format depends on config.advanced.should_use_composite_key:
-    - True: ["/_meta/store", "/id"]
-    - False: ["/id"]
-    """
     store_contexts = await _initialize_store_contexts(
         log, http, config, should_cancel_ongoing_job
     )
 
-    # Determine which resources are available across all stores (union)
-    all_available: set[type[ShopifyGraphQLResource]] = set()
-    for ctx in store_contexts.values():
-        all_available.update(ctx.available_resources)
-
-    log.info(
-        f"Discovered {len(all_available)} stream(s) across {len(store_contexts)} store(s)"
-    )
-
-    # Build resources
     resources: list[Resource] = []
-
-    for model in INCREMENTAL_RESOURCES:
-        stores_with_access = _stores_with_access_to(model, store_contexts)
-
-        if not stores_with_access:
+    for model in INCREMENTAL_RESOURCES + FULL_REFRESH_RESOURCES:
+        if model.NAME not in bound_stream_names:
             continue
 
-        resources.append(
-            _build_incremental_resource(model, stores_with_access, store_contexts, config)
-        )
-
-    # Build snapshot resources. Each is a single binding keyed on
-    # [/_meta/store, /_meta/row_id] whose snapshot fans out into one per-store
-    # subtask
-    for model in FULL_REFRESH_RESOURCES:
         stores_with_access = _stores_with_access_to(model, store_contexts)
-
-        if not stores_with_access:
-            continue
-
-        resources.append(
-            _build_snapshot_resource(model, stores_with_access, store_contexts)
-        )
+        if stores_with_access:
+            resources.append(
+                _build_resource(model, stores_with_access, store_contexts, config)
+            )
 
     return resources
