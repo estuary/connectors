@@ -615,6 +615,76 @@ def _build_incremental_resource(
     )
 
 
+def _build_snapshot_resource(
+    model: type[ShopifyGraphQLResource],
+    stores_with_access: list[str],
+    store_contexts: dict[str, StoreContext],
+) -> SnapshotResource:
+    """Build the snapshot resource for `model`, with one subtask per store in `stores_with_access`."""
+    snapshot_key = ["/_meta/store", "/_meta/row_id"]
+
+    async def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        _all_bindings,
+    ):
+        data_model = create_response_data_model(model)
+
+        fetch_snapshot_fns: dict[str, functools.partial] = {}
+        tombstones: dict[str, ShopifyDocument] = {}
+        for store_id in stores_with_access:
+            ctx = store_contexts[store_id]
+            if model.SHOULD_USE_BULK_QUERIES:
+                fetch_snapshot_fns[store_id] = functools.partial(
+                    bulk_fetch_snapshot,
+                    ctx.http,
+                    ctx.bulk_job_manager,
+                    model,
+                    store_id,
+                    ctx.capabilities,
+                )
+            else:
+                fetch_snapshot_fns[store_id] = functools.partial(
+                    fetch_snapshot,
+                    ctx.client,
+                    model,
+                    data_model,
+                    store_id,
+                    ctx.capabilities,
+                )
+            # The tombstone must carry the /_meta/store discriminator so
+            # deletes target the correct [store, row_id] key. The CDK only
+            # fills in op/row_id.
+            tombstones[store_id] = ShopifyDocument(
+                _meta=ShopifyDocument.Meta(op="d", store=store_id),
+            )
+
+        open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_snapshot=fetch_snapshot_fns,
+            tombstone=tombstones,
+        )
+
+
+    return SnapshotResource(
+        name=model.NAME,
+        key=snapshot_key,
+        # ShopifyDocument's discovered schema include /_meta/store, which is
+        # a necessary key component that the CDK's BaseDocument couldn't know about.
+        model=ShopifyDocument,
+        open=open,
+        initial_config=ResourceConfigWithSchedule(
+            name=model.NAME,
+            interval=timedelta(minutes=15)
+        ),
+    )
+
+
 async def all_resources(
     log: Logger,
     http: HTTPMixin,
@@ -688,79 +758,14 @@ async def all_resources(
     # Build snapshot resources. Each is a single binding keyed on
     # [/_meta/store, /_meta/row_id] whose snapshot fans out into one per-store
     # subtask
-    snapshot_key = ["/_meta/store", "/_meta/row_id"]
     for model in FULL_REFRESH_RESOURCES:
         stores_with_access = _stores_with_access_to(model, store_contexts)
 
         if not stores_with_access:
             continue
 
-        def create_snapshot_open_fn(
-            model: type[ShopifyGraphQLResource],
-            stores_with_access: list[str],
-        ):
-            async def open(
-                binding: CaptureBinding[ResourceConfig],
-                binding_index: int,
-                state: ResourceState,
-                task: Task,
-                _all_bindings,
-            ):
-                data_model = create_response_data_model(model)
-
-                fetch_snapshot_fns: dict[str, functools.partial] = {}
-                tombstones: dict[str, ShopifyDocument] = {}
-                for store_id in stores_with_access:
-                    ctx = store_contexts[store_id]
-                    if model.SHOULD_USE_BULK_QUERIES:
-                        fetch_snapshot_fns[store_id] = functools.partial(
-                            bulk_fetch_snapshot,
-                            ctx.http,
-                            ctx.bulk_job_manager,
-                            model,
-                            store_id,
-                            ctx.capabilities,
-                        )
-                    else:
-                        fetch_snapshot_fns[store_id] = functools.partial(
-                            fetch_snapshot,
-                            ctx.client,
-                            model,
-                            data_model,
-                            store_id,
-                            ctx.capabilities,
-                        )
-                    # The tombstone must carry the /_meta/store discriminator so
-                    # deletes target the correct [store, row_id] key. The CDK only
-                    # fills in op/row_id.
-                    tombstones[store_id] = ShopifyDocument(
-                        _meta=ShopifyDocument.Meta(op="d", store=store_id),
-                    )
-
-                open_binding(
-                    binding,
-                    binding_index,
-                    state,
-                    task,
-                    fetch_snapshot=fetch_snapshot_fns,
-                    tombstone=tombstones,
-                )
-
-            return open
-
         resources.append(
-            SnapshotResource(
-                name=model.NAME,
-                key=snapshot_key,
-                # ShopifyDocument's discovered schema include /_meta/store, which is
-                # a necessary key component that the CDK's BaseDocument couldn't know about.
-                model=ShopifyDocument,
-                open=create_snapshot_open_fn(model, stores_with_access),
-                initial_config=ResourceConfigWithSchedule(
-                    name=model.NAME,
-                    interval=timedelta(minutes=15)
-                ),
-            )
+            _build_snapshot_resource(model, stores_with_access, store_contexts)
         )
 
     return resources
