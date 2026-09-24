@@ -16,13 +16,28 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// fakeFiles records directory and file operations; directories list as empty.
 type fakeFiles struct {
 	files.FilesInterface
-	created []string
+	created, deleted []string
 }
 
 func (f *fakeFiles) CreateDirectory(_ context.Context, req files.CreateDirectoryRequest) error {
 	f.created = append(f.created, req.DirectoryPath)
+	return nil
+}
+
+func (f *fakeFiles) ListDirectoryContentsAll(context.Context, files.ListDirectoryContentsRequest) ([]files.DirectoryEntry, error) {
+	return nil, nil
+}
+
+func (f *fakeFiles) DeleteByFilePath(_ context.Context, path string) error {
+	f.deleted = append(f.deleted, path)
+	return nil
+}
+
+func (f *fakeFiles) DeleteDirectoryByDirectoryPath(_ context.Context, path string) error {
+	f.deleted = append(f.deleted, path)
 	return nil
 }
 
@@ -37,13 +52,13 @@ func TestStagedFileCompression(t *testing.T) {
 	require.NoError(t, f.writer.Write([]any{"hello", 42}))
 	require.NoError(t, f.writer.Close())
 
-	require.Len(t, f.uploaded, 1)
-	require.True(t, strings.HasPrefix(f.uploaded[0], "txn-1/"), "got %q", f.uploaded[0])
-	require.True(t, strings.HasSuffix(f.uploaded[0], ".json.gz"), "got %q", f.uploaded[0])
+	local, err := os.ReadDir(f.dir)
+	require.NoError(t, err)
+	require.Len(t, local, 1)
+	require.True(t, strings.HasSuffix(local[0].Name(), ".json.gz"), "got %q", local[0].Name())
 	require.Equal(t, "/Volumes/c/s/v/root/txn-1", f.remoteDir())
-	require.Equal(t, "/Volumes/c/s/v/root/txn-1/"+filepath.Base(f.uploaded[0]), pathsWithRoot(f.root, f.uploaded)[0])
 
-	contents, err := os.ReadFile(filepath.Join(f.dir, filepath.Base(f.uploaded[0])))
+	contents, err := os.ReadFile(filepath.Join(f.dir, local[0].Name()))
 	require.NoError(t, err)
 
 	gz, err := gzip.NewReader(bytes.NewReader(contents))

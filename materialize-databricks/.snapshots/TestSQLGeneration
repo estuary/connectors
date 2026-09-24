@@ -413,27 +413,51 @@ AND `a-schema`.key_value.`key!binary` = r.`key!binary` AND `a-schema`.key_value.
 		VALUES (r.key1, r.key2, r.`key!binary`, r.array, r.binary, r.boolean, r.field_with_projection, r.flow_published_at, r.integer, r.`integerGt128Bit`, r.`integerGt256Bit`, r.`integerGt64Bit`, r.`integerWithUserDDL`, r.multiple, r.`nonAsciiκόσμε`, r.number, r.`numberCastToString`, r.object, r.string, r.`stringInteger`, r.`stringInteger18Chars`, r.`stringInteger38Chars`, r.`stringInteger39Chars`, r.`stringInteger66Chars`, r.`stringInteger77Chars`, r.`stringNumber`, r.flow_document);
 --- End `a-schema`.key_value mergeInto ---
 
---- Begin `a-schema`.key_value copyIntoDirect ---
+--- Begin `a-schema`.key_value copyIntoDirect directory ---
+	COPY INTO `a-schema`.key_value FROM (
+    SELECT
+		key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`, array::STRING, unbase64(binary)::BINARY as binary, boolean::BOOLEAN, field_with_projection::STRING, flow_published_at::TIMESTAMP, integer::LONG, `integerGt128Bit`::NUMERIC(38,0), `integerGt256Bit`::NUMERIC(38,0), `integerGt64Bit`::NUMERIC(38,0), `integerWithUserDDL`::DECIMAL(20), multiple::STRING, `nonAsciiκόσμε`::STRING, number::DOUBLE, `numberCastToString`::STRING, object::STRING, string::STRING, `stringInteger`::NUMERIC(38,0), `stringInteger18Chars`::NUMERIC(38,0), `stringInteger38Chars`::NUMERIC(38,0), `stringInteger39Chars`::STRING, `stringInteger66Chars`::STRING, `stringInteger77Chars`::STRING, `stringNumber`::DOUBLE, flow_document::STRING
+  FROM 'test-staging-path/txn-1'
+	)
+  FILEFORMAT = JSON
+  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false', 'inferSchema' = 'false' )
+	COPY_OPTIONS ( 'mergeSchema' = 'true' )
+  ;
+--- End `a-schema`.key_value copyIntoDirect ---
+
+--- Begin `a-schema`.key_value copyIntoDirect root files ---
 	COPY INTO `a-schema`.key_value FROM (
     SELECT
 		key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`, array::STRING, unbase64(binary)::BINARY as binary, boolean::BOOLEAN, field_with_projection::STRING, flow_published_at::TIMESTAMP, integer::LONG, `integerGt128Bit`::NUMERIC(38,0), `integerGt256Bit`::NUMERIC(38,0), `integerGt64Bit`::NUMERIC(38,0), `integerWithUserDDL`::DECIMAL(20), multiple::STRING, `nonAsciiκόσμε`::STRING, number::DOUBLE, `numberCastToString`::STRING, object::STRING, string::STRING, `stringInteger`::NUMERIC(38,0), `stringInteger18Chars`::NUMERIC(38,0), `stringInteger38Chars`::NUMERIC(38,0), `stringInteger39Chars`::STRING, `stringInteger66Chars`::STRING, `stringInteger77Chars`::STRING, `stringNumber`::DOUBLE, flow_document::STRING
   FROM 'test-staging-path'
 	)
   FILEFORMAT = JSON
-  FILES = ('txn-1/file1.json.gz','txn-1/file2.json.gz')
+  FILES = ('file1.json.gz','file2.json.gz')
   FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false', 'inferSchema' = 'false' )
 	COPY_OPTIONS ( 'mergeSchema' = 'true' )
   ;
 --- End `a-schema`.key_value copyIntoDirect ---
 
---- Begin `a-schema`.delta_updates copyIntoDirect ---
+--- Begin `a-schema`.delta_updates copyIntoDirect directory ---
+	COPY INTO `a-schema`.delta_updates FROM (
+    SELECT
+		`theKey`::STRING, `aValue`::LONG, flow_published_at::TIMESTAMP
+  FROM 'test-staging-path/txn-1'
+	)
+  FILEFORMAT = JSON
+  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false', 'inferSchema' = 'false' )
+	COPY_OPTIONS ( 'mergeSchema' = 'true' )
+  ;
+--- End `a-schema`.delta_updates copyIntoDirect ---
+
+--- Begin `a-schema`.delta_updates copyIntoDirect root files ---
 	COPY INTO `a-schema`.delta_updates FROM (
     SELECT
 		`theKey`::STRING, `aValue`::LONG, flow_published_at::TIMESTAMP
   FROM 'test-staging-path'
 	)
   FILEFORMAT = JSON
-  FILES = ('txn-1/file1.json.gz','txn-1/file2.json.gz')
+  FILES = ('file1.json.gz','file2.json.gz')
   FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false', 'inferSchema' = 'false' )
 	COPY_OPTIONS ( 'mergeSchema' = 'true' )
   ;

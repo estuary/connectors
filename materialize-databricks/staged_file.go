@@ -114,10 +114,6 @@ type stagedFile struct {
 	buf    *fileBuffer
 	writer *writer.JsonWriter
 
-	// List of file names uploaded during the current transaction for transaction data, not
-	// including the manifest file name itself. These data file names randomly generated UUIDs.
-	uploaded []string
-
 	// Per-transaction coordination.
 	putFiles chan string
 	group    *errgroup.Group
@@ -157,7 +153,6 @@ func (f *stagedFile) start(ctx context.Context, db *stdsql.DB) error {
 	}
 
 	// Reset values used per-transaction.
-	f.uploaded = []string{}
 	f.txnDir = uuid.NewString()
 	if err := f.files.CreateDirectory(ctx, files.CreateDirectoryRequest{DirectoryPath: f.remoteDir()}); err != nil {
 		return fmt.Errorf("creating staging directory %q: %w", f.remoteDir(), err)
@@ -199,16 +194,16 @@ func (f *stagedFile) writeRow(row []interface{}) error {
 	return nil
 }
 
-func (f *stagedFile) flush() ([]string, error) {
+func (f *stagedFile) flush() error {
 	if err := f.putFile(); err != nil {
-		return nil, fmt.Errorf("flush putFile: %w", err)
+		return fmt.Errorf("flush putFile: %w", err)
 	}
 
 	close(f.putFiles)
 	f.started = false
 
 	// Wait for all outstanding PUT requests to complete.
-	return f.uploaded, f.group.Wait()
+	return f.group.Wait()
 }
 
 func (f *stagedFile) putWorker(ctx context.Context, db *stdsql.DB, filePaths <-chan string) error {
@@ -256,8 +251,7 @@ func (f *stagedFile) putWorker(ctx context.Context, db *stdsql.DB, filePaths <-c
 
 func (f *stagedFile) newFile() error {
 	// Databricks infers the codec of a staged file from its extension when reading it back.
-	var fName = filepath.Join(f.txnDir, uuid.NewString()+".json.gz")
-	filePath := filepath.Join(f.dir, filepath.Base(fName))
+	filePath := filepath.Join(f.dir, uuid.NewString()+".json.gz")
 
 	file, err := os.Create(filePath)
 	if err != nil {
@@ -269,7 +263,6 @@ func (f *stagedFile) newFile() error {
 		file: file,
 	}
 	f.writer = writer.NewJsonWriter(f.buf, f.fields)
-	f.uploaded = append(f.uploaded, fName)
 
 	return nil
 }
