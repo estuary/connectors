@@ -251,6 +251,18 @@ def _get_available_resources(
     return available
 
 
+def _stores_with_access_to(
+    model: type[ShopifyGraphQLResource],
+    store_contexts: dict[str, StoreContext],
+) -> list[str]:
+    """IDs of the stores that can serve `model`: their granted scopes and plan tier allow it."""
+    return [
+        store_id
+        for store_id, ctx in store_contexts.items()
+        if model in ctx.available_resources
+    ]
+
+
 def _create_initial_state(
     store_ids: list[str],
     start_date: AwareDatetime,
@@ -535,11 +547,7 @@ async def all_resources(
     )
 
     for model in INCREMENTAL_RESOURCES:
-        stores_with_access = [
-            store_id
-            for store_id, ctx in store_contexts.items()
-            if model in ctx.available_resources
-        ]
+        stores_with_access = _stores_with_access_to(model, store_contexts)
 
         if not stores_with_access:
             continue
@@ -681,11 +689,7 @@ async def all_resources(
     # subtask
     snapshot_key = ["/_meta/store", "/_meta/row_id"]
     for model in FULL_REFRESH_RESOURCES:
-        stores_with_access = [
-            store_id
-            for store_id, ctx in store_contexts.items()
-            if model in ctx.available_resources
-        ]
+        stores_with_access = _stores_with_access_to(model, store_contexts)
 
         if not stores_with_access:
             continue
