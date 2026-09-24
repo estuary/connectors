@@ -799,9 +799,15 @@ async def bound_resources(
             continue
 
         stores_with_access = _stores_with_access_to(model, store_contexts)
-        if stores_with_access:
-            resources.append(
-                _build_resource(model, stores_with_access, store_contexts, config)
+        if not stores_with_access:
+            # Build the resource anyway so the binding resolves and opens idle instead of
+            # failing validation and the whole capture.
+            log.warning(
+                f"No initialized store can serve bound stream '{model.NAME}'. Its binding will be idle."
             )
+
+        resources.append(
+            _build_resource(model, stores_with_access, store_contexts, config)
+        )
 
     return resources
