@@ -300,7 +300,7 @@ class BulkOperationCancel(BaseModel, extra="forbid"):
 
 
 class BulkOperationRunQuery(BaseModel, extra="forbid"):
-    bulkOperation: BulkOperationDetails | None
+    bulkOperation: BulkOperationWithQuery | None
     userErrors: list[BulkOperationUserErrors]
 
 

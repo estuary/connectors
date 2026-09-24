@@ -442,6 +442,7 @@ class BulkJobManager:
                 completedAt
                 url
                 errorCode
+                query
                 }}
                 userErrors {{
                 field
@@ -463,5 +464,12 @@ class BulkJobManager:
             raise self._build_submit_error(data.bulkOperationRunQuery.userErrors, query)
 
         self._tracked_jobs.add(details.id)
+
+        # cancel_current relies on Shopify keeping the marker in the query it reports back.
+        if BULK_QUERY_MARKER not in details.query:
+            self.log.warning(
+                f"[{self.client.store}] Shopify did not keep the bulk query marker for job {details.id}."
+                " If the connector restarts while this job is running, it will not cancel the job."
+            )
 
         return details.id
