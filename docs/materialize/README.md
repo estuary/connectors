@@ -691,7 +691,9 @@ sends and the hard-delete argument the connector passes to `it.Next(...)`:
 `softDeleted` and `skipped` are visibility buckets only; the comparison uses
 `insert`, `update` and `delete`. Delta-updates bindings never see `Exists` and
 so expect only inserts. The line also carries the round's `loadRequests` and
-`loaded` responses.
+`loaded` responses, and a `truncate` count of the backfills that completed in
+it (see `Request.Flush`), each of which permits the connector to delete rows
+published before its boundary. `truncate` is a visibility bucket too.
 
 ## Actual side: the reporting contract
 
@@ -727,7 +729,11 @@ target table, exclude checkpoint and staging-table statements, and configure
 its client to report matched rather than changed rows where those differ
 (MySQL's `clientFoundRows`). Optional `.WithStaged(n)` and `.WithLoaded(n)`
 carry rows written to and loaded from a staging area, for connectors that
-already have them.
+already have them. `.WithTruncated(n)` carries the rows deleted because they
+were published before a completed backfill. It is never checked, and it is
+kept out of `deleted` and `total` so that a truncation cannot fail the
+comparison. A connector that truncates in a round with no stores for the
+binding still reports, with `m.TotalRowStats(0).WithTruncated(n)`.
 
 ## Verdicts
 
@@ -773,9 +779,9 @@ or `CONNECTOR_NAME` for a variant built from another connector's image) and
 `<VERSION>-<short sha>`, e.g. `v1-3f2a9c1`; local builds report `dev` or
 `local-<sha>`), so dashboards can aggregate verdicts by connector and build.
 Every line carries `verdict`, `fidelity`, `bindings`, `loadRequests`,
-`loaded`, `expected.{insert,update,delete,softDeleted,skipped}` and
-`actual.{inserted,updated,deleted,total}` (plus `staged`/`loaded` when
-reported).
+`loaded`, `expected.{insert,update,delete,softDeleted,skipped}` (plus
+`truncate` when nonzero) and `actual.{inserted,updated,deleted,total}` (plus
+`staged`/`loaded`/`truncated` when reported).
 
 ## Testing
 

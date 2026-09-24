@@ -435,6 +435,7 @@ func RunTransactions(
 				"binding":  bc.Binding,
 				"boundary": backfillCompletes[int(bc.Binding)],
 			}).Info("backfill completed")
+			health.observeTruncation(round, int(bc.Binding))
 		}
 		if err = transactor.Flush(ctx, statePatches, backfillBegins, backfillCompletes); err != nil {
 			return fmt.Errorf("transactor.Flush: %w", err)
