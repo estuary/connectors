@@ -1,5 +1,13 @@
 # materialize-snowflake
 
+## 2026-09-24
+
+### Fixed
+- Reduced memory used while uploading staged files, which since the
+  2026-09-22 driver update could exceed the connector's memory limit and
+  restart the task repeatedly when several large files for one table were
+  uploaded at once.
+
 ## 2026-09-21
 
 ### Fixed
