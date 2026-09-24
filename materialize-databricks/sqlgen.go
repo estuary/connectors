@@ -311,7 +311,9 @@ JOIN ({{ template "loadSource" $ }}) AS r
   FROM {{ Literal $.StagingPath }}
 	)
   FILEFORMAT = JSON
+  {{- if $.Files }}
   FILES = ('{{ Join $.Files "','" }}')
+  {{- end }}
   FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false', 'inferSchema' = 'false' )
 	COPY_OPTIONS ( 'mergeSchema' = 'true' )
   ;
@@ -362,7 +364,8 @@ JOIN ({{ template "loadSource" $ }}) AS r
 }
 
 type tableWithFiles struct {
-	// Files are relative to StagingPath for COPY INTO and full paths otherwise.
+	// Files are relative to StagingPath for COPY INTO, which reads the whole
+	// of StagingPath when there are none, and full paths otherwise.
 	Files       []string
 	StagingPath string
 	Table       *sql.Table

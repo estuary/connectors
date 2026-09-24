@@ -84,11 +84,20 @@ func TestSQLGeneration(t *testing.T) {
 
 		var testcase = tbl.Identifier + " " + tpl.Name()
 
-		var rendered, err = RenderTableWithFiles(tbl, []string{"txn-1/file1.json.gz", "txn-1/file2.json.gz"}, "test-staging-path", tpl, nil)
-		require.NoError(t, err)
-		snap.WriteString("--- Begin " + testcase + " ---")
-		snap.WriteString(rendered)
-		snap.WriteString("--- End " + testcase + " ---\n\n")
+		for _, tc := range []struct {
+			name  string
+			files []string
+			path  string
+		}{
+			{"directory", nil, "test-staging-path/txn-1"},
+			{"root files", []string{"file1.json.gz", "file2.json.gz"}, "test-staging-path"},
+		} {
+			var rendered, err = RenderTableWithFiles(tbl, tc.files, tc.path, tpl, nil)
+			require.NoError(t, err)
+			snap.WriteString("--- Begin " + testcase + " " + tc.name + " ---")
+			snap.WriteString(rendered)
+			snap.WriteString("--- End " + testcase + " ---\n\n")
+		}
 	}
 
 	for _, tpl := range []*template.Template{
@@ -100,11 +109,20 @@ func TestSQLGeneration(t *testing.T) {
 
 		var testcase = tbl.Identifier + " " + tpl.Name()
 
-		var rendered, err = RenderTableWithFiles(tbl, []string{"txn-1/file1.json.gz", "txn-1/file2.json.gz"}, "test-staging-path", tpl, nil)
-		require.NoError(t, err)
-		snap.WriteString("--- Begin " + testcase + " ---")
-		snap.WriteString(rendered)
-		snap.WriteString("--- End " + testcase + " ---\n\n")
+		for _, tc := range []struct {
+			name  string
+			files []string
+			path  string
+		}{
+			{"directory", nil, "test-staging-path/txn-1"},
+			{"root files", []string{"file1.json.gz", "file2.json.gz"}, "test-staging-path"},
+		} {
+			var rendered, err = RenderTableWithFiles(tbl, tc.files, tc.path, tpl, nil)
+			require.NoError(t, err)
+			snap.WriteString("--- Begin " + testcase + " " + tc.name + " ---")
+			snap.WriteString(rendered)
+			snap.WriteString("--- End " + testcase + " ---\n\n")
+		}
 	}
 
 	cupaloy.SnapshotT(t, snap.String())
