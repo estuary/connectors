@@ -1023,19 +1023,14 @@ func (d *transactor) renderCommitQueries(b *binding, files []string, bounds []sq
 			dirs = append(dirs, dir)
 		}
 	}
-	var first = true
 	for chunk := range slices.Chunk(rootFiles, queryBatchSize) {
-		var chunkDirs []string
-		if first {
-			chunkDirs, first = dirs, false
-		}
-		if query, err := RenderTableWithStaged(b.target, chunkDirs, chunk, b.storeSchema, d.templates.mergeInto, bounds); err != nil {
+		if query, err := RenderTableWithStaged(b.target, nil, chunk, b.storeSchema, d.templates.mergeInto, bounds); err != nil {
 			return nil, fmt.Errorf("mergeInto template: %w", err)
 		} else {
 			queries = append(queries, query)
 		}
 	}
-	if first && len(dirs) > 0 {
+	if len(dirs) > 0 {
 		if query, err := RenderTableWithStaged(b.target, dirs, nil, b.storeSchema, d.templates.mergeInto, bounds); err != nil {
 			return nil, fmt.Errorf("mergeInto template: %w", err)
 		} else {
