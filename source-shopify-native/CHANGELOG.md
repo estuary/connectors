@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-09-24
+
+### Changed
+- Captures keep running when a Shopify store is frozen (HTTP 402), locked (423), or no
+  longer exists (404). Such a store is skipped with a warning and resumes from its last
+  persisted cursor once it is reachable again after a future connector restart.
+- A binding for a stream that no configured store can serve now opens idle with a warning
+  instead of failing validation and the capture.
+
 ## 2026-08-27
 
 ### Added

@@ -51,13 +51,7 @@ from .models import (
 
 
 class StoreInitError(Exception):
-    """Raised when one or more stores fail to initialize.
-
-    Current behavior is fail-fast: any single store failure blocks the entire capture.
-    This surfaces configuration errors clearly rather than silently skipping a store.
-    TODO: Consider graceful degradation — continue with healthy stores and surface
-    errors for failed ones without blocking the entire capture.
-    """
+    """Raised when store initialization can't proceed."""
 
     def __init__(
         self, failed_stores: dict[str, BaseException], initialized_stores: list[str]
@@ -70,6 +64,20 @@ class StoreInitError(Exception):
         super().__init__(
             f"Failed to initialize {len(failed_stores)} store(s):\n{store_errors}"
         )
+
+
+# Statuses Shopify returns for a shop that exists but can't serve Admin API requests right
+# now: 402 = frozen (unpaid), 423 = locked. A misspelled store name can't produce these, so
+# validation tolerates them too.
+FROZEN_OR_LOCKED_STORE_STATUS_CODES: frozenset[int] = frozenset({402, 423})
+# 404 = closed or deleted, but also a misspelled store name. Skipped when initializing stores
+# so a closed store doesn't stop the capture, but rejected by validation so a typo fails
+# loudly; a closed store must be removed from the config before the next publish.
+UNAVAILABLE_STORE_STATUS_CODES: frozenset[int] = FROZEN_OR_LOCKED_STORE_STATUS_CODES | {404}
+
+
+def _is_store_unavailable(error: BaseException) -> bool:
+    return isinstance(error, HTTPError) and error.code in UNAVAILABLE_STORE_STATUS_CODES
 
 
 class StoreHTTP(HTTPMixin):
@@ -453,10 +461,23 @@ async def _validate_store(
     try:
         await bulk_job_manager.check_connectivity()
     except HTTPError as err:
+        if err.code in FROZEN_OR_LOCKED_STORE_STATUS_CODES:
+            log.warning(
+                f"Store '{store_config.store}' is unavailable (HTTP {err.code}) and will be skipped until it is reachable again.",
+                {"error": err.message},
+            )
+            return None
         if err.code == 401:
             return (
                 f"Store '{store_config.store}': Invalid credentials. "
                 f"Please confirm the provided credentials are correct.\n\n{err.message}"
+            )
+        if err.code == 404:
+            return (
+                f"Store '{store_config.store}': Store not found. "
+                f"Please confirm the store name is the prefix of your admin URL "
+                f"(e.g., 'mystore' for mystore.myshopify.com), or remove the store "
+                f"if it has been closed.\n\n{err.message}"
             )
         return f"Store '{store_config.store}': Encountered error validating access token.\n\n{err.message}"
 
@@ -704,7 +725,9 @@ async def _initialize_store_contexts(
 ) -> dict[str, StoreContext]:
     """Initialize every configured store in parallel, keyed by store name.
 
-    Raises StoreInitError if any store fails to initialize.
+    Unavailable stores (see UNAVAILABLE_STORE_STATUS_CODES) are skipped with a warning.
+    Raises StoreInitError if a store fails for any other reason, or if every store is
+    unavailable.
     """
     store_contexts: dict[str, StoreContext] = {}
 
@@ -718,8 +741,15 @@ async def _initialize_store_contexts(
     )
 
     failed_stores: dict[str, BaseException] = {}
+    unavailable_stores: dict[str, BaseException] = {}
     for store_config, result in zip(config.stores, results):
-        if isinstance(result, BaseException):
+        if isinstance(result, BaseException) and _is_store_unavailable(result):
+            log.warning(
+                f"Store '{store_config.store}' is unavailable and will be skipped until it is reachable again.",
+                {"error": str(result)},
+            )
+            unavailable_stores[store_config.store] = result
+        elif isinstance(result, BaseException):
             log.error(f"Failed to initialize store '{store_config.store}': {result}")
             failed_stores[store_config.store] = result
         else:
@@ -734,11 +764,11 @@ async def _initialize_store_contexts(
                 )
             store_contexts[store_config.store] = result
 
-    if not store_contexts:
-        raise StoreInitError(failed_stores, [])
-
     if failed_stores:
         raise StoreInitError(failed_stores, list(store_contexts.keys()))
+
+    if not store_contexts:
+        raise StoreInitError(unavailable_stores, [])
 
     return store_contexts
 
