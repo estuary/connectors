@@ -2,6 +2,12 @@
 
 ## 2026-09-24
 
+### Added
+- New `Max Concurrent Bulk Operations` setting under Advanced Config limits
+  how many bulk query operations the connector runs at once for each store
+  (1 to 5, default 5). Lower it to leave Shopify's bulk operation slots free
+  for other systems that submit bulk queries through the same app.
+
 ### Changed
 - On startup, the connector now cancels only the bulk query operations it
   submitted itself, which it marks with a `# Estuary Flow Managed Bulk Query`
