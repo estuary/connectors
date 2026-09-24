@@ -1002,7 +1002,7 @@ func scanRowStats(rows *stdsql.Rows) m.RowStats {
 // direct COPY INTO otherwise, chunked to bound the size of any single query.
 // Root-level files come from checkpoints written before staging directories
 // existed and are read one by one.
-// TODO: remove the root-level file path in about December 2026, after every
+// TODO: remove the root-level file path in about January 2027, after every
 // task has started on this version and drained its pending checkpoint.
 func (d *transactor) renderCommitQueries(b *binding, files []string, bounds []sql.MergeBound, needsMerge bool) ([]string, error) {
 	var queries []string
