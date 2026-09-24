@@ -28,7 +28,11 @@ from .api import (
     fetch_contact_lists_page,
     check_contact_list_memberships_access,
     check_contact_lists_access,
+    check_line_items_access,
+    check_products_access,
+    check_tickets_access,
     dt_to_ms,
+    probe_associations,
     is_missing_scope_error,
     fetch_contact_list_memberships_page,
     fetch_contact_lists,
@@ -230,6 +234,18 @@ async def _remove_permission_blocked_resources(
             Names.campaigns,
             check_campaigns_access(http, log),
         ),
+        (
+            Names.tickets,
+            check_tickets_access(http, log),
+        ),
+        (
+            Names.products,
+            check_products_access(http, log),
+        ),
+        (
+            Names.line_items,
+            check_line_items_access(http, log),
+        ),
     ]
 
     for resource, gen in PERMISSION_BLOCKED_RESOURCES:
@@ -377,6 +393,10 @@ def crm_object_with_associations(
         task: Task,
         all_bindings,
     ):
+        # Warm the probe here so its cost and its log land at open rather than
+        # midway through a page.
+        await probe_associations(task.log, cls, http, path_component)
+
         # Emit a sourced schema to increase the inferred schema's complexity limit.
         properties = await fetch_properties(task.log, http, path_component)
         task.sourced_schema(binding_index, cls.sourced_schema(properties.results))
