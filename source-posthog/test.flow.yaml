@@ -5,7 +5,7 @@ captures:
     endpoint:
       local:
         command:
-        - python
+        - /Users/jasemjaihouni/repos/connectors/.venv/bin/python
         - -m
         - source_posthog
         config: config.yaml
@@ -38,3 +38,7 @@ captures:
         name: Persons
         interval: PT5M
       target: acmeCo/Persons
+    - resource:
+        name: Sessions
+        interval: PT5M
+      target: acmeCo/Sessions

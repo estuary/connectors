@@ -1,7 +1,7 @@
 """Resource definitions for PostHog connector."""
 
-from copy import deepcopy
 import functools
+from copy import deepcopy
 from datetime import UTC, datetime, timedelta
 from logging import Logger
 
@@ -20,12 +20,14 @@ from .api import (
     backfill_feature_flags,
     backfill_persons,
     backfill_project_events,
+    backfill_sessions,
     fetch_entity,
     fetch_feature_flags,
     fetch_persons,
     fetch_project_entity,
     fetch_project_events,
     fetch_project_ids,
+    fetch_sessions,
     fetch_token_scopes,
 )
 from .models import (
@@ -40,6 +42,7 @@ from .models import (
     Project,
     ResourceConfig,
     ResourceState,
+    Session,
 )
 
 # Standard tombstone for snapshot resources (CDK convention)
@@ -59,6 +62,7 @@ RESOURCE_REQUIRED_SCOPES: dict[str, str] = {
     "Annotations": "annotation:read",
     "Events": "query:read",
     "Persons": "query:read",
+    "Sessions": "query:read",
 }
 
 PostHogResource = Resource[
@@ -473,6 +477,54 @@ async def persons(
     )
 
 
+async def sessions(
+    log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> PostHogResource:
+    project_ids = await fetch_project_ids(http, config, log)
+    cutoff = datetime.now(tz=UTC)
+
+    incremental_fetchers = {
+        f"{project_id}": functools.partial(fetch_sessions, http, config, project_id)
+        for project_id in project_ids
+    }
+
+    backfill_fetchers = {
+        f"{project_id}": functools.partial(backfill_sessions, http, config, project_id)
+        for project_id in project_ids
+    }
+
+    async def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings,
+    ):
+        await _patch_missing_project_states(binding, state, task, project_ids, cutoff)
+
+        open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=incremental_fetchers,
+            fetch_page=backfill_fetchers,
+        )
+
+    return PostHogResource(
+        name=Session.resource_name,
+        key=["/_meta/project_id", "/session_id"],
+        model=Session,
+        open=open,
+        initial_state=_generate_resource_state(project_ids, cutoff),
+        initial_config=ResourceConfig(
+            name=Session.resource_name,
+            interval=timedelta(minutes=5),
+        ),
+        schema_inference=True,
+    )
+
+
 async def all_resources(
     log: Logger,
     http: HTTPMixin,
@@ -492,6 +544,7 @@ async def all_resources(
         await events(log, http, config),
         await feature_flags(log, http, config),
         await persons(log, http, config),
+        await sessions(log, http, config),
     ]
 
     return await filter_resources_by_scopes(log, http, config, resources)

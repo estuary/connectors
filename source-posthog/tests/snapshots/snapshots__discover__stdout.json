@@ -564,5 +564,102 @@
     "key": [
       "/_meta/row_id"
     ]
+  },
+  {
+    "recommendedName": "Sessions",
+    "resourceConfig": {
+      "name": "Sessions",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            },
+            "project_id": {
+              "default": -1,
+              "description": "The PostHog project this document belongs to",
+              "title": "Project Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "PostHog session: one visit, aggregated from the events that carry its id.\n\nA session row is recomputed every time another event lands for it, so the\ncursor is ingestion time rather than session start. `$start_timestamp` never\nmoves once a session exists; `greatest(max_inserted_at, $end_timestamp)`\nadvances whenever the row changes, which is what makes updates observable.\n\nThe `greatest()` is also what lets one expression serve both backfill and\nincremental: `max_inserted_at` only exists from around the end of 2025 and is\nthe unix epoch before that, so for older rows the expression degrades to\n`$end_timestamp` on its own.",
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "end_timestamp": {
+          "format": "date-time",
+          "title": "End Timestamp",
+          "type": "string"
+        },
+        "max_inserted_at": {
+          "format": "date-time",
+          "title": "Max Inserted At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "session_id",
+        "end_timestamp",
+        "max_inserted_at"
+      ],
+      "title": "Session",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/_meta/project_id",
+      "/session_id"
+    ]
   }
 ]
