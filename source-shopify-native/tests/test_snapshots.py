@@ -1,5 +1,6 @@
 import json
 import subprocess
+import sys
 
 
 def sanitize_tokens(data):
@@ -37,11 +38,40 @@ def test_capture(request, snapshot):
             "1",
             "--delay",
             "250s",
+            # Task logs are written to stderr as JSON at the task's log level. Without this flag,
+            # flowctl filters them at WARN, which drops the connector's info logs checked below.
+            "--log-json",
         ],
         stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         text=True,
     )
+
+    task_logs = []
+    for line in result.stderr.splitlines():
+        try:
+            log = json.loads(line)
+        except json.JSONDecodeError:
+            log = None
+        if isinstance(log, dict) and "message" in log:
+            task_logs.append(log)
+            if log.get("level") not in ("warn", "error"):
+                continue
+        # Pass warnings, errors, and flowctl's own output through, which is what this test showed
+        # before it captured stderr.
+        sys.stderr.write(line + "\n")
+
     assert result.returncode == 0
+
+    # Shopify must keep the marker comment the connector adds to each bulk query, since that's how
+    # the connector finds its own jobs to cancel on restart. The connector warns when it doesn't.
+    # The first check makes sure bulk jobs ran and their logs were read, so the second can't pass
+    # vacuously.
+    messages = [log["message"] for log in task_logs]
+    assert any("has completed." in m for m in messages)
+    marker_warnings = [m for m in messages if "did not keep the bulk query marker" in m]
+    assert not marker_warnings, marker_warnings
+
     lines = [json.loads(line) for line in result.stdout.splitlines()]
 
     # Keep one representative document per stream, preserving first-appearance order.
