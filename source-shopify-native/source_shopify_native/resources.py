@@ -685,19 +685,15 @@ def _build_snapshot_resource(
     )
 
 
-async def all_resources(
+async def _initialize_store_contexts(
     log: Logger,
     http: HTTPMixin,
     config: EndpointConfig,
-    should_cancel_ongoing_job: bool = False,
-) -> list[Resource]:
-    """Discover all available resources across all configured stores.
+    should_cancel_ongoing_job: bool,
+) -> dict[str, StoreContext]:
+    """Initialize every configured store in parallel, keyed by store name.
 
-    State format is always dictionary-based: {"inc": {"store_id": {...}}}
-
-    Collection key format depends on config.advanced.should_use_composite_key:
-    - True: ["/_meta/store", "/id"]
-    - False: ["/id"]
+    Raises StoreInitError if any store fails to initialize.
     """
     store_contexts: dict[str, StoreContext] = {}
 
@@ -732,6 +728,27 @@ async def all_resources(
 
     if failed_stores:
         raise StoreInitError(failed_stores, list(store_contexts.keys()))
+
+    return store_contexts
+
+
+async def all_resources(
+    log: Logger,
+    http: HTTPMixin,
+    config: EndpointConfig,
+    should_cancel_ongoing_job: bool = False,
+) -> list[Resource]:
+    """Discover all available resources across all configured stores.
+
+    State format is always dictionary-based: {"inc": {"store_id": {...}}}
+
+    Collection key format depends on config.advanced.should_use_composite_key:
+    - True: ["/_meta/store", "/id"]
+    - False: ["/id"]
+    """
+    store_contexts = await _initialize_store_contexts(
+        log, http, config, should_cancel_ongoing_job
+    )
 
     # Determine which resources are available across all stores (union)
     all_available: set[type[ShopifyGraphQLResource]] = set()
