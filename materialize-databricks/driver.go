@@ -18,7 +18,6 @@ import (
 	"github.com/databricks/databricks-sdk-go"
 	dbConfig "github.com/databricks/databricks-sdk-go/config"
 	"github.com/databricks/databricks-sdk-go/logger"
-	"github.com/databricks/databricks-sdk-go/service/files"
 	"github.com/databricks/databricks-sdk-go/useragent"
 	dbsqllog "github.com/databricks/databricks-sql-go/logger"
 	m "github.com/estuary/connectors/go/materialize"
@@ -395,11 +394,8 @@ func (t *transactor) addBinding(target sql.Table) error {
 		return out
 	}
 
-	var mkdir = func(ctx context.Context, path string) error {
-		return t.wsClient.Files.CreateDirectory(ctx, files.CreateDirectoryRequest{DirectoryPath: path})
-	}
-	b.loadFile = newStagedFile(t.cfg, b.rootStagingPath, translatedFieldNames(target.KeyNames()), mkdir)
-	b.storeFile = newStagedFile(t.cfg, b.rootStagingPath, append(translatedFieldNames(target.ColumnNames()), "_flow_delete"), mkdir)
+	b.loadFile = newStagedFile(t.cfg, b.rootStagingPath, translatedFieldNames(target.KeyNames()), t.wsClient.Files)
+	b.storeFile = newStagedFile(t.cfg, b.rootStagingPath, append(translatedFieldNames(target.ColumnNames()), "_flow_delete"), t.wsClient.Files)
 	b.loadSchema = stagedSchemaDDL(target.KeyPtrs(), false)
 	b.storeSchema = stagedSchemaDDL(target.Columns(), true)
 	b.loadMergeBounds = sql.NewMergeBoundsBuilder(target.Keys, t.ep.Dialect.Literal)
