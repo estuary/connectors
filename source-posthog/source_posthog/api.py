@@ -28,12 +28,19 @@ from .models import (
     ProjectEntity,
     ProjectIdValidationContext,
     RestResponseMeta,
+    Session,
 )
 
 P = ParamSpec("P")
 
 HOGQL_PAGE_SIZE = 50_000
 BACKFILL_TIMEOUT_PERIOD = timedelta(minutes=5)
+
+# 3 days is PostHog's own SESSIONS_LOOKBACK_DAYS, from the sessions model in
+# their batch exporter:
+# products/batch_exports/backend/temporal/sql/sessions.py
+# Their note on choosing it: "While testing, 3 days catched almost all sessions."
+SESSIONS_LOOKBACK = timedelta(days=3)
 
 
 # Cache for project IDs per organization (avoids re-fetching on retry).
@@ -348,6 +355,187 @@ def backfill_timeout(timeout_period: timedelta):
         return wrapper
 
     return decorator
+
+
+async def _query_sessions(
+    start: datetime,
+    end: datetime,
+    lookback: timedelta,
+    base_url: str,
+    project_id: int,
+    http: HTTPSession,
+    log: Logger,
+) -> AsyncGenerator[Session, None]:
+    """Yield sessions whose ingestion time falls in [start, end).
+
+    Sessions needs its own query rather than `_query_hogql` for three reasons:
+    its cursor is an expression rather than a COALESCE of columns, it carries a
+    second predicate for partition pruning, and it selects on `>=` so that rows
+    sharing a cursor value at a page boundary are re-read rather than skipped.
+    """
+    url = Session.get_api_endpoint_url(base_url, project_id)
+    ctx = ProjectIdValidationContext(project_id=project_id)
+    cursor = Session.cursor_expression
+    prune = Session.prune_column
+
+    discovered = await _get_hogql_columns(Session, base_url, project_id, http, log)
+    # `$`-prefixed names are aliased bare so documents read like the rest of the
+    # connector. `team_id` is left alone: HogQL rejects it as an alias.
+    selected = [
+        f"{column} AS {column.lstrip('$')}" if column.startswith("$") else column
+        for column in discovered
+    ] + Session.extra_columns
+    column_names = [column.lstrip("$") for column in discovered] + [
+        "session_id_v7",
+        "team_id",
+        "duration",
+    ]
+
+    def literal(when: datetime) -> str:
+        serialized = when.astimezone(UTC).replace(tzinfo=None).isoformat()
+        return f"toDateTime64('{serialized}', 6, 'UTC')"
+
+    payload = {
+        "query": {
+            "kind": "HogQLQuery",
+            "query": f"SELECT {', '.join(selected)} "
+            + f"FROM {Session.table_name} "
+            + f"WHERE {cursor} >= {literal(start)} "
+            + f"AND {cursor} < {literal(end)} "
+            + f"AND {prune} >= {literal(start - lookback)} "
+            + f"AND {prune} < {literal(end)} "
+            + f"ORDER BY {cursor} ASC "
+            + f"LIMIT {HOGQL_PAGE_SIZE}",
+        },
+    }
+
+    _, body = await http.request_stream(log, url, method="POST", json=payload)
+    processor = IncrementalJsonProcessor(body(), "results.item", HogQLRow)
+
+    async for row in processor:
+        yield Session.model_validate(
+            dict(zip(column_names, row.root, strict=True)),
+            context=ctx,
+        )
+
+
+async def _sweep_sessions(
+    http: HTTPSession,
+    config: EndpointConfig,
+    project_id: int,
+    log: Logger,
+    start: datetime,
+    end: datetime,
+) -> AsyncGenerator[Session | datetime, None]:
+    """Walk [start, end) by advancing the cursor, yielding the reached instant last.
+
+    The cursor advances only past rows actually read. A session whose
+    `$end_timestamp` is in the future — a client with a fast clock — sits outside
+    `end` and is therefore never read, so it cannot drag the cursor past itself
+    and is picked up by a later sweep instead.
+    """
+    base_url = config.advanced.base_url
+    reached = start
+    doc_count = 0
+
+    while True:
+        batch_count = 0
+
+        async for item in _query_sessions(
+            reached, end, SESSIONS_LOOKBACK, base_url, project_id, http, log
+        ):
+            item_cursor = item.get_cursor()
+            batch_count += 1
+            reached = max(reached, item_cursor)
+
+            if cache.should_yield("sessions", f"{project_id}/{item.id}", item_cursor):
+                doc_count += 1
+                yield item
+
+        if batch_count < HOGQL_PAGE_SIZE:
+            break
+
+    log.info(f"Swept {doc_count} sessions from project {project_id}")
+
+    if reached > start:
+        yield reached
+
+
+async def fetch_sessions(
+    http: HTTPSession,
+    config: EndpointConfig,
+    project_id: int,
+    log: Logger,
+    cursor: LogCursor,
+) -> AsyncGenerator[Session | LogCursor, None]:
+    """Emit sessions whose ingestion time landed since the last poll.
+
+                cursor        horizon - 1s   horizon = last elapsed second
+    ───────────────┼───────────────┼──────────────┼─────▶ time (1s ticks)
+                   │               │              │
+    cursor_expr ───[═══════════════╪══════════════)
+    prune_column ══╪═══════════════╪══════════════)
+    emitted ───────[═══════════════]              │
+                   │               │              └─ excluded; the window is
+                   │               │                 half-open, so it opens
+                   │               │                 the next poll
+                   │               └─ last second collected
+                   └─ re-read on purpose: a row sharing this exact instant
+                      must not be skipped at a page boundary
+
+    The cursor bound is inclusive and the horizon exclusive, so a row is
+    re-read rather than lost when several share one instant; the collection
+    key collapses the duplicate. `prune_column` trails by SESSIONS_LOOKBACK.
+    """
+    assert isinstance(cursor, datetime)
+
+    horizon = datetime.now(tz=UTC).replace(microsecond=0) - timedelta(seconds=1)
+    if horizon <= cursor:
+        return
+
+    async for item in _sweep_sessions(http, config, project_id, log, cursor, horizon):
+        yield item
+
+
+@backfill_timeout(BACKFILL_TIMEOUT_PERIOD)
+async def backfill_sessions(
+    http: HTTPSession,
+    config: EndpointConfig,
+    project_id: int,
+    log: Logger,
+    page: PageCursor | None,
+    cutoff: LogCursor,
+) -> AsyncGenerator[Session | PageCursor, None]:
+    """Walk sessions from the configured start date up to the incremental cutoff.
+
+             start_date      cutoff - 1s    cutoff = incremental hand-off
+    ───────────────┼───────────────┼──────────────┼─────▶ time (1s ticks)
+                   │               │              │
+    cursor_expr ───[═══════════════╪══════════════)
+    prune_column ══╪═══════════════╪══════════════)
+    emitted ───────[═══════════════]              │
+                   │               │              └─ belongs to the next
+                   │               │                 stage: incremental opens
+                   │               │                 its first window here
+                   │               └─ last second collected
+                   └─ queried as-is; the boundary instant falls out
+
+    Resumes from the reached instant rather than an offset, so a row that is
+    deleted mid-walk renumbers nothing.
+    """
+    assert isinstance(page, str | None)
+    assert isinstance(cutoff, datetime)
+
+    start = datetime.fromisoformat(page) if page is not None else config.start_date
+
+    if start >= cutoff:
+        return
+
+    async for item in _sweep_sessions(http, config, project_id, log, start, cutoff):
+        if isinstance(item, datetime):
+            yield item.isoformat()
+        else:
+            yield item
 
 
 @backfill_timeout(BACKFILL_TIMEOUT_PERIOD)

@@ -64,6 +64,7 @@ __all__ = [
     "ResourceConfig",
     "ResourceState",
     "RestResponseMeta",
+    "Session",
     "default_start_date",
 ]
 
@@ -323,6 +324,47 @@ class Person(HogQLEntity[str]):
     @override
     def get_cursor(self) -> AwareDatetime:
         return self.last_seen_at or self.created_at
+
+
+class Session(HogQLEntity[str]):
+    """PostHog session: one visit, aggregated from the events that carry its id.
+
+    A session row is recomputed every time another event lands for it, so the
+    cursor is ingestion time rather than session start. `$start_timestamp` never
+    moves once a session exists; `greatest(max_inserted_at, $end_timestamp)`
+    advances whenever the row changes, which is what makes updates observable.
+
+    The `greatest()` is also what lets one expression serve both backfill and
+    incremental: `max_inserted_at` only exists from around the end of 2025 and is
+    the unix epoch before that, so for older rows the expression degrades to
+    `$end_timestamp` on its own.
+    """
+
+    resource_name: ClassVar[str] = "Sessions"
+    table_name: ClassVar[str] = "sessions"
+    # Unused: Sessions builds its own WHERE clause from `cursor_expression`
+    # below, because COALESCE would pick max_inserted_at's epoch-zero over a
+    # real $end_timestamp.
+    cursor_columns: ClassVar[list[str]] = ["max_inserted_at", "$end_timestamp"]
+
+    cursor_expression: ClassVar[str] = "greatest(max_inserted_at, `$end_timestamp`)"
+    # Bounds the cursor filter so ClickHouse can prune partitions; see
+    # SESSIONS_LOOKBACK in api.py.
+    prune_column: ClassVar[str] = "`$end_timestamp`"
+    # Addressable but absent from `SELECT *`, so column discovery misses them.
+    extra_columns: ClassVar[list[str]] = [
+        "toString(session_id_v7)",
+        "team_id",
+        "duration",
+    ]
+
+    id: str = Field(alias="session_id")
+    end_timestamp: AwareDatetime
+    max_inserted_at: AwareDatetime
+
+    @override
+    def get_cursor(self) -> AwareDatetime:
+        return max(self.max_inserted_at, self.end_timestamp)
 
 
 # =============================================================================
