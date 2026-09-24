@@ -2,16 +2,16 @@
 description: Materialize data collections into a Google Cloud SQL for SQL Server database. Estuary's connector supports SSH tunneling and delta updates.
 ---
 
-# Google Cloud SQL for SQLServer
+# Google Cloud SQL for SQL Server
 
-This connector materializes Estuary collections into tables in a Microsoft SQLServer database.
+This connector materializes Estuary collections into tables in a Microsoft SQL Server database.
 
 ## Prerequisites
 
 To use this connector, you'll need:
 
-- A SQLServer database to which to materialize, and user credentials.
-  - SQLServer 2017 and later are supported
+- A SQL Server database to which to materialize, and user credentials.
+  - SQL Server 2017 and later are supported
   - The connector will create new tables in the database per your specification,
     so user credentials must have access to create new tables.
 - At least one Estuary collection
@@ -46,7 +46,7 @@ GRANT CONTROL ON DATABASE::<database> TO flow_materialize;
 ## Configuration
 
 To use this connector, begin with data in one or more Estuary collections.
-Use the below properties to configure a SQLServer materialization, which will direct one or more of your Estuary collections to your desired tables, or views, in the database.
+Use the below properties to configure a SQL Server materialization, which will direct one or more of your Estuary collections to your desired tables, or views, in the database.
 
 ### Properties
 
@@ -105,8 +105,8 @@ The default is to use standard updates.
 
 ## Reserved words
 
-SQLServer has a list of reserved words that must be quoted in order to be used as an identifier.
-Estuary considers all the reserved words in the official [SQLServer documentation](https://learn.microsoft.com/en-us/sql/t-sql/language-elements/reserved-keywords-transact-sql?view=sql-server-2017).
+SQL Server has a list of reserved words that must be quoted in order to be used as an identifier.
+Estuary considers all the reserved words in the official [SQL Server documentation](https://learn.microsoft.com/en-us/sql/t-sql/language-elements/reserved-keywords-transact-sql?view=sql-server-2017).
 
 These reserved words are listed in the table below. Estuary automatically quotes fields that are in this list.
 
