@@ -267,5 +267,65 @@
       "timezone": "UTC",
       "uuid": "019c2351-c720-0000-990d-d080c67e1de8"
     }
+  ],
+  [
+    "acmeCo/Sessions",
+    {
+      "_meta": {
+        "project_id": 304748,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "autocapture_count": 0,
+      "channel_type": "Paid Social",
+      "distinct_id": "seed-visitor-0021",
+      "duration": 561,
+      "end_current_url": null,
+      "end_hostname": null,
+      "end_pathname": null,
+      "end_timestamp": "2026-09-17T06:12:16Z",
+      "entry__kx": null,
+      "entry_current_url": "https://estuary-seed.example.com/docs",
+      "entry_dclid": null,
+      "entry_fbclid": null,
+      "entry_gad_source": null,
+      "entry_gbraid": null,
+      "entry_gclid": null,
+      "entry_gclsrc": null,
+      "entry_hostname": "estuary-seed.example.com",
+      "entry_igshid": null,
+      "entry_irclid": null,
+      "entry_li_fat_id": null,
+      "entry_mc_cid": null,
+      "entry_msclkid": null,
+      "entry_pathname": "/docs",
+      "entry_referring_domain": "www.linkedin.com",
+      "entry_ttclid": null,
+      "entry_twclid": null,
+      "entry_utm_campaign": "q3-launch",
+      "entry_utm_content": null,
+      "entry_utm_medium": "paid-social",
+      "entry_utm_source": "linkedin",
+      "entry_utm_term": null,
+      "entry_wbraid": null,
+      "is_bounce": 0,
+      "last_external_click_url": null,
+      "max_inserted_at": "redacted",
+      "num_uniq_urls": 4,
+      "page_screen_autocapture_count_up_to": 2,
+      "pageview_count": 4,
+      "screen_count": 0,
+      "session_duration": 561,
+      "session_id": "01a0adf5-fe98-768a-a1b9-efe19293793e",
+      "session_id_v7": "2163523839705245042967080909302626622",
+      "start_timestamp": "2026-09-17T06:02:55Z",
+      "team_id": 304748,
+      "urls": [
+        "https://estuary-seed.example.com/docs",
+        "https://estuary-seed.example.com/docs/connectors",
+        "https://estuary-seed.example.com/docs/quickstart",
+        "https://estuary-seed.example.com/pricing"
+      ],
+      "vitals_lcp": null
+    }
   ]
 ]

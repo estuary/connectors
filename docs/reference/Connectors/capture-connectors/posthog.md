@@ -22,6 +22,16 @@ The connector captures the following PostHog resources:
 
 - Feature Flags
 - Events
+- Sessions
+
+:::info
+`Sessions` captures PostHog's `sessions` table — one row per visit, with entry
+and exit URLs, UTM and click-ID attribution, pageview counts, `is_bounce` (`0`
+or `1`) and channel type. Sessions are a computed aggregate: a session's row is
+recalculated whenever another event arrives for it, so the same `session_id` may
+be captured several times and converge on its final values. It is keyed on
+`session_id`, which joins to `$session_id` on `Events`.
+:::
 
 :::info
 The connector automatically discovers and captures data from all projects within the specified organization. You do not need to configure individual projects.
@@ -38,7 +48,7 @@ The connector automatically discovers and captures data from all projects within
   | `cohort:read`       | Cohorts         |
   | `feature_flag:read` | Feature Flags   |
   | `annotation:read`   | Annotations     |
-  | `query:read`        | Events, Persons |
+  | `query:read`        | Events, Persons, Sessions |
 
   A wildcard scope grants access to all resources.
 
@@ -95,6 +105,10 @@ captures:
           name: Persons
           interval: PT5M
         target: ${PREFIX}/Persons
+      - resource:
+          name: Sessions
+          interval: PT5M
+        target: ${PREFIX}/Sessions
       - resource:
           name: FeatureFlags
           interval: PT5M

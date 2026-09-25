@@ -64,6 +64,7 @@ __all__ = [
     "ResourceConfig",
     "ResourceState",
     "RestResponseMeta",
+    "Session",
     "default_start_date",
 ]
 
@@ -323,6 +324,77 @@ class Person(HogQLEntity[str]):
     @override
     def get_cursor(self) -> AwareDatetime:
         return self.last_seen_at or self.created_at
+
+
+class Session(HogQLEntity[str]):
+    """One visit to your site or app, aggregated from the events that carry its id.
+
+    PostHog recalculates a session as more events arrive for it, so the same
+    `session_id` is captured several times and converges on its final values.
+    `session_id` joins to `$session_id` on Events, and `distinct_id` to
+    `distinct_id` on Events.
+    """
+
+    resource_name: ClassVar[str] = "Sessions"
+    table_name: ClassVar[str] = "sessions"
+    # Unused: Sessions builds its own WHERE clause from `cursor_expression()`
+    # below, because COALESCE would pick max_inserted_at's epoch-zero over a
+    # real $end_timestamp.
+    cursor_columns: ClassVar[list[str]] = ["max_inserted_at", "$end_timestamp"]
+
+    # Bounds the cursor filter so ClickHouse can prune partitions; see
+    # SESSIONS_LOOKBACK in api.py.
+    prune_column: ClassVar[str] = "`$end_timestamp`"
+    # Breaks ties between rows sharing a cursor instant, so a sweep can page
+    # through them in a total order. Unique per session within a project.
+    tiebreak_column: ClassVar[str] = "session_id"
+    # Addressable but absent from `SELECT *`, so column discovery misses them.
+    extra_columns: ClassVar[list[str]] = [
+        "toString(session_id_v7)",
+        "team_id",
+        "duration",
+    ]
+
+    id: str = Field(alias="session_id")
+    end_timestamp: AwareDatetime
+    max_inserted_at: AwareDatetime | None = None
+
+    @classmethod
+    def cursor_expression(cls, discovered_columns: list[str]) -> str:
+        """Build the HogQL expression this stream sweeps on, at 1s resolution.
+
+        A session row is recomputed every time another event lands for it, so
+        the cursor is ingestion time rather than session start.
+        `$start_timestamp` never moves once a session exists; `greatest()`
+        advances whenever the row changes, which is what makes updates
+        observable. That is also what lets one expression serve both backfill
+        and incremental: `max_inserted_at` is the unix epoch on rows written
+        before it existed, so for those the expression degrades to
+        `$end_timestamp` on its own.
+
+        `max_inserted_at` itself only exists from around the end of 2025, so a
+        self-hosted instance older than that does not have the column at all
+        and the same degraded expression is used for the whole table. That path
+        is UNVERIFIED: we have no pre-2025 instance to probe.
+
+        `toStartOfSecond` keeps the expression at the same resolution as
+        `get_cursor()`, so the order the server pages in is the order the
+        client reconstructs — the tie-break in `_query_sessions` depends on
+        the two agreeing exactly.
+        """
+        latest = (
+            "greatest(max_inserted_at, `$end_timestamp`)"
+            if "max_inserted_at" in discovered_columns
+            else "`$end_timestamp`"
+        )
+        return f"toStartOfSecond({latest})"
+
+    @override
+    def get_cursor(self) -> AwareDatetime:
+        latest = self.end_timestamp
+        if self.max_inserted_at is not None:
+            latest = max(latest, self.max_inserted_at)
+        return latest.replace(microsecond=0)
 
 
 # =============================================================================

@@ -3,26 +3,37 @@ import subprocess
 from pathlib import Path
 
 import pytest
-
 from estuary_cdk.utils import compare_capture_records
-
 
 FIELDS_TO_REDACT = [
     "available_product_features",
     "created_at",
     "last_calculation",
     "last_seen_at",
+    # Ingestion time, carried on every Sessions document as the stream's cursor.
+    # It changes whenever the fixture is re-seeded, so leaving it unredacted
+    # would break the capture snapshot on every replay.
+    "max_inserted_at",
     "pending_version",
     "updated_at",
     "version",
 ]
 
+# Fields whose values are ClickHouse array aggregates. The aggregate has no
+# defined element order, so these come back shuffled between captures. Sorting
+# them keeps the snapshot comparable without giving up coverage of the contents,
+# which redacting the field outright would lose.
+UNORDERED_LIST_FIELDS = [
+    "urls",
+]
+
 
 def redact_nested_fields(value: list | dict) -> None:
     """
-    Recursively redact volatile fields wherever they appear so snapshots stay
-    stable across captures. PostHog embeds organization and team objects inside
-    other records, so redacting only the top level leaves the nested copies to
+    Recursively normalize volatile fields wherever they appear so snapshots stay
+    stable across captures: redact the ones whose value churns, sort the ones
+    whose order churns. PostHog embeds organization and team objects inside
+    other records, so touching only the top level leaves the nested copies to
     churn.
     """
     if isinstance(value, list):
@@ -32,6 +43,8 @@ def redact_nested_fields(value: list | dict) -> None:
         for key, nested in value.items():
             if key in FIELDS_TO_REDACT:
                 value[key] = "redacted"
+            elif key in UNORDERED_LIST_FIELDS and isinstance(nested, list):
+                value[key] = sorted(nested, key=str)
             else:
                 redact_nested_fields(nested)
 
