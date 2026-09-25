@@ -9,6 +9,9 @@ captures:
         - -m
         - source_shopify_native
         config: config.yaml
+    # tests/test_snapshots.py::test_capture reads info-level connector logs from stderr.
+    shards:
+      logLevel: info
     bindings:
     - resource:
         name: abandoned_checkouts

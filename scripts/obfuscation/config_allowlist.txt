@@ -131,6 +131,7 @@ node_id
 page_size
 search_page_size
 max_batch_size
+max_concurrent_bulk_ops
 incremental_limit
 backfill_limit
 fileSizeLimit

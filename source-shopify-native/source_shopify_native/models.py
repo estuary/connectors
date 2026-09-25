@@ -60,6 +60,10 @@ scopes = [
     "read_marketplace_fulfillment_orders",
 ]
 
+# Shopify API 2026-01+ allows each app to run up to 5 bulk query operations per store at once.
+# See: https://shopify.dev/docs/api/usage/bulk-operations/queries#limitations
+MAX_CONCURRENT_BULK_OPS = 5
+
 # TODO(justin): OAuth support is temporarily removed for multi-store. Will revisit once the
 # OAuth app is approved and UI/runtime is ready to support OAuth inside array items with credentials.
 # See git history for the previous OAUTH2_SPEC implementation.
@@ -142,6 +146,18 @@ class EndpointConfig(BaseModel):
                 "single-store captures during migration. Must be set to true (with a full "
                 "backfill / dataflow reset of all bindings) before adding additional stores "
                 "to a legacy capture."
+            ),
+            json_schema_extra={"nonsensitive": True},
+        )
+        max_concurrent_bulk_ops: int = Field(
+            default=MAX_CONCURRENT_BULK_OPS,
+            ge=1,
+            le=MAX_CONCURRENT_BULK_OPS,
+            title="Max Concurrent Bulk Operations",
+            description=(
+                "Maximum number of bulk query operations the connector runs at the same time "
+                "for each store. Shopify allows at most 5. Lower this to leave slots free for "
+                "other systems that submit bulk queries through the same app."
             ),
             json_schema_extra={"nonsensitive": True},
         )
@@ -281,6 +297,10 @@ class BulkOperationDetails(BaseModel, extra="allow"):
     errorCode: BulkOperationErrorCodes | None
 
 
+class BulkOperationWithQuery(BulkOperationDetails):
+    query: str
+
+
 class UserErrors(BaseModel, extra="allow"):
     field: str | list[str] | None
     message: str
@@ -296,7 +316,7 @@ class BulkOperationCancel(BaseModel, extra="forbid"):
 
 
 class BulkOperationRunQuery(BaseModel, extra="forbid"):
-    bulkOperation: BulkOperationDetails | None
+    bulkOperation: BulkOperationWithQuery | None
     userErrors: list[BulkOperationUserErrors]
 
 
@@ -313,7 +333,7 @@ class BulkSpecificData(BaseModel, extra="forbid"):
 
 
 class BulkOperationEdge(BaseModel, extra="forbid"):
-    node: BulkOperationDetails
+    node: BulkOperationWithQuery
 
 
 class BulkOperationsConnection(BaseModel, extra="forbid"):
