@@ -1,9 +1,12 @@
 package connector
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 
 	"net/url"
+	"strings"
 
 	"github.com/estuary/connectors/go/common"
 )
@@ -61,6 +64,45 @@ func (c config) DefaultNamespace() string {
 
 func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
 	return c.Advanced.FeatureFlags, nil
+}
+
+// UnmarshalJSON removes any login from the address as the config is parsed, so
+// it can't leak into messages.
+func (c *config) UnmarshalJSON(data []byte) error {
+	// A custom unmarshaler doesn't inherit the caller's DisallowUnknownFields,
+	// so decode strictly here.
+	type plain config
+	var d = json.NewDecoder(bytes.NewReader(data))
+	d.DisallowUnknownFields()
+	if err := d.Decode((*plain)(c)); err != nil {
+		return err
+	}
+	c.Address = withoutCredentials(c.Address)
+	return nil
+}
+
+// withoutCredentials removes any login from the address. The address shouldn't
+// contain one, but users sometimes paste a full connection string, and the
+// configured user and password replace it when connecting anyway.
+func withoutCredentials(address string) string {
+	uri, err := url.Parse(address)
+	if err == nil && uri.Scheme != "" && uri.Host != "" {
+		uri.User = nil
+		return uri.String()
+	}
+	// ToURI treats anything else as a bare host, so everything up to the last
+	// '@' can only be a login.
+	scheme, rest, ok := strings.Cut(address, "://")
+	if !ok {
+		scheme, rest = "", address
+	}
+	if i := strings.LastIndex(rest, "@"); i >= 0 {
+		rest = rest[i+1:]
+	}
+	if scheme == "" {
+		return rest
+	}
+	return scheme + "://" + rest
 }
 
 // ToURI converts the Config to a DSN string.
