@@ -3,15 +3,17 @@ import subprocess
 from pathlib import Path
 
 import pytest
-
 from estuary_cdk.utils import compare_capture_records
-
 
 FIELDS_TO_REDACT = [
     "available_product_features",
     "created_at",
     "last_calculation",
     "last_seen_at",
+    # Ingestion time, carried on every Sessions document as the stream's cursor.
+    # It changes whenever the fixture is re-seeded, so leaving it unredacted
+    # would break the capture snapshot on every replay.
+    "max_inserted_at",
     "pending_version",
     "updated_at",
     "version",
