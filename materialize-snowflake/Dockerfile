@@ -59,17 +59,19 @@ COPY materialize-snowflake/sidecar /opt/materialize-snowflake/sidecar
 WORKDIR /opt/materialize-snowflake/sidecar
 RUN poetry install --only main
 
-# Test the sidecar, as the builder stage does the connector. A throwaway venv
-# holds pytest, keeping the test dependencies out of the venv the image ships,
-# and reaches the SDK through the shipped venv's site-packages: most of the suite
-# stubs the SDK, but the guard on the append path's use of msgspec.Raw has to run
-# against the installed one. SNOWPIPE_SDK_GUARD makes an SDK it cannot import a
-# failure there rather than a skip, so the guard cannot be passed over silently.
+# Type-check and test the sidecar, as the builder stage does the connector. A
+# throwaway venv holds mypy and pytest, keeping the test dependencies out of the
+# venv the image ships, and reaches the SDK through the shipped venv's
+# site-packages: most of the suite stubs the SDK, but the guard on the append
+# path's use of msgspec.Raw has to run against the installed one.
+# SNOWPIPE_SDK_GUARD makes an SDK it cannot import a failure there rather than a
+# skip, so the guard cannot be passed over silently.
 RUN python3 -m venv /tmp/testvenv \
-     && /tmp/testvenv/bin/pip install --no-cache-dir pytest \
-     && SNOWPIPE_SDK_GUARD=required \
+     && /tmp/testvenv/bin/pip install --no-cache-dir pytest "mypy>=1.8,<2" \
+     && export SNOWPIPE_SDK_GUARD=required \
         PYTHONPATH="/opt/materialize-snowflake/sidecar:/opt/estuary-cdk:$(/opt/venv/bin/python -c 'import site; print(site.getsitepackages()[0])')" \
-        /tmp/testvenv/bin/python -m pytest -q tests \
+     && /tmp/testvenv/bin/python -m mypy --cache-dir /tmp/testvenv/mypy-cache \
+     && /tmp/testvenv/bin/python -m pytest -q tests \
      && rm -rf /tmp/testvenv
 
 # Runtime Stage

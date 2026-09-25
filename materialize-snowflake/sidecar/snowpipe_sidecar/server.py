@@ -68,7 +68,7 @@ class Server:
                 logger.error("malformed request", extra={"error": str(err)})
                 self._exit(3)
                 return
-            params = req.get("params") or {}
+            params: dict[str, Any] = req.get("params") or {}
 
             # The payload is consumed here whatever becomes of the request, since
             # anything left of it would be read as the next request's header.
@@ -90,9 +90,10 @@ class Server:
                     return
 
             if op in _CHANNEL_OPS:
-                q = self._channel_queues.get(params.get("channel"))
+                channel = params.get("channel")
+                q = self._channel_queues.get(channel) if channel is not None else None
                 if q is None:
-                    self._reply_error(rid, SidecarError("unknown_channel", f"channel {params.get('channel')!r} is not open"))
+                    self._reply_error(rid, SidecarError("unknown_channel", f"channel {channel!r} is not open"))
                     continue
                 q.put((rid, op, params, payload))
             else:
@@ -140,6 +141,7 @@ class Server:
                 threading.Thread(target=self._worker, args=(q,), daemon=True).start()
             self._reply(rid, status)
         elif op == "append":
+            assert payload is not None, "the reader attaches a payload to every append"
             n = self._manager.append(
                 params["channel"],
                 params["start_token"],

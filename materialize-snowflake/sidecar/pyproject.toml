@@ -18,9 +18,19 @@ msgspec = "*"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.4"
+mypy = "^1.8.0"
 
 [tool.ruff]
 target-version = "py312"
+
+[tool.mypy]
+python_version = "3.12"
+files = ["snowpipe_sidecar", "tests"]
+
+# The snowpipe-streaming SDK ships without type information.
+[[tool.mypy.overrides]]
+module = ["snowflake.ingest.*"]
+ignore_missing_imports = true
 
 [build-system]
 requires = ["poetry-core"]
