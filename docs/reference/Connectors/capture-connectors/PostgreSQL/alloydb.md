@@ -8,8 +8,11 @@ slug: /reference/Connectors/capture-connectors/alloydb/
 This connector uses change data capture (CDC) to continuously capture table updates in an AlloyDB database into one or more Estuary collections.
 
 AlloyDB is a fully managed, PostgreSQL-compatible database available in the Google Cloud platform.
-This connector is derived from the [PostgreSQL capture connector](/reference/Connectors/capture-connectors/PostgreSQL/),
-so the same configuration applies, but the setup steps look somewhat different.
+
+This connector is a variant of the [PostgreSQL connector](./PostgreSQL.md).
+Refer to that page for additional connector features, usage, and the full
+configuration reference. Information specific to AlloyDB and its setup is
+presented below.
 
 ## Prerequisites
 
@@ -49,15 +52,6 @@ and set up the watermarks table and publication.
 
 3. Follow the instructions to create a [virtual machine for SSH tunneling](/guides/connect-network/#setup-for-google-cloud)
 in the same Google Cloud project as your instance.
-
-## Backfills and performance considerations
-
-When the AlloyDB capture is initiated, by default, the connector first *backfills*, or captures the targeted tables in their current state. It then transitions to capturing change events on an ongoing basis.
-
-This is desirable in most cases, as it ensures that a complete view of your tables is captured into Estuary.
-However, you may find it appropriate to skip the backfill, especially for extremely large tables.
-
-In this case, you may turn off backfilling on a per-table basis. See [properties](#properties) for details.
 
 ## Configuration
 
