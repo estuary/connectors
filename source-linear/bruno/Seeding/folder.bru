@@ -1,0 +1,38 @@
+meta {
+  name: Seeding
+  seq: 9
+}
+
+docs {
+  **Only the user runs these requests. Never the assistant.**
+
+  Every request in this folder MUTATES Linear state. They are authored here, with their
+  real HTTP verb and real GraphQL `mutation` document visible, and handed to the user to
+  run. The assistant does not execute them under any circumstance.
+
+  Everything at the collection's top level is read-only (GraphQL `query` documents); this
+  folder is the only place mutations live.
+
+  ## Why this folder exists
+
+  The Estuary workspace is Linear's stock onboarding content and nothing else:
+
+  | collection | rows | note                                       |
+  |------------|------|--------------------------------------------|
+  | issues     | 4    | all share `updatedAt` 2026-07-30T21:35:03.808Z |
+  | issueLabels| 3    | same timestamp; all workspace-level        |
+  | projects   | 0    | endpoint never observed with data          |
+  | initiatives| 0    | endpoint never observed with data          |
+  | archived   | 0    | across all four types                      |
+
+  That leaves four things unverifiable by reading alone. Each request below closes exactly
+  one of them; the "re-run after" line names the read probe to re-execute afterwards.
+
+  ## Run order
+
+  `A1` and `A2` are independent of each other and of the `D` group. `D1` and `D2` both
+  target an existing issue and should be run in order, D1 then D2, because D2's archival
+  also re-answers D1's question.
+
+  Cap: 4 mutations, all plain single requests, no loops.
+}

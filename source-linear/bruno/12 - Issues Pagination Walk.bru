@@ -1,0 +1,119 @@
+meta {
+  name: 12 - Issues Pagination Walk
+  type: graphql
+  seq: 12
+}
+
+post {
+  url: {{base_url}}
+  body: graphql
+  auth: inherit
+}
+
+body:graphql {
+  query IssuesPaginationWalk {
+    issues(first: 2, includeArchived: true, orderBy: updatedAt) {
+      nodes { id updatedAt }
+      pageInfo { hasNextPage endCursor }
+    }
+  }
+}
+
+script:post-response {
+  // Capture page 1's endCursor so `13 - Issues Pagination Walk Page 2` can consume it
+  // without a hand-pinned id. Runtime var only — in-memory, never persisted.
+  const c = res.getBody()?.data?.issues?.pageInfo?.endCursor;
+  if (c) bru.setVar('issues_page1_cursor', c);
+}
+
+docs {
+  Reference: https://linear.app/developers/pagination
+
+  Page 1 of a deliberate `first: 2` walk across the 4-issue population, sized to force
+  multiple pages out of a tiny dataset. Run this BEFORE
+  `13 - Issues Pagination Walk Page 2` in a fresh session — it captures `endCursor` into
+  the runtime var `issues_page1_cursor` that request 13 consumes.
+
+  This is the cheap "ordered, contiguous paging below the cap" check: page 1 + page 2 must
+  reassemble the unpaged result exactly — same ids, same order, no gap, no duplicate, no
+  reorder.
+
+  **Limitation / observed finding** (confirmed 2026-07-30): returns the first 2 of 4 ids
+  with `hasNextPage: true`, and
+
+      "endCursor": "86eeb50c-332c-46a7-bebf-a0b67dc346bf"
+
+  **The cursor is the raw node UUID, not an opaque server-issued token.** It is exactly the
+  `id` of the last node in the page — Linear is doing keyset pagination on
+  (sort key, id). This matters for two reasons:
+
+  1. It sidesteps the opaque-token durability question entirely. There is no TTL to expire,
+    no server-side continuation state to invalidate, nothing to prove durable across
+    connector restarts, because the cursor is derived from the document itself.
+  2. It implies `id` is the tiebreaker within equal sort keys, which is why the ordering of
+    this workspace's four all-tied-on-`updatedAt` issues is stable and repeatable across
+    requests rather than arbitrary.
+
+  Note the connector does NOT checkpoint this cursor across sync cycles — it checkpoints
+  `updatedAt` and re-derives pages. `after` is used only WITHIN a single sweep.
+}
+
+example {
+  name: 200 — page 1 of 2; endCursor is the raw node UUID
+
+  request: {
+    url: https://api.linear.app/graphql
+    method: POST
+    mode: graphql
+
+    body:graphql: {
+      query IssuesPaginationWalk {
+        issues(first: 2, includeArchived: true, orderBy: updatedAt) {
+          nodes { id updatedAt }
+          pageInfo { hasNextPage endCursor }
+        }
+      }
+    }
+  }
+
+  response: {
+    headers: {
+      x-complexity: 4
+      x-ratelimit-requests-limit: 2500
+      x-ratelimit-requests-remaining: 2489
+      x-ratelimit-complexity-limit: 3000000
+      x-ratelimit-complexity-remaining: 2999988
+    }
+
+    status: {
+      code: 200
+      text: OK
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "data": {
+            "issues": {
+              "nodes": [
+                {
+                  "id": "4937bc7e-6bda-4612-9a80-3fbaaec872d9",
+                  "updatedAt": "2026-08-04T18:12:51.985Z"
+                },
+                {
+                  "id": "adbc7deb-6607-4f39-ade2-c23268dc3ec7",
+                  "updatedAt": "2026-07-30T21:35:03.808Z"
+                }
+              ],
+              "pageInfo": {
+                "hasNextPage": true,
+                "endCursor": "adbc7deb-6607-4f39-ade2-c23268dc3ec7"
+              }
+            }
+          }
+        }
+      '''
+    }
+  }
+}

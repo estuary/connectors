@@ -1,0 +1,56 @@
+meta {
+  name: D1 - Touch Issue Updated At
+  type: graphql
+  seq: 3
+}
+
+post {
+  url: {{base_url}}
+  body: graphql
+  auth: inherit
+}
+
+body:graphql {
+  mutation TouchIssue($issueId: String!) {
+    issueUpdate(id: $issueId, input: { description: "Welcome to Linear! \n\n(touched by source-linear verification)" }) {
+      success
+      issue { id identifier title createdAt updatedAt archivedAt }
+    }
+  }
+}
+
+body:graphql:vars {
+  {
+    "issueId": "4937bc7e-6bda-4612-9a80-3fbaaec872d9"
+  }
+}
+
+docs {
+  Reference: https://linear.app/developers/graphql
+
+  **Only the user runs this. Never the assistant.** This is a state-mutating call.
+
+  Bumps the `updatedAt` of exactly ONE issue (`EST-1`, "Get familiar with Linear") so the
+  workspace stops being a degenerate all-timestamps-tied dataset. Targets `description`,
+  a no-op-shaped field that no other stream's snapshot depends on.
+
+  Closes TWO gaps that are currently the biggest holes in this cluster's verification:
+
+  1. **Ascending `updatedAt` order is unproven.** `11 - Issues Ascending Sweep` showed the
+     `sort` mechanism works (via `title`), but with every `updatedAt` identical it could
+     not show that `sort: [{updatedAt: {order: Ascending}}]` actually orders by that key.
+     The connector's per-page checkpointing for Issues / Projects / Initiatives rests
+     entirely on this.
+  2. **The `gt` cursor has never been observed NARROWING a non-empty result.** Every
+     filter probe so far returns either all rows or zero rows, because all rows share one
+     timestamp. After this mutation, `filter: {updatedAt: {gt: "<the other 3 issues'
+     timestamp>"}}` should return EXACTLY this one issue — the first true partial narrowing
+     in the collection.
+
+  **Re-run after:** `11 - Issues Ascending Sweep` (confirm the touched issue now sorts LAST
+  under `Ascending`, i.e. the highest `updatedAt` is at the end) and
+  `07 - Cursor Filter Boundary` (confirm `gt: 2026-07-30T21:35:03.808Z` now returns 1 row
+  instead of 0).
+
+  Please report the touched issue's new `updatedAt` so the follow-up filters can be pinned.
+}

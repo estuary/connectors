@@ -94,6 +94,10 @@ jobs:
             type: capture
             version: v2
             usage_rate: "1.0"
+          - name: source-linear
+            type: capture
+            version: v1
+            usage_rate: "1.0"
           - name: source-linkedin-pages
             type: capture
             version: v1

@@ -1,0 +1,163 @@
+meta {
+  name: 07 - Cursor Filter Boundary
+  type: graphql
+  seq: 7
+}
+
+post {
+  url: {{base_url}}
+  body: graphql
+  auth: inherit
+}
+
+body:graphql {
+  query CursorFilterBoundary {
+    justBefore: issues(first: 250, filter: {updatedAt: {gt: "2026-07-30T21:35:03.807Z"}}) { nodes { id updatedAt } }
+    exactGt:    issues(first: 250, filter: {updatedAt: {gt: "2026-07-30T21:35:03.808Z"}}) { nodes { id updatedAt } }
+    exactGte:   issues(first: 250, filter: {updatedAt: {gte: "2026-07-30T21:35:03.808Z"}}) { nodes { id updatedAt } }
+    wideOpen:   issues(first: 250, filter: {updatedAt: {gt: "2020-01-01T00:00:00Z"}}) { nodes { id updatedAt } }
+  }
+}
+
+docs {
+  Reference: https://linear.app/developers/filtering
+
+  Proves the incremental cursor filter is honored, at MILLISECOND precision, and pins down
+  the `gt` vs `gte` boundary semantics the connector's checkpoint arithmetic depends on.
+
+  All four issues in this workspace share the byte-identical `updatedAt`
+  `2026-07-30T21:35:03.808Z`, which makes this a uniquely sharp boundary test.
+
+  **Limitation / observed finding** (confirmed 2026-07-30):
+
+  | alias        | filter                     | rows |
+  |--------------|----------------------------|------|
+  | `justBefore` | `gt: ...03.807Z`           | 4    |
+  | `exactGt`    | `gt: ...03.808Z`           | 0    |
+  | `exactGte`   | `gte: ...03.808Z`          | 4    |
+  | `wideOpen`   | `gt: 2020-01-01T00:00:00Z` | 4    |
+
+  So: the filter narrows as documented, sub-second precision IS respected (a 1 ms shift
+  flips the result set from 4 rows to 0), `gt` is strictly exclusive, and `gte` is
+  inclusive. RFC3339 with a `Z` offset and millisecond precision is accepted verbatim.
+
+  **This table is also the live demonstration of the tied-cursor hazard.** Because all 4
+  rows share one `updatedAt`, the two obvious cursor policies both misbehave when a page
+  boundary lands inside a tie group:
+
+  - `gt: <last seen updatedAt>` — skips every remaining row sharing that timestamp. If the
+    connector had emitted only 2 of these 4 and checkpointed `...03.808Z`, the other 2
+    would be lost permanently, exactly as `exactGt` returns 0 rows here.
+  - `gte: <last seen updatedAt>` — re-reads the whole tie group on every subsequent sweep,
+    forever (`exactGte` returns all 4). Safe against loss, but it cannot make progress if a
+    tie group is ever larger than one page.
+
+  Ties are not a corner case on Linear: bulk operations stamp identical `updatedAt` values
+  across many rows, which is precisely how this workspace's 4 issues + 3 labels + 6
+  workflow states all came to share one millisecond. The connector's cursor policy must
+  handle this explicitly — see the plan's "Cursor policy" section.
+}
+
+example {
+  name: 200 — gt exclusive / gte inclusive at 1ms boundary
+
+  request: {
+    url: https://api.linear.app/graphql
+    method: POST
+    mode: graphql
+
+    body:graphql: {
+      query CursorFilterBoundary {
+        justBefore: issues(first: 250, filter: {updatedAt: {gt: "2026-07-30T21:35:03.807Z"}}) { nodes { id updatedAt } }
+        exactGt:    issues(first: 250, filter: {updatedAt: {gt: "2026-07-30T21:35:03.808Z"}}) { nodes { id updatedAt } }
+        exactGte:   issues(first: 250, filter: {updatedAt: {gte: "2026-07-30T21:35:03.808Z"}}) { nodes { id updatedAt } }
+        wideOpen:   issues(first: 250, filter: {updatedAt: {gt: "2020-01-01T00:00:00Z"}}) { nodes { id updatedAt } }
+      }
+    }
+  }
+
+  response: {
+    headers: {
+      x-complexity: 9
+      x-ratelimit-requests-limit: 2500
+      x-ratelimit-requests-remaining: 2493
+      x-ratelimit-complexity-limit: 3000000
+      x-ratelimit-complexity-remaining: 2999991
+    }
+
+    status: {
+      code: 200
+      text: OK
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "data": {
+            "justBefore": {
+              "count": 3,
+              "rows": [
+                {
+                  "id": "adbc7deb-6607-4f39-ade2-c23268dc3ec7",
+                  "updatedAt": "2026-07-30T21:35:03.808Z"
+                },
+                {
+                  "id": "86eeb50c-332c-46a7-bebf-a0b67dc346bf",
+                  "updatedAt": "2026-07-30T21:35:03.808Z"
+                },
+                {
+                  "id": "4937bc7e-6bda-4612-9a80-3fbaaec872d9",
+                  "updatedAt": "2026-08-04T18:12:51.985Z"
+                }
+              ]
+            },
+            "exactGt": {
+              "count": 1,
+              "rows": [
+                {
+                  "id": "4937bc7e-6bda-4612-9a80-3fbaaec872d9",
+                  "updatedAt": "2026-08-04T18:12:51.985Z"
+                }
+              ]
+            },
+            "exactGte": {
+              "count": 3,
+              "rows": [
+                {
+                  "id": "adbc7deb-6607-4f39-ade2-c23268dc3ec7",
+                  "updatedAt": "2026-07-30T21:35:03.808Z"
+                },
+                {
+                  "id": "86eeb50c-332c-46a7-bebf-a0b67dc346bf",
+                  "updatedAt": "2026-07-30T21:35:03.808Z"
+                },
+                {
+                  "id": "4937bc7e-6bda-4612-9a80-3fbaaec872d9",
+                  "updatedAt": "2026-08-04T18:12:51.985Z"
+                }
+              ]
+            },
+            "wideOpen": {
+              "count": 3,
+              "rows": [
+                {
+                  "id": "adbc7deb-6607-4f39-ade2-c23268dc3ec7",
+                  "updatedAt": "2026-07-30T21:35:03.808Z"
+                },
+                {
+                  "id": "86eeb50c-332c-46a7-bebf-a0b67dc346bf",
+                  "updatedAt": "2026-07-30T21:35:03.808Z"
+                },
+                {
+                  "id": "4937bc7e-6bda-4612-9a80-3fbaaec872d9",
+                  "updatedAt": "2026-08-04T18:12:51.985Z"
+                }
+              ]
+            }
+          }
+        }
+      '''
+    }
+  }
+}

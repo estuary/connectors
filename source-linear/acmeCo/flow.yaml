@@ -1,0 +1,17 @@
+collections:
+  acmeCo/initiatives:
+    schema: initiatives.schema.yaml
+    key:
+    - /id
+  acmeCo/issues:
+    schema: issues.schema.yaml
+    key:
+    - /id
+  acmeCo/labels:
+    schema: labels.schema.yaml
+    key:
+    - /id
+  acmeCo/projects:
+    schema: projects.schema.yaml
+    key:
+    - /id
