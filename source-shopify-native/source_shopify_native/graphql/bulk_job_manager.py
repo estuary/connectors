@@ -75,6 +75,7 @@ class BulkJobManager:
     ):
         self.client = client
         self.log = log
+        self.max_concurrent_bulk_ops = max_concurrent_bulk_ops
         self.semaphore = asyncio.Semaphore(max_concurrent_bulk_ops)
         self._tracked_jobs: set[str] = set()
         self._cancel_tasks: set[asyncio.Task[None]] = set()
@@ -423,7 +424,10 @@ class BulkJobManager:
         if external_jobs:
             msg_parts.append(
                 f"Jobs not tracked by this job manager: {', '.join(sorted(external_jobs))}."
-                " Please prevent the other application from submitting bulk query operations to Shopify."
+                f" The connector is configured to run up to {self.max_concurrent_bulk_ops} of Shopify's"
+                f" {MAX_CONCURRENT_BULK_OPS} bulk query slots for this store and app."
+                " Lower the Max Concurrent Bulk Operations advanced setting to leave more slots free,"
+                " or reduce how many bulk queries the other system submits through the same app."
             )
 
         return BulkJobError(
