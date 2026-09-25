@@ -1,5 +1,6 @@
 ---
 description: Capture AlloyDB table updates with Estuary's CDC connector. Setup guide for logical decoding, replication slots, publications, watermarks tables, and SSH tunneling.
+slug: /reference/Connectors/capture-connectors/alloydb/
 ---
 
 # AlloyDB
@@ -46,7 +47,7 @@ and set up the watermarks table and publication.
   CREATE PUBLICATION flow_publication FOR ALL TABLES;
   ```
 
-3. Follow the instructions to create a [virtual machine for SSH tunneling](../../../guides/connect-network.md#setup-for-google-cloud)
+3. Follow the instructions to create a [virtual machine for SSH tunneling](/guides/connect-network/#setup-for-google-cloud)
 in the same Google Cloud project as your instance.
 
 ## Backfills and performance considerations
@@ -61,7 +62,7 @@ In this case, you may turn off backfilling on a per-table basis. See [properties
 ## Configuration
 
 You configure connectors either in the Estuary web app, or by directly editing the catalog specification file.
-See [connectors](../../../concepts/connectors.md#using-connectors) to learn more about using connectors. The values and specification sample below provide configuration details specific to the PostgreSQL source connector.
+See [connectors](/concepts/connectors/#using-connectors) to learn more about using connectors. The values and specification sample below provide configuration details specific to the PostgreSQL source connector.
 
 ### Properties
 
@@ -141,4 +142,4 @@ captures:
 ```
 Your capture definition will likely be more complex, with additional bindings for each table in the source database.
 
-[Learn more about capture definitions.](../../../concepts/captures.md)
+[Learn more about capture definitions.](/concepts/captures)

@@ -1,12 +1,12 @@
 ---
-description: Capture PostgreSQL changes from Google Cloud SQL instances with Estuary’s CDC connector. Setup guide includes logical replication, WAL handling, replication slots, publications, watermarks tables, and backfills.
+description: Capture Amazon Aurora PostgreSQL changes with Estuary's CDC connector. Setup guide includes logical replication, WAL handling, replication slots, publications, watermarks tables, and backfills.
 ---
 
-# Google Cloud SQL for PostgreSQL
+# Amazon Aurora for PostgreSQL
 
 This connector uses change data capture (CDC) to continuously capture updates in a PostgreSQL database into one or more Estuary collections.
 
-## Supported versions and platforms
+## Supported versions
 
 This connector supports PostgreSQL versions 10.0 and later.
 
@@ -26,26 +26,49 @@ You'll need a PostgreSQL database setup with the following:
   - In more restricted setups, this must be created manually, but can be created automatically if the connector has suitable permissions.
   - **For read-only environments**, the capture can operate in read-only mode which does not require a watermarks table. See [Read-Only Captures](#read-only-captures) for details.
 
+:::tip Configuration Tip
+To capture data from databases hosted on your internal network, you may need to
+use [SSH tunneling](/guides/connect-network/). If you have a
+[private deployment](/getting-started/deployment-options/#private-deployment),
+you can also use private cloud networking features to reach your database.
+:::
+
 ## Setup
+
+You must apply some of the settings to the entire Aurora DB cluster, and others to a database instance within the cluster.
+For each step, take note of which entity you're working with.
 
 1. Allow connections between the database and Estuary. There are two ways to do this: by granting direct access to Estuary's IP or by creating an SSH tunnel.
 
    1. To allow direct access:
 
-      - [Enable public IP on your database](https://cloud.google.com/sql/docs/mysql/configure-ip#add) and add the [Estuary IP addresses](/reference/allow-ip-addresses) as authorized IP addresses.
+      - [Modify the instance](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Aurora.Modifying.html#Aurora.Modifying.Instance), choosing **Publicly accessible** in the **Connectivity** settings.
+      - Edit the VPC security group associated with your instance, or create a new VPC security group and associate it with the instance as described in [the Amazon documentation](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.RDSSecurityGroups.html#Overview.RDSSecurityGroups.Create). Create a new inbound rule and a new outbound rule that allow all traffic from the [Estuary IP addresses](/reference/allow-ip-addresses).
 
    2. To allow secure connections via SSH tunneling:
-      - Follow the guide to [configure an SSH server for tunneling](../../../../../guides/connect-network/)
-      - When you configure your connector as described in the [configuration](#configuration) section above, including the additional `networkTunnel` configuration to enable the SSH tunnel. See [Connecting to endpoints on secure networks](../../../../concepts/connectors.md#connecting-to-endpoints-on-secure-networks) for additional details and a sample.
+      - Follow the guide to [configure an SSH server for tunneling](/guides/connect-network/)
+      - When you configure your connector as described in the [configuration](#configuration) section above, including the additional `networkTunnel` configuration to enable the SSH tunnel. See [Connecting to endpoints on secure networks](/concepts/connectors.md#connecting-to-endpoints-on-secure-networks) for additional details and a sample.
 
-2. On Google Cloud, navigate to your instance's Overview page. Click "Edit configuration". Scroll down to the Flags section. Click "ADD FLAG". Set [the `cloudsql.logical_decoding` flag to `on`](https://cloud.google.com/sql/docs/postgres/flags) to enable logical replication on your Cloud SQL PostgreSQL instance.
+2. Enable logical replication on your Aurora DB cluster.
 
-3. In your PostgreSQL client, connect to your instance and issue the following commands to create a new user for the capture with appropriate permissions,
+   1. Create a [parameter group](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/USER_WorkingWithDBClusterParamGroups.html#USER_WorkingWithParamGroups.CreatingCluster).
+      Create a unique name and description and set the following properties:
+
+      - **Family**: aurora-postgresql13, or substitute the version of Aurora PostgreSQL used for your cluster.
+      - **Type**: DB Cluster Parameter group
+
+   2. [Modify the new parameter group](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/USER_WorkingWithDBClusterParamGroups.html#USER_WorkingWithParamGroups.ModifyingCluster) and set `rds.logical_replication=1`.
+
+   3. [Associate the parameter group](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/USER_WorkingWithDBClusterParamGroups.html#USER_WorkingWithParamGroups.AssociatingCluster) with the DB cluster.
+
+   4. Reboot the cluster to allow the new parameter group to take effect.
+
+3. In the PostgreSQL client, connect to your instance and run the following commands to create a new user for the capture with appropriate permissions,
    and set up the watermarks table and publication.
 
 ```sql
-CREATE USER flow_capture WITH REPLICATION
-IN ROLE cloudsqlsuperuser LOGIN PASSWORD 'secret';
+CREATE USER flow_capture WITH PASSWORD 'secret';
+GRANT rds_replication TO flow_capture;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO flow_capture;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO flow_capture;
 CREATE TABLE IF NOT EXISTS public.flow_watermarks (slot TEXT PRIMARY KEY, watermark TEXT);
@@ -59,8 +82,7 @@ where `<other_tables>` lists all tables that will be captured from. The `publish
 setting is recommended (because most users will want changes to a partitioned table to be captured
 under the name of the root table) but is not required.
 
-4. In the Cloud Console, note the instance's host under Public IP Address. Its port will always be `5432`.
-   Together, you'll use the host:port as the `address` property when you configure the connector.
+6. In the [RDS console](https://console.aws.amazon.com/rds/), note the instance's Endpoint and Port. You'll need these for the `address` property when you configure the connector.
 
 ## Backfills and performance considerations
 
@@ -70,6 +92,66 @@ This is desirable in most cases, as it ensures that a complete view of your tabl
 However, you may find it appropriate to skip the backfill, especially for extremely large tables.
 
 In this case, you may turn off backfilling on a per-table basis. See [properties](#properties) for details.
+
+## Replication slot recovery
+
+If the replication slot is dropped or invalidated — for example after a major version upgrade, a failover, or a WAL size limit being exceeded — the capture will fail and require manual recovery. See [PostgreSQL replication slot recovery](/guides/troubleshooting/postgres-replication-slot-recovery) for step-by-step instructions.
+
+If the failover is planned and you can pause writes, you can re-establish the capture without a full backfill. See [Preventing backfills during database upgrades and failovers](/reference/backfilling-data/#preventing-backfills-during-database-upgrades-and-failovers).
+
+## WAL Retention and Tuning Parameters
+
+Postgres logical replication works by reading change events from the writeahead log,
+reordering WAL events in memory on the server, and sending them to the client in the
+order that transactions were committed. The replication slot used by the capture is
+essentially a cursor into that logical sequence of changes.
+
+Because of how Postgres reorders WAL events into atomic transactions, there are two
+distinct LSNs which matter when it comes to WAL retention. The `confirmed_flush_lsn`
+property of a replication slot represents the latest event in the WAL which has been
+sent to and confirmed by the client. However there may be some number of uncommitted
+changes prior to this point in the WAL which are still relevant and will be sent to
+the client in later transactions. Thus there is also a `restart_lsn` property which
+represents the point in the WAL from which logical decoding must resume in the future
+if the replication connection is closed and restarted.
+
+The server cannot clean up old WAL files so long as there are active replication slots
+whose `restart_lsn` position requires them. There are two ways that `restart_lsn` might
+get stuck at a particular point in the WAL:
+
+1. When a capture is deleted, disabled, or repeatedly failing for other reasons,
+   it is not able to advance the `confirmed_flush_lsn` and thus `restart_lsn` cannot
+   advance either.
+2. When a long-running transaction is open on the server the `restart_lsn` of a
+   replication slot may be unable to advance even though `confirmed_flush_lsn` is.
+
+By default Postgres will retain an unbounded amount of WAL data and fill up the entire
+disk if a replication slot stops advancing. There are two ways to address this:
+
+1. When deleting a capture, make sure that the replication slot is also successfully deleted.
+   - You can list replication slots with the query `SELECT * FROM pg_replication_slots` and
+     can drop the replication slot manually with `pg_drop_replication_slot('flow_slot')`.
+2. The database setting `max_slot_wal_keep_size` can be used to bound the maximum amount of
+   WAL data which a replication slot can force the database to retain.
+   - This setting defaults to `-1` (unlimited) but should be set on production databases
+     to protect them from unbounded WAL retention filling up the entire disk.
+   - Proper sizing of this setting is complex for reasons discussed below, but a value
+     of `50GB` should be enough for many databases.
+
+When the `max_slot_wal_keep_size` limit is exceeded, Postgres will terminate any active
+replication connections using that slot and invalidate the replication slot so that it
+can no longer be used. If Postgres invalidates the replication slot, the Estuary capture
+using that slot will fail and manual intervention will be required to restart the capture
+and re-backfill all tables.
+
+Setting too low of a limit for `max_slot_wal_keep_size` can cause additional failures
+in the presence of long-running transactions. Even when a client is actively receiving
+and acknowledging replication events, a long-running transaction can cause the `restart_lsn`
+of the replication slot to remain stuck until that transaction commits. Thus the value of
+`max_slot_wal_keep_size` needs to be set high enough to avoid this happening. The precise
+value depends on the overall change rate of your database and worst-case transaction open
+time, but there is no downside to using a larger value provided you have enough free disk
+space.
 
 ## Read-Only Captures
 
@@ -87,13 +169,13 @@ every few minutes and include that in the capture.
 PostgreSQL logical replication can only acknowledge changes which modify at least one
 table in the publication. If all of the tables being captured are idle while there are
 significant changes to other tables on the same server, the replication slot cannot
-advance and PostgreSQL WAL retention will continue to grow, potentially without bound (see [WAL Retention and Tuning Parameters](PostgreSQL.md#wal-retention-and-tuning-parameters))
+advance and PostgreSQL WAL retention will continue to grow, potentially without bound (see [WAL Retention and Tuning Parameters](#wal-retention-and-tuning-parameters))
 for more information.
 
 To enable read-only operation:
 
 - In the Estuary web app: Select the "Read-Only Capture" checkbox in the "Advanced Options" section of the capture configuration.
-- In the YAML configuration: Set read_only_capture: true in the advanced section of the config.
+- In the YAML configuration: Set `read_only_capture: true` in the advanced section of the config.
 
 ### Capturing from Read-Only Standbys
 
@@ -112,7 +194,7 @@ ERROR: logical decoding cannot be used while in recovery
 If you encounter this error, you have the following options:
 - **Upgrade** your PostgreSQL database to version 16 or later
 - **Capture from the primary instance** instead of the standby
-- Use the [PostgreSQL Batch Connector](../postgres-batch/) to capture the data
+- Use the [PostgreSQL Batch Connector](./postgres-batch/) to capture the data
 :::
 
 In addition to the read-only capture requirement that there be frequent writes to at least one
@@ -128,20 +210,35 @@ This will cause the logical replication slot to be invalidated, breaking the cap
 
 The solution is to set `hot_standby_feedback = on` so that the standby replica will keep the
 upstream database informed about what catalog metadata needs to be retained. To enable hot
-standby feedback on a Google CLoud SQL PostgreSQL instance:
+standby feedback on a self-managed PostgreSQL instance, run the following statements
+(on the standby replica):
 
-1. Navigate to your replica instance in the Google Cloud Console
-2. Click "Edit configuration"
-3. In the Flags section, click "ADD A DATABASE FLAG"
-4. Select `hot_standby_feedback` and set it to `on`
-5. Click "Save" and wait for the instance to restart
+```sql
+ALTER SYSTEM SET hot_standby_feedback = on;
+SELECT pg_reload_conf();
+```
 
 You can verify whether the setting is enabled by running `SHOW hot_standby_feedback;`
+
+Managed PostgreSQL instances from a cloud provider may require use of provider-specific
+mechanisms to enable this setting and/or reload the modified configuration.
+
+## IAM Authentication
+
+Instead of username/password authentication, you may use an IAM role with your cloud provider for this connector.
+
+See guides by provider for setup details:
+
+* [AWS](/guides/iam-auth/aws)
+* [GCP](/guides/iam-auth/gcp)
+* [Azure](/guides/iam-auth/azure)
+
+The connector will require [credentials](#authentication) based on your chosen authentication method, such as an AWS role ARN or GCP workload identity pool audience.
 
 ## Configuration
 
 You configure connectors either in the Estuary web app, or by directly editing the catalog specification file.
-See [connectors](../../../../concepts/connectors.md#using-connectors) to learn more about using connectors. The values and specification sample below provide configuration details specific to the PostgreSQL source connector.
+See [connectors](/concepts/connectors.md#using-connectors) to learn more about using connectors. The values and specification sample below provide configuration details specific to the PostgreSQL source connector.
 
 ### Properties
 
@@ -159,10 +256,14 @@ See [connectors](../../../../concepts/connectors.md#using-connectors) to learn m
 | Property | Title | Description | Type | Required/Default |
 | --- | --- | --- | --- | --- |
 | **`/credentials`** | Authentication | Authentication method and credentials that provide access to the database. | object | Required |
-| `/credentials/auth_type` | Auth Type | The authentication method to use. One of `UserPassword` or `GCPIAM`. | string |  |
+| `/credentials/auth_type` | Auth Type | The authentication method to use. One of `UserPassword`, `AWSIAM`, `GCPIAM`, or `AzureIAM`. | string |  |
 | `/credentials/password` | Password | Password for the specified database user. | string | Required for `UserPassword` auth |
+| `/credentials/aws_region` | AWS Region | AWS region of your resource. | string | Required for `AWSIAM` auth |
+| `/credentials/aws_role_arn` | AWS Role ARN | AWS role for Estuary to use that has access to the resource. | string | Required for `AWSIAM` auth |
 | `/credentials/gcp_service_account_to_impersonate` | GCP Service Account | GCP service account email for Cloud SQL IAM authentication. | string | Required for `GCPIAM` auth |
 | `/credentials/gcp_workload_identity_pool_audience` | Workload Identity Pool Audience | GCP workload identity pool audience. The format should be similar to: `//iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/test-pool/providers/test-provider`. | string | Required for `GCPIAM` auth |
+| `/credentials/azure_client_id` | Azure Client ID | Azure App Registration Client ID for Azure Active Directory authentication. | string | Required for `AzureIAM` auth |
+| `/credentials/azure_tenant_id` | Azure Tenant ID | Azure Tenant ID for Azure Active Directory authentication. | string | Required for `AzureIAM` auth |
 
 ##### Discovery Filters
 
@@ -208,6 +309,10 @@ these filters exclude will be deactivated the next time discovery runs.
 | `/priority` | Backfill Priority | Optional priority for this binding. The highest priority binding(s) will be backfilled completely before any others. Negative priorities are allowed and will cause a binding to be backfilled after others. | integer | `0` |
 | `/advanced/additional_backfill_filter` | Additional Backfill Filter | Optional filter clause which will be applied to all backfill queries for this binding. Contact Estuary support for assistance before using this option. | string | |
 
+#### SSL Mode
+
+Certain managed PostgreSQL implementations may require you to explicitly set the [SSL Mode](https://www.postgresql.org/docs/current/libpq-ssl.html#LIBPQ-SSL-PROTECTION) to connect with Estuary. One example is [Neon](https://neon.tech/docs/connect/connect-securely), which requires the setting `verify-full`. Check your managed PostgreSQL's documentation for details if you encounter errors related to the SSL mode configuration.
+
 ### Sample
 
 A minimal capture definition will look like the following:
@@ -217,7 +322,7 @@ captures:
   ${PREFIX}/${CAPTURE_NAME}:
     endpoint:
       connector:
-        image: ghcr.io/estuary/source-google-cloud-sql-postgres:v3
+        image: ghcr.io/estuary/source-amazon-aurora-postgres:v3
         config:
           address: host:port
           database: postgres
@@ -250,19 +355,19 @@ unexpected results in downstream catalog tasks if adjustments are not made.
 
 The PostgreSQL connector handles TOASTed values for you when you follow the [standard discovery workflow](/concepts/captures.md#discovery)
 or use the [Estuary UI](/concepts/web-app.md) to create your capture.
-It uses [merge](/reference/reduction-strategies/merge) [reductions](../../../../concepts/schemas.md#reductions)
+It uses [merge](/reference/reduction-strategies/merge) [reductions](/concepts/schemas.md#reductions)
 to fill in the previous known TOASTed value in cases when that value is omitted from a row update.
 
 However, due to the event-driven nature of certain tasks in Estuary, it's still possible to see unexpected results in your data flow, specifically:
 
 - When you materialize the captured data to another system using a connector that requires [delta updates](/concepts/materialization/#delta-updates)
-- When you perform a [derivation](../../../../concepts/derivations.md) that uses TOASTed values
+- When you perform a [derivation](/concepts/derivations.md) that uses TOASTed values
 
 ### Troubleshooting
 
 If you encounter an issue that you suspect is due to TOASTed values, try the following:
 
-- Ensure your collection's schema is using the merge [reduction strategy](../../../../concepts/schemas.md#reduce-annotations).
+- Ensure your collection's schema is using the merge [reduction strategy](/concepts/schemas.md#reduce-annotations).
 - [Set REPLICA IDENTITY to FULL](https://www.postgresql.org/docs/9.4/sql-altertable.html) for the table. This circumvents the problem by forcing the
   WAL to record all values regardless of size. However, this can have performance impacts on your database and must be carefully evaluated.
 - [Contact Estuary support](mailto:support@estuary.dev) for assistance.

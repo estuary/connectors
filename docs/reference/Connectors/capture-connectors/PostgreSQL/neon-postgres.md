@@ -238,7 +238,7 @@ captures:
   ${PREFIX}/${CAPTURE_NAME}:
     endpoint:
       connector:
-        image: ghcr.io/estuary/source-postgres:v3
+        image: ghcr.io/estuary/source-neon-postgres:v3
         config:
           address: host:port
           database: postgres
