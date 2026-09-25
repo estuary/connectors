@@ -16,7 +16,6 @@ is what keeps the image build from passing over the guard it exists to enforce.
 
 import inspect
 import os
-from typing import List
 
 import pytest
 
@@ -130,8 +129,8 @@ def test_decode_to_raw_scans_rows_without_building_them():
     # producing views onto the payload rather than Python objects.
     encoder = msgspec.json.Encoder()
     payload = b"[" + b",".join(encoder.encode(row) for row in ROWS) + b"]"
-    rows = msgspec.json.Decoder(List[Raw]).decode(payload)
+    rows = msgspec.json.Decoder(list[Raw]).decode(payload)
     assert [bytes(row) for row in rows] == [encoder.encode(row) for row in ROWS]
 
     with pytest.raises(msgspec.DecodeError):
-        msgspec.json.Decoder(List[Raw]).decode(b'[{"a":1},{oops}]')
+        msgspec.json.Decoder(list[Raw]).decode(b'[{"a":1},{oops}]')

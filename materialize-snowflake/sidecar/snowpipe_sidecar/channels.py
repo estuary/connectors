@@ -9,7 +9,8 @@ import logging
 import threading
 import time
 import uuid
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from collections.abc import Callable
+from typing import Any
 
 import msgspec
 from msgspec import Raw
@@ -21,7 +22,7 @@ logger = logging.getLogger("snowpipe_sidecar.channels")
 # bytes are never materialized as a Python object on the way to Snowflake. The
 # decode below scans the payload to find each row's extent without building it.
 # tests/test_sdk_raw_rows.py is the guard on that route through the SDK.
-_ROWS_DECODER = msgspec.json.Decoder(List[Raw])
+_ROWS_DECODER = msgspec.json.Decoder(list[Raw])
 
 # A row must be a JSON object, but the SDK forwards everything to Snowflake
 # unchecked, and Snowflake counts an invalid row as a rejected row rather than
@@ -38,6 +39,9 @@ _SATURATION_INITIAL_DELAY_S = 0.5
 _SATURATION_MAX_DELAY_S = 10.0
 
 
+type ClientFactory = Callable[[dict[str, Any], str, str, str], Any]
+
+
 class SidecarError(Exception):
     """An error with a stable code, surfaced through an RPC error response."""
 
@@ -46,7 +50,7 @@ class SidecarError(Exception):
         self.code = code
 
 
-def _default_client_factory(props: Dict[str, Any], database: str, schema: str, table: str):
+def _default_client_factory(props: dict[str, Any], database: str, schema: str, table: str):
     # Imported here so that process environment (SS_LOG_TARGET et al) is
     # in place before the SDK's native core initializes.
     from snowflake.ingest.streaming import StreamingIngestClient
@@ -60,7 +64,7 @@ def _default_client_factory(props: Dict[str, Any], database: str, schema: str, t
     )
 
 
-def _status_dict(status: Any) -> Dict[str, Any]:
+def _status_dict(status: Any) -> dict[str, Any]:
     return {
         "committed_token": status.latest_committed_offset_token,
         "rows_error_count": status.rows_error_count,
@@ -68,7 +72,7 @@ def _status_dict(status: Any) -> Dict[str, Any]:
     }
 
 
-def _decode_rows(payload: bytes, row_count: int) -> List[Raw]:
+def _decode_rows(payload: bytes, row_count: int) -> list[Raw]:
     try:
         rows = _ROWS_DECODER.decode(payload)
     except msgspec.DecodeError as err:
@@ -94,14 +98,14 @@ def _wrap_sdk_error(err: Exception) -> SidecarError:
 
 
 class ChannelManager:
-    def __init__(self, props: Dict[str, Any], client_factory: Optional[Callable] = None):
+    def __init__(self, props: dict[str, Any], client_factory: ClientFactory | None = None):
         self._props = props
         self._client_factory = client_factory or _default_client_factory
         self._mu = threading.Lock()
-        self._clients: Dict[Tuple[str, str, str], Any] = {}
-        self._channels: Dict[str, Any] = {}
+        self._clients: dict[tuple[str, str, str], Any] = {}
+        self._channels: dict[str, Any] = {}
 
-    def open(self, database: str, schema: str, table: str, channel: str) -> Dict[str, Any]:
+    def open(self, database: str, schema: str, table: str, channel: str) -> dict[str, Any]:
         """Open a channel by name, returning Snowflake's authoritative status
         for it: the latest committed offset token, and the row-error statistics
         accumulated over the channel's life so far."""
@@ -162,7 +166,7 @@ class ChannelManager:
                 raise _wrap_sdk_error(err) from err
             return len(rows)
 
-    def wait_commit(self, channel: str, token: str, timeout_s: float) -> Dict[str, Any]:
+    def wait_commit(self, channel: str, token: str, timeout_s: float) -> dict[str, Any]:
         """Wait for the token to commit, returning the channel's status once it
         has. A committed token says nothing about the rows Snowflake rejected
         along the way, which the caller needs in order to decide whether the
@@ -175,7 +179,7 @@ class ChannelManager:
             raise _wrap_sdk_error(err) from err
         return _status_dict(st)
 
-    def status(self, channel: str) -> Dict[str, Any]:
+    def status(self, channel: str) -> dict[str, Any]:
         ch = self._channel(channel)
         try:
             st = ch.get_channel_status()

@@ -20,11 +20,14 @@ import logging
 import os
 import queue
 import threading
-from typing import Any, Callable, Dict, Optional
+from collections.abc import Callable
+from typing import Any
 
 from .channels import ChannelManager, SidecarError
 
 logger = logging.getLogger("snowpipe_sidecar.server")
+
+type _Request = tuple[int, str, dict[str, Any], bytes | None]
 
 _CHANNEL_OPS = frozenset(["append", "wait_commit", "channel_status", "close_channel"])
 
@@ -34,7 +37,7 @@ class Server:
         self,
         conn,
         auth_token: str,
-        manager_factory: Callable[[Dict[str, Any]], ChannelManager] = ChannelManager,
+        manager_factory: Callable[[dict[str, Any]], ChannelManager] = ChannelManager,
         exit_fn: Callable[[int], None] = os._exit,
     ):
         self._conn = conn
@@ -43,10 +46,10 @@ class Server:
         self._exit = exit_fn
 
         self._wlock = threading.Lock()
-        self._manager: Optional[ChannelManager] = None
+        self._manager: ChannelManager | None = None
 
-        self._control: "queue.Queue" = queue.Queue()
-        self._channel_queues: Dict[str, "queue.Queue"] = {}
+        self._control: queue.Queue[_Request] = queue.Queue()
+        self._channel_queues: dict[str, queue.Queue[_Request]] = {}
 
     def serve(self) -> None:
         threading.Thread(target=self._worker, args=(self._control,), daemon=True).start()
@@ -100,7 +103,7 @@ class Server:
         logger.info("connection closed; exiting")
         self._exit(0)
 
-    def _worker(self, q: "queue.Queue") -> None:
+    def _worker(self, q: queue.Queue[_Request]) -> None:
         while True:
             rid, op, params, payload = q.get()
             try:
@@ -113,7 +116,7 @@ class Server:
                 return
 
     def _dispatch(
-        self, rid: int, op: str, params: Dict[str, Any], payload: Optional[bytes] = None
+        self, rid: int, op: str, params: dict[str, Any], payload: bytes | None = None
     ) -> None:
         if op == "configure":
             if params.get("auth") != self._auth_token:
@@ -132,7 +135,7 @@ class Server:
             )
             # The channel worker must exist before the caller sees success.
             if params["channel"] not in self._channel_queues:
-                q: "queue.Queue" = queue.Queue()
+                q: queue.Queue[_Request] = queue.Queue()
                 self._channel_queues[params["channel"]] = q
                 threading.Thread(target=self._worker, args=(q,), daemon=True).start()
             self._reply(rid, status)
@@ -163,8 +166,8 @@ class Server:
         else:
             raise SidecarError("protocol", f"unknown op {op!r}")
 
-    def _reply(self, rid: int, result: Optional[Dict[str, Any]]) -> None:
-        res: Dict[str, Any] = {"id": rid, "ok": True}
+    def _reply(self, rid: int, result: dict[str, Any] | None) -> None:
+        res: dict[str, Any] = {"id": rid, "ok": True}
         if result is not None:
             res["result"] = result
         self._send(res)
@@ -172,7 +175,7 @@ class Server:
     def _reply_error(self, rid: int, err: SidecarError) -> None:
         self._send({"id": rid, "ok": False, "error": str(err), "code": err.code})
 
-    def _send(self, res: Dict[str, Any]) -> None:
+    def _send(self, res: dict[str, Any]) -> None:
         data = (json.dumps(res) + "\n").encode()
         with self._wlock:
             self._conn.sendall(data)
