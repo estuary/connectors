@@ -167,8 +167,8 @@ See [connectors](/concepts/connectors.md#using-connectors) to learn more about u
 | `/advanced/source_tag` | Source Tag | This value is added as the property 'tag' in the source metadata of each document. | string |  |
 | `/advanced/statement_timeout` | Statement Timeout | Overrides the default statement timeout used by the connector. Allowed values: `30s`, `1m`, `5m`, `30m`, or empty to disable. | string |  |
 | `/advanced/rediscovery_interval` | Rediscovery Interval | How often the connector re-runs discovery while a capture is running, in order to notice schema changes and newly added tables. Accepts duration strings like `15m` or `1h`, from `1m` up to `8760h`. | string | `"15m"` |
-| `/advanced/sslmode` | SSL Mode | Controls whether connections use TLS and whether the server's certificate is verified. One of `disabled`, `preferred`, `required`, `verify_ca`, or `verify_identity`. See [TLS and certificate verification](#tls-and-certificate-verification). When unset the connector behaves as `preferred` for password authentication and `required` for IAM authentication. | string |  |
-| `/advanced/ssl_server_ca` | SSL Server CA | PEM-encoded certificate authority the server certificate must chain to. Required for `verify_ca`. Optional for `verify_identity`, where the system root certificates are used when unset. | string |  |
+| `/advanced/sslmode` | SSL Mode | Controls whether connections use TLS and whether the server's certificate is verified. One of `disabled`, `preferred`, `required`, `verify_ca`, or `verify_identity`. See [TLS and certificate verification](#tls-and-certificate-verification). | string | `"verify_identity"` |
+| `/advanced/ssl_server_ca` | SSL Server CA | PEM-encoded certificate authority the server certificate must chain to. Required for `verify_ca`. Optional for `verify_identity`, which otherwise trusts public certificate authorities and the CAs of Amazon RDS and Google Cloud SQL (shared CA). | string |  |
 | `/advanced/ssl_client_cert` | SSL Client Certificate | Optional PEM-encoded client certificate to present to the server for mutual TLS. | string |  |
 | `/advanced/ssl_client_key` | SSL Client Key | PEM-encoded private key for the SSL Client Certificate. | string |  |
 
@@ -237,16 +237,17 @@ Your capture definition will likely be more complex, with additional bindings fo
 
 ## TLS and certificate verification
 
-By default the connector encrypts its connection with TLS when the server supports it, but does not verify the server's certificate. To protect against an attacker impersonating your database server, set the `sslmode` advanced option to one of the verifying modes:
+By default the connector uses `verify_identity`: it requires a TLS-encrypted connection and checks that the server's certificate is valid for the configured server hostname, which protects against an attacker impersonating your database server. When `ssl_server_ca` is empty, the connector trusts public certificate authorities, which include the ones Azure Database for MySQL uses, and the CAs of Amazon RDS and Aurora and Google Cloud SQL's shared CA. When `ssl_server_ca` is set, the connector trusts only that CA.
 
-- `verify_ca` checks that the server certificate is signed by the CA you paste into `ssl_server_ca`, without checking the hostname. Use this when connecting by IP address, or when the certificate's name doesn't match the address you connect to.
-- `verify_identity` additionally checks that the certificate is valid for the configured server hostname.
+Amazon RDS certificates are issued by Amazon's own CA, which the connector trusts by default in all commercial AWS regions and AWS GovCloud (US), so `verify_identity` works without `ssl_server_ca` when you connect to your instance's RDS endpoint. In China regions, paste the [RDS certificate bundle for your region](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.SSL.html) into `ssl_server_ca`.
 
-Amazon RDS certificates are issued by Amazon's own CA rather than a public one, so either mode needs the [RDS certificate bundle for your region](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.SSL.html) pasted into `ssl_server_ca`. `verify_identity` works because the certificate is issued for your instance's `rds.amazonaws.com` endpoint.
+If the server's certificate can't be verified, the connection fails with an error explaining why. Set the `sslmode` advanced option to one of:
 
-Both modes work when connecting through an SSH network tunnel, because the certificate is checked against the configured server address rather than the tunnel endpoint.
+- `verify_ca` checks that the server certificate is signed by the CA you paste into `ssl_server_ca`, without checking the hostname. Use this when connecting by IP address, or when the certificate doesn't name the address you connect to.
+- `required` enforces TLS without verifying the server.
+- `preferred` falls back to an unencrypted connection when TLS fails, and `disabled` never uses TLS. IAM authentication presents a bearer token as the password, which must never be sent unencrypted, so `disabled` and `preferred` are both rejected in that case.
 
-`required` enforces TLS without verifying the server, `preferred` falls back to an unencrypted connection when TLS fails, and `disabled` never uses TLS. IAM authentication presents a bearer token as the password, which must never be sent unencrypted, so `disabled` and `preferred` are both rejected in that case.
+Both verifying modes work when connecting through an SSH network tunnel, because the certificate is checked against the configured server address rather than the tunnel endpoint.
 
 ## Troubleshooting Capture Errors
 

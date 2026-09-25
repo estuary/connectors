@@ -50,8 +50,8 @@ See [connectors](/concepts/connectors/#using-connectors) to learn more about usi
 | `/advanced/discover_schemas` | Discovery Schema Selection | If this is specified, only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas. | array | `[]` |
 | `/advanced/dbname` | Database Name | The name of the database to connect to. This is optional, as the connector can discover and capture from all databases it's authorized to access. | string | |
 | `/advanced/source_tag` | Source Tag | When set, the capture will add this value as the property 'tag' in the source metadata of each document. | string | |
-| `/advanced/sslmode` | SSL Mode | Controls whether connections use TLS and whether the server's certificate is verified. One of `disabled`, `preferred`, `required`, `verify_ca`, or `verify_identity`. See [TLS and certificate verification](#tls-and-certificate-verification). Defaults to `preferred` when unset. | string |  |
-| `/advanced/ssl_server_ca` | SSL Server CA | PEM-encoded certificate authority the server certificate must chain to. Required for `verify_ca`. Optional for `verify_identity`, where the system root certificates are used when unset. | string |  |
+| `/advanced/sslmode` | SSL Mode | Controls whether connections use TLS and whether the server's certificate is verified. One of `disabled`, `preferred`, `required`, `verify_ca`, or `verify_identity`. See [TLS and certificate verification](#tls-and-certificate-verification). | string | `"verify_identity"` |
+| `/advanced/ssl_server_ca` | SSL Server CA | PEM-encoded certificate authority the server certificate must chain to. Required for `verify_ca`. Optional for `verify_identity`, which otherwise trusts public certificate authorities and the CAs of Amazon RDS and Google Cloud SQL (shared CA). | string |  |
 | `/advanced/ssl_client_cert` | SSL Client Certificate | Optional PEM-encoded client certificate to present to the server for mutual TLS. | string |  |
 | `/advanced/ssl_client_key` | SSL Client Key | PEM-encoded private key for the SSL Client Certificate. | string |  |
 | `/networkTunnel` | Network Tunnel | Connect to your system through an SSH server that acts as a bastion host for your network. | object | |
@@ -89,14 +89,17 @@ captures:
 
 ## TLS and certificate verification
 
-By default the connector encrypts its connection with TLS when the server supports it, but does not verify the server's certificate. To protect against an attacker impersonating your database server, set the `sslmode` advanced option to one of the verifying modes:
+By default the connector uses `verify_identity`: it requires a TLS-encrypted connection and checks that the server's certificate is valid for the configured server hostname, which protects against an attacker impersonating your database server. When `ssl_server_ca` is empty, the connector trusts public certificate authorities, which include the ones Azure Database for MySQL uses, and the CAs of Amazon RDS and Aurora and Google Cloud SQL's shared CA. When `ssl_server_ca` is set, the connector trusts only that CA.
 
-- `verify_ca` checks that the server certificate is signed by the CA you paste into `ssl_server_ca`, without checking the hostname. Use this when connecting by IP address, or when the certificate's name doesn't match the address you connect to.
-- `verify_identity` additionally checks that the certificate is valid for the configured server hostname. If your server uses a certificate from a public CA you can leave `ssl_server_ca` empty; otherwise paste the CA that issued the certificate.
+A self-managed server's auto-generated or self-signed certificate usually comes from a private CA and names no host, so `verify_identity` rejects it. Paste the CA that issued it into `ssl_server_ca` and use `verify_ca`.
 
-Both modes work when connecting through an SSH network tunnel, because the certificate is checked against the configured server address rather than the tunnel endpoint.
+If the server's certificate can't be verified, the connection fails with an error explaining why. Set the `sslmode` advanced option to one of:
 
-`required` enforces TLS without verifying the server, `preferred` falls back to an unencrypted connection when TLS fails, and `disabled` never uses TLS.
+- `verify_ca` checks that the server certificate is signed by the CA you paste into `ssl_server_ca`, without checking the hostname. Use this when connecting by IP address, or when the certificate doesn't name the address you connect to.
+- `required` enforces TLS without verifying the server.
+- `preferred` falls back to an unencrypted connection when TLS fails, and `disabled` never uses TLS.
+
+Both verifying modes work when connecting through an SSH network tunnel, because the certificate is checked against the configured server address rather than the tunnel endpoint.
 
 ## Query templates
 

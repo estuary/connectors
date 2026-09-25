@@ -235,8 +235,8 @@ type advancedConfig struct {
 	FeatureFlags             string   `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"order=8,nonsensitive=true"`
 	StatementTimeout         string   `json:"statement_timeout,omitempty" jsonschema:"title=Statement Timeout,description=Overrides the default statement timeout used by the connector. The default of zero disables statement timeouts entirely.,enum=,enum=30s,enum=1m,enum=5m,enum=30m,default=" jsonschema_extras:"order=9,nonsensitive=true"`
 
-	SSLMode       string `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Whether to use TLS and how strictly to verify the server certificate. Defaults to 'preferred' for password authentication and 'required' for IAM authentication. See the connector documentation for details.,enum=disabled,enum=preferred,enum=required,enum=verify_ca,enum=verify_identity" jsonschema_extras:"order=10,nonsensitive=true"`
-	SSLServerCA   string `json:"ssl_server_ca,omitempty" jsonschema:"title=SSL Server CA,description=PEM-encoded CA certificate the server certificate must chain to. Required for 'verify_ca'; optional for 'verify_identity'." jsonschema_extras:"order=11,secret=true,multiline=true"`
+	SSLMode       string `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Whether to use TLS and how strictly to verify the server certificate. Defaults to 'verify_identity'. See the connector documentation for details.,enum=disabled,enum=preferred,enum=required,enum=verify_ca,enum=verify_identity,default=verify_identity" jsonschema_extras:"order=10,nonsensitive=true"`
+	SSLServerCA   string `json:"ssl_server_ca,omitempty" jsonschema:"title=SSL Server CA,description=PEM-encoded CA certificate the server certificate must chain to. Required for 'verify_ca'. Optional for 'verify_identity'\\, which otherwise trusts public certificate authorities and the CAs of Amazon RDS and Google Cloud SQL (shared CA)." jsonschema_extras:"order=11,secret=true,multiline=true"`
 	SSLClientCert string `json:"ssl_client_cert,omitempty" jsonschema:"title=SSL Client Certificate,description=Optional PEM-encoded client certificate for mutual TLS." jsonschema_extras:"order=12,secret=true,multiline=true"`
 	SSLClientKey  string `json:"ssl_client_key,omitempty" jsonschema:"title=SSL Client Key,description=PEM-encoded private key for the client certificate." jsonschema_extras:"order=13,secret=true,multiline=true"`
 
@@ -295,16 +295,14 @@ func (c *Config) Validate() error {
 	if err := sqlcapture.ValidateRediscoveryInterval(c.Advanced.RediscoveryInterval); err != nil {
 		return err
 	}
-	if c.Advanced.SSLMode != "" || c.Advanced.SSLServerCA != "" || c.Advanced.SSLClientCert != "" || c.Advanced.SSLClientKey != "" {
-		if err := c.sslSettings().Validate(); err != nil {
-			return err
-		}
+	if err := c.sslSettings().Validate(); err != nil {
+		return err
 	}
 	// Checked against the effective mode rather than the raw setting, so that an
 	// unset 'sslmode' is judged by the default it resolves to.
 	if sslSettings := c.sslSettings(); c.usesBearerToken() && !sslSettings.GuaranteesEncryption() {
 		return fmt.Errorf("'sslmode' cannot be %q with 'auth_type' %q: this authentication scheme presents a bearer token as the password, which must never be sent over an unencrypted connection. Use %q, %q, or %q",
-			sslSettings.Mode, c.Credentials.AuthType, mysqltls.ModeRequired, mysqltls.ModeVerifyCA, mysqltls.ModeVerifyIdentity)
+			sslSettings.EffectiveMode(), c.Credentials.AuthType, mysqltls.ModeRequired, mysqltls.ModeVerifyCA, mysqltls.ModeVerifyIdentity)
 	}
 	if err := c.DiscoveryFilters.Validate(); err != nil {
 		return err
@@ -412,25 +410,21 @@ func (c *Config) usesBearerToken() bool {
 }
 
 // sslSettings returns the TLS settings for connections to the database. An unset
-// 'sslmode' preserves the connector's historical behaviour: TLS is attempted, and
-// an unencrypted fallback is permitted only when a password is being presented.
+// 'sslmode' selects mysqltls.DefaultMode.
 func (c *Config) sslSettings() mysqltls.Settings {
-	var mode = c.Advanced.SSLMode
-	if mode == "" {
-		// TODO: We eventually want to make `ModeRequired` the global default.
-		// We'll have to set up a feature flag so we don't break any existing
-		// captures that do not support SSL
-		mode = mysqltls.ModePreferred
-		if c.usesBearerToken() {
-			mode = mysqltls.ModeRequired
-		}
-	}
 	return mysqltls.Settings{
-		Mode:       mode,
+		Mode:       c.Advanced.SSLMode,
 		ServerCA:   c.Advanced.SSLServerCA,
 		ClientCert: c.Advanced.SSLClientCert,
 		ClientKey:  c.Advanced.SSLClientKey,
 	}
+}
+
+// sslFailureMessage explains a TLS connection attempt that failed with err
+// and could not fall back to an unencrypted connection, or returns "" when
+// TLS didn't cause the failure.
+func (c *Config) sslFailureMessage(settings mysqltls.Settings, err error) string {
+	return settings.FailureMessage(err, c.serverHost(), !c.usesBearerToken())
 }
 
 // serverHost returns the hostname portion of the configured address, which is
@@ -494,12 +488,15 @@ func (db *mysqlDatabase) dial(address, password string) (*client.Conn, error) {
 
 	var connWithTLS, errWithTLS = attempt(tlsConfig)
 	if errWithTLS == nil {
-		logrus.WithFields(logrus.Fields{"addr": address, "sslmode": settings.Mode}).Info("connected with TLS")
+		logrus.WithFields(logrus.Fields{"addr": address, "sslmode": settings.EffectiveMode()}).Info("connected with TLS")
 		return connWithTLS, nil
 	} else if errors.As(errWithTLS, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
 		return nil, cerrors.NewUserError(mysqlErr, "incorrect username or password")
 	} else if !settings.AllowsPlaintextFallback() {
-		return nil, fmt.Errorf("unable to connect to database with TLS (sslmode %q): %w", settings.Mode, errWithTLS)
+		if msg := db.config.sslFailureMessage(settings, errWithTLS); msg != "" {
+			return nil, cerrors.NewUserError(errWithTLS, "could not connect to the database over TLS: "+msg)
+		}
+		return nil, fmt.Errorf("unable to connect to database with TLS (sslmode %q): %w", settings.EffectiveMode(), errWithTLS)
 	}
 
 	// The following if-else chain looks somewhat complicated but it's really very simple.
@@ -529,12 +526,8 @@ func (db *mysqlDatabase) connect(ctx context.Context) error {
 		"serverID": db.config.Advanced.NodeID,
 	}).Info("connecting to database")
 
-	if settings := db.config.sslSettings(); db.config.Advanced.SSLMode == "" {
-		var msg = "'sslmode' is not set, defaulting to %q"
-		if settings.AllowsPlaintextFallback() {
-			msg += "; traffic may travel unencrypted if the server does not offer TLS"
-		}
-		logrus.WithField("sslmode", settings.Mode).Warnf(msg, settings.Mode)
+	if db.config.Advanced.SSLMode == "" {
+		logrus.WithField("sslmode", mysqltls.DefaultMode).Infof("'sslmode' is not set, defaulting to %q", mysqltls.DefaultMode)
 	}
 
 	var address = db.config.Address
