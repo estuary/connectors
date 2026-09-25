@@ -5,7 +5,7 @@ captures:
     endpoint:
       local:
         command:
-        - /Users/jasemjaihouni/repos/connectors/.venv/bin/python
+        - python
         - -m
         - source_posthog
         config: config.yaml
