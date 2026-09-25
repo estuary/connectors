@@ -16,7 +16,7 @@ The SQL CDC group of database connectors share some common features, from
 real-time CDC ingestion to [extra backfill options](/reference/backfilling-data/#resource-configuration-backfill-modes)
 and other [advanced features](/guides/customize-dataflows/#sql-captures).
 
-- [AlloyDB](./alloydb.md)
+- [AlloyDB](./PostgreSQL/alloydb.md)
 - [Amazon RDS SQL Server](./SQLServer/amazon-rds-sqlserver.md)
 - [Azure SQL Server](./SQLServer/)
 - [Google Cloud SQL Server](./SQLServer/google-cloud-sql-sqlserver.md)
