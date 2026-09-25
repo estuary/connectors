@@ -7,6 +7,7 @@ import aiohttp
 from estuary_cdk.http import HTTPError
 
 from source_shopify_native.models import (
+    MAX_CONCURRENT_BULK_OPS,
     BulkCancelData,
     BulkOperationDetails,
     BulkOperationErrorCodes,
@@ -27,13 +28,12 @@ JOB_ID_PATTERN = re.compile(r"gid://shopify/BulkOperation/\d+")
 INITIAL_SLEEP = 1
 MAX_SLEEP = 2
 SIX_HOURS = 6 * 60 * 60
-MAX_CONCURRENT_BULK_OPS = 5
 MAX_QUERY_REQUEST_ATTEMPTS = 5
 MAX_QUERY_REQUEST_RETRY_INTERVAL = 60  # 1 minute
 # Prepended to every bulk query the connector submits. Shopify reports the submitted query back
-# in `BulkOperation.query`, so the marker tells the connector's own jobs apart from jobs other
-# systems submit with the same app credentials. Changing it orphans jobs submitted by prior
-# versions.
+# in `BulkOperation.query`, which is how `cancel_current` tells the connector's own running jobs
+# apart from jobs other systems submit with the same app credentials. Changing it orphans jobs
+# submitted by prior versions.
 BULK_QUERY_MARKER = "# Estuary Flow Managed Bulk Query"
 
 
@@ -67,10 +67,16 @@ class BulkJobError(RuntimeError):
 
 
 class BulkJobManager:
-    def __init__(self, client: ShopifyGraphQLClient, log: Logger):
+    def __init__(
+        self,
+        client: ShopifyGraphQLClient,
+        log: Logger,
+        max_concurrent_bulk_ops: int = MAX_CONCURRENT_BULK_OPS,
+    ):
         self.client = client
         self.log = log
-        self.semaphore = asyncio.Semaphore(MAX_CONCURRENT_BULK_OPS)
+        self.max_concurrent_bulk_ops = max_concurrent_bulk_ops
+        self.semaphore = asyncio.Semaphore(max_concurrent_bulk_ops)
         self._tracked_jobs: set[str] = set()
         self._cancel_tasks: set[asyncio.Task[None]] = set()
 
@@ -79,7 +85,14 @@ class BulkJobManager:
         await self._get_running_jobs()
 
     async def cancel_current(self):
-        running_jobs = await self._get_running_jobs()
+        running_jobs: list[BulkOperationDetails] = []
+        for job_details in await self._get_running_jobs():
+            if BULK_QUERY_MARKER in job_details.query:
+                running_jobs.append(job_details)
+            else:
+                self.log.info(
+                    f"[{self.client.store}] Leaving bulk job {job_details.id} running since it was not submitted by this connector."
+                )
 
         if not running_jobs:
             return
@@ -411,7 +424,10 @@ class BulkJobManager:
         if external_jobs:
             msg_parts.append(
                 f"Jobs not tracked by this job manager: {', '.join(sorted(external_jobs))}."
-                " Please prevent the other application from submitting bulk query operations to Shopify."
+                f" The connector is configured to run up to {self.max_concurrent_bulk_ops} of Shopify's"
+                f" {MAX_CONCURRENT_BULK_OPS} bulk query slots for this store and app."
+                " Lower the Max Concurrent Bulk Operations advanced setting to leave more slots free,"
+                " or reduce how many bulk queries the other system submits through the same app."
             )
 
         return BulkJobError(

@@ -1,10 +1,12 @@
-"""Tests for how BulkJobManager marks the bulk jobs it submits, and which jobs it cancels on startup.
+"""Tests for how BulkJobManager marks the bulk jobs it submits, which jobs it cancels on startup,
+and how many jobs it runs at once.
 
 Shopify's concurrency limit applies per app per shop, and `bulkOperations` lists every running job
 for the app, including jobs submitted by other systems that share the connector's credentials. The
-connector tags each query it submits with a marker comment so it can tell its own jobs apart from
-theirs. Until every running capture submits marked queries, startup still cancels every running
-job. Only the GraphQL client is faked, so the real query building and response parsing run.
+connector tags each query it submits with a marker comment and only cancels running jobs that carry
+it. It also runs no more jobs at once than the configured limit, so customers can leave slots free
+for those other systems. Only the GraphQL client is faked, so the real query building and response
+parsing run.
 """
 
 import asyncio
@@ -15,7 +17,11 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from source_shopify_native.graphql.bulk_job_manager import BulkJobManager
+from source_shopify_native.graphql.bulk_job_manager import (
+    BULK_QUERY_CONCURRENCY_LIMIT_EXCEEDED_ERROR,
+    BulkJobError,
+    BulkJobManager,
+)
 
 # Pinned as a literal rather than imported: jobs submitted by one connector version are cancelled
 # by the next, so changing the marker is a compatibility break this test should flag.
@@ -50,6 +56,7 @@ class FakeClient:
     def __init__(
         self,
         running_jobs: list[dict[str, Any]],
+        rejecting_job_ids: list[str] | None = None,
         final_status: str = "CANCELED",
         keeps_comments: bool = True,
     ):
@@ -58,15 +65,34 @@ class FakeClient:
         self.keeps_comments = keeps_comments
         self.running_jobs = running_jobs
         self.final_status = final_status
+        # When set, submits are rejected as if these jobs held all of Shopify's slots.
+        self.rejecting_job_ids = rejecting_job_ids
         self.cancelled: list[str] = []
         self.polled: list[str] = []
         self.submitted: list[str] = []
+        # Jobs submitted and not yet reported finished, and the most there have been at once.
+        self.in_flight: set[str] = set()
+        self.max_in_flight = 0
 
     async def request(self, query: str, data_model: type, log: Logger, context: Any = None):
         # Yield like a real request would, so concurrent callers interleave.
         await asyncio.sleep(0)
 
-        if "bulkOperationRunQuery(" in query:
+        if "bulkOperationRunQuery(" in query and self.rejecting_job_ids is not None:
+            self.submitted.append(query)
+            payload = {
+                "bulkOperationRunQuery": {
+                    "bulkOperation": None,
+                    "userErrors": [
+                        {
+                            "field": None,
+                            "message": f"{BULK_QUERY_CONCURRENCY_LIMIT_EXCEEDED_ERROR}: {', '.join(self.rejecting_job_ids)}.",
+                            "code": "OPERATION_IN_PROGRESS",
+                        }
+                    ],
+                }
+            }
+        elif "bulkOperationRunQuery(" in query:
             self.submitted.append(query)
             reported_query = _submitted_inner_query(query)
             if not self.keeps_comments:
@@ -74,6 +100,8 @@ class FakeClient:
                     line for line in reported_query.splitlines() if not line.strip().startswith("#")
                 )
             job_id = f"gid://shopify/BulkOperation/{100 + len(self.submitted)}"
+            self.in_flight.add(job_id)
+            self.max_in_flight = max(self.max_in_flight, len(self.in_flight))
             payload = {
                 "bulkOperationRunQuery": {
                     "bulkOperation": _job(job_id, status="CREATED", query=reported_query),
@@ -94,6 +122,7 @@ class FakeClient:
         elif "node(id:" in query:
             job_id = _job_id(query)
             self.polled.append(job_id)
+            self.in_flight.discard(job_id)
             node = _job(job_id, status=self.final_status)
             if self.final_status == "COMPLETED":
                 node["url"] = "https://example.com/results.jsonl"
@@ -122,25 +151,68 @@ def log():
     return MagicMock(spec=Logger)
 
 
-def _manager(client: FakeClient, log) -> BulkJobManager:
-    return BulkJobManager(client, log)  # type: ignore[arg-type]
+def _manager(client: FakeClient, log, max_concurrent_bulk_ops: int = 5) -> BulkJobManager:
+    return BulkJobManager(client, log, max_concurrent_bulk_ops)  # type: ignore[arg-type]
 
 
 @pytest.mark.asyncio
-async def test_cancel_current_cancels_every_running_job(log):
-    """Startup still cancels every running job, marked or not.
-
-    Jobs submitted before the marker shipped carry none, so cancelling only marked jobs has to wait
-    until every running capture has restarted onto a version that marks its queries.
-    """
+async def test_cancel_current_cancels_only_marked_jobs(log):
+    """A running job without the marker belongs to another system and is left alone."""
     client = FakeClient(running_jobs=[MARKED_JOB, UNMARKED_JOB])
     manager = _manager(client, log)
 
     await manager.cancel_current()
-    # Let the background waits for the cancels finish, so they aren't left pending when the test ends.
+    # Let the background wait for the cancel finish, so it isn't left pending when the test ends.
     await asyncio.gather(*manager._cancel_tasks)
 
-    assert client.cancelled == [MARKED_JOB["id"], UNMARKED_JOB["id"]]
+    assert client.cancelled == [MARKED_JOB["id"]]
+
+
+@pytest.mark.asyncio
+async def test_cancel_current_ignores_unmarked_jobs(log):
+    """With only other systems' jobs running, nothing is cancelled or waited on."""
+    client = FakeClient(running_jobs=[UNMARKED_JOB])
+
+    await _manager(client, log).cancel_current()
+
+    assert client.cancelled == []
+    assert client.polled == []
+
+
+@pytest.mark.parametrize("max_concurrent_bulk_ops, expected_max_in_flight", [(1, 1), (2, 2), (5, 3)])
+@pytest.mark.asyncio
+async def test_execute_runs_at_most_max_concurrent_bulk_ops(
+    log, max_concurrent_bulk_ops: int, expected_max_in_flight: int
+):
+    """Concurrent executes beyond the limit wait for a slot, leaving the rest free for other systems.
+
+    The (5, 3) case checks that three jobs do run together when the limit allows it.
+    """
+    client = FakeClient(running_jobs=[], final_status="COMPLETED")
+    manager = _manager(client, log, max_concurrent_bulk_ops)
+
+    await asyncio.gather(
+        *[manager.execute(MagicMock(NAME="products"), "{ products { edges { node { id } } } }") for _ in range(3)]
+    )
+
+    assert len(client.submitted) == 3
+    assert client.max_in_flight == expected_max_in_flight
+
+
+@pytest.mark.asyncio
+async def test_execute_rejected_by_other_systems_jobs_points_to_setting(log):
+    """When other systems' jobs fill the slots, the error tells the customer how to make room."""
+    client = FakeClient(running_jobs=[], rejecting_job_ids=[UNMARKED_JOB["id"]])
+
+    with pytest.raises(BulkJobError) as exc_info:
+        await _manager(client, log, max_concurrent_bulk_ops=3).execute(
+            MagicMock(NAME="products"), "{ products { edges { node { id } } } }"
+        )
+
+    message = exc_info.value.message
+    assert UNMARKED_JOB["id"] in message
+    assert "up to 3 of Shopify's 5 bulk query slots" in message
+    assert "Max Concurrent Bulk Operations" in message
 
 
 @pytest.mark.asyncio

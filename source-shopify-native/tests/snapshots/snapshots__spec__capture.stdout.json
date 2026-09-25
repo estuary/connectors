@@ -38,6 +38,15 @@
               "nonsensitive": true,
               "title": "Use Composite Key",
               "type": "boolean"
+            },
+            "max_concurrent_bulk_ops": {
+              "default": 5,
+              "description": "Maximum number of bulk query operations the connector runs at the same time for each store. Shopify allows at most 5. Lower this to leave slots free for other systems that submit bulk queries through the same app.",
+              "maximum": 5,
+              "minimum": 1,
+              "nonsensitive": true,
+              "title": "Max Concurrent Bulk Operations",
+              "type": "integer"
             }
           },
           "title": "Advanced",

@@ -90,6 +90,8 @@ When authenticating with an access token or client credentials, ensure the follo
 
 This connector submits and processes the results of [bulk query operations](https://shopify.dev/docs/api/admin-graphql/2026-01/mutations/bulkoperationrunquery) to capture data. As of API version 2026-01, Shopify supports up to [5 concurrent bulk query operations](https://shopify.dev/docs/api/usage/bulk-operations/queries#limitations). The connector takes advantage of this to run multiple bulk queries in parallel for improved performance.
 
+The limit of 5 applies to each app on each store, so bulk queries submitted through a different app don't compete with the connector. If another system submits bulk queries through the same app as the connector, lower `/advanced/max_concurrent_bulk_ops` to leave slots free for it. The connector can't count that system's queries, so keep its usage within the slots you leave free, or the connector's bulk queries will be rejected. When a capture starts, it cancels bulk queries still running from its previous session and leaves other systems' bulk queries running. It recognises its own by a `# Estuary Flow Managed Bulk Query` comment it adds to each one.
+
 ## Configuration
 
 You configure connectors either in the Estuary web app, or by directly editing the catalog specification file.
@@ -110,6 +112,7 @@ you'll sign in directly and won't need the access token.
 | `/start_date` | Start Date | UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data before this date will not be replicated. Note that the `read_all_orders` scope is required when reading orders older than 60 days. | string | 30 days before the present date |
 | `/advanced/window_size` | Window Size | Window size for incremental streams in ISO 8601 format (e.g., P30D means 30 days, PT6H means 6 hours). | string | P30D |
 | `/advanced/should_use_composite_key` | Use Composite Key | Include store identifier (`/_meta/store`) in collection keys. Enabled by default for new captures. Set to `true` and backfill all bindings before adding stores to a legacy capture. | boolean | `true` (new) / `false` (legacy) |
+| `/advanced/max_concurrent_bulk_ops` | Max Concurrent Bulk Operations | Maximum number of bulk query operations the connector runs at the same time for each store, from 1 to 5. Lower it to leave slots free for other systems that submit bulk queries through the same app. See [Bulk Query Operation Limitations](#bulk-query-operation-limitations). | integer | 5 |
 
 **Credential properties for Private App Credentials:**
 
