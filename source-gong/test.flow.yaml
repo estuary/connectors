@@ -19,6 +19,14 @@ captures:
         interval: PT2M
       target: acmeCo/calls
     - resource:
+        name: extensive_calls
+        interval: PT15M
+      target: acmeCo/extensive_calls
+    - resource:
+        name: call_transcripts
+        interval: PT15M
+      target: acmeCo/call_transcripts
+    - resource:
         name: users
         interval: PT2M
         schedule: 0 0 * * *

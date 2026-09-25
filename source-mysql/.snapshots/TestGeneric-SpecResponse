@@ -195,32 +195,37 @@
             "type": "string",
             "title": "Database Name",
             "description": "The name of database to connect to. In general this shouldn't matter. The connector can discover and capture from all databases it's authorized to access.",
-            "default": "mysql"
+            "default": "mysql",
+            "order": 0
           },
           "skip_binlog_retention_check": {
             "type": "boolean",
             "title": "Skip Binlog Retention Sanity Check",
             "description": "Bypasses the 'dangerously short binlog retention' sanity check at startup. Only do this if you understand the danger and have a specific need.",
             "default": false,
-            "nonsensitive": true
+            "nonsensitive": true,
+            "order": 1
           },
           "node_id": {
             "type": "integer",
             "title": "Node ID",
             "description": "Node ID for the capture. Each node in a replication cluster must have a unique 32-bit ID. The specific value doesn't matter so long as it is unique. If unset or zero the connector will pick a value.",
-            "nonsensitive": true
+            "nonsensitive": true,
+            "order": 2
           },
           "skip_backfills": {
             "type": "string",
             "title": "Skip Backfills",
-            "description": "A comma-separated list of fully-qualified table names which should not be backfilled."
+            "description": "A comma-separated list of fully-qualified table names which should not be backfilled.",
+            "order": 3
           },
           "backfill_chunk_size": {
             "type": "integer",
             "title": "Backfill Chunk Size",
             "description": "The number of rows which should be fetched from the database in a single backfill query.",
             "default": 50000,
-            "nonsensitive": true
+            "nonsensitive": true,
+            "order": 4
           },
           "discover_schemas": {
             "items": {
@@ -229,26 +234,30 @@
             "type": "array",
             "title": "Discovery Schema Selection",
             "description": "If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas.",
-            "nonsensitive": true
+            "nonsensitive": true,
+            "order": 5
           },
           "source_tag": {
             "type": "string",
             "title": "Source Tag",
             "description": "When set the capture will add this value as the property 'tag' in the source metadata of each document.",
-            "nonsensitive": true
+            "nonsensitive": true,
+            "order": 6
           },
           "rediscovery_interval": {
             "type": "string",
             "title": "Rediscovery Interval",
             "description": "How often the connector re-runs discovery while a capture is running to notice schema changes and newly added tables. Accepts duration strings like '15m' or '1h'. Defaults to 15m when unspecified.",
             "default": "15m",
+            "order": 7,
             "pattern": "^[0-9]+(ms|s|m|h)$"
           },
           "feature_flags": {
             "type": "string",
             "title": "Feature Flags",
             "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.",
-            "nonsensitive": true
+            "nonsensitive": true,
+            "order": 8
           },
           "statement_timeout": {
             "type": "string",
@@ -262,13 +271,53 @@
             "title": "Statement Timeout",
             "description": "Overrides the default statement timeout used by the connector. The default of zero disables statement timeouts entirely.",
             "default": "",
-            "nonsensitive": true
+            "nonsensitive": true,
+            "order": 9
+          },
+          "sslmode": {
+            "type": "string",
+            "enum": [
+              "disabled",
+              "preferred",
+              "required",
+              "verify_ca",
+              "verify_identity"
+            ],
+            "title": "SSL Mode",
+            "description": "Whether to use TLS and how strictly to verify the server certificate. Defaults to 'preferred' for password authentication and 'required' for IAM authentication. See the connector documentation for details.",
+            "nonsensitive": true,
+            "order": 10
+          },
+          "ssl_server_ca": {
+            "type": "string",
+            "title": "SSL Server CA",
+            "description": "PEM-encoded CA certificate the server certificate must chain to. Required for 'verify_ca'; optional for 'verify_identity'.",
+            "multiline": true,
+            "order": 11,
+            "secret": true
+          },
+          "ssl_client_cert": {
+            "type": "string",
+            "title": "SSL Client Certificate",
+            "description": "Optional PEM-encoded client certificate for mutual TLS.",
+            "multiline": true,
+            "order": 12,
+            "secret": true
+          },
+          "ssl_client_key": {
+            "type": "string",
+            "title": "SSL Client Key",
+            "description": "PEM-encoded private key for the client certificate.",
+            "multiline": true,
+            "order": 13,
+            "secret": true
           },
           "watermarks_table": {
             "type": "string",
             "title": "Watermarks Table Name",
             "description": "This property is deprecated and will be removed in the near future. Previously named the table to be used for watermark writes. Currently the only effect of this setting is to exclude the watermarks table from discovery if present.",
-            "default": "flow.watermarks"
+            "default": "flow.watermarks",
+            "order": 14
           },
           "heartbeat_interval": {
             "type": "string",
@@ -276,6 +325,7 @@
             "description": "This property is deprecated and will be removed in the near future. Has no effect.",
             "default": "60s",
             "nonsensitive": true,
+            "order": 15,
             "pattern": "^[-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+$"
           }
         },

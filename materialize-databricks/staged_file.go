@@ -6,11 +6,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	stdsql "database/sql"
 
+	"github.com/databricks/databricks-sdk-go/service/files"
 	driverctx "github.com/databricks/databricks-sql-go/driverctx"
 	"github.com/estuary/connectors/go/writer"
+	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -18,6 +21,26 @@ import (
 
 const fileSizeLimit = 128 * 1024 * 1024
 const uploadConcurrency = 3
+
+// stagedSchemaDDL renders a read_files schema. Doubles stay STRING because
+// their JSON form may be "NaN" or "Inf", which the query's cast accepts.
+func stagedSchemaDDL(cols []*sql.Column, withDeleteFlag bool) string {
+	var out = make([]string, 0, len(cols)+1)
+	for _, col := range cols {
+		var ddl = "STRING"
+		switch strings.Fields(col.DDL)[0] {
+		case "LONG":
+			ddl = "BIGINT"
+		case "BOOLEAN":
+			ddl = "BOOLEAN"
+		}
+		out = append(out, "`"+strings.ReplaceAll(translateFlowField(col.Field), "`", "``")+"` "+ddl)
+	}
+	if withDeleteFlag {
+		out = append(out, "`_flow_delete` BOOLEAN")
+	}
+	return strings.Join(out, ", ")
+}
 
 // fileBuffer provides Close() for a *bufio.Writer writing to an *os.File. Close() will flush the
 // buffer and close the underlying file.
@@ -55,10 +78,14 @@ func (f *fileBuffer) Close() error {
 // disk file, but streaming PUTs do not currently work well and we have not been able to stream more than
 // 60MB of data for each upload, which is very small and leads to performance limitations
 //
+// Each transaction's files go into their own directory under the root so a
+// query can read them as one relation.
+//
 // The lifecycle of a staged file for a transaction is as follows:
 //
-// - start: Initializes the local directory for local disk files and starts a worker that will concurrently send files
-// to Databricks via FilesAPI.Upload RPC as local files are finished.
+// - start: Initializes the local directory for local disk files, creates the transaction's remote
+// directory, and starts a worker that will concurrently send files to Databricks via
+// FilesAPI.Upload RPC as local files are finished.
 //
 // - writeRow: Writes a slice of values as JSON and writes to the current local file. If the local
 // file has reached a size threshold a new file will be started. Finished files are sent to the
@@ -73,7 +100,9 @@ type stagedFile struct {
 	dir string
 
 	// The remote root directory for uploading files
-	root string
+	root   string
+	txnDir string
+	files  files.FilesInterface
 
 	// Indicates if the stagedFile has been initialized for this transaction yet. Set `true` by
 	// start() and `false` by flush().
@@ -85,17 +114,13 @@ type stagedFile struct {
 	buf    *fileBuffer
 	writer *writer.JsonWriter
 
-	// List of file names uploaded during the current transaction for transaction data, not
-	// including the manifest file name itself. These data file names randomly generated UUIDs.
-	uploaded []string
-
 	// Per-transaction coordination.
 	putFiles chan string
 	group    *errgroup.Group
 	groupCtx context.Context // Used to check for group cancellation upon the worker returning an error.
 }
 
-func newStagedFile(cfg config, root string, fields []string) *stagedFile {
+func newStagedFile(cfg config, root string, fields []string, filesAPI files.FilesInterface) *stagedFile {
 	uuid := uuid.NewString()
 	var tempdir = os.TempDir()
 
@@ -103,8 +128,13 @@ func newStagedFile(cfg config, root string, fields []string) *stagedFile {
 		fields: fields,
 		dir:    filepath.Join(tempdir, uuid),
 		root:   root,
+		files:  filesAPI,
 		cfg:    cfg,
 	}
+}
+
+func (f *stagedFile) remoteDir() string {
+	return filepath.Join(f.root, f.txnDir)
 }
 
 func (f *stagedFile) start(ctx context.Context, db *stdsql.DB) error {
@@ -123,7 +153,10 @@ func (f *stagedFile) start(ctx context.Context, db *stdsql.DB) error {
 	}
 
 	// Reset values used per-transaction.
-	f.uploaded = []string{}
+	f.txnDir = uuid.NewString()
+	if err := f.files.CreateDirectory(ctx, files.CreateDirectoryRequest{DirectoryPath: f.remoteDir()}); err != nil {
+		return fmt.Errorf("creating staging directory %q: %w", f.remoteDir(), err)
+	}
 	f.group, f.groupCtx = errgroup.WithContext(ctx)
 	f.putFiles = make(chan string)
 
@@ -161,20 +194,16 @@ func (f *stagedFile) writeRow(row []interface{}) error {
 	return nil
 }
 
-func (f *stagedFile) flush() ([]string, error) {
+func (f *stagedFile) flush() error {
 	if err := f.putFile(); err != nil {
-		return nil, fmt.Errorf("flush putFile: %w", err)
+		return fmt.Errorf("flush putFile: %w", err)
 	}
 
 	close(f.putFiles)
 	f.started = false
 
 	// Wait for all outstanding PUT requests to complete.
-	return f.uploaded, f.group.Wait()
-}
-
-func (f *stagedFile) remoteFilePath(file string) string {
-	return filepath.Join(f.root, file)
+	return f.group.Wait()
 }
 
 func (f *stagedFile) putWorker(ctx context.Context, db *stdsql.DB, filePaths <-chan string) error {
@@ -192,7 +221,7 @@ func (f *stagedFile) putWorker(ctx context.Context, db *stdsql.DB, filePaths <-c
 		}
 
 		var fName = filepath.Base(file)
-		log.WithField("filepath", f.remoteFilePath(fName)).Debug("staged file: uploading")
+		log.WithField("filepath", filepath.Join(f.remoteDir(), fName)).Debug("staged file: uploading")
 
 		ctx = driverctx.NewContextWithStagingInfo(ctx, []string{f.dir})
 
@@ -200,7 +229,7 @@ func (f *stagedFile) putWorker(ctx context.Context, db *stdsql.DB, filePaths <-c
 		var maxAttempts = 3
 		var attempt = 0
 		for {
-			if _, err := db.ExecContext(ctx, fmt.Sprintf(`PUT '%s' INTO '%s' OVERWRITE`, file, f.remoteFilePath(fName))); err != nil {
+			if _, err := db.ExecContext(ctx, fmt.Sprintf(`PUT '%s' INTO '%s' OVERWRITE`, file, filepath.Join(f.remoteDir(), fName))); err != nil {
 				if attempt < maxAttempts {
 					attempt++
 					continue
@@ -210,7 +239,7 @@ func (f *stagedFile) putWorker(ctx context.Context, db *stdsql.DB, filePaths <-c
 			break
 		}
 
-		log.WithField("filepath", f.remoteFilePath(fName)).Debug("staged file: upload done")
+		log.WithField("filepath", filepath.Join(f.remoteDir(), fName)).Debug("staged file: upload done")
 
 		// Once the file has been staged to Databricks we don't need it locally anymore and can
 		// remove the local copy to manage disk usage.
@@ -222,8 +251,7 @@ func (f *stagedFile) putWorker(ctx context.Context, db *stdsql.DB, filePaths <-c
 
 func (f *stagedFile) newFile() error {
 	// Databricks infers the codec of a staged file from its extension when reading it back.
-	var fName = fmt.Sprintf("%s.json.gz", uuid.NewString())
-	filePath := filepath.Join(f.dir, fName)
+	filePath := filepath.Join(f.dir, uuid.NewString()+".json.gz")
 
 	file, err := os.Create(filePath)
 	if err != nil {
@@ -235,7 +263,6 @@ func (f *stagedFile) newFile() error {
 		file: file,
 	}
 	f.writer = writer.NewJsonWriter(f.buf, f.fields)
-	f.uploaded = append(f.uploaded, fName)
 
 	return nil
 }

@@ -16,6 +16,7 @@ import (
 	"github.com/estuary/connectors/go/auth/iam"
 	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
+	mysqltls "github.com/estuary/connectors/go/mysql/tls"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	"github.com/estuary/connectors/go/schedule"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
@@ -223,20 +224,25 @@ type Config struct {
 }
 
 type advancedConfig struct {
-	DBName                   string   `json:"dbname,omitempty" jsonschema:"title=Database Name,default=mysql,description=The name of database to connect to. In general this shouldn't matter. The connector can discover and capture from all databases it's authorized to access."`
-	SkipBinlogRetentionCheck bool     `json:"skip_binlog_retention_check,omitempty" jsonschema:"title=Skip Binlog Retention Sanity Check,default=false,description=Bypasses the 'dangerously short binlog retention' sanity check at startup. Only do this if you understand the danger and have a specific need." jsonschema_extras:"nonsensitive=true"`
-	NodeID                   uint32   `json:"node_id,omitempty" jsonschema:"title=Node ID,description=Node ID for the capture. Each node in a replication cluster must have a unique 32-bit ID. The specific value doesn't matter so long as it is unique. If unset or zero the connector will pick a value." jsonschema_extras:"nonsensitive=true"`
-	SkipBackfills            string   `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled."`
-	BackfillChunkSize        int      `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=50000,description=The number of rows which should be fetched from the database in a single backfill query." jsonschema_extras:"nonsensitive=true"`
-	DiscoverSchemas          []string `json:"discover_schemas,omitempty" jsonschema:"title=Discovery Schema Selection,description=If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas." jsonschema_extras:"nonsensitive=true"`
-	SourceTag                string   `json:"source_tag,omitempty" jsonschema:"title=Source Tag,description=When set the capture will add this value as the property 'tag' in the source metadata of each document." jsonschema_extras:"nonsensitive=true"`
-	RediscoveryInterval      string   `json:"rediscovery_interval,omitempty" jsonschema:"title=Rediscovery Interval,default=15m,description=How often the connector re-runs discovery while a capture is running to notice schema changes and newly added tables. Accepts duration strings like '15m' or '1h'. Defaults to 15m when unspecified." jsonschema_extras:"pattern=^[0-9]+(ms|s|m|h)$"`
-	FeatureFlags             string   `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
-	StatementTimeout         string   `json:"statement_timeout,omitempty" jsonschema:"title=Statement Timeout,description=Overrides the default statement timeout used by the connector. The default of zero disables statement timeouts entirely.,enum=,enum=30s,enum=1m,enum=5m,enum=30m,default=" jsonschema_extras:"nonsensitive=true"`
+	DBName                   string   `json:"dbname,omitempty" jsonschema:"title=Database Name,default=mysql,description=The name of database to connect to. In general this shouldn't matter. The connector can discover and capture from all databases it's authorized to access." jsonschema_extras:"order=0"`
+	SkipBinlogRetentionCheck bool     `json:"skip_binlog_retention_check,omitempty" jsonschema:"title=Skip Binlog Retention Sanity Check,default=false,description=Bypasses the 'dangerously short binlog retention' sanity check at startup. Only do this if you understand the danger and have a specific need." jsonschema_extras:"order=1,nonsensitive=true"`
+	NodeID                   uint32   `json:"node_id,omitempty" jsonschema:"title=Node ID,description=Node ID for the capture. Each node in a replication cluster must have a unique 32-bit ID. The specific value doesn't matter so long as it is unique. If unset or zero the connector will pick a value." jsonschema_extras:"order=2,nonsensitive=true"`
+	SkipBackfills            string   `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled." jsonschema_extras:"order=3"`
+	BackfillChunkSize        int      `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=50000,description=The number of rows which should be fetched from the database in a single backfill query." jsonschema_extras:"order=4,nonsensitive=true"`
+	DiscoverSchemas          []string `json:"discover_schemas,omitempty" jsonschema:"title=Discovery Schema Selection,description=If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas." jsonschema_extras:"order=5,nonsensitive=true"`
+	SourceTag                string   `json:"source_tag,omitempty" jsonschema:"title=Source Tag,description=When set the capture will add this value as the property 'tag' in the source metadata of each document." jsonschema_extras:"order=6,nonsensitive=true"`
+	RediscoveryInterval      string   `json:"rediscovery_interval,omitempty" jsonschema:"title=Rediscovery Interval,default=15m,description=How often the connector re-runs discovery while a capture is running to notice schema changes and newly added tables. Accepts duration strings like '15m' or '1h'. Defaults to 15m when unspecified." jsonschema_extras:"order=7,pattern=^[0-9]+(ms|s|m|h)$"`
+	FeatureFlags             string   `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"order=8,nonsensitive=true"`
+	StatementTimeout         string   `json:"statement_timeout,omitempty" jsonschema:"title=Statement Timeout,description=Overrides the default statement timeout used by the connector. The default of zero disables statement timeouts entirely.,enum=,enum=30s,enum=1m,enum=5m,enum=30m,default=" jsonschema_extras:"order=9,nonsensitive=true"`
+
+	SSLMode       string `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Whether to use TLS and how strictly to verify the server certificate. Defaults to 'preferred' for password authentication and 'required' for IAM authentication. See the connector documentation for details.,enum=disabled,enum=preferred,enum=required,enum=verify_ca,enum=verify_identity" jsonschema_extras:"order=10,nonsensitive=true"`
+	SSLServerCA   string `json:"ssl_server_ca,omitempty" jsonschema:"title=SSL Server CA,description=PEM-encoded CA certificate the server certificate must chain to. Required for 'verify_ca'; optional for 'verify_identity'." jsonschema_extras:"order=11,secret=true,multiline=true"`
+	SSLClientCert string `json:"ssl_client_cert,omitempty" jsonschema:"title=SSL Client Certificate,description=Optional PEM-encoded client certificate for mutual TLS." jsonschema_extras:"order=12,secret=true,multiline=true"`
+	SSLClientKey  string `json:"ssl_client_key,omitempty" jsonschema:"title=SSL Client Key,description=PEM-encoded private key for the client certificate." jsonschema_extras:"order=13,secret=true,multiline=true"`
 
 	// Deprecated config options which no longer do much of anything.
-	WatermarksTable   string `json:"watermarks_table,omitempty" jsonschema:"title=Watermarks Table Name,default=flow.watermarks,description=This property is deprecated and will be removed in the near future. Previously named the table to be used for watermark writes. Currently the only effect of this setting is to exclude the watermarks table from discovery if present."`
-	HeartbeatInterval string `json:"heartbeat_interval,omitempty" jsonschema:"title=Heartbeat Interval,default=60s,description=This property is deprecated and will be removed in the near future. Has no effect." jsonschema_extras:"pattern=^[-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+$,nonsensitive=true"`
+	WatermarksTable   string `json:"watermarks_table,omitempty" jsonschema:"title=Watermarks Table Name,default=flow.watermarks,description=This property is deprecated and will be removed in the near future. Previously named the table to be used for watermark writes. Currently the only effect of this setting is to exclude the watermarks table from discovery if present." jsonschema_extras:"order=14"`
+	HeartbeatInterval string `json:"heartbeat_interval,omitempty" jsonschema:"title=Heartbeat Interval,default=60s,description=This property is deprecated and will be removed in the near future. Has no effect." jsonschema_extras:"order=15,pattern=^[-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+$,nonsensitive=true"`
 }
 
 // Validate checks that the configuration possesses all required properties.
@@ -288,6 +294,17 @@ func (c *Config) Validate() error {
 	}
 	if err := sqlcapture.ValidateRediscoveryInterval(c.Advanced.RediscoveryInterval); err != nil {
 		return err
+	}
+	if c.Advanced.SSLMode != "" || c.Advanced.SSLServerCA != "" || c.Advanced.SSLClientCert != "" || c.Advanced.SSLClientKey != "" {
+		if err := c.sslSettings().Validate(); err != nil {
+			return err
+		}
+	}
+	// Checked against the effective mode rather than the raw setting, so that an
+	// unset 'sslmode' is judged by the default it resolves to.
+	if sslSettings := c.sslSettings(); c.usesBearerToken() && !sslSettings.GuaranteesEncryption() {
+		return fmt.Errorf("'sslmode' cannot be %q with 'auth_type' %q: this authentication scheme presents a bearer token as the password, which must never be sent over an unencrypted connection. Use %q, %q, or %q",
+			sslSettings.Mode, c.Credentials.AuthType, mysqltls.ModeRequired, mysqltls.ModeVerifyCA, mysqltls.ModeVerifyIdentity)
 	}
 	if err := c.DiscoveryFilters.Validate(); err != nil {
 		return err
@@ -384,15 +401,46 @@ func (c *Config) EffectivePassword(ctx context.Context) (string, error) {
 	return "", fmt.Errorf("unsupported 'auth_type' %q", c.Credentials.AuthType)
 }
 
-// requiresTLS reports whether the configured authentication method forbids falling
-// back to an unencrypted connection.
-func (c *Config) requiresTLS() bool {
-	switch c.Credentials.AuthType {
-	case UserPassword:
-		return false
-	default:
-		return true
+// usesBearerToken reports whether the configured authentication method presents
+// a short-lived token rather than a password, which must never travel over an
+// unencrypted connection. Every method other than plain password authentication
+// is treated as a token so that a newly added method fails closed. A nil
+// credentials union is the legacy flat password, since this may run during
+// validation before normalizeCredentials has converted it.
+func (c *Config) usesBearerToken() bool {
+	return c.Credentials != nil && c.Credentials.AuthType != UserPassword
+}
+
+// sslSettings returns the TLS settings for connections to the database. An unset
+// 'sslmode' preserves the connector's historical behaviour: TLS is attempted, and
+// an unencrypted fallback is permitted only when a password is being presented.
+func (c *Config) sslSettings() mysqltls.Settings {
+	var mode = c.Advanced.SSLMode
+	if mode == "" {
+		// TODO: We eventually want to make `ModeRequired` the global default.
+		// We'll have to set up a feature flag so we don't break any existing
+		// captures that do not support SSL
+		mode = mysqltls.ModePreferred
+		if c.usesBearerToken() {
+			mode = mysqltls.ModeRequired
+		}
 	}
+	return mysqltls.Settings{
+		Mode:       mode,
+		ServerCA:   c.Advanced.SSLServerCA,
+		ClientCert: c.Advanced.SSLClientCert,
+		ClientKey:  c.Advanced.SSLClientKey,
+	}
+}
+
+// serverHost returns the hostname portion of the configured address, which is
+// the name a server certificate is verified against even when the connection
+// itself goes through a network tunnel.
+func (c *Config) serverHost() string {
+	if host, _, err := net.SplitHostPort(c.Address); err == nil {
+		return host
+	}
+	return c.Address
 }
 
 func configSchema() json.RawMessage {
@@ -407,49 +455,61 @@ func configSchema() json.RawMessage {
 // From https://dev.mysql.com/doc/mysql-errors/8.4/en/server-error-reference.html
 const mysqlErrorCodeSecureTransportRequired = 3159
 
-func withTLS(c *client.Conn) error {
-	c.SetTLSConfig(&tls.Config{InsecureSkipVerify: true})
-	return nil
-}
-
 func withAttrs(c *client.Conn) error {
 	c.SetAttributes(map[string]string{"program_name": "Estuary source-mysql"})
 	return nil
 }
 
-// connectTLSOnly establishes a TLS connection and never falls back to an
-// unencrypted one. This is the IAM path.
-func (db *mysqlDatabase) connectTLSOnly(address, password string) (*client.Conn, error) {
-	var conn, err = client.Connect(address, db.config.User, password, db.config.Advanced.DBName, withTLS, withAttrs)
-	if err == nil {
-		logrus.WithField("addr", address).Info("connected with TLS")
-		return conn, nil
+// dial opens a single client connection according to the configured SSL
+// settings. TLS is attempted first (unless disabled), and an unencrypted
+// connection is tried only when the settings permit falling back.
+func (db *mysqlDatabase) dial(address, password string) (*client.Conn, error) {
+	var settings = db.config.sslSettings()
+	var tlsConfig, err = settings.Config(db.config.serverHost())
+	if err != nil {
+		return nil, err
 	}
 	var mysqlErr *mysql.MyError
-	if errors.As(err, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
-		return nil, cerrors.NewUserError(mysqlErr, "incorrect username or password")
+	var attempt = func(tlsConfig *tls.Config) (*client.Conn, error) {
+		var opts = []client.Option{withAttrs}
+		if tlsConfig != nil {
+			opts = append(opts, func(c *client.Conn) error {
+				c.SetTLSConfig(tlsConfig)
+				return nil
+			})
+		}
+		return client.Connect(address, db.config.User, password, db.config.Advanced.DBName, opts...)
 	}
-	return nil, fmt.Errorf("unable to connect to database with TLS: %w", err)
-}
 
-// connectPreferringTLS tries TLS first and falls back to an unencrypted connection,
-// which is acceptable for password authentication.
-func (db *mysqlDatabase) connectPreferringTLS(address, password string) (*client.Conn, error) {
-	// The following if-else chain looks somewhat complicated but it's really very simple.
-	// * We'd prefer to use TLS, so we first try to connect with TLS, and then if that fails
-	//   we try again without.
-	// * If either error is an incorrect username/password then we just report that.
-	// * Otherwise we report both errors because it's better to be clear what failed and how.
-	// * Except if the non-TLS connection specifically failed because TLS is required then
-	//   we don't need to mention that and just return the with-TLS error.
-	var mysqlErr *mysql.MyError
-	if connWithTLS, errWithTLS := client.Connect(address, db.config.User, password, db.config.Advanced.DBName, withTLS, withAttrs); errWithTLS == nil {
-		logrus.WithField("addr", address).Info("connected with TLS")
+	if tlsConfig == nil {
+		var conn, err = attempt(nil)
+		if err == nil {
+			logrus.WithField("addr", address).Info("connected without TLS")
+			return conn, nil
+		} else if errors.As(err, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
+			return nil, cerrors.NewUserError(mysqlErr, "incorrect username or password")
+		}
+		return nil, fmt.Errorf("unable to connect to database without TLS: %w", err)
+	}
+
+	var connWithTLS, errWithTLS = attempt(tlsConfig)
+	if errWithTLS == nil {
+		logrus.WithFields(logrus.Fields{"addr": address, "sslmode": settings.Mode}).Info("connected with TLS")
 		return connWithTLS, nil
 	} else if errors.As(errWithTLS, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
 		return nil, cerrors.NewUserError(mysqlErr, "incorrect username or password")
-	} else if connWithoutTLS, errWithoutTLS := client.Connect(address, db.config.User, password, db.config.Advanced.DBName, withAttrs); errWithoutTLS == nil {
-		logrus.WithField("addr", address).Info("connected without TLS")
+	} else if !settings.AllowsPlaintextFallback() {
+		return nil, fmt.Errorf("unable to connect to database with TLS (sslmode %q): %w", settings.Mode, errWithTLS)
+	}
+
+	// The following if-else chain looks somewhat complicated but it's really very simple.
+	// * The TLS connection failed and we're allowed to fall back, so try again without.
+	// * If the error is an incorrect username/password then we just report that.
+	// * Otherwise we report both errors because it's better to be clear what failed and how.
+	// * Except if the non-TLS connection specifically failed because TLS is required then
+	//   we don't need to mention that and just return the with-TLS error.
+	if connWithoutTLS, errWithoutTLS := attempt(nil); errWithoutTLS == nil {
+		logrus.WithFields(logrus.Fields{"addr": address, "errWithTLS": errWithTLS}).Info("connected without TLS")
 		return connWithoutTLS, nil
 	} else if errors.As(errWithoutTLS, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
 		logrus.WithFields(logrus.Fields{"withTLS": errWithTLS, "nonTLS": errWithoutTLS}).Error("unable to connect to database")
@@ -468,6 +528,14 @@ func (db *mysqlDatabase) connect(ctx context.Context) error {
 		"user":     db.config.User,
 		"serverID": db.config.Advanced.NodeID,
 	}).Info("connecting to database")
+
+	if settings := db.config.sslSettings(); db.config.Advanced.SSLMode == "" {
+		var msg = "'sslmode' is not set, defaulting to %q"
+		if settings.AllowsPlaintextFallback() {
+			msg += "; traffic may travel unencrypted if the server does not offer TLS"
+		}
+		logrus.WithField("sslmode", settings.Mode).Warnf(msg, settings.Mode)
+	}
 
 	var address = db.config.Address
 	// If SSH Tunnel is configured, we are going to create a tunnel from localhost:5432
@@ -491,12 +559,7 @@ func (db *mysqlDatabase) connect(ctx context.Context) error {
 		return err
 	}
 
-	var conn *client.Conn
-	if db.config.requiresTLS() {
-		conn, err = db.connectTLSOnly(address, password)
-	} else {
-		conn, err = db.connectPreferringTLS(address, password)
-	}
+	conn, err := db.dial(address, password)
 	if err != nil {
 		return err
 	}

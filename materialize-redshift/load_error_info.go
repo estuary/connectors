@@ -7,7 +7,16 @@ import (
 	"slices"
 	"strings"
 
+	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/jackc/pgx/v5"
+)
+
+// likePatternReplacer escapes a SQL LIKE pattern that is using ^ as the escape
+// character.  This char is picked since it is not special in SQL.
+var likePatternReplacer = strings.NewReplacer(
+	`^`, `^^`,
+	`_`, `^_`,
+	`%`, `^%`,
 )
 
 type loadErrorInfo struct {
@@ -21,10 +30,12 @@ type loadErrorInfo struct {
 // getLoadErrorInfo looks up the load error recorded for any of the staged
 // files, which may sit under several prefixes when shards' files are copied
 // together.
-func getLoadErrorInfo(ctx context.Context, conn *pgx.Conn, bucket string, files []string) (loadErrorInfo, error) {
+func getLoadErrorInfo(ctx context.Context, conn *pgx.Conn, dialect sql.Dialect, bucket string, files []string) (loadErrorInfo, error) {
 	var prefixes []string
 	for _, f := range files {
-		if p := fmt.Sprintf("file_name LIKE 's3://%s/%s/%%'", bucket, path.Dir(f)); !slices.Contains(prefixes, p) {
+		bucketPath := fmt.Sprintf("s3://%s/%s/", bucket, path.Dir(f))
+		bucketPattern := likePatternReplacer.Replace(bucketPath) + "%"
+		if p := fmt.Sprintf("file_name LIKE %s ESCAPE '^'", dialect.Literal(bucketPattern)); !slices.Contains(prefixes, p) {
 			prefixes = append(prefixes, p)
 		}
 	}

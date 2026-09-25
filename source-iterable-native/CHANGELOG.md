@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-09-21
+
+### Fixed
+- The `campaigns` stream now captures campaigns when they start and finish.
+
 ## 2026-08-05
 
 ### Fixed

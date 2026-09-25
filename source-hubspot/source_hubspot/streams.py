@@ -157,7 +157,7 @@ class API:
     def get_authenticator(self) -> Optional[Oauth2Authenticator]:
         if self.is_oauth2():
             return Oauth2Authenticator(
-                token_refresh_endpoint=self.BASE_URL + "/oauth/v1/token",
+                token_refresh_endpoint=self.BASE_URL + "/oauth/2026-09/token",
                 client_id=self.credentials["client_id"],
                 client_secret=self.credentials["client_secret"],
                 refresh_token=self.credentials["refresh_token"],

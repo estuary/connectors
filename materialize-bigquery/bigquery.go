@@ -10,6 +10,7 @@ import (
 	"cloud.google.com/go/bigquery"
 	"github.com/estuary/connectors/go/auth/iam"
 	"github.com/estuary/connectors/go/blob"
+	"github.com/estuary/connectors/go/common"
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
@@ -22,14 +23,14 @@ import (
 	"google.golang.org/api/option"
 )
 
-var featureFlagDefaults = map[string]bool{
+var featureFlagDefaults = map[string]common.FlagDefault{
 	// When set, object and array field types will be materialized as JSON
 	// columns, instead of the historical behavior of strings.
-	"objects_and_arrays_as_json":       true,
-	"datetime_keys_as_string":          true,
-	"retain_existing_data_on_backfill": false,
-	"skip_cleanup":                     false,
-	"native_binary_column_type":        true,
+	"objects_and_arrays_as_json":       common.FlagEnabled,
+	"datetime_keys_as_string":          common.FlagEnabled,
+	"retain_existing_data_on_backfill": common.FlagDisabled,
+	"skip_cleanup":                     common.FlagDisabled,
+	"native_binary_column_type":        common.FlagEnabled,
 }
 
 type AuthType string
@@ -207,15 +208,16 @@ func (c config) DefaultNamespace() string {
 	return c.Dataset
 }
 
-func (c config) FeatureFlags() (string, map[string]bool) {
+func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
 	return c.Advanced.FeatureFlags, featureFlagDefaults
 }
 
 type tableConfig struct {
-	Table     string `json:"table" jsonschema:"title=Table,description=Table in the BigQuery dataset to store materialized result in." jsonschema_extras:"x-collection-name=true"`
-	Dataset   string `json:"dataset,omitempty" jsonschema:"title=Alternative Dataset,description=Alternative dataset for this table (optional). Must be located in the region set in the endpoint configuration." jsonschema_extras:"x-schema-name=true"`
-	Delta     bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Defaults is false." jsonschema_extras:"x-delta-updates=true,nonsensitive=true"`
-	projectID string
+	Table       string `json:"table" jsonschema:"title=Table,description=Table in the BigQuery dataset to store materialized result in." jsonschema_extras:"x-collection-name=true"`
+	Dataset     string `json:"dataset,omitempty" jsonschema:"title=Alternative Dataset,description=Alternative dataset for this table (optional). Must be located in the region set in the endpoint configuration." jsonschema_extras:"x-schema-name=true"`
+	Delta       bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Defaults is false." jsonschema_extras:"x-delta-updates=true,nonsensitive=true"`
+	PartitionBy string `json:"partition_by,omitempty" jsonschema:"title=Partition By,description=Optional expression to use as the table's PARTITION BY clause\\, for example DATE(created_at). Changing this value requires backfilling the binding\\, which drops and re-creates the table." jsonschema_extras:"advanced=true,nonsensitive=true"`
+	projectID   string
 }
 
 func (c tableConfig) WithDefaults(cfg config) tableConfig {
@@ -238,11 +240,7 @@ func (c tableConfig) Parameters() ([]string, bool, error) {
 	return []string{c.projectID, c.Dataset, c.Table}, c.Delta, nil
 }
 
-func Driver() *sql.Driver[config, tableConfig] {
-	return NewDriver()
-}
-
-func NewDriver() *sql.Driver[config, tableConfig] {
+func newSQLDriver() *sql.Driver[config, tableConfig] {
 	return &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-bigquery",
 		StartTunnel:      func(ctx context.Context, cfg config) error { return nil },

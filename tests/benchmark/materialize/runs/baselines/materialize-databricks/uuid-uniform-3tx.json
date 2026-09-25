@@ -1,0 +1,94 @@
+{
+  "connector": "materialize-databricks",
+  "scenario": "uuid-uniform-3tx.yaml",
+  "seed": 0,
+  "preview_exit_code": 0,
+  "apply_seconds": 9.196145152,
+  "wall_seconds": 1244.255761152,
+  "rounds_observed": 4,
+  "scenario_transactions": 4,
+  "total_docs": 7864330,
+  "total_bytes": 32212295680,
+  "observed_docs": 7864330,
+  "observed_bytes": 32212295680,
+  "docs_per_sec": 6320.509211642125,
+  "mb_per_sec": 24.68948910797705,
+  "transactions": [
+    {
+      "index": 0,
+      "collection": "bench/wide_uuid",
+      "doc_count": 2621440,
+      "doc_size": 4096,
+      "bytes": 10737418240,
+      "fresh": {
+        "start": 0,
+        "count": 2621440,
+        "op": "c"
+      },
+      "overlaps": [],
+      "wall_seconds": 216.591134976,
+      "mb_per_sec": 47.278019948206435,
+      "docs_per_sec": 12103.173106740847
+    },
+    {
+      "index": 1,
+      "collection": "bench/wide_uuid",
+      "doc_count": 2621440,
+      "doc_size": 4096,
+      "bytes": 10737418240,
+      "fresh": {
+        "start": 2621440,
+        "count": 1572864,
+        "op": "c"
+      },
+      "overlaps": [
+        {
+          "op": "u",
+          "with": 0,
+          "count": 1048576
+        }
+      ],
+      "wall_seconds": 290.758855936,
+      "mb_per_sec": 35.2181878245317,
+      "docs_per_sec": 9015.856083080114
+    },
+    {
+      "index": 2,
+      "collection": "bench/wide_uuid",
+      "doc_count": 2621440,
+      "doc_size": 4096,
+      "bytes": 10737418240,
+      "fresh": {
+        "start": 4194304,
+        "count": 1572864,
+        "op": "c"
+      },
+      "overlaps": [
+        {
+          "op": "u",
+          "with": 1,
+          "count": 1048576
+        }
+      ],
+      "wall_seconds": 479.271261184,
+      "mb_per_sec": 21.365770972169134,
+      "docs_per_sec": 5469.637368875298
+    },
+    {
+      "index": 3,
+      "collection": "bench/wide_uuid",
+      "doc_count": 10,
+      "doc_size": 4096,
+      "bytes": 40960,
+      "fresh": {
+        "start": 5767168,
+        "count": 10,
+        "op": "c"
+      },
+      "overlaps": [],
+      "wall_seconds": 257.634509056,
+      "mb_per_sec": 0.00015161982819432505,
+      "docs_per_sec": 0.03881467601774721
+    }
+  ]
+}

@@ -2,10 +2,19 @@ package main
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
+	"math/big"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/estuary/connectors/go/auth/iam"
+	mysqltls "github.com/estuary/connectors/go/mysql/tls"
 	"github.com/stretchr/testify/require"
 )
 
@@ -343,22 +352,165 @@ func TestEffectivePassword(t *testing.T) {
 	})
 }
 
-func TestRequiresTLS(t *testing.T) {
+func TestDefaultSSLMode(t *testing.T) {
 	// Pinned per auth type so that adding another IAM method cannot silently reopen
 	// the plaintext fallback. The unknown-type case pins the fail-closed default.
 	for _, tc := range []struct {
 		authType AuthType
-		expect   bool
+		expect   string
 	}{
-		{UserPassword, false},
-		{AWSIAM, true},
-		{GCPIAM, true},
-		{AzureIAM, true},
-		{AuthType("Bogus"), true},
+		{UserPassword, mysqltls.ModePreferred},
+		{AWSIAM, mysqltls.ModeRequired},
+		{GCPIAM, mysqltls.ModeRequired},
+		{AzureIAM, mysqltls.ModeRequired},
+		{AuthType("Bogus"), mysqltls.ModeRequired},
 	} {
 		t.Run(string(tc.authType), func(t *testing.T) {
 			var cfg = Config{Credentials: &CredentialsConfig{AuthType: tc.authType}}
-			require.Equal(t, tc.expect, cfg.requiresTLS())
+			require.Equal(t, tc.expect, cfg.sslSettings().Mode)
+			require.Equal(t, tc.expect == mysqltls.ModePreferred, cfg.sslSettings().AllowsPlaintextFallback())
 		})
 	}
+
+	t.Run("LegacyPasswordIsPreferred", func(t *testing.T) {
+		var cfg = Config{Password: "secret"}
+		require.Equal(t, mysqltls.ModePreferred, cfg.sslSettings().Mode)
+	})
+	t.Run("ExplicitModeWins", func(t *testing.T) {
+		var cfg = Config{Credentials: &CredentialsConfig{AuthType: AWSIAM}}
+		cfg.Advanced.SSLMode = mysqltls.ModeVerifyIdentity
+		require.Equal(t, mysqltls.ModeVerifyIdentity, cfg.sslSettings().Mode)
+	})
+}
+
+func TestSSLModeValidation(t *testing.T) {
+	var base = func() Config {
+		return Config{Address: "db.example.com:3306", User: "flow_capture", Password: "secret"}
+	}
+	t.Run("UnsetIsValid", func(t *testing.T) {
+		var cfg = base()
+		require.NoError(t, cfg.Validate())
+	})
+	t.Run("UnknownMode", func(t *testing.T) {
+		var cfg = base()
+		cfg.Advanced.SSLMode = "VERIFY_CA"
+		require.ErrorContains(t, cfg.Validate(), "unknown setting")
+	})
+	t.Run("VerifyCARequiresCA", func(t *testing.T) {
+		var cfg = base()
+		cfg.Advanced.SSLMode = mysqltls.ModeVerifyCA
+		require.ErrorContains(t, cfg.Validate(), "'ssl_server_ca' is required")
+	})
+	t.Run("VerifyIdentityWithoutCA", func(t *testing.T) {
+		var cfg = base()
+		cfg.Advanced.SSLMode = mysqltls.ModeVerifyIdentity
+		require.NoError(t, cfg.Validate())
+	})
+	t.Run("CARequiresVerifyingMode", func(t *testing.T) {
+		for _, mode := range []string{"", mysqltls.ModeDisabled, mysqltls.ModePreferred, mysqltls.ModeRequired} {
+			var name = mode
+			if name == "" {
+				name = "Unset"
+			}
+			t.Run(name, func(t *testing.T) {
+				var cfg = base()
+				cfg.Advanced.SSLMode = mode
+				cfg.Advanced.SSLServerCA = testCAPEM(t)
+				require.ErrorContains(t, cfg.Validate(), "does not verify the server certificate")
+			})
+		}
+		t.Run("VerifyIdentity", func(t *testing.T) {
+			var cfg = base()
+			cfg.Advanced.SSLMode = mysqltls.ModeVerifyIdentity
+			cfg.Advanced.SSLServerCA = testCAPEM(t)
+			require.NoError(t, cfg.Validate())
+		})
+	})
+	// Under bearer-token auth the password is a short-lived credential, so every
+	// mode that could put it on the wire unencrypted must be rejected.
+	t.Run("BearerTokenRequiresEncryptedMode", func(t *testing.T) {
+		var iamConfig = func() Config {
+			var cfg = base()
+			cfg.Password = ""
+			cfg.Credentials = &CredentialsConfig{
+				AuthType: AzureIAM,
+				IAMConfig: iam.IAMConfig{
+					AzureConfig: iam.AzureConfig{
+						AzureClientID: "11111111-2222-3333-4444-555555555555",
+						AzureTenantID: "66666666-7777-8888-9999-000000000000",
+					},
+					IAMTokens: iam.IAMTokens{AzureTokens: iam.AzureTokens{AzureAccessToken: "tok"}},
+				},
+			}
+			return cfg
+		}
+		for _, tc := range []struct {
+			mode    string
+			allowed bool
+		}{
+			{"", true}, // Defaults to 'required'.
+			{mysqltls.ModeDisabled, false},
+			{mysqltls.ModePreferred, false},
+			{mysqltls.ModeRequired, true},
+			{mysqltls.ModeVerifyIdentity, true},
+		} {
+			var name = tc.mode
+			if name == "" {
+				name = "Unset"
+			}
+			t.Run(name, func(t *testing.T) {
+				var cfg = iamConfig()
+				cfg.Advanced.SSLMode = tc.mode
+				if tc.allowed {
+					require.NoError(t, cfg.Validate())
+					require.True(t, cfg.sslSettings().GuaranteesEncryption())
+				} else {
+					require.ErrorContains(t, cfg.Validate(), "must never be sent over an unencrypted connection")
+					require.False(t, cfg.sslSettings().GuaranteesEncryption())
+				}
+			})
+		}
+
+		t.Run("VerifyCAWithCA", func(t *testing.T) {
+			var cfg = iamConfig()
+			cfg.Advanced.SSLMode = mysqltls.ModeVerifyCA
+			cfg.Advanced.SSLServerCA = testCAPEM(t)
+			require.NoError(t, cfg.Validate())
+		})
+	})
+	t.Run("PreferredAllowedWithPassword", func(t *testing.T) {
+		var cfg = base()
+		cfg.Advanced.SSLMode = mysqltls.ModePreferred
+		require.NoError(t, cfg.Validate())
+	})
+	t.Run("DisabledAllowedWithPassword", func(t *testing.T) {
+		var cfg = base()
+		cfg.Advanced.SSLMode = mysqltls.ModeDisabled
+		require.NoError(t, cfg.Validate())
+	})
+	t.Run("ServerHost", func(t *testing.T) {
+		var cfg = base()
+		require.Equal(t, "db.example.com", cfg.serverHost())
+		require.Equal(t, "db.example.com", (&Config{Address: "db.example.com"}).serverHost())
+	})
+}
+
+// testCAPEM returns a throwaway self-signed CA certificate in PEM form, for
+// cases that need 'ssl_server_ca' to contain something that actually parses.
+func testCAPEM(t *testing.T) string {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	var tmpl = &x509.Certificate{
+		SerialNumber:          big.NewInt(1),
+		Subject:               pkix.Name{CommonName: "test-ca"},
+		NotBefore:             time.Now().Add(-time.Hour),
+		NotAfter:              time.Now().Add(time.Hour),
+		KeyUsage:              x509.KeyUsageCertSign,
+		IsCA:                  true,
+		BasicConstraintsValid: true,
+	}
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	require.NoError(t, err)
+	return string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}))
 }

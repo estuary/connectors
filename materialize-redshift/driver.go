@@ -19,6 +19,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/estuary/connectors/go/blob"
+	"github.com/estuary/connectors/go/common"
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
@@ -57,11 +58,11 @@ const (
 	redshiftTextColumnLength = 256
 )
 
-var featureFlagDefaults = map[string]bool{
-	"datetime_keys_as_string":          true,
-	"s3_use_dualstack_endpoints":       false,
-	"retain_existing_data_on_backfill": false,
-	"native_binary_column_type":        true,
+var featureFlagDefaults = map[string]common.FlagDefault{
+	"datetime_keys_as_string":          common.FlagEnabled,
+	"s3_use_dualstack_endpoints":       common.FlagDisabled,
+	"retain_existing_data_on_backfill": common.FlagDisabled,
+	"native_binary_column_type":        common.FlagEnabled,
 }
 
 type sshForwarding struct {
@@ -138,7 +139,7 @@ func (c config) DefaultNamespace() string {
 	return c.Schema
 }
 
-func (c config) FeatureFlags() (string, map[string]bool) {
+func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
 	return c.Advanced.FeatureFlags, featureFlagDefaults
 }
 
@@ -317,6 +318,7 @@ type transactor struct {
 	cfg                            config
 	store                          *s3Store
 	caseSensitiveIdentifierEnabled bool
+	dialect                        sql.Dialect
 
 	rangeKey string
 	// The shard whose key range begins at 0 applies every shard's staged
@@ -379,6 +381,7 @@ func prepareNewTransactor(
 			caseSensitiveIdentifierEnabled: caseSensitiveIdentifierEnabled,
 			rangeKey:                       rangeKeyOf(fence.KeyBegin, fence.KeyEnd),
 			primary:                        fence.KeyBegin == 0,
+			dialect:                        ep.Dialect,
 			checkpointsTable: &checkpointsTable{
 				table:           ep.Dialect.Identifier(fence.TablePath...),
 				materialization: fence.Materialization.String(),
@@ -697,7 +700,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		if copySQL, err := d.copyFromS3(fmt.Sprintf("flow_temp_table_%d", b.target.Binding), manifest, false); err != nil {
 			return err
 		} else if _, err := txn.Exec(ctx, copySQL); err != nil {
-			return handleCopyIntoErr(ctx, txn, d.cfg.Bucket, files, b.target.Identifier, err)
+			return handleCopyIntoErr(ctx, txn, d.dialect, d.cfg.Bucket, files, b.target.Identifier, err)
 		}
 	}
 
@@ -1142,7 +1145,7 @@ func (d *transactor) applyStaged(ctx context.Context, conn *pgx.Conn, groups []*
 			if copySQL, err := d.copyFromS3(fmt.Sprintf("flow_temp_table_%d_deleted", b.target.Binding), g.deleteManifest, false); err != nil {
 				return nil, err
 			} else if _, err := txn.Exec(ctx, copySQL); err != nil {
-				return nil, handleCopyIntoErr(ctx, txn, d.cfg.Bucket, g.merged.DeleteFiles, b.target.Identifier, err)
+				return nil, handleCopyIntoErr(ctx, txn, d.dialect, d.cfg.Bucket, g.merged.DeleteFiles, b.target.Identifier, err)
 			} else if tag, err := txn.Exec(ctx, b.deleteQuerySQL); err != nil {
 				return nil, fmt.Errorf("deleting from table '%s': %w", b.target.Identifier, err)
 			} else {
@@ -1169,7 +1172,7 @@ func (d *transactor) applyStaged(ctx context.Context, conn *pgx.Conn, groups []*
 			if copySQL, err := d.copyFromS3(fmt.Sprintf("flow_temp_table_%d", b.target.Binding), g.storeManifest, true); err != nil {
 				return nil, err
 			} else if _, err := txn.Exec(ctx, copySQL); err != nil {
-				return nil, handleCopyIntoErr(ctx, txn, d.cfg.Bucket, g.merged.StoreFiles, b.target.Identifier, err)
+				return nil, handleCopyIntoErr(ctx, txn, d.dialect, d.cfg.Bucket, g.merged.StoreFiles, b.target.Identifier, err)
 			} else if n, err := lastCopyCount(ctx, txn); err != nil {
 				return nil, fmt.Errorf("reading rows staged for table '%s': %w", b.target.Identifier, err)
 			} else if _, err := txn.Exec(ctx, b.mergeIntoSQL); err != nil {
@@ -1185,7 +1188,7 @@ func (d *transactor) applyStaged(ctx context.Context, conn *pgx.Conn, groups []*
 			if copySQL, err := d.copyFromS3(b.target.Identifier, g.storeManifest, true); err != nil {
 				return nil, err
 			} else if _, err := txn.Exec(ctx, copySQL); err != nil {
-				return nil, handleCopyIntoErr(ctx, txn, d.cfg.Bucket, g.merged.StoreFiles, b.target.Identifier, err)
+				return nil, handleCopyIntoErr(ctx, txn, d.dialect, d.cfg.Bucket, g.merged.StoreFiles, b.target.Identifier, err)
 			} else if n, err := lastCopyCount(ctx, txn); err != nil {
 				return nil, fmt.Errorf("reading rows loaded into table '%s': %w", b.target.Identifier, err)
 			} else {
@@ -1224,13 +1227,13 @@ func (d *transactor) putManifest(ctx context.Context, files []string) (string, e
 // always return an error. `sys_load_error_detail` is queried instead of `stl_load_errors` since it
 // is available to both serverless and provisioned versions of Redshift, whereas `stl_load_errors`
 // is only available on provisioned Redshift.
-func handleCopyIntoErr(ctx context.Context, txn pgx.Tx, bucket string, files []string, table string, copyIntoErr error) error {
+func handleCopyIntoErr(ctx context.Context, txn pgx.Tx, dialect sql.Dialect, bucket string, files []string, table string, copyIntoErr error) error {
 	// The transaction has failed. It must be finish being rolled back before using its underlying
 	// connection again.
 	txn.Rollback(ctx)
 	conn := txn.Conn()
 
-	loadErrInfo, err := getLoadErrorInfo(ctx, conn, bucket, files)
+	loadErrInfo, err := getLoadErrorInfo(ctx, conn, dialect, bucket, files)
 	if err != nil {
 		// If querying sys_load_error_detail fails for some reason, return the original error back
 		// unchanged, but log why sys_load_error_detail could not be queried. Some errors (target

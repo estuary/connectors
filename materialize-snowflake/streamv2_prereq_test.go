@@ -134,13 +134,17 @@ func TestValidateStreamingV2Auth(t *testing.T) {
 	t.Run("the v2 write path with key-pair credentials is allowed", func(t *testing.T) {
 		var cfg = testStreamingConfigAuth(t, "snowpipe_streaming_v2", snowflake_auth.JWT)
 		require.NoError(t, cfg.Validate())
-		require.True(t, cfg.isStreamsV2(true))
+		flags, err := boilerplate.ResolveFlags(cfg, &pf.MaterializationSpec{})
+		require.NoError(t, err)
+		require.True(t, cfg.isStreamsV2(true, flags))
 	})
 
 	t.Run("the v2 flag without key-pair credentials is allowed and does not select the path", func(t *testing.T) {
 		var cfg = testStreamingConfigAuth(t, "snowpipe_streaming_v2", snowflake_auth.UserPass)
 		require.NoError(t, cfg.Validate())
-		require.False(t, cfg.isStreamsV2(true))
+		flags, err := boilerplate.ResolveFlags(cfg, &pf.MaterializationSpec{})
+		require.NoError(t, err)
+		require.False(t, cfg.isStreamsV2(true, flags))
 	})
 
 	t.Run("user-password credentials are allowed without the v2 write path", func(t *testing.T) {

@@ -1,3 +1,12 @@
+---
+title: Chargebee (Deprecated)
+description: Deprecated Chargebee capture connector. Use Estuary's native Chargebee connector instead to sync subscriptions, customers, invoices, and plans.
+---
+
+<head>
+  <meta name="robots" content="noindex, follow" />
+</head>
+
 # Chargebee (Deprecated)
 
 This connector captures data from Chargebee into Estuary collections.

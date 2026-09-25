@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-09-23
+### Changed
+- Each transaction's staged files are uploaded into a directory of their own,
+  and the load and MERGE queries read that directory as one relation with the
+  files' schema given explicitly, instead of one schema-inferred scan per
+  file. COPY INTO no longer infers column types either. Files staged by an
+  earlier version and still pending in the checkpoint commit as before.
+
 ## 2026-09-17
 ### Fixed
 - Fixed escaping of identifiers containing backslash character.

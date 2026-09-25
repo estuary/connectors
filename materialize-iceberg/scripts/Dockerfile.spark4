@@ -1,0 +1,27 @@
+# Spark 4.0.2 + Iceberg 1.10.1: the exact pairing shipped by EMR Serverless
+# release emr-spark-8.0.0, and the minimum needed to write Iceberg format v3
+# variant columns. The Spark 3.5 image (Dockerfile.spark) stays alongside so
+# the frozen JSON-string path keeps coverage.
+FROM apache/spark:4.0.2-python3
+
+# The PySpark scripts use boto3 for reading job inputs and writing status
+# files to S3. The base image only has the Spark Python bindings.
+USER root
+RUN pip install --no-cache-dir boto3==1.35.36
+
+# Resolve the Iceberg + AWS jars at image build time and copy them into
+# Spark's auto-loaded jars directory (/opt/spark/jars). hadoop-aws matches the
+# Hadoop client bundled with Spark 4.0.2.
+RUN mkdir -p /opt/jars-cache && chown -R spark:spark /opt/jars-cache
+USER spark
+RUN echo "pass" > /tmp/warmup.py && \
+    /opt/spark/bin/spark-submit \
+        --master "local[1]" \
+        --packages "org.apache.iceberg:iceberg-spark-runtime-4.0_2.13:1.10.1,org.apache.iceberg:iceberg-aws-bundle:1.10.1,org.apache.hadoop:hadoop-aws:3.4.1" \
+        --conf "spark.jars.ivy=/opt/jars-cache" \
+        /tmp/warmup.py && \
+    rm /tmp/warmup.py
+USER root
+RUN cp /opt/jars-cache/jars/*.jar /opt/spark/jars/ && \
+    rm -rf /opt/jars-cache
+USER spark

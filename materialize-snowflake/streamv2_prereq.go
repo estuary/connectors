@@ -63,7 +63,10 @@ func requireStreamingV2Runtime(spec *pf.MaterializationSpec, stateJson json.RawM
 		return fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	flags := boilerplate.ParseFlags(cfg)
+	flags, err := boilerplate.ResolveFlags(cfg, spec)
+	if err != nil {
+		return err
+	}
 	if flags[flagSnowpipeStreaming] && flags[flagSnowpipeStreamingV2] {
 		return fmt.Errorf(
 			"the %q feature flag requires the v2 materialization runtime, which this task is not running: add %q to the task's shards.flags, or remove %q from the endpoint configuration's feature_flags",

@@ -1,5 +1,21 @@
 # materialize-snowflake
 
+## 2026-09-24
+
+### Fixed
+- Reduced memory used while uploading staged files, which since the
+  2026-09-22 driver update could exceed the connector's memory limit and
+  restart the task repeatedly when several large files for one table were
+  uploaded at once.
+
+## 2026-09-21
+
+### Fixed
+- When syncing automatic clustering, the connector now checks the clustering
+  state of exactly the target table. Previously, a table in the same schema
+  whose name differed only where the target's name has an underscore could be
+  read instead, causing a clustering key to be dropped or kept incorrectly.
+
 ## 2026-09-12
 
 ### Fixed

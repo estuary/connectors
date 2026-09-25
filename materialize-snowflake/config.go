@@ -9,9 +9,9 @@ import (
 	"strings"
 
 	snowflake_auth "github.com/estuary/connectors/go/auth/snowflake"
+	"github.com/estuary/connectors/go/common"
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
-	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	log "github.com/sirupsen/logrus"
 	sf "github.com/snowflakedb/gosnowflake/v2"
 )
@@ -27,12 +27,12 @@ const (
 	flagSnowpipeStreamingV2 = "snowpipe_streaming_v2"
 )
 
-var featureFlagDefaults = map[string]bool{
-	flagSnowpipeStreaming:              true,
-	flagSnowpipeStreamingV2:            false,
-	"datetime_keys_as_string":          true,
-	"retain_existing_data_on_backfill": false,
-	"native_binary_column_type":        true,
+var featureFlagDefaults = map[string]common.FlagDefault{
+	flagSnowpipeStreaming:              common.FlagEnabled,
+	flagSnowpipeStreamingV2:            common.FlagDisabled,
+	"datetime_keys_as_string":          common.FlagEnabled,
+	"retain_existing_data_on_backfill": common.FlagDisabled,
+	"native_binary_column_type":        common.FlagEnabled,
 }
 
 // snowflakeTimestampType specifies how timestamp columns should be handled in Snowflake.
@@ -212,7 +212,7 @@ func (c config) DefaultNamespace() string {
 	return c.Schema
 }
 
-func (c config) FeatureFlags() (string, map[string]bool) {
+func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
 	return c.Advanced.FeatureFlags, featureFlagDefaults
 }
 
@@ -243,11 +243,11 @@ func (c config) Validate() error {
 	return validHost(c.Host)
 }
 
-func (c config) isStreamsV2(deltaUpdates bool) bool {
-	return c.isStreamsV1(deltaUpdates) && boilerplate.ParseFlags(c)[flagSnowpipeStreamingV2]
+func (c config) isStreamsV2(deltaUpdates bool, featureFlags map[string]bool) bool {
+	return c.isStreamsV1(deltaUpdates, featureFlags) && featureFlags[flagSnowpipeStreamingV2]
 }
 
-func (c config) isStreamsV1(deltaUpdates bool) bool {
+func (c config) isStreamsV1(deltaUpdates bool, featureFlags map[string]bool) bool {
 	return deltaUpdates && c.Credentials != nil && c.Credentials.AuthType == snowflake_auth.JWT &&
-		boilerplate.ParseFlags(c)[flagSnowpipeStreaming]
+		featureFlags[flagSnowpipeStreaming]
 }

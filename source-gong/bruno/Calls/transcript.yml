@@ -1,0 +1,59 @@
+info:
+  name: transcript
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: "{{base_url}}/v2/calls/transcript"
+  headers:
+    - name: content-type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "filter": {
+          "fromDateTime": "2026-08-01T00:00:00Z",
+          "toDateTime": "2026-10-01T00:00:00Z"
+        }
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://gong.app.gong.io/settings/api/documentation#post-/v2/calls/transcript
+
+  **WHY:** the endpoint backing the `call_transcripts` stream. Proves the
+  `callTranscripts` items key and the monologue/sentence nesting.
+
+  **VERIFIED (2026-09-16):** returns `200` with
+  `{records, callTranscripts, requestId}`; both seeded calls have transcripts.
+  An item is:
+
+      {"callId": "7022652889306584427",
+       "transcript": [{"speakerId": "...", "topic": null,
+                       "sentences": [{"start": 160, "end": 740,
+                                      "text": "chapter I."}]}]}
+
+  `start`/`end` are milliseconds from the start of the call. `topic` was `null`
+  for every monologue on the sandbox.
+
+  **VERIFIED (2026-09-16) — an item has no timestamp.** The filter bounds the
+  call's date, so `CallTranscript` checkpoints on the window end and relies on
+  the `/callId` key to collapse re-reads.
+
+  **VERIFIED (2026-09-16) — `callId` is a JSON string**, while `calls`
+  captures `id` as a number. `CallTranscript.callId` is declared `int` so the
+  two collections join.
+
+  **UNOBSERVABLE:** pagination. With two calls, `records` carries no `cursor`
+  key; the paging loop is shared with every other endpoint here.
+
+  **LIMITATION — transcripts appear only after analysis**, like the calls
+  themselves, so the stream shares `calls_lookback_window`.

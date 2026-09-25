@@ -5,11 +5,12 @@ import (
 	"text/template"
 
 	"github.com/bradleyjkemp/cupaloy"
+	"github.com/estuary/connectors/go/common"
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/stretchr/testify/require"
 )
 
-var testDialect = createDatabricksDialect(featureFlagDefaults)
+var testDialect = createDatabricksDialect(common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{}))
 var testTemplates = renderTemplates(testDialect)
 
 func TestSQLGeneration(t *testing.T) {
@@ -54,16 +55,25 @@ func TestSQLGeneration(t *testing.T) {
 			},
 		}
 
-		tf := tableWithFiles{
-			Table:       &tbl,
-			StagingPath: "test-staging-path",
-			Files:       []string{"file1", "file2"},
-			Bounds:      bounds,
+		var schema = stagedSchemaDDL(tbl.Columns(), true)
+		if tpl != testTemplates.mergeInto {
+			schema = stagedSchemaDDL(tbl.KeyPtrs(), false)
 		}
-
-		snap.WriteString("--- Begin " + testcase + " ---")
-		require.NoError(t, tpl.Execute(snap, &tf))
-		snap.WriteString("--- End " + testcase + " ---\n\n")
+		for _, tc := range []struct {
+			name        string
+			dirs, files []string
+		}{
+			{"directory", []string{"test-staging-path/txn-1"}, nil},
+			{"directories", []string{"test-staging-path/txn-1", "test-staging-path/txn-2"}, nil},
+			{"root files", nil, []string{"test-staging-path/file1.json.gz", "test-staging-path/file2.json.gz"}},
+			{"directory and root files", []string{"test-staging-path/txn-1"}, []string{"test-staging-path/file1.json.gz"}},
+		} {
+			var rendered, err = RenderTableWithStaged(tbl, tc.dirs, tc.files, schema, tpl, bounds)
+			require.NoError(t, err)
+			snap.WriteString("--- Begin " + testcase + " " + tc.name + " ---")
+			snap.WriteString(rendered)
+			snap.WriteString("--- End " + testcase + " ---\n\n")
+		}
 	}
 
 	for _, tpl := range []*template.Template{
@@ -74,10 +84,20 @@ func TestSQLGeneration(t *testing.T) {
 
 		var testcase = tbl.Identifier + " " + tpl.Name()
 
-		var tplData = tableWithFiles{Table: &tbl, StagingPath: "test-staging-path", Files: []string{"file1", "file2"}}
-		snap.WriteString("--- Begin " + testcase + " ---")
-		require.NoError(t, tpl.Execute(snap, &tplData))
-		snap.WriteString("--- End " + testcase + " ---\n\n")
+		for _, tc := range []struct {
+			name  string
+			files []string
+			path  string
+		}{
+			{"directory", nil, "test-staging-path/txn-1"},
+			{"root files", []string{"file1.json.gz", "file2.json.gz"}, "test-staging-path"},
+		} {
+			var rendered, err = RenderTableWithFiles(tbl, tc.files, tc.path, tpl, nil)
+			require.NoError(t, err)
+			snap.WriteString("--- Begin " + testcase + " " + tc.name + " ---")
+			snap.WriteString(rendered)
+			snap.WriteString("--- End " + testcase + " ---\n\n")
+		}
 	}
 
 	for _, tpl := range []*template.Template{
@@ -89,10 +109,20 @@ func TestSQLGeneration(t *testing.T) {
 
 		var testcase = tbl.Identifier + " " + tpl.Name()
 
-		var tplData = tableWithFiles{Table: &tbl, StagingPath: "test-staging-path", Files: []string{"file1", "file2"}}
-		snap.WriteString("--- Begin " + testcase + " ---")
-		require.NoError(t, tpl.Execute(snap, &tplData))
-		snap.WriteString("--- End " + testcase + " ---\n\n")
+		for _, tc := range []struct {
+			name  string
+			files []string
+			path  string
+		}{
+			{"directory", nil, "test-staging-path/txn-1"},
+			{"root files", []string{"file1.json.gz", "file2.json.gz"}, "test-staging-path"},
+		} {
+			var rendered, err = RenderTableWithFiles(tbl, tc.files, tc.path, tpl, nil)
+			require.NoError(t, err)
+			snap.WriteString("--- Begin " + testcase + " " + tc.name + " ---")
+			snap.WriteString(rendered)
+			snap.WriteString("--- End " + testcase + " ---\n\n")
+		}
 	}
 
 	cupaloy.SnapshotT(t, snap.String())

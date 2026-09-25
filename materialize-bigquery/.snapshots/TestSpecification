@@ -293,6 +293,13 @@
         "default": false,
         "nonsensitive": true,
         "x-delta-updates": true
+      },
+      "partition_by": {
+        "type": "string",
+        "title": "Partition By",
+        "description": "Optional expression to use as the table's PARTITION BY clause, for example DATE(created_at). Changing this value requires backfilling the binding, which drops and re-creates the table.",
+        "advanced": true,
+        "nonsensitive": true
       }
     },
     "type": "object",

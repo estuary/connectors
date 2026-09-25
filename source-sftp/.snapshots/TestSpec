@@ -7,6 +7,22 @@
       "description": "Host and port of the SFTP server. Example: myserver.com:22",
       "order": 0
     },
+    "knownHosts": {
+      "type": "string",
+      "title": "SSH Known Hosts",
+      "description": "Host keys of the SFTP server in OpenSSH known_hosts format, one per line: the output of `ssh-keyscan -p 2222 myserver.com`, for example `[myserver.com]:2222 ssh-ed25519 AAAA...`.",
+      "multiline": true,
+      "order": 1
+    },
+    "skipHostKeyVerification": {
+      "type": "boolean",
+      "title": "Skip Host Key Verification",
+      "description": "Connect without verifying the SFTP server's host key.",
+      "default": false,
+      "order": 2,
+      "nonsensitive": true,
+      "x-hidden-field": true
+    },
     "credentials": {
       "type": "object",
       "discriminator": {

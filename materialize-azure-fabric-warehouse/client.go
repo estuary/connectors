@@ -283,7 +283,7 @@ type badRequestResponseBody struct {
 	ErrorCodes       []int  `json:"error_codes"`
 }
 
-func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
+func preReqs(ctx context.Context, cfg config, featureFlags map[string]bool) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
 
 	db, err := cfg.db()
@@ -302,8 +302,6 @@ func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
 		return errs
 	}
 
-	// Get feature flags and create dialect for preReqs function
-	_, featureFlags := cfg.FeatureFlags()
 	dialect := createDialect(featureFlags, caseInsensitiveResources)
 	var wh int
 	if err := db.QueryRowContext(pingCtx, fmt.Sprintf("SELECT 1 from sys.databases WHERE name = %s;", dialect.Literal(cfg.Warehouse))).Scan(&wh); err != nil {

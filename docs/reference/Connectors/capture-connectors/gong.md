@@ -1,5 +1,5 @@
 ---
-description: Capture Gong revenue intelligence data with Estuary's connector, including calls, users, and scorecards, using API key authentication. Configure start date and call lookback windows.
+description: Capture Gong revenue intelligence data with Estuary's connector, including calls, call transcripts, users, and scorecards, using API key authentication. Configure start date and call lookback windows.
 ---
 
 # Gong
@@ -13,6 +13,8 @@ This connector captures data from Gong into Estuary collections.
 The following data resources are supported through the [Gong API](https://gong.app.gong.io/settings/api/documentation):
 
 * [calls](https://gong.app.gong.io/settings/api/documentation#get-/v2/calls)
+* [extensive_calls](https://gong.app.gong.io/settings/api/documentation#post-/v2/calls/extensive)
+* [call_transcripts](https://gong.app.gong.io/settings/api/documentation#post-/v2/calls/transcript)
 * [users](https://gong.app.gong.io/settings/api/documentation#post-/v2/users/extensive)
 * [scorecards](https://gong.app.gong.io/settings/api/documentation#post-/v2/stats/activity/scorecards)
 * [scorecard_definitions](https://gong.app.gong.io/settings/api/documentation#get-/v2/settings/scorecards)
@@ -39,7 +41,7 @@ See [connectors](../../../concepts/connectors.md#using-connectors) to learn more
 | **`/credentials/access_key_secret`** | Access Key Secret | Gong API Access Key Secret. | string | Required |
 | `/region` | Region | API region for your Gong account. | string | Default: `us-55616` |
 | `/start_date` | Start Date | UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Data generated before this date will not be replicated. If left blank, defaults to 30 days before the current date. | string | |
-| `/calls_lookback_window` | Calls Lookback Window | Number of days to look back for calls that may have been enriched after the initial sync. Must be between 1 and 30. | integer | Default: `7` |
+| `/calls_lookback_window` | Calls Lookback Window | Number of days to look back for calls that may have been enriched after the initial sync. Applies to `calls`, `extensive_calls`, and `call_transcripts`. Must be between 1 and 30. | integer | Default: `7` |
 
 #### Bindings
 
@@ -66,6 +68,12 @@ captures:
       - resource:
           name: calls
         target: ${PREFIX}/calls
+      - resource:
+          name: extensive_calls
+        target: ${PREFIX}/extensive_calls
+      - resource:
+          name: call_transcripts
+        target: ${PREFIX}/call_transcripts
       - resource:
           name: users
         target: ${PREFIX}/users

@@ -159,6 +159,7 @@ ascendingKeys
 
 # --- connection behaviour (non-identifying) ---
 sslmode
+skipHostKeyVerification
 dictionary_mode
 api_version
 
@@ -172,3 +173,4 @@ skip_state
 fail_after
 exit_after
 rediscovery_interval
+scale

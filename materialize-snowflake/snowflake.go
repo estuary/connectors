@@ -204,7 +204,7 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 }
 
 func getTimestampTypeMapping(ctx context.Context, db *stdsql.DB) (timestampTypeMapping, bool, error) {
-	xdb := sqlx.NewDb(db, "snowflake").Unsafe()
+	var xdb = sqlx.NewDb(db, "snowflake").Unsafe()
 
 	type paramRow struct {
 		Value string `db:"value"`
@@ -239,6 +239,7 @@ var _ m.Transactor = (*transactor)(nil)
 type transactor struct {
 	runtimeCheckpoint   m.RuntimeCheckpoint
 	cfg                 config
+	featureFlags        map[string]bool
 	ep                  *sql.Endpoint[config]
 	db                  *stdsql.DB
 	snowpipeStreaming   *streamManager
@@ -321,6 +322,7 @@ func newTransactor(
 	var d = &transactor{
 		runtimeCheckpoint:   fence.Checkpoint,
 		cfg:                 cfg,
+		featureFlags:        featureFlags,
 		ep:                  ep,
 		templates:           renderTemplates(ep.Dialect),
 		db:                  db,
@@ -408,7 +410,7 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, cp checkp
 	b.store.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
 	var loc = d.ep.Dialect.TableLocator(b.target.Path)
 
-	if d.cfg.isStreamsV2(b.target.DeltaUpdates) {
+	if d.cfg.isStreamsV2(b.target.DeltaUpdates, d.featureFlags) {
 		if len(cp.StreamBlobs) > 0 {
 			// We're upgrading from streams v1, and the v1 path left behind some
 			// blobs that only it can drain.
@@ -444,7 +446,7 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, cp checkp
 		}).Warn("this binding is leaving the snowpipe_streaming_v2 write path; documents its channels committed beyond the checkpoint will be materialized again; with delta updates these duplicates would be permanent")
 	}
 
-	if d.cfg.isStreamsV1(b.target.DeltaUpdates) {
+	if d.cfg.isStreamsV1(b.target.DeltaUpdates, d.featureFlags) {
 		if err := d.snowpipeStreaming.addBinding(ctx, loc.TableSchema, d.ep.Identifier(loc.TableName), b.target); err != nil {
 			var apiError *streamingApiError
 			var colError *unhandledColError
@@ -1558,46 +1560,41 @@ func clusteringKeyExpr(table sql.Table, fieldNames []string) (string, error) {
 // queryCurrentClusterBy returns the current CLUSTER BY expression for a table,
 // or an empty string if the table has no clustering key.
 func queryCurrentClusterBy(ctx context.Context, db *stdsql.DB, schema, table string) (string, error) {
-	// SHOW TABLES LIKE returns a row with a "cluster_by" column.
-	rows, err := db.QueryContext(ctx, fmt.Sprintf("SHOW TABLES LIKE '%s' IN SCHEMA %q;", table, schema))
-	if err != nil {
+	// The pattern is escaped so that `_` and `%` in the table name match
+	// literally, and the returned name is still compared exactly because
+	// LIKE matches case-insensitively.
+	var query = fmt.Sprintf("SHOW TABLES LIKE '%s' IN SCHEMA %q;", escapeShowLikePattern(table), schema)
+
+	type tableRow struct {
+		Name      string            `db:"name"`
+		ClusterBy stdsql.NullString `db:"cluster_by"`
+	}
+
+	var tableRows []tableRow
+	var xdb = sqlx.NewDb(db, "snowflake").Unsafe()
+	if err := xdb.SelectContext(ctx, &tableRows, query); err != nil {
 		return "", fmt.Errorf("querying table clustering state: %w", err)
 	}
-	defer rows.Close()
 
-	cols, err := rows.Columns()
-	if err != nil {
-		return "", fmt.Errorf("getting columns: %w", err)
-	}
-
-	clusterByIdx := -1
-	for i, col := range cols {
-		if strings.EqualFold(col, "cluster_by") {
-			clusterByIdx = i
-			break
+	for _, row := range tableRows {
+		if row.Name == table {
+			return row.ClusterBy.String, nil
 		}
 	}
-	if clusterByIdx == -1 {
-		return "", nil
-	}
-
-	if !rows.Next() {
-		return "", nil
-	}
-
-	vals := make([]any, len(cols))
-	ptrs := make([]any, len(cols))
-	for i := range vals {
-		ptrs[i] = &vals[i]
-	}
-	if err := rows.Scan(ptrs...); err != nil {
-		return "", fmt.Errorf("scanning table row: %w", err)
-	}
-
-	if v, ok := vals[clusterByIdx].(string); ok {
-		return v, nil
-	}
 	return "", nil
+}
+
+// escapeShowLikePattern quotes an identifier for literal use inside a SHOW
+// ... LIKE '<pattern>' string. Snowflake unescapes the string literal before
+// LIKE sees it, so each wildcard needs a doubled backslash to survive as an
+// escaped wildcard.
+func escapeShowLikePattern(name string) string {
+	return strings.NewReplacer(
+		`\\`, `\\\\`,
+		`_`, `\\_`,
+		`%`, `\\%`,
+		`'`, `''`,
+	).Replace(name)
 }
 
 func (d *transactor) syncClustering(ctx context.Context, bindings []sql.Table, open pm.Request_Open) error {

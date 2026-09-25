@@ -18,6 +18,7 @@ import (
 	"time"
 
 	snowflake_auth "github.com/estuary/connectors/go/auth/snowflake"
+	"github.com/estuary/connectors/go/common"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	jsonpatch "github.com/evanphx/json-patch/v5"
@@ -208,6 +209,7 @@ func TestStreamV2LeavingTheWritePathSweepsItsChannels(t *testing.T) {
 		}
 		var d = &transactor{
 			cfg:                 cfg,
+			featureFlags:        common.ResolveFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults, common.CreatedAt{}),
 			ep:                  &sql.Endpoint[config]{Dialect: snowflakeDialect("SCH", timestampTypeLTZ, nil)},
 			_range:              &pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32},
 			version:             "v1",
@@ -232,7 +234,7 @@ func TestStreamV2LeavingTheWritePathSweepsItsChannels(t *testing.T) {
 		const stateKey = "stay.v1"
 		var prior, channel = seed(t, stateKey)
 		var d = newTransactor(t, stateKey, prior)
-		d.cfg.Advanced.FeatureFlags = "snowpipe_streaming_v2"
+		d.featureFlags = common.ResolveFlags("snowpipe_streaming_v2", featureFlagDefaults, common.CreatedAt{})
 
 		require.NoError(t, d.addBinding(ctx, target(stateKey, true), *d.cp[stateKey]))
 		require.True(t, lastBinding(d).streamingV2)
@@ -246,7 +248,7 @@ func TestStreamV2LeavingTheWritePathSweepsItsChannels(t *testing.T) {
 		var d = newTransactor(t, stateKey, prior)
 		// snowpipe_streaming is enabled by default, so dropping the v2 flag alone
 		// is the downgrade.
-		d.cfg.Advanced.FeatureFlags = ""
+		d.featureFlags = common.ResolveFlags("", featureFlagDefaults, common.CreatedAt{})
 		d.snowpipeStreaming = openChannelServer(t, 0)
 
 		require.NoError(t, d.addBinding(ctx, target(stateKey, true), *d.cp[stateKey]))
@@ -259,7 +261,7 @@ func TestStreamV2LeavingTheWritePathSweepsItsChannels(t *testing.T) {
 		const stateKey = "fallback.v1"
 		var prior, channel = seed(t, stateKey)
 		var d = newTransactor(t, stateKey, prior)
-		d.cfg.Advanced.FeatureFlags = "snowpipe_streaming"
+		d.featureFlags = common.ResolveFlags("snowpipe_streaming", featureFlagDefaults, common.CreatedAt{})
 		d.snowpipeStreaming = openChannelServer(t, 6)
 
 		require.NoError(t, d.addBinding(ctx, target(stateKey, true), *d.cp[stateKey]))
@@ -273,7 +275,7 @@ func TestStreamV2LeavingTheWritePathSweepsItsChannels(t *testing.T) {
 		const stateKey = "delta.v1"
 		var prior, channel = seed(t, stateKey)
 		var d = newTransactor(t, stateKey, prior)
-		d.cfg.Advanced.FeatureFlags = "snowpipe_streaming_v2"
+		d.featureFlags = common.ResolveFlags("snowpipe_streaming_v2", featureFlagDefaults, common.CreatedAt{})
 
 		require.NoError(t, d.addBinding(ctx, target(stateKey, false), *d.cp[stateKey]))
 		require.False(t, lastBinding(d).streaming)
@@ -287,14 +289,14 @@ func TestStreamV2LeavingTheWritePathSweepsItsChannels(t *testing.T) {
 		var prior, channel = seed(t, stateKey)
 
 		var away = newTransactor(t, stateKey, prior)
-		away.cfg.Advanced.FeatureFlags = "snowpipe_streaming_v2"
+		away.featureFlags = common.ResolveFlags("snowpipe_streaming_v2", featureFlagDefaults, common.CreatedAt{})
 		require.NoError(t, away.addBinding(ctx, target(stateKey, false), *away.cp[stateKey]))
 
 		// The return derives the same channel name and finds nothing under it, so
 		// the documents it is about to materialize are not skipped: compare
 		// TestStreamV2ReturningToTheWritePathSkipsNewDocuments.
 		var back = newTransactor(t, stateKey, nil)
-		back.cfg.Advanced.FeatureFlags = "snowpipe_streaming_v2"
+		back.featureFlags = common.ResolveFlags("snowpipe_streaming_v2", featureFlagDefaults, common.CreatedAt{})
 		require.NoError(t, back.addBinding(ctx, target(stateKey, true), *back.cp[stateKey]))
 		require.NoError(t, testWriteRow(ctx, back.snowpipeStreamingV2, 0, []any{"k", "new"}))
 		var c = back.snowpipeStreamingV2.bindings[0].activeChannels[0]
@@ -571,6 +573,7 @@ func TestStreamV2SwitchOntoTheWritePathWithPendingWorkIsRejected(t *testing.T) {
 		var rng = &pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32}
 		var d = &transactor{
 			cfg:                 cfg,
+			featureFlags:        common.ResolveFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults, common.CreatedAt{}),
 			ep:                  &sql.Endpoint[config]{Dialect: snowflakeDialect("SCH", timestampTypeLTZ, nil)},
 			_range:              rng,
 			version:             "v1",
