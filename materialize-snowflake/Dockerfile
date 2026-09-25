@@ -71,7 +71,7 @@ RUN python3 -m venv /tmp/testvenv \
      && export SNOWPIPE_SDK_GUARD=required \
         PYTHONPATH="/opt/materialize-snowflake/sidecar:/opt/estuary-cdk:$(/opt/venv/bin/python -c 'import site; print(site.getsitepackages()[0])')" \
      && /tmp/testvenv/bin/python -m mypy --cache-dir /tmp/testvenv/mypy-cache \
-     && /tmp/testvenv/bin/python -m pytest -q tests \
+     && /tmp/testvenv/bin/python -m pytest -q -p no:cacheprovider tests \
      && rm -rf /tmp/testvenv
 
 # Runtime Stage
