@@ -460,10 +460,11 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, cp checkp
 				return fmt.Errorf("adding binding to stream manager: %w", err)
 			}
 			log.WithError(err).WithField("table", b.target.Path).Info("not using Snowpipe Streaming for table")
+		} else {
+			b.streaming = true
+			d.bindings = append(d.bindings, b)
+			return nil
 		}
-		b.streaming = true
-		d.bindings = append(d.bindings, b)
-		return nil
 	}
 
 	b.load.stage = newStagedFile(os.TempDir())
