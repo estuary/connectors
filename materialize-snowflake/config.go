@@ -16,10 +16,20 @@ import (
 	sf "github.com/snowflakedb/gosnowflake/v2"
 )
 
+const (
+	// flagSnowpipeStreaming enables Snowpipe streaming for delta-updates
+	// bindings that use JWT authentication.
+	flagSnowpipeStreaming = "snowpipe_streaming"
+	// flagSnowpipeStreamingV2 enables the high-performance Snowpipe Streaming
+	// architecture, via the Python SDK sidecar, for delta-updates bindings that
+	// use JWT authentication. It requires the v2 materialization runtime; see
+	// requireStreamingV2Runtime.
+	flagSnowpipeStreamingV2 = "snowpipe_streaming_v2"
+)
+
 var featureFlagDefaults = map[string]common.FlagDefault{
-	// Use Snowpipe streaming for delta-updates bindings that use JWT
-	// authentication.
-	"snowpipe_streaming":               common.FlagEnabled,
+	flagSnowpipeStreaming:              common.FlagEnabled,
+	flagSnowpipeStreamingV2:            common.FlagDisabled,
 	"datetime_keys_as_string":          common.FlagEnabled,
 	"retain_existing_data_on_backfill": common.FlagDisabled,
 	"native_binary_column_type":        common.FlagEnabled,
@@ -231,4 +241,13 @@ func (c config) Validate() error {
 	}
 
 	return validHost(c.Host)
+}
+
+func (c config) isStreamsV2(deltaUpdates bool, featureFlags map[string]bool) bool {
+	return c.isStreamsV1(deltaUpdates, featureFlags) && featureFlags[flagSnowpipeStreamingV2]
+}
+
+func (c config) isStreamsV1(deltaUpdates bool, featureFlags map[string]bool) bool {
+	return deltaUpdates && c.Credentials != nil && c.Credentials.AuthType == snowflake_auth.JWT &&
+		featureFlags[flagSnowpipeStreaming]
 }
