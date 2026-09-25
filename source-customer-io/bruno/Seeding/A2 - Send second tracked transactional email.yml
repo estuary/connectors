@@ -1,0 +1,52 @@
+info:
+  name: A2 - Send second tracked transactional email
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{base_url}}/v1/send/email"
+  body:
+    type: json
+    json: |-
+      {
+        "to": "person2@example.com",
+        "from": "person1@example.com",
+        "identifiers": { "email": "person2@example.com" },
+        "subject": "Estuary connector probe A2",
+        "body": "<p>Connector verification send A2.</p>",
+        "tracked": true,
+        "disable_message_retention": false
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **ONLY THE USER RUNS THIS REQUEST. The assistant never runs it** — it is a
+    state-mutating call that sends real email (`API-NEVER-MUTATE`).
+
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Send-Messages/operation/sendEmail
+
+    **WHY:** Adds a fourth delivery, addressed to the sandbox's *second* profile,
+    so `Messages / page walk` has enough rows for a genuine multi-page `limit=1`
+    walk and so the delivery corpus spans two recipients rather than one. Run
+    after `Seeding / A1 - Send tracked transactional email`.
+
+    Deliberately targets a different profile from `A1`: it makes the paging walk's
+    ordering check meaningful (four distinct ids, two recipients) and it exercises
+    the `identifiers` branch keyed by `email` rather than by `id`, so the
+    `customer_id` vs. `customer_identifiers` divergence noted on `Messages / bare`
+    is observable on real rows — Customer.io documents `customer_id` as nullable
+    exactly when a workspace identifies people by something other than `id`.
+
+    Same test-mode caveat as `A1`: without a verified sending domain this may fail
+    to deliver. A failed delivery still creates a delivery record, which is all
+    this request needs.
+
+    **Outcome:** not yet run.

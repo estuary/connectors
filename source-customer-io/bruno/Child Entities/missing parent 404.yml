@@ -1,0 +1,73 @@
+info:
+  name: missing parent 404
+  type: http
+  seq: 4
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/campaigns/999999/actions"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/automations/operation/listCampaignActions
+
+    **WHY:** A parent-iterating fetch reads its parent list once, then makes one
+    request per parent. A parent deleted in that gap is the normal race, not an
+    exotic one — and the failure mode differs completely depending on whether
+    the provider answers with an empty list or an error. If it errors, the fetch
+    must catch and skip per parent or a single deletion fails the whole sweep.
+
+    **VERIFIED (2026-09-22):** All four Cluster E routes return a structured
+    `404` for a non-existent parent, never an empty list:
+
+    - `/v1/campaigns/999999/actions` -> 404
+    - `/v1/broadcasts/999999/actions` -> 404
+    - `/v1/newsletters/999999/contents` -> 404
+    - `/v1/segments/999999/membership` -> 404
+
+    All four carry the same body,
+    `{"errors":[{"detail":"not found (reference <ulid>)","status":"404"}]}`.
+    This is the structured-JSON 404 that `ESP Suppressions / domain scoped
+    variant` established means "route matched, resource absent" — distinct from
+    the bare Go string `404 page not found` an unrouted path returns. All four
+    routes therefore exist and are correctly spelled.
+
+    **Connector consequence:** the per-parent request must be wrapped so a `404`
+    logs and skips that parent rather than failing the sweep. Any other status
+    must still propagate — a blanket `except HTTPError` would swallow the 401
+    that a missing `token_source` produces, which is the bug this connector
+    already shipped once.
+
+    **Note on the reference ULID:** the `reference` value is a per-request trace
+    id and differs on every call. It is replaced with `REDACTED` in the saved
+    examples so re-runs diff cleanly.
+
+examples:
+  - name: 404 - structured not-found for a non-existent parent
+    request:
+      url: "https://api.customer.io/v1/campaigns/999999/actions"
+      method: GET
+    response:
+      status: 404
+      statusText: Not Found
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "errors": [
+              {
+                "detail": "not found (reference REDACTED)",
+                "status": "404"
+              }
+            ]
+          }

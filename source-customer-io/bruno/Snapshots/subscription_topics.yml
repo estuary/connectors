@@ -1,0 +1,54 @@
+info:
+  name: subscription_topics
+  type: http
+  seq: 9
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/subscription_topics"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Subscriptions/operation/getTopics
+
+    **WHY:** Establishes envelope key and shape for the dimension that decodes
+    `subscription_topic_id` on newsletters and on per-profile subscription
+    preferences.
+
+    **VERIFIED (2026-09-14):** 200, **envelope key is `topics`**, not
+    `subscription_topics`. Value `[]`.
+
+        **VERIFIED (2026-09-14):** No pagination field of any kind in the response —
+        no `next`, no `total`, no `has_more`. The array is the whole result set.
+        See `segments limit ignored` for the negative control and
+        `newsletters positive control` for the contrast.
+
+    **UNOBSERVABLE (2026-09-14):** No topics configured in the sandbox. Shape below
+    is DOCUMENTED. `Seeding/B7` carries the UI click-path — no POST route exists.
+
+    **DOCUMENTED (2026-09-14):** A topic carries `id` (int), `identifier`, `name`,
+    `description`, `subscribed_by_default` (bool). No timestamps.
+examples:
+  - name: 200 - empty array; envelope key is `topics`
+    request:
+      url: "https://api.customer.io/v1/subscription_topics"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "topics": []
+          }

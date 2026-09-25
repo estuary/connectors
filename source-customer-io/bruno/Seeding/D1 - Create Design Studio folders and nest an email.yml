@@ -1,0 +1,93 @@
+info:
+  name: D1 - Create Design Studio folders and nest an email
+  type: http
+  seq: 10
+
+http:
+  method: POST
+  url: "{{base_url}}/v1/design_studio/folders"
+  body:
+    type: json
+    json: |-
+      {
+        "name": "Estuary Probe Folder"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Design-Studio/operation/createFolder
+
+    **WHY:** Two Cluster D findings are **UNOBSERVABLE** purely because the
+    workspace has zero Design Studio folders, and both are design-blocking:
+
+    1. `parent folder scoping` — whether the default listing is scoped to the
+       root directory. If it is, the connector silently loses every email filed
+       in a folder. **Data-loss class.**
+    2. `folders array overlap` — whether the `folders[]` array embedded in the
+       `/emails` and `/components` responses is the same corpus as
+       `/v1/design_studio/folders`, which decides whether
+       `design_studio_folders` is a stream or a duplicate.
+
+    A third finding, that `sort_by=updated` orders by the timestamp rather than
+    merely reversing a tie-break, needs two rows with **different** `updated`
+    values — which this also produces, because editing an email bumps `updated`.
+
+    **NOT RUN.** This is a mutating request and is recorded here for the user to
+    run, never the agent. The UI click-path below is the preferred route: it is
+    what a customer would actually do, and moving an email into a folder is
+    **not** expressible through the API — `PUT /v1/design_studio/emails/{id}`
+    accepts `content`, `envelope` and `transformers` but exposes **no
+    `parent_folder_id`**, so the nesting step is UI-only regardless.
+
+    ## UI click-path (preferred, ~2 minutes)
+
+    In the Customer.io app, with the sandbox workspace selected:
+
+    1. Left nav -> **Design Studio**. The two sample emails ("Example Code
+       Editor Email", "Example Visual Editor Email") are listed at the root.
+    2. **New** (top right) -> **Folder**. Name it `Estuary Probe A`. Create.
+    3. **New** -> **Folder** again, name it `Estuary Probe B`. Create.
+       Two folders is deliberate: one is enough to test nesting, but a second
+       root-level folder is what shows whether a *subset* or the *whole* folder
+       corpus comes back in the embedded `folders[]`.
+    4. Back at the Design Studio root, select **Example Visual Editor Email**
+       (its row checkbox), then **Move** -> choose `Estuary Probe A` -> confirm.
+       Exactly one of the two emails must end up inside a folder; leave
+       "Example Code Editor Email" at the root as the control.
+    5. Open **Example Code Editor Email**, change its subject line or any
+       content, and save. This bumps only that email's `updated`, giving the two
+       emails **distinct** `updated` values.
+
+    Then re-run, in this order, and compare against the recorded examples:
+
+    - `Design Studio / folders bare` — expect `total: 2`, and a real folder
+      document shape (currently UNOBSERVABLE).
+    - `Design Studio / emails bare` — **the decisive one.** If `total` is still
+      `2` and the foldered email is present with a non-null
+      `parent_folder_id`, the default listing is recursive and the flat
+      single-call design in `plan.md` is correct. If `total` drops to `1` and
+      only the root email comes back, the default is root-scoped and the fetch
+      must be rewritten to walk folders recursively.
+    - `Design Studio / folders array overlap` — compare the `folders[].id` set
+      from `emails bare` against the `folders[].id` set from `folders bare`.
+      Subset means the embedded array is a join and can be ignored.
+    - `Design Studio / sort applied` — `sort_by=updated&sort_order=desc` should
+      now put the just-edited email first.
+
+    ## API alternative
+
+    The request body above creates one root-level folder. Repeat with a
+    different `name` for the second. Response is the created folder object,
+    whose `id` is the UUID to use for `parent_folder_id` probes. Step 4
+    (nesting an existing email) has no API equivalent — use the UI.
+
+    **Cleanup:** `DELETE /v1/design_studio/folders/{id}`. Deleting a folder that
+    still contains an email may cascade or may 409; move the email back to the
+    root first if the folders are not wanted permanently.

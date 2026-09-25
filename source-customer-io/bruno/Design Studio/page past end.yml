@@ -1,0 +1,120 @@
+info:
+  name: page past end
+  type: http
+  seq: 8
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/design_studio/emails?page=99999&limit=1"
+  params:
+    - name: page
+      value: "99999"
+      type: query
+    - name: limit
+      value: "1"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Design-Studio-emails/operation/listEmails
+
+    **WHY:** `/v1/messages` has a live-cycle bug: an out-of-range positional
+    offset is silently ignored, the walk **restarts at page one**, and the
+    response hands back page one's `next` — so a naive loop never terminates
+    (`Messages / page walk continued`, and `api.py:46-50`, which bounds it with
+    `MAX_PAGES_PER_WINDOW`). Page-number paging is positional in exactly the
+    same way, so the same failure mode has to be ruled out here rather than
+    assumed absent.
+
+    **VERIFIED (2026-09-22):** Out-of-range pages are **safe on this endpoint**.
+    Both `page=3` (one past the end at `limit=1`) and `page=99999` return
+    `200` with an **empty item array**, echoing the requested page number back
+    in `meta.pagination.page` and the true `total` of 2. The walk does **not**
+    restart at page one — the defining symptom of the `/v1/messages` bug is
+    absent.
+
+    **VERIFIED (2026-09-22):** This gives the family a fourth termination shape.
+    The other three in this API are all token-falsiness tests (`next: ""`,
+    absent `next`, populated token). Here there is no token at all, and two
+    independent stop conditions are available:
+
+    - **arithmetic:** `page * limit >= meta.pagination.total`
+    - **empty page:** the item array came back empty
+
+    The connector uses the **empty-page test as the primary stop** and the
+    arithmetic as a secondary guard, because `total` is re-evaluated per request
+    against a collection that can change between pages: a row deleted mid-walk
+    lowers `total` and could satisfy the arithmetic early, truncating the walk.
+    An empty page cannot truncate early. Under a bounded `updated_before`
+    horizon both conditions agree in the common case.
+
+    **VERIFIED (2026-09-22):** `page=0` and `page=-1` are **rejected** with a
+    structured `400` (`"page must be an integer >= 1"`) rather than clamped to
+    1. Pages are 1-indexed and the connector must start at 1, not 0.
+
+examples:
+  - name: 200 - far out-of-range page returns empty, no restart at page one
+    request:
+      url: "https://api.customer.io/v1/design_studio/emails?page=99999&limit=1"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "emails": [],
+            "folders": [],
+            "meta": {
+              "pagination": {
+                "page": 99999,
+                "limit": 1,
+                "total": 2
+              },
+              "filters": {
+                "parent_folder_id": null,
+                "direct_descendants_only": false,
+                "sort_by": "created",
+                "sort_order": "asc",
+                "created_before": null,
+                "created_after": null,
+                "updated_before": null,
+                "updated_after": null,
+                "is_template": null,
+                "has_translations": null,
+                "is_linked": null
+              }
+            }
+          }
+  - name: 400 - page zero is rejected, not clamped
+    request:
+      url: "https://api.customer.io/v1/design_studio/emails?page=0"
+      method: GET
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "errors": [
+              {
+                "detail": "page must be an integer >= 1",
+                "status": "400"
+              }
+            ]
+          }

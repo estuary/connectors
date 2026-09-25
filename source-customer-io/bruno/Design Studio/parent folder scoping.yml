@@ -1,0 +1,175 @@
+info:
+  name: parent folder scoping
+  type: http
+  seq: 11
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/design_studio/emails?direct_descendants_only=true"
+  params:
+    - name: direct_descendants_only
+      value: "true"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Design-Studio-emails/operation/listEmails
+
+    **WHY:** The highest-severity open question in Cluster D, and a data-loss
+    risk rather than a cosmetic one.
+
+    The spec's `parent_folder_id` description reads: *"Filter by parent folder.
+    Must reference an existing folder. **If not set, the response filters by the
+    root level directory.** To list only items in the root folder, leave
+    `parent_folder_id` unset and only set `direct_descendants_only` to `true`."*
+
+    Read literally, the first sentence says the **default response is already
+    scoped to root** — which, if true, means a connector that just calls
+    `/v1/design_studio/emails` silently captures only root-level emails and
+    misses everything filed in a folder, with a 200 and no indication anything
+    was omitted. That is the same trap class as `drafts` on `/v1/messages` and
+    `hidden` on `/v1/sender_identities`, both of which turned out to be real.
+
+    The second sentence argues the other way: if the default were already
+    root-only, setting `direct_descendants_only=true` would be a no-op and the
+    sentence would be vacuous. The reading that makes it meaningful is that
+    unset + `false` means *root **and all its descendants*** (everything), while
+    unset + `true` narrows to root's direct children only.
+
+    This provider's spec has now been observed wrong seven times, so the benign
+    reading cannot be assumed.
+
+    **UNOBSERVABLE (2026-09-22):** Cannot be settled with the current workspace.
+    Both sandbox emails sit at the root (`parent_folder_id: null`) and **zero
+    folders exist**, so "root only" and "root plus descendants" return the same
+    two rows and the same `total: 2`. `direct_descendants_only=true` was run and
+    returned exactly the default response — consistent with both readings.
+
+    Discriminating needs a folder containing at least one email. `Seeding / D1`
+    is the click-path; the discriminating request afterwards is the bare
+    `emails bare`, checking whether the foldered email appears in it.
+
+    **Consequence if the pessimistic reading holds:** the flat single-call design
+    in `plan.md` is wrong and the fetch must walk folders recursively —
+    `parent_folder_id` per folder, folders themselves discovered from the
+    `folders[]` sibling array. That converts Cluster D from 1 request per window
+    into 1 + N, and makes `folders` a mandatory stream rather than a droppable
+    one. The plan carries this as its single blocking risk.
+
+    **UNOBSERVABLE (2026-09-23):** Whether the default `/v1/design_studio/emails`
+    listing is recursive or scoped to the root directory is **still open**, and it
+    is the one finding in this cluster that is data-loss class: if the default is
+    root-scoped, every email filed inside a folder is silently missed and the
+    connector's flat single-call design in `api.py`
+    (`_drain_design_studio_window`) is wrong.
+
+    Two folders now exist in the sandbox (`Estuary Probe A`
+    `9621d6dd-a4ae-4420-a50c-c4aaa0df822d`, `Estuary Probe B`
+    `7e0ef3ba-6eb1-42b3-be6a-da1f594875af`, both created via
+    `Seeding / D1`), but **both sample emails remain at the root**, so the
+    distinguishing case has never existed. Nesting an email has no API route --
+    `PUT /v1/design_studio/emails/{id}` accepts `content`, `envelope` and
+    `transformers` and exposes no `parent_folder_id` -- so it can only be done by
+    dragging the email onto a folder in the Design Studio file browser.
+
+    **To close this**, in a workspace with at least one email inside a folder:
+    run `Design Studio / emails bare` and check `meta.pagination.total`.
+
+    - Total counts every email, foldered ones included, each carrying a non-null
+      `parent_folder_id` -> the default listing is recursive, and the connector
+      as written is correct.
+    - Total counts only root-level emails -> the default is root-scoped, and
+      `_drain_design_studio_window` must be rewritten to walk
+      `design_studio_folders` and issue one request per folder.
+
+    Until then the connector ships on the recursive reading, which is what the
+    OpenAPI spec implies by documenting `parent_folder_id` as a *filter* rather
+    than as a required scope.
+
+examples:
+  - name: 200 - non-discriminating, no folders exist to nest anything in
+    request:
+      url: "https://api.customer.io/v1/design_studio/emails?direct_descendants_only=true"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "emails": [
+              {
+                "id": "11111111-1111-4111-8111-111111111111",
+                "name": "Example Code Editor Email",
+                "is_template": false,
+                "is_linked": false,
+                "has_translations": false,
+                "parent_folder_id": null,
+                "created": 1789071558,
+                "updated": 1789071558
+              },
+              {
+                "id": "22222222-2222-4222-8222-222222222222",
+                "name": "Example Visual Editor Email",
+                "is_template": false,
+                "is_linked": false,
+                "has_translations": false,
+                "parent_folder_id": null,
+                "created": 1789071558,
+                "updated": 1789071558
+              }
+            ],
+            "folders": [],
+            "meta": {
+              "pagination": {
+                "page": 1,
+                "limit": 1000,
+                "total": 2
+              },
+              "filters": {
+                "parent_folder_id": null,
+                "direct_descendants_only": true,
+                "sort_by": "created",
+                "sort_order": "asc",
+                "created_before": null,
+                "created_after": null,
+                "updated_before": null,
+                "updated_after": null,
+                "is_template": null,
+                "has_translations": null,
+                "is_linked": null
+              }
+            }
+          }
+  - name: 404 - unknown parent folder is a structured, routed 404
+    request:
+      url: "https://api.customer.io/v1/design_studio/emails?parent_folder_id=123e4567-e89b-12d3-a456-426614174000"
+      method: GET
+    response:
+      status: 404
+      statusText: Not Found
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "errors": [
+              {
+                "detail": "parent folder not found",
+                "status": "404"
+              }
+            ]
+          }

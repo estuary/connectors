@@ -1,0 +1,63 @@
+info:
+  name: newsletters next loops
+  type: http
+  seq: 15
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/newsletters?limit=1&start=MQ=="
+  params:
+    - name: limit
+      value: "1"
+      type: query
+    - name: start
+      value: "MQ=="
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Newsletters/operation/listNewsletters
+
+    **WHY:** Follows the `next` token `newsletters positive control` returned.
+    The sandbox holds exactly one newsletter and `limit=1` was requested, so
+    this is the "exhausted exactly on a page boundary" case — the case that
+    turns an off-by-one in a pagination loop into an infinite one.
+
+    **VERIFIED (2026-09-14):** Terminates correctly. Returns
+    `{"newsletters": [], "next": ""}` — an empty array and the empty-string
+    terminal marker, the same convention `/v1/messages` uses. The
+    past-the-end offset does **not** restart the walk at page 1 the way an
+    out-of-range `v20:<n>` offset does on `/v1/messages`.
+
+    So an exactly-exhausted walk costs one extra empty request and then stops.
+    No infinite-loop hazard here, provided termination is a falsiness test.
+
+    **Also VERIFIED (2026-09-14):** `newsletters` returns `[]` for its empty
+    state, not `null` — one more data point for the split recorded on
+    `collections`.
+
+examples:
+  - name: 200 - empty page, next terminal
+    request:
+      url: "https://api.customer.io/v1/newsletters?limit=1&start=MQ=="
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "newsletters": [],
+            "next": ""
+          }

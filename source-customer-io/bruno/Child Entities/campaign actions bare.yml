@@ -1,0 +1,87 @@
+info:
+  name: campaign actions bare
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/campaigns/{{campaign_id}}/actions"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/automations/operation/listCampaignActions
+
+    **WHY:** Establish the envelope, the termination signal and the empty-state
+    representation for the first of the two `actions` routes, and test the
+    cluster's headline question: does this endpoint duplicate the `actions[]`
+    array already carried on the `campaigns` snapshot document? Cluster A
+    dropped the per-parent `*/messages` variants and Cluster D dropped the
+    embedded `folders[]` on exactly that test.
+
+    **VERIFIED (2026-09-22):** Envelope key is `actions`, matching the last path
+    segment. The empty response is `{"actions": []}` — an empty array, not
+    `null`.
+
+    **VERIFIED (2026-09-22):** **The `next` key is absent entirely** from the
+    empty response, even though the provider's OpenAPI spec declares `next` on
+    this operation's 200 schema (`.paths["/v1/campaigns/{campaign_id}/actions"]
+    .get.responses["200"] ... .properties` is `["actions","next"]`). This is the
+    same absent-key convention `/v1/customers/{id}/messages` and `/v1/optouts`
+    use, and the eighth observed instance of this provider's spec being wrong.
+    A `while "next" in body` or `while next is not None` loop is wrong here; the
+    falsiness test the connector already uses covers it.
+
+    **UNOBSERVABLE:** the populated shape. The sandbox's only automation (id 1)
+    is a draft with `actions: []`, and **no `POST` route exists** anywhere under
+    `/v1/campaigns/{campaign_id}/actions` in the provider's spec — only `GET`
+    and `PUT` against an already-existing `{action_id}`. An action cannot be
+    created through this API at all, so no seeding request can close this and
+    the `bruno-probe-endpoint` ~10-request seeding cap is not the binding
+    constraint. Proceeding on: (a) the spec's four-variant `oneOf`
+    (`Email / message`, `SMS/MMS`, `WhatsApp`, `Webhook`) for the item shape,
+    which a snapshot binding tolerates because snapshot models declare no
+    required fields and rely on schema inference; (b) the falsiness termination
+    test, which is correct under all four conventions this API uses regardless
+    of which one appears when the array is non-empty. The UI click-path that
+    would close it is in
+    `Seeding / E1 - UI click-path - add an Email action to automation 1`.
+
+    **DOCUMENTED (2026-09-22):** the spec caps the array at `maxItems: 10` and
+    the operation description says "This endpoint returns up to 10 `actions` at
+    a time. If there is another page of results, the response will include a
+    `next` string." Both claims are unconfirmable against an empty list.
+
+    **VERIFIED (2026-09-22):** **No duplication with the parent document.** The
+    `actions[]` array on a `campaigns` list item is a two-field stub —
+    `{id, type}` and nothing else (spec, all seven trigger variants) — while
+    this endpoint returns the full action: `body`, `subject`, `layout`, `from`,
+    `sending_state`, `created`, `updated`, `deduplicate_id`. That is a genuinely
+    different grain, unlike the per-parent `*/messages` routes, which returned
+    documents byte-identical to `/v1/messages`. Both arrays are empty in this
+    workspace, so the *identity* of the ids across the two could not be checked;
+    the schema difference is what settles it.
+
+examples:
+  - name: 200 - empty actions array, no next key
+    request:
+      url: "https://api.customer.io/v1/campaigns/1/actions"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "actions": []
+          }

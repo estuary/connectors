@@ -1,0 +1,29 @@
+info:
+  name: ESP Suppressions
+  type: folder
+  seq: 4
+
+docs:
+  content: |-
+    `/v1/esp/suppression/{suppression_type}` — addresses the email service
+    provider has suppressed, by reason.
+
+    **This folder exists because the endpoint was mis-grouped.** It was
+    originally assigned to Cluster C on the assumption that it pages with
+    `start`/`limit` and returns `next` like the rest of that cluster. It does
+    not. Three independent differences, each on its own enough to break a
+    shared implementation:
+
+    1. **Offset pagination, not cursor.** `offset`/`limit`, and the 200 schema
+       declares **no `next` field at all**. Termination has to be inferred from
+       a short page rather than read off a marker.
+    2. **The resource fans out over a path parameter.** `{suppression_type}` is
+       a server-validated enum of four values, so this is four result sets
+       behind one route, not one.
+    3. **The item array comes back as JSON `null`**, where all three genuine
+       Cluster C endpoints return `[]`.
+
+    A fourth route, `/v1/esp/domains/{domain_name}/suppression/{type}`, returns
+    the same documents but pages by **cursor** with a `next` — a different
+    mechanism again, for the same data. It is also redundant: the flat endpoint
+    takes a `domain` query filter. See `domain scoped variant`.

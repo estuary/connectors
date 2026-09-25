@@ -1,0 +1,93 @@
+info:
+  name: page walk
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/messages?limit=1"
+  params:
+    - name: limit
+      value: "1"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Messages/operation/listMessages
+
+    **WHY:** Two questions the connector's pagination and cursor design both
+    depend on: (1) in what order does `/v1/messages` return deliveries, and
+    (2) does a `limit=1` walk reassemble the same set, in the same order, with
+    no gap, duplicate, or reorder. The endpoint exposes **no sort parameter**, so
+    paging relies entirely on a stable default order — that stability has to be
+    proved, not assumed.
+
+    To walk: run this request, copy the returned `next` into the `start` query
+    param, re-run, and repeat until `next` is `""`. Save each page as its own
+    example (`200 - page 1`, `200 - page 2`, ...). Deliberately manual — no
+    scripted loop (`bruno-probe-endpoint` Phase 6 forbids request-generating
+    scripts).
+
+    **VERIFIED (2026-09-14):** Contiguity holds. A `limit=1` walk over the
+    sandbox's 2 deliveries returns each exactly once, in a stable order, with no
+    gap, duplicate or reorder, and terminates with `next: ""` on page 2. Repeated
+    runs of every other request in this folder returned the same two deliveries
+    in the same order, so the default order is **stable across calls**.
+
+    **UNOBSERVABLE:** The ordering *key*. Both sandbox deliveries share
+    `created: 1789073105` (they are two recipients of one newsletter send), so
+    the observed order cannot distinguish "newest `created` first" from any other
+    rule, and the endpoint exposes no sort parameter to pin it. Seeding more
+    deliveries would help only if they landed in different seconds, and the trial
+    workspace expires shortly.
+
+    **This is by design de-risked, not left dangling.** The connector's backfill
+    walks fixed `start_ts`/`end_ts` time windows rather than relying on result
+    order, precisely so that an unprovable ordering cannot become a correctness
+    dependency. `created` is immutable, so an elapsed window is a frozen set
+    regardless of what order the server returns it in. If the ordering key is
+    ever established, nothing in the design needs to change. See `plan.md` §5a.
+
+    **DOCUMENTED (2026-09-10):** `start` is presented as an opaque server-issued
+    continuation token; the spec says only "The token for the page of results you
+    want to return." Nothing in the docs states a TTL, a stability guarantee
+    across provider-side state changes, or a resumability window.
+
+    **VERIFIED (2026-09-14):** It is **not actually opaque, and it is
+    positional** — see `Messages / page walk continued` for the decode and the
+    out-of-range behavior. Both the documentary silence and the observed
+    behavior point the same way: the connector must keep `start` local to a
+    single generator invocation and checkpoint only a value derived from the
+    documents themselves (a `created` watermark). See `plan.md` §3.
+
+examples:
+  - name: 200 - page 1 of a limit=1 walk (projection)
+    request:
+      url: "https://api.customer.io/v1/messages?limit=1"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "messages": [
+              {
+                "id": "dgSKmQ4DAAIBAaCNESMVaO-6zjnpCeH1pQ==",
+                "created": 1789073105,
+                "deduplicate_id": "dgSKmQ4DAAIBAaCNESMVaO-6zjnpCeH1pQ==:1789073290"
+              }
+            ],
+            "next": "djIwOjE="
+          }

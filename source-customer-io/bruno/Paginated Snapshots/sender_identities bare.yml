@@ -1,0 +1,58 @@
+info:
+  name: sender_identities bare
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/sender_identities"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Sender-Identities/operation/listSenderIdentities
+
+    **WHY:** Establishes the envelope key, the empty-state representation and
+    the terminal-`next` convention for the second Cluster C endpoint. Issued
+    bare so the response records the endpoint's *default* behaviour — which
+    matters more here than elsewhere, because this endpoint has a default
+    filter that hides rows (see `sender_identities hidden`).
+
+    **VERIFIED (2026-09-21):** 200 with `{"sender_identities": [], "next": ""}`.
+
+    - Envelope key is `sender_identities` — it does match the path segment,
+      unlike `/v1/transactional` and `/v1/object_types`.
+    - Empty state is **`[]`**, not `null`. Two of Cluster C's three endpoints
+      (`newsletters`, `sender_identities`) return `[]`; `optouts` also returns
+      `[]`. No Cluster C endpoint has been observed returning `null` — but
+      `ESP Suppressions / bounces` does, so the connector still normalises.
+    - `next` is present and **empty on a response that is itself empty**. So
+      unlike `/v1/newsletters`, this endpoint does not hand back a token
+      pointing past the end when the result set is exhausted — at least not
+      when it is exhausted at zero rows.
+
+    **UNOBSERVABLE (2026-09-21):** The sandbox workspace has no sender
+    identities, so no document shape, no multi-page walk and no token format
+    were observed. Whether this endpoint's token is a bare positional offset
+    (like `/v1/newsletters`) or the `v20:<n>` form (like `/v1/messages`) is
+    **not established** — see `sender_identities bad token`, which proves only
+    that *some* token validation happens.
+
+    **DOCUMENTED (2026-09-21):** Per the OpenAPI spec
+    (https://docs.customer.io/files/journeys-app.json) a sender identity
+    carries `id` (int), `name`, `email`, `address`, `phone`, `template_type`
+    (enum), `auto_generated` (bool), `hidden` (bool) and `deduplicate_id`.
+
+    **LIMITATION (DOCUMENTED 2026-09-21) — no timestamps.** The spec declares
+    **no `created`/`updated` field of any kind** on a sender identity. The only
+    time-bearing value is `deduplicate_id`, whose spec example `4534:1478035647`
+    is `<id>:<unix seconds>` — the same shape `/v1/newsletters` returns
+    (`1:1789073099`, matching that row's `updated`). It is a de-facto
+    updated-at, but it is a string, it is not documented as one, and **no query
+    parameter filters on it**. This endpoint cannot be incremental.

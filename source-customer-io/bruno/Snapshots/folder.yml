@@ -1,0 +1,19 @@
+info:
+  name: Snapshots
+  type: folder
+  seq: 2
+
+docs:
+  content: |-
+    Cluster B — the unfiltered, unpaginated list endpoints behind the
+    connector's snapshot streams. One request per candidate endpoint, each
+    issued bare (no query parameters) so the response records the endpoint's
+    *default* behaviour: envelope key, whether a pagination field appears, and
+    the document shape.
+
+    The sandbox workspace is a trial created ~2026-09-07 holding 2 profiles,
+    1 one-time send and 2 email deliveries, so several of these return empty
+    arrays. An empty array still proves the path, the auth and the envelope
+    key; it proves nothing about document shape. Those requests are marked
+    **UNOBSERVABLE** with the OpenAPI spec cited as the DOCUMENTED fallback,
+    and `Seeding/` carries the UI click-paths that would make them observable.

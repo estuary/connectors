@@ -1,0 +1,55 @@
+info:
+  name: B3 - Create a collection
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{base_url}}/v1/collections"
+  body:
+    type: json
+    json: |-
+      {
+        "name": "estuary_probe_collection",
+        "data": [
+          { "sku": "EST-1", "label": "Probe row one", "price": 10 },
+          { "sku": "EST-2", "label": "Probe row two", "price": 20 }
+        ]
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **ONLY THE USER RUNS THIS REQUEST. The assistant never runs it**
+    (`API-NEVER-MUTATE`).
+
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Collections/operation/addCollection
+
+    **WHY:** `Snapshots / collections` returned `{"collections": null}`, which
+    proves the envelope and the null empty-state but nothing about the
+    document. Creating one collection makes `id`, `name`, `description`,
+    `schema`, `rows`, `bytes`, `created_at` and `updated_at` observable, and
+    in particular settles whether `collections` flips from `null` to `[]` once
+    non-empty — the question that decides whether `null` is a Go nil-slice
+    artifact or a documented empty-state contract.
+
+    **Expect this to fail on a trial workspace.** Collections are limited to
+    premium and enterprise plans
+    (https://docs.customer.io/messaging/objects-data/collections/). A 4xx here
+    is itself a useful result: record it and leave `collections` UNOBSERVABLE.
+    A 200 means the trial includes the feature after all.
+
+    **After running,** re-run `Snapshots / collections` and save the new
+    response as a second example.
+
+    **Cleanup:** `DELETE /v1/collections/{collection_id}` removes it. Deleting
+    it *after* a second read is also the cheapest way to observe whether the
+    array returns to `null` or settles on `[]`.
+
+    **Outcome:** not yet run.
