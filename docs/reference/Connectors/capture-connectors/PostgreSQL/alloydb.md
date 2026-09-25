@@ -23,7 +23,7 @@ You'll need an AlloyDB database setup with the following:
 * A replication slot. This represents a “cursor” into the PostgreSQL write-ahead log from which change events can be read.
     * Optional; if none exist, one will be created by the connector.
     * If you wish to run multiple captures from the same database, each must have its own slot.
-    You can create these slots yourself, or by specifying a name other than the default in the advanced [configuration](#configuration).
+    You can create these slots yourself, or by specifying a name other than the default in the advanced [configuration](./PostgreSQL.md#configuration).
 * A publication. This represents the set of tables for which change events will be reported.
     * In more restricted setups, this must be created manually, but can be created automatically if the connector has suitable permissions.
 * A watermarks table. The watermarks table is a small “scratch space” to which the connector occasionally writes a small amount of data to ensure accuracy when backfilling preexisting table contents.
