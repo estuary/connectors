@@ -30,6 +30,11 @@ SIX_HOURS = 6 * 60 * 60
 MAX_CONCURRENT_BULK_OPS = 5
 MAX_QUERY_REQUEST_ATTEMPTS = 5
 MAX_QUERY_REQUEST_RETRY_INTERVAL = 60  # 1 minute
+# Prepended to every bulk query the connector submits. Shopify reports the submitted query back
+# in `BulkOperation.query`, so the marker tells the connector's own jobs apart from jobs other
+# systems submit with the same app credentials. Changing it orphans jobs submitted by prior
+# versions.
+BULK_QUERY_MARKER = "# Estuary Flow Managed Bulk Query"
 
 
 class BulkJobError(RuntimeError):
@@ -421,7 +426,7 @@ class BulkJobManager:
         query = f"""
             mutation {{
             bulkOperationRunQuery(
-                query: \"\"\"{query}\"\"\",
+                query: \"\"\"{BULK_QUERY_MARKER}\n{query}\"\"\",
                 groupObjects: true
             ) {{
                 bulkOperation {{
