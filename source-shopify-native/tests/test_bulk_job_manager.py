@@ -51,8 +51,11 @@ class FakeClient:
         self,
         running_jobs: list[dict[str, Any]],
         final_status: str = "CANCELED",
+        keeps_comments: bool = True,
     ):
         self.store = STORE
+        # Whether the query reported back for a submitted job keeps its comment lines.
+        self.keeps_comments = keeps_comments
         self.running_jobs = running_jobs
         self.final_status = final_status
         self.cancelled: list[str] = []
@@ -65,10 +68,15 @@ class FakeClient:
 
         if "bulkOperationRunQuery(" in query:
             self.submitted.append(query)
+            reported_query = _submitted_inner_query(query)
+            if not self.keeps_comments:
+                reported_query = "\n".join(
+                    line for line in reported_query.splitlines() if not line.strip().startswith("#")
+                )
             job_id = f"gid://shopify/BulkOperation/{100 + len(self.submitted)}"
             payload = {
                 "bulkOperationRunQuery": {
-                    "bulkOperation": _job(job_id, status="CREATED", query=_submitted_inner_query(query)),
+                    "bulkOperation": _job(job_id, status="CREATED", query=reported_query),
                     "userErrors": [],
                 }
             }
@@ -146,3 +154,15 @@ async def test_execute_submits_marked_query(log):
     assert len(client.submitted) == 1
     inner_lines = [line.strip() for line in _submitted_inner_query(client.submitted[0]).splitlines()]
     assert MARKER in inner_lines
+    log.warning.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_execute_warns_when_shopify_drops_marker(log):
+    """If Shopify stops keeping comments, the connector can't recognise its own jobs, so say so."""
+    client = FakeClient(running_jobs=[], final_status="COMPLETED", keeps_comments=False)
+
+    await _manager(client, log).execute(MagicMock(NAME="products"), "{ products { edges { node { id } } } }")
+
+    warnings = [call.args[0] for call in log.warning.call_args_list]
+    assert any("did not keep the bulk query marker" in w for w in warnings), warnings
