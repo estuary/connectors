@@ -6,9 +6,11 @@ import ReactPlayer from "react-player";
 
 # PostgreSQL
 
-This connector uses change data capture (CDC) to continuously capture updates in a PostgreSQL database into one or more Estuary collections.
+Estuary's PostgreSQL connector uses change data capture (CDC) to continuously capture updates from a PostgreSQL database into one or more data collections.
 
 For managed PostgreSQL instances that do not support logical replication, we offer a [PostgreSQL Batch Connector](./postgres-batch/) as an alternative.
+
+Postgres can also be used as a destination with the [PostgreSQL **materialization** connector](/reference/Connectors/materialization-connectors/PostgreSQL).
 
 ## Supported versions and platforms
 
@@ -17,12 +19,33 @@ This connector supports PostgreSQL versions 10.0 and later on major cloud platfo
 Setup instructions are provided for the following platforms:
 
 - [Self-hosted PostgreSQL](#self-hosted-postgresql)
-- [Amazon RDS](./amazon-rds-postgres/)
+- [AlloyDB](./alloydb.md)
 - [Amazon Aurora](./amazon-aurora/)
-- [Google Cloud SQL](./google-cloud-sql-postgres/)
+- [Amazon RDS](./amazon-rds-postgres/)
 - [Azure Database for PostgreSQL](#azure-database-for-postgresql)
+- [Google Cloud SQL](./google-cloud-sql-postgres/)
+- [Neon](./neon-postgres.md)
+- [Supabase](./Supabase.md)
+
+To use the connector with other platforms, follow the [generic setup instructions](#self-hosted-postgresql).
 
 <ReactPlayer controls url="https://www.youtube.com/watch?v=10BLaiRc9uU?t=355" />
+
+## Features
+
+This connector and its variants include the following features:
+
+| Feature | Availability | Notes |
+| --- | --- | --- |
+| Real-time capture | ✅ | Destination sync cadence can still be controlled on the materialization side |
+| [Capture from standbys](#capturing-from-read-only-standbys) | ✅<br/>PostgreSQL version 16+ | Requires additional setup configuration |
+| [IAM authentication](#iam-authentication) | ✅<br/>Cloud-based variants can use the IAM option for the relevant platform | AWS, Azure, and GCP IAM options |
+| [SSH tunneling](/guides/connect-network) | ✅ | [Private and BYOC](/private-byoc) deployments can also support [reverse SSH](/guides/connect-network/#expose-ports-on-a-reverse-ssh-tunnel-bastion) |
+| [PrivateLink](/private-byoc/privatelink) | ✅<br/>Only available for [private/BYOC](/private-byoc) deployments | Support for AWS PrivateLink, Azure Private Link, and GCP Private Service Connect |
+| Limit captured data | ✅ | Multiple configuration options are provided to [manage backfills](#backfills-and-performance-considerations) |
+| [History mode](/guides/customize-dataflows/#history-mode) | ✅ | |
+| [Source tag](/guides/customize-dataflows/#source-tag) | ✅ | |
+| [Rediscovery interval](/guides/customize-dataflows/#rediscovery-interval) | ✅ | |
 
 ## Prerequisites
 
@@ -48,15 +71,6 @@ you can also use private cloud networking features to reach your database.
 :::
 
 ## Setup
-
-To meet these requirements, follow the steps for your hosting type.
-
-- [Self-hosted PostgreSQL](#self-hosted-postgresql)
-- [Amazon RDS](./amazon-rds-postgres/)
-- [Amazon Aurora](#amazon-aurora)
-- [Google Cloud SQL](./google-cloud-sql-postgres/)
-- [Azure Database for PostgreSQL](#azure-database-for-postgresql)
-- [Supabase](Supabase)
 
 ### Self-hosted PostgreSQL
 
@@ -108,6 +122,11 @@ where `<other_tables>` lists all tables that will be captured from. The `publish
 setting is recommended (because most users will want changes to a partitioned table to be captured
 under the name of the root table) but is not required.
 
+:::tip
+It is recommended that you only include tables you wish to capture in the
+publication rather than creating a publication `FOR ALL TABLES`.
+:::
+
 4. Set WAL level to logical:
 
 ```sql
@@ -132,31 +151,31 @@ ALTER SYSTEM SET wal_level = logical;
 
 3. In the PostgreSQL client, connect to your instance and run the following commands to create a new user for the capture with appropriate permissions.
 
-```sql
-CREATE USER flow_capture WITH PASSWORD 'secret' REPLICATION;
-```
+   ```sql
+   CREATE USER flow_capture WITH PASSWORD 'secret' REPLICATION;
+   ```
 
-- If using PostgreSQL v14 or later:
+   - If using PostgreSQL v14 or later:
 
-```sql
-GRANT pg_read_all_data TO flow_capture;
-```
+   ```sql
+   GRANT pg_read_all_data TO flow_capture;
+   ```
 
-- If using an earlier version:
+   - If using an earlier version:
 
-  ```sql
-  ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES to flow_capture;
-      GRANT SELECT ON ALL TABLES IN SCHEMA public, <others> TO flow_capture;
-      GRANT SELECT ON ALL TABLES IN SCHEMA information_schema, pg_catalog TO flow_capture;
-  ```
+     ```sql
+     ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES to flow_capture;
+     GRANT SELECT ON ALL TABLES IN SCHEMA public, <others> TO flow_capture;
+     GRANT SELECT ON ALL TABLES IN SCHEMA information_schema, pg_catalog TO flow_capture;
+     ```
 
-  where `<others>` lists all schemas that will be captured from.
+     where `<others>` lists all schemas that will be captured from.
 
-  :::info
-  If an even more restricted set of permissions is desired, you can also grant SELECT on
-  just the specific table(s) which should be captured from. The ‘information_schema’ and ‘pg_catalog’ access is required for stream auto-discovery, but not for capturing already
-  configured streams.
-  :::
+     :::info
+     If an even more restricted set of permissions is desired, you can also grant SELECT on
+     just the specific table(s) which should be captured from. The ‘information_schema’ and ‘pg_catalog’ access is required for stream auto-discovery, but not for capturing already
+     configured streams.
+     :::
 
 4. Set up the watermarks table and publication.
 
@@ -176,6 +195,10 @@ ALTER PUBLICATION flow_publication ADD TABLE public.flow_watermarks, <other_tabl
    - Find the instance's host under Server Name, and the port under Connection Strings (usually `5432`). Together, you'll use the host:port as the `address` property when you configure the connector.
    - Format `user` as `username@databasename`; for example, `flow_capture@myazuredb`.
 
+### SSL Mode
+
+Certain managed PostgreSQL implementations may require you to explicitly set the [SSL Mode](https://www.postgresql.org/docs/current/libpq-ssl.html#LIBPQ-SSL-PROTECTION) to connect with Estuary. One example is [Neon](https://neon.tech/docs/connect/connect-securely), which requires the setting `verify-full`. Check your managed PostgreSQL's documentation for details if you encounter errors related to the SSL mode configuration.
+
 ## Backfills and performance considerations
 
 When the PostgreSQL capture is initiated, by default, the connector first _backfills_, or captures the targeted tables in their current state. It then transitions to capturing change events on an ongoing basis.
@@ -183,7 +206,22 @@ When the PostgreSQL capture is initiated, by default, the connector first _backf
 This is desirable in most cases, as it ensures that a complete view of your tables is captured into Estuary.
 However, you may find it appropriate to skip the backfill, especially for extremely large tables.
 
-In this case, you may turn off backfilling on a per-table basis. See [properties](#properties) for details.
+This connector provides a variety of ways to manage your backfilling preferences
+and reduce a backfill's impact.
+
+On a per-connector basis, you can:
+
+* [Use `XID`s](/reference/backfilling-data/#postgresql-capture) to specify a minimum (and/or max) `XID` for your backfill
+* Provide a list of table names to skip during backfills
+* Set the backfill chunk size to tune backfill efficiency
+
+On a per-binding basis, you can:
+
+* Choose a [backfill mode](/reference/backfilling-data/#resource-configuration-backfill-modes)
+* Set the backfill priority for the table
+* Apply a SQL statement as an [additional backfill filter](/reference/backfilling-data/#additional-backfill-filters)
+
+See endpoint and binding [properties](#properties) for additional usage details.
 
 ## Replication slot recovery
 
@@ -261,13 +299,13 @@ every few minutes and include that in the capture.
 PostgreSQL logical replication can only acknowledge changes which modify at least one
 table in the publication. If all of the tables being captured are idle while there are
 significant changes to other tables on the same server, the replication slot cannot
-advance and PostgreSQL WAL retention will continue to grow, potentially without bound (see [WAL Retention and Tuning Parameters](#wal-retention-and-tuning-parameters))
-for more information.
+advance and PostgreSQL WAL retention will continue to grow, potentially without bound (see [WAL Retention and Tuning Parameters](#wal-retention-and-tuning-parameters)
+for more information).
 
 To enable read-only operation:
 
-- In the Estuary web app: Select the "Read-Only Capture" checkbox in the "Advanced Options" section of the capture configuration.
-- In the YAML configuration: Set `read_only_capture: true` in the advanced section of the config.
+- In the Estuary dashboard: Select the "Read-Only Capture" checkbox in the "Advanced Options" section of the capture configuration.
+- Or in the YAML configuration: Set `read_only_capture: true` in the advanced section of the config.
 
 ### Capturing from Read-Only Standbys
 
@@ -327,35 +365,86 @@ See guides by provider for setup details:
 
 The connector will require [credentials](#authentication) based on your chosen authentication method, such as an AWS role ARN or GCP workload identity pool audience.
 
+## TOASTed values
+
+PostgreSQL has a hard page size limit, usually 8 KB, for performance reasons.
+If your tables contain values that exceed the limit, those values can't be stored directly.
+PostgreSQL uses [TOAST](https://www.postgresql.org/docs/current/storage-toast.html) (The Oversized-Attribute Storage Technique) to
+store them separately.
+
+TOASTed values can sometimes present a challenge for systems that rely on the PostgreSQL write-ahead log (WAL), like this connector.
+If a change event occurs on a row that contains a TOASTed value, _but the TOASTed value itself is unchanged_, it is omitted from the WAL.
+As a result, the connector emits a row update with the value omitted, which might cause
+unexpected results in downstream catalog tasks if adjustments are not made.
+
+The PostgreSQL connector handles TOASTed values for you when you follow the [standard discovery workflow](/concepts/captures.md#discovery)
+or use the [Estuary dashboard](/concepts/web-app.md) to create your capture.
+It uses [merge](/reference/reduction-strategies/merge) [reductions](/concepts/schemas.md#reductions)
+to fill in the previous known TOASTed value in cases when that value is omitted from a row update.
+
+However, due to the event-driven nature of certain tasks in Estuary, it's still possible to see unexpected results in your data flow, specifically:
+
+- When you materialize the captured data to another system using a connector that requires [delta updates](/concepts/materialization/#delta-updates)
+- When you perform a [derivation](/concepts/derivations.md) that uses TOASTed values
+
 ## Configuration
 
-You configure connectors either in the Estuary web app, or by directly editing the catalog specification file.
-See [connectors](/concepts/connectors.md#using-connectors) to learn more about using connectors. The values and specification sample below provide configuration details specific to the PostgreSQL source connector.
+You configure connectors either in the Estuary dashboard, or by directly editing the catalog specification file.
+See [connectors](/concepts/connectors.md#using-connectors) to learn more about using connectors.
+
+PostgreSQL captures can be configured using the following properties.
+* **Bolded** properties are required
+* Other properties allow you to customize your configuration
 
 ### Properties
 
 #### Endpoint
 
-| Property                        | Title               | Description                                                                                                                                 | Type    | Required/Default           |
-| ------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------- | -------------------------- |
-| **`/address`**                  | Address             | The host or host:port at which the database can be reached.                                                                                 | string  | Required                   |
-| **`/database`**                 | Database            | Logical database name to capture from.                                                                                                      | string  | Required, `"postgres"`     |
-| **`/user`**                     | User                | The database user to authenticate as.                                                                                                       | string  | Required, `"flow_capture"` |
+Endpoint properties let you connect to your endpoint system and provide
+customization for the connector as a whole.
+
+| Property | Title | Description | Type | Required/Default |
+| --- | --- | --- | --- | --- |
+| **`/address`** | Address | The host or `host:port` at which the database can be reached. | string | Required |
+| **`/database`** | Database | Logical database name to capture from. | string | Required, `"postgres"` |
+| **`/user`** | User | The database user to authenticate as. | string | Required, `"flow_capture"` |
+| **`/credentials`** | Authentication | [Authentication method](#authentication) and credentials that provide access to the database. | object | Required |
 | `/historyMode` | History Mode | Capture each change event, without merging. | boolean | `false` |
 
 ##### Authentication
 
+The connector must use one of the following authentication types:
+
+**User/Password Authentication**
+
 | Property | Title | Description | Type | Required/Default |
 | --- | --- | --- | --- | --- |
-| **`/credentials`** | Authentication | Authentication method and credentials that provide access to the database. | object | Required |
-| `/credentials/auth_type` | Auth Type | The authentication method to use. One of `UserPassword`, `AWSIAM`, `GCPIAM`, or `AzureIAM`. | string |  |
-| `/credentials/password` | Password | Password for the specified database user. | string | Required for `UserPassword` auth |
-| `/credentials/aws_region` | AWS Region | AWS region of your resource. | string | Required for `AWSIAM` auth |
-| `/credentials/aws_role_arn` | AWS Role ARN | AWS role for Estuary to use that has access to the resource. | string | Required for `AWSIAM` auth |
-| `/credentials/gcp_service_account_to_impersonate` | GCP Service Account | GCP service account email for Cloud SQL IAM authentication. | string | Required for `GCPIAM` auth |
-| `/credentials/gcp_workload_identity_pool_audience` | Workload Identity Pool Audience | GCP workload identity pool audience. The format should be similar to: `//iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/test-pool/providers/test-provider`. | string | Required for `GCPIAM` auth |
-| `/credentials/azure_client_id` | Azure Client ID | Azure App Registration Client ID for Azure Active Directory authentication. | string | Required for `AzureIAM` auth |
-| `/credentials/azure_tenant_id` | Azure Tenant ID | Azure Tenant ID for Azure Active Directory authentication. | string | Required for `AzureIAM` auth |
+| **`/credentials/auth_type`** | Auth Type | The authentication method to use. Use `UserPassword`. | string | Required |
+| **`/credentials/password`** | Password | Password for the specified database user. | string | Required |
+
+**AWS IAM Authentication**
+
+| Property | Title | Description | Type | Required/Default |
+| --- | --- | --- | --- | --- |
+| **`/credentials/auth_type`** | Auth Type | The authentication method to use. Use `AWSIAM`. | string | Required |
+| **`/credentials/aws_region`** | AWS Region | AWS region of your resource. | string | Required |
+| **`/credentials/aws_role_arn`** | AWS Role ARN | AWS role for Estuary to use that has access to the resource. | string | Required |
+
+**GCP IAM Authentication**
+
+| Property | Title | Description | Type | Required/Default |
+| --- | --- | --- | --- | --- |
+| **`/credentials/auth_type`** | Auth Type | The authentication method to use. Use `GCPIAM`. | string | Required |
+| **`/credentials/gcp_service_account_to_impersonate`** | GCP Service Account | GCP service account email for Cloud SQL IAM authentication. | string | Required |
+| **`/credentials/gcp_workload_identity_pool_audience`** | Workload Identity Pool Audience | GCP workload identity pool audience. The format should be similar to: `//iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/test-pool/providers/test-provider`. | string | Required |
+
+**Azure IAM Authentication**
+
+| Property | Title | Description | Type | Required/Default |
+| --- | --- | --- | --- | --- |
+| **`/credentials/auth_type`** | Auth Type | The authentication method to use. Use `AzureIAM`. | string | Required |
+| **`/credentials/azure_client_id`** | Azure Client ID | Azure App Registration Client ID for Azure Active Directory authentication. | string | Required |
+| **`/credentials/azure_tenant_id`** | Azure Tenant ID | Azure Tenant ID for Azure Active Directory authentication. | string | Required |
 
 ##### Discovery Filters
 
@@ -375,13 +464,13 @@ these filters exclude will be deactivated the next time discovery runs.
 
 | Property | Title | Description | Type | Required/Default |
 | --- | --- | --- | --- | --- |
-| `/advanced`                     | Advanced Options    | Options for advanced users. You should not typically need to modify these.                                                                  | object  |                            |
-| `/advanced/backfill_chunk_size` | Backfill Chunk Size | The number of rows which should be fetched from the database in a single backfill query.                                                    | integer | `4096`                     |
-| `/advanced/publicationName`     | Publication Name    | The name of the PostgreSQL publication to replicate from.                                                                                   | string  | `"flow_publication"`       |
-| `/advanced/skip_backfills`      | Skip Backfills      | A comma-separated list of fully-qualified table names which should not be backfilled.                                                       | string  |                            |
-| `/advanced/slotName`            | Slot Name           | The name of the PostgreSQL replication slot to replicate from.                                                                              | string  | `"flow_slot"`              |
-| `/advanced/watermarksTable`     | Watermarks Table    | The name of the table used for watermark writes during backfills. Must be fully-qualified in &#x27;&lt;schema&gt;.&lt;table&gt;&#x27; form. | string  | `"public.flow_watermarks"` |
-| `/advanced/sslmode`             | SSL Mode            | Overrides SSL connection behavior by setting the 'sslmode' parameter.                                                                       | string  |                            |
+| `/advanced` | Advanced Options | Options for advanced users. You should not typically need to modify these. | object |  |
+| `/advanced/backfill_chunk_size` | Backfill Chunk Size | The number of rows which should be fetched from the database in a single backfill query. | integer | `4096` |
+| `/advanced/publicationName` | Publication Name | The name of the PostgreSQL publication to replicate from. | string | `"flow_publication"` |
+| `/advanced/skip_backfills` | Skip Backfills | A comma-separated list of fully-qualified table names which should not be backfilled. | string |  |
+| `/advanced/slotName` | Slot Name | The name of the PostgreSQL replication slot to replicate from. | string | `"flow_slot"` |
+| `/advanced/watermarksTable` | Watermarks Table | The name of the table used for watermark writes during backfills. Must be fully-qualified in `<schema>.<table>` form. | string  | `"public.flow_watermarks"` |
+| `/advanced/sslmode` | SSL Mode | Overrides SSL connection behavior by setting the 'sslmode' parameter. | string |  |
 | `/advanced/discover_schemas` | Discovery Schema Selection | If this is specified, only tables in the selected schema(s) will be automatically discovered. | string array |  |
 | `/advanced/min_backfill_xid` | Minimum Backfill XID | Only backfill rows with XMIN values greater (in a 32-bit modular comparison) than the specified XID. Helpful for reducing re-backfill data volume in certain edge cases. | string |  |
 | `/advanced/read_only_capture` | Read-Only Capture | When set, the capture will operate in [read-only mode](#read-only-captures) and avoid operations such as watermark writes. | boolean | `false` |
@@ -390,20 +479,26 @@ these filters exclude will be deactivated the next time discovery runs.
 | `/advanced/source_tag` | Source Tag | This value is added as the property 'tag' in the source metadata of each document. | string |  |
 | `/advanced/statement_timeout` | Statement Timeout | Overrides the statement timeout used by the connector. Leave blank to use the default of 2 minutes. Set to `0` to disable statement timeouts entirely. Options include `""`, `0`, `30s`, `1m`, `2m`, `5m`, and `30m`. | string | `""` |
 | `/advanced/rediscovery_interval` | Rediscovery Interval | How often the connector re-runs discovery while a capture is running, in order to notice schema changes and newly added tables. Accepts duration strings like `15m` or `1h`, from `1m` up to `8760h`. | string | `"15m"` |
+| `/advanced/feature_flags` | Feature Flags | Provide settings to handle edge cases or try experimental features. See [feature flags](/guides/advanced-usage/feature-flags) for usage. Contact support before applying to any production workloads. | string |  |
+
+##### Network Tunnel
+
+You may use `networkTunnel` properties with this capture to configure an SSH
+tunnel. See [secure networks](/concepts/connectors/#connecting-to-endpoints-on-secure-networks)
+for property names and usage.
 
 #### Bindings
 
-| Property         | Title     | Description                                                                                | Type   | Required/Default |
-| ---------------- | --------- | ------------------------------------------------------------------------------------------ | ------ | ---------------- |
-| **`/namespace`** | Namespace | The [namespace/schema](https://www.postgresql.org/docs/9.1/ddl-schemas.html) of the table. | string | Required         |
-| **`/stream`**    | Stream    | Table name.     | string | Required         |
+Binding properties are configured on a per-resource basis. This is how you tell
+Estuary to transfer data from specific tables to your data collections.
+
+| Property | Title | Description | Type | Required/Default |
+| --- | --- | --- | --- |
+| **`/namespace`** | Namespace | The [namespace/schema](https://www.postgresql.org/docs/9.1/ddl-schemas.html) of the table. | string | Required |
+| **`/stream`** | Stream | Table name. | string | Required |
 | `/mode` | [Backfill Mode](/reference/backfilling-data/#resource-configuration-backfill-modes) | How the preexisting contents of the table should be backfilled. This should generally not be changed. | string | `""` |
 | `/priority` | Backfill Priority | Optional priority for this binding. The highest priority binding(s) will be backfilled completely before any others. Negative priorities are allowed and will cause a binding to be backfilled after others. | integer | `0` |
 | `/advanced/additional_backfill_filter` | Additional Backfill Filter | Optional filter clause which will be applied to all backfill queries for this binding. Contact Estuary support for assistance before using this option. | string | |
-
-#### SSL Mode
-
-Certain managed PostgreSQL implementations may require you to explicitly set the [SSL Mode](https://www.postgresql.org/docs/current/libpq-ssl.html#LIBPQ-SSL-PROTECTION) to connect with Estuary. One example is [Neon](https://neon.tech/docs/connect/connect-securely), which requires the setting `verify-full`. Check your managed PostgreSQL's documentation for details if you encounter errors related to the SSL mode configuration.
 
 ### Sample
 
@@ -429,47 +524,17 @@ captures:
         target: ${PREFIX}/${COLLECTION_NAME}
 ```
 
+Use this as a reference if you plan to write your own specification and
+publish it using [`flowctl`](/concepts/flowctl).
 Your capture definition will likely be more complex, with additional bindings for each table in the source database.
 
 [Learn more about capture definitions.](/concepts/captures.md)
 
-## TOASTed values
+## Troubleshooting
 
-PostgreSQL has a hard page size limit, usually 8 KB, for performance reasons.
-If your tables contain values that exceed the limit, those values can't be stored directly.
-PostgreSQL uses [TOAST](https://www.postgresql.org/docs/current/storage-toast.html) (The Oversized-Attribute Storage Technique) to
-store them separately.
-
-TOASTed values can sometimes present a challenge for systems that rely on the PostgreSQL write-ahead log (WAL), like this connector.
-If a change event occurs on a row that contains a TOASTed value, _but the TOASTed value itself is unchanged_, it is omitted from the WAL.
-As a result, the connector emits a row update with the value omitted, which might cause
-unexpected results in downstream catalog tasks if adjustments are not made.
-
-The PostgreSQL connector handles TOASTed values for you when you follow the [standard discovery workflow](/concepts/captures.md#discovery)
-or use the [Estuary UI](/concepts/web-app.md) to create your capture.
-It uses [merge](/reference/reduction-strategies/merge) [reductions](/concepts/schemas.md#reductions)
-to fill in the previous known TOASTed value in cases when that value is omitted from a row update.
-
-However, due to the event-driven nature of certain tasks in Estuary, it's still possible to see unexpected results in your data flow, specifically:
-
-- When you materialize the captured data to another system using a connector that requires [delta updates](/concepts/materialization/#delta-updates)
-- When you perform a [derivation](/concepts/derivations.md) that uses TOASTed values
-
-### Troubleshooting
-
-If you encounter an issue that you suspect is due to TOASTed values, try the following:
+If you encounter an issue that you suspect is due to [TOASTed](#toasted-values) values, try the following:
 
 - Ensure your collection's schema is using the merge [reduction strategy](/concepts/schemas.md#reduce-annotations).
 - [Set REPLICA IDENTITY to FULL](https://www.postgresql.org/docs/9.4/sql-altertable.html) for the table. This circumvents the problem by forcing the
   WAL to record all values regardless of size. However, this can have performance impacts on your database and must be carefully evaluated.
 - [Contact Estuary support](mailto:support@estuary.dev) for assistance.
-
-## Publications
-
-It is recommended that the publication used by the capture only contain the tables that will be captured. In some cases it may be desirable to create this publication for all tables in the database instead of specific tables, for example using:
-
-```sql
-CREATE PUBLICATION flow_publication FOR ALL TABLES WITH (publish_via_partition_root = true);
-```
-
-Caution must be used if creating the publication in this way as all existing tables (even those not part of the capture) will be included in it, and if any of them do not have a primary key they will no longer be able to process updates or deletes.
