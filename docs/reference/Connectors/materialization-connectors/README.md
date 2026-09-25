@@ -40,6 +40,7 @@ In the future, other open-source materialization connectors from third parties c
 * [MySQL](./MySQL/)
 * [MySQL Heatwave](./mysql-heatwave.md)
 * [Pinecone](./pinecone.md)
+* [Qdrant](./qdrant.md)
 * [PostgreSQL](./PostgreSQL/)
 * [SingleStore](./MySQL/singlestore-mysql.md)
 * [SQLite](./SQLite.md)
