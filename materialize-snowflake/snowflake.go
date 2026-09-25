@@ -885,6 +885,10 @@ func (d *transactor) copyHistory(ctx context.Context, tableName string, fileName
 	return items, nil
 }
 
+func (d *transactor) Flush(context.Context, []json.RawMessage, map[int]time.Time, map[int]time.Time) error {
+	return nil
+}
+
 // Acknowledge merges data from temporary table to main table
 func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
 	defer func() {

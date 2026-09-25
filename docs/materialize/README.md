@@ -374,6 +374,54 @@ Much more complexity for the client.
 Aside from internal usage, only very sophisticated users would successfully use
 this.
 
+### Backfill truncation
+
+`Request.Flush` also carries the backfill signals of the transaction.
+`m.RunTransactions` decodes them and calls the required `Transactor.Flush`
+method once per transaction, after `Load` returns and before the first
+`Store`:
+
+```go
+Flush(ctx context.Context, statePatches []json.RawMessage, begins, completes map[int]time.Time) error
+```
+
+`completes` maps a binding index to its truncation boundary, which is the
+publication time of the backfill's begin signal. Once a binding appears there,
+the connector may delete its rows whose `flow_published_at` is earlier than the
+boundary, because the backfill has re-sent every document that still exists. A
+binding in `begins` needs no action. A complete may arrive a transaction or more
+late, which is safe because the boundary travels with it. `statePatches` holds
+every shard's state patches from its prior `Response.Acknowledged`.
+
+A connector that cannot delete keeps a no-op `Flush`. A connector that
+truncates owns three concerns:
+
+- **Shards.** With more than one shard, one shard's delete can remove rows that
+  another shard is about to update but hasn't committed yet. A connector that
+  runs multiple shards must therefore have a single shard delete, after every
+  shard's stores for the transaction have been applied.
+- **Timing.** A delete inside `Flush` runs before that transaction's stores. It
+  is unsafe when a store of an existing document is a plain `UPDATE`, which
+  matches nothing once its row is gone. Such a connector deletes after its
+  stores, in the same destination transaction.
+- **Crash safety.** A pending truncation that must survive a restart belongs in
+  the state returned from `StartCommit`, which is durable. State returned from
+  `Acknowledge` is not.
+
+Two rules apply to every truncating connector:
+
+- **Delta-updates bindings are exempt.** A backfill re-sends only the current
+  version of each document, so deleting a delta table's older rows would drop
+  history the backfill cannot reproduce.
+- **Precision.** The boundary is compared at the column's own precision. A
+  destination whose timestamp columns are coarser than the boundary floors the
+  boundary first, so that a live row never rounds below it.
+
+A binding that excludes `flow_published_at` cannot be truncated. The connector
+skips it and logs a WARN with `eventType: connectorStatus`, which surfaces the
+reason on the task page. Rows deleted by truncation are reported on the
+transaction health line as `truncated` (see [Transaction health](#transaction-health)).
+
 ## Request.Store + Request.StartCommit + Request.Acknowledge
 
 These three messages are highly related, and depending on the various patterns
@@ -691,7 +739,9 @@ sends and the hard-delete argument the connector passes to `it.Next(...)`:
 `softDeleted` and `skipped` are visibility buckets only; the comparison uses
 `insert`, `update` and `delete`. Delta-updates bindings never see `Exists` and
 so expect only inserts. The line also carries the round's `loadRequests` and
-`loaded` responses.
+`loaded` responses, and a `truncate` count of the backfills that completed in
+it (see `Request.Flush`), each of which permits the connector to delete rows
+published before its boundary. `truncate` is a visibility bucket too.
 
 ## Actual side: the reporting contract
 
@@ -727,7 +777,11 @@ target table, exclude checkpoint and staging-table statements, and configure
 its client to report matched rather than changed rows where those differ
 (MySQL's `clientFoundRows`). Optional `.WithStaged(n)` and `.WithLoaded(n)`
 carry rows written to and loaded from a staging area, for connectors that
-already have them.
+already have them. `.WithTruncated(n)` carries the rows deleted because they
+were published before a completed backfill. It is never checked, and it is
+kept out of `deleted` and `total` so that a truncation cannot fail the
+comparison. A connector that truncates in a round with no stores for the
+binding still reports, with `m.TotalRowStats(0).WithTruncated(n)`.
 
 ## Verdicts
 
@@ -773,9 +827,9 @@ or `CONNECTOR_NAME` for a variant built from another connector's image) and
 `<VERSION>-<short sha>`, e.g. `v1-3f2a9c1`; local builds report `dev` or
 `local-<sha>`), so dashboards can aggregate verdicts by connector and build.
 Every line carries `verdict`, `fidelity`, `bindings`, `loadRequests`,
-`loaded`, `expected.{insert,update,delete,softDeleted,skipped}` and
-`actual.{inserted,updated,deleted,total}` (plus `staged`/`loaded` when
-reported).
+`loaded`, `expected.{insert,update,delete,softDeleted,skipped}` (plus
+`truncate` when nonzero) and `actual.{inserted,updated,deleted,total}` (plus
+`staged`/`loaded`/`truncated` when reported).
 
 ## Testing
 

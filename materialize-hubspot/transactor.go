@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"iter"
 	"sync/atomic"
+	"time"
 
 	"github.com/estuary/connectors/go/materialize"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
@@ -75,6 +76,10 @@ func (t *transactor) RecoverCheckpoint(context.Context, pf.MaterializationSpec, 
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error {
+	return nil
+}
+
+func (t *transactor) Flush(context.Context, []json.RawMessage, map[int]time.Time, map[int]time.Time) error {
 	return nil
 }
 

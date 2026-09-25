@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
@@ -329,6 +330,9 @@ type transactor struct {
 	committedTokens map[string]bool
 	// The whole state: staged transactions not yet applied, from every shard.
 	state connectorState
+	// truncations maps a binding index to the boundary of a backfill that
+	// completed in the current transaction, for staging by Store.
+	truncations map[int]time.Time
 	// Set only for a task crossing over from the old format, whose row still
 	// holds the runtime checkpoint and whose state has nothing staged.
 	runtimeCheckpoint m.RuntimeCheckpoint
@@ -457,6 +461,7 @@ type binding struct {
 	mergeIntoSQL              string
 	deleteQuerySQL            string
 	loadQuerySQL              string
+	truncateSQL               string
 
 	// The transaction being staged, if any.
 	staged *stateItem
@@ -500,6 +505,13 @@ func (t *transactor) addBinding(target sql.Table, is *boilerplate.InfoSchema) er
 		var err error
 		if *m.sql, err = sql.RenderTableTemplate(target, m.tpl); err != nil {
 			return err
+		}
+	}
+
+	for _, col := range target.Values {
+		if col.Ptr == "/_meta/uuid" && col.Inference.String_ != nil && col.Inference.String_.Format == "date-time" && col.Inference.String_.ContentEncoding == "uuid" && !col.UserDefinedDDL {
+			b.truncateSQL = fmt.Sprintf("DELETE FROM %s WHERE %s < $1;", target.Identifier, col.Identifier)
+			break
 		}
 	}
 
@@ -860,6 +872,15 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 	}
 
+	for binding, boundary := range d.truncations {
+		var b = d.bindings[binding]
+		if b.staged == nil {
+			b.staged = &stateItem{ID: uuid.NewString(), Round: it.Round}
+		}
+		b.staged.TruncateBefore = &boundary
+	}
+	d.truncations = nil
+
 	return func(ctx context.Context, checkpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
 		if checkpoint != nil {
 			raw, err := checkpoint.Marshal()
@@ -891,6 +912,31 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 		return &pf.ConnectorState{UpdatedJson: patch, MergePatch: true}, nil
 	}, nil
+}
+
+// Flush records completed backfills on the primary only, since every shard
+// receives the same completions and only the primary applies staged work.
+func (d *transactor) Flush(_ context.Context, _ []json.RawMessage, _ map[int]time.Time, completes map[int]time.Time) error {
+	d.truncations = make(map[int]time.Time, len(completes))
+	if !d.primary {
+		return nil
+	}
+	for binding, boundary := range completes {
+		var b = d.bindings[binding]
+		if b.target.DeltaUpdates {
+			continue
+		}
+		if b.truncateSQL == "" {
+			log.WithFields(log.Fields{
+				"eventType": "connectorStatus",
+				"table":     b.target.Identifier,
+				"boundary":  boundary,
+			}).Warnf("Rows published before the backfill of table %s were not deleted because the binding excludes the flow_published_at field. Include that field to enable deletion after a backfill.", b.target.Identifier)
+			continue
+		}
+		d.truncations[binding] = boundary
+	}
+	return nil
 }
 
 func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
@@ -972,6 +1018,9 @@ type commitGroup struct {
 	// first merged entry's; a multi-shard commit is unchecked anyway.
 	round    int
 	hasRound bool
+	// truncated is the number of rows the group's truncation deleted, once
+	// it has run.
+	truncated *int64
 }
 
 // commit runs the staged transactions of pending as one Redshift
@@ -999,6 +1048,9 @@ func (d *transactor) commit(ctx context.Context, pending connectorState, legacyC
 			g.merged.DeleteFiles = append(g.merged.DeleteFiles, e.DeleteFiles...)
 			g.merged.MustMerge = g.merged.MustMerge || e.MustMerge
 			g.merged.Rows += e.Rows
+			if e.TruncateBefore != nil && (g.merged.TruncateBefore == nil || e.TruncateBefore.After(*g.merged.TruncateBefore)) {
+				g.merged.TruncateBefore = e.TruncateBefore
+			}
 			if rk == d.rangeKey || !g.hasRound {
 				g.round, g.hasRound = e.Round, true
 			}
@@ -1009,7 +1061,7 @@ func (d *transactor) commit(ctx context.Context, pending connectorState, legacyC
 			}
 			tokensMap.add(b.target.StateKey, rk, e.ID)
 		}
-		if len(g.merged.StoreFiles) > 0 || len(g.merged.DeleteFiles) > 0 {
+		if len(g.merged.StoreFiles) > 0 || len(g.merged.DeleteFiles) > 0 || g.merged.TruncateBefore != nil {
 			groups = append(groups, g)
 		}
 	}
@@ -1098,6 +1150,9 @@ func (d *transactor) commit(ctx context.Context, pending connectorState, legacyC
 		stats := m.TotalRowStats(affected[g])
 		if g.merged.Rows > 0 {
 			stats = stats.WithStaged(g.merged.Rows)
+		}
+		if g.truncated != nil {
+			stats = stats.WithTruncated(*g.truncated)
 		}
 		d.be.ReportRowStats(g.round, g.binding.target.Path, stats)
 	}
@@ -1194,6 +1249,27 @@ func (d *transactor) applyStaged(ctx context.Context, conn *pgx.Conn, groups []*
 			} else {
 				affected[g] += n
 			}
+		}
+
+		// The truncation runs after the stores, so that it keeps the rows
+		// they just wrote, which were published after the boundary.
+		if g.merged.TruncateBefore == nil {
+			// Pass.
+		} else if b.truncateSQL == "" {
+			log.WithFields(log.Fields{
+				"table":    b.target.Identifier,
+				"boundary": *g.merged.TruncateBefore,
+			}).Warn("skipping staged truncation because the binding no longer includes the flow_published_at field")
+		} else if tag, err := txn.Exec(ctx, b.truncateSQL, *g.merged.TruncateBefore); err != nil {
+			return nil, fmt.Errorf("truncating %s after backfill: %w", b.target.Identifier, err)
+		} else {
+			var n = tag.RowsAffected()
+			g.truncated = &n
+			log.WithFields(log.Fields{
+				"table":    b.target.Identifier,
+				"boundary": *g.merged.TruncateBefore,
+				"deleted":  n,
+			}).Info("truncated rows published before the backfill")
 		}
 
 		d.be.FinishedResourceCommit(b.target.Path)

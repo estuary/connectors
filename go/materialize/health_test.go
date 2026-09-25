@@ -15,6 +15,7 @@ import (
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	"github.com/gogo/protobuf/types"
 	log "github.com/sirupsen/logrus"
 	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/require"
@@ -36,11 +37,11 @@ type healthLine struct {
 	LoadRequests     int64
 	Loaded           int64
 	Expected         struct {
-		Insert, Update, Delete, SoftDeleted, Skipped int64
+		Insert, Update, Delete, SoftDeleted, Skipped, Truncate int64
 	}
 	Actual struct {
 		Inserted, Updated, Deleted, Total int64
-		Staged, Loaded                    *int64
+		Staged, Loaded, Truncated         *int64
 	}
 	Pending    int
 	Recovery   bool
@@ -106,6 +107,8 @@ func (s *scriptedStream) RecvMsg(m *pm.Request) error {
 type txn struct {
 	loads  []pm.Request
 	stores []pm.Request
+	// completes are bindings whose backfill completes in the transaction.
+	completes []int
 }
 
 func loadReq(binding int, key string) pm.Request {
@@ -131,7 +134,13 @@ func scriptRequests(txns []txn) []pm.Request {
 	for _, tx := range txns {
 		out = append(out, pm.Request{Acknowledge: &pm.Request_Acknowledge{}})
 		out = append(out, tx.loads...)
-		out = append(out, pm.Request{Flush: &pm.Request_Flush{}})
+		var flush = &pm.Request_Flush{}
+		for _, binding := range tx.completes {
+			flush.BackfillCompletes = append(flush.BackfillCompletes, &pm.Request_Flush_BackfillComplete{
+				Binding: uint32(binding), Timestamp: &types.Timestamp{Seconds: 1},
+			})
+		}
+		out = append(out, pm.Request{Flush: flush})
 		out = append(out, tx.stores...)
 		out = append(out, pm.Request{StartCommit: &pm.Request_StartCommit{RuntimeCheckpoint: &pc.Checkpoint{}}})
 	}
@@ -188,6 +197,11 @@ type scriptedTransactor struct {
 	deferReports bool
 	// recoveryReports are reported from the recovery Acknowledge.
 	recoveryReports func(be *BindingEvents)
+	// truncated, when set, is reported as deleted by each backfill that
+	// completes, together with any stores of the same binding.
+	truncated *int64
+
+	completes map[int]time.Time
 
 	mu      sync.Mutex
 	pending []func()
@@ -226,6 +240,7 @@ func (t *scriptedTransactor) Store(it *StoreIterator) (StartCommitFunc, error) {
 		return nil, it.Err()
 	}
 	round := it.Round
+	completes := t.completes
 
 	doReport := func() {
 		if t.report == nil {
@@ -233,7 +248,15 @@ func (t *scriptedTransactor) Store(it *StoreIterator) (StartCommitFunc, error) {
 		}
 		for binding, n := range stored {
 			if stats := t.report(round, binding, n); stats != nil {
+				if _, ok := completes[binding]; ok && t.truncated != nil {
+					*stats = stats.WithTruncated(*t.truncated)
+				}
 				t.be.ReportRowStats(round, t.bindings[binding].path, *stats)
+			}
+		}
+		for binding := range completes {
+			if _, ok := stored[binding]; !ok && t.truncated != nil {
+				t.be.ReportRowStats(round, t.bindings[binding].path, TotalRowStats(0).WithTruncated(*t.truncated))
 			}
 		}
 	}
@@ -248,6 +271,11 @@ func (t *scriptedTransactor) Store(it *StoreIterator) (StartCommitFunc, error) {
 		}
 		return nil, nil
 	}, nil
+}
+
+func (t *scriptedTransactor) Flush(_ context.Context, _ []json.RawMessage, _ map[int]time.Time, completes map[int]time.Time) error {
+	t.completes = completes
+	return nil
 }
 
 func (t *scriptedTransactor) Acknowledge(context.Context, []json.RawMessage, []string) (*pf.ConnectorState, error) {
@@ -826,6 +854,39 @@ func TestHealthSharded(t *testing.T) {
 	require.Equal(t, 2, sum.Rounds)
 	require.Equal(t, int64(2), sum.Expected.Insert)
 	require.Equal(t, int64(4), sum.Actual.Inserted)
+}
+
+func TestHealthTruncation(t *testing.T) {
+	txns := []txn{{
+		stores:    []pm.Request{storeReq(0, "a", false, false)},
+		completes: []int{0, 1},
+	}}
+	totalReport := func(_, _ int, stored int64) *RowStats {
+		s := TotalRowStats(stored)
+		return &s
+	}
+
+	t.Run("reported", func(t *testing.T) {
+		truncated := int64(3)
+		tr := &scriptedTransactor{bindings: twoBindings, report: totalReport, truncated: &truncated}
+		lines := runHealthScenario(t, tr, openRequest(twoBindings, nil), txns, nil, nil)
+		require.Len(t, lines, 1)
+		require.Equal(t, "ok", lines[0].Verdict)
+		require.Equal(t, 2, lines[0].Bindings)
+		require.Equal(t, int64(2), lines[0].Expected.Truncate)
+		require.Equal(t, int64(1), lines[0].Actual.Total)
+		require.NotNil(t, lines[0].Actual.Truncated)
+		require.Equal(t, int64(6), *lines[0].Actual.Truncated)
+	})
+
+	t.Run("never reported", func(t *testing.T) {
+		tr := &scriptedTransactor{bindings: twoBindings, report: totalReport}
+		lines := runHealthScenario(t, tr, openRequest(twoBindings, nil), txns, nil, nil)
+		require.Len(t, lines, 1)
+		require.Equal(t, "ok", lines[0].Verdict)
+		require.Equal(t, int64(2), lines[0].Expected.Truncate)
+		require.Nil(t, lines[0].Actual.Truncated)
+	})
 }
 
 func TestHealthUnknownBinding(t *testing.T) {

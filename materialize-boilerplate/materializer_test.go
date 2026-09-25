@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
@@ -608,6 +609,10 @@ func (t *testTransactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	panic("unimplemented")
 }
 
+func (t *testTransactor) Flush(context.Context, []json.RawMessage, map[int]time.Time, map[int]time.Time) error {
+	return nil
+}
+
 func (t *testTransactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
 	panic("unimplemented")
 }
@@ -684,6 +689,10 @@ type drainTestTransactor struct {
 
 func (t *drainTestTransactor) UnmarshalState(state json.RawMessage) error {
 	t.rec.unmarshaled = state
+	return nil
+}
+
+func (t *drainTestTransactor) Flush(context.Context, []json.RawMessage, map[int]time.Time, map[int]time.Time) error {
 	return nil
 }
 
