@@ -29,18 +29,25 @@ Connector (Go)                          Sidecar (Python)
       |<----------------------- ok, then exit 0 |
 ```
 
-The connector spawns the sidecar and writes a random auth token to its stdin,
-where no argv or environ listing can see it. The sidecar binds a unix domain
-socket (or, started with `--tcp`, an ephemeral localhost port) and prints one
-line to stdout:
+The connector spawns the sidecar with `--uds <path>`, naming a socket inside a
+temporary directory that only the connector's user can enter. It writes a
+random auth token to the sidecar's stdin, where no argv or environ listing can
+see it. The sidecar binds the socket, accepts exactly one connection, and
+prints one line to stdout:
 
 ```json
-{"ready": true, "transport": "uds"}
-{"ready": true, "transport": "tcp", "port": 54321}
+{"ready": true}
 ```
 
 The connector dials the socket. The first request must be `configure`, and it
 must echo the auth token. Everything after that is channel work.
+
+The token stops a process that reaches the socket before the connector does
+from issuing ops on it. That protection adds little to the directory's
+permissions, because only a process running as the connector's user can reach
+the socket, and such a process can read the token from the connector's memory.
+The token is defense in depth. It cannot stop an interloper from taking the
+one accepted connection, which fails the connector's dial and so the task.
 
 ## Framing
 
@@ -54,10 +61,11 @@ may arrive in any order.
 ```
 
 `append` is the one exception. Its rows follow the header line as a raw
-payload of exactly `payload_len` bytes — a JSON array of row objects — and the
-next line begins right after them. Neither side's reader parses the rows: the
-sidecar verifies the array holds `row_count` objects, then hands their bytes
-to the SDK as they are.
+payload of exactly `payload_len` bytes, holding a JSON array of row objects,
+and the next line begins right after them. The sidecar's reader consumes the
+payload without parsing it. The channel's worker then scans the array to check
+that it holds `row_count` rows and that each row is an object, and hands each
+row's bytes to the SDK as they are.
 
 ```
 → {"id": 8, "op": "append", "params": {"channel": "c1", "start_token": "41",
@@ -68,15 +76,15 @@ to the SDK as they are.
 
 ## Operations
 
-| Op | Params | Result |
-| --- | --- | --- |
-| `configure` | `profile`, `auth` | — |
-| `open_channel` | `database`, `schema`, `table`, `channel` | channel status |
-| `append` | `channel`, `start_token`, `end_token`, `row_count`, `payload_len` | `{"appended": n}` |
-| `wait_commit` | `channel`, `token`, `timeout_s` | channel status |
-| `channel_status` | `channel` | channel status |
-| `close_channel` | `channel`, `drop` | — |
-| `shutdown` | — | — |
+| Op               | Params                                                            | Result            |
+|------------------|-------------------------------------------------------------------|-------------------|
+| `configure`      | `profile`, `auth`                                                 | —                 |
+| `open_channel`   | `database`, `schema`, `table`, `channel`                          | channel status    |
+| `append`         | `channel`, `start_token`, `end_token`, `row_count`, `payload_len` | `{"appended": n}` |
+| `wait_commit`    | `channel`, `token`, `timeout_s`                                   | channel status    |
+| `channel_status` | `channel`                                                         | channel status    |
+| `close_channel`  | `channel`, `drop`                                                 | —                 |
+| `shutdown`       | —                                                                 | —                 |
 
 A channel status is Snowflake's authoritative answer for the channel:
 
@@ -86,40 +94,67 @@ A channel status is Snowflake's authoritative answer for the channel:
 
 `committed_token` is null when the channel has never committed.
 `rows_error_count` counts rows Snowflake rejected over the channel's whole
-life; a clean commit does not reset it.
+life. A clean commit does not reset it, and it survives both a channel reopen
+and a new client session.
 
-- `open_channel` opens or reopens a channel. Its status carries the committed
-  token that recovery reads.
+- `open_channel` opens a channel by name, including one that an earlier
+  session left in Snowflake. Its status carries the committed token that
+  recovery reads. Opening a name that this session already holds open is an
+  error.
 - `append`'s tokens are those of the batch's first and last rows.
-- `wait_commit` blocks until the channel's committed token equals `token`.
+- `wait_commit` blocks until the channel's committed token equals `token`, or
+  fails after `timeout_s` seconds.
 - `close_channel` with `drop` also drops the channel in Snowflake, discarding
   its committed token instead of leaving it for a later open of the same name.
-- `shutdown` flushes everything and exits 0. Closing the socket does too.
+- `shutdown` closes every channel and client, which flushes what the SDK has
+  buffered, then replies and exits 0. It does not wait for channel ops still
+  queued behind it.
 
 ## Ordering
 
-The sidecar runs `configure`, `open_channel`, and `shutdown` one at a time.
-Each channel gets its own worker, so ops on the same channel run in the order
-they were sent, and a slow `wait_commit` on one channel never delays an
-`append` to another.
+The sidecar runs `configure`, `open_channel`, and `shutdown` one at a time on
+a control worker. Each open channel gets its own worker, so ops on the same
+channel run in the order they were sent, and a slow `wait_commit` on one
+channel never delays an `append` to another.
+
+A channel's worker exists only once its `open_channel` has succeeded, and an
+op sent to a channel without a worker fails with `unknown_channel`. The
+connector therefore awaits the `open_channel` reply before it sends any op on
+that channel.
 
 ## Errors and failure
 
-A failed op answers with `ok: false` and a stable `code` for logs:
+A failed op answers with `ok: false`, an `error` message, and a `code`:
 
 ```json
 {"id": 9, "ok": false, "code": "invalid_rows", "error": "append header states 2 row(s) but its payload holds 3"}
 ```
 
-The failure policy is crash-only. Every error is fatal to the write path;
-neither side retries an op. The sidecar exits non-zero on a malformed request
-or an unhandled exception. The connector never restarts it: a dead sidecar or
-a broken socket fails the task, the runtime restarts the connector, and
-recovery replays from the offset tokens Snowflake holds. Each op also carries
-a Go-side timeout, and a timeout abandons the socket, because a connection
-that missed a response can no longer be trusted to match ids.
+The sidecar's own codes are `auth`, `protocol`, `unknown_channel`,
+`invalid_rows`, and `sdk_error`. An SDK error that names its own error code
+carries that name instead. The connector may branch on a code, so the
+sidecar's codes are stable. The connector does so for `unknown_channel` when
+it drops a channel, because a channel it has not opened must be opened before
+it can be dropped.
+
+The failure policy is otherwise crash-only. Any other failed op is fatal to
+the write path, and the connector retries none. The sidecar retries only an
+`append` that the SDK refuses as `RECEIVER_SATURATED`, because that is the
+SDK's flow-control signal. It backs off for up to 90 seconds, which stays
+under the connector's `append` timeout. The sidecar exits non-zero on a
+malformed request or an unhandled exception. The connector never restarts it.
+A dead sidecar or a broken socket fails the task, the runtime restarts the
+connector, and recovery replays from the offset tokens Snowflake holds. Each
+op also carries a Go-side timeout, and a timeout abandons the socket, because
+a connection that missed a response can no longer be trusted to match ids.
+
+When the connection closes, or the sidecar receives SIGTERM, it exits 0
+without flushing. Anything the SDK still buffered is recovered the same way,
+from the offset tokens.
 
 ## Logging
 
 The socket carries no logs. The sidecar writes JSON ops-log lines to stderr,
-and the connector relays them into its own log stream.
+and the connector relays them into its own log stream. A stderr line that is
+not ops-log JSON, such as output from the SDK's native core, is wrapped in a
+log record rather than passed through.

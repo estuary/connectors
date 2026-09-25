@@ -252,8 +252,9 @@ func (c *sidecarClient) Configure(ctx context.Context, profile sidecarProfile, a
 	}{profile, authToken}, rpcTimeoutConfigure, nil)
 }
 
-// OpenChannel opens (or reopens) a channel on the auto-created default pipe of
-// the given table.
+// OpenChannel opens a channel by name on the auto-created default pipe of the
+// given table, including one that an earlier session left in Snowflake. Opening
+// a name that this session already holds open is an error.
 func (c *sidecarClient) OpenChannel(ctx context.Context, database, schema, table, channelName string) (*channelStatusResult, error) {
 	var res channelStatusResult
 	if err := c.call(ctx, "open_channel", struct {

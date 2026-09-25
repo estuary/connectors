@@ -102,7 +102,7 @@ class ChannelManager:
         self._channels: Dict[str, Any] = {}
 
     def open(self, database: str, schema: str, table: str, channel: str) -> Dict[str, Any]:
-        """Open (or reopen) a channel, returning Snowflake's authoritative status
+        """Open a channel by name, returning Snowflake's authoritative status
         for it: the latest committed offset token, and the row-error statistics
         accumulated over the channel's life so far."""
         key = (database, schema, table)
