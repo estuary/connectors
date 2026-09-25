@@ -107,7 +107,7 @@ ALTER SYSTEM SET wal_level = logical;
 ```
 5. Restart PostgreSQL to allow the WAL level change to take effect.
 
-### Sample
+## Sample
 
 A minimal capture definition will look like the following:
 
@@ -130,6 +130,3 @@ captures:
           namespace: ${TABLE_NAMESPACE}
         target: ${PREFIX}/${COLLECTION_NAME}
 ```
-Your capture definition will likely be more complex, with additional bindings for each table in the source database.
-
-[Learn more about capture definitions.](/concepts/captures.md)

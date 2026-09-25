@@ -151,7 +151,7 @@ Optionally, you can change the name of the destination name for each table. You 
 
 4. Click **Save and Publish** to provision the connector and kick off the automated backfill process.
 
-### Sample
+## Sample
 
 A minimal capture definition will look like the following:
 
@@ -174,6 +174,3 @@ captures:
           namespace: ${TABLE_NAMESPACE}
         target: ${PREFIX}/${COLLECTION_NAME}
 ```
-Your capture definition will likely be more complex, with additional bindings for each table in the source database.
-
-[Learn more about capture definitions.](/concepts/captures.md)
