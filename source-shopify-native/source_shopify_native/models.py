@@ -279,6 +279,7 @@ class BulkOperationDetails(BaseModel, extra="allow"):
     completedAt: str | None
     url: str | None
     errorCode: BulkOperationErrorCodes | None
+    query: str
 
 
 class UserErrors(BaseModel, extra="allow"):
