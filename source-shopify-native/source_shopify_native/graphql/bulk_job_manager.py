@@ -460,4 +460,12 @@ class BulkJobManager:
 
         self._tracked_jobs.add(details.id)
 
+        # Recognising the connector's own jobs relies on Shopify keeping the marker in the query it
+        # reports back.
+        if BULK_QUERY_MARKER not in details.query:
+            self.log.warning(
+                f"[{self.client.store}] Shopify did not keep the bulk query marker for job {details.id}."
+                " The connector relies on it to find its own jobs to cancel on restart."
+            )
+
         return details.id
