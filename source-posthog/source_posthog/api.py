@@ -3,6 +3,7 @@ PostHog API client functions.
 """
 
 from collections.abc import AsyncGenerator
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from functools import wraps
 from logging import Logger
@@ -357,8 +358,55 @@ def backfill_timeout(timeout_period: timedelta):
     return decorator
 
 
+@dataclass(frozen=True, slots=True)
+class _SessionsQuery:
+    """The SELECT shape for one project's sessions table, probed once per sweep.
+
+    `cursor` is an expression rather than a column, so it is repeated in the
+    WHERE and ORDER BY clauses rather than referenced by alias. `column_names`
+    positionally matches `selected`, which is what the row zip relies on.
+    """
+
+    cursor: str
+    selected: list[str]
+    column_names: list[str]
+
+
+async def _sessions_query(
+    base_url: str,
+    project_id: int,
+    http: HTTPSession,
+    log: Logger,
+) -> _SessionsQuery:
+    discovered = await _get_hogql_columns(Session, base_url, project_id, http, log)
+    # `$`-prefixed names are aliased bare so documents read like the rest of the
+    # connector. `team_id` is left alone: HogQL rejects it as an alias.
+    return _SessionsQuery(
+        cursor=Session.cursor_expression(discovered),
+        selected=[
+            f"{column} AS {column.lstrip('$')}" if column.startswith("$") else column
+            for column in discovered
+        ]
+        + Session.extra_columns,
+        column_names=[column.lstrip("$") for column in discovered]
+        + [
+            "session_id_v7",
+            "team_id",
+            "duration",
+        ],
+    )
+
+
+def _hogql_string(value: str) -> str:
+    """Quote `value` as a HogQL string literal."""
+    escaped = value.replace("\\", "\\\\").replace("'", "\\'")
+    return f"'{escaped}'"
+
+
 async def _query_sessions(
+    query: _SessionsQuery,
     start: datetime,
+    after_id: str | None,
     end: datetime,
     lookback: timedelta,
     base_url: str,
@@ -366,45 +414,48 @@ async def _query_sessions(
     http: HTTPSession,
     log: Logger,
 ) -> AsyncGenerator[Session, None]:
-    """Yield sessions whose ingestion time falls in [start, end).
+    """Yield one page of sessions from [start, end), ordered by (cursor, id).
 
-    Sessions needs its own query rather than `_query_hogql` for three reasons:
-    its cursor is an expression rather than a COALESCE of columns, it carries a
-    second predicate for partition pruning, and it selects on `>=` so that rows
-    sharing a cursor value at a page boundary are re-read rather than skipped.
+    With `after_id` set the page opens strictly after that row in the ordering,
+    so paging cannot stall on a run of rows sharing one cursor instant. With it
+    unset the lower bound is inclusive instead, so a row sitting on a
+    checkpointed instant is re-read rather than skipped; the collection key
+    collapses the duplicate.
+
+    Sessions needs its own query rather than `_query_hogql` because its cursor
+    is an expression rather than a COALESCE of columns, it carries a second
+    predicate for partition pruning, and it pages by key rather than by cursor
+    alone.
     """
     url = Session.get_api_endpoint_url(base_url, project_id)
     ctx = ProjectIdValidationContext(project_id=project_id)
-    cursor = Session.cursor_expression
+    cursor = query.cursor
     prune = Session.prune_column
-
-    discovered = await _get_hogql_columns(Session, base_url, project_id, http, log)
-    # `$`-prefixed names are aliased bare so documents read like the rest of the
-    # connector. `team_id` is left alone: HogQL rejects it as an alias.
-    selected = [
-        f"{column} AS {column.lstrip('$')}" if column.startswith("$") else column
-        for column in discovered
-    ] + Session.extra_columns
-    column_names = [column.lstrip("$") for column in discovered] + [
-        "session_id_v7",
-        "team_id",
-        "duration",
-    ]
+    tiebreak = Session.tiebreak_column
 
     def literal(when: datetime) -> str:
         serialized = when.astimezone(UTC).replace(tzinfo=None).isoformat()
         return f"toDateTime64('{serialized}', 6, 'UTC')"
 
+    if after_id is None:
+        lower_bound = f"{cursor} >= {literal(start)}"
+    else:
+        lower_bound = (
+            f"({cursor} > {literal(start)} OR "
+            + f"({cursor} = {literal(start)} "
+            + f"AND {tiebreak} > {_hogql_string(after_id)}))"
+        )
+
     payload = {
         "query": {
             "kind": "HogQLQuery",
-            "query": f"SELECT {', '.join(selected)} "
+            "query": f"SELECT {', '.join(query.selected)} "
             + f"FROM {Session.table_name} "
-            + f"WHERE {cursor} >= {literal(start)} "
+            + f"WHERE {lower_bound} "
             + f"AND {cursor} < {literal(end)} "
             + f"AND {prune} >= {literal(start - lookback)} "
             + f"AND {prune} < {literal(end)} "
-            + f"ORDER BY {cursor} ASC "
+            + f"ORDER BY {cursor} ASC, {tiebreak} ASC "
             + f"LIMIT {HOGQL_PAGE_SIZE}",
         },
     }
@@ -414,7 +465,7 @@ async def _query_sessions(
 
     async for row in processor:
         yield Session.model_validate(
-            dict(zip(column_names, row.root, strict=True)),
+            dict(zip(query.column_names, row.root, strict=True)),
             context=ctx,
         )
 
@@ -433,20 +484,37 @@ async def _sweep_sessions(
     `$end_timestamp` is in the future — a client with a fast clock — sits outside
     `end` and is therefore never read, so it cannot drag the cursor past itself
     and is picked up by a later sweep instead.
+
+    Only the instant is checkpointed, never the tie-break id: resuming a sweep
+    re-opens the instant inclusively and pages through its rows again, so the
+    persisted state stays a plain value watermark.
     """
     base_url = config.advanced.base_url
+    query = await _sessions_query(base_url, project_id, http, log)
     reached = start
+    after_id: str | None = None
     doc_count = 0
 
     while True:
         batch_count = 0
 
         async for item in _query_sessions(
-            reached, end, SESSIONS_LOOKBACK, base_url, project_id, http, log
+            query,
+            reached,
+            after_id,
+            end,
+            SESSIONS_LOOKBACK,
+            base_url,
+            project_id,
+            http,
+            log,
         ):
             item_cursor = item.get_cursor()
             batch_count += 1
-            reached = max(reached, item_cursor)
+            # Both halves of the key come from the same row — the last one the
+            # server sent — so the next page opens exactly where this one ended.
+            reached = item_cursor
+            after_id = item.id
 
             if cache.should_yield("sessions", f"{project_id}/{item.id}", item_cursor):
                 doc_count += 1

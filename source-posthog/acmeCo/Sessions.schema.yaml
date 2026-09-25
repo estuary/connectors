@@ -24,17 +24,12 @@ $defs:
     type: object
 additionalProperties: true
 description: |-
-  PostHog session: one visit, aggregated from the events that carry its id.
+  One visit to your site or app, aggregated from the events that carry its id.
 
-  A session row is recomputed every time another event lands for it, so the
-  cursor is ingestion time rather than session start. `$start_timestamp` never
-  moves once a session exists; `greatest(max_inserted_at, $end_timestamp)`
-  advances whenever the row changes, which is what makes updates observable.
-
-  The `greatest()` is also what lets one expression serve both backfill and
-  incremental: `max_inserted_at` only exists from around the end of 2025 and is
-  the unix epoch before that, so for older rows the expression degrades to
-  `$end_timestamp` on its own.
+  PostHog recalculates a session as more events arrive for it, so the same
+  `session_id` is captured several times and converges on its final values.
+  `session_id` joins to `$session_id` on Events, and `distinct_id` to
+  `distinct_id` on Events.
 properties:
   _meta:
     $ref: '#/$defs/Meta'
@@ -47,13 +42,15 @@ properties:
     title: End Timestamp
     type: string
   max_inserted_at:
-    format: date-time
+    anyOf:
+    - format: date-time
+      type: string
+    - type: 'null'
+    default: null
     title: Max Inserted At
-    type: string
 required:
 - session_id
 - end_timestamp
-- max_inserted_at
 title: Session
 type: object
 x-infer-schema: true
