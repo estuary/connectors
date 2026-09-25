@@ -31,9 +31,9 @@ SIX_HOURS = 6 * 60 * 60
 MAX_QUERY_REQUEST_ATTEMPTS = 5
 MAX_QUERY_REQUEST_RETRY_INTERVAL = 60  # 1 minute
 # Prepended to every bulk query the connector submits. Shopify reports the submitted query back
-# in `BulkOperation.query`, so the marker tells the connector's own jobs apart from jobs other
-# systems submit with the same app credentials. Changing it orphans jobs submitted by prior
-# versions.
+# in `BulkOperation.query`, which is how `cancel_current` tells the connector's own running jobs
+# apart from jobs other systems submit with the same app credentials. Changing it orphans jobs
+# submitted by prior versions.
 BULK_QUERY_MARKER = "# Estuary Flow Managed Bulk Query"
 
 
@@ -84,7 +84,14 @@ class BulkJobManager:
         await self._get_running_jobs()
 
     async def cancel_current(self):
-        running_jobs = await self._get_running_jobs()
+        running_jobs: list[BulkOperationDetails] = []
+        for job_details in await self._get_running_jobs():
+            if BULK_QUERY_MARKER in job_details.query:
+                running_jobs.append(job_details)
+            else:
+                self.log.info(
+                    f"[{self.client.store}] Leaving bulk job {job_details.id} running since it was not submitted by this connector."
+                )
 
         if not running_jobs:
             return
