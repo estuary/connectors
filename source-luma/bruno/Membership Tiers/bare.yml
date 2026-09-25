@@ -1,0 +1,28 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/memberships/tiers/list"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://docs.luma.com/reference/get_v1-memberships-tiers-list
+  
+  **WHY:** backs the `membership_tiers` stream — the calendar's membership
+  offering. Members themselves are exposed through `GET
+  /v1/calendars/contacts/list` (a `membership` field per contact), which is not
+  part of this connector yet.
+  
+  **VERIFIED (2026-09-17):** `200`, `{entries: [], has_more: false}` — this
+  calendar has no membership tiers. **UNOBSERVABLE:** the populated tier shape;
+  the connector relies on the OpenAPI schema (`id, name, description,
+  tint_color, access_info, registration_questions[]`) and schema inference.

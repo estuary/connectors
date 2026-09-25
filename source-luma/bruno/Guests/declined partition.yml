@@ -1,0 +1,27 @@
+info:
+  name: declined partition
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/events/guests/list?event_id={{event_id}}&approval_status=declined"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://docs.luma.com/reference/get_v1-events-guests-list
+  
+  **WHY:** silent-data-loss audit for the `approval_status` filter. The docs
+  give it no default; the connector omits it and needs to know that omitting it
+  returns every status rather than, say, only `approved`.
+  
+  **VERIFIED (2026-09-17):** `200`, `entries: []` for `declined` on this event,
+  while the unfiltered `Guests / bare` returns 2 guests. See `Guests / approved
+  partition` for the other half of the audit and the statuses that remain
+  unobservable.

@@ -1,0 +1,40 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/calendars/events/list"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://docs.luma.com/reference/get_v1-calendars-events-list
+  
+  **WHY:** backs the `events` stream; confirms the `{entries, has_more,
+  next_cursor}` envelope and the per-event field set with no filters applied.
+  
+  **LIMITATION (DOCUMENTED 2026-09-17):** three request parameters default to a
+  narrowed listing, all quoted from the reference page above:
+  - `status` — "Filter by calendar submission status. Defaults to `approved`."
+    Events submitted to the calendar and awaiting approval are excluded.
+  - `platforms` — "Defaults to `luma` for backwards compatibility." External
+    (non-Luma) events listed on the calendar are excluded.
+  - `access` — "Defaults to `manage`, returning only events the Calendar
+    manages." Events merely *listed* on the calendar but managed elsewhere come
+    back with `access: "view"`, city-level location and host-only fields omitted.
+  The connector sweeps `status=approved` and `status=pending` and passes
+  `platforms=luma&platforms=external`, but keeps `access=manage`: view-only
+  events are not this calendar's data, are returned obfuscated, and their guests
+  cannot be listed with this key. See `Events / all platforms and pending`.
+  
+  **VERIFIED (2026-09-17):** `200`, 12 events on this calendar, `has_more:
+  false`. Events carry `id` (`evt-` prefix), `calendar_id`, `start_at`,
+  `end_at`, `created_at`, `access: "manage"`, `tags[]`, `submitted_by{}` — the
+  last two are absent from the OpenAPI schema but present live. No `updated_at`.
