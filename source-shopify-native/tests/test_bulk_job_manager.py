@@ -3,11 +3,10 @@ and how many jobs it runs at once.
 
 Shopify's concurrency limit applies per app per shop, and `bulkOperations` lists every running job
 for the app, including jobs submitted by other systems that share the connector's credentials. The
-connector tags each query it submits with a marker comment so it can tell its own jobs apart from
-theirs. Until every running capture submits marked queries, startup still cancels every running
-job. The connector also runs no more jobs at once than the configured limit, so customers can leave
-slots free for those other systems. Only the GraphQL client is faked, so the real query building
-and response parsing run.
+connector tags each query it submits with a marker comment and only cancels running jobs that carry
+it. It also runs no more jobs at once than the configured limit, so customers can leave slots free
+for those other systems. Only the GraphQL client is faked, so the real query building and response
+parsing run.
 """
 
 import asyncio
@@ -136,20 +135,27 @@ def _manager(client: FakeClient, log, max_concurrent_bulk_ops: int = 5) -> BulkJ
 
 
 @pytest.mark.asyncio
-async def test_cancel_current_cancels_every_running_job(log):
-    """Startup still cancels every running job, marked or not.
-
-    Jobs submitted before the marker shipped carry none, so cancelling only marked jobs has to wait
-    until every running capture has restarted onto a version that marks its queries.
-    """
+async def test_cancel_current_cancels_only_marked_jobs(log):
+    """A running job without the marker belongs to another system and is left alone."""
     client = FakeClient(running_jobs=[MARKED_JOB, UNMARKED_JOB])
     manager = _manager(client, log)
 
     await manager.cancel_current()
-    # Let the background waits for the cancels finish, so they aren't left pending when the test ends.
+    # Let the background wait for the cancel finish, so it isn't left pending when the test ends.
     await asyncio.gather(*manager._cancel_tasks)
 
-    assert client.cancelled == [MARKED_JOB["id"], UNMARKED_JOB["id"]]
+    assert client.cancelled == [MARKED_JOB["id"]]
+
+
+@pytest.mark.asyncio
+async def test_cancel_current_ignores_unmarked_jobs(log):
+    """With only other systems' jobs running, nothing is cancelled or waited on."""
+    client = FakeClient(running_jobs=[UNMARKED_JOB])
+
+    await _manager(client, log).cancel_current()
+
+    assert client.cancelled == []
+    assert client.polled == []
 
 
 @pytest.mark.parametrize("max_concurrent_bulk_ops, expected_max_in_flight", [(1, 1), (2, 2), (5, 3)])

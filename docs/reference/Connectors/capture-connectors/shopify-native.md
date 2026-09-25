@@ -90,7 +90,7 @@ When authenticating with an access token or client credentials, ensure the follo
 
 This connector submits and processes the results of [bulk query operations](https://shopify.dev/docs/api/admin-graphql/2026-01/mutations/bulkoperationrunquery) to capture data. As of API version 2026-01, Shopify supports up to [5 concurrent bulk query operations](https://shopify.dev/docs/api/usage/bulk-operations/queries#limitations). The connector takes advantage of this to run multiple bulk queries in parallel for improved performance.
 
-The limit of 5 applies to each app on each store, so bulk queries submitted through a different app don't compete with the connector. If another system submits bulk queries through the same app as the connector, lower `/advanced/max_concurrent_bulk_ops` to leave slots free for it. The connector can't count that system's queries, so keep its usage within the slots you leave free, or the connector's bulk queries will be rejected.
+The limit of 5 applies to each app on each store, so bulk queries submitted through a different app don't compete with the connector. If another system submits bulk queries through the same app as the connector, lower `/advanced/max_concurrent_bulk_ops` to leave slots free for it. The connector can't count that system's queries, so keep its usage within the slots you leave free, or the connector's bulk queries will be rejected. When a capture starts, it cancels bulk queries still running from its previous session and leaves other systems' bulk queries running. It recognises its own by a `# Estuary Flow Managed Bulk Query` comment it adds to each one.
 
 ## Configuration
 
