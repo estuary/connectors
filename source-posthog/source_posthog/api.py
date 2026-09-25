@@ -43,6 +43,10 @@ BACKFILL_TIMEOUT_PERIOD = timedelta(minutes=5)
 # Their note on choosing it: "While testing, 3 days catched almost all sessions."
 SESSIONS_LOOKBACK = timedelta(days=3)
 
+# One unit of the Sessions cursor's resolution, which `toStartOfSecond` in
+# `Session.cursor_expression` fixes at one second.
+SESSIONS_CURSOR_TICK = timedelta(seconds=1)
+
 
 # Cache for project IDs per organization (avoids re-fetching on retry).
 _project_ids_cache = None
@@ -523,7 +527,19 @@ async def _sweep_sessions(
         if batch_count < HOGQL_PAGE_SIZE:
             break
 
-    log.info(f"Swept {doc_count} sessions from project {project_id}")
+    # Evict below the window's lower bound, never at or above it. The rows
+    # sitting exactly on `start` are the ones the next sweep re-reads through
+    # its inclusive bound, and they have to stay cached for that re-read to be
+    # suppressed — hence the one-tick offset, since `cleanup` keeps only
+    # entries strictly newer than its cutoff. Evicting on `reached` instead
+    # would drop the whole tail the next sweep re-opens. Anything older than
+    # this can no longer be reached by either task's window and is dead weight.
+    evicted = cache.cleanup("sessions", start - SESSIONS_CURSOR_TICK)
+
+    log.info(
+        f"Swept {doc_count} sessions from project {project_id} "
+        + f"(evicted {evicted} cache entries, {cache.count_for('sessions')} remain)"
+    )
 
     if reached > start:
         yield reached
