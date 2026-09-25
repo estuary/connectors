@@ -6,6 +6,11 @@ description: Capture Supabase updates with Estuary's CDC connector. Setup guide 
 
 This connector uses change data capture (CDC) to continuously capture updates in a Supabase PostgreSQL database into one or more Estuary collections.
 
+This connector is a variant of the [PostgreSQL connector](./PostgreSQL.md).
+Refer to that page for additional connector features, usage, and the full
+configuration reference. Information specific to Supabase and its setup is
+presented below.
+
 ## Supported versions and platforms
 
 This connector supports all Supabase PostgreSQL instances.
@@ -51,7 +56,6 @@ for your database, if you have not already done so. This can be configured under
 in the Supabase dashboard.
 
 ## Setup
-
 
 The simplest way to meet the above prerequisites is to change the WAL level and have the connector use a database superuser role.
 
@@ -103,95 +107,6 @@ ALTER SYSTEM SET wal_level = logical;
 ```
 5. Restart PostgreSQL to allow the WAL level change to take effect.
 
-
-## Backfills and performance considerations
-
-When the PostgreSQL capture is initiated, by default, the connector first *backfills*, or captures the targeted tables in their current state. It then transitions to capturing change events on an ongoing basis.
-
-This is desirable in most cases, as it ensures that a complete view of your tables is captured into Estuary.
-However, you may find it appropriate to skip the backfill, especially for extremely large tables.
-
-In this case, you may turn off backfilling on a per-table basis. See [properties](#properties) for details.
-
-## Configuration
-
-You configure connectors either in the Estuary web app, or by directly editing the catalog specification file.
-See [connectors](/concepts/connectors.md#using-connectors) to learn more about using connectors. The values and specification sample below provide configuration details specific to the PostgreSQL source connector.
-
-
-### Properties
-
-#### Endpoint
-
-| Property                        | Title               | Description                                                                                                                                 | Type    | Required/Default           |
-|---------------------------------|---------------------|---------------------------------------------------------------------------------------------------------------------------------------------|---------|----------------------------|
-| **`/address`**                  | Address             | The host or host:port at which the database can be reached.                                                                                 | string  | Required                   |
-| **`/database`**                 | Database            | Logical database name to capture from.                                                                                                      | string  | Required, `"postgres"`     |
-| **`/user`**                     | User                | The database user to authenticate as.                                                                                                       | string  | Required, `"flow_capture"` |
-| `/historyMode` | History Mode | Capture each change event, without merging. | boolean | `false` |
-
-##### Authentication
-
-| Property | Title | Description | Type | Required/Default |
-| --- | --- | --- | --- | --- |
-| **`/credentials`** | Authentication | Authentication method and credentials that provide access to the database. | object | Required |
-| `/credentials/auth_type` | Auth Type | The authentication method to use. One of `UserPassword`, `AWSIAM`, `GCPIAM`, or `AzureIAM`. | string |  |
-| `/credentials/password` | Password | Password for the specified database user. | string | Required for `UserPassword` auth |
-| `/credentials/aws_region` | AWS Region | AWS region of your resource. | string | Required for `AWSIAM` auth |
-| `/credentials/aws_role_arn` | AWS Role ARN | AWS role for Estuary to use that has access to the resource. | string | Required for `AWSIAM` auth |
-| `/credentials/gcp_service_account_to_impersonate` | GCP Service Account | GCP service account email for Cloud SQL IAM authentication. | string | Required for `GCPIAM` auth |
-| `/credentials/gcp_workload_identity_pool_audience` | Workload Identity Pool Audience | GCP workload identity pool audience. The format should be similar to: `//iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/test-pool/providers/test-provider`. | string | Required for `GCPIAM` auth |
-| `/credentials/azure_client_id` | Azure Client ID | Azure App Registration Client ID for Azure Active Directory authentication. | string | Required for `AzureIAM` auth |
-| `/credentials/azure_tenant_id` | Azure Tenant ID | Azure Tenant ID for Azure Active Directory authentication. | string | Required for `AzureIAM` auth |
-
-##### Discovery Filters
-
-Options that restrict which tables are surfaced by discovery. These take effect
-when discovery runs. If your capture has automatic discovery enabled, a table
-these filters exclude will be deactivated the next time discovery runs.
-
-| Property | Title | Description | Type | Required/Default |
-| --- | --- | --- | --- | --- |
-| `/discoveryFilters` | Discovery Filters | Options that restrict which tables are visible to discovery. | object | |
-| `/discoveryFilters/include_schemas` | Include Schemas | If specified, only tables in the listed schemas are discovered. Combined as a union with the `Discovery Schema Selection` setting under Advanced Options. | string array | |
-| `/discoveryFilters/exclude_schemas` | Exclude Schemas | Tables in the listed schemas are excluded from discovery. | string array | |
-| `/discoveryFilters/table_patterns` | Table Patterns | If specified, only tables matching at least one of these glob patterns are discovered. A pattern containing a `.` matches against the qualified `schema.table` name. A pattern without a `.` matches the unqualified table name in any schema. Use `*` or `?` as wildcards. | string array | |
-| `/discoveryFilters/discover_unpublished_tables` | Discover Unpublished Tables | When set, the capture discovers all tables, including those not currently in the publication. Combined as a union with the equivalent setting under Advanced Options. | boolean | |
-
-##### Advanced options
-
-| Property | Title | Description | Type | Required/Default |
-| --- | --- | --- | --- | --- |
-| `/advanced`                     | Advanced Options    | Options for advanced users. You should not typically need to modify these.                                                                  | object  |                            |
-| `/advanced/backfill_chunk_size` | Backfill Chunk Size | The number of rows which should be fetched from the database in a single backfill query.                                                    | integer | `4096`                     |
-| `/advanced/publicationName`     | Publication Name    | The name of the PostgreSQL publication to replicate from.                                                                                   | string  | `"flow_publication"`       |
-| `/advanced/skip_backfills`      | Skip Backfills      | A comma-separated list of fully-qualified table names which should not be backfilled.                                                       | string  |                            |
-| `/advanced/slotName`            | Slot Name           | The name of the PostgreSQL replication slot to replicate from.                                                                              | string  | `"flow_slot"`              |
-| `/advanced/watermarksTable`     | Watermarks Table    | The name of the table used for watermark writes during backfills. Must be fully-qualified in &#x27;&lt;schema&gt;.&lt;table&gt;&#x27; form. | string  | `"public.flow_watermarks"` |
-| `/advanced/sslmode`             | SSL Mode            | Overrides SSL connection behavior by setting the 'sslmode' parameter.                                                                       | string  |                            |
-| `/advanced/discover_schemas` | Discovery Schema Selection | If this is specified, only tables in the selected schema(s) will be automatically discovered. | string array |  |
-| `/advanced/min_backfill_xid` | Minimum Backfill XID | Only backfill rows with XMIN values greater (in a 32-bit modular comparison) than the specified XID. Helpful for reducing re-backfill data volume in certain edge cases. | string |  |
-| `/advanced/read_only_capture` | Read-Only Capture | When set, the capture will operate in read-only mode and avoid operations such as watermark writes. | boolean | `false` |
-| `/advanced/capture_as_partitions` | Capture Partitioned Tables As Partitions | When set, the capture will discover and capture partitioned tables as individual partitions rather than as a single root table. This requires the publication to be created without `publish_via_partition_root`. | boolean | `false` |
-| `/advanced/discover_unpublished_tables` | Discover Unpublished Tables | If `true`, the capture discovers all tables, even ones not currently in the publication. | boolean |  |
-| `/advanced/source_tag` | Source Tag | This value is added as the property 'tag' in the source metadata of each document. | string |  |
-| `/advanced/statement_timeout` | Statement Timeout | Overrides the statement timeout used by the connector. Leave blank to use the default of 2 minutes. Set to `0` to disable statement timeouts entirely. Options include `""`, `0`, `30s`, `1m`, `2m`, `5m`, and `30m`. | string | `""` |
-| `/advanced/rediscovery_interval` | Rediscovery Interval | How often the connector re-runs discovery while a capture is running, in order to notice schema changes and newly added tables. Accepts duration strings like `15m` or `1h`, from `1m` up to `8760h`. | string | `"15m"` |
-
-#### Bindings
-
-| Property         | Title     | Description                                                                                | Type   | Required/Default |
-|------------------|-----------|--------------------------------------------------------------------------------------------|--------|------------------|
-| **`/namespace`** | Namespace | The [namespace/schema](https://www.postgresql.org/docs/9.1/ddl-schemas.html) of the table. | string | Required         |
-| **`/stream`**    | Stream    | Table name.     | string | Required         |
-| `/mode` | [Backfill Mode](/reference/backfilling-data/#resource-configuration-backfill-modes) | How the preexisting contents of the table should be backfilled. This should generally not be changed. | string | `""` |
-| `/priority` | Backfill Priority | Optional priority for this binding. The highest priority binding(s) will be backfilled completely before any others. Negative priorities are allowed and will cause a binding to be backfilled after others. | integer | `0` |
-| `/advanced/additional_backfill_filter` | Additional Backfill Filter | Optional filter clause which will be applied to all backfill queries for this binding. Contact Estuary support for assistance before using this option. | string | |
-
-#### SSL Mode
-
-Certain managed PostgreSQL implementations may require you to explicitly set the [SSL Mode](https://www.postgresql.org/docs/current/libpq-ssl.html#LIBPQ-SSL-PROTECTION) to connect with Estuary. One example is [Neon](https://neon.tech/docs/connect/connect-securely), which requires the setting `verify-full`. Check your managed PostgreSQL's documentation for details if you encounter errors related to the SSL mode configuration.
-
 ### Sample
 
 A minimal capture definition will look like the following:
@@ -218,45 +133,3 @@ captures:
 Your capture definition will likely be more complex, with additional bindings for each table in the source database.
 
 [Learn more about capture definitions.](/concepts/captures.md)
-
-
-## TOASTed values
-
-PostgreSQL has a hard page size limit, usually 8 KB, for performance reasons.
-If your tables contain values that exceed the limit, those values can't be stored directly.
-PostgreSQL uses [TOAST](https://www.postgresql.org/docs/current/storage-toast.html) (The Oversized-Attribute Storage Technique) to
-store them separately.
-
-TOASTed values can sometimes present a challenge for systems that rely on the PostgreSQL write-ahead log (WAL), like this connector.
-If a change event occurs on a row that contains a TOASTed value, _but the TOASTed value itself is unchanged_, it is omitted from the WAL.
-As a result, the connector emits a row update with the value omitted, which might cause
-unexpected results in downstream catalog tasks if adjustments are not made.
-
-The PostgreSQL connector handles TOASTed values for you when you follow the [standard discovery workflow](/concepts/captures.md#discovery)
-or use the [Estuary UI](/concepts/web-app.md) to create your capture.
-It uses [merge](/reference/reduction-strategies/merge) [reductions](/concepts/schemas.md#reductions)
-to fill in the previous known TOASTed value in cases when that value is omitted from a row update.
-
-However, due to the event-driven nature of certain tasks in Estuary, it's still possible to see unexpected results in your data flow, specifically:
-
-- When you materialize the captured data to another system using a connector that requires [delta updates](/concepts/materialization/#delta-updates)
-- When you perform a [derivation](/concepts/derivations.md) that uses TOASTed values
-
-### Troubleshooting
-
-If you encounter an issue that you suspect is due to TOASTed values, try the following:
-
-- Ensure your collection's schema is using the merge [reduction strategy](/concepts/schemas.md#reduce-annotations).
-- [Set REPLICA IDENTITY to FULL](https://www.postgresql.org/docs/9.4/sql-altertable.html) for the table. This circumvents the problem by forcing the
-WAL to record all values regardless of size. However, this can have performance impacts on your database and must be carefully evaluated.
-- [Contact Estuary support](mailto:support@estuary.dev) for assistance.
-
-## Publications
-
-It is recommended that the publication used by the capture only contain the tables that will be captured. In some cases it may be desirable to create this publication for all tables in the database instead of specific tables, for example using:
-
-```sql
-CREATE PUBLICATION flow_publication FOR ALL TABLES WITH (publish_via_partition_root = true);
-```
-
-Caution must be used if creating the publication in this way as all existing tables (even those not part of the capture) will be included in it, and if any of them do not have a primary key they will no longer be able to process updates or deletes.
