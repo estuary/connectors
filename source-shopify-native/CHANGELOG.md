@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-09-28
+
+### Added
+- New `Max Concurrent Bulk Operations` setting under Advanced Config limits
+  how many bulk query operations the connector runs at once for each store
+  (1 to 5, default 5). Lower it to leave Shopify's bulk operation slots free
+  for other systems that submit bulk queries through the same app.
+
 ## 2026-08-27
 
 ### Added

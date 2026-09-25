@@ -182,12 +182,13 @@ async def _create_store_context(
     http: HTTPMixin,
     store_config: StoreConfig,
     should_cancel_ongoing_job: bool,
+    max_concurrent_bulk_ops: int,
 ) -> StoreContext:
     """Create context for a single store."""
     token_source = _build_token_source(store_config)
     store_http = StoreHTTP(http, token_source)
     client = gql.ShopifyGraphQLClient(store_http, store_config.store)
-    bulk_job_manager = BulkJobManager(client, log)
+    bulk_job_manager = BulkJobManager(client, log, max_concurrent_bulk_ops)
 
     if should_cancel_ongoing_job:
         await bulk_job_manager.cancel_current()
@@ -488,7 +489,13 @@ async def all_resources(
     # Initialize all store contexts in parallel
     results = await asyncio.gather(
         *[
-            _create_store_context(log, http, store_config, should_cancel_ongoing_job)
+            _create_store_context(
+                log,
+                http,
+                store_config,
+                should_cancel_ongoing_job,
+                config.advanced.max_concurrent_bulk_ops,
+            )
             for store_config in config.stores
         ],
         return_exceptions=True,

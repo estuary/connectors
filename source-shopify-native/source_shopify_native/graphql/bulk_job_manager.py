@@ -7,6 +7,7 @@ import aiohttp
 from estuary_cdk.http import HTTPError
 
 from source_shopify_native.models import (
+    MAX_CONCURRENT_BULK_OPS,
     BulkCancelData,
     BulkOperationDetails,
     BulkOperationErrorCodes,
@@ -27,7 +28,6 @@ JOB_ID_PATTERN = re.compile(r"gid://shopify/BulkOperation/\d+")
 INITIAL_SLEEP = 1
 MAX_SLEEP = 2
 SIX_HOURS = 6 * 60 * 60
-MAX_CONCURRENT_BULK_OPS = 5
 MAX_QUERY_REQUEST_ATTEMPTS = 5
 MAX_QUERY_REQUEST_RETRY_INTERVAL = 60  # 1 minute
 # Prepended to every bulk query the connector submits. Shopify reports the submitted query back
@@ -67,10 +67,15 @@ class BulkJobError(RuntimeError):
 
 
 class BulkJobManager:
-    def __init__(self, client: ShopifyGraphQLClient, log: Logger):
+    def __init__(
+        self,
+        client: ShopifyGraphQLClient,
+        log: Logger,
+        max_concurrent_bulk_ops: int = MAX_CONCURRENT_BULK_OPS,
+    ):
         self.client = client
         self.log = log
-        self.semaphore = asyncio.Semaphore(MAX_CONCURRENT_BULK_OPS)
+        self.semaphore = asyncio.Semaphore(max_concurrent_bulk_ops)
         self._tracked_jobs: set[str] = set()
         self._cancel_tasks: set[asyncio.Task[None]] = set()
 
