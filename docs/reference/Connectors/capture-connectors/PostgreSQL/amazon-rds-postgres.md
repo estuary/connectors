@@ -97,7 +97,7 @@ You can verify whether the setting is enabled by running `SHOW hot_standby_feedb
 See the main [PostgreSQL capture reference](./PostgreSQL.md#capturing-from-read-only-standbys)
 for more information on capturing from read-only standby instances.
 
-### Sample
+## Sample
 
 A minimal capture definition will look like the following:
 
@@ -120,7 +120,3 @@ captures:
           namespace: ${TABLE_NAMESPACE}
         target: ${PREFIX}/${COLLECTION_NAME}
 ```
-
-Your capture definition will likely be more complex, with additional bindings for each table in the source database.
-
-[Learn more about capture definitions.](/concepts/captures.md)

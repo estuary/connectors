@@ -89,7 +89,7 @@ under the name of the root table) but is not required.
 
 6. In the [RDS console](https://console.aws.amazon.com/rds/), note the instance's Endpoint and Port. You'll need these for the `address` property when you configure the connector.
 
-### Sample
+## Sample
 
 A minimal capture definition will look like the following:
 
@@ -112,7 +112,3 @@ captures:
           namespace: ${TABLE_NAMESPACE}
         target: ${PREFIX}/${COLLECTION_NAME}
 ```
-
-Your capture definition will likely be more complex, with additional bindings for each table in the source database.
-
-[Learn more about capture definitions.](/concepts/captures.md)

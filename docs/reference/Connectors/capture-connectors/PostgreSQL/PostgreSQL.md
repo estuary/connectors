@@ -20,7 +20,7 @@ Setup instructions are provided for the following platforms:
 
 - [Self-hosted PostgreSQL](#self-hosted-postgresql)
 - [AlloyDB](./alloydb.md)
-- [Amazon Aurora](./amazon-aurora/)
+- [Amazon Aurora](./amazon-aurora-postgres/)
 - [Amazon RDS](./amazon-rds-postgres/)
 - [Azure Database for PostgreSQL](#azure-database-for-postgresql)
 - [Google Cloud SQL](./google-cloud-sql-postgres/)
@@ -493,7 +493,7 @@ Binding properties are configured on a per-resource basis. This is how you tell
 Estuary to transfer data from specific tables to your data collections.
 
 | Property | Title | Description | Type | Required/Default |
-| --- | --- | --- | --- |
+| --- | --- | --- | --- | --- |
 | **`/namespace`** | Namespace | The [namespace/schema](https://www.postgresql.org/docs/9.1/ddl-schemas.html) of the table. | string | Required |
 | **`/stream`** | Stream | Table name. | string | Required |
 | `/mode` | [Backfill Mode](/reference/backfilling-data/#resource-configuration-backfill-modes) | How the preexisting contents of the table should be backfilled. This should generally not be changed. | string | `""` |

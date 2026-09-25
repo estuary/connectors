@@ -31,7 +31,7 @@ You'll need an AlloyDB database setup with the following:
 
 You'll also need a virtual machine to connect securely to the instance via SSH tunnelling (AlloyDB doesn't support IP allowlisting).
 
-### Setup
+## Setup
 
 To meet the prerequisites, complete these steps.
 
@@ -53,47 +53,15 @@ and set up the watermarks table and publication.
 3. Follow the instructions to create a [virtual machine for SSH tunneling](/guides/connect-network/#setup-for-google-cloud)
 in the same Google Cloud project as your instance.
 
-## Configuration
+### Network Tunnel
 
-You configure connectors either in the Estuary web app, or by directly editing the catalog specification file.
-See [connectors](/concepts/connectors/#using-connectors) to learn more about using connectors. The values and specification sample below provide configuration details specific to the PostgreSQL source connector.
-
-### Properties
-
-#### Endpoint
-
-The SSH config section is required for this connector.
+The Network Tunnel section to set up SSH forwarding is required for this connector.
 You'll fill in the database address with a localhost IP address,
 and specify your VM's IP address as the SSH address.
-See the table below and the [sample config](#sample).
+See [secure connections](/concepts/connectors/#connecting-to-endpoints-on-secure-networks)
+for properties and their usage, as well as the [sample config](#sample).
 
-| Property | Title | Description | Type | Required/Default |
-|---|---|---|---|---|
-| **`/address`** | Address | The host or host:port at which the database can be reached. | string | Required |
-| **`/database`** | Database | Logical database name to capture from. | string | Required, `"postgres"` |
-| **`/user`** | User | The database user to authenticate as. | string | Required, `"flow_capture"` |
-| **`/password`** | Password | Password for the specified database user. | string | Required |
-| `/advanced` | Advanced Options | Options for advanced users. You should not typically need to modify these. | object |  |
-| `/advanced/backfill_chunk_size` | Backfill Chunk Size | The number of rows which should be fetched from the database in a single backfill query. | integer | `4096` |
-| `/advanced/publicationName` | Publication Name | The name of the PostgreSQL publication to replicate from. | string | `"flow_publication"` |
-| `/advanced/skip_backfills` | Skip Backfills | A comma-separated list of fully-qualified table names which should not be backfilled. | string |  |
-| `/advanced/slotName` | Slot Name | The name of the PostgreSQL replication slot to replicate from. | string | `"flow_slot"` |
-| `/advanced/watermarksTable` | Watermarks Table | The name of the table used for watermark writes during backfills. Must be fully-qualified in &#x27;&lt;schema&gt;.&lt;table&gt;&#x27; form. | string | `"public.flow_watermarks"` |
-| `/advanced/rediscovery_interval` | Rediscovery Interval | How often the connector re-runs discovery while a capture is running, in order to notice schema changes and newly added tables. Accepts duration strings like `15m` or `1h`, from `1m` up to `8760h`. | string | `"15m"` |
-| `networkTunnel` | Network Tunnel | Connect to your system through an SSH server that acts as a bastion host for your network. | Object | |
-| `networkTunnel/sshForwarding` | SSH Forwarding | | Object | |
-| `networkTunnel/sshForwarding/sshEndpoint` | SSH Endpoint | Endpoint of the remote SSH server (in this case, your Google Cloud VM) that supports tunneling (in the form of ssh://user@address). | String | |
-| `networkTunnel/sshForwarding/privateKey` | SSH Private Key | Private key to connect to the remote SSH server. | String | |
-
-#### Bindings
-
-| Property | Title | Description | Type | Required/Default |
-|-------|------|------|---------| --------|
-| **`/namespace`** | Namespace | The [namespace/instance](https://cloud.google.com/alloydb/docs/overview#hierarchical_resource_structure) of the table. | string | Required |
-| **`/stream`** | Stream | Table name. | string | Required |
-| **`/syncMode`** | Sync mode | Connection method. Always set to `incremental`. | string | Required |
-
-### Sample
+## Sample
 
 A minimal capture definition will look like the following:
 
@@ -111,29 +79,15 @@ captures:
           networkTunnel:
             sshForwarding:
               sshEndpoint: ssh://sshUser@vm-ip-address
-              privateKey: |2
+              privateKey: |
               -----BEGIN RSA PRIVATE KEY-----
-              MIICXAIBAAKBgQCJO7G6R+kv2MMS8Suw21sk2twHg8Vog0fjimEWJEwyAfFM/Toi
-              EJ6r5RTaSvN++/+MPWUll7sUdOOBZr6ErLKLHEt7uXxusAzOjMxFKZpEARMcjwHY
-              v/tN1A2OYU0qay1DOwknEE0i+/Bvf8lMS7VDjHmwRaBtRed/+iAQHf128QIDAQAB
-              AoGAGoOUBP+byAjDN8esv1DCPU6jsDf/Tf//RbEYrOR6bDb/3fYW4zn+zgtGih5t
-              CR268+dwwWCdXohu5DNrn8qV/Awk7hWp18mlcNyO0skT84zvippe+juQMK4hDQNi
-              ywp8mDvKQwpOuzw6wNEitcGDuACx5U/1JEGGmuIRGx2ST5kCQQDsstfWDcYqbdhr
-              5KemOPpu80OtBYzlgpN0iVP/6XW1e5FCRp2ofQKZYXVwu5txKIakjYRruUiiZTza
-              QeXRPbp3AkEAlGx6wMe1l9UtAAlkgCFYbuxM+eRD4Gg5qLYFpKNsoINXTnlfDry5
-              +1NkuyiQDjzOSPiLZ4Abpf+a+myjOuNL1wJBAOwkdM6aCVT1J9BkW5mrCLY+PgtV
-              GT80KTY/d6091fBMKhxL5SheJ4SsRYVFtguL2eA7S5xJSpyxkadRzR0Wj3sCQAvA
-              bxO2fE1SRqbbF4cBnOPjd9DNXwZ0miQejWHUwrQO0inXeExNaxhYKQCcnJNUAy1J
-              6JfAT/AbxeSQF3iBKK8CQAt5r/LLEM1/8ekGOvBh8MAQpWBW771QzHUN84SiUd/q
-              xR9mfItngPwYJ9d/pTO7u9ZUPHEoat8Ave4waB08DsI=
+              MIICX......
+              ...
+              ...
               -----END RSA PRIVATE KEY-----
     bindings:
       - resource:
           stream: ${TABLE_NAME}
           namespace: ${TABLE_NAMESPACE}
-          syncMode: incremental
         target: ${PREFIX}/${COLLECTION_NAME}
 ```
-Your capture definition will likely be more complex, with additional bindings for each table in the source database.
-
-[Learn more about capture definitions.](/concepts/captures)
