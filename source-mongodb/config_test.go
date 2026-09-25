@@ -243,3 +243,9 @@ func TestSpec(t *testing.T) {
 	require.NoError(t, err)
 	cupaloy.SnapshotT(t, string(formatted))
 }
+
+func TestRedactedAddress(t *testing.T) {
+	require.Equal(t, "mongodb+srv://user:xxxxx@my-mongo.test/?authSource=admin", redactedAddress("mongodb+srv://user:secret@my-mongo.test/?authSource=admin"))
+	require.Equal(t, "mongodb://my-mongo.test:27017", redactedAddress("mongodb://my-mongo.test:27017"))
+	require.Equal(t, "<unparseable address>", redactedAddress("mongodb://user:secret@my-mongo.test:bad"))
+}
