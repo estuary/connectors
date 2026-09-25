@@ -25,12 +25,12 @@ The connector captures the following PostHog resources:
 - Sessions
 
 :::info
-`Sessions` captures PostHog's `sessions` table — one row per visit, with entry and
-exit URLs, UTM and click-ID attribution, pageview counts, bounce flag and channel
-type. Sessions are a computed aggregate: a session's row is recalculated whenever
-another event arrives for it, so the same `session_id` may be captured several
-times and converge on its final values. It is keyed on `session_id`, which joins
-to `$session_id` on `Events`.
+`Sessions` captures PostHog's `sessions` table — one row per visit, with entry
+and exit URLs, UTM and click-ID attribution, pageview counts, `is_bounce` (`0`
+or `1`) and channel type. Sessions are a computed aggregate: a session's row is
+recalculated whenever another event arrives for it, so the same `session_id` may
+be captured several times and converge on its final values. It is keyed on
+`session_id`, which joins to `$session_id` on `Events`.
 :::
 
 :::info
