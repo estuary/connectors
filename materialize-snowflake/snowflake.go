@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"maps"
 	"os"
 	"slices"
 	"strconv"
@@ -334,13 +333,11 @@ func newTransactor(
 		cp:                  make(checkpoint),
 	}
 
-	// Streaming v2 needs its part of the checkpoint state sooner than usual.
 	if len(open.StateJson) > 0 {
 		if err := d.UnmarshalState(open.StateJson); err != nil {
 			return nil, fmt.Errorf("unmarshalling connector state: %w", err)
 		}
 	}
-	priorCheckpoint := maps.Clone(d.cp)
 
 	if db, err := stdsql.Open("snowflake", dsn); err != nil {
 		return nil, fmt.Errorf("load stdsql.Open: %w", err)
@@ -360,8 +357,7 @@ func newTransactor(
 	}
 
 	for _, binding := range bindings {
-		priorCheckpointItem, _ := priorCheckpoint[binding.StateKey]
-		if err = d.addBinding(ctx, binding, *cmp.Or(priorCheckpointItem, &checkpointItem{})); err != nil {
+		if err = d.addBinding(ctx, binding, *cmp.Or(d.cp[binding.StateKey], &checkpointItem{})); err != nil {
 			return nil, fmt.Errorf("adding binding for %s: %w", binding.Path, err)
 		}
 	}
@@ -404,7 +400,7 @@ type binding struct {
 	}
 }
 
-func (d *transactor) addBinding(ctx context.Context, target sql.Table, priorCheckpointItem checkpointItem) error {
+func (d *transactor) addBinding(ctx context.Context, target sql.Table, cp checkpointItem) error {
 	var b = new(binding)
 	b.target = target
 	b.nullFieldsToStrip = target.NullableFieldsToStrip()
@@ -413,29 +409,29 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, priorChec
 	var loc = d.ep.Dialect.TableLocator(b.target.Path)
 
 	if d.cfg.isStreamsV2(b.target.DeltaUpdates) {
-		if len(priorCheckpointItem.StreamBlobs) > 0 {
+		if len(cp.StreamBlobs) > 0 {
 			// We're upgrading from streams v1, and the v1 path left behind some
 			// blobs that only it can drain.
 
 			if err := d.snowpipeStreaming.addBinding(ctx, loc.TableSchema, d.ep.Identifier(loc.TableName), b.target); err != nil {
 				return fmt.Errorf(
 					"opening the snowpipe_streaming channel on %s to finish %d staged blob(s): %w. Restore the snowpipe_streaming write path for one transaction before moving the binding onto snowpipe_streaming_v2, or backfill the binding, which discards those blobs and materializes their documents again",
-					b.target.Identifier, len(priorCheckpointItem.StreamBlobs), err)
+					b.target.Identifier, len(cp.StreamBlobs), err)
 			}
 
 			log.WithFields(log.Fields{
 				"table": b.target.Identifier,
-				"blobs": len(priorCheckpointItem.StreamBlobs),
+				"blobs": len(cp.StreamBlobs),
 			}).Info("opened a snowpipe_streaming channel to finish the blobs that path staged")
 		}
 
-		d.snowpipeStreamingV2.addBinding(d.cfg.Database, loc.TableSchema, d.ep.Identifier(loc.TableName), b.target, priorCheckpointItem.StreamV2)
+		d.snowpipeStreamingV2.addBinding(d.cfg.Database, loc.TableSchema, d.ep.Identifier(loc.TableName), b.target, cp.StreamV2)
 		b.streamingV2 = true
 		d.bindings = append(d.bindings, b)
 		return nil
 	}
 
-	if len(priorCheckpointItem.StreamV2.channelNames()) > 0 {
+	if len(cp.StreamV2.channelNames()) > 0 {
 		// We're switching away from streams v2, and the v2 path left behind
 		// some channels that only it can clean up.
 
@@ -444,7 +440,7 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, priorChec
 		}
 		log.WithFields(log.Fields{
 			"table":    b.target.Identifier,
-			"channels": priorCheckpointItem.StreamV2.channelNames(),
+			"channels": cp.StreamV2.channelNames(),
 		}).Warn("this binding is leaving the snowpipe_streaming_v2 write path; documents its channels committed beyond the checkpoint will be materialized again; with delta updates these duplicates would be permanent")
 	}
 
