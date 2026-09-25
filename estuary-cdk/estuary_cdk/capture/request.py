@@ -41,11 +41,11 @@ class ValidateLastCaptureEndpointConfig(BaseModel):
     config: dict[str, Any]
 
 
-class ValidateLastCapture(ValidateBase, Generic[EndpointConfig, ResourceConfig]):
+class ValidateLastCapture(ValidateBase[ResourceConfig], Generic[EndpointConfig, ResourceConfig]):
     config: ValidateLastCaptureEndpointConfig
 
 
-class Validate(ValidateBase, Generic[EndpointConfig, ResourceConfig]):
+class Validate(ValidateBase[ResourceConfig], Generic[EndpointConfig, ResourceConfig]):
     config: EndpointConfig
     lastCapture: ValidateLastCapture[EndpointConfig, ResourceConfig] | None = None
 

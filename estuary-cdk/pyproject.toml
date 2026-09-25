@@ -16,11 +16,14 @@ pydantic = ">1.10,<3"
 xxhash = "^3.4.1"
 ijson = "^3.3.0"
 pycron = "^3.1.2"
-stream-unzip = "0.0.99"
+stream-unzip = ">=0.0.101"
 typing-extensions = "^4.13"
 
 google-auth = {version = ">=2.40.3", extras = ["requests"]}
-pendulum = "<=2.0.0 | >=3.0.0"
+# Equivalent to "2.0.0 or >=3.0.0" over pendulum's published releases, but
+# expressible in PEP 440 (a `||` union renders as invalid PEP 508 metadata,
+# which uv rejects). Later 2.x releases don't build on modern Pythons.
+pendulum = ">=2.0.0,!=2.0.1,!=2.0.2,!=2.0.3,!=2.0.4,!=2.0.5,!=2.1.*"
 
 airbyte-cdk = {version = "<=6.56.0", optional = true}
 

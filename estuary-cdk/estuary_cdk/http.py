@@ -15,11 +15,13 @@ from multidict import CIMultiDictProxy
 from pydantic import BaseModel
 
 from . import Mixin
+# `from x import Y as Y` marks Y as an explicit re-export: this package ships
+# py.typed, and connectors import these names from this module.
 from .flow import (
-    AccessToken,
+    AccessToken as AccessToken,
     AuthorizationCodeFlowOAuth2Credentials,
     BaseOAuth2Credentials,
-    BasicAuth,
+    BasicAuth as BasicAuth,
     ClientCredentialsOAuth2Credentials,
     GoogleServiceAccount,
     GoogleServiceAccountSpec,

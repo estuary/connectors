@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from enum import Enum, StrEnum
 from itertools import combinations
-from logging import Logger
+from logging import Logger as Logger
 from typing import (
     Any,
     Callable,
@@ -22,25 +22,31 @@ from pydantic import AwareDatetime, BaseModel, Field, NonNegativeInt
 
 from ..cron import next_fire
 from ..logger import OBSERVABLE_FIELD
+# `from x import Y as Y` marks Y as an explicit re-export: this package ships
+# py.typed, and connectors import these names from this module.
 from ..flow import (
-    AccessToken,
+    AccessToken as AccessToken,
     AuthorizationCodeFlowOAuth2Credentials,
-    BaseOAuth2Credentials,
-    BasicAuth,
-    CaptureBinding,
-    ClientCredentialsOAuth2Credentials,
-    LongLivedClientCredentialsOAuth2Credentials,
-    OAuth2Spec,
-    OAuth2TokenFlowSpec,
-    ResourceOwnerPasswordOAuth2Credentials,
-    RotatingOAuth2Credentials,
+    BaseOAuth2Credentials as BaseOAuth2Credentials,
+    BasicAuth as BasicAuth,
+    CaptureBinding as CaptureBinding,
+    ClientCredentialsOAuth2Credentials as ClientCredentialsOAuth2Credentials,
+    LongLivedClientCredentialsOAuth2Credentials as LongLivedClientCredentialsOAuth2Credentials,
+    OAuth2Spec as OAuth2Spec,
+    OAuth2TokenFlowSpec as OAuth2TokenFlowSpec,
+    ResourceOwnerPasswordOAuth2Credentials as ResourceOwnerPasswordOAuth2Credentials,
+    RotatingOAuth2Credentials as RotatingOAuth2Credentials,
     ValidationError,
 )
 from ..pydantic_polyfill import GenericModel
 from ..utils import json_merge_patch
 from . import Task, request, response
 from .webhook.match import CollectionMatchingSpec, UrlMatch
-from .document import _BaseDocument, AssociatedDocument, BaseDocument
+from .document import (
+    _BaseDocument,
+    AssociatedDocument as AssociatedDocument,
+    BaseDocument as BaseDocument,
+)
 
 LogCursor = tuple[str | int] | AwareDatetime | NonNegativeInt
 """LogCursor is a cursor into a logical log of changes.
@@ -656,11 +662,11 @@ def _get_min_incremental_cursor(state: ResourceState) -> datetime | None:
 
 
 def open(
-    open: request.Open[Any, _ResourceConfig, _ConnectorState],
+    open: request.Open[Any, _BaseResourceConfig, _ConnectorState],
     resolved_bindings: list[
         tuple[
-            CaptureBinding[_ResourceConfig],
-            Resource[_BaseDocument, _ResourceConfig, _ResourceState],
+            CaptureBinding[_BaseResourceConfig],
+            Resource[_BaseDocument, _BaseResourceConfig, _ResourceState],
         ]
     ],
 ) -> tuple[response.Opened, Callable[[Task], Awaitable[None]]]:

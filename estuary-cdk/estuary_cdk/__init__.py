@@ -58,9 +58,13 @@ class BaseConnector(Generic[Request], abc.ABC):
     #
     # Python classes are type-erased, so it's not possible to determine the
     # concrete class at runtime using only type annotations.
-    @classmethod
-    @abc.abstractclassmethod
-    def request_class(cls) -> type[Request]:
+    #
+    # It's an instance method (not a classmethod) because connectors
+    # idiomatically override it as `def request_class(self)`, and a
+    # classmethod base makes every such override a type-checking error.
+    # serve() calls it through the instance, so either form works at runtime.
+    @abc.abstractmethod
+    def request_class(self) -> type[Request]:
         raise NotImplementedError()
 
     @abc.abstractmethod

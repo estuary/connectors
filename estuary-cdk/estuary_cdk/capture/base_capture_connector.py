@@ -65,8 +65,10 @@ class BaseCaptureConnector(
     Acknowledge protocol, lets ACK-requiring Tasks block their checkpoints
     until Flow confirms persistence."""
 
+    # Parameters are positional-only so that overrides may name them freely
+    # (connectors commonly use `_` / `__` for unused arguments).
     @abc.abstractmethod
-    async def spec(self, log: FlowLogger, _: request.Spec) -> ConnectorSpec:
+    async def spec(self, log: FlowLogger, _: request.Spec, /) -> ConnectorSpec:
         raise NotImplementedError()
 
     @abc.abstractmethod
