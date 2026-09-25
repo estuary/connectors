@@ -1,5 +1,4 @@
 ---
-sidebar_position: 6
 description: Capture Supabase updates with Estuary's CDC connector. Setup guide includes logical replication, WAL handling, replication slots, publications, watermarks tables, and backfills.
 ---
 
@@ -202,7 +201,7 @@ captures:
   ${PREFIX}/${CAPTURE_NAME}:
     endpoint:
       connector:
-        image: ghcr.io/estuary/source-postgres:v3
+        image: ghcr.io/estuary/source-supabase-postgres:v3
         config:
           address: host:port
           database: postgres
