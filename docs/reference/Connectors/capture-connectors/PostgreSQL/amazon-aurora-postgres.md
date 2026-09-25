@@ -52,7 +52,7 @@ For each step, take note of which entity you're working with.
 
    2. To allow secure connections via SSH tunneling:
       - Follow the guide to [configure an SSH server for tunneling](/guides/connect-network/)
-      - When you configure your connector as described in the [configuration](#configuration) section above, including the additional `networkTunnel` configuration to enable the SSH tunnel. See [Connecting to endpoints on secure networks](/concepts/connectors.md#connecting-to-endpoints-on-secure-networks) for additional details and a sample.
+      - When you configure your connector as described in the [configuration](./PostgreSQL.md#configuration) section above, including the additional `networkTunnel` configuration to enable the SSH tunnel. See [Connecting to endpoints on secure networks](/concepts/connectors.md#connecting-to-endpoints-on-secure-networks) for additional details and a sample.
 
 2. Enable logical replication on your Aurora DB cluster.
 
