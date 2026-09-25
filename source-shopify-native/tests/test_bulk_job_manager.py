@@ -17,7 +17,11 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from source_shopify_native.graphql.bulk_job_manager import BulkJobManager
+from source_shopify_native.graphql.bulk_job_manager import (
+    BULK_QUERY_CONCURRENCY_LIMIT_EXCEEDED_ERROR,
+    BulkJobError,
+    BulkJobManager,
+)
 
 # Pinned as a literal rather than imported: jobs submitted by one connector version are cancelled
 # by the next, so changing the marker is a compatibility break this test should flag.
@@ -52,6 +56,7 @@ class FakeClient:
     def __init__(
         self,
         running_jobs: list[dict[str, Any]],
+        rejecting_job_ids: list[str] | None = None,
         final_status: str = "CANCELED",
         keeps_comments: bool = True,
     ):
@@ -60,6 +65,8 @@ class FakeClient:
         self.keeps_comments = keeps_comments
         self.running_jobs = running_jobs
         self.final_status = final_status
+        # When set, submits are rejected as if these jobs held all of Shopify's slots.
+        self.rejecting_job_ids = rejecting_job_ids
         self.cancelled: list[str] = []
         self.polled: list[str] = []
         self.submitted: list[str] = []
@@ -71,7 +78,21 @@ class FakeClient:
         # Yield like a real request would, so concurrent callers interleave.
         await asyncio.sleep(0)
 
-        if "bulkOperationRunQuery(" in query:
+        if "bulkOperationRunQuery(" in query and self.rejecting_job_ids is not None:
+            self.submitted.append(query)
+            payload = {
+                "bulkOperationRunQuery": {
+                    "bulkOperation": None,
+                    "userErrors": [
+                        {
+                            "field": None,
+                            "message": f"{BULK_QUERY_CONCURRENCY_LIMIT_EXCEEDED_ERROR}: {', '.join(self.rejecting_job_ids)}.",
+                            "code": "OPERATION_IN_PROGRESS",
+                        }
+                    ],
+                }
+            }
+        elif "bulkOperationRunQuery(" in query:
             self.submitted.append(query)
             reported_query = _submitted_inner_query(query)
             if not self.keeps_comments:
@@ -176,6 +197,22 @@ async def test_execute_runs_at_most_max_concurrent_bulk_ops(
 
     assert len(client.submitted) == 3
     assert client.max_in_flight == expected_max_in_flight
+
+
+@pytest.mark.asyncio
+async def test_execute_rejected_by_other_systems_jobs_points_to_setting(log):
+    """When other systems' jobs fill the slots, the error tells the customer how to make room."""
+    client = FakeClient(running_jobs=[], rejecting_job_ids=[UNMARKED_JOB["id"]])
+
+    with pytest.raises(BulkJobError) as exc_info:
+        await _manager(client, log, max_concurrent_bulk_ops=3).execute(
+            MagicMock(NAME="products"), "{ products { edges { node { id } } } }"
+        )
+
+    message = exc_info.value.message
+    assert UNMARKED_JOB["id"] in message
+    assert "up to 3 of Shopify's 5 bulk query slots" in message
+    assert "Max Concurrent Bulk Operations" in message
 
 
 @pytest.mark.asyncio
