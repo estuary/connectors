@@ -217,6 +217,7 @@ class BulkJobManager:
                         completedAt
                         url
                         errorCode
+                        query
                     }}
                 }}
             }}
@@ -242,6 +243,7 @@ class BulkJobManager:
                         completedAt
                         url
                         errorCode
+                        query
                     }}
                     userErrors {{
                         field
@@ -430,6 +432,7 @@ class BulkJobManager:
                 completedAt
                 url
                 errorCode
+                query
                 }}
                 userErrors {{
                 field
