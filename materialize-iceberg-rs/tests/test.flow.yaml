@@ -1,0 +1,27 @@
+materializations:
+  acmeCo/materialize-iceberg-rs:
+    endpoint:
+      local:
+        command:
+          - cargo
+          - run
+        protobuf: true
+        config: {}
+    bindings:
+      - resource:
+          table: test_table
+        source: test/collection
+        fields:
+          recommended: true
+          include:
+            flow_document: {}
+
+collections:
+  test/collection:
+    schema:
+      type: object
+      properties:
+        id: { type: integer }
+        value: { type: string }
+      required: [id]
+    key: [/id]

@@ -169,6 +169,7 @@ jobs:
           - materialize-google-sheets
           - materialize-hubspot
           - materialize-iceberg
+          - materialize-iceberg-rs
           - materialize-kafka
           - materialize-mongodb
           - materialize-motherduck
