@@ -2,10 +2,13 @@
 #
 # Work out which connector CI lanes a set of changed paths affects.
 #
-# Reads changed paths on stdin, one per line, and writes two lines to stdout:
+# Reads changed paths on stdin, one per line, and writes three lines to stdout:
 #
-#   python=true|false     the Python connector workflow must run
-#   go_rust=true|false    the Go & Rust connector workflow must run
+#   python=true|false        the Python connector workflow must run
+#   go_rust=true|false       the Go & Rust connector workflow must run
+#   python_connectors=...    the Python connectors to build: `all` when a path
+#                            shared by every one of them changed, otherwise a
+#                            compact JSON list of connector directories
 #
 # The lane chosen for each path is logged to stderr.
 set -euo pipefail
@@ -14,6 +17,11 @@ REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 
 python=false
 go_rust=false
+
+# Set when a changed path feeds every Python connector. Otherwise only the
+# connector directories collected in $python_dirs are affected.
+python_all=false
+python_dirs=()
 
 # Read stdin up front so it can be scanned before classifying. Deleting a
 # connector takes its pyproject.toml off disk, so the changed paths are the only
@@ -79,10 +87,21 @@ while IFS= read -r path || [ -n "$path" ]; do
     fi
 
     case "$lane" in
-        python) python=true ;;
+        python)
+            python=true
+            case "$path" in
+                # The CDK (and the Dockerfiles connectors symlink to), the
+                # workflow and its connector list feed every Python connector.
+                estuary-cdk/* | .github/workflows/python.yaml | .github/python-connectors.yaml)
+                    python_all=true ;;
+                *) python_dirs+=("${path%%/*}") ;;
+            esac
+            ;;
         go_rust) go_rust=true ;;
         both)
+            # Anything shared by both lanes is shared by every Python connector.
             python=true
+            python_all=true
             go_rust=true
             ;;
     esac
@@ -92,3 +111,11 @@ done <<< "$input"
 
 echo "python=${python}"
 echo "go_rust=${go_rust}"
+if [ "$python_all" = true ]; then
+    echo "python_connectors=all"
+else
+    # `${arr[@]+...}` because bash before 4.4 treats an empty array as unset
+    # under `set -u`.
+    jq -cn '$ARGS.positional | unique' --args ${python_dirs[@]+"${python_dirs[@]}"} |
+        sed 's/^/python_connectors=/'
+fi

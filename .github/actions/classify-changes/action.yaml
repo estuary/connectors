@@ -11,6 +11,11 @@ outputs:
   go_rust:
     description: Whether the Go & Rust connector workflow needs to run.
     value: ${{ steps.classify.outputs.go_rust }}
+  python_connectors:
+    description: >
+      The Python connectors to build: `all`, or a JSON list of connector
+      directories.
+    value: ${{ steps.classify.outputs.python_connectors }}
 
 runs:
   using: "composite"
@@ -27,7 +32,7 @@ runs:
         # Every failure path below runs both lanes.
         fallback() {
           echo "$1; running both lanes to be safe"
-          printf 'python=true\ngo_rust=true\n' >> "$GITHUB_OUTPUT"
+          printf 'python=true\ngo_rust=true\npython_connectors=all\n' >> "$GITHUB_OUTPUT"
           exit 0
         }
 
@@ -77,8 +82,12 @@ runs:
 
         # Guard the shape of the verdict too: an empty or malformed value would
         # compare unequal to 'true' in the callers' `if:` and skip everything.
+        # python_connectors is `all` or a JSON array, which callers pass to
+        # fromJSON.
+        CONNECTORS=$(sed -n 's/^python_connectors=//p' <<< "$VERDICT")
         if ! grep -Eq '^python=(true|false)$' <<< "$VERDICT" ||
-           ! grep -Eq '^go_rust=(true|false)$' <<< "$VERDICT"; then
+           ! grep -Eq '^go_rust=(true|false)$' <<< "$VERDICT" ||
+           ! { [ "$CONNECTORS" = all ] || jq -e 'type == "array"' <<< "$CONNECTORS" > /dev/null 2>&1; }; then
           fallback "classifier gave '${VERDICT}'"
         fi
 
