@@ -36,6 +36,9 @@
 #                            #   process. Fixture documents hash-route by
 #                            #   collection key, so each document lands on
 #                            #   exactly one shard.
+#     [--wrap CMD]           # local-binary mode only: launch the connector as
+#                            #   `CMD <binary>`, e.g. a systemd-run scope that
+#                            #   applies production-like memory and CPU limits.
 
 set -o errexit
 set -o pipefail
@@ -55,6 +58,7 @@ SHARD_FLAGS=()
 TABLE_SUFFIX=""
 SHARD_LOG_LEVEL=""
 SHARDS=1
+WRAP=""
 
 while (($#)); do
   case "$1" in
@@ -69,6 +73,7 @@ while (($#)); do
     --table-suffix) TABLE_SUFFIX="$2";   shift 2 ;;
     --shard-log-level) SHARD_LOG_LEVEL="$2"; shift 2 ;;
     --shards)    SHARDS="$2";    shift 2 ;;
+    --wrap)      WRAP="$2";      shift 2 ;;
     -h|--help)
       sed -n '2,38p' "$0"; exit 0 ;;
     *) echo "unknown flag: $1" >&2; exit 2 ;;
@@ -123,6 +128,14 @@ else
     echo "build produced no binary at $CONNECTOR_BIN ($BUILD_PKG matched no main package)" >&2
     exit 1
   }
+  if [[ -n "$WRAP" ]]; then
+    # The spec always launches <connector>/connector, so move the real binary
+    # aside and put an exec wrapper in its place.
+    mv "$CONNECTOR_BIN" "$CONNECTOR_BIN.real"
+    printf '#!/bin/bash\nexec %s %q "$@"\n' "$WRAP" "$CONNECTOR_BIN.real" > "$CONNECTOR_BIN"
+    chmod +x "$CONNECTOR_BIN"
+    echo "wrapping connector: $WRAP $CONNECTOR_BIN.real"
+  fi
 fi
 
 # Output directory.

@@ -143,12 +143,31 @@ def _resolve_sizing(raw: dict, idx: int) -> tuple[int, int]:
     return doc_count, doc_size
 
 
+def expand_collections(raw_collections: list[dict]) -> list[dict]:
+    """Expand `replicas: N` on a collection entry into N entries named
+    `<name>-<i>`, so a scenario can declare many identical bindings."""
+    out: list[dict] = []
+    for c in raw_collections:
+        n = int(c.get("replicas", 1))
+        if n < 1:
+            raise ValueError(f"collection {c['name']}: replicas must be >= 1 (got {n})")
+        if n == 1 and "replicas" not in c:
+            out.append(c)
+            continue
+        width = len(str(n - 1))
+        for i in range(n):
+            entry = {k: v for k, v in c.items() if k != "replicas"}
+            entry["name"] = f"{c['name']}-{i:0{width}d}"
+            out.append(entry)
+    return out
+
+
 def load_scenario(path: str) -> tuple[dict[str, CollectionSpec], list[TxSpec]]:
     with open(path) as f:
         raw = yaml.safe_load(f)
 
     collections: dict[str, CollectionSpec] = {}
-    for c in raw.get("collections", []):
+    for c in expand_collections(raw.get("collections", [])):
         key_type = c.get("key_type", "integer")
         if key_type not in _VALID_KEY_TYPES:
             raise ValueError(
@@ -260,20 +279,38 @@ def load_scenario(path: str) -> tuple[dict[str, CollectionSpec], list[TxSpec]]:
                 f"transaction[{i}]: overlap fractions sum to {total_overlap:.4f} > 1"
             )
 
-        col = t.get("collection", default_collection)
-        if col not in collections:
-            raise ValueError(f"transaction[{i}]: unknown collection {col!r}")
-
-        transactions.append(
-            TxSpec(
-                index=i,
-                collection=col,
-                doc_count=doc_count,
-                doc_size=doc_size,
-                overlaps=overlaps,
-                op=t.get("op", "c"),
+        # A transaction targets one collection by default. `collections` (a
+        # list of names, or "all") spreads doc_count evenly across several,
+        # and the emitter interleaves their documents under a single commit.
+        if "collections" in t:
+            cols = t["collections"]
+            if cols == "all":
+                cols = list(collections)
+            if not isinstance(cols, list) or not cols:
+                raise ValueError(f"transaction[{i}]: collections must be a non-empty list or 'all'")
+        else:
+            cols = [t.get("collection", default_collection)]
+        for col in cols:
+            if col not in collections:
+                raise ValueError(f"transaction[{i}]: unknown collection {col!r}")
+        if doc_count < len(cols):
+            raise ValueError(
+                f"transaction[{i}]: doc_count={doc_count} is less than its {len(cols)} collections"
             )
-        )
+
+        for j, col in enumerate(cols):
+            # Distribute the remainder over the first few collections.
+            per = doc_count // len(cols) + (1 if j < doc_count % len(cols) else 0)
+            transactions.append(
+                TxSpec(
+                    index=i,
+                    collection=col,
+                    doc_count=per,
+                    doc_size=doc_size,
+                    overlaps=overlaps,
+                    op=t.get("op", "c"),
+                )
+            )
 
     if not transactions:
         raise ValueError("scenario must define at least one transaction")
@@ -654,6 +691,35 @@ def _resolve_op_plan(
     return plans, fresh_start, fresh_count
 
 
+def _doc_lines(
+    col: CollectionSpec,
+    tx: TxSpec,
+    runs: list[tuple],
+    templates: dict,
+    pool: str,
+    pool_size: int,
+):
+    """Yield one fixture line per document for the given (keys, op) runs."""
+    doc_size = tx.doc_size
+    format_key = _KEY_FORMATTERS[col.key_type]
+    for keys, op in runs:
+        variants = templates[(col.name, op)]
+        n_variants = len(variants)
+        for key in keys:
+            prefix, middle, suffix, overhead = variants[key % n_variants]
+            key_s = format_key(key)
+            pad = doc_size - overhead - len(key_s)
+            if pad < 0:
+                raise ValueError(
+                    f"transaction[{tx.index}]: doc_size={doc_size} smaller than minimum "
+                    f"({overhead + len(key_s)}) for key={key} op={op!r}; "
+                    f"increase doc_size or shrink schema/key"
+                )
+            off = (key * _POOL_MIX) % (pool_size - pad + 1) if pad > 0 else 0
+            payload = pool[off : off + pad] if pad > 0 else ""
+            yield prefix + key_s + middle + payload + suffix
+
+
 def emit(
     collections: dict[str, CollectionSpec],
     transactions: list[TxSpec],
@@ -685,60 +751,56 @@ def emit(
     # Initial empty commit so the connector applies the spec before data flows.
     out.write('{"commit":true}\n')
 
+    groups: dict[int, list[TxSpec]] = {}
     for tx in transactions:
-        col = collections[tx.collection]
-        cstate = states[tx.collection]
+        groups.setdefault(tx.index, []).append(tx)
+
+    for index, group in groups.items():
         # Per-tx RNG is used only to sample overlap key sets. The emit
         # path does no per-doc RNG — payload entropy comes from pool slice.
-        tx_rng = random.Random(seed * 1_000_003 + tx.index)
+        tx_rng = random.Random(seed * 1_000_003 + index)
 
-        plans, fresh_start, fresh_count = _resolve_op_plan(tx, cstate, tx_rng)
+        # One document iterator per collection in the group. Interleaving
+        # them round-robin mirrors how a multi-binding Store phase
+        # arrives at a connector.
+        iterators = []
+        for tx in group:
+            col = collections[tx.collection]
+            cstate = states[tx.collection]
+            plans, fresh_start, fresh_count = _resolve_op_plan(tx, cstate, tx_rng)
 
-        state_log["transactions"].append(
-            {
-                "index": tx.index,
-                "collection": tx.collection,
-                "doc_count": tx.doc_count,
-                "doc_size": tx.doc_size,
-                "fresh": {"start": fresh_start, "count": fresh_count, "op": tx.op},
-                "overlaps": [
-                    {"op": p.op, "with": p.src_tx, "count": len(p.keys)}
-                    for p in plans
-                ],
-            }
-        )
+            state_log["transactions"].append(
+                {
+                    "index": tx.index,
+                    "collection": tx.collection,
+                    "doc_count": tx.doc_count,
+                    "doc_size": tx.doc_size,
+                    "fresh": {"start": fresh_start, "count": fresh_count, "op": tx.op},
+                    "overlaps": [
+                        {"op": p.op, "with": p.src_tx, "count": len(p.keys)}
+                        for p in plans
+                    ],
+                }
+            )
+
+            runs = [(plan.keys, plan.op) for plan in plans]
+            runs.append((range(fresh_start, fresh_start + fresh_count), tx.op))
+            iterators.append(_doc_lines(col, tx, runs, templates, pool, pool_size))
 
         write = out.write
-        doc_size = tx.doc_size
-        format_key = _KEY_FORMATTERS[col.key_type]
-
-        def _emit_run(keys, op: str) -> None:
-            variants = templates[(col.name, op)]
-            n_variants = len(variants)
-            for key in keys:
-                prefix, middle, suffix, overhead = variants[key % n_variants]
-                key_s = format_key(key)
-                pad = doc_size - overhead - len(key_s)
-                if pad < 0:
-                    raise ValueError(
-                        f"transaction[{tx.index}]: doc_size={doc_size} smaller than minimum "
-                        f"({overhead + len(key_s)}) for key={key} op={op!r}; "
-                        f"increase doc_size or shrink schema/key"
-                    )
-                off = (key * _POOL_MIX) % (pool_size - pad + 1) if pad > 0 else 0
-                write(prefix)
-                write(key_s)
-                write(middle)
-                if pad > 0:
-                    write(pool[off : off + pad])
-                write(suffix)
-
-        # Emit overlap docs (grouped by overlap entry).
-        for plan in plans:
-            _emit_run(plan.keys, plan.op)
-
-        # Emit fresh creates.
-        _emit_run(range(fresh_start, fresh_start + fresh_count), tx.op)
+        if len(iterators) == 1:
+            for line in iterators[0]:
+                write(line)
+        else:
+            active = iterators
+            while active:
+                still = []
+                for it in active:
+                    line = next(it, None)
+                    if line is not None:
+                        write(line)
+                        still.append(it)
+                active = still
 
         out.write('{"commit":true}\n')
         out.flush()

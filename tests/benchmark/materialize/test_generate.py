@@ -709,3 +709,47 @@ class TestOrderedUUIDKeys(unittest.TestCase):
         tx1 = [d["id"] for d in docs[1000:]]
         # Every updated id falls within the last 10% of tx0's id space.
         self.assertTrue(all(i >= tx0[900] for i in tx1), min(tx1))
+
+
+class TestMultiCollectionTransactions(unittest.TestCase):
+    """`replicas` on a collection and `collections` on a transaction."""
+
+    def test_replicas_and_interleaving(self):
+        replicated = dict(SIMPLE_COLLECTION, replicas=3)
+        lines, state = _run(
+            [{"doc_count": 10, "doc_size": 64, "collections": "all"}],
+            collection=replicated,
+        )
+        docs = [json.loads(l) for l in lines if '"commit"' not in l]
+        self.assertEqual(len(docs), 10)
+        # One commit up front, one after the transaction.
+        self.assertEqual(sum('"commit"' in l for l in lines), 2)
+        names = [d[0] for d in docs]
+        self.assertEqual(sorted(set(names)), ["bench/simple-0", "bench/simple-1", "bench/simple-2"])
+        # 10 docs over 3 collections: 4, 3, 3, interleaved round-robin.
+        self.assertEqual(names[:6], ["bench/simple-0", "bench/simple-1", "bench/simple-2"] * 2)
+        self.assertEqual(names.count("bench/simple-0"), 4)
+        # Each collection owns its own key space and per-tx range.
+        self.assertEqual(len(state["transactions"]), 3)
+        for entry in state["transactions"]:
+            self.assertEqual(entry["index"], 0)
+            self.assertEqual(entry["fresh"]["start"], 0)
+
+    def test_overlap_against_multi_collection_tx(self):
+        replicated = dict(SIMPLE_COLLECTION, replicas=2)
+        lines, state = _run(
+            [
+                {"doc_count": 10, "doc_size": 64, "collections": "all"},
+                {"doc_count": 4, "doc_size": 64, "collection": "bench/simple-1",
+                 "overlaps": [{"with": 0, "fraction": 0.5, "op": "d"}]},
+            ],
+            collection=replicated,
+        )
+        second = [e for e in state["transactions"] if e["index"] == 1]
+        self.assertEqual(len(second), 1)
+        self.assertEqual(second[0]["overlaps"], [{"op": "d", "with": 0, "count": 2}])
+        # Deleted keys come from collection 1's own range of tx 0 (5 keys).
+        deletes = [json.loads(l) for l in lines if '"op": "d"' in l or '"op":"d"' in l]
+        self.assertEqual(len(deletes), 2)
+        for _, doc in deletes:
+            self.assertLess(doc["id"], 5)

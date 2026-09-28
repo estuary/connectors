@@ -1,0 +1,26 @@
+# Memory-pressure scenario: one transaction fanned across 40 bindings, each
+# receiving enough data to roll its staged file past the 250 MiB rotation
+# threshold during the Store phase. Documents interleave round-robin, so all
+# bindings rotate at about the same moment and their uploads contend for the
+# connector's upload budget at once. Pair with sample_heap.sh on the
+# connector's pprof port (localhost:6060) and summarize with heap_breakdown.py.
+collections:
+  - name: bench/mem
+    replicas: 40
+    schema:
+      type: object
+      properties:
+        id:      { type: integer }
+        val:     { type: integer }
+        payload: { type: string }
+      required: [id]
+    key: [/id]
+
+transactions:
+  # 40 x 360 MB uncompressed; the random payload compresses to roughly 0.75x,
+  # so each binding rotates one 250 MiB file mid-transaction and flushes the
+  # remainder at commit.
+  - total_size: 14400MB
+    doc_size: 64KB
+    collections: all
+    op: c

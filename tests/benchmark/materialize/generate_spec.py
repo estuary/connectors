@@ -44,6 +44,9 @@ from typing import Any
 
 import yaml
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from generate import expand_collections  # noqa: E402
+
 
 def _table_name(collection_name: str) -> str:
     base = collection_name.rsplit("/", 1)[-1]
@@ -140,7 +143,7 @@ def build_spec(
     collections_out: dict[str, dict] = {}
     bindings_out: list[dict] = []
 
-    for c in scenario.get("collections", []):
+    for c in expand_collections(scenario.get("collections", [])):
         name = c["name"]
         collections_out[name] = {
             "schema": c["schema"],
