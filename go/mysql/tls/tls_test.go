@@ -151,6 +151,28 @@ func TestValidate(t *testing.T) {
 	require.False(t, Settings{Mode: ModeDisabled}.AllowsPlaintextFallback())
 }
 
+func TestConfigPresentsClientCertificate(t *testing.T) {
+	var ca = newTestCA(t, "ca")
+	var client = ca.issue(t, "client")
+	keyDER, err := x509.MarshalECPrivateKey(client.PrivateKey.(*ecdsa.PrivateKey))
+	require.NoError(t, err)
+	var certPEM = string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: client.Certificate[0]}))
+	var keyPEM = string(pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyDER}))
+
+	for _, s := range []Settings{
+		{Mode: ModePreferred},
+		{Mode: ModeRequired},
+		{Mode: ModeVerifyCA, ServerCA: ca.pem},
+		{Mode: ModeVerifyIdentity},
+	} {
+		s.ClientCert, s.ClientKey = certPEM, keyPEM
+		cfg, err := s.Config("host")
+		require.NoError(t, err)
+		require.Len(t, cfg.Certificates, 1, s.Mode)
+		require.Equal(t, client.Certificate, cfg.Certificates[0].Certificate, s.Mode)
+	}
+}
+
 // Pinned per mode because callers rely on this to decide whether a bearer token
 // may be presented: 'disabled' never encrypts and 'preferred' may silently stop
 // encrypting, so only the three strict modes qualify.

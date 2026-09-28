@@ -45,32 +45,43 @@ type Settings struct {
 // Validate checks that the settings are internally consistent and that any
 // PEM material parses.
 func (s Settings) Validate() error {
+	var _, _, err = s.parse()
+	return err
+}
+
+// parse validates the settings and decodes their PEM material: the pool
+// 'ssl_server_ca' configures, or nil when it is unset, and the client
+// certificate to present, if any.
+func (s Settings) parse() (serverCA *x509.CertPool, clientCerts []tls.Certificate, err error) {
 	if !slices.Contains(Modes, s.Mode) {
-		return fmt.Errorf("invalid 'sslmode' configuration: unknown setting %q", s.Mode)
+		return nil, nil, fmt.Errorf("invalid 'sslmode' configuration: unknown setting %q", s.Mode)
 	}
 	if s.Mode == ModeVerifyCA && s.ServerCA == "" {
-		return fmt.Errorf("'ssl_server_ca' is required when 'sslmode' is %q", ModeVerifyCA)
+		return nil, nil, fmt.Errorf("'ssl_server_ca' is required when 'sslmode' is %q", ModeVerifyCA)
 	}
 	if s.ServerCA != "" && s.Mode != ModeVerifyCA && s.Mode != ModeVerifyIdentity {
-		return fmt.Errorf("'ssl_server_ca' is set but 'sslmode' is %q, which does not verify the server certificate: set 'sslmode' to %q or %q, or remove 'ssl_server_ca'", s.Mode, ModeVerifyCA, ModeVerifyIdentity)
+		return nil, nil, fmt.Errorf("'ssl_server_ca' is set but 'sslmode' is %q, which does not verify the server certificate: set 'sslmode' to %q or %q, or remove 'ssl_server_ca'", s.Mode, ModeVerifyCA, ModeVerifyIdentity)
 	}
 	if s.ClientCert != "" && s.Mode == ModeDisabled {
-		return fmt.Errorf("'ssl_client_cert' is set but 'sslmode' is %q, which never uses TLS: choose another 'sslmode', or remove 'ssl_client_cert' and 'ssl_client_key'", ModeDisabled)
+		return nil, nil, fmt.Errorf("'ssl_client_cert' is set but 'sslmode' is %q, which never uses TLS: choose another 'sslmode', or remove 'ssl_client_cert' and 'ssl_client_key'", ModeDisabled)
 	}
 	if s.ServerCA != "" {
-		if _, err := s.rootCAs(); err != nil {
-			return err
+		serverCA = x509.NewCertPool()
+		if !serverCA.AppendCertsFromPEM([]byte(s.ServerCA)) {
+			return nil, nil, errors.New("invalid 'ssl_server_ca': no PEM-encoded certificates found")
 		}
 	}
 	if (s.ClientCert == "") != (s.ClientKey == "") {
-		return errors.New("'ssl_client_cert' and 'ssl_client_key' must be provided together")
+		return nil, nil, errors.New("'ssl_client_cert' and 'ssl_client_key' must be provided together")
 	}
 	if s.ClientCert != "" {
-		if _, err := tls.X509KeyPair([]byte(s.ClientCert), []byte(s.ClientKey)); err != nil {
-			return fmt.Errorf("invalid 'ssl_client_cert' / 'ssl_client_key': %w", err)
+		cert, err := tls.X509KeyPair([]byte(s.ClientCert), []byte(s.ClientKey))
+		if err != nil {
+			return nil, nil, fmt.Errorf("invalid 'ssl_client_cert' / 'ssl_client_key': %w", err)
 		}
+		clientCerts = []tls.Certificate{cert}
 	}
-	return nil
+	return serverCA, clientCerts, nil
 }
 
 // AllowsPlaintextFallback reports whether a failed TLS connection attempt may
@@ -97,21 +108,15 @@ func (s Settings) GuaranteesEncryption() bool {
 // be the hostname the user configured, not the local end of any tunnel, since
 // that is the name the certificate is checked against under verify_identity.
 func (s Settings) Config(serverHost string) (*tls.Config, error) {
-	if err := s.Validate(); err != nil {
+	serverCA, clientCerts, err := s.parse()
+	if err != nil {
 		return nil, err
 	}
 	if s.Mode == ModeDisabled {
 		return nil, nil
 	}
 
-	var cfg = &tls.Config{}
-	if s.ClientCert != "" {
-		cert, err := tls.X509KeyPair([]byte(s.ClientCert), []byte(s.ClientKey))
-		if err != nil {
-			return nil, fmt.Errorf("invalid 'ssl_client_cert' / 'ssl_client_key': %w", err)
-		}
-		cfg.Certificates = []tls.Certificate{cert}
-	}
+	var cfg = &tls.Config{Certificates: clientCerts}
 
 	switch s.Mode {
 	case ModePreferred, ModeRequired:
@@ -120,33 +125,15 @@ func (s Settings) Config(serverHost string) (*tls.Config, error) {
 		// REQUIRED modes.
 		cfg.InsecureSkipVerify = true
 	case ModeVerifyCA:
-		roots, err := s.rootCAs()
-		if err != nil {
-			return nil, err
-		}
 		// Go's verifier always checks the hostname when InsecureSkipVerify is
 		// false, so chain-only verification has to be done by hand.
 		cfg.InsecureSkipVerify = true
-		cfg.VerifyPeerCertificate = verifyChainOnly(roots)
+		cfg.VerifyPeerCertificate = verifyChainOnly(serverCA)
 	case ModeVerifyIdentity:
-		cfg.ServerName = serverHost
-		if s.ServerCA != "" {
-			roots, err := s.rootCAs()
-			if err != nil {
-				return nil, err
-			}
-			cfg.RootCAs = roots
-		}
+		// A nil pool, when 'ssl_server_ca' is unset, trusts the system roots.
+		cfg.ServerName, cfg.RootCAs = serverHost, serverCA
 	}
 	return cfg, nil
-}
-
-func (s Settings) rootCAs() (*x509.CertPool, error) {
-	var pool = x509.NewCertPool()
-	if !pool.AppendCertsFromPEM([]byte(s.ServerCA)) {
-		return nil, errors.New("invalid 'ssl_server_ca': no PEM-encoded certificates found")
-	}
-	return pool, nil
 }
 
 // verifyChainOnly verifies that the presented leaf certificate chains to one
