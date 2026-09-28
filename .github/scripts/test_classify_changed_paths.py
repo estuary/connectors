@@ -60,6 +60,11 @@ class TestLanes(unittest.TestCase):
         self.assertEqual(classify(".github/workflows/python.yaml"), (True, False))
         self.assertEqual(classify(".github/workflows/ci.yaml"), (False, True))
 
+    def test_python_connector_list_is_python_only(self):
+        # python.yaml reads its matrix from this file, so editing the list
+        # has to run the Python workflow as editing the matrix did.
+        self.assertEqual(classify(".github/python-connectors.yaml"), (True, False))
+
     def test_estuary_cdk_workflow_triggers_neither_connector_lane(self):
         self.assertEqual(classify(".github/workflows/estuary-cdk.yaml"), (False, False))
 

@@ -4,10 +4,10 @@ delayed_tag.py — compute the ':delayed' image tag plan for Estuary connectors.
 
 Subcommands
 -----------
-plan   Read ci.yaml / python.yaml, query GitHub for merged PRs, then for each
-       connector pick the most recent PR that (a) touched that connector's
-       directory, (b) was merged at least CUTOFF_DAYS ago, and (c) has not
-       been reverted on main. Writes plan.tsv and later.tsv.
+plan   Read ci.yaml / python-connectors.yaml, query GitHub for merged PRs,
+       then for each connector pick the most recent PR that (a) touched that
+       connector's directory, (b) was merged at least CUTOFF_DAYS ago, and
+       (c) has not been reverted on main. Writes plan.tsv and later.tsv.
 
 check  Read plan.tsv / later.tsv, call Claude Sonnet for each connector that
        has LATER PRs to detect roll-forward fixes, then write safe_plan.tsv
@@ -210,7 +210,7 @@ def filter_backward_moves(
 # Connector image discovery
 # ---------------------------------------------------------------------------
 
-def load_connector_images(ci_yaml: str, python_yaml: str) -> list:
+def load_connector_images(ci_yaml: str, python_connectors: str) -> list:
     """
     Return the list of (image_name, source_dir) pairs from the workflow
     matrix entries.  Variants in <connector>/VARIANTS inherit their parent's
@@ -225,10 +225,19 @@ def load_connector_images(ci_yaml: str, python_yaml: str) -> list:
         except subprocess.CalledProcessError:
             return []
 
+    # yq_list reads an unreadable file as an empty list. For the Python list
+    # that would silently drop every Python connector from the plan, so an
+    # empty result is an error.
+    python_names = yq_list('.[].name', python_connectors)
+    if not python_names:
+        print(f'::error::no Python connectors read from {python_connectors}',
+              file=sys.stderr)
+        sys.exit(1)
+
     raw_connectors = (
         yq_list('.jobs.build_connectors.strategy.matrix.connector[]', ci_yaml) +
         yq_list('.jobs.build_connectors.strategy.matrix.include[].connector', ci_yaml) +
-        yq_list('.jobs.py_connector.strategy.matrix.connector[].name', python_yaml)
+        python_names
     )
 
     seen: set = set()
@@ -270,11 +279,11 @@ def resolve_family(connector_images: list, selected: str) -> list:
     return [c for c in connector_images if c.source_dir == match.source_dir]
 
 
-def resolve_version(source_dir: str, python_yaml: str) -> str:
+def resolve_version(source_dir: str, python_connectors: str) -> str:
     """
     Return the version tag (e.g. 'v3') CI publishes for a connector.
 
-    Python connectors carry their version in the python.yaml matrix; Go
+    Python connectors carry their version in .github/python-connectors.yaml; Go
     connectors carry it in a VERSION file in the connector directory. We check
     the matrix first because some Python connectors have no VERSION file.
     Returns '' when neither source yields a version.
@@ -282,9 +291,8 @@ def resolve_version(source_dir: str, python_yaml: str) -> str:
     try:
         out = subprocess.check_output(
             ['yq',
-             f'.jobs.py_connector.strategy.matrix.connector[] '
-             f'| select(.name == "{source_dir}") | .version',
-             python_yaml],
+             f'.[] | select(.name == "{source_dir}") | .version',
+             python_connectors],
             text=True, stderr=subprocess.DEVNULL,
         )
         for line in out.splitlines():
@@ -1071,7 +1079,7 @@ def cmd_plan(args: argparse.Namespace) -> None:
     print(f'Cutoff: {datetime.datetime.utcfromtimestamp(cutoff_epoch).isoformat()}Z')
     print(f'HEAD:   {head_sha[:7]}')
 
-    connector_images = load_connector_images(args.ci_yaml, args.python_yaml)
+    connector_images = load_connector_images(args.ci_yaml, args.python_connectors)
     print(f'Considering {len(connector_images)} connector image(s)')
 
     prs = fetch_merged_prs(owner, repo, token, lookback_days=args.lookback_days)
@@ -1307,18 +1315,18 @@ def cmd_forward(args: argparse.Namespace) -> None:
     workflow's tagging step. Includes all variants of the selected connector.
     """
     selected = args.connector.strip()
-    images = load_connector_images(args.ci_yaml, args.python_yaml)
+    images = load_connector_images(args.ci_yaml, args.python_connectors)
     family = resolve_family(images, selected)
     if not family:
         print(
             f'::error::unknown connector {selected!r}: not found in the '
-            f'ci.yaml / python.yaml connector matrices',
+            f'ci.yaml matrix / python-connectors.yaml',
             file=sys.stderr,
         )
         sys.exit(1)
 
     source_dir = family[0].source_dir
-    version = resolve_version(source_dir, args.python_yaml)
+    version = resolve_version(source_dir, args.python_connectors)
     if not version:
         print(
             f'::error::could not determine the version tag for {selected!r} '
@@ -1348,7 +1356,7 @@ def main(argv: Optional[list] = None) -> None:
     p = sub.add_parser('plan', help='compute per-connector boundary PRs')
     p.add_argument('--repo',          default=os.environ.get('GITHUB_REPOSITORY', ''))
     p.add_argument('--ci-yaml',       default='.github/workflows/ci.yaml')
-    p.add_argument('--python-yaml',   default='.github/workflows/python.yaml')
+    p.add_argument('--python-connectors', default='.github/python-connectors.yaml')
     p.add_argument('--cutoff-days',   type=int, default=14)
     p.add_argument('--lookback-days', type=int, default=60)
     p.add_argument('--output-plan',   default='/tmp/plan.tsv')
@@ -1387,7 +1395,7 @@ def main(argv: Optional[list] = None) -> None:
     p.add_argument('--connector',   required=True,
                    help='connector image name, e.g. source-postgres')
     p.add_argument('--ci-yaml',     default='.github/workflows/ci.yaml')
-    p.add_argument('--python-yaml', default='.github/workflows/python.yaml')
+    p.add_argument('--python-connectors', default='.github/python-connectors.yaml')
     p.add_argument('--output',      default='/tmp/forward_plan.tsv')
 
     args = parser.parse_args(argv)
