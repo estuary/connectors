@@ -327,7 +327,7 @@ func newTransactor(
 		_range:            open.Range,
 		version:           open.Version,
 		be:                be,
-		uploads:           newUploadLimiter(),
+		uploads:           newUploadLimiter(len(open.Materialization.Bindings)),
 	}
 
 	if db, err := stdsql.Open("snowflake", dsn); err != nil {

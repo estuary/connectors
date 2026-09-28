@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"github.com/estuary/connectors/go/encrow"
+	"github.com/klauspost/compress/gzip"
 	"github.com/klauspost/pgzip"
 	"github.com/segmentio/encoding/json"
 )
@@ -26,6 +27,7 @@ const (
 
 type jsonConfig struct {
 	disableCompression bool
+	serialCompression  bool
 	skipNulls          bool
 }
 
@@ -34,6 +36,16 @@ type JsonOption func(*jsonConfig)
 func WithJsonDisableCompression() JsonOption {
 	return func(cfg *jsonConfig) {
 		cfg.disableCompression = true
+	}
+}
+
+// WithJsonSerialCompression compresses on the writing goroutine instead of
+// with pgzip's parallel workers. It gives up some throughput on multi-core
+// machines, but an idle open writer holds under 1 MiB instead of about
+// 7.5 MiB, which matters when one writer is open per binding.
+func WithJsonSerialCompression() JsonOption {
+	return func(cfg *jsonConfig) {
+		cfg.serialCompression = true
 	}
 }
 
@@ -46,7 +58,7 @@ func WithJsonSkipNulls() JsonOption {
 type JsonWriter struct {
 	w     io.Writer // will be set to `gz` for compressed writes or `cwc` if compression is disabled
 	cwc   *countingWriteCloser
-	gz    *pgzip.Writer
+	gz    io.WriteCloser // set when compression is enabled
 	shape *encrow.Shape
 	buf   []byte
 }
@@ -63,8 +75,10 @@ func NewJsonWriter(w io.WriteCloser, fields []string, opts ...JsonOption) *JsonW
 		cwc: &countingWriteCloser{w: w},
 	}
 
-	if !cfg.disableCompression {
-		gz, err := pgzip.NewWriterLevel(jw.cwc, jsonCompressionlevel)
+	if cfg.disableCompression {
+		jw.w = jw.cwc
+	} else if cfg.serialCompression {
+		gz, err := gzip.NewWriterLevel(jw.cwc, jsonCompressionlevel)
 		if err != nil {
 			// Only possible if compressionLevel is not valid.
 			panic("invalid compression level for gzip.NewWriterLevel")
@@ -72,7 +86,13 @@ func NewJsonWriter(w io.WriteCloser, fields []string, opts ...JsonOption) *JsonW
 		jw.gz = gz
 		jw.w = gz
 	} else {
-		jw.w = jw.cwc
+		gz, err := pgzip.NewWriterLevel(jw.cwc, jsonCompressionlevel)
+		if err != nil {
+			// Only possible if compressionLevel is not valid.
+			panic("invalid compression level for gzip.NewWriterLevel")
+		}
+		jw.gz = gz
+		jw.w = gz
 	}
 
 	if fields != nil {

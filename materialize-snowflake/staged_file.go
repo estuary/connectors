@@ -302,7 +302,7 @@ func (f *stagedFile) newFile() error {
 		buf:  bufio.NewWriter(file),
 		file: file,
 	}
-	f.writer = writer.NewJsonWriter(f.buf, nil)
+	f.writer = writer.NewJsonWriter(f.buf, nil, writer.WithJsonSerialCompression())
 
 	return nil
 }

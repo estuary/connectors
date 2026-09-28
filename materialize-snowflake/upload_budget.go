@@ -2,6 +2,7 @@ package connector
 
 import (
 	"github.com/estuary/connectors/go/common"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -12,18 +13,28 @@ import (
 // That figure was measured at 29-30 MiB per upload with 8 MiB parts (the
 // growth of the first read adds to the three parts), and 205 MiB with the
 // driver's 64 MiB default. GCS-backed stages stream the file and hold
-// nothing. uploadBudgetPercent of the container memory limit is divided by
-// the per-upload cost to bound how many PUTs may run at once across all
-// bindings; the rest is left for the per-binding gzip writers (about 2.5 MiB
-// each), row conversion, and the Go runtime.
+// nothing.
+//
+// uploadBudgetPercent of the container memory limit is shared between the
+// per-binding cost of an open staged file (a serial gzip writer plus row
+// buffers, about 1 MiB) and the in-flight PUTs; whatever the bindings don't
+// need is divided by the per-upload cost to bound how many PUTs may run at
+// once across all bindings. The rest of the limit is left for row conversion,
+// the driver, and the Go runtime.
 const (
-	uploadPartSize      = 8 << 20
-	uploadParallel      = 1
-	uploadMemoryPerFile = 32 << 20
-	uploadBudgetPercent = 50
+	uploadPartSize       = 8 << 20
+	uploadParallel       = 1
+	uploadMemoryPerFile  = 32 << 20
+	bindingMemoryReserve = 2 << 20
+	uploadBudgetPercent  = 50
 )
 
-func newUploadLimiter() *semaphore.Weighted {
-	slots := common.MemoryLimit() * uploadBudgetPercent / 100 / uploadMemoryPerFile
-	return semaphore.NewWeighted(max(1, slots))
+func newUploadLimiter(bindings int) *semaphore.Weighted {
+	budget := common.MemoryLimit()*uploadBudgetPercent/100 - int64(bindings)*bindingMemoryReserve
+	slots := max(1, budget/uploadMemoryPerFile)
+	log.WithFields(log.Fields{
+		"bindings":          bindings,
+		"concurrentUploads": slots,
+	}).Info("upload concurrency budget")
+	return semaphore.NewWeighted(slots)
 }
