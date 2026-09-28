@@ -42,6 +42,9 @@ while IFS= read -r path || [ -n "$path" ]; do
         .github/workflows/ci.yaml) lane="go_rust" ;;
         .github/workflows/estuary-cdk.yaml) lane="none" ;;
 
+        # The Python connector matrix, which python.yaml reads as data.
+        .github/python-connectors.yaml) lane="python" ;;
+
         # Shared build plumbing that both workflows invoke.
         .github/actions/* | fetch-flow.sh) lane="both" ;;
     esac

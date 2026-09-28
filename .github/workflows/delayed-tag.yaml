@@ -67,7 +67,7 @@ jobs:
         run: cd .github/scripts && python3 -m unittest test_delayed_tag -v
 
       - name: Plan per-connector delayed PR boundaries
-        # Reads ci.yaml / python.yaml for the connector list, fetches merged
+        # Reads ci.yaml / python-connectors.yaml for the connector list, fetches merged
         # PRs from GitHub, and for each connector selects the most recent PR
         # that (a) touched the connector's directory, (b) merged >= 14 days ago,
         # and (c) has not been reverted on main.
