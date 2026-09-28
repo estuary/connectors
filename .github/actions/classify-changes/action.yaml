@@ -6,7 +6,10 @@ description: >
 
 outputs:
   python:
-    description: Whether the Python connector workflow needs to run.
+    description: >
+      Whether any path in the Python lane changed. python.yaml gates its
+      builds on its connector matrix instead, so this is informational, and
+      is what python.yaml falls back to if connector selection is reverted.
     value: ${{ steps.classify.outputs.python }}
   go_rust:
     description: Whether the Go & Rust connector workflow needs to run.
