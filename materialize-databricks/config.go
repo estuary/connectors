@@ -5,6 +5,8 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/databricks/databricks-sdk-go"
+	dbConfig "github.com/databricks/databricks-sdk-go/config"
 	"github.com/estuary/connectors/go/common"
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
@@ -223,4 +225,25 @@ func (c config) ToURI(materializationName string) string {
 	}
 
 	return strings.TrimLeft(uri.String(), "/")
+}
+
+// workspaceConfig is the Databricks SDK configuration for this endpoint,
+// carrying the credentials selected by the configured auth type.
+func (c config) workspaceConfig() *databricks.Config {
+	host := fmt.Sprintf("%s/%s", c.Address, c.HTTPPath)
+	switch c.Credentials.AuthType {
+	case OAUTH_M2M_AUTH_TYPE:
+		return &databricks.Config{
+			Host:         host,
+			ClientID:     c.Credentials.ClientID,
+			ClientSecret: c.Credentials.ClientSecret,
+		}
+	default: // PAT_AUTH_TYPE
+		return &databricks.Config{
+			Host:  host,
+			Token: c.Credentials.PersonalAccessToken,
+			// Pin PAT so the SDK does not fall back to discovering credentials from the environment.
+			Credentials: dbConfig.PatCredentials{},
+		}
+	}
 }
