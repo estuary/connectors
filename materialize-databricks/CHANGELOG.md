@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-09-28
+### Fixed
+- Materializations using `OAuth2 M2M` credentials no longer fail every
+  transaction with `pat auth: token is required`. Since 2026-09-23 the staging
+  directory was created with a client that always used PAT authentication,
+  regardless of the configured `auth_type`.
+
 ## 2026-09-23
 ### Changed
 - Each transaction's staged files are uploaded into a directory of their own,

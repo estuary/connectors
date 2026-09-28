@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/databricks/databricks-sdk-go"
-	dbConfig "github.com/databricks/databricks-sdk-go/config"
 	"github.com/databricks/databricks-sdk-go/logger"
 	"github.com/databricks/databricks-sdk-go/service/files"
 	"github.com/databricks/databricks-sdk-go/useragent"
@@ -279,12 +278,9 @@ func newTransactor(
 ) (m.Transactor, error) {
 	var cfg = ep.Config
 
-	wsClient, err := databricks.NewWorkspaceClient(&databricks.Config{
-		Host:               fmt.Sprintf("%s/%s", cfg.Address, cfg.HTTPPath),
-		Token:              cfg.Credentials.PersonalAccessToken,
-		Credentials:        dbConfig.PatCredentials{}, // enforce PAT auth
-		HTTPTimeoutSeconds: 5 * 60,                    // This is necessary for file uploads as they can sometimes take longer than the default 60s
-	})
+	wsConfig := cfg.workspaceConfig()
+	wsConfig.HTTPTimeoutSeconds = 5 * 60 // This is necessary for file uploads as they can sometimes take longer than the default 60s
+	wsClient, err := databricks.NewWorkspaceClient(wsConfig)
 	if err != nil {
 		return nil, fmt.Errorf("initialising workspace client: %w", err)
 	}
