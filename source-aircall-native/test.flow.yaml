@@ -5,7 +5,7 @@ captures:
     endpoint:
       local:
         command:
-        - /Users/jonwihl/Desktop/ConnectorSkills/connectors/source-aircall-native/.venv/bin/python
+        - python
         - -m
         - source_aircall_native
         config: config.yaml
