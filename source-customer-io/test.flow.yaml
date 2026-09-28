@@ -1,10 +1,60 @@
+import:
+- acmeCo/flow.yaml
 captures:
   acmeCo/source-customer-io:
     endpoint:
       local:
         command:
-          - python
-          - "-m"
-          - source_customer_io
+        - python
+        - -m
+        - source_customer_io
         config: config.yaml
-    bindings: []
+    bindings:
+    - resource:
+        name: campaigns
+        interval: PT5M
+      target: acmeCo/campaigns
+    - resource:
+        name: broadcasts
+        interval: PT5M
+      target: acmeCo/broadcasts
+    - resource:
+        name: segments
+        interval: PT5M
+      target: acmeCo/segments
+    - resource:
+        name: transactional_messages
+        interval: PT5M
+      target: acmeCo/transactional_messages
+    - resource:
+        name: subscription_topics
+        interval: PT5M
+      target: acmeCo/subscription_topics
+    - resource:
+        name: object_types
+        interval: PT5M
+      target: acmeCo/object_types
+    - resource:
+        name: newsletters
+        interval: PT5M
+      target: acmeCo/newsletters
+    - resource:
+        name: optouts
+        interval: PT1H
+      target: acmeCo/optouts
+    - resource:
+        name: design_studio_emails
+        interval: PT5M
+      target: acmeCo/design_studio_emails
+    - resource:
+        name: design_studio_folders
+        interval: PT5M
+      target: acmeCo/design_studio_folders
+    - resource:
+        name: newsletter_contents
+        interval: PT1H
+      target: acmeCo/newsletter_contents
+    - resource:
+        name: transactional_contents
+        interval: PT1H
+      target: acmeCo/transactional_contents

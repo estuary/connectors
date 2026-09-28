@@ -1,0 +1,268 @@
+[
+  [
+    "acmeCo/campaigns",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "actions": [],
+      "active": false,
+      "created": "redacted",
+      "deduplicate_id": "redacted",
+      "description": "",
+      "first_started": "redacted",
+      "id": 1,
+      "name": "estuary_probe_automation",
+      "scheduled_start": 0,
+      "scheduled_start_should_backfill": false,
+      "scheduled_stop": 0,
+      "scheduled_stop_should_sunset": false,
+      "state": "draft",
+      "tags": null,
+      "trigger_segment_ids": [
+        1
+      ],
+      "type": "seg_attr",
+      "updated": "redacted"
+    }
+  ],
+  [
+    "acmeCo/broadcasts",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "actions": [],
+      "active": false,
+      "created": "redacted",
+      "deduplicate_id": "redacted",
+      "description": "",
+      "first_started": "redacted",
+      "id": 2,
+      "name": "Estuary-test-email-api",
+      "scheduled_start": 0,
+      "scheduled_start_should_backfill": false,
+      "scheduled_stop": 0,
+      "scheduled_stop_should_sunset": false,
+      "state": "draft",
+      "tags": null,
+      "type": "triggered_broadcast",
+      "updated": "redacted"
+    }
+  ],
+  [
+    "acmeCo/segments",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "conditions": {
+        "and": [
+          {
+            "event": {
+              "filters": {
+                "and": [
+                  {
+                    "field": "to",
+                    "inverse": false,
+                    "operator": "exists",
+                    "value": ""
+                  },
+                  {
+                    "field": "from",
+                    "inverse": true,
+                    "operator": "exists",
+                    "value": ""
+                  }
+                ]
+              },
+              "id": 1,
+              "name": "cio_id",
+              "type": "attribute_change"
+            },
+            "inverse": false,
+            "times": 1,
+            "within": 0
+          }
+        ]
+      },
+      "created_at": "redacted",
+      "deduplicate_id": "redacted",
+      "description": "Includes all the people in your workspace.",
+      "id": 1,
+      "name": "All Users",
+      "progress": null,
+      "state": "finished",
+      "tags": [
+        "Sample"
+      ],
+      "type": "dynamic",
+      "updated_at": "redacted"
+    }
+  ],
+  [
+    "acmeCo/transactional_messages",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "created_at": "redacted",
+      "description": "",
+      "hide_message_body": false,
+      "id": 1,
+      "link_tracking": true,
+      "name": "All uncategorized email messages",
+      "open_tracking": true,
+      "queue_drafts": false,
+      "send_to_unsubscribed": true,
+      "trigger_name": "",
+      "updated_at": "redacted"
+    }
+  ],
+  [
+    "acmeCo/subscription_topics",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "description": "",
+      "id": 1,
+      "identifier": "topic_1",
+      "name": "Estuary probe topic",
+      "subscribed_by_default": true
+    }
+  ],
+  [
+    "acmeCo/object_types",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "enabled": true,
+      "id": "1",
+      "name": "estuary_probe_object",
+      "singular_name": "Probe Object",
+      "singular_slug": "estuary_probe_object",
+      "slug": "estuary_probe_object"
+    }
+  ],
+  [
+    "acmeCo/newsletters",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "content_ids": [
+        2
+      ],
+      "created": "redacted",
+      "deduplicate_id": "redacted",
+      "id": 1,
+      "name": "Test Message",
+      "sent_at": 1789073105,
+      "tags": [
+        "Sample"
+      ],
+      "type": "email",
+      "updated": "redacted"
+    }
+  ],
+  [
+    "acmeCo/optouts",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "cio_id": "redacted",
+      "customer_id": "redacted",
+      "optouts": [
+        {
+          "channel": "sms",
+          "from": "+15551234567"
+        }
+      ]
+    }
+  ],
+  [
+    "acmeCo/newsletter_contents",
+    {
+      "_meta": {
+        "op": "c",
+        "parent_id": 1,
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "bcc": "",
+      "body": "redacted",
+      "body_amp": "redacted",
+      "body_plain": "redacted",
+      "cc": "",
+      "created": "redacted",
+      "deduplicate_id": "redacted",
+      "fake_bcc": true,
+      "from": "",
+      "from_id": null,
+      "headers": "[]",
+      "id": 2,
+      "language": "",
+      "layout": "",
+      "name": "Test Message",
+      "newsletter_id": 1,
+      "preheader_text": "",
+      "preprocessor": "none",
+      "recipient": "redacted",
+      "reply_to": "",
+      "reply_to_id": null,
+      "subject": "redacted",
+      "test_group_id": 0,
+      "type": "email",
+      "updated": "redacted"
+    }
+  ],
+  [
+    "acmeCo/transactional_contents",
+    {
+      "_meta": {
+        "op": "c",
+        "parent_id": 1,
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "bcc": null,
+      "body": "redacted",
+      "cc": null,
+      "created": "redacted",
+      "fake_bcc": true,
+      "from": "",
+      "from_id": null,
+      "headers": "[]",
+      "id": 1,
+      "language": "",
+      "name": "All uncategorized email messages",
+      "preheader_text": null,
+      "preprocessor": "",
+      "recipient": "redacted",
+      "reply_to": "",
+      "reply_to_id": null,
+      "subject": "redacted",
+      "type": "email",
+      "updated": "redacted"
+    }
+  ]
+]
