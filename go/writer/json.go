@@ -30,6 +30,7 @@ type jsonConfig struct {
 	serialCompression  bool
 	blockSize          int
 	blocks             int
+	gzipPool           *GzipPool
 	skipNulls          bool
 }
 
@@ -63,6 +64,15 @@ func WithJsonCompressionBlocks(blockSize, blocks int) JsonOption {
 	}
 }
 
+// WithJsonGzipPool compresses through a shared GzipPool, so an open writer
+// holds only a chunk buffer and a 32 KiB dictionary tail rather than its own
+// compressor. Use it when many writers are open at once.
+func WithJsonGzipPool(pool *GzipPool) JsonOption {
+	return func(cfg *jsonConfig) {
+		cfg.gzipPool = pool
+	}
+}
+
 func WithJsonSkipNulls() JsonOption {
 	return func(cfg *jsonConfig) {
 		cfg.skipNulls = true
@@ -91,6 +101,10 @@ func NewJsonWriter(w io.WriteCloser, fields []string, opts ...JsonOption) *JsonW
 
 	if cfg.disableCompression {
 		jw.w = jw.cwc
+	} else if cfg.gzipPool != nil {
+		gz := cfg.gzipPool.NewStream(jw.cwc)
+		jw.gz = gz
+		jw.w = gz
 	} else if cfg.serialCompression {
 		gz, err := gzip.NewWriterLevel(jw.cwc, jsonCompressionlevel)
 		if err != nil {
