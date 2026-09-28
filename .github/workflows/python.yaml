@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   # Which connectors did this change touch? This job classifies every changed
-  # path, and the build jobs below gate on its answer.
+  # path, and the build jobs below build only the connectors in its answer.
   #
   # It can't be a `paths` filter because dynamically telling a Python connector
   # from a Go or Rust one means looking for a pyproject.toml, which needs the
@@ -28,7 +28,7 @@ jobs:
   classify_changes:
     runs-on: ubuntu-24.04
     outputs:
-      run: ${{ steps.classify.outputs.python }}
+      run: ${{ steps.matrix.outputs.run }}
       matrix: ${{ steps.matrix.outputs.matrix }}
     steps:
       - uses: actions/checkout@v4
@@ -42,10 +42,21 @@ jobs:
         uses: ./.github/actions/classify-changes
 
       # The connector list lives in its own file so it can be read as data.
+      # The matrix is the connectors the classifier reported, or all of them.
       - id: matrix
+        env:
+          # Passed through env, never interpolated into the script.
+          CONNECTORS: ${{ steps.classify.outputs.python_connectors }}
         run: |
-          MATRIX=$(yq -o=json -I=0 '.' .github/python-connectors.yaml)
+          ALL=$(yq -o=json -I=0 '.' .github/python-connectors.yaml)
+          if [ "$CONNECTORS" = all ]; then
+            MATRIX=$ALL
+          else
+            MATRIX=$(jq -c --argjson want "$CONNECTORS" 'map(select(.name | IN($want[])))' <<< "$ALL")
+          fi
           echo "matrix=${MATRIX}" >> "$GITHUB_OUTPUT"
+          # GitHub rejects an empty matrix, so the build jobs gate on this.
+          if [ "$MATRIX" = '[]' ]; then echo "run=false"; else echo "run=true"; fi >> "$GITHUB_OUTPUT"
 
   fetch_flow:
     needs: classify_changes
@@ -67,6 +78,7 @@ jobs:
     runs-on: ubuntu-24.04
     needs: [classify_changes, fetch_flow]
     if: needs.classify_changes.outputs.run == 'true'
+    name: ${{ matrix.connector.name }}
     strategy:
       fail-fast: false
       matrix:

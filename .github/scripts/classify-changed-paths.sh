@@ -4,7 +4,9 @@
 #
 # Reads changed paths on stdin, one per line, and writes three lines to stdout:
 #
-#   python=true|false        the Python connector workflow must run
+#   python=true|false        a path in the Python lane changed; it can be true
+#                            while python_connectors is [], for a Python
+#                            directory missing from the connector list
 #   go_rust=true|false       the Go & Rust connector workflow must run
 #   python_connectors=...    the Python connectors to build: `all` when a path
 #                            shared by every one of them changed, otherwise a
