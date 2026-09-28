@@ -11,10 +11,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/estuary/connectors/go/common"
 	"github.com/estuary/connectors/go/writer"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/snowflakedb/gosnowflake/v2"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 )
 
 // fileBuffer provides Close() for a *bufio.Writer writing to an *os.File. Close() will flush the
@@ -80,6 +83,9 @@ type stagedFile struct {
 	// temporary directory to store local files
 	tempdir string
 
+	// Bounds in-flight PUTs across every stagedFile of the transactor.
+	uploads *semaphore.Weighted
+
 	// The full directory path of local files for this binding formed by joining tempdir and uuid.
 	dir string
 
@@ -100,13 +106,34 @@ type stagedFile struct {
 	groupCtx context.Context // Used to check for group cancellation upon the worker returning an error.
 }
 
-func newStagedFile(tempdir string) *stagedFile {
+func newStagedFile(tempdir string, uploads *semaphore.Weighted) *stagedFile {
 	return &stagedFile{
 		tempdir: tempdir,
+		uploads: uploads,
 	}
 }
 
 const MaxConcurrentUploads = 5
+
+// The gosnowflake driver hands uploadPartSize to the S3 transfer manager as
+// both the part size and the multipart threshold. The transfer manager then
+// reads one part up front and keeps a pool of uploadParallel+1 parts, so every
+// in-flight PUT to an S3-backed stage holds about uploadMemoryPerFile of heap
+// (measured at 29-30 MiB; 205 MiB with the driver's 64 MiB default). GCS-backed
+// stages stream the file and hold nothing. uploadBudgetPercent of the container
+// memory limit is divided by that cost to bound how many PUTs may run at once
+// across all bindings.
+const (
+	uploadPartSize      = 8 << 20
+	uploadParallel      = 1
+	uploadMemoryPerFile = 32 << 20
+	uploadBudgetPercent = 50
+)
+
+func newUploadLimiter() *semaphore.Weighted {
+	slots := common.MemoryLimit() * uploadBudgetPercent / 100 / uploadMemoryPerFile
+	return semaphore.NewWeighted(max(1, slots))
+}
 
 func (f *stagedFile) start(ctx context.Context, db *stdsql.DB) error {
 	if f.started {
@@ -205,68 +232,80 @@ func (f *stagedFile) putWorker(ctx context.Context, db *stdsql.DB, filePaths <-c
 			file = f
 		}
 
-		query := fmt.Sprintf(
-			// OVERWRITE=TRUE is set here not because we intend to overwrite anything, but rather to
-			// avoid an extra LIST query that setting OVERWRITE=FALSE incurs.
-			// PARALLEL=1 because the driver preallocates PARALLEL+1 64 MiB
-			// part buffers for each multipart upload, and MaxConcurrentUploads
-			// of those run at once.
-			`PUT file://%s @flow_v1/%s AUTO_COMPRESS=FALSE SOURCE_COMPRESSION=GZIP OVERWRITE=TRUE PARALLEL=1;`,
-			file, f.uuid,
-		)
-		var source, target, sourceSize, targetSize, sourceCompression, targetCompression, status, message string
-		var attempt int
-		// Retry a few times on errors since there are occasionally transient
-		// network errors when running PUT queries.
-		for attempt = 1; ; attempt++ {
-			// NB: Not using QueryRowContext here since the Go Snowflake driver
-			// retains contexts internally, and this worker is called with a context
-			// that is cancelled after group.Wait() returns.
-			ts := time.Now()
-			err := db.QueryRow(query).Scan(&source, &target, &sourceSize, &targetSize, &sourceCompression, &targetCompression, &status, &message)
-			if err != nil && attempt > 3 {
-				return fmt.Errorf("putWorker PUT to stage: %w", err)
-			} else if err != nil {
-				delay := time.Duration(attempt) * time.Second
-				log.WithFields(log.Fields{
-					"attempt":         attempt,
-					"delay":           delay,
-					"requestDuration": time.Since(ts).String(),
-				}).WithError(err).Info("putWorker retrying PUT to stage")
-				time.Sleep(delay)
-				continue
-			}
-
-			break
+		if err := f.uploads.Acquire(ctx, 1); err != nil {
+			return err
 		}
-
-		if !strings.EqualFold("uploaded", status) {
-			return fmt.Errorf("putWorker PUT to stage unexpected upload status: %s", status)
-		}
-
-		log.WithFields(log.Fields{
-			"source":     source,
-			"target":     target,
-			"targetSize": targetSize,
-			"file":       file,
-			"uuid":       f.uuid,
-		}).Debug("uploading file")
-
-		if size, err := strconv.Atoi(targetSize); err != nil {
-			return fmt.Errorf("parsing targetSize: %w", err)
-		} else {
-			f.uploaded = append(f.uploaded, fileRecord{
-				Path: fmt.Sprintf("%s/%s", f.uuid, target),
-				Size: size,
-			})
-		}
-
-		// Once the file has been staged to Snowflake we don't need it locally anymore and can
-		// remove the local copy to manage disk usage.
-		if err := os.Remove(file); err != nil {
-			return fmt.Errorf("putWorker removing local file: %w", err)
+		err := f.put(db, file)
+		f.uploads.Release(1)
+		if err != nil {
+			return err
 		}
 	}
+}
+
+func (f *stagedFile) put(db *stdsql.DB, file string) error {
+	query := fmt.Sprintf(
+		// OVERWRITE=TRUE is set here not because we intend to overwrite anything, but rather to
+		// avoid an extra LIST query that setting OVERWRITE=FALSE incurs.
+		`PUT file://%s @flow_v1/%s AUTO_COMPRESS=FALSE SOURCE_COMPRESSION=GZIP OVERWRITE=TRUE PARALLEL=%d;`,
+		file, f.uuid, uploadParallel,
+	)
+	// NB: Not derived from the worker's context since the Go Snowflake
+	// driver retains contexts internally, and the worker's context is
+	// cancelled after group.Wait() returns.
+	putCtx := gosnowflake.WithFileTransferOptions(context.Background(), &gosnowflake.SnowflakeFileTransferOptions{
+		MultiPartThreshold: uploadPartSize,
+	})
+	var source, target, sourceSize, targetSize, sourceCompression, targetCompression, status, message string
+	var attempt int
+	// Retry a few times on errors since there are occasionally transient
+	// network errors when running PUT queries.
+	for attempt = 1; ; attempt++ {
+		ts := time.Now()
+		err := db.QueryRowContext(putCtx, query).Scan(&source, &target, &sourceSize, &targetSize, &sourceCompression, &targetCompression, &status, &message)
+		if err != nil && attempt > 3 {
+			return fmt.Errorf("putWorker PUT to stage: %w", err)
+		} else if err != nil {
+			delay := time.Duration(attempt) * time.Second
+			log.WithFields(log.Fields{
+				"attempt":         attempt,
+				"delay":           delay,
+				"requestDuration": time.Since(ts).String(),
+			}).WithError(err).Info("putWorker retrying PUT to stage")
+			time.Sleep(delay)
+			continue
+		}
+
+		break
+	}
+
+	if !strings.EqualFold("uploaded", status) {
+		return fmt.Errorf("putWorker PUT to stage unexpected upload status: %s", status)
+	}
+
+	log.WithFields(log.Fields{
+		"source":     source,
+		"target":     target,
+		"targetSize": targetSize,
+		"file":       file,
+		"uuid":       f.uuid,
+	}).Debug("uploading file")
+
+	if size, err := strconv.Atoi(targetSize); err != nil {
+		return fmt.Errorf("parsing targetSize: %w", err)
+	} else {
+		f.uploaded = append(f.uploaded, fileRecord{
+			Path: fmt.Sprintf("%s/%s", f.uuid, target),
+			Size: size,
+		})
+	}
+
+	// Once the file has been staged to Snowflake we don't need it locally anymore and can
+	// remove the local copy to manage disk usage.
+	if err := os.Remove(file); err != nil {
+		return fmt.Errorf("putWorker removing local file: %w", err)
+	}
+	return nil
 }
 
 func (f *stagedFile) newFile() error {
