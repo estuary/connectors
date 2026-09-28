@@ -12,7 +12,9 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Don't cancel in progress builds of main, since that can result in connector
+  # specs not being updated.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   # Which connectors did this change touch? This job classifies every changed
