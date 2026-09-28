@@ -400,10 +400,10 @@ truncates owns three concerns:
   another shard is about to update but hasn't committed yet. A connector that
   runs multiple shards must therefore have a single shard delete, after every
   shard's stores for the transaction have been applied.
-- **Timing.** A delete inside `Flush` runs before that transaction's stores. It
-  is unsafe when a store of an existing document is a plain `UPDATE`, which
-  matches nothing once its row is gone. Such a connector deletes after its
-  stores, in the same destination transaction.
+- **Timing.** The backfill-complete signal arrives in `Flush`, before the
+  transaction's stores. The connector must still delete after those stores, in
+  the same destination transaction. If it deleted first, a store that updates an
+  existing row would find the row already gone, and the update would be lost.
 - **Crash safety.** A pending truncation that must survive a restart belongs in
   the state returned from `StartCommit`, which is durable. State returned from
   `Acknowledge` is not.
