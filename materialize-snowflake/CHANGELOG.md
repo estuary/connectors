@@ -4,10 +4,13 @@
 
 ### Fixed
 - Staged files are now uploaded in 8 MiB parts, and the number of uploads in
-  flight is capped across all tables based on the connector's memory limit.
-  Previously each upload held about 192 MiB and every table could run five at
-  once, so transactions touching several tables could exceed the memory limit
-  and restart the task repeatedly.
+  flight is capped across all tables based on the connector's memory limit and
+  the number of bindings. Previously each upload held about 192 MiB and every
+  table could run five at once, so transactions touching several tables could
+  exceed the memory limit and restart the task repeatedly.
+- Staged files are compressed on the writing goroutine, which cuts the memory
+  held per open table from about 10 MiB to under 2 MiB so materializations
+  with many bindings stay within the memory limit.
 
 ## 2026-09-24
 
