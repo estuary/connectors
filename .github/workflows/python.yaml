@@ -1,18 +1,14 @@
 name: Python Connectors
 
+# No `paths-ignore`: the `Python connectors` gate below has to report on every
+# PR to be usable as a required check. The classifier already skips the builds
+# for paths that build nothing.
 on:
   push:
     branches: [main]
-    paths-ignore: &non_code_paths
-      - "**.md"
-      - "docs/**"
-      - ".claude/**"
-      - ".github/workflows/ci.yaml"
-      - ".github/workflows/estuary-cdk.yaml"
 
   pull_request:
     branches: [main]
-    paths-ignore: *non_code_paths
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -147,3 +143,26 @@ jobs:
           tag_sha: ${{ steps.setup.outputs.tag_sha }}
           tag_version: ${{ matrix.connector.version }}
           variants: ${{ matrix.connector.variants }}
+
+  # One status check covering every job above, whichever connectors ran, so
+  # it can be made a required check. It must run with `always()`: GitHub
+  # counts a skipped job as passing a required check.
+  python_gate:
+    name: Python connectors # the required check's name; keep it fixed
+    needs: [classify_changes, fetch_flow, py_connector]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+          RUN: ${{ needs.classify_changes.outputs.run }}
+          PY: ${{ needs.py_connector.result }}
+        run: |
+          for r in $RESULTS; do
+            case "$r" in success|skipped) ;; *) echo "::error::a job ended $r"; exit 1 ;; esac
+          done
+          # "skipped" only counts as OK when there was nothing to build.
+          # This reads the same `run` output the build jobs gate on.
+          if [ "$RUN" = true ] && [ "$PY" != success ]; then
+            echo "::error::connectors were due to build but py_connector ended $PY"; exit 1
+          fi
