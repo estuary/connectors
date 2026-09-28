@@ -21,6 +21,7 @@ from delayed_tag import (
     call_claude,
     filter_backward_moves,
     find_boundary,
+    load_connector_images,
     load_verdict_cache,
     parse_claude_verdict,
     pr_touches_dir,
@@ -349,6 +350,32 @@ class TestBuildClaudeContent(unittest.TestCase):
         forward = build_claude_content('i', 'd', 1, 'c', [(10, 'x'), (20, 'y')])
         reverse = build_claude_content('i', 'd', 1, 'c', [(20, 'y'), (10, 'x')])
         self.assertEqual(forward[0]['text'], reverse[0]['text'])
+
+
+# ---------------------------------------------------------------------------
+# load_connector_images
+# ---------------------------------------------------------------------------
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+class TestLoadConnectorImages(unittest.TestCase):
+
+    def test_reads_the_python_connector_list(self):
+        images = load_connector_images(
+            str(REPO_ROOT / '.github/workflows/ci.yaml'),
+            str(REPO_ROOT / '.github/python-connectors.yaml'),
+        )
+        self.assertIn('source-sentry', [c.image_name for c in images])
+
+    def test_unreadable_python_list_is_fatal(self):
+        # Reading it as empty would drop every Python connector from the plan.
+        with self.assertRaises(SystemExit), \
+                mock.patch('sys.stderr', new_callable=io.StringIO):
+            load_connector_images(
+                str(REPO_ROOT / '.github/workflows/ci.yaml'),
+                str(REPO_ROOT / 'nonexistent.yaml'),
+            )
 
 
 # ---------------------------------------------------------------------------
