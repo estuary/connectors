@@ -187,15 +187,18 @@ async def snapshot_teams(
             await http.request(log, url, params=params, timeout=HTTP_TIMEOUT)
         )
 
-        # Guards against an empty page arriving with a non-null cursor, which the
-        # documented "query until the cursor is null" loop would follow forever.
-        if not response.entities:
-            break
-
         for team in response.entities:
             yield FullRefreshResource.model_validate(team)
 
+        # Only a null cursor ends the listing: a page can be empty while later
+        # pages still hold teams.
         if not response.cursor:
+            break
+
+        if response.cursor == params.get("cursor"):
+            log.warning("Teams API returned the cursor it was sent; stopping pagination.", {
+                "cursor": response.cursor,
+            })
             break
 
         params["cursor"] = response.cursor
