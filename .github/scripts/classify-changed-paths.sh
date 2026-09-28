@@ -45,8 +45,11 @@ while IFS= read -r path || [ -n "$path" ]; do
         # The Python connector matrix, which python.yaml reads as data.
         .github/python-connectors.yaml) lane="python" ;;
 
-        # Shared build plumbing that both workflows invoke.
-        .github/actions/* | fetch-flow.sh) lane="both" ;;
+        # Shared build plumbing that both workflows invoke. Both workflows also
+        # build images with the repo root as the Docker context, so the root
+        # .dockerignore shapes every image, and the deploy action layers
+        # connector-variant.Dockerfile onto every image it pushes.
+        .github/actions/* | fetch-flow.sh | .dockerignore | connector-variant.Dockerfile) lane="both" ;;
     esac
 
     if [ -z "$lane" ]; then
