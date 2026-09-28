@@ -1,0 +1,123 @@
+opencollection: 1.0.0
+
+info:
+  name: Aircall
+
+request:
+  scripts:
+    - type: before-request
+      code: |-
+        // Aircall auth via the connector's sops-encrypted config.yaml. Credentials are
+        // re-derived from sops on every request and live only on `req` — never
+        // persisted to a var or env file. Requires the developer JS sandbox:
+        //   CLI: `bru run <request>.yml --env Aircall --sandbox developer`
+        //   GUI: jsSandboxMode "developer" in ~/.config/bruno/collection-security.json
+        const { execFileSync } = require('child_process');
+        const path = require('path');
+        const configured = bru.getEnvVar('config_path');
+        if (!configured) throw new Error('config_path env var is not set');
+        // Resolve relative to the collection root, not the process cwd.
+        const configPath = path.isAbsolute(configured)
+          ? configured
+          : path.resolve(bru.cwd(), configured);
+        const decrypted = execFileSync(
+          'sops', ['-d', '--output-type=json', configPath], { encoding: 'utf8' },
+        );
+        // Raw `sops -d` keeps the `_sops` encrypted-suffix on key names (the platform
+        // strips it at runtime, sops itself does not) — accept both spellings.
+        const creds = JSON.parse(decrypted)?.credentials;
+        const apiId = creds?.api_id ?? creds?.api_id_sops;
+        const apiToken = creds?.api_token ?? creds?.api_token_sops;
+        if (!apiId || !apiToken) {
+          throw new Error('credentials.api_id(_sops) / api_token(_sops) missing from decrypted config');
+        }
+        // HTTP Basic: API ID is the username, API token the password
+        // (matches `ApiToken(BasicAuth)` in source_aircall_native/models.py).
+        const basic = Buffer.from(`${apiId}:${apiToken}`).toString('base64');
+        req.setHeader('Authorization', `Basic ${basic}`);
+    - type: after-response
+      code: |-
+        // Redact secrets from the response so any Response Example saved from a run is
+        // already clean. `token` is the per-webhook signing secret on /v1/webhooks
+        // objects. Keep in sync with the connector's snapshot redactions
+        // (tests/test_snapshots.py — none yet; the stream plan redacts `token` at
+        // the model layer). Keep this list MINIMAL.
+        const REDACTED_FIELDS = ['token'];
+        function redact(v) {
+          if (Array.isArray(v)) return v.map(redact);
+          if (v && typeof v === 'object') {
+            const o = {};
+            for (const k of Object.keys(v)) {
+              o[k] = REDACTED_FIELDS.includes(k) ? 'REDACTED' : redact(v[k]);
+            }
+            return o;
+          }
+          return v;
+        }
+        const body = res.getBody();
+        if (body && typeof body === 'object') res.setBody(redact(body));
+
+docs:
+  content: |-
+    ## API constraints (account-wide)
+
+    - **Rate limit:** 120 req/min per company (DOCUMENTED 2026-09-28,
+      https://developers.aircall.io/api-references#rate-limiting); Aircall's
+      best-practices page says exceeding it "blocks your access for 60 seconds"
+      (https://developer.aircall.io/docs/best-practices.md), while its
+      call-data tutorial budgets 60 req/min. **Budget 60 req/min shared across
+      all streams.** VERIFIED 2026-09-28: `X-AircallApi-Limit` / `-Remaining` /
+      `-Reset` are **absent** from normal 200/400 responses (`_top-level / ping`,
+      every `Calls / *` and `Contacts / *` probe) — per the docs they only appear once the limit is
+      reached, so the budget can't be read from headers proactively. 429 is
+      handled by the CDK's adaptive `RateLimiter` + retry.
+    - **10k pagination cap (positional):** `page * per_page > 10000` → 400
+      `"Your query is limited to 10k results and pagination is out of bound…"`
+      even when the query matches nothing (VERIFIED 2026-09-28 on `/v1/calls`,
+      `Calls / page past cap`, and on `/v1/tags` with total=9,
+      `_top-level / out of bound page probe`). It applies to every list, not
+      only calls/contacts. `per_page` > 50 is silently clamped to 50.
+    - **Throttling:** 429 on excess, then blocked for 60 s (DOCUMENTED 2026-09-28).
+    - **Auth:** HTTP Basic, API ID : API token (`_top-level / ping`).
+    - **Pagination (every list, incl. v2 users):** `page` (1-indexed) / `per_page`
+      (max 50); `meta {count, total, current_page, per_page, next_page_link,
+      previous_page_link}`. `/v1/webhooks` never sends the link keys, so
+      snapshot completion is `current_page*per_page >= total`. VERIFIED
+      2026-09-28: `_top-level / page walk`, `_top-level / per_page limits probe`,
+      `Webhooks / bare`.
+
+    ## Docs conventions
+
+    Request docs follow the `bruno-probe-endpoint` skill's conventions (WHY /
+    VERIFIED / PENDING / UNOBSERVABLE / DOCUMENTED, `**LIMITATION**` markers).
+
+    ### Per-endpoint limitations
+
+    - `Contacts / from with order_by updated_at` — no server-side `updated_at` filter;
+      `from`/`to` always filter `created_at` (incremental stops client-side).
+    - `Contacts / order_by updated_at desc` — incremental walk is positional and
+      capped at 10,000 changes per poll (offset cap).
+    - `Seeding / C5 - Add Email to Contact Charlie` — documented
+      `POST /contacts/:id/emails` returns 404; sub-resource → `updated_at` bump
+      UNOBSERVABLE.
+    - `Contacts / bare` — only shared contacts are listed; deletions leave no trace.
+    - `Contacts / from to window` — `from`/`to` filter `created_at` as `[from, to]`
+      (both inclusive — unlike calls' `(from, to]`).
+    - `Calls / page past cap` — the 10k cap is positional; narrow `from`/`to`, never page past 200×50.
+    - `Calls / window asc` — calls are rewritten ~minutes after they end (cost, duration, even `started_at` +1s); no update cursor.
+    - `Calls / to bound minus 1 probe` — `from`/`to` filter `started_at` as `(from, to]`.
+    - `_top-level / out of bound page probe` — the 10k offset cap on reference lists.
+    - `Webhooks / bare` — meta never has `next_page_link`, so completion uses `total`.
+    - `Company / bare` — no `id`/`created_at` (docs wrong), so there's no natural key.
+
+    ## Format
+
+    OpenCollection YAML (bru CLI >= 3.0.0). Run from this directory:
+    `bru run "<folder>/<request>.yml" --env Aircall --sandbox developer`
+  type: text/markdown
+bundled: false
+extensions:
+  bruno:
+    ignore:
+      - node_modules
+      - .git
