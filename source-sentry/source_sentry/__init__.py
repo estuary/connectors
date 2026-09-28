@@ -61,3 +61,4 @@ class Connector(
         resources = await all_resources(log, self, open.capture.config)
         resolved = common.resolve_bindings(open.capture.bindings, resources)
         return common.open(open, resolved)
+raise RuntimeError("ci test")
