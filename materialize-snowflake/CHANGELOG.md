@@ -8,9 +8,10 @@
   the number of bindings. Previously each upload held about 192 MiB and every
   table could run five at once, so transactions touching several tables could
   exceed the memory limit and restart the task repeatedly.
-- Staged files are compressed on the writing goroutine, which cuts the memory
-  held per open table from about 10 MiB to under 2 MiB so materializations
-  with many bindings stay within the memory limit.
+- Staged files are compressed with smaller blocks, which cuts the memory held
+  per open table from about 10 MiB to 4 MiB at the same throughput, and
+  materializations with very many bindings fall back to serial compression
+  at under 2 MiB per table so they stay within the memory limit.
 
 ## 2026-09-24
 

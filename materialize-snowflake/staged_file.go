@@ -16,7 +16,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/snowflakedb/gosnowflake/v2"
 	"golang.org/x/sync/errgroup"
-	"golang.org/x/sync/semaphore"
 )
 
 // fileBuffer provides Close() for a *bufio.Writer writing to an *os.File. Close() will flush the
@@ -82,8 +81,9 @@ type stagedFile struct {
 	// temporary directory to store local files
 	tempdir string
 
-	// Bounds in-flight PUTs across every stagedFile of the transactor.
-	uploads *semaphore.Weighted
+	// Bounds in-flight PUTs across every stagedFile of the transactor, and
+	// picks the compression settings for each file.
+	budget stagingBudget
 
 	// The full directory path of local files for this binding formed by joining tempdir and uuid.
 	dir string
@@ -105,10 +105,10 @@ type stagedFile struct {
 	groupCtx context.Context // Used to check for group cancellation upon the worker returning an error.
 }
 
-func newStagedFile(tempdir string, uploads *semaphore.Weighted) *stagedFile {
+func newStagedFile(tempdir string, budget stagingBudget) *stagedFile {
 	return &stagedFile{
 		tempdir: tempdir,
-		uploads: uploads,
+		budget:  budget,
 	}
 }
 
@@ -213,11 +213,11 @@ func (f *stagedFile) putWorker(ctx context.Context, db *stdsql.DB, filePaths <-c
 			file = f
 		}
 
-		if err := f.uploads.Acquire(ctx, 1); err != nil {
+		if err := f.budget.uploads.Acquire(ctx, 1); err != nil {
 			return err
 		}
 		err := f.put(db, file)
-		f.uploads.Release(1)
+		f.budget.uploads.Release(1)
 		if err != nil {
 			return err
 		}
@@ -302,7 +302,7 @@ func (f *stagedFile) newFile() error {
 		buf:  bufio.NewWriter(file),
 		file: file,
 	}
-	f.writer = writer.NewJsonWriter(f.buf, nil, writer.WithJsonSerialCompression())
+	f.writer = writer.NewJsonWriter(f.buf, nil, f.budget.writerOpts...)
 
 	return nil
 }

@@ -24,7 +24,6 @@ import (
 	sf "github.com/snowflakedb/gosnowflake/v2"
 	"go.gazette.dev/core/consumer/protocol"
 	"golang.org/x/sync/errgroup"
-	"golang.org/x/sync/semaphore"
 )
 
 type tableConfig struct {
@@ -254,7 +253,7 @@ type transactor struct {
 	}
 	templates templates
 	bindings  []*binding
-	uploads   *semaphore.Weighted
+	staging   stagingBudget
 	be        *m.BindingEvents
 	cp        checkpoint
 
@@ -327,7 +326,7 @@ func newTransactor(
 		_range:            open.Range,
 		version:           open.Version,
 		be:                be,
-		uploads:           newUploadLimiter(len(open.Materialization.Bindings)),
+		staging:           newStagingBudget(len(open.Materialization.Bindings)),
 	}
 
 	if db, err := stdsql.Open("snowflake", dsn); err != nil {
@@ -421,8 +420,8 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, streaming
 		}
 	}
 
-	b.load.stage = newStagedFile(os.TempDir(), d.uploads)
-	b.store.stage = newStagedFile(os.TempDir(), d.uploads)
+	b.load.stage = newStagedFile(os.TempDir(), d.staging)
+	b.store.stage = newStagedFile(os.TempDir(), d.staging)
 
 	if b.target.DeltaUpdates && d.cfg.Credentials.AuthType == snowflake_auth.JWT {
 		var keyBegin = fmt.Sprintf("%08x", d._range.KeyBegin)

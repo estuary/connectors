@@ -28,6 +28,8 @@ const (
 type jsonConfig struct {
 	disableCompression bool
 	serialCompression  bool
+	blockSize          int
+	blocks             int
 	skipNulls          bool
 }
 
@@ -46,6 +48,18 @@ func WithJsonDisableCompression() JsonOption {
 func WithJsonSerialCompression() JsonOption {
 	return func(cfg *jsonConfig) {
 		cfg.serialCompression = true
+	}
+}
+
+// WithJsonCompressionBlocks sets pgzip's block size and the number of blocks
+// compressed concurrently. The defaults are 1 MiB blocks and GOMAXPROCS
+// blocks; an open writer holds roughly (blocks+2) x blockSize plus a
+// compressor per block, so smaller settings trade some parallelism for a
+// much smaller footprint per writer.
+func WithJsonCompressionBlocks(blockSize, blocks int) JsonOption {
+	return func(cfg *jsonConfig) {
+		cfg.blockSize = blockSize
+		cfg.blocks = blocks
 	}
 }
 
@@ -90,6 +104,11 @@ func NewJsonWriter(w io.WriteCloser, fields []string, opts ...JsonOption) *JsonW
 		if err != nil {
 			// Only possible if compressionLevel is not valid.
 			panic("invalid compression level for gzip.NewWriterLevel")
+		}
+		if cfg.blockSize > 0 {
+			if err := gz.SetConcurrency(cfg.blockSize, cfg.blocks); err != nil {
+				panic(fmt.Sprintf("invalid compression block settings: %v", err))
+			}
 		}
 		jw.gz = gz
 		jw.w = gz
