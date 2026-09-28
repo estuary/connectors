@@ -48,6 +48,12 @@ class TestLanes(unittest.TestCase):
         self.assertEqual(classify(".github/actions/setup/action.yaml"), (True, True))
         self.assertEqual(classify("fetch-flow.sh"), (True, True))
 
+    def test_docker_build_inputs_are_both(self):
+        # Every image is built from the repo root, and every pushed image goes
+        # through connector-variant.Dockerfile, so neither is Go-only.
+        self.assertEqual(classify(".dockerignore"), (True, True))
+        self.assertEqual(classify("connector-variant.Dockerfile"), (True, True))
+
     def test_docs_are_neither(self):
         self.assertEqual(classify("CLAUDE.md"), (False, False))
         self.assertEqual(classify("docs/contexts/captures.md"), (False, False))
