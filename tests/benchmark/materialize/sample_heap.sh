@@ -15,9 +15,9 @@ mkdir -p "$OUT_DIR"
 
 while true; do
   ts=$(date +%s)
-  pid=$(pgrep -f "$PATTERN" | head -1 || true)
-  rss=0
-  [[ -n "$pid" ]] && rss=$(ps -o rss= -p "$pid" | tr -d ' ')
+  # A --wrap launcher leaves several processes matching the pattern; the
+  # connector itself is the one with the largest RSS.
+  rss=$(pgrep -f "$PATTERN" | xargs -r ps -o rss= -p 2>/dev/null | sort -n | tail -1 | tr -d ' ')
   echo "$ts rss_kb=${rss:-0}" >> "$OUT_DIR/rss.log"
   if curl -sf --max-time 60 -o "$OUT_DIR/heap-$ts.pb.gz" http://localhost:6060/debug/pprof/heap; then
     curl -sf --max-time 60 "http://localhost:6060/debug/pprof/heap?debug=1" \
