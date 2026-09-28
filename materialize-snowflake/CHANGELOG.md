@@ -1,5 +1,14 @@
 # materialize-snowflake
 
+## 2026-09-28
+
+### Fixed
+- Staged files are now uploaded in 8 MiB parts, and the number of uploads in
+  flight is capped across all tables based on the connector's memory limit.
+  Previously each upload held about 192 MiB and every table could run five at
+  once, so transactions touching several tables could exceed the memory limit
+  and restart the task repeatedly.
+
 ## 2026-09-24
 
 ### Fixed
