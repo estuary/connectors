@@ -48,18 +48,18 @@ fn constraint_for_projection(p: &Projection) -> Constraint {
             ..Default::default()
         }
     } else if p.ptr.is_empty() {
-        Constraint {
-            r#type: constraint::Type::FieldOptional.into(),
-            reason: "The root document may be materialized".to_string(),
-            ..Default::default()
-        }
-    } else if p.field == "flow_published_at" || !p.ptr.strip_prefix("/").unwrap().contains("/") {
+        // The connector stores the root document verbatim alongside the key
+        // columns, so it must be selected for materialization to write
+        // anything.
         Constraint {
             r#type: constraint::Type::LocationRecommended.into(),
-            reason: "Top-level locations should usually be materialized".to_string(),
+            reason: "The root document should usually be materialized".to_string(),
             ..Default::default()
         }
     } else {
+        // Only the key and the root document are currently written; other
+        // fields aren't persisted, so they're optional rather than
+        // recommended.
         Constraint {
             r#type: constraint::Type::FieldOptional.into(),
             reason: "This field may be materialized".to_string(),

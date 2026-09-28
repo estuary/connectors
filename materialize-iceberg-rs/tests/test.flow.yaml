@@ -6,7 +6,16 @@ materializations:
           - cargo
           - run
         protobuf: true
-        config: {}
+        config:
+          store:
+            type: S3
+            bucket: test-bucket
+            prefix: warehouse
+            region: us-east-1
+            credentials:
+              awsAccessKeyId: test_key
+              awsSecretAccessKey: test_secret
+            endpoint: http://localhost:9603
     bindings:
       - resource:
           table: test_table
