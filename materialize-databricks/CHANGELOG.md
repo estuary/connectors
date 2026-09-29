@@ -6,6 +6,10 @@
   transaction's rows move on to the next table, instead of every table's file
   staying open until commit. Wide transactions no longer hold a compressor per
   table, and uploads overlap with writing the remaining tables.
+- A pending commit no longer fails with `UNRESOLVED_COLUMN` on every restart
+  after a publish adds a column to its table. Rows staged before the column
+  existed now commit with that column as NULL. This does not yet cover work
+  staged by an earlier version that commits with COPY INTO.
 
 ## 2026-09-28
 ### Fixed
