@@ -57,6 +57,7 @@ var featureFlagDefaults = map[string]common.FlagDefault{
 	"native_binary_column_type":        common.FlagEnabled,
 	"enum":                             common.FlagEnabled,
 	"jsonb":                            common.FlagEnabled,
+	"truncate_after_backfill":          common.FlagEnabled,
 }
 
 func ctxWithQueryTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
@@ -374,6 +375,9 @@ type transactor struct {
 	}
 	bindings []*binding
 	be       *m.BindingEvents
+	// truncateAfterBackfill permits deleting the rows published before a
+	// completed backfill.
+	truncateAfterBackfill bool
 	// truncations maps a binding index to the boundary of a completed
 	// backfill, for deletion in this transaction's commit.
 	truncations map[int]time.Time
@@ -395,7 +399,12 @@ func newTransactor(
 	// Create templates using the dialect from the endpoint (which already has feature flags)
 	templates := renderTemplates(ep.Dialect)
 
-	var d = &transactor{cfg: cfg, templates: templates, be: be}
+	var d = &transactor{
+		cfg:                   cfg,
+		templates:             templates,
+		be:                    be,
+		truncateAfterBackfill: sql.TruncateAfterBackfill(featureFlags),
+	}
 	d.store.fence = fence
 
 	// Establish connections.
@@ -514,6 +523,12 @@ func (t *transactor) Flush(_ context.Context, completes map[int]time.Time) error
 	for binding, boundary := range completes {
 		var b = t.bindings[binding]
 		if b.target.DeltaUpdates {
+			continue
+		} else if !t.truncateAfterBackfill {
+			log.WithFields(log.Fields{
+				"table":    b.target.Identifier,
+				"boundary": boundary,
+			}).Info("rows published before the backfill were not deleted because feature flags disable it")
 			continue
 		}
 		if b.truncateSQL == "" {

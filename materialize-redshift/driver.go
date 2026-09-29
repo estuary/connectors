@@ -64,6 +64,7 @@ var featureFlagDefaults = map[string]common.FlagDefault{
 	"s3_use_dualstack_endpoints":       common.FlagDisabled,
 	"retain_existing_data_on_backfill": common.FlagDisabled,
 	"native_binary_column_type":        common.FlagEnabled,
+	"truncate_after_backfill":          common.FlagEnabled,
 }
 
 type sshForwarding struct {
@@ -330,6 +331,9 @@ type transactor struct {
 	committedTokens map[string]bool
 	// The whole state: staged transactions not yet applied, from every shard.
 	state connectorState
+	// truncateAfterBackfill permits deleting the rows published before a
+	// completed backfill.
+	truncateAfterBackfill bool
 	// truncations maps a binding index to the boundary of a backfill that
 	// completed in the current transaction, for staging by Store.
 	truncations map[int]time.Time
@@ -392,8 +396,9 @@ func prepareNewTransactor(
 				keyBegin:        fence.KeyBegin,
 				keyEnd:          fence.KeyEnd,
 			},
-			committedTokens: make(map[string]bool),
-			state:           make(connectorState),
+			committedTokens:       make(map[string]bool),
+			state:                 make(connectorState),
+			truncateAfterBackfill: sql.TruncateAfterBackfill(featureFlags),
 		}
 
 		client, err := d.cfg.toS3Client(ctx, featureFlags)
@@ -921,6 +926,12 @@ func (d *transactor) Flush(_ context.Context, completes map[int]time.Time) error
 	for binding, boundary := range completes {
 		var b = d.bindings[binding]
 		if b.target.DeltaUpdates {
+			continue
+		} else if !d.truncateAfterBackfill {
+			log.WithFields(log.Fields{
+				"table":    b.target.Identifier,
+				"boundary": boundary,
+			}).Info("rows published before the backfill were not deleted because feature flags disable it")
 			continue
 		}
 		if b.truncateSQL == "" {

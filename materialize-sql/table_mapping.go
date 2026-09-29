@@ -162,6 +162,13 @@ func publishedAtMismatch(col *Column) error {
 	return nil
 }
 
+// TruncateAfterBackfill reports whether resolved feature flags permit deleting
+// the rows published before a completed backfill. Retaining existing data on
+// backfill forbids it, because those rows are exactly the data being retained.
+func TruncateAfterBackfill(featureFlags map[string]bool) bool {
+	return featureFlags["truncate_after_backfill"] && !featureFlags["retain_existing_data_on_backfill"]
+}
+
 // Columns returns all columns of the Table as a single slice,
 // ordered as Keys, then Values, then the Document.
 func (t *Table) Columns() []*Column {
