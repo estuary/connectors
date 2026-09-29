@@ -127,7 +127,7 @@ func TestValidate(t *testing.T) {
 	require.NoError(t, Settings{Mode: ModePreferred}.Validate())
 	require.NoError(t, Settings{Mode: ModeVerifyIdentity}.Validate())
 	require.NoError(t, Settings{Mode: ModeVerifyCA, ServerCA: ca.pem}.Validate())
-	require.Error(t, Settings{Mode: ""}.Validate())
+	require.NoError(t, Settings{}.Validate()) // Unset selects DefaultMode.
 	require.Error(t, Settings{Mode: "VERIFY_CA"}.Validate())
 	require.Error(t, Settings{Mode: ModeVerifyCA}.Validate())
 	require.Error(t, Settings{Mode: ModeVerifyCA, ServerCA: "not a pem"}.Validate())
@@ -191,7 +191,7 @@ func TestGuaranteesEncryption(t *testing.T) {
 			require.Equal(t, tc.expect, Settings{Mode: tc.mode}.GuaranteesEncryption())
 		})
 	}
-	// An unset or bogus mode must not read as a guarantee.
-	require.False(t, Settings{}.GuaranteesEncryption())
+	// An unset mode is judged by DefaultMode, and a bogus one must not read as a guarantee.
+	require.True(t, Settings{}.GuaranteesEncryption())
 	require.False(t, Settings{Mode: "REQUIRED"}.GuaranteesEncryption())
 }

@@ -174,7 +174,7 @@ func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursorJSON 
 	var errWithTLS error
 	if streamer, errWithTLS = syncer.StartSync(pos); errWithTLS == nil {
 		if tlsConfig != nil {
-			logrus.WithField("sslmode", sslSettings.Mode).Debug("replication connected with TLS")
+			logrus.WithField("sslmode", sslSettings.EffectiveMode()).Debug("replication connected with TLS")
 		} else {
 			logrus.Debug("replication connected without TLS")
 		}
@@ -183,13 +183,13 @@ func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursorJSON 
 		if userErr := wrapMySQLReplicationError(errWithTLS); userErr != nil {
 			return nil, userErr
 		}
-		return nil, fmt.Errorf("error starting binlog sync (sslmode %q): %w", sslSettings.Mode, errWithTLS)
+		return nil, fmt.Errorf("error starting binlog sync (sslmode %q): %w", sslSettings.EffectiveMode(), errWithTLS)
 	} else {
 		syncer.Close()
 		syncConfig.TLSConfig = nil
 		syncer = replication.NewBinlogSyncer(syncConfig)
 		if streamer, err = syncer.StartSync(pos); err == nil {
-			logrus.WithField("errWithTLS", errWithTLS).Info("replication connected without TLS")
+			logrus.WithField("errWithTLS", errWithTLS).Warn("replication connected without TLS")
 		} else {
 			if userErr := wrapMySQLReplicationError(err); userErr != nil {
 				return nil, userErr
