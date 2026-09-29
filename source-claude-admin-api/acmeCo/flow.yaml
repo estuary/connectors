@@ -1,0 +1,15 @@
+collections:
+  acmeCo/ClaudeCodeUsageReport:
+    schema: ClaudeCodeUsageReport.schema.yaml
+    key:
+    - /date
+    - /organization_id
+    - /actor_id
+  acmeCo/Organization:
+    schema: Organization.schema.yaml
+    key:
+    - /id
+  acmeCo/Users:
+    schema: Users.schema.yaml
+    key:
+    - /id
