@@ -69,6 +69,9 @@ func TestIntegration(t *testing.T) {
 	})
 
 	t.Run("truncate", func(t *testing.T) {
+		if testutil.RuntimeV1() {
+			t.Skip("backfill signals require runtime-next")
+		}
 		var ctx = context.Background()
 		var cfg = mustGetCfg(t)
 		var taskName = "acmeCo/tests/materialize-redshift-truncate"
