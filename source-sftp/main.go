@@ -39,6 +39,8 @@ type config struct {
 
 const knownHostsDescription = "Host keys of the SFTP server in OpenSSH known_hosts format, one per line: the output of `ssh-keyscan -p 2222 myserver.com`, for example `[myserver.com]:2222 ssh-ed25519 AAAA...`."
 
+var errMissingKnownHosts = errors.New("missing SSH Known Hosts: paste the host keys of the SFTP server, as printed by `ssh-keyscan -p <port> <host>`")
+
 const skipHostKeyVerificationDescription = "Connect without verifying the SFTP server's host key."
 
 func (config) GetFieldDocString(fieldName string) string {
@@ -125,6 +127,8 @@ func (c config) Validate() error {
 		return err
 	} else if pins != nil && c.SkipHostKeyVerification {
 		return errors.New("both Skip Host Key Verification and SSH Known Hosts are set. Keep SSH Known Hosts to verify the server, or clear it and keep Skip Host Key Verification to connect without verification, but not both")
+	} else if pins == nil && !c.SkipHostKeyVerification {
+		return errMissingKnownHosts
 	}
 
 	return nil
@@ -173,11 +177,13 @@ func newSftpSource(ctx context.Context, cfg config) (filesource.Store, error) {
 		Auth: []ssh.AuthMethod{},
 	}
 
-	if pins, err := parseKnownHosts(cfg.KnownHosts); err != nil {
+	if cfg.SkipHostKeyVerification {
+		log.WithField("address", cfg.Address).Warn("Skip Host Key Verification is enabled, so the identity of the SFTP server is not verified.")
+		sshConfig.HostKeyCallback = ssh.InsecureIgnoreHostKey()
+	} else if pins, err := parseKnownHosts(cfg.KnownHosts); err != nil {
 		return nil, err
 	} else if pins == nil {
-		log.WithField("address", cfg.Address).Warn("no SSH Known Hosts are configured, so the identity of the SFTP server is not verified.")
-		sshConfig.HostKeyCallback = ssh.InsecureIgnoreHostKey()
+		return nil, errMissingKnownHosts
 	} else {
 		sshConfig.HostKeyCallback = pins.callback(cfg.Address)
 		sshConfig.HostKeyAlgorithms = pins.hostKeyAlgorithms(cfg.Address)

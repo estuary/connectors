@@ -80,7 +80,7 @@ func newKnownHostsCallback(content string) (ssh.HostKeyCallback, error) {
 
 // parseKnownHosts parses the `knownHosts` config field. It returns nil, nil
 // for empty content. Content that has text but no entries (only comments, say)
-// is an error rather than silently disabling verification.
+// is an error.
 func parseKnownHosts(content string) (*knownHosts, error) {
 	if strings.TrimSpace(content) == "" {
 		return nil, nil
@@ -118,7 +118,7 @@ func parseKnownHosts(content string) (*knownHosts, error) {
 	}
 
 	if len(pins.entries) == 0 {
-		return nil, errors.New("knownHosts has no host key entries, only comments or blank lines. Paste the output of ssh-keyscan, or leave the field empty to skip host key verification")
+		return nil, errors.New("knownHosts has no host key entries, only comments or blank lines. Paste the output of ssh-keyscan")
 	}
 	return &pins, nil
 }
