@@ -437,7 +437,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			continue
 		}
 
-		if err := b.loadFile.flush(); err != nil {
+		if err := b.loadFile.wait(); err != nil {
 			return fmt.Errorf("flushing load file for binding[%d]: %w", idx, err)
 		}
 
@@ -644,9 +644,21 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	}
 	defer db.Close()
 
+	var lastBinding = -1
 	// Skip deleted, non-existent documents iff HardDelete is enabled.
 	for it.Next(d.cfg.HardDelete) {
 		var b = d.bindings[it.Binding]
+
+		// Store requests are ordered by binding, so the previous binding has received all of
+		// its rows and its staged file can be finished now rather than held open until commit.
+		if lastBinding != -1 && lastBinding != it.Binding {
+			if last := d.bindings[lastBinding]; last.storeFile.started {
+				if err := last.storeFile.finish(); err != nil {
+					return nil, fmt.Errorf("finishing store file for %s: %w", last.target.Path, err)
+				}
+			}
+		}
+		lastBinding = it.Binding
 
 		flowDelete := d.cfg.HardDelete && it.Delete
 		if err := b.storeFile.start(ctx, db); err != nil {
@@ -675,7 +687,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			continue
 		}
 
-		if err := b.storeFile.flush(); err != nil {
+		if err := b.storeFile.wait(); err != nil {
 			return nil, fmt.Errorf("flushing store file for binding[%d]: %w", idx, err)
 		}
 
