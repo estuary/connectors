@@ -236,7 +236,7 @@ type advancedConfig struct {
 	StatementTimeout         string   `json:"statement_timeout,omitempty" jsonschema:"title=Statement Timeout,description=Overrides the default statement timeout used by the connector. The default of zero disables statement timeouts entirely.,enum=,enum=30s,enum=1m,enum=5m,enum=30m,default=" jsonschema_extras:"order=9,nonsensitive=true"`
 
 	SSLMode       string `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Whether to use TLS and how strictly to verify the server certificate. Defaults to 'required'. See the connector documentation for details.,enum=disabled,enum=preferred,enum=required,enum=verify_ca,enum=verify_identity,default=required" jsonschema_extras:"order=10,nonsensitive=true"`
-	SSLServerCA   string `json:"ssl_server_ca,omitempty" jsonschema:"title=SSL Server CA,description=PEM-encoded CA certificate the server certificate must chain to. Required for 'verify_ca'; optional for 'verify_identity'." jsonschema_extras:"order=11,secret=true,multiline=true"`
+	SSLServerCA   string `json:"ssl_server_ca,omitempty" jsonschema:"title=SSL Server CA,description=PEM-encoded CA certificate the server certificate must chain to. Required for 'verify_ca'. Optional for 'verify_identity'\\, which otherwise trusts public certificate authorities and the CAs of Amazon RDS and Google Cloud SQL (shared CA)." jsonschema_extras:"order=11,secret=true,multiline=true"`
 	SSLClientCert string `json:"ssl_client_cert,omitempty" jsonschema:"title=SSL Client Certificate,description=Optional PEM-encoded client certificate for mutual TLS." jsonschema_extras:"order=12,secret=true,multiline=true"`
 	SSLClientKey  string `json:"ssl_client_key,omitempty" jsonschema:"title=SSL Client Key,description=PEM-encoded private key for the client certificate." jsonschema_extras:"order=13,secret=true,multiline=true"`
 
@@ -420,6 +420,13 @@ func (c *Config) sslSettings() mysqltls.Settings {
 	}
 }
 
+// sslFailureMessage explains a TLS connection attempt that failed with err
+// and could not fall back to an unencrypted connection, or returns "" when
+// TLS didn't cause the failure.
+func (c *Config) sslFailureMessage(settings mysqltls.Settings, err error) string {
+	return settings.FailureMessage(err, c.serverHost(), !c.usesBearerToken())
+}
+
 // serverHost returns the hostname portion of the configured address, which is
 // the name a server certificate is verified against even when the connection
 // itself goes through a network tunnel.
@@ -486,6 +493,9 @@ func (db *mysqlDatabase) dial(address, password string) (*client.Conn, error) {
 	} else if errors.As(errWithTLS, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
 		return nil, cerrors.NewUserError(mysqlErr, "incorrect username or password")
 	} else if !settings.AllowsPlaintextFallback() {
+		if msg := db.config.sslFailureMessage(settings, errWithTLS); msg != "" {
+			return nil, cerrors.NewUserError(errWithTLS, "could not connect to the database over TLS: "+msg)
+		}
 		return nil, fmt.Errorf("unable to connect to database with TLS (sslmode %q): %w", settings.EffectiveMode(), errWithTLS)
 	}
 

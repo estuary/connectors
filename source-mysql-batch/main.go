@@ -53,7 +53,7 @@ type advancedConfig struct {
 	FeatureFlags    string   `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"order=5,nonsensitive=true"`
 
 	SSLMode       string `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Whether to use TLS and how strictly to verify the server certificate. Defaults to 'required'. See the connector documentation for details.,enum=disabled,enum=preferred,enum=required,enum=verify_ca,enum=verify_identity,default=required" jsonschema_extras:"order=6,nonsensitive=true"`
-	SSLServerCA   string `json:"ssl_server_ca,omitempty" jsonschema:"title=SSL Server CA,description=PEM-encoded CA certificate the server certificate must chain to. Required for 'verify_ca'; optional for 'verify_identity'." jsonschema_extras:"order=7,secret=true,multiline=true"`
+	SSLServerCA   string `json:"ssl_server_ca,omitempty" jsonschema:"title=SSL Server CA,description=PEM-encoded CA certificate the server certificate must chain to. Required for 'verify_ca'. Optional for 'verify_identity'\\, which otherwise trusts public certificate authorities and the CAs of Amazon RDS and Google Cloud SQL (shared CA)." jsonschema_extras:"order=7,secret=true,multiline=true"`
 	SSLClientCert string `json:"ssl_client_cert,omitempty" jsonschema:"title=SSL Client Certificate,description=Optional PEM-encoded client certificate for mutual TLS." jsonschema_extras:"order=8,secret=true,multiline=true"`
 	SSLClientKey  string `json:"ssl_client_key,omitempty" jsonschema:"title=SSL Client Key,description=PEM-encoded private key for the client certificate." jsonschema_extras:"order=9,secret=true,multiline=true"`
 
@@ -228,6 +228,9 @@ func connectMySQL(ctx context.Context, cfg *Config) (*client.Conn, error) {
 	} else if errors.As(errWithTLS, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
 		return nil, cerrors.NewUserError(mysqlErr, "incorrect username or password")
 	} else if !settings.AllowsPlaintextFallback() {
+		if msg := settings.FailureMessage(errWithTLS, cfg.serverHost(), true); msg != "" {
+			return nil, cerrors.NewUserError(errWithTLS, "could not connect to the database over TLS: "+msg)
+		}
 		return nil, fmt.Errorf("unable to connect to database with TLS (sslmode %q): %w", settings.EffectiveMode(), errWithTLS)
 	} else if connWithoutTLS, errWithoutTLS := dial(nil); errWithoutTLS == nil {
 		// The TLS connection failed and 'preferred' mode permits falling back to an

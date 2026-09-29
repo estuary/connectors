@@ -28,7 +28,7 @@ const (
 	ModeVerifyCA = "verify_ca"
 	// ModeVerifyIdentity verifies the server certificate chain and that it is
 	// valid for the configured server hostname. Uses the provided CA when set,
-	// otherwise the system root store.
+	// otherwise the system root store plus the bundled managed-database CAs.
 	ModeVerifyIdentity = "verify_identity"
 )
 
@@ -142,41 +142,35 @@ func (s Settings) Config(serverHost string) (*tls.Config, error) {
 		// attacker can impersonate it; this matches MySQL's own PREFERRED and
 		// REQUIRED modes.
 		cfg.InsecureSkipVerify = true
-	case ModeVerifyCA:
+	case ModeVerifyCA, ModeVerifyIdentity:
+		var roots = serverCA
+		if roots == nil {
+			roots = defaultRoots()
+		}
+		if mode == ModeVerifyIdentity {
+			cfg.ServerName, cfg.RootCAs = serverHost, roots
+			break
+		}
 		// Go's verifier always checks the hostname when InsecureSkipVerify is
-		// false, so chain-only verification has to be done by hand.
+		// false, so chain-only verification has to be done by hand. The
+		// handshake has already failed if the server presented no certificate.
 		cfg.InsecureSkipVerify = true
-		cfg.VerifyPeerCertificate = verifyChainOnly(serverCA)
-	case ModeVerifyIdentity:
-		// A nil pool, when 'ssl_server_ca' is unset, trusts the system roots.
-		cfg.ServerName, cfg.RootCAs = serverHost, serverCA
+		cfg.VerifyConnection = func(cs tls.ConnectionState) error {
+			var opts = x509.VerifyOptions{Roots: roots, Intermediates: x509.NewCertPool()}
+			for _, cert := range cs.PeerCertificates[1:] {
+				opts.Intermediates.AddCert(cert)
+			}
+			if _, err := cs.PeerCertificates[0].Verify(opts); err != nil {
+				// Wrapped like Go's own verification failures, so that
+				// verificationRemediation can find the certificates the
+				// server presented.
+				return &tls.CertificateVerificationError{
+					UnverifiedCertificates: cs.PeerCertificates,
+					Err:                    fmt.Errorf("server certificate not signed by the configured 'ssl_server_ca': %w", err),
+				}
+			}
+			return nil
+		}
 	}
 	return cfg, nil
-}
-
-// verifyChainOnly verifies that the presented leaf certificate chains to one
-// of roots, treating any additional presented certificates as intermediates,
-// without checking the certificate's names against the server address.
-func verifyChainOnly(roots *x509.CertPool) func(rawCerts [][]byte, _ [][]*x509.Certificate) error {
-	return func(rawCerts [][]byte, _ [][]*x509.Certificate) error {
-		if len(rawCerts) == 0 {
-			return errors.New("server presented no certificate")
-		}
-		var certs = make([]*x509.Certificate, 0, len(rawCerts))
-		for _, raw := range rawCerts {
-			cert, err := x509.ParseCertificate(raw)
-			if err != nil {
-				return fmt.Errorf("parsing server certificate: %w", err)
-			}
-			certs = append(certs, cert)
-		}
-		var intermediates = x509.NewCertPool()
-		for _, cert := range certs[1:] {
-			intermediates.AddCert(cert)
-		}
-		if _, err := certs[0].Verify(x509.VerifyOptions{Roots: roots, Intermediates: intermediates}); err != nil {
-			return fmt.Errorf("server certificate not signed by the configured 'ssl_server_ca': %w", err)
-		}
-		return nil
-	}
 }

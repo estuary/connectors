@@ -183,6 +183,13 @@ func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursorJSON 
 		if userErr := wrapMySQLReplicationError(errWithTLS); userErr != nil {
 			return nil, userErr
 		}
+		// The main connection has already succeeded with these settings, so a
+		// failure here is rarely down to TLS: StartSync also registers as a
+		// replica, which fails without the REPLICATION SLAVE privilege. When
+		// 'sslmode' is disabled, sslFailureMessage never blames TLS.
+		if msg := db.config.sslFailureMessage(sslSettings, errWithTLS); msg != "" {
+			return nil, cerrors.NewUserError(errWithTLS, "could not start binlog replication over TLS: "+msg)
+		}
 		return nil, fmt.Errorf("error starting binlog sync (sslmode %q): %w", sslSettings.EffectiveMode(), errWithTLS)
 	} else {
 		syncer.Close()
