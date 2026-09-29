@@ -477,11 +477,8 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 		}
 	}
 
-	for _, col := range target.Values {
-		if col.Ptr == "/_meta/uuid" && col.Inference.String_ != nil && col.Inference.String_.Format == "date-time" && col.Inference.String_.ContentEncoding == "uuid" && !col.UserDefinedDDL {
-			b.truncateSQL = fmt.Sprintf("DELETE FROM %s WHERE %s < $1;", target.Identifier, col.Identifier)
-			break
-		}
+	if col, err := target.PublishedAtColumn(); err == nil {
+		b.truncateSQL = fmt.Sprintf("DELETE FROM %s WHERE %s < $1;", target.Identifier, col.Identifier)
 	}
 
 	t.bindings = append(t.bindings, b)
@@ -520,11 +517,12 @@ func (t *transactor) Flush(_ context.Context, _ []json.RawMessage, _ map[int]tim
 			continue
 		}
 		if b.truncateSQL == "" {
+			var _, reason = b.target.PublishedAtColumn()
 			log.WithFields(log.Fields{
 				"eventType": "connectorStatus",
 				"table":     b.target.Identifier,
 				"boundary":  boundary,
-			}).Warnf("Rows published before the backfill of table %s were not deleted because the binding excludes the flow_published_at field. Include that field to enable deletion after a backfill.", b.target.Identifier)
+			}).Warnf("Rows published before the backfill of table %s were not deleted because %s.", b.target.Identifier, reason)
 			continue
 		}
 		t.truncations[binding] = boundary

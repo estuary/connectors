@@ -508,11 +508,8 @@ func (t *transactor) addBinding(target sql.Table, is *boilerplate.InfoSchema) er
 		}
 	}
 
-	for _, col := range target.Values {
-		if col.Ptr == "/_meta/uuid" && col.Inference.String_ != nil && col.Inference.String_.Format == "date-time" && col.Inference.String_.ContentEncoding == "uuid" && !col.UserDefinedDDL {
-			b.truncateSQL = fmt.Sprintf("DELETE FROM %s WHERE %s < $1;", target.Identifier, col.Identifier)
-			break
-		}
+	if col, err := target.PublishedAtColumn(); err == nil {
+		b.truncateSQL = fmt.Sprintf("DELETE FROM %s WHERE %s < $1;", target.Identifier, col.Identifier)
 	}
 
 	// The load/store/delete tables template are re-evaluated every transaction
@@ -927,11 +924,12 @@ func (d *transactor) Flush(_ context.Context, _ []json.RawMessage, _ map[int]tim
 			continue
 		}
 		if b.truncateSQL == "" {
+			var _, reason = b.target.PublishedAtColumn()
 			log.WithFields(log.Fields{
 				"eventType": "connectorStatus",
 				"table":     b.target.Identifier,
 				"boundary":  boundary,
-			}).Warnf("Rows published before the backfill of table %s were not deleted because the binding excludes the flow_published_at field. Include that field to enable deletion after a backfill.", b.target.Identifier)
+			}).Warnf("Rows published before the backfill of table %s were not deleted because %s.", b.target.Identifier, reason)
 			continue
 		}
 		d.truncations[binding] = boundary
@@ -1256,10 +1254,12 @@ func (d *transactor) applyStaged(ctx context.Context, conn *pgx.Conn, groups []*
 		if g.merged.TruncateBefore == nil {
 			// Pass.
 		} else if b.truncateSQL == "" {
+			var _, reason = b.target.PublishedAtColumn()
 			log.WithFields(log.Fields{
 				"table":    b.target.Identifier,
 				"boundary": *g.merged.TruncateBefore,
-			}).Warn("skipping staged truncation because the binding no longer includes the flow_published_at field")
+				"reason":   reason.Error(),
+			}).Warn("skipping staged truncation because the binding no longer supports it")
 		} else if tag, err := txn.Exec(ctx, b.truncateSQL, *g.merged.TruncateBefore); err != nil {
 			return nil, fmt.Errorf("truncating %s after backfill: %w", b.target.Identifier, err)
 		} else {

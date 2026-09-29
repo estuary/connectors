@@ -127,6 +127,41 @@ func (t *Table) convertTuple(in tuple.Tuple, columns []Column, out []interface{}
 	return out, nil
 }
 
+// PublishedAtColumn returns the value column that holds each document's
+// publication time, which is /_meta/uuid projected as a date-time. The error
+// is a clause stating why no column qualifies, suited for an operator to act on.
+func (t *Table) PublishedAtColumn() (*Column, error) {
+	var reason error
+	for i := range t.Values {
+		var col = &t.Values[i]
+		if col.Ptr != "/_meta/uuid" {
+			continue
+		} else if err := publishedAtMismatch(col); err == nil {
+			return col, nil
+		} else if reason == nil {
+			reason = err
+		}
+	}
+	if reason == nil {
+		reason = fmt.Errorf("the binding excludes the flow_published_at field, which must be included to enable deletion after a backfill")
+	}
+	return nil, reason
+}
+
+// publishedAtMismatch returns why a column projecting /_meta/uuid cannot be
+// compared as a timestamp, or nil if it can.
+func publishedAtMismatch(col *Column) error {
+	var s = col.Inference.String_
+	if col.UserDefinedDDL {
+		return fmt.Errorf("field %s has a user-defined DDL type", col.Field)
+	} else if s == nil {
+		return fmt.Errorf("field %s projects /_meta/uuid without a string type, where a date-time with uuid encoding is required", col.Field)
+	} else if s.Format != "date-time" || s.ContentEncoding != "uuid" {
+		return fmt.Errorf("field %s projects /_meta/uuid with the unexpected format %q and content encoding %q, where a date-time with uuid encoding is required", col.Field, s.Format, s.ContentEncoding)
+	}
+	return nil
+}
+
 // Columns returns all columns of the Table as a single slice,
 // ordered as Keys, then Values, then the Document.
 func (t *Table) Columns() []*Column {
