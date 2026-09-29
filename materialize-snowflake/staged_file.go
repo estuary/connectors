@@ -74,8 +74,11 @@ type fileRecord struct {
 // file has reached a size threshold a new file will be started. Finished files are sent to the
 // worker for staging in Snowflake.
 //
-// - flush: Sends the current & final local file to the worker for staging and waits for the worker
-// to complete before returning.
+// - finish: Sends the current & final local file to the worker for staging, releasing the file
+// writer. Store requests arrive ordered by binding, so a binding's file can be finished as soon
+// as the iterator moves past it, letting its uploads overlap with later bindings.
+//
+// - wait: Waits for the worker to complete uploading all files of the transaction.
 type stagedFile struct {
 	// Random string that will serve as the directory for local and remote files of this binding.
 	uuid string
@@ -90,8 +93,12 @@ type stagedFile struct {
 	dir string
 
 	// Indicates if the stagedFile has been initialized for this transaction yet. Set `true` by
-	// start() and `false` by flush().
+	// start() and `false` by wait().
 	started bool
+
+	// Set by finish() once the final file has been handed to the workers and no more rows will
+	// be written this transaction.
+	finished bool
 
 	// References to the current file being written.
 	buf    *fileBuffer
@@ -207,15 +214,31 @@ func (f *stagedFile) writeRow(row []interface{}) error {
 	return nil
 }
 
-func (f *stagedFile) flush() (string, error) {
+func (f *stagedFile) finish() error {
+	if f.finished {
+		return nil
+	}
 	if err := f.putFile(); err != nil {
-		return "", fmt.Errorf("flush putFile: %w", err)
+		return fmt.Errorf("finish putFile: %w", err)
 	}
 	close(f.putFiles)
+	f.finished = true
+	return nil
+}
+
+func (f *stagedFile) wait() (string, error) {
+	if err := f.finish(); err != nil {
+		return "", err
+	}
 	f.started = false
+	f.finished = false
 
 	// Wait for all outstanding PUT requests to complete.
 	return fmt.Sprintf("@flow_v1/%s", f.uuid), f.group.Wait()
+}
+
+func (f *stagedFile) flush() (string, error) {
+	return f.wait()
 }
 
 func (f *stagedFile) putWorker(ctx context.Context, db *stdsql.DB, filePaths <-chan string) error {

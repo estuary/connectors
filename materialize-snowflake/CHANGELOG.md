@@ -8,6 +8,10 @@
   Previously each upload held about 192 MiB and every table could run five at
   once, so transactions touching several tables could exceed the memory limit
   and restart the task repeatedly.
+- Each table's staged file is finished and sent to Snowflake as soon as the
+  transaction's rows move on to the next table, instead of every table's file
+  staying open until commit. Wide transactions no longer hold a compressor per
+  table, and uploads overlap with writing the remaining tables.
 
 ## 2026-09-24
 

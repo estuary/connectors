@@ -640,9 +640,21 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var ctx = it.Context()
 	var round = it.Round
 
+	var lastBinding = -1
 	// Skip deleted, non-existent documents iff HardDelete is enabled.
 	for it.Next(d.cfg.HardDelete) {
 		var b = d.bindings[it.Binding]
+
+		// Store requests are ordered by binding, so the previous binding has received all of
+		// its rows and its staged file can be finished now rather than held open until commit.
+		if lastBinding != -1 && lastBinding != it.Binding {
+			if last := d.bindings[lastBinding]; !last.streaming && last.store.stage.started {
+				if err := last.store.stage.finish(); err != nil {
+					return nil, fmt.Errorf("finishing staged file for %s: %w", last.target.Path, err)
+				}
+			}
+		}
+		lastBinding = it.Binding
 
 		if it.Exists {
 			b.store.mustMerge = true
@@ -715,7 +727,7 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 			continue
 		}
 
-		dir, err := b.store.stage.flush()
+		dir, err := b.store.stage.wait()
 		if err != nil {
 			return nil, err
 		}
