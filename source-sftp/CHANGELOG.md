@@ -1,5 +1,11 @@
 # source-sftp
 
+## 2026-09-30
+
+### Changed
+
+- `SSH Known Hosts` (`knownHosts`) is now required. A configuration without it is rejected instead of connecting to the SFTP server without verifying its identity.
+
 ## 2026-09-21
 
 ### Added

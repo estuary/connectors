@@ -48,7 +48,7 @@ This connector supports multiple bindings to capture from different directories 
 
 ## Host key verification
 
-Set `SSH Known Hosts` to the public host key(s) of your SFTP server. When it is set, the connector refuses to connect if the server presents a key that is not listed, which protects the capture against man-in-the-middle attacks. When it is left empty the connector connects to whatever server answers at the address.
+Set `SSH Known Hosts` to the public host key(s) of your SFTP server. The field is required: the connector refuses to connect if the server presents a key that is not listed, which protects the capture against man-in-the-middle attacks.
 
 The field takes OpenSSH `known_hosts` lines, one per line, as printed by `ssh-keyscan`. Run it against your server from a machine you trust, and paste the output:
 
@@ -62,7 +62,7 @@ ssh-keyscan -p 2222 myserver.com
 
 The host column must name the configured `Address` in `known_hosts` form: the bare hostname for port 22, `[host]:port` for any other port. `ssh-keyscan -p` prints it in the right form. The usual OpenSSH `known_hosts` syntax is accepted: hashed hosts, `*` and `?` wildcards in the host part, `!` negation, several keys for the same host, `@cert-authority` lines that trust every host certificate signed by an SSH certificate authority, and `@revoked` lines. The port is matched literally, so a wildcard for a server on a port other than 22 must carry it: `[*.example.com]:2222`, not `*.example.com`.
 
-If the field has text but no host key entries (only comments, for example), the connector refuses the configuration rather than silently connecting unverified.
+The connector fails validation if the field has text but no host key entries (only comments, for example).
 
 If your server's operator publishes only a fingerprint (AWS Transfer Family, for example), run `ssh-keyscan` as above and check that the fingerprint of the scanned key matches the published one before pasting it:
 
@@ -79,7 +79,7 @@ You configure connectors either in the Estuary web app, or by directly editing t
 | Property                    | Title                 | Description                                                                                                                                                                                                                                                                                              | Type         | Required/Default  |
 | --------------------------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ----------------- |
 | **`/address`**              | Address               | Host and port of the SFTP server. Example: `myserver.com:22`                                                                                                                                                                                                                                             | string       | Required          |
-| `/knownHosts`               | SSH Known Hosts       | Host keys of the SFTP server in OpenSSH `known_hosts` format, one per line.                                                                                                                                                                                                                              | string       |                   |
+| **`/knownHosts`**           | SSH Known Hosts       | Host keys of the SFTP server in OpenSSH `known_hosts` format, one per line.                                                                                                                                                                                                                              | string       | Required          |
 | **`/credentials`**          | Credentials           | Credentials for authentication                                                                                                                                                                                                                                                                           | object       | Required          |
 | **`/credentials/type`**     | Authentication Method | Set to `sshKey` to authenticate with an SSH key, or `password` to authenticate with a password.                                                                                                                                                                                                          | string       | Required          |
 | **`/credentials/username`** | Username              | Username for authentication.                                                                                                                                                                                                                                                                             | string       | Required          |
