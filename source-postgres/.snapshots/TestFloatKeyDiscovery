@@ -35,8 +35,14 @@ sql> CREATE TABLE test.floatkeydiscovery_109173 (id DOUBLE PRECISION PRIMARY KEY
     "allOf": [
       {
         "if": {
+          "required": [
+            "_meta"
+          ],
           "properties": {
             "_meta": {
+              "required": [
+                "op"
+              ],
               "properties": {
                 "op": {
                   "const": "d"

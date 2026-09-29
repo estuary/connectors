@@ -33,8 +33,14 @@ sql> CREATE TABLE test.usertypes_domain_245097 (id INTEGER PRIMARY KEY, value Us
     "allOf": [
       {
         "if": {
+          "required": [
+            "_meta"
+          ],
           "properties": {
             "_meta": {
+              "required": [
+                "op"
+              ],
               "properties": {
                 "op": {
                   "const": "d"

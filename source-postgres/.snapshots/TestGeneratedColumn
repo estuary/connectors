@@ -41,8 +41,14 @@ sql> CREATE TABLE test.generatedcolumn_136230 (id INTEGER PRIMARY KEY, a VARCHAR
     "allOf": [
       {
         "if": {
+          "required": [
+            "_meta"
+          ],
           "properties": {
             "_meta": {
+              "required": [
+                "op"
+              ],
               "properties": {
                 "op": {
                   "const": "d"

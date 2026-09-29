@@ -33,8 +33,14 @@ sql> CREATE TABLE dbo.Collation_VarcharKeyDiscovery_989577 (id VARCHAR(32) PRIMA
     "allOf": [
       {
         "if": {
+          "required": [
+            "_meta"
+          ],
           "properties": {
             "_meta": {
+              "required": [
+                "op"
+              ],
               "properties": {
                 "op": {
                   "const": "d"

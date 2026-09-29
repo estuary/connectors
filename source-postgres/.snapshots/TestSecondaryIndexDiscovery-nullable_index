@@ -48,8 +48,14 @@ sql> CREATE UNIQUE INDEX idx892285_k23 ON test.tbl892285 (k2, k3)
     "allOf": [
       {
         "if": {
+          "required": [
+            "_meta"
+          ],
           "properties": {
             "_meta": {
+              "required": [
+                "op"
+              ],
               "properties": {
                 "op": {
                   "const": "d"

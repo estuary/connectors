@@ -32,8 +32,14 @@ sql> CREATE TABLE public.tbl419033 (id INTEGER PRIMARY KEY, data TEXT)
     "allOf": [
       {
         "if": {
+          "required": [
+            "_meta"
+          ],
           "properties": {
             "_meta": {
+              "required": [
+                "op"
+              ],
               "properties": {
                 "op": {
                   "const": "d"

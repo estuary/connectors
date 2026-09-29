@@ -45,8 +45,14 @@ sql> CREATE TABLE test.citext_675587 (id INTEGER PRIMARY KEY, data CITEXT, arr C
     "allOf": [
       {
         "if": {
+          "required": [
+            "_meta"
+          ],
           "properties": {
             "_meta": {
+              "required": [
+                "op"
+              ],
               "properties": {
                 "op": {
                   "const": "d"

@@ -8,8 +8,14 @@ Binding 0:
     },
     "document_schema_json": {
       "if": {
+        "required": [
+          "_meta"
+        ],
         "properties": {
           "_meta": {
+            "required": [
+              "op"
+            ],
             "properties": {
               "op": {
                 "const": "d"
@@ -95,8 +101,14 @@ Binding 1:
     },
     "document_schema_json": {
       "if": {
+        "required": [
+          "_meta"
+        ],
         "properties": {
           "_meta": {
+            "required": [
+              "op"
+            ],
             "properties": {
               "op": {
                 "const": "d"
@@ -182,8 +194,14 @@ Binding 2:
     },
     "document_schema_json": {
       "if": {
+        "required": [
+          "_meta"
+        ],
         "properties": {
           "_meta": {
+            "required": [
+              "op"
+            ],
             "properties": {
               "op": {
                 "const": "d"
@@ -269,8 +287,14 @@ Binding 3:
     },
     "document_schema_json": {
       "if": {
+        "required": [
+          "_meta"
+        ],
         "properties": {
           "_meta": {
+            "required": [
+              "op"
+            ],
             "properties": {
               "op": {
                 "const": "d"
