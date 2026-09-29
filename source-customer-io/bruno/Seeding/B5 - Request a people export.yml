@@ -1,0 +1,53 @@
+info:
+  name: B5 - Request a people export
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: "{{base_url}}/v1/exports/customers"
+  body:
+    type: json
+    json: |-
+      {
+        "filters": {
+          "and": [
+            { "segment": { "id": 1 } }
+          ]
+        }
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **ONLY THE USER RUNS THIS REQUEST. The assistant never runs it**
+    (`API-NEVER-MUTATE`).
+
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Exports/operation/exportPeopleData
+
+    **WHY:** `Snapshots / exports` returned `{"exports": null}`. One export job
+    makes the document observable and, more usefully, shows how `status` and
+    `updated_at` move as the job progresses — the behaviour that decides
+    whether a snapshot binding over job records is worth having at all.
+
+    Filters on segment id 1 ("All Users"), which exists in this workspace and
+    contains its 2 profiles. It exports profile data the account already holds;
+    it sends no messages.
+
+    **Only run this if the stream is being kept.** The current recommendation
+    is to drop `exports` (§3 of the plan), in which case this request exists
+    to document what was *not* verified and should stay unrun.
+
+    **Note:** the export record carries `user_email` — the Customer.io account
+    user who requested it. Running this writes your own address into the
+    workspace's export list.
+
+    **After running,** re-run `Snapshots / exports` and save the response.
+
+    **Outcome:** not yet run.

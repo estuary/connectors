@@ -1,0 +1,74 @@
+info:
+  name: A1 - Send tracked transactional email
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{base_url}}/v1/send/email"
+  body:
+    type: json
+    json: |-
+      {
+        "to": "person1@example.com",
+        "from": "person1@example.com",
+        "identifiers": { "id": "example_person_1" },
+        "subject": "Estuary connector probe A1",
+        "body": "<p>Connector verification send A1. <a href=\"https://estuary.dev/\">Click this link</a> to record a `clicked` metric.</p>",
+        "tracked": true,
+        "disable_message_retention": false
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // Chain the created delivery id into the read probes so the user does not
+        // hand-copy it. Runtime var only — in-memory, never persisted (a resource
+        // id, not a credential; see API-TOKEN-EPHEMERAL).
+        const id = res.getBody()?.delivery_id;
+        if (id) bru.setVar('seed_delivery_id', id);
+
+docs:
+  content: |-
+    **ONLY THE USER RUNS THIS REQUEST. The assistant never runs it** — it is a
+    state-mutating call that sends real email (`API-NEVER-MUTATE`).
+
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Send-Messages/operation/sendEmail
+
+    **WHY:** Feeds two probes that cannot be closed read-only:
+
+    - `Messages / by id` — the `deduplicate_id` experiment. This send creates a
+      delivery whose `metrics` start at `sent`/`delivered`. Opening the email and
+      then **clicking the link in it** lands `opened` and later `clicked` at
+      strictly later seconds, which is the only way to observe whether
+      `deduplicate_id`'s suffix advances. The sandbox's two pre-existing
+      deliveries cannot serve: their only "opens" are prefetch/bot opens recorded
+      in the same second as `delivered`, so nothing further will land on them.
+    - `Messages / page walk` — order and contiguity of a multi-page walk. Two
+      deliveries is too few; run this and `A2` to get to four.
+
+    **Before running, check:** the workspace has **no verified sending domain**
+    and is in test mode, so this may return a 4xx or produce a delivery that
+    `failed`/`undeliverable` rather than one that is delivered. Either outcome is
+    still useful — a failed delivery exercises `failure_message` (non-null) and
+    the `metrics: {"failed": ...}` sparse-map branch, both of which the connector's
+    document model has to accept. But only a **delivered and clicked** message
+    closes the `deduplicate_id` question. If the send does not arrive, verify a
+    sending domain in the Customer.io UI first, or mark that question UNOBSERVABLE
+    per `Messages / by id`.
+
+    `tracked: true` is load-bearing — without open/click tracking no `opened` or
+    `clicked` metric is ever recorded and the experiment cannot run.
+
+    `to`/`from`/`identifiers` are pre-filled for the sandbox's own profile
+    (`example_person_1`). Change them if the workspace differs.
+
+    **Outcome:** not yet run.

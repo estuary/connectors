@@ -1,0 +1,84 @@
+info:
+  name: campaigns
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/campaigns"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Campaigns/operation/listCampaigns
+
+    **WHY:** Establishes the envelope key, the absence of pagination, and the
+    document shape for the `campaigns` snapshot stream. `campaigns` is the API
+    name for what the UI has called **Automations** since the 2026-07-15
+    navigation rename (https://docs.customer.io/release-notes/2026-07-15-navigation-terminology/);
+    the API name did not change.
+
+    **VERIFIED (2026-09-14):** 200, envelope key `campaigns`, value `[]` — an
+    **empty array**, not `null`. Contrast `collections`, `exports` and
+    `reporting_webhooks`, which return `null` for the same "nothing here" state.
+
+        **VERIFIED (2026-09-14):** No pagination field of any kind in the response —
+        no `next`, no `total`, no `has_more`. The array is the whole result set.
+        See `segments limit ignored` for the negative control and
+        `newsletters positive control` for the contrast.
+
+    **UNOBSERVABLE (2026-09-14):** The sandbox workspace (trial, created ~2026-09-07,
+    2 profiles / 1 one-time send / 2 deliveries) contains **no automations**, so
+    the empty array proves the path, the auth and the envelope key and nothing
+    about the document. Document shape below is **DOCUMENTED**, not verified.
+    `Seeding/B1` carries the UI click-path that would make it observable.
+
+    **DOCUMENTED (2026-09-14):** https://docs.customer.io/files/journeys-app.json —
+    `campaigns.items` is a **`oneOf` over seven variants**, one per automation
+    trigger type: Segment, Event, Form, Date, Relationship, Object, Webhook.
+    Twelve properties are present in **all seven**: `actions` (array of
+    `{id, type}`), `active`, `created` (unix int), `deduplicate_id`,
+    `description`, `first_started` (unix int), `id` (int), `name`, `state`,
+    `tags`, `type`, `updated` (unix int).
+
+    Trigger-specific properties, present only on some variants:
+    `trigger_segment_ids`, `msg_templates` (deprecated), `event_name`,
+    `date_attribute`, `frequency`, `start_hour`, `start_minutes`, `timezone`,
+    `use_customer_timezone`, `audience`, `filter_object_attributes`,
+    `filter_relationship_attributes`, `object_type_id`,
+    `relationship_attribute_triggers`, `object_attribute_triggers`,
+    `webhook_id`, `filter_segment_ids`.
+
+    **LIMITATION:** Do **not** model this as a pydantic discriminated union over
+    `type` — the variant set is the provider's, the rendered docs truncate enums
+    elsewhere in this API (see the collection root), and Cluster A already found
+    two field names diverging from this spec. Schema inference over an
+    `extra="allow"` document is the correct treatment.
+
+    **DOCUMENTED (2026-09-14):** `updated` is a genuine last-modified timestamp and
+    `deduplicate_id` is `id:timestamp` with the same meaning as on deliveries —
+    but **no query parameter filters on either**, which is what forces the
+    snapshot strategy rather than incremental.
+examples:
+  - name: 200 - empty array (sandbox has no automations)
+    request:
+      url: "https://api.customer.io/v1/campaigns"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "campaigns": []
+          }

@@ -1,0 +1,68 @@
+info:
+  name: invalid timestamp
+  type: http
+  seq: 14
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/design_studio/emails?updated_after=notanumber"
+  params:
+    - name: updated_after
+      value: "notanumber"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Design-Studio-emails/operation/listEmails
+
+    **WHY:** Confirms the timestamp filters are **parsed**, not pattern-matched
+    or passed through. An endpoint that ignored the filter would have no reason
+    to reject an unparseable value, so a 400 here is independent corroboration
+    of `updated_after boundary` — it shows the value reaches a code path that
+    cares what it is.
+
+    **VERIFIED (2026-09-22):** `400 {"errors":[{"detail":"invalid value for
+    updated_after: notanumber","status":"400"}]}`.
+
+    **VERIFIED (2026-09-22):** The timestamps are **unix seconds as bare
+    integers**. An RFC3339 string is rejected by this same validator, so the
+    connector must convert its `datetime` cursor to `int(dt.timestamp())` on the
+    way out — `api.py:53`'s `_dt_to_ts` already does exactly this for
+    `/v1/messages` and is reused unchanged.
+
+    **Consequence:** this is the outbound half of the type barrier described in
+    `plan.md`. The inbound half is `get_cursor() -> datetime` on the document
+    model: the provider's int must become a `datetime` before it reaches a
+    LogCursor, because the CDK gates interval back-off on the cursor's *type*
+    (`estuary-cdk/estuary_cdk/capture/common.py:1389-1404`) and a non-`datetime`
+    LogCursor silently disables back-off, hot-looping against a 10 req/s API.
+
+examples:
+  - name: 400 - unparseable timestamp rejected
+    request:
+      url: "https://api.customer.io/v1/design_studio/emails?updated_after=notanumber"
+      method: GET
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "errors": [
+              {
+                "detail": "invalid value for updated_after: notanumber",
+                "status": "400"
+              }
+            ]
+          }

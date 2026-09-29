@@ -1,0 +1,79 @@
+info:
+  name: workspaces
+  type: http
+  seq: 12
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/workspaces"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Workspaces/operation/listWorkspaces
+
+    **WHY:** Establishes shape, and — because this is also the endpoint
+    `validate_credentials` probes (`resources.py:34`) — confirms how many rows an
+    App API Key can ever see.
+
+    **VERIFIED (2026-09-14):** 200, envelope key `workspaces`, exactly **one** row.
+    Per-item keys observed: `id` (int), `name`, `messages_sent` (int),
+    `billable_messages_sent` (int), `people` (int), `object_types` (int),
+    `objects` (int).
+
+        **VERIFIED (2026-09-14):** No pagination field of any kind in the response —
+        no `next`, no `total`, no `has_more`. The array is the whole result set.
+        See `segments limit ignored` for the negative control and
+        `newsletters positive control` for the contrast.
+
+    **VERIFIED (2026-09-14):** Every field except `id` and `name` is a **live
+    counter**. `messages_sent`/`billable_messages_sent` were 2 and `people` was 2
+    at the time of this read, matching the two deliveries and two profiles in the
+    sandbox. These move whenever anything happens in the workspace.
+
+    **LIMITATION — consequence for a snapshot binding:** the CDK suppresses a
+    snapshot pass whose xxh3 digest is unchanged
+    (`estuary-cdk/estuary_cdk/capture/common.py:1130`). Because the counters
+    drift, this binding's digest changes on most polls, so it re-emits its single
+    row indefinitely. Not incorrect, but it is a stream whose only content is a
+    row that is always "new" and whose numbers are recomputable downstream.
+
+    **DOCUMENTED (2026-09-14):** App API credentials are issued per workspace
+    (https://docs.customer.io/integrations/api/app/ — "API Credentials"), so this
+    endpoint returns the one workspace the key belongs to. One row observed here
+    is consistent with that, but a single-workspace account cannot distinguish
+    "scoped to one" from "account has one"; treat the one-row claim as DOCUMENTED,
+    not VERIFIED.
+examples:
+  - name: 200 - the single workspace this App API Key is scoped to
+    request:
+      url: "https://api.customer.io/v1/workspaces"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "workspaces": [
+              {
+                "id": 232586,
+                "name": "Estuary",
+                "messages_sent": 2,
+                "billable_messages_sent": 2,
+                "people": 2,
+                "object_types": 0,
+                "objects": 0
+              }
+            ]
+          }

@@ -1,0 +1,45 @@
+info:
+  name: optouts limit and from
+  type: http
+  seq: 7
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/optouts?limit=100000&from=%2B15551234567"
+  params:
+    - name: limit
+      value: "100000"
+      type: query
+    - name: from
+      value: "+15551234567"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **WHY:** Two questions in one request, both cheap against an empty result
+    set. (1) Over-limit handling: the spec declares `limit` `maximum: 1000`, and
+    `/v1/messages` was observed **accepting** `limit=1001` with a 200 rather
+    than rejecting it (`Messages / limit over max`), which put the ceiling on
+    the connector. (2) Whether `from` — the only filter this endpoint has — is
+    validated. The number is the spec's own placeholder, not a sandbox value.
+
+    **VERIFIED (2026-09-21):** 200 for `limit=100000`. The documented maximum of
+    1000 is **not enforced by rejection**, matching `/v1/messages`. The
+    connector must clamp to 1000 itself; `api.py:MAX_PAGE_SIZE` already holds
+    that constant and applies to this endpoint unchanged.
+
+    **UNOBSERVABLE (2026-09-21):** whether the over-limit request was *clamped*
+    to 1000 or honoured at 100000 cannot be told from an empty result set. It
+    does not matter for the connector, which never sends more than 1000.
+
+    **VERIFIED (2026-09-21):** `from` is accepted with a 200 and no error, so a
+    syntactically valid E.164 sender is not rejected. **UNOBSERVABLE:** whether
+    it filters. The connector sends no `from` — it wants every opt-out — so this
+    is recorded for completeness, not because anything depends on it.

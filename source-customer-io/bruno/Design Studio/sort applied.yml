@@ -1,0 +1,164 @@
+info:
+  name: sort applied
+  type: http
+  seq: 10
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/design_studio/emails?sort_by=name&sort_order=desc"
+  params:
+    - name: sort_by
+      value: "name"
+      type: query
+    - name: sort_order
+      value: "desc"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Design-Studio-emails/operation/listEmails
+
+    **WHY:** `FETCH-CHECKPOINT-STABLE-STATE` lets a positional offset cross a
+    checkpoint **only** when membership and order under it are provably stable.
+    A proven sort is half of what that proof would need, so `sort_by` is probed
+    on its own merits rather than taken from the spec.
+
+    **VERIFIED (2026-09-22):** `sort_order` is applied. The two sandbox emails
+    are named "Example **C**ode Editor Email" and "Example **V**isual Editor
+    Email"; `sort_by=name&sort_order=asc` returns them C-then-V and
+    `sort_by=name&sort_order=desc` returns them V-then-C. The ordering flips
+    with the parameter, so it is not the provider's incidental storage order.
+
+    **VERIFIED (2026-09-22):** `sort_by=bogus` returns a structured `400`
+    (`"sort_by must be one of: created, updated, name"`), confirming the enum
+    server-side and confirming again that this family validates rather than
+    ignores.
+
+    **UNOBSERVABLE (2026-09-22):** That `sort_by=updated` orders **by the
+    `updated` value**. Both sandbox rows carry an identical
+    `updated` (1789071558), so `updated` cannot discriminate between them.
+    `sort_by=updated&sort_order=desc` does return the rows in reversed order
+    versus `asc`, which shows the sort machinery runs for this key too — but
+    with a tied sort key that only demonstrates a reversed tie-break, not a
+    correct ordering by timestamp. Distinguishing the two needs two rows with
+    **different** `updated` values; `Seeding / D1` produces them.
+
+    **Consequence:** the plan does **not** rely on `sort_by=updated` for
+    correctness. Even a fully proven sort would not be sufficient for
+    `FETCH-CHECKPOINT-STABLE-STATE`, because `updated` is *mutable* — a row
+    edited mid-walk moves in the ordering and can be skipped across a
+    checkpoint gap regardless of how well the server sorts. The connector keeps
+    page numbers local to one invocation instead, which needs no sort proof at
+    all. The sort is requested only to make the walk deterministic within an
+    invocation.
+
+    **UNOBSERVABLE (2026-09-23), contradicting evidence:** `sort_by` is validated
+    -- `sort_by=bogus` returns 400 naming the three legal values -- but whether it
+    actually *orders* the response is **not** established, and one observation
+    points against it.
+
+    With two folders whose `updated` values differ by five seconds
+    (`Estuary Probe A` 1790106871, `Estuary Probe B` 1790106876), a connector
+    request carrying `sort_by=updated&sort_order=asc` emitted **B before A**.
+    Both rows fall inside one backfill window, so ascending order by `updated`
+    should have produced A first. That is n=1 and was observed through the
+    connector rather than through this request, so it is suggestive, not
+    conclusive -- it may be the same silently-ignored-parameter behaviour that
+    `/v1/segments` shows for `limit`.
+
+    **Nothing in the connector depends on the answer.** These are incremental
+    streams keyed on `/id` whose windows are bounded by time rather than by
+    position, so emission order cannot affect correctness; `sort_by` is sent only
+    to make a walk deterministic within one invocation. Recorded because the
+    plan asserted the parameter was applied and this observation disagrees.
+
+    **To close this**, run this request against a workspace holding three or more
+    rows with distinct `updated` values and compare `asc` against `desc`.
+
+examples:
+  - name: 200 - descending by name reverses the order
+    request:
+      url: "https://api.customer.io/v1/design_studio/emails?sort_by=name&sort_order=desc"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "emails": [
+              {
+                "id": "22222222-2222-4222-8222-222222222222",
+                "name": "Example Visual Editor Email",
+                "is_template": false,
+                "is_linked": false,
+                "has_translations": false,
+                "parent_folder_id": null,
+                "created": 1789071558,
+                "updated": 1789071558
+              },
+              {
+                "id": "11111111-1111-4111-8111-111111111111",
+                "name": "Example Code Editor Email",
+                "is_template": false,
+                "is_linked": false,
+                "has_translations": false,
+                "parent_folder_id": null,
+                "created": 1789071558,
+                "updated": 1789071558
+              }
+            ],
+            "folders": [],
+            "meta": {
+              "pagination": {
+                "page": 1,
+                "limit": 1000,
+                "total": 2
+              },
+              "filters": {
+                "parent_folder_id": null,
+                "direct_descendants_only": false,
+                "sort_by": "name",
+                "sort_order": "desc",
+                "created_before": null,
+                "created_after": null,
+                "updated_before": null,
+                "updated_after": null,
+                "is_template": null,
+                "has_translations": null,
+                "is_linked": null
+              }
+            }
+          }
+  - name: 400 - sort_by enum validated server-side
+    request:
+      url: "https://api.customer.io/v1/design_studio/emails?sort_by=bogus"
+      method: GET
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "errors": [
+              {
+                "detail": "sort_by must be one of: created, updated, name",
+                "status": "400"
+              }
+            ]
+          }

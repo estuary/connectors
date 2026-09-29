@@ -1,0 +1,30 @@
+info:
+  name: Paginated Snapshots
+  type: folder
+  seq: 3
+
+docs:
+  content: |-
+    Cluster C — the list endpoints that page with `start`/`limit` and return a
+    `next` continuation token, but expose **no server-side time filter**. They
+    sit between Cluster A (`/v1/messages`, filtered and incremental) and
+    Cluster B (`Snapshots/`, unfiltered *and* unpaginated): the documents carry
+    timestamps in some cases, but nothing filters on them, so the replication
+    strategy is a snapshot — one that has to drain a page walk rather than
+    read a single response.
+
+    `newsletters` is probed in `Snapshots/` for historical reasons — it was
+    first run there as the positive control for `segments limit ignored`
+    (`Snapshots / newsletters positive control`, `Snapshots / newsletters next
+    loops`). Those two requests are Cluster C evidence; only
+    `newsletters out of range token` was added here, because it closes a
+    hazard the earlier pair did not test.
+
+    **The three endpoints here do not share a terminal convention.**
+    `newsletters` and `sender_identities` return `next: ""` on the last page;
+    `optouts` **omits `next` entirely**. Test falsiness, never `is not None`,
+    and never `"next" in body`.
+
+    `/v1/esp/suppression/{type}` was originally grouped into this cluster and
+    does **not** belong — it pages by `offset`, returns no `next` at all, and
+    fans out over a path parameter. It has its own folder, `ESP Suppressions/`.

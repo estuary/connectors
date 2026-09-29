@@ -1,0 +1,82 @@
+info:
+  name: transactional
+  type: http
+  seq: 4
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/transactional"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Transactional/operation/listTransactional
+
+    **WHY:** Establishes the envelope key and shape for the
+    `transactional_messages` stream. Note the path is `/v1/transactional`, not
+    `/v1/transactional_messages` — path and stream name differ, which is exactly
+    why `PATH` and `NAME` are separate ClassVars.
+
+    **VERIFIED (2026-09-14):** 200, **envelope key is `messages`** — not
+    `transactional`, and not `transactional_messages`. This collides by name with
+    the envelope of `GET /v1/messages`, which carries an entirely different
+    document (a delivery). `ITEMS_KEY` must therefore be per-stream state; it
+    cannot be derived from `NAME` or from `PATH`.
+
+        **VERIFIED (2026-09-14):** No pagination field of any kind in the response —
+        no `next`, no `total`, no `has_more`. The array is the whole result set.
+        See `segments limit ignored` for the negative control and
+        `newsletters positive control` for the contrast.
+
+    **VERIFIED (2026-09-14):** One row present — the workspace's default
+    "All uncategorized email messages" transactional message, id 1. Per-item keys
+    observed: `id` (int), `name`, `description`, `send_to_unsubscribed` (bool),
+    `link_tracking` (bool), `open_tracking` (bool), `hide_message_body` (bool),
+    `queue_drafts` (bool), `trigger_name` (string), `created_at` (unix int),
+    `updated_at` (unix int).
+
+    **VERIFIED (2026-09-14):** `trigger_name` is returned but is **absent from the
+    OpenAPI spec**. There is **no `deduplicate_id`** on this object, unlike
+    campaigns / broadcasts / segments / exports — another reason no single
+    cursor-or-change-marker field can be assumed cluster-wide.
+
+    **LIMITATION:** One row, and it is the workspace default rather than a
+    user-created message, so optional fields (a non-empty `description`, a real
+    `trigger_name`) are unexercised. Shape is VERIFIED for the fields present.
+examples:
+  - name: 200 - default transactional message; envelope key is `messages`
+    request:
+      url: "https://api.customer.io/v1/transactional"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "messages": [
+              {
+                "id": 1,
+                "name": "All uncategorized email messages",
+                "description": "",
+                "send_to_unsubscribed": true,
+                "link_tracking": true,
+                "open_tracking": true,
+                "hide_message_body": false,
+                "queue_drafts": false,
+                "trigger_name": "",
+                "created_at": 1789071557,
+                "updated_at": 1789071557
+              }
+            ]
+          }

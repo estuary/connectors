@@ -1,0 +1,115 @@
+info:
+  name: newsletter contents bare
+  type: http
+  seq: 5
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/newsletters/{{newsletter_id}}/contents"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/one-time-sends/operation/listNewsletterContents
+
+    **WHY:** This is the only Cluster E route with data in the sandbox, so it
+    carries the whole cluster's shape evidence. It also decides the cluster's
+    grain question: `Design Studio / emails bare` deliberately captured the list
+    grain and refused the 15 KB `content.html` behind
+    `GET /v1/design_studio/emails/{id}`. If `contents` embeds rendered bodies at
+    *list* grain, that precedent has to be re-argued rather than reapplied.
+
+    **VERIFIED (2026-09-22):** Envelope key `contents`, item array `[]`-style
+    (one item present). The single variant response is **13,446 bytes**, of
+    which `body` alone is **10,196 bytes** of rendered HTML. There is no
+    metadata-only projection available: this list endpoint *is* the full-body
+    endpoint. The Design Studio precedent does not transfer — there the body sat
+    behind a **separate per-row request** we declined to make, whereas here the
+    body arrives in the one request the connector makes anyway. The consistent
+    rule across both is "do not spend extra requests fetching rendered content",
+    and this route does not.
+
+    **VERIFIED (2026-09-22):** Items carry `newsletter_id` — the parent id **is**
+    in the body on this route. It is not on the sibling
+    `/v1/transactional/{id}/contents` (see `Child Entities / transactional
+    contents bare`), so a connector must not rely on it generally.
+
+    **VERIFIED (2026-09-22):** **The spec is missing four fields that are
+    always present.** Observed keys include `created`, `updated`, `body_plain`
+    and `test_group_id`; the spec's `contents` item schema lists none of them.
+    `created` / `updated` are bare unix seconds (the `campaigns`/`broadcasts`
+    convention, not `created_at`/`updated_at`), and `deduplicate_id` is present.
+    None of it is usable as a cursor — this route accepts no time filter.
+
+    **VERIFIED (2026-09-22):** `preprocessor` came back `"none"`. The spec
+    declares it `enum: ["premailer"]`. Ninth observed spec defect; a reminder
+    that no enum from this provider may be narrowed in a connector model.
+
+    **VERIFIED (2026-09-22):** `id` here is the **content-variant** id (`2`),
+    which matches the parent's `content_ids: [2]` array. The parent newsletter
+    carries only those ids, never the variant bodies, so this route does **not**
+    duplicate anything already captured by the `newsletters` snapshot.
+
+    **UNOBSERVABLE:** the empty representation. The workspace's single one-time
+    send has exactly one variant, and a one-time send always has at least one,
+    so `{"contents": null}` vs `{"contents": []}` cannot be discriminated here.
+    Proceeding on `SnapshotPage.items()`, which normalises both
+    (`models.py:_null_as_empty` and the `or []` in `SnapshotPage.items`).
+
+    **Saved-example note:** the example below is a **projection**. `body` is
+    replaced with a short placeholder (its real value is 10,196 bytes of the
+    provider's sample template) and `name` / `subject` carry placeholder text.
+    Byte counts are preserved in the docs above, which is what the size argument
+    rests on.
+
+examples:
+  - name: 200 - single content variant (projection; body elided)
+    request:
+      url: "https://api.customer.io/v1/newsletters/1/contents"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "contents": [
+              {
+                "id": 2,
+                "newsletter_id": 1,
+                "name": "Example Variant",
+                "subject": "Example Subject",
+                "type": "email",
+                "language": "",
+                "layout": "",
+                "body": "<!DOCTYPE html><html …> ELIDED: 10196 bytes of rendered HTML </html>",
+                "body_plain": "",
+                "body_amp": "",
+                "preheader_text": "",
+                "preprocessor": "none",
+                "test_group_id": 0,
+                "from": "",
+                "from_id": null,
+                "reply_to": "",
+                "reply_to_id": null,
+                "recipient": "REDACTED",
+                "bcc": "",
+                "cc": "",
+                "fake_bcc": true,
+                "headers": "[]",
+                "created": 1789072954,
+                "updated": 1789073079,
+                "deduplicate_id": "2:1789073079"
+              }
+            ]
+          }

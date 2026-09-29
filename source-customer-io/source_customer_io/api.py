@@ -1,0 +1,544 @@
+from collections.abc import AsyncGenerator
+from itertools import groupby
+from datetime import datetime, timedelta, UTC
+from logging import Logger
+from typing import Any
+
+from estuary_cdk.capture.common import LogCursor, PageCursor
+from estuary_cdk.http import HTTPError, HTTPSession
+
+from .models import (
+    ChildObject,
+    ConfigObject,
+    DeliveriesResponse,
+    Delivery,
+    DesignStudioObject,
+    DesignStudioPage,
+    PaginatedObject,
+    SnapshotObject,
+    SnapshotPage,
+)
+
+# Customer.io App API base URLs. Every endpoint carries a `/v1/` path prefix that is
+# *not* part of the base URL, so per-endpoint paths look like
+# f"{base_url(config.region)}/v1/<path>".
+API = "https://api.customer.io"
+API_EU = "https://api-eu.customer.io"
+
+# Keys mirror EndpointConfig.region's Literal values. Customer.io does not route
+# App API requests across regions -- the wrong host returns 401, not a redirect --
+# and the region is not derivable from an App API Key, so it must come from config.
+REGION_BASE_URLS = {
+    "us": API,
+    "eu": API_EU,
+}
+
+
+def base_url(region: str) -> str:
+    return REGION_BASE_URLS[region]
+
+
+# `limit` above this is accepted rather than rejected, so the ceiling is ours to
+# enforce. See the `limit over max` request in the Bruno collection.
+MAX_PAGE_SIZE = 1000
+
+# `/v1/messages` serves at most six months of history. Requests for a wider range
+# return 200 with a narrowed result set and no indication they were narrowed, so
+# the connector clamps its own floor and says so.
+MAX_HISTORY = timedelta(days=183)
+
+# An out-of-range `start` token makes the API restart the walk at page one and
+# hand back page one's `next`, which is a live cycle. The connector never injects
+# a stale token, so normal operation cannot enter it; this bounds a provider-side
+# bug rather than an expected case.
+MAX_PAGES_PER_WINDOW = 10_000
+
+
+def _dt_to_ts(dt: datetime) -> int:
+    return int(dt.timestamp())
+
+
+def backfill_floor(start_date: datetime, log: Logger) -> datetime:
+    """The earliest instant `/v1/messages` will serve, given a configured start date."""
+    clamp = datetime.now(tz=UTC) - MAX_HISTORY
+    if start_date < clamp:
+        log.warning(
+            "start_date predates Customer.io's six-month delivery history limit; "
+            "backfilling from the limit instead.",
+            {"start_date": start_date, "earliest_available": clamp},
+        )
+        return clamp
+    return start_date
+
+
+async def _drain_window(
+    http: HTTPSession,
+    base: str,
+    log: Logger,
+    start: datetime,
+    end: datetime,
+) -> AsyncGenerator[Delivery, None]:
+    """Yield every delivery created within [start, end], following pagination to the end.
+
+    Both bounds are inclusive. The continuation token is local to this call: it is
+    a positional offset the provider does not guarantee across a gap, so it is
+    never checkpointed.
+    """
+    url = f"{base}{Delivery.PATH}"
+    params: dict[str, str | int] = {
+        "limit": MAX_PAGE_SIZE,
+        Delivery.SINCE_PARAM: _dt_to_ts(start),
+        Delivery.BEFORE_PARAM: _dt_to_ts(end),
+        # Free to request: the response is otherwise identical, and in-app survey
+        # responses are picked up where they exist.
+        "get_tracked_responses": "true",
+    }
+
+    for page in range(MAX_PAGES_PER_WINDOW):
+        response = DeliveriesResponse.model_validate_json(
+            await http.request(log, url, params=params)
+        )
+
+        for delivery in response.messages:
+            yield delivery
+
+        if not response.next:
+            return
+
+        params = {**params, "start": response.next}
+    else:
+        raise RuntimeError(
+            f"Pagination did not terminate within {MAX_PAGES_PER_WINDOW} pages "
+            f"for window [{start}, {end}]."
+        )
+
+
+async def fetch_deliveries(
+    http: HTTPSession,
+    base: str,
+    lag: timedelta,
+    window_size: timedelta,
+    log: Logger,
+    log_cursor: LogCursor,
+) -> AsyncGenerator[Delivery | LogCursor, None]:
+    """Incrementally fetch deliveries by creation time, trailing the present by `lag`.
+
+                 cursor   cursor + 1s  horizon = last elapsed second - lag
+    ────────────────┼──────────┼──────────────┼─────▶ time (1s ticks)
+                    │          │              │
+    start_ts ───────┼──────────[══════════════╪═════▶
+    end_ts ═════════╪══════════╪══════════════]
+    emitted ────────┼──────────[══════════════]
+                    │          │              └─ the present second is still
+                    │          │                 in progress; its deliveries
+                    │          │                 wait for the next poll
+                    │          └─ first emitted second
+                    └─ already emitted by the previous poll
+    Both bounds inclusive, so start_ts is cursor + 1s.
+
+    Bound twice per binding: once at lag=0 to tail new deliveries, and once
+    trailing by the re-scan window to re-read them after their metrics settle.
+    """
+    assert isinstance(log_cursor, datetime)
+
+    # The last fully-elapsed second, less this subtask's lag.
+    horizon = datetime.now(tz=UTC).replace(microsecond=0) - timedelta(seconds=1) - lag
+    if horizon <= log_cursor:
+        return
+
+    start = log_cursor + timedelta(seconds=1)
+    end = min(start + window_size, horizon)
+
+    async for delivery in _drain_window(http, base, log, start, end):
+        yield delivery
+
+    # Advance even when the window was empty. Every tick in it had fully elapsed
+    # and was filtered server-side, so nothing can still arrive in it -- and
+    # because the window is capped at `window_size`, holding the cursor back
+    # would leave it stranded behind a quiet stretch longer than one window.
+    yield end
+
+
+async def backfill_deliveries(
+    http: HTTPSession,
+    base: str,
+    window_size: timedelta,
+    log: Logger,
+    page: PageCursor,
+    cutoff: datetime,
+) -> AsyncGenerator[Delivery | PageCursor, None]:
+    """Walk historical deliveries in fixed forward windows up to the cutoff.
+
+       window_start  window_start + W    cutoff - 1s    cutoff
+    ────────┼──────────────┼──────────────────┼────────────┼───▶ time (1s ticks)
+            │              │                  │            │
+    start_ts[══════════════╪══════════════════╪════════════╪──▶
+    end_ts ═╪══════════════]                  │            │
+    emitted [══════════════]                  │            │
+            │              │                  │            └─ incremental's
+            │              │                  │               first tick
+            │              │                  └─ backfill's last tick
+            │              └─ end of this window, inclusive
+            └─ resume point, carried as an RFC3339 PageCursor
+    Both bounds inclusive. One window drains per invocation.
+
+    The resume key is a timestamp rather than a position: `/v1/messages` exposes
+    no sort parameter, and an elapsed window is a frozen set because `created`
+    is immutable, so the walk is correct without depending on result order.
+    """
+    assert isinstance(page, str)
+
+    window_start = datetime.fromisoformat(page)
+    if window_start >= cutoff:
+        return
+
+    window_end = min(window_start + window_size, cutoff) - timedelta(seconds=1)
+
+    async for delivery in _drain_window(http, base, log, window_start, window_end):
+        yield delivery
+
+    yield (window_end + timedelta(seconds=1)).isoformat()
+
+
+def _ordered(
+    model: type[SnapshotObject], items: list[dict[str, Any]], log: Logger
+) -> list[dict[str, Any]]:
+    """Sort rows by the model's ordering key, or warn and leave them alone.
+
+    Snapshot rows are addressed positionally, so a stable order is what keeps an
+    unchanged row on the same key between passes. The provider documents no
+    ordering of its own.
+    """
+    if not items:
+        return items
+
+    if not all(model.ORDER_KEY in item for item in items):
+        log.warning(
+            "Not every row carries the ordering key; emitting them in the "
+            "provider's order instead.",
+            {"resource": model.NAME, "order_key": model.ORDER_KEY},
+        )
+        return items
+
+    try:
+        return sorted(items, key=lambda item: item[model.ORDER_KEY])
+    except TypeError:
+        log.warning(
+            "Rows carry mixed types in their ordering key; emitting them in "
+            "the provider's order instead.",
+            {"resource": model.NAME, "order_key": model.ORDER_KEY},
+        )
+        return items
+
+
+async def snapshot_config_objects(
+    http: HTTPSession,
+    base: str,
+    model: type[ConfigObject],
+    log: Logger,
+) -> AsyncGenerator[ConfigObject, None]:
+    """Yield every row of one configuration endpoint.
+
+    These endpoints take no parameters and return the whole collection in a
+    single response, so each pass is a complete snapshot.
+
+    Rows are emitted in `ORDER_KEY` order where every row carries it. The
+    provider documents no ordering, and snapshot bindings address rows
+    positionally, so sorting is what stops an unchanged row from moving to a
+    different key when the provider reorders its response.
+    """
+    url = f"{base}{model.PATH}"
+    page = SnapshotPage.model_validate_json(await http.request(log, url))
+
+    for item in _ordered(model, page.items(model.ITEMS_KEY), log):
+        yield model.model_validate(item)
+
+
+async def snapshot_paginated_objects(
+    http: HTTPSession,
+    base: str,
+    model: type[PaginatedObject],
+    log: Logger,
+) -> AsyncGenerator[PaginatedObject, None]:
+    """Yield every row of one paginated endpoint, walking `start` to the end.
+
+    The whole result set is collected before anything is emitted, because
+    ordering has to be stable across the entire snapshot rather than within a
+    page -- rows are addressed positionally, so a row that moves between pages
+    would otherwise land on a different key.
+
+    The continuation token stays inside this call. It is a positional offset the
+    provider makes no promises about across a gap, so it is never checkpointed.
+    """
+    url = f"{base}{model.PATH}"
+    request_params: dict[str, str | int] = {
+        "limit": MAX_PAGE_SIZE,
+        **model.EXTRA_PARAMS,
+    }
+
+    items: list[dict[str, Any]] = []
+    for _ in range(MAX_PAGES_PER_WINDOW):
+        page = SnapshotPage.model_validate_json(
+            await http.request(log, url, params=request_params)
+        )
+        items.extend(page.items(model.ITEMS_KEY))
+
+        # Three terminal conventions exist across this API: an empty string, an
+        # absent key, and a populated token. Only a falsiness test covers all.
+        if not page.next:
+            break
+
+        request_params = {**request_params, "start": page.next}
+    else:
+        raise RuntimeError(
+            f"Pagination did not terminate within {MAX_PAGES_PER_WINDOW} pages "
+            f"for {model.NAME}."
+        )
+
+    for item in _ordered(model, items, log):
+        yield model.model_validate(item)
+
+
+# Design Studio pages by number rather than by token, and accepts up to 10000
+# rows per page. 1000 keeps a page's memory footprint in line with the rest of
+# the connector.
+DESIGN_STUDIO_MAX_PAGE_SIZE = 1000
+
+# Defensive only. Unlike `/v1/messages`, a page past the end here returns an
+# empty array with the true total rather than restarting the walk, so no cycle
+# is known -- but an unbounded loop over a remote paginator is not worth
+# shipping.
+DESIGN_STUDIO_MAX_PAGES = 10_000
+
+
+async def _drain_design_studio_window(
+    http: HTTPSession,
+    base: str,
+    model: type[DesignStudioObject],
+    log: Logger,
+    start: datetime,
+    end: datetime,
+) -> AsyncGenerator[DesignStudioObject, None]:
+    """Yield every row whose `updated` falls in [start, end], inclusive.
+
+    The queried instants sit one second outside that window on each side,
+    because Design Studio's bounds are exclusive -- the mirror of
+    `/v1/messages`, whose bounds are inclusive. Getting this backwards drops
+    every row landing exactly on a boundary second, silently.
+
+    The page number stays inside this call. It is a positional offset the
+    provider makes no promises about across a gap, so it is never checkpointed.
+    """
+    url = f"{base}{model.PATH}"
+
+    for page in range(1, DESIGN_STUDIO_MAX_PAGES + 1):
+        body = DesignStudioPage.model_validate_json(
+            await http.request(
+                log,
+                url,
+                params={
+                    "limit": DESIGN_STUDIO_MAX_PAGE_SIZE,
+                    model.SINCE_PARAM: _dt_to_ts(start) - 1,
+                    model.BEFORE_PARAM: _dt_to_ts(end) + 1,
+                    # Deterministic within one walk. Nothing depends on it:
+                    # the window is bounded by time, not by position.
+                    "sort_by": "updated",
+                    "sort_order": "asc",
+                    "page": page,
+                },
+            )
+        )
+
+        items = body.items(model.ITEMS_KEY)
+        # No continuation token exists in this family; an empty page is the end.
+        if not items:
+            return
+
+        for item in items:
+            yield model.model_validate(item)
+
+    raise RuntimeError(
+        f"Pagination did not terminate within {DESIGN_STUDIO_MAX_PAGES} pages "
+        f"for {model.NAME} window [{start}, {end}]."
+    )
+
+
+async def fetch_design_studio_objects(
+    http: HTTPSession,
+    base: str,
+    model: type[DesignStudioObject],
+    window_size: timedelta,
+    log: Logger,
+    log_cursor: LogCursor,
+) -> AsyncGenerator[DesignStudioObject | LogCursor, None]:
+    """Incrementally fetch Design Studio rows by their update time.
+
+                  cursor   cursor + 1s    horizon   horizon + 1s
+    ────────────────┼──────────┼────────────┼───────────┼──▶ time (1s ticks)
+                    │          │            │           │
+    updated_after ──(══════════╪════════════╪═══════════╪═▶
+    updated_before ═╪══════════╪════════════╪═══════════)
+    emitted ────────┼──────────[════════════]           │
+                    │          │            │           └─ queried one tick
+                    │          │            │              past the window,
+                    │          │            │              since it excludes
+                    │          │            └─ last fully-elapsed second
+                    │          └─ first emitted second
+                    └─ already emitted by the previous poll
+    Both provider bounds are exclusive, so each queried instant sits one tick
+    outside the window actually wanted.
+    """
+    assert isinstance(log_cursor, datetime)
+
+    horizon = datetime.now(tz=UTC).replace(microsecond=0) - timedelta(seconds=1)
+    if horizon <= log_cursor:
+        return
+
+    end = min(log_cursor + window_size, horizon)
+
+    async for row in _drain_design_studio_window(
+        http, base, model, log, log_cursor + timedelta(seconds=1), end
+    ):
+        yield row
+
+    yield end
+
+
+async def backfill_design_studio_objects(
+    http: HTTPSession,
+    base: str,
+    model: type[DesignStudioObject],
+    window_size: timedelta,
+    log: Logger,
+    page: PageCursor,
+    cutoff: datetime,
+) -> AsyncGenerator[DesignStudioObject | PageCursor, None]:
+    """Walk historical Design Studio rows in fixed forward windows to the cutoff.
+
+       window_start  window_start + W    cutoff - 1s    cutoff
+    ────────┼──────────────┼──────────────────┼────────────┼───▶ time (1s ticks)
+            │              │                  │            │
+    updated_after(══════════╪══════════════════╪════════════╪──▶
+    updated_before══════════)                  │            │
+    emitted [══════════════]                   │            │
+            │              │                   │           └─ incremental's
+            │              │                   │              first tick
+            │              │                   └─ backfill's last tick
+            │              └─ end of this window, inclusive
+            └─ resume point, carried as an RFC3339 PageCursor
+    One window drains per invocation.
+
+    The sweep walks `updated`, the same axis as the incremental task, rather
+    than the immutable `created`. On the `created` axis, editing a row the sweep
+    has already passed would strand the edit: the backfill never revisits it and
+    the incremental task starts after the cutoff. `updated` only moves forward,
+    so an edit relocates a row ahead of the sweep, never behind it.
+    """
+    assert isinstance(page, str)
+
+    window_start = datetime.fromisoformat(page)
+    if window_start >= cutoff:
+        return
+
+    window_end = min(window_start + window_size, cutoff) - timedelta(seconds=1)
+
+    async for row in _drain_design_studio_window(
+        http, base, model, log, window_start, window_end
+    ):
+        yield row
+
+    yield (window_end + timedelta(seconds=1)).isoformat()
+
+
+async def _parent_ids(
+    http: HTTPSession,
+    base: str,
+    parent: type[SnapshotObject],
+    log: Logger,
+) -> list[int | str]:
+    """Collect every parent id, draining the parent listing completely first.
+
+    Interleaving per-parent child requests with a still-open parent response
+    risks timing the parent connection out, so the ids are materialised before
+    any child request goes out.
+    """
+    drain = (
+        snapshot_paginated_objects
+        if issubclass(parent, PaginatedObject)
+        else snapshot_config_objects
+    )
+
+    ids: list[int | str] = []
+    async for row in drain(http, base, parent, log):  # type: ignore[arg-type]
+        # Snapshot models declare no fields -- a required one would fail the
+        # bare tombstone the CDK writes on deletion -- so the id is read from
+        # the extras. Raise rather than skip: a parent without an id means the
+        # provider's shape changed, and silently dropping it would take every
+        # one of its children with it.
+        extra = row.model_extra or {}
+        if "id" not in extra:
+            raise ValueError(
+                f"A {parent.NAME} row carries no id, so its children cannot be listed."
+            )
+        ids.append(extra["id"])
+
+    return ids
+
+
+async def snapshot_child_objects(
+    http: HTTPSession,
+    base: str,
+    model: type[ChildObject],
+    log: Logger,
+) -> AsyncGenerator[ChildObject, None]:
+    """Yield every child row across every parent, one request per parent.
+
+    These routes accept no parameters -- `limit` is ignored on all of them and
+    `start` is a hard 400 on the actions routes -- so each parent is a single
+    request with no page walk.
+
+    Rows are buffered across all parents and ordered once, because snapshot
+    bindings address rows positionally: ordering has to be stable over the whole
+    pass, not within one parent, or a row moves to a different key whenever an
+    earlier parent gains or loses one.
+    """
+    parent_ids = await _parent_ids(http, base, model.PARENT, log)
+
+    rows: list[tuple[int | str, dict[str, Any]]] = []
+
+    for parent_id in parent_ids:
+        # An empty id templates a path the API answers with an unrouted 404,
+        # which would silently orphan every child of that parent. Integer 0 is
+        # a legitimate id, so only the empty string is rejected.
+        if parent_id == "":
+            log.warning(
+                "Skipping a parent with an empty id.",
+                {"resource": model.NAME, "parent": model.PARENT.NAME},
+            )
+            continue
+
+        url = f"{base}{model.PATH_TEMPLATE.format(parent_id=parent_id)}"
+
+        try:
+            page = SnapshotPage.model_validate_json(await http.request(log, url))
+        except HTTPError as err:
+            # A parent deleted between listing it and reading its children.
+            # Narrow on purpose: a blanket catch here would swallow the 401 a
+            # missing token source produces, which this connector shipped once.
+            if err.code != 404:
+                raise
+            log.warning(
+                "Parent disappeared while reading its children; skipping it.",
+                {"resource": model.NAME, "parent_id": parent_id},
+            )
+            continue
+
+        rows.extend((parent_id, item) for item in page.items(model.ITEMS_KEY))
+
+    # Parent id is the outer sort term and is always present, since the driver
+    # supplies it rather than reading it off the response.
+    for parent_id, group in groupby(rows, key=lambda row: row[0]):
+        for item in _ordered(model, [item for _, item in group], log):
+            yield model.model_validate(
+                {**item, "_meta": {**(item.get("_meta") or {}), "parent_id": parent_id}}
+            )

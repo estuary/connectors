@@ -1,0 +1,80 @@
+info:
+  name: components bare
+  type: http
+  seq: 3
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/design_studio/components"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Design-Studio/operation/listComponents
+
+    **WHY:** Confirms `/components` is shaped like `/emails` — the premise of
+    giving Cluster D one parametrized fetch function rather than three.
+
+    **VERIFIED (2026-09-22):** 200, three top-level keys `components`, `folders`
+    and `meta`, exactly mirroring `/emails`. Envelope key matches the path
+    segment. Both arrays `[]`, not `null`. No `next`.
+
+    **VERIFIED (2026-09-22):** `meta.filters` carries **ten** entries — the nine
+    shared ones plus `tag`, this endpoint's only unique filter. `/emails` has
+    eleven (plus `is_template`, `has_translations`, `is_linked`). The extra
+    filters differ per endpoint but the shared nine, the `meta` block and the
+    paging contract do not, which is what makes one parametrized fetch correct.
+
+    **VERIFIED (2026-09-22):** `tag=nonexistent-tag` returns 200 with an empty
+    array and echoes `"tag": "nonexistent-tag"` — it filters rather than
+    erroring on an unknown tag. The connector sends no `tag`: it wants every
+    component, and `tag` is a narrowing filter with no "all" sentinel.
+
+    **UNOBSERVABLE (2026-09-22):** The component **document shape** — the
+    workspace holds zero components. The OpenAPI spec DOCUMENTS it as `{id,
+    name, tag, parent_folder_id, created, updated}`; it carries the same
+    `created`/`updated` unix-second pair as an email, which is all the fetch
+    path depends on. `Seeding / D1` makes it observable.
+
+examples:
+  - name: 200 - no components in the workspace
+    request:
+      url: "https://api.customer.io/v1/design_studio/components"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "components": [],
+            "folders": [],
+            "meta": {
+              "pagination": {
+                "page": 1,
+                "limit": 1000,
+                "total": 0
+              },
+              "filters": {
+                "parent_folder_id": null,
+                "direct_descendants_only": false,
+                "sort_by": "created",
+                "sort_order": "asc",
+                "created_before": null,
+                "created_after": null,
+                "updated_before": null,
+                "updated_after": null,
+                "tag": null
+              }
+            }
+          }

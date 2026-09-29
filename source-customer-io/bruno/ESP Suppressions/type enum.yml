@@ -1,0 +1,63 @@
+info:
+  name: type enum
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/esp/suppression/unsubscribes"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **WHY:** `{suppression_type}` is a path parameter, so the set of valid
+    values decides how many bindings this endpoint becomes. The spec declares an
+    enum; this connector's experience with this provider's spec (five prior
+    inaccuracies) makes an independent check cheap and worthwhile. `unsubscribes`
+    is a plausible-but-wrong value, chosen because it is the one a reader would
+    most likely assume exists.
+
+    **VERIFIED (2026-09-21):** 400,
+    `{"errors":[{"detail":"type is invalid","status":"400"}]}`. The type is
+    validated server-side against a closed set, and a wrong value fails fast
+    rather than returning an empty list — which is exactly the behaviour that
+    makes enumerating the set by probe reliable.
+
+    **VERIFIED (2026-09-21) — the enum, probed exhaustively.** Each candidate
+    was issued as a bare GET:
+
+    | value            | status |
+    |------------------|--------|
+    | `bounces`        | 200    |
+    | `spam_reports`   | 200    |
+    | `blocks`         | 200    |
+    | `invalid_emails` | 200    |
+    | `unsubscribes`   | 400    |
+    | `complaints`     | 400    |
+    | `invalid`        | 400    |
+    | `drops`          | 400    |
+    | `bounce`         | 400    |
+    | `spam_report`    | 400    |
+    | `block`          | 400    |
+    | `spam`           | 400    |
+    | `bounced`        | 400    |
+    | `blocked`        | 400    |
+    | `unsubscribe`    | 400    |
+    | `suppressions`   | 400    |
+
+    The four that return 200 are exactly the four the spec's enum declares —
+    `blocks`, `bounces`, `spam_reports`, `invalid_emails`. **The spec is correct
+    here**, which is worth recording explicitly given how often it has not been.
+    Note the singular forms all 400: the values are plural, without exception.
+
+    Consequence: this route is four result sets, not one. Any binding has to
+    either fan out over the four types or carry the type as a discriminator on
+    the document — and since the type is not returned in the response body
+    (`category` is documented but absent, see `bounces`), fanning out is the only
+    way the type reaches the captured document at all.

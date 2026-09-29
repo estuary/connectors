@@ -1,0 +1,64 @@
+info:
+  name: broadcasts
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/broadcasts"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Broadcasts/operation/listBroadcasts
+
+    **WHY:** Establishes envelope key, pagination absence and document shape for
+    the `broadcasts` snapshot stream.
+
+    **Naming, which is easy to get wrong here:** API `broadcasts` means
+    **API-triggered broadcasts** (UI: Broadcasts > "Messages triggered by API").
+    It is **not** the UI's "One-time sends" — those are API `newsletters`, a
+    *different* endpoint with a *different* shape (see
+    `newsletters positive control`). Deliveries carry both a `broadcast_id` and a
+    `newsletter_id`, and they refer to these two distinct objects.
+
+    **VERIFIED (2026-09-14):** 200, envelope key `broadcasts`, value `[]` (empty
+    array, not `null`).
+
+        **VERIFIED (2026-09-14):** No pagination field of any kind in the response —
+        no `next`, no `total`, no `has_more`. The array is the whole result set.
+        See `segments limit ignored` for the negative control and
+        `newsletters positive control` for the contrast.
+
+    **UNOBSERVABLE (2026-09-14):** No API-triggered broadcasts exist in the sandbox.
+    Shape below is DOCUMENTED only. `Seeding/B2` carries the UI click-path.
+
+    **DOCUMENTED (2026-09-14):** Per the OpenAPI spec, a broadcast object carries
+    `actions` (array of `{id, type}`), `active`, `created` (unix int),
+    `deduplicate_id`, `first_started` (unix int), `id` (int),
+    `msg_template_ids` (array of `{id, type}`), `name`, `state`, `tags`,
+    `type`, `updated` (unix int). Unlike campaigns this is a **single flat
+    object**, not a `oneOf`.
+examples:
+  - name: 200 - empty array (sandbox has no API-triggered broadcasts)
+    request:
+      url: "https://api.customer.io/v1/broadcasts"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "broadcasts": []
+          }

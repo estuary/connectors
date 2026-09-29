@@ -1,0 +1,79 @@
+info:
+  name: newsletter contents params ignored
+  type: http
+  seq: 6
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/newsletters/{{newsletter_id}}/contents?start=MDox&limit=1"
+  params:
+    - name: start
+      value: MDox
+      type: query
+    - name: limit
+      value: "1"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/one-time-sends/operation/listNewsletterContents
+
+    **WHY:** The spec declares no query parameters for this route. Both `actions`
+    routes *also* declare none (or only `start`) and yet **reject** `start` with
+    a 400, so "the spec lists no parameters" predicts nothing about behaviour in
+    this API. Establish directly whether anything is honoured, ignored, or
+    rejected before assuming a single-response read.
+
+    **VERIFIED (2026-09-22):** Everything is **accepted and ignored**. `limit=1`,
+    `start=MDox`, and `start=not-a-token` each return `200` with the full,
+    unchanged single-variant body — no narrowing, no 400. This is the opposite
+    of both `actions` routes, which 400 on any `start`.
+
+    **VERIFIED (2026-09-22):** No `next`, `total` or `has_more` key appears in
+    any response. Combined with the ignored parameters this is a **single-
+    response full-list read** with no termination signal to test, the same
+    contract as `Snapshots / segments` — which is precisely why `limit` being
+    ignored cannot be taken as proof the whole list was returned. It is taken on
+    the provider's word plus the parent's `content_ids` array, whose length (1)
+    matches the returned count.
+
+    **Connector consequence:** send no parameters, make exactly one request per
+    parent, and do not write a page loop. A future workspace with an A/B test or
+    many language variants would exercise the only case where a hidden cap could
+    bite; the `content_ids` length on the parent is the cheap cross-check that
+    would detect it, and the plan records it as an accepted risk rather than
+    building a page walk against an endpoint that has no paging.
+
+examples:
+  - name: 200 - start and limit both ignored, full body returned (projection)
+    request:
+      url: "https://api.customer.io/v1/newsletters/1/contents?start=MDox&limit=1"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "contents": [
+              {
+                "id": 2,
+                "newsletter_id": 1,
+                "name": "Example Variant",
+                "body": "<!DOCTYPE html><html …> ELIDED: 10196 bytes of rendered HTML </html>",
+                "created": 1789072954,
+                "updated": 1789073079
+              }
+            ]
+          }

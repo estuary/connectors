@@ -1,0 +1,175 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/messages?limit=5"
+  params:
+    - name: limit
+      value: "5"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Messages/operation/listMessages
+
+    **WHY:** Establishes the delivery document shape and the pagination envelope
+    that every other request in this folder builds on, and pins `message_id` /
+    `message_created` / `customer_id` in `environments/CustomerIO.yml` for the
+    boundary and by-id probes. This is the endpoint behind the connector's
+    `messages` stream.
+
+    **LIMITATION (VERIFIED 2026-09-10):** The terminal page is signalled by
+    `next: ""` — an **empty string**, not `null` and not an absent key. The
+    field is present on every response, including the last one. A
+    `while next is not None:` pagination loop therefore never terminates and
+    spins against the API forever; the loop must test falsiness
+    (`while next_page:` / `if not next_page: break`). Singer's
+    `tap-customerio` shipped exactly this bug.
+
+    **LIMITATION (DOCUMENTED 2026-09-10):** The OpenAPI spec at
+    https://docs.customer.io/files/journeys-app.json declares the 200 response as
+    `{"messages": [...]}` only — `next` is **absent from the schema** despite
+    always being returned. The spec is not authoritative for this envelope; this
+    saved example is.
+
+    **VERIFIED (2026-09-10):** Response envelope is
+    `{"messages": [...], "next": "<opaque>"}`. Per-item keys observed:
+    `id`, `deduplicate_id`, `msg_template_id`, `action_id`,
+    `parent_action_id`, `transactional_message_id`, `customer_id`,
+    `customer_identifiers`, `trigger_event_id`, `recipient`, `subject`,
+    `metrics`, `created`, `failure_message`, `newsletter_id`,
+    `content_id`, `campaign_id`, `broadcast_id`, `type`, `forgotten`.
+
+    **VERIFIED (2026-09-10):** Two per-item keys diverge from the OpenAPI spec:
+    the response carries `msg_template_id` where the spec names the field
+    `message_template_id`, and carries `transactional_message_id`, which the
+    spec omits entirely. Model the **observed** names.
+
+    **VERIFIED (2026-09-10):** `metrics` is a sparse map — it holds only the
+    metrics actually recorded for that delivery, so an absent key means "not
+    recorded", never zero. Do not model it as a fixed-shape object with defaults.
+
+    **VERIFIED (2026-09-14):** `deduplicate_id` has the form
+    `{id}:{unix_seconds}`, and the suffix **advances when a new metric lands**. A
+    natural before/after experiment on delivery `dgSKmQ4DAAIBAaCNESMVaO-...`
+    settled this without any seeding:
+
+    | | 2026-09-10 read | 2026-09-14 read |
+    |---|---|---|
+    | `created` | 1789073105 | 1789073105 (unchanged) |
+    | `metrics.sent` | 1789073107 | 1789073107 |
+    | `metrics.delivered` | 1789073113 | 1789073113 |
+    | `metrics.clicked` | *absent* | **1789073290** |
+    | `deduplicate_id` suffix | 1789073113 | **1789073290** |
+
+    A click landed at 1789073290 between the two reads; the suffix tracked it.
+    The suffix equals `max(metrics.values())` in every sample, and is never
+    `created` and never `sent`. So `deduplicate_id` is a genuine de-facto
+    `updated_at` for deliveries.
+
+    **It is still not usable as an incremental cursor** — no query parameter
+    filters on it, and `start_ts`/`end_ts` see creation time only. Its value is
+    that downstream consumers can detect change cheaply. The connector captures
+    it and does **not** branch on it; see `plan.md` §4.
+
+    **DOCUMENTED (2026-09-10):** The OpenAPI spec describes `deduplicate_id` as
+    "An identifier in the format `id:timestamp` [...] the timestamp is the last
+    time the object was updated." It is therefore a documented change marker, not
+    an undocumented coincidence — but the rendered docs never surface it.
+
+examples:
+  - name: 200 - full shape, next terminal on a single page
+    request:
+      url: "https://api.customer.io/v1/messages?limit=5"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "messages": [
+              {
+                "id": "dgSKmQ4DAAIBAaCNESMVaO-6zjnpCeH1pQ==",
+                "deduplicate_id": "dgSKmQ4DAAIBAaCNESMVaO-6zjnpCeH1pQ==:1789073290",
+                "msg_template_id": 2,
+                "action_id": null,
+                "parent_action_id": null,
+                "transactional_message_id": null,
+                "customer_id": "example_person_1",
+                "customer_identifiers": {
+                  "cio_id": "a1b2c3000001",
+                  "email": "REDACTED",
+                  "id": "example_person_1"
+                },
+                "trigger_event_id": null,
+                "recipient": "REDACTED",
+                "subject": "Testing Customer.io",
+                "metrics": {
+                  "clicked": 1789073290,
+                  "delivered": 1789073113,
+                  "human_clicked": 1789073290,
+                  "human_link:2": 1789073290,
+                  "human_opened": 1789073290,
+                  "link:2": 1789073290,
+                  "opened": 1789073113,
+                  "prefetch_opened": 1789073113,
+                  "sent": 1789073107
+                },
+                "created": 1789073105,
+                "failure_message": null,
+                "newsletter_id": 1,
+                "content_id": 2,
+                "campaign_id": null,
+                "broadcast_id": null,
+                "type": "email",
+                "forgotten": false
+              },
+              {
+                "id": "dgSKmQ4DAAEAAaCNESMPgKzJ2JjWbxaoqw==",
+                "deduplicate_id": "dgSKmQ4DAAEAAaCNESMPgKzJ2JjWbxaoqw==:1789073112",
+                "msg_template_id": 2,
+                "action_id": null,
+                "parent_action_id": null,
+                "transactional_message_id": null,
+                "customer_id": "example_person_2",
+                "customer_identifiers": {
+                  "cio_id": "a1b2c3000002",
+                  "email": "REDACTED",
+                  "id": "example_person_2"
+                },
+                "trigger_event_id": null,
+                "recipient": "REDACTED",
+                "subject": "Testing Customer.io",
+                "metrics": {
+                  "delivered": 1789073112,
+                  "opened": 1789073112,
+                  "prefetch_opened": 1789073112,
+                  "sent": 1789073106
+                },
+                "created": 1789073105,
+                "failure_message": null,
+                "newsletter_id": 1,
+                "content_id": 2,
+                "campaign_id": null,
+                "broadcast_id": null,
+                "type": "email",
+                "forgotten": false
+              }
+            ],
+            "next": ""
+          }

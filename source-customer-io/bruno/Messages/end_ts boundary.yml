@@ -1,0 +1,105 @@
+info:
+  name: end_ts boundary
+  type: http
+  seq: 4
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/messages?limit=100&start_ts=1&end_ts={{message_created}}"
+  params:
+    - name: limit
+      value: "100"
+      type: query
+    - name: start_ts
+      value: "1"
+      type: query
+    - name: end_ts
+      value: "{{message_created}}"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Messages/operation/listMessages
+
+    **WHY:** The `end_ts` half of the same boundary question as
+    `Messages / start_ts boundary`. Queries `end_ts` at a known delivery's
+    exact `created` second: if the delivery is returned, `end_ts` is inclusive
+    (`<=`). The connector caps each incremental window at the last fully-elapsed
+    second (`FETCH-COMPLETE-TICKS`), so this decides whether that cap is sent as
+    `end_ts = horizon` or `end_ts = horizon + 1`.
+
+    `start_ts=1` (not 0) is a deliberate lower bound — it keeps the request a
+    two-sided window so the 6-month clamp behavior is the same one
+    `Messages / six month clamp` measures, rather than the different
+    "`end_ts` only" default path.
+
+    **VERIFIED (2026-09-14):** `end_ts` is **inclusive** — the filter selects
+    `created <= end_ts`.
+
+    | Query | Result |
+    |---|---|
+    | `end_ts = 1789073105` (exact `created`) | 2 deliveries returned |
+    | `end_ts = 1789073104` (`created - 1s`) | **0 deliveries** |
+
+    As with `start_ts`, the negative control rules out "the parameter was
+    ignored".
+
+    Connector consequence: the incremental window's cap is sent as
+    `end_ts = horizon` with no adjustment, and the backfill's window end is
+    `min(window_start + W, cutoff) - 1s`. Both bounds inclusive means the
+    backfill to incremental seam is exactly gapless with no double-counted
+    second. See `plan.md` §5d.
+
+examples:
+  - name: 200 - end_ts at exact created (projection)
+    request:
+      url: "https://api.customer.io/v1/messages?limit=100&start_ts=1&end_ts=1789073105"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "messages": [
+              {
+                "id": "dgSKmQ4DAAIBAaCNESMVaO-6zjnpCeH1pQ==",
+                "created": 1789073105,
+                "deduplicate_id": "dgSKmQ4DAAIBAaCNESMVaO-6zjnpCeH1pQ==:1789073290"
+              },
+              {
+                "id": "dgSKmQ4DAAEAAaCNESMPgKzJ2JjWbxaoqw==",
+                "created": 1789073105,
+                "deduplicate_id": "dgSKmQ4DAAEAAaCNESMPgKzJ2JjWbxaoqw==:1789073112"
+              }
+            ],
+            "next": ""
+          }
+  - name: 200 - negative control, end_ts = created - 1s (projection)
+    request:
+      url: "https://api.customer.io/v1/messages?limit=100&start_ts=1&end_ts=1789073104"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "messages": [],
+            "next": ""
+          }

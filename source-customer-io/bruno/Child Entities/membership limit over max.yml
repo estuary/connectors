@@ -1,0 +1,81 @@
+info:
+  name: membership limit over max
+  type: http
+  seq: 11
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/segments/{{segment_id}}/membership?limit=30001"
+  params:
+    - name: limit
+      value: "30001"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/segments/operation/listSegmentCustomers
+
+    **WHY:** `FETCH-PAGE-SIZE-RESEARCH` requires the maximum page size and its
+    **enforcement mode** per endpoint. This API has both modes already:
+    `/v1/messages` accepts `limit=1001` with a 200 and clamps silently
+    (`Messages / limit over max`), while Design Studio rejects `limit=10001`
+    with a 400 (`Design Studio / page past end`). The connector's ceiling
+    constant is only safe once the mode here is known.
+
+    **DOCUMENTED (2026-09-22):** the spec gives `limit` a `default: 1000` and a
+    `maximum: 30000` — thirty times `api.py:MAX_PAGE_SIZE` and a third distinct
+    ceiling in this connector.
+
+    **VERIFIED (2026-09-22):** `limit=30001` is **accepted with a 200**, not
+    rejected. The `/v1/messages` mode, not the Design Studio mode. Whether the
+    provider clamps to 30000 or truncates without a pagination signal is
+    **UNOBSERVABLE** with 2 members in the workspace, and reaching 30,001 profiles
+    would need a bulk seeder, which `bruno-probe-endpoint` rules out. Proceeding
+    on: the connector enforces its own ceiling and never sends a `limit` above
+    it, which makes the distinction unreachable in practice.
+
+    **Connector consequence:** `api.py:MAX_PAGE_SIZE` (1000) must **not** be
+    reused as the ceiling here, and neither may Design Studio's 10000. If this
+    resource ships, it needs its own constant.
+
+examples:
+  - name: 200 - limit one past the documented 30000 maximum is accepted
+    request:
+      url: "https://api.customer.io/v1/segments/1/membership?limit=30001"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "segment_id": 1,
+            "ids": [
+              "example_person_1",
+              "example_person_2"
+            ],
+            "identifiers": [
+              {
+                "cio_id": "aa0000000001",
+                "email": "REDACTED",
+                "id": "example_person_1"
+              },
+              {
+                "cio_id": "aa0000000002",
+                "email": "REDACTED",
+                "id": "example_person_2"
+              }
+            ],
+            "next": ""
+          }

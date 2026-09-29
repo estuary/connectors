@@ -1,0 +1,55 @@
+info:
+  name: domain scoped variant
+  type: http
+  seq: 4
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/esp/domains/mail.example.com/suppression/bounces"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **WHY:** The by-domain route returns the same suppression documents as the
+    flat one but is declared with **cursor** pagination — `start`/`limit` and a
+    `next` — where the flat route uses `offset` and no marker. Two pagination
+    mechanisms over one resource is unusual enough to be worth pinning down,
+    because if the by-domain route were the better-behaved one it would be the
+    right endpoint to build on.
+
+    The domain is the spec's own placeholder, `mail.example.com`, not a sandbox
+    value.
+
+    **VERIFIED (2026-09-21):** 404 with a **structured Customer.io error body**,
+    `{"errors":[{"detail":"not found (reference ...)","status":"404"}]}`.
+
+    That body is the finding. A path this API does not route at all returns the
+    bare Go router string `404 page not found` with no JSON — confirmed against
+    `/v1/esp`, `/v1/esp/suppression`, `/v1/esp/domains` and
+    `/v1/sending_domains`, all of which return the bare form. The structured
+    body therefore means **the route exists and was matched; the domain did
+    not**. The sandbox has no verified sending domain.
+
+    **UNOBSERVABLE (2026-09-21):** everything about this route's behaviour —
+    response shape, whether `next` is really returned, token format. It cannot
+    be probed without a verified sending domain, which requires DNS records the
+    sandbox has none of.
+
+    **Conclusion — do not build on this route.** Three reasons, in order:
+
+    1. It is **redundant**. The flat endpoint takes a `domain` query parameter
+       (spec, `offset pagination`), so every result set reachable here is
+       reachable there without a path fan-out.
+    2. It requires **enumerating sending domains first**, making it a
+       child-entity pattern — and there is no working list route for the parent
+       (`/v1/esp/domains` and `/v1/sending_domains` both 404).
+    3. Building it would mean maintaining **two pagination mechanisms** for one
+       document type.
+
+    Recorded so the next reader does not re-derive it.

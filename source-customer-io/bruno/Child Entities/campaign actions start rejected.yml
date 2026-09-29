@@ -1,0 +1,89 @@
+info:
+  name: campaign actions start rejected
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/campaigns/{{campaign_id}}/actions?start=MDox"
+  params:
+    - name: start
+      value: MDox
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/automations/operation/listCampaignActions
+
+    **WHY:** The spec declares `start` as this route's continuation parameter
+    and declares no `limit`. Before designing a page walk, establish which
+    parameters are honoured, which are ignored and which are rejected — this API
+    has burned three clusters by accepting a parameter with a 200 and dropping
+    it (`Snapshots / segments limit ignored`), so a 200 is never evidence a
+    parameter applied.
+
+    **LIMITATION (VERIFIED 2026-09-22):** `start` is **rejected with a 400** for
+    every token value tried — `MDox` (a real token minted by
+    `/v1/segments/1/membership`, base64 `0:1`) and a freshly-built base64 `0:0`
+    both return `{"errors":[{"detail":"bad request (reference ...)","status":
+    "400"}]}`. Consistent with the account-wide rule that continuation tokens
+    are **per-endpoint** and never interchangeable; whether this route would
+    accept a token it minted itself is UNOBSERVABLE, because with zero actions
+    it never mints one.
+
+    **VERIFIED (2026-09-22):** `limit=1` is accepted with a 200 and ignored — it
+    is not in the spec for this route and the endpoint does not reject it. An
+    unknown parameter (`bogus_param=1`) is likewise accepted and ignored. So
+    parameter validation here is **selective**: `start` is parsed and validated,
+    everything else falls through. Contrast Design Studio, which rejects every
+    malformed parameter, and Cluster B, which validates nothing.
+
+    **Connector consequence:** send **no query parameters at all** on this
+    route. Sending a `limit` is a no-op, and sending any `start` the connector
+    did not receive from this same endpoint is a hard 400.
+
+examples:
+  - name: 400 - start token rejected
+    request:
+      url: "https://api.customer.io/v1/campaigns/1/actions?start=MDox"
+      method: GET
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "errors": [
+              {
+                "detail": "bad request (reference REDACTED)",
+                "status": "400"
+              }
+            ]
+          }
+  - name: 200 - limit accepted and ignored
+    request:
+      url: "https://api.customer.io/v1/campaigns/1/actions?limit=1"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "actions": []
+          }

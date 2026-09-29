@@ -1,0 +1,77 @@
+info:
+  name: drafts partition
+  type: http
+  seq: 7
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/messages?limit=5&drafts=true"
+  params:
+    - name: limit
+      value: "5"
+      type: query
+    - name: drafts
+      value: "true"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Messages/operation/listMessages
+
+    **WHY:** Silent-data-loss audit of `/v1/messages`'s defaulted parameters.
+    `drafts` is the one parameter on this endpoint that partitions the
+    population by state, and the docs' phrasing makes it a **switch, not an
+    include flag**: "If true, your request returns drafts **rather than**
+    active/sent messages." That means the connector's default sweep silently omits
+    an entire partition, the same way Stripe's `/v1/prices` defaults to
+    `active=true`. Running the excluded partition proves the filter is honored
+    and records the request shape for production accounts that do have drafts.
+
+    **LIMITATION (DOCUMENTED 2026-09-10):** `drafts` partitions rather than
+    includes. Covering the full population therefore needs two sweeps, not one —
+    there is no `drafts=all` sentinel. The connector's v1 scope is sent
+    deliveries only; if drafted deliveries are ever wanted they need their own
+    subtask with an independent cursor, because the two partitions are disjoint
+    and a single `created` watermark cannot serve both.
+
+    **VERIFIED (2026-09-14):** The filter is honored and the partitions are
+    **disjoint**. `drafts=true` returns `{"messages": [], "next": ""}` — zero
+    items — while the identical request without the flag returns both sent
+    deliveries. A draft-inclusive sweep is therefore impossible in one request.
+
+    **VERIFIED (2026-09-14):** An empty result still carries `next: ""`, the same
+    terminal signal as a populated final page. The falsy-check pagination loop in
+    `Messages / bare` handles the empty case with no special branch.
+
+    **UNOBSERVABLE:** The drafted-delivery document shape. The workspace has one
+    completed one-time send and no drafted deliveries, and creating one requires
+    the UI's draft flow rather than an API call, so it is outside the
+    ~10-manual-request seeding budget. v1 does not capture drafts (see
+    `plan.md` §10), so nothing in the connector depends on this shape; if drafts
+    are scoped in later, this probe is the place to start.
+
+examples:
+  - name: 200 - drafts partition is empty, next still terminal
+    request:
+      url: "https://api.customer.io/v1/messages?limit=5&drafts=true"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "messages": [],
+            "next": ""
+          }

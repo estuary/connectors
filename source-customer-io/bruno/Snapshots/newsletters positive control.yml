@@ -1,0 +1,88 @@
+info:
+  name: newsletters positive control
+  type: http
+  seq: 14
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/newsletters?limit=1"
+  params:
+    - name: limit
+      value: "1"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Newsletters/operation/listNewsletters
+
+    **WHY:** Positive control for `segments limit ignored`. Without it, "the
+    parameters were ignored" is indistinguishable from "the parameters were
+    malformed" or "this sandbox ignores parameters". `/v1/newsletters` is a
+    Customer.io list endpoint that *does* declare `limit`/`start`/`sort` and
+    *does* return `next`, so the same `limit=1` run against it isolates the
+    behaviour to the endpoint.
+
+    `newsletters` is **not** a Cluster B stream. It is the API name for the
+    UI's "One-time sends" (renamed from "Newsletters" on 2026-07-15), and its
+    shape places it in the paginated family with `/v1/messages`.
+
+    **VERIFIED (2026-09-14):** `limit=1` **is** honoured — 1 of 1 newsletter
+    returned — and the response carries `next: "MQ=="`. So the ignore observed
+    on `/v1/segments` is a property of that endpoint, not of the request.
+
+    **VERIFIED (2026-09-14):** `next` is returned **non-empty even though the
+    walk is exhausted**: the sandbox holds exactly one newsletter and one was
+    returned, yet `next` points past the end. A pagination loop must therefore
+    follow it and terminate on the *following* page — see
+    `newsletters next loops`.
+
+    **VERIFIED (2026-09-14):** The token base64-decodes to `1` — a bare
+    positional offset. This is **not** the `v20:<n>` form `/v1/messages` uses
+    (Cluster A, `Messages / page walk continued`). Continuation tokens are
+    per-endpoint and are not interchangeable across this API.
+
+    **Cross-cluster note:** whoever implements `newsletters` inherits Cluster
+    A's rules — falsiness test for termination, and never checkpoint the
+    offset token.
+
+examples:
+  - name: 200 - limit honoured, next returned past the end
+    request:
+      url: "https://api.customer.io/v1/newsletters?limit=1"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "newsletters": [
+              {
+                "id": 1,
+                "deduplicate_id": "1:1789073099",
+                "content_ids": [
+                  2
+                ],
+                "name": "Test Message",
+                "sent_at": 1789073105,
+                "created": 1789072954,
+                "updated": 1789073099,
+                "type": "email",
+                "tags": [
+                  "Sample"
+                ]
+              }
+            ],
+            "next": "MQ=="
+          }

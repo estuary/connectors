@@ -1,0 +1,75 @@
+info:
+  name: customer
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/customers/{{customer_id}}/messages?limit=5"
+  params:
+    - name: limit
+      value: "5"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Customers/operation/listCustomerMessages
+
+    **WHY:** The per-parent variant with the most different parameter set — it
+    drops `type`, `metric`, `drafts` and `get_tracked_responses` and adds
+    `id_type`. If even this one returns the same documents as `/v1/messages`,
+    the "no new rows" conclusion on `Messages Per Parent / newsletter` holds
+    across the whole family. Also the natural child-of-`customers` candidate, so
+    it is worth pricing: a per-customer sweep costs one request per profile per
+    poll, which at 10 req/s is unusable on any account with a real audience.
+
+    **DOCUMENTED (2026-09-10):** Clamps to 6 months, like `/v1/messages` and
+    unlike the other four per-parent variants: "If your `start_ts` and
+    `end_ts` range is more than 6 months, we'll return 6 months of data from the
+    most recent timestamp in your request." So it does not even buy the extended
+    history the campaign/newsletter/broadcast/transactional variants do.
+
+    **VERIFIED (2026-09-14):** Returns the one delivery belonging to profile
+    `example_person_1`, identical to that delivery as returned by `Messages / bare`.
+    Again a filtered view over the same corpus.
+
+    **LIMITATION (VERIFIED 2026-09-14):** This endpoint's envelope **omits `next`
+    entirely** — the response body is `{"messages": [...]}` with no `next` key at
+    all, where `/v1/messages` returns `next: ""`. Three different terminal
+    conventions now exist across the family (`""`, absent, and a populated
+    token), which is a concrete argument against treating these endpoints as one
+    parametrized fetch: a shared implementation would have to normalise the
+    envelope per variant. It is also a second reason the connector's termination
+    test must be falsiness rather than `is not None` or `"next" in body`.
+
+examples:
+  - name: 200 - next key absent entirely (projection)
+    request:
+      url: "https://api.customer.io/v1/customers/example_person_1/messages?limit=5"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "messages": [
+              {
+                "id": "dgSKmQ4DAAIBAaCNESMVaO-6zjnpCeH1pQ==",
+                "created": 1789073105,
+                "deduplicate_id": "dgSKmQ4DAAIBAaCNESMVaO-6zjnpCeH1pQ==:1789073290"
+              }
+            ],
+            "next": null
+          }

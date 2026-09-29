@@ -1,0 +1,59 @@
+info:
+  name: reporting_webhooks
+  type: http
+  seq: 11
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/reporting_webhooks"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Reporting-Webhooks/operation/listWebhooks
+
+    **WHY:** Establishes envelope key and empty-state representation.
+
+    **VERIFIED (2026-09-14):** 200 with body `{"reporting_webhooks": null}` —
+    **`null`, not `[]`**. Third of the three null-returning endpoints; see
+    `collections` for the consequence and required model shape.
+
+        **VERIFIED (2026-09-14):** No pagination field of any kind in the response —
+        no `next`, no `total`, no `has_more`. The array is the whole result set.
+        See `segments limit ignored` for the negative control and
+        `newsletters positive control` for the contrast.
+
+    **UNOBSERVABLE (2026-09-14):** No reporting webhooks configured. Shape below is
+    DOCUMENTED. `Seeding/B8` is an authored (unrun) `POST /v1/reporting_webhooks`.
+
+    **DOCUMENTED (2026-09-14):** A reporting webhook carries `id` (int), `name`,
+    `endpoint` (the destination URL), `events` (array of string), `type`,
+    `disabled` (bool), `full_resolution` (bool), `with_content` (bool). No
+    timestamps, no `deduplicate_id`.
+
+    **LIMITATION:** This is the customer's own outbound integration plumbing —
+    destination URLs and event subscriptions. It describes the Customer.io
+    account's configuration, not its marketing data.
+examples:
+  - name: 200 - null item array (no reporting webhooks configured)
+    request:
+      url: "https://api.customer.io/v1/reporting_webhooks"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "reporting_webhooks": null
+          }

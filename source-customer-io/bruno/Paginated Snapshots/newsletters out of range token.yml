@@ -1,0 +1,74 @@
+info:
+  name: newsletters out of range token
+  type: http
+  seq: 8
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/newsletters?limit=1&start=OTk5"
+  params:
+    - name: limit
+      value: "1"
+      type: query
+    - name: start
+      value: "OTk5"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Newsletters/operation/listNewsletters
+
+    **WHY:** `Snapshots / newsletters next loops` established that the
+    *exactly* past-the-end offset (`MQ==` = 1, against 1 row) terminates
+    cleanly. It did not establish what a **far** out-of-range offset does, and
+    that is the case that actually matters: on `/v1/messages` a far
+    out-of-range `v20:<n>` offset is silently ignored and the walk **restarts
+    at page 1**, handing back page 1's `next` — a live cycle
+    (`Messages / page walk continued`). An off-by-one and a wild offset are not
+    the same test, and `newsletters` is the one Cluster C endpoint with enough
+    rows to tell the two apart.
+
+    `OTk5` is base64 for `999`; the workspace holds one newsletter.
+
+    **VERIFIED (2026-09-21):** 200 with `{"newsletters": [], "next": ""}`. An
+    out-of-range offset returns the terminal marker and an empty page — it does
+    **not** restart the walk. `/v1/newsletters` does not share `/v1/messages`'s
+    cycle hazard, and this is a positive result rather than an empty-workspace
+    artifact, because page 1 here is demonstrably non-empty
+    (`Snapshots / newsletters positive control` returns the row).
+
+    This is the strongest pagination-safety evidence in Cluster C, and it is
+    the reason the same drain loop can be trusted on the sibling endpoints whose
+    workspaces are empty. It does not license dropping the loop's page cap: the
+    cap bounds a provider-side bug, and `/v1/messages` proves that bug exists
+    somewhere in this API.
+
+    **VERIFIED (2026-09-21):** `start=notbase64!!` returns 400 on this endpoint
+    too — malformed tokens fail loudly, out-of-range ones do not. Same split as
+    `sender_identities bad token` and `optouts bad token`.
+
+examples:
+  - name: 200 - out-of-range offset terminates, does not restart
+    request:
+      url: "https://api.customer.io/v1/newsletters?limit=1&start=OTk5"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "newsletters": [],
+            "next": ""
+          }

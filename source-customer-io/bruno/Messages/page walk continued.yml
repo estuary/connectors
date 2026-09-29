@@ -1,0 +1,115 @@
+info:
+  name: page walk continued
+  type: http
+  seq: 3
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/messages?limit=1&start={{start_token}}"
+  params:
+    - name: limit
+      value: "1"
+      type: query
+    - name: start
+      value: "{{start_token}}"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Messages/operation/listMessages
+
+    **WHY:** Page 2+ of the walk started by `Messages / page walk`. Split into its
+    own request because page 1 must be issued *without* a `start` param, so one
+    request cannot serve both. Set `start_token` (env var, or `--env-var
+    start_token=…`) to the `next` value from the previous page and re-run until
+    `next` comes back `""`.
+
+    **VERIFIED (2026-09-14):** **LIMITATION** — the `start` token is **not
+    genuinely opaque: it is a base64-encoded positional offset.** The token
+    returned after a `limit=1` first page is `djIwOjE=`, which base64-decodes to
+    the ASCII string `v20:1` — a version tag plus the row offset. This is
+    decisive for checkpointing: `FETCH-CHECKPOINT-STABLE-STATE` permits a
+    positional offset to cross a checkpoint **only** when membership and order
+    under it are provably stable across the resume gap. Deliveries are created
+    continuously and the list is not ordered by an immutable key the connector
+    controls, so a persisted offset resumed minutes later points at a different
+    row than it did when it was issued — rows shift underneath it and the skipped
+    ones are lost silently. The connector therefore keeps `start` **local to a
+    single generator invocation** and checkpoints only `created` timestamps. See
+    `plan.md` §3.
+
+examples:
+  - name: 200 - page 2, terminal (projection)
+    request:
+      url: "https://api.customer.io/v1/messages?limit=1&start=djIwOjE%3D"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "messages": [
+              {
+                "id": "dgSKmQ4DAAEAAaCNESMPgKzJ2JjWbxaoqw==",
+                "created": 1789073105,
+                "deduplicate_id": "dgSKmQ4DAAEAAaCNESMPgKzJ2JjWbxaoqw==:1789073112"
+              }
+            ],
+            "next": ""
+          }
+  - name: 200 - out-of-range offset silently restarts at page 1 (projection)
+    request:
+      url: "https://api.customer.io/v1/messages?limit=1&start=djIwOjI%3D"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "messages": [
+              {
+                "id": "dgSKmQ4DAAIBAaCNESMVaO-6zjnpCeH1pQ==",
+                "created": 1789073105,
+                "deduplicate_id": "dgSKmQ4DAAIBAaCNESMVaO-6zjnpCeH1pQ==:1789073290"
+              }
+            ],
+            "next": "djIwOjE="
+          }
+  - name: 400 - malformed start token
+    request:
+      url: "https://api.customer.io/v1/messages?limit=1&start=not-a-real-token"
+      method: GET
+    response:
+      status: 400
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "errors": [
+              {
+                "detail": "bad request (reference 01M2G7M0GEM2WFX4JTA8ZF03NW)",
+                "status": "400"
+              }
+            ]
+          }

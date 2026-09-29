@@ -1,0 +1,77 @@
+info:
+  name: folders bare
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/design_studio/folders"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Design-Studio/operation/listFolders
+
+    **WHY:** Confirms the path, the envelope key and the empty-array convention
+    for the flat folder listing, and measures how much of Cluster D's design can
+    be settled without seeding a folder.
+
+    **VERIFIED (2026-09-22):** 200, `{"folders": [], "meta": {...}}`. Two
+    top-level keys — this endpoint has **no sibling item array**, unlike
+    `/emails` and `/components` which both carry `folders` alongside their own
+    collection. Envelope key matches the path segment.
+
+    **VERIFIED (2026-09-22):** The empty array is `[]`, not `null`.
+
+    **VERIFIED (2026-09-22):** `meta.pagination.total` is `0` and the same nine-
+    field `meta.filters` echo appears, so the `meta` block is uniform across the
+    family even where the item array is empty. No `next` key.
+
+    **UNOBSERVABLE (2026-09-22):** The folder **document shape** — the workspace
+    holds zero folders. The OpenAPI spec DOCUMENTS it as `{id, name,
+    parent_folder_id, created, updated}`, identical field-for-field to the
+    `folders[]` entries embedded in the `/emails` and `/components` responses.
+    That identity is the basis of the duplication concern in `folders array
+    overlap`, and it is a spec claim, not an observation. `Seeding / D1` makes
+    it observable.
+
+examples:
+  - name: 200 - no folders in the workspace
+    request:
+      url: "https://api.customer.io/v1/design_studio/folders"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "folders": [],
+            "meta": {
+              "pagination": {
+                "page": 1,
+                "limit": 1000,
+                "total": 0
+              },
+              "filters": {
+                "parent_folder_id": null,
+                "direct_descendants_only": false,
+                "sort_by": "created",
+                "sort_order": "asc",
+                "created_before": null,
+                "created_after": null,
+                "updated_before": null,
+                "updated_after": null
+              }
+            }
+          }

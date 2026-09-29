@@ -1,0 +1,82 @@
+info:
+  name: limit over max
+  type: http
+  seq: 5
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/messages?limit=1001"
+  params:
+    - name: limit
+      value: "1001"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Messages/operation/listMessages
+
+    **WHY:** `FETCH-PAGE-SIZE-RESEARCH` requires the page-size ceiling and its
+    **enforcement mode** be established per endpoint, because the three modes lead
+    to different connector code: a 4xx means the connector must clamp before
+    sending; a silent clamp is benign; a silent truncation without a pagination
+    signal would lose data. Pushes one past the documented maximum.
+
+    **LIMITATION (DOCUMENTED 2026-09-10):** The OpenAPI spec gives `limit` a
+    `default: 50` and `maximum: 1000` on `/v1/messages`. The connector should
+    request 1000 to minimize round trips against the 10 req/s budget.
+
+    **VERIFIED (2026-09-14):** `limit=1001` is **accepted with a 200** — not
+    rejected. The provider does not error on an over-limit page size, so the
+    connector gets no signal that it asked for more than the maximum. It must
+    treat 1000 as its own ceiling rather than relying on a 4xx to catch a
+    mistake.
+
+    **UNOBSERVABLE:** *Clamp vs. silent truncation* still cannot be
+    distinguished (the 200 above only rules out rejection).
+    Telling them apart needs more than 1000 deliveries in the account; the sandbox
+    has 2, and reaching 1000 would require a scripted bulk-seeder, which
+    `bruno-probe-endpoint` Phase 6 rules out ("never loop requests in a script,
+    and cap seeding at ~10 manual requests"). We rely on the documented ceiling
+    plus this argument for why the distinction is not load-bearing here: the
+    connector paginates by following `next` until it is `""`, so it consumes
+    whatever page size the server actually serves and never assumes it received
+    the number it asked for. A clamp and a truncation are indistinguishable *and
+    harmless* under a follow-the-token walk. Fallback if wrong: the connector's
+    page size is a constant in `api.py`, so lowering it is a one-line change.
+
+examples:
+  - name: 200 - limit 1001 accepted, not rejected (projection)
+    request:
+      url: "https://api.customer.io/v1/messages?limit=1001"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "messages": [
+              {
+                "id": "dgSKmQ4DAAIBAaCNESMVaO-6zjnpCeH1pQ==",
+                "created": 1789073105,
+                "deduplicate_id": "dgSKmQ4DAAIBAaCNESMVaO-6zjnpCeH1pQ==:1789073290"
+              },
+              {
+                "id": "dgSKmQ4DAAEAAaCNESMPgKzJ2JjWbxaoqw==",
+                "created": 1789073105,
+                "deduplicate_id": "dgSKmQ4DAAEAAaCNESMPgKzJ2JjWbxaoqw==:1789073112"
+              }
+            ],
+            "next": ""
+          }

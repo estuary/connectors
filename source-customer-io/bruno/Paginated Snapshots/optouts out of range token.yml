@@ -1,0 +1,46 @@
+info:
+  name: optouts out of range token
+  type: http
+  seq: 5
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/optouts?start=OTk5"
+  params:
+    - name: start
+      value: "OTk5"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **WHY:** Tests for the cycle hazard `/v1/messages` carries. There, an
+    out-of-range positional offset is **silently ignored** and the walk
+    restarts at page 1, returning page 1's `next` — a live infinite loop
+    (`Messages / page walk continued`). Because Cluster C's tokens are
+    positional too, the same failure mode has to be ruled out per endpoint
+    rather than assumed absent.
+
+    `OTk5` is base64 for `999`, far past the end of any page of this workspace.
+
+    **VERIFIED (2026-09-21):** 200 with `{"optouts": []}` — an empty result and
+    no `next`. The walk does **not** restart at page 1. No cycle hazard on this
+    endpoint.
+
+    **UNOBSERVABLE (2026-09-21):** the workspace holds zero opt-outs, so this
+    probe cannot distinguish "the out-of-range offset was applied and returned
+    nothing" from "the offset was ignored and the empty full set was returned".
+    The result is reassuring rather than conclusive; the finding that carries
+    weight is the *contrast* with `/v1/messages`, which restarts observably even
+    against a small result set.
+
+    Either way the connector's rule is unchanged and does not depend on this:
+    the continuation token is **never checkpointed**, so a stale offset is never
+    replayed and the cycle is unreachable in normal operation. See
+    `api.py`'s `_drain_window` and `MAX_PAGES_PER_WINDOW`.

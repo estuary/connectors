@@ -1,0 +1,58 @@
+info:
+  name: bounces
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/esp/suppression/bounces"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/ESP-Suppression
+
+    **WHY:** Establishes the envelope, the empty-state representation and the
+    absence of a pagination marker — the three findings that moved this
+    endpoint out of Cluster C.
+
+    **VERIFIED (2026-09-21):** 200 with body `{"suppressions": null}`.
+
+    **LIMITATION (VERIFIED 2026-09-21) — null item array.** The item array is
+    JSON **`null`**, not `[]`. This is the same connector-crashing shape
+    documented at length on `Snapshots / collections`: a pydantic field written
+    `suppressions: list[Suppression] = []` raises `ValidationError` here,
+    because a default applies only to an absent key. `models.py`'s
+    `_null_as_empty` BeforeValidator (`models.py:120`) is the existing remedy
+    and applies unchanged.
+
+    Worth noting for the count: this is now the **fourth** endpoint in this API
+    observed returning `null` for an item array, after `collections`, `exports`
+    and `reporting_webhooks` — and the first outside Cluster B. The OpenAPI spec
+    declares `type: "array"`, not nullable, for all four.
+
+    **LIMITATION (VERIFIED 2026-09-21) — no `next`, and no `category` either.**
+    The response carries exactly one key. The spec declares a `category` field
+    alongside `suppressions` (enum `bounces`/`spam`) and it is **not present**
+    in the actual response. That is the sixth observed inaccuracy in this
+    provider's spec, after `msg_template_id`, `transactional_message_id`,
+    `conditions`, `trigger_name` and the `link:<n>` metrics keys. Do not model
+    `category` as required; prefer schema inference.
+
+    The spec also declares no `next` for this route, and none was returned —
+    for once spec and reality agree. Pagination is by `offset` (below).
+
+    **UNOBSERVABLE (2026-09-21):** No suppressed addresses in the workspace, and
+    none can be created without sending mail that hard-bounces. Document shape,
+    page-size behaviour and — critically — **whether `offset` advances at all**
+    are unestablished. See `offset pagination`.
+
+    **DOCUMENTED (2026-09-21):** Per the spec a suppression is
+    `{email, created (date-time), reason, status}`. `created` is the only
+    timestamp; nothing filters on it.

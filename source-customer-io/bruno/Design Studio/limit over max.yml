@@ -1,0 +1,71 @@
+info:
+  name: limit over max
+  type: http
+  seq: 9
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/design_studio/emails?limit=10001"
+  params:
+    - name: limit
+      value: "10001"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Design-Studio-emails/operation/listEmails
+
+    **WHY:** `FETCH-PAGE-SIZE-RESEARCH` requires the max page size and its
+    **enforcement mode** per endpoint. `/v1/messages` and `/v1/optouts` both
+    accept an over-max `limit` with a 200 and clamp silently, which is why
+    `api.py:39` carries `MAX_PAGE_SIZE = 1000` as a ceiling the *connector*
+    enforces. Whether Cluster D behaves the same changes both the constant and
+    who is responsible for it.
+
+    **VERIFIED (2026-09-22):** Cluster D **rejects** rather than clamping.
+    `limit=10001` returns `400 {"errors":[{"detail":"limit must be an integer
+    between 1 and 10000","status":"400"}]}`. `limit=0` is rejected by the same
+    message. So the documented maximum of **10000** is real and enforced, and
+    the true maximum is ten times Cluster A's and Cluster C's.
+
+    **Consequence:** the connector must **not** reuse `api.py:MAX_PAGE_SIZE`
+    for this cluster — that constant encodes a different endpoint family's
+    ceiling and sending it here would merely cost pages, but the reverse
+    (10000 sent to `/v1/messages`) would be silently clamped and invite the
+    belief that pages of 10000 are being read. `plan.md` adds a separate
+    `DESIGN_STUDIO_MAX_PAGE_SIZE = 10_000`.
+
+    **LIMITATION:** this is the only endpoint family in this connector that
+    validates paging parameters by rejection. A shared helper that assumes
+    silent clamping (the behaviour everywhere else) would turn a
+    previously-inert over-max `limit` into a hard 400 here.
+
+examples:
+  - name: 400 - over-max limit rejected
+    request:
+      url: "https://api.customer.io/v1/design_studio/emails?limit=10001"
+      method: GET
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "errors": [
+              {
+                "detail": "limit must be an integer between 1 and 10000",
+                "status": "400"
+              }
+            ]
+          }

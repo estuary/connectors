@@ -1,0 +1,49 @@
+collections:
+  acmeCo/broadcasts:
+    schema: broadcasts.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/campaigns:
+    schema: campaigns.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/design_studio_emails:
+    schema: design_studio_emails.schema.yaml
+    key:
+    - /id
+  acmeCo/design_studio_folders:
+    schema: design_studio_folders.schema.yaml
+    key:
+    - /id
+  acmeCo/newsletter_contents:
+    schema: newsletter_contents.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/newsletters:
+    schema: newsletters.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/object_types:
+    schema: object_types.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/optouts:
+    schema: optouts.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/segments:
+    schema: segments.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/subscription_topics:
+    schema: subscription_topics.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/transactional_contents:
+    schema: transactional_contents.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/transactional_messages:
+    schema: transactional_messages.schema.yaml
+    key:
+    - /_meta/row_id

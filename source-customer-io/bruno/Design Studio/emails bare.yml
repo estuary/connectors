@@ -1,0 +1,112 @@
+info:
+  name: emails bare
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/design_studio/emails"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Design-Studio-emails/operation/listEmails
+
+    **WHY:** Establishes the default response for the cluster's only populated
+    endpoint: envelope keys, the `meta` block, the document shape, and what the
+    endpoint does when given no parameters at all.
+
+    **VERIFIED (2026-09-22):** 200. Three top-level keys — `emails`, `folders`
+    and `meta`. The envelope key **does** match the path segment here, unlike
+    `/v1/transactional` (`messages`) and `/v1/object_types` (`types`).
+
+    `meta.pagination` is `{page, limit, total}` with the defaults applied
+    (`page: 1`, `limit: 1000`) and `total: 2`. **There is no `next` key** —
+    neither empty-string nor absent-with-a-token, the two conventions the rest
+    of this API uses. Termination is arithmetic here, not a token test.
+
+    `meta.filters` echoes all nine filters this endpoint accepts, unset ones as
+    `null`. The echo is generated from the parsed request, so it proves the
+    parameters were *read*; that they were *applied* is proven separately in
+    `updated_after boundary`.
+
+    **VERIFIED (2026-09-22):** The email document is **metadata only** — `id`,
+    `name`, `is_template`, `is_linked`, `has_translations`, `parent_folder_id`,
+    `created`, `updated`. Eight fields, ~180 bytes per row. No `content`, no
+    `envelope`, no `transformers`. See `email detail content` for where the
+    template body actually lives and why the connector must not go get it.
+
+    **VERIFIED (2026-09-22):** `folders` came back `[]`, not `null`, with zero
+    folders in the workspace. The three Cluster B endpoints that return `null`
+    for an empty array have no counterpart here. The connector still routes this
+    through `_null_as_empty` (`models.py:120`) on the house principle that which
+    handler nulls its array is a provider serializer artifact, not a contract.
+
+    **VERIFIED (2026-09-22):** `created` and `updated` are **bare**, not
+    `created_at`/`updated_at`, and are unix seconds. `id` is a UUID string.
+
+examples:
+  - name: 200 - two root-level emails, no next key
+    request:
+      url: "https://api.customer.io/v1/design_studio/emails"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "emails": [
+              {
+                "id": "11111111-1111-4111-8111-111111111111",
+                "name": "Example Code Editor Email",
+                "is_template": false,
+                "is_linked": false,
+                "has_translations": false,
+                "parent_folder_id": null,
+                "created": 1789071558,
+                "updated": 1789071558
+              },
+              {
+                "id": "22222222-2222-4222-8222-222222222222",
+                "name": "Example Visual Editor Email",
+                "is_template": false,
+                "is_linked": false,
+                "has_translations": false,
+                "parent_folder_id": null,
+                "created": 1789071558,
+                "updated": 1789071558
+              }
+            ],
+            "folders": [],
+            "meta": {
+              "pagination": {
+                "page": 1,
+                "limit": 1000,
+                "total": 2
+              },
+              "filters": {
+                "parent_folder_id": null,
+                "direct_descendants_only": false,
+                "sort_by": "created",
+                "sort_order": "asc",
+                "created_before": null,
+                "created_after": null,
+                "updated_before": null,
+                "updated_after": null,
+                "is_template": null,
+                "has_translations": null,
+                "is_linked": null
+              }
+            }
+          }

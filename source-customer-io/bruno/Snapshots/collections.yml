@@ -1,0 +1,81 @@
+info:
+  name: collections
+  type: http
+  seq: 5
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/collections"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Collections/operation/getCollections
+
+    **WHY:** Establishes the envelope key and — as it turns out — the single most
+    consequential finding in Cluster B: the empty-state representation.
+
+    **VERIFIED (2026-09-14):** 200 with body `{"collections": null}` — the value is
+    **JSON `null`, not `[]`**.
+
+    **LIMITATION (VERIFIED 2026-09-14) — connector-crashing:** Three of the twelve
+    Cluster B endpoints (`collections`, `exports`, `reporting_webhooks`) return
+    `null` for the item array while the other nine return `[]`. The OpenAPI spec
+    declares `type: "array"` — **not** nullable — for all of them, so the spec
+    gives no warning.
+
+    A pydantic field written the obvious way, `collections: list[Collection] = []`,
+    **raises `ValidationError: Input should be a valid array`** on this response:
+    a default only applies when the key is *absent*, never when it is present and
+    `null`. Reproduced against pydantic 2.9. The connector's existing
+    `DeliveriesResponse.messages: list[Delivery] = []` (`models.py:121`) has this
+    exact shape and survives only because `/v1/messages` happens always to return
+    an array.
+
+    Every Cluster B envelope model must therefore declare the item list as
+    `list[T] | None = None` and normalise `None` to `[]` at the single point where
+    it is read. Do not special-case the three endpoints — which handler returns
+    `null` is an artifact of the provider's serializer (a Go `nil` slice marshals
+    to `null`, an allocated empty one to `[]`), not a documented contract, so any
+    of the twelve could flip in either direction without notice.
+
+        **VERIFIED (2026-09-14):** No pagination field of any kind in the response —
+        no `next`, no `total`, no `has_more`. The array is the whole result set.
+        See `segments limit ignored` for the negative control and
+        `newsletters positive control` for the contrast.
+
+    **UNOBSERVABLE (2026-09-14):** No collection documents observable. There is a
+    second, independent reason beyond the empty sandbox: Collections are
+    **limited to premium and enterprise plans**
+    (https://docs.customer.io/messaging/objects-data/collections/), and this is a
+    trial workspace. `Seeding/B3` may therefore 4xx rather than create anything —
+    which would itself be the answer.
+
+    **DOCUMENTED (2026-09-14):** Per the OpenAPI spec a collection object carries
+    `id` (int), `name`, `description`, `schema` (array of string), `rows` (int),
+    `bytes` (int), `created_at` (unix int), `updated_at` (unix int). Metadata
+    only — the collection's *contents* live at
+    `GET /v1/collections/{collection_id}/content` and are out of scope here.
+examples:
+  - name: 200 - null item array, not an empty array
+    request:
+      url: "https://api.customer.io/v1/collections"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "collections": null
+          }

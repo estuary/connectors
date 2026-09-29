@@ -1,0 +1,106 @@
+info:
+  name: folders array overlap
+  type: http
+  seq: 12
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/design_studio/folders?limit=10000"
+  params:
+    - name: limit
+      value: "10000"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Design-Studio/operation/listFolders
+
+    **WHY:** Decides whether `design_studio_folders` should exist as a stream at
+    all. `/v1/design_studio/emails` and `/v1/design_studio/components` each
+    return a `folders[]` array **alongside** their own collection. If those
+    folders are the same objects `/v1/design_studio/folders` returns, then
+    capturing all three streams writes the same folder rows into two
+    collections — the same double-write reasoning that dropped the per-parent
+    `*/messages` variants from Cluster A (`Messages Per Parent / newsletter`).
+
+    **DOCUMENTED (2026-09-22):** The OpenAPI spec gives the `folders[]` items
+    embedded in the `/emails` and `/components` responses a schema that is
+    **identical field-for-field** to the items of `/v1/design_studio/folders`:
+    `{id, name, parent_folder_id, created, updated}`, same types, same
+    descriptions, same example object. There is no marker distinguishing an
+    embedded folder from a listed one, and no field the embedded form lacks.
+    The spec's own wording for `/emails` is *"a paginated list of emails **and a
+    separate array of folders that the emails belong to**"* — i.e. a
+    context/breadcrumb join, a subset of the same corpus, not a distinct entity.
+
+    **UNOBSERVABLE (2026-09-22):** That they are the **same corpus** at runtime.
+    The workspace holds zero folders, so both `/v1/design_studio/folders` and
+    every embedded `folders[]` return `[]`. Two empty arrays are consistent with
+    identity and with anything else.
+
+    Settling it needs at least two folders, one of them containing an email, and
+    then a comparison of the `id` sets. `Seeding / D1` is the click-path. The
+    decisive comparison is:
+
+    - `GET /v1/design_studio/folders` -> set A of folder ids
+    - `GET /v1/design_studio/emails` -> set B of `folders[].id`
+
+    If **B is a subset of A**, the embedded array is a join and
+    `design_studio_folders` is the authoritative stream: keep it, drop the
+    embedded array unread. If **B contains ids absent from A**, the flat
+    endpoint is not a superset and both are needed.
+
+    **VERIFIED (2026-09-22):** `limit=10000` (the documented maximum) is
+    accepted with a 200 on this endpoint, so the enforced ceiling established on
+    `/emails` in `limit over max` holds for `/folders` too.
+
+    **Consequence (pending the comparison):** `plan.md` recommends keeping
+    `design_studio_folders` as its own stream and **ignoring the embedded
+    `folders[]` array entirely** in the emails and components fetch paths. That
+    choice is correct under both outcomes if B is a subset of A, and is the
+    house preference regardless — per `CLAUDE.md`'s GraphQL/related-entity rule,
+    a stream references a related entity by id and lets the entity's own stream
+    be authoritative. `emails[].parent_folder_id` already carries that
+    reference.
+
+examples:
+  - name: 200 - max limit accepted, no folders to compare
+    request:
+      url: "https://api.customer.io/v1/design_studio/folders?limit=10000"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "folders": [],
+            "meta": {
+              "pagination": {
+                "page": 1,
+                "limit": 10000,
+                "total": 0
+              },
+              "filters": {
+                "parent_folder_id": null,
+                "direct_descendants_only": false,
+                "sort_by": "created",
+                "sort_order": "asc",
+                "created_before": null,
+                "created_after": null,
+                "updated_before": null,
+                "updated_after": null
+              }
+            }
+          }

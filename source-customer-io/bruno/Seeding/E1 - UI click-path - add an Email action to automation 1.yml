@@ -1,0 +1,74 @@
+info:
+  name: E1 - UI click-path - add an Email action to automation 1
+  type: http
+  seq: 11
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/campaigns/{{campaign_id}}/actions"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/automations/operation/listCampaignActions
+
+    **This request performs no mutation.** It is the read-back `GET` only. The
+    seeding step it belongs to is a **manual UI click-path** with no API
+    equivalent, written out below. It lives in `Seeding/` because it is the
+    close-out step for a seeding sequence, not because it mutates anything.
+
+    **WHY:** Both `/v1/campaigns/{id}/actions` and `/v1/broadcasts/{id}/actions`
+    are observable only in their empty state in this workspace
+    (`Child Entities / campaign actions bare`,
+    `Child Entities / broadcast actions bare`). Their populated item shape, and
+    whether a `next` key appears once the array is non-empty, are open. Running
+    the click-path below and then this request closes both.
+
+    **Why there is no seeding request for it.** The provider's OpenAPI spec
+    exposes **no `POST`** anywhere under `/v1/campaigns/{campaign_id}/actions`
+    or `/v1/broadcasts/{broadcast_id}/actions` — only `GET`, and `PUT` against
+    an already-existing `{action_id}`. An action cannot be created through this
+    API at any request count, so the `bruno-probe-endpoint` ~10-request seeding
+    cap is not what blocks it. That is why the corresponding claims in
+    `Child Entities / campaign actions bare` and
+    `Child Entities / broadcast actions bare` are marked **UNOBSERVABLE** rather
+    than **PENDING**.
+
+    ## Click-path (the user runs this, in the Customer.io UI)
+
+    1. Go to **Journeys > Automations** and open `estuary_probe_automation`
+       (id 1). It is a draft with a segment trigger on segment 1.
+    2. In the workflow builder, drag an **Email** tile onto the canvas below the
+       trigger.
+    3. Open the tile, pick any layout, and give it a subject — any non-empty
+       value. Content does not matter; the probe reads shape, not text.
+    4. **Save the draft. Do not start the automation** — a running automation
+       against segment 1 would send real mail to the two live profiles in this
+       workspace, and would also perturb the `messages` stream's snapshots.
+    5. Optionally repeat on broadcast 2 (**Journeys > Broadcasts >
+       Estuary-test-email-api**) to close the broadcast route as well.
+
+    Nothing in this path sends a message; a draft action is inert.
+
+    ## After running it
+
+    Run this request and save the response as an example. Then update, in this
+    order:
+
+    - `Child Entities / campaign actions bare` — replace the **UNOBSERVABLE**
+      claim with the observed item shape, and record whether `next` is present,
+      `""`, or a token when the array is non-empty.
+    - `Child Entities / campaign actions start rejected` — retry `start` with a
+      token this endpoint actually minted, which is the one case the 400 finding
+      could not cover.
+    - `Child Entities / broadcast actions bare` — same, if step 5 was run.
+    - The cluster plan's pagination contract for both `actions` resources, which
+      currently rests on the falsiness test alone.
+
+    **Outcome:** not yet run as of 2026-09-22.

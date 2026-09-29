@@ -1,0 +1,47 @@
+info:
+  name: sender_identities hidden
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/sender_identities?hidden=true"
+  params:
+    - name: hidden
+      value: "true"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Sender-Identities/operation/listSenderIdentities
+
+    **WHY:** `hidden` is a **default-on filter that removes rows from the
+    response**, which is the same class of trap as `drafts` on `/v1/messages`
+    (`Messages / drafts partition`): a connector that omits the parameter
+    captures a silently incomplete set and has no way to tell. This endpoint is
+    the only one in Cluster C with such a parameter, so it is the only one where
+    "issue the request bare" is the wrong default.
+
+    **DOCUMENTED (2026-09-21):** the spec's description is "If true, include
+    hidden senders in the results." — an *include* flag, so the default
+    response excludes hidden senders. The connector must send `hidden=true`.
+
+    **VERIFIED (2026-09-21):** the parameter is accepted — 200, not a 400.
+
+    **UNOBSERVABLE (2026-09-21):** the workspace has zero sender identities, so
+    `hidden=true` and the bare request return the identical empty body. Whether
+    the parameter actually widens the result set is **not established**, and
+    cannot be until a hidden sender exists. `Seeding / C2` is the click-path.
+
+    Note the asymmetry that makes sending it the safe default regardless: if
+    `hidden=true` is honoured, sending it is strictly correct; if it is
+    silently ignored (as `limit`/`start`/`sort` are on every Cluster B
+    endpoint), sending it costs nothing. There is no reading under which
+    omitting it is better.

@@ -1,0 +1,91 @@
+info:
+  name: updated_before boundary
+  type: http
+  seq: 5
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/design_studio/emails?updated_before={{design_studio_email_updated}}"
+  params:
+    - name: updated_before
+      value: "{{design_studio_email_updated}}"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Design-Studio-emails/operation/listEmails
+
+    **WHY:** Pins the *upper* bound's inclusivity independently. `updated_after`
+    being exclusive does not imply `updated_before` is — `/v1/messages` makes
+    both of its bounds inclusive, and a mismatched pair would either drop or
+    duplicate a row at every window seam.
+
+    **VERIFIED (2026-09-22):** `updated_before` is **honoured, and is
+    exclusive**.
+
+    | `updated_before` | rows | `meta.pagination.total` |
+    |---|---|---|
+    | `1789071557` (T-1) | 0 | 0 |
+    | `1789071558` (T)   | **0** | **0** |
+    | `1789071559` (T+1) | **2** | **2** |
+
+    The T row is the negative control: a row whose `updated` equals the bound is
+    excluded. So the pair is symmetric and the window is **open at both ends**:
+    `updated_after < updated < updated_before`.
+
+    **Consequence:** an incremental window is queried as
+    `updated_after = cursor`, `updated_before = horizon + 1s`, and the emitted
+    span is the closed interval `[cursor + 1s, horizon]`. The `+ 1s` sits on the
+    *upper* rail here, which is the mirror image of `fetch_deliveries`, where
+    the inclusive bounds put it on the lower rail. Getting this backwards
+    silently drops every row that lands exactly on the horizon second.
+
+    **VERIFIED (2026-09-22):** `created_after=1789071557&created_before=1789071559`
+    returns both rows, so the two bounds compose into a half-open-to-both-sides
+    range rather than one of them being ignored when both are present.
+
+examples:
+  - name: 200 - negative control, bound at the row's own timestamp excludes it
+    request:
+      url: "https://api.customer.io/v1/design_studio/emails?updated_before=1789071558"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "emails": [],
+            "folders": [],
+            "meta": {
+              "pagination": {
+                "page": 1,
+                "limit": 1000,
+                "total": 0
+              },
+              "filters": {
+                "parent_folder_id": null,
+                "direct_descendants_only": false,
+                "sort_by": "created",
+                "sort_order": "asc",
+                "created_before": null,
+                "created_after": null,
+                "updated_before": 1789071558,
+                "updated_after": null,
+                "is_template": null,
+                "has_translations": null,
+                "is_linked": null
+              }
+            }
+          }

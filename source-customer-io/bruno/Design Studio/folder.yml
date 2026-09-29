@@ -1,0 +1,53 @@
+info:
+  name: Design Studio
+  type: folder
+  seq: 5
+
+docs:
+  content: |-
+    Cluster D — `/v1/design_studio/{emails,components,folders}`. The **only
+    family in this API with working server-side time filtering**, and the only
+    one that validates its query parameters by rejection rather than silently
+    ignoring them.
+
+    Every other cluster in this collection had to be built around a provider
+    that accepts parameters and drops them on the floor (`Snapshots / segments
+    limit ignored`). This family is the opposite, and the difference is
+    load-bearing enough that it was established with negative controls before
+    any design was written — see `updated_after boundary`.
+
+    ## What holds across all three endpoints
+
+    - **Pagination is page-number based:** `page` (>= 1, default 1) and `limit`
+      (1..10000, default 1000), with `meta.pagination.{page,limit,total}` echoed
+      back. This is the **third** pagination mechanism in this connector,
+      distinct from `/v1/messages`'s `v20:<n>` continuation token and Cluster
+      C's bare positional `start` offsets. There is **no `next` field** anywhere
+      in this family.
+    - **`meta.filters` echoes every filter the request applied**, including the
+      ones left unset (as `null`). This is a request echo, not proof of
+      application — the filters were proven by negative control separately.
+    - **Timestamps are `created` / `updated`, bare, unix seconds** — the
+      `campaigns`/`broadcasts` convention, not the `created_at`/`updated_at`
+      convention used by `segments`/`transactional`/`collections`.
+    - **`id` is a UUID string**, not the bare int used almost everywhere else in
+      this API and not the quoted int `object_types` uses.
+    - **Item arrays come back `[]`, never `null`**, on all three endpoints in
+      the empty case — unlike `collections`, `exports`, `reporting_webhooks`
+      and the ESP suppression routes.
+    - **Parameter validation is by rejection.** `limit=10001`, `limit=0`,
+      `page=0`, `sort_by=bogus` and a non-numeric timestamp each return a
+      structured `400 {"errors":[{"detail":...,"status":"400"}]}`. Contrast
+      `/v1/messages`, which accepts `limit=1001` with a 200 and clamps silently.
+
+    ## Sandbox contents
+
+    At probe time the workspace held **2 emails**, **0 components** and **0
+    folders**. Both emails sit at the root (`parent_folder_id: null`) and share
+    an identical `created` == `updated` == 1789071558, because they are the
+    sample emails the trial workspace is seeded with.
+
+    That is enough to prove the filters, the paging and the envelope, and it is
+    *not* enough to settle two folder-dependent questions. Those are recorded as
+    **UNOBSERVABLE** on `parent folder scoping` and `folders array overlap`,
+    with the seeding click-path in `Seeding / D1`.

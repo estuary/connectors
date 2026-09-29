@@ -1,0 +1,57 @@
+info:
+  name: subscription_channels
+  type: http
+  seq: 10
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/subscription_channels"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Subscriptions/operation/getChannels
+
+    **WHY:** Establishes envelope key and shape, and informs whether a
+    near-static channel enumeration deserves its own binding.
+
+    **VERIFIED (2026-09-14):** 200, **envelope key is `channels`**, not
+    `subscription_channels`. Value `[]`.
+
+        **VERIFIED (2026-09-14):** No pagination field of any kind in the response —
+        no `next`, no `total`, no `has_more`. The array is the whole result set.
+        See `segments limit ignored` for the negative control and
+        `newsletters positive control` for the contrast.
+
+    **UNOBSERVABLE (2026-09-14):** No channels configured. Shape below is DOCUMENTED.
+    `Seeding/B7` covers this alongside topics — same settings page, no POST route.
+
+    **DOCUMENTED (2026-09-14):** A channel carries `id` (int), `name`, `description`,
+    `type`, `subscribed_by_default` (bool). No timestamps.
+
+    **LIMITATION:** An empty array here means "the subscription center has no
+    *custom* channels", not "this workspace has no delivery channels". The
+    built-in channels are not enumerated by this endpoint until configured.
+examples:
+  - name: 200 - empty array; envelope key is `channels`
+    request:
+      url: "https://api.customer.io/v1/subscription_channels"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "channels": []
+          }

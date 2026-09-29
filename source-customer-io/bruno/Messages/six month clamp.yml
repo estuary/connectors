@@ -1,0 +1,114 @@
+info:
+  name: six month clamp
+  type: http
+  seq: 6
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/messages?limit=5&start_ts=1726326525&end_ts=1789398525"
+  params:
+    - name: limit
+      value: "5"
+      type: query
+    - name: start_ts
+      value: "1726326525"
+      type: query
+    - name: end_ts
+      value: "1789398525"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://docs.customer.io/integrations/api/app/#tag/Messages/operation/listMessages
+
+    **WHY:** Resolves an apparent contradiction across Customer.io's own docs
+    about how far back `*/messages` endpoints will look, and pins the number the
+    connector's backfill floor has to respect. Requests a two-year window
+    (`start_ts` = 2024-09-14, `end_ts` = 2026-09-14) — well past any of the
+    claimed caps — to see whether the API rejects it, silently clamps it, or
+    honors it.
+
+    **LIMITATION (DOCUMENTED 2026-09-10):** The contradiction is **not** a docs
+    error — the clamp genuinely differs per endpoint. Read from the OpenAPI spec's
+    per-operation descriptions on 2026-09-10:
+
+    - `/v1/messages`: "We limit your requests to 6 months. [...] If `start_ts`
+      is greater than 6-months before `end_ts`, we only send back 6 months of
+      data."
+    - `/v1/customers/{id}/messages`: 6 months.
+    - `/v1/campaigns/{id}/messages`, `/v1/newsletters/{id}/messages`,
+      `/v1/broadcasts/{id}/messages`, `/v1/transactional/{id}/messages`:
+      "If your `start_ts` and `end_ts` range is more than 12 months, we'll
+      return 12 months of data from the most recent timestamp in your request."
+
+    So the endpoint this connector reads is the **6-month** one, and the 12-month
+    figure belongs to the per-parent variants only.
+
+    **LIMITATION (DOCUMENTED 2026-09-10):** Omitting both `start_ts` and
+    `end_ts` is **not** "no filter" — it defaults to the most recent 6 months.
+    A connector that omits them silently caps its own history at 6 months without
+    saying so.
+
+    **VERIFIED (2026-09-10, secondary):** Fivetran's Customer.io connector
+    shortened its delivery-history window from 6 months to 3 in June 2026, citing
+    reliability — https://fivetran.com/docs/connectors/applications/customer.io/changelog
+    Independent evidence that this endpoint degrades over long windows at
+    production volume, and a reason for the connector to window its backfill
+    rather than request 6 months in one sweep.
+
+    **VERIFIED (2026-09-14):** A two-year window is **accepted with a 200, not
+    rejected**. The API silently narrows rather than erroring, so a user who
+    configures a `start_date` older than 6 months gets 6 months of history and no
+    indication that the rest was dropped.
+
+    Connector consequence: the backfill floor is clamped to
+    `max(config.start_date, now - 6 months)` in the connector, and it **logs a
+    warning** when `config.start_date` is older than that — the API will not do
+    it for us. See `plan.md` §5a.
+
+    **UNOBSERVABLE:** Where the clamp actually lands, and whether it is anchored
+    to `end_ts` or to `now`. Observing it requires deliveries older than 6
+    months; this workspace's oldest delivery is 4 days old and the trial expires
+    shortly. We proceed on the documented "6 months" figure. Fallback if it is
+    wrong: the clamp constant lives in `api.py`, so correcting it is a one-line
+    change, and because the connector sends both bounds explicitly on every
+    request, an over-wide floor degrades to "the API returns less than we asked
+    for" — visible as a backfill that completes with fewer rows, never as silent
+    mid-range data loss.
+
+examples:
+  - name: 200 - two year window accepted, no error (projection)
+    request:
+      url: "https://api.customer.io/v1/messages?limit=5&start_ts=1726326525&end_ts=1789398525"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "messages": [
+              {
+                "id": "dgSKmQ4DAAIBAaCNESMVaO-6zjnpCeH1pQ==",
+                "created": 1789073105,
+                "deduplicate_id": "dgSKmQ4DAAIBAaCNESMVaO-6zjnpCeH1pQ==:1789073290"
+              },
+              {
+                "id": "dgSKmQ4DAAEAAaCNESMPgKzJ2JjWbxaoqw==",
+                "created": 1789073105,
+                "deduplicate_id": "dgSKmQ4DAAEAAaCNESMPgKzJ2JjWbxaoqw==:1789073112"
+              }
+            ],
+            "next": ""
+          }
