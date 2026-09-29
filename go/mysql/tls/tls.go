@@ -34,12 +34,24 @@ const (
 
 var Modes = []string{ModeDisabled, ModePreferred, ModeRequired, ModeVerifyCA, ModeVerifyIdentity}
 
+// DefaultMode applies when 'sslmode' is unset: the connection must be encrypted,
+// but the server certificate is not verified.
+const DefaultMode = ModeRequired
+
 // Settings holds the user-facing SSL configuration.
 type Settings struct {
-	Mode       string // One of Modes. Must not be empty; callers map an unset mode to their default.
+	Mode       string // One of Modes, or empty for DefaultMode.
 	ServerCA   string // PEM-encoded CA certificate(s) the server certificate must chain to.
 	ClientCert string // Optional PEM-encoded client certificate for mutual TLS.
 	ClientKey  string // PEM-encoded private key for ClientCert.
+}
+
+// EffectiveMode returns Mode, or DefaultMode when Mode is unset.
+func (s Settings) EffectiveMode() string {
+	if s.Mode == "" {
+		return DefaultMode
+	}
+	return s.Mode
 }
 
 // Validate checks that the settings are internally consistent and that any
@@ -53,17 +65,22 @@ func (s Settings) Validate() error {
 // 'ssl_server_ca' configures, or nil when it is unset, and the client
 // certificate to present, if any.
 func (s Settings) parse() (serverCA *x509.CertPool, clientCerts []tls.Certificate, err error) {
-	if !slices.Contains(Modes, s.Mode) {
-		return nil, nil, fmt.Errorf("invalid 'sslmode' configuration: unknown setting %q", s.Mode)
+	var mode = s.EffectiveMode()
+	if !slices.Contains(Modes, mode) {
+		return nil, nil, fmt.Errorf("invalid 'sslmode' configuration: unknown setting %q", mode)
 	}
-	if s.Mode == ModeVerifyCA && s.ServerCA == "" {
+	if mode == ModeVerifyCA && s.ServerCA == "" {
 		return nil, nil, fmt.Errorf("'ssl_server_ca' is required when 'sslmode' is %q", ModeVerifyCA)
 	}
-	if s.ServerCA != "" && s.Mode != ModeVerifyCA && s.Mode != ModeVerifyIdentity {
-		return nil, nil, fmt.Errorf("'ssl_server_ca' is set but 'sslmode' is %q, which does not verify the server certificate: set 'sslmode' to %q or %q, or remove 'ssl_server_ca'", s.Mode, ModeVerifyCA, ModeVerifyIdentity)
+	if s.ServerCA != "" && mode != ModeVerifyCA && mode != ModeVerifyIdentity {
+		return nil, nil, fmt.Errorf("'ssl_server_ca' is set but 'sslmode' is %q, "+
+			"which does not verify the server certificate: "+
+			"set 'sslmode' to %q or %q, or remove 'ssl_server_ca'", mode, ModeVerifyCA, ModeVerifyIdentity)
 	}
-	if s.ClientCert != "" && s.Mode == ModeDisabled {
-		return nil, nil, fmt.Errorf("'ssl_client_cert' is set but 'sslmode' is %q, which never uses TLS: choose another 'sslmode', or remove 'ssl_client_cert' and 'ssl_client_key'", ModeDisabled)
+	if s.ClientCert != "" && mode == ModeDisabled {
+		return nil, nil, fmt.Errorf("'ssl_client_cert' is set but 'sslmode' is %q, "+
+			"which never uses TLS: choose another 'sslmode', "+
+			"or remove 'ssl_client_cert' and 'ssl_client_key'", ModeDisabled)
 	}
 	if s.ServerCA != "" {
 		serverCA = x509.NewCertPool()
@@ -87,13 +104,13 @@ func (s Settings) parse() (serverCA *x509.CertPool, clientCerts []tls.Certificat
 // AllowsPlaintextFallback reports whether a failed TLS connection attempt may
 // be retried without encryption.
 func (s Settings) AllowsPlaintextFallback() bool {
-	return s.Mode == ModePreferred
+	return s.EffectiveMode() == ModePreferred
 }
 
 // GuaranteesEncryption reports whether every connection made with these settings
 // is necessarily encrypted.
 func (s Settings) GuaranteesEncryption() bool {
-	switch s.Mode {
+	switch s.EffectiveMode() {
 	case ModeRequired, ModeVerifyCA, ModeVerifyIdentity:
 		return true
 	case ModeDisabled, ModePreferred:
@@ -112,13 +129,14 @@ func (s Settings) Config(serverHost string) (*tls.Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	if s.Mode == ModeDisabled {
+	var mode = s.EffectiveMode()
+	if mode == ModeDisabled {
 		return nil, nil
 	}
 
 	var cfg = &tls.Config{Certificates: clientCerts}
 
-	switch s.Mode {
+	switch mode {
 	case ModePreferred, ModeRequired:
 		// Encryption only. The server is not authenticated, so an on-path
 		// attacker can impersonate it; this matches MySQL's own PREFERRED and

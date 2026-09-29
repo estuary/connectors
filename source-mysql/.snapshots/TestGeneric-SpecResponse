@@ -284,7 +284,8 @@
               "verify_identity"
             ],
             "title": "SSL Mode",
-            "description": "Whether to use TLS and how strictly to verify the server certificate. Defaults to 'preferred' for password authentication and 'required' for IAM authentication. See the connector documentation for details.",
+            "description": "Whether to use TLS and how strictly to verify the server certificate. Defaults to 'required'. See the connector documentation for details.",
+            "default": "required",
             "nonsensitive": true,
             "order": 10
           },
