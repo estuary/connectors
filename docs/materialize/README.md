@@ -403,9 +403,10 @@ truncates owns three concerns:
   transaction's stores. The connector must still delete after those stores, in
   the same destination transaction. If it deleted first, a store that updates an
   existing row would find the row already gone, and the update would be lost.
-- **Crash safety.** A pending truncation that must survive a restart belongs in
-  the state returned from `StartCommit`, which is durable. State returned from
-  `Acknowledge` is not.
+- **Crash safety.** A pending truncation belongs in the state returned from
+  `StartCommit`, because that state commits atomically with the transaction's
+  checkpoint. State returned from `Acknowledge` commits after the transaction,
+  and a crash before it persists causes `Acknowledge` to run again.
 
 Two rules apply to every truncating connector:
 
