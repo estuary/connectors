@@ -1,0 +1,17 @@
+collections:
+  acmeCo/calendars:
+    schema: calendars.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/events:
+    schema: events.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/guests:
+    schema: guests.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/membership_tiers:
+    schema: membership_tiers.schema.yaml
+    key:
+    - /_meta/row_id

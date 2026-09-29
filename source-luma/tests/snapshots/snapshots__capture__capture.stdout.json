@@ -1,0 +1,109 @@
+[
+  [
+    "acmeCo/calendars",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "avatar_url": "https://images.lumacdn.com/calendars/da/ee5c00ec-6835-40ea-b53b-48cc94981e29.jpg",
+      "coordinate": {
+        "latitude": 40.712775,
+        "longitude": -74.005973
+      },
+      "cover_image_url": "https://images.lumacdn.com/calendar-cover-images/n9/f8644fda-5d80-4478-96b3-f277fd23bab7.png",
+      "description": "Data Movement for The Enterprise.",
+      "id": "cal-Y6eACUKemfTGrkO",
+      "instagram_handle": null,
+      "is_personal": false,
+      "location": {
+        "city": "New York",
+        "country": "United States",
+        "country_code": "US",
+        "region": null,
+        "timezone": "America/New_York"
+      },
+      "name": "Estuary",
+      "slug": "estuary",
+      "social_image_url": "https://images.lumacdn.com/calendar-cover-images/8p/fa49a5f4-4c4b-48da-850f-aacf0b22e030.png",
+      "twitter_handle": "EstuaryDev",
+      "url": "https://luma.com/estuary",
+      "website": "https://estuary.dev/",
+      "youtube_handle": "estuarydev"
+    }
+  ],
+  [
+    "acmeCo/events",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "calendar_id": "cal-Y6eACUKemfTGrkO",
+      "coordinate": null,
+      "created_at": "2025-01-30T20:27:30.140Z",
+      "duration_interval": "P0Y0M0DT1H0M0S",
+      "end_at": "2025-02-11T20:00:00.000+00:00",
+      "geo_address_json": null,
+      "host": "Coalesce, Inc.",
+      "id": "calev-PVOFHwG55CyTWud",
+      "name": "Demos with Doug: Putting Real-Time ELT Data Pipelines to Work",
+      "platform": "external",
+      "start_at": "2025-02-11T19:00:00.000Z",
+      "submitted_by": {
+        "avatar_url": "https://images.lumacdn.com/avatars/po/6bdbfc49-7a3d-47e1-9846-f6da531a7f59.jpg",
+        "email": "REDACTED",
+        "first_name": "Dani",
+        "id": "usr-Uvws7qshGS7cP7B",
+        "last_name": "P\u00e1lma",
+        "name": "Dani P\u00e1lma"
+      },
+      "tags": [],
+      "timezone": "America/New_York",
+      "url": "https://www.linkedin.com/events/demoswithdoug-puttingreal-timee7290473157642133504/"
+    }
+  ],
+  [
+    "acmeCo/guests",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "approval_status": "approved",
+      "attribution_params": null,
+      "check_in_qr_code": "https://luma.com/check-in/evt-k0ZMKv8mVCBHUBP?pk=g-hWhvzuX3DXqZ95X",
+      "eth_address": null,
+      "event_id": "evt-k0ZMKv8mVCBHUBP",
+      "event_tickets": [
+        {
+          "amount": 0,
+          "amount_discount": 0,
+          "amount_tax": 0,
+          "checked_in_at": null,
+          "currency": "usd",
+          "event_ticket_type_id": "evtticktyp-C0ijB5gh6KHeckH",
+          "id": "eventticket-3Iy6fIZJ4PNU2l6",
+          "is_captured": false,
+          "name": "Standard"
+        }
+      ],
+      "id": "gst-GF3W8rywS0aMwpo",
+      "invited_at": null,
+      "joined_at": null,
+      "phone_number": "REDACTED",
+      "registered_at": "2025-01-30T18:41:53.316Z",
+      "registration_answers": [],
+      "solana_address": null,
+      "user_email": "REDACTED",
+      "user_first_name": "Elif",
+      "user_id": "usr-rvBaW1XPsSuofk9",
+      "user_last_name": "Sen",
+      "user_name": "Elif Sen",
+      "utm_source": null
+    }
+  ]
+]

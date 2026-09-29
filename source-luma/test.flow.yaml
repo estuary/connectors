@@ -1,0 +1,28 @@
+import:
+- acmeCo/flow.yaml
+captures:
+  acmeCo/source-luma:
+    endpoint:
+      local:
+        command:
+        - python
+        - -m
+        - source_luma
+        config: config.yaml
+    bindings:
+    - resource:
+        name: calendars
+        interval: PT1H
+      target: acmeCo/calendars
+    - resource:
+        name: membership_tiers
+        interval: PT1H
+      target: acmeCo/membership_tiers
+    - resource:
+        name: events
+        interval: PT5M
+      target: acmeCo/events
+    - resource:
+        name: guests
+        interval: PT15M
+      target: acmeCo/guests

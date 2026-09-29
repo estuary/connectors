@@ -1,0 +1,28 @@
+info:
+  name: get
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/calendars/get"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://docs.luma.com/reference/get_v1-calendars-get
+  
+  **WHY:** backs the `calendars` stream. A calendar API key is scoped to exactly
+  one calendar and this endpoint takes no parameters, so the stream is a
+  one-document snapshot of the calendar the key belongs to. `GET
+  /v1/organizations/calendars/list` would list many, but needs an organization
+  key (see the collection root).
+  
+  **VERIFIED (2026-09-17):** `200` with a single calendar object `{id, name,
+  slug, url, description, location{...}, coordinate{...}, ...}` — no envelope,
+  no `entries`. `id` is prefixed `cal-`.

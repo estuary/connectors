@@ -1,0 +1,25 @@
+info:
+  name: get-self
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/users/get-self"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://docs.luma.com/reference/get_v1-users-get-self
+  
+  **WHY:** the cheapest authenticated call in the API, so it doubles as the auth
+  probe — `validate_credentials` in `source_luma/resources.py` hits this exact
+  path via `fetch_self`.
+  
+  **VERIFIED (2026-09-17):** `200` with `{id, name, avatar_url, email,
+  first_name, last_name}` for the key owner. A wrong key answers `401`.

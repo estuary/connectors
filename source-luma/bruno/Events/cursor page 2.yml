@@ -1,0 +1,25 @@
+info:
+  name: cursor page 2
+  type: http
+  seq: 4
+
+http:
+  method: GET
+  url: "{{base_url}}/v1/calendars/events/list?pagination_limit=1&sort_column=start_at&sort_direction=asc&pagination_cursor={{events_next_cursor}}"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://docs.luma.com/reference/get_v1-calendars-events-list
+  
+  **WHY:** proves `pagination_cursor` resumes the walk — the entry returned here
+  must differ from the one in `Events / cursor page`, which must run first in a
+  fresh session (it sets `events_next_cursor`).
+  
+  **VERIFIED (2026-09-17):** `200`, 1 entry with a later `start_at` than page 1,
+  `has_more: true`.

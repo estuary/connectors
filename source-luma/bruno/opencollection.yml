@@ -1,0 +1,112 @@
+opencollection: 1.0.0
+
+info:
+  name: Luma
+
+request:
+  scripts:
+    - type: before-request
+      code: |-
+        // Luma auth via the connector's sops-encrypted config.yaml. The key is
+        // re-derived from sops on every request and lives only on `req` — it is never
+        // persisted to a var or env file. Requires the developer JS sandbox:
+        //   CLI: `bru run <request>.yml --env Luma --sandbox developer`
+        //   GUI: jsSandboxMode "developer" in ~/.config/bruno/collection-security.json
+        const { execFileSync } = require('child_process');
+        const path = require('path');
+        const configured = bru.getEnvVar('config_path');
+        if (!configured) throw new Error('config_path env var is not set');
+        // Resolve relative to the collection root, not the process cwd — the GUI's
+        // cwd is wherever Bruno was launched from, only the CLI runs from bruno/.
+        const configPath = path.isAbsolute(configured)
+          ? configured
+          : path.resolve(bru.cwd(), configured);
+        const decrypted = execFileSync(
+          'sops', ['-d', '--output-type=json', configPath], { encoding: 'utf8' },
+        );
+        // Raw `sops -d` keeps the `_sops` encrypted-suffix on key names (the platform
+        // strips it at runtime, sops itself does not) — accept both spellings.
+        const creds = JSON.parse(decrypted)?.credentials;
+        const apiKey = creds?.access_token ?? creds?.access_token_sops;
+        if (!apiKey) {
+          throw new Error('credentials.access_token(_sops) missing from decrypted config');
+        }
+        // Bare key in a custom header — no Bearer prefix. Mirrors AUTHORIZATION_HEADER
+        // in source_luma/api.py.
+        req.setHeader('x-luma-api-key', apiKey);
+    - type: after-response
+      code: |-
+        // Redact personal contact details so any Response Example saved from a run is
+        // already clean. This MUST cover REDACTED_FIELDS in tests/test_snapshots.py:
+        // a field redacted in the snapshot tests is redacted here, with the same
+        // marker, so examples reflect what the tests assert.
+        const REDACTED_FIELDS = ['email', 'user_email', 'phone_number'];
+
+        const redact = (node) => {
+          if (Array.isArray(node)) return node.forEach(redact);
+          if (!node || typeof node !== 'object') return;
+          for (const [key, value] of Object.entries(node)) {
+            if (REDACTED_FIELDS.includes(key)) node[key] = 'REDACTED';
+            else redact(value);
+          }
+        };
+
+        const body = res.getBody();
+        if (body && typeof body === 'object') redact(body);
+
+docs:
+  content: |-
+    ## API constraints (account-wide)
+
+    Facts that hold for the whole Luma account, not any single endpoint.
+
+    - **Base URL:** `https://public-api.luma.com`, one host for every account
+      (DOCUMENTED 2026-09-17, https://docs.luma.com/reference/getting-started-with-your-api;
+      the machine-readable spec is `https://public-api.luma.com/openapi.json`).
+    - **Auth:** bare API key in the `x-luma-api-key` request header. Keys are
+      minted per calendar at luma.com/calendar/manage/api-keys and grant access
+      only to that calendar; a Luma Plus subscription is required. Organization
+      API keys also exist and unlock the `/v1/organizations/*` family.
+      **VERIFIED (2026-09-17):** this connector's key is a *calendar* key —
+      `GET /v1/organizations/calendars/list` answers `400 {"message":"This
+      endpoint requires an organization API key."}`. A bad key answers `401`.
+    - **Rate limit (DOCUMENTED 2026-09-17, https://docs.luma.com/reference/rate-limits):**
+      200 requests/minute per calendar for calendar keys, 500/minute per
+      organization for organization keys. Breaching returns `429` and blocks
+      for one minute; `Retry-After` (seconds) is set on the `429`. Every
+      response carries `X-RateLimit-Limit`, `X-RateLimit-Remaining`,
+      `X-RateLimit-Reset` (VERIFIED 2026-09-17: `x-ratelimit-limit: 200` on
+      this key). The connector relies on the CDK's default 429 backoff and
+      keeps its per-poll request count bounded by page size.
+    - **Formats (DOCUMENTED 2026-09-17, https://docs.luma.com/reference/formats):**
+      all timestamps are ISO 8601 in UTC with millisecond precision
+      (`2022-10-04T05:20:00.000Z`); durations are ISO 8601 (`P0Y0M0DT1H0M0S`).
+    - **Pagination:** cursor-based on every list endpoint — `pagination_limit`
+      + `pagination_cursor` request params; `{entries, has_more, next_cursor}`
+      envelope. `next_cursor` is an opaque base64 blob and is only ever used
+      within a single snapshot sweep, never checkpointed.
+    - **No `updated_at` anywhere.** Events, guests, calendars and tiers expose
+      `created_at` / `registered_at` at best and no list endpoint filters on
+      modification time, so every stream in this connector is a snapshot
+      (full re-list per interval, deletions inferred by the CDK).
+    - **Read-only by policy.** This collection contains only GET requests; the
+      connector never writes to Luma. There is no `Seeding/` folder on purpose.
+
+    ## Endpoint LIMITATION index
+
+    `grep -rl LIMITATION bruno/` enumerates them. Currently:
+
+    - `Events / bare` — default filters (`status=approved`, `platforms=luma`,
+      `access=manage`) silently narrow the listing.
+    - `Events / cursor page` — `before`/`after` filter on `start_at`, not on
+      creation or modification time.
+    - `Events / external platform only` — external (`calev-`) events have no
+      guest list; listing their guests answers `403`.
+    - `Guests / bare` — guest documents do not carry their `event_id`; the
+      connector stamps it from the request.
+
+    ## Running
+
+    From `bruno/`: `bru run <Folder> --env Luma --sandbox developer`.
+    Conventions for the VERIFIED / PENDING / UNOBSERVABLE / DOCUMENTED markers
+    live in the `bruno-probe-endpoint` skill.

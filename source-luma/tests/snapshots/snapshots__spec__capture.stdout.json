@@ -1,0 +1,93 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$defs": {
+        "ApiKey": {
+          "description": "A Luma API key, sent on every request in the `x-luma-api-key` header.\n\nKeys are minted per calendar (luma.com/calendar/manage/api-keys) and\ngrant access only to the calendar they were created on.",
+          "properties": {
+            "credentials_title": {
+              "const": "API Key",
+              "default": "API Key",
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "access_token": {
+              "description": "Luma calendar API key. Requires a Luma Plus subscription on the calendar.",
+              "secret": true,
+              "title": "API Key",
+              "type": "string"
+            }
+          },
+          "required": [
+            "access_token"
+          ],
+          "title": "ApiKey",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "credentials": {
+          "discriminator": {
+            "mapping": {
+              "API Key": "#/$defs/ApiKey"
+            },
+            "propertyName": "credentials_title"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ApiKey"
+            }
+          ],
+          "title": "Authentication"
+        }
+      },
+      "required": [
+        "credentials"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "description": "ResourceConfig is a common resource configuration shape.",
+      "properties": {
+        "_meta": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Meta"
+        },
+        "name": {
+          "description": "Name of this resource",
+          "title": "Name",
+          "type": "string"
+        },
+        "interval": {
+          "default": "PT0S",
+          "description": "Interval between updates for this resource",
+          "format": "duration",
+          "nonsensitive": true,
+          "title": "Interval",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ResourceConfig",
+      "type": "object"
+    },
+    "documentationUrl": "https://go.estuary.dev/source-luma",
+    "resourcePathPointers": [
+      "/name"
+    ]
+  }
+]
