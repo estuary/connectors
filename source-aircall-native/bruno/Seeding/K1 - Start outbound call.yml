@@ -1,0 +1,61 @@
+info:
+  name: K1 - Start outbound call
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{base_url}}/users/{{seed_user_id}}/calls"
+  body:
+    type: json
+    data: |-
+      {
+        "number_id": {{seed_number_id}},
+        "to": "{{seed_dial_to}}"
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('seed_user_id')) bru.setVar('seed_user_id', 'PIN_FROM_USERS_BARE');
+        if (!bru.getVar('seed_number_id')) bru.setVar('seed_number_id', 'PIN_FROM_NUMBERS_BARE');
+        if (!bru.getVar('seed_dial_to')) bru.setVar('seed_dial_to', 'PIN_E164_PHONE_YOU_CONTROL');
+        for (const k of ['seed_user_id', 'seed_number_id', 'seed_dial_to']) {
+          if (String(bru.getVar(k)).startsWith('PIN_')) throw new Error(k + ' is unpinned — edit the fallback in this script');
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://developers.aircall.io/api-references#start-an-outbound-call
+
+    **ONLY THE USER RUNS THIS — never the assistant.** It mutates Aircall state.
+
+    **WHY:** `/v1/calls` returned `meta.total: 0` on 2026-09-28 — no calls in
+    retention, so the Call shape, the `from`/`to` field semantics, boundary
+    inclusivity, and sort key are all unobservable. This places a real
+    outbound call from the pinned user's Aircall Workspace (Desktop app must be
+    open, user available, number active) to a phone you control. Feeds
+    `Calls / window asc`, `Calls / from bound probe`, `Calls / to bound probe`.
+
+    **Simpler alternative (no request needed):** place 3–5 calls by hand from
+    Aircall Workspace / to an Aircall number: one answered outbound, one
+    answered inbound, one missed inbound with a voicemail. A mix of
+    answered/missed/voicemail exercises `answered_at: null`,
+    `missed_call_reason`, and `voicemail`. Calls must be at least a few seconds
+    apart so the boundary probes can pin a call with a unique `started_at`.
+
+    Pin `seed_user_id` from `Users / bare`, `seed_number_id` from
+    `Numbers / bare`, and `seed_dial_to` (E.164) by editing the fallbacks in
+    the before-request script. Expected response: 204 No Content.
+
+    **Outcome:** not run — the user placed 3 outbound calls by hand in Aircall
+    Workspace on 2026-09-28 (4186780376, 4186784158, 4186787210) instead.
+  type: text/markdown
