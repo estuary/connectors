@@ -1,0 +1,55 @@
+# Updates every key that public-messages-50gb.yaml created, 50 GB in total:
+# the five original transactions are declared with `emit: false` so their key
+# ranges exist without being re-sent, and each update transaction rewrites
+# one of them in full with different content. Run with the same seed and
+# `--keep` against the table the first scenario left behind.
+collections:
+  - name: bench/public_messages
+    key: [/id]
+    key_type: uuid
+    key_field: id
+    payload_field: content
+    resource: { table: public_messages }
+    schema:
+      type: object
+      if:
+        properties:
+          _meta:
+            properties: { op: { const: d } }
+      then:
+        reduce: { delete: true, strategy: merge }
+      else:
+        reduce: { strategy: merge }
+      required: [id, _meta]
+      properties:
+        id: { type: string, format: uuid, description: "(source type: non-nullable uuid)" }
+        active_workflow_run_id: { type: [string, "null"], description: "(source type: text)" }
+        content: { contentMediaType: application/json, description: "(source type: non-nullable json)" }
+        created_at: { type: string, format: date-time, description: "(source type: non-nullable timestamptz)" }
+        deleted_at: { type: [string, "null"], format: date-time, description: "(source type: timestamptz)" }
+        evaluation_id: { type: string, format: uuid, description: "(source type: non-nullable uuid)" }
+        evaluation_session_id: { type: string, format: uuid, description: "(source type: non-nullable uuid)" }
+        failure_reason: { type: [string, "null"], description: "(source type: text)" }
+        metadata: { contentMediaType: application/vnd.estuary.postgresql.jsonb+json, description: "(source type: jsonb)" }
+        model_id: { type: [string, "null"], format: uuid, description: "(source type: uuid)" }
+        parent_message_ids: { contentMediaType: application/json, description: "(source type: non-nullable json)" }
+        role: { type: string, description: "(source type: non-nullable text)" }
+        status: { type: string, description: "(source type: non-nullable text)" }
+        updated_at: { type: string, format: date-time, description: "(source type: non-nullable timestamptz)" }
+        uuidv7_migrated: { type: [boolean, "null"], description: "(source type: bool)" }
+        _meta:
+          type: object
+          required: [op]
+          properties: { op: { enum: [c, u, d] } }
+
+transactions:
+  - { total_size: 10GB, doc_size: 8KB, op: c, emit: false }
+  - { total_size: 10GB, doc_size: 8KB, op: c, emit: false }
+  - { total_size: 10GB, doc_size: 8KB, op: c, emit: false }
+  - { total_size: 10GB, doc_size: 8KB, op: c, emit: false }
+  - { total_size: 10GB, doc_size: 8KB, op: c, emit: false }
+  - { total_size: 10GB, doc_size: 8KB, overlaps: [{ with: 0, fraction: 1.0, op: u }] }
+  - { total_size: 10GB, doc_size: 8KB, overlaps: [{ with: 1, fraction: 1.0, op: u }] }
+  - { total_size: 10GB, doc_size: 8KB, overlaps: [{ with: 2, fraction: 1.0, op: u }] }
+  - { total_size: 10GB, doc_size: 8KB, overlaps: [{ with: 3, fraction: 1.0, op: u }] }
+  - { total_size: 10GB, doc_size: 8KB, overlaps: [{ with: 4, fraction: 1.0, op: u }] }

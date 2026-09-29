@@ -275,8 +275,12 @@ RESOURCES
 
 # Drop whatever an earlier run left behind, so this run starts against an empty
 # destination however that run ended.
-echo "preparing destination"
-drop_destination "before run"
+if (( KEEP )); then
+  echo "--keep set; not dropping the destination before the run"
+else
+  echo "preparing destination"
+  drop_destination "before run"
+fi
 
 # Set up FIFO + background generator.
 FIFO="$OUT_DIR/fixture.fifo"

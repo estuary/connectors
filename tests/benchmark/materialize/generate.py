@@ -110,6 +110,9 @@ class TxSpec:
     doc_size: int
     overlaps: list[OverlapSpec] = field(default_factory=list)
     op: str = "c"  # op for the "fresh" remainder
+    # False allocates the transaction's key ranges without emitting it, so a
+    # later scenario can update keys a previous run created.
+    emit: bool = True
 
 
 def _resolve_sizing(raw: dict, idx: int) -> tuple[int, int]:
@@ -309,6 +312,7 @@ def load_scenario(path: str) -> tuple[dict[str, CollectionSpec], list[TxSpec]]:
                     doc_size=doc_size,
                     overlaps=overlaps,
                     op=t.get("op", "c"),
+                    emit=bool(t.get("emit", True)),
                 )
             )
 
@@ -721,7 +725,7 @@ def _doc_lines(
                     f"({overhead + len(key_s)}) for key={key} op={op!r}; "
                     f"increase doc_size or shrink schema/key"
                 )
-            off = (key * _POOL_MIX) % (pool_size - pad + 1) if pad > 0 else 0
+            off = ((key + tx.index * 7919) * _POOL_MIX) % (pool_size - pad + 1) if pad > 0 else 0
             payload = pool[off : off + pad] if pad > 0 else ""
             yield prefix + key_s + middle + payload + suffix
 
@@ -774,6 +778,8 @@ def emit(
             col = collections[tx.collection]
             cstate = states[tx.collection]
             plans, fresh_start, fresh_count = _resolve_op_plan(tx, cstate, tx_rng)
+            if not tx.emit:
+                continue
 
             state_log["transactions"].append(
                 {
@@ -808,6 +814,8 @@ def emit(
                         still.append(it)
                 active = still
 
+        if not iterators:
+            continue
         out.write('{"commit":true}\n')
         out.flush()
 
