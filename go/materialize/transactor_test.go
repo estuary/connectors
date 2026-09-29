@@ -80,8 +80,6 @@ func TestSplitStatePatches(t *testing.T) {
 type flushRecorder struct {
 	scriptedTransactor
 	err       error
-	patches   [][]json.RawMessage
-	begins    []map[int]time.Time
 	completes []map[int]time.Time
 }
 
@@ -90,9 +88,7 @@ func (t *flushRecorder) NewTransactor(_ context.Context, _ pm.Request_Open, be *
 	return t, &pm.Response_Opened{}, nil, nil
 }
 
-func (t *flushRecorder) Flush(_ context.Context, statePatches []json.RawMessage, begins, completes map[int]time.Time) error {
-	t.patches = append(t.patches, statePatches)
-	t.begins = append(t.begins, begins)
+func (t *flushRecorder) Flush(_ context.Context, completes map[int]time.Time) error {
 	t.completes = append(t.completes, completes)
 	return t.err
 }
@@ -128,23 +124,18 @@ func TestFlushSignals(t *testing.T) {
 	var beginProto, _ = types.TimestampProto(begin)
 	var completeProto, _ = types.TimestampProto(complete)
 
-	t.Run("signals and patches reach the transactor", func(t *testing.T) {
+	t.Run("completes reach the transactor", func(t *testing.T) {
 		var hook = logtest.NewGlobal()
 		defer hook.Reset()
 
 		var tr = &flushRecorder{scriptedTransactor: scriptedTransactor{bindings: twoBindings}}
 		var stream, err = runFlush(t, tr, &pm.Request_Flush{
-			StatePatchesJson:  json.RawMessage("[{\"a\":1}\t,{\"b\":2}\t]"),
 			BackfillBegins:    []*pm.Request_Flush_BackfillBegin{{Binding: 1, Timestamp: beginProto}},
 			BackfillCompletes: []*pm.Request_Flush_BackfillComplete{{Binding: 0, Timestamp: completeProto}},
 		})
 		require.NoError(t, err)
 
-		require.Len(t, tr.patches, 1)
-		require.Len(t, tr.patches[0], 2)
-		require.JSONEq(t, `{"a":1}`, string(tr.patches[0][0]))
-		require.JSONEq(t, `{"b":2}`, string(tr.patches[0][1]))
-		require.Equal(t, map[int]time.Time{1: begin}, tr.begins[0])
+		require.Len(t, tr.completes, 1)
 		require.Equal(t, map[int]time.Time{0: complete}, tr.completes[0])
 
 		var flushed int
@@ -170,9 +161,7 @@ func TestFlushSignals(t *testing.T) {
 		var tr = &flushRecorder{scriptedTransactor: scriptedTransactor{bindings: twoBindings}}
 		var _, err = runFlush(t, tr, &pm.Request_Flush{})
 		require.NoError(t, err)
-		require.Len(t, tr.patches, 1)
-		require.Empty(t, tr.patches[0])
-		require.Empty(t, tr.begins[0])
+		require.Len(t, tr.completes, 1)
 		require.Empty(t, tr.completes[0])
 	})
 
@@ -182,7 +171,7 @@ func TestFlushSignals(t *testing.T) {
 			BackfillCompletes: []*pm.Request_Flush_BackfillComplete{{Binding: 0}},
 		})
 		require.ErrorContains(t, err, "invalid timestamp in Flush.BackfillCompletes")
-		require.Empty(t, tr.patches)
+		require.Empty(t, tr.completes)
 	})
 
 	t.Run("transactor error is wrapped", func(t *testing.T) {

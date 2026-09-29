@@ -55,20 +55,14 @@ type Transactor interface {
 	// Flush ends the load phase of a transaction, so it is called after Load
 	// returns and before the first Store.
 	//
-	// `statePatches` holds the state patches that every shard, including this
-	// one, returned in its Acknowledged response for the prior transaction.
-	// Those patches are non-transactional, so they are not part of any commit.
+	// `completes` maps a binding index to its truncation boundary for each
+	// backfill that completed in this transaction. The boundary is the
+	// publication time of the backfill's begin signal. A stored document of
+	// that binding whose `flow_published_at` is earlier than the boundary
+	// predates the backfill, so it is stale and may be deleted.
 	//
-	// `begins` and `completes` map a binding index to its truncation boundary
-	// for each backfill that began or completed in this transaction. The
-	// boundary is the publication time of the backfill's begin signal. A
-	// stored document whose `flow_published_at` is earlier than the boundary
-	// predates the backfill. Once its binding appears in `completes`, that
-	// document is stale and may be deleted. A binding in `begins` needs no
-	// action.
-	//
-	// Runtime v1 does not populate these fields.
-	Flush(ctx context.Context, statePatches []json.RawMessage, begins map[int]time.Time, completes map[int]time.Time) error
+	// Runtime v1 does not populate `completes`.
+	Flush(ctx context.Context, completes map[int]time.Time) error
 
 	// Store consumes Store requests from the StoreIterator and returns
 	// a StartCommitFunc which is used to commit the stored transaction.
@@ -411,18 +405,14 @@ func RunTransactions(
 		if err = validateIsFlush(&rxRequest); err != nil {
 			return err
 		}
-		if statePatches, err = SplitStatePatches(rxRequest.Flush.StatePatchesJson); err != nil {
-			return err
-		}
-		var backfillBegins = make(map[int]time.Time, len(rxRequest.Flush.BackfillBegins))
 		for _, bb := range rxRequest.Flush.BackfillBegins {
-			backfillBegins[int(bb.Binding)], err = types.TimestampFromProto(bb.Timestamp)
-			if err != nil {
+			var boundary time.Time
+			if boundary, err = types.TimestampFromProto(bb.Timestamp); err != nil {
 				return fmt.Errorf("invalid timestamp in Flush.BackfillBegins: %w", err)
 			}
 			log.WithFields(log.Fields{
 				"binding":  bb.Binding,
-				"boundary": backfillBegins[int(bb.Binding)],
+				"boundary": boundary,
 			}).Info("backfill began")
 		}
 		var backfillCompletes = make(map[int]time.Time, len(rxRequest.Flush.BackfillCompletes))
@@ -437,7 +427,7 @@ func RunTransactions(
 			}).Info("backfill completed")
 			health.observeTruncation(round, int(bc.Binding))
 		}
-		if err = transactor.Flush(ctx, statePatches, backfillBegins, backfillCompletes); err != nil {
+		if err = transactor.Flush(ctx, backfillCompletes); err != nil {
 			return fmt.Errorf("transactor.Flush: %w", err)
 		} else if err = writeFlushed(stream, &txResponse); err != nil {
 			return err

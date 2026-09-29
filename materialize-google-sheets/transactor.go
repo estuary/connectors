@@ -71,7 +71,7 @@ func (b transactorBinding) columnCount() int {
 func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
 func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) { return nil, nil }
 
-func (t *transactor) Flush(context.Context, []json.RawMessage, map[int]time.Time, map[int]time.Time) error {
+func (t *transactor) Flush(context.Context, map[int]time.Time) error {
 	return nil
 }
 

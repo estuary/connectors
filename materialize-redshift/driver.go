@@ -913,7 +913,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 // Flush records completed backfills on the primary only, since every shard
 // receives the same completions and only the primary applies staged work.
-func (d *transactor) Flush(_ context.Context, _ []json.RawMessage, _ map[int]time.Time, completes map[int]time.Time) error {
+func (d *transactor) Flush(_ context.Context, completes map[int]time.Time) error {
 	d.truncations = make(map[int]time.Time, len(completes))
 	if !d.primary {
 		return nil

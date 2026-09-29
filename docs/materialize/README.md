@@ -382,16 +382,15 @@ method once per transaction, after `Load` returns and before the first
 `Store`:
 
 ```go
-Flush(ctx context.Context, statePatches []json.RawMessage, begins, completes map[int]time.Time) error
+Flush(ctx context.Context, completes map[int]time.Time) error
 ```
 
 `completes` maps a binding index to its truncation boundary, which is the
 publication time of the backfill's begin signal. Once a binding appears there,
 the connector may delete its rows whose `flow_published_at` is earlier than the
 boundary, because the backfill has re-sent every document that still exists. A
-binding in `begins` needs no action. A complete may arrive a transaction or more
-late, which is safe because the boundary travels with it. `statePatches` holds
-every shard's state patches from its prior `Response.Acknowledged`.
+complete may arrive a transaction or more late, which is safe because the
+boundary travels with it.
 
 A connector that cannot delete keeps a no-op `Flush`. A connector that
 truncates owns three concerns:

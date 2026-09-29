@@ -697,7 +697,7 @@ func (d *transactor) startCommitState() (*pf.ConnectorState, error) {
 	return &pf.ConnectorState{UpdatedJson: patch, MergePatch: true}, nil
 }
 
-func (d *transactor) Flush(context.Context, []json.RawMessage, map[int]time.Time, map[int]time.Time) error {
+func (d *transactor) Flush(context.Context, map[int]time.Time) error {
 	return nil
 }
 

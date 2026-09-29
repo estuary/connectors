@@ -609,7 +609,7 @@ func (t *testTransactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	panic("unimplemented")
 }
 
-func (t *testTransactor) Flush(context.Context, []json.RawMessage, map[int]time.Time, map[int]time.Time) error {
+func (t *testTransactor) Flush(context.Context, map[int]time.Time) error {
 	return nil
 }
 
@@ -692,7 +692,7 @@ func (t *drainTestTransactor) UnmarshalState(state json.RawMessage) error {
 	return nil
 }
 
-func (t *drainTestTransactor) Flush(context.Context, []json.RawMessage, map[int]time.Time, map[int]time.Time) error {
+func (t *drainTestTransactor) Flush(context.Context, map[int]time.Time) error {
 	return nil
 }
 

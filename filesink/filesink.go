@@ -440,7 +440,7 @@ func (t *transactor[T]) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}, nil
 }
 
-func (t *transactor[T]) Flush(context.Context, []json.RawMessage, map[int]time.Time, map[int]time.Time) error {
+func (t *transactor[T]) Flush(context.Context, map[int]time.Time) error {
 	return nil
 }
 

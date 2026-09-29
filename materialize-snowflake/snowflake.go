@@ -885,7 +885,7 @@ func (d *transactor) copyHistory(ctx context.Context, tableName string, fileName
 	return items, nil
 }
 
-func (d *transactor) Flush(context.Context, []json.RawMessage, map[int]time.Time, map[int]time.Time) error {
+func (d *transactor) Flush(context.Context, map[int]time.Time) error {
 	return nil
 }
 

@@ -873,7 +873,7 @@ func (t *transactor) bindingForStateKey(stateKey string) (*binding, bool) {
 	return nil, false
 }
 
-func (t *transactor) Flush(context.Context, []json.RawMessage, map[int]time.Time, map[int]time.Time) error {
+func (t *transactor) Flush(context.Context, map[int]time.Time) error {
 	return nil
 }
 

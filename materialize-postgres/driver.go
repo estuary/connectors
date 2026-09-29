@@ -509,7 +509,7 @@ func (t *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSp
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
 
-func (t *transactor) Flush(_ context.Context, _ []json.RawMessage, _ map[int]time.Time, completes map[int]time.Time) error {
+func (t *transactor) Flush(_ context.Context, completes map[int]time.Time) error {
 	t.truncations = make(map[int]time.Time, len(completes))
 	for binding, boundary := range completes {
 		var b = t.bindings[binding]

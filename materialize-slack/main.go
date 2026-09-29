@@ -308,7 +308,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 func (transactor) Destroy() {
 }
 
-func (t *transactor) Flush(context.Context, []json.RawMessage, map[int]time.Time, map[int]time.Time) error {
+func (t *transactor) Flush(context.Context, map[int]time.Time) error {
 	return nil
 }
 

@@ -273,7 +273,7 @@ func (t *scriptedTransactor) Store(it *StoreIterator) (StartCommitFunc, error) {
 	}, nil
 }
 
-func (t *scriptedTransactor) Flush(_ context.Context, _ []json.RawMessage, _ map[int]time.Time, completes map[int]time.Time) error {
+func (t *scriptedTransactor) Flush(_ context.Context, completes map[int]time.Time) error {
 	t.completes = completes
 	return nil
 }
