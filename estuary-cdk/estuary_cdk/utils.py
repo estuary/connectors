@@ -1,13 +1,70 @@
 import asyncio
+import time
 import traceback
-from collections.abc import Mapping
+from collections.abc import Awaitable, Mapping
 from dataclasses import dataclass
-from typing import Any
+from logging import Logger
+from typing import Any, TypeVar
+
+T = TypeVar("T")
+
+
+async def surface_slow(
+    log: Logger,
+    op: str,
+    aw: Awaitable[T],
+    *,
+    warn_after: float = 30.0,
+    warn_interval: float = 60.0,
+    deadline: float | None = None,
+) -> T:
+    """
+    Await `aw`, periodically logging a warning while it runs so that slow
+    external calls are visible in task and build logs instead of hanging
+    silently. A first warning is logged after `warn_after` seconds and then
+    every `warn_interval` seconds.
+
+    If `deadline` is set, the awaitable is cancelled once it elapses and a
+    TimeoutError is raised. Leave `deadline` as None for operations that must
+    not be cancelled once started, such as work following an irreversible
+    side effect.
+    """
+    task = asyncio.ensure_future(aw)
+    started = time.monotonic()
+    next_warn = warn_after
+
+    while True:
+        try:
+            return await asyncio.wait_for(asyncio.shield(task), timeout=next_warn)
+        except asyncio.CancelledError:
+            # Our caller was cancelled; don't leak the shielded task.
+            _ = task.cancel()
+            raise
+        except TimeoutError:
+            if task.done():
+                # The awaitable itself raised TimeoutError, as opposed to our
+                # polling timeout having elapsed; propagate its outcome.
+                return task.result()
+            elapsed = time.monotonic() - started
+            if deadline is not None and elapsed >= deadline:
+                _ = task.cancel()
+                raise TimeoutError(
+                    f"{op} did not complete within {deadline:.0f} seconds (giving up)"
+                )
+            log.warning(
+                f"{op} is still running",
+                {
+                    "elapsed_seconds": round(elapsed),
+                    "deadline_seconds": deadline,
+                },
+            )
+            next_warn = warn_interval
 
 
 @dataclass
 class TaskInfo:
     """Information about an asyncio task."""
+
     task: asyncio.Task[Any]
     task_name: str
     coro_name: str
