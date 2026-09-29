@@ -385,6 +385,12 @@ def _fixed_scalar(prop: str, schema: dict) -> Any:
         return 3.14
     if t == "boolean":
         return True
+    # Strings with a format must validate against it.
+    fmt = schema.get("format")
+    if fmt == "date-time":
+        return "2026-01-01T00:00:00Z"
+    if fmt == "uuid":
+        return "9b5c1a2e-3d4f-4a6b-8c7d-0e1f2a3b4c5d"
     # default: string
     return f"{prop}_value"
 

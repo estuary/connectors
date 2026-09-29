@@ -1,0 +1,48 @@
+# One collection shaped like a Postgres CDC "public.messages" table, keyed on
+# a random (unordered) UUID, 50 GB over five 10 GB transactions of 8 KB docs.
+# The `content` field carries the padding.
+collections:
+  - name: bench/public_messages
+    key: [/id]
+    key_type: uuid
+    key_field: id
+    payload_field: content
+    resource: { table: public_messages }
+    schema:
+      type: object
+      if:
+        properties:
+          _meta:
+            properties: { op: { const: d } }
+      then:
+        reduce: { delete: true, strategy: merge }
+      else:
+        reduce: { strategy: merge }
+      required: [id, _meta]
+      properties:
+        id: { type: string, format: uuid, description: "(source type: non-nullable uuid)" }
+        active_workflow_run_id: { type: [string, "null"], description: "(source type: text)" }
+        content: { contentMediaType: application/json, description: "(source type: non-nullable json)" }
+        created_at: { type: string, format: date-time, description: "(source type: non-nullable timestamptz)" }
+        deleted_at: { type: [string, "null"], format: date-time, description: "(source type: timestamptz)" }
+        evaluation_id: { type: string, format: uuid, description: "(source type: non-nullable uuid)" }
+        evaluation_session_id: { type: string, format: uuid, description: "(source type: non-nullable uuid)" }
+        failure_reason: { type: [string, "null"], description: "(source type: text)" }
+        metadata: { contentMediaType: application/vnd.estuary.postgresql.jsonb+json, description: "(source type: jsonb)" }
+        model_id: { type: [string, "null"], format: uuid, description: "(source type: uuid)" }
+        parent_message_ids: { contentMediaType: application/json, description: "(source type: non-nullable json)" }
+        role: { type: string, description: "(source type: non-nullable text)" }
+        status: { type: string, description: "(source type: non-nullable text)" }
+        updated_at: { type: string, format: date-time, description: "(source type: non-nullable timestamptz)" }
+        uuidv7_migrated: { type: [boolean, "null"], description: "(source type: bool)" }
+        _meta:
+          type: object
+          required: [op]
+          properties: { op: { enum: [c, u, d] } }
+
+transactions:
+  - { total_size: 10GB, doc_size: 8KB, op: c }
+  - { total_size: 10GB, doc_size: 8KB, op: c }
+  - { total_size: 10GB, doc_size: 8KB, op: c }
+  - { total_size: 10GB, doc_size: 8KB, op: c }
+  - { total_size: 10GB, doc_size: 8KB, op: c }
