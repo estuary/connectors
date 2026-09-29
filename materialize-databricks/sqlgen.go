@@ -268,7 +268,7 @@ JOIN ({{ template "loadSource" $ }}) AS r
 			{{- if $ind }}, {{ end -}}
 			{{ template "cast" $key -}}
 			{{- end }}, _flow_delete::BOOLEAN
-			FROM json.`+"`{{ $file }}`"+`
+			FROM read_files({{ Literal $file }}, format => 'json', schema => {{ Literal $.Schema }}, mode => 'FAILFAST', schemaEvolutionMode => 'none')
 		)
 {{- end }}
 {{ end }}
@@ -306,7 +306,7 @@ JOIN ({{ template "loadSource" $ }}) AS r
     SELECT
 		{{ range $ind, $key := $.Table.Columns }}
 			{{- if $ind }}, {{ end -}}
-			{{ template "cast" $key -}}
+			{{- if $.IsStaged $key }}{{ template "cast" $key }}{{ else }}NULL::{{ First (Split $key.DDL " ") }} AS {{ $key.Identifier }}{{ end -}}
 		{{- end }}
   FROM {{ Literal $.StagingPath }}
 	)
@@ -373,10 +373,20 @@ type tableWithFiles struct {
 	// Directories are each read as one relation with Schema, a DDL string.
 	Directories []string
 	Schema      string
+	// Staged are the translated field names of the staged rows, when known.
+	Staged []string
 }
 
-func RenderTableWithFiles(table sql.Table, files []string, stagingPath string, tpl *template.Template, bounds []sql.MergeBound) (string, error) {
-	return renderTemplate(tpl, &tableWithFiles{Table: &table, Files: files, StagingPath: stagingPath, Bounds: bounds})
+// IsStaged reports whether the staged rows carry col. It returns true when
+// Staged is nil, because the rows' fields are then unknown.
+func (t *tableWithFiles) IsStaged(col *sql.Column) bool {
+	return t.Staged == nil || slices.Contains(t.Staged, translateFlowField(col.Field))
+}
+
+// RenderTableWithFiles renders a COPY INTO of staged files, given the
+// translated field names of their rows or nil when those are unknown.
+func RenderTableWithFiles(table sql.Table, files []string, stagingPath string, staged []string, tpl *template.Template, bounds []sql.MergeBound) (string, error) {
+	return renderTemplate(tpl, &tableWithFiles{Table: &table, Files: files, StagingPath: stagingPath, Staged: staged, Bounds: bounds})
 }
 
 // RenderTableWithStaged renders a load or merge over staging directories and root-level files.

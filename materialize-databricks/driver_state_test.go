@@ -845,8 +845,8 @@ func TestAcknowledgeMergesRootFilesWithDirectories(t *testing.T) {
 
 	require.Len(t, recording.executed, 2)
 	var rootQuery, dirQuery = recording.executed[0], recording.executed[1]
-	require.Contains(t, rootQuery, "FROM json.`/Volumes/cat/schema/flow_staging/flow_temp_tables/old.json.gz`")
-	require.NotContains(t, rootQuery, "read_files(")
+	require.Contains(t, rootQuery, "FROM read_files('/Volumes/cat/schema/flow_staging/flow_temp_tables/old.json.gz', format => 'json', schema => ")
+	require.NotContains(t, rootQuery, "txn-2")
 	require.Contains(t, dirQuery, "read_files('/Volumes/cat/schema/flow_staging/flow_temp_tables/txn-2', format => 'json', schema => ")
 	require.Equal(t, 1, strings.Count(dirQuery, "read_files("))
 	require.NotContains(t, dirQuery, "old.json.gz")

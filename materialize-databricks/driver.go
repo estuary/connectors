@@ -519,6 +519,8 @@ type checkpointItem struct {
 	// Directory is the transaction's staging directory, relative to the
 	// binding's staging root.
 	Directory string `json:",omitempty"`
+	// Fields are the translated field names of the staged rows.
+	Fields []string `json:",omitempty"`
 	// Bounds are the rendered merge-bound literals of the observed key range,
 	// positional with the target table's key columns.
 	Bounds []mergeBoundLiterals `json:",omitempty"`
@@ -698,6 +700,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		// see https://docs.databricks.com/en/sql/language-manual/delta-copy-into.html
 		d.cp.add(b.target.StateKey, d.rangeKey, &checkpointItem{
 			Directory:  b.storeFile.txnDir,
+			Fields:     b.storeFile.fields,
 			Bounds:     boundsLiterals(b.storeMergeBounds.Build()),
 			NeedsMerge: !b.target.DeltaUpdates && b.needsMerge,
 			round:      it.Round,
@@ -1019,9 +1022,11 @@ func scanRowStats(rows *stdsql.Rows) m.RowStats {
 // task has started on this version and drained its pending checkpoint.
 func (d *transactor) renderCommitQueries(b *binding, items []*checkpointItem, bounds []sql.MergeBound, needsMerge bool) ([]string, error) {
 	var dirs, rootFiles []string
+	var dirItems []*checkpointItem
 	for _, item := range items {
 		if item.Directory != "" {
 			dirs = append(dirs, filepath.Join(b.rootStagingPath, item.Directory))
+			dirItems = append(dirItems, item)
 		} else {
 			rootFiles = append(rootFiles, item.StagedFiles...)
 		}
@@ -1030,14 +1035,14 @@ func (d *transactor) renderCommitQueries(b *binding, items []*checkpointItem, bo
 	var queries []string
 	if !needsMerge {
 		for chunk := range slices.Chunk(rootFiles, queryBatchSize) {
-			if query, err := RenderTableWithFiles(b.target, chunk, b.rootStagingPath, d.templates.copyIntoDirect, bounds); err != nil {
+			if query, err := RenderTableWithFiles(b.target, chunk, b.rootStagingPath, nil, d.templates.copyIntoDirect, bounds); err != nil {
 				return nil, fmt.Errorf("copyIntoDirect template: %w", err)
 			} else {
 				queries = append(queries, query)
 			}
 		}
-		for _, dir := range dirs {
-			if query, err := RenderTableWithFiles(b.target, nil, dir, d.templates.copyIntoDirect, bounds); err != nil {
+		for i, dir := range dirs {
+			if query, err := RenderTableWithFiles(b.target, nil, dir, dirItems[i].Fields, d.templates.copyIntoDirect, bounds); err != nil {
 				return nil, fmt.Errorf("copyIntoDirect template: %w", err)
 			} else {
 				queries = append(queries, query)

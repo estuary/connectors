@@ -84,15 +84,25 @@ func TestSQLGeneration(t *testing.T) {
 
 		var testcase = tbl.Identifier + " " + tpl.Name()
 
+		// Every field but "string", as if its column was added after staging.
+		var staged []string
+		for _, col := range tbl.Columns() {
+			if col.Field != "string" {
+				staged = append(staged, translateFlowField(col.Field))
+			}
+		}
+
 		for _, tc := range []struct {
-			name  string
-			files []string
-			path  string
+			name   string
+			files  []string
+			path   string
+			staged []string
 		}{
-			{"directory", nil, "test-staging-path/txn-1"},
-			{"root files", []string{"file1.json.gz", "file2.json.gz"}, "test-staging-path"},
+			{"directory", nil, "test-staging-path/txn-1", nil},
+			{"directory with a column added after staging", nil, "test-staging-path/txn-1", staged},
+			{"root files", []string{"file1.json.gz", "file2.json.gz"}, "test-staging-path", nil},
 		} {
-			var rendered, err = RenderTableWithFiles(tbl, tc.files, tc.path, tpl, nil)
+			var rendered, err = RenderTableWithFiles(tbl, tc.files, tc.path, tc.staged, tpl, nil)
 			require.NoError(t, err)
 			snap.WriteString("--- Begin " + testcase + " " + tc.name + " ---")
 			snap.WriteString(rendered)
@@ -117,7 +127,7 @@ func TestSQLGeneration(t *testing.T) {
 			{"directory", nil, "test-staging-path/txn-1"},
 			{"root files", []string{"file1.json.gz", "file2.json.gz"}, "test-staging-path"},
 		} {
-			var rendered, err = RenderTableWithFiles(tbl, tc.files, tc.path, tpl, nil)
+			var rendered, err = RenderTableWithFiles(tbl, tc.files, tc.path, nil, tpl, nil)
 			require.NoError(t, err)
 			snap.WriteString("--- Begin " + testcase + " " + tc.name + " ---")
 			snap.WriteString(rendered)

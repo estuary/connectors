@@ -365,12 +365,12 @@ AND `a-schema`.key_value.`key!binary` = r.`key!binary` AND `a-schema`.key_value.
 		(
 			SELECT
 			key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`, array::STRING, unbase64(binary)::BINARY as binary, boolean::BOOLEAN, field_with_projection::STRING, flow_published_at::TIMESTAMP, integer::LONG, `integerGt128Bit`::NUMERIC(38,0), `integerGt256Bit`::NUMERIC(38,0), `integerGt64Bit`::NUMERIC(38,0), `integerWithUserDDL`::DECIMAL(20), multiple::STRING, `nonAsciiκόσμε`::STRING, number::DOUBLE, `numberCastToString`::STRING, object::STRING, string::STRING, `stringInteger`::NUMERIC(38,0), `stringInteger18Chars`::NUMERIC(38,0), `stringInteger38Chars`::NUMERIC(38,0), `stringInteger39Chars`::STRING, `stringInteger66Chars`::STRING, `stringInteger77Chars`::STRING, `stringNumber`::DOUBLE, flow_document::STRING, _flow_delete::BOOLEAN
-			FROM json.`test-staging-path/file1.json.gz`
+			FROM read_files('test-staging-path/file1.json.gz', format => 'json', schema => '`key1` BIGINT, `key2` BOOLEAN, `key!binary` STRING, `array` STRING, `binary` STRING, `boolean` BOOLEAN, `field_with_projection` STRING, `flow_published_at` STRING, `integer` BIGINT, `integerGt128Bit` STRING, `integerGt256Bit` STRING, `integerGt64Bit` STRING, `integerWithUserDDL` STRING, `multiple` STRING, `nonAsciiκόσμε` STRING, `number` STRING, `numberCastToString` STRING, `object` STRING, `string` STRING, `stringInteger` STRING, `stringInteger18Chars` STRING, `stringInteger38Chars` STRING, `stringInteger39Chars` STRING, `stringInteger66Chars` STRING, `stringInteger77Chars` STRING, `stringNumber` STRING, `flow_document` STRING, `_flow_delete` BOOLEAN', mode => 'FAILFAST', schemaEvolutionMode => 'none')
 		)
 		 UNION ALL (
 			SELECT
 			key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`, array::STRING, unbase64(binary)::BINARY as binary, boolean::BOOLEAN, field_with_projection::STRING, flow_published_at::TIMESTAMP, integer::LONG, `integerGt128Bit`::NUMERIC(38,0), `integerGt256Bit`::NUMERIC(38,0), `integerGt64Bit`::NUMERIC(38,0), `integerWithUserDDL`::DECIMAL(20), multiple::STRING, `nonAsciiκόσμε`::STRING, number::DOUBLE, `numberCastToString`::STRING, object::STRING, string::STRING, `stringInteger`::NUMERIC(38,0), `stringInteger18Chars`::NUMERIC(38,0), `stringInteger38Chars`::NUMERIC(38,0), `stringInteger39Chars`::STRING, `stringInteger66Chars`::STRING, `stringInteger77Chars`::STRING, `stringNumber`::DOUBLE, flow_document::STRING, _flow_delete::BOOLEAN
-			FROM json.`test-staging-path/file2.json.gz`
+			FROM read_files('test-staging-path/file2.json.gz', format => 'json', schema => '`key1` BIGINT, `key2` BOOLEAN, `key!binary` STRING, `array` STRING, `binary` STRING, `boolean` BOOLEAN, `field_with_projection` STRING, `flow_published_at` STRING, `integer` BIGINT, `integerGt128Bit` STRING, `integerGt256Bit` STRING, `integerGt64Bit` STRING, `integerWithUserDDL` STRING, `multiple` STRING, `nonAsciiκόσμε` STRING, `number` STRING, `numberCastToString` STRING, `object` STRING, `string` STRING, `stringInteger` STRING, `stringInteger18Chars` STRING, `stringInteger38Chars` STRING, `stringInteger39Chars` STRING, `stringInteger66Chars` STRING, `stringInteger77Chars` STRING, `stringNumber` STRING, `flow_document` STRING, `_flow_delete` BOOLEAN', mode => 'FAILFAST', schemaEvolutionMode => 'none')
 		)
 ) AS r
   ON 
@@ -397,7 +397,7 @@ AND `a-schema`.key_value.`key!binary` = r.`key!binary` AND `a-schema`.key_value.
 		 UNION ALL (
 			SELECT
 			key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`, array::STRING, unbase64(binary)::BINARY as binary, boolean::BOOLEAN, field_with_projection::STRING, flow_published_at::TIMESTAMP, integer::LONG, `integerGt128Bit`::NUMERIC(38,0), `integerGt256Bit`::NUMERIC(38,0), `integerGt64Bit`::NUMERIC(38,0), `integerWithUserDDL`::DECIMAL(20), multiple::STRING, `nonAsciiκόσμε`::STRING, number::DOUBLE, `numberCastToString`::STRING, object::STRING, string::STRING, `stringInteger`::NUMERIC(38,0), `stringInteger18Chars`::NUMERIC(38,0), `stringInteger38Chars`::NUMERIC(38,0), `stringInteger39Chars`::STRING, `stringInteger66Chars`::STRING, `stringInteger77Chars`::STRING, `stringNumber`::DOUBLE, flow_document::STRING, _flow_delete::BOOLEAN
-			FROM json.`test-staging-path/file1.json.gz`
+			FROM read_files('test-staging-path/file1.json.gz', format => 'json', schema => '`key1` BIGINT, `key2` BOOLEAN, `key!binary` STRING, `array` STRING, `binary` STRING, `boolean` BOOLEAN, `field_with_projection` STRING, `flow_published_at` STRING, `integer` BIGINT, `integerGt128Bit` STRING, `integerGt256Bit` STRING, `integerGt64Bit` STRING, `integerWithUserDDL` STRING, `multiple` STRING, `nonAsciiκόσμε` STRING, `number` STRING, `numberCastToString` STRING, `object` STRING, `string` STRING, `stringInteger` STRING, `stringInteger18Chars` STRING, `stringInteger38Chars` STRING, `stringInteger39Chars` STRING, `stringInteger66Chars` STRING, `stringInteger77Chars` STRING, `stringNumber` STRING, `flow_document` STRING, `_flow_delete` BOOLEAN', mode => 'FAILFAST', schemaEvolutionMode => 'none')
 		)
 ) AS r
   ON 
@@ -417,6 +417,18 @@ AND `a-schema`.key_value.`key!binary` = r.`key!binary` AND `a-schema`.key_value.
 	COPY INTO `a-schema`.key_value FROM (
     SELECT
 		key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`, array::STRING, unbase64(binary)::BINARY as binary, boolean::BOOLEAN, field_with_projection::STRING, flow_published_at::TIMESTAMP, integer::LONG, `integerGt128Bit`::NUMERIC(38,0), `integerGt256Bit`::NUMERIC(38,0), `integerGt64Bit`::NUMERIC(38,0), `integerWithUserDDL`::DECIMAL(20), multiple::STRING, `nonAsciiκόσμε`::STRING, number::DOUBLE, `numberCastToString`::STRING, object::STRING, string::STRING, `stringInteger`::NUMERIC(38,0), `stringInteger18Chars`::NUMERIC(38,0), `stringInteger38Chars`::NUMERIC(38,0), `stringInteger39Chars`::STRING, `stringInteger66Chars`::STRING, `stringInteger77Chars`::STRING, `stringNumber`::DOUBLE, flow_document::STRING
+  FROM 'test-staging-path/txn-1'
+	)
+  FILEFORMAT = JSON
+  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false', 'inferSchema' = 'false' )
+	COPY_OPTIONS ( 'mergeSchema' = 'true' )
+  ;
+--- End `a-schema`.key_value copyIntoDirect ---
+
+--- Begin `a-schema`.key_value copyIntoDirect directory with a column added after staging ---
+	COPY INTO `a-schema`.key_value FROM (
+    SELECT
+		key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`, array::STRING, unbase64(binary)::BINARY as binary, boolean::BOOLEAN, field_with_projection::STRING, flow_published_at::TIMESTAMP, integer::LONG, `integerGt128Bit`::NUMERIC(38,0), `integerGt256Bit`::NUMERIC(38,0), `integerGt64Bit`::NUMERIC(38,0), `integerWithUserDDL`::DECIMAL(20), multiple::STRING, `nonAsciiκόσμε`::STRING, number::DOUBLE, `numberCastToString`::STRING, object::STRING, NULL::STRING AS string, `stringInteger`::NUMERIC(38,0), `stringInteger18Chars`::NUMERIC(38,0), `stringInteger38Chars`::NUMERIC(38,0), `stringInteger39Chars`::STRING, `stringInteger66Chars`::STRING, `stringInteger77Chars`::STRING, `stringNumber`::DOUBLE, flow_document::STRING
   FROM 'test-staging-path/txn-1'
 	)
   FILEFORMAT = JSON

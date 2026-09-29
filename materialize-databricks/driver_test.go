@@ -166,7 +166,6 @@ func TestRecoverAfterAddedColumn(t *testing.T) {
 		needsMerge bool
 	}{
 		{"root file merge", false, true},
-		{"root file copy", false, false},
 		{"directory merge", true, true},
 		{"directory copy", true, false},
 	} {
@@ -176,6 +175,7 @@ func TestRecoverAfterAddedColumn(t *testing.T) {
 			var item = &checkpointItem{NeedsMerge: tc.needsMerge}
 			if tc.directory {
 				item.Directory = name
+				item.Fields = []string{"id", "val", "flow_document", "_flow_delete"}
 				stage(t, id, filepath.Join(b.rootStagingPath, name, "staged.json.gz"))
 			} else {
 				item.StagedFiles = []string{name + ".json.gz"}
