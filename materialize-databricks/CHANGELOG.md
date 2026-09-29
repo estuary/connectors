@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-09-29
+### Fixed
+- Each table's staged files are finished and uploaded as soon as the
+  transaction's rows move on to the next table, instead of every table's file
+  staying open until commit. Wide transactions no longer hold a compressor per
+  table, and uploads overlap with writing the remaining tables.
+
+## 2026-09-28
+### Fixed
+- Materializations using `OAuth2 M2M` credentials no longer fail every
+  transaction with `pat auth: token is required`. Since 2026-09-23 the staging
+  directory was created with a client that always used PAT authentication,
+  regardless of the configured `auth_type`.
+
 ## 2026-09-23
 ### Changed
 - Each transaction's staged files are uploaded into a directory of their own,

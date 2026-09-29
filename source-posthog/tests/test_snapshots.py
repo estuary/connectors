@@ -55,10 +55,28 @@ def test_capture(request, snapshot):
     assert result.returncode == 0
     lines = [json.loads(l) for l in result.stdout.splitlines()]
 
+    # One document per stream keeps the snapshot small and resilient to churn
+    # in the dev account. The first document a stream emits is its oldest,
+    # since incremental streams are walked in cursor order, so it is the least
+    # likely to be displaced as new data arrives.
+    unique_stream_lines = []
+    seen = set()
+
     for l in lines:
+        stream = l[0]
+        if stream not in seen:
+            unique_stream_lines.append(l)
+            seen.add(stream)
+
+    for l in unique_stream_lines:
         _collection, record = l[0], l[1]
 
         redact_nested_fields(record)
+
+    # Sort lines to keep a consistent ordering of captured bindings. The
+    # comparison below is positional, so a reordered run would otherwise
+    # report every stream as mismatched rather than as a reordering.
+    lines = sorted(unique_stream_lines, key=lambda l: l[0])
 
     snapshot_path = (
         Path(request.fspath.dirname) / "snapshots" / "snapshots__capture__stdout.json"

@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/databricks/databricks-sdk-go"
-	dbConfig "github.com/databricks/databricks-sdk-go/config"
 	"github.com/databricks/databricks-sdk-go/service/catalog"
 	databricksSql "github.com/databricks/databricks-sdk-go/service/sql"
 	dbsqlerr "github.com/databricks/databricks-sql-go/errors"
@@ -44,23 +43,7 @@ func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint
 		return nil, fmt.Errorf("opening database: %w", err)
 	}
 
-	var wsConfig *databricks.Config
-	switch cfg.Credentials.AuthType {
-	case OAUTH_M2M_AUTH_TYPE:
-		wsConfig = &databricks.Config{
-			Host:         fmt.Sprintf("%s/%s", cfg.Address, cfg.HTTPPath),
-			ClientID:     cfg.Credentials.ClientID,
-			ClientSecret: cfg.Credentials.ClientSecret,
-		}
-	default: // PAT_AUTH_TYPE
-		wsConfig = &databricks.Config{
-			Host:        fmt.Sprintf("%s/%s", cfg.Address, cfg.HTTPPath),
-			Token:       cfg.Credentials.PersonalAccessToken,
-			Credentials: dbConfig.PatCredentials{}, // enforce PAT auth
-		}
-	}
-
-	wsClient, err := databricks.NewWorkspaceClient(wsConfig)
+	wsClient, err := databricks.NewWorkspaceClient(cfg.workspaceConfig())
 	if err != nil {
 		return nil, fmt.Errorf("creating workspace client: %w", err)
 	}
@@ -239,23 +222,7 @@ func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, e
 func preReqs(ctx context.Context, cfg config, _ map[string]bool) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
 
-	var wsConfig *databricks.Config
-	switch cfg.Credentials.AuthType {
-	case OAUTH_M2M_AUTH_TYPE:
-		wsConfig = &databricks.Config{
-			Host:         fmt.Sprintf("%s/%s", cfg.Address, cfg.HTTPPath),
-			ClientID:     cfg.Credentials.ClientID,
-			ClientSecret: cfg.Credentials.ClientSecret,
-		}
-	default: // PAT_AUTH_TYPE
-		wsConfig = &databricks.Config{
-			Host:        fmt.Sprintf("%s/%s", cfg.Address, cfg.HTTPPath),
-			Token:       cfg.Credentials.PersonalAccessToken,
-			Credentials: dbConfig.PatCredentials{}, // enforce PAT auth
-		}
-	}
-
-	wsClient, err := databricks.NewWorkspaceClient(wsConfig)
+	wsClient, err := databricks.NewWorkspaceClient(cfg.workspaceConfig())
 	if err != nil {
 		errs.Err(fmt.Errorf("creating workspace client: %w", err))
 		return errs

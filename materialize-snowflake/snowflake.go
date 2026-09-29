@@ -25,6 +25,7 @@ import (
 	sf "github.com/snowflakedb/gosnowflake/v2"
 	"go.gazette.dev/core/consumer/protocol"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 )
 
 type tableConfig struct {
@@ -256,6 +257,7 @@ type transactor struct {
 	}
 	templates templates
 	bindings  []*binding
+	uploads   *semaphore.Weighted
 	be        *m.BindingEvents
 	cp        checkpoint
 
@@ -333,6 +335,7 @@ func newTransactor(
 		version:             open.Version,
 		be:                  be,
 		cp:                  make(checkpoint),
+		uploads:             newUploadLimiter(),
 	}
 
 	if len(open.StateJson) > 0 {
@@ -469,8 +472,8 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, cp checkp
 		}
 	}
 
-	b.load.stage = newStagedFile(os.TempDir())
-	b.store.stage = newStagedFile(os.TempDir())
+	b.load.stage = newStagedFile(os.TempDir(), d.uploads)
+	b.store.stage = newStagedFile(os.TempDir(), d.uploads)
 
 	if b.target.DeltaUpdates && d.cfg.Credentials.AuthType == snowflake_auth.JWT {
 		var keyBegin = fmt.Sprintf("%08x", d._range.KeyBegin)
@@ -526,7 +529,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			continue
 		}
 
-		if dir, err := b.load.stage.flush(); err != nil {
+		if dir, err := b.load.stage.wait(); err != nil {
 			return fmt.Errorf("load.stage(): %w", err)
 		} else {
 			// Choose appropriate load query template based on configuration
@@ -699,9 +702,21 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var ctx = it.Context()
 	var round = it.Round
 
+	var lastBinding = -1
 	// Skip deleted, non-existent documents iff HardDelete is enabled.
 	for it.Next(d.cfg.HardDelete) {
 		var b = d.bindings[it.Binding]
+
+		// Store requests are ordered by binding, so the previous binding has received all of
+		// its rows and its staged file can be finished now rather than held open until commit.
+		if lastBinding != -1 && lastBinding != it.Binding {
+			if last := d.bindings[lastBinding]; !last.streaming && !last.streamingV2 && last.store.stage.started {
+				if err := last.store.stage.finish(); err != nil {
+					return nil, fmt.Errorf("finishing staged file for %s: %w", last.target.Path, err)
+				}
+			}
+		}
+		lastBinding = it.Binding
 
 		if it.Exists {
 			b.store.mustMerge = true
@@ -796,7 +811,7 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 			continue
 		}
 
-		dir, err := b.store.stage.flush()
+		dir, err := b.store.stage.wait()
 		if err != nil {
 			return nil, err
 		}

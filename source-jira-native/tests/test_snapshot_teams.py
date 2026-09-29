@@ -91,14 +91,32 @@ def test_pages_are_walked_until_the_cursor_is_null():
     assert [r["cursor"] for r in requests[1:]] == ["c1", "c2"]
 
 
-def test_empty_page_with_a_non_null_cursor_terminates():
-    # Following the cursor until it's null, as the docs instruct, would never end here.
-    http = StubSession([{"cursor": "c1", "entities": []}])
+def test_empty_pages_with_a_cursor_are_followed():
+    # The API can return empty pages, cursor still set, ahead of the pages holding teams.
+    http = StubSession([
+        {"cursor": "c1", "entities": []},
+        {"cursor": "c2", "entities": []},
+        {"cursor": None, "entities": [{"teamId": "t1"}, {"teamId": "t2"}]},
+    ])
 
     docs = run_snapshot(http)
 
-    assert docs == []
-    assert len(teams_requests(http)) == 1
+    assert [d["teamId"] for d in docs] == ["t1", "t2"]
+    requests = teams_requests(http)
+    assert [r.get("cursor") for r in requests] == [None, "c1", "c2"]
+
+
+def test_a_cursor_that_does_not_advance_ends_the_walk():
+    # StubSession raises if a third page is requested.
+    http = StubSession([
+        {"cursor": "c1", "entities": [{"teamId": "t1"}]},
+        {"cursor": "c1", "entities": [{"teamId": "t2"}]},
+    ])
+
+    docs = run_snapshot(http)
+
+    assert [d["teamId"] for d in docs] == ["t1", "t2"]
+    assert len(teams_requests(http)) == 2
 
 
 def _config(**overrides: Any) -> EndpointConfig:

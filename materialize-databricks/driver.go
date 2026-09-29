@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/databricks/databricks-sdk-go"
-	dbConfig "github.com/databricks/databricks-sdk-go/config"
 	"github.com/databricks/databricks-sdk-go/logger"
 	"github.com/databricks/databricks-sdk-go/service/files"
 	"github.com/databricks/databricks-sdk-go/useragent"
@@ -279,12 +278,9 @@ func newTransactor(
 ) (m.Transactor, error) {
 	var cfg = ep.Config
 
-	wsClient, err := databricks.NewWorkspaceClient(&databricks.Config{
-		Host:               fmt.Sprintf("%s/%s", cfg.Address, cfg.HTTPPath),
-		Token:              cfg.Credentials.PersonalAccessToken,
-		Credentials:        dbConfig.PatCredentials{}, // enforce PAT auth
-		HTTPTimeoutSeconds: 5 * 60,                    // This is necessary for file uploads as they can sometimes take longer than the default 60s
-	})
+	wsConfig := cfg.workspaceConfig()
+	wsConfig.HTTPTimeoutSeconds = 5 * 60 // This is necessary for file uploads as they can sometimes take longer than the default 60s
+	wsClient, err := databricks.NewWorkspaceClient(wsConfig)
 	if err != nil {
 		return nil, fmt.Errorf("initialising workspace client: %w", err)
 	}
@@ -441,7 +437,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			continue
 		}
 
-		if err := b.loadFile.flush(); err != nil {
+		if err := b.loadFile.wait(); err != nil {
 			return fmt.Errorf("flushing load file for binding[%d]: %w", idx, err)
 		}
 
@@ -648,9 +644,21 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	}
 	defer db.Close()
 
+	var lastBinding = -1
 	// Skip deleted, non-existent documents iff HardDelete is enabled.
 	for it.Next(d.cfg.HardDelete) {
 		var b = d.bindings[it.Binding]
+
+		// Store requests are ordered by binding, so the previous binding has received all of
+		// its rows and its staged file can be finished now rather than held open until commit.
+		if lastBinding != -1 && lastBinding != it.Binding {
+			if last := d.bindings[lastBinding]; last.storeFile.started {
+				if err := last.storeFile.finish(); err != nil {
+					return nil, fmt.Errorf("finishing store file for %s: %w", last.target.Path, err)
+				}
+			}
+		}
+		lastBinding = it.Binding
 
 		flowDelete := d.cfg.HardDelete && it.Delete
 		if err := b.storeFile.start(ctx, db); err != nil {
@@ -679,7 +687,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			continue
 		}
 
-		if err := b.storeFile.flush(); err != nil {
+		if err := b.storeFile.wait(); err != nil {
 			return nil, fmt.Errorf("flushing store file for binding[%d]: %w", idx, err)
 		}
 

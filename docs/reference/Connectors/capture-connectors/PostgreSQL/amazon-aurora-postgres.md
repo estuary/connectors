@@ -1,17 +1,17 @@
 ---
-description: Capture PostgreSQL changes from Google Cloud SQL instances with Estuary’s CDC connector. Setup guide includes logical replication, WAL handling, replication slots, publications, watermarks tables, and backfills.
+description: Capture Amazon Aurora PostgreSQL changes with Estuary's CDC connector. Setup guide includes logical replication, WAL handling, replication slots, publications, watermarks tables, and backfills.
 ---
 
-# Google Cloud SQL for PostgreSQL
+# Amazon Aurora for PostgreSQL
 
 This connector uses change data capture (CDC) to continuously capture updates in a PostgreSQL database into one or more Estuary collections.
 
 This connector is a variant of the [PostgreSQL connector](./PostgreSQL.md).
 Refer to that page for additional connector features, usage, and the full
-configuration reference. Information specific to Google Cloud SQL and its setup is
+configuration reference. Information specific to Amazon Aurora and its setup is
 presented below.
 
-## Supported versions and platforms
+## Supported versions
 
 This connector supports PostgreSQL versions 10.0 and later.
 
@@ -31,26 +31,49 @@ You'll need a PostgreSQL database setup with the following:
   - In more restricted setups, this must be created manually, but can be created automatically if the connector has suitable permissions.
   - **For read-only environments**, the capture can operate in read-only mode which does not require a watermarks table. See [Read-Only Captures](./PostgreSQL.md#read-only-captures) for details.
 
+:::tip Configuration Tip
+To capture data from databases hosted on your internal network, you may need to
+use [SSH tunneling](/guides/connect-network/). If you have a
+[private deployment](/getting-started/deployment-options/#private-deployment),
+you can also use private cloud networking features to reach your database.
+:::
+
 ## Setup
+
+You must apply some of the settings to the entire Aurora DB cluster, and others to a database instance within the cluster.
+For each step, take note of which entity you're working with.
 
 1. Allow connections between the database and Estuary. There are two ways to do this: by granting direct access to Estuary's IP or by creating an SSH tunnel.
 
    1. To allow direct access:
 
-      - [Enable public IP on your database](https://cloud.google.com/sql/docs/mysql/configure-ip#add) and add the [Estuary IP addresses](/reference/allow-ip-addresses) as authorized IP addresses.
+      - [Modify the instance](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Aurora.Modifying.html#Aurora.Modifying.Instance), choosing **Publicly accessible** in the **Connectivity** settings.
+      - Edit the VPC security group associated with your instance, or create a new VPC security group and associate it with the instance as described in [the Amazon documentation](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.RDSSecurityGroups.html#Overview.RDSSecurityGroups.Create). Create a new inbound rule and a new outbound rule that allow all traffic from the [Estuary IP addresses](/reference/allow-ip-addresses).
 
    2. To allow secure connections via SSH tunneling:
-      - Follow the guide to [configure an SSH server for tunneling](../../../../../guides/connect-network/)
-      - When you configure your connector as described in the [configuration](./PostgreSQL.md#configuration) section above, including the additional `networkTunnel` configuration to enable the SSH tunnel. See [Connecting to endpoints on secure networks](../../../../concepts/connectors.md#connecting-to-endpoints-on-secure-networks) for additional details and a sample.
+      - Follow the guide to [configure an SSH server for tunneling](/guides/connect-network/)
+      - When you configure your connector as described in the [configuration](./PostgreSQL.md#configuration) section above, including the additional `networkTunnel` configuration to enable the SSH tunnel. See [Connecting to endpoints on secure networks](/concepts/connectors.md#connecting-to-endpoints-on-secure-networks) for additional details and a sample.
 
-2. On Google Cloud, navigate to your instance's Overview page. Click "Edit configuration". Scroll down to the Flags section. Click "ADD FLAG". Set [the `cloudsql.logical_decoding` flag to `on`](https://cloud.google.com/sql/docs/postgres/flags) to enable logical replication on your Cloud SQL PostgreSQL instance.
+2. Enable logical replication on your Aurora DB cluster.
 
-3. In your PostgreSQL client, connect to your instance and issue the following commands to create a new user for the capture with appropriate permissions,
+   1. Create a [parameter group](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/USER_WorkingWithDBClusterParamGroups.html#USER_WorkingWithParamGroups.CreatingCluster).
+      Create a unique name and description and set the following properties:
+
+      - **Family**: aurora-postgresql13, or substitute the version of Aurora PostgreSQL used for your cluster.
+      - **Type**: DB Cluster Parameter group
+
+   2. [Modify the new parameter group](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/USER_WorkingWithDBClusterParamGroups.html#USER_WorkingWithParamGroups.ModifyingCluster) and set `rds.logical_replication=1`.
+
+   3. [Associate the parameter group](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/USER_WorkingWithDBClusterParamGroups.html#USER_WorkingWithParamGroups.AssociatingCluster) with the DB cluster.
+
+   4. Reboot the cluster to allow the new parameter group to take effect.
+
+3. In the PostgreSQL client, connect to your instance and run the following commands to create a new user for the capture with appropriate permissions,
    and set up the watermarks table and publication.
 
 ```sql
-CREATE USER flow_capture WITH REPLICATION
-IN ROLE cloudsqlsuperuser LOGIN PASSWORD 'secret';
+CREATE USER flow_capture WITH PASSWORD 'secret';
+GRANT rds_replication TO flow_capture;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO flow_capture;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO flow_capture;
 CREATE TABLE IF NOT EXISTS public.flow_watermarks (slot TEXT PRIMARY KEY, watermark TEXT);
@@ -64,26 +87,7 @@ where `<other_tables>` lists all tables that will be captured from. The `publish
 setting is recommended (because most users will want changes to a partitioned table to be captured
 under the name of the root table) but is not required.
 
-4. In the Cloud Console, note the instance's host under Public IP Address. Its port will always be `5432`.
-   Together, you'll use the host:port as the `address` property when you configure the connector.
-
-### Capturing from Read-Only Standbys
-
-If you are capturing from a read-only standby on RDS, you will need to set
-`hot_standby_feedback = on` so that the standby replica will keep the
-upstream database informed about what catalog metadata needs to be retained. To enable hot
-standby feedback on a Google CLoud SQL PostgreSQL instance:
-
-1. Navigate to your replica instance in the Google Cloud Console
-2. Click "Edit configuration"
-3. In the Flags section, click "ADD A DATABASE FLAG"
-4. Select `hot_standby_feedback` and set it to `on`
-5. Click "Save" and wait for the instance to restart
-
-You can verify whether the setting is enabled by running `SHOW hot_standby_feedback;`
-
-See the main [PostgreSQL capture reference](./PostgreSQL.md#capturing-from-read-only-standbys)
-for more information on capturing from read-only standby instances.
+6. In the [RDS console](https://console.aws.amazon.com/rds/), note the instance's Endpoint and Port. You'll need these for the `address` property when you configure the connector.
 
 ## Sample
 
@@ -94,7 +98,7 @@ captures:
   ${PREFIX}/${CAPTURE_NAME}:
     endpoint:
       connector:
-        image: ghcr.io/estuary/source-google-cloud-sql-postgres:v3
+        image: ghcr.io/estuary/source-amazon-aurora-postgres:v3
         config:
           address: host:port
           database: postgres

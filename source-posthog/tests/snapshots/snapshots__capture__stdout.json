@@ -111,10 +111,51 @@
       "last_backfill_person_properties_at": null,
       "last_calculation": "redacted",
       "last_error_message": null,
+      "last_import_total_count": null,
+      "last_import_unmatched_count": null,
       "name": "Test Cohort 1",
       "pending_version": "redacted",
       "query": null,
+      "realtime": null,
       "version": "redacted"
+    }
+  ],
+  [
+    "acmeCo/Events",
+    {
+      "$group_0": "",
+      "$group_1": "",
+      "$group_2": "",
+      "$group_3": "",
+      "$group_4": "",
+      "$session_id": "01a0adf5-fe98-768a-a1b9-efe19293793e",
+      "$window_id": "",
+      "_meta": {
+        "project_id": 304748,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "created_at": "redacted",
+      "distinct_id": "seed-visitor-0021",
+      "elements_chain": "",
+      "elements_chain_elements": [],
+      "elements_chain_href": "",
+      "elements_chain_ids": [],
+      "elements_chain_texts": [],
+      "event": "$pageview",
+      "event_issue_id": null,
+      "issue_assigned_role_id": null,
+      "issue_assigned_user_id": null,
+      "issue_description": null,
+      "issue_first_seen": null,
+      "issue_id": null,
+      "issue_id_v2": null,
+      "issue_name": null,
+      "issue_status": null,
+      "person_id": "4200798f-45d2-57e4-b745-ea83e3aea048",
+      "person_mode": "full",
+      "properties": "{\"$browser\":\"Chrome\",\"$current_url\":\"https://estuary-seed.example.com/docs\",\"$device_type\":\"Desktop\",\"$geoip_accuracy_radius\":20,\"$geoip_city_name\":\"Portland\",\"$geoip_continent_code\":\"NA\",\"$geoip_continent_name\":\"North America\",\"$geoip_country_code\":\"US\",\"$geoip_country_name\":\"United States\",\"$geoip_latitude\":45.5173,\"$geoip_longitude\":-122.6398,\"$geoip_postal_code\":\"97214\",\"$geoip_subdivision_1_code\":\"OR\",\"$geoip_subdivision_1_name\":\"Oregon\",\"$geoip_time_zone\":\"America/Los_Angeles\",\"$host\":\"estuary-seed.example.com\",\"$ip\":\"75.164.164.30\",\"$pathname\":\"/docs\",\"$referrer\":\"https://www.linkedin.com/\",\"$referring_domain\":\"www.linkedin.com\",\"$session_id\":\"01a0adf5-fe98-768a-a1b9-efe19293793e\",\"$set\":{\"$geoip_accuracy_radius\":20,\"$geoip_city_confidence\":null,\"$geoip_city_name\":\"Portland\",\"$geoip_continent_code\":\"NA\",\"$geoip_continent_name\":\"North America\",\"$geoip_country_code\":\"US\",\"$geoip_country_name\":\"United States\",\"$geoip_latitude\":45.5173,\"$geoip_longitude\":-122.6398,\"$geoip_postal_code\":\"97214\",\"$geoip_subdivision_1_code\":\"OR\",\"$geoip_subdivision_1_name\":\"Oregon\",\"$geoip_subdivision_2_code\":null,\"$geoip_subdivision_2_name\":null,\"$geoip_time_zone\":\"America/Los_Angeles\",\"$browser\":\"Chrome\",\"$device_type\":\"Desktop\",\"$current_url\":\"https://estuary-seed.example.com/docs\",\"$pathname\":\"/docs\",\"$referring_domain\":\"www.linkedin.com\",\"$referrer\":\"https://www.linkedin.com/\",\"utm_source\":\"linkedin\",\"utm_medium\":\"paid-social\",\"utm_campaign\":\"q3-launch\"},\"$set_once\":{\"$initial_geoip_accuracy_radius\":20,\"$initial_geoip_city_confidence\":null,\"$initial_geoip_city_name\":\"Portland\",\"$initial_geoip_continent_code\":\"NA\",\"$initial_geoip_continent_name\":\"North America\",\"$initial_geoip_country_code\":\"US\",\"$initial_geoip_country_name\":\"United States\",\"$initial_geoip_latitude\":45.5173,\"$initial_geoip_longitude\":-122.6398,\"$initial_geoip_postal_code\":\"97214\",\"$initial_geoip_subdivision_1_code\":\"OR\",\"$initial_geoip_subdivision_1_name\":\"Oregon\",\"$initial_geoip_subdivision_2_code\":null,\"$initial_geoip_subdivision_2_name\":null,\"$initial_geoip_time_zone\":\"America/Los_Angeles\",\"$initial_browser\":\"Chrome\",\"$initial_device_type\":\"Desktop\",\"$initial_current_url\":\"https://estuary-seed.example.com/docs\",\"$initial_pathname\":\"/docs\",\"$initial_referring_domain\":\"www.linkedin.com\",\"$initial_referrer\":\"https://www.linkedin.com/\",\"$initial_utm_source\":\"linkedin\",\"$initial_utm_medium\":\"paid-social\",\"$initial_utm_campaign\":\"q3-launch\"},\"distinct_id\":\"seed-visitor-0021\",\"utm_campaign\":\"q3-launch\",\"utm_medium\":\"paid-social\",\"utm_source\":\"linkedin\"}",
+      "timestamp": "2026-09-17T06:02:55Z",
+      "uuid": "01a0adf5-fe98-7ddf-b162-15b6c300fbdf"
     }
   ],
   [
@@ -130,22 +171,21 @@
       "created_at": "redacted",
       "customer_id": null,
       "default_anonymize_ips": false,
-      "default_experiment_stats_method": "bayesian",
       "default_role_id": null,
       "enforce_2fa": null,
       "enforce_verified_domains": null,
+      "has_signed_baa": false,
       "id": "019c2351-c712-0000-8470-cf277880e65a",
       "is_active": true,
       "is_ai_data_processing_approved": false,
       "is_ai_training_cta_shown": true,
       "is_ai_training_locked": true,
       "is_ai_training_opted_in": false,
-      "is_hipaa": false,
       "is_member_join_email_enabled": true,
       "is_not_active_reason": null,
       "is_pending_deletion": false,
       "logo_media_id": null,
-      "member_count": 1,
+      "member_count": 3,
       "members_can_create_projects": false,
       "members_can_invite": true,
       "members_can_see_org_members": true,
@@ -163,6 +203,7 @@
           "organization_id": "019c2351-c712-0000-8470-cf277880e65a"
         }
       ],
+      "read_only_mcp_access": false,
       "slug": "estuary-dcro",
       "teams": [
         {
@@ -182,7 +223,24 @@
           "uuid": "019c2351-c720-0000-990d-d080c67e1de8"
         }
       ],
-      "updated_at": "redacted"
+      "updated_at": "redacted",
+      "uses_most_specific_access_resolution": true
+    }
+  ],
+  [
+    "acmeCo/Persons",
+    {
+      "$virt_initial_channel_type": "Direct",
+      "$virt_initial_referring_domain_type": "$direct",
+      "_meta": {
+        "project_id": 304748,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "created_at": "redacted",
+      "id": "383bbb53-ff79-5881-9e7b-04c8c261d5dc",
+      "is_identified": 0,
+      "last_seen_at": "redacted",
+      "properties": "{\"$pathname\":\"/docs\",\"$referrer\":\"$direct\",\"$current_url\":\"https://estuary-fixture.example.com/docs\",\"$geoip_latitude\":45.5173,\"$geoip_city_name\":\"Portland\",\"$geoip_longitude\":-122.6398,\"$geoip_time_zone\":\"America/Los_Angeles\",\"$initial_pathname\":\"/docs\",\"$initial_referrer\":\"$direct\",\"$referring_domain\":\"$direct\",\"$geoip_postal_code\":\"97214\",\"$creator_event_uuid\":\"01a0bf8b-b800-7945-8457-05914efa0b01\",\"$geoip_country_code\":\"US\",\"$geoip_country_name\":\"United States\",\"$initial_current_url\":\"https://estuary-fixture.example.com/docs\",\"$geoip_continent_code\":\"NA\",\"$geoip_continent_name\":\"North America\",\"$geoip_accuracy_radius\":20,\"$geoip_city_confidence\":null,\"$initial_geoip_latitude\":45.5173,\"$initial_geoip_city_name\":\"Portland\",\"$initial_geoip_longitude\":-122.6398,\"$initial_geoip_time_zone\":\"America/Los_Angeles\",\"$geoip_subdivision_1_code\":\"OR\",\"$geoip_subdivision_1_name\":\"Oregon\",\"$geoip_subdivision_2_code\":null,\"$geoip_subdivision_2_name\":null,\"$initial_referring_domain\":\"$direct\",\"$initial_geoip_postal_code\":\"97214\",\"$initial_geoip_country_code\":\"US\",\"$initial_geoip_country_name\":\"United States\",\"$initial_geoip_continent_code\":\"NA\",\"$initial_geoip_continent_name\":\"North America\",\"$initial_geoip_accuracy_radius\":20,\"$initial_geoip_city_confidence\":null,\"$initial_geoip_subdivision_1_code\":\"OR\",\"$initial_geoip_subdivision_1_name\":\"Oregon\",\"$initial_geoip_subdivision_2_code\":null,\"$initial_geoip_subdivision_2_name\":null}"
     }
   ],
   [
@@ -205,6 +263,7 @@
       "name": "Default project",
       "organization": "019c2351-c712-0000-8470-cf277880e65a",
       "project_id": 304748,
+      "tags": [],
       "timezone": "UTC",
       "uuid": "019c2351-c720-0000-990d-d080c67e1de8"
     }
