@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-09-29
+### Fixed
+- Each table's staged files are finished and uploaded as soon as the
+  transaction's rows move on to the next table, instead of every table's file
+  staying open until commit. Wide transactions no longer hold a compressor per
+  table, and uploads overlap with writing the remaining tables.
+
 ## 2026-09-28
 ### Fixed
 - Materializations using `OAuth2 M2M` credentials no longer fail every

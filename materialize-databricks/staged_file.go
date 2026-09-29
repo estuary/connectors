@@ -108,6 +108,10 @@ type stagedFile struct {
 	// start() and `false` by flush().
 	started bool
 
+	// Set by finish() once the final file has been handed to the workers and no more rows will
+	// be written this transaction.
+	finished bool
+
 	cfg config
 
 	// References to the current file being written.
@@ -194,15 +198,28 @@ func (f *stagedFile) writeRow(row []interface{}) error {
 	return nil
 }
 
-func (f *stagedFile) flush() error {
-	if err := f.putFile(); err != nil {
-		return fmt.Errorf("flush putFile: %w", err)
+// finish sends the current & final local file to the workers, releasing the file writer. Store
+// requests arrive ordered by binding, so a binding's file can be finished as soon as the
+// iterator moves past it, letting its uploads overlap with later bindings.
+func (f *stagedFile) finish() error {
+	if f.finished {
+		return nil
 	}
-
+	if err := f.putFile(); err != nil {
+		return fmt.Errorf("finish putFile: %w", err)
+	}
 	close(f.putFiles)
-	f.started = false
+	f.finished = true
+	return nil
+}
 
-	// Wait for all outstanding PUT requests to complete.
+// wait finishes the file if needed and waits for all outstanding PUT requests to complete.
+func (f *stagedFile) wait() error {
+	if err := f.finish(); err != nil {
+		return err
+	}
+	f.started = false
+	f.finished = false
 	return f.group.Wait()
 }
 
