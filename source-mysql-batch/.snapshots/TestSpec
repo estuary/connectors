@@ -86,7 +86,7 @@
           "ssl_server_ca": {
             "type": "string",
             "title": "SSL Server CA",
-            "description": "PEM-encoded CA certificate the server certificate must chain to. Required for 'verify_ca'; optional for 'verify_identity'.",
+            "description": "PEM-encoded CA certificate the server certificate must chain to. Required for 'verify_ca'. Optional for 'verify_identity', which otherwise trusts public certificate authorities and the CAs of Amazon RDS and Google Cloud SQL (shared CA).",
             "multiline": true,
             "order": 7,
             "secret": true
