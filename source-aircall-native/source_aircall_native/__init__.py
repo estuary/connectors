@@ -9,15 +9,10 @@ from estuary_cdk.capture import (
     request,
     response,
 )
-from estuary_cdk.flow import (
-    ConnectorSpec,
-)
+from estuary_cdk.capture.common import ResourceConfigWithSchedule
+from estuary_cdk.flow import ConnectorSpec
 
-from .models import (
-    ConnectorState,
-    EndpointConfig,
-    ResourceConfigWithSchedule,
-)
+from .models import ConnectorState, EndpointConfig
 from .resources import all_resources, validate_credentials
 
 

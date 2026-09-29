@@ -33,7 +33,7 @@ Aircall only serves the last six months of calls through its API, so `calls` is 
 :::
 
 :::tip
-The `contacts` stream re-captures all contacts with periodic backfills. These backfills can be scheduled with the `schedule` resource config setting. By default, `contacts`'s schedule is `0 0 * * *`, which means the stream attempts to backfill every day at 00:00 UTC.
+The `contacts` stream re-captures all contacts with periodic backfills. These backfills can be scheduled with the `schedule` resource config setting. By default, `contacts`'s schedule is `0 0 * * *`, which means the stream attempts to backfill every day at 00:00 UTC. If more than 10,000 contacts change between two polls, the most recent 10,000 are captured right away and the rest are captured by the next scheduled backfill.
 
 Aircall doesn't expose deleted contacts, so contacts deleted in Aircall remain in the collection. Only shared contacts are available through the Aircall API; users' personal contacts are not captured.
 :::

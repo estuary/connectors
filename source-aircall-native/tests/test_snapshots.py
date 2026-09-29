@@ -3,12 +3,11 @@ import subprocess
 
 from pydantic import JsonValue
 
+# Aircall only serves six months of calls, so the test account's seeded calls
+# eventually age out of the API and the stream goes quiet.
+STREAMS_EXCLUDED_FROM_CAPTURE = {"acmeCo/calls"}
+
 FIELDS_TO_REDACT = [
-    # Signed call media links that expire and change on every read.
-    "recording",
-    "voicemail",
-    "recording_short_url",
-    "voicemail_short_url",
     # Live user and number status.
     "availability",
     "availability_status",
@@ -60,7 +59,7 @@ def test_capture(request, snapshot):
 
     for line in lines:
         stream = line[0]
-        if stream not in seen:
+        if stream not in seen and stream not in STREAMS_EXCLUDED_FROM_CAPTURE:
             redact_nested_fields(line[1], FIELDS_TO_REDACT)
             unique_stream_lines.append(line)
             seen.add(stream)

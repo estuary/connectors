@@ -2,18 +2,17 @@ import functools
 from collections.abc import AsyncGenerator, Callable
 from datetime import timedelta
 from logging import Logger
-from typing import Any
 
 from estuary_cdk.capture import Task, common
 from estuary_cdk.capture.common import (
-    Resource,
     ResourceConfigWithSchedule,
     ResourceState,
     SnapshotResource,
     open_binding,
 )
+from estuary_cdk.capture.document import BaseDocument
 from estuary_cdk.flow import CaptureBinding, ValidationError
-from estuary_cdk.http import HTTPError, HTTPMixin, HTTPSession, TokenSource
+from estuary_cdk.http import HTTPError, HTTPMixin, TokenSource
 
 from .api import (
     ONE_SECOND,
@@ -21,17 +20,10 @@ from .api import (
     backfill_contacts,
     fetch_calls,
     fetch_contacts,
+    snapshot_company,
     snapshot_list,
-    snapshot_object,
 )
-from .models import (
-    SNAPSHOT_LIST_STREAMS,
-    SNAPSHOT_OBJECT_STREAMS,
-    AircallReferenceEntity,
-    Call,
-    Contact,
-    EndpointConfig,
-)
+from .models import SNAPSHOT_STREAMS, Call, Contact, EndpointConfig
 from .shared import API, now
 
 REALTIME = "realtime"
@@ -43,19 +35,10 @@ LOOKBACK_LAG = timedelta(hours=24)
 # Contacts are re-backfilled daily to pick up changes the `updated_at` walk
 # cannot see, such as edits to a contact's phone numbers or emails.
 CONTACTS_SCHEDULE = "0 0 * * *"
-
-AircallResource = Resource[
-    AircallReferenceEntity, ResourceConfigWithSchedule, ResourceState
-]
-
-SnapshotFetchFn = Callable[
-    [HTTPSession, type[AircallReferenceEntity], Logger],
-    AsyncGenerator[AircallReferenceEntity, None],
-]
+INTERVAL = timedelta(minutes=5)
 
 
 async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointConfig):
-    """Confirm the configured credentials authenticate against the provider."""
     http.token_source = TokenSource(oauth_spec=None, credentials=config.credentials)
 
     try:
@@ -69,53 +52,40 @@ async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointCon
         raise ValidationError([msg])
 
 
-def snapshot_resources(http: HTTPMixin) -> list[AircallResource]:
+def snapshot_resources(http: HTTPMixin) -> list[common.Resource]:
     def open(
-        stream: type[AircallReferenceEntity],
-        fetch_fn: SnapshotFetchFn,
+        fetch_snapshot: Callable[[Logger], AsyncGenerator[BaseDocument, None]],
         binding: CaptureBinding[ResourceConfigWithSchedule],
         binding_index: int,
         state: ResourceState,
         task: Task,
-        _all_bindings: object,
+        all_bindings,
     ):
-        open_binding(
-            binding,
-            binding_index,
-            state,
-            task,
-            fetch_snapshot=functools.partial(fetch_fn, http, stream),
-        )
+        open_binding(binding, binding_index, state, task, fetch_snapshot=fetch_snapshot)
 
-    fetch_fns: list[tuple[list[type[AircallReferenceEntity]], SnapshotFetchFn]] = [
-        (SNAPSHOT_LIST_STREAMS, snapshot_list),
-        (SNAPSHOT_OBJECT_STREAMS, snapshot_object),
-    ]
+    fetches = {
+        name: functools.partial(snapshot_list, http, endpoint)
+        for name, endpoint in SNAPSHOT_STREAMS.items()
+    }
+    fetches["company"] = functools.partial(snapshot_company, http)
 
-    resources: list[AircallResource] = [
+    return [
         SnapshotResource(
-            name=stream.name,
-            open=functools.partial(open, stream, fetch_fn),
-            initial_config=ResourceConfigWithSchedule(
-                name=stream.name, interval=timedelta(minutes=5)
-            ),
+            name=name,
+            open=functools.partial(open, fetch),
+            initial_config=ResourceConfigWithSchedule(name=name, interval=INTERVAL),
         )
-        for streams, fetch_fn in fetch_fns
-        for stream in streams
+        for name, fetch in fetches.items()
     ]
 
-    return resources
 
-
-def calls(
-    http: HTTPMixin, config: EndpointConfig
-) -> common.Resource[Call, ResourceConfigWithSchedule, ResourceState]:
+def calls(http: HTTPMixin, config: EndpointConfig) -> common.Resource:
     def open(
         binding: CaptureBinding[ResourceConfigWithSchedule],
         binding_index: int,
         state: ResourceState,
         task: Task,
-        _all_bindings: object,
+        all_bindings,
     ):
         open_binding(
             binding,
@@ -132,7 +102,7 @@ def calls(
     cutoff = now().replace(microsecond=0)
 
     return common.Resource(
-        name=Call.name,
+        name="calls",
         key=["/id"],
         model=Call,
         open=open,
@@ -145,22 +115,18 @@ def calls(
             },
             backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None),
         ),
-        initial_config=ResourceConfigWithSchedule(
-            name=Call.name, interval=timedelta(minutes=5)
-        ),
+        initial_config=ResourceConfigWithSchedule(name="calls", interval=INTERVAL),
         schema_inference=True,
     )
 
 
-def contacts(
-    http: HTTPMixin,
-) -> common.Resource[Contact, ResourceConfigWithSchedule, ResourceState]:
+def contacts(http: HTTPMixin) -> common.Resource:
     def open(
         binding: CaptureBinding[ResourceConfigWithSchedule],
         binding_index: int,
         state: ResourceState,
         task: Task,
-        _all_bindings: object,
+        all_bindings,
     ):
         open_binding(
             binding,
@@ -174,7 +140,7 @@ def contacts(
     cutoff = now().replace(microsecond=0)
 
     return common.Resource(
-        name=Contact.name,
+        name="contacts",
         key=["/id"],
         model=Contact,
         open=open,
@@ -183,9 +149,7 @@ def contacts(
             backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None),
         ),
         initial_config=ResourceConfigWithSchedule(
-            name=Contact.name,
-            interval=timedelta(minutes=5),
-            schedule=CONTACTS_SCHEDULE,
+            name="contacts", interval=INTERVAL, schedule=CONTACTS_SCHEDULE
         ),
         schema_inference=True,
     )
@@ -193,11 +157,6 @@ def contacts(
 
 async def all_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig
-) -> list[common.Resource[Any, ResourceConfigWithSchedule, ResourceState]]:
-    """Enumerate every stream the connector exposes."""
+) -> list[common.Resource]:
     http.token_source = TokenSource(oauth_spec=None, credentials=config.credentials)
-    return [
-        calls(http, config),
-        contacts(http),
-        *snapshot_resources(http),
-    ]
+    return [calls(http, config), contacts(http), *snapshot_resources(http)]
