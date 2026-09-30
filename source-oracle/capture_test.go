@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
+	st "github.com/estuary/connectors/source-boilerplate/testing"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/connectors/sqlcapture/tests"
 	"github.com/sirupsen/logrus"
@@ -591,5 +592,69 @@ func TestSourceTag(t *testing.T) {
 	cs.Capture(ctx, t, nil)
 	tb.Insert(ctx, t, tableName, [][]any{{2, "two"}, {3, "three"}})
 	cs.Capture(ctx, t, nil)
+	cupaloy.SnapshotT(t, cs.Summary())
+}
+
+// TestPrimaryKeyUpdate verifies that an UPDATE which changes the primary key is
+// captured as a delete of the old key followed by an insert of the new key.
+func TestPrimaryKeyUpdate(t *testing.T) {
+	var tb, ctx = oracleTestBackend(t), context.Background()
+	var uniqueID = "63510878"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data VARCHAR(32))")
+
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	cs.Validator = &st.OrderedCaptureValidator{}
+	sqlcapture.TestShutdownAfterCaughtUp = true
+	t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = false })
+
+	// Initial backfill
+	tb.Insert(ctx, t, tableName, [][]any{{0, "zero"}, {1, "one"}, {2, "two"}})
+	cs.Capture(ctx, t, nil)
+
+	// Some replication
+	tb.Insert(ctx, t, tableName, [][]any{{3, "three"}, {4, "four"}, {5, "five"}})
+	cs.Capture(ctx, t, nil)
+
+	// Primary key updates
+	tb.Update(ctx, t, tableName, "id", 1, "id", 6)
+	tb.Update(ctx, t, tableName, "id", 4, "id", 7)
+	cs.Capture(ctx, t, nil)
+
+	cupaloy.SnapshotT(t, cs.Summary())
+}
+
+// TestPrimaryKeyUpdateOfOnlyChangesBinding verifies that key-changing updates are
+// captured as delete/insert pairs when the binding skips its backfill.
+func TestPrimaryKeyUpdateOfOnlyChangesBinding(t *testing.T) {
+	var tb, ctx = oracleTestBackend(t), context.Background()
+	var uniqueID = "51329336"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data VARCHAR(32))")
+
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	cs.Validator = &st.OrderedCaptureValidator{}
+	sqlcapture.TestShutdownAfterCaughtUp = true
+	t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = false })
+
+	// Set backfill mode to 'Only Changes'
+	var res sqlcapture.Resource
+	require.NoError(t, json.Unmarshal(cs.Bindings[0].ResourceConfigJson, &res))
+	res.Mode = sqlcapture.BackfillModeOnlyChanges
+	resJSON, err := json.Marshal(res)
+	require.NoError(t, err)
+	cs.Bindings[0].ResourceConfigJson = resJSON
+
+	// Initial backfill
+	tb.Insert(ctx, t, tableName, [][]any{{0, "zero"}, {1, "one"}, {2, "two"}})
+	cs.Capture(ctx, t, nil)
+
+	// Some replication
+	tb.Insert(ctx, t, tableName, [][]any{{3, "three"}, {4, "four"}, {5, "five"}})
+	cs.Capture(ctx, t, nil)
+
+	// Primary key updates
+	tb.Update(ctx, t, tableName, "id", 1, "id", 6)
+	tb.Update(ctx, t, tableName, "id", 4, "id", 7)
+	cs.Capture(ctx, t, nil)
+
 	cupaloy.SnapshotT(t, cs.Summary())
 }
