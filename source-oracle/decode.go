@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
@@ -151,7 +152,10 @@ func decodeUnistr(input string) (string, error) {
 	return val, nil
 }
 
-func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.DatabaseEvent, error) {
+// decodeMessage translates a LogMiner message into change events. An UPDATE which
+// changes the row key becomes a delete of the old row-state followed by an insert
+// of the new row-state, so that no document is left behind at the old key.
+func (s *replicationStream) decodeMessage(msg logminerMessage) ([]sqlcapture.DatabaseEvent, error) {
 	var streamID = sqlcapture.JoinStreamID(msg.Owner, msg.TableName)
 
 	var parser, err = sqlparser.New(sqlparser.Options{})
@@ -297,6 +301,11 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 				}
 				if value != nil {
 					before[key] = value
+				} else {
+					// The undo WHERE clause above populated this key with the row's
+					// *new* value. A NULL old value must not leave that in place, or the
+					// before-state would misdescribe the old row.
+					delete(before, key)
 				}
 			}
 		}
@@ -359,6 +368,19 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 	if err != nil {
 		return nil, fmt.Errorf("error encoding row key for %q: %w", streamID, err)
 	}
+
+	var beforeRowKey []byte
+	if op == sqlcapture.UpdateOp {
+		if missing := missingColumns(keyColumns, before); len(missing) > 0 {
+			logrus.WithFields(logrus.Fields{
+				"stream":  streamID,
+				"scn":     msg.SCN,
+				"missing": missing,
+			}).Debug("before-state lacks key columns, unable to detect a row key change")
+		} else if beforeRowKey, err = sqlcapture.EncodeRowKey(keyColumns, before, columnTypes, encodeKeyFDB); err != nil {
+			return nil, fmt.Errorf("error encoding before row key for %q: %w", streamID, err)
+		}
+	}
 	delete(after, "ROWID")
 	delete(before, "ROWID")
 
@@ -376,6 +398,24 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 		Tag:   s.db.config.Advanced.SourceTag,
 	}
 
+	if beforeRowKey != nil && !bytes.Equal(beforeRowKey, rowKey) {
+		var insertSourceInfo = *sourceInfo
+		return []sqlcapture.DatabaseEvent{
+			&sqlcapture.OldChangeEvent{
+				Operation: sqlcapture.DeleteOp,
+				RowKey:    beforeRowKey,
+				Source:    sourceInfo,
+				Before:    before,
+			},
+			&sqlcapture.OldChangeEvent{
+				Operation: sqlcapture.InsertOp,
+				RowKey:    rowKey,
+				Source:    &insertSourceInfo,
+				After:     after,
+			},
+		}, nil
+	}
+
 	var event = &sqlcapture.OldChangeEvent{
 		Operation: op,
 		RowKey:    rowKey,
@@ -384,5 +424,16 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 		After:     after,
 	}
 
-	return event, nil
+	return []sqlcapture.DatabaseEvent{event}, nil
+}
+
+// missingColumns returns the names in columns which have no value in fields.
+func missingColumns(columns []string, fields map[string]any) []string {
+	var missing []string
+	for _, col := range columns {
+		if _, ok := fields[col]; !ok {
+			missing = append(missing, col)
+		}
+	}
+	return missing
 }

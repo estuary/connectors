@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/c__flow_test_logminer/t63510878": 8 Documents
+# Collection "acmeCo/test/c__flow_test_logminer/t63510878": 10 Documents
 # ================================
 {"DATA":"zero","ID":"0","_meta":{"op":"c","source":{"schema":"C##FLOW_TEST_LOGMINER","snapshot":true,"table":"T63510878","row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
 {"DATA":"one","ID":"1","_meta":{"op":"c","source":{"schema":"C##FLOW_TEST_LOGMINER","snapshot":true,"table":"T63510878","row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
@@ -7,8 +7,10 @@
 {"DATA":"three","ID":"3","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"T63510878","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
 {"DATA":"four","ID":"4","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"T63510878","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
 {"DATA":"five","ID":"5","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"T63510878","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
-{"DATA":"one","ID":"6","_meta":{"op":"u","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"T63510878","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111},"before":{"DATA":"one","ID":"1"}}}
-{"DATA":"four","ID":"7","_meta":{"op":"u","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"T63510878","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111},"before":{"DATA":"four","ID":"4"}}}
+{"DATA":"one","ID":"1","_meta":{"op":"d","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"T63510878","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
+{"DATA":"one","ID":"6","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"T63510878","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
+{"DATA":"four","ID":"4","_meta":{"op":"d","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"T63510878","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
+{"DATA":"four","ID":"7","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"T63510878","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
 # ================================
 # Final State Checkpoint
 # ================================

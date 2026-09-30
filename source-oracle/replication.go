@@ -993,11 +993,16 @@ func (s *replicationStream) emitEvent(ctx context.Context, event sqlcapture.Data
 }
 
 func (s *replicationStream) decodeAndEmitMessage(ctx context.Context, msg logminerMessage) error {
-	var event, err = s.decodeMessage(msg)
+	var events, err = s.decodeMessage(msg)
 	if err != nil {
 		return fmt.Errorf("decode message: %w", err)
 	}
-	return s.emitEvent(ctx, event)
+	for _, event := range events {
+		if err := s.emitEvent(ctx, event); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // in WHERE AST, columns are quoted with backticks for some reason. This function

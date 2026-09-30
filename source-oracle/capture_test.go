@@ -658,3 +658,42 @@ func TestPrimaryKeyUpdateOfOnlyChangesBinding(t *testing.T) {
 
 	cupaloy.SnapshotT(t, cs.Summary())
 }
+
+// TestPrimaryKeyUpdateFromNull verifies that an UPDATE which changes a
+// nullable, user-overridden key column from NULL to a value is not mistaken
+// for a delete of some other row. Oracle's undo SQL cannot express the NULL
+// old value in a way we can trust, so the before-state must omit the column
+// and no key-change delete is emitted.
+//
+// The stale row at (north, NULL) is tolerated; deleting (north, X7) would not
+// be.
+func TestPrimaryKeyUpdateFromNull(t *testing.T) {
+	var tb, ctx = oracleTestBackend(t), context.Background()
+	var uniqueID = "40172655"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(region VARCHAR(32) NOT NULL, code VARCHAR(32), status VARCHAR(16) NOT NULL)")
+
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	cs.Validator = &st.OrderedCaptureValidator{}
+	sqlcapture.TestShutdownAfterCaughtUp = true
+	t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = false })
+
+	// Force a key which includes the nullable column
+	var res sqlcapture.Resource
+	require.NoError(t, json.Unmarshal(cs.Bindings[0].ResourceConfigJson, &res))
+	res.PrimaryKey = []string{"REGION", "CODE"}
+	resJSON, err := json.Marshal(res)
+	require.NoError(t, err)
+	cs.Bindings[0].ResourceConfigJson = resJSON
+	cs.Bindings[0].Collection.Key = res.PrimaryKey
+
+	// Initial backfill
+	tb.Insert(ctx, t, tableName, [][]any{{"north", "X7", "open"}, {"north", nil, "open"}, {"south", "Q1", "closed"}})
+	cs.Capture(ctx, t, nil)
+
+	// Move (north, NULL) to (south, X7). The old row's CODE was NULL, which the
+	// undo SQL cannot convey, so this must not be captured as a delete of (north, X7).
+	tb.Query(ctx, t, true, fmt.Sprintf(`UPDATE %s SET region = 'south', code = 'X7' WHERE region = 'north' AND code IS NULL`, tableName))
+	cs.Capture(ctx, t, nil)
+
+	cupaloy.SnapshotT(t, cs.Summary())
+}
