@@ -188,6 +188,7 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 				NewTransactor:       newTransactor,
 				ConcurrentApply:     true,
 				NoFlowDocument:      cfg.Advanced.NoFlowDocument,
+				KeyChangeInPlace:    true,
 				Options: m.MaterializeOptions{
 					ExtendedLogging: true,
 					AckSchedule: &m.AckScheduleOption{
