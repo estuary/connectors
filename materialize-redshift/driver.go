@@ -297,6 +297,7 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 				NewTransactor:       prepareNewTransactor(templates, caseSensitiveIdentifierEnabled),
 				ConcurrentApply:     true,
 				NoFlowDocument:      cfg.Advanced.NoFlowDocument,
+				KeyChangeInPlace:    true,
 				Options: m.MaterializeOptions{
 					ExtendedLogging: true,
 					AckSchedule: &m.AckScheduleOption{
