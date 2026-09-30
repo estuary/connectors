@@ -34,7 +34,7 @@ runs:
                        --build-arg DOCS_URL=https://go.estuary.dev/${VARIANT} \
                        --tag ghcr.io/estuary/${VARIANT}:${{ inputs.tag_sha }} \
                        --file connector-variant.Dockerfile .;
-          docker image push ghcr.io/estuary/${VARIANT}:${{ inputs.tag_sha }};
+          bash "${{ github.action_path }}/push-with-retry.sh" ghcr.io/estuary/${VARIANT}:${{ inputs.tag_sha }};
         done
 
     - name: Push ${{ inputs.connector }} image(s) with 'dev' and '${{ inputs.tag_version }}' tags
@@ -45,8 +45,8 @@ runs:
           docker image tag ghcr.io/estuary/${VARIANT}:${{ inputs.tag_sha }} ghcr.io/estuary/${VARIANT}:dev;
           docker image tag ghcr.io/estuary/${VARIANT}:${{ inputs.tag_sha }} ghcr.io/estuary/${VARIANT}:${{ inputs.tag_version }};
 
-          docker image push ghcr.io/estuary/${VARIANT}:dev;
-          docker image push ghcr.io/estuary/${VARIANT}:${{ inputs.tag_version }};
+          bash "${{ github.action_path }}/push-with-retry.sh" ghcr.io/estuary/${VARIANT}:dev;
+          bash "${{ github.action_path }}/push-with-retry.sh" ghcr.io/estuary/${VARIANT}:${{ inputs.tag_version }};
         done
 
     - uses: dorny/paths-filter@v2
