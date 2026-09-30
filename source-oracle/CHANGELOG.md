@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-09-29
+
+### Changed
+- An UPDATE which changes a row's primary key (or the capture's custom key
+  columns) is now captured as a delete of the old row followed by an insert of
+  the new row, instead of a single update at the new key. Destinations no longer
+  keep an orphaned row under the old key. This requires the key columns to
+  appear in LogMiner's undo SQL, which primary-key or all-column supplemental
+  logging provides. When they are missing the change is captured as an update,
+  as before.
+
 ## 2026-08-18
 
 ### Added
