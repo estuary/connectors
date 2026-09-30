@@ -64,6 +64,7 @@ __all__ = [
     "ResourceConfig",
     "ResourceState",
     "RestResponseMeta",
+    "Session",
     "default_start_date",
 ]
 
@@ -323,6 +324,73 @@ class Person(HogQLEntity[str]):
     @override
     def get_cursor(self) -> AwareDatetime:
         return self.last_seen_at or self.created_at
+
+
+class Session(HogQLEntity[str]):
+    """One visit to your site or app, aggregated from the events that carry its id.
+
+    PostHog recalculates a session as more events arrive for it, so the same
+    `session_id` is captured several times and converges on its final values.
+    `session_id` joins to `$session_id` on Events, and `distinct_id` to
+    `distinct_id` on Events.
+    """
+
+    resource_name: ClassVar[str] = "Sessions"
+    table_name: ClassVar[str] = "sessions"
+    # Unused: Sessions builds its own WHERE clause from `cursor_expression()`
+    # below, because COALESCE would pick max_inserted_at's epoch-zero over a
+    # real $end_timestamp.
+    cursor_columns: ClassVar[list[str]] = ["max_inserted_at", "$end_timestamp"]
+
+    # A stored column the query can bound the scan by. The cursor is computed
+    # from two columns, so PostHog's backend cannot use it to skip old data;
+    # this one it can. See SESSIONS_ALLOWED_LATENESS in api.py.
+    scan_column: ClassVar[str] = "`$end_timestamp`"
+    # Breaks ties between rows sharing a cursor instant, so a sweep can page
+    # through them in a total order. Unique per session within a project.
+    tiebreak_column: ClassVar[str] = "session_id"
+    # Addressable but absent from `SELECT *`, so column discovery misses them.
+    # Keyed by the name the document carries, valued by the HogQL expression
+    # that produces it, so the SELECT list and the names the row is zipped
+    # against cannot drift apart.
+    extra_columns: ClassVar[dict[str, str]] = {
+        "session_id_v7": "toString(session_id_v7)",
+        "team_id": "team_id",
+        "duration": "duration",
+    }
+
+    id: str = Field(alias="session_id")
+    end_timestamp: AwareDatetime
+    max_inserted_at: AwareDatetime | None = None
+
+    @classmethod
+    def cursor_expression(cls, discovered_columns: list[str]) -> str:
+        """Build the HogQL expression this stream sweeps on, at 1s resolution.
+
+        `max_inserted_at` is ingestion time, which advances whenever any event
+        lands for the session, including a late one carrying an old timestamp.
+        It is the unix epoch on rows written before it existed and absent
+        entirely on instances older than late 2025, so `greatest()` falls back
+        to `$end_timestamp`. That fallback is UNVERIFIED: we have no such
+        instance to probe.
+
+        `toStartOfSecond` matches `get_cursor()`'s resolution, so the server
+        pages in the order the client reconstructs. The tie-break in
+        `_query_sessions` depends on the two agreeing exactly.
+        """
+        latest = (
+            "greatest(max_inserted_at, `$end_timestamp`)"
+            if "max_inserted_at" in discovered_columns
+            else "`$end_timestamp`"
+        )
+        return f"toStartOfSecond({latest})"
+
+    @override
+    def get_cursor(self) -> AwareDatetime:
+        latest = self.end_timestamp
+        if self.max_inserted_at is not None:
+            latest = max(latest, self.max_inserted_at)
+        return latest.replace(microsecond=0)
 
 
 # =============================================================================
