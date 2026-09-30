@@ -10,6 +10,15 @@ on:
   pull_request:
     branches: [main]
 
+  # Push runs only build the connectors a change touches, so a deploy that
+  # failed, or a queued run a newer push replaced, stays missed until the
+  # connector changes again. The nightly run builds and deploys every Python
+  # connector, fixing those within a day and picking up base image updates.
+  # A manual run does the same; it only moves `dev` and version tags on main.
+  schedule:
+    - cron: "0 8 * * *"
+  workflow_dispatch:
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   # Don't cancel in progress builds of main, since that can result in connector

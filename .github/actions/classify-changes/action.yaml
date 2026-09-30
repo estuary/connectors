@@ -39,6 +39,16 @@ runs:
           exit 0
         }
 
+        # Scheduled and manual runs have no change to classify; they exist to
+        # build everything.
+        case "${{ github.event_name }}" in
+          schedule | workflow_dispatch)
+            echo "${{ github.event_name }} run; running both lanes"
+            printf 'python=true\ngo_rust=true\npython_connectors=all\n' >> "$GITHUB_OUTPUT"
+            exit 0
+            ;;
+        esac
+
         # Which paths changed comes from the API rather than from git history
         # for various reasons, mostly to avoid re-engineering the "which paths
         # have changed?" logic ourselves.
