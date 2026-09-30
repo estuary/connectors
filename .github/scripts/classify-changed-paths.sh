@@ -47,10 +47,12 @@ while IFS= read -r path || [ -n "$path" ]; do
 
         # Each workflow is triggered by edits to itself so a change to one
         # verifies itself rather than waiting on an unrelated connector edit.
-        # estuary-cdk.yaml drives its own separate workflow.
+        # estuary-cdk.yaml drives its own separate workflow, and
+        # python-auto-rerun.yaml only re-runs python.yaml's failed jobs.
         .github/workflows/python.yaml) lane="python" ;;
         .github/workflows/ci.yaml) lane="go_rust" ;;
         .github/workflows/estuary-cdk.yaml) lane="none" ;;
+        .github/workflows/python-auto-rerun.yaml) lane="none" ;;
 
         # The Python connector matrix, which python.yaml reads as data.
         .github/python-connectors.yaml) lane="python" ;;
