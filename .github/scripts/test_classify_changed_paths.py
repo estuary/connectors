@@ -94,6 +94,11 @@ class TestLanes(unittest.TestCase):
             classify(".github/workflows/estuary-cdk.yaml"), (False, False, [])
         )
 
+    def test_python_auto_rerun_workflow_triggers_neither_connector_lane(self):
+        self.assertEqual(
+            classify(".github/workflows/python-auto-rerun.yaml"), (False, False, [])
+        )
+
     def test_nested_pyproject_does_not_make_a_go_connector_python(self):
         # materialize-iceberg/python/pyproject.toml exists. Classing its parent as
         # Python would stop ci.yaml building a Go connector.
