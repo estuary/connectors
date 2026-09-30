@@ -106,8 +106,11 @@ runs:
           bash "${{ github.action_path }}/push-with-retry.sh" ghcr.io/estuary/${VARIANT}:${{ inputs.tag_version }};
         done
 
+    # Requeue is for connectors a push changed; scheduled and manual runs
+    # have no push to compare.
     - uses: dorny/paths-filter@v2
       id: filter
+      if: github.event_name == 'push'
       with:
         filters: |
           connector:
