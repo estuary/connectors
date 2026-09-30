@@ -148,6 +148,18 @@ func RunMigrationTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[
 	testutil.RunMigrationTest(t, driver.NewMaterializer, sourcePath, makeResourceFn, actionDescSanitizers)
 }
 
+// RunKeyChangeMigrationTest verifies that a KeyChangeInPlace endpoint keeps
+// its table and data through a group-by changing backfill.
+func RunKeyChangeMigrationTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](
+	t *testing.T,
+	driver *Driver[EC, RC],
+	sourcePath string,
+	makeResourceFn func(string, bool) RC,
+	actionDescSanitizers []func(string) string,
+) {
+	testutil.RunKeyChangeMigrationTest(t, driver, driver.NewMaterializer, sourcePath, makeResourceFn, actionDescSanitizers)
+}
+
 // FeatureFlagMigrationPhase is one apply of a RunFeatureFlagMigrationTest.
 type FeatureFlagMigrationPhase = testutil.FeatureFlagMigrationPhase
 

@@ -1,0 +1,49 @@
+Task: acmeCo/tests/materialize-redshift
+
+Base:
+Resource: key_change_test
+["applied.actionDescription", "\nCREATE TABLE IF NOT EXISTS key_change_test (\n\tid BIGINT,\n\tflow_published_at TIMESTAMPTZ,\n\ttenant TEXT,\n\tvalue TEXT\n);\n\nCOMMENT ON TABLE key_change_test IS 'Generated for materialization acmeCo/tests/materialize-redshift of collection key/change';\nCOMMENT ON COLUMN key_change_test.id IS 'auto-generated projection of JSON at: /id with inferred types: [integer]';\nCOMMENT ON COLUMN key_change_test.flow_published_at IS 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';\nCOMMENT ON COLUMN key_change_test.tenant IS 'auto-generated projection of JSON at: /tenant with inferred types: [string]';\nCOMMENT ON COLUMN key_change_test.value IS 'auto-generated projection of JSON at: /value with inferred types: [string]';\n"]
+["applied.actionDescription", ""]
+
+{"Name":"flow_published_at","Nullable":true,"Type":"timestamp with time zone"}
+{"Name":"id","Nullable":true,"Type":"bigint"}
+{"Name":"tenant","Nullable":true,"Type":"character varying"}
+{"Name":"value","Nullable":true,"Type":"character varying"}
+
+Table Data:
+{"flow_published_at":"1970-01-01T00:00:00Z","id":1,"tenant":"a","value":"one"}
+{"flow_published_at":"1970-01-01T00:00:01Z","id":2,"tenant":"a","value":"two"}
+{"flow_published_at":"1970-01-01T00:00:02Z","id":3,"tenant":"b","value":"three"}
+
+Group-by changed with backfill:
+Resource: key_change_test
+
+{"Name":"flow_published_at","Nullable":true,"Type":"timestamp with time zone"}
+{"Name":"id","Nullable":true,"Type":"bigint"}
+{"Name":"tenant","Nullable":true,"Type":"character varying"}
+{"Name":"value","Nullable":true,"Type":"character varying"}
+
+Table Data:
+{"flow_published_at":"1970-01-01T00:00:00Z","id":1,"tenant":"a","value":"one"}
+{"flow_published_at":"1970-01-01T00:00:01Z","id":2,"tenant":"a","value":"two"}
+{"flow_published_at":"1970-01-01T00:00:02Z","id":3,"tenant":"b","value":"three"}
+
+Materialized under the new group-by:
+Resource: key_change_test
+["applied.actionDescription", "ALTER TABLE key_change_test ADD COLUMN flow_document SUPER;"]
+["applied.actionDescription", ""]
+
+{"Name":"flow_document","Nullable":true,"Type":"super"}
+{"Name":"flow_published_at","Nullable":true,"Type":"timestamp with time zone"}
+{"Name":"id","Nullable":true,"Type":"bigint"}
+{"Name":"tenant","Nullable":true,"Type":"character varying"}
+{"Name":"value","Nullable":true,"Type":"character varying"}
+
+Table Data:
+{"flow_document":{"_meta":{"uuid":"13814000-1dd2-11b2-8000-071353030311"},"id":1,"tenant":"a","value":"one-updated"},"flow_published_at":"1970-01-01T00:00:00Z","id":1,"tenant":"a","value":"one-updated"}
+{"flow_document":null,"flow_published_at":"1970-01-01T00:00:01Z","id":2,"tenant":"a","value":"two"}
+{"flow_document":{"_meta":{"uuid":"1419d680-1dd2-11b2-8000-071353030311"},"id":2,"tenant":"c","value":"two-moved"},"flow_published_at":"1970-01-01T00:00:01Z","id":2,"tenant":"c","value":"two-moved"}
+{"flow_document":null,"flow_published_at":"1970-01-01T00:00:02Z","id":3,"tenant":"b","value":"three"}
+{"flow_document":{"_meta":{"uuid":"14b26d00-1dd2-11b2-8000-071353030311"},"id":4,"tenant":"b","value":"four"},"flow_published_at":"1970-01-01T00:00:02Z","id":4,"tenant":"b","value":"four"}
+
+

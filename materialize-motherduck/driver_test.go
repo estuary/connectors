@@ -32,6 +32,7 @@ type integrationVariant struct {
 	materializeSpec string
 	applySpec       string
 	migrateSpec     string
+	keyChangeSpec   string
 	fenceSpec       string
 }
 
@@ -44,6 +45,7 @@ var (
 		materializeSpec: "testdata/materialize.flow.yaml",
 		applySpec:       "testdata/apply.flow.yaml",
 		migrateSpec:     "testdata/migrate.flow.yaml",
+		keyChangeSpec:   "testdata/key-change.flow.yaml",
 		fenceSpec:       "testdata/fence.flow.yaml",
 	}
 
@@ -54,6 +56,7 @@ var (
 		materializeSpec: "testdata/materialize.ducklake.flow.yaml",
 		applySpec:       "testdata/apply.ducklake.flow.yaml",
 		migrateSpec:     "testdata/migrate.ducklake.flow.yaml",
+		keyChangeSpec:   "testdata/key-change.ducklake.flow.yaml",
 	}
 )
 
@@ -105,6 +108,9 @@ func runIntegrationSuite(t *testing.T, variant integrationVariant) {
 
 	t.Run("migrate", func(t *testing.T) {
 		sql.RunMigrationTest(t, NewDriver(), variant.migrateSpec, makeTestResource, nil)
+	})
+	t.Run("key-change-migrate", func(t *testing.T) {
+		sql.RunKeyChangeMigrationTest(t, NewDriver(), variant.keyChangeSpec, makeTestResource, nil)
 	})
 }
 
