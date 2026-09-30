@@ -160,6 +160,8 @@ type Endpoint[EC boilerplate.EndpointConfiger] struct {
 	ConcurrentApply bool
 	// NoFlowDocument indicates whether flow_document projection should be optional (true) or mandatory (false)
 	NoFlowDocument bool
+	// KeyChangeInPlace indicates that key changes don't require re-creating the table.
+	KeyChangeInPlace bool
 	// Options are general materialization options that apply to this task.
 	Options m.MaterializeOptions
 }

@@ -79,6 +79,10 @@ type MaterializeCfg struct {
 	// result in a resource deletion + re-creation.
 	NoTruncateResources bool
 
+	// KeyChangeInPlace indicates that a backfill with a changed collection key
+	// does not require re-creating the resource.
+	KeyChangeInPlace bool
+
 	// Serialization policy to use for all bindings of this materialization.
 	SerPolicy *pf.SerPolicy
 
@@ -614,7 +618,7 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 			// For simplicity, if the collection key has changed the resource
 			// will be re-created, although theoretically some systems could
 			// handle this change without fully dropping & re-creating.
-			if !slices.Equal(lastBinding.Collection.Key, thisBinding.Collection.Key) {
+			if !mCfg.KeyChangeInPlace && !slices.Equal(lastBinding.Collection.Key, thisBinding.Collection.Key) {
 				doTruncate = false
 			}
 

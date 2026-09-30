@@ -141,6 +141,7 @@ func (s *sqlMaterialization[EC, RC]) Config() boilerplate.MaterializeCfg {
 		CaseInsensitiveFields:    s.endpoint.Dialect.CaseInsensitiveColumns,
 		CaseInsensitiveResources: s.endpoint.Dialect.CaseInsensitiveResources,
 		ConcurrentApply:          s.endpoint.ConcurrentApply,
+		KeyChangeInPlace:         s.endpoint.KeyChangeInPlace,
 		NoCreateNamespaces:       !doCreateSchemas,
 		SerPolicy:                s.endpoint.SerPolicy,
 		MaterializeOptions:       s.endpoint.Options,
