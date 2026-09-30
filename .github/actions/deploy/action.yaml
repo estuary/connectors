@@ -31,6 +31,7 @@ runs:
         for VARIANT in ${{ inputs.connector }} ${{ inputs.variants }}; do
           echo "Building and pushing ${VARIANT}:${{ inputs.tag }}...";
           docker build --build-arg BASE_CONNECTOR=ghcr.io/estuary/${{ inputs.connector }}:local \
+                       --label org.opencontainers.image.revision=${{ github.sha }} \
                        --build-arg DOCS_URL=https://go.estuary.dev/${VARIANT} \
                        --tag ghcr.io/estuary/${VARIANT}:${{ inputs.tag_sha }} \
                        --file connector-variant.Dockerfile .;
