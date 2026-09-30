@@ -4,6 +4,88 @@ This file collects the conventions a contributor needs to know when
 submitting a PR. It's intentionally short; expand sections as patterns
 solidify.
 
+## Commits & pull requests
+
+These conventions build on GitHub's
+[Write Better Commits, Build Better Projects](https://github.blog/developer-skills/github/write-better-commits-build-better-projects/)
+post. Commit messages follow the [scoped commits](https://scopedcommits.com/)
+style.
+
+### Commit messages
+
+Commit subjects use a `<component>: <what changed>` format. The component
+is a connector, a shared package like `sqlcapture` or `estuary-cdk`, or an
+area like `docs` or `ci`. For changes spanning multiple connectors, use
+shorthand like `{source,materialize}-mongodb` or `source-*`.
+
+The subject should say what the commit does, and the body should explain
+why it's needed. When it's useful, also describe the approach taken or how
+the change was tested. If a commit is a refactor with no behavior change,
+say so. Commits with a self-explanatory subject, like a changelog entry,
+don't need a body.
+
+```
+source-postgres: Default 2m statement_timeout
+
+For historical reasons we defaulted to an unlimited statement
+timeout. This is probably not the right default behavior in the
+general case since it overrides any database-default timeouts
+_and_ an unlimited query timeout can cause issues in prod DBs.
+
+After this change we will default to `2m` and if a user wants to
+let backfill queries run longer than that they are free to raise
+the timeout or set it to `0` for unlimited.
+```
+
+### Structuring commits
+
+`main` should have a linear history where every commit is small and
+atomic. A small commit has minimal scope and does one thing. An atomic
+commit is a stable, independent unit of change. The repo should still
+build and pass tests at every commit. That keeps `git bisect` usable and
+makes it possible to revert a commit on its own if needed.
+
+Larger changes should be split into a sequence of commits. Avoid mixing
+different kinds of changes in the same commit. For example, a bug fix, a
+refactor, and a formatting change should each be their own commit.
+Changelog entries, docs updates, and re-encrypted test credentials can be
+separate commits too. Bruno collections should go in their own commit
+since they are often large and clutter the diff. When making
+the same change across multiple connectors, use one commit per connector.
+
+Order the commits so each one builds on the last. Refactors go before the
+behavior change that depends on them, and test infrastructure like a
+benchmark goes before the change it validates.
+
+Some examples:
+
+- [#5286](https://github.com/estuary/connectors/pull/5286) makes a couple
+  of incidental fixes and a refactor before fixing the bug.
+- [#5180](https://github.com/estuary/connectors/pull/5180) makes a
+  multi-step behavior change where each commit is safe on its own.
+- [#5119](https://github.com/estuary/connectors/pull/5119) adds a
+  benchmark and then the optimization it measures.
+- [#5312](https://github.com/estuary/connectors/pull/5312) applies the
+  same fix to two connectors in separate commits.
+
+### Pull requests
+
+PR titles use the same `<component>: <summary>` format as commits. The
+description should summarize what the PR changes and why at a high level.
+Call out any effect on existing tasks. Use the template's "Notes for
+reviewers" section for anything that helps with review, like how the
+commits are organized, open questions, or planned follow-up work. Link the
+related issue or Slack thread too.
+
+Before merging, clean up your PR's commits so no "WIP", "fix typo", or
+"address review comments" commits end up on `main`. Review feedback should
+be folded into the commit it belongs to. You can use
+`git commit --fixup=<sha>` and then
+`git rebase -i --autosquash origin/main` to do this. CI only tests the
+final commit in a PR, so check that the earlier commits build and pass
+tests too. `git rebase --exec "<test command>" origin/main` runs a command
+at each commit.
+
 ## Encrypting test credentials
 
 In order to support rapid connector development, we would like to include encrypted credentials alongside each connector wherever feasible. This allows both easily automated testing, as well as allowing other people to quickly run all connectors that have credentials. Fortunately, Flow has built-in support for encrypted credentials through the use of [`sops`](https://github.com/getsops/sops).
