@@ -27,7 +27,7 @@ import (
 type config struct {
 	Address                 string            `json:"address" jsonschema:"title=Address" jsonschema_extras:"order=0"`
 	KnownHosts              string            `json:"knownHosts,omitempty" jsonschema:"title=SSH Known Hosts" jsonschema_extras:"order=1,multiline=true"`
-	SkipHostKeyVerification bool              `json:"skipHostKeyVerification,omitempty" jsonschema:"title=Skip Host Key Verification" jsonschema_extras:"order=2,nonsensitive=true,x-hidden-field=true"`
+	SkipHostKeyVerification bool              `json:"skipHostKeyVerification,omitempty" jsonschema:"title=Skip Host Key Verification" jsonschema_extras:"order=2,nonsensitive=true"`
 	Username                string            `json:"username" jsonschema:"-"`
 	Password                string            `json:"password" jsonschema:"-"`
 	Directory               string            `json:"directory" jsonschema:"title=Directory" jsonschema_extras:"order=4"`
@@ -39,9 +39,9 @@ type config struct {
 
 const knownHostsDescription = "Host keys of the SFTP server in OpenSSH known_hosts format, one per line: the output of `ssh-keyscan -p 2222 myserver.com`, for example `[myserver.com]:2222 ssh-ed25519 AAAA...`."
 
-var errMissingKnownHosts = errors.New("missing SSH Known Hosts: paste the host keys of the SFTP server, as printed by `ssh-keyscan -p <port> <host>`")
+var errMissingKnownHosts = errors.New("missing SSH Known Hosts: paste the host keys of the SFTP server, as printed by `ssh-keyscan -p <port> <host>`, or set Skip Host Key Verification to connect without verifying the server")
 
-const skipHostKeyVerificationDescription = "Connect without verifying the SFTP server's host key."
+const skipHostKeyVerificationDescription = "Connect without verifying the SFTP server's host key. This leaves the capture open to man-in-the-middle attacks."
 
 func (config) GetFieldDocString(fieldName string) string {
 	switch fieldName {
@@ -515,8 +515,7 @@ func configSchema(parserSchema json.RawMessage) json.RawMessage {
             "description": ` + string(skipHostKeyVerificationDescriptionJSON) + `,
             "default": false,
             "order": 2,
-            "nonsensitive": true,
-            "x-hidden-field": true
+            "nonsensitive": true
           },
           "credentials": {
             "type": "object",
