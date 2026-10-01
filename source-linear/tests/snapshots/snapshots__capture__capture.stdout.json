@@ -144,22 +144,26 @@
     "acmeCo/labels",
     {
       "_meta": {
+        "op": "c",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "archivedAt": null,
-      "color": "#4EA7FC",
-      "createdAt": "2026-07-30T21:35:03.808000Z",
-      "creator": null,
+      "color": "#bec2c8",
+      "createdAt": "2026-10-01T18:58:07.880Z",
+      "creator": {
+        "id": "8ef0e033-440f-4809-b0ff-6a68821fc413"
+      },
       "description": null,
-      "id": "274d6628-3101-41c1-96bd-27241c8301b5",
+      "id": "e962dbd0-9fdb-44a1-ac36-c4bf658f06d2",
       "inheritedFrom": null,
       "isGroup": false,
       "lastAppliedAt": null,
-      "name": "Improvement",
+      "name": "Test",
       "parent": null,
       "retiredAt": null,
       "team": null,
-      "updatedAt": "2026-07-30T21:35:03.808000Z"
+      "updatedAt": "2026-10-01T18:58:07.880Z"
     }
   ]
 ]

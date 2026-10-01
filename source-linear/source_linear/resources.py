@@ -13,15 +13,14 @@ from .api import (
     floor_to_tick,
     backfill_initiatives,
     backfill_issues,
-    backfill_labels,
     backfill_projects,
     fetch_initiatives,
     fetch_issues,
-    fetch_labels,
     fetch_projects,
+    snapshot_labels,
 )
 from .models import (
-    ALL_RESOURCES,
+    INCREMENTAL_RESOURCES,
     EndpointConfig,
     Initiative,
     Issue,
@@ -67,13 +66,12 @@ async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointCon
         raise ValidationError([msg])
 
 
-# Every stream is incremental + backfill on the same `updatedAt` cursor, so one builder
-# covers all four; only the fetch pair differs.
+# Every incremental stream is incremental + backfill on the same `updatedAt` cursor, so one
+# builder covers all three; only the fetch pair differs.
 _FETCHERS = {
     Issue: (fetch_issues, backfill_issues),
     Project: (fetch_projects, backfill_projects),
     Initiative: (fetch_initiatives, backfill_initiatives),
-    IssueLabel: (fetch_labels, backfill_labels),
 }
 
 
@@ -119,10 +117,42 @@ def _resource(
     )
 
 
+def _labels(http: HTTPMixin) -> common.Resource:
+    """Labels are re-read in full each interval; see `IssueLabel` for why.
+
+    A label absent from a snapshot is emitted as a deletion, so labels deleted in Linear
+    are removed downstream. `start_date` does not apply.
+    """
+
+    def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        _all_bindings,
+    ):
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_snapshot=functools.partial(snapshot_labels, http),
+        )
+
+    return common.SnapshotResource(
+        name=IssueLabel.name,
+        open=open,
+        initial_config=ResourceConfig(name=IssueLabel.name, interval=timedelta(minutes=5)),
+    )
+
+
 async def all_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
     """Enumerate every stream the connector exposes."""
     http.token_source = _token_source(config)
 
-    return [_resource(entity, http, config) for entity in ALL_RESOURCES]
+    return [
+        *(_resource(entity, http, config) for entity in INCREMENTAL_RESOURCES),
+        _labels(http),
+    ]

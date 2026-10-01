@@ -25,11 +25,13 @@ Two API behaviors drive the implementation, neither documented by Linear — bot
 established by probe, and the requests that prove them are in `bruno/`:
 
 - **`orderBy` is descending-only**, and its enum members carry null schema descriptions.
-  Three of the four root fields also accept `sort`, which allows an ascending walk;
-  `issueLabels` rejects it. Windows are therefore `(cursor, horizon]` over a fully-elapsed
-  tick, which keeps the exclusive lower bound safe in either direction.
+  The three incremental root fields also accept `sort`, which allows an ascending walk.
+  Windows are `(cursor, horizon]` over a fully-elapsed tick.
+- **Applying a label does not advance the label's `updatedAt`**, only its `lastAppliedAt`.
+  `labels` is therefore a full snapshot each interval rather than an `updatedAt` cursor,
+  which also lets it observe archival and deletion. `start_date` does not apply to it.
 - **Archiving does not advance `updatedAt`.** Only `IssueFilter` exposes an `archivedAt`
-  comparator, so Issues gets a second cursored pass and the other three streams cannot
+  comparator, so Issues gets a second cursored pass; Projects and Initiatives cannot
   observe archival at all.
 
 `bruno/` is the evidence record: account-wide constraints in `collection.bru`, per-endpoint

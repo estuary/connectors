@@ -10,7 +10,7 @@ collections:
   acmeCo/labels:
     schema: labels.schema.yaml
     key:
-    - /id
+    - /_meta/row_id
   acmeCo/projects:
     schema: projects.schema.yaml
     key:

@@ -35,7 +35,7 @@ class ApiKey(AccessToken):
 
 class EndpointConfig(BaseModel):
     start_date: AwareDatetime = Field(
-        description="UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated. If left blank, the start date will be set to 30 days before the present.",
+        description="UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated, except labels, which are always captured in full. If left blank, the start date will be set to 30 days before the present.",
         title="Start Date",
         default_factory=default_start_date,
     )
@@ -118,22 +118,26 @@ LABEL_SELECTION = """
 """
 
 
-class LinearResource(BaseDocument, extra="allow"):
+class LinearEntity(BaseDocument, extra="allow"):
     """One Relay connection on Linear's single GraphQL endpoint."""
 
     name: ClassVar[str]
     root_field: ClassVar[str]
     selection: ClassVar[str]
+
+    id: str
+
+
+class LinearResource(LinearEntity):
+    """An entity captured incrementally on its `updatedAt` clock, sorted ascending."""
+
     CURSOR_FIELD: ClassVar[str] = "updatedAt"
     # Second clock, set only where archival is separately detectable: `IssueFilter` is the
     # one filter type exposing an `archivedAt` comparator.
     ARCHIVAL_CURSOR_FIELD: ClassVar[str | None] = None
-    # False means `orderBy` only, which is descending-only. `issueLabels` rejects `sort`.
-    supports_sort: ClassVar[bool]
 
     # Required rather than defensively read: the cursor logic depends on these, so a
     # provider shape change should fail at validation rather than silently emit nothing.
-    id: str
     createdAt: AwareDatetime
     updatedAt: AwareDatetime
     # The tombstone. Archiving does not advance `updatedAt`, so this field — not cursor
@@ -149,7 +153,6 @@ class Issue(LinearResource):
     name: ClassVar[str] = "issues"
     root_field: ClassVar[str] = "issues"
     selection: ClassVar[str] = ISSUE_SELECTION
-    supports_sort: ClassVar[bool] = True
     ARCHIVAL_CURSOR_FIELD: ClassVar[str | None] = "archivedAt"
 
 
@@ -157,24 +160,27 @@ class Project(LinearResource):
     name: ClassVar[str] = "projects"
     root_field: ClassVar[str] = "projects"
     selection: ClassVar[str] = PROJECT_SELECTION
-    supports_sort: ClassVar[bool] = True
 
 
 class Initiative(LinearResource):
     name: ClassVar[str] = "initiatives"
     root_field: ClassVar[str] = "initiatives"
     selection: ClassVar[str] = INITIATIVE_SELECTION
-    supports_sort: ClassVar[bool] = True
 
 
-class IssueLabel(LinearResource):
+class IssueLabel(LinearEntity):
+    """Captured as a full snapshot rather than on an `updatedAt` cursor.
+
+    Applying a label stamps its `lastAppliedAt` but never advances its `updatedAt`, so a
+    cursor would miss label activity and every label untouched since `start_date`.
+    """
+
     name: ClassVar[str] = "labels"
     root_field: ClassVar[str] = "issueLabels"
     selection: ClassVar[str] = LABEL_SELECTION
-    supports_sort: ClassVar[bool] = False
 
 
-ALL_RESOURCES: list[type[LinearResource]] = [Issue, Project, Initiative, IssueLabel]
+INCREMENTAL_RESOURCES: list[type[LinearResource]] = [Issue, Project, Initiative]
 
 
 class PageInfo(BaseModel, extra="allow"):

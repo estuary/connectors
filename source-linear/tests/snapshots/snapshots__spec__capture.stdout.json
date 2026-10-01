@@ -29,7 +29,7 @@
       },
       "properties": {
         "start_date": {
-          "description": "UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated. If left blank, the start date will be set to 30 days before the present.",
+          "description": "UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated, except labels, which are always captured in full. If left blank, the start date will be set to 30 days before the present.",
           "format": "date-time",
           "title": "Start Date",
           "type": "string"

@@ -342,41 +342,9 @@
         "_meta": {
           "$ref": "#/$defs/Meta",
           "description": "Document metadata"
-        },
-        "id": {
-          "title": "Id",
-          "type": "string"
-        },
-        "createdAt": {
-          "format": "date-time",
-          "title": "Createdat",
-          "type": "string"
-        },
-        "updatedAt": {
-          "format": "date-time",
-          "title": "Updatedat",
-          "type": "string"
-        },
-        "archivedAt": {
-          "anyOf": [
-            {
-              "format": "date-time",
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Archivedat"
         }
       },
-      "required": [
-        "id",
-        "createdAt",
-        "updatedAt"
-      ],
-      "title": "IssueLabel",
+      "title": "BaseDocument",
       "type": "object",
       "x-infer-schema": true,
       "if": {
@@ -404,7 +372,7 @@
       }
     },
     "key": [
-      "/id"
+      "/_meta/row_id"
     ]
   }
 ]

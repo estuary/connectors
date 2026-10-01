@@ -2,7 +2,7 @@ import asyncio
 from collections.abc import Mapping
 from datetime import datetime, timedelta, UTC
 from logging import Logger
-from typing import Any, AsyncGenerator
+from typing import Any, AsyncGenerator, TypeVar
 
 from estuary_cdk.capture.common import LogCursor, PageCursor
 from estuary_cdk.http import HTTPError, HTTPSession
@@ -12,11 +12,15 @@ from .models import (
     Initiative,
     Issue,
     IssueLabel,
+    LinearEntity,
     LinearGraphQLRemainder,
     LinearResource,
     PageInfo,
     Project,
 )
+
+# PEP 695 syntax needs Python 3.12; this connector still targets ^3.11.
+_Entity = TypeVar("_Entity", bound=LinearEntity)
 
 # Linear exposes a single GraphQL endpoint. Every stream POSTs a different query document to
 # this URL rather than hitting per-resource REST paths, so there are no path segments to
@@ -63,45 +67,56 @@ def _horizon() -> datetime:
     return floor_to_tick(datetime.now(tz=UTC)) - TICK
 
 
-def _connection_query(
-    entity: type[LinearResource],
-    *,
-    paginated: bool,
-    archival: bool = False,
+def _query_document(
+    entity: type[LinearEntity], args: list[str], declarations: list[str], *, paginated: bool
 ) -> str:
-    """Build the document for one page of `entity`'s Relay connection."""
-    cursor_field = entity.ARCHIVAL_CURSOR_FIELD if archival else entity.CURSOR_FIELD
+    """Build the document for one page of `entity`'s Relay connection.
 
-    args = [
-        "first: $first",
-        # Mandatory on every request, not only the archival pass: without it archived rows
-        # are unreachable by any means, and their absence is indistinguishable from
-        # "nothing was archived".
-        "includeArchived: true",
-        f"filter: {{ {cursor_field}: {{ gt: $after_ts, lte: $through }} }}",
-    ]
+    `includeArchived` is set on every request: without it archived rows are unreachable by
+    any means, and their absence is indistinguishable from "nothing was archived".
+    """
+    args = ["first: $first", "includeArchived: true", *args]
+    declarations = ["$first: Int!", *declarations]
     if paginated:
         args.append("after: $after")
-
-    # The archival pass cannot be sorted — `IssueSortInput` exposes no `archivedAt` member —
-    # so it always walks in the connection's default order.
-    if entity.supports_sort and not archival:
-        args.append(f"sort: [{{{cursor_field}: {{order: Ascending}}}}]")
-    elif not entity.supports_sort:
-        args.append(f"orderBy: {cursor_field}")
-
-    declarations = "$first: Int!, $after_ts: DateTimeOrDuration!, $through: DateTimeOrDuration!"
-    if paginated:
-        declarations += ", $after: String"
+        declarations.append("$after: String")
 
     return f"""
-query Fetch({declarations}) {{
+query Fetch({", ".join(declarations)}) {{
   {entity.root_field}({", ".join(args)}) {{
     nodes {{ {entity.selection} }}
     pageInfo {{ hasNextPage endCursor }}
   }}
 }}
 """
+
+
+def _connection_query(
+    entity: type[LinearResource],
+    *,
+    paginated: bool,
+    archival: bool = False,
+) -> str:
+    """One page of `entity`'s rows whose cursor field falls in `(after_ts, through]`."""
+    cursor_field = entity.ARCHIVAL_CURSOR_FIELD if archival else entity.CURSOR_FIELD
+
+    args = [f"filter: {{ {cursor_field}: {{ gt: $after_ts, lte: $through }} }}"]
+    # The archival pass cannot be sorted — `IssueSortInput` exposes no `archivedAt` member —
+    # so it walks in the connection's default order.
+    if not archival:
+        args.append(f"sort: [{{{cursor_field}: {{order: Ascending}}}}]")
+
+    return _query_document(
+        entity,
+        args,
+        ["$after_ts: DateTimeOrDuration!", "$through: DateTimeOrDuration!"],
+        paginated=paginated,
+    )
+
+
+def _snapshot_query(entity: type[LinearEntity], *, paginated: bool) -> str:
+    """One page of all of `entity`'s rows, archived ones included."""
+    return _query_document(entity, [], [], paginated=paginated)
 
 
 def _budget_delay(
@@ -165,7 +180,7 @@ async def _throttle(log: Logger, headers: Mapping[str, str]) -> None:
 
 
 def _check_errors(
-    log: Logger, entity: type[LinearResource], remainder: LinearGraphQLRemainder
+    log: Logger, entity: type[LinearEntity], remainder: LinearGraphQLRemainder
 ) -> None:
     """Raise unless the response carries usable rows.
 
@@ -198,12 +213,12 @@ def _check_errors(
 
 
 async def _execute(
-    entity: type[LinearResource],
+    entity: type[_Entity],
     http: HTTPSession,
     log: Logger,
     query: str,
     variables: dict[str, Any],
-) -> tuple[list[LinearResource], PageInfo]:
+) -> tuple[list[_Entity], PageInfo]:
     """POST one query document and return its rows plus pagination state."""
     try:
         headers, body = await http.request_stream(
@@ -412,21 +427,17 @@ async def _backfill(
                      │                              └─ last backfilled tick
                      └─ start of history; boundary instant is not load-bearing
 
-    The walk consumes the window from whichever end it can sort from, so the resume value
-    bounds that end: an ascending walk raises `gt`, a descending one lowers `lte`.
-    Archived rows need no special handling — `includeArchived` is always set and an
-    archived row keeps the `updatedAt` of its last real edit.
+    The walk ascends, so a resume value raises `gt`. Archived rows need no special
+    handling — `includeArchived` is always set and an archived row keeps the `updatedAt`
+    of its last real edit.
     """
     assert isinstance(cutoff, datetime)
 
     # Backfill owns everything strictly below the cutoff; incremental owns the cutoff tick
     # onward, so the two meet with no gap and no overlap.
-    backfill_end = floor_to_tick(cutoff) - TICK
+    through = floor_to_tick(cutoff) - TICK
     resume = datetime.fromisoformat(page) if isinstance(page, str) else None
-
-    ascending = entity.supports_sort
-    after_ts = resume if (ascending and resume is not None) else start_date
-    through = (resume - TICK) if (not ascending and resume is not None) else backfill_end
+    after_ts = resume if resume is not None else start_date
 
     if after_ts >= through:
         return
@@ -485,13 +496,6 @@ async def fetch_initiatives(
         yield item
 
 
-async def fetch_labels(
-    http: HTTPSession, log: Logger, log_cursor: LogCursor
-) -> AsyncGenerator[LinearResource | LogCursor, None]:
-    async for item in _fetch_changes(IssueLabel, http, log, log_cursor):
-        yield item
-
-
 async def backfill_issues(
     http: HTTPSession, start_date: datetime, log: Logger, page: PageCursor, cutoff: LogCursor
 ) -> AsyncGenerator[LinearResource | PageCursor, None]:
@@ -513,8 +517,31 @@ async def backfill_initiatives(
         yield item
 
 
-async def backfill_labels(
-    http: HTTPSession, start_date: datetime, log: Logger, page: PageCursor, cutoff: LogCursor
-) -> AsyncGenerator[LinearResource | PageCursor, None]:
-    async for item in _backfill(IssueLabel, http, start_date, log, page, cutoff):
+async def _snapshot(
+    entity: type[_Entity], http: HTTPSession, log: Logger
+) -> AsyncGenerator[_Entity, None]:
+    """Yield every row of `entity`, archived ones included, regardless of age."""
+    after: str | None = None
+
+    while True:
+        variables: dict[str, Any] = {"first": MAX_PAGE_SIZE}
+        if after is not None:
+            variables["after"] = after
+
+        query = _snapshot_query(entity, paginated=after is not None)
+        nodes, page_info = await _execute(entity, http, log, query, variables)
+
+        for node in nodes:
+            yield node
+
+        if not page_info.hasNextPage or not page_info.endCursor:
+            return
+
+        after = page_info.endCursor
+
+
+async def snapshot_labels(
+    http: HTTPSession, log: Logger
+) -> AsyncGenerator[IssueLabel, None]:
+    async for item in _snapshot(IssueLabel, http, log):
         yield item

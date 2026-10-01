@@ -14,10 +14,14 @@ It authenticates with a Linear [personal API key](https://linear.app/developers/
 | `issues`      | Issues across every team the authenticating user can access.                     | Incremental + backfill  |
 | `projects`    | Projects, including their status, dates, and progress.                           | Incremental + backfill  |
 | `initiatives` | Initiatives and their owning relationships. Requires a paid Linear plan.         | Incremental + backfill  |
-| `labels`      | Issue labels, both workspace-level and team-level.                               | Incremental + backfill  |
+| `labels`      | Issue labels, both workspace-level and team-level.                               | Snapshot                |
 
-Every stream is keyed on `/id` and cursored on `updatedAt`. After the initial backfill, each
-sync captures only records changed since the previous sync.
+`issues`, `projects`, and `initiatives` are keyed on `/id` and cursored on `updatedAt`. After
+the initial backfill, each sync captures only records changed since the previous sync.
+
+`labels` is re-read in full every interval, because applying a label to an issue does not
+advance the label's `updatedAt`. Every label is captured regardless of the start date, and
+each row carries a `/_meta/row_id` key instead of `/id`.
 
 Only primary keys, cursors, and the `archivedAt` tombstone are declared on the write schema;
 all remaining fields are populated by schema inference, so new Linear fields appear
@@ -35,7 +39,10 @@ different consequence per stream, and it affects how you should interpret captur
   with `archivedAt` set — treat that as the tombstone. Do **not** infer archival from
   `updatedAt` movement, which does not change when an issue is archived.
 
-- **`projects`, `initiatives`, and `labels` do not capture archival.** Linear's API exposes no
+- **`labels` capture archival and deletion.** Each snapshot includes archived labels with
+  `archivedAt` set, and a label deleted in Linear is removed from your destination.
+
+- **`projects` and `initiatives` do not capture archival.** Linear's API exposes no
   `archivedAt` filter for these types, so there is no way to detect archival incrementally. A
   record archived or deleted in Linear **remains in your destination indefinitely with a null
   `archivedAt`**, indistinguishable from a live record. Re-running a full backfill of the
@@ -90,7 +97,7 @@ See [connectors](../../../concepts/connectors.md#using-connectors) to learn more
 | ------------------------------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | ---------------- |
 | **`/credentials`**              | Authentication | Linear API key credentials.                                                                                                                        | object | Required         |
 | **`/credentials/access_token`** | API Key        | Linear personal API key, created under Settings > Security & access > Personal API keys.                                                            | string | Required         |
-| `/start_date`                   | Start Date     | UTC date and time from which to start replicating data. Data generated before this date is not replicated. Defaults to 30 days before the present. | string | 30 days ago      |
+| `/start_date`                   | Start Date     | UTC date and time from which to start replicating data. Data generated before this date is not replicated, except labels, which are always captured in full. Defaults to 30 days before the present. | string | 30 days ago      |
 
 #### Bindings
 
