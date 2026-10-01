@@ -24,15 +24,19 @@ COPY source-kafka/Cargo.* /connector/
 # dependency twice. Release is the cheaper profile to share -- `cargo test
 # --release` reuses all but the dev-dependencies of the release build, and
 # clippy then compiles nothing.
-RUN mkdir src \
+# Cargo refuses to load the manifest if a declared bench target's file is
+# missing, so the bench gets a stub too even though nothing builds it here.
+RUN mkdir src benches \
     && echo "fn main() {}" > src/main.rs \
     && touch src/lib.rs \
+    && echo "fn main() {}" > benches/protobuf_path.rs \
     && cargo test --release --locked --no-run \
     && cargo clippy --release --locked --no-deps \
     && cargo build --release --locked \
-    && rm -r src
+    && rm -r src benches
 
 COPY source-kafka/src ./src
+COPY source-kafka/benches ./benches
 
 # This touch prevents Docker from using a cached empty main.rs file.
 RUN touch src/main.rs \
