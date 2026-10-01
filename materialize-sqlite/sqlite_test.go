@@ -144,6 +144,48 @@ func TestLoad(t *testing.T) {
 	require.JSONEq(t, `{"id":2,"v":2}`, got[2])
 }
 
+func TestCreateLoadTableAfterRestart(t *testing.T) {
+	var ctx = context.Background()
+
+	table, err := sql.ResolveTable(testTableShape("test_results"), sqliteDialect)
+	require.NoError(t, err)
+	var path = filepath.Join(t.TempDir(), "test.db")
+	var createSQL = mustRender(t, table, tplCreateLoadTable)
+
+	// Each iteration is one connector run against the same database file.
+	for range 2 {
+		conn := openLoadConn(t, ctx, path)
+		_, err := conn.ExecContext(ctx, createSQL)
+		require.NoError(t, err)
+		require.NoError(t, conn.Close())
+	}
+
+	// The destination file holds no staging tables.
+	db, err := stdsql.Open("sqlite3", path)
+	require.NoError(t, err)
+	defer db.Close()
+	var count int
+	require.NoError(t, db.QueryRowContext(ctx,
+		`SELECT count(*) FROM sqlite_master WHERE name LIKE 'flow_temp_table_%'`).Scan(&count))
+	require.Zero(t, count)
+}
+
+// openLoadConn opens a connection to the database at path with the load
+// database attached.
+func openLoadConn(t *testing.T, ctx context.Context, path string) *stdsql.Conn {
+	t.Helper()
+
+	db, err := stdsql.Open("sqlite3", path)
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+
+	conn, err := db.Conn(ctx)
+	require.NoError(t, err)
+	_, err = conn.ExecContext(ctx, attachSQL)
+	require.NoError(t, err)
+	return conn
+}
+
 func testTableShape(name string) sql.TableShape {
 	return sql.TableShape{
 		Path:    sql.TablePath{name},
