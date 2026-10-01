@@ -53,6 +53,9 @@ while IFS= read -r path || [ -n "$path" ]; do
         .github/workflows/ci.yaml) lane="go_rust" ;;
         .github/workflows/estuary-cdk.yaml) lane="none" ;;
         .github/workflows/python-auto-rerun.yaml) lane="none" ;;
+        # The shared ruff config only feeds report-only lint steps, so it
+        # builds nothing. estuary-cdk.yaml lints the CDK when it changes.
+        ruff.toml) lane="none" ;;
 
         # The Python connector matrix, which python.yaml reads as data.
         .github/python-connectors.yaml) lane="python" ;;

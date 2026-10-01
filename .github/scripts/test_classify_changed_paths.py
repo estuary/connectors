@@ -99,6 +99,11 @@ class TestLanes(unittest.TestCase):
             classify(".github/workflows/python-auto-rerun.yaml"), (False, False, [])
         )
 
+    def test_ruff_config_triggers_neither_connector_lane(self):
+        # Lint only reports, so the shared ruff config builds nothing. Without
+        # this rule it would fall through to the Go & Rust lane like go.mod.
+        self.assertEqual(classify("ruff.toml"), (False, False, []))
+
     def test_nested_pyproject_does_not_make_a_go_connector_python(self):
         # materialize-iceberg/python/pyproject.toml exists. Classing its parent as
         # Python would stop ci.yaml building a Go connector.
