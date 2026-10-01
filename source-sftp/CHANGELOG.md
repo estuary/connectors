@@ -1,10 +1,14 @@
 # source-sftp
 
-## 2026-09-30
+## 2026-10-01
 
 ### Changed
 
-- `SSH Known Hosts` (`knownHosts`) is now required. A configuration without it is rejected instead of connecting to the SFTP server without verifying its identity.
+- `SSH Known Hosts` (`knownHosts`) is now required unless `Skip Host Key Verification` (`skipHostKeyVerification`) is set. A configuration with neither is rejected.
+
+### Added
+
+- `Skip Host Key Verification` (`skipHostKeyVerification`) is now shown in the UI and documented, as the explicit way to connect without verifying the server's host key.
 
 ## 2026-09-21
 
