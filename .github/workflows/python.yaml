@@ -121,6 +121,12 @@ jobs:
       - name: Install Poetry
         uses: snok/install-poetry@v1
 
+      # Report-only: findings show up as PR annotations without failing the
+      # job. It runs before the tests so it still reports when they fail. The
+      # version must match `required-version` in ruff.toml.
+      - name: ${{ matrix.connector.name }} lint
+        run: pipx run ruff==0.16.9 check --exit-zero --output-format=github ${{ matrix.connector.name }}
+
       - name: ${{ matrix.connector.name }} tests
         run: |
           cd ${{ matrix.connector.name }}
