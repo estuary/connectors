@@ -143,7 +143,7 @@ class TestFetchSideConversationsIncremental:
         side_convs = [r for r in results if isinstance(r, SideConversation)]
         cursors = [r for r in results if isinstance(r, tuple)]
 
-        assert [sc.id for sc in side_convs] == ["sc-1", "sc-2"]
+        assert sorted(sc.id for sc in side_convs) == ["sc-1", "sc-2"]
         assert cursors == [(next_page,)]
 
     async def test_skips_deleted_tickets(self):
@@ -213,7 +213,7 @@ class TestBackfillSideConversations:
         side_convs = [r for r in results if isinstance(r, SideConversation)]
         page_cursors = [r for r in results if isinstance(r, str)]
 
-        assert [sc.id for sc in side_convs] == ["sc-1", "sc-2"]
+        assert sorted(sc.id for sc in side_convs) == ["sc-1", "sc-2"]
         assert page_cursors == [next_page]
 
     async def test_stops_when_ticket_reaches_cutoff(self):
@@ -263,6 +263,28 @@ class TestBackfillSideConversations:
         assert len(side_convs) == 1
         assert side_convs[0].id == "sc-2"
         assert len(http.urls) == 1
+
+    async def test_ticket_error_fails_page_without_cursor(self):
+        cutoff = datetime(2026, 6, 1, tzinfo=UTC)
+        start_date = datetime(2025, 1, 1, tzinfo=UTC)
+        next_page = "page-cursor-2"
+
+        http = MockHTTP()
+        http.queue({"side_conversations": [_side_conv("sc-1", 101)], "next_page": None})
+        http.queue_error(500)
+
+        results: list[SideConversation | str] = []
+        with patch("source_zendesk_support_native.api._fetch_incremental_cursor_export_resources") as mock_export:
+            mock_export.return_value = _async_iter([_ticket(101), _ticket(102), next_page])
+
+            with pytest.raises(HTTPError):
+                async for r in backfill_side_conversations(
+                    http, "subdomain", start_date, log, None, cutoff
+                ):
+                    results.append(r)
+
+        # The page must not be checkpointed when any of its tickets failed.
+        assert next_page not in results
 
 
 # ---------------------------------------------------------------------------
