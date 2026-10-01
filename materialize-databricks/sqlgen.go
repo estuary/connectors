@@ -151,6 +151,8 @@ type templates struct {
 	loadQuery               *template.Template
 	loadQueryNoFlowDocument *template.Template
 	copyIntoDirect          *template.Template
+	createStagingTable      *template.Template
+	copyIntoStaging         *template.Template
 	mergeInto               *template.Template
 }
 
@@ -249,8 +251,19 @@ JOIN ({{ template "loadSource" $ }}) AS r
 {{ end }}
 
 {{ define "storeSource" }}
+{{- range $ti, $tbl := $.Tables }}
+		{{ if $ti }} UNION ALL {{ end -}}
+		(
+			SELECT
+			{{ range $ind, $key := $.Table.Columns }}
+			{{- if $ind }}, {{ end -}}
+			{{ $key.Identifier }}
+			{{- end }}, _flow_delete
+			FROM {{ $tbl }}
+		)
+{{- end }}
 {{- range $di, $dir := $.Directories }}
-		{{ if $di }} UNION ALL {{ end -}}
+		{{ if or $di $.Tables }} UNION ALL {{ end -}}
 		(
 			SELECT
 			{{ range $ind, $key := $.Table.Columns }}
@@ -261,7 +274,7 @@ JOIN ({{ template "loadSource" $ }}) AS r
 		)
 {{- end }}
 {{- range $fi, $file := $.Files }}
-		{{ if or $fi $.Directories }} UNION ALL {{ end -}}
+		{{ if or $fi $.Directories $.Tables }} UNION ALL {{ end -}}
 		(
 			SELECT
 			{{ range $ind, $key := $.Table.Columns }}
@@ -319,6 +332,30 @@ JOIN ({{ template "loadSource" $ }}) AS r
   ;
 {{ end }}
 
+{{ define "createStagingTable" }}
+CREATE TABLE IF NOT EXISTS {{ $.StagingTable }} (
+  {{- range $ind, $col := $.Table.Columns }}
+  {{- if $ind }},{{ end }}
+  {{$col.Identifier}} {{$col.NullableDDL}}
+  {{- end }},
+  _flow_delete BOOLEAN
+) TBLPROPERTIES ('delta.columnMapping.mode' = 'name');
+{{ end }}
+
+{{ define "copyIntoStaging" }}
+	COPY INTO {{ $.StagingTable }} FROM (
+    SELECT
+		{{ range $ind, $key := $.Table.Columns }}
+			{{- if $ind }}, {{ end -}}
+			{{ template "cast" $key -}}
+		{{- end }}, _flow_delete::BOOLEAN
+  FROM {{ Literal $.StagingPath }}
+	)
+  FILEFORMAT = JSON
+  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false', 'inferSchema' = 'false' )
+  ;
+{{ end }}
+
 {{ define "mergeInto" }}
 	MERGE INTO {{ $.Table.Identifier }} AS l
 	USING ({{ template "storeSource" $ }}) AS r
@@ -359,6 +396,8 @@ JOIN ({{ template "loadSource" $ }}) AS r
 		loadQuery:               tplAll.Lookup("loadQuery"),
 		loadQueryNoFlowDocument: tplAll.Lookup("loadQueryNoFlowDocument"),
 		copyIntoDirect:          tplAll.Lookup("copyIntoDirect"),
+		createStagingTable:      tplAll.Lookup("createStagingTable"),
+		copyIntoStaging:         tplAll.Lookup("copyIntoStaging"),
 		mergeInto:               tplAll.Lookup("mergeInto"),
 	}
 }
@@ -373,6 +412,10 @@ type tableWithFiles struct {
 	// Directories are each read as one relation with Schema, a DDL string.
 	Directories []string
 	Schema      string
+	// StagingTable is a transaction's staging table, and Tables are the staging
+	// tables a MERGE reads.
+	StagingTable string
+	Tables       []string
 }
 
 func RenderTableWithFiles(table sql.Table, files []string, stagingPath string, tpl *template.Template, bounds []sql.MergeBound) (string, error) {

@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-10-01
+### Changed
+- Updates to existing rows are loaded into a Delta staging table once a
+  table's rows are staged, and the commit's MERGE reads that table instead of
+  the staged JSON files. In transactions with several tables, this loading
+  overlaps with staging the remaining tables.
+
 ## 2026-09-29
 ### Fixed
 - Each table's staged files are finished and uploaded as soon as the

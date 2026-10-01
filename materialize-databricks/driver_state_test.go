@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -79,6 +80,7 @@ type recordingDriver struct{}
 type recordingConn struct{}
 
 var recording struct {
+	mu       sync.Mutex
 	executed []string
 	failWith error
 	// failFirst limits failWith to the first failFirst statements when
@@ -95,7 +97,16 @@ func (recordingConn) Prepare(string) (driver.Stmt, error) {
 func (recordingConn) Close() error              { return nil }
 func (recordingConn) Begin() (driver.Tx, error) { return nil, fmt.Errorf("begin is not implemented") }
 
+func (c recordingConn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
+	if _, err := c.QueryContext(ctx, query, args); err != nil {
+		return nil, err
+	}
+	return driver.RowsAffected(0), nil
+}
+
 func (recordingConn) QueryContext(_ context.Context, query string, _ []driver.NamedValue) (driver.Rows, error) {
+	recording.mu.Lock()
+	defer recording.mu.Unlock()
 	recording.attempts++
 	if recording.failWith != nil && (recording.failFirst == 0 || recording.attempts <= recording.failFirst) {
 		return nil, recording.failWith
@@ -899,4 +910,60 @@ func TestAcknowledgeCommitsDirectoriesOfAllShards(t *testing.T) {
 			require.NotContains(t, recording.executed[i], "FILES")
 		}
 	})
+}
+
+func TestAcknowledgeMergesStagingTables(t *testing.T) {
+	var d = renderingTransactor(lowerRangeKey)
+	var item = dirItem(true, []mergeBoundLiterals{bound("1", "10"), bound("'2024-01-01T00:00:00Z'", "'2024-01-02T00:00:00Z'")}, "txn-1")
+	item.StagingTable = "txn-1_delta"
+	d.cp.add("a_table.v1", lowerRangeKey, item)
+	d.cp.add("a_table.v1", upperRangeKey, dirItem(false,
+		[]mergeBoundLiterals{bound("5", "50"), bound("'2024-01-01T12:00:00Z'", "'2024-01-03T00:00:00Z'")},
+		"txn-2"))
+
+	_, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
+	require.NoError(t, err)
+
+	require.Len(t, recording.executed, 1)
+	var query = recording.executed[0]
+	require.Contains(t, query, "MERGE INTO `schema`.`a_table`")
+	require.Contains(t, query, "FROM delta.`/Volumes/cat/schema/flow_staging/flow_temp_tables/txn-1_delta`")
+	require.Contains(t, query, "read_files('/Volumes/cat/schema/flow_staging/flow_temp_tables/txn-2', format => 'json'")
+	require.NotContains(t, query, "flow_temp_tables/txn-1'")
+	require.ElementsMatch(t, []string{
+		"/Volumes/cat/schema/flow_staging/flow_temp_tables/txn-1_delta",
+		"/Volumes/cat/schema/flow_staging/flow_temp_tables/txn-1",
+		"/Volumes/cat/schema/flow_staging/flow_temp_tables/txn-2",
+	}, d.files.(*fakeFiles).deleted)
+	require.Empty(t, d.cp)
+}
+
+func TestLoadStagingTable(t *testing.T) {
+	for _, needsMerge := range []bool{false, true} {
+		var db = recordingDB(t, nil)
+		var d = renderingTransactor(lowerRangeKey)
+		var b = d.bindings[0]
+		b.storeFile = newStagedFile(config{}, b.rootStagingPath, []string{"id", "ts", "_flow_delete"}, d.files)
+		b.storeFile.dir = filepath.Join(t.TempDir(), "local")
+		b.needsMerge = needsMerge
+
+		var ctx = context.Background()
+		require.NoError(t, b.storeFile.start(ctx, db))
+		require.NoError(t, b.storeFile.writeRow([]any{1, "2024-01-01T00:00:00Z", false}))
+		require.NoError(t, d.loadStagingTable(ctx, db, b))
+
+		if !needsMerge {
+			require.Len(t, recording.executed, 1)
+			require.Empty(t, b.stagingTable)
+			continue
+		}
+		var dir = b.storeFile.remoteDir()
+		require.Len(t, recording.executed, 3)
+		require.True(t, strings.HasPrefix(recording.executed[0], "PUT "), recording.executed[0])
+		require.Contains(t, recording.executed[1], "CREATE TABLE IF NOT EXISTS delta.`"+dir+"_delta`")
+		require.Contains(t, recording.executed[2], "COPY INTO delta.`"+dir+"_delta`")
+		require.Contains(t, recording.executed[2], "FROM '"+dir+"'")
+		require.NotContains(t, recording.executed[2], "FILES")
+		require.Equal(t, b.storeFile.txnDir+"_delta", b.stagingTable)
+	}
 }
