@@ -234,32 +234,24 @@ def _generate_delayed_stream_resource_state(
     cutoff: datetime,
     lookback_cutoff: datetime,
     inc_offset: timedelta = timedelta(),
-    should_backfill_lookback: bool = True,
 ) -> ResourceState:
-    """Seed one backfill and one incremental subtask per project, per stage.
+    """Seed one backfill and a realtime and lookback incremental per project.
 
-    Pass `should_backfill_lookback=False` where only the live tail needs the
-    delayed second pass: history is settled when a backfill reads it, so the
-    lookback backfill would re-walk the realtime one's range and find the same
-    rows.
+    Only the live tail needs the delayed second pass. A lookback backfill would
+    re-walk a subset of the realtime backfill's range and emit the same rows.
     """
-    backfill = {
-        f"{project_id}_{REALTIME}": ResourceState.Backfill(
-            cutoff=cutoff, next_page=None
-        )
-        for project_id in project_ids
-    }
-
-    if should_backfill_lookback:
-        backfill |= {
-            f"{project_id}_{LOOKBACK}": ResourceState.Backfill(
-                cutoff=lookback_cutoff, next_page=None
+    return ResourceState(
+        # Keying backfills by `_{REALTIME}` is non-standard and doesn't make
+        # sense: there's one backfill per project, and "realtime" names an
+        # incremental stage. It was an unfortunate naming decision. It's kept
+        # because it has no functional impact, and renaming it isn't worth
+        # migrating existing captures' state.
+        backfill={
+            f"{project_id}_{REALTIME}": ResourceState.Backfill(
+                cutoff=cutoff, next_page=None
             )
             for project_id in project_ids
-        }
-
-    return ResourceState(
-        backfill=backfill,
+        },
         inc={
             **{
                 f"{project_id}_{REALTIME}": ResourceState.Incremental(
@@ -285,7 +277,6 @@ async def _patch_missing_project_states(
     cutoff: datetime,
     lookback_cutoff: datetime | None = None,
     inc_offset: timedelta = timedelta(),
-    should_backfill_lookback: bool = True,
 ):
     if not (isinstance(state.inc, dict) and isinstance(state.backfill, dict)):
         return
@@ -304,11 +295,7 @@ async def _patch_missing_project_states(
         new_states = _generate_resource_state(missing_project_ids, cutoff, inc_offset)
     else:
         new_states = _generate_delayed_stream_resource_state(
-            missing_project_ids,
-            cutoff,
-            lookback_cutoff,
-            inc_offset,
-            should_backfill_lookback,
+            missing_project_ids, cutoff, lookback_cutoff, inc_offset
         )
     assert isinstance(new_states.inc, dict)
     assert isinstance(new_states.backfill, dict)
@@ -357,19 +344,12 @@ async def events(
     }
 
     # Backfill fetchers (for fetch_page) - called with (log, page, cutoff)
+    # See `_generate_delayed_stream_resource_state` for the `_{REALTIME}` key.
     backfill_fetchers = {
-        **{
-            f"{project_id}_{REALTIME}": functools.partial(
-                backfill_project_events, http, config, project_id
-            )
-            for project_id in project_ids
-        },
-        **{
-            f"{project_id}_{LOOKBACK}": functools.partial(
-                backfill_project_events, http, config, project_id
-            )
-            for project_id in project_ids
-        },
+        f"{project_id}_{REALTIME}": functools.partial(
+            backfill_project_events, http, config, project_id
+        )
+        for project_id in project_ids
     }
 
     async def open(
@@ -573,7 +553,6 @@ async def sessions(
             cutoff,
             lookback_cutoff,
             inc_offset=SESSIONS_CURSOR_TICK,
-            should_backfill_lookback=False,
         )
 
         open_binding(
@@ -595,11 +574,7 @@ async def sessions(
         # becomes the first instant it emits. That closes the seam with the
         # realtime backfill, which stops one tick short of `cutoff`.
         initial_state=_generate_delayed_stream_resource_state(
-            project_ids,
-            cutoff,
-            lookback_cutoff,
-            SESSIONS_CURSOR_TICK,
-            should_backfill_lookback=False,
+            project_ids, cutoff, lookback_cutoff, SESSIONS_CURSOR_TICK
         ),
         initial_config=ResourceConfig(
             name=Session.resource_name,
