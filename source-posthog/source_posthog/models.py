@@ -6,6 +6,7 @@ import functools
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from typing import Annotated, Any, ClassVar, override
 from urllib.parse import urljoin
 
@@ -410,4 +411,7 @@ class HogQLResponseMeta(BaseModel):
     columns: list[str]
 
 
-HogQLRow = RootModel[list[JsonValue]]
+# ijson yields Decimal for every JSON float, which `JsonValue` rejects. Keeping
+# Decimal in the union preserves the exact value the API sent; the CDK
+# serializes it as a string on the way out.
+HogQLRow = RootModel[list[JsonValue | Decimal]]
