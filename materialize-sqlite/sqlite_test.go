@@ -4,15 +4,70 @@ import (
 	"context"
 	stdsql "database/sql"
 	"encoding/json"
+	"errors"
+	"os"
 	"path/filepath"
 	"testing"
 	"text/template"
 
+	"github.com/estuary/connectors/materialize-boilerplate/testutil"
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/stretchr/testify/require"
 )
+
+func TestIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
+	t.Run("truncate", func(t *testing.T) {
+		if testutil.RuntimeV1() {
+			t.Skip("backfill signals require runtime-next")
+		}
+		var ctx = context.Background()
+		// The connector's database outlives its process, so each run starts
+		// from a fresh file.
+		for _, path := range []string{databasePath, databasePath + "-journal"} {
+			if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+				require.NoError(t, err)
+			}
+		}
+
+		testutil.RunFlowctl(t, "raw", "preview-next",
+			"--name", "acmeCo/tests/materialize-sqlite-truncate",
+			"--source", "testdata/truncate.flow.yaml",
+			"--fixture", "testdata/truncate.fixture.json",
+			"--shards", "1",
+			"--timeout", "5m",
+		)
+
+		db, err := stdsql.Open("sqlite3", databasePath)
+		require.NoError(t, err)
+		defer db.Close()
+
+		// The fixture stores ids 1-3, then re-stores only id 1 during a
+		// backfill. Only the table with a flow_published_at column loses the
+		// rows published before the backfill.
+		for table, want := range map[string][]int64{
+			"truncate_standard":        {1},
+			"truncate_no_published_at": {1, 2, 3},
+		} {
+			var rows, err = db.QueryContext(ctx, "SELECT id FROM "+table+" ORDER BY id;")
+			require.NoError(t, err)
+			var ids []int64
+			for rows.Next() {
+				var id int64
+				require.NoError(t, rows.Scan(&id))
+				ids = append(ids, id)
+			}
+			require.NoError(t, rows.Err())
+			require.NoError(t, rows.Close())
+			require.Equal(t, want, ids, table)
+		}
+	})
+}
 
 func TestStoreInsertThenUpdate(t *testing.T) {
 	var ctx = context.Background()
