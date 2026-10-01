@@ -125,5 +125,30 @@ func TestSQLGeneration(t *testing.T) {
 		}
 	}
 
+	{
+		tbl := tables[0]
+		var staging = "delta.`test-staging-path/txn-1_delta`"
+		for _, tc := range []struct {
+			name string
+			tpl  *template.Template
+			data tableWithFiles
+		}{
+			{"createStagingTable", testTemplates.createStagingTable, tableWithFiles{StagingTable: staging}},
+			{"copyIntoStaging", testTemplates.copyIntoStaging, tableWithFiles{StagingTable: staging, StagingPath: "test-staging-path/txn-1"}},
+			{"mergeInto staging tables and directory", testTemplates.mergeInto, tableWithFiles{
+				Tables:      []string{staging, "delta.`test-staging-path/txn-2_delta`"},
+				Directories: []string{"test-staging-path/txn-3"},
+				Schema:      stagedSchemaDDL(tbl.Columns(), true),
+			}},
+		} {
+			tc.data.Table = &tbl
+			var rendered, err = renderTemplate(tc.tpl, &tc.data)
+			require.NoError(t, err)
+			snap.WriteString("--- Begin " + tbl.Identifier + " " + tc.name + " ---")
+			snap.WriteString(rendered)
+			snap.WriteString("--- End " + tbl.Identifier + " ---\n\n")
+		}
+	}
+
 	cupaloy.SnapshotT(t, snap.String())
 }
