@@ -333,8 +333,8 @@ JOIN ({{ template "loadSource" $ }}) AS r
 {{ end }}
 
 {{ define "createStagingTable" }}
-CREATE TABLE IF NOT EXISTS {{ $.StagingTable }} (
-  {{- range $ind, $col := $.Table.Columns }}
+CREATE TABLE IF NOT EXISTS {{ $.Identifier }} (
+  {{- range $ind, $col := $.Target.Columns }}
   {{- if $ind }},{{ end }}
   {{$col.Identifier}} {{$col.NullableDDL}}
   {{- end }},
@@ -343,13 +343,13 @@ CREATE TABLE IF NOT EXISTS {{ $.StagingTable }} (
 {{ end }}
 
 {{ define "copyIntoStaging" }}
-	COPY INTO {{ $.StagingTable }} FROM (
+	COPY INTO {{ $.Identifier }} FROM (
     SELECT
-		{{ range $ind, $key := $.Table.Columns }}
+		{{ range $ind, $key := $.Target.Columns }}
 			{{- if $ind }}, {{ end -}}
 			{{ template "cast" $key -}}
 		{{- end }}, _flow_delete::BOOLEAN
-  FROM {{ Literal $.StagingPath }}
+  FROM {{ Literal $.Directory }}
 	)
   FILEFORMAT = JSON
   FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false', 'inferSchema' = 'false' )
@@ -412,10 +412,16 @@ type tableWithFiles struct {
 	// Directories are each read as one relation with Schema, a DDL string.
 	Directories []string
 	Schema      string
-	// StagingTable is a transaction's staging table, and Tables are the staging
-	// tables a MERGE reads.
-	StagingTable string
-	Tables       []string
+	// Tables are the staging tables a MERGE reads.
+	Tables []string
+}
+
+// stagingLoad renders the creation and loading of a staging table from a
+// directory of staged files.
+type stagingLoad struct {
+	Target     *sql.Table
+	Identifier string
+	Directory  string
 }
 
 func RenderTableWithFiles(table sql.Table, files []string, stagingPath string, tpl *template.Template, bounds []sql.MergeBound) (string, error) {
@@ -427,7 +433,7 @@ func RenderTableWithStaged(table sql.Table, dirs, rootFiles []string, schema str
 	return renderTemplate(tpl, &tableWithFiles{Table: &table, Directories: dirs, Files: rootFiles, Schema: schema, Bounds: bounds})
 }
 
-func renderTemplate(tpl *template.Template, data *tableWithFiles) (string, error) {
+func renderTemplate(tpl *template.Template, data any) (string, error) {
 	var w strings.Builder
 	if err := tpl.Execute(&w, data); err != nil {
 		return "", err
