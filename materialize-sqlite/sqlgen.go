@@ -141,7 +141,7 @@ var (
   {{- if $ind }},{{ end }}
   {{ $val.Identifier}} = {{ $val.Placeholder }}
   {{- end }}
-  {{- if $.Document }},
+  {{- if $.Document }}{{ if $.Values }},{{ end }}
   {{ $.Document.Identifier }} = {{ $.Document.Placeholder }}
   {{- end -}}
   {{ range $ind, $key := $.Keys }}
