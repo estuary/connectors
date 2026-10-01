@@ -52,6 +52,33 @@ func TestStoreInsertThenUpdate(t *testing.T) {
 	require.JSONEq(t, `{"id":2}`, documentJSON(t, byID[2]["flow_document"]))
 }
 
+func TestStoreUpdateWithoutValues(t *testing.T) {
+	var ctx = context.Background()
+
+	var shape = testTableShape("key_only")
+	shape.Values = nil
+	table, db := setupTestTableShape(t, shape)
+
+	insertSQL := mustRender(t, table, tplStoreInsert)
+	updateSQL := mustRender(t, table, tplStoreUpdate)
+
+	params, err := table.ConvertAll(tuple.Tuple{int64(1)}, tuple.Tuple{}, json.RawMessage(`{"id":1}`))
+	require.NoError(t, err)
+	_, err = db.ExecContext(ctx, insertSQL, params...)
+	require.NoError(t, err)
+
+	params, err = table.ConvertAll(tuple.Tuple{int64(1)}, tuple.Tuple{}, json.RawMessage(`{"id":1,"v":2}`))
+	require.NoError(t, err)
+	res, err := db.ExecContext(ctx, updateSQL, params...)
+	require.NoError(t, err)
+	affected, err := res.RowsAffected()
+	require.NoError(t, err)
+	require.Equal(t, int64(1), affected)
+
+	byID := readTableByID(t, ctx, db, table.Identifier)
+	require.JSONEq(t, `{"id":1,"v":2}`, documentJSON(t, byID[1]["flow_document"]))
+}
+
 func TestLoad(t *testing.T) {
 	var ctx = context.Background()
 	table, db := setupTestTable(t)
@@ -140,8 +167,13 @@ func testTableShape(name string) sql.TableShape {
 // opens an isolated on-disk database, and creates the target table.
 func setupTestTable(t *testing.T) (sql.Table, *stdsql.DB) {
 	t.Helper()
+	return setupTestTableShape(t, testTableShape("test_results"))
+}
 
-	table, err := sql.ResolveTable(testTableShape("test_results"), sqliteDialect)
+func setupTestTableShape(t *testing.T, shape sql.TableShape) (sql.Table, *stdsql.DB) {
+	t.Helper()
+
+	table, err := sql.ResolveTable(shape, sqliteDialect)
 	require.NoError(t, err)
 
 	db, err := stdsql.Open("sqlite3", filepath.Join(t.TempDir(), "test.db"))
