@@ -206,7 +206,8 @@ func testTableShape(name string) sql.TableShape {
 }
 
 // setupTestTable resolves the test table shape through the real sqliteDialect,
-// opens an isolated on-disk database, and creates the target table.
+// opens an isolated on-disk database with the load database attached, and
+// creates the target table.
 func setupTestTable(t *testing.T) (sql.Table, *stdsql.DB) {
 	t.Helper()
 	return setupTestTableShape(t, testTableShape("test_results"))
@@ -221,6 +222,11 @@ func setupTestTableShape(t *testing.T, shape sql.TableShape) (sql.Table, *stdsql
 	db, err := stdsql.Open("sqlite3", filepath.Join(t.TempDir(), "test.db"))
 	require.NoError(t, err)
 	t.Cleanup(func() { db.Close() })
+
+	// The load database is attached per connection, so pin the pool to one.
+	db.SetMaxOpenConns(1)
+	_, err = db.ExecContext(context.Background(), attachSQL)
+	require.NoError(t, err)
 
 	_, err = db.ExecContext(context.Background(), mustRender(t, table, tplCreateTargetTable))
 	require.NoError(t, err)
