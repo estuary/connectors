@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 	"text/template"
+	"time"
 
 	"github.com/estuary/connectors/materialize-boilerplate/testutil"
 	sql "github.com/estuary/connectors/materialize-sql"
@@ -105,6 +106,62 @@ func TestStoreInsertThenUpdate(t *testing.T) {
 	require.JSONEq(t, `{"id":1,"v":2}`, documentJSON(t, byID[1]["flow_document"]))
 	require.Equal(t, "orig2", byID[2]["canary"])
 	require.JSONEq(t, `{"id":2}`, documentJSON(t, byID[2]["flow_document"]))
+}
+
+func TestTruncateBoundaryPrecision(t *testing.T) {
+	var ctx = t.Context()
+	var shape = testTableShape("truncate_precision")
+	shape.Values = append(shape.Values, sql.Projection{Projection: pf.Projection{
+		Field: "flow_published_at",
+		Ptr:   "/_meta/uuid",
+		Inference: pf.Inference{
+			Types:   []string{"string"},
+			Exists:  pf.Inference_MUST,
+			String_: &pf.Inference_String{Format: "date-time", ContentEncoding: "uuid"},
+		},
+	}})
+	table, err := sql.ResolveTable(shape, sqliteDialect)
+	require.NoError(t, err)
+
+	db, err := stdsql.Open("sqlite3", filepath.Join(t.TempDir(), "test.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+	_, err = db.ExecContext(ctx, mustRender(t, table, tplCreateTargetTable))
+	require.NoError(t, err)
+
+	var d = &transactor{}
+	d.load.conn, err = db.Conn(ctx)
+	require.NoError(t, err)
+	t.Cleanup(func() { d.load.conn.Close() })
+	_, err = d.load.conn.ExecContext(ctx, attachSQL)
+	require.NoError(t, err)
+	require.NoError(t, d.addBinding(ctx, table))
+	var truncateSQL = d.bindings[0].store.truncateSQL
+	require.NotEmpty(t, truncateSQL)
+
+	// Rows published one nanosecond on either side of the boundary, and at
+	// it, in the fixed-width form the runtime writes.
+	var boundary = time.Date(2026, 9, 29, 12, 0, 0, 500, time.UTC)
+	var insertSQL = mustRender(t, table, tplStoreInsert)
+	for id, publishedAt := range map[int64]string{
+		1: "2026-09-29T12:00:00.000000499Z",
+		2: "2026-09-29T12:00:00.000000500Z",
+		3: "2026-09-29T12:00:00.000000501Z",
+	} {
+		_, err = db.ExecContext(ctx, insertSQL, id, "canary", publishedAt, "{}")
+		require.NoError(t, err)
+	}
+
+	res, err := db.ExecContext(ctx, truncateSQL, boundary.Format(publishedAtLayout))
+	require.NoError(t, err)
+	n, err := res.RowsAffected()
+	require.NoError(t, err)
+	require.Equal(t, int64(1), n)
+
+	var byID = readTableByID(t, ctx, db, table.Identifier)
+	require.Len(t, byID, 2)
+	require.Contains(t, byID, int64(2))
+	require.Contains(t, byID, int64(3))
 }
 
 func TestStoreUpdateWithoutValues(t *testing.T) {
