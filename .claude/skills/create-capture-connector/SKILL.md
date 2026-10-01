@@ -91,6 +91,7 @@ The stream-builders already did `add-stream`'s research, classification, and liv
 ## Phase 8 — Finalize
 
 - Run the full test suite (`poetry run pytest`, output to a file and read it — don't `tail`).
+- **Lint:** once the suite passes, run `pipx run ruff==0.16.9 check source-$1/` from the repo root (output to a file and read it). Fix findings in code this session wrote; report pre-existing ones to the user without fixing them.
 - Confirm the discover snapshot lists every stream; note any quiet streams legitimately absent from the capture snapshot.
 - **Release requirements** — every new connector ships with all three; `source-zuora`'s introduction is the reference shape for each:
   - **CI registration**: add an entry to `.github/python-connectors.yaml`, the list `.github/workflows/python.yaml` builds its matrix from (`name`, `type: capture`, `version` matching the connector's `VERSION` file, `usage_rate: "1.0"`).
