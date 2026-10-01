@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
@@ -238,6 +239,45 @@ func (c *config) Validate() error {
 	return nil
 }
 
+// UnmarshalJSON removes any login from the address as the config is parsed, so
+// it can't leak into messages.
+func (c *config) UnmarshalJSON(data []byte) error {
+	// A custom unmarshaler doesn't inherit the caller's DisallowUnknownFields,
+	// so decode strictly here.
+	type plain config
+	var d = json.NewDecoder(bytes.NewReader(data))
+	d.DisallowUnknownFields()
+	if err := d.Decode((*plain)(c)); err != nil {
+		return err
+	}
+	c.Address = withoutCredentials(c.Address)
+	return nil
+}
+
+// withoutCredentials removes any login from the address. The address shouldn't
+// contain one, but users sometimes paste a full connection string, and the
+// configured user and password replace it when connecting anyway.
+func withoutCredentials(address string) string {
+	uri, err := url.Parse(address)
+	if err == nil && uri.Scheme != "" && uri.Host != "" {
+		uri.User = nil
+		return uri.String()
+	}
+	// ToURI treats anything else as a bare host, so everything up to the last
+	// '@' can only be a login.
+	scheme, rest, ok := strings.Cut(address, "://")
+	if !ok {
+		scheme, rest = "", address
+	}
+	if i := strings.LastIndex(rest, "@"); i >= 0 {
+		rest = rest[i+1:]
+	}
+	if scheme == "" {
+		return rest
+	}
+	return scheme + "://" + rest
+}
+
 // ToURI converts the Config to a DSN string.
 func (c *config) ToURI() *url.URL {
 	var address = c.Address
@@ -262,12 +302,25 @@ func (c *config) ToURI() *url.URL {
 	return uri
 }
 
+// redactedAddress masks any password in the address for use in messages. The
+// address shouldn't contain credentials, but users sometimes paste a full
+// connection string.
+func redactedAddress(address string) string {
+	uri, err := url.Parse(address)
+	if err != nil {
+		return "<unparseable address>"
+	}
+	return uri.Redacted()
+}
+
 type driver struct{}
 
 func isDocumentDB(address string) (bool, error) {
 	uri, err := url.Parse(address)
 	if err != nil {
-		return false, fmt.Errorf("parsing address: %w", err)
+		// A *url.Error repeats its input, which may contain a password, so unwrap it
+		// to get the actual error.
+		return false, fmt.Errorf("parsing address: %w", errors.Unwrap(err))
 	}
 
 	return strings.HasSuffix(uri.Hostname(), ".docdb.amazonaws.com"), nil
@@ -298,7 +351,9 @@ func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error)
 	if cfg.NetworkTunnel != nil && cfg.NetworkTunnel.SSHForwarding != nil && cfg.NetworkTunnel.SSHForwarding.SSHEndpoint != "" {
 		uri, err := url.Parse(cfg.Address)
 		if err != nil {
-			return nil, fmt.Errorf("parsing address for network tunnel: %w", err)
+			// A *url.Error repeats its input, which may contain a password, so unwrap it
+			// to get the actual error.
+			return nil, fmt.Errorf("parsing address for network tunnel: %w", errors.Unwrap(err))
 		}
 
 		var sshConfig = &networkTunnel.SshConfig{
@@ -314,7 +369,7 @@ func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error)
 			return nil, err
 		}
 	} else if isDocDB {
-		return nil, fmt.Errorf("the provided address %q appears to be for Amazon DocumentDB, which requires an SSH tunnel configuration", cfg.Address)
+		return nil, fmt.Errorf("the provided address %q appears to be for Amazon DocumentDB, which requires an SSH tunnel configuration", redactedAddress(cfg.Address))
 	}
 
 	poolMonitor := &event.PoolMonitor{
@@ -384,7 +439,7 @@ func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error)
 		client.Disconnect(ctx) // ignore error result
 
 		if errors.Is(err, context.DeadlineExceeded) {
-			return nil, cerrors.NewUserError(err, fmt.Sprintf("cannot connect to address %q: double check your configuration, and make sure Estuary's IP is allowed to connect to your database", cfg.Address))
+			return nil, cerrors.NewUserError(err, fmt.Sprintf("cannot connect to address %q: double check your configuration, and make sure Estuary's IP is allowed to connect to your database", redactedAddress(cfg.Address)))
 		} else if errors.As(err, &mongoErr) {
 			if mongoErr.Code == 18 {
 				// See https://github.com/mongodb/mongo-go-driver/blob/master/docs/common-issues.md#authentication-failed

@@ -56,14 +56,20 @@ def test_capture(request, snapshot):
     assert result.returncode == 0
     lines = [json.loads(l) for l in result.stdout.splitlines()]
 
-    unique_stream_lines = []
-    seen = set()
+    # Some streams emit in no particular order, so the snapshotted record for each
+    # stream is the one with the lowest id. Streams without ids keep their first record.
+    selected_by_stream: dict[str, list] = {}
 
     for line in lines:
-        stream = line[0]
-        if stream not in seen and stream not in OMITTED_STREAMS:
-            unique_stream_lines.append(line)
-            seen.add(stream)
+        stream, rec = line[0], line[1]
+        if stream in OMITTED_STREAMS:
+            continue
+
+        selected = selected_by_stream.get(stream)
+        if selected is None or ("id" in rec and rec["id"] < selected[1]["id"]):
+            selected_by_stream[stream] = line
+
+    unique_stream_lines = list(selected_by_stream.values())
 
     for l in unique_stream_lines:
         stream, rec = l[0], l[1]

@@ -1,0 +1,51 @@
+info:
+  name: media url churn
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{base_url}}/v2/calls/extensive"
+  headers:
+    - name: content-type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "filter": {
+          "fromDateTime": "2026-08-01T00:00:00Z",
+          "toDateTime": "2026-10-01T00:00:00Z"
+        },
+        "contentSelector": {
+          "context": "None",
+          "exposedFields": {
+            "media": true
+          }
+        }
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://gong.app.gong.io/settings/api/documentation#post-/v2/calls/extensive
+
+  **WHY:** the evidence for `media: false` on `Calls / extensive`. Run it twice
+  and compare `calls[].media.audioUrl`.
+
+      bru run "Calls/media url churn.yml" --env Gong --sandbox developer
+
+  **VERIFIED (2026-09-16) — `media.audioUrl` is re-signed on every request.**
+  Two identical requests seconds apart returned identical documents apart from
+  `audioUrl`, a SigV4 presigned S3 URL with `X-Amz-Expires=28799` (about eight
+  hours). Capturing it would re-emit every call in the daily lookback window
+  with a new signature, and the stored link expires within hours.
+
+  **VERIFIED (2026-09-16) — `metaData.meetingUrl` is a different, stable URL:**
+  the `public-api-upload/.../media.mp3` object path already captured by
+  `calls`, which returns `403` to an unsigned GET (see `Calls / bare`).

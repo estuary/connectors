@@ -8,7 +8,9 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
+	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -35,8 +37,8 @@ func (c config) DefaultNamespace() string {
 	return ""
 }
 
-func (c config) FeatureFlags() (string, map[string]bool) {
-	return "", make(map[string]bool)
+func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
+	return "", nil
 }
 
 type tableConfig struct {
@@ -93,7 +95,7 @@ func NewSQLiteDriver() *sql.Driver[config, tableConfig] {
 				ConcurrentApply:     false,
 			}, nil
 		},
-		PreReqs: func(context.Context, config) *cerrors.PrereqErr { return &cerrors.PrereqErr{} },
+		PreReqs: func(context.Context, config, map[string]bool) *cerrors.PrereqErr { return &cerrors.PrereqErr{} },
 	}
 }
 
@@ -305,6 +307,10 @@ func (t *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSp
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
+func (t *transactor) Flush(context.Context, map[int]time.Time) error {
+	return nil
+}
+
 func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
 	return nil, nil
 }

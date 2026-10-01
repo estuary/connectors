@@ -150,6 +150,12 @@ func TestEntryPatchReplacesPrevious(t *testing.T) {
 	require.Equal(t, next, pending["a_table.v1"][fullRange])
 }
 
+func TestEntryWithoutTruncationOmitsIt(t *testing.T) {
+	var fields map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(mustMarshal(t, entry("p/files.manifest", "p/f1")), &fields))
+	require.NotContains(t, fields, "truncateBefore")
+}
+
 func TestStateRouting(t *testing.T) {
 	var state = json.RawMessage(`{
 		"a_table.v1": {

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -546,6 +547,7 @@ func renderableTable() sql.Table {
 func renderingTransactor(rangeKey string) *transactor {
 	var d = testTransactor(rangeKey)
 	d.templates = testTemplates
+	d.files = &fakeFiles{}
 	d.bindings = append(d.bindings, &binding{
 		target:          renderableTable(),
 		rootStagingPath: "/Volumes/cat/schema/flow_staging/flow_temp_tables",
@@ -557,12 +559,21 @@ func bound(lower, upper string) mergeBoundLiterals {
 	return mergeBoundLiterals{Lower: lower, Upper: upper}
 }
 
+// structuredItem is an entry written before staged files had a directory per
+// transaction.
 func structuredItem(needsMerge bool, bounds []mergeBoundLiterals, files ...string) *checkpointItem {
 	return &checkpointItem{
-		ToDelete:    nil, // deleteFiles requires a workspace client
 		StagedFiles: files,
 		Bounds:      bounds,
 		NeedsMerge:  needsMerge,
+	}
+}
+
+func dirItem(needsMerge bool, bounds []mergeBoundLiterals, dir string) *checkpointItem {
+	return &checkpointItem{
+		Directory:  dir,
+		Bounds:     bounds,
+		NeedsMerge: needsMerge,
 	}
 }
 
@@ -815,5 +826,77 @@ func TestCombineBounds(t *testing.T) {
 		require.Empty(t, out[0].LiteralLower)
 		require.Empty(t, out[1].LiteralLower)
 		require.Equal(t, keys[0].Identifier, out[0].Identifier)
+	})
+}
+
+// Root-level files from a checkpoint written before staging directories existed
+// merge in their own query, ahead of the directories.
+func TestAcknowledgeMergesRootFilesWithDirectories(t *testing.T) {
+	var d = renderingTransactor(lowerRangeKey)
+	d.cp.add("a_table.v1", lowerRangeKey, structuredItem(true,
+		[]mergeBoundLiterals{bound("1", "10"), bound("'2024-01-01T00:00:00Z'", "'2024-01-02T00:00:00Z'")},
+		"old.json.gz"))
+	d.cp.add("a_table.v1", upperRangeKey, dirItem(true,
+		[]mergeBoundLiterals{bound("5", "50"), bound("'2024-01-01T12:00:00Z'", "'2024-01-03T00:00:00Z'")},
+		"txn-2"))
+
+	state, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
+	require.NoError(t, err)
+
+	require.Len(t, recording.executed, 2)
+	var rootQuery, dirQuery = recording.executed[0], recording.executed[1]
+	require.Contains(t, rootQuery, "FROM json.`/Volumes/cat/schema/flow_staging/flow_temp_tables/old.json.gz`")
+	require.NotContains(t, rootQuery, "read_files(")
+	require.Contains(t, dirQuery, "read_files('/Volumes/cat/schema/flow_staging/flow_temp_tables/txn-2', format => 'json', schema => ")
+	require.Equal(t, 1, strings.Count(dirQuery, "read_files("))
+	require.NotContains(t, dirQuery, "old.json.gz")
+	require.Equal(t, []string{"/Volumes/cat/schema/flow_staging/flow_temp_tables/txn-2"}, d.files.(*fakeFiles).deleted)
+	for _, query := range recording.executed {
+		require.Contains(t, query, "MERGE INTO `schema`.`a_table`")
+		require.Contains(t, query, "l.id >= LEAST(1::LONG, 5::LONG)")
+		require.Contains(t, query, "l.id <= GREATEST(10::LONG, 50::LONG)")
+	}
+
+	require.JSONEq(t, `{
+		"a_table.v1": {"00000000-7fffffff": null, "80000000-ffffffff": null}
+	}`, string(state.UpdatedJson))
+	require.Empty(t, d.cp)
+}
+
+func TestAcknowledgeCommitsDirectoriesOfAllShards(t *testing.T) {
+	t.Run("merge reads every directory in one query", func(t *testing.T) {
+		var d = renderingTransactor(lowerRangeKey)
+		d.cp.add("a_table.v1", lowerRangeKey, dirItem(true, []mergeBoundLiterals{bound("1", "10"), bound("'2024-01-01T00:00:00Z'", "'2024-01-02T00:00:00Z'")}, "txn-1"))
+		d.cp.add("a_table.v1", upperRangeKey, dirItem(false, []mergeBoundLiterals{bound("5", "50"), bound("'2024-01-01T12:00:00Z'", "'2024-01-03T00:00:00Z'")}, "txn-2"))
+
+		_, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
+		require.NoError(t, err)
+
+		require.Len(t, recording.executed, 1)
+		var query = recording.executed[0]
+		require.Contains(t, query, "MERGE INTO `schema`.`a_table`")
+		require.Contains(t, query, "read_files('/Volumes/cat/schema/flow_staging/flow_temp_tables/txn-1'")
+		require.Contains(t, query, "read_files('/Volumes/cat/schema/flow_staging/flow_temp_tables/txn-2'")
+		require.Contains(t, query, "l.id >= LEAST(1::LONG, 5::LONG)")
+		require.ElementsMatch(t, []string{
+			"/Volumes/cat/schema/flow_staging/flow_temp_tables/txn-1",
+			"/Volumes/cat/schema/flow_staging/flow_temp_tables/txn-2",
+		}, d.files.(*fakeFiles).deleted)
+	})
+
+	t.Run("copy reads each directory whole", func(t *testing.T) {
+		var d = renderingTransactor(lowerRangeKey)
+		d.cp.add("a_table.v1", lowerRangeKey, dirItem(false, nil, "txn-1"))
+		d.cp.add("a_table.v1", upperRangeKey, dirItem(false, nil, "txn-2"))
+
+		_, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
+		require.NoError(t, err)
+
+		require.Len(t, recording.executed, 2)
+		for i, dir := range []string{"txn-1", "txn-2"} {
+			require.Contains(t, recording.executed[i], "COPY INTO `schema`.`a_table`")
+			require.Contains(t, recording.executed[i], "FROM '/Volumes/cat/schema/flow_staging/flow_temp_tables/"+dir+"'")
+			require.NotContains(t, recording.executed[i], "FILES")
+		}
 	})
 }

@@ -1,0 +1,16 @@
+import:
+  - ../../materialize-boilerplate/testdata/integration/collections.key-change.flow.yaml
+
+materializations:
+  acmeCo/tests/materialize-motherduck/ducklake:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.ducklake.s3.yaml
+    bindings:
+    - resource:
+        table: key_change
+      source: key/change
+      fields:
+        recommended: true

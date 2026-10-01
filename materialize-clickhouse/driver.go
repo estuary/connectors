@@ -10,11 +10,13 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	chproto "github.com/ClickHouse/ch-go/proto"
 	"github.com/ClickHouse/clickhouse-go/v2"
 	chdriver "github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 	clickhouseproto "github.com/ClickHouse/clickhouse-go/v2/lib/proto"
+	"github.com/estuary/connectors/go/common"
 	m "github.com/estuary/connectors/go/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -117,7 +119,7 @@ func (c config) DefaultNamespace() string {
 	return ""
 }
 
-func (c config) FeatureFlags() (string, map[string]bool) {
+func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
 	return c.Advanced.FeatureFlags, nil
 }
 
@@ -869,6 +871,10 @@ func (t *transactor) bindingForStateKey(stateKey string) (*binding, bool) {
 		}
 	}
 	return nil, false
+}
+
+func (t *transactor) Flush(context.Context, map[int]time.Time) error {
+	return nil
 }
 
 func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {

@@ -31,9 +31,11 @@ share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-__pycache__/
-.venv/
-.mypy_cache/
+**/__pycache__
+**/.venv
+**/.mypy_cache
+**/.pytest_cache
+**/.ruff_cache
 .docker-cache/
 MANIFEST
 Dockerfile

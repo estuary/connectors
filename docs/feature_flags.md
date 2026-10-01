@@ -32,6 +32,17 @@ var featureFlagDefaults = map[string]bool{
 }
 ```
 
+Materialization connectors instead hold `common.FlagDefault` values, so that a flag's
+default can be gated on the task's creation date — see
+[Changing Default Behaviors (Materializations)](#changing-default-behaviors-materializations):
+
+```go
+var featureFlagDefaults = map[string]common.FlagDefault{
+  // A short (one or two line) description of what this flag does when set/unset.
+  "do_something": common.FlagDisabled,
+}
+```
+
 Then at the appropriate point(s) in the code, introduce the new logic conditional on the
 flag setting:
 
@@ -51,9 +62,94 @@ Typically this should be default-off, but if it makes things clearer there shoul
 be anything wrong with adding a default-on flag instead and having `no_foobar` be the
 setting which opts into the new behavior.
 
-## Changing Default Behaviors
+## Changing Default Behaviors (Materializations)
 
-The process for changing a default connector behavior is as follows:
+Materialization connectors can gate a flag's default on when a task was created,
+which changes the default for new tasks only, with no config edits and no
+coordinated merge. This is the preferred approach; the manual bulk-editing process in
+the next section remains for captures, which don't yet resolve flags this way.
+
+The default-values map holds `common.FlagDefault` values rather than plain booleans:
+
+```go
+var featureFlagDefaults = map[string]common.FlagDefault{
+  // A short (one or two line) description of what this flag does when set/unset.
+  "do_something": common.FlagDisabled,
+  // Applies only to tasks created on or after the date this flag was released,
+  // so that tasks already running at that point keep the old behavior.
+  "new_thing": common.FlagEnabledForTasksCreatedAfter("2026-06-10"),
+}
+```
+
+Set the cutoff to the day after the pull request merges. Every task in existence at
+that point is older than the cutoff and keeps the old behavior for the rest of its
+life, while every task created afterwards gets the new behavior from its first
+publication. A user can still opt either way per-task with `new_thing` /
+`no_new_thing` in `/advanced/feature_flags`, which always wins over the cutoff.
+
+The cutoff is a date, not a timestamp, because a date is all a spec records about when
+a task was created — the two dates are compared directly. A flag therefore takes effect
+for the whole of the day it ships on, so pick the date accordingly if that matters.
+
+### How it resolves
+
+Built capture and materialization specs carry a `created_at` date (UTC, `YYYY-MM-DD`),
+derived by the control plane from the task's control-plane ID. The materialization
+boilerplate resolves flags from that date in every RPC:
+
+| RPC | Creation date taken from |
+| --- | --- |
+| Validate | `req.LastMaterialization` — absent for a task that has never been published |
+| Apply | `req.Materialization` |
+| Open | `req.Materialization` |
+
+Resolution is therefore a pure function of the spec: it is stable for the life of the
+task, identical across the three RPCs, and needs nothing persisted in connector state.
+
+The date is absent in exactly one place: the Validate of a task that has not been
+published yet, which has no previous spec to carry one. Publishing the task creates
+it, so its very first Apply and Open — and every RPC after that — do have the date.
+An absent date means "brand new" and resolves against today's, which is the date the
+task is about to be created with.
+
+### Recording the resolved value in the config
+
+So that a task's flags can be read off its config rather than inferred from its
+creation date, Open emits a [`configUpdate`](observable_logs.md) event restating the
+endpoint config with each cutoff-gated flag written out explicitly — `new_thing` or
+`no_new_thing` in `/advanced/feature_flags`. It is recomputed on every Open and stops
+being emitted once the config contains the flag.
+
+The restatement never decrypts and re-encrypts the config. Open carries the task's
+sealed config alongside its decrypted one, and the flag is written into the plaintext
+`sops.overlay` of that document: the runtime merges the overlay over the decrypted
+config, having first checked that every location it touches is annotated
+`nonsensitive: true` in the connector's config schema — which is why
+`/advanced/feature_flags` must carry `jsonschema_extras:"nonsensitive=true"`. The
+encrypted values are copied across untouched, so a config stays under the key it was
+encrypted with, including a customer-managed one that Estuary cannot itself encrypt to.
+A config that isn't encrypted has no ciphertext to preserve and is restated directly.
+
+Property order does matter to sops, which computes its MAC over a document's values in
+the order it encounters them — but it is not something the connector has to preserve.
+The control plane parses the emitted config and re-serializes it when applying the
+update, which sorts its properties, so the restatement is sorted here as well and a
+config that verifies once stored verifies as emitted.
+
+This is a *record*, not a decision. The value written is the one the connector already
+resolved from the creation date, so the config can never contradict the connector's
+behavior, and a task behaves identically whether or not the update has landed yet —
+which is what makes it safe for the write to be asynchronous and best-effort. Failures
+are logged and ignored.
+
+Only cutoff-gated flags are recorded. Flags with a fixed default are deliberately left
+out: writing those into every config would freeze them per-task and defeat any later
+fleet-wide change of the default.
+
+## Changing Default Behaviors Manually
+
+For captures, and for materialization flags that can't be expressed as a creation-date
+cutoff, the process for changing a default connector behavior is as follows:
 
  - Add the feature flag `new_thing` with a default value corresponding to the old behavior (typically false).
  - Edit the endpoint configs of all tasks in production to add the `no_new_thing` flag setting.

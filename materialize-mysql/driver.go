@@ -14,6 +14,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/estuary/connectors/go/common"
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
@@ -27,10 +28,10 @@ import (
 	"go.gazette.dev/core/consumer/protocol"
 )
 
-var featureFlagDefaults = map[string]bool{
-	"datetime_keys_as_string":          true,
-	"retain_existing_data_on_backfill": false,
-	"native_binary_column_type":        true,
+var featureFlagDefaults = map[string]common.FlagDefault{
+	"datetime_keys_as_string":          common.FlagEnabled,
+	"retain_existing_data_on_backfill": common.FlagDisabled,
+	"native_binary_column_type":        common.FlagEnabled,
 }
 
 type sshForwarding struct {
@@ -109,7 +110,7 @@ func (c config) DefaultNamespace() string {
 	return ""
 }
 
-func (c config) FeatureFlags() (string, map[string]bool) {
+func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
 	return c.Advanced.FeatureFlags, featureFlagDefaults
 }
 
@@ -436,6 +437,10 @@ func (t *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSp
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
+func (t *transactor) Flush(context.Context, map[int]time.Time) error {
+	return nil
+}
+
 func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
 	return nil, nil
 }

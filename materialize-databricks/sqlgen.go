@@ -188,19 +188,7 @@ ALTER TABLE {{$.Identifier}} ADD COLUMN
 {{ if $.Table.Document -}}
 SELECT {{ $.Table.Binding }}, {{ $.Table.Identifier }}.{{ $.Table.Document.Identifier }}
 	FROM {{ $.Table.Identifier }}
-	JOIN (
-		{{- range $fi, $file := $.Files }}
-		{{ if $fi }} UNION ALL {{ end -}}
-		(
-			SELECT
-			{{ range $ind, $key := $.Table.Keys }}
-			{{- if $ind }}, {{ end -}}
-			{{ template "cast" $key -}}
-			{{- end }}
-			FROM json.`+"`{{ $file }}`"+`
-		)
-		{{- end }}
-	) AS r
+	JOIN ({{ template "loadSource" $ }}) AS r
 	{{- range $ind, $bound := $.Bounds }}
 	{{ if $ind }}AND {{ else }}ON {{ end -}}
 	{{ $.Table.Identifier }}.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
@@ -222,23 +210,66 @@ to_json(struct(
 {{- end}}
 )) as flow_document
 FROM {{ $.Table.Identifier }}
-JOIN (
-	{{- range $fi, $file := $.Files }}
-	{{ if $fi }} UNION ALL {{ end -}}
-	(
-		SELECT
-		{{ range $ind, $key := $.Table.Keys }}
-		{{- if $ind }}, {{ end -}}
-		{{ template "cast" $key -}}
-		{{- end }}
-		FROM json.`+"`{{ $file }}`"+`
-	)
-	{{- end }}
-) AS r
+JOIN ({{ template "loadSource" $ }}) AS r
 {{- range $ind, $bound := $.Bounds }}
 {{ if $ind }}AND {{ else }}ON {{ end -}}
 {{ $.Table.Identifier }}.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
 {{- if $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+{{- end }}
+{{ end }}
+
+-- The staged files of a transaction: one relation per staging directory, and
+-- one scan per file for files staged at the root by earlier versions.
+-- TODO: remove the per-file scans in about January 2027, with the root-level
+-- file path in renderCommitQueries.
+
+{{ define "loadSource" }}
+{{- range $di, $dir := $.Directories }}
+		{{ if $di }} UNION ALL {{ end -}}
+		(
+			SELECT
+			{{ range $ind, $key := $.Table.Keys }}
+			{{- if $ind }}, {{ end -}}
+			{{ template "cast" $key -}}
+			{{- end }}
+			FROM read_files({{ Literal $dir }}, format => 'json', schema => {{ Literal $.Schema }}, mode => 'FAILFAST', schemaEvolutionMode => 'none')
+		)
+{{- end }}
+{{- range $fi, $file := $.Files }}
+		{{ if or $fi $.Directories }} UNION ALL {{ end -}}
+		(
+			SELECT
+			{{ range $ind, $key := $.Table.Keys }}
+			{{- if $ind }}, {{ end -}}
+			{{ template "cast" $key -}}
+			{{- end }}
+			FROM json.`+"`{{ $file }}`"+`
+		)
+{{- end }}
+{{ end }}
+
+{{ define "storeSource" }}
+{{- range $di, $dir := $.Directories }}
+		{{ if $di }} UNION ALL {{ end -}}
+		(
+			SELECT
+			{{ range $ind, $key := $.Table.Columns }}
+			{{- if $ind }}, {{ end -}}
+			{{ template "cast" $key -}}
+			{{- end }}, _flow_delete::BOOLEAN
+			FROM read_files({{ Literal $dir }}, format => 'json', schema => {{ Literal $.Schema }}, mode => 'FAILFAST', schemaEvolutionMode => 'none')
+		)
+{{- end }}
+{{- range $fi, $file := $.Files }}
+		{{ if or $fi $.Directories }} UNION ALL {{ end -}}
+		(
+			SELECT
+			{{ range $ind, $key := $.Table.Columns }}
+			{{- if $ind }}, {{ end -}}
+			{{ template "cast" $key -}}
+			{{- end }}, _flow_delete::BOOLEAN
+			FROM json.`+"`{{ $file }}`"+`
+		)
 {{- end }}
 {{ end }}
 
@@ -280,27 +311,17 @@ JOIN (
   FROM {{ Literal $.StagingPath }}
 	)
   FILEFORMAT = JSON
+  {{- if $.Files }}
   FILES = ('{{ Join $.Files "','" }}')
-  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )
+  {{- end }}
+  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false', 'inferSchema' = 'false' )
 	COPY_OPTIONS ( 'mergeSchema' = 'true' )
   ;
 {{ end }}
 
 {{ define "mergeInto" }}
 	MERGE INTO {{ $.Table.Identifier }} AS l
-	USING (
-		{{- range $fi, $file := $.Files }}
-		{{ if $fi }} UNION ALL {{ end -}}
-		(
-			SELECT
-			{{ range $ind, $key := $.Table.Columns }}
-			{{- if $ind }}, {{ end -}}
-			{{ template "cast" $key -}}
-			{{- end }}, _flow_delete::BOOLEAN
-			FROM json.`+"`{{ $file }}`"+`
-		)
-		{{- end }}
-	) AS r
+	USING ({{ template "storeSource" $ }}) AS r
   ON {{ range $ind, $bound := $.Bounds }}
     {{ if $ind -}} AND {{ end -}}
     l.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
@@ -343,15 +364,29 @@ JOIN (
 }
 
 type tableWithFiles struct {
+	// Files are relative to StagingPath for COPY INTO, which reads the whole
+	// of StagingPath when there are none, and full paths otherwise.
 	Files       []string
 	StagingPath string
 	Table       *sql.Table
 	Bounds      []sql.MergeBound
+	// Directories are each read as one relation with Schema, a DDL string.
+	Directories []string
+	Schema      string
 }
 
 func RenderTableWithFiles(table sql.Table, files []string, stagingPath string, tpl *template.Template, bounds []sql.MergeBound) (string, error) {
+	return renderTemplate(tpl, &tableWithFiles{Table: &table, Files: files, StagingPath: stagingPath, Bounds: bounds})
+}
+
+// RenderTableWithStaged renders a load or merge over staging directories and root-level files.
+func RenderTableWithStaged(table sql.Table, dirs, rootFiles []string, schema string, tpl *template.Template, bounds []sql.MergeBound) (string, error) {
+	return renderTemplate(tpl, &tableWithFiles{Table: &table, Directories: dirs, Files: rootFiles, Schema: schema, Bounds: bounds})
+}
+
+func renderTemplate(tpl *template.Template, data *tableWithFiles) (string, error) {
 	var w strings.Builder
-	if err := tpl.Execute(&w, &tableWithFiles{Table: &table, Files: files, StagingPath: stagingPath, Bounds: bounds}); err != nil {
+	if err := tpl.Execute(&w, data); err != nil {
 		return "", err
 	}
 	return w.String(), nil

@@ -1,3 +1,11 @@
+---
+title: (Deprecated) Google Analytics UA
+description: Deprecated Google Universal Analytics capture connector. Google retired Universal Analytics; use Estuary's Google Analytics 4 connector instead.
+---
+
+<head>
+  <meta name="robots" content="noindex, follow" />
+</head>
 
 # (Deprecated) Google Analytics UA
 

@@ -1,8 +1,10 @@
 import asyncio
 import base64
+import functools
+import itertools
 from datetime import datetime, timedelta, UTC
 from logging import Logger
-from typing import Any, AsyncGenerator
+from typing import Any, AsyncGenerator, Callable, TypeVar
 
 from estuary_cdk.capture.common import LogCursor, PageCursor
 from estuary_cdk.http import Headers, HeadersAndBodyGenerator, HTTPSession, HTTPError
@@ -43,6 +45,9 @@ CURSOR_PAGINATION_PAGE_SIZE = 100
 MAX_INCREMENTAL_EXPORT_PAGE_SIZE = 1000
 MAX_SATISFACTION_RATINGS_WINDOW_SIZE = timedelta(days=30)
 MIN_PAGE_SIZE = 1
+# Zendesk's rate limit is shared account-wide with the customer's other integrations,
+# so each binding keeps only a few per-ticket requests in flight.
+TICKET_CHILD_CONCURRENCY = 5
 # Zendesk errors out if a start or end time parameter is 60 seconds or less in the past. 
 TIME_PARAMETER_DELAY = timedelta(seconds=61)
 # Zendesk's API is eventually consistent: a record can become queryable seconds or
@@ -950,6 +955,38 @@ async def _fetch_ticket_child_resources(
                 params["page[after]"] = response.meta.after_cursor
 
 
+T = TypeVar("T")
+
+
+async def _fetch_ticket_children_concurrently(
+    ticket_ids: list[int],
+    fetch_children: Callable[[int], AsyncGenerator[T, None]],
+) -> AsyncGenerator[T, None]:
+    """
+    Yields the children of every ticket in `ticket_ids`, in no particular
+    order, keeping at most TICKET_CHILD_CONCURRENCY tickets in flight or
+    buffered at a time. Raises the first error any ticket's fetch raises.
+    """
+    semaphore = asyncio.Semaphore(TICKET_CHILD_CONCURRENCY)
+
+    async def _collect(ticket_id: int) -> list[T]:
+        await semaphore.acquire()
+        return [child async for child in fetch_children(ticket_id)]
+
+    tasks = [asyncio.create_task(_collect(ticket_id)) for ticket_id in ticket_ids]
+    try:
+        for next_done in asyncio.as_completed(tasks):
+            for child in await next_done:
+                yield child
+            # Released only after a ticket's children are yielded so memory
+            # stays bounded when emitting is slower than fetching.
+            semaphore.release()
+    finally:
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+
 async def fetch_ticket_child_resources(
     http: HTTPSession,
     subdomain: str,
@@ -990,12 +1027,11 @@ async def fetch_ticket_child_resources(
                 break
 
         if len(tickets) > 0 and next_page_cursor:
-            for ticket in tickets:
-                if ticket.status == 'deleted':
-                    continue
-
-                async for child_resource in _fetch_ticket_child_resources(http, subdomain, path, response_model, ticket.id, log):
-                    yield child_resource
+            async for child_resource in _fetch_ticket_children_concurrently(
+                [ticket.id for ticket in tickets if ticket.status != 'deleted'],
+                functools.partial(_fetch_ticket_child_resources, http, subdomain, path, response_model, log=log),
+            ):
+                yield child_resource
 
             yield (next_page_cursor,)
             tickets = []
@@ -1035,14 +1071,16 @@ async def backfill_ticket_child_resources(
                 break
 
         if len(tickets) > 0 and next_page_cursor:
-            for ticket in tickets:
-                if ticket.updated_at >= cutoff:
-                    return
-                if ticket.status == 'deleted':
-                    continue
+            tickets_before_cutoff = list(itertools.takewhile(lambda t: t.updated_at < cutoff, tickets))
 
-                async for child_resource in _fetch_ticket_child_resources(http, subdomain, path, response_model, ticket.id, log):
-                    yield child_resource
+            async for child_resource in _fetch_ticket_children_concurrently(
+                [ticket.id for ticket in tickets_before_cutoff if ticket.status != 'deleted'],
+                functools.partial(_fetch_ticket_child_resources, http, subdomain, path, response_model, log=log),
+            ):
+                yield child_resource
+
+            if len(tickets_before_cutoff) < len(tickets):
+                return
 
             yield next_page_cursor
             tickets = []
@@ -1114,11 +1152,11 @@ async def fetch_side_conversations(
                 break
 
         if len(tickets) > 0 and next_page_cursor:
-            for ticket in tickets:
-                if ticket.status == 'deleted':
-                    continue
-                async for side_conv in _fetch_side_conversations(http, subdomain, ticket.id, log):
-                    yield side_conv
+            async for side_conv in _fetch_ticket_children_concurrently(
+                [ticket.id for ticket in tickets if ticket.status != 'deleted'],
+                functools.partial(_fetch_side_conversations, http, subdomain, log=log),
+            ):
+                yield side_conv
 
             yield (next_page_cursor,)
             tickets = []
@@ -1158,13 +1196,16 @@ async def backfill_side_conversations(
                 break
 
         if len(tickets) > 0 and next_page_cursor:
-            for ticket in tickets:
-                if ticket.updated_at >= cutoff:
-                    return
-                if ticket.status == "deleted":
-                    continue
-                async for side_conv in _fetch_side_conversations(http, subdomain, ticket.id, log):
-                    yield side_conv
+            tickets_before_cutoff = list(itertools.takewhile(lambda t: t.updated_at < cutoff, tickets))
+
+            async for side_conv in _fetch_ticket_children_concurrently(
+                [ticket.id for ticket in tickets_before_cutoff if ticket.status != "deleted"],
+                functools.partial(_fetch_side_conversations, http, subdomain, log=log),
+            ):
+                yield side_conv
+
+            if len(tickets_before_cutoff) < len(tickets):
+                return
 
             yield next_page_cursor
             tickets = []

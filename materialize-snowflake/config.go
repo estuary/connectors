@@ -9,19 +9,30 @@ import (
 	"strings"
 
 	snowflake_auth "github.com/estuary/connectors/go/auth/snowflake"
+	"github.com/estuary/connectors/go/common"
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
 	log "github.com/sirupsen/logrus"
 	sf "github.com/snowflakedb/gosnowflake/v2"
 )
 
-var featureFlagDefaults = map[string]bool{
-	// Use Snowpipe streaming for delta-updates bindings that use JWT
-	// authentication.
-	"snowpipe_streaming":               true,
-	"datetime_keys_as_string":          true,
-	"retain_existing_data_on_backfill": false,
-	"native_binary_column_type":        true,
+const (
+	// flagSnowpipeStreaming enables Snowpipe streaming for delta-updates
+	// bindings that use JWT authentication.
+	flagSnowpipeStreaming = "snowpipe_streaming"
+	// flagSnowpipeStreamingV2 enables the high-performance Snowpipe Streaming
+	// architecture, via the Python SDK sidecar, for delta-updates bindings that
+	// use JWT authentication. It requires the v2 materialization runtime; see
+	// requireStreamingV2Runtime.
+	flagSnowpipeStreamingV2 = "snowpipe_streaming_v2"
+)
+
+var featureFlagDefaults = map[string]common.FlagDefault{
+	flagSnowpipeStreaming:              common.FlagEnabled,
+	flagSnowpipeStreamingV2:            common.FlagDisabled,
+	"datetime_keys_as_string":          common.FlagEnabled,
+	"retain_existing_data_on_backfill": common.FlagDisabled,
+	"native_binary_column_type":        common.FlagEnabled,
 }
 
 // snowflakeTimestampType specifies how timestamp columns should be handled in Snowflake.
@@ -201,7 +212,7 @@ func (c config) DefaultNamespace() string {
 	return c.Schema
 }
 
-func (c config) FeatureFlags() (string, map[string]bool) {
+func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
 	return c.Advanced.FeatureFlags, featureFlagDefaults
 }
 
@@ -230,4 +241,13 @@ func (c config) Validate() error {
 	}
 
 	return validHost(c.Host)
+}
+
+func (c config) isStreamsV2(deltaUpdates bool, featureFlags map[string]bool) bool {
+	return c.isStreamsV1(deltaUpdates, featureFlags) && featureFlags[flagSnowpipeStreamingV2]
+}
+
+func (c config) isStreamsV1(deltaUpdates bool, featureFlags map[string]bool) bool {
+	return deltaUpdates && c.Credentials != nil && c.Credentials.AuthType == snowflake_auth.JWT &&
+		featureFlags[flagSnowpipeStreaming]
 }

@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-09-17
+
+### Changed
+- Removed `ActivityMetric` from the list of supported standard objects. It requires a query
+  strategy the connector currently does not support, which caused captures to crash when
+  attempting to query `ActivityMetric` records.
+
 ## 2026-09-09
 
 ### Fixed

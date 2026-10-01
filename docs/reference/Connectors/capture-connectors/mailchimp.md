@@ -1,6 +1,11 @@
 ---
-description: Sync Mailchimp data with Estuary's connector, including lists, campaigns, and email activity, using a Mailchimp API key.
+title: Mailchimp (Deprecated)
+description: Deprecated Mailchimp capture connector. Use Estuary's native Mailchimp connector instead to sync lists, campaigns, and email activity.
 ---
+
+<head>
+  <meta name="robots" content="noindex, follow" />
+</head>
 
 # Mailchimp (Deprecated)
 

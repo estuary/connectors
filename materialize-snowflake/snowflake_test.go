@@ -2,10 +2,13 @@ package connector
 
 import (
 	"context"
+	stdsql "database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/estuary/connectors/go/common"
 	"os/exec"
 	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -149,6 +152,9 @@ func TestIntegration(t *testing.T) {
 	t.Run("migrate", func(t *testing.T) {
 		sql.RunMigrationTest(t, NewDriver(), "testdata/migrate.flow.yaml", makeResourceFn, nil)
 	})
+	t.Run("key-change-migrate", func(t *testing.T) {
+		sql.RunKeyChangeMigrationTest(t, NewDriver(), "testdata/key-change.flow.yaml", makeResourceFn, nil)
+	})
 }
 
 func TestPrereqs(t *testing.T) {
@@ -196,7 +202,45 @@ func TestPrereqs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require.Equal(t, tt.want, preReqs(context.Background(), *tt.cfg(cfg)).Unwrap())
+			require.Equal(t, tt.want, preReqs(context.Background(), *tt.cfg(cfg), common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{})).Unwrap())
 		})
 	}
+}
+
+func TestQueryCurrentClusterBy(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode")
+	}
+
+	ctx := context.Background()
+	cfg := mustGetCfg(t)
+
+	dsn, err := cfg.toURI(true, "")
+	require.NoError(t, err)
+	db, err := stdsql.Open("snowflake", dsn)
+	require.NoError(t, err)
+	defer db.Close()
+
+	const schema = "ESTUARY_SCHEMA"
+	// The decoy differs from the target only at the underscore position, and
+	// its "A" sorts before "_" so an unescaped LIKE pattern returns it first.
+	base := fmt.Sprintf("CLUSTERBY_%s", strings.ToUpper(uuid.NewString()[:8]))
+	target := base + "_T"
+	decoy := base + "AT"
+
+	for _, name := range []string{target, decoy} {
+		_, err := db.ExecContext(ctx, fmt.Sprintf(`CREATE TABLE %s.%s (ID INTEGER);`, schema, name))
+		require.NoError(t, err)
+		t.Cleanup(func() { db.ExecContext(ctx, fmt.Sprintf(`DROP TABLE IF EXISTS %s.%s;`, schema, name)) })
+	}
+	_, err = db.ExecContext(ctx, fmt.Sprintf(`ALTER TABLE %s.%s CLUSTER BY (ID);`, schema, decoy))
+	require.NoError(t, err)
+
+	got, err := queryCurrentClusterBy(ctx, db, schema, target)
+	require.NoError(t, err)
+	require.Equal(t, "", got)
+
+	got, err = queryCurrentClusterBy(ctx, db, schema, decoy)
+	require.NoError(t, err)
+	require.Equal(t, "LINEAR(ID)", got)
 }

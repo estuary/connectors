@@ -1,5 +1,11 @@
+import pytest
+
 from source_gong.models import (
     Call,
+    CallTranscript,
+    ExtensiveCall,
+    FilteredGongResource,
+    HttpMethod,
     User,
     Scorecard,
     ScorecardDefinition,
@@ -132,3 +138,105 @@ class TestParseResponse:
         items, cursor = _parse_response(User, "users", raw)
         assert cursor is None
         assert len(items) == 1
+
+
+class TestExtensiveCall:
+    # Shape taken from bruno/Calls/extensive.yml against the sandbox.
+    META = {
+        "id": "7022652889306584427",
+        "started": "2026-08-28T08:00:00-07:00",
+        "title": "Estuary seed call A",
+    }
+
+    def test_carries_no_document_cursor(self):
+        call = ExtensiveCall.model_validate({"metaData": self.META})
+        assert not hasattr(call, "cursor_value")
+
+    def test_id_coerced_to_int(self):
+        call = ExtensiveCall.model_validate({"metaData": self.META})
+        assert call.metaData.id == 7022652889306584427
+
+    def test_id_field_mirrors_nested_key(self):
+        assert ExtensiveCall.KEY == ["/metaData/id"]
+        assert ExtensiveCall.get_key_json_path() == ExtensiveCall.KEY[0]
+
+    def test_content_blocks_ride_on_extra(self):
+        call = ExtensiveCall.model_validate(
+            {"metaData": self.META, "parties": [{"id": "1"}], "content": {"brief": "b"}}
+        )
+        dumped = call.model_dump()
+        assert dumped["parties"] == [{"id": "1"}]
+        assert dumped["content"] == {"brief": "b"}
+
+    def test_media_not_requested(self):
+        exposed = ExtensiveCall.BODY_EXTRA["contentSelector"]["exposedFields"]
+        assert exposed["media"] is False
+
+
+class TestCallTranscript:
+    # Shape taken from bruno/Calls/transcript.yml against the sandbox.
+    ITEM = {
+        "callId": "7022652889306584427",
+        "transcript": [
+            {
+                "speakerId": "656861958384341821",
+                "topic": None,
+                "sentences": [{"start": 160, "end": 740, "text": "chapter I."}],
+            }
+        ],
+    }
+
+    def test_call_id_coerced_to_int_so_it_joins_calls(self):
+        transcript = CallTranscript.model_validate(self.ITEM)
+        assert (
+            transcript.callId
+            == Call.model_validate(
+                {"id": "7022652889306584427", "started": "2026-08-28T08:00:00Z"}
+            ).id
+        )
+
+    def test_monologues_ride_on_extra(self):
+        transcript = CallTranscript.model_validate(self.ITEM)
+        assert transcript.model_dump()["transcript"] == self.ITEM["transcript"]
+
+    def test_carries_no_document_cursor(self):
+        assert not hasattr(CallTranscript.model_validate(self.ITEM), "cursor_value")
+
+    def test_posts_a_filter_wrapped_body_without_extras(self):
+        assert CallTranscript.METHOD is HttpMethod.POST
+        assert CallTranscript.FILTER_WRAPPER is True
+        assert CallTranscript.BODY_EXTRA == {}
+
+
+class TestRequiredClassVars:
+    def test_incomplete_subclass_is_rejected(self):
+        with pytest.raises(TypeError, match="URL_PATH"):
+
+            class Incomplete(FilteredGongResource):
+                NAME = "incomplete"
+                KEY = ["/id"]
+                ITEMS_KEY = "things"
+                FROM_PARAM = "from"
+                TO_PARAM = "to"
+
+    def test_abstract_base_is_exempt(self):
+        class Abstract(FilteredGongResource):
+            ABSTRACT = True
+
+        assert Abstract.ABSTRACT is True
+
+
+class TestParseNewStreams:
+    def test_parse_extensive_calls(self):
+        raw = b'{"calls":[{"metaData":{"id":"1","started":"2026-08-28T08:00:00Z"}}],"records":{"cursor":"c1"}}'
+        items, cursor = _parse_response(ExtensiveCall, "calls", raw)
+        assert len(items) == 1
+        assert items[0].metaData.id == 1
+        assert cursor == "c1"
+
+    def test_parse_call_transcripts(self):
+        raw = b'{"callTranscripts":[{"callId":"1","transcript":[]}],"records":{"totalRecords":1}}'
+        items, cursor = _parse_response(CallTranscript, "callTranscripts", raw)
+        assert len(items) == 1
+        assert items[0].callId == 1
+        assert cursor is None

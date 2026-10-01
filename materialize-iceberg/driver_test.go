@@ -254,7 +254,7 @@ func TestIntegration(t *testing.T) {
 				// is read from the staged file's temporary view. JSON-shaped
 				// fields are variant columns when the flag is on.
 				jsonLiteral := "'{}'"
-				if common.ParseFeatureFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults)["variant_columns"] {
+				if common.ResolveFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults, common.CreatedAt{})["variant_columns"] {
 					jsonLiteral = "parse_json('{}')"
 				}
 				literals := map[string]string{
@@ -369,7 +369,7 @@ func TestIntegration(t *testing.T) {
 func runVariantCreateV3(t *testing.T, taskName string, cfg config) {
 	ctx := context.Background()
 
-	flags := common.ParseFeatureFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults)
+	flags := common.ResolveFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults, common.CreatedAt{})
 	require.True(t, flags["variant_columns"], "the spark4 config must enable variant_columns")
 	newMaterialization := func(variant bool) *materialization {
 		f := make(map[string]bool, len(flags))

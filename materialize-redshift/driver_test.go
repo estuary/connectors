@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/estuary/connectors/go/common"
 	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	testutil "github.com/estuary/connectors/materialize-boilerplate/testutil"
@@ -67,6 +68,58 @@ func TestIntegration(t *testing.T) {
 			sql.RuntimeConfig{Shards: 2, Fidelity: m.FidelityTotal})
 	})
 
+	t.Run("truncate", func(t *testing.T) {
+		if testutil.RuntimeV1() {
+			t.Skip("backfill signals require runtime-next")
+		}
+		var ctx = context.Background()
+		var cfg = mustGetCfg(t)
+		var taskName = "acmeCo/tests/materialize-redshift-truncate"
+		var tables = []string{"truncate_standard", "truncate_delta", "truncate_no_published_at"}
+
+		conn, err := pgx.Connect(ctx, cfg.toURI())
+		require.NoError(t, err)
+		defer conn.Close(ctx)
+
+		var identifiers = make(map[string]string)
+		for _, table := range tables {
+			path, _, err := tableConfig{Table: table}.WithDefaults(cfg).Parameters()
+			require.NoError(t, err)
+			identifiers[table] = pgx.Identifier(path).Sanitize()
+			_, err = conn.Exec(ctx, "DROP TABLE IF EXISTS "+identifiers[table]+";")
+			require.NoError(t, err)
+		}
+		materializer, err := NewDriver().NewMaterializer(ctx, taskName, cfg, testFlags(t, cfg))
+		require.NoError(t, err)
+		defer materializer.Close(ctx)
+		require.NoError(t, materializer.CleanupTestTask(ctx, taskName))
+
+		// Two shards, so that the primary truncates after applying a peer's
+		// staged stores.
+		testutil.RunFlowctl(t, "raw", "preview-next",
+			"--name", taskName,
+			"--source", "testdata/truncate.flow.yaml",
+			"--fixture", "testdata/truncate.fixture.json",
+			"--shards", "2",
+			"--timeout", "10m",
+		)
+
+		// The fixture stores ids 1-3, then re-stores only id 1 during a
+		// backfill. Only the standard table with a flow_published_at column
+		// loses the rows published before the backfill.
+		for table, want := range map[string][]int64{
+			"truncate_standard":        {1},
+			"truncate_delta":           {1, 1, 2, 3},
+			"truncate_no_published_at": {1, 2, 3},
+		} {
+			var rows, err = conn.Query(ctx, "SELECT id FROM "+identifiers[table]+" ORDER BY id;")
+			require.NoError(t, err)
+			ids, err := pgx.CollectRows(rows, pgx.RowTo[int64])
+			require.NoError(t, err)
+			require.Equal(t, want, ids, table)
+		}
+	})
+
 	t.Run("apply", func(t *testing.T) {
 		sql.RunApplyTest(t, NewDriver(), "testdata/apply.flow.yaml", makeResourceFn)
 	})
@@ -118,7 +171,7 @@ func TestIntegration(t *testing.T) {
 			// The drain applies under the fixture spec's own name and leaves
 			// its tokens row behind.
 			t.Cleanup(func() {
-				materializer, err := NewDriver().NewMaterializer(ctx, taskName, cfg, boilerplate.ParseFlags(cfg))
+				materializer, err := NewDriver().NewMaterializer(ctx, taskName, cfg, testFlags(t, cfg))
 				require.NoError(t, err)
 				defer materializer.Close(ctx)
 				require.NoError(t, materializer.CleanupTestTask(ctx, "test/sqlite"))
@@ -130,6 +183,9 @@ func TestIntegration(t *testing.T) {
 
 	t.Run("migrate", func(t *testing.T) {
 		sql.RunMigrationTest(t, NewDriver(), "testdata/migrate.flow.yaml", makeResourceFn, nil)
+	})
+	t.Run("key-change-migrate", func(t *testing.T) {
+		sql.RunKeyChangeMigrationTest(t, NewDriver(), "testdata/key-change.flow.yaml", makeResourceFn, nil)
 	})
 
 	t.Run("idempotency", func(t *testing.T) {
@@ -143,7 +199,7 @@ func stageRows(t *testing.T, cfg config, fields []string, rows [][]any) *stateIt
 	t.Helper()
 	ctx := context.Background()
 
-	client, err := cfg.toS3Client(ctx, boilerplate.ParseFlags(cfg))
+	client, err := cfg.toS3Client(ctx, testFlags(t, cfg))
 	require.NoError(t, err)
 
 	f := newStagedFile(newS3Store(client, cfg.Bucket), cfg.effectiveBucketPath(), fields)
@@ -164,7 +220,7 @@ func stageRows(t *testing.T, cfg config, fields []string, rows [][]any) *stateIt
 func runIdempotencyTest(t *testing.T, makeResourceFn func(string, bool) tableConfig) {
 	ctx := context.Background()
 	cfg := mustGetCfg(t)
-	flags := boilerplate.ParseFlags(cfg)
+	flags := testFlags(t, cfg)
 	suffix := fmt.Sprintf("%s_flow_test_%d", uuid.NewString()[:8], time.Now().Unix())
 
 	driver := NewDriver()
@@ -393,7 +449,18 @@ func TestPrereqs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require.Equal(t, tt.want, preReqs(ctx, tt.cfg(cfg)).Unwrap())
+			require.Equal(t, tt.want, preReqs(ctx, tt.cfg(cfg), common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{})).Unwrap())
 		})
 	}
+}
+
+// testFlags resolves feature flags for a test that has no runtime spec to take a
+// creation date from, so date-gated flags resolve as for a brand-new task.
+func testFlags(t *testing.T, cfg config) map[string]bool {
+	t.Helper()
+
+	flags, err := boilerplate.ResolveFlags(cfg, &pf.MaterializationSpec{})
+	require.NoError(t, err)
+
+	return flags
 }

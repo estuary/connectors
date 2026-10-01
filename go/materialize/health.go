@@ -82,6 +82,9 @@ type RowStats struct {
 	// Loaded is the number of staged rows the destination loaded, when the
 	// connector can observe it. Checked against Staged.
 	Loaded *int64
+	// Truncated is the number of rows deleted because they were published
+	// before a completed backfill. It is visibility only, never checked.
+	Truncated *int64
 }
 
 // ExactRowStats reports a full breakdown of affected rows.
@@ -119,6 +122,12 @@ func (s RowStats) WithLoaded(n int64) RowStats {
 	return s
 }
 
+// WithTruncated sets the number of rows a backfill truncation deleted.
+func (s RowStats) WithTruncated(n int64) RowStats {
+	s.Truncated = &n
+	return s
+}
+
 func (s RowStats) add(o RowStats) RowStats {
 	s.Fidelity = minFidelity(s.Fidelity.orNone(), o.Fidelity.orNone())
 	s.Inserted += o.Inserted
@@ -127,6 +136,7 @@ func (s RowStats) add(o RowStats) RowStats {
 	s.Total += o.Total
 	s.Staged = addOptional(s.Staged, o.Staged)
 	s.Loaded = addOptional(s.Loaded, o.Loaded)
+	s.Truncated = addOptional(s.Truncated, o.Truncated)
 	return s
 }
 
@@ -150,6 +160,10 @@ type expectedCounts struct {
 	// skipped counts hard deletes of documents that don't exist, which the
 	// StoreIterator never hands to the connector.
 	skipped int64
+	// truncate counts completed backfills, each of which permits the
+	// connector to delete rows published before it. It is a visibility
+	// bucket only.
+	truncate int64
 }
 
 // stores is the number of documents actually handed to the connector.
@@ -161,6 +175,7 @@ func (e expectedCounts) add(o expectedCounts) expectedCounts {
 	e.delete += o.delete
 	e.softDeleted += o.softDeleted
 	e.skipped += o.skipped
+	e.truncate += o.truncate
 	return e
 }
 
@@ -428,6 +443,15 @@ func recoverHealthPanic() {
 	}
 }
 
+// keyOf is the binding key of a binding index, or a placeholder naming the
+// index when it is out of range.
+func (h *healthTracker) keyOf(binding int) string {
+	if binding >= 0 && binding < len(h.keys) {
+		return h.keys[binding]
+	}
+	return fmt.Sprintf("binding %d", binding)
+}
+
 // observeStore classifies one Store request as the StoreIterator reads it.
 func (h *healthTracker) observeStore(round, binding int, exists, deleted, hardDelete bool) {
 	defer recoverHealthPanic()
@@ -435,12 +459,22 @@ func (h *healthTracker) observeStore(round, binding int, exists, deleted, hardDe
 	defer h.mu.Unlock()
 
 	r := h.openRound(round)
-	key := fmt.Sprintf("binding %d", binding)
-	if binding >= 0 && binding < len(h.keys) {
-		key = h.keys[binding]
-	}
+	key := h.keyOf(binding)
 	e := r.expected[key]
 	e.observe(exists, deleted, hardDelete)
+	r.expected[key] = e
+}
+
+// observeTruncation records a backfill completed for a binding in a round.
+func (h *healthTracker) observeTruncation(round, binding int) {
+	defer recoverHealthPanic()
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	r := h.openRound(round)
+	key := h.keyOf(binding)
+	e := r.expected[key]
+	e.truncate++
 	r.expected[key] = e
 }
 
@@ -591,7 +625,7 @@ func (h *healthTracker) evaluate(r *healthRound) {
 		a, reported := r.actual[key]
 		path := h.paths[key]
 
-		if e.stores() > 0 || e.skipped > 0 {
+		if e.stores() > 0 || e.skipped > 0 || e.truncate > 0 {
 			w.addExpected(key, e)
 		}
 		if !reported {
@@ -728,6 +762,19 @@ func (h *healthTracker) emit(w *healthWindow, verdict string, extra log.Fields) 
 	if w.actual.Loaded != nil {
 		actual["loaded"] = *w.actual.Loaded
 	}
+	if w.actual.Truncated != nil {
+		actual["truncated"] = *w.actual.Truncated
+	}
+	expected := log.Fields{
+		"insert":      w.expected.insert,
+		"update":      w.expected.update,
+		"delete":      w.expected.delete,
+		"softDeleted": w.expected.softDeleted,
+		"skipped":     w.expected.skipped,
+	}
+	if w.expected.truncate > 0 {
+		expected["truncate"] = w.expected.truncate
+	}
 
 	fields := log.Fields{
 		// observable promotes the line into the data-plane's Grafana stream,
@@ -745,14 +792,8 @@ func (h *healthTracker) emit(w *healthWindow, verdict string, extra log.Fields) 
 		"bindings":          len(w.bindings),
 		"loadRequests":      w.loadRequests,
 		"loaded":            w.loaded,
-		"expected": log.Fields{
-			"insert":      w.expected.insert,
-			"update":      w.expected.update,
-			"delete":      w.expected.delete,
-			"softDeleted": w.expected.softDeleted,
-			"skipped":     w.expected.skipped,
-		},
-		"actual": actual,
+		"expected":          expected,
+		"actual":            actual,
 	}
 	if w.pending > 0 {
 		fields["pending"] = w.pending

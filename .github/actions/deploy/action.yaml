@@ -31,26 +31,86 @@ runs:
         for VARIANT in ${{ inputs.connector }} ${{ inputs.variants }}; do
           echo "Building and pushing ${VARIANT}:${{ inputs.tag }}...";
           docker build --build-arg BASE_CONNECTOR=ghcr.io/estuary/${{ inputs.connector }}:local \
+                       --label org.opencontainers.image.revision=${{ github.sha }} \
                        --build-arg DOCS_URL=https://go.estuary.dev/${VARIANT} \
                        --tag ghcr.io/estuary/${VARIANT}:${{ inputs.tag_sha }} \
                        --file connector-variant.Dockerfile .;
-          docker image push ghcr.io/estuary/${VARIANT}:${{ inputs.tag_sha }};
+          bash "${{ github.action_path }}/push-with-retry.sh" ghcr.io/estuary/${VARIANT}:${{ inputs.tag_sha }};
         done
 
+    # Re-running an old run would otherwise move `dev` and the version tag back
+    # to that run's commit, over a newer deploy of the same connector. The
+    # revision label on the current `:dev` says which commit it came from, and
+    # the tags only move when this commit is the same or newer. A missing `:dev`
+    # (the first deploy) or one with no label (from before the label existed)
+    # doesn't stop them. Anything else that leaves the order unknown fails the
+    # job rather than risk moving the tags back.
+    - name: Check whether ${{ inputs.connector }}'s dev tag comes from a newer commit
+      id: guard
+      if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        IMAGE: ghcr.io/estuary/${{ inputs.connector }}
+        REPO: ${{ github.repository }}
+        SHA: ${{ github.sha }}
+      run: |
+        set -euo pipefail
+        fail() { echo "::error::$1; leaving dev and ${{ inputs.tag_version }} alone"; exit 1; }
+
+        # The SHA tag was pushed above, so the package exists and a missing
+        # `:dev` reports `not found` rather than an authorization error.
+        ERR="${RUNNER_TEMP}/guard-inspect.err"
+        if ! IMAGE_JSON=$(docker buildx imagetools inspect "${IMAGE}:dev" --format '{{ json .Image }}' 2> "$ERR"); then
+          cat "$ERR" >&2
+          grep -qF "${IMAGE}:dev: not found" "$ERR" || fail "could not inspect ${IMAGE}:dev"
+          IMAGE_JSON=null
+        fi
+
+        # `.Image` is the image config for a single-platform image, and a map
+        # of platform to config for a multi-platform one.
+        DEPLOYED=$(jq -r '
+          if . == null then ""
+          elif has("config") then .config.Labels["org.opencontainers.image.revision"] // ""
+          elif has("linux/amd64") then .["linux/amd64"].config.Labels["org.opencontainers.image.revision"] // ""
+          else error("no linux/amd64 image config") end' <<< "$IMAGE_JSON") ||
+          fail "could not read the revision label of ${IMAGE}:dev"
+
+        if [ -z "$DEPLOYED" ]; then
+          echo "${IMAGE}:dev is missing or has no revision label"
+          LATEST=true
+        else
+          STATUS=$(gh api "repos/${REPO}/compare/${DEPLOYED}...${SHA}" --jq .status) ||
+            fail "could not compare ${DEPLOYED}...${SHA}"
+          # `ahead` means this commit is newer than the deployed one.
+          case "$STATUS" in
+            ahead|identical) LATEST=true ;;
+            behind)
+              echo "::notice::${IMAGE}:dev comes from ${DEPLOYED}, which is newer than ${SHA}; leaving dev and ${{ inputs.tag_version }} alone"
+              LATEST=false
+              ;;
+            *) fail "${SHA} and ${IMAGE}:dev's ${DEPLOYED} are ${STATUS:-unordered}" ;;
+          esac
+        fi
+        echo "latest=${LATEST}" >> "$GITHUB_OUTPUT"
+
     - name: Push ${{ inputs.connector }} image(s) with 'dev' and '${{ inputs.tag_version }}' tags
-      if: ${{ github.event_name == 'push' }}
+      if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && steps.guard.outputs.latest == 'true'
       shell: bash
       run: |
         for VARIANT in ${{ inputs.connector }} ${{ inputs.variants }}; do
           docker image tag ghcr.io/estuary/${VARIANT}:${{ inputs.tag_sha }} ghcr.io/estuary/${VARIANT}:dev;
           docker image tag ghcr.io/estuary/${VARIANT}:${{ inputs.tag_sha }} ghcr.io/estuary/${VARIANT}:${{ inputs.tag_version }};
 
-          docker image push ghcr.io/estuary/${VARIANT}:dev;
-          docker image push ghcr.io/estuary/${VARIANT}:${{ inputs.tag_version }};
+          bash "${{ github.action_path }}/push-with-retry.sh" ghcr.io/estuary/${VARIANT}:dev;
+          bash "${{ github.action_path }}/push-with-retry.sh" ghcr.io/estuary/${VARIANT}:${{ inputs.tag_version }};
         done
 
+    # Requeue is for connectors a push changed; scheduled and manual runs
+    # have no push to compare.
     - uses: dorny/paths-filter@v2
       id: filter
+      if: github.event_name == 'push'
       with:
         filters: |
           connector:
@@ -62,7 +122,7 @@ runs:
     # role claim is github_action_connector_refresh; PostgREST runs requeue_connector_tag
     # under that role.
     - name: Re-queue connector tags for ${{ inputs.connector }}
-      if: github.event_name == 'push' && steps.filter.outputs.connector == 'true'
+      if: github.event_name == 'push' && steps.filter.outputs.connector == 'true' && steps.guard.outputs.latest == 'true'
       shell: bash
       env:
         RT_ID: ${{ inputs.rt_id }}

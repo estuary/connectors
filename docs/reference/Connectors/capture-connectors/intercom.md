@@ -1,3 +1,11 @@
+---
+title: Intercom (Deprecated)
+description: Deprecated Intercom capture connector. Use Estuary's native Intercom connector instead to sync contacts, conversations, companies, and segments.
+---
+
+<head>
+  <meta name="robots" content="noindex, follow" />
+</head>
 
 # Intercom (Deprecated)
 

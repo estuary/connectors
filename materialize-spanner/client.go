@@ -93,7 +93,7 @@ func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint
 	}, nil
 }
 
-func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
+func preReqs(ctx context.Context, cfg config, _ map[string]bool) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
 
 	// Build the database path
