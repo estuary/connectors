@@ -3,7 +3,7 @@
 ## 2026-10-01
 
 ### Changed
-- `ticket_audits` and `ticket_comments` now fetch up to 5 tickets' records at a time instead of one at a time, so these streams catch up faster after many tickets are updated at once.
+- `ticket_audits`, `ticket_comments`, and `side_conversations` now fetch up to 5 tickets' records at a time instead of one at a time, so these streams catch up faster after many tickets are updated at once.
 
 ## 2026-09-10
 

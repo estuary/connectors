@@ -1152,11 +1152,11 @@ async def fetch_side_conversations(
                 break
 
         if len(tickets) > 0 and next_page_cursor:
-            for ticket in tickets:
-                if ticket.status == 'deleted':
-                    continue
-                async for side_conv in _fetch_side_conversations(http, subdomain, ticket.id, log):
-                    yield side_conv
+            async for side_conv in _fetch_ticket_children_concurrently(
+                [ticket.id for ticket in tickets if ticket.status != 'deleted'],
+                functools.partial(_fetch_side_conversations, http, subdomain, log=log),
+            ):
+                yield side_conv
 
             yield (next_page_cursor,)
             tickets = []
@@ -1196,13 +1196,16 @@ async def backfill_side_conversations(
                 break
 
         if len(tickets) > 0 and next_page_cursor:
-            for ticket in tickets:
-                if ticket.updated_at >= cutoff:
-                    return
-                if ticket.status == "deleted":
-                    continue
-                async for side_conv in _fetch_side_conversations(http, subdomain, ticket.id, log):
-                    yield side_conv
+            tickets_before_cutoff = list(itertools.takewhile(lambda t: t.updated_at < cutoff, tickets))
+
+            async for side_conv in _fetch_ticket_children_concurrently(
+                [ticket.id for ticket in tickets_before_cutoff if ticket.status != "deleted"],
+                functools.partial(_fetch_side_conversations, http, subdomain, log=log),
+            ):
+                yield side_conv
+
+            if len(tickets_before_cutoff) < len(tickets):
+                return
 
             yield next_page_cursor
             tickets = []
