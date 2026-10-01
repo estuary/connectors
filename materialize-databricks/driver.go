@@ -746,7 +746,7 @@ func (d *transactor) loadStagingTable(ctx context.Context, db *stdsql.DB, b *bin
 	}
 
 	var name = b.storeFile.txnDir + "_delta"
-	var data = &tableWithFiles{Table: &b.target, StagingTable: stagingIdentifier(b, name), StagingPath: b.storeFile.remoteDir()}
+	var data = &stagingLoad{Target: &b.target, Identifier: stagingIdentifier(b, name), Directory: b.storeFile.remoteDir()}
 	for _, tpl := range []*template.Template{d.templates.createStagingTable, d.templates.copyIntoStaging} {
 		if query, err := renderTemplate(tpl, data); err != nil {
 			return fmt.Errorf("%s template: %w", tpl.Name(), err)
