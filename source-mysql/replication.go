@@ -1006,6 +1006,10 @@ func (rs *mysqlReplicationStream) handleQuery(ctx context.Context, parser *sqlpa
 	case *sqlparser.CreateView, *sqlparser.AlterView, *sqlparser.DropView:
 		// All view creation/deletion/alterations should be fine to ignore since we don't capture from views.
 		logrus.WithField("query", query).Debug("ignoring benign query")
+	case *sqlparser.CreateProcedure, *sqlparser.DropProcedure:
+		// Stored procedures don't change the schema of any table, so they're safe to ignore.
+		// Most reach this point only when a leading comment defeats ignoreQueriesRe.
+		logrus.WithField("query", query).Debug("ignoring benign query")
 	case *sqlparser.DropDatabase:
 		// Remember that In MySQL land "database" is a synonym for the usual SQL concept "schema"
 		if streamIDs := rs.tablesInSchema(stmt.GetDatabaseName()); len(streamIDs) > 0 {
