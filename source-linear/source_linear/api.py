@@ -264,11 +264,12 @@ async def _walk_pages(
     through: datetime,
     *,
     archival: bool = False,
-) -> AsyncGenerator[list[LinearResource], None]:
+) -> AsyncGenerator[tuple[list[LinearResource], bool], None]:
     """Yield `(after_ts, through]` one page at a time, following `pageInfo.endCursor`.
 
-    Exposes page boundaries so a caller can checkpoint between them. The Relay cursor is
-    used only within one walk and is never checkpointed; durable position is a timestamp.
+    Each page comes with whether another follows, so a caller can checkpoint between pages
+    and knows when the window has drained. The Relay cursor is used only within one walk
+    and is never checkpointed; durable position is a timestamp.
     """
     after: str | None = None
 
@@ -286,9 +287,10 @@ async def _walk_pages(
         )
         nodes, page_info = await _execute(entity, http, log, query, variables)
 
-        yield nodes
+        more = page_info.hasNextPage and page_info.endCursor is not None
+        yield nodes, more
 
-        if not page_info.hasNextPage or not page_info.endCursor:
+        if not more:
             return
 
         after = page_info.endCursor
@@ -304,7 +306,7 @@ async def _walk(
     archival: bool = False,
 ) -> AsyncGenerator[LinearResource, None]:
     """Yield every row in `(after_ts, through]`."""
-    async for nodes in _walk_pages(
+    async for nodes, _ in _walk_pages(
         entity, http, log, after_ts, through, archival=archival
     ):
         for node in nodes:
@@ -447,11 +449,13 @@ async def _backfill(
     # last-seen value instead would split a tie group and permanently drop its remainder,
     # and Linear ties are common — a bulk edit stamps one timestamp across every row it
     # touches. A page that holds a single value therefore checkpoints nothing and the walk
-    # continues, so a tie group wider than one page cannot stall it.
+    # continues, so a tie group wider than one page cannot stall it. The last page never
+    # checkpoints: resuming from its boundary would re-emit its final tie group only to
+    # observe an empty window.
     boundary: datetime | None = None
     previous: datetime | None = None
 
-    async for nodes in _walk_pages(
+    async for nodes, more in _walk_pages(
         entity, http, log, after_ts, through
     ):
         for node in nodes:
@@ -462,7 +466,7 @@ async def _backfill(
                 boundary = previous
             previous = current
 
-        if boundary is not None:
+        if more and boundary is not None:
             yield boundary.isoformat()
             return
 
