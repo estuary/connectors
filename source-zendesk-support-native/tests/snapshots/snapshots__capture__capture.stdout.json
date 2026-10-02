@@ -623,6 +623,47 @@
     }
   ],
   [
+    "acmeCo/side_conversation_events",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef",
+        "row_id": 0
+      },
+      "actor": {
+        "email": "alexb@estuary.dev",
+        "name": "Alex Bair",
+        "user_id": 28835702984212
+      },
+      "created_at": "2026-05-08T13:22:48.141000Z",
+      "id": "01ad1c9e-4ae1-11f1-9738-b5e9d567b472",
+      "message": {
+        "attachments": [],
+        "body": "The smoke is very colorful.",
+        "external_ids": {},
+        "from": {
+          "email": "alexb@estuary.dev",
+          "name": "Alex Bair",
+          "user_id": 28835702984212
+        },
+        "html_body": "<div class=\"zd-comment\">\n<p>The smoke is very colorful.</p>\n</div>",
+        "preview_text": "The smoke is very colorful.",
+        "subject": "My mouse is on fire!",
+        "to": [
+          {
+            "email": "someone@example.com",
+            "name": "Someone",
+            "user_id": 49045981562772
+          }
+        ]
+      },
+      "side_conversation_id": "01ad1c9e-4ae1-11f1-9738-b5e9d567b472",
+      "ticket_id": 1,
+      "type": "create",
+      "updates": {},
+      "via": "api"
+    }
+  ],
+  [
     "acmeCo/side_conversations",
     {
       "_meta": {

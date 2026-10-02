@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-02
+
+### Added
+- New `side_conversation_events` stream captures every side conversation event, including the message body (`message.body` and `message.html_body`) of each email and reply. It's available when side conversations are enabled and the connector's credentials belong to an admin.
+
 ## 2026-10-01
 
 ### Changed

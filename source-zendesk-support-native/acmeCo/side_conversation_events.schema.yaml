@@ -25,9 +25,14 @@ properties:
   id:
     title: Id
     type: string
+  created_at:
+    format: date-time
+    title: Created At
+    type: string
 required:
 - id
-title: SideConversation
+- created_at
+title: SideConversationEvent
 type: object
 x-infer-schema: true
 if:
