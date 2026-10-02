@@ -294,9 +294,6 @@ class ConnectorState(GenericModel, Generic[_BaseResourceState], extra="forbid"):
 
     bindingStateV1: dict[str, _BaseResourceState | None] = {}
     backfillRequests: dict[str, bool | None] = {}
-    # A refresh token that's more recent than the one in the connector's spec. It's used when
-    # a connector requires periodically rotating refresh tokens, otherwise it's None.
-    refresh_token: str | None = None
 
 
 _ConnectorState = TypeVar("_ConnectorState", bound=ConnectorState)
