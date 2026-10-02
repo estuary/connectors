@@ -46,21 +46,25 @@ FULL_REFRESH_RESOURCES: list[tuple[str, str, str, str | None]] = [
 
 # Incremental resources that use date windows.
 # Each tuple contains the resource's name and its fetch function.
-INCREMENTAL_DATE_WINDOW_RESOURCES: list[tuple[str, IncrementalDateWindowResourceFetchChangesFn]] = [
-    ('contacts', fetch_contacts),
+INCREMENTAL_DATE_WINDOW_RESOURCES: list[
+    tuple[str, IncrementalDateWindowResourceFetchChangesFn]
+] = [
+    ("contacts", fetch_contacts),
 ]
 
 # Incremental resources that don't use date windows.
 # Each tuple contains the resource's name and its fetch function.
 INCREMENTAL_RESOURCES: list[tuple[str, IncrementalResourceFetchChangesFn]] = [
-    ('conversation_parts', fetch_conversations_parts),
-    ('tickets', fetch_tickets),
-    ('conversations', fetch_conversations),
+    ("conversation_parts", fetch_conversations_parts),
+    ("tickets", fetch_tickets),
+    ("conversations", fetch_conversations),
 ]
 
 # Resources that have a timestamp field we can use to perform client side filtering.
 # Each tuple contains the resource's name and its fetch function.
-CLIENT_SIDE_FILTERED_RESOURCES: list[tuple[str, ClientSideFilteringResourceFetchChangesFn]] = [
+CLIENT_SIDE_FILTERED_RESOURCES: list[
+    tuple[str, ClientSideFilteringResourceFetchChangesFn]
+] = [
     ("segments", fetch_segments),
 ]
 
@@ -72,10 +76,10 @@ COMPANY_RESOURCES: list[tuple[str, CompanyResourceFetchChangesFn]] = [
 ]
 
 
-async def validate_credentials(
-        log: Logger, http: HTTPMixin, config: EndpointConfig
-):
-    http.token_source = TokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials)
+async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointConfig):
+    http.token_source = TokenSource(
+        oauth_spec=OAUTH2_SPEC, credentials=config.credentials
+    )
     url = f"{API}/data_attributes"
     params = {"model": "contact"}
     headers = {API_VERSION_HEADER: config.advanced.api_version}
@@ -83,7 +87,7 @@ async def validate_credentials(
     try:
         await http.request(log, url, params=params, headers=headers)
     except HTTPError as err:
-        msg = 'Unknown error occurred.'
+        msg = "Unknown error occurred."
         if err.code == 401:
             msg = f"Invalid credentials. Please confirm the provided credentials are correct.\n\n{err.message}"
         else:
@@ -93,18 +97,18 @@ async def validate_credentials(
 
 
 def full_refresh_resources(
-        log: Logger, http: HTTPMixin, config: EndpointConfig
+    log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.SnapshotResource]:
 
     def open(
-            path: str,
-            response_field: str,
-            query_param: str | None,
-            binding: CaptureBinding[ResourceConfig],
-            binding_index: int,
-            state: ResourceState,
-            task: Task,
-            all_bindings
+        path: str,
+        response_field: str,
+        query_param: str | None,
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings,
     ):
         common.open_binding(
             binding,
@@ -126,9 +130,7 @@ def full_refresh_resources(
             name=name,
             model=common.BaseDocument,
             open=functools.partial(open, path, response_field, query_param),
-            initial_config=ResourceConfig(
-                name=name, interval=timedelta(minutes=5)
-            ),
+            initial_config=ResourceConfig(name=name, interval=timedelta(minutes=5)),
             schema_inference=True,
         )
         for (name, path, response_field, query_param) in FULL_REFRESH_RESOURCES
@@ -138,7 +140,7 @@ def full_refresh_resources(
 
 
 def incremental_resources(
-        log: Logger, http: HTTPMixin, config: EndpointConfig
+    log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
 
     def open(
@@ -147,7 +149,7 @@ def incremental_resources(
         binding_index: int,
         state: ResourceState,
         task: Task,
-        all_bindings
+        all_bindings,
     ):
         common.open_binding(
             binding,
@@ -159,11 +161,11 @@ def incremental_resources(
                 http,
                 config.advanced.search_page_size,
                 config.advanced.api_version,
-            )
+            ),
         )
 
     resources = [
-            common.Resource(
+        common.Resource(
             name=name,
             key=["/id"],
             model=TimestampedResource,
@@ -171,9 +173,7 @@ def incremental_resources(
             initial_state=ResourceState(
                 inc=ResourceState.Incremental(cursor=config.start_date),
             ),
-            initial_config=ResourceConfig(
-                name=name, interval=timedelta(minutes=5)
-            ),
+            initial_config=ResourceConfig(name=name, interval=timedelta(minutes=5)),
             schema_inference=True,
         )
         for (name, fetch_fn) in INCREMENTAL_RESOURCES
@@ -183,7 +183,7 @@ def incremental_resources(
 
 
 def incremental_date_window_resources(
-        log: Logger, http: HTTPMixin, config: EndpointConfig
+    log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
 
     def open(
@@ -192,7 +192,7 @@ def incremental_date_window_resources(
         binding_index: int,
         state: ResourceState,
         task: Task,
-        all_bindings
+        all_bindings,
     ):
         common.open_binding(
             binding,
@@ -205,7 +205,7 @@ def incremental_date_window_resources(
                 config.advanced.window_size,
                 config.advanced.search_page_size,
                 config.advanced.api_version,
-            )
+            ),
         )
 
     resources = [
@@ -217,9 +217,7 @@ def incremental_date_window_resources(
             initial_state=ResourceState(
                 inc=ResourceState.Incremental(cursor=config.start_date),
             ),
-            initial_config=ResourceConfig(
-                name=name, interval=timedelta(minutes=5)
-            ),
+            initial_config=ResourceConfig(name=name, interval=timedelta(minutes=5)),
             schema_inference=True,
         )
         for (name, fetch_fn) in INCREMENTAL_DATE_WINDOW_RESOURCES
@@ -229,7 +227,7 @@ def incremental_date_window_resources(
 
 
 def client_side_filtered_resources(
-        log: Logger, http: HTTPMixin, config: EndpointConfig
+    log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
 
     def open(
@@ -238,7 +236,7 @@ def client_side_filtered_resources(
         binding_index: int,
         state: ResourceState,
         task: Task,
-        all_bindings
+        all_bindings,
     ):
         common.open_binding(
             binding,
@@ -249,11 +247,11 @@ def client_side_filtered_resources(
                 fetch_fn,
                 http,
                 config.advanced.api_version,
-            )
+            ),
         )
 
     resources = [
-            common.Resource(
+        common.Resource(
             name=name,
             key=["/id"],
             model=TimestampedResource,
@@ -261,9 +259,7 @@ def client_side_filtered_resources(
             initial_state=ResourceState(
                 inc=ResourceState.Incremental(cursor=config.start_date),
             ),
-            initial_config=ResourceConfig(
-                name=name, interval=timedelta(minutes=5)
-            ),
+            initial_config=ResourceConfig(name=name, interval=timedelta(minutes=5)),
             schema_inference=True,
         )
         for (name, fetch_fn) in CLIENT_SIDE_FILTERED_RESOURCES
@@ -273,7 +269,7 @@ def client_side_filtered_resources(
 
 
 def company_resources(
-        log: Logger, http: HTTPMixin, config: EndpointConfig
+    log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
 
     def open(
@@ -282,7 +278,7 @@ def company_resources(
         binding_index: int,
         state: ResourceState,
         task: Task,
-        all_bindings
+        all_bindings,
     ):
         common.open_binding(
             binding,
@@ -294,11 +290,11 @@ def company_resources(
                 http,
                 config.advanced.use_companies_list_endpoint,
                 config.advanced.api_version,
-            )
+            ),
         )
 
     resources = [
-            common.Resource(
+        common.Resource(
             name=name,
             key=["/id"],
             model=TimestampedResource,
@@ -306,9 +302,7 @@ def company_resources(
             initial_state=ResourceState(
                 inc=ResourceState.Incremental(cursor=config.start_date),
             ),
-            initial_config=ResourceConfig(
-                name=name, interval=timedelta(minutes=5)
-            ),
+            initial_config=ResourceConfig(name=name, interval=timedelta(minutes=5)),
             schema_inference=True,
         )
         for (name, fetch_fn) in COMPANY_RESOURCES
@@ -317,11 +311,12 @@ def company_resources(
     return resources
 
 
-
 async def all_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
-    http.token_source = TokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials)
+    http.token_source = TokenSource(
+        oauth_spec=OAUTH2_SPEC, credentials=config.credentials
+    )
 
     return [
         *full_refresh_resources(log, http, config),
