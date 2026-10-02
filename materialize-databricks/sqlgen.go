@@ -257,7 +257,7 @@ JOIN ({{ template "loadSource" $ }}) AS r
 			SELECT
 			{{ range $ind, $key := $.Table.Columns }}
 			{{- if $ind }}, {{ end -}}
-			{{ $key.Identifier }}
+			c{{ $ind }} AS {{ $key.Identifier }}
 			{{- end }}, _flow_delete
 			FROM {{ $tbl }}
 		)
@@ -293,6 +293,15 @@ JOIN ({{ template "loadSource" $ }}) AS r
 {{ $DDL := First (Split $.DDL " ") }}
 {{- if eq $DDL "BINARY" -}}
 	unbase64({{ $.Identifier }})::BINARY as {{ $.Identifier }}
+{{- else -}}
+	{{ $.Identifier }}::{{- $DDL -}}
+{{- end -}}
+{{- end }}
+
+{{ define "castValue" -}}
+{{ $DDL := First (Split $.DDL " ") }}
+{{- if eq $DDL "BINARY" -}}
+	unbase64({{ $.Identifier }})::BINARY
 {{- else -}}
 	{{ $.Identifier }}::{{- $DDL -}}
 {{- end -}}
@@ -336,10 +345,10 @@ JOIN ({{ template "loadSource" $ }}) AS r
 CREATE TABLE IF NOT EXISTS {{ $.Identifier }} (
   {{- range $ind, $col := $.Target.Columns }}
   {{- if $ind }},{{ end }}
-  {{$col.Identifier}} {{$col.NullableDDL}}
+  c{{ $ind }} {{$col.NullableDDL}}
   {{- end }},
   _flow_delete BOOLEAN
-) TBLPROPERTIES ('delta.columnMapping.mode' = 'name');
+);
 {{ end }}
 
 {{ define "copyIntoStaging" }}
@@ -347,8 +356,8 @@ CREATE TABLE IF NOT EXISTS {{ $.Identifier }} (
     SELECT
 		{{ range $ind, $key := $.Target.Columns }}
 			{{- if $ind }}, {{ end -}}
-			{{ template "cast" $key -}}
-		{{- end }}, _flow_delete::BOOLEAN
+			{{ template "castValue" $key }} AS c{{ $ind }}
+		{{- end }}, _flow_delete::BOOLEAN AS _flow_delete
   FROM {{ Literal $.Directory }}
 	)
   FILEFORMAT = JSON

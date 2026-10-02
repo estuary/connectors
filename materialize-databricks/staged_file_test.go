@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/databricks/databricks-sdk-go/service/files"
@@ -19,24 +20,35 @@ import (
 // fakeFiles records directory and file operations; directories list as empty.
 type fakeFiles struct {
 	files.FilesInterface
+	mu               sync.Mutex
 	created, deleted []string
+	// entries are the listed contents of directories.
+	entries map[string][]files.DirectoryEntry
 }
 
 func (f *fakeFiles) CreateDirectory(_ context.Context, req files.CreateDirectoryRequest) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.created = append(f.created, req.DirectoryPath)
 	return nil
 }
 
-func (f *fakeFiles) ListDirectoryContentsAll(context.Context, files.ListDirectoryContentsRequest) ([]files.DirectoryEntry, error) {
-	return nil, nil
+func (f *fakeFiles) ListDirectoryContentsAll(_ context.Context, req files.ListDirectoryContentsRequest) ([]files.DirectoryEntry, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.entries[req.DirectoryPath], nil
 }
 
 func (f *fakeFiles) DeleteByFilePath(_ context.Context, path string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.deleted = append(f.deleted, path)
 	return nil
 }
 
 func (f *fakeFiles) DeleteDirectoryByDirectoryPath(_ context.Context, path string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.deleted = append(f.deleted, path)
 	return nil
 }
@@ -44,7 +56,7 @@ func (f *fakeFiles) DeleteDirectoryByDirectoryPath(_ context.Context, path strin
 // TestStagedFileCompression covers the local-file half of stagedFile: staged files are gzipped and
 // named so that Databricks decompresses them on read.
 func TestStagedFileCompression(t *testing.T) {
-	var f = newStagedFile(config{}, "/Volumes/c/s/v/root", []string{"first", "second"}, nil)
+	var f = newStagedFile(config{}, "/Volumes/c/s/v/root", "abc", []string{"first", "second"}, nil)
 	f.dir = t.TempDir()
 	f.txnDir = "txn-1"
 
@@ -73,7 +85,7 @@ func TestStagedFileCompression(t *testing.T) {
 
 func TestStagedFileStartCreatesDirectory(t *testing.T) {
 	var api = &fakeFiles{}
-	var f = newStagedFile(config{}, "/Volumes/c/s/v/root", []string{"id"}, api)
+	var f = newStagedFile(config{}, "/Volumes/c/s/v/root", "abc", []string{"id"}, api)
 	f.dir = filepath.Join(t.TempDir(), "local")
 
 	require.NoError(t, f.start(context.Background(), nil))

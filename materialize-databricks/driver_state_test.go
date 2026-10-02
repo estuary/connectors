@@ -13,10 +13,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/databricks/databricks-sdk-go/service/files"
 	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
@@ -861,7 +863,7 @@ func TestAcknowledgeMergesRootFilesWithDirectories(t *testing.T) {
 	require.Contains(t, dirQuery, "read_files('/Volumes/cat/schema/flow_staging/flow_temp_tables/txn-2', format => 'json', schema => ")
 	require.Equal(t, 1, strings.Count(dirQuery, "read_files("))
 	require.NotContains(t, dirQuery, "old.json.gz")
-	require.Equal(t, []string{"/Volumes/cat/schema/flow_staging/flow_temp_tables/txn-2"}, d.files.(*fakeFiles).deleted)
+	require.Equal(t, []string{"/Volumes/cat/schema/flow_staging/flow_temp_tables/txn-2"}, deletedFiles(d))
 	for _, query := range recording.executed {
 		require.Contains(t, query, "MERGE INTO `schema`.`a_table`")
 		require.Contains(t, query, "l.id >= LEAST(1::LONG, 5::LONG)")
@@ -892,7 +894,7 @@ func TestAcknowledgeCommitsDirectoriesOfAllShards(t *testing.T) {
 		require.ElementsMatch(t, []string{
 			"/Volumes/cat/schema/flow_staging/flow_temp_tables/txn-1",
 			"/Volumes/cat/schema/flow_staging/flow_temp_tables/txn-2",
-		}, d.files.(*fakeFiles).deleted)
+		}, deletedFiles(d))
 	})
 
 	t.Run("copy reads each directory whole", func(t *testing.T) {
@@ -934,7 +936,7 @@ func TestAcknowledgeMergesStagingTables(t *testing.T) {
 		"/Volumes/cat/schema/flow_staging/flow_temp_tables/txn-1_delta",
 		"/Volumes/cat/schema/flow_staging/flow_temp_tables/txn-1",
 		"/Volumes/cat/schema/flow_staging/flow_temp_tables/txn-2",
-	}, d.files.(*fakeFiles).deleted)
+	}, deletedFiles(d))
 	require.Empty(t, d.cp)
 }
 
@@ -943,7 +945,7 @@ func TestLoadStagingTable(t *testing.T) {
 		var db = recordingDB(t, nil)
 		var d = renderingTransactor(lowerRangeKey)
 		var b = d.bindings[0]
-		b.storeFile = newStagedFile(config{}, b.rootStagingPath, []string{"id", "ts", "_flow_delete"}, d.files)
+		b.storeFile = newStagedFile(config{}, b.rootStagingPath, "abc", []string{"id", "ts", "_flow_delete"}, d.files)
 		b.storeFile.dir = filepath.Join(t.TempDir(), "local")
 		b.needsMerge = needsMerge
 
@@ -966,4 +968,70 @@ func TestLoadStagingTable(t *testing.T) {
 		require.NotContains(t, recording.executed[2], "FILES")
 		require.Equal(t, b.storeFile.txnDir+"_delta", b.stagingTable)
 	}
+}
+
+// deletedFiles waits for the transactor's background cleanups and returns what
+// they deleted.
+func deletedFiles(d *transactor) []string {
+	d.cleanups.Wait()
+	return d.files.(*fakeFiles).deleted
+}
+
+// v7At returns a version 7 UUID created at t.
+func v7At(t time.Time) string {
+	var id = uuid.Must(uuid.NewV7())
+	var ms = uint64(t.UnixMilli())
+	for i := 0; i < 6; i++ {
+		id[i] = byte(ms >> (40 - 8*i))
+	}
+	return id.String()
+}
+
+func TestStagedBefore(t *testing.T) {
+	var now = time.Now()
+	var old, fresh = v7At(now.Add(-48 * time.Hour)), v7At(now)
+	var cutoff = now.Add(-sweepAge)
+
+	require.True(t, stagedBefore("abc", "abc_"+old, cutoff))
+	require.True(t, stagedBefore("abc", "abc_"+old+"_delta", cutoff))
+	require.False(t, stagedBefore("abc", "abc_"+fresh, cutoff))
+	require.False(t, stagedBefore("abc", "xyz_"+old, cutoff), "another task's directory")
+	require.False(t, stagedBefore("abc", old, cutoff), "a directory of an earlier version")
+	require.False(t, stagedBefore("abc", "abc_"+uuid.NewString(), cutoff), "not a v7 UUID")
+}
+
+func TestSweepStaging(t *testing.T) {
+	var d = renderingTransactor(lowerRangeKey)
+	d.stagingPrefix = "abc"
+	var root = d.bindings[0].rootStagingPath
+	var old = func() string { return "abc_" + v7At(time.Now().Add(-48*time.Hour)) }
+	var stale, pending, fresh, foreign = old(), old(), "abc_" + v7At(time.Now()), "xyz_" + v7At(time.Now().Add(-48*time.Hour))
+	d.cp.add("a_table.v1", lowerRangeKey, dirItem(true, nil, pending))
+
+	var dir = func(name string) files.DirectoryEntry {
+		return files.DirectoryEntry{Name: name, Path: root + "/" + name, IsDirectory: true}
+	}
+	d.files.(*fakeFiles).entries = map[string][]files.DirectoryEntry{
+		root: {dir(stale), dir(stale + "_delta"), dir(pending), dir(fresh), dir(foreign), {Name: "legacy.json.gz", Path: root + "/legacy.json.gz"}},
+	}
+
+	d.sweepStaging(context.Background())
+	require.Eventually(t, func() bool {
+		d.files.(*fakeFiles).mu.Lock()
+		defer d.files.(*fakeFiles).mu.Unlock()
+		return len(d.files.(*fakeFiles).deleted) == 2
+	}, 5*time.Second, 10*time.Millisecond)
+	require.ElementsMatch(t, []string{root + "/" + stale, root + "/" + stale + "_delta"}, deletedFiles(d))
+}
+
+func TestDeleteDirectoryRecurses(t *testing.T) {
+	var d = renderingTransactor(lowerRangeKey)
+	d.files.(*fakeFiles).entries = map[string][]files.DirectoryEntry{
+		"/t":            {{Path: "/t/part-0.parquet"}, {Path: "/t/_delta_log", IsDirectory: true}},
+		"/t/_delta_log": {{Path: "/t/_delta_log/0.json"}},
+	}
+	require.NoError(t, d.deleteDirectory(context.Background(), "/t"))
+	var deleted = d.files.(*fakeFiles).deleted
+	require.ElementsMatch(t, []string{"/t/part-0.parquet", "/t/_delta_log/0.json", "/t/_delta_log", "/t"}, deleted)
+	require.Equal(t, "/t", deleted[len(deleted)-1], "a directory is deleted after its contents")
 }
