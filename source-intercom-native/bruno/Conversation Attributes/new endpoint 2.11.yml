@@ -1,0 +1,52 @@
+info:
+  name: new endpoint 2.11
+  type: http
+  seq: 4
+
+http:
+  method: GET
+  url: "{{base_url}}/conversations/attributes"
+  headers:
+    - name: Intercom-Version
+      value: "2.11"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 400 - not available on 2.11
+    request:
+      url: "{{base_url}}/conversations/attributes"
+      method: GET
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "type": "error.list",
+            "request_id": "0003trv0dli1u7n5vs9g",
+            "errors": [
+              {
+                "code": "intercom_version_invalid",
+                "message": "Requested resource is not available in current API version"
+              }
+            ]
+          }
+
+docs: |-
+  **REFERENCE:** [List all conversation attributes (2.16)](https://developers.intercom.com/docs/references/rest-api/api.intercom.io/conversations-attributes/listconversationattributes)
+
+  **WHY:** Same question as `Conversation Attributes / new endpoint 2.15`, on the
+  connector's default version (2.11).
+
+  **VERIFIED (2026-10-02):** 400 `intercom_version_invalid`, same as
+  `Conversation Attributes / new endpoint 2.15`.

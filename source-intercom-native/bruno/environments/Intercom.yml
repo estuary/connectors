@@ -1,0 +1,5 @@
+variables:
+  - name: base_url
+    value: https://api.intercom.io
+  - name: config_path
+    value: ../config.yaml
