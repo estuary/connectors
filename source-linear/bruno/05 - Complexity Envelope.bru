@@ -1,0 +1,125 @@
+meta {
+  name: 05 - Complexity Envelope
+  type: graphql
+  seq: 5
+}
+
+post {
+  url: {{base_url}}
+  body: graphql
+  auth: inherit
+}
+
+body:graphql {
+  query ComplexityEnvelope {
+    wide: issues(first: 250) {
+      nodes {
+        id
+        comments(first: 250) { nodes { id user { id name email createdAt } } }
+      }
+    }
+  }
+}
+
+docs {
+  Reference: https://linear.app/developers/rate-limiting
+
+  Determines whether the 10,000-point per-query cap is enforced against the DOCUMENTED
+  STATIC ESTIMATE or against ACTUAL EXECUTED COST. The distinction decides whether the
+  connector can pick a fixed `first` up front or needs an adaptive one.
+
+  The documented formula is static: "Each property is 0.1 point, each object is 1 point
+  and any connection multiplies its children's points based on the given pagination
+  argument, or the default 50." Under that formula this query estimates at roughly
+  250 x (1 + 250 x (1 + 4 x 0.1)) = ~87,750 points — nearly 9x over the cap. A statically
+  enforced cap would reject it outright.
+
+  **Limitation / observed finding:** it is NOT rejected. Confirmed 2026-07-30: HTTP 200,
+  no `errors`, and `X-Complexity: 6`. The cap is enforced against ACTUAL executed cost,
+  and `X-Complexity` reports actual cost — this workspace holds 4 issues with 0 comments,
+  so almost nothing is billed no matter how broad the requested shape.
+
+  Two consequences, both load-bearing for the connector:
+
+  1. **`X-Complexity` measured on this workspace does not extrapolate.** Every complexity
+     figure recorded in this collection reflects 4 issues / 3 labels / 0 projects /
+     0 initiatives. They establish the SHAPE of the cost model, not the production cost.
+     Sizing `first` for a real workspace must use the documented static formula as an
+     upper bound (see each stream's `1x - ... Backfill Sweep` docs for the arithmetic).
+  2. **A fixed "safe" `first` cannot be validated here, so the connector must degrade
+     dynamically.** A page size that is free on a 4-issue workspace can exceed 10,000
+     actual points on a large one. The connector needs complexity-aware retry that halves
+     `first` on a cap rejection rather than a hard-coded constant tuned against this
+     account.
+
+  Note this probe deliberately requests a shape the connector will NEVER send (a 250x250
+  nested connection). It exists only to discriminate static vs. actual enforcement.
+}
+
+example {
+  name: 200 — 250x250 nesting NOT rejected; issues cap is actual-cost
+
+  request: {
+    url: https://api.linear.app/graphql
+    method: POST
+    mode: graphql
+
+    body:graphql: {
+      query ComplexityEnvelope {
+        wide: issues(first: 250) {
+          nodes {
+            id
+            comments(first: 250) { nodes { id user { id name email createdAt } } }
+          }
+        }
+      }
+    }
+  }
+
+  response: {
+    headers: {
+      x-complexity: 6
+      x-ratelimit-requests-limit: 2500
+      x-ratelimit-requests-remaining: 2495
+      x-ratelimit-complexity-limit: 3000000
+      x-ratelimit-complexity-remaining: 2999994
+    }
+
+    status: {
+      code: 200
+      text: OK
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "data": {
+            "wide": {
+              "nodes": [
+                {
+                  "id": "adbc7deb-6607-4f39-ade2-c23268dc3ec7",
+                  "comments": {
+                    "nodes": []
+                  }
+                },
+                {
+                  "id": "86eeb50c-332c-46a7-bebf-a0b67dc346bf",
+                  "comments": {
+                    "nodes": []
+                  }
+                },
+                {
+                  "id": "4937bc7e-6bda-4612-9a80-3fbaaec872d9",
+                  "comments": {
+                    "nodes": []
+                  }
+                }
+              ]
+            }
+          }
+        }
+      '''
+    }
+  }
+}

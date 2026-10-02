@@ -1,0 +1,122 @@
+meta {
+  name: 13 - Issues Pagination Walk Page 2
+  type: graphql
+  seq: 13
+}
+
+post {
+  url: {{base_url}}
+  body: graphql
+  auth: inherit
+}
+
+body:graphql {
+  query IssuesPaginationWalkPage2 {
+    issues(first: 2, includeArchived: true, orderBy: updatedAt, after: "{{issues_page1_cursor}}") {
+      nodes { id updatedAt }
+      pageInfo { hasNextPage endCursor }
+    }
+  }
+}
+
+script:pre-request {
+  // Conditional fallback for out-of-order runs. NOT a `vars:pre-request` default, which
+  // would be reassigned on every run and clobber the cursor request 12 captured.
+  if (!bru.getVar('issues_page1_cursor')) {
+    bru.setVar('issues_page1_cursor', '86eeb50c-332c-46a7-bebf-a0b67dc346bf');
+  }
+}
+
+docs {
+  Reference: https://linear.app/developers/pagination
+
+  Page 2 of the walk started in `12 - Issues Pagination Walk`. Run that request first in a
+  fresh session so `issues_page1_cursor` is populated; otherwise the pre-request script
+  falls back to the cursor observed on 2026-07-30.
+
+  **Limitation / observed finding** (confirmed 2026-07-30): completes the walk cleanly.
+
+  - page 1 (`first: 2`)            -> `adbc7deb…`, `86eeb50c…`  `hasNextPage: true`
+  - page 2 (`after: 86eeb50c…`)    -> `4937bc7e…`, `431c9f95…`  `hasNextPage: false`
+  - page 3 (`after: 431c9f95…`)    -> `[]`, `hasNextPage: false`, **`endCursor: null`**
+
+  Concatenating pages 1 and 2 reproduces the unpaged 4-id result in the same order, with no
+  gap, duplicate, or reorder. The pagination machinery is contiguous and stable below the
+  cap.
+
+  **Completion signal for the connector: `pageInfo.hasNextPage == false`.** Stop there —
+  do NOT loop until an empty page. The final page arrives WITH data and
+  `hasNextPage: false` in the same response, so an empty-page-terminated loop would spend
+  one wasted request per sweep per stream. `endCursor` going null on the exhausted page is
+  a secondary signal and must not be relied on alone: it is null on a legitimately empty
+  result set too (which is the normal steady state for an incremental sweep that finds no
+  changes).
+
+  **Not verified — cap-tail truncation.** Whether a >250-row result set capped at 250
+  truncates the SORT TAIL rather than an arbitrary middle row cannot be observed here: it
+  needs more than 250 rows in one collection, i.e. bulk seeding, which is out of scope
+  (the skill's ~10-request seeding ceiling). We rely on Linear's documented keyset
+  pagination contract for that boundary. The risk is contained regardless: with
+  `sort: updatedAt Ascending` + `after`, the connector walks pages rather than jumping
+  offsets, so it never skips past unread rows even if a page is short.
+}
+
+example {
+  name: 200 — page 2, hasNextPage=false, walk reassembles
+
+  request: {
+    url: https://api.linear.app/graphql
+    method: POST
+    mode: graphql
+
+    body:graphql: {
+      query IssuesPaginationWalkPage2 {
+        issues(first: 2, includeArchived: true, orderBy: updatedAt, after: "{{issues_page1_cursor}}") {
+          nodes { id updatedAt }
+          pageInfo { hasNextPage endCursor }
+        }
+      }
+    }
+  }
+
+  response: {
+    headers: {
+      x-complexity: 4
+      x-ratelimit-requests-limit: 2500
+      x-ratelimit-requests-remaining: 2488
+      x-ratelimit-complexity-limit: 3000000
+      x-ratelimit-complexity-remaining: 2999996
+    }
+
+    status: {
+      code: 200
+      text: OK
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "data": {
+            "issues": {
+              "nodes": [
+                {
+                  "id": "86eeb50c-332c-46a7-bebf-a0b67dc346bf",
+                  "updatedAt": "2026-07-30T21:35:03.808Z"
+                },
+                {
+                  "id": "431c9f95-fe23-44cb-9391-f4880c51bede",
+                  "updatedAt": "2026-07-30T21:35:03.808Z"
+                }
+              ],
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": "431c9f95-fe23-44cb-9391-f4880c51bede"
+              }
+            }
+          }
+        }
+      '''
+    }
+  }
+}

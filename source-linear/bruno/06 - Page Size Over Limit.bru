@@ -1,0 +1,135 @@
+meta {
+  name: 06 - Page Size Over Limit
+  type: graphql
+  seq: 6
+}
+
+post {
+  url: {{base_url}}
+  body: graphql
+  auth: inherit
+}
+
+body:graphql {
+  query PageSizeOverLimit {
+    issues(first: 251) {
+      nodes { id }
+      pageInfo { hasNextPage endCursor }
+    }
+  }
+}
+
+docs {
+  Reference: https://linear.app/developers/pagination
+
+  The documented-limit +1 probe. Linear's pagination docs state the default page size
+  ("The first 50 results are returned by default without query arguments") but never state
+  a MAXIMUM, so the ceiling and its enforcement mode had to be established live.
+
+  **Limitation / observed finding — max `first` is 250, and over-limit is REJECTED, not
+  clamped.** Confirmed 2026-07-30. `first: 250` succeeds; `first: 251` fails with:
+
+      HTTP 200
+      { "data": null,
+        "errors": [{ "message": "Argument Validation Error",
+                     "path": ["issues"],
+                     "extensions": {
+                       "code": "INVALID_INPUT",
+                       "validationErrors": [{ "property": "first", "value": 251,
+                         "constraints": { "max": "first must not be greater than 250" } }],
+                       "userError": true,
+                       "userPresentableMessage": "first must not be greater than 250." } }] }
+
+  Three things worth pulling out:
+
+  - **Rejected, not clamped, and not truncated.** `data` is null and NO page is returned.
+    There is no silent-data-loss mode here; the connector must clamp `first` to <= 250
+    itself before sending. A too-large page size fails the whole sync loudly.
+  - **HTTP 200 on a hard failure.** This is the cleanest demonstration in the collection
+    that Linear's status code carries no success signal. A connector that checks only
+    `response.status` would read `data: null` as an empty page and silently conclude the
+    stream is exhausted. Every response must be checked for a top-level `errors` array.
+  - The ceiling is an ARGUMENT VALIDATION constraint, so unlike the complexity numbers in
+    `05 - Complexity Envelope` it is independent of how much data the workspace holds.
+    250 is a real, portable maximum.
+
+  The same 250 ceiling applies to `projects`, `initiatives`, and `issueLabels` — all four
+  root fields take `first: Int` against the same validator (see
+  `02 - Introspect Pagination Args`).
+}
+
+example {
+  name: 200 + errors — first=251 rejected, not clamped (data: null)
+
+  request: {
+    url: https://api.linear.app/graphql
+    method: POST
+    mode: graphql
+
+    body:graphql: {
+      query PageSizeOverLimit {
+        issues(first: 251) {
+          nodes { id }
+          pageInfo { hasNextPage endCursor }
+        }
+      }
+    }
+  }
+
+  response: {
+    headers: {
+      x-complexity: 3
+      x-ratelimit-requests-limit: 2500
+      x-ratelimit-requests-remaining: 2494
+      x-ratelimit-complexity-limit: 3000000
+      x-ratelimit-complexity-remaining: 2999991
+    }
+
+    status: {
+      code: 200
+      text: OK
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "errors": [
+            {
+              "message": "Argument Validation Error",
+              "path": [
+                "issues"
+              ],
+              "locations": [
+                {
+                  "line": 2,
+                  "column": 3
+                }
+              ],
+              "extensions": {
+                "code": "INVALID_INPUT",
+                "validationErrors": [
+                  {
+                    "target": {
+                      "first": 251
+                    },
+                    "value": 251,
+                    "property": "first",
+                    "children": [],
+                    "constraints": {
+                      "max": "first must not be greater than 250"
+                    }
+                  }
+                ],
+                "type": "invalid input",
+                "userError": true,
+                "userPresentableMessage": "first must not be greater than 250."
+              }
+            }
+          ],
+          "data": null
+        }
+      '''
+    }
+  }
+}

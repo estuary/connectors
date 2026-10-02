@@ -1,0 +1,55 @@
+meta {
+  name: D2 - Archive Issue
+  type: graphql
+  seq: 4
+}
+
+post {
+  url: {{base_url}}
+  body: graphql
+  auth: inherit
+}
+
+body:graphql {
+  mutation ArchiveIssue($issueId: String!) {
+    issueArchive(id: $issueId) {
+      success
+    }
+  }
+}
+
+body:graphql:vars {
+  {
+    "issueId": "431c9f95-fe23-44cb-9391-f4880c51bede"
+  }
+}
+
+docs {
+  Reference: https://linear.app/developers/graphql
+
+  **Only the user runs this. Never the assistant.** This is a state-mutating call.
+
+  Archives exactly ONE issue (`EST-2`, "Connect your tools"). Reversible — Linear's UI can
+  unarchive it, and `issueUnarchive` exists if you would rather undo it via the API.
+
+  Closes THE single highest-risk unverified assumption in the whole cluster.
+
+  `14 - Issues Include Archived` established that Linear hides archived rows by default and
+  that `archivedAt` is exposed on all four types, so the plan sets `includeArchived: true`
+  everywhere and treats `archivedAt != null` as the tombstone. But with zero archived
+  records in the workspace, two things remain pure assumption:
+
+  1. That archived rows actually DO appear when `includeArchived: true` is passed.
+  2. **That archiving BUMPS `updatedAt`.** This is the load-bearing one. If archiving
+     leaves `updatedAt` unchanged, then an `updatedAt`-cursored incremental sweep will
+     never re-emit the row, the archival never reaches the destination, and downstream
+     keeps a live-looking copy of a deleted record indefinitely. `includeArchived: true`
+     would not save us — only a periodic full backfill would. If this turns out to be the
+     case, the cluster needs a scheduled full re-sweep and the plan must change.
+
+  **Re-run after:** `14 - Issues Include Archived` — check that (a) `withArchived` now
+  returns 4 rows while `liveOnly` returns 3, and (b) the archived row's `updatedAt` is
+  NEWER than its pre-archive value, not the original bulk-seed timestamp.
+
+  Please report the archived issue's `updatedAt` and `archivedAt` from the re-run.
+}

@@ -146,6 +146,7 @@ Integrations with streaming systems, queue services, and webhooks.
 - [GitHub](./github.md)
 - [Incident.io](./incident-io.md)
 - [Jira](./jira-native.md)
+- [Linear](./linear.md)
 - [Monday](./monday.md)
 - [Navan](./navan.md)
 - [Sentry](./sentry.md)
