@@ -320,6 +320,7 @@ type capture struct {
 	// stream goroutines.
 	mu                    sync.Mutex
 	backfillAttempt       uint64
+	explainedBackfills    map[backfillExplainKey]struct{}
 	state                 captureState
 	processedStreamEvents int
 	emittedStreamDocs     int

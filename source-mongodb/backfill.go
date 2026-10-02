@@ -363,10 +363,15 @@ func (c *capture) doBackfill(
 	if opts.Hint != nil {
 		query = append(query, bson.E{Key: "hint", Value: opts.Hint})
 	}
+	if rc := collection.Database().ReadConcern(); rc != nil && rc.GetLevel() != "" {
+		query = append(query, bson.E{Key: "readConcern", Value: bson.D{{Key: "level", Value: rc.GetLevel()}}})
+	}
 	queryJSON, err := bson.MarshalExtJSON(query, true, false)
 	if err != nil {
 		logEntry.WithError(err).Warn("could not serialize backfill query for logging")
 	}
+	progress.setOperation("explaining query")
+	c.explainBackfill(ctx, binding, query, lastCursorValue != nil, logEntry)
 	progress.setOperation("find")
 	logEntry.WithField("query", string(queryJSON)).Info("querying backfill documents")
 	findStarted := time.Now()
