@@ -136,7 +136,8 @@ def _generate_contacts_search_body(
         "pagination": pagination,
         "sort": {
             "field": "updated_at",
-            "order": "desc",
+            # API version 2.16+ rejects any value other than "ascending" or "descending".
+            "order": "descending",
         },
     }
 
