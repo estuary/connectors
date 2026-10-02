@@ -359,6 +359,29 @@ async def events(
         task: Task,
         all_bindings,
     ):
+        # Captures created before the lookback backfill was dropped may still
+        # hold an unfinished `_{LOOKBACK}` backfill. Nothing runs it anymore and
+        # the realtime backfill covers its range, so delete it.
+        if isinstance(state.backfill, dict):
+            stale_keys = [k for k in state.backfill if k.endswith(f"_{LOOKBACK}")]
+            if stale_keys:
+                for k in stale_keys:
+                    del state.backfill[k]
+
+                task.log.info(
+                    "Removing lookback backfill state.",
+                    {"stale_keys": stale_keys},
+                )
+                await task.checkpoint(
+                    ConnectorState(
+                        bindingStateV1={
+                            binding.stateKey: ResourceState(
+                                backfill={k: None for k in stale_keys}
+                            )
+                        }
+                    )
+                )
+
         await _patch_missing_project_states(
             binding, state, task, project_ids, cutoff, lookback_cutoff
         )
