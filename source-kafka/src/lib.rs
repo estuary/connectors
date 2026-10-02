@@ -22,6 +22,7 @@ pub mod msk_oauthbearer;
 pub mod protobuf;
 pub mod pull;
 pub mod schema_registry;
+pub mod transcode;
 
 const KAFKA_METADATA_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
 
