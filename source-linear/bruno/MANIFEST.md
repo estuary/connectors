@@ -1,22 +1,13 @@
 # Bruno manifest — source-linear (Issues / Projects / Initiatives / Labels)
 
-Collection: `/Users/jonwihl/.claude/jobs/3325b132/tmp/bruno/`
-→ **orchestrator lands it at `source-linear/bruno/` during integration.**
-
-It is deliberately NOT in the shared checkout: background sessions can't write there
-(parallel stream-builders would collide on the same `bruno/` path) and worktree isolation
-was unavailable. `environments/Linear.bru` already holds the connector-relative
-`config_path: ../config.yaml`, correct for its final home. See `bruno/README.md` for
-run instructions from the current location.
-
-`bru` is vendored at `tmp/tools/node_modules/.bin/bru` (not installed on this machine; an
-earlier `/tmp` copy was wiped by system cleanup). Permanent install: `npm i -g @usebruno/cli`.
+Collection: `source-linear/bruno/`. Run instructions are in `README.md`; install the CLI
+with `npm i -g @usebruno/cli`.
 
 - **21** read-only requests (GraphQL `query` documents), 21/21 green. Executed live in two
   rounds against org `estuary-test`: **2026-07-30** (pre-seed) and **2026-08-04**
   (post-seed). Every one carries a saved `example { }` block — all regenerated against the
   post-seed workspace — with the observed status, rate-limit/complexity headers, and body.
-- 5 mutating requests in `Seeding/` — **authored only, never run by me.**
+- 4 mutating requests in `Seeding/` — **authored only, never run by me.**
 
 ## Running it
 
@@ -26,7 +17,7 @@ bru run . --env Linear --sandbox developer     # 21 read-only requests
 ```
 
 > **Do not add `-r` / `--recursive` to that command.** `bru run .` is non-recursive, which
-> is the only reason it skips `Seeding/`. Adding `-r` would execute all five MUTATIONS
+> is the only reason it skips `Seeding/`. Adding `-r` would execute all four MUTATIONS
 > (create project, create initiative, edit an issue, archive an issue) in one go. Run
 > seeding requests individually and deliberately.
 
@@ -110,10 +101,12 @@ timestamp ties and why direction had to be established via `users`.
 
 ## Reviewed outcome
 
-Plan status is **FINAL** (`plan.md`). Four gate decisions settled; the archival design was
-rewritten after `Seeding/D2` returned a verified negative.
+Four gate decisions settled; the archival design was rewritten after `Seeding/D2` returned
+a verified negative.
 
-The one accepted limitation, which belongs in the connector's user-facing docs: **archival
-and deletion of Projects, Initiatives and Labels are not captured** — no `archivedAt` filter
-exists on their filter types and archiving does not advance `updatedAt`. Issues *is* covered,
-via the separate `archivedAt` pass in `15 - Issues Archival Sweep`.
+The accepted limitation, documented on the connector's docs page: **archival and deletion of
+Projects and Initiatives are not captured** — no `archivedAt` filter exists on their filter
+types and archiving does not advance `updatedAt`. Issues *is* covered, via the separate
+`archivedAt` pass in `15 - Issues Archival Sweep`. Labels is covered too: it was later changed
+to a full snapshot each interval, so archived labels arrive with `archivedAt` set and deleted
+labels are removed downstream.

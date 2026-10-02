@@ -1,5 +1,5 @@
 ---
-description: Use the Linear connector to capture issues, projects, initiatives, and labels into Estuary. Authenticates with a Linear personal API key and captures each resource incrementally on its updatedAt timestamp.
+description: Use the Linear connector to capture issues, projects, initiatives, and labels into Estuary. Authenticates with a Linear personal API key, captures issues, projects, and initiatives incrementally on their updatedAt timestamp, and re-reads labels in full each interval.
 ---
 
 # Linear
@@ -23,6 +23,11 @@ the initial backfill, each sync captures only records changed since the previous
 advance the label's `updatedAt`. Every label is captured regardless of the start date, and
 each row carries a `/_meta/row_id` key instead of `/id`.
 
+Related records are referenced by id. Each issue carries `labelIds`, so issues join to the
+`labels` collection, along with `{ id }` references to its team, state, project, cycle, parent
+and assignee. Two relationships are not captured: the teams a project belongs to, and the
+projects under an initiative.
+
 Only primary keys, cursors, and the `archivedAt` tombstone are declared on the write schema;
 all remaining fields are populated by schema inference, so new Linear fields appear
 automatically without a connector change.
@@ -39,14 +44,29 @@ different consequence per stream, and it affects how you should interpret captur
   with `archivedAt` set — treat that as the tombstone. Do **not** infer archival from
   `updatedAt` movement, which does not change when an issue is archived.
 
+  A **deleted** issue is not removed from your destination. Linear moves it to the trash
+  first, and it arrives with `trashed: true` only if trashing advances `updatedAt`, which has
+  not been verified. Once Linear purges it, it never arrives again.
+
 - **`labels` capture archival and deletion.** Each snapshot includes archived labels with
   `archivedAt` set, and a label deleted in Linear is removed from your destination.
 
 - **`projects` and `initiatives` do not capture archival.** Linear's API exposes no
   `archivedAt` filter for these types, so there is no way to detect archival incrementally. A
   record archived or deleted in Linear **remains in your destination indefinitely with a null
-  `archivedAt`**, indistinguishable from a live record. Re-running a full backfill of the
-  binding is the only way to reconcile.
+  `archivedAt`**, indistinguishable from a live record. Re-running a backfill of the binding
+  picks up `archivedAt` for records updated since the start date. It never removes records,
+  though, so deleted projects and initiatives stay in your destination, and records archived
+  before the start date keep a null `archivedAt`.
+
+## Limitations
+
+- `identifier` is not captured for projects or initiatives. Linear gates it behind its paid
+  "Project IDs" and "Initiative IDs" add-ons, and requesting it errors on every page for
+  workspaces without them.
+- `initiatives` requires a paid Linear plan. How Linear responds to the stream on a workspace
+  without the entitlement has not been verified. If it returns an error, the binding fails,
+  so disable it on such workspaces.
 
 ## Rate limits
 
@@ -61,7 +81,9 @@ Linear meters two independent hourly budgets per user:
 Either can bind first, because complexity is charged per record returned rather than per
 request: workspaces whose records carry many populated relations spend complexity faster than
 requests. The connector reads both budgets from every response and pauses until the relevant
-window resets, so a healthy capture should not be rate-limited. Reducing binding `interval`s
+window resets, so a healthy capture should not be rate-limited. If Linear still rejects a
+request as rate-limited, the connector waits for the budget to reset and retries. If a single
+page exceeds the 10,000-point cap, it retries with a smaller page. Reducing binding `interval`s
 across many bindings increases consumption of both budgets proportionally.
 
 ## Prerequisites
