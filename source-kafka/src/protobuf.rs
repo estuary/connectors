@@ -21,6 +21,9 @@ pub fn parse_message_indexes(data: &[u8]) -> Result<(Vec<i32>, usize)> {
         // Array length of 0 means use the first (index 0) message
         return Ok((vec![0], offset));
     }
+    if array_len < 0 {
+        anyhow::bail!("negative message index array length {array_len}");
+    }
 
     let mut indexes = Vec::with_capacity(array_len as usize);
     for _ in 0..array_len {
@@ -415,6 +418,12 @@ mod tests {
         let (indexes, consumed) = parse_message_indexes(&[0x02, 0x02]).unwrap();
         assert_eq!(indexes, vec![1]);
         assert_eq!(consumed, 2);
+    }
+
+    #[test]
+    fn test_parse_message_indexes_negative_length_is_an_error() {
+        // Zigzag 0x01 decodes to -1; it used to panic allocating the vector.
+        assert!(parse_message_indexes(&[0x01]).is_err());
     }
 
     #[test]
