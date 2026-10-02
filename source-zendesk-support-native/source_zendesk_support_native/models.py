@@ -506,6 +506,17 @@ class SideConversationsResponse(BaseModel, extra="allow"):
     next_page: str | None = None
 
 
+class SideConversationEvent(FullRefreshResource):
+    # Side conversation event IDs are UUID strings, not integers.
+    id: str
+    created_at: AwareDatetime
+
+
+class SideConversationEventsResponse(BaseModel, extra="allow"):
+    end_time: int
+    next_page: str | None
+
+
 class AccountSettings(BaseModel, extra="allow"):
     class Settings(BaseModel, extra="allow"):
         class SideConversationsSettings(BaseModel, extra="allow"):

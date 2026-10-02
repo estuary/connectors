@@ -35,6 +35,8 @@ from .models import (
     PostCommentVotesResponse,
     SideConversation,
     SideConversationsResponse,
+    SideConversationEvent,
+    SideConversationEventsResponse,
     INCREMENTAL_CURSOR_EXPORT_TYPES,
     FilterParam,
     TicketChildResourceValidationContext,
@@ -1211,6 +1213,130 @@ async def backfill_side_conversations(
             tickets = []
         elif not next_page_cursor:
             break
+
+
+SIDE_CONVERSATION_EVENTS_REQ_PER_MIN_LIMIT = 60
+
+side_conversation_events_api_lock = asyncio.Lock()
+
+
+async def _fetch_side_conversation_events(
+    http: HTTPSession,
+    subdomain: str,
+    start: datetime,
+    horizon: datetime,
+    log: Logger,
+) -> AsyncGenerator[SideConversationEvent | datetime, None]:
+    """
+    Yields the side conversation events created in [start, horizon), oldest
+    first, interleaved with datetime checkpoints. A checkpoint `c` means every
+    event created before `c` has been yielded. `start` and `horizon` are whole
+    seconds.
+
+                start     end_time  horizon − 1s  horizon
+    ──────────────┼───────────┼───────────┼──────────┼───▶ time (1s ticks)
+                  │           │           │          │
+    start_time ───[═══════════╪═══════════╪══════════╪═══▶
+    emitted ──────[═══════════╪═══════════]──────────┼
+                  │           │           │          └─ the first event here
+                  │           │           │             ends the sweep
+                  │           │           └─ last emitted second
+                  │           └─ each page's end_time is a checkpoint; the
+                  │              next page re-sends that second, so the
+                  │              previous page's ids are skipped
+                  └─ start_time is inclusive at second precision
+
+    The endpoint takes no upper bound, so `horizon` is enforced client-side.
+    """
+    url = f"{url_base(subdomain)}/tickets/side_conversations/events"
+    params = {"start_time": _dt_to_s(start)}
+    boundary_ids: set[str] = set()
+
+    while True:
+        async with side_conversation_events_api_lock:
+            _, body = await http.request_stream(log, url, params=params)
+            processor = IncrementalJsonProcessor(
+                body(),
+                "events.item",
+                SideConversationEvent,
+                SideConversationEventsResponse,
+            )
+
+            page_ids: set[str] = set()
+
+            async for event in processor:
+                if event.created_at >= horizon:
+                    return
+
+                page_ids.add(event.id)
+                if event.id in boundary_ids:
+                    continue
+
+                yield event
+
+            remainder = processor.get_remainder()
+
+            if remainder.next_page is None:
+                return
+
+            # Pages advance by whole seconds, so a second holding more than a
+            # page of events can't be paged past.
+            if remainder.end_time <= params["start_time"]:
+                raise RuntimeError(
+                    f"More than a page of side conversation events were created at {params['start_time']}, and this stream cannot progress without potentially missing data. Contact Estuary Support for help resolving this issue."
+                )
+
+            boundary_ids = page_ids
+            params["start_time"] = remainder.end_time
+            yield _s_to_dt(remainder.end_time)
+
+            # Sleep to stay within this endpoint's 600 requests per 10 minutes limit.
+            await asyncio.sleep(60 / SIDE_CONVERSATION_EVENTS_REQ_PER_MIN_LIMIT)
+
+
+async def fetch_side_conversation_events(
+    http: HTTPSession,
+    subdomain: str,
+    log: Logger,
+    log_cursor: LogCursor,
+) -> AsyncGenerator[SideConversationEvent | LogCursor, None]:
+    assert isinstance(log_cursor, datetime)
+
+    horizon = _s_to_dt(_dt_to_s(datetime.now(tz=UTC) - INCREMENTAL_LAG))
+    if horizon <= log_cursor:
+        return
+
+    async for result in _fetch_side_conversation_events(
+        http, subdomain, log_cursor, horizon, log
+    ):
+        yield result
+
+    yield horizon
+
+
+async def backfill_side_conversation_events(
+    http: HTTPSession,
+    subdomain: str,
+    start_date: datetime,
+    log: Logger,
+    page: PageCursor | None,
+    cutoff: LogCursor,
+) -> AsyncGenerator[SideConversationEvent | PageCursor, None]:
+    assert isinstance(cutoff, datetime)
+
+    if page is None:
+        start = start_date
+    else:
+        assert isinstance(page, int)
+        start = _s_to_dt(page)
+
+    async for result in _fetch_side_conversation_events(
+        http, subdomain, start, cutoff, log
+    ):
+        if isinstance(result, datetime):
+            yield _dt_to_s(result)
+        else:
+            yield result
 
 
 async def fetch_audit_logs(
