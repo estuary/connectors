@@ -74,6 +74,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	if err != nil {
 		return fmt.Errorf("connecting to database: %w", err)
 	}
+	log.Info("connected to database")
 
 	defer func() {
 		if err = client.Disconnect(ctx); err != nil {
@@ -168,6 +169,21 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	}
 
 	skipConfiguredBackfills(&prevState, changeStreamBindings, &cfg)
+	for _, binding := range allBindings {
+		state := prevState.Resources[binding.stateKey].Backfill
+		var resumeAfter any
+		if state.LastCursorValue != nil {
+			resumeAfter = state.LastCursorValue.String()
+		}
+		log.WithFields(log.Fields{
+			"database":       binding.resource.Database,
+			"collection":     binding.resource.Collection,
+			"mode":           binding.resource.getMode(),
+			"backfillDone":   state.done(),
+			"backfilledDocs": state.BackfilledDocs,
+			"resumeAfter":    resumeAfter,
+		}).Info("loaded binding state")
+	}
 
 	var c = capture{
 		client:                      client,
@@ -217,7 +233,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		"supportsChangeStreams": serverInfo.supportsChangeStreams,
 		"supportsPreImages":     serverInfo.supportsPreImages,
 		"supportsStartAfter":    serverInfo.supportsStartAfter,
-	}).Info("connected to database")
+	}).Info("checked database capabilities")
 
 	coordinator := newBatchStreamCoordinator(changeStreamBindings, func(ctx context.Context) (primitive.Timestamp, error) {
 		return getClusterOpTime(ctx, client)
@@ -303,6 +319,7 @@ type capture struct {
 	// mu provides synchronization for values that are accessed by concurrent backfill and change
 	// stream goroutines.
 	mu                    sync.Mutex
+	backfillAttempt       uint64
 	state                 captureState
 	processedStreamEvents int
 	emittedStreamDocs     int
