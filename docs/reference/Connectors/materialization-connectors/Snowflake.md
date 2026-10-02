@@ -325,7 +325,7 @@ To use it, all of the following must be true:
 * The endpoint configuration uses [key-pair (JWT) authentication](#key-pair-authentication).
 * `snowpipe_streaming_v2` is set in the endpoint configuration's `advanced.feature_flags`. This write path builds on
   Snowpipe Streaming, so setting `no_snowpipe_streaming` turns it off as well.
-* The task runs on Estuary's V2 materialization runtime, which is selected with the `enable-runtime-v2` shard flag:
+* The task runs on [Estuary's new runtime](/concepts/advanced/runtime/#runtime-migration), which is selected with the `enable-runtime-v2` shard flag:
 
   ```yaml
   materializations:
@@ -352,7 +352,7 @@ delta updates. When the task starts on the new path, it drops the binding's stre
 key-pair authentication, so keep the endpoint on key-pair authentication while the binding leaves. If a transaction
 was interrupted before it committed, the rows Snowflake had already received from it are materialized again by the
 new path, and because the binding uses delta updates, those duplicates remain in the table. The task must stay on the
-V2 runtime until that first transaction completes: removing the `enable-runtime-v2` shard flag at the same time is
+new runtime until that first transaction completes: removing the `enable-runtime-v2` shard flag at the same time is
 rejected.
 
 Two tasks cannot stream into the same table. A task that tries fails when it first writes to the table, with an
