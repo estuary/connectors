@@ -14,7 +14,6 @@ from estuary_cdk.capture.connector_status import ConnectorStatus
 from .. import BaseConnector, Stopped
 from ..flow import (
     ConnectorSpec,
-    ConnectorStateUpdate,
     EndpointConfig,
     ResourceConfig,
     RotatingOAuth2Credentials,
@@ -296,15 +295,6 @@ class BaseCaptureConnector(
     ):
         data = response.model_dump_json(by_alias=True, exclude_unset=True).encode()
         await emit_bytes(data + b"\n", self.output)
-
-    async def _checkpoint(self, state: GeneralConnectorState, merge_patch: bool = True):
-        r = Response[Any, Any, GeneralConnectorState](
-            checkpoint=response.Checkpoint(
-                state=ConnectorStateUpdate(updated=state, mergePatch=merge_patch)
-            )
-        )
-
-        await self._emit(r)
 
     async def _encrypt_config(
         self,
