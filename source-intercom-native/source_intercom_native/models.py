@@ -58,6 +58,12 @@ MAX_SEARCH_PAGE_SIZE = 150
 DEFAULT_API_VERSION = "2.11"
 
 
+def parse_api_version(api_version: str) -> tuple[int, int]:
+    # Versions must be compared numerically; as strings, "2.9" sorts after "2.16".
+    major, minor = api_version.split(".")
+    return (int(major), int(minor))
+
+
 def default_start_date():
     dt = datetime.now(tz=UTC) - timedelta(days=30)
     return dt

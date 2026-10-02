@@ -17,6 +17,7 @@ from .models import (
     CompanyResourceFetchChangesFn,
     IncrementalDateWindowResourceFetchChangesFn,
     OAUTH2_SPEC,
+    parse_api_version,
 )
 from .api import (
     snapshot_resources,
@@ -96,11 +97,24 @@ async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointCon
         raise ValidationError([msg])
 
 
+def _resolve_snapshot_endpoint(
+    name: str, path: str, query_param: str | None, api_version: str
+) -> tuple[str, str | None]:
+    # Intercom API version 2.16 removed /data_attributes?model=conversation in favour of
+    # /conversations/attributes, which doesn't exist before 2.16 and only returns custom
+    # conversation attributes.
+    if name == "conversation_attributes" and parse_api_version(api_version) >= (2, 16):
+        return ("conversations/attributes", None)
+
+    return (path, query_param)
+
+
 def full_refresh_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.SnapshotResource]:
 
     def open(
+        name: str,
         path: str,
         response_field: str,
         query_param: str | None,
@@ -110,6 +124,10 @@ def full_refresh_resources(
         task: Task,
         all_bindings,
     ):
+        path, query_param = _resolve_snapshot_endpoint(
+            name, path, query_param, config.advanced.api_version
+        )
+
         common.open_binding(
             binding,
             binding_index,
@@ -129,7 +147,7 @@ def full_refresh_resources(
         common.SnapshotResource(
             name=name,
             model=common.BaseDocument,
-            open=functools.partial(open, path, response_field, query_param),
+            open=functools.partial(open, name, path, response_field, query_param),
             initial_config=ResourceConfig(name=name, interval=timedelta(minutes=5)),
             schema_inference=True,
         )
