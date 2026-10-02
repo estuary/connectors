@@ -53,28 +53,21 @@ ConnectorState = GenericConnectorState[ResourceState]
 # 250-row page well inside the 10,000-point per-query cap. Fields gated behind paid add-ons
 # are excluded too: an un-entitled field errors on every page rather than arriving absent.
 
+# Kept to the fields users are known to want, per the repo's minimal-field-set rule. Add
+# fields here as they are asked for.
 ISSUE_SELECTION = """
     id createdAt updatedAt archivedAt
     number identifier title description
     priority priorityLabel estimate
-    sortOrder prioritySortOrder subIssueSortOrder
-    startedAt startedTriageAt triagedAt completedAt canceledAt
-    autoClosedAt autoArchivedAt
-    addedToProjectAt addedToCycleAt addedToTeamAt snoozedUntilAt
-    dueDate slaStartedAt slaBreachesAt slaType
-    customerTicketCount branchName url trashed
-    labelIds
+    startedAt completedAt canceledAt dueDate
+    url trashed labelIds
     team { id }
     state { id }
     assignee { id }
     creator { id }
-    delegate { id }
     project { id }
-    projectMilestone { id }
     cycle { id }
     parent { id }
-    snoozedBy { id }
-    lastAppliedTemplate { id }
 """
 
 # `status` is a ProjectStatus object here but a bare enum on Initiative, so the two cannot
@@ -85,7 +78,7 @@ PROJECT_SELECTION = """
     priority priorityLabel sortOrder prioritySortOrder
     startDate targetDate startedAt completedAt canceledAt
     autoArchivedAt healthUpdatedAt trashed
-    progress scope url slackChannelId content
+    progress scope url slackChannelId
     status { id }
     creator { id }
     lead { id }
@@ -100,7 +93,7 @@ INITIATIVE_SELECTION = """
     name description slugId icon color status
     priority sortOrder prioritySortOrder
     targetDate startedAt completedAt canceledAt
-    healthUpdatedAt trashed url content
+    healthUpdatedAt trashed url
     creator { id }
     owner { id }
     leadTeam { id }
