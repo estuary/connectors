@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+	"time"
 
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/stretchr/testify/require"
@@ -265,15 +266,19 @@ func TestCommitConflictRetriesGiveUp(t *testing.T) {
 	var ctx = context.Background()
 	c, connector := newInjectingClient(t)
 
+	var savedDelay = retryBaseDelay
+	retryBaseDelay = time.Millisecond
+	t.Cleanup(func() { retryBaseDelay = savedDelay })
+
 	var conflicts []error
-	for range 15 {
+	for range maxAttempts + 5 {
 		conflicts = append(conflicts, duckLakeConflictErr)
 	}
 	connector.inject(conflicts...)
 
 	err := c.CreateTable(ctx, sql.TableCreate{TableCreateSql: "CREATE TABLE memory.main.target (a INTEGER);"})
 	require.ErrorIs(t, err, duckLakeConflictErr)
-	require.Equal(t, 10, connector.attemptedCommits())
+	require.Equal(t, maxAttempts, connector.attemptedCommits())
 }
 
 func TestOtherErrorsAreNotRetried(t *testing.T) {
