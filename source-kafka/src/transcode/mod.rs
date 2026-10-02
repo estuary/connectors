@@ -56,6 +56,11 @@ mod emit;
 mod index;
 mod json;
 mod plan;
+/// Differential tests: the transcoder against the production path
+/// (`DynamicMessage` decode + `MergeSerializer`) on the same wire bytes. The
+/// production path is the oracle for both successful output and failure.
+#[cfg(test)]
+mod tests;
 mod wire;
 mod wkt;
 
