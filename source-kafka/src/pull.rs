@@ -2,7 +2,7 @@ use crate::{
     configuration::{EndpointConfig, FlowConsumerContext, Resource, SchemaRegistryConfig},
     document::MergeSerializer,
     schema_registry::{RegisteredSchema, SchemaRegistryClient},
-    write_capture_response,
+    write_capture_response, write_captured,
 };
 use anyhow::{anyhow, Context, Result};
 use apache_avro::{types::Value as AvroValue, Schema as AvroSchema};
@@ -235,21 +235,10 @@ pub async fn do_pull(req: Open, mut stdout: BufWriter<Stdout>) -> Result<()> {
             .get(msg.topic())
             .with_context(|| format!("got a message for unknown topic {}", msg.topic()))?;
 
-        let message = response::Captured {
-            binding: binding_info.binding_index,
-            doc_json: doc_bytes.into(),
-        };
+        write_captured(binding_info.binding_index, &doc_bytes, &mut stdout)?;
 
         let checkpoint =
             CaptureState::state_slice(&binding_info.state_key, msg.partition(), msg.offset());
-
-        write_capture_response(
-            Response {
-                captured: Some(message),
-                ..Default::default()
-            },
-            &mut stdout,
-        )?;
 
         write_capture_response(
             Response {
