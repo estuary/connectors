@@ -1,8 +1,9 @@
 import asyncio
+import re
 from collections.abc import Mapping
 from datetime import datetime, timedelta, UTC
 from logging import Logger
-from typing import Any, AsyncGenerator, TypeVar
+from typing import Any, AsyncGenerator, Callable, TypeVar
 
 from estuary_cdk.capture.common import LogCursor, PageCursor
 from estuary_cdk.http import HTTPError, HTTPSession
@@ -39,12 +40,29 @@ TICK = timedelta(milliseconds=1)
 # than per request. Pause before either is spent, since a rate-limited response cannot be
 # retried by the framework (see `_execute`).
 _REQUESTS_REMAINING_FLOOR = 50
-# A full 250-row page costs on the order of a thousand points, so hold back several pages'
-# worth rather than a fixed small count.
+# Measured full-page costs run from 10 points (Issues) to 2,225 (Projects), so hold back
+# several of the costliest pages rather than a fixed small count.
 _COMPLEXITY_REMAINING_FLOOR = 20_000
 # Bound a single pre-emptive sleep so a malformed or stale reset header cannot park the
 # connector indefinitely.
 _MAX_SLEEP_SECONDS = 60 * 60
+# The `RATELIMITED` backstop's retry budget, and its starting backoff when no reset time
+# has been seen yet.
+_RATE_LIMITED_ATTEMPTS = 5
+_RATE_LIMITED_BACKOFF_SECONDS = 60
+
+# UNVERIFIED: Linear documents no distinct error for exceeding its 10,000-point per-query
+# cap, and the test workspace is too small to provoke one (see `05 - Complexity Envelope`).
+# This assumes the error message mentions complexity.
+_COMPLEXITY_ERROR_RE = re.compile(r"complex", re.IGNORECASE)
+
+# The latest budget reset any response has announced. A `RATELIMITED` rejection carries no
+# usable headers, so the backstop waits on this instead.
+_latest_reset_at: datetime | None = None
+
+
+class _QueryTooComplex(Exception):
+    """One page's query exceeded Linear's per-query complexity cap."""
 
 _AUTH_ERROR_CODES = frozenset({"AUTHENTICATION_ERROR", "FORBIDDEN"})
 
@@ -99,6 +117,7 @@ def _connection_query(
 ) -> str:
     """One page of `entity`'s rows whose cursor field falls in `(after_ts, through]`."""
     cursor_field = entity.ARCHIVAL_CURSOR_FIELD if archival else entity.CURSOR_FIELD
+    assert cursor_field is not None, f"{entity.name} has no archival clock"
 
     args = [f"filter: {{ {cursor_field}: {{ gt: $after_ts, lte: $through }} }}"]
     # The archival pass cannot be sorted — `IssueSortInput` exposes no `archivedAt` member —
@@ -139,6 +158,8 @@ def _budget_delay(
         )
         return 0.0
 
+    _note_reset(reset_at)
+
     if remaining > floor:
         return 0.0
 
@@ -158,13 +179,34 @@ def _budget_delay(
     return delay
 
 
+def _note_reset(reset_at: datetime) -> None:
+    global _latest_reset_at
+    if _latest_reset_at is None or reset_at > _latest_reset_at:
+        _latest_reset_at = reset_at
+
+
+def _rate_limited_delay(attempt: int) -> float:
+    """Seconds to wait before retrying a `RATELIMITED` rejection.
+
+    Waits for the latest budget reset Linear has announced when one is still ahead, since
+    both budgets refill hourly and an earlier retry would only be rejected again. Without
+    one, backs off exponentially from `_RATE_LIMITED_BACKOFF_SECONDS`.
+    """
+    now = datetime.now(tz=UTC)
+    if _latest_reset_at is not None and _latest_reset_at > now:
+        delay = (_latest_reset_at - now).total_seconds() + 1
+    else:
+        delay = _RATE_LIMITED_BACKOFF_SECONDS * 2 ** (attempt - 1)
+    return min(delay, _MAX_SLEEP_SECONDS)
+
+
 async def _throttle(log: Logger, headers: Mapping[str, str]) -> None:
     """Sleep until whichever hourly budget is nearly spent has reset.
 
-    Guarantees the connector stays under both limits. This is the only reliable defence:
+    Guarantees the connector stays under both limits. This is the primary defence:
     Linear signals exhaustion as HTTP 400 with a `RATELIMITED` code, and the CDK raises 4xx
     immediately without consulting `should_retry`, so the framework cannot retry one.
-    `_execute` keeps a backstop for the race.
+    `_request` keeps a backstop for the race.
 
     Both budgets are checked because which one binds depends on the workspace, not on the
     connector. Requests bind when rows are sparse, but complexity is charged per row
@@ -182,12 +224,11 @@ async def _throttle(log: Logger, headers: Mapping[str, str]) -> None:
 def _check_errors(
     log: Logger, entity: type[LinearEntity], remainder: LinearGraphQLRemainder
 ) -> None:
-    """Raise unless the response carries usable rows.
+    """Raise if the response carries any GraphQL error.
 
-    A populated `data` block alongside a non-empty `errors` array is a partial success and
-    its rows are emitted: a field gated behind a paid add-on errors on every page, and
-    treating that as fatal would break the sync outright on workspaces lacking the feature.
-    An empty `data` with errors is a total failure and raises.
+    A partial success is treated as a failure too. The selections exclude every field
+    gated behind a paid add-on, so no partial error is expected, and emitting the rows that
+    did resolve would hide a resolver failure that nulls a field across a whole page.
     """
     errors = remainder.errors or []
     if not errors:
@@ -196,12 +237,9 @@ def _check_errors(
     codes = {err.extensions.code for err in errors if err.extensions}
     messages = [err.message for err in errors]
 
-    if remainder.data is not None:
-        log.warning(
-            "Linear returned errors alongside data; emitting the rows that resolved",
-            {"stream": entity.name, "codes": sorted(codes), "errors": messages},
-        )
-        return
+    # An exhausted hourly complexity budget is `RATELIMITED`, not an oversized page.
+    if "RATELIMITED" not in codes and any(_COMPLEXITY_ERROR_RE.search(m) for m in messages):
+        raise _QueryTooComplex(f"{entity.name}: {messages}")
 
     if codes & _AUTH_ERROR_CODES:
         raise RuntimeError(
@@ -212,33 +250,49 @@ def _check_errors(
     raise RuntimeError(f"Linear returned errors for {entity.name}: {messages}")
 
 
+async def _request(
+    entity: type[LinearEntity],
+    log: Logger,
+    http: HTTPSession,
+    query: str,
+    variables: dict[str, Any],
+):
+    """POST one query document, retrying `RATELIMITED` rejections until a budget resets.
+
+    A rate-limit rejection is only identifiable from the body, which the CDK embeds in the
+    message; its status is 400, which the framework treats as terminal.
+    """
+    payload = {"query": query, "variables": variables}
+    for attempt in range(1, _RATE_LIMITED_ATTEMPTS + 1):
+        try:
+            return await http.request_stream(log, API, method="POST", json=payload)
+        except HTTPError as err:
+            if err.code != 400:
+                raise
+            if _COMPLEXITY_ERROR_RE.search(err.message) and "RATELIMITED" not in err.message:
+                raise _QueryTooComplex(f"{entity.name}: {err.message}") from err
+            if "RATELIMITED" not in err.message or attempt == _RATE_LIMITED_ATTEMPTS:
+                raise
+
+            delay = _rate_limited_delay(attempt)
+            log.warning(
+                "Linear rate limit hit despite pre-emptive throttling; backing off",
+                {"stream": entity.name, "attempt": attempt, "sleep_seconds": delay},
+            )
+            await asyncio.sleep(delay)
+
+    raise AssertionError("unreachable: the last attempt either returns or raises")
+
+
 async def _execute(
     entity: type[_Entity],
-    http: HTTPSession,
     log: Logger,
+    http: HTTPSession,
     query: str,
     variables: dict[str, Any],
 ) -> tuple[list[_Entity], PageInfo]:
     """POST one query document and return its rows plus pagination state."""
-    try:
-        headers, body = await http.request_stream(
-            log, API, method="POST", json={"query": query, "variables": variables}
-        )
-    except HTTPError as err:
-        # Backstop to `_throttle`. A rate-limit rejection is only identifiable from the
-        # body, which the CDK embeds in the message; its status is 400, which the framework
-        # treats as terminal.
-        if err.code == 400 and "RATELIMITED" in err.message:
-            log.warning(
-                "Linear rate limit hit despite pre-emptive throttling; backing off",
-                {"stream": entity.name},
-            )
-            await asyncio.sleep(60)
-            headers, body = await http.request_stream(
-                log, API, method="POST", json={"query": query, "variables": variables}
-            )
-        else:
-            raise
+    headers, body = await _request(entity, log, http, query, variables)
 
     processor = IncrementalJsonProcessor(
         body(),
@@ -256,36 +310,40 @@ async def _execute(
     return nodes, remainder.page_info(entity.root_field)
 
 
-async def _walk_pages(
-    entity: type[LinearResource],
-    http: HTTPSession,
+async def _pages(
+    entity: type[_Entity],
     log: Logger,
-    after_ts: datetime,
-    through: datetime,
-    *,
-    archival: bool = False,
-) -> AsyncGenerator[tuple[list[LinearResource], bool], None]:
-    """Yield `(after_ts, through]` one page at a time, following `pageInfo.endCursor`.
+    http: HTTPSession,
+    query_for: Callable[[bool], str],
+    variables: dict[str, Any],
+) -> AsyncGenerator[tuple[list[_Entity], bool], None]:
+    """Yield one Relay connection a page at a time, with whether another page follows.
 
-    Each page comes with whether another follows, so a caller can checkpoint between pages
-    and knows when the window has drained. The Relay cursor is used only within one walk
-    and is never checkpointed; durable position is a timestamp.
+    A page rejected as too complex is retried at half the size, and the walk keeps the
+    smaller size from then on. The Relay cursor stays valid across a size change, so no row
+    is skipped or repeated. `query_for(paginated)` builds the document for one page.
     """
     after: str | None = None
+    first = MAX_PAGE_SIZE
 
     while True:
-        variables: dict[str, Any] = {
-            "first": MAX_PAGE_SIZE,
-            "after_ts": _format_timestamp(after_ts),
-            "through": _format_timestamp(through),
-        }
+        page_variables = {**variables, "first": first}
         if after is not None:
-            variables["after"] = after
+            page_variables["after"] = after
 
-        query = _connection_query(
-            entity, paginated=after is not None, archival=archival
-        )
-        nodes, page_info = await _execute(entity, http, log, query, variables)
+        try:
+            nodes, page_info = await _execute(
+                entity, log, http, query_for(after is not None), page_variables
+            )
+        except _QueryTooComplex:
+            if first == 1:
+                raise
+            first = max(1, first // 2)
+            log.warning(
+                "Linear rejected a page as too complex; retrying with a smaller page",
+                {"stream": entity.name, "page_size": first},
+            )
+            continue
 
         more = page_info.hasNextPage and page_info.endCursor is not None
         yield nodes, more
@@ -296,10 +354,35 @@ async def _walk_pages(
         after = page_info.endCursor
 
 
+async def _walk_pages(
+    entity: type[LinearResource],
+    log: Logger,
+    http: HTTPSession,
+    after_ts: datetime,
+    through: datetime,
+    *,
+    archival: bool = False,
+) -> AsyncGenerator[tuple[list[LinearResource], bool], None]:
+    """Yield `(after_ts, through]` one page at a time, with whether another page follows.
+
+    Lets a caller checkpoint between pages and know when the window has drained. The Relay
+    cursor is used only within one walk and is never checkpointed; durable position is a
+    timestamp.
+    """
+    async for page in _pages(
+        entity,
+        log,
+        http,
+        lambda paginated: _connection_query(entity, paginated=paginated, archival=archival),
+        {"after_ts": _format_timestamp(after_ts), "through": _format_timestamp(through)},
+    ):
+        yield page
+
+
 async def _walk(
     entity: type[LinearResource],
-    http: HTTPSession,
     log: Logger,
+    http: HTTPSession,
     after_ts: datetime,
     through: datetime,
     *,
@@ -307,7 +390,7 @@ async def _walk(
 ) -> AsyncGenerator[LinearResource, None]:
     """Yield every row in `(after_ts, through]`."""
     async for nodes, _ in _walk_pages(
-        entity, http, log, after_ts, through, archival=archival
+        entity, log, http, after_ts, through, archival=archival
     ):
         for node in nodes:
             yield node
@@ -315,8 +398,8 @@ async def _walk(
 
 async def _fetch_changes(
     entity: type[LinearResource],
-    http: HTTPSession,
     log: Logger,
+    http: HTTPSession,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[LinearResource | LogCursor, None]:
     """Emit rows whose cursor field falls in `(log_cursor, horizon]`, then checkpoint.
@@ -347,7 +430,7 @@ async def _fetch_changes(
         return
 
     emitted = False
-    async for node in _walk(entity, http, log, log_cursor, horizon):
+    async for node in _walk(entity, log, http, log_cursor, horizon):
         yield node
         emitted = True
 
@@ -356,8 +439,8 @@ async def _fetch_changes(
 
 
 async def _fetch_issue_changes(
-    http: HTTPSession,
     log: Logger,
+    http: HTTPSession,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[LinearResource | LogCursor, None]:
     """Emit Issues changed or archived in `(log_cursor, horizon]`, then checkpoint.
@@ -391,11 +474,11 @@ async def _fetch_issue_changes(
 
     emitted = False
 
-    async for node in _walk(Issue, http, log, log_cursor, horizon):
+    async for node in _walk(Issue, log, http, log_cursor, horizon):
         yield node
         emitted = True
 
-    async for node in _walk(Issue, http, log, log_cursor, horizon, archival=True):
+    async for node in _walk(Issue, log, http, log_cursor, horizon, archival=True):
         yield node
         emitted = True
 
@@ -405,9 +488,9 @@ async def _fetch_issue_changes(
 
 async def _backfill(
     entity: type[LinearResource],
+    log: Logger,
     http: HTTPSession,
     start_date: datetime,
-    log: Logger,
     page: PageCursor,
     cutoff: LogCursor,
 ) -> AsyncGenerator[LinearResource | PageCursor, None]:
@@ -456,7 +539,7 @@ async def _backfill(
     previous: datetime | None = None
 
     async for nodes, more in _walk_pages(
-        entity, http, log, after_ts, through
+        entity, log, http, after_ts, through
     ):
         for node in nodes:
             yield node
@@ -482,70 +565,62 @@ async def _backfill(
 async def fetch_issues(
     http: HTTPSession, log: Logger, log_cursor: LogCursor
 ) -> AsyncGenerator[LinearResource | LogCursor, None]:
-    async for item in _fetch_issue_changes(http, log, log_cursor):
+    async for item in _fetch_issue_changes(log, http, log_cursor):
         yield item
 
 
 async def fetch_projects(
     http: HTTPSession, log: Logger, log_cursor: LogCursor
 ) -> AsyncGenerator[LinearResource | LogCursor, None]:
-    async for item in _fetch_changes(Project, http, log, log_cursor):
+    async for item in _fetch_changes(Project, log, http, log_cursor):
         yield item
 
 
 async def fetch_initiatives(
     http: HTTPSession, log: Logger, log_cursor: LogCursor
 ) -> AsyncGenerator[LinearResource | LogCursor, None]:
-    async for item in _fetch_changes(Initiative, http, log, log_cursor):
+    async for item in _fetch_changes(Initiative, log, http, log_cursor):
         yield item
 
 
 async def backfill_issues(
     http: HTTPSession, start_date: datetime, log: Logger, page: PageCursor, cutoff: LogCursor
 ) -> AsyncGenerator[LinearResource | PageCursor, None]:
-    async for item in _backfill(Issue, http, start_date, log, page, cutoff):
+    async for item in _backfill(Issue, log, http, start_date, page, cutoff):
         yield item
 
 
 async def backfill_projects(
     http: HTTPSession, start_date: datetime, log: Logger, page: PageCursor, cutoff: LogCursor
 ) -> AsyncGenerator[LinearResource | PageCursor, None]:
-    async for item in _backfill(Project, http, start_date, log, page, cutoff):
+    async for item in _backfill(Project, log, http, start_date, page, cutoff):
         yield item
 
 
 async def backfill_initiatives(
     http: HTTPSession, start_date: datetime, log: Logger, page: PageCursor, cutoff: LogCursor
 ) -> AsyncGenerator[LinearResource | PageCursor, None]:
-    async for item in _backfill(Initiative, http, start_date, log, page, cutoff):
+    async for item in _backfill(Initiative, log, http, start_date, page, cutoff):
         yield item
 
 
 async def _snapshot(
-    entity: type[_Entity], http: HTTPSession, log: Logger
+    entity: type[_Entity], log: Logger, http: HTTPSession
 ) -> AsyncGenerator[_Entity, None]:
     """Yield every row of `entity`, archived ones included, regardless of age."""
-    after: str | None = None
-
-    while True:
-        variables: dict[str, Any] = {"first": MAX_PAGE_SIZE}
-        if after is not None:
-            variables["after"] = after
-
-        query = _snapshot_query(entity, paginated=after is not None)
-        nodes, page_info = await _execute(entity, http, log, query, variables)
-
+    async for nodes, _ in _pages(
+        entity,
+        log,
+        http,
+        lambda paginated: _snapshot_query(entity, paginated=paginated),
+        {},
+    ):
         for node in nodes:
             yield node
-
-        if not page_info.hasNextPage or not page_info.endCursor:
-            return
-
-        after = page_info.endCursor
 
 
 async def snapshot_labels(
     http: HTTPSession, log: Logger
 ) -> AsyncGenerator[IssueLabel, None]:
-    async for item in _snapshot(IssueLabel, http, log):
+    async for item in _snapshot(IssueLabel, log, http):
         yield item

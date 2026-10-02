@@ -63,6 +63,7 @@ ISSUE_SELECTION = """
     addedToProjectAt addedToCycleAt addedToTeamAt snoozedUntilAt
     dueDate slaStartedAt slaBreachesAt slaType
     customerTicketCount branchName url trashed
+    labelIds
     team { id }
     state { id }
     assignee { id }
@@ -183,13 +184,15 @@ class IssueLabel(LinearEntity):
 INCREMENTAL_RESOURCES: list[type[LinearResource]] = [Issue, Project, Initiative]
 
 
+# Required, like the cursor fields: a response missing them must fail validation rather
+# than end a walk after one page as though it had drained.
 class PageInfo(BaseModel, extra="allow"):
-    hasNextPage: bool = False
+    hasNextPage: bool
     endCursor: str | None = None
 
 
 class Connection(BaseModel, extra="allow"):
-    pageInfo: PageInfo = Field(default_factory=PageInfo)
+    pageInfo: PageInfo
 
 
 class GraphQLError(BaseModel, extra="allow"):
@@ -211,5 +214,6 @@ class LinearGraphQLRemainder(BaseModel, extra="allow"):
     errors: list[GraphQLError] | None = None
 
     def page_info(self, root_field: str) -> PageInfo:
-        connection = (self.data or {}).get(root_field)
-        return connection.pageInfo if connection else PageInfo()
+        if self.data is None or root_field not in self.data:
+            raise ValueError(f"Linear's response has no `{root_field}` connection")
+        return self.data[root_field].pageInfo

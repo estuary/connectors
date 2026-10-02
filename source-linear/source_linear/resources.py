@@ -1,4 +1,6 @@
 import functools
+from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime, timedelta, UTC
 from logging import Logger
 
@@ -66,12 +68,18 @@ async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointCon
         raise ValidationError([msg])
 
 
+@dataclass(frozen=True)
+class _Fetchers:
+    fetch_changes: Callable
+    fetch_page: Callable
+
+
 # Every incremental stream is incremental + backfill on the same `updatedAt` cursor, so one
 # builder covers all three; only the fetch pair differs.
 _FETCHERS = {
-    Issue: (fetch_issues, backfill_issues),
-    Project: (fetch_projects, backfill_projects),
-    Initiative: (fetch_initiatives, backfill_initiatives),
+    Issue: _Fetchers(fetch_issues, backfill_issues),
+    Project: _Fetchers(fetch_projects, backfill_projects),
+    Initiative: _Fetchers(fetch_initiatives, backfill_initiatives),
 }
 
 
@@ -80,7 +88,7 @@ def _resource(
     http: HTTPMixin,
     config: EndpointConfig,
 ) -> common.Resource:
-    fetch_changes, fetch_page = _FETCHERS[entity]
+    fetchers = _FETCHERS[entity]
 
     def open(
         binding: CaptureBinding[ResourceConfig],
@@ -94,8 +102,8 @@ def _resource(
             binding_index,
             state,
             task,
-            fetch_changes=functools.partial(fetch_changes, http),
-            fetch_page=functools.partial(fetch_page, http, config.start_date),
+            fetch_changes=functools.partial(fetchers.fetch_changes, http),
+            fetch_page=functools.partial(fetchers.fetch_page, http, config.start_date),
         )
 
     # Seed the incremental cursor one tick below the cutoff. The incremental window's lower
