@@ -1,5 +1,5 @@
 //! Stage-by-stage timing of the per-message CPU path for registry protobuf
-//! payloads so each stage's cost is explicit.
+//! payloads, so the share a wire-to-JSON transcoder could remove is explicit.
 //!
 //! Run with `cargo bench --bench protobuf_path`. Kafka I/O runs on librdkafka's
 //! own threads and is not modeled here; this is the work the single tokio
@@ -20,9 +20,11 @@
 //!
 //! The table's other columns: `wire` is the encoded protobuf body in bytes,
 //! `json` the captured document in bytes (key fields and `_meta` included),
-//! and `total` the sum of the stages. Times are ns per message, the median of
-//! seven rounds. Later changes add a column per path they introduce and report
-//! against these same names.
+//! `total` the sum of the stages, `transcoder` the share of `total` in
+//! resolve+decode+serialize (what a wire-to-JSON transcoder replaces), and
+//! `ceiling` the speedup if that share cost nothing. Times are ns per message,
+//! the median of seven rounds. Later changes add a column per path they
+//! introduce and report against these same names.
 //!
 //! Not modeled: the schema-cache and binding lookups (a few hash probes per
 //! message), the nested-message index path (`resolve` sees the common
@@ -42,8 +44,8 @@ use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
 
 use prost_reflect::{
-    bytes::Bytes, prost::Message as _, DescriptorPool, DynamicMessage, MapKey, SerializeOptions,
-    Value as PValue,
+    bytes::Bytes, prost::Message as _, DescriptorPool, DynamicMessage, MapKey, MessageDescriptor,
+    SerializeOptions, Value as PValue,
 };
 use proto_flow::capture::{
     response::{Captured, Checkpoint},
@@ -57,6 +59,7 @@ use source_kafka::protobuf::{
     decode_protobuf_message, parse_message_indexes, resolve_message_from_indexes,
 };
 use source_kafka::pull::write_checkpoint;
+use source_kafka::transcode::{Plans, Transcoder};
 use source_kafka::{write_capture_response, write_captured};
 
 /// Same shape as the private `Meta` in src/pull.rs.
@@ -374,6 +377,7 @@ struct Row {
     envelope: f64,
     checkpoint: f64,
     flush: f64,
+    transcode: f64,
     raw_envelope: f64,
     raw_checkpoint: f64,
 }
@@ -389,10 +393,22 @@ impl Row {
             + self.checkpoint
             + self.flush
     }
+    fn replaceable(&self) -> f64 {
+        self.resolve + self.decode + self.serialize
+    }
+    fn transcoded_total(&self) -> f64 {
+        self.current_total() - self.replaceable() + self.transcode
+    }
     /// Writing the Captured and Checkpoint responses as raw bytes instead of
     /// through `Response` serialization, on its own.
     fn raw_total(&self) -> f64 {
         self.current_total() - self.envelope - self.checkpoint
+            + self.raw_envelope
+            + self.raw_checkpoint
+    }
+    /// Transcoder and raw responses together.
+    fn stacked_total(&self) -> f64 {
+        self.transcoded_total() - self.envelope - self.checkpoint
             + self.raw_envelope
             + self.raw_checkpoint
     }
@@ -405,6 +421,7 @@ fn main() {
 
     for fixture in &fixtures {
         let framed = fixture.framed.as_slice();
+        let root: MessageDescriptor = pool.get_message_by_name(fixture.message_name).unwrap();
         let (indexes, off) = parse_message_indexes(&framed[5..]).unwrap();
         let desc = resolve_message_from_indexes(&pool, fixture.message_name, &indexes).unwrap();
         let body = &framed[5 + off..];
@@ -412,6 +429,28 @@ fn main() {
         let meta = meta_for("service-events", b"header-value", 1_759_320_000_123);
         let key = key_fields(&pool, &fixture.framed_key);
         let json = serialize_streaming(&decoded, Some(&key), &meta);
+
+        let plans = Plans::for_schema(&pool, fixture.message_name).unwrap();
+        let plan = plans.plan_for(&root).unwrap();
+        let mut transcoder = Transcoder::new();
+        let mut transcoded = Vec::new();
+        transcoder
+            .transcode(&plans, plan, body, Some(&key), &meta, &mut transcoded)
+            .unwrap();
+        // Byte-identical except for map fields, whose entries the streaming
+        // path emits in HashMap order and the transcoder emits sorted.
+        if fixture.name == "event" {
+            let a: Value = serde_json::from_slice(&transcoded).unwrap();
+            let b: Value = serde_json::from_slice(&json).unwrap();
+            assert_eq!(a, b, "{}: transcoder output must parse equal", fixture.name);
+        } else {
+            assert_eq!(
+                String::from_utf8_lossy(&transcoded),
+                String::from_utf8_lossy(&json),
+                "{}: transcoder output must match the streaming path byte for byte",
+                fixture.name
+            );
+        }
 
         let meta_ns = time(|| {
             black_box(meta_for(
@@ -552,6 +591,17 @@ fn main() {
             black_box(&raw);
         });
 
+        let transcode_ns = time(|| {
+            // The plan lookup stands in for `resolve`: the cache is keyed by
+            // the framed message indexes, so it runs per message too.
+            let plan = plans.plan_for_indexes(black_box(&framed[5..])).unwrap().0;
+            let mut buf = Vec::new();
+            transcoder
+                .transcode(&plans, plan, black_box(body), Some(&key), &meta, &mut buf)
+                .unwrap();
+            black_box(buf);
+        });
+
         rows.push(Row {
             name: fixture.name,
             wire_bytes: body.len(),
@@ -564,6 +614,7 @@ fn main() {
             envelope: envelope_ns,
             checkpoint: checkpoint_ns,
             flush: flush_ns,
+            transcode: transcode_ns,
             raw_envelope: raw_envelope_ns,
             raw_checkpoint: raw_checkpoint_ns,
         });
@@ -571,33 +622,52 @@ fn main() {
 
     println!();
     println!(
-        "{:<8} {:>5} {:>5} | {:>6} {:>6} {:>7} {:>7} {:>9} {:>8} {:>10} {:>6} | {:>7} | {:>7} {:>7} | {:>7}",
+        "{:<8} {:>5} {:>5} | {:>6} {:>6} {:>7} {:>7} {:>9} {:>8} {:>10} {:>6} | {:>7} | {:>9} {:>7} {:>7} | {:>10} {:>7} {:>7} {:>7} {:>7}",
         "shape", "wire", "json", "meta", "key", "resolve", "decode", "serialize", "envelope",
-        "checkpoint", "flush", "total", "raw-env", "raw-ckp", "raw"
+        "checkpoint", "flush", "total", "transcode", "raw-env", "raw-ckp", "transcoder", "ceiling", "actual", "raw", "stacked"
     );
     println!(
-        "{:<8} {:>5} {:>5} | {:>6} {:>6} {:>7} {:>7} {:>9} {:>8} {:>10} {:>6} | {:>7} | {:>7} {:>7} | {:>7}",
-        "", "bytes", "bytes", "ns", "ns", "ns", "ns", "ns", "ns", "ns", "ns", "ns/msg", "ns", "ns", "x"
+        "{:<8} {:>5} {:>5} | {:>6} {:>6} {:>7} {:>7} {:>9} {:>8} {:>10} {:>6} | {:>7} | {:>9} {:>7} {:>7} | {:>10} {:>7} {:>7} {:>7} {:>7}",
+        "", "bytes", "bytes", "ns", "ns", "ns", "ns", "ns", "ns", "ns", "ns", "ns/msg", "ns", "ns", "ns", "share", "x", "x", "x", "x"
     );
     for r in &rows {
         let total = r.current_total();
+        let repl = r.replaceable() / total;
+        let ceiling = total / (total - r.replaceable());
+        let actual = total / r.transcoded_total();
         let raw = total / r.raw_total();
+        let stacked = total / r.stacked_total();
         println!(
-            "{:<8} {:>5} {:>5} | {:>6.0} {:>6.0} {:>7.0} {:>7.0} {:>9.0} {:>8.0} {:>10.0} {:>6.0} | {:>7.0} | {:>7.0} {:>7.0} | {:>6.2}x",
+            "{:<8} {:>5} {:>5} | {:>6.0} {:>6.0} {:>7.0} {:>7.0} {:>9.0} {:>8.0} {:>10.0} {:>6.0} | {:>7.0} | {:>9.0} {:>7.0} {:>7.0} | {:>9.0}% {:>6.2}x {:>6.2}x {:>6.2}x {:>6.2}x",
             r.name, r.wire_bytes, r.json_bytes, r.meta, r.key, r.resolve, r.decode, r.serialize,
-            r.envelope, r.checkpoint, r.flush, total, r.raw_envelope, r.raw_checkpoint, raw
+            r.envelope, r.checkpoint, r.flush, total, r.transcode, r.raw_envelope, r.raw_checkpoint,
+            repl * 100.0, ceiling, actual, raw, stacked
         );
     }
     println!();
     println!("wire, json   bytes of the encoded protobuf body and of the captured document (key fields and _meta included)");
     println!("stages       ns per message, median of 7 rounds; total = their sum, the cost of one message on the pull loop");
     println!("flush        the per-message write(2), measured into /dev/null: a floor for the write to the runtime's pipe");
+    println!(
+        "transcode    ns for the wire-to-JSON transcoder, which replaces resolve+decode+serialize"
+    );
     println!("raw-env/ckp  ns to write the Captured and Checkpoint responses as raw bytes, replacing envelope and checkpoint");
+    println!("transcoder   share of total in resolve+decode+serialize, the stages the transcoder replaces");
+    println!("ceiling      total / (total - transcoder share): the speedup if those stages cost nothing at all, the most any replacement for them can reach");
+    println!("actual       speedup of total with transcode in place of resolve+decode+serialize");
     println!("raw          speedup of total with raw-env and raw-ckp in place of envelope and checkpoint");
+    println!(
+        "stacked      actual, with raw-env and raw-ckp in place of envelope and checkpoint as well"
+    );
     println!();
     println!("Implied single-core throughput at 100% CPU, captured document bytes per second:");
     for r in &rows {
         let now = r.json_bytes as f64 / r.current_total() * 1e9 / (1024.0 * 1024.0);
-        println!("  {:<8} {:>8.1} MiB/s", r.name, now);
+        let then = r.json_bytes as f64 / r.transcoded_total() * 1e9 / (1024.0 * 1024.0);
+        let stacked = r.json_bytes as f64 / r.stacked_total() * 1e9 / (1024.0 * 1024.0);
+        println!(
+            "  {:<8} current {:>8.1} MiB/s   transcoded {:>8.1} MiB/s   stacked {:>8.1} MiB/s",
+            r.name, now, then, stacked
+        );
     }
 }
