@@ -18,7 +18,7 @@
       "dataset": {
         "type": "string",
         "title": "Dataset",
-        "description": "BigQuery dataset for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables.",
+        "description": "BigQuery dataset for bound collection tables (unless overridden within the binding resource configuration).",
         "order": 3
       },
       "bucket": {
