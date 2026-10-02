@@ -26,6 +26,7 @@ var featureFlagDefaults = map[string]common.FlagDefault{
 	"datetime_keys_as_string":          common.FlagEnabled,
 	"retain_existing_data_on_backfill": common.FlagDisabled,
 	"native_binary_column_type":        common.FlagEnabled,
+	"truncate_after_backfill":          common.FlagEnabled,
 }
 
 type config struct {
