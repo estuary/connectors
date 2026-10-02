@@ -43,27 +43,42 @@ fn http_client() -> reqwest::Client {
 /// built, while holding target/debug/.cargo-lock. Generating beside the
 /// original keeps its relative `import:` valid.
 fn catalog() -> &'static str {
-    static PATH: std::sync::OnceLock<String> = std::sync::OnceLock::new();
-    PATH.get_or_init(|| {
-        const GENERATED: &str = "tests/test.generated.flow.yaml";
-        let source = std::fs::read_to_string("tests/test.flow.yaml").unwrap();
+    generate_catalog(&std::fs::read_to_string("tests/test.flow.yaml").unwrap())
+}
 
-        let anchor = "        command:\n          - cargo\n          - run\n";
-        assert!(
-            source.contains(anchor),
-            "tests/test.flow.yaml no longer declares `cargo run` as the connector \
-             command; update catalog() to match",
-        );
-        let rewritten = source.replace(
-            anchor,
-            &format!(
-                "        command:\n          - {}\n",
-                env!("CARGO_BIN_EXE_source-kafka")
-            ),
-        );
-        std::fs::write(GENERATED, rewritten).unwrap();
-        GENERATED.to_string()
-    })
+/// The committed catalog with `protobuf_transcoder` disabled through the
+/// `no_` prefix, so the default path is exercised end to end as well.
+fn catalog_without_transcoder() -> &'static str {
+    let source = std::fs::read_to_string("tests/test.flow.yaml").unwrap();
+    let anchor = "feature_flags: protobuf_transcoder\n";
+    assert!(
+        source.contains(anchor),
+        "tests/test.flow.yaml no longer enables `protobuf_transcoder`; update \
+         catalog_without_transcoder() to match",
+    );
+    generate_catalog(&source.replace(anchor, "feature_flags: no_protobuf_transcoder\n"))
+}
+
+/// Writes `source` beside the committed catalog with the connector command
+/// pointed at the cargo-built binary. Rewritten on every call: the tests run
+/// serially and each wants its own flags.
+fn generate_catalog(source: &str) -> &'static str {
+    const GENERATED: &str = "tests/test.generated.flow.yaml";
+    let anchor = "        command:\n          - cargo\n          - run\n";
+    assert!(
+        source.contains(anchor),
+        "tests/test.flow.yaml no longer declares `cargo run` as the connector \
+         command; update generate_catalog() to match",
+    );
+    let rewritten = source.replace(
+        anchor,
+        &format!(
+            "        command:\n          - {}\n",
+            env!("CARGO_BIN_EXE_source-kafka")
+        ),
+    );
+    std::fs::write(GENERATED, rewritten).unwrap();
+    GENERATED
 }
 
 /// Run `program` under coreutils `timeout`, capturing output to files.
@@ -190,6 +205,42 @@ async fn test_capture() {
     let snap = std::str::from_utf8(&output.stdout).unwrap();
 
     insta::assert_snapshot!(snap);
+}
+
+/// The default path. The committed catalog turns the transcoder on, so this
+/// runs the same capture with it off and expects the same bytes: the protobuf
+/// topics have no map fields, so the two paths are byte-identical.
+#[tokio::test]
+#[serial_test::serial]
+async fn test_capture_transcoder_off() {
+    setup_test().await;
+
+    let output = bounded_command(
+        "test_capture_transcoder_off: flowctl raw preview-next",
+        300,
+        "flowctl",
+        &[
+            "--profile",
+            "local",
+            "raw",
+            "preview-next",
+            "--source",
+            catalog_without_transcoder(),
+            "--sessions",
+            "1",
+            "--delay",
+            "2s",
+            "--output-state",
+        ],
+    );
+
+    println!("{}", std::str::from_utf8(&output.stderr).unwrap());
+
+    assert!(output.status.success());
+
+    let snap = std::str::from_utf8(&output.stdout).unwrap();
+
+    insta::assert_snapshot!("capture", snap);
 }
 
 #[tokio::test]
