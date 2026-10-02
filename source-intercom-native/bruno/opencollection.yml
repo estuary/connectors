@@ -1,0 +1,64 @@
+opencollection: 1.0.0
+
+info:
+  name: Intercom
+
+request:
+  scripts:
+    - type: before-request
+      code: |-
+        // Intercom auth via the connector's sops-encrypted config.yaml. The token is
+        // re-derived from sops on every request and lives only on `req` — it is never
+        // persisted to a var or env file. Requires the developer JS sandbox:
+        //   CLI: `bru run <request>.yml --env Intercom --sandbox developer`
+        //   GUI: jsSandboxMode "developer" in ~/.config/bruno/collection-security.json
+        // Modeled on source-mailchimp-native/bruno/opencollection.yml:7-31.
+        const { execFileSync } = require('child_process');
+        const path = require('path');
+        const configured = bru.getEnvVar('config_path');
+        if (!configured) throw new Error('config_path env var is not set');
+        // Resolve relative to the collection root, not the process cwd — the GUI's
+        // cwd is wherever Bruno was launched from, only the CLI runs from bruno/.
+        const configPath = path.isAbsolute(configured)
+          ? configured
+          : path.resolve(bru.cwd(), configured);
+        const decrypted = execFileSync(
+          'sops', ['-d', '--output-type=json', configPath], { encoding: 'utf8' },
+        );
+        // Raw `sops -d` keeps the `_sops` encrypted-suffix on key names (the platform
+        // strips it at runtime, sops itself does not) — accept both spellings.
+        // config.yaml uses the "Private App Credentials" (AccessToken) variant.
+        const creds = JSON.parse(decrypted)?.credentials;
+        const token = creds?.access_token ?? creds?.access_token_sops;
+        if (!token) {
+          throw new Error('credentials.access_token(_sops) missing from decrypted config');
+        }
+        req.setHeader('Authorization', `Bearer ${token}`);
+        req.setHeader('Accept', 'application/json');
+    - type: after-response
+      code: |-
+        // Print status + body only, so CLI runs show the response without needing
+        // `--reporter-json` (which would also write request headers, including the
+        // bearer token, to disk). No redaction: tests/test_snapshots.py redacts nothing.
+        console.log('BRU_RESPONSE ' + JSON.stringify({ status: res.getStatus(), body: res.getBody() }));
+
+docs:
+  content: |-
+    ## API constraints (account-wide)
+
+    - **Versioning:** every request carries an `Intercom-Version` header. The
+      connector sends `config.advanced.api_version` (default `2.11`, see
+      `models.py`). Requests in this collection pin the header explicitly, since
+      the version is usually the thing under test.
+    - **Rate limits:** not yet surveyed in this collection.
+
+    ## LIMITATION index
+
+    - `Conversation Attributes / old endpoint 2.16` — `/data_attributes?model=conversation`
+      is rejected on 2.16+.
+    - `Contacts / search sort desc 2.16` — `sort.order: "desc"` is rejected on 2.16+.
+
+    ## Running
+
+    `npx @usebruno/cli run "<Folder>/<request>.yml" --env Intercom --sandbox developer`
+    from this directory. Conventions: `.claude/skills/bruno-probe-endpoint`.

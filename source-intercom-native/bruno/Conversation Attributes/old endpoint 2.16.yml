@@ -1,0 +1,56 @@
+info:
+  name: old endpoint 2.16
+  type: http
+  seq: 6
+
+http:
+  method: GET
+  url: "{{base_url}}/data_attributes?model=conversation"
+  params:
+    - name: model
+      value: "conversation"
+      type: query
+  headers:
+    - name: Intercom-Version
+      value: "2.16"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 422 - model=conversation no longer supported
+    request:
+      url: "{{base_url}}/data_attributes?model=conversation"
+      method: GET
+    response:
+      status: 422
+      statusText: Unprocessable Entity
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "type": "error.list",
+            "request_id": "0003ubcpk2nrm4ep7e5g",
+            "errors": [
+              {
+                "code": "parameter_invalid",
+                "message": "model=conversation is no longer supported. Use GET /conversations/attributes instead"
+              }
+            ]
+          }
+
+docs: |-
+  **REFERENCE:** [List all data attributes (2.16)](https://developers.intercom.com/docs/references/rest-api/api.intercom.io/data-attributes/lisdataattributes)
+
+  **WHY:** Confirms the reported break: 422 on 2.16 and the exact error body.
+
+  **LIMITATION (VERIFIED 2026-10-02):** 422 `parameter_invalid`: "model=conversation is
+  no longer supported. Use GET /conversations/attributes instead". This matches the
+  reported failure; the CDK doesn't retry 4xx errors, so the task fails.
