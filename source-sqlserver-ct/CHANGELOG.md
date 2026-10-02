@@ -1,5 +1,14 @@
 # source-sqlserver-ct
 
+## 2026-10-02
+
+### Fixed
+- Primary key discovery now reads the `sys` catalog views directly instead of
+  `INFORMATION_SCHEMA.KEY_COLUMN_USAGE`. Compiling a query against that view
+  takes a lock shared by every database on the instance, so on servers hosting
+  many captured databases, concurrent discoveries queued behind one another and
+  held the server at sustained high CPU. Discovered keys are unchanged.
+
 ## 2026-08-18
 
 ### Added
