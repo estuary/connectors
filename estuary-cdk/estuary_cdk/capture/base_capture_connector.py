@@ -1,5 +1,6 @@
 import abc
 import asyncio
+import io
 import json
 import os
 import sys
@@ -14,6 +15,7 @@ from estuary_cdk.capture.connector_status import ConnectorStatus
 from .. import BaseConnector, Stopped
 from ..flow import (
     ConnectorSpec,
+    ConnectorStateUpdate,
     EndpointConfig,
     ResourceConfig,
     RotatingOAuth2Credentials,
@@ -26,7 +28,8 @@ from ..logger import FlowLogger
 from ..utils import format_error_message, get_running_tasks_info, sort_dict
 from . import Request, Response, Task, request, response
 from ._emit import emit_bytes
-from .common import _ConnectorState
+from .common import ConnectorState, _ConnectorState
+from .response import Checkpoint
 from .transactor import Transactor
 
 # Default encryption service URL, can be overridden via ENCRYPTION_URL environment variable
@@ -151,6 +154,25 @@ class BaseCaptureConnector(
                 self.output,
                 requires_explicit_acks=opened.explicitAcknowledgements,
             )
+
+            # Rotating OAuth2 credentials used to keep a refresh token in connector
+            # state. Nothing reads it anymore, so delete it from any state that still has one.
+            if open.state.refresh_token is not None:
+                log.info("Removing obsolete refresh token from connector state.")
+                checkpoint = Response[Any, Any, GeneralConnectorState](
+                    checkpoint=Checkpoint(
+                        state=ConnectorStateUpdate(
+                            updated=ConnectorState(refresh_token=None),
+                            mergePatch=True,
+                        )
+                    )
+                )
+                buffer = io.BytesIO()
+                buffer.write(
+                    checkpoint.model_dump_json(by_alias=True, exclude_unset=True).encode()
+                )
+                buffer.write(b"\n")
+                await self._transactor.commit(buffer)
 
             stopping = Task.Stopping()
 
