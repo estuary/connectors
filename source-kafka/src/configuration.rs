@@ -5,6 +5,7 @@ use rdkafka::statistics::Statistics;
 use rdkafka::ClientConfig;
 use schemars::{schema::RootSchema, JsonSchema};
 use serde::{de, Deserialize, Deserializer, Serialize};
+use std::collections::HashMap;
 use std::sync::Mutex;
 
 // How often in milliseconds librdkafka computes consumer statistics and
@@ -19,6 +20,47 @@ pub struct EndpointConfig {
     credentials: Option<Credentials>,
     tls: Option<TlsSettings>,
     pub schema_registry: SchemaRegistryConfig,
+    #[serde(default)]
+    pub advanced: Option<Advanced>,
+}
+
+#[derive(Serialize, Deserialize, Default)]
+pub struct Advanced {
+    #[serde(default)]
+    pub feature_flags: Option<String>,
+}
+
+impl EndpointConfig {
+    /// The feature flag settings for this capture: `defaults` overridden by the
+    /// comma-separated `advanced.feature_flags` string.
+    pub fn feature_flags(&self, defaults: &[(&str, bool)]) -> HashMap<String, bool> {
+        let flags = self
+            .advanced
+            .as_ref()
+            .and_then(|advanced| advanced.feature_flags.as_deref())
+            .unwrap_or("");
+        parse_feature_flags(flags, defaults)
+    }
+}
+
+/// Parse a feature flag string the way the Go connectors do: comma-separated
+/// names, each enabling a flag, or disabling it with a `no_` prefix.
+pub fn parse_feature_flags(flags: &str, defaults: &[(&str, bool)]) -> HashMap<String, bool> {
+    let mut settings: HashMap<String, bool> = defaults
+        .iter()
+        .map(|(name, value)| (name.to_string(), *value))
+        .collect();
+    for flag in flags.split(',') {
+        let flag = flag.trim();
+        let (name, value) = match flag.strip_prefix("no_") {
+            Some(name) => (name, false),
+            None => (flag, true),
+        };
+        if !name.is_empty() {
+            settings.insert(name.to_string(), value);
+        }
+    }
+    settings
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -267,10 +309,55 @@ impl JsonSchema for EndpointConfig {
                             "enable_json_only",
                         ],
                     }],
+                },
+                "advanced": {
+                    "title": "Advanced Options",
+                    "description": "Options for advanced users. You should not typically need to modify these.",
+                    "type": "object",
+                    "order": 4,
+                    "advanced": true,
+                    "properties": {
+                        "feature_flags": {
+                            "type": "string",
+                            "title": "Feature Flags",
+                            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.",
+                            "nonsensitive": true,
+                            "order": 0
+                        }
+                    }
                 }
             }
         }))
         .unwrap()
+    }
+}
+
+#[cfg(test)]
+mod feature_flag_tests {
+    use super::*;
+
+    #[test]
+    fn parses_like_the_go_connectors() {
+        let defaults = &[("a", false), ("b", true)];
+        let flags = parse_feature_flags(" a, no_b ,, c ,no_", defaults);
+        assert!(flags["a"]);
+        assert!(!flags["b"]);
+        assert!(flags["c"]);
+        assert_eq!(flags.len(), 3);
+
+        let flags = parse_feature_flags("", defaults);
+        assert!(!flags["a"]);
+        assert!(flags["b"]);
+    }
+
+    #[test]
+    fn config_without_advanced_section_uses_defaults() {
+        let config: EndpointConfig = serde_json::from_value(serde_json::json!({
+            "bootstrap_servers": "localhost:9092",
+            "schema_registry": {"schema_registry_type": "no_schema_registry", "enable_json_only": true}
+        }))
+        .unwrap();
+        assert!(config.feature_flags(&[("x", true)])["x"]);
     }
 }
 
