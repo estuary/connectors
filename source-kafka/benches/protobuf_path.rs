@@ -56,7 +56,8 @@ use source_kafka::document::MergeSerializer;
 use source_kafka::protobuf::{
     decode_protobuf_message, parse_message_indexes, resolve_message_from_indexes,
 };
-use source_kafka::write_capture_response;
+use source_kafka::pull::write_checkpoint;
+use source_kafka::{write_capture_response, write_captured};
 
 /// Same shape as the private `Meta` in src/pull.rs.
 #[derive(Serialize, Default)]
@@ -373,6 +374,8 @@ struct Row {
     envelope: f64,
     checkpoint: f64,
     flush: f64,
+    raw_envelope: f64,
+    raw_checkpoint: f64,
 }
 
 impl Row {
@@ -385,6 +388,13 @@ impl Row {
             + self.envelope
             + self.checkpoint
             + self.flush
+    }
+    /// Writing the Captured and Checkpoint responses as raw bytes instead of
+    /// through `Response` serialization, on its own.
+    fn raw_total(&self) -> f64 {
+        self.current_total() - self.envelope - self.checkpoint
+            + self.raw_envelope
+            + self.raw_checkpoint
     }
 }
 
@@ -467,6 +477,22 @@ fn main() {
         // The write(2) the pull loop pays per message: both lines through the
         // same BufWriter the connector uses, flushed, into /dev/null.
         let mut lines = Vec::new();
+        write_captured(3, &json, &mut lines).unwrap();
+        write_checkpoint("service-events", 11, 1_234_567_890, &mut lines).unwrap();
+        let mut pipe = std::io::BufWriter::with_capacity(
+            256 * 1024,
+            std::fs::File::create("/dev/null").unwrap(),
+        );
+        let flush_ns = time(|| {
+            pipe.write_all(black_box(&lines)).unwrap();
+            pipe.flush().unwrap();
+        });
+
+        // The raw writers the connector now uses, checked byte-identical
+        // against `Response` serialization here as well as in the unit tests.
+        let mut raw = Vec::with_capacity(json.len() * 2);
+        write_captured(3, &json, &mut raw).unwrap();
+        sink.clear();
         write_capture_response(
             Response {
                 captured: Some(Captured {
@@ -475,9 +501,19 @@ fn main() {
                 }),
                 ..Default::default()
             },
-            &mut lines,
+            &mut sink,
         )
         .unwrap();
+        assert_eq!(raw, sink, "raw envelope must match Response serialization");
+        let raw_envelope_ns = time(|| {
+            raw.clear();
+            write_captured(3, black_box(&json), &mut raw).unwrap();
+            black_box(&raw);
+        });
+
+        raw.clear();
+        write_checkpoint("service-events", 11, 1_234_567_890, &mut raw).unwrap();
+        sink.clear();
         {
             let mut partitions = HashMap::new();
             partitions.insert(11, 1_234_567_890i64);
@@ -495,17 +531,25 @@ fn main() {
                     }),
                     ..Default::default()
                 },
-                &mut lines,
+                &mut sink,
             )
             .unwrap();
         }
-        let mut pipe = std::io::BufWriter::with_capacity(
-            256 * 1024,
-            std::fs::File::create("/dev/null").unwrap(),
+        assert_eq!(
+            String::from_utf8_lossy(&raw),
+            String::from_utf8_lossy(&sink),
+            "raw checkpoint must match Response serialization"
         );
-        let flush_ns = time(|| {
-            pipe.write_all(black_box(&lines)).unwrap();
-            pipe.flush().unwrap();
+        let raw_checkpoint_ns = time(|| {
+            raw.clear();
+            write_checkpoint(
+                "service-events",
+                black_box(11),
+                black_box(1_234_567_890),
+                &mut raw,
+            )
+            .unwrap();
+            black_box(&raw);
         });
 
         rows.push(Row {
@@ -520,50 +564,36 @@ fn main() {
             envelope: envelope_ns,
             checkpoint: checkpoint_ns,
             flush: flush_ns,
+            raw_envelope: raw_envelope_ns,
+            raw_checkpoint: raw_checkpoint_ns,
         });
     }
 
     println!();
     println!(
-        "{:<8} {:>5} {:>5} | {:>6} {:>6} {:>7} {:>7} {:>9} {:>8} {:>10} {:>6} | {:>7}",
-        "shape",
-        "wire",
-        "json",
-        "meta",
-        "key",
-        "resolve",
-        "decode",
-        "serialize",
-        "envelope",
-        "checkpoint",
-        "flush",
-        "total"
+        "{:<8} {:>5} {:>5} | {:>6} {:>6} {:>7} {:>7} {:>9} {:>8} {:>10} {:>6} | {:>7} | {:>7} {:>7} | {:>7}",
+        "shape", "wire", "json", "meta", "key", "resolve", "decode", "serialize", "envelope",
+        "checkpoint", "flush", "total", "raw-env", "raw-ckp", "raw"
     );
     println!(
-        "{:<8} {:>5} {:>5} | {:>6} {:>6} {:>7} {:>7} {:>9} {:>8} {:>10} {:>6} | {:>7}",
-        "", "bytes", "bytes", "ns", "ns", "ns", "ns", "ns", "ns", "ns", "ns", "ns/msg"
+        "{:<8} {:>5} {:>5} | {:>6} {:>6} {:>7} {:>7} {:>9} {:>8} {:>10} {:>6} | {:>7} | {:>7} {:>7} | {:>7}",
+        "", "bytes", "bytes", "ns", "ns", "ns", "ns", "ns", "ns", "ns", "ns", "ns/msg", "ns", "ns", "x"
     );
     for r in &rows {
+        let total = r.current_total();
+        let raw = total / r.raw_total();
         println!(
-            "{:<8} {:>5} {:>5} | {:>6.0} {:>6.0} {:>7.0} {:>7.0} {:>9.0} {:>8.0} {:>10.0} {:>6.0} | {:>7.0}",
-            r.name,
-            r.wire_bytes,
-            r.json_bytes,
-            r.meta,
-            r.key,
-            r.resolve,
-            r.decode,
-            r.serialize,
-            r.envelope,
-            r.checkpoint,
-            r.flush,
-            r.current_total()
+            "{:<8} {:>5} {:>5} | {:>6.0} {:>6.0} {:>7.0} {:>7.0} {:>9.0} {:>8.0} {:>10.0} {:>6.0} | {:>7.0} | {:>7.0} {:>7.0} | {:>6.2}x",
+            r.name, r.wire_bytes, r.json_bytes, r.meta, r.key, r.resolve, r.decode, r.serialize,
+            r.envelope, r.checkpoint, r.flush, total, r.raw_envelope, r.raw_checkpoint, raw
         );
     }
     println!();
     println!("wire, json   bytes of the encoded protobuf body and of the captured document (key fields and _meta included)");
     println!("stages       ns per message, median of 7 rounds; total = their sum, the cost of one message on the pull loop");
     println!("flush        the per-message write(2), measured into /dev/null: a floor for the write to the runtime's pipe");
+    println!("raw-env/ckp  ns to write the Captured and Checkpoint responses as raw bytes, replacing envelope and checkpoint");
+    println!("raw          speedup of total with raw-env and raw-ckp in place of envelope and checkpoint");
     println!();
     println!("Implied single-core throughput at 100% CPU, captured document bytes per second:");
     for r in &rows {
