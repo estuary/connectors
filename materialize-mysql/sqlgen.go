@@ -262,6 +262,9 @@ func prepareDatetimeToStringCast(loc *time.Location) sql.CastSQLFunc {
 	}
 }
 
+// datetimeLayout is the form of a DATETIME literal at microsecond precision.
+const datetimeLayout = "2006-01-02 15:04:05.999999"
+
 func rfc3339ToTZ(loc *time.Location, clamp bool) sql.ElementConverter {
 	return sql.StringCastConverter(func(str string) (interface{}, error) {
 		var date = str
@@ -280,7 +283,7 @@ func rfc3339ToTZ(loc *time.Location, clamp bool) sql.ElementConverter {
 		if t, _, err := sql.ParseRFC3339Nano(date); err != nil {
 			return nil, err
 		} else {
-			return t.In(loc).Format("2006-01-02 15:04:05.999999"), nil
+			return t.In(loc).Format(datetimeLayout), nil
 		}
 	})
 }
