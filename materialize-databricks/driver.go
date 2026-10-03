@@ -3,7 +3,9 @@ package connector
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	stdsql "database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"maps"
@@ -13,6 +15,8 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
+	"text/template"
 	"time"
 
 	"github.com/databricks/databricks-sdk-go"
@@ -25,14 +29,21 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
+	"golang.org/x/sync/errgroup"
 
 	_ "github.com/databricks/databricks-sql-go"
 )
 
 const defaultPort = "443"
 const volumeName = "flow_staging"
+
+// deleteSlots limits how many Files API deletes the background cleanups run at once.
+var deleteSlots = make(chan struct{}, 16)
+
+const sweepAge = 24 * time.Hour
 
 type tableConfig struct {
 	Table         string `json:"table" jsonschema:"title=Table,description=Name of the table" jsonschema_extras:"x-collection-name=true"`
@@ -151,6 +162,9 @@ type transactor struct {
 	ep                    *sql.Endpoint[config]
 	templates             templates
 	materializationName   string
+	stagingPrefix         string
+	cleanups              sync.WaitGroup
+	sweepOnce             sync.Once
 }
 
 func (d *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSpec, _ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
@@ -303,6 +317,7 @@ func newTransactor(
 		be:                    be,
 		ep:                    ep,
 		templates:             renderTemplates(ep.Dialect),
+		stagingPrefix:         stagingPrefix(materializationName),
 	}
 	db, err := d.openDB()
 	if err != nil {
@@ -367,6 +382,10 @@ type binding struct {
 	loadSchema  string
 	storeSchema string
 
+	// stagingTable is the Delta table of this transaction's store rows,
+	// relative to rootStagingPath. It's set only when the rows are merged.
+	stagingTable string
+
 	// a binding needs to be merged if there are updates to existing documents
 	// otherwise we just do a direct copy by moving all data from temporary table
 	// into the target table. Note that in case of delta updates, "needsMerge"
@@ -394,8 +413,8 @@ func (t *transactor) addBinding(target sql.Table) error {
 		return out
 	}
 
-	b.loadFile = newStagedFile(t.cfg, b.rootStagingPath, translatedFieldNames(target.KeyNames()), t.files)
-	b.storeFile = newStagedFile(t.cfg, b.rootStagingPath, append(translatedFieldNames(target.ColumnNames()), "_flow_delete"), t.files)
+	b.loadFile = newStagedFile(t.cfg, b.rootStagingPath, t.stagingPrefix, translatedFieldNames(target.KeyNames()), t.files)
+	b.storeFile = newStagedFile(t.cfg, b.rootStagingPath, t.stagingPrefix, append(translatedFieldNames(target.ColumnNames()), "_flow_delete"), t.files)
 	b.loadSchema = stagedSchemaDDL(target.KeyPtrs(), false)
 	b.storeSchema = stagedSchemaDDL(target.Columns(), true)
 	b.loadMergeBounds = sql.NewMergeBoundsBuilder(target.Keys, t.ep.Dialect.Literal)
@@ -454,11 +473,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			toDelete = append(toDelete, b.loadFile.remoteDir())
 		}
 	}
-	defer func() {
-		for _, dir := range toDelete {
-			d.deleteDirectory(ctx, dir)
-		}
-	}()
+	defer d.cleanUp(ctx, toDelete, nil)
 
 	if it.Err() != nil {
 		return it.Err()
@@ -520,6 +535,9 @@ type checkpointItem struct {
 	// Directory is the transaction's staging directory, relative to the
 	// binding's staging root.
 	Directory string `json:",omitempty"`
+	// StagingTable is the Delta table holding the rows of Directory, relative
+	// to the binding's staging root.
+	StagingTable string `json:",omitempty"`
 	// Bounds are the rendered merge-bound literals of the observed key range,
 	// positional with the target table's key columns.
 	Bounds []mergeBoundLiterals `json:",omitempty"`
@@ -605,23 +623,117 @@ func parseCheckpointItem(data json.RawMessage) (*checkpointItem, error) {
 	return &item, nil
 }
 
-// deleteDirectory deletes a staging directory and its files. The Files API
-// only deletes empty directories.
-func (d *transactor) deleteDirectory(ctx context.Context, dir string) {
+// deleteDirectory deletes a staging directory and its contents. The Files API
+// deletes one file per request and only deletes empty directories.
+func (d *transactor) deleteDirectory(ctx context.Context, dir string) error {
 	entries, err := d.files.ListDirectoryContentsAll(ctx, files.ListDirectoryContentsRequest{DirectoryPath: dir})
 	if err != nil {
 		log.WithFields(log.Fields{"dir": dir, "err": err}).Debug("listing staging directory failed")
-		return
+		return err
 	}
+	var group errgroup.Group
 	for _, entry := range entries {
-		if err := d.files.DeleteByFilePath(ctx, entry.Path); err != nil {
-			log.WithFields(log.Fields{"file": entry.Path, "err": err}).Debug("deleting staged file failed")
-			return
+		group.Go(func() error {
+			if entry.IsDirectory {
+				return d.deleteDirectory(ctx, entry.Path)
+			}
+			deleteSlots <- struct{}{}
+			defer func() { <-deleteSlots }()
+			if err := d.files.DeleteByFilePath(ctx, entry.Path); err != nil {
+				log.WithFields(log.Fields{"file": entry.Path, "err": err}).Debug("deleting staged file failed")
+				return err
+			}
+			return nil
+		})
+	}
+	if err := group.Wait(); err != nil {
+		return err
+	} else if err := d.files.DeleteDirectoryByDirectoryPath(ctx, dir); err != nil {
+		log.WithFields(log.Fields{"dir": dir, "err": err}).Debug("deleting staging directory failed")
+		return err
+	}
+	return nil
+}
+
+// cleanUp deletes staging directories and files in the background. A later
+// sweepStaging deletes anything it leaves behind.
+func (d *transactor) cleanUp(ctx context.Context, dirs, files []string) {
+	ctx = context.WithoutCancel(ctx)
+	d.cleanups.Add(1)
+	go func() {
+		defer d.cleanups.Done()
+		for _, dir := range dirs {
+			_ = d.deleteDirectory(ctx, dir)
+		}
+		d.deleteFiles(ctx, files)
+	}()
+}
+
+// sweepStaging deletes this task's staging directories that cleanups didn't
+// finish: those no pending entry references that are older than sweepAge.
+// Younger ones may belong to other shards' transactions still being staged.
+func (d *transactor) sweepStaging(ctx context.Context) {
+	var referenced = make(map[string]bool)
+	var mark = func(cp checkpoint) {
+		for _, item := range cp {
+			if item != nil {
+				referenced[item.Directory], referenced[item.StagingTable] = true, true
+			}
 		}
 	}
-	if err := d.files.DeleteDirectoryByDirectoryPath(ctx, dir); err != nil {
-		log.WithFields(log.Fields{"dir": dir, "err": err}).Debug("deleting staging directory failed")
+	for _, cp := range d.cp {
+		mark(cp)
 	}
+	for _, cp := range d.peerShardsCheckpoints {
+		mark(cp)
+	}
+
+	var roots = make(map[string]bool)
+	for _, b := range d.bindings {
+		roots[b.rootStagingPath] = true
+	}
+	ctx = context.WithoutCancel(ctx)
+	go func() {
+		for root := range roots {
+			entries, err := d.files.ListDirectoryContentsAll(ctx, files.ListDirectoryContentsRequest{DirectoryPath: root})
+			if err != nil {
+				log.WithFields(log.Fields{"dir": root, "err": err}).Debug("listing staging root failed")
+				continue
+			}
+			var stale []string
+			for _, entry := range entries {
+				if entry.IsDirectory && !referenced[entry.Name] && stagedBefore(d.stagingPrefix, entry.Name, time.Now().Add(-sweepAge)) {
+					stale = append(stale, entry.Path)
+				}
+			}
+			if len(stale) != 0 {
+				log.WithFields(log.Fields{"dir": root, "count": len(stale)}).Info("deleting stale staging directories")
+				d.cleanUp(ctx, stale, nil)
+			}
+		}
+	}()
+}
+
+// stagedBefore reports whether name is a transaction directory or staging
+// table of the prefix created before cutoff.
+func stagedBefore(prefix, name string, cutoff time.Time) bool {
+	var rest, ok = strings.CutPrefix(name, prefix+"_")
+	if !ok || len(rest) < 36 {
+		return false
+	}
+	id, err := uuid.Parse(rest[:36])
+	if err != nil || id.Version() != 7 {
+		return false
+	}
+	var sec, nsec = id.Time().UnixTime()
+	return time.Unix(sec, nsec).Before(cutoff)
+}
+
+// stagingPrefix identifies a task's staging directories, since other tasks
+// may share the staging volume.
+func stagingPrefix(materializationName string) string {
+	var sum = sha256.Sum256([]byte(materializationName))
+	return hex.EncodeToString(sum[:6])
 }
 
 func (d *transactor) deleteFiles(ctx context.Context, files []string) {
@@ -645,19 +757,25 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	}
 	defer db.Close()
 
+	var loading = make(map[int]chan error)
+	var load = func(idx int) {
+		var done = make(chan error, 1)
+		loading[idx] = done
+		go func() { done <- d.loadStagingTable(ctx, db, d.bindings[idx]) }()
+	}
+
 	var lastBinding = -1
 	// Skip deleted, non-existent documents iff HardDelete is enabled.
 	for it.Next(d.cfg.HardDelete) {
 		var b = d.bindings[it.Binding]
 
-		// Store requests are ordered by binding, so the previous binding has received all of
-		// its rows and its staged file can be finished now rather than held open until commit.
+		// Store requests are ordered by binding, so the previous binding has all of its rows. Its
+		// files upload and load into its staging table while later bindings are written.
 		if lastBinding != -1 && lastBinding != it.Binding {
-			if last := d.bindings[lastBinding]; last.storeFile.started {
-				if err := last.storeFile.finish(); err != nil {
-					return nil, fmt.Errorf("finishing store file for %s: %w", last.target.Path, err)
-				}
-			}
+			load(lastBinding)
+		}
+		if _, ok := loading[it.Binding]; ok {
+			return nil, fmt.Errorf("store requests for binding[%d] are not contiguous", it.Binding)
 		}
 		lastBinding = it.Binding
 
@@ -676,6 +794,9 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			b.needsMerge = true
 		}
 	}
+	if lastBinding != -1 {
+		load(lastBinding)
+	}
 
 	// Upload the staged files and record in the checkpoint everything needed to commit them into
 	// the destination tables: if the connector is restarted in the middle of a commit it can run
@@ -684,11 +805,10 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	// binding stateKey so that in case of a recovery being necessary we don't run queries
 	// belonging to bindings that have been removed.
 	for idx, b := range d.bindings {
-		if !b.storeFile.started {
+		var done, ok = loading[idx]
+		if !ok {
 			continue
-		}
-
-		if err := b.storeFile.wait(); err != nil {
+		} else if err := <-done; err != nil {
 			return nil, fmt.Errorf("flushing store file for binding[%d]: %w", idx, err)
 		}
 
@@ -698,12 +818,13 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		// not be loaded again
 		// see https://docs.databricks.com/en/sql/language-manual/delta-copy-into.html
 		d.cp.add(b.target.StateKey, d.rangeKey, &checkpointItem{
-			Directory:  b.storeFile.txnDir,
-			Bounds:     boundsLiterals(b.storeMergeBounds.Build()),
-			NeedsMerge: !b.target.DeltaUpdates && b.needsMerge,
-			round:      it.Round,
+			Directory:    b.storeFile.txnDir,
+			StagingTable: b.stagingTable,
+			Bounds:       boundsLiterals(b.storeMergeBounds.Build()),
+			NeedsMerge:   !b.target.DeltaUpdates && b.needsMerge,
+			round:        it.Round,
 		})
-		b.needsMerge = false // reset for next round
+		b.needsMerge, b.stagingTable = false, "" // reset for next round
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
@@ -713,6 +834,34 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			return state, nil
 		}
 	}, nil
+}
+
+// loadStagingTable waits for the binding's store files to upload and, if they're
+// merged, loads them into a Delta table. The MERGE reads that table rather than
+// the JSON files, so Databricks doesn't materialize its source. The table lives
+// in the staging volume by path and isn't registered in the catalog.
+func (d *transactor) loadStagingTable(ctx context.Context, db *stdsql.DB, b *binding) error {
+	if err := b.storeFile.wait(); err != nil {
+		return err
+	} else if b.target.DeltaUpdates || !b.needsMerge {
+		return nil
+	}
+
+	var name = b.storeFile.txnDir + "_delta"
+	var data = &stagingLoad{Target: &b.target, Identifier: stagingIdentifier(b, name), Directory: b.storeFile.remoteDir()}
+	for _, tpl := range []*template.Template{d.templates.createStagingTable, d.templates.copyIntoStaging} {
+		if query, err := renderTemplate(tpl, data); err != nil {
+			return fmt.Errorf("%s template: %w", tpl.Name(), err)
+		} else if _, err := db.ExecContext(ctx, query); err != nil {
+			return fmt.Errorf("%s: %w", tpl.Name(), err)
+		}
+	}
+	b.stagingTable = name
+	return nil
+}
+
+func stagingIdentifier(b *binding, name string) string {
+	return "delta.`" + filepath.Join(b.rootStagingPath, name) + "`"
 }
 
 func (d *transactor) startCommitState() (*pf.ConnectorState, error) {
@@ -769,7 +918,13 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	}
 	defer db.Close()
 
-	return d.acknowledgeApply(ctx, db, shouldProcess)
+	state, err := d.acknowledgeApply(ctx, db, shouldProcess)
+	if err == nil {
+		// Recovered entries are committed by now, so staging directories that no
+		// pending entry references can be swept.
+		d.sweepOnce.Do(func() { d.sweepStaging(ctx) })
+	}
+	return state, err
 }
 
 // acknowledgeApply executes pending checkpoint entries — this shard's own, and as the primary
@@ -905,13 +1060,18 @@ func (d *transactor) commitBindingCheckpointItems(ctx context.Context, db *stdsq
 	}
 	d.be.FinishedResourceCommit(b.target.Path)
 
+	var dirs, files []string
 	for _, item := range items {
+		if item.StagingTable != "" {
+			dirs = append(dirs, filepath.Join(b.rootStagingPath, item.StagingTable))
+		}
 		if item.Directory != "" {
-			d.deleteDirectory(ctx, filepath.Join(b.rootStagingPath, item.Directory))
+			dirs = append(dirs, filepath.Join(b.rootStagingPath, item.Directory))
 		} else {
-			d.deleteFiles(ctx, item.ToDelete)
+			files = append(files, item.ToDelete...)
 		}
 	}
+	d.cleanUp(ctx, dirs, files)
 
 	return nil
 }
@@ -924,7 +1084,7 @@ func (d *transactor) commitBindingCheckpointItems(ctx context.Context, db *stdsq
 func (d *transactor) execQueries(ctx context.Context, db *stdsql.DB, queries []string, tolerateMissing bool, report func(m.RowStats)) error {
 	for _, query := range queries {
 		if stats, err := d.execQuery(ctx, db, query); err != nil {
-			if tolerateMissing && (strings.Contains(err.Error(), "PATH_NOT_FOUND") || strings.Contains(err.Error(), "Path does not exist") || strings.Contains(err.Error(), "CF_PATH_DOES_NOT_EXIST_FOR_READ_FILES") || strings.Contains(err.Error(), "COPY_INTO_SOURCE_SCHEMA_INFERENCE_FAILED") || strings.Contains(err.Error(), "Table doesn't exist") || strings.Contains(err.Error(), "TABLE_OR_VIEW_NOT_FOUND")) {
+			if tolerateMissing && (strings.Contains(err.Error(), "PATH_NOT_FOUND") || strings.Contains(err.Error(), "Path does not exist") || strings.Contains(err.Error(), "CF_PATH_DOES_NOT_EXIST_FOR_READ_FILES") || strings.Contains(err.Error(), "COPY_INTO_SOURCE_SCHEMA_INFERENCE_FAILED") || strings.Contains(err.Error(), "Table doesn't exist") || strings.Contains(err.Error(), "TABLE_OR_VIEW_NOT_FOUND") || isPartialStagingTable(err)) {
 				continue
 			}
 			return fmt.Errorf("query %q failed: %w", query, err)
@@ -933,6 +1093,14 @@ func (d *transactor) execQueries(ctx context.Context, db *stdsql.DB, queries []s
 		}
 	}
 	return nil
+}
+
+// isPartialStagingTable reports whether err comes from reading a partly
+// deleted staging table. Deletion starts only after the table's MERGE succeeds.
+func isPartialStagingTable(err error) bool {
+	return slices.ContainsFunc([]string{"DELTA_TABLE_NOT_FOUND", "DELTA_TRUNCATED_TRANSACTION_LOG", "DELTA_FILE_NOT_FOUND", "FAILED_READ_FILE"}, func(class string) bool {
+		return strings.Contains(err.Error(), class)
+	})
 }
 
 // retriableErrorClasses are the Databricks error classes of a commit query
@@ -1023,9 +1191,11 @@ func scanRowStats(rows *stdsql.Rows) m.RowStats {
 // TODO: remove the root-level file path in about January 2027, after every
 // task has started on this version and drained its pending checkpoint.
 func (d *transactor) renderCommitQueries(b *binding, items []*checkpointItem, bounds []sql.MergeBound, needsMerge bool) ([]string, error) {
-	var dirs, rootFiles []string
+	var dirs, tables, rootFiles []string
 	for _, item := range items {
-		if item.Directory != "" {
+		if item.StagingTable != "" && needsMerge {
+			tables = append(tables, stagingIdentifier(b, item.StagingTable))
+		} else if item.Directory != "" {
 			dirs = append(dirs, filepath.Join(b.rootStagingPath, item.Directory))
 		} else {
 			rootFiles = append(rootFiles, item.StagedFiles...)
@@ -1058,8 +1228,8 @@ func (d *transactor) renderCommitQueries(b *binding, items []*checkpointItem, bo
 			queries = append(queries, query)
 		}
 	}
-	if len(dirs) > 0 {
-		if query, err := RenderTableWithStaged(b.target, dirs, nil, b.storeSchema, d.templates.mergeInto, bounds); err != nil {
+	if len(dirs) > 0 || len(tables) > 0 {
+		if query, err := renderTemplate(d.templates.mergeInto, &tableWithFiles{Table: &b.target, Directories: dirs, Tables: tables, Schema: b.storeSchema, Bounds: bounds}); err != nil {
 			return nil, fmt.Errorf("mergeInto template: %w", err)
 		} else {
 			queries = append(queries, query)
