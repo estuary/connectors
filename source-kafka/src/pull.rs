@@ -1,7 +1,9 @@
 use crate::{
     configuration::{EndpointConfig, FlowConsumerContext, Resource, SchemaRegistryConfig},
     document::MergeSerializer,
-    schema_registry::{RegisteredSchema, SchemaRegistryClient},
+    protobuf::{decode_protobuf_message, parse_message_indexes, resolve_message_from_indexes},
+    schema_registry::{ProtobufSchema, RegisteredSchema, SchemaRegistryClient},
+    transcode::{Plans, TranscodeError, Transcoder},
     write_captured,
 };
 use anyhow::{anyhow, Context, Result};
@@ -12,11 +14,11 @@ use bigdecimal::BigDecimal;
 use hex::decode;
 use highway::{HighwayHash, HighwayHasher, Key};
 use lazy_static::lazy_static;
+use prost_reflect::SerializeOptions;
 use proto_flow::{
     capture::request::Open,
     flow::{capture_spec::Binding, RangeSpec},
 };
-use prost_reflect::DynamicMessage;
 use rdkafka::{
     consumer::{BaseConsumer, Consumer},
     message::Headers,
@@ -28,6 +30,14 @@ use serde_json::{json, Map};
 use std::collections::{hash_map::Entry, HashMap};
 use std::io::{BufWriter, Stdout, Write};
 use time::{format_description, OffsetDateTime};
+
+/// Feature flags this connector reads, with their defaults. Set through
+/// `advanced.feature_flags`; `no_<flag>` disables one.
+const FEATURE_FLAG_DEFAULTS: &[(&str, bool)] = &[
+    // Transcode registry protobuf payloads straight from the wire instead of
+    // through a DynamicMessage. See src/transcode/mod.rs.
+    ("protobuf_transcoder", false),
+];
 
 #[derive(Debug, Deserialize, Serialize, Default)]
 struct CaptureState {
@@ -75,11 +85,15 @@ enum MetaTimestamp {
     LogAppendTime(String),
 }
 
-/// The result of parsing a message payload or key. Protobuf payloads are kept
-/// as a `DynamicMessage` so they can be streamed straight to output without an
-/// intermediate `serde_json::Value` DOM; everything else is parsed to a `Value`.
-enum Parsed {
-    Message(DynamicMessage),
+/// The result of parsing a message payload or key. Registry protobuf payloads
+/// are left as wire bytes so `do_pull` can transcode them straight to output
+/// once the key and `_meta` are known; everything else is parsed to a `Value`.
+enum Parsed<'a> {
+    Protobuf {
+        schema_id: u32,
+        /// The whole datum, Confluent framing included.
+        datum: &'a [u8],
+    },
     Value(serde_json::Value),
 }
 
@@ -93,6 +107,8 @@ pub async fn do_pull(req: Open, mut stdout: BufWriter<Stdout>) -> Result<()> {
     };
 
     let config: EndpointConfig = serde_json::from_slice(&spec.config_json)?;
+    let feature_flags = config.feature_flags(FEATURE_FLAG_DEFAULTS);
+    let is_transcoder_enabled = feature_flags["protobuf_transcoder"];
     let mut consumer = config.to_consumer().await?;
     let schema_client = match config.schema_registry {
         SchemaRegistryConfig::ConfluentSchemaRegistry {
@@ -103,6 +119,9 @@ pub async fn do_pull(req: Open, mut stdout: BufWriter<Stdout>) -> Result<()> {
         SchemaRegistryConfig::NoSchemaRegistry { .. } => None,
     };
     let mut schema_cache: HashMap<u32, RegisteredSchema> = HashMap::new();
+    let mut plans_cache: HashMap<u32, Plans> = HashMap::new();
+    let mut transcoder = Transcoder::new();
+    tracing::info!(feature_flags = ?feature_flags, "resolved feature flags");
 
     let topics_to_bindings =
         setup_consumer(&mut consumer, state, &spec.bindings, &req.range).await?;
@@ -117,19 +136,7 @@ pub async fn do_pull(req: Open, mut stdout: BufWriter<Stdout>) -> Result<()> {
         let payload = match msg.payload() {
             Some(bytes) => parse_datum(bytes, false, &mut schema_cache, schema_client.as_ref())
                 .await
-                .with_context(|| {
-                    // The first 64 bytes are enough to inspect the schema
-                    // registry framing (magic byte, schema ID, and protobuf
-                    // message indexes) of an unparseable message.
-                    format!(
-                        "parsing message payload for topic {} (partition {}, offset {}, payload length {}, first bytes {})",
-                        msg.topic(),
-                        msg.partition(),
-                        msg.offset(),
-                        bytes.len(),
-                        hex::encode(&bytes[..bytes.len().min(64)]),
-                    )
-                })?,
+                .with_context(|| describe_payload(&msg, bytes))?,
             None => {
                 // We interpret an absent message payload as a deletion
                 // tombstone. The captured document will otherwise be empty
@@ -192,28 +199,54 @@ pub async fn do_pull(req: Open, mut stdout: BufWriter<Stdout>) -> Result<()> {
                         msg.topic(),
                         other
                     ),
-                    Parsed::Message(_) => unreachable!("keys are parsed with is_key = true"),
+                    Parsed::Protobuf { .. } => unreachable!("keys are parsed with is_key = true"),
                 }
             }
             None => None,
         };
 
         // Build the captured document's JSON bytes. Protobuf payloads are
-        // streamed straight into the buffer with the key and _meta merged in.
-        // Other payloads are already a Value.
+        // transcoded straight into the buffer with the key and _meta merged
+        // in. Other payloads are already a Value.
         let doc_bytes: Vec<u8> = match payload {
-            Parsed::Message(message) => {
-                let mut buf = Vec::new();
-                {
-                    let mut ser = serde_json::Serializer::new(&mut buf);
-                    message
-                        .serialize_with_options(
-                            MergeSerializer::new(&mut ser, key_fields.as_ref(), &meta),
-                            &prost_reflect::SerializeOptions::new().use_proto_field_name(true),
-                        )
-                        .context("serializing protobuf message")?;
+            Parsed::Protobuf { schema_id, datum } => {
+                let Some(RegisteredSchema::Protobuf(proto_schema)) = schema_cache.get(&schema_id)
+                else {
+                    unreachable!(
+                        "parse_datum returns Parsed::Protobuf only for a cached protobuf schema"
+                    )
+                };
+                let framed = &datum[5..];
+                if !is_transcoder_enabled {
+                    // The default: no plans are built for a capture that
+                    // never consults them.
+                    dynamic_protobuf_document(proto_schema, framed, key_fields.as_ref(), &meta)
+                        .with_context(|| describe_payload(&msg, datum))?
+                } else {
+                    let plans = match plans_cache.entry(schema_id) {
+                        Entry::Occupied(e) => e.into_mut(),
+                        Entry::Vacant(e) => e.insert(
+                            Plans::for_schema(
+                                &proto_schema.descriptor_pool,
+                                &proto_schema.message_name,
+                            )
+                            .with_context(|| {
+                                format!("building transcoder plans for schema id {schema_id}")
+                            })?,
+                        ),
+                    };
+                    let location = (msg.topic(), msg.partition(), msg.offset());
+                    transcode_or_fall_back(
+                        plans,
+                        &mut transcoder,
+                        proto_schema,
+                        framed,
+                        key_fields.as_ref(),
+                        &meta,
+                        location,
+                    )
+                    .with_context(|| describe_payload(&msg, datum))?
                 }
-                buf
             }
             Parsed::Value(mut doc) => {
                 let captured = doc
@@ -266,6 +299,91 @@ pub fn write_checkpoint<W: Write>(
     out.write_all(b"}}}},\"mergePatch\":true}}}\n")
         .context("writing checkpoint response")?;
     out.flush().context("flushing output")
+}
+
+/// Context for a payload that failed to parse. The first 64 bytes are enough
+/// to inspect the schema registry framing (magic byte, schema ID, and protobuf
+/// message indexes).
+fn describe_payload(msg: &rdkafka::message::BorrowedMessage<'_>, bytes: &[u8]) -> String {
+    format!(
+        "parsing message payload for topic {} (partition {}, offset {}, payload length {}, first bytes {})",
+        msg.topic(),
+        msg.partition(),
+        msg.offset(),
+        bytes.len(),
+        hex::encode(&bytes[..bytes.len().min(64)]),
+    )
+}
+
+/// The DynamicMessage path for a registry protobuf payload. `framed` is the
+/// datum after the magic byte and schema id: message indexes, then the message.
+fn dynamic_protobuf_document(
+    proto_schema: &ProtobufSchema,
+    framed: &[u8],
+    key: Option<&Map<String, serde_json::Value>>,
+    meta: &Meta,
+) -> Result<Vec<u8>> {
+    let (indexes, payload_offset) = parse_message_indexes(framed)?;
+    let descriptor = resolve_message_from_indexes(
+        &proto_schema.descriptor_pool,
+        &proto_schema.message_name,
+        &indexes,
+    )?;
+    let message = decode_protobuf_message(&descriptor, &framed[payload_offset..])?;
+    let mut buf = Vec::new();
+    {
+        let mut ser = serde_json::Serializer::new(&mut buf);
+        message
+            .serialize_with_options(
+                MergeSerializer::new(&mut ser, key, meta),
+                &SerializeOptions::new().use_proto_field_name(true),
+            )
+            .context("serializing protobuf message")?;
+    }
+    Ok(buf)
+}
+
+/// The transcoder path. The inner `Err` is the reason the transcoder declined
+/// the message, which the caller resolves with the DynamicMessage path.
+fn transcoded_protobuf_document(
+    plans: &Plans,
+    transcoder: &mut Transcoder,
+    framed: &[u8],
+    key: Option<&Map<String, serde_json::Value>>,
+    meta: &Meta,
+) -> Result<std::result::Result<Vec<u8>, &'static str>> {
+    let (plan, consumed) = plans.plan_for_indexes(framed)?;
+    let mut buf = Vec::new();
+    match transcoder.transcode(plans, plan, &framed[consumed..], key, meta, &mut buf) {
+        Ok(()) => Ok(Ok(buf)),
+        Err(TranscodeError::Unsupported(why)) => Ok(Err(why)),
+        Err(err @ TranscodeError::Decode(_)) => Err(anyhow::Error::new(err)),
+    }
+}
+
+/// The transcoder, with the DynamicMessage path for the shapes it declines.
+fn transcode_or_fall_back(
+    plans: &Plans,
+    transcoder: &mut Transcoder,
+    proto_schema: &ProtobufSchema,
+    framed: &[u8],
+    key: Option<&Map<String, serde_json::Value>>,
+    meta: &Meta,
+    (topic, partition, offset): (&str, i32, i64),
+) -> Result<Vec<u8>> {
+    match transcoded_protobuf_document(plans, transcoder, framed, key, meta)? {
+        Ok(buf) => Ok(buf),
+        Err(reason) => {
+            tracing::debug!(
+                topic,
+                partition,
+                offset,
+                reason,
+                "protobuf transcoder declined a message; using the DynamicMessage path"
+            );
+            dynamic_protobuf_document(proto_schema, framed, key, meta)
+        }
+    }
 }
 
 fn unix_millis_to_rfc3339(millis: i64) -> Result<String> {
@@ -367,12 +485,12 @@ fn responsible_for_partition(range: &Option<RangeSpec>, topic: &str, partition: 
     hash >= range.key_begin && hash <= range.key_end
 }
 
-async fn parse_datum(
-    datum: &[u8],
+async fn parse_datum<'a>(
+    datum: &'a [u8],
     is_key: bool,
     schema_cache: &mut HashMap<u32, RegisteredSchema>,
     schema_client: Option<&SchemaRegistryClient>,
-) -> Result<Parsed> {
+) -> Result<Parsed<'a>> {
     match (schema_client, datum[0]) {
         (Some(schema_client), 0) => {
             // Schema registry is available, and this message was encoded with a
@@ -403,39 +521,39 @@ async fn parse_datum(
                 }
                 RegisteredSchema::Json(_) => Ok(Parsed::Value(serde_json::from_slice(&datum[5..])?)),
                 RegisteredSchema::Protobuf(proto_schema) => {
+                    if !is_key {
+                        // Payloads are transcoded straight to output by
+                        // do_pull once the key and _meta are known.
+                        return Ok(Parsed::Protobuf { schema_id, datum });
+                    }
+
                     // Parse message indexes (bytes after schema ID)
-                    let (indexes, payload_offset) = crate::protobuf::parse_message_indexes(&datum[5..])?;
+                    let (indexes, payload_offset) = parse_message_indexes(&datum[5..])?;
 
                     // Resolve message descriptor using indexes
-                    let descriptor = crate::protobuf::resolve_message_from_indexes(
+                    let descriptor = resolve_message_from_indexes(
                         &proto_schema.descriptor_pool,
                         &proto_schema.message_name,
                         &indexes,
                     )?;
 
                     // Decode to DynamicMessage
-                    let message = crate::protobuf::decode_protobuf_message(&descriptor, &datum[5 + payload_offset..])?;
+                    let message =
+                        decode_protobuf_message(&descriptor, &datum[5 + payload_offset..])?;
 
-                    if is_key {
-                        // Convert to JSON using proto field names to match discovered schemas.
-                        let json_value: serde_json::Value = message.serialize_with_options(
-                            serde_json::value::Serializer,
-                            &prost_reflect::SerializeOptions::new().use_proto_field_name(true),
-                        )?;
+                    // Convert to JSON using proto field names to match discovered schemas.
+                    let json_value: serde_json::Value = message.serialize_with_options(
+                        serde_json::value::Serializer,
+                        &SerializeOptions::new().use_proto_field_name(true),
+                    )?;
 
-                        // For keys that are not objects, wrap in a synthetic _key field
-                        if json_value.is_object() {
-                            Ok(Parsed::Value(json_value))
-                        } else {
-                            Ok(Parsed::Value(
-                                serde_json::Map::from_iter([("_key".to_string(), json_value)])
-                                    .into(),
-                            ))
-                        }
+                    // For keys that are not objects, wrap in a synthetic _key field
+                    if json_value.is_object() {
+                        Ok(Parsed::Value(json_value))
                     } else {
-                        // Payloads are streamed straight to output by do_pull,
-                        // so keep the decoded message rather than build a DOM.
-                        Ok(Parsed::Message(message))
+                        Ok(Parsed::Value(
+                            serde_json::Map::from_iter([("_key".to_string(), json_value)]).into(),
+                        ))
                     }
                 }
             }
@@ -656,17 +774,17 @@ mod tests {
 
     use super::*;
     use crate::write_capture_response;
-    use proto_flow::capture::{
-        response::{self, Checkpoint},
-        Response,
-    };
-    use proto_flow::flow::ConnectorState;
     use apache_avro::{
         types::{Record, Value as AvroValue},
         Days, Decimal, Duration, Millis, Months,
     };
     use bigdecimal::num_bigint::ToBigInt;
     use insta::assert_json_snapshot;
+    use proto_flow::capture::{
+        response::{self, Checkpoint},
+        Response,
+    };
+    use proto_flow::flow::ConnectorState;
     use serde_json::json;
 
     #[test]
@@ -873,6 +991,8 @@ mod tests {
     }
 
     fn checkpoint_via_response(state_key: &str, partition: i32, offset: i64) -> Vec<u8> {
+        use proto_flow::capture::response::Checkpoint;
+        use proto_flow::flow::ConnectorState;
         let state = CaptureState::state_slice(state_key, partition, offset);
         let mut out = Vec::new();
         write_capture_response(
@@ -921,7 +1041,7 @@ mod tests {
         }
     }
 
-    /// The runtime's own decoder must read back exactly what was written.
+    /// The runtime's decoder must read back the exact state slice.
     #[test]
     fn checkpoint_round_trips_through_the_response_decoder() {
         for state_key in STATE_KEYS {
@@ -943,5 +1063,248 @@ mod tests {
         let mut out = FlushCountingWriter::default();
         write_checkpoint("t", 0, 0, &mut out).unwrap();
         assert_eq!(out.flushes, 1, "a checkpoint must flush");
+    }
+
+    // --- protobuf wiring ---------------------------------------------------
+
+    fn test_meta() -> Meta {
+        Meta {
+            topic: "t".to_string(),
+            partition: 3,
+            offset: 42,
+            op: "u".to_string(),
+            headers: None,
+            timestamp: None,
+        }
+    }
+
+    fn pb_varint(mut v: u64) -> Vec<u8> {
+        let mut out = Vec::new();
+        while v >= 0x80 {
+            out.push((v & 0x7F) as u8 | 0x80);
+            v >>= 7;
+        }
+        out.push(v as u8);
+        out
+    }
+
+    fn pb_len(number: u32, payload: &[u8]) -> Vec<u8> {
+        [
+            pb_varint(((number as u64) << 3) | 2),
+            pb_varint(payload.len() as u64),
+            payload.to_vec(),
+        ]
+        .concat()
+    }
+
+    fn pb_vi(number: u32, v: u64) -> Vec<u8> {
+        [pb_varint((number as u64) << 3), pb_varint(v)].concat()
+    }
+
+    /// Both protobuf paths on the same framed datum: the same bytes, or both
+    /// fail.
+    fn assert_paths_agree(
+        label: &str,
+        plans: &Plans,
+        transcoder: &mut Transcoder,
+        schema: &ProtobufSchema,
+        framed: &[u8],
+        key: Option<&Map<String, serde_json::Value>>,
+    ) {
+        let meta = test_meta();
+        let expected = dynamic_protobuf_document(schema, framed, key, &meta);
+        let got =
+            transcode_or_fall_back(plans, transcoder, schema, framed, key, &meta, ("t", 3, 42));
+        match (expected, got) {
+            (Ok(e), Ok(g)) => assert_eq!(
+                String::from_utf8_lossy(&g),
+                String::from_utf8_lossy(&e),
+                "{label}"
+            ),
+            (Err(_), Err(_)) => {}
+            (e, g) => panic!("{label}: dynamic {e:?} vs transcoder {g:?}"),
+        }
+    }
+
+    /// Every Confluent message-index framing `do_pull` can see, through the
+    /// real wiring rather than the transcoder's own tests. Index arrays are
+    /// zigzag varints: a length, then indexes into the file's top-level
+    /// messages (Nested, Everything, Kinds, Tree, Sparse) and then into
+    /// nested messages.
+    #[test]
+    fn transcoder_wiring_matches_the_dynamic_path() {
+        use crate::document::differential as corpus;
+        use prost_reflect::prost::Message as _;
+        use prost_reflect::Value as PValue;
+
+        let pool = corpus::pool();
+        let schema = ProtobufSchema {
+            descriptor_pool: pool.clone(),
+            message_name: "differential.Everything".to_string(),
+        };
+        let plans = Plans::for_schema(&pool, "differential.Everything").unwrap();
+        let mut transcoder = Transcoder::new();
+        // Map-free, so the dynamic path's bytes are deterministic.
+        let everything = corpus::everything(
+            &pool,
+            vec![
+                ("f_int32", PValue::I32(7)),
+                ("f_string", PValue::String("payload".to_string())),
+                ("_meta", PValue::String("dropped".to_string())),
+                (
+                    "f_message",
+                    PValue::Message(corpus::nested(&pool, "n", 0.5, vec![1.5])),
+                ),
+            ],
+        )
+        .encode_to_vec();
+        let key: Map<String, serde_json::Value> = json!({"f_string": "key-wins", "id": 7})
+            .as_object()
+            .unwrap()
+            .clone();
+
+        let cases: Vec<(&str, Vec<u8>)> = vec![
+            ("no-indexes", everything.clone()),
+            ("zero-byte", [vec![0x00], everything.clone()].concat()),
+            (
+                "array-of-zero",
+                [vec![0x02, 0x00], everything.clone()].concat(),
+            ),
+            (
+                "padded-zero-length",
+                [vec![0x80, 0x00], everything.clone()].concat(),
+            ),
+            (
+                "top-level-index-1",
+                [vec![0x02, 0x02], everything.clone()].concat(),
+            ),
+            (
+                "nested-map-entry-type",
+                [vec![0x04, 0x02, 0x00], pb_len(1, b"k"), pb_len(2, b"v")].concat(),
+            ),
+            (
+                "top-level-index-3-tree",
+                [
+                    vec![0x02, 0x06],
+                    pb_len(1, b"root"),
+                    pb_len(2, &pb_len(1, b"leaf")),
+                ]
+                .concat(),
+            ),
+            (
+                "index-out-of-bounds",
+                [vec![0x02, 0x0A], everything.clone()].concat(),
+            ),
+            (
+                "negative-array-length",
+                [vec![0x01], everything.clone()].concat(),
+            ),
+            (
+                "negative-index",
+                [vec![0x02, 0x01], everything.clone()].concat(),
+            ),
+            ("truncated-index-array", vec![0x04, 0x02]),
+            ("decode-error", [vec![0x00], pb_vi(17, 1)].concat()),
+            ("empty-message", vec![0x00]),
+        ];
+        for (label, framed) in cases {
+            assert_paths_agree(label, &plans, &mut transcoder, &schema, &framed, None);
+            assert_paths_agree(
+                &format!("{label}/key"),
+                &plans,
+                &mut transcoder,
+                &schema,
+                &framed,
+                Some(&key),
+            );
+        }
+    }
+
+    /// A declined message runs the dynamic path with the key and `_meta`
+    /// merged, exactly as a transcoded one would be.
+    #[test]
+    fn declined_messages_fall_back_with_the_key_merged() {
+        let set = protox::compile(
+            ["differential_corpus_proto2.proto"],
+            [concat!(env!("CARGO_MANIFEST_DIR"), "/src/testdata")],
+        )
+        .unwrap();
+        let pool = prost_reflect::DescriptorPool::from_file_descriptor_set(set).unwrap();
+        let schema = ProtobufSchema {
+            descriptor_pool: pool.clone(),
+            message_name: "differential2.Plain".to_string(),
+        };
+        let plans = Plans::for_schema(&pool, "differential2.Plain").unwrap();
+        let mut transcoder = Transcoder::new();
+        let meta = test_meta();
+        let key: Map<String, serde_json::Value> = json!({"a": "key", "_meta": {"k": 1}})
+            .as_object()
+            .unwrap()
+            .clone();
+        // Legacy is the file's second message; index array [1].
+        let legacy = [vec![0x02, 0x02], pb_vi(1, 5), pb_len(100, b"ext")].concat();
+
+        let declined =
+            transcoded_protobuf_document(&plans, &mut transcoder, &legacy, Some(&key), &meta)
+                .unwrap();
+        assert_eq!(declined, Err("message with extensions"));
+
+        let got = transcode_or_fall_back(
+            &plans,
+            &mut transcoder,
+            &schema,
+            &legacy,
+            Some(&key),
+            &meta,
+            ("t", 3, 42),
+        )
+        .unwrap();
+        let expected = dynamic_protobuf_document(&schema, &legacy, Some(&key), &meta).unwrap();
+        assert_eq!(got, expected);
+        let got = String::from_utf8(got).unwrap();
+        assert!(
+            got.contains(r#""a":"key""#) && got.contains(r#""_meta":{"k":1}"#),
+            "{got}"
+        );
+    }
+
+    /// The flag as `do_pull` reads it: parsed from the endpoint config JSON
+    /// and looked up by the name in `FEATURE_FLAG_DEFAULTS`.
+    #[test]
+    fn transcoder_flag_resolves_from_the_endpoint_config() {
+        for (advanced, expected) in [
+            (json!(null), false),
+            (json!({}), false),
+            (json!({"feature_flags": null}), false),
+            (json!({"feature_flags": ""}), false),
+            (json!({"feature_flags": "protobuf_transcoder"}), true),
+            (
+                json!({"feature_flags": " protobuf_transcoder , other"}),
+                true,
+            ),
+            (json!({"feature_flags": "no_protobuf_transcoder"}), false),
+            (
+                json!({"feature_flags": "protobuf_transcoder,no_protobuf_transcoder"}),
+                false,
+            ),
+            (
+                json!({"feature_flags": "no_protobuf_transcoder,protobuf_transcoder"}),
+                true,
+            ),
+            (json!({"feature_flags": "no_no_protobuf_transcoder"}), false),
+            (json!({"feature_flags": "other_flag"}), false),
+        ] {
+            let config: EndpointConfig = serde_json::from_value(json!({
+                "bootstrap_servers": "localhost:9092",
+                "schema_registry": {
+                    "schema_registry_type": "no_schema_registry",
+                    "enable_json_only": true
+                },
+                "advanced": advanced,
+            }))
+            .unwrap();
+            let flags = config.feature_flags(FEATURE_FLAG_DEFAULTS);
+            assert_eq!(flags["protobuf_transcoder"], expected, "{advanced}");
+        }
     }
 }

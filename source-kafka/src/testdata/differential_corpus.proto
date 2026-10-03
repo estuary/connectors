@@ -1,12 +1,13 @@
-// Corpus schema for the differential tests in src/document.rs, exercising
-// every field shape the connector can encounter in registry protobuf
-// payloads. Compiled at test time with protox.
+// Corpus schema for the differential tests in src/document.rs and
+// src/transcode/tests, exercising every field shape the connector can
+// encounter in registry protobuf payloads. Compiled at test time with protox.
 syntax = "proto3";
 
 package differential;
 
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
+import "google/protobuf/empty.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
@@ -16,6 +17,20 @@ enum Corner {
   CORNER_UNSPECIFIED = 0;
   CORNER_A = 1;
   CORNER_B = 2;
+}
+
+// A declared negative value, which encodes as a ten-byte varint.
+enum Signed {
+  SIGNED_ZERO = 0;
+  SIGNED_NEG = -1;
+  SIGNED_POS = 7;
+}
+
+enum AliasedCorner {
+  option allow_alias = true;
+  ALIASED_CORNER_UNSPECIFIED = 0;
+  ALIASED_CORNER_ONE = 1;
+  ALIASED_CORNER_UNO = 1;
 }
 
 message Nested {
@@ -79,4 +94,95 @@ message Everything {
   // Collides with the metadata field the connector reserves. Captured
   // documents must keep only the connector's _meta.
   string _meta = 44;
+
+  repeated sint32 r_sint32 = 45;
+  map<sint32, string> m_sint32 = 46;
+}
+
+// Every repeated and map shape Everything leaves out, and the well-known
+// types it leaves out, so each scalar kind is seen packed, unpacked, as a map
+// key, and as a map value.
+message Kinds {
+  repeated double r_double = 1;
+  repeated int32 r_int32 = 2;
+  repeated int64 r_int64 = 3;
+  repeated uint32 r_uint32 = 4;
+  repeated uint64 r_uint64 = 5;
+  repeated sint64 r_sint64 = 6;
+  repeated fixed32 r_fixed32 = 7;
+  repeated fixed64 r_fixed64 = 8;
+  repeated sfixed32 r_sfixed32 = 9;
+  repeated sfixed64 r_sfixed64 = 10;
+  repeated bool r_bool = 11;
+  repeated bytes r_bytes = 12;
+  repeated Corner r_enum = 13;
+  repeated google.protobuf.Timestamp r_timestamp = 14;
+
+  map<uint32, string> m_uint32 = 15;
+  map<sint64, string> m_sint64 = 16;
+  map<fixed32, string> m_fixed32 = 17;
+  map<fixed64, string> m_fixed64 = 18;
+  map<sfixed32, string> m_sfixed32 = 19;
+  map<sfixed64, string> m_sfixed64 = 20;
+
+  map<string, double> mv_double = 21;
+  map<string, float> mv_float = 22;
+  map<string, int32> mv_int32 = 23;
+  map<string, int64> mv_int64 = 24;
+  map<string, uint32> mv_uint32 = 25;
+  map<string, uint64> mv_uint64 = 26;
+  map<string, sint32> mv_sint32 = 27;
+  map<string, sint64> mv_sint64 = 28;
+  map<string, fixed32> mv_fixed32 = 29;
+  map<string, fixed64> mv_fixed64 = 30;
+  map<string, sfixed32> mv_sfixed32 = 31;
+  map<string, sfixed64> mv_sfixed64 = 32;
+  map<string, bool> mv_bool = 33;
+  map<string, bytes> mv_bytes = 34;
+  map<string, Corner> mv_enum = 35;
+  map<string, google.protobuf.Duration> mv_duration = 36;
+
+  google.protobuf.Int32Value wrap_int32 = 37;
+  google.protobuf.UInt32Value wrap_uint32 = 38;
+  google.protobuf.Empty wkt_empty = 39;
+
+  oneof pick {
+    int32 one_int32 = 40;
+    Corner one_enum = 41;
+    bytes one_bytes = 42;
+    google.protobuf.Timestamp one_timestamp = 43;
+  }
+  optional string opt_string = 44;
+  optional Corner opt_enum = 45;
+
+  Tree tree = 46;
+
+  // Well-known types in repeated and map positions.
+  repeated google.protobuf.FloatValue r_wrap_float = 47;
+  map<string, google.protobuf.Int64Value> mv_wrap_int64 = 48;
+  repeated google.protobuf.Any r_any = 49;
+  repeated google.protobuf.Struct r_struct = 50;
+  map<string, google.protobuf.Value> mv_value = 51;
+  repeated google.protobuf.ListValue r_list = 52;
+
+  optional Nested opt_message = 53;
+  google.protobuf.NullValue f_null_plain = 54;
+  Signed f_signed = 55;
+  repeated Signed r_signed = 56;
+  AliasedCorner f_aliased = 57;
+}
+
+// A self-referential message, as user schemas nest their own types.
+message Tree {
+  string label = 1;
+  repeated Tree children = 2;
+  map<string, Tree> named = 3;
+}
+
+// Field numbers above the dense-lookup limit, so plans for this message take
+// the binary-search path.
+message Sparse {
+  int32 low = 1;
+  string high = 2000;
+  repeated int32 packed_high = 3000;
 }
