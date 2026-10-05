@@ -54,7 +54,7 @@ request:
     - type: after-response
       code: |-
         // Redact noisy fields from the response so any Response Example saved from a run
-        // is already clean — no manual edit step. This MUST cover REDACTED_FIELDS in
+        // is already clean — no manual edit step. This MUST cover FIELDS_TO_REDACT in
         // tests/test_snapshots.py (see the "Redaction" docs note below): a field
         // redacted in the snapshot tests is redacted here, with the same "REDACTED"
         // marker, so examples reflect what the tests assert. Keep this list MINIMAL —
@@ -65,13 +65,13 @@ request:
         // still receive it; `stats` is derived analytics (rates/counts/activity dates)
         // that drift with account activity, so it would otherwise flake the capture
         // snapshot.
-        const REDACTED_FIELDS = ['_links', 'stats'];
+        const FIELDS_TO_REDACT = ['_links', 'stats'];
         function redact(v) {
           if (Array.isArray(v)) return v.map(redact);
           if (v && typeof v === 'object') {
             const o = {};
             for (const k of Object.keys(v)) {
-              o[k] = REDACTED_FIELDS.includes(k) ? 'REDACTED' : redact(v[k]);
+              o[k] = FIELDS_TO_REDACT.includes(k) ? 'REDACTED' : redact(v[k]);
             }
             return o;
           }
@@ -176,7 +176,7 @@ docs:
     voluminous, and its hrefs embed the account's data-center subdomain) and
     `stats` (derived analytics — rates, counts, activity dates — that drift with
     account activity) from every response, so saved examples come out already
-    clean. Its `REDACTED_FIELDS` list must cover the one in
+    clean. Its `FIELDS_TO_REDACT` list must cover the one in
     `tests/test_snapshots.py` (currently just `stats`); `_links` is extra here
     because the connector excludes it server-side while raw probe requests
     still receive it. Keep the list minimal (it also hides those fields from
