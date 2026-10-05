@@ -7,6 +7,8 @@ allowed-tools: Bash Read Write Edit Glob Grep WebFetch WebSearch
 
 Add a `stream-name` stream to the `source-$1` connector. Read a few neighboring streams in the same connector before designing the new one — local conventions outrank any generic pattern.
 
+Phases 0–3 and 6–7 are the extend path's own: they baseline an existing suite, design from scratch, and regenerate per stream. An orchestrator that hands you a reviewed plan (`create-capture-connector`) owns those and names the phases you run.
+
 ## Laws
 
 **Shared laws** — read both before Phase 0; they are the single authority:
