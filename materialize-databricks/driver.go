@@ -837,8 +837,8 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 }
 
 // copyIntoStagingTable waits for the binding's store files to upload and, if
-// they're merged, copies them into a Delta table. The MERGE reads that table rather than
-// the JSON files, so Databricks doesn't materialize its source. The table lives
+// they need a MERGE, copies them into a Delta table. The MERGE reads that table rather than
+// the JSON files, so Databricks doesn't materialize the files during MERGE time. The table lives
 // in the staging volume by path and isn't registered in the catalog.
 func (d *transactor) copyIntoStagingTable(ctx context.Context, db *stdsql.DB, b *binding) error {
 	if err := b.storeFile.wait(); err != nil {
@@ -1079,12 +1079,12 @@ func (d *transactor) commitBindingCheckpointItems(ctx context.Context, db *stdsq
 // execQueries runs the given queries in order, passing each one's row stats
 // to report. tolerateMissing is set when recovering entries which may already
 // have been applied by a previous session whose state clearing didn't commit:
-// their staged files (and possibly their target table) were already deleted,
-// and it is okay to skip them in this case.
+// their staged files and staging tables (and possibly their target table) were
+// already deleted, or partly deleted, and it is okay to skip them in this case.
 func (d *transactor) execQueries(ctx context.Context, db *stdsql.DB, queries []string, tolerateMissing bool, report func(m.RowStats)) error {
 	for _, query := range queries {
 		if stats, err := d.execQuery(ctx, db, query); err != nil {
-			if tolerateMissing && (strings.Contains(err.Error(), "PATH_NOT_FOUND") || strings.Contains(err.Error(), "Path does not exist") || strings.Contains(err.Error(), "CF_PATH_DOES_NOT_EXIST_FOR_READ_FILES") || strings.Contains(err.Error(), "COPY_INTO_SOURCE_SCHEMA_INFERENCE_FAILED") || strings.Contains(err.Error(), "Table doesn't exist") || strings.Contains(err.Error(), "TABLE_OR_VIEW_NOT_FOUND") || isPartialStagingTable(err)) {
+			if tolerateMissing && (strings.Contains(err.Error(), "PATH_NOT_FOUND") || strings.Contains(err.Error(), "Path does not exist") || strings.Contains(err.Error(), "CF_PATH_DOES_NOT_EXIST_FOR_READ_FILES") || strings.Contains(err.Error(), "COPY_INTO_SOURCE_SCHEMA_INFERENCE_FAILED") || strings.Contains(err.Error(), "Table doesn't exist") || strings.Contains(err.Error(), "TABLE_OR_VIEW_NOT_FOUND") || strings.Contains(err.Error(), "DELTA_TABLE_NOT_FOUND") || strings.Contains(err.Error(), "DELTA_TRUNCATED_TRANSACTION_LOG") || strings.Contains(err.Error(), "DELTA_FILE_NOT_FOUND") || strings.Contains(err.Error(), "FAILED_READ_FILE")) {
 				continue
 			}
 			return fmt.Errorf("query %q failed: %w", query, err)
@@ -1093,14 +1093,6 @@ func (d *transactor) execQueries(ctx context.Context, db *stdsql.DB, queries []s
 		}
 	}
 	return nil
-}
-
-// isPartialStagingTable reports whether err comes from reading a partly
-// deleted staging table. Deletion starts only after the table's MERGE succeeds.
-func isPartialStagingTable(err error) bool {
-	return slices.ContainsFunc([]string{"DELTA_TABLE_NOT_FOUND", "DELTA_TRUNCATED_TRANSACTION_LOG", "DELTA_FILE_NOT_FOUND", "FAILED_READ_FILE"}, func(class string) bool {
-		return strings.Contains(err.Error(), class)
-	})
 }
 
 // retriableErrorClasses are the Databricks error classes of a commit query
