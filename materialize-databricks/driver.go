@@ -861,7 +861,7 @@ func (d *transactor) copyIntoStagingTable(ctx context.Context, db *stdsql.DB, b 
 }
 
 func stagingIdentifier(b *binding, name string) string {
-	return "delta.`" + filepath.Join(b.rootStagingPath, name) + "`"
+	return "delta.`" + strings.ReplaceAll(filepath.Join(b.rootStagingPath, name), "`", "``") + "`"
 }
 
 func (d *transactor) startCommitState() (*pf.ConnectorState, error) {
