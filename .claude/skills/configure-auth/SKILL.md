@@ -1,13 +1,13 @@
 ---
 name: configure-auth
-description: Replace the AUTH SEAM left by scaffold-connector with a real authentication scheme — determine the provider's auth method, pick the matching estuary-cdk credentials primitive, wire the discriminated credentials union into models.py, define an OAuth2Spec when offering managed OAuth, set the TokenSource, and implement validate_credentials against a real probe endpoint. Use as the second step of create-capture-connector (after scaffold-connector), or any time a connector's auth needs to be (re)wired.
+description: Wire a connector's authentication — pick the estuary-cdk credentials primitive for the provider's scheme, replace scaffold-connector's AUTH SEAM, implement validate_credentials. Use after scaffold-connector, or whenever a connector's auth is added or rewired.
 argument-hint: "[connector-name]"
 allowed-tools: Bash Read Write Edit Glob Grep WebFetch WebSearch
 ---
 
 Wire authentication into `source-$1`, replacing the `# AUTH SEAM` stubs that `scaffold-connector` left in `models.py`, `resources.py`, and `config.yaml`. The deliverable is a connector whose `flowctl raw spec` advertises the right credential options (and OAuth block, if any) and whose `validate_credentials` probes a real endpoint — **but not a live-verified one**: confirming the probe actually authenticates requires real credentials and is deferred to `bruno-probe-endpoint`.
 
-This skill runs **as its own subagent** so the orchestrator's context stays clean. Its final message is a structured summary (see Output). The CDK auth primitives live in `estuary-cdk/estuary_cdk/flow.py` (`AccessToken`, `BasicAuth`, `OAuth2Spec`, `BaseOAuth2Credentials`, `LongLivedClientCredentialsOAuth2Credentials`, `RotatingOAuth2Credentials`, `ClientCredentialsOAuth2Credentials`, `GoogleServiceAccount`) and `estuary-cdk/estuary_cdk/http.py` (`TokenSource`). Read them before editing.
+Run this skill **inline, in the caller's context**: Phase 2 is a user gate the caller owns. Its final message is a structured summary (see Output). The CDK auth primitives live in `estuary-cdk/estuary_cdk/flow.py` (`AccessToken`, `BasicAuth`, `OAuth2Spec`, `BaseOAuth2Credentials`, `LongLivedClientCredentialsOAuth2Credentials`, `RotatingOAuth2Credentials`, `ClientCredentialsOAuth2Credentials`, `GoogleServiceAccount`) and `estuary-cdk/estuary_cdk/http.py` (`TokenSource`). Read them before editing.
 
 ## Guiding rules
 
@@ -45,9 +45,9 @@ Map the answer to a CDK primitive. In order of preference:
 
 **Default to offering both OAuth and a static key when both are viable** — the prevailing production shape is `OAuth2Credentials | AccessToken` (hubspot-native, intercom). The static arm keeps the connector usable even where managed OAuth isn't set up. Where a service account is also viable, `source-google-sheets-native` runs all three arms (`OAuth2Credentials | GoogleServiceAccount | AccessToken`).
 
-> **Managed-OAuth dependency (surface this!):** `OAuth2Spec.provider` must match an OAuth app **registered on the Estuary side** (the dashboard holds the client_id/secret). If Estuary has no app registered for this provider, the OAuth arm won't work end-to-end in production even though `spec` advertises it — only the static-key arm will. Call this out at the Phase 2 checkpoint as a dependency the user/ops must satisfy; it is not something this skill can resolve in code.
+> **Managed-OAuth dependency (surface this!):** `OAuth2Spec.provider` must match an OAuth app **registered on the Estuary side** (the dashboard holds the client_id/secret). If Estuary has no app registered for this provider, the OAuth arm won't work end-to-end in production even though `spec` advertises it — only the static-key arm will. Call this out at the Phase 2 gate as a dependency the user/ops must satisfy; it is not something this skill can resolve in code.
 
-## Phase 2 — Checkpoint
+## Phase 2 — Scheme gate
 
 This is `GATE-AUTH-SCHEME` ([`interaction-mode.md`](../../shared/interaction-mode.md)).
 
@@ -152,14 +152,9 @@ poetry run flowctl raw spec --source test.flow.yaml -o json --emit-raw
 
 Confirm the emitted `configSchema` shows the credential option(s) with the right titles and `secret` annotations, and that an `oauth2` block is present iff you defined one. `flowctl raw discover` should still succeed with zero bindings. Do not run `validate` or `preview` (no real creds; live auth is `bruno-probe-endpoint`'s job). Fix any Pydantic/import error before handing off — `for_provider` and `TYPE_CHECKING` mistakes surface here.
 
-## Phase 6 — Hand off for credential entry & encryption
+## Phase 6 — Hand off (`GATE-CREDENTIALS`)
 
-Configuration setup ends here, but **nothing downstream can run against the live API until the user supplies real credentials.** `config.yaml` still holds placeholders. Stop and hand back to the user (or, under `create-capture-connector`, signal the orchestrator to pause) with explicit instructions to:
-
-1. Populate `config.yaml` with their real credential values for the chosen scheme.
-2. Encrypt it with sops (the repo's standard — match a sibling connector's `sops`/KMS setup; e.g. `sops --encrypt --in-place config.yaml` with the project's key).
-
-Do not proceed to `bruno-probe-endpoint` or any authenticated step until the user confirms `config.yaml` is populated and encrypted. This pause is mandatory in **both** interaction modes (`GATE-CREDENTIALS`) — the credentials are the user's to provide and this skill must never fabricate or encrypt them on their behalf. In autonomous mode it is the run's one interruption, so the orchestrator batches its other questions into it; standalone, compose the hand-off per `interaction-mode.md` § The batched checkpoint.
+`config.yaml` still holds placeholders, and the credentials are the user's to provide. Hand back the two facts the gate needs: the fields for the chosen scheme, and the sops command (match a sibling connector's `sops`/KMS setup). Under `create-capture-connector` the orchestrator composes the stop; standalone, resolve it per the gate table in [`interaction-mode.md`](../../shared/interaction-mode.md).
 
 ## Output
 
