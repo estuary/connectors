@@ -28,7 +28,7 @@ Checkable from a diff: a `curl` invocation against the provider's host in any co
 
 The decrypted token lives on `req` for the in-flight request only. Never `bru.setVar`, never `bru.setEnvVar`, never write it to a committed file — it is re-derived from `sops` on every request, in both the CLI and the GUI.
 
-This is why the per-request OAuth refresh roundtrip in [auth-wiring.md](auth-wiring.md) is intentional rather than wasteful: caching the access token would persist it into a committed environment file.
+This is why the per-request OAuth refresh roundtrip in [auth-wiring.md](../skills/bruno-probe-endpoint/auth-wiring.md) is intentional rather than wasteful: caching the access token would persist it into a committed environment file.
 
 Runtime vars _are_ fine for non-secret resource ids chained between requests — the prohibition is specifically on credentials.
 
