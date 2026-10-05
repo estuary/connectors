@@ -425,9 +425,9 @@ type tableWithFiles struct {
 	Tables []string
 }
 
-// stagingLoad renders the creation and loading of a staging table from a
-// directory of staged files.
-type stagingLoad struct {
+// stagingCopy renders the creation of a staging table and the copy of a
+// directory of staged files into it.
+type stagingCopy struct {
 	Target     *sql.Table
 	Identifier string
 	Directory  string
