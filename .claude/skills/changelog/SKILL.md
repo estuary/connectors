@@ -59,18 +59,69 @@ for the convention.
    Only include categories that have at least one bullet. Today's date
    in UTC (`date -u +%Y-%m-%d`).
 
+   **Who reads this:** customers skimming the connector's docs page for
+   changes that affect them. An entry says *what* changed, not what to do
+   about it and not why.
+
+   **Categories:**
+   - Added: a new option, stream, binding, or supported variant.
+   - Changed: existing behavior differs but wasn't broken, including
+     performance and resource use.
+   - Fixed: something broken now works (failures, wrong or missing data).
+     Test: could a customer have filed a bug about the old behavior?
+   - Removed: dropped options or support.
+
    **Voice rules:**
-   - Write for customers, not engineers.
-   - Describe the user-visible effect, not the implementation.
+   - Each bullet is exactly one sentence. Say what changed for the
+     customer, then stop.
+   - Leave out the mechanism, the root cause, why the old behavior was
+     wrong, and usage details (defaults, caveats, required follow-up
+     actions). The connector docs and support cover those.
+   - Don't name internal state, data structures or algorithms. Describe
+     failures in plain words rather than quoting error strings.
+   - Name the area and the effect, so even a short entry is concrete.
+     "Improved performance in some setups" is never acceptable.
+   - State fixes plainly. Hedge ("may", "on busy instances") only the size
+     of an effect that depends on the customer's setup, never whether the
+     change happened.
+   - Plain, terse prose: no stacked qualifiers, parenthetical asides,
+     dashes that add explanation, or clauses interjected mid-sentence.
+   - One bullet per distinct effect. Active voice, present tense.
+   - Put field names and config keys in backticks.
+
+   **Examples** (illustrative; write each entry for its own change rather
+   than copying these shapes):
+   - Effect, not implementation
      - Bad: "Refactored field type mapping to use new strategy interface."
      - Good: "`NUMERIC(p, 0)` columns are now captured as integers instead
        of strings."
-   - One bullet per distinct effect. Don't merge unrelated changes.
-   - Active voice, present tense.
-   - Reference user-facing names (field names, config keys, error messages)
-     in backticks.
+   - Changed
+     - Bad: "Primary key discovery now reads the `sys` catalog views
+       directly instead of `INFORMATION_SCHEMA.KEY_COLUMN_USAGE`.
+       Compiling a query against that view takes an instance-wide lock..."
+     - Good: "Primary key discovery may cause less database locking on
+       busy instances."
+   - Fixed
+     - Bad: "Captures of databases with pre-images enabled no longer fail
+       permanently with `received fragment N without first fragment`.
+       MongoDB delivers change events larger than 16MB as a series of
+       fragments, and the connector could checkpoint a resume token
+       pointing partway through one of them..."
+     - Good: "Captures with pre-images enabled no longer fail after
+       restarting during a very large change event."
+   - Added
+     - Bad: "New `additional_backfill_filter` advanced option on each
+       binding. When set, the filter clause is applied to all backfill
+       queries for that table, so rows which the filter excludes are never
+       backfilled. Setting or changing the filter requires re-backfilling
+       the binding, while clearing it does not..."
+     - Good: "New `additional_backfill_filter` binding option skips
+       backfilling rows that don't match a filter."
 
-4. **Show the draft to the user** with the path it'll go to, e.g.
+4. **Reread each bullet as a customer skimming the docs** and cut
+   anything they wouldn't miss.
+
+5. **Show the draft to the user** with the path it'll go to, e.g.
 
    > Draft for `source-postgres/CHANGELOG.md`:
    > ```
@@ -80,11 +131,11 @@ for the convention.
    > ```
    > Apply, or want me to revise?
 
-5. **Apply on confirmation.** Insert the new entry below `# Changelog`
+6. **Apply on confirmation.** Insert the new entry below `# Changelog`
    and above the most recent existing entry. Don't delete or modify
    existing entries.
 
-6. **Multiple connectors.** If the PR touches multiple connectors,
+7. **Multiple connectors.** If the PR touches multiple connectors,
    show all drafts at once, then apply all on a single confirmation.
 
 ## What to skip

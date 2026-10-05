@@ -78,17 +78,22 @@ categories. Most recent on top.
 - New `read_only` config field to skip replication-slot creation.
 
 ### Changed
-- `VARCHAR` columns now use UTF-8 collation by default; previous default
-  was the database's server collation.
+- `VARCHAR` columns now use UTF-8 collation by default.
 
 ### Fixed
 - Reconnect after `wal_sender_timeout` no longer loops indefinitely.
 ```
 
-Write entries for **customers**, not engineers — describe the user-visible
-effect, not the implementation. "Refactored to use new strategy interface"
-is a bad entry. "Field type detection now correctly handles NUMERIC(p,0)
-as integer" is a good one.
+Write entries for **customers** skimming for changes that affect them, not
+engineers — describe the user-visible effect, not the implementation.
+"Refactored to use new strategy interface" is a bad entry. "Field type
+detection now correctly handles NUMERIC(p,0) as integer" is a good one.
+
+Keep each bullet to one sentence. Leave out the mechanism, the root cause
+and usage details such as defaults, caveats or required follow-up actions;
+those belong in the PR, the connector docs, and support.
+
+Use **Changed** for behavior that differs but wasn't broken, and **Fixed** for something a customer could have filed a bug about.
 
 ### Seeding a connector's changelog
 
