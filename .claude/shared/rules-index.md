@@ -51,6 +51,7 @@ Invoke before writing or changing any `fetch_*` / `backfill_*` function.
 | `FETCH-LOGCURSOR-AFTER-DOCS` | diff | A LogCursor must be yielded after documents are emitted |
 | `FETCH-VALUE-WATERMARK-RESUME` | diff | Resume by value watermark, not positional offset — **data-loss-class** |
 | `FETCH-CHECKPOINT-STABLE-STATE` | diff | A `PageCursor` must mean the same thing after a resume gap — **data-loss-class** |
+| `FETCH-DICT-CURSOR-WORKLIST` | diff | A backfill whose resume state is a work list carries it in a dict `PageCursor` built via `make_cursor_dict` |
 | `FETCH-PAGE-SIZE-RESEARCH` | runtime | Max page size and enforcement mode, per endpoint |
 | `DOC-FLAG-ONLY-UNVERIFIED` | diff | No "(verified live)" stamps; annotate only what could *not* be verified |
 | `DOC-CONTRACT-NOT-MECHANISM` | diff | Docstrings state guarantees, not the current implementation's steps |

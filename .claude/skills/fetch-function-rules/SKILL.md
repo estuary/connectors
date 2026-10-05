@@ -51,7 +51,7 @@ The **start** of a backfill window is not load-bearing: query `since = start_dat
 
 ### `FETCH-BACKFILL-ALONGSIDE` · checkable-from-diff
 
-When implementing an incremental stream, always try to implement a backfill function (`fetch_page`) alongside `fetch_changes`. The backfill collects historical data up to the log cursor.
+Implement a backfill function (`fetch_page`) alongside `fetch_changes` for every incremental stream, unless `classify-stream-types` settled it as incremental-only. The backfill collects historical data up to the log cursor.
 
 ### `FETCH-CURSOR-MUST-BE-UPDATED` · checkable-from-diff
 
