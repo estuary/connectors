@@ -112,6 +112,7 @@ Not rule lists — invoke when the situation applies, and audit against them whe
 | Choosing a replication strategy | [`classify-stream-types`](../skills/classify-stream-types/SKILL.md) |
 | Wiring credentials / OAuth | [`configure-auth`](../skills/configure-auth/SKILL.md) |
 | Verifying an endpoint against live behavior | [`bruno-probe-endpoint`](../skills/bruno-probe-endpoint/SKILL.md) |
+| Tagging a claim about API behavior (VERIFIED / DOCUMENTED / PENDING / UNOBSERVABLE) | [`evidence-markers.md`](evidence-markers.md) |
 
 ### Cross-cutting review sweeps
 

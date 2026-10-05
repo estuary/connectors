@@ -2,7 +2,7 @@
 name: bruno-probe-endpoint
 description: Stand up a Bruno collection that hits a provider endpoint with sops-decrypted credentials, then verify the live response matches the docs before writing connector code. Use as the verification phase of `add-stream`, or any time the provider's docs need to be checked against the actual API.
 argument-hint: "[provider-name] [endpoint-path]"
-allowed-tools: Bash Read Write Edit Glob WebFetch
+allowed-tools: Bash Read Write Edit Glob Grep WebFetch
 ---
 
 Verify that the provider's `endpoint-path` actually returns what the docs say it does, using a Bruno collection authenticated against the connector's existing sops-encrypted credentials. The goal is to make decisions from live behavior, not docs.
@@ -25,7 +25,7 @@ This skill writes no connector code and never modifies `config.yaml`. Its output
 
 Create the collection **inside the connector** at `<connector>/bruno/`, in Bruno's **OpenCollection YAML** format (requires Bruno / `bru` CLI >= 3.0.0; the legacy `.bru` format is deprecated for new work):
 
-- `opencollection.yml` — the collection root: name, collection-level auth mode, the collection-level scripts (sops pre-request auth, Phase 3; redaction post-response, Phase 5), and the collection `docs:` block. The root docs hold **collection-specific facts only** — account-wide API constraints, the index of per-endpoint LIMITATION findings, run instructions. Do not restate this skill's conventions (the WHY/VERIFIED/PENDING/UNOBSERVABLE taxonomy and its laws) inside the collection — they live here; the root may carry at most a one-line pointer to this skill.
+- `opencollection.yml` — the collection root: name, collection-level auth mode, the collection-level scripts (sops pre-request auth, Phase 3; redaction post-response, Phase 5), and the collection `docs:` block. The root docs hold **collection-specific facts only** — account-wide API constraints, the index of per-endpoint LIMITATION findings, run instructions. The conventions (the marker taxonomy in [`evidence-markers.md`](../../shared/evidence-markers.md), this skill's laws) stay in the repo's `.claude/`; the root may carry a one-line pointer to them.
 - `environments/<Provider>.yml` — non-secret vars (base URL, connector-relative config path).
 - **One subdirectory per resource family**, each with a `folder.yml` (`info: {name, type: folder, seq}`): `Lists/`, `Members/`, `Campaigns/`, … plus underscore-prefixed folders for shared URL-shape probes (`_top-level/`, `_list-child/`) and `Seeding/` for mutations (Phase 6). One `.yml` per request inside, named for what the request proves (`bare.yml`, `offset page.yml`, `since filter.yml`) — the folder carries the resource name, so request names never repeat it.
 
@@ -66,70 +66,7 @@ The committed pre-request script decrypts the connector's sops-encrypted `config
 - **CLI:** run with `bru run … --sandbox developer`.
 - **GUI (Bruno desktop):** the collection's JS sandbox must be set to **developer** mode (`jsSandboxMode: "developer"` in `~/.config/bruno/collection-security.json` — see [[reference-bruno-sandbox-mode-location]]). In developer mode the GUI sandbox exposes Node built-ins, so the identical `child_process` + `sops` path works there too. No keychain / `vars:secret` fallback is needed.
 
-Implementation contract:
-
-- Use `execFileSync('sops', ['-d', '--output-type=json', configPath])` (argv-form — avoids shell injection if the config path ever contains spaces or special chars). Let real sops failures (missing file, bad path, missing field) throw loudly; don't swallow them.
-- The decrypted token lives on `req` only. Never `bru.setEnvVar(…)` it back, even temporarily — that would persist it to the environment file and into git (`API-TOKEN-EPHEMERAL`).
-- The JSON paths below (`credentials.access_token`, etc.) are illustrative — use the exact path Phase 2 established for this connector.
-
-### House style A — provider takes a static token (e.g. Stripe)
-
-When the sops-decrypted config exposes a long-lived API key directly, decrypt and attach in one step. Reference: `source-mailchimp-native/bruno/opencollection.yml`. In `opencollection.yml`:
-
-```yaml
-request:
-  scripts:
-    - type: before-request
-      code: |-
-        const { execFileSync } = require('child_process');
-        const configPath = bru.getEnvVar('config_path');
-        if (!configPath) throw new Error('config_path env var is not set');
-        const decrypted = execFileSync(
-          'sops', ['-d', '--output-type=json', configPath], { encoding: 'utf8' },
-        );
-        const token = JSON.parse(decrypted)?.credentials?.access_token;
-        if (!token) throw new Error('credentials.access_token missing from decrypted config');
-        req.setHeader('Authorization', `Bearer ${token}`);
-```
-
-### House style B — provider uses OAuth refresh-token (e.g. HubSpot)
-
-When the sops-decrypted config holds a `refresh_token` plus `client_id`/`client_secret`, exchange them for a short-lived access token via `bru.sendRequest` on every request. No sibling collection uses this style yet; the block below is the reference. In `opencollection.yml`:
-
-```yaml
-request:
-  scripts:
-    - type: before-request
-      code: |-
-        const { execFileSync } = require('child_process');
-        const configPath = bru.getEnvVar('config_path');
-        if (!configPath) throw new Error('config_path env var is not set');
-        const decrypted = execFileSync(
-          'sops', ['-d', '--output-type=json', configPath], { encoding: 'utf8' },
-        );
-        const creds = JSON.parse(decrypted)?.credentials;
-        if (!creds?.client_id || !creds?.client_secret || !creds?.refresh_token) {
-          throw new Error('credentials.{client_id,client_secret,refresh_token} missing');
-        }
-
-        const resp = await bru.sendRequest({
-          method: 'POST',
-          url: 'https://api.hubapi.com/oauth/v1/token',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          data:
-            'grant_type=refresh_token' +
-            `&client_id=${encodeURIComponent(creds.client_id)}` +
-            `&client_secret=${encodeURIComponent(creds.client_secret)}` +
-            `&refresh_token=${encodeURIComponent(creds.refresh_token)}`,
-        });
-        const accessToken = resp?.data?.access_token;
-        if (!accessToken) throw new Error(`token refresh failed: ${JSON.stringify(resp?.data ?? resp)}`);
-        req.setHeader('Authorization', `Bearer ${accessToken}`);
-```
-
-The per-request OAuth roundtrip is intentional — caching the access token via `bru.setEnvVar` would persist it to a committed file (an `API-TOKEN-EPHEMERAL` violation). Most providers' token endpoints are far above the connector's rate-limit budget; if yours isn't, that's a separate problem to surface to the user.
-
-When pasting either style into a new collection, look at a sibling connector's `bruno/opencollection.yml` for the most current shape rather than copying from this doc.
+Two house styles, by what the decrypted config holds: **A**, a static token attached directly (live reference: `source-mailchimp-native/bruno/opencollection.yml`); **B**, an OAuth refresh token exchanged for an access token on every request. The script contract and the style B block are in [`auth-wiring.md`](auth-wiring.md); copy style A from the sibling collection, which is always more current than a doc.
 
 ## Phase 4 — Request Authoring
 
@@ -190,14 +127,7 @@ Two related correctness properties for a sorted, paged list:
 
 **When a docs block names another request, write it folder-qualified as `` `Folder / info.name` ``** (e.g. ``see `Members / since boundary probe` ``; ``run `Seeding/B2 - Add Tagged Member 2` first``) so a reader can find it — bare request names repeat across folders. After renaming or moving any request, grep the collection for backtick-quoted references to the old name and update them, remembering that references wrapped across a line break won't match a whole-name grep — a docs block pointing at a name that no longer exists is a stale string a reviewer can't resolve.
 
-**Tag every behavioral claim with its epistemic status when you draft it — not only when a reviewer catches an unlabeled assumption.** A claim is one of four:
-
-- `**VERIFIED (YYYY-MM-DD):**` — a saved example backs it. The date is the live run's date (which may differ from the commit date); it tells a future reader how stale the evidence might be.
-- `**PENDING:**` — not yet answered, but answerable by seeding data or further probing the API. State the concrete path to close it (which seed to run, which probe to author). **No PENDING claim may remain by the end of research and implementation** — each must be resolved to VERIFIED or reclassified as UNOBSERVABLE with justification; grep for the marker before hand-off.
-- `**UNOBSERVABLE:**` — not practically verifiable: the state can't be seeded by us, or arises only in irreproducible circumstances outside our control (e.g. a soft bounce needs a real remote mailbox failing transiently at exactly send time; a feature-gated object type the account can't create). State the reason, the assumption you're proceeding on, the supporting evidence you _do_ have (adjacent verified behavior, docs), and the fallback if the assumption proves wrong.
-- `**DOCUMENTED (YYYY-MM-DD):**` — sourced from the provider's docs rather than a live response: the fact was read (not recalled) on the given date at the cited URL, but no saved example backs it. Distinct from VERIFIED so a reader knows it rests on the provider's word, not on observed behavior.
-
-An assumption written as fact is a latent bug; the same assumption written as UNOBSERVABLE with a fallback is a design decision a reader can audit. Endpoint-specific constraints with connector consequences additionally carry the `**LIMITATION**` marker (e.g. `**LIMITATION (VERIFIED 2026-06-30):**`) so `grep -rl LIMITATION` enumerates them; the collection root docs keep a short index of them — an index only, since the marker definitions live in this skill.
+**Tag every behavioral claim with its evidence marker when you draft it**, per [`evidence-markers.md`](../../shared/evidence-markers.md): VERIFIED, DOCUMENTED, PENDING or UNOBSERVABLE, plus LIMITATION on endpoint-specific constraints with connector consequences. That file also holds the hand-off rule for PENDING claims.
 
 ## Phase 5 — Execution
 
