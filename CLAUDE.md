@@ -88,7 +88,7 @@ Issues live as GitHub issues in `estuary/connectors`, driven by the `gh` CLI (th
 
 ### Domain docs
 
-Multi-context: [CONTEXT-MAP.md](CONTEXT-MAP.md) splits captures from materializations, with per-context glossaries and ADRs under `docs/contexts/`. See [docs/agents/domain.md](docs/agents/domain.md).
+Multi-context: [CONTEXT-MAP.md](CONTEXT-MAP.md) splits captures from materializations. See [docs/agents/domain.md](docs/agents/domain.md).
 
 ### Connector work
 

@@ -16,7 +16,7 @@ If the connector name is missing, stop and report that before doing anything des
 
 ## Laws
 
-These apply in every phase. Re-read them before each phase boundary.
+These apply in every phase.
 
 1. Activate the connector's Python venv before invoking `flowctl`. A fresh Bash invocation will not have it active; the connector subprocess will fail with `ModuleNotFoundError: No module named '<package>'`. Use `source "$(poetry env info --path)/bin/activate"` from the connector dir.
 2. When emptying `bindings:` in `test.flow.yaml`, use `Write` (full file rewrite), **not** `Edit`. A partial Edit can leave orphaned `- resource:` entries dangling under an empty list, which produces invalid YAML that's hard to spot.
