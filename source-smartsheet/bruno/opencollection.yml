@@ -32,7 +32,7 @@ request:
         req.setHeader('Authorization', `Bearer ${token}`);
     - type: after-response
       code: |-
-        // Mirror the connector's snapshot redactions once test.flow.yaml/REDACTED_FIELDS
+        // Mirror the connector's snapshot redactions once test.flow.yaml/FIELDS_TO_REDACT
         // exist for this connector — none defined yet (zero streams registered as of
         // this session). Revisit once `add-stream` lands the Sheets streams and their
         // snapshot tests define a redaction set.
@@ -166,7 +166,7 @@ docs:
     ## Redaction
 
     No response redaction is configured: the connector's snapshot tests
-    (tests/test_snapshots.py) define no `REDACTED_FIELDS` set — the only
+    (tests/test_snapshots.py) define no `FIELDS_TO_REDACT` set — the only
     normalization is the CDK's `_meta.uuid` placeholder, which has no
     request-example counterpart — so there is nothing to mirror and the
     `after-response` script above stays a placeholder. The saved examples are

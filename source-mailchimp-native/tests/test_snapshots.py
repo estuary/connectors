@@ -8,13 +8,13 @@ import subprocess
 # (`fetch_collection_page` excludes it server-side), but bruno's raw probe
 # responses still do.
 REDACTED = "REDACTED"
-REDACTED_FIELDS = {"stats"}
+FIELDS_TO_REDACT = {"stats"}
 
 
 def _redact(value):
     if isinstance(value, dict):
         return {
-            k: (REDACTED if k in REDACTED_FIELDS else _redact(v))
+            k: (REDACTED if k in FIELDS_TO_REDACT else _redact(v))
             for k, v in value.items()
         }
     if isinstance(value, list):
