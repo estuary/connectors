@@ -95,8 +95,11 @@ Gates are the points where a skill would ask the user; each resolves as _interac
 | `GATE-AUTH-SCHEME` | conduct | Confirm / simplest static scheme |
 | `GATE-CREDENTIALS` | conduct | Hard stop in both modes; batched in autonomous |
 | `GATE-TIGHT-BUDGET` | conduct | Ask per run / declare a budget at the checkpoint |
+| `GATE-STREAM-DESIGN` | conduct | Confirm endpoint, grain, classification / proceed and ledger |
 | `GATE-INCREMENTAL-ONLY` | conduct | Confirm / never |
 | `GATE-STRATEGY-UNCLEAR` | conduct | Ask / decide on size and cursor |
+| `GATE-OPAQUE-CURSOR` | conduct | Blocker / reject the opaque cursor |
+| `GATE-PARTITION-COVERAGE` | conduct | Decide together / sentinel else sequential sweeps |
 | `GATE-PLAN-REVIEW` | conduct | Human gate / self-review + reviewer subagent |
 | `GATE-SEEDING` | conduct | Hand over / PENDING, unless `seeding: assistant` |
 | `GATE-CONFIG-DIRTY` | conduct | Ask / stop live calls |
