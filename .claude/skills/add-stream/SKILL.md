@@ -2,7 +2,7 @@
 name: add-stream
 description: Add a new stream to an existing estuary-cdk connector — classify the endpoint, register it, regenerate flow discovery, refresh snapshots. Use when extending a `source-*` connector with another endpoint.
 argument-hint: "[connector-name] [stream-name]"
-allowed-tools: Bash Read Write Edit Glob Grep WebFetch WebSearch
+allowed-tools: Bash Read Write Edit Glob Grep WebFetch WebSearch Agent Skill
 ---
 
 Add a `stream-name` stream to the `source-$1` connector. Read a few neighboring streams in the same connector before designing the new one — local conventions outrank any generic pattern.
@@ -89,7 +89,7 @@ After the implementation compiles and before regenerating flow discovery, run ov
    - House-pattern errors (e.g. `request_class`/`spec`/`credentials_title` override complaints inherited from the scaffold/reference idioms) may be pre-existing noise: **verify parity by running the same check on a sibling connector** before ignoring them, and say so out loud.
 2. **Organize imports**: `pipx run ruff==0.16.9 check --select I --fix source_<pkg>/ tests/`. Always use the pinned version: the repo's `ruff.toml` rejects any other.
 3. **Lint**: `pipx run ruff==0.16.9 check source_<pkg>/ tests/`. Fix findings in code this session wrote; report pre-existing ones to the user without fixing them.
-4. **Format**: `black source_<pkg>/ tests/`.
+4. **Format**: `pipx run ruff==0.16.9 format source_<pkg>/ tests/`.
 
 Re-run the test suite if any of these changed code. If a tool isn't on PATH, find it (editor tooling dirs count) or ask — don't skip the step silently.
 
