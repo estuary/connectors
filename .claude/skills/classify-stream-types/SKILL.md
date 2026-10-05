@@ -1,146 +1,57 @@
 ---
 name: classify-stream-types
-description: Classify API endpoints into stream types (webhook, incremental, backfill, snapshot) and generate resource definitions for estuary-cdk connectors. Use after scaffolding a connector or when adding new streams.
+description: Choose each endpoint's replication strategy (webhook, incremental + backfill, incremental-only, snapshot, scheduled backfill) for an estuary-cdk connector. Use when adding or planning streams; the caller implements the result.
 argument-hint: "[connector-name]"
-allowed-tools: Bash Read Write Edit Glob Grep WebFetch WebSearch
+allowed-tools: Bash Read Grep Glob WebFetch WebSearch
 ---
 
-Classify each API endpoint of `source-$ARGUMENTS` into the appropriate stream type and generate resource definitions. Read the connector's `api.py` and `resources.py` first, then research the provider's API docs.
+Classify each endpoint of `source-$1` into a replication strategy, with a rationale. The output is the classification; the caller owns confirmation and implementation. Read the connector's existing streams first so the choice matches local convention, then research the provider's docs for each endpoint's filtering, pagination and cursor capabilities.
 
 ## Decision flowchart
 
-This chart chooses a **strategy**. Once chosen, the implementation rules for fetch functions — window semantics, resume keys, checkpointing — are in the `fetch-function-rules` skill; the `created_at` and LogCursor criteria below appear there as `FETCH-CURSOR-MUST-BE-UPDATED` and `FETCH-LOGCURSOR-AFTER-DOCS`. Keep the two in sync if either changes.
+This chart chooses a **strategy**. Implementation rules for fetch functions (window semantics, resume keys, checkpointing) are in the `fetch-function-rules` skill; the `created_at` and LogCursor criteria below appear there as `FETCH-CURSOR-MUST-BE-UPDATED` and `FETCH-LOGCURSOR-AFTER-DOCS`. Keep the two in sync if either changes.
 
 Evaluate each endpoint in order:
 
-1. **Does the provider push events via HTTP?** → **Webhook** stream (via `WebhookCaptureSpec`). See `/create-webhook-connector` for setup.
-2. **Does the endpoint support date-range or cursor-based filtering with a cursor that persists over time?** (e.g., `updated_at`, monotonic ID, event timestamp, sequence number — not just `created_at`) → **Incremental + Backfill**. Prefer endpoints that also support sorting, but filtering without document sorting is fine.
-3. **No filtering, but offers a cursor field and supports sorting in reverse order?** → **Incremental only**. Use `fetch_changes` to walk from the latest document backward to the cursor (initially `start_date`). Only yield a cursor checkpoint once the walk reaches the cursor — if interrupted mid-walk, the next invocation restarts from the top. After the initial catch-up, subsequent invocations only walk back to the last checkpoint.
-4. **Is the dataset small with no change tracking?** → **Snapshot**. They carry the added benefit that they can infer deletions.
-5. **Is the resource mutable but there's no `updated_at` style field, only a `created` cursor?** Incremental-only on `created` catches new rows but **silently misses every update/delete** to existing rows. Pair the incremental stream with a **scheduled backfill** as the only mechanism that recovers update/delete state. See "Scheduled backfill as update fetcher".
-6. **Large dataset, no filtering or sorting?** → Look for a different endpoint; failing that, `GATE-STRATEGY-UNCLEAR` (resolved under "Scheduled backfill as update fetcher").
+1. **Does the provider push events via HTTP?** → **Webhook** stream (`WebhookCaptureSpec`), set up per `create-webhook-connector`.
+2. **Does the endpoint filter by date range or a cursor that persists over time** (`updated_at`, monotonic id, event timestamp, sequence number; not `created_at` alone)? → **Incremental + Backfill**. Sorting support is a bonus, not a requirement.
+3. **No filtering, but a cursor field and reverse sort?** → **Incremental only**. `fetch_changes` walks from the newest document back to the cursor (initially `start_date`) and yields a checkpoint only once the walk reaches it; an interrupted walk restarts from the top.
+4. **Small dataset, no change tracking?** → **Snapshot**. Snapshots also infer deletions.
+5. **Mutable resource with only a `created` cursor?** Incremental on `created` catches new rows and silently misses every update and delete. Pair it with a **scheduled backfill** (below).
+6. **Large dataset, no filtering or sorting?** → Look for another endpoint; failing that, `GATE-STRATEGY-UNCLEAR`.
 
-**Never commit to an incremental-only approach (no backfill) without confirmation — `GATE-INCREMENTAL-ONLY`** ([`interaction-mode.md`](../../shared/interaction-mode.md)). If there's any usable cursor, prefer incremental + backfill. Human-in-the-loop: incremental-only only if the user explicitly confirms backfill isn't needed. Autonomous: nobody can confirm, so any usable cursor → incremental + backfill, none → snapshot (slower, but observes every row); ledger the tradeoff and the endpoint's size estimate so the user can revisit it.
+`GATE-INCREMENTAL-ONLY` ([`interaction-mode.md`](../../shared/interaction-mode.md)): any usable cursor prefers incremental + backfill. Human-in-the-loop: incremental-only needs the user's explicit word that backfill is unneeded. Autonomous: any usable cursor → incremental + backfill; none → snapshot, which is slower but observes every row; ledger the tradeoff and the size estimate.
 
 ## Scheduled backfill as update fetcher
 
-When a resource is mutable but the provider gives you no way to _target_ its updates — no webhook events, no `updated_at` filter on the list endpoint — scheduled backfill (a periodic, full re-list of the resource on a cron) is the correct answer. The destination dedupes by `id`, so re-emitting unchanged rows is harmless; the goal is just to eventually observe updates.
+When a resource is mutable and the provider offers no way to target its updates (no events, no `updated_at` filter), a periodic full re-list on a cron is the correct answer. The destination dedupes by `id`, so re-emitting unchanged rows is harmless; the goal is to eventually observe updates.
 
-Before reaching for it, rule out the alternatives so the choice is deliberate:
+Rule out the alternatives first so the choice is deliberate:
 
-- **Webhook / event-stream polling**: only viable if the provider actually emits events for create/update/delete on this resource. Verify against the docs — and, where you can, empirically, since published event catalogs sometimes omit events the provider really does send.
-- **Lookback window** (used in `source-hubspot-native`, `source-outreach`, `source-jira-native`): runs a second incremental subtask trailing the realtime cursor by a fixed lag (e.g. 1h, 6h) to recover late-arriving rows from an eventually-consistent index.
-- **Sliding window of recent data** (used in `source-calendly` for scheduled events): re-fetches a bounded window like `[now - N months, now + M months]` on every poll, using a server-side time filter that _correlates with where updates actually happen_ (e.g. `min_start_time` for upcoming meetings). Works only when updates are concentrated in a known window relative to `now`. **Doesn't work for resources where any historical record can and is likely to be edited at any time** (e.g. a blocklist created 2 years ago getting an entry added today).
+- **Webhook or event-stream polling**: only if the provider emits create/update/delete events for this resource. Verify in the docs and, where possible, empirically; event catalogs omit events providers really send.
+- **Lookback window** (`source-hubspot-native`, `source-outreach`, `source-jira-native`): a second incremental subtask trailing the realtime cursor by a fixed lag (1h, 6h) recovers late-arriving rows from an eventually-consistent index.
+- **Sliding window of recent data** (`source-calendly`, scheduled events): re-fetch a bounded window like `[now − N months, now + M months]` each poll, using a server-side time filter that correlates with where updates happen (`min_start_time` for upcoming meetings). Fails for resources whose historical records can be edited at any time.
 
-If none of those fit → `GATE-STRATEGY-UNCLEAR`: in human-in-the-loop mode ask the user for assessment. In autonomous mode decide on dataset size and cursor availability: a **small** dataset gets a **snapshot**; a **large** dataset with **any usable cursor** (a `created`-only cursor counts) gets **incremental + scheduled backfill** — `fetch_changes` on the cursor for prompt new rows, `fetch_page` on the cron to recover updates and deletes (see "Code pattern" below). A large dataset with no cursor at all falls back to a snapshot on a long poll interval; never a bare `fetch_page`-only cron. Ledger the size estimate, the cursor decision, and the alternatives you ruled out as an open question.
+If none fit → `GATE-STRATEGY-UNCLEAR`. Human-in-the-loop: ask for assessment. Autonomous: small dataset → snapshot; large with any usable cursor (a `created`-only cursor counts) → incremental + scheduled backfill, `fetch_changes` on the cursor for prompt new rows and `fetch_page` on the cron for updates and deletes; large with no cursor → snapshot on a long interval. A bare `fetch_page`-only cron is never the answer. Ledger the size estimate, the cursor decision and the alternatives ruled out as an open question.
 
-### Code pattern
+**Wiring.** Add the stream to the connector's scheduled-backfill list and pass `schedule=DEFAULT_SCHEDULE` in its `ResourceConfigWithSchedule`; streams without a schedule omit the field, whose default is `""`. Reference: `SCHEDULED_BACKFILL_STREAMS` in `source-stripe-native/source_stripe_native/models.py` and `DEFAULT_SCHEDULE` in its `resources.py`.
 
-Add the stream to whatever list the connector uses to opt streams into a scheduled cron, then wire that into the `ResourceConfigWithSchedule` (or equivalent) at binding-construction time. Streams that need a scheduled rebackfill pass `schedule=DEFAULT_SCHEDULE`; streams that don't simply omit the field — it defaults to `""` (no schedule). Never pass `schedule=""` explicitly. Reference: `source-stripe-native/source_stripe_native/models.py` — `SCHEDULED_BACKFILL_STREAMS` list and the `DEFAULT_SCHEDULE = "0 0 * * *"` constant in `resources.py`.
+## Reference implementations
 
-## Code patterns
+Copy the shape from the reference, not from memory:
 
-### Incremental + Backfill
+| Strategy               | Reference                                                                                                                                                                                |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Incremental + backfill | `source-sentry/source_sentry/resources.py`, `open_issue_binding`. Initial state sets both `inc` (cursor = cutoff) and `backfill` (cutoff, `next_page=None` meaning "start of backfill"). |
+| Incremental only       | `source-front/source_front/resources.py`, `incremental_resources_with_cursor_fields`. Initial state sets `inc` with cursor = `start_date`.                                               |
+| Snapshot               | `source-ashby/source_ashby/resources.py`.                                                                                                                                                |
+| Webhook                | `create-webhook-connector`.                                                                                                                                                              |
 
-Reference: `source-sentry/source_sentry/resources.py` — `open_issue_binding` function.
+**Snapshots use `SnapshotResource`, never the generic `Resource`, with its defaults** (no `model`, `key`, `initial_state` or `schema_inference`). The model's schema is the collection's write schema, and every required field must be present on every document written, including the tombstones the CDK emits for rows that vanished between snapshots. A tombstone missing a required field fails the capture with a schema violation. `SnapshotResource` defaults model and tombstone to `BaseDocument` so they always agree; with the default `/_meta/row_id` key that is sufficient.
 
-```python
-def open_binding_fn(
-    binding: CaptureBinding[ResourceConfig],
-    binding_index: int,
-    state: ResourceState,
-    task: Task,
-    all_bindings,
-):
-    common.open_binding(
-        binding,
-        binding_index,
-        state,
-        task,
-        fetch_changes=functools.partial(fetch_incremental, http, ...),
-        fetch_page=functools.partial(backfill_historical, http, ...),
-    )
+## Backfill shape
 
-# Initial state must set both inc and backfill:
-# Convention: next_page=None signals "beginning of backfill".
-# The fetch_page function handles None by falling back to start_date.
-cutoff = datetime.now(tz=UTC)
-initial_state = ResourceState(
-    inc=ResourceState.Incremental(cursor=cutoff),
-    backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None),
-)
-```
-
-### Incremental only
-
-Reference: `source-front/source_front/resources.py` — `incremental_resources_with_cursor_fields` function.
-
-```python
-common.open_binding(
-    binding, binding_index, state, task,
-    fetch_changes=functools.partial(fetch_changes_fn, http, ...),
-)
-
-initial_state = ResourceState(
-    inc=ResourceState.Incremental(cursor=config.start_date),
-)
-```
-
-### Snapshot
-
-**Use `SnapshotResource`, not the generic `Resource`.** Reference: `source-ashby/source_ashby/resources.py`
-
-Rely on its defaults — don't pass `model`, `key`, `initial_state`, or `schema_inference`. The model's schema becomes the collection's write schema, and every field required by the write schema must be present on *every* document written to the collection — including the tombstones the CDK emits for rows that disappeared between snapshots. A tombstone missing a required field fails the capture with a JSON schema violation. `SnapshotResource` defaults both the model and the tombstone to `BaseDocument` so the two always agree; with the default `/_meta/row_id` key, that is sufficient.
-
-```python
-from estuary_cdk.capture.common import (
-    ResourceConfig,
-    ResourceState,
-    SnapshotResource,
-    Task,
-    open_binding,
-)
-from estuary_cdk.flow import CaptureBinding
-
-def open(
-    binding: CaptureBinding[ResourceConfig],
-    binding_index: int,
-    state: ResourceState,
-    task: Task,
-    all_bindings,
-) -> None:
-    open_binding(
-        binding,
-        binding_index,
-        state,
-        task,
-        fetch_snapshot=functools.partial(list_all, http, ...),
-    )
-
-resource = SnapshotResource(
-    name=MyDocument.name,
-    open=open,
-    initial_config=ResourceConfig(name=MyDocument.name, interval=timedelta(minutes=5)),
-)
-```
-
-### Webhook
-
-Defer to `/create-webhook-connector` skill for webhook stream setup.
-
-## Backfill design guidance
-
-- `fetch_page(log, page_cursor, cutoff)` walks historical data from oldest to cutoff
-- Page cursor tracks progress across the CDK's 24-hour periodic restart
-- Each invocation fetches one page or time window, then yields a `PageCursor` for the next
-- **Checkpoint every N wall-clock minutes** (e.g., 5 min): track elapsed time within `fetch_page` and yield a `PageCursor` checkpoint when the time budget is reached, even mid-sequence. This ensures progress is saved if the connector restarts.
-- Return without yielding a `PageCursor` to signal completion
-- The `cutoff` LogCursor marks where incremental replication takes over — suppress documents at or after the cutoff
-
-## Workflow
-
-1. Read the connector's `api.py` and `resources.py`
-2. Research the provider's API docs (via WebFetch/WebSearch) to understand each endpoint's filtering, pagination, and cursor capabilities
-3. For each endpoint, apply the decision flowchart above
-4. Present the classification to the user for confirmation before generating code
-5. Generate or modify resource definitions in `resources.py` and fetch functions in `api.py`
+- `fetch_page(log, page_cursor, cutoff)` walks history from oldest to `cutoff`, one page or time window per invocation, yielding the `PageCursor` for the next.
+- The `PageCursor` carries progress across the CDK's 24-hour restart. What it may encode, and when to yield it, is `fetch-function-rules` (`FETCH-CHECKPOINT-STABLE-STATE`, `FETCH-VALUE-WATERMARK-RESUME`, `FETCH-DICT-CURSOR-WORKLIST`).
+- Return without yielding a `PageCursor` to signal completion.
+- `cutoff` is where incremental takes over; documents at or after it are suppressed (`FETCH-SEAM-PRECISION`).
