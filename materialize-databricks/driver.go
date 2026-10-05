@@ -757,11 +757,11 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	}
 	defer db.Close()
 
-	var loading = make(map[int]chan error)
-	var load = func(idx int) {
+	var stagingTableCopies = make(map[int]chan error)
+	var copyIntoStaging = func(idx int) {
 		var done = make(chan error, 1)
-		loading[idx] = done
-		go func() { done <- d.loadStagingTable(ctx, db, d.bindings[idx]) }()
+		stagingTableCopies[idx] = done
+		go func() { done <- d.copyIntoStagingTable(ctx, db, d.bindings[idx]) }()
 	}
 
 	var lastBinding = -1
@@ -770,11 +770,11 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		var b = d.bindings[it.Binding]
 
 		// Store requests are ordered by binding, so the previous binding has all of its rows. Its
-		// files upload and load into its staging table while later bindings are written.
+		// files are uploaded and copied into its staging table while later bindings are written.
 		if lastBinding != -1 && lastBinding != it.Binding {
-			load(lastBinding)
+			copyIntoStaging(lastBinding)
 		}
-		if _, ok := loading[it.Binding]; ok {
+		if _, ok := stagingTableCopies[it.Binding]; ok {
 			return nil, fmt.Errorf("store requests for binding[%d] are not contiguous", it.Binding)
 		}
 		lastBinding = it.Binding
@@ -795,7 +795,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		}
 	}
 	if lastBinding != -1 {
-		load(lastBinding)
+		copyIntoStaging(lastBinding)
 	}
 
 	// Upload the staged files and record in the checkpoint everything needed to commit them into
@@ -805,7 +805,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	// binding stateKey so that in case of a recovery being necessary we don't run queries
 	// belonging to bindings that have been removed.
 	for idx, b := range d.bindings {
-		var done, ok = loading[idx]
+		var done, ok = stagingTableCopies[idx]
 		if !ok {
 			continue
 		} else if err := <-done; err != nil {
@@ -836,11 +836,11 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	}, nil
 }
 
-// loadStagingTable waits for the binding's store files to upload and, if they're
-// merged, loads them into a Delta table. The MERGE reads that table rather than
+// copyIntoStagingTable waits for the binding's store files to upload and, if
+// they're merged, copies them into a Delta table. The MERGE reads that table rather than
 // the JSON files, so Databricks doesn't materialize its source. The table lives
 // in the staging volume by path and isn't registered in the catalog.
-func (d *transactor) loadStagingTable(ctx context.Context, db *stdsql.DB, b *binding) error {
+func (d *transactor) copyIntoStagingTable(ctx context.Context, db *stdsql.DB, b *binding) error {
 	if err := b.storeFile.wait(); err != nil {
 		return err
 	} else if b.target.DeltaUpdates || !b.needsMerge {
@@ -848,7 +848,7 @@ func (d *transactor) loadStagingTable(ctx context.Context, db *stdsql.DB, b *bin
 	}
 
 	var name = b.storeFile.txnDir + "_delta"
-	var data = &stagingLoad{Target: &b.target, Identifier: stagingIdentifier(b, name), Directory: b.storeFile.remoteDir()}
+	var data = &stagingCopy{Target: &b.target, Identifier: stagingIdentifier(b, name), Directory: b.storeFile.remoteDir()}
 	for _, tpl := range []*template.Template{d.templates.createStagingTable, d.templates.copyIntoStaging} {
 		if query, err := renderTemplate(tpl, data); err != nil {
 			return fmt.Errorf("%s template: %w", tpl.Name(), err)

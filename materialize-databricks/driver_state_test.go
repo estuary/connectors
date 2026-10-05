@@ -940,7 +940,7 @@ func TestAcknowledgeMergesStagingTables(t *testing.T) {
 	require.Empty(t, d.cp)
 }
 
-func TestLoadStagingTable(t *testing.T) {
+func TestCopyIntoStagingTable(t *testing.T) {
 	for _, needsMerge := range []bool{false, true} {
 		var db = recordingDB(t, nil)
 		var d = renderingTransactor(lowerRangeKey)
@@ -952,7 +952,7 @@ func TestLoadStagingTable(t *testing.T) {
 		var ctx = context.Background()
 		require.NoError(t, b.storeFile.start(ctx, db))
 		require.NoError(t, b.storeFile.writeRow([]any{1, "2024-01-01T00:00:00Z", false}))
-		require.NoError(t, d.loadStagingTable(ctx, db, b))
+		require.NoError(t, d.copyIntoStagingTable(ctx, db, b))
 
 		if !needsMerge {
 			require.Len(t, recording.executed, 1)

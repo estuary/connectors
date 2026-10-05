@@ -128,14 +128,14 @@ func TestSQLGeneration(t *testing.T) {
 	{
 		tbl := tables[0]
 		var staging = "delta.`test-staging-path/txn-1_delta`"
-		var load = &stagingLoad{Target: &tbl, Identifier: staging, Directory: "test-staging-path/txn-1"}
+		var staged = &stagingCopy{Target: &tbl, Identifier: staging, Directory: "test-staging-path/txn-1"}
 		for _, tc := range []struct {
 			name string
 			tpl  *template.Template
 			data any
 		}{
-			{"createStagingTable", testTemplates.createStagingTable, load},
-			{"copyIntoStaging", testTemplates.copyIntoStaging, load},
+			{"createStagingTable", testTemplates.createStagingTable, staged},
+			{"copyIntoStaging", testTemplates.copyIntoStaging, staged},
 			{"mergeInto staging tables and directory", testTemplates.mergeInto, &tableWithFiles{
 				Table:       &tbl,
 				Tables:      []string{staging, "delta.`test-staging-path/txn-2_delta`"},
