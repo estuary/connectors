@@ -3,11 +3,9 @@ package connector
 import (
 	"context"
 	stdsql "database/sql"
-	"errors"
 	"fmt"
 	"io"
 	"path"
-	"slices"
 	"strings"
 	"time"
 
@@ -23,8 +21,6 @@ import (
 	"github.com/segmentio/encoding/json"
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
-
-	duckdb "github.com/duckdb/duckdb-go/v2"
 )
 
 func NewDriver() *sql.Driver[config, tableConfig] {
@@ -370,13 +366,6 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}, nil
 }
 
-var retryableDuckdbErrors = []duckdb.ErrorType{
-	// These both seem to be intermittent errors originating from the internals
-	// of MotherDuck / duckdb that resolve with a retry.
-	duckdb.ErrorTypeConnection,
-	duckdb.ErrorTypeTransaction,
-}
-
 type bindingCommit struct {
 	path    []string
 	queries []string
@@ -431,18 +420,10 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string, round int) 
 		b.updates = 0
 	}
 
-	for attempt := 1; ; attempt++ {
-		if err := d.commitBindings(ctx, commits, fenceUpdate, round); err != nil {
-			var duckdbErr *duckdb.Error
-			if attempt <= 3 && errors.As(err, &duckdbErr) && slices.Contains(retryableDuckdbErrors, duckdbErr.Type) {
-				log.WithError(err).WithField("attempt", attempt).Warn("retrying commit due to retryable duckdb error")
-				continue
-			}
-
-			return err
-		}
-
-		break
+	if err := withRetries(ctx, "store commit", func() error {
+		return d.commitBindings(ctx, commits, fenceUpdate, round)
+	}); err != nil {
+		return err
 	}
 
 	if err := d.storeFiles.CleanupCurrentTransaction(ctx); err != nil {

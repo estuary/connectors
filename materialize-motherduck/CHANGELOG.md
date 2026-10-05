@@ -1,5 +1,16 @@
 # materialize-motherduck
 
+## 2026-10-02
+
+### Fixed
+- A DuckLake destination could fail a publication or restart a task with
+  `Failed to commit DuckLake transaction` when another writer committed to the
+  same database at the same moment. Creating, altering, dropping, and
+  truncating tables, creating schemas, and starting a task now retry this
+  conflict, waiting a little longer before each attempt.
+- Retries of a failed data commit now wait before trying again, making them
+  less likely to collide with the same concurrent writer.
+
 ## 2026-08-25
 
 ### Added
