@@ -25,8 +25,23 @@ import (
 
 const databasePath = "/tmp/sqlite.db"
 
+// publishedAtLayout is the form of flow_published_at values, which are stored
+// as TEXT. It is fixed-width at nanosecond precision, so values in this form
+// compare lexicographically in temporal order.
+const publishedAtLayout = "2006-01-02T15:04:05.000000000Z"
+
+var featureFlagDefaults = map[string]common.FlagDefault{
+	"truncate_after_backfill": common.FlagEnabled,
+}
+
 type config struct {
+	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
+
 	path string
+}
+
+type advancedConfig struct {
+	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
 }
 
 func (c config) Validate() error {
@@ -38,7 +53,7 @@ func (c config) DefaultNamespace() string {
 }
 
 func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
-	return "", nil
+	return c.Advanced.FeatureFlags, featureFlagDefaults
 }
 
 type tableConfig struct {
@@ -175,8 +190,9 @@ func newTransactor(
 	be *m.BindingEvents,
 ) (m.Transactor, error) {
 	var d = &transactor{
-		dialect: &sqliteDialect,
-		be:      be,
+		dialect:               &sqliteDialect,
+		be:                    be,
+		truncateAfterBackfill: sql.TruncateAfterBackfill(featureFlags),
 	}
 	d.store.fence = &fence
 
@@ -245,6 +261,12 @@ type transactor struct {
 	}
 	bindings []*binding
 	be       *m.BindingEvents
+	// truncateAfterBackfill permits deleting the rows published before a
+	// completed backfill.
+	truncateAfterBackfill bool
+	// truncations maps a binding index to the boundary of a completed
+	// backfill, for deletion in this transaction's commit.
+	truncations map[int]time.Time
 }
 
 type binding struct {
@@ -257,8 +279,9 @@ type binding struct {
 	}
 	// Variables accessed by Prepare, Store, and Commit.
 	store struct {
-		insertSQL string
-		updateSQL string
+		insertSQL   string
+		updateSQL   string
+		truncateSQL string
 	}
 }
 
@@ -290,6 +313,10 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 		return fmt.Errorf("storeUpdate template: %w", err)
 	}
 
+	if col, err := target.PublishedAtColumn(); err == nil {
+		b.store.truncateSQL = fmt.Sprintf("DELETE FROM %s WHERE %s < ?1;", target.Identifier, col.Identifier)
+	}
+
 	// Create a binding-scoped temporary table for staged keys to load.
 	if _, err = t.load.conn.ExecContext(ctx, keyCreateSQL); err != nil {
 		return fmt.Errorf("Exec(%s): %w", keyCreateSQL, err)
@@ -307,7 +334,31 @@ func (t *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSp
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
-func (t *transactor) Flush(context.Context, map[int]time.Time) error {
+
+func (t *transactor) Flush(_ context.Context, completes map[int]time.Time) error {
+	t.truncations = make(map[int]time.Time, len(completes))
+	for binding, boundary := range completes {
+		var b = t.bindings[binding]
+		if b.target.DeltaUpdates {
+			continue
+		} else if !t.truncateAfterBackfill {
+			log.WithFields(log.Fields{
+				"table":    b.target.Identifier,
+				"boundary": boundary,
+			}).Info("rows published before the backfill were not deleted because feature flags disable it")
+			continue
+		}
+		if b.store.truncateSQL == "" {
+			var _, reason = b.target.PublishedAtColumn()
+			log.WithFields(log.Fields{
+				"eventType": "connectorStatus",
+				"table":     b.target.Identifier,
+				"boundary":  boundary,
+			}).Warnf("Rows published before the backfill of table %s were not deleted because %s.", b.target.Identifier, reason)
+			continue
+		}
+		t.truncations[binding] = boundary
+	}
 	return nil
 }
 
@@ -377,6 +428,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}
 
 	var round = it.Round
+	var truncations = d.truncations
 	var rowsAffected = make([]int64, len(d.bindings))
 	var stored = make([]bool, len(d.bindings))
 
@@ -404,15 +456,37 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 	}
 
+	// Truncations run after the stores, because a store of an existing row
+	// is an UPDATE that would match nothing if its row were already deleted.
+	var truncated = make(map[int]int64, len(truncations))
+	for binding, boundary := range truncations {
+		var b = d.bindings[binding]
+		var res, err = txn.ExecContext(it.Context(), b.store.truncateSQL, boundary.UTC().Format(publishedAtLayout))
+		if err != nil {
+			return nil, fmt.Errorf("truncating %s after backfill: %w", b.target.Identifier, err)
+		}
+		var n, _ = res.RowsAffected()
+		truncated[binding] = n
+		log.WithFields(log.Fields{
+			"table":    b.target.Identifier,
+			"boundary": boundary,
+			"deleted":  n,
+		}).Info("truncated rows published before the backfill")
+	}
+
 	if err := txn.Commit(); err != nil {
 		return nil, fmt.Errorf("commit transaction: %w", err)
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
 		for i, b := range d.bindings {
-			if stored[i] {
-				d.be.ReportRowStats(round, b.target.Path, m.TotalRowStats(rowsAffected[i]))
+			var stats = m.TotalRowStats(rowsAffected[i])
+			if n, ok := truncated[i]; ok {
+				stats = stats.WithTruncated(n)
+			} else if !stored[i] {
+				continue
 			}
+			d.be.ReportRowStats(round, b.target.Path, stats)
 		}
 		return nil, nil
 	}, nil

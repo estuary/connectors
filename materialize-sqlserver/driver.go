@@ -34,6 +34,7 @@ var featureFlagDefaults = map[string]common.FlagDefault{
 	"datetime_keys_as_string":          common.FlagEnabled,
 	"retain_existing_data_on_backfill": common.FlagDisabled,
 	"native_binary_column_type":        common.FlagEnabled,
+	"truncate_after_backfill":          common.FlagEnabled,
 }
 
 type AuthType string
@@ -373,6 +374,12 @@ type transactor struct {
 	}
 	bindings []*binding
 	be       *m.BindingEvents
+	// truncateAfterBackfill permits deleting the rows published before a
+	// completed backfill.
+	truncateAfterBackfill bool
+	// truncations maps a binding index to the boundary of a completed
+	// backfill, for deletion in this transaction's commit.
+	truncations map[int]time.Time
 }
 
 func (t *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSpec, _ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
@@ -394,7 +401,12 @@ func prepareNewTransactor(
 		be *m.BindingEvents,
 	) (m.Transactor, error) {
 		var cfg = ep.Config
-		var d = &transactor{templates: templates, cfg: cfg, be: be}
+		var d = &transactor{
+			templates:             templates,
+			cfg:                   cfg,
+			be:                    be,
+			truncateAfterBackfill: sql.TruncateAfterBackfill(featureFlags),
+		}
 		d.store.fence = fence
 
 		connector, err := ep.Config.ToSQLConnector(ctx)
@@ -413,7 +425,7 @@ func prepareNewTransactor(
 		}
 
 		for _, binding := range bindings {
-			if err := d.addBinding(ctx, binding, featureFlags); err != nil {
+			if err := d.addBinding(ctx, binding, is); err != nil {
 				return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 			}
 		}
@@ -453,9 +465,14 @@ type binding struct {
 	tempStoreTruncate   string
 	mergeInto           string
 	directCopy          string
+
+	// truncateSQL deletes the rows published before a boundary. It is empty
+	// when truncateReason states why the table cannot be truncated.
+	truncateSQL    string
+	truncateReason error
 }
 
-func (t *transactor) addBinding(ctx context.Context, target sql.Table, featureFlags map[string]bool) error {
+func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boilerplate.InfoSchema) error {
 	var b = &binding{target: target, nullFieldsToStrip: target.NullableFieldsToStrip()}
 
 	// Choose the appropriate load query template based on configuration
@@ -489,6 +506,12 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, featureFl
 		}
 	}
 
+	if col, err := target.PublishedAtColumn(); err != nil {
+		b.truncateReason = err
+	} else {
+		b.truncateReason = addTruncation(b, col, is)
+	}
+
 	t.bindings = append(t.bindings, b)
 
 	// Create a binding-scoped temporary table for staged keys to load.
@@ -505,8 +528,55 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, featureFl
 	return nil
 }
 
+// addTruncation prepares b to delete the rows whose col is earlier than a
+// boundary, compared in the type that col has in the table. It returns why b
+// cannot be truncated, as a clause suited for an operator.
+func addTruncation(b *binding, col *sql.Column, is *boilerplate.InfoSchema) error {
+	var res = is.GetResource(b.target.Path)
+	if res == nil {
+		return fmt.Errorf("table %s was not found in the database", b.target.Identifier)
+	}
+	var existing = res.GetField(col.Field)
+	if existing == nil {
+		return fmt.Errorf("column %s was not found in the table", col.Identifier)
+	}
+	meta, ok := existing.Meta.(datetimeFieldMeta)
+	if !ok {
+		return fmt.Errorf("column %s is not a DATETIME, DATETIME2 or SMALLDATETIME", col.Identifier)
+	}
+
+	// Stored values reach col by conversion from a DATETIME2(7), so the
+	// boundary takes the same conversion. It rounds monotonically, so a row
+	// published at or after the boundary never compares below it.
+	b.truncateSQL = fmt.Sprintf("DELETE FROM %s WHERE %s < CAST(CAST(@p1 AS DATETIME2(7)) AS %s);", b.target.Identifier, col.Identifier, meta.ddl)
+	return nil
+}
+
 func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
-func (t *transactor) Flush(context.Context, map[int]time.Time) error {
+
+func (t *transactor) Flush(_ context.Context, completes map[int]time.Time) error {
+	t.truncations = make(map[int]time.Time, len(completes))
+	for binding, boundary := range completes {
+		var b = t.bindings[binding]
+		if b.target.DeltaUpdates {
+			continue
+		} else if !t.truncateAfterBackfill {
+			log.WithFields(log.Fields{
+				"table":    b.target.Identifier,
+				"boundary": boundary,
+			}).Info("rows published before the backfill were not deleted because feature flags disable it")
+			continue
+		}
+		if b.truncateSQL == "" {
+			log.WithFields(log.Fields{
+				"eventType": "connectorStatus",
+				"table":     b.target.Identifier,
+				"boundary":  boundary,
+			}).Warnf("Rows published before the backfill of table %s were not deleted because %s.", b.target.Identifier, b.truncateReason)
+			continue
+		}
+		t.truncations[binding] = boundary
+	}
 	return nil
 }
 
@@ -659,6 +729,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}
 
 	round := it.Round
+	var truncations = d.truncations
 
 	// Skip deleted, non-existent documents iff HardDelete is enabled.
 	for it.Next(d.cfg.HardDelete) {
@@ -720,26 +791,52 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
 		defer txn.Rollback()
 
-		for _, b := range d.bindings {
-			if !b.hasData {
+		for i, b := range d.bindings {
+			var boundary, truncate = truncations[i]
+			if !b.hasData && !truncate {
 				continue
 			}
 
 			d.be.StartedResourceCommit(b.target.Path)
-			// A single-statement batch, so RowsAffected is the target rows
-			// this statement touched; MERGE counts every clause that fired.
-			stmt, what := b.directCopy, "direct insert"
-			if b.needsMerge {
-				stmt, what = b.mergeInto, "merge"
-			}
-			if res, err := txn.ExecContext(ctx, stmt); err != nil {
-				return nil, m.FinishedOperation(fmt.Errorf("store batch %s on %q: %w", what, b.target.Identifier, err))
-			} else if n, err := res.RowsAffected(); err == nil {
-				d.be.ReportRowStats(round, b.target.Path, m.TotalRowStats(n).WithStaged(b.staged))
+			var stats, report = m.TotalRowStats(0), truncate
+			if b.hasData {
+				// A single-statement batch, so RowsAffected is the target rows
+				// this statement touched; MERGE counts every clause that fired.
+				stmt, what := b.directCopy, "direct insert"
+				if b.needsMerge {
+					stmt, what = b.mergeInto, "merge"
+				}
+				if res, err := txn.ExecContext(ctx, stmt); err != nil {
+					return nil, m.FinishedOperation(fmt.Errorf("store batch %s on %q: %w", what, b.target.Identifier, err))
+				} else if n, err := res.RowsAffected(); err == nil {
+					stats, report = m.TotalRowStats(n).WithStaged(b.staged), true
+				}
+
+				if _, err := txn.ExecContext(ctx, b.tempStoreTruncate); err != nil {
+					return nil, m.FinishedOperation(fmt.Errorf("truncating store table: %w", err))
+				}
 			}
 
-			if _, err = txn.ExecContext(ctx, b.tempStoreTruncate); err != nil {
-				return nil, m.FinishedOperation(fmt.Errorf("truncating store table: %w", err))
+			// The truncation follows the binding's stores, so it removes only
+			// the rows they did not rewrite.
+			if truncate {
+				// The boundary is bound in UTC, because a cast to DATETIME2
+				// keeps the wall-clock time of its offset.
+				var n int64
+				if res, err := txn.ExecContext(ctx, b.truncateSQL, boundary.UTC()); err != nil {
+					return nil, m.FinishedOperation(fmt.Errorf("truncating %s after backfill: %w", b.target.Identifier, err))
+				} else if n, err = res.RowsAffected(); err != nil {
+					return nil, m.FinishedOperation(fmt.Errorf("truncating %s after backfill (rows affected): %w", b.target.Identifier, err))
+				}
+				stats = stats.WithTruncated(n)
+				log.WithFields(log.Fields{
+					"table":    b.target.Identifier,
+					"boundary": boundary,
+					"deleted":  n,
+				}).Info("truncated rows published before the backfill")
+			}
+			if report {
+				d.be.ReportRowStats(round, b.target.Path, stats)
 			}
 			d.be.FinishedResourceCommit(b.target.Path)
 
