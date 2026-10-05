@@ -130,6 +130,47 @@ func (t *testWriter) Close() error {
 	return nil
 }
 
+func TestJsonWriterSkipNulls(t *testing.T) {
+	for _, tt := range []struct {
+		name      string
+		fields    []string
+		input     []any
+		wantBytes []byte
+	}{
+		{
+			name:      "all values present",
+			fields:    []string{"str", "int"},
+			input:     []any{"testing", 1},
+			wantBytes: append([]byte(`{"int":1,"str":"testing"}`), '\n'),
+		},
+		{
+			name:      "some values null",
+			fields:    []string{"str", "int", "bool"},
+			input:     []any{"testing", nil, true},
+			wantBytes: append([]byte(`{"bool":true,"str":"testing"}`), '\n'),
+		},
+		{
+			name:      "all values null",
+			fields:    []string{"str", "int"},
+			input:     []any{nil, nil},
+			wantBytes: append([]byte(`{}`), '\n'),
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			tw := &testWriter{
+				w: &buf,
+			}
+
+			w := NewJsonWriter(tw, tt.fields, WithJsonSkipNulls(), WithJsonDisableCompression())
+			require.NoError(t, w.Write(tt.input))
+			require.NoError(t, w.Close())
+
+			require.Equal(t, string(tt.wantBytes), buf.String())
+		})
+	}
+}
+
 const benchmarkDatasetSize = 1000
 
 func BenchmarkEncodingObjects(b *testing.B) {
