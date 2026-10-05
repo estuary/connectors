@@ -64,7 +64,7 @@ If `models.py` has no credential class yet, a prerequisite is missing: run `conf
 The committed pre-request script decrypts the connector's sops-encrypted `config.yaml` via Node's `child_process` and injects the credential on `req`. The same script runs in **both** runtimes — there is no fallback path:
 
 - **CLI:** run with `bru run … --sandbox developer`.
-- **GUI (Bruno desktop):** the collection's JS sandbox must be set to **developer** mode (`jsSandboxMode: "developer"` in `~/.config/bruno/collection-security.json` — see [[reference-bruno-sandbox-mode-location]]). In developer mode the GUI sandbox exposes Node built-ins, so the identical `child_process` + `sops` path works there too. No keychain / `vars:secret` fallback is needed.
+- **GUI (Bruno desktop):** the collection's JS sandbox must be set to **developer** mode (`jsSandboxMode: "developer"` in `~/.config/bruno/collection-security.json`). In developer mode the GUI sandbox exposes Node built-ins, so the identical `child_process` + `sops` path works there too. No keychain / `vars:secret` fallback is needed.
 
 Two house styles, by what the decrypted config holds: **A**, a static token attached directly (live reference: `source-mailchimp-native/bruno/opencollection.yml`); **B**, an OAuth refresh token exchanged for an access token on every request. The script contract and the style B block are in [`auth-wiring.md`](auth-wiring.md); copy style A from the sibling collection, which is always more current than a doc.
 
@@ -94,7 +94,7 @@ Name the cursor fields the connector will use, and prove they work. Before autho
 
 ### Silent Data Loss
 
-Audit every list endpoint's default filters for silent data loss. Providers often default to "show me the live, non-deleted, non-archived subset" — e.g. Stripe's `/v1/prices` defaults to `active=true`, `/v1/subscriptions` defaults to `status=active`. Before declaring an endpoint verified, read the docs for **every** parameter that has a default and ask: does the default exclude documents the connector is supposed to capture? In particular check for `active`, `status`, `state`, `deleted`, `archived`, `visibility`, and similar partition-by-state parameters. If the default excludes a partition:
+Audit every list endpoint's default filters for silent data loss. Providers often default to "show me the live, non-deleted, non-archived subset" — e.g. Stripe's `/v1/subscriptions` defaults to `status=active`. Before declaring an endpoint verified, read the docs for **every** parameter that has a default and ask: does the default exclude documents the connector is supposed to capture? In particular check for `active`, `status`, `state`, `deleted`, `archived`, `visibility`, and similar partition-by-state parameters. If the default excludes a partition:
 
 - Quote the doc line that establishes the default in the verification report.
 - Run a request for each excluded partition (e.g. `active=false`) and save it as a saved example — even if the test account returns zero items for that partition, you've proved the filter is honored and documented the request shape for production accounts that _do_ have data there.
