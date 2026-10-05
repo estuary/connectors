@@ -9,7 +9,7 @@ The phases are identical in both modes; only how each gate _resolves_ differs. E
 
 ## Resolving the mode
 
-The orchestrating skill opens every run with the questionnaire below, for every connector. `CONDUCT-CONSENT-PER-CONNECTOR`: no answer outlives the run — not the mode, not the seeding consent, not the credentials or a decision to go without them. They are answers about one connector and one provider account; a user who let you seed a Mailchimp sandbox has said nothing about their Okta tenant. The one shortcut is an answer already in the prompt: `--autonomous` / `--human-in-the-loop` after the connector name, or plain language that clearly means one of them ("don't ask me anything", "just build it and tell me what you did" → `autonomous`; "check with me before …" → `human-in-the-loop`). That answers the mode question only. The seeding question is always asked, because it is the only thing that ever lets you mutate the user's account.
+The orchestrating skill opens every run with the questionnaire below, for every connector. `CONDUCT-CONSENT-PER-CONNECTOR`: no answer outlives the run — not the mode, not the seeding answer, not the credentials or a decision to go without them. They are answers about one connector and one provider account; a user who let you seed a Mailchimp sandbox has said nothing about their Okta tenant. The one shortcut is an answer already in the prompt: `--autonomous` / `--human-in-the-loop` after the connector name, or plain language that clearly means one of them ("don't ask me anything", "just build it and tell me what you did" → `autonomous`; "check with me before …" → `human-in-the-loop`). That answers the mode question only. The seeding question is always asked, because it is the only thing that ever lets you mutate the user's account.
 
 `CONDUCT-PERMISSIONS-FILE`: record the answers with `python3 .claude/scripts/permissions.py grant source-<name> --mode <m> --seeding <s>`. That writes `.claude/permissions/source-<name>.json` (gitignored), which the repo's `PreToolUse` hook (`.claude/hooks/permission-gate.py`) reads before any live provider call, so `API-MUTATE-ONLY-WITH-CONSENT` and `API-CONFIG-GATE` hold mechanically in every session, including background ones. After the credential checkpoint, `permissions.py stamp` binds the permission to the committed `config.yaml`; `permissions.py revoke` deletes it at hand-off. Only the orchestrating skill runs these, only from the user's live answers.
 
@@ -38,18 +38,23 @@ Removing the human from the gates removes the review that catches wrong plans. A
 
 ## Gate table
 
+Outcomes only; the owner named in each row holds the reasoning.
+
 | Gate | `human-in-the-loop` | `autonomous` |
 | ---- | ------------- | ------------ |
-| `GATE-STREAM-LIST` — the prompt names no streams, or names them vaguely | Ask for the list before continuing. | Build every resource the provider documents as listable; present the list at the checkpoint as "these unless you say otherwise". |
-| `GATE-AUTH-SCHEME` — `configure-auth` Phase 2 | Confirm scheme, union shape, probe endpoint, managed-OAuth dependency. | Simplest static scheme, one arm; other schemes mentioned at the checkpoint. |
-| `GATE-CREDENTIALS` — `config.yaml` needs real, sops-encrypted values | Stop and hand off. | **The one checkpoint**, batched (below). "No credentials" is a legitimate docs-only run: PENDING plans, and the ledger opens with that fact. |
-| `GATE-TIGHT-BUDGET` — a required endpoint allows ≤ 20 req/hr (`API-BUDGET-20RPH`) | Ask before each API-hitting run. | State the run budget in the checkpoint (how many live runs, which bindings you'll `disable: true` meanwhile) and stay inside it. Restore disabled bindings before hand-off. |
-| `GATE-INCREMENTAL-ONLY` — `classify-stream-types` | Confirm with the user first. | Never. Any usable cursor → incremental + backfill; none → snapshot. |
-| `GATE-STRATEGY-UNCLEAR` — `classify-stream-types` | Ask for assessment. | Small → snapshot; large with any cursor → incremental + scheduled backfill; large with none → snapshot on a long interval. Ledger as open. |
-| `GATE-PLAN-REVIEW` — `stream-builder` draft plan | Render the draft inline, `AskUserQuestion`, incorporate feedback. | Self-review against `rules-index.md`, write `## Decisions made without review`; the orchestrator's reviewer subagent grades it before integration. |
-| `GATE-SEEDING` — `bruno-probe-endpoint` Phase 6 | `seeding: assistant` → run it; `seeding: user` → hand over and wait. | `seeding: assistant` → run it; otherwise author nothing and leave the finding PENDING — never relabeled UNOBSERVABLE. |
-| `GATE-CONFIG-DIRTY` — the hook refuses a live run because `config.yaml` is dirty or was re-committed (`API-CONFIG-GATE`) | Ask the user to commit / re-confirm, then `permissions.py stamp`. | No live calls until hand-off; PENDING; ledger. |
-| `GATE-COMMIT-SPLIT` — the diff mixes the connector with an unrelated snapshot/schema sweep | Recommend the split. | Perform it. Push and PR need a human in both modes (`CONDUCT-CONFIRM-BEFORE-WRITE-HISTORY`). |
+| `GATE-STREAM-LIST` — no or vague stream list (`create-capture-connector` Phase 0) | Ask. | Every resource the provider documents as listable; shown at the checkpoint. |
+| `GATE-AUTH-SCHEME` — `configure-auth` Phase 2 | Confirm. | Simplest static scheme, one arm. |
+| `GATE-CREDENTIALS` — `config.yaml` needs real values (`create-capture-connector` Phase 4) | Stop, hand off. | **The one checkpoint**, batched (below). "No credentials" → docs-only run. |
+| `GATE-TIGHT-BUDGET` — a required endpoint allows ≤ 20 req/hr (`API-BUDGET-20RPH`) | Ask before each live run. | Declare the budget at the checkpoint and stay inside it; restore `disable: true` bindings before hand-off. |
+| `GATE-STREAM-DESIGN` — `add-stream` Phase 3 | Confirm endpoint, grain, classification. | Proceed; ledger. Already settled when a reviewed plan supplies the design. |
+| `GATE-INCREMENTAL-ONLY` — `classify-stream-types` | Confirm. | Never. |
+| `GATE-STRATEGY-UNCLEAR` — `classify-stream-types` | Ask. | Decide on size and cursor; ledger as open. |
+| `GATE-OPAQUE-CURSOR` — `bruno-probe-endpoint`, token stability undocumented | Surface as a blocker. | Reject the opaque cursor; derived cursor or snapshot. |
+| `GATE-PARTITION-COVERAGE` — `bruno-probe-endpoint`, a default filter hides a partition | Decide together. | Sentinel sweep if offered, else sequential sweeps. |
+| `GATE-PLAN-REVIEW` — `stream-builder` draft plan | Human review, inline. | Self-review; orchestrator's reviewer before integration. |
+| `GATE-SEEDING` — `bruno-probe-endpoint` Phase 6 | Per the seeding answer. | `assistant` → run; otherwise PENDING. |
+| `GATE-CONFIG-DIRTY` — the hook refused a live run (`API-CONFIG-GATE`) | Re-confirm, then `permissions.py stamp`. | No live calls until hand-off; PENDING; ledger. |
+| `GATE-COMMIT-SPLIT` — connector diff mixed with an unrelated sweep | Recommend. | Perform. Push and PR always need a human (`CONDUCT-CONFIRM-BEFORE-WRITE-HISTORY`). |
 
 ## The batched checkpoint (`GATE-CREDENTIALS` in autonomous mode)
 

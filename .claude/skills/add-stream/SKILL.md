@@ -61,7 +61,7 @@ The decision test: "what is the thing that, once true, never changes?" That's th
 
 Defer to the `classify-stream-types` skill. Don't re-derive its flowchart here. Bring back: the chosen replication strategy (webhook, incremental+backfill, incremental-only, or snapshot) and the rationale.
 
-**Checkpoint:** present the chosen endpoint (from Phase 2), the document grain, the classification, and the rationale to the user, and ask whether they want to proceed to Phase 4 (Model Implementation). Stop here until they say yes. This is the natural break for the user to course-correct before any connector code gets written.
+**`GATE-STREAM-DESIGN`** ([`interaction-mode.md`](../../shared/interaction-mode.md)): the chosen endpoint, the document grain, the classification and the rationale are the design; nothing in connector code changes until it is settled. Human-in-the-loop: present them and wait for the user's yes. Autonomous: proceed and ledger the three choices with their rejected alternatives.
 
 ## Phase 4 — Model Implementation
 
