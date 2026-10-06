@@ -652,8 +652,17 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			// reported: should the truncate at the start of the next round
 			// fail too, that round's key-count check trips with no indication
 			// of why the table was not empty.
-			if truncErr := t.load.conn.Exec(ctx, b.load.truncateSQL); truncErr != nil && err == nil {
-				err = fmt.Errorf("truncating load table for %s after load: %w", b.target.Identifier, truncErr)
+			//
+			// When the load itself failed, its error is the one worth
+			// reporting, so the truncate is a single best-effort attempt.
+			if err != nil {
+				_ = t.load.conn.Exec(ctx, b.load.truncateSQL)
+				continue
+			}
+			if err = transientRetryPolicy.retry(ctx, "truncating load table after load", isTransientErr, func() error {
+				return t.load.conn.Exec(ctx, b.load.truncateSQL)
+			}); err != nil {
+				err = fmt.Errorf("truncating load table for %s after load: %w", b.target.Identifier, err)
 			}
 		}
 	}()
@@ -662,8 +671,11 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		if _, found := activeBindings[it.Binding]; !found {
 			b := t.bindings[it.Binding]
 			// The load table exists (ensured at session start); truncate
-			// clears any keys left over from a previous round.
-			if err = t.load.conn.Exec(ctx, b.load.truncateSQL); err != nil {
+			// clears any keys left over from a previous round. TRUNCATE is
+			// idempotent, so a transient connection drop is simply retried.
+			if err = transientRetryPolicy.retry(ctx, "truncating load stage table", isTransientErr, func() error {
+				return t.load.conn.Exec(ctx, b.load.truncateSQL)
+			}); err != nil {
 				return fmt.Errorf("truncating load stage table for %s: %w", b.target.Identifier, err)
 			}
 			activeBindings[it.Binding] = 0
@@ -1003,24 +1015,34 @@ func isUnknownTableErr(err error) bool {
 // counts under select_sequential_consistency, which makes the result
 // authoritative for the connection that will service the partition moves.
 func (t *transactor) queryStoreParts(ctx context.Context, b *binding) (parts []stagedPartition, totalRows int64, err error) {
-	rows, err := t.store.conn.Query(ctx, b.store.queryPartsSQL)
-	if err != nil {
-		return nil, 0, fmt.Errorf("querying store table partitions: %w", err)
-	}
-	defer rows.Close()
+	// The read has no side effects, so a transient connection drop restarts
+	// it from scratch.
+	err = transientRetryPolicy.retry(ctx, "querying store table partitions", isTransientErr, func() error {
+		parts, totalRows = nil, 0
 
-	for rows.Next() {
-		var part stagedPartition
-		var partitionRows uint64
-		if err = rows.Scan(&part.ID, &partitionRows); err != nil {
-			return nil, 0, fmt.Errorf("scanning store table partition: %w", err)
+		rows, err := t.store.conn.Query(ctx, b.store.queryPartsSQL)
+		if err != nil {
+			return fmt.Errorf("querying store table partitions: %w", err)
 		}
-		part.Rows = int64(partitionRows)
-		parts = append(parts, part)
-		totalRows += part.Rows
-	}
-	if err = rows.Err(); err != nil {
-		return nil, 0, fmt.Errorf("iterating store table partitions: %w", err)
+		defer rows.Close()
+
+		for rows.Next() {
+			var part stagedPartition
+			var partitionRows uint64
+			if err = rows.Scan(&part.ID, &partitionRows); err != nil {
+				return fmt.Errorf("scanning store table partition: %w", err)
+			}
+			part.Rows = int64(partitionRows)
+			parts = append(parts, part)
+			totalRows += part.Rows
+		}
+		if err = rows.Err(); err != nil {
+			return fmt.Errorf("iterating store table partitions: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, 0, err
 	}
 	return parts, totalRows, nil
 }
@@ -1256,27 +1278,13 @@ func (t *transactor) reconcileStagedPartitions(
 // table holds no staged rows of a pending commit; on the recovery path this
 // is guaranteed by moveStorePartitionsToTarget's post-move emptiness check.
 func (t *transactor) ensureTempTables(ctx context.Context, b *binding) error {
+	// Every step is idempotent (CREATE IF NOT EXISTS, a read, DROP IF EXISTS,
+	// TRUNCATE), so a transient connection drop restarts the sequence from
+	// the top without changing its outcome.
 	ensure := func(createSQL, truncateSQL, dropSQL string, tableName string) error {
-		if err := t.store.conn.Exec(ctx, createSQL); err != nil {
-			return fmt.Errorf("creating temp table: %w", err)
-		}
-		matches, err := t.tempTableMatchesTarget(ctx, tableName, b)
-		if err != nil {
-			return err
-		}
-		if !matches {
-			if err := t.store.conn.Exec(ctx, dropSQL); err != nil {
-				return fmt.Errorf("dropping schema-drifted temp table: %w", err)
-			}
-			if err := t.store.conn.Exec(ctx, createSQL); err != nil {
-				return fmt.Errorf("re-creating temp table: %w", err)
-			}
-			return nil
-		}
-		if err := t.store.conn.Exec(ctx, truncateSQL); err != nil {
-			return fmt.Errorf("truncating temp table: %w", err)
-		}
-		return nil
+		return transientRetryPolicy.retry(ctx, "ensuring temp table", isTransientErr, func() error {
+			return t.ensureTempTable(ctx, b, createSQL, truncateSQL, dropSQL, tableName)
+		})
 	}
 
 	if err := ensure(b.store.createTableSQL, b.store.truncateSQL, b.store.dropTableSQL, storeTableName(b.target, t._range.KeyBegin)); err != nil {
@@ -1293,6 +1301,30 @@ func (t *transactor) ensureTempTables(ctx context.Context, b *binding) error {
 	return nil
 }
 
+// ensureTempTable is one pass of ensureTempTables for a single temp table.
+func (t *transactor) ensureTempTable(ctx context.Context, b *binding, createSQL, truncateSQL, dropSQL string, tableName string) error {
+	if err := t.store.conn.Exec(ctx, createSQL); err != nil {
+		return fmt.Errorf("creating temp table: %w", err)
+	}
+	matches, err := t.tempTableMatchesTarget(ctx, tableName, b)
+	if err != nil {
+		return err
+	}
+	if !matches {
+		if err := t.store.conn.Exec(ctx, dropSQL); err != nil {
+			return fmt.Errorf("dropping schema-drifted temp table: %w", err)
+		}
+		if err := t.store.conn.Exec(ctx, createSQL); err != nil {
+			return fmt.Errorf("re-creating temp table: %w", err)
+		}
+		return nil
+	}
+	if err := t.store.conn.Exec(ctx, truncateSQL); err != nil {
+		return fmt.Errorf("truncating temp table: %w", err)
+	}
+	return nil
+}
+
 // storePartitionKeyDrifted reports whether the binding's store table and
 // target table both exist but have different partition keys. If either table
 // is missing it reports false, leaving that condition to the caller's
@@ -1302,23 +1334,26 @@ func (t *transactor) storePartitionKeyDrifted(ctx context.Context, b *binding) (
 	var storeTable = storeTableName(b.target, t._range.KeyBegin)
 	var targetTable = b.target.Path[0]
 
-	rows, err := t.store.conn.Query(ctx,
-		"SELECT name, partition_key FROM system.tables WHERE database = currentDatabase() AND name IN (?, ?)",
-		storeTable, targetTable)
-	if err != nil {
-		return false, fmt.Errorf("querying partition keys: %w", err)
-	}
-	defer rows.Close()
-
-	var keys = make(map[string]string)
-	for rows.Next() {
-		var name, pk string
-		if err := rows.Scan(&name, &pk); err != nil {
-			return false, fmt.Errorf("scanning partition key: %w", err)
+	var keys map[string]string
+	if err := transientRetryPolicy.retry(ctx, "querying partition keys", isTransientErr, func() error {
+		rows, err := t.store.conn.Query(ctx,
+			"SELECT name, partition_key FROM system.tables WHERE database = currentDatabase() AND name IN (?, ?)",
+			storeTable, targetTable)
+		if err != nil {
+			return fmt.Errorf("querying partition keys: %w", err)
 		}
-		keys[name] = pk
-	}
-	if err := rows.Err(); err != nil {
+		defer rows.Close()
+
+		keys = make(map[string]string)
+		for rows.Next() {
+			var name, pk string
+			if err := rows.Scan(&name, &pk); err != nil {
+				return fmt.Errorf("scanning partition key: %w", err)
+			}
+			keys[name] = pk
+		}
+		return rows.Err()
+	}); err != nil {
 		return false, err
 	}
 
