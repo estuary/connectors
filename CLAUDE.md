@@ -92,7 +92,7 @@ Multi-context: [CONTEXT-MAP.md](CONTEXT-MAP.md) splits captures from materializa
 
 ### Connector work
 
-Skills under `.claude/skills/` cover the connector lifecycle — `create-capture-connector`, `scaffold-connector`, `configure-auth`, `add-stream`, `child-entities`, `bruno-probe-endpoint`, `regenerate-flow-discovery`, `changelog`. The rules they enforce are indexed in [.claude/shared/rules-index.md](.claude/shared/rules-index.md); always-on Python rules load from [.claude/rules/connector-python.md](.claude/rules/connector-python.md).
+Skills under `.claude/skills/` cover the connector lifecycle, from `create-capture-connector` to `changelog`. Discovery and snapshot regeneration is the `regenerate-flow-discovery` agent under `.claude/agents/`, dispatched via the Agent tool. The rules they enforce are indexed in [.claude/shared/rules-index.md](.claude/shared/rules-index.md); [.claude/rules/connector-python.md](.claude/rules/connector-python.md) loads automatically when a `source-*/**/*.py` file is read or edited.
 
 ### PR reviews
 
