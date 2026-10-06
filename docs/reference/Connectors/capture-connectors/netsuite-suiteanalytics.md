@@ -25,13 +25,13 @@ Each table binding uses one of three sync modes. The connector picks a mode auto
 
 Tables with a date-time column suitable for change tracking (configured via [`log_cursor`](#bindings)) are synced **incrementally**. Most base record tables — such as `Transaction`, `Account`, `Customer`, `Employee`, `Item`, `Subsidiary`, and `Vendor` — have a `lastmodifieddate` column that the connector discovers automatically. Some linking tables, including `TransactionLine`, `NextTransactionLineLink`, `PreviousTransactionLineLink`, `NextTransactionAccountingLineLink`, and `PreviousTransactionAccountingLineLink`, also use `lastmodifieddate` (or `linelastmodifieddate`) for incremental capture.
 
-During incremental sync, the connector queries only for rows modified since the last checkpoint. The polling frequency is controlled by the [`interval`](#bindings) setting (default: 1 hour).
+During incremental sync, the connector queries only for rows modified since the last checkpoint. The polling frequency is controlled by the [`interval`](#bindings) setting (default: 1 hour). For fresher data, set a shorter interval such as `PT5M`.
 
 **How to tell if a table is incremental:** check the binding's `log_cursor` field. If it's set (for example, `lastmodifieddate`), the table is incremental.
 
 ### Paginated backfill
 
-Tables that have a `page_cursor` but no `log_cursor` are loaded by **paginated backfill** — the connector reads the entire table in ordered pages using the [`page_cursor`](#bindings). To re-read the table on a recurring basis, set a [`schedule`](#setting-a-schedule) cron expression. `TransactionAccountingLine` is an example of a table that defaults to this mode.
+Tables that have a `page_cursor` but no `log_cursor` are loaded by **paginated backfill** — the connector reads the entire table in ordered pages using the [`page_cursor`](#bindings). To re-read the table on a recurring basis, set a [`schedule`](#setting-a-schedule) cron expression. `TransactionAccountingLine` defaults to this mode with no schedule, because the `transaction` binding's [association](#table-associations) reloads its rows when a transaction changes. An edit to an accounting line that does not change its transaction's `lastmodifieddate` is not captured unless you set a `schedule` on `TransactionAccountingLine`.
 
 ### Snapshot
 
@@ -172,6 +172,8 @@ You can also authenticate with a username and password, but a consumer/token is 
 You configure connectors either in the Estuary web app, or by directly editing the catalog specification file.
 See [connectors](../../../concepts/connectors.md#using-connectors) to learn more about using connectors. The values and specification sample below provide configuration details specific to the NetSuite source connector.
 
+Keep [**Automatically keep schemas up to date**](../../../concepts/captures.md#automatically-update-captures) turned on for this capture. Collection schemas do not accept unknown fields, so with it off, a column added in NetSuite can fail the capture until you refresh its bindings.
+
 ### Properties
 
 #### Endpoint
@@ -179,7 +181,7 @@ See [connectors](../../../concepts/connectors.md#using-connectors) to learn more
 | Property                      | Title                  | Description                                                                                      | Type   | Required/Default |
 | ----------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------ | ------ | ---------------- |
 | `/account`                     | Netsuite Account ID    | Netsuite realm/Account ID e.g. 2344535, as for `production` or 2344535_SB1, as for `sandbox` | string | Required         |
-| `/suiteanalytics_data_source` | Data Source            | Which NetSuite data source to use. This should generally be `NetSuite2.com`                | string | Required         |
+| `/suiteanalytics_data_source` | Data Source            | Which NetSuite data source to use. This should generally be `NetSuite2.com`                | string | `NetSuite2.com`  |
 | `/authentication`             | Authentication Details | Credentials to access your NetSuite account                                                      | object | Required         |
 | `/authentication/auth_type`   | Authentication Type    | Type of authentication used, either `token` or `user_pass`.                                      | string | `token`          |
 
@@ -206,7 +208,7 @@ See [connectors](../../../concepts/connectors.md#using-connectors) to learn more
 | ---------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- | ---------------- |
 | `/advanced/connection_limit` | Connection Limit | The maximum number of concurrent data streams to attempt at once.                                                                                                                                                   | int  | 10 Connections   |
 | `/advanced/task_limit`       | Task Limit       | The maximum number of concurrent tasks to run at once. A task is either a backfill or incremental load. Backfills can load multiple chunks in parallel, so this must be strictly &lt;= `/advanced/connection_limit` | int  | 5 Tasks          |
-| `/advanced/start_date`       | Start Date       | The date that we should attempt to start backfilling from. If not provided, backfill from the beginning.                                                                                                            | date | Not Required     |
+| `/advanced/start_date`       | Start Date       | The date that we should attempt to start backfilling from. If not provided, backfill from the beginning.                                                                                                            | date-time | Not Required     |
 | `/advanced/query_idle_timeout_seconds` | Query Idle Timeout | Maximum time to wait for the next row during query execution. Query will timeout if no rows are received within this duration. | [`ISO8601` Duration](https://www.digi.com/resources/documentation/digidocs/90001488-13/reference/r_iso_8601_duration_format.htm) | `PT30M` |
 | `/advanced/metadata_read_method` | Metadata Read Method | How table and column metadata is read. `Full Catalog Scan` reads each `OA_*` system table in a single query, which is fastest on a healthy account. `Per-Table Batches` reads metadata a table at a time, stitched together with `UNION ALL`. `Per-Table Batches` is slower, but it works when NetSuite cannot serve metadata for some table in the account. | string | `Full Catalog Scan` |
 
@@ -215,11 +217,11 @@ See [connectors](../../../concepts/connectors.md#using-connectors) to learn more
 | Property                                    | Title                   | Description                                                                                                                           | Type                                                                                                                             | Required/Default                    |
 | ------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
 | `/name`                                     | Name                    | The name of the table this binding refers to                                                                                          | string                                                                                                                           | Required                            |
-| `/interval`                                 | Interval                | How frequently to check for incremental changes                                                                                       | [`ISO8601` Duration](https://www.digi.com/resources/documentation/digidocs/90001488-13/reference/r_iso_8601_duration_format.htm) | `PT1H` (1 Hour)                     |
+| `/interval`                                 | Interval                | How frequently to check for incremental changes                                                                                       | [`ISO8601` Duration](https://www.digi.com/resources/documentation/digidocs/90001488-13/reference/r_iso_8601_duration_format.htm) | `PT1H` (1 Hour); `P1D` for snapshot bindings |
 | `/schedule`         | Schedule     | [Schedule](#setting-a-schedule) to automatically rebackfill this binding. Accepts a cron expression.      | string |   |
-| `/log_cursor`                               | Log Cursor              | A date-time column to use for incremental capture of modifications.                                                                   | String                                                                                                                           | Required (Automatically Discovered) |
-| `/page_cursor`                              | Page Cursor             | An indexed, non-NULL integer column to use for ordered table backfills. Does not need to be unique, but should have high cardinality. | String                                                                                                                           | Required (Automatically Discovered) |
-| `/concurrency`                              | Concurrency             | Maximum number of concurrent connections to use for backfilling.                                                                      | int                                                                                                                              | 1 Connection                        |
+| `/log_cursor`                               | Incremental Cursor      | A date-time column to use for incremental capture of modifications.                                                                   | String                                                                                                                           | Required (Automatically Discovered) |
+| `/page_cursor`                              | Backfill Cursor         | An indexed, non-NULL integer column to use for ordered table backfills. Does not need to be unique, but should have high cardinality. | String                                                                                                                           | Required (Automatically Discovered) |
+| `/concurrency`                              | Concurrency             | Maximum number of concurrent connections to use for backfilling. Cannot be greater than `/advanced/connection_limit`.                 | int                                                                                                                              | 1 Connection                        |
 | `/query_limit`                              | Query Limit             | Maximum number of rows to fetch in a query. Will be divided between all connections if `/concurrency` > 1                             | int                                                                                                                              | 100,000 Rows                        |
 | `/select_columns`         | Manually Selected Columns     | Override the columns to load from the table. If empty, all columns will be loaded. Ideally this should only be set when loading specific columns is necessary, as it won't automatically update when new columns are added or removed. | string array | `[]`  |
 | `/snapshot_backfill`     | Single-shot Backfill           | Attempt to backfill using a single-shot query to load all rows. Useful when no good page cursor exists, and the table is of reasonable size. Incremental updates are still possible if a log cursor is defined. | boolean | `false` |
@@ -309,10 +311,15 @@ To set exclusions for particular special column types, configure the resource's 
 
 If you find these exclusions too broad, you can add back individual filtered-out fields using the resource's **Additional Columns** Advanced Option.
 
+A binding whose queries return no rows and then fail with `Timed out too many times when fetching data from` usually selects a special column that NetSuite cannot serve.
+Turn on all four exclusion options for that binding, then add back only the columns you need under **Additional Columns**.
+
+Long-text (CLOB) values are captured up to 160,000 characters. On tables with many long-text columns, the limit is lower to keep the query under NetSuite's length limit, and the connector logs `CLOB columns will be truncated to fit the query length limit`. To capture longer values, exclude the columns you do not need.
+
 You can find out whether a specific column falls under one of these special types in NetSuite's column metadata under the `userdata` field.
 
 ## Setting a Schedule
 
-The `schedule` field accepts a cron expression that triggers a periodic re-backfill of the binding. It applies only to **paginated backfill** bindings (those with a key and `page_cursor` but no `log_cursor`). Newly discovered paginated bindings default to `0 0 * * *` (daily at midnight UTC).
+The `schedule` field accepts a cron expression that triggers a periodic re-backfill of the binding. It applies only to **paginated backfill** bindings (those with a key and `page_cursor` but no `log_cursor`). Newly discovered paginated bindings default to `0 0 * * *` (daily at midnight UTC), unless another binding loads them through an association.
 
 Incremental and snapshot bindings should not use `schedule` — incremental bindings keep up via `log_cursor`, and snapshots manage their own cadence via `interval`. See [Sync modes and data loading](#sync-modes-and-data-loading) for details.
