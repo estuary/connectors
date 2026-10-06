@@ -40,8 +40,8 @@ import (
 const defaultPort = "443"
 const volumeName = "flow_staging"
 
-// deleteSlots limits how many Files API deletes the background cleanups run at once.
-var deleteSlots = make(chan struct{}, 16)
+// deleteConcurrency is how many Files API deletes a cleanup runs at once.
+const deleteConcurrency = 16
 
 const sweepAge = 24 * time.Hour
 
@@ -624,23 +624,36 @@ func parseCheckpointItem(data json.RawMessage) (*checkpointItem, error) {
 }
 
 // deleteDirectory deletes a staging directory and its contents. The Files API
-// deletes one file per request and only deletes empty directories.
+// deletes one file per request and only deletes empty directories, so the
+// tree is listed first, then its files are deleted concurrently, then its
+// directories from the deepest up.
 func (d *transactor) deleteDirectory(ctx context.Context, dir string) error {
-	entries, err := d.files.ListDirectoryContentsAll(ctx, files.ListDirectoryContentsRequest{DirectoryPath: dir})
-	if err != nil {
-		log.WithFields(log.Fields{"dir": dir, "err": err}).Debug("listing staging directory failed")
-		return err
-	}
-	var group errgroup.Group
-	for _, entry := range entries {
-		group.Go(func() error {
+	var paths, dirs []string
+	for stack := []string{dir}; len(stack) > 0; {
+		var cur = stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		dirs = append(dirs, cur)
+
+		entries, err := d.files.ListDirectoryContentsAll(ctx, files.ListDirectoryContentsRequest{DirectoryPath: cur})
+		if err != nil {
+			log.WithFields(log.Fields{"dir": cur, "err": err}).Debug("listing staging directory failed")
+			return err
+		}
+		for _, entry := range entries {
 			if entry.IsDirectory {
-				return d.deleteDirectory(ctx, entry.Path)
+				stack = append(stack, entry.Path)
+			} else {
+				paths = append(paths, entry.Path)
 			}
-			deleteSlots <- struct{}{}
-			defer func() { <-deleteSlots }()
-			if err := d.files.DeleteByFilePath(ctx, entry.Path); err != nil {
-				log.WithFields(log.Fields{"file": entry.Path, "err": err}).Debug("deleting staged file failed")
+		}
+	}
+
+	var group, groupCtx = errgroup.WithContext(ctx)
+	group.SetLimit(deleteConcurrency)
+	for _, path := range paths {
+		group.Go(func() error {
+			if err := d.files.DeleteByFilePath(groupCtx, path); err != nil {
+				log.WithFields(log.Fields{"file": path, "err": err}).Debug("deleting staged file failed")
 				return err
 			}
 			return nil
@@ -648,9 +661,12 @@ func (d *transactor) deleteDirectory(ctx context.Context, dir string) error {
 	}
 	if err := group.Wait(); err != nil {
 		return err
-	} else if err := d.files.DeleteDirectoryByDirectoryPath(ctx, dir); err != nil {
-		log.WithFields(log.Fields{"dir": dir, "err": err}).Debug("deleting staging directory failed")
-		return err
+	}
+	for _, cur := range slices.Backward(dirs) {
+		if err := d.files.DeleteDirectoryByDirectoryPath(ctx, cur); err != nil {
+			log.WithFields(log.Fields{"dir": cur, "err": err}).Debug("deleting staging directory failed")
+			return err
+		}
 	}
 	return nil
 }
