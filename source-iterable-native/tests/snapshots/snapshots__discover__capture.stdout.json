@@ -155,6 +155,10 @@
           "title": "Updatedat",
           "type": "integer"
         },
+        "startAt": {
+          "title": "Startat",
+          "type": "integer"
+        },
         "endedAt": {
           "title": "Endedat",
           "type": "integer"

@@ -1,5 +1,34 @@
 # materialize-snowflake
 
+## 2026-09-28
+
+### Fixed
+- Staged files are uploaded in 8 MiB parts, and the number of uploads in
+  flight is capped across all tables based on the connector's memory limit.
+  Previously each upload held about 192 MiB and every table could run five at
+  once, so transactions touching several tables could exceed the memory limit
+  and restart the task repeatedly.
+- Each table's staged file is finished and sent to Snowflake as soon as the
+  transaction's rows move on to the next table, instead of every table's file
+  staying open until commit. Wide transactions no longer hold a compressor per
+  table, and uploads overlap with writing the remaining tables.
+
+## 2026-09-24
+
+### Fixed
+- Reduced memory used while uploading staged files, which since the
+  2026-09-22 driver update could exceed the connector's memory limit and
+  restart the task repeatedly when several large files for one table were
+  uploaded at once.
+
+## 2026-09-21
+
+### Fixed
+- When syncing automatic clustering, the connector now checks the clustering
+  state of exactly the target table. Previously, a table in the same schema
+  whose name differed only where the target's name has an underscore could be
+  read instead, causing a clustering key to be dropped or kept incorrectly.
+
 ## 2026-09-12
 
 ### Fixed
@@ -11,6 +40,50 @@
 
 ### Fixed
 - Fix channel closed panic when debug logging is enabled.
+
+## 2026-09-10
+
+### Added
+- New `snowpipe_streaming_v2` feature flag (off by default). Delta-updates
+  bindings stream their rows to Snowflake through the high-performance Snowpipe
+  Streaming architecture as they are materialized, so nothing is staged and each
+  row is transmitted once. Requires key-pair (JWT) authentication and the
+  `enable-runtime-v2` shard flag. A task missing either, or which also sets
+  `snowpipe_streaming`, is rejected before anything in Snowflake is created or
+  altered. The runtime flag can only be checked once the task runs, so a
+  publication of a task without it logs a warning naming the flag.
+
+### Changed
+With `snowpipe_streaming_v2` set, delta-updates bindings behave as follows.
+- Each binding writes through four channels per shard, one per equal key range
+  of the shard's key-hash range, for a ceiling of 80 MB/s per shard. A shard
+  split or join hands each surviving shard whole channels, which resume from
+  their committed offset tokens, so a topology change loses nothing.
+- Rows become visible in the destination slightly before the Flow transaction
+  which produced them commits. Every committed transaction is still
+  materialized exactly once, including across restarts.
+- Backfilling a binding truncates its table like any other backfill, so grants
+  on that table survive it, and the `retain_existing_data_on_backfill` feature
+  flag applies to it the same way it applies to every other binding. The
+  channels of the replaced binding are dropped when the backfill first opens.
+- A binding moving onto this path first finishes the work its previous write
+  path staged. Where that is impossible, the binding is rejected, naming the
+  table and the count outstanding.
+- Two tasks may not stream into one table; the second is rejected, naming the
+  first. A task that was deleted or renamed leaves its channels on the table,
+  and is named the same way, until the binding is backfilled with the
+  `always_drop_tables_on_backfill` feature flag set, which drops the table and
+  every channel on it.
+- The one way off this path without a backfill is setting `snowpipe_streaming`
+  while removing `snowpipe_streaming_v2`, on a task that keeps the V2 runtime.
+  Documents Snowflake had committed beyond the checkpoint are then materialized
+  again. Any other departure is rejected, naming the binding.
+- A row Snowflake's ingestion rejects fails the transaction, reporting
+  Snowflake's own description of what it rejected. Rejected rows cannot be
+  re-sent, so the failure holds until the binding is backfilled.
+- If the connector cannot establish which rows Snowflake already holds, such as
+  after the same shard is split twice before its channels converged, it fails
+  rather than duplicate or drop rows. Backfilling the binding recovers.
 
 ## 2026-08-25
 

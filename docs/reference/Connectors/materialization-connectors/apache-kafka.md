@@ -17,6 +17,16 @@ format.
 
 For Avro messages, the connector must be configured to use a [schema
 registry](https://docs.confluent.io/platform/current/schema-registry/index.html).
+With `avro_logical_types` enabled, which is the default for new
+materializations, registered schemas include Avro logical types, so a field
+with `format: date-time`, including the `flow_published_at` metadata field, is a
+`long` with `logicalType: timestamp-micros`. Materializations created before
+this option existed do not have it enabled and register these fields as plain
+`string` values. A specification written by hand that omits the field, or sets
+it to `false`, also keeps the `string` encoding, for example to match topics
+written by an older materialization. Enabling it on an existing materialization
+changes the type of those fields in its topics, which may break consumers that
+expect a string.
 
 JSON messages may be materialized without a schema registry.
 
@@ -99,6 +109,7 @@ Note that, by default, all top-level fields are recommended for materialization.
 | `/schema_registry/endpoint`     | Schema Registry Endpoint | Schema registry API endpoint. For example: `https://registry-id.us-east-2.aws.confluent.cloud`.                                                      | string  |                         |
 | `/schema_registry/username`     | Schema Registry Username | Schema registry username to use for authentication. If you are using Confluent Cloud, this will be the 'Key' from your schema registry API key.    | string  |                         |
 | `/schema_registry/password`     | Schema Registry Password | Schema registry password to use for authentication. If you are using Confluent Cloud, this will be the 'Secret' from your schema registry API key. | string  |                         |
+| `/avro_logical_types`           | Avro Logical Types       | Register Avro schemas with logical types, so that date-time fields such as `flow_published_at` are timestamps rather than strings. Treated as `false` when omitted. | boolean | `true` in the web app |
 
 #### Bindings
 
@@ -122,6 +133,8 @@ materializations:
             mechanism: SCRAM-SHA-512
             username: bruce.wayne
             password: definitely-not-batman
+          message_format: Avro
+          avro_logical_types: true
           schema_registry:
             endpoint: https://schema.registry.com
             username: schemaregistry.username

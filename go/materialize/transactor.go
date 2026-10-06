@@ -9,6 +9,7 @@ import (
 
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	"github.com/gogo/protobuf/types"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	pc "go.gazette.dev/core/consumer/protocol"
@@ -50,6 +51,19 @@ type Transactor interface {
 	// updates of that prior transaction, and thus meet the formal "read-committed"
 	// guarantee required by the runtime.
 	Load(_ *LoadIterator, loaded func(binding int, doc json.RawMessage) error) error
+
+	// Flush ends the load phase of a transaction, so it is called after Load
+	// returns and before the first Store.
+	//
+	// `completes` maps a binding index to its truncation boundary for each
+	// backfill that completed in this transaction. The boundary is the
+	// publication time of the backfill's begin signal. A stored document of
+	// that binding whose `flow_published_at` is earlier than the boundary
+	// predates the backfill, so it is stale and may be deleted.
+	//
+	// Runtime v1 does not populate `completes`.
+	Flush(ctx context.Context, completes map[int]time.Time) error
+
 	// Store consumes Store requests from the StoreIterator and returns
 	// a StartCommitFunc which is used to commit the stored transaction.
 	// StartCommitFunc may be nil, which indicate that commits are a
@@ -390,6 +404,31 @@ func RunTransactions(
 
 		if err = validateIsFlush(&rxRequest); err != nil {
 			return err
+		}
+		for _, bb := range rxRequest.Flush.BackfillBegins {
+			var boundary time.Time
+			if boundary, err = types.TimestampFromProto(bb.Timestamp); err != nil {
+				return fmt.Errorf("invalid timestamp in Flush.BackfillBegins: %w", err)
+			}
+			log.WithFields(log.Fields{
+				"binding":  bb.Binding,
+				"boundary": boundary,
+			}).Info("backfill began")
+		}
+		var backfillCompletes = make(map[int]time.Time, len(rxRequest.Flush.BackfillCompletes))
+		for _, bc := range rxRequest.Flush.BackfillCompletes {
+			backfillCompletes[int(bc.Binding)], err = types.TimestampFromProto(bc.Timestamp)
+			if err != nil {
+				return fmt.Errorf("invalid timestamp in Flush.BackfillCompletes: %w", err)
+			}
+			log.WithFields(log.Fields{
+				"binding":  bc.Binding,
+				"boundary": backfillCompletes[int(bc.Binding)],
+			}).Info("backfill completed")
+			health.observeTruncation(round, int(bc.Binding))
+		}
+		if err = transactor.Flush(ctx, backfillCompletes); err != nil {
+			return fmt.Errorf("transactor.Flush: %w", err)
 		} else if err = writeFlushed(stream, &txResponse); err != nil {
 			return err
 		}

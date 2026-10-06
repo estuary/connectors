@@ -195,9 +195,6 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     "ActiveScratchOrgShare": {
         "cursor_field": CursorFields.LAST_MODIFIED_DATE
     },
-    "ActivityMetric": {
-        "cursor_field": CursorFields.SYSTEM_MODSTAMP
-    },
     "ActvTgtPlatformFieldValue": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },

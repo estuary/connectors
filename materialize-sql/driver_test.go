@@ -2,6 +2,7 @@ package sql
 
 import (
 	"context"
+	"github.com/estuary/connectors/go/common"
 	"testing"
 	"text/template"
 
@@ -13,9 +14,9 @@ import (
 
 type stateKeyTestConfig struct{}
 
-func (stateKeyTestConfig) Validate() error                         { return nil }
-func (stateKeyTestConfig) DefaultNamespace() string                { return "public" }
-func (stateKeyTestConfig) FeatureFlags() (string, map[string]bool) { return "", nil }
+func (stateKeyTestConfig) Validate() error                                       { return nil }
+func (stateKeyTestConfig) DefaultNamespace() string                              { return "public" }
+func (stateKeyTestConfig) FeatureFlags() (string, map[string]common.FlagDefault) { return "", nil }
 
 type stateKeyTestResource struct{}
 

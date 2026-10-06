@@ -17,6 +17,7 @@ import (
 	databasepb "cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
 	instance "cloud.google.com/go/spanner/admin/instance/apiv1"
 	instancepb "cloud.google.com/go/spanner/admin/instance/apiv1/instancepb"
+	"github.com/estuary/connectors/go/common"
 	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
@@ -28,8 +29,8 @@ import (
 	"google.golang.org/api/option"
 )
 
-var featureFlagDefaults = map[string]bool{
-	"datetimes_as_string": true,
+var featureFlagDefaults = map[string]common.FlagDefault{
+	"datetimes_as_string": common.FlagEnabled,
 }
 
 // credentialConfig represents authentication options for Cloud Spanner
@@ -71,7 +72,7 @@ func (c config) Validate() error {
 	return nil
 }
 
-func (c config) FeatureFlags() (string, map[string]bool) {
+func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
 	return c.Advanced.FeatureFlags, featureFlagDefaults
 }
 
@@ -599,6 +600,10 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
+func (t *transactor) Flush(context.Context, map[int]time.Time) error {
+	return nil
+}
+
 func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
 	return nil, nil
 }

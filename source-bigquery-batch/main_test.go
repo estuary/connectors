@@ -328,6 +328,38 @@ func TestSimpleCapture(t *testing.T) {
 	})
 }
 
+// TestIngestionTimePartitioning exercises discovery and capture of an ingestion-time
+// partitioned table. Such tables have a `_PARTITIONTIME` pseudo-column with a NULL
+// ordinal position. We skip pseudo-columns.
+func TestIngestionTimePartitioning(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testBigQueryClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(ctx, t, control, tableName, "(id INTEGER PRIMARY KEY NOT ENFORCED, data STRING) PARTITION BY _PARTITIONDATE")
+
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+	setCursorColumns(t, cs.Bindings[0], "id")
+	t.Run("Discovery", func(t *testing.T) {
+		var schema struct {
+			Properties map[string]json.RawMessage `json:"properties"`
+		}
+		require.NoError(t, json.Unmarshal(cs.Bindings[0].Collection.ReadSchemaJson, &schema))
+		require.NotContains(t, schema.Properties, "_PARTITIONTIME")
+		require.NotContains(t, schema.Properties, "_PARTITIONDATE")
+		cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings))
+	})
+
+	t.Run("Capture", func(t *testing.T) {
+		setShutdownAfterQuery(t, true)
+
+		require.NoError(t, parallelSetupQueries(ctx, t, control, fmt.Sprintf("INSERT INTO %s (id, data) VALUES (@p0, @p1)", tableName), [][]any{
+			{1, "Value for row 1"}, {2, "Value for row 2"},
+			{3, "Value for row 3"}, {4, "Value for row 4"},
+		}))
+		cs.Capture(ctx, t, nil)
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
+
 // TestIntegerTypes exercises discovery and capture of the integer types
 // INT, SMALLINT, INTEGER, BIGINT, TINYINT, and BYTEINT. In BigQuery these
 // types are all aliases for each other, but it's worth being thorough.

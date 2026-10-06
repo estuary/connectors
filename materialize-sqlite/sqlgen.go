@@ -49,7 +49,7 @@ var sqliteDialect = func() sql.Dialect {
 var (
 	tplAll = sql.MustParseTemplate(sqliteDialect, "root", `
   {{ define "temp_name" -}}
-  flow_temp_table_{{ $.Binding }}
+  load.flow_temp_table_{{ $.Binding }}
   {{- end }}
 
   -- Templated creation of a materialized table definition and comments:
@@ -141,7 +141,7 @@ var (
   {{- if $ind }},{{ end }}
   {{ $val.Identifier}} = {{ $val.Placeholder }}
   {{- end }}
-  {{- if $.Document }},
+  {{- if $.Document }}{{ if $.Values }},{{ end }}
   {{ $.Document.Identifier }} = {{ $.Document.Placeholder }}
   {{- end -}}
   {{ range $ind, $key := $.Keys }}

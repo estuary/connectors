@@ -1,0 +1,51 @@
+Task: acmeCo/tests/materialize-azure-fabric-warehouse
+
+Base:
+Resource: integration_tests.estuary_test_schema.key_change_test
+["applied.actionDescription", "\nCREATE TABLE integration_tests.estuary_test_schema.key_change_test (\n\tid BIGINT,\n\tflow_published_at DATETIME2(6),\n\ttenant VARCHAR(MAX),\n\t\"value\" VARCHAR(MAX),\n\tflow_document VARCHAR(MAX)\n);\n"]
+["applied.actionDescription", ""]
+
+{"Name":"flow_document","Nullable":true,"Type":"varchar"}
+{"Name":"flow_published_at","Nullable":true,"Type":"datetime2"}
+{"Name":"id","Nullable":true,"Type":"bigint"}
+{"Name":"tenant","Nullable":true,"Type":"varchar"}
+{"Name":"value","Nullable":true,"Type":"varchar"}
+
+Table Data:
+{"flow_document":{"_meta":{"uuid":"13814000-1dd2-11b2-8000-071353030311"},"id":1,"tenant":"a","value":"one"},"flow_published_at":"1970-01-01T00:00:00Z","id":1,"tenant":"a","value":"one"}
+{"flow_document":{"_meta":{"uuid":"1419d680-1dd2-11b2-8000-071353030311"},"id":2,"tenant":"a","value":"two"},"flow_published_at":"1970-01-01T00:00:01Z","id":2,"tenant":"a","value":"two"}
+{"flow_document":{"_meta":{"uuid":"14b26d00-1dd2-11b2-8000-071353030311"},"id":3,"tenant":"b","value":"three"},"flow_published_at":"1970-01-01T00:00:02Z","id":3,"tenant":"b","value":"three"}
+
+Group-by changed with backfill:
+Resource: integration_tests.estuary_test_schema.key_change_test
+
+{"Name":"flow_document","Nullable":true,"Type":"varchar"}
+{"Name":"flow_published_at","Nullable":true,"Type":"datetime2"}
+{"Name":"id","Nullable":true,"Type":"bigint"}
+{"Name":"tenant","Nullable":true,"Type":"varchar"}
+{"Name":"value","Nullable":true,"Type":"varchar"}
+
+Table Data:
+{"flow_document":{"_meta":{"uuid":"13814000-1dd2-11b2-8000-071353030311"},"id":1,"tenant":"a","value":"one"},"flow_published_at":"1970-01-01T00:00:00Z","id":1,"tenant":"a","value":"one"}
+{"flow_document":{"_meta":{"uuid":"1419d680-1dd2-11b2-8000-071353030311"},"id":2,"tenant":"a","value":"two"},"flow_published_at":"1970-01-01T00:00:01Z","id":2,"tenant":"a","value":"two"}
+{"flow_document":{"_meta":{"uuid":"14b26d00-1dd2-11b2-8000-071353030311"},"id":3,"tenant":"b","value":"three"},"flow_published_at":"1970-01-01T00:00:02Z","id":3,"tenant":"b","value":"three"}
+
+Materialized under the new group-by:
+Resource: integration_tests.estuary_test_schema.key_change_test
+["applied.actionDescription", ""]
+["applied.actionDescription", ""]
+
+{"Name":"flow_document","Nullable":true,"Type":"varchar"}
+{"Name":"flow_published_at","Nullable":true,"Type":"datetime2"}
+{"Name":"id","Nullable":true,"Type":"bigint"}
+{"Name":"tenant","Nullable":true,"Type":"varchar"}
+{"Name":"value","Nullable":true,"Type":"varchar"}
+
+Table Data:
+{"flow_document":{"_meta":{"uuid":"13814000-1dd2-11b2-8000-071353030311"},"id":1,"tenant":"a","value":"one-updated"},"flow_published_at":"1970-01-01T00:00:00Z","id":1,"tenant":"a","value":"one-updated"}
+{"flow_document":{"_meta":{"uuid":"1419d680-1dd2-11b2-8000-071353030311"},"id":2,"tenant":"a","value":"two"},"flow_published_at":"1970-01-01T00:00:01Z","id":2,"tenant":"a","value":"two"}
+{"flow_document":{"_meta":{"uuid":"1419d680-1dd2-11b2-8000-071353030311"},"id":2,"tenant":"c","value":"two-moved"},"flow_published_at":"1970-01-01T00:00:01Z","id":2,"tenant":"c","value":"two-moved"}
+{"flow_document":{"_meta":{"uuid":"14b26d00-1dd2-11b2-8000-071353030311"},"id":3,"tenant":"b","value":"three"},"flow_published_at":"1970-01-01T00:00:02Z","id":3,"tenant":"b","value":"three"}
+{"flow_document":{"_meta":{"uuid":"14b26d00-1dd2-11b2-8000-071353030311"},"id":4,"tenant":"b","value":"four"},"flow_published_at":"1970-01-01T00:00:02Z","id":4,"tenant":"b","value":"four"}
+
+

@@ -107,7 +107,8 @@ func (Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 }
 
 func (Driver) NewTransactor(ctx context.Context, req pm.Request_Open, be *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
-	return boilerplate.RunNewTransactor(ctx, req, be, NewMaterializer)
+	return boilerplate.RunNewTransactor(ctx, req, be, NewMaterializer,
+		boilerplate.WithConfigUpdates([]string{"advanced", "feature_flags"}))
 }
 
 type materialization struct {

@@ -5,6 +5,7 @@ import (
 	stdsql "database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/estuary/connectors/go/common"
 	"os/exec"
 	"slices"
 	"strings"
@@ -53,6 +54,65 @@ func TestIntegration(t *testing.T) {
 	t.Run("materialize", func(t *testing.T) {
 		sql.RunMaterializationTest(t, NewDriver(), "testdata/materialize.flow.yaml", makeResourceFn, nil,
 			sql.RuntimeConfig{Shards: 1, Fidelity: m.FidelityTotal})
+	})
+
+	t.Run("truncate", func(t *testing.T) {
+		if boilerplate.RuntimeV1() {
+			t.Skip("backfill signals require runtime-next")
+		}
+		boilerplate.RunTestAllTasks(t, "testdata/truncate.flow.yaml", func(t *testing.T, _ []byte, taskName string, cfg config) {
+			t.Run(taskName, func(t *testing.T) {
+				var ctx = context.Background()
+				db, err := stdsql.Open("mysql", cfg.ToURI())
+				require.NoError(t, err)
+				defer db.Close()
+
+				// SingleStore drops at most one table per statement.
+				for _, table := range []string{"truncate_standard", "truncate_delta", "truncate_no_published_at"} {
+					_, err = db.ExecContext(ctx, "DROP TABLE IF EXISTS "+table+";")
+					require.NoError(t, err)
+				}
+				var checkpoints int
+				require.NoError(t, db.QueryRowContext(ctx,
+					"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = ? AND table_name = 'flow_checkpoints_v1'",
+					cfg.Database,
+				).Scan(&checkpoints))
+				if checkpoints > 0 {
+					_, err = db.ExecContext(ctx, `DELETE FROM flow_checkpoints_v1 WHERE materialization = ?;`, taskName)
+					require.NoError(t, err)
+				}
+
+				boilerplate.RunFlowctl(t, "raw", "preview-next",
+					"--name", taskName,
+					"--source", "testdata/truncate.flow.yaml",
+					"--fixture", "testdata/truncate.fixture.json",
+					"--shards", "1",
+					"--timeout", "5m",
+					"--network", "flow-test",
+				)
+
+				// The fixture stores ids 1-3, then re-stores only id 1 during a
+				// backfill. Only the standard table with a flow_published_at
+				// column loses the rows published before the backfill.
+				for table, want := range map[string][]int64{
+					"truncate_standard":        {1},
+					"truncate_delta":           {1, 1, 2, 3},
+					"truncate_no_published_at": {1, 2, 3},
+				} {
+					var rows, err = db.QueryContext(ctx, "SELECT id FROM "+table+" ORDER BY id;")
+					require.NoError(t, err)
+					var ids []int64
+					for rows.Next() {
+						var id int64
+						require.NoError(t, rows.Scan(&id))
+						ids = append(ids, id)
+					}
+					require.NoError(t, rows.Err())
+					require.NoError(t, rows.Close())
+					require.Equal(t, want, ids, table)
+				}
+			})
+		})
 	})
 
 	t.Run("apply", func(t *testing.T) {
@@ -258,7 +318,7 @@ func TestPrereqs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var actual = preReqs(ctx, tt.cfg(cfg)).Unwrap()
+			var actual = preReqs(ctx, tt.cfg(cfg), common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{})).Unwrap()
 
 			require.Equal(t, len(tt.want), len(actual))
 			for i := 0; i < len(tt.want); i++ {

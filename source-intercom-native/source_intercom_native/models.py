@@ -50,10 +50,18 @@ OAUTH2_SPEC = OAuth2Spec(
 if TYPE_CHECKING:
     OAuth2Credentials = LongLivedClientCredentialsOAuth2Credentials
 else:
-    OAuth2Credentials = LongLivedClientCredentialsOAuth2Credentials.for_provider(OAUTH2_SPEC.provider)
+    OAuth2Credentials = LongLivedClientCredentialsOAuth2Credentials.for_provider(
+        OAUTH2_SPEC.provider
+    )
 
 MAX_SEARCH_PAGE_SIZE = 150
 DEFAULT_API_VERSION = "2.11"
+
+
+def parse_api_version(api_version: str) -> tuple[int, int]:
+    # Versions must be compared numerically; as strings, "2.9" sorts after "2.16".
+    major, minor = api_version.split(".")
+    return (int(major), int(minor))
 
 
 def default_start_date():
@@ -71,26 +79,33 @@ class EndpointConfig(BaseModel):
         title="Start Date",
         default_factory=default_start_date,
     )
+
     class Advanced(BaseModel):
-        window_size: Annotated[int, Field(
-            description="Window size in days for incremental streams.",
-            title="Window Size",
-            default=5,
-            gt=0,
-        )]
+        window_size: Annotated[
+            int,
+            Field(
+                description="Window size in days for incremental streams.",
+                title="Window Size",
+                default=5,
+                gt=0,
+            ),
+        ]
         use_companies_list_endpoint: bool = Field(
             description="If selected, the /companies/list endpoint is used instead of the /companies/scroll endpoint. Typically, leave as the default unless the connector's logs indicate otherwise.",
             title="Use /companies/list endpoint",
             default=False,
             json_schema_extra={"nonsensitive": True},
         )
-        search_page_size: Annotated[int, Field(
-            description="Page size for streams that use Intercom's search endpoints. Typically, leave as the default unless streams using search endpoints encounter constant Intercom server timeouts.",
-            title="Search Streams' Page Size",
-            default=MAX_SEARCH_PAGE_SIZE,
-            gt=0,
-            le=MAX_SEARCH_PAGE_SIZE,
-        )]
+        search_page_size: Annotated[
+            int,
+            Field(
+                description="Page size for streams that use Intercom's search endpoints. Typically, leave as the default unless streams using search endpoints encounter constant Intercom server timeouts.",
+                title="Search Streams' Page Size",
+                default=MAX_SEARCH_PAGE_SIZE,
+                gt=0,
+                le=MAX_SEARCH_PAGE_SIZE,
+            ),
+        ]
         api_version: str = Field(
             description=f"The Intercom API version used for requests. Defaults to '{DEFAULT_API_VERSION}'.",
             title="API Version",
@@ -100,7 +115,7 @@ class EndpointConfig(BaseModel):
         )
 
     advanced: Advanced = Field(
-        default_factory=Advanced, #type: ignore
+        default_factory=Advanced,  # type: ignore
         title="Advanced Config",
         description="Advanced settings for the connector.",
         json_schema_extra={"advanced": True},
@@ -133,7 +148,7 @@ class SearchResponse(BaseModel, extra="allow"):
             page: int
             starting_after: str
 
-        next: Optional[Next] = None # If next is not present, this is the last page.
+        next: Optional[Next] = None  # If next is not present, this is the last page.
 
     pages: Pagination
 
@@ -220,7 +235,7 @@ class CompanyListResponse(BaseModel, extra="allow"):
         page: int
         per_page: int
         total_pages: int
-        next: Optional[str] # If next is None, this is the last page.
+        next: Optional[str]  # If next is None, this is the last page.
 
     pages: Pagination
 

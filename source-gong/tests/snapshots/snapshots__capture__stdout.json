@@ -1,5 +1,536 @@
 [
   [
+    "acmeCo/call_transcripts",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "callId": 7022652889306584427,
+      "transcript": [
+        {
+          "sentences": [
+            {
+              "end": 740,
+              "start": 160,
+              "text": "chapter I."
+            }
+          ],
+          "speakerId": "656861958384341821",
+          "topic": null
+        },
+        {
+          "sentences": [
+            {
+              "end": 19740,
+              "start": 17500,
+              "text": "introduces a latter day heroin."
+            },
+            {
+              "end": 22480,
+              "start": 19740,
+              "text": "I was 22 and without employment."
+            },
+            {
+              "end": 34040,
+              "start": 22920,
+              "text": "I would not say by this that I was without occupation in the world in which we live set with daisies and kingfishers and undeciphered faces of men and women."
+            },
+            {
+              "end": 37920,
+              "start": 34200,
+              "text": "I doubt I could be at a loss for something to occupy me."
+            },
+            {
+              "end": 43340,
+              "start": 38100,
+              "text": "A swallow's back as he turns in the sunshine is so full of meaning."
+            },
+            {
+              "end": 82920,
+              "start": 43640,
+              "text": "If you dwell in the country you need but pin on a hat and slip out into a meadow and there in some bite of the hedgerow, you shall see spring buds, untwisting, sulphur butterflies, coquetting, hear nightingales sing as they sang to keats, and streamlets, make madrigal as they wimpled for Marlowe, nay, even here in London where life is rarer, how can I cruise down the strand without encountering strange barks, mysterious argosies that attract and intrigue me that living stream is so marvellous."
+            },
+            {
+              "end": 88180,
+              "start": 82920,
+              "text": "Whence come they, these shadows and whither, do they go innumerable?"
+            },
+            {
+              "end": 93380,
+              "start": 88180,
+              "text": "Silent, each wrapped in his own thought, yet each real to himself."
+            },
+            {
+              "end": 104660,
+              "start": 93380,
+              "text": "As I, to my heart, to me, they are shooting stars, phantoms that flash athwart the orbit of my life one second and then vanish."
+            },
+            {
+              "end": 109880,
+              "start": 104660,
+              "text": "But to themselves, they are the centre of a world of the world."
+            },
+            {
+              "end": 114500,
+              "start": 109880,
+              "text": "And I am but one of the meteors that dart across their horizon."
+            },
+            {
+              "end": 121320,
+              "start": 115140,
+              "text": "I cannot choose but wonder who each is and why he is here for one after another."
+            },
+            {
+              "end": 122760,
+              "start": 121320,
+              "text": "I invent a story."
+            },
+            {
+              "end": 128200,
+              "start": 122760,
+              "text": "It may not be the true story but at least it amuses me every morning."
+            },
+            {
+              "end": 143280,
+              "start": 128200,
+              "text": "I see them stream in from the unknown by the early trains and disperse like sparks that twinkle on the thin soot of the chimney back men with small black bags bound for mysterious offices."
+            },
+            {
+              "end": 145660,
+              "start": 144140,
+              "text": "What happens in those offices?"
+            },
+            {
+              "end": 152100,
+              "start": 145660,
+              "text": "I have no idea they may lend money or buy shares or promote Christian knowledge."
+            },
+            {
+              "end": 156900,
+              "start": 152500,
+              "text": "I only know, I see them come in the morning and flit again at night."
+            },
+            {
+              "end": 161100,
+              "start": 157080,
+              "text": "Sometimes the same figures recognizably identical."
+            },
+            {
+              "end": 168520,
+              "start": 161480,
+              "text": "They rush back absorbed to catch the train to the unknown as they rushed up from it earlier."
+            },
+            {
+              "end": 181280,
+              "start": 168840,
+              "text": "So, day after day, the tide sets and ebbs while I stand on the shore of the vast sea of London like a child that watches and commissioner Lynn guards me."
+            },
+            {
+              "end": 188680,
+              "start": 181280,
+              "text": "I have always been grateful to mr Samuel butler for his eccentric theory that a woman wrote the odyssey."
+            },
+            {
+              "end": 191020,
+              "start": 188680,
+              "text": "I do not say that I agree with him."
+            },
+            {
+              "end": 196660,
+              "start": 191020,
+              "text": "If I did, I am not aware that any critic would attach the least importance to my opinion."
+            },
+            {
+              "end": 202140,
+              "start": 196660,
+              "text": "But it is a soothing theory for us latter day women without thinking it true."
+            },
+            {
+              "end": 208020,
+              "start": 202640,
+              "text": "I love to believe it, the odyssey, you will grant is the epic of the imagination."
+            }
+          ],
+          "speakerId": "656861958384341821",
+          "topic": "Small Talk"
+        },
+        {
+          "sentences": [
+            {
+              "end": 213420,
+              "start": 208020,
+              "text": "It is the epic of mystery in the iliad which is the epic of fact."
+            },
+            {
+              "end": 217040,
+              "start": 213420,
+              "text": "Everything is clear cut, distinct commonplace."
+            },
+            {
+              "end": 236500,
+              "start": 217820,
+              "text": "I do not conceive that a woman could have written the iliad, its theme would fail to interest her that hard hand play of battle counts for naught to our sex, clang of bronze sword on ringing shield rouses no echo in our heart or brain."
+            },
+            {
+              "end": 238380,
+              "start": 236500,
+              "text": "It is a masculine poem."
+            },
+            {
+              "end": 250220,
+              "start": 238380,
+              "text": "How practical it is, how cold, how every day, how mannish considering its August age, how little it gleams with the glamour of antiquity."
+            },
+            {
+              "end": 256440,
+              "start": 250640,
+              "text": "Ulysses in the iliad is just a shifty politician, an adroit public speaker."
+            },
+            {
+              "end": 261080,
+              "start": 256440,
+              "text": "Achilles is just a petulant, ill disciplined young warrior."
+            },
+            {
+              "end": 265520,
+              "start": 261080,
+              "text": "I have met him in London, fresh home from the transvaal."
+            },
+            {
+              "end": 269100,
+              "start": 265520,
+              "text": "The whole mighty saga is a saga of men's."
+            },
+            {
+              "end": 272380,
+              "start": 269100,
+              "text": "Ideas so sharp is it in its outlines?"
+            },
+            {
+              "end": 273860,
+              "start": 272380,
+              "text": "So historical?"
+            },
+            {
+              "end": 275180,
+              "start": 273860,
+              "text": "So definite?"
+            },
+            {
+              "end": 276800,
+              "start": 275180,
+              "text": "But the odyssey?"
+            },
+            {
+              "end": 280860,
+              "start": 276800,
+              "text": "Yes, I read in it clearly the fine hand of a woman."
+            },
+            {
+              "end": 287400,
+              "start": 280860,
+              "text": "It has the vagueness, the elusiveness, the melting hazy charm of feminine craft."
+            }
+          ],
+          "speakerId": "656861958384341821",
+          "topic": null
+        },
+        {
+          "sentences": [
+            {
+              "end": 289660,
+              "start": 288300,
+              "text": "It thrills with mystery."
+            },
+            {
+              "end": 294060,
+              "start": 289860,
+              "text": "And woman is the mystic, look at its glorious dimness."
+            },
+            {
+              "end": 297980,
+              "start": 294260,
+              "text": "You descry its geography in veiled outline."
+            },
+            {
+              "end": 313920,
+              "start": 297980,
+              "text": "Only as one beholds the paps of Diora, on a day of sea fog, through swaying sheets of white cloud, from a fisherman's boat on the bay of oban, it is a celtic dreamland from morning to night."
+            },
+            {
+              "end": 332060,
+              "start": 313960,
+              "text": "In that enchanted poem, on and on, we sail past uncertain isles or dubious blue headlands, begirt with fantastic forms and in perils of the sea more awesome than the real architects have reconstructed priam's palace."
+            },
+            {
+              "end": 346110,
+              "start": 332360,
+              "text": "I believe from the description in the iliad that is man's way of describing but who could reconstruct from the rapt words of the odyssey, circe's island or the gardens of alcinous."
+            },
+            {
+              "end": 355890,
+              "start": 346410,
+              "text": "Peering and prying, schliemann found in the battle epic, a whole plan of the troad or at least read one into it."
+            },
+            {
+              "end": 366850,
+              "start": 356090,
+              "text": "Fancy even imagining you could construct a chart of the mediterranean to show the homeward maze of the much travelled wanderer from ilion to ithaca."
+            },
+            {
+              "end": 376030,
+              "start": 367050,
+              "text": "The bare idea would indicate a misconception of the odyssey for those are the seas and islands that never were they live."
+            },
+            {
+              "end": 385590,
+              "start": 376030,
+              "text": "But in the ghost geography of poets and women as arguments, indeed, the proofs adduced seem to me preposterous."
+            },
+            {
+              "end": 391230,
+              "start": 385650,
+              "text": "It is nonsense to say that in the odyssey, the chief role is played by women."
+            },
+            {
+              "end": 406510,
+              "start": 391410,
+              "text": "Do women's books deal exclusively or even mainly with their own sex is not the titan man, the strong sardonic, woman, quelling hero, a recognized commonplace of women's fancy."
+            },
+            {
+              "end": 415190,
+              "start": 406850,
+              "text": "I did not believe an ithacan lady wrote the odyssey because of the relative importance of Penelope and nausicaa."
+            },
+            {
+              "end": 425950,
+              "start": 415490,
+              "text": "Surely even a man might have set Penelope at her web or nausicaa at her tennis in that I see nothing occult or esoterically feminine."
+            },
+            {
+              "end": 432660,
+              "start": 426500,
+              "text": "Men must be aware that every circe has the power of turning men into swine."
+            },
+            {
+              "end": 435860,
+              "start": 432740,
+              "text": "They ought to know they have seen it done daily."
+            },
+            {
+              "end": 439100,
+              "start": 436200,
+              "text": "No, those are not the reasons that weigh with me."
+            },
+            {
+              "end": 448500,
+              "start": 439360,
+              "text": "It is the wonder, the magic, the purple mystery of the odyssey that tells to my mind in favor of its female authorship."
+            },
+            {
+              "end": 452700,
+              "start": 448700,
+              "text": "And though I know mr Samuel butler's, theory is not true."
+            },
+            {
+              "end": 457520,
+              "start": 452900,
+              "text": "I thank God I am woman enough nonetheless to embrace it."
+            },
+            {
+              "end": 460670,
+              "start": 458190,
+              "text": "But what has all this to do with my story?"
+            },
+            {
+              "end": 465510,
+              "start": 460670,
+              "text": "The story I am setting out in my own fashion to tell you a great deal."
+            },
+            {
+              "end": 473570,
+              "start": 465510,
+              "text": "And besides, unless you, let me tell it in my own wayward way, I can never get through with it in that respect."
+            },
+            {
+              "end": 476870,
+              "start": 473570,
+              "text": "Also, I hold myself true woman."
+            },
+            {
+              "end": 478590,
+              "start": 476870,
+              "text": "And this is the connection."
+            },
+            {
+              "end": 481450,
+              "start": 478590,
+              "text": "If only we could have lived in those days."
+            },
+            {
+              "end": 485070,
+              "start": 481450,
+              "text": "People say, I answer, you are living in them."
+            },
+            {
+              "end": 526970,
+              "start": 485070,
+              "text": "It is not the days not the places not the things that change, but we who see them otherwise consider the mediterranean is the same sea to day as when the ithacan lady who wrote the odyssey looked out upon its blue zones to behold it peopled with strange forms and wizard shadows for that nameless sappho that prehistoric, Charlotte bront, that inchoate, Elizabeth Barrett browning, the ionian main swarmed alive with gorgons and harpies as loch Finna, with herrings, sirens sang on every rock to lure the seamen."
+            },
+            {
+              "end": 532350,
+              "start": 526970,
+              "text": "Promontories glowed red at set of sun with the forges of the cyclops."
+            },
+            {
+              "end": 553050,
+              "start": 532350,
+              "text": "You may steam down the prosaic adriatic to day in an Austrian Lloyd steamer, a fearsome, behemoth, bellowing, snorting, flame, breathing, and identify those charmed shores of hellenic fancy as laid down with soundings in the admiralty surveys."
+            },
+            {
+              "end": 555550,
+              "start": 553050,
+              "text": "But that is your blindness."
+            },
+            {
+              "end": 559550,
+              "start": 555550,
+              "text": "Scylla and charybdis are there as of old."
+            },
+            {
+              "end": 563370,
+              "start": 559550,
+              "text": "Tis, you who turn them into the straits of Messina."
+            },
+            {
+              "end": 566810,
+              "start": 563370,
+              "text": "Polyphemus still haunts his seaward cave."
+            },
+            {
+              "end": 571290,
+              "start": 567390,
+              "text": "Tis, you who transform him into a custom house officer."
+            },
+            {
+              "end": 585490,
+              "start": 571670,
+              "text": "Adventures are to the adventurous, go through the world in search of calypso and you will surely find her be modern and you will find only williston junction that may suffice for you."
+            },
+            {
+              "end": 596110,
+              "start": 585650,
+              "text": "I live in those days as all lovers of the mystical have always lived in them and I will go forth into the world in search of adventures."
+            },
+            {
+              "end": 623290,
+              "start": 596890,
+              "text": "They are sure to come to me for faith moves mountains in every age when the princess cleodolund is sent out from the city as a prey for the dragon, some youthful saint George in celestial armour rides by in the Nick of time on his snow white steed and draws his trusty blade and fights for her and rescues her from the loathly thing."
+            },
+            {
+              "end": 624090,
+              "start": 623290,
+              "text": "Else."
+            },
+            {
+              "end": 628250,
+              "start": 624090,
+              "text": "What were the use of faith and of poetry in every age?"
+            },
+            {
+              "end": 638970,
+              "start": 628250,
+              "text": "We fashion the story anew in our passing manner, dressing it up our own clothes and fitting it to our particular modes and morals."
+            },
+            {
+              "end": 643390,
+              "start": 638970,
+              "text": "But tis the same to the end through all disguises."
+            },
+            {
+              "end": 663980,
+              "start": 643390,
+              "text": "The Greeks told it as the tale of Perseus, and andromeda, they made their hero purely Greek, a triumphant young son of immortal, zeus, who rescues a beautiful princess with fair nude limbs like parian marble from the devouring sea monster."
+            }
+          ],
+          "speakerId": "656861958384341821",
+          "topic": "Small Talk"
+        },
+        {
+          "sentences": [
+            {
+              "end": 685660,
+              "start": 663980,
+              "text": "Medieval Italy made the sign of the cross, turned the son of Danae into a Christian martyr, and clad the beautiful nude maiden in clinging silk robes as it would fain, have clad Malian, aphrodite herself when it converted her image into a crowned madonna."
+            },
+            {
+              "end": 701520,
+              "start": 685660,
+              "text": "The renaissance came and cellini unclothed her again in his revived paganism to set her polished bronze limbs where every eye might see and stare in the piazza at Florence."
+            },
+            {
+              "end": 714240,
+              "start": 701520,
+              "text": "Our modern novelists dress her up afresh in the princess robe of the day, sage green or crushed strawberry and turn her loose on that slimy old dragon."
+            },
+            {
+              "end": 723140,
+              "start": 714240,
+              "text": "The world till prince charming comes by as a baronet in a tennis suit to lay at her feet 10,000 a year."
+            },
+            {
+              "end": 725240,
+              "start": 723140,
+              "text": "And the title of my lady."
+            },
+            {
+              "end": 727400,
+              "start": 725240,
+              "text": "But tis the old tale still."
+            },
+            {
+              "end": 738500,
+              "start": 727400,
+              "text": "And who lists to tell it may trick it out once more in his own heart's fashion for though there be nothing new under the sun, the old wonder."
+            },
+            {
+              "end": 741080,
+              "start": 738500,
+              "text": "Is there as marvelous as ever."
+            },
+            {
+              "end": 743340,
+              "start": 741080,
+              "text": "If you choose to marvel at it."
+            },
+            {
+              "end": 747360,
+              "start": 743340,
+              "text": "Each spring brings it back a perpetual miracle."
+            },
+            {
+              "end": 764900,
+              "start": 747360,
+              "text": "So, I set forth into the world a princess cleodolund of the nineteenth century ready to face the dragons that as I well know, abound in it and full of faith in the saint George who will come to rescue me."
+            },
+            {
+              "end": 782260,
+              "start": 765380,
+              "text": "I mean to sail away on my odyssey unabashed touching at such shores as may chance to beckon, yet hopeful of reaching at last the realms of alcinous from all which you may guess that I am a girton girl."
+            },
+            {
+              "end": 783760,
+              "start": 782260,
+              "text": "Chapter one."
+            }
+          ],
+          "speakerId": "656861958384341821",
+          "topic": null
+        }
+      ]
+    }
+  ],
+  [
     "acmeCo/calls",
     {
       "_meta": {
@@ -25,6 +556,410 @@
       "title": "Estuary seed call A",
       "url": "https://us02-16381.app.gong.io/call?id=7022652889306584427",
       "workspaceId": "4042227664642553970"
+    }
+  ],
+  [
+    "acmeCo/extensive_calls",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "collaboration": {},
+      "content": {
+        "brief": "Estuary from Estuary Partner discussed her journey from unemployment and personal loss to securing a job as a shorthand and typewriter. She recounted her job search, the interview process at Flor and Fingalman, and her eventual acceptance of a \"modest starvation\" wage, viewing it as a triumph in her \"struggle for life\" and a validation of her ability to earn a living.",
+        "keyPoints": [
+          {
+            "text": "Unemployed and Grieving: The narrator, 22 and having suffered a great loss, finds herself without employment after her four months of pre-paid settlement and deepest mourning have ended."
+          },
+          {
+            "text": "Financial Necessity: Facing \"professional indigence\" after living simply, she realizes the urgent need to earn her livelihood, as her grief has worn away."
+          },
+          {
+            "text": "Acquired Skills: Despite her \"grasshopper\" nature, she had learned shorthand and typewriting, though she later realizes these are common skills for women in London."
+          },
+          {
+            "text": "Job Search Begins: With only six shillings and elevenpence, she prioritizes finding lunch and then a job, stopping at an aerated bread shop."
+          },
+          {
+            "text": "Advertisement Discovery: While having coffee, she finds an advertisement in an evening paper for a \"Shorthand and typewriter, wanted female, legal work\" at Flor and Fingalman."
+          },
+          {
+            "text": "Prompt Application: Recognizing the importance of promptness, she immediately rushes to Southampton Row to be the first to apply for the position."
+          },
+          {
+            "text": "Initial Clerk Encounter: Upon arrival, she is initially ignored by three male clerks who then question her typing speed (claiming 197 wpm) and type of machine."
+          },
+          {
+            "text": "Interview with Mr. Fingalman: She is then led to Mr. Fingalman, a \"fat and oily\" commissioner for oaths, who inspects her and asks about her name (Juliet Appleton), age (22), and experience."
+          },
+          {
+            "text": "Typing Test and Approval: After a brief dictation and transcription test, the chief clerk and Mr. Fingalman approve her, with the chief clerk's \"lordly approbation\" securing her appointment."
+          },
+          {
+            "text": "Terms and Success: She accepts the \"modest starvation\" terms without demur, feeling exalted by her success in the \"struggle for life\" and her ability to earn her own bread."
+          }
+        ],
+        "outline": [
+          {
+            "duration": 155.2100067138672,
+            "items": [
+              {
+                "startTime": 8.949999809265137,
+                "text": "Estuary recounted a personal story, noting that at 22, she was unemployed and friendless, having suffered a great loss four months prior. She explained that the initial intense sorrow had subsided, allowing her to begin smiling and feeling the sun again, attributing this resilience to a \"quicksilver lightheartedness\" inherent in her race and the necessity of earning a livelihood."
+              },
+              {
+                "startTime": 8.949999809265137,
+                "text": "She mentioned that her first four months of living expenses were pre-paid due to the warden's prudent nature, who preferred to avoid bad debts."
+              },
+              {
+                "startTime": 87.25,
+                "text": "Estuary explained that after her four months of mourning, finding employment became essential. She briefly mentioned a bank failure and an electric light failure as contributing factors, though she admitted she couldn't elaborate on the details without revealing her ignorance."
+              },
+              {
+                "startTime": 87.25,
+                "text": "She noted that being poor was not difficult for her, as she lived like other East Enders and had learned from her \"match girls\" how to be \"hungry and merry.\" However, she distinguished her previous \"amateur\" poverty from the \"professional indigence\" she now faced."
+              },
+              {
+                "startTime": 87.25,
+                "text": "Upon leaving the guild, entrusting Commissioner Lynn to Sister Phyllis and Sister Agatha, Estuary had six shillings and elevenpence as her available assets, considering herself a \"capitalist\" in her own way. She decided that the first priority was to find lunch, and the second was to find a situation."
+              }
+            ],
+            "section": "Personal Background",
+            "startTime": 8.949999809265137
+          },
+          {
+            "duration": 84.41000366210938,
+            "items": [
+              {
+                "startTime": 164.16000366210938,
+                "text": "Estuary stated that she was naturally inclined to live for the present, belonging to the \"tribe of the grasshopper\" rather than the \"ant.\" However, she had been deeply influenced by Sister Phillis's exhortations during her last four months at the guild, leading her to learn shorthand and typewriting."
+              },
+              {
+                "startTime": 164.16000366210938,
+                "text": "She acknowledged that she was unaware at the time that these skills were common among London girls, suggesting she might have pursued other trades like millinery or cake making otherwise. Accepting her identity as a \"typewriter,\" she began her job search by walking down the Strand and stopping at an aerated bread shop."
+              },
+              {
+                "startTime": 164.16000366210938,
+                "text": "She expressed her opposition to luxury but noted that a cup of coffee and a slice of seed cake were within her budget. She calculated that after spending fourpence, she had six shillings and sevenpence remaining from her initial six shillings and elevenpence."
+              }
+            ],
+            "section": "Job Search Preparation",
+            "startTime": 164.16000366210938
+          },
+          {
+            "duration": 80.44998168945312,
+            "items": [
+              {
+                "startTime": 248.57000732421875,
+                "text": "Estuary picked up an evening paper left by a previous customer and scanned the advertisements. Her attention was caught by an advertisement for a \"Shorthand and typewriter, wanted female, legal work, apply Flor and Fingalman, 27 B Southampton row.\""
+              },
+              {
+                "startTime": 248.57000732421875,
+                "text": "Feeling optimistic about her prospects, she noted that the paper was current, emphasizing the importance of promptness in business. She quickly finished her coffee and, recognizing that the \"struggle for existence has become one of the rights of woman,\" hurried to Flor and Fingalman's."
+              },
+              {
+                "startTime": 248.57000732421875,
+                "text": "She confirmed her qualifications as a female shorthand and typewriter, ready to fulfill any legal requirements. She humorously commented on the unpoetical nature of the term \"female,\" noting its absence in descriptions of figures like Heloise or Ophelia, though acknowledging Touchstone's use of it for Audry."
+              },
+              {
+                "startTime": 329.0199890136719,
+                "text": "Estuary described the 19th century's unique chivalry, noting that while it referred to women as \"females,\" it also provided them with the bicycle and almost acknowledged their suitability for the franchise, placing them slightly below \"navvies\" but above \"40 shilling lodgers,\" which Estuary considered magnanimous."
+              },
+              {
+                "startTime": 329.0199890136719,
+                "text": "Estuary recounted rushing to Charing Cross Road and then Southampton Row, where, driven by the \"struggle for existence,\" Estuary believed to be a strong contender for a \"shorthand and typewriter, female\" position advertised \"up two pair of stairs.\""
+              }
+            ],
+            "section": "Identifying Opportunity",
+            "startTime": 248.57000732421875
+          },
+          {
+            "duration": 159.3800048828125,
+            "items": [
+              {
+                "startTime": 329.0199890136719,
+                "text": "Upon entering the outer office, Estuary observed its \"fustiness\" and three male clerks in \"seedy black coats,\" the eldest having \"hair the colour of a fox's.\" The clerks continued \"chaffing one another\" for two minutes, seemingly oblivious to Estuary's presence, inferring Estuary was a candidate for the \"shorthand and typewriter female\" post and treating Estuary accordingly."
+              },
+              {
+                "startTime": 411.05999755859375,
+                "text": "The clerks' conversation focused on \"the horse\" and \"the turf,\" which Estuary understood to refer not to the \"greensward of the downs\" but to the \"imperceptible moral turf of Fleet Street.\" The two younger clerks were described as \"indeterminate young men with straight black hair and features modelled on an oyster.\""
+              },
+              {
+                "startTime": 411.05999755859375,
+                "text": "Feeling ignored, Estuary subtly coughed to signify presence, an \"apologetic cough\" meaning, \"I beg your pardon. But will you kindly attend to me?\""
+              },
+              {
+                "startTime": 411.05999755859375,
+                "text": "However, the clerks did not rush."
+              },
+              {
+                "startTime": 411.05999755859375,
+                "text": "The youngest clerk, a \"pulpy youth,\" adjusted his cuffs and finished \"some deep remarks upon two year old form\" before staring at Estuary. Estuary presumed he was satisfied with her appearance because he then wheeled around on his high stool and, with \"the chivalry of his age and class,\" asked, \"Well, what's your business?\""
+              },
+              {
+                "startTime": 411.05999755859375,
+                "text": "Estuary's voice \"trembled a little,\" but she mustered courage and stated, \"I have called about your advertisement for a shorthand and typewriter female.\""
+              }
+            ],
+            "section": "Initial Encounter",
+            "startTime": 329.0199890136719
+          },
+          {
+            "duration": 80.50003051757812,
+            "items": [
+              {
+                "startTime": 488.3999938964844,
+                "text": "The \"pulpy youth\" \"eyed\" Estuary \"up and down.\" Estuary described herself as \"slender\" and \"if not pretty, at least interesting looking.\""
+              },
+              {
+                "startTime": 488.3999938964844,
+                "text": "After a long pause, he asked, \"how many words a minute?\""
+              },
+              {
+                "startTime": 488.3999938964844,
+                "text": "Estuary \"stretched truth as far as its elasticity would permit,\" answering \"197\" with \"an affectation of the precisest accuracy,\" believing \"to say 200 were commonplace.\""
+              },
+              {
+                "startTime": 488.3999938964844,
+                "text": "The \"pulpy youth\" \"ran his eyes over\" Estuary \"as if I were a horse for sale.\" Estuary was conscious of her \"little black dress and hat\" and a \"fiery patch in the centre of my cheek,\" but acknowledged that \"if you struggle for life, you must expect these episodes.\""
+              },
+              {
+                "startTime": 488.3999938964844,
+                "text": "He slowly said, \"good enough,\" with a side glance at his fellow clerks. Estuary suspected the words were meant more for them than for her, and referred more to her \"face and figure than to my real or imagined pace per minute.\""
+              },
+              {
+                "startTime": 488.3999938964844,
+                "text": "The eldest clerk, with the \"foxy head,\" wheeled around and stared. He had \"hairy hands and large goggle eyes\" and asked, \"got your own machine?\""
+              },
+              {
+                "startTime": 488.3999938964844,
+                "text": "Estuary replied, \"yes.\" He then asked, \"what sort,\" and upon hearing \"a barluck,\" he said, \"that'll do,\" eyeing the rest."
+              },
+              {
+                "startTime": 568.9000244140625,
+                "text": "Estuary detected an \"undercurrent of double meaning,\" feeling he was expressing \"modified satisfaction at my outer personality.\""
+              }
+            ],
+            "section": "Interview Questions",
+            "startTime": 488.3999938964844
+          },
+          {
+            "duration": 84.97998046875,
+            "items": [
+              {
+                "startTime": 568.9000244140625,
+                "text": "The clerks questioned Estuary for \"some minutes with equal grace and charm.\" Then, the eldest clerk slowly rose, murmured, \"I'll tell the governor,\" and disappeared through a \"dingy door marked in large letters Mr."
+              },
+              {
+                "startTime": 568.9000244140625,
+                "text": "Fingalman.\""
+              },
+              {
+                "startTime": 568.9000244140625,
+                "text": "Shortly after, he returned and \"beckoned\" Estuary \"mysteriously.\" Estuary followed him, \"trembling.\""
+              },
+              {
+                "startTime": 568.9000244140625,
+                "text": "He waved his \"hairy hand\" towards Estuary, as if presenting her to the man at the table."
+              },
+              {
+                "startTime": 568.9000244140625,
+                "text": "Estuary felt \"disagreeably like Esther in the presence of Ahasuerus,\" describing him as \"a fat and oily Ahasuerus of 50.\" The clerk introduced Estuary as \"This is the young person.\""
+              },
+              {
+                "startTime": 568.9000244140625,
+                "text": "Ahasuerus, identified as Mr. Fingleman, \"inspected\" Estuary \"in turn.\""
+              },
+              {
+                "startTime": 568.9000244140625,
+                "text": "Estuary \"coiled before his glance.\" He was a \"commissioner for oaths\" and wore \"large round spectacles.\""
+              },
+              {
+                "startTime": 568.9000244140625,
+                "text": "He eventually asked, \"Had experience?\" Estuary noted he was \"rotund and obviously wealthy though 'twas a third rate solicitor's.\""
+              },
+              {
+                "startTime": 568.9000244140625,
+                "text": "Estuary replied, \"A little.\" She had intended to say \"lots\" beforehand, but \"when it came to the pinch, the ingrained bad habit of speaking the truth reasserted itself partially.\""
+              }
+            ],
+            "section": "Meeting Mr. Fingalman",
+            "startTime": 568.9000244140625
+          },
+          {
+            "duration": 87.78997802734375,
+            "items": [
+              {
+                "startTime": 653.8800048828125,
+                "text": "Ahasuerus interrogated Juliet Appleton, aged 22, scrutinizing her appearance as if evaluating a horse. He then tested her skills by dictating a short business letter and instructing her to transcribe it on a typewriter."
+              },
+              {
+                "startTime": 653.8800048828125,
+                "text": "The chief clerk observed with ostentatious servility."
+              },
+              {
+                "startTime": 653.8800048828125,
+                "text": "After Juliet completed the transcription, the chief clerk reviewed her work, nodded, and presented it to Ahasuerus. Ahasuerus grunted in approval, asking, \"She'll do?\""
+              },
+              {
+                "startTime": 653.8800048828125,
+                "text": "The chief clerk confirmed, \"Yes, she's the first we've seen.\" Ahasuerus cautiously added, \"Saves trouble.\""
+              },
+              {
+                "startTime": 653.8800048828125,
+                "text": "Juliet realized the chief clerk's approval, akin to a sultan's vizier, secured her appointment. The \"oriental monarch\" (Ahasuerus) instructed the chief clerk to settle terms with her outside, stating, \"You know what I give, bother me no more with it,\" before returning to his writing."
+              }
+            ],
+            "section": "Skill Assessment",
+            "startTime": 653.8800048828125
+          },
+          {
+            "duration": 0.0,
+            "items": [
+              {
+                "startTime": 741.6699829101562,
+                "text": "The terms proposed by the vizier were described as \"modest starvation,\" but Juliet, having experienced the East End, accepted them without demur, becoming an \"engaged typewriter\" in Southampton Row."
+              }
+            ],
+            "section": "Job Offer & Acceptance",
+            "startTime": 741.6699829101562
+          },
+          {
+            "duration": 144.5400390625,
+            "items": [
+              {
+                "startTime": 741.6699829101562,
+                "text": "Juliet, possessing a \"mercurial temperament,\" felt exalted by this success, walking down Charing Cross Road \"in the seventh heaven.\" She believed she had justified herself before the \"impartial tribunal of political economy,\" proving she could earn her own living."
+              },
+              {
+                "startTime": 741.6699829101562,
+                "text": "She had obtained a footing in the \"struggle for life\" through this \"magnificent post of shorthand and typewriter, female,\" which was advertised for public competition."
+              },
+              {
+                "startTime": 826.5700073242188,
+                "text": "Juliet won the competition due to her energy, promptitude, and rapid resolution, securing the \"prize of a modest starvation.\" She had proven herself \"fittest by the mere fact of survival,\" despite Matthew Arnold's teachings that there was no proper reason for her existing."
+              },
+              {
+                "startTime": 826.5700073242188,
+                "text": "The remaining question was whether she could adapt to her environment, thereby fulfilling \"the whole gospel of Darwinism.\""
+              }
+            ],
+            "section": "Post-Interview Reflection",
+            "startTime": 741.6699829101562
+          }
+        ],
+        "topics": [
+          {
+            "duration": 72,
+            "name": "Call Setup"
+          },
+          {
+            "duration": 464,
+            "name": "Small Talk"
+          },
+          {
+            "duration": 0,
+            "name": "Moving Forward"
+          },
+          {
+            "duration": 0,
+            "name": "Pricing"
+          },
+          {
+            "duration": 0,
+            "name": "Next Steps"
+          },
+          {
+            "duration": 0,
+            "name": "Wrap-Up"
+          }
+        ],
+        "trackers": []
+      },
+      "context": [],
+      "interaction": {
+        "interactionStats": [
+          {
+            "name": "Talk Ratio",
+            "value": 1.0
+          },
+          {
+            "name": "Longest Monologue",
+            "value": 877
+          },
+          {
+            "name": "Longest Customer Story",
+            "value": 0
+          },
+          {
+            "name": "Interactivity",
+            "value": 0.0
+          },
+          {
+            "name": "Patience",
+            "value": 0.0
+          }
+        ],
+        "questions": {
+          "companyCount": 0,
+          "nonCompanyCount": 0
+        },
+        "speakers": [
+          {
+            "id": "4320313088335534949",
+            "talkTime": 877.0,
+            "userId": "4164091100197006958"
+          }
+        ]
+      },
+      "metaData": {
+        "calendarEventId": null,
+        "clientUniqueId": "estuary-seed-b1e-20260830",
+        "customData": null,
+        "direction": "Inbound",
+        "duration": 887,
+        "id": 7693221800038890052,
+        "isPrivate": false,
+        "language": "eng",
+        "media": "Audio",
+        "meetingUrl": "https://gong-pre-redaction-media-gpe-nam-02-1-us-west-2.s3.amazonaws.com/public-api-upload/153365637041284604/7693221800038890052/7bzi3z1d9mmj187hzju/media.mp3",
+        "primaryUserId": "4164091100197006958",
+        "purpose": "Connector integration test",
+        "scheduled": "2026-08-30T03:00:00-07:00",
+        "scope": "External",
+        "sdrDisposition": null,
+        "started": "2026-08-30T03:00:00-07:00",
+        "system": "Upload API",
+        "title": "Estuary seed call B",
+        "url": "https://us02-16381.app.gong.io/call?id=7693221800038890052",
+        "workspaceId": "4042227664642553970"
+      },
+      "parties": [
+        {
+          "affiliation": "Internal",
+          "context": [],
+          "emailAddress": "redacted",
+          "id": "4320313088335534949",
+          "methods": [
+            "Attendee"
+          ],
+          "name": "Estuary Seeding",
+          "phoneNumber": "redacted",
+          "speakerId": "1580833210577559850",
+          "userId": "4164091100197006958"
+        },
+        {
+          "affiliation": "External",
+          "context": [],
+          "emailAddress": "redacted",
+          "id": "4378425308115870244",
+          "methods": [
+            "Attendee"
+          ],
+          "name": "Seed Participant",
+          "speakerId": null
+        }
+      ]
     }
   ],
   [

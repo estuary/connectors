@@ -14,6 +14,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/estuary/connectors/go/common"
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
@@ -27,10 +28,11 @@ import (
 	"go.gazette.dev/core/consumer/protocol"
 )
 
-var featureFlagDefaults = map[string]bool{
-	"datetime_keys_as_string":          true,
-	"retain_existing_data_on_backfill": false,
-	"native_binary_column_type":        true,
+var featureFlagDefaults = map[string]common.FlagDefault{
+	"datetime_keys_as_string":          common.FlagEnabled,
+	"retain_existing_data_on_backfill": common.FlagDisabled,
+	"native_binary_column_type":        common.FlagEnabled,
+	"truncate_after_backfill":          common.FlagEnabled,
 }
 
 type sshForwarding struct {
@@ -109,7 +111,7 @@ func (c config) DefaultNamespace() string {
 	return ""
 }
 
-func (c config) FeatureFlags() (string, map[string]bool) {
+func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
 	return c.Advanced.FeatureFlags, featureFlagDefaults
 }
 
@@ -332,7 +334,7 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 				MetaCheckpoints:     sql.FlowCheckpointsTable(nil),
 				NewClient:           prepareNewClient(tzLocation),
 				CreateTableTemplate: templates.createTargetTable,
-				NewTransactor:       prepareNewTransactor(templates, product),
+				NewTransactor:       prepareNewTransactor(templates, product, tzLocation),
 				ConcurrentApply:     false,
 				NoFlowDocument:      cfg.Advanced.NoFlowDocument,
 				Options: m.MaterializeOptions{
@@ -429,6 +431,15 @@ type transactor struct {
 	}
 	bindings []*binding
 	be       *m.BindingEvents
+	// tzLocation is the zone of the wall-clock times stored in DATETIME
+	// columns.
+	tzLocation *time.Location
+	// truncateAfterBackfill permits deleting the rows published before a
+	// completed backfill.
+	truncateAfterBackfill bool
+	// truncations maps a binding index to the boundary of a completed
+	// backfill, for deletion in this transaction's commit.
+	truncations map[int]time.Time
 }
 
 func (t *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSpec, _ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
@@ -436,6 +447,41 @@ func (t *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSp
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
+
+func (t *transactor) Flush(_ context.Context, completes map[int]time.Time) error {
+	t.truncations = make(map[int]time.Time, len(completes))
+	for binding, boundary := range completes {
+		var b = t.bindings[binding]
+		if b.target.DeltaUpdates {
+			continue
+		} else if !t.truncateAfterBackfill {
+			log.WithFields(log.Fields{
+				"table":    b.target.Identifier,
+				"boundary": boundary,
+			}).Info("rows published before the backfill were not deleted because feature flags disable it")
+			continue
+		}
+		if b.truncateSQL == "" {
+			log.WithFields(log.Fields{
+				"eventType": "connectorStatus",
+				"table":     b.target.Identifier,
+				"boundary":  boundary,
+			}).Warnf("Rows published before the backfill of table %s were not deleted because %s.", b.target.Identifier, b.truncateReason)
+			continue
+		}
+		t.truncations[binding] = boundary
+	}
+	return nil
+}
+
+// truncateBefore returns the DATETIME literal below which a stored
+// flow_published_at belongs to a document published before boundary. The
+// literal is floored to the column's precision, because the column may round
+// a stored value up to the next unit.
+func truncateBefore(boundary time.Time, loc *time.Location, precision time.Duration) string {
+	return boundary.Truncate(precision).In(loc).Format(datetimeLayout)
+}
+
 func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
 	return nil, nil
 }
@@ -443,6 +489,7 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 func prepareNewTransactor(
 	templates templates,
 	product string,
+	tzLocation *time.Location,
 ) func(context.Context, string, map[string]bool, *sql.Endpoint[config], sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema, *m.BindingEvents) (m.Transactor, error) {
 	return func(
 		ctx context.Context,
@@ -456,7 +503,15 @@ func prepareNewTransactor(
 		be *m.BindingEvents,
 	) (m.Transactor, error) {
 		var cfg = ep.Config
-		var d = &transactor{dialect: ep.Dialect, templates: templates, cfg: cfg, be: be, product: product}
+		var d = &transactor{
+			dialect:               ep.Dialect,
+			templates:             templates,
+			cfg:                   cfg,
+			be:                    be,
+			product:               product,
+			tzLocation:            tzLocation,
+			truncateAfterBackfill: sql.TruncateAfterBackfill(featureFlags),
+		}
 		d.store.fence = fence
 
 		// Establish connections.
@@ -524,6 +579,13 @@ type binding struct {
 	deleteQuerySQL    string
 	loadDeleteSQL     string
 	deleteTruncateSQL string
+
+	// truncateSQL deletes the rows published before a boundary. It is empty
+	// when truncateReason states why the table cannot be truncated.
+	truncateSQL    string
+	truncateReason error
+	// truncatePrecision is the resolution of the flow_published_at column.
+	truncatePrecision time.Duration
 
 	mustMerge  bool
 	mustDelete bool
@@ -604,6 +666,12 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 	}
 	b.varcharColumnMetas = columnMetas
 
+	if col, err := target.PublishedAtColumn(); err != nil {
+		b.truncateReason = err
+	} else {
+		b.truncateReason = addTruncation(b, col, is)
+	}
+
 	t.bindings = append(t.bindings, b)
 
 	// Create a binding-scoped temporary table for staged keys to load.
@@ -631,6 +699,31 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 
 	b.tempVarcharMetas = tempColumnMetas
 
+	return nil
+}
+
+// addTruncation prepares b to delete the rows whose col is earlier than a
+// boundary, at the fractional-seconds precision that col has in the table. It
+// returns why b cannot be truncated, as a clause suited for an operator.
+func addTruncation(b *binding, col *sql.Column, is *boilerplate.InfoSchema) error {
+	var res = is.GetResource(b.target.Path)
+	if res == nil {
+		return fmt.Errorf("table %s was not found in the database", b.target.Identifier)
+	}
+	var existing = res.GetField(col.Field)
+	if existing == nil {
+		return fmt.Errorf("column %s was not found in the table", col.Identifier)
+	}
+	meta, ok := existing.Meta.(datetimeFieldMeta)
+	if !ok {
+		return fmt.Errorf("column %s is not a DATETIME", col.Identifier)
+	}
+
+	b.truncateSQL = fmt.Sprintf("DELETE FROM %s WHERE %s < ?;", b.target.Identifier, col.Identifier)
+	b.truncatePrecision = time.Second
+	for range meta.precision {
+		b.truncatePrecision /= 10
+	}
 	return nil
 }
 
@@ -779,6 +872,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	}
 
 	round := it.Round
+	var truncations = d.truncations
 
 	// The StoreIterator iterates over documents ordered by their binding, so we
 	// can keep track of the last binding that we have seen, and if we have moved
@@ -878,7 +972,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
 		defer txn.Rollback()
 
-		for _, b := range d.bindings {
+		for i, b := range d.bindings {
 			d.be.StartedResourceCommit(b.target.Path)
 			// Target rows affected this round. LOAD DATA and DELETE report
 			// one per row; REPLACE reports 2 per replaced row and 1 per row
@@ -915,8 +1009,29 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 				// Reset for the next round.
 				b.mustMerge = false
 			}
-			if b.hasData {
-				d.be.ReportRowStats(round, b.target.Path, m.TotalRowStats(affected))
+
+			// The truncation follows the binding's stores, so it removes only
+			// the rows they did not rewrite.
+			var stats = m.TotalRowStats(affected)
+			var boundary, truncate = truncations[i]
+			if truncate {
+				var before = truncateBefore(boundary, d.tzLocation, b.truncatePrecision)
+				var n int64
+				if res, err := txn.ExecContext(ctx, b.truncateSQL, before); err != nil {
+					return nil, m.FinishedOperation(fmt.Errorf("truncating %s after backfill: %w", b.target.Identifier, err))
+				} else if n, err = res.RowsAffected(); err != nil {
+					return nil, m.FinishedOperation(fmt.Errorf("truncating %s after backfill (rows affected): %w", b.target.Identifier, err))
+				}
+				stats = stats.WithTruncated(n)
+				log.WithFields(log.Fields{
+					"table":    b.target.Identifier,
+					"boundary": boundary,
+					"before":   before,
+					"deleted":  n,
+				}).Info("truncated rows published before the backfill")
+			}
+			if b.hasData || truncate {
+				d.be.ReportRowStats(round, b.target.Path, stats)
 			}
 			b.hasData, b.insertRows, b.updateStaged = false, 0, 0
 			d.be.FinishedResourceCommit(b.target.Path)

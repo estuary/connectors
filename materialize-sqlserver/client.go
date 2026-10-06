@@ -41,7 +41,7 @@ func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint
 	}, nil
 }
 
-func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
+func preReqs(ctx context.Context, cfg config, _ map[string]bool) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
 
 	connector, err := cfg.ToSQLConnector(ctx)
@@ -84,8 +84,53 @@ func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
 	return errs
 }
 
+// datetimeFieldMeta is attached to the ExistingField.Meta of a DATETIME,
+// DATETIME2 or SMALLDATETIME column to carry its full type, including any
+// fractional-seconds precision.
+type datetimeFieldMeta struct {
+	ddl string
+}
+
 func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
-	return sql.StdPopulateInfoSchema(ctx, is, c.db, c.ep.Dialect, c.ep.Config.Database, resourcePaths)
+	if err := sql.StdPopulateInfoSchema(ctx, is, c.db, c.ep.Dialect, c.ep.Config.Database, resourcePaths); err != nil {
+		return err
+	} else if len(resourcePaths) == 0 {
+		return nil
+	}
+
+	schemas := make([]string, 0, len(resourcePaths))
+	for _, p := range resourcePaths {
+		loc := c.ep.Dialect.TableLocator(p)
+		schemas = append(schemas, c.ep.Dialect.Literal(loc.TableSchema))
+	}
+	slices.Sort(schemas)
+	schemas = slices.Compact(schemas)
+
+	rows, err := c.db.QueryContext(ctx, fmt.Sprintf(`
+		SELECT table_schema, table_name, column_name, data_type, datetime_precision
+		FROM information_schema.columns
+		WHERE table_catalog = %s AND table_schema IN (%s) AND data_type IN ('datetime', 'datetime2', 'smalldatetime')`,
+		c.ep.Dialect.Literal(c.ep.Config.Database), strings.Join(schemas, ",")))
+	if err != nil {
+		return fmt.Errorf("querying datetime types: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var ts, tn, cn, dataType string
+		var precision stdsql.NullInt64
+		if err := rows.Scan(&ts, &tn, &cn, &dataType, &precision); err != nil {
+			return err
+		}
+		var ddl = strings.ToUpper(dataType)
+		if ddl == "DATETIME2" {
+			ddl += fmt.Sprintf("(%d)", precision.Int64)
+		}
+		if field := is.PushResource(ts, tn).GetField(cn); field != nil {
+			field.Meta = datetimeFieldMeta{ddl: ddl}
+		}
+	}
+	return rows.Err()
 }
 
 var columnMigrationSteps = []sql.ColumnMigrationStep{

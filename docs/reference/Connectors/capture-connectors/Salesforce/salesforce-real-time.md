@@ -1,3 +1,12 @@
+---
+title: Salesforce — Real-time data (deprecated)
+description: Deprecated Salesforce real-time capture connector. Use Estuary's native Salesforce connector instead for both real-time and historical data.
+---
+
+<head>
+  <meta name="robots" content="noindex, follow" />
+</head>
+
 # Salesforce — Real-time data (deprecated)
 
 This connector captures data from Salesforce objects into Estuary collections in real time via the [Salesforce PushTopic API](https://developer.salesforce.com/docs/atlas.en-us.api_streaming.meta/api_streaming/pushtopic_events_intro.htm).

@@ -49,7 +49,7 @@ func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint
 	}, nil
 }
 
-func preReqs(ctx context.Context, conf config) *cerrors.PrereqErr {
+func preReqs(ctx context.Context, conf config, _ map[string]bool) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
 
 	cfg := conf

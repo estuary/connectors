@@ -45,6 +45,8 @@ UUID_COLLECTION = {
     "key_type": "uuid",
 }
 
+ORDERED_UUID_COLLECTION = dict(UUID_COLLECTION, name="bench/uuid_ordered", key_type="uuid_ordered")
+
 # Uses enum values of *different* byte-lengths on purpose, so the exact
 # byte-size tests exercise the per-variant overhead bookkeeping.
 ENUM_VALUES = ["ck0", "ck1", "ck2", "ck3", "ck4", "ck5", "ck6", "ck7", "ck8", "ck9"]
@@ -664,3 +666,46 @@ class TestDeterminism(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestOrderedUUIDKeys(unittest.TestCase):
+    """Tests for key_type: uuid_ordered support."""
+
+    def test_ordered_uuid_keys_are_v7_shaped_and_ordered(self):
+        import uuid
+
+        lines, _ = _run([{"doc_count": 200, "doc_size": 256}], collection=ORDERED_UUID_COLLECTION)
+        ids = [json.loads(l)[1]["id"] for l in lines if not l.startswith("{")]
+        self.assertEqual(len(ids), 200)
+        for i in ids:
+            parsed = uuid.UUID(i)
+            self.assertEqual(str(parsed), i)
+            self.assertEqual(parsed.version, 7)
+        self.assertEqual(ids, sorted(ids))
+        self.assertEqual(len(set(ids)), 200)
+
+    def test_ordered_uuid_exact_byte_size(self):
+        lines, _ = _run([{"doc_count": 50, "doc_size": 256}], collection=ORDERED_UUID_COLLECTION)
+        for l in lines:
+            if l.startswith("{"):
+                continue
+            _, doc = json.loads(l)
+            self.assertEqual(len(json.dumps(doc, separators=(",", ":")).encode("utf-8")), 256)
+
+    def test_ordered_uuid_range_overlap_is_contiguous_in_id_space(self):
+        lines, _ = _run(
+            [
+                {"doc_count": 1000, "doc_size": 256},
+                {
+                    "doc_count": 100,
+                    "doc_size": 256,
+                    "overlaps": [{"with": 0, "fraction": 1.0, "op": "u", "range": [0.9, 1.0]}],
+                },
+            ],
+            collection=ORDERED_UUID_COLLECTION,
+        )
+        docs = [json.loads(l)[1] for l in lines if not l.startswith("{")]
+        tx0 = [d["id"] for d in docs[:1000]]
+        tx1 = [d["id"] for d in docs[1000:]]
+        # Every updated id falls within the last 10% of tx0's id space.
+        self.assertTrue(all(i >= tx0[900] for i in tx1), min(tx1))

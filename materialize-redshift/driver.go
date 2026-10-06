@@ -13,12 +13,14 @@ import (
 	"slices"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/estuary/connectors/go/blob"
+	"github.com/estuary/connectors/go/common"
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
@@ -57,11 +59,12 @@ const (
 	redshiftTextColumnLength = 256
 )
 
-var featureFlagDefaults = map[string]bool{
-	"datetime_keys_as_string":          true,
-	"s3_use_dualstack_endpoints":       false,
-	"retain_existing_data_on_backfill": false,
-	"native_binary_column_type":        true,
+var featureFlagDefaults = map[string]common.FlagDefault{
+	"datetime_keys_as_string":          common.FlagEnabled,
+	"s3_use_dualstack_endpoints":       common.FlagDisabled,
+	"retain_existing_data_on_backfill": common.FlagDisabled,
+	"native_binary_column_type":        common.FlagEnabled,
+	"truncate_after_backfill":          common.FlagEnabled,
 }
 
 type sshForwarding struct {
@@ -138,7 +141,7 @@ func (c config) DefaultNamespace() string {
 	return c.Schema
 }
 
-func (c config) FeatureFlags() (string, map[string]bool) {
+func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
 	return c.Advanced.FeatureFlags, featureFlagDefaults
 }
 
@@ -296,6 +299,7 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 				NewTransactor:       prepareNewTransactor(templates, caseSensitiveIdentifierEnabled),
 				ConcurrentApply:     true,
 				NoFlowDocument:      cfg.Advanced.NoFlowDocument,
+				KeyChangeInPlace:    true,
 				Options: m.MaterializeOptions{
 					ExtendedLogging: true,
 					AckSchedule: &m.AckScheduleOption{
@@ -317,6 +321,7 @@ type transactor struct {
 	cfg                            config
 	store                          *s3Store
 	caseSensitiveIdentifierEnabled bool
+	dialect                        sql.Dialect
 
 	rangeKey string
 	// The shard whose key range begins at 0 applies every shard's staged
@@ -327,6 +332,12 @@ type transactor struct {
 	committedTokens map[string]bool
 	// The whole state: staged transactions not yet applied, from every shard.
 	state connectorState
+	// truncateAfterBackfill permits deleting the rows published before a
+	// completed backfill.
+	truncateAfterBackfill bool
+	// truncations maps a binding index to the boundary of a backfill that
+	// completed in the current transaction, for staging by Store.
+	truncations map[int]time.Time
 	// Set only for a task crossing over from the old format, whose row still
 	// holds the runtime checkpoint and whose state has nothing staged.
 	runtimeCheckpoint m.RuntimeCheckpoint
@@ -379,14 +390,16 @@ func prepareNewTransactor(
 			caseSensitiveIdentifierEnabled: caseSensitiveIdentifierEnabled,
 			rangeKey:                       rangeKeyOf(fence.KeyBegin, fence.KeyEnd),
 			primary:                        fence.KeyBegin == 0,
+			dialect:                        ep.Dialect,
 			checkpointsTable: &checkpointsTable{
 				table:           ep.Dialect.Identifier(fence.TablePath...),
 				materialization: fence.Materialization.String(),
 				keyBegin:        fence.KeyBegin,
 				keyEnd:          fence.KeyEnd,
 			},
-			committedTokens: make(map[string]bool),
-			state:           make(connectorState),
+			committedTokens:       make(map[string]bool),
+			state:                 make(connectorState),
+			truncateAfterBackfill: sql.TruncateAfterBackfill(featureFlags),
 		}
 
 		client, err := d.cfg.toS3Client(ctx, featureFlags)
@@ -454,6 +467,7 @@ type binding struct {
 	mergeIntoSQL              string
 	deleteQuerySQL            string
 	loadQuerySQL              string
+	truncateSQL               string
 
 	// The transaction being staged, if any.
 	staged *stateItem
@@ -498,6 +512,10 @@ func (t *transactor) addBinding(target sql.Table, is *boilerplate.InfoSchema) er
 		if *m.sql, err = sql.RenderTableTemplate(target, m.tpl); err != nil {
 			return err
 		}
+	}
+
+	if col, err := target.PublishedAtColumn(); err == nil {
+		b.truncateSQL = fmt.Sprintf("DELETE FROM %s WHERE %s < $1;", target.Identifier, col.Identifier)
 	}
 
 	// The load/store/delete tables template are re-evaluated every transaction
@@ -697,7 +715,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		if copySQL, err := d.copyFromS3(fmt.Sprintf("flow_temp_table_%d", b.target.Binding), manifest, false); err != nil {
 			return err
 		} else if _, err := txn.Exec(ctx, copySQL); err != nil {
-			return handleCopyIntoErr(ctx, txn, d.cfg.Bucket, files, b.target.Identifier, err)
+			return handleCopyIntoErr(ctx, txn, d.dialect, d.cfg.Bucket, files, b.target.Identifier, err)
 		}
 	}
 
@@ -857,6 +875,15 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 	}
 
+	for binding, boundary := range d.truncations {
+		var b = d.bindings[binding]
+		if b.staged == nil {
+			b.staged = &stateItem{ID: uuid.NewString(), Round: it.Round}
+		}
+		b.staged.TruncateBefore = &boundary
+	}
+	d.truncations = nil
+
 	return func(ctx context.Context, checkpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
 		if checkpoint != nil {
 			raw, err := checkpoint.Marshal()
@@ -888,6 +915,38 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 		return &pf.ConnectorState{UpdatedJson: patch, MergePatch: true}, nil
 	}, nil
+}
+
+// Flush records completed backfills on the primary only, since every shard
+// receives the same completions and only the primary applies staged work.
+func (d *transactor) Flush(_ context.Context, completes map[int]time.Time) error {
+	d.truncations = make(map[int]time.Time, len(completes))
+	if !d.primary {
+		return nil
+	}
+	for binding, boundary := range completes {
+		var b = d.bindings[binding]
+		if b.target.DeltaUpdates {
+			continue
+		} else if !d.truncateAfterBackfill {
+			log.WithFields(log.Fields{
+				"table":    b.target.Identifier,
+				"boundary": boundary,
+			}).Info("rows published before the backfill were not deleted because feature flags disable it")
+			continue
+		}
+		if b.truncateSQL == "" {
+			var _, reason = b.target.PublishedAtColumn()
+			log.WithFields(log.Fields{
+				"eventType": "connectorStatus",
+				"table":     b.target.Identifier,
+				"boundary":  boundary,
+			}).Warnf("Rows published before the backfill of table %s were not deleted because %s.", b.target.Identifier, reason)
+			continue
+		}
+		d.truncations[binding] = boundary
+	}
+	return nil
 }
 
 func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
@@ -969,6 +1028,9 @@ type commitGroup struct {
 	// first merged entry's; a multi-shard commit is unchecked anyway.
 	round    int
 	hasRound bool
+	// truncated is the number of rows the group's truncation deleted, once
+	// it has run.
+	truncated *int64
 }
 
 // commit runs the staged transactions of pending as one Redshift
@@ -996,6 +1058,9 @@ func (d *transactor) commit(ctx context.Context, pending connectorState, legacyC
 			g.merged.DeleteFiles = append(g.merged.DeleteFiles, e.DeleteFiles...)
 			g.merged.MustMerge = g.merged.MustMerge || e.MustMerge
 			g.merged.Rows += e.Rows
+			if e.TruncateBefore != nil && (g.merged.TruncateBefore == nil || e.TruncateBefore.After(*g.merged.TruncateBefore)) {
+				g.merged.TruncateBefore = e.TruncateBefore
+			}
 			if rk == d.rangeKey || !g.hasRound {
 				g.round, g.hasRound = e.Round, true
 			}
@@ -1006,7 +1071,7 @@ func (d *transactor) commit(ctx context.Context, pending connectorState, legacyC
 			}
 			tokensMap.add(b.target.StateKey, rk, e.ID)
 		}
-		if len(g.merged.StoreFiles) > 0 || len(g.merged.DeleteFiles) > 0 {
+		if len(g.merged.StoreFiles) > 0 || len(g.merged.DeleteFiles) > 0 || g.merged.TruncateBefore != nil {
 			groups = append(groups, g)
 		}
 	}
@@ -1096,6 +1161,9 @@ func (d *transactor) commit(ctx context.Context, pending connectorState, legacyC
 		if g.merged.Rows > 0 {
 			stats = stats.WithStaged(g.merged.Rows)
 		}
+		if g.truncated != nil {
+			stats = stats.WithTruncated(*g.truncated)
+		}
 		d.be.ReportRowStats(g.round, g.binding.target.Path, stats)
 	}
 	for _, bucket := range tokensMap {
@@ -1142,7 +1210,7 @@ func (d *transactor) applyStaged(ctx context.Context, conn *pgx.Conn, groups []*
 			if copySQL, err := d.copyFromS3(fmt.Sprintf("flow_temp_table_%d_deleted", b.target.Binding), g.deleteManifest, false); err != nil {
 				return nil, err
 			} else if _, err := txn.Exec(ctx, copySQL); err != nil {
-				return nil, handleCopyIntoErr(ctx, txn, d.cfg.Bucket, g.merged.DeleteFiles, b.target.Identifier, err)
+				return nil, handleCopyIntoErr(ctx, txn, d.dialect, d.cfg.Bucket, g.merged.DeleteFiles, b.target.Identifier, err)
 			} else if tag, err := txn.Exec(ctx, b.deleteQuerySQL); err != nil {
 				return nil, fmt.Errorf("deleting from table '%s': %w", b.target.Identifier, err)
 			} else {
@@ -1169,7 +1237,7 @@ func (d *transactor) applyStaged(ctx context.Context, conn *pgx.Conn, groups []*
 			if copySQL, err := d.copyFromS3(fmt.Sprintf("flow_temp_table_%d", b.target.Binding), g.storeManifest, true); err != nil {
 				return nil, err
 			} else if _, err := txn.Exec(ctx, copySQL); err != nil {
-				return nil, handleCopyIntoErr(ctx, txn, d.cfg.Bucket, g.merged.StoreFiles, b.target.Identifier, err)
+				return nil, handleCopyIntoErr(ctx, txn, d.dialect, d.cfg.Bucket, g.merged.StoreFiles, b.target.Identifier, err)
 			} else if n, err := lastCopyCount(ctx, txn); err != nil {
 				return nil, fmt.Errorf("reading rows staged for table '%s': %w", b.target.Identifier, err)
 			} else if _, err := txn.Exec(ctx, b.mergeIntoSQL); err != nil {
@@ -1185,12 +1253,35 @@ func (d *transactor) applyStaged(ctx context.Context, conn *pgx.Conn, groups []*
 			if copySQL, err := d.copyFromS3(b.target.Identifier, g.storeManifest, true); err != nil {
 				return nil, err
 			} else if _, err := txn.Exec(ctx, copySQL); err != nil {
-				return nil, handleCopyIntoErr(ctx, txn, d.cfg.Bucket, g.merged.StoreFiles, b.target.Identifier, err)
+				return nil, handleCopyIntoErr(ctx, txn, d.dialect, d.cfg.Bucket, g.merged.StoreFiles, b.target.Identifier, err)
 			} else if n, err := lastCopyCount(ctx, txn); err != nil {
 				return nil, fmt.Errorf("reading rows loaded into table '%s': %w", b.target.Identifier, err)
 			} else {
 				affected[g] += n
 			}
+		}
+
+		// The truncation runs after the stores, so that it keeps the rows
+		// they just wrote, which were published after the boundary.
+		if g.merged.TruncateBefore == nil {
+			// Pass.
+		} else if b.truncateSQL == "" {
+			var _, reason = b.target.PublishedAtColumn()
+			log.WithFields(log.Fields{
+				"table":    b.target.Identifier,
+				"boundary": *g.merged.TruncateBefore,
+				"reason":   reason.Error(),
+			}).Warn("skipping staged truncation because the binding no longer supports it")
+		} else if tag, err := txn.Exec(ctx, b.truncateSQL, *g.merged.TruncateBefore); err != nil {
+			return nil, fmt.Errorf("truncating %s after backfill: %w", b.target.Identifier, err)
+		} else {
+			var n = tag.RowsAffected()
+			g.truncated = &n
+			log.WithFields(log.Fields{
+				"table":    b.target.Identifier,
+				"boundary": *g.merged.TruncateBefore,
+				"deleted":  n,
+			}).Info("truncated rows published before the backfill")
 		}
 
 		d.be.FinishedResourceCommit(b.target.Path)
@@ -1224,13 +1315,13 @@ func (d *transactor) putManifest(ctx context.Context, files []string) (string, e
 // always return an error. `sys_load_error_detail` is queried instead of `stl_load_errors` since it
 // is available to both serverless and provisioned versions of Redshift, whereas `stl_load_errors`
 // is only available on provisioned Redshift.
-func handleCopyIntoErr(ctx context.Context, txn pgx.Tx, bucket string, files []string, table string, copyIntoErr error) error {
+func handleCopyIntoErr(ctx context.Context, txn pgx.Tx, dialect sql.Dialect, bucket string, files []string, table string, copyIntoErr error) error {
 	// The transaction has failed. It must be finish being rolled back before using its underlying
 	// connection again.
 	txn.Rollback(ctx)
 	conn := txn.Conn()
 
-	loadErrInfo, err := getLoadErrorInfo(ctx, conn, bucket, files)
+	loadErrInfo, err := getLoadErrorInfo(ctx, conn, dialect, bucket, files)
 	if err != nil {
 		// If querying sys_load_error_detail fails for some reason, return the original error back
 		// unchanged, but log why sys_load_error_detail could not be queried. Some errors (target

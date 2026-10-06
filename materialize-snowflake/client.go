@@ -34,11 +34,12 @@ const (
 var _ sql.SchemaManager = (*client)(nil)
 
 type client struct {
-	db         *stdsql.DB
-	dbNoSchema *stdsql.DB // for metadata operations performed before the endpoint-level schema is created
-	xdb        *sqlx.DB   // used to easily read the results of SHOW queries
-	cfg        config
-	ep         *sql.Endpoint[config]
+	db                  *stdsql.DB
+	dbNoSchema          *stdsql.DB // for metadata operations performed before the endpoint-level schema is created
+	xdb                 *sqlx.DB   // used to easily read the results of SHOW queries
+	cfg                 config
+	ep                  *sql.Endpoint[config]
+	materializationName string
 }
 
 func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint[config]) (sql.Client, error) {
@@ -63,11 +64,12 @@ func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint
 	}
 
 	return &client{
-		db:         db,
-		dbNoSchema: dbNoSchema,
-		xdb:        sqlx.NewDb(dbNoSchema, "snowflake").Unsafe(),
-		cfg:        ep.Config,
-		ep:         ep,
+		db:                  db,
+		dbNoSchema:          dbNoSchema,
+		xdb:                 sqlx.NewDb(dbNoSchema, "snowflake").Unsafe(),
+		cfg:                 ep.Config,
+		ep:                  ep,
+		materializationName: materializationName,
 	}, nil
 }
 
@@ -272,7 +274,7 @@ func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, e
 	return sql.StdCreateSchema(ctx, c.dbNoSchema, c.ep.Dialect, schemaName)
 }
 
-func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
+func preReqs(ctx context.Context, cfg config, _ map[string]bool) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
 
 	dsn, err := cfg.toURI(false, "")

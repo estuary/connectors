@@ -15,3 +15,9 @@ boto3 = "^1.37.2"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[[tool.mypy.overrides]]
+module = [
+    "pyspark.*",
+]
+ignore_missing_imports = true

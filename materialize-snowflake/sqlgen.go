@@ -23,6 +23,15 @@ func isSimpleIdentifier(s string) bool {
 	return simpleIdentifierRegexp.MatchString(s) && !slices.Contains(SF_RESERVED_WORDS, strings.ToLower(s))
 }
 
+// unquotedIdentifier removes SQL identifier quotes, yielding the exact name that
+// Snowflake stores.
+func unquotedIdentifier(ident string) string {
+	if strings.HasPrefix(ident, `"`) && strings.HasSuffix(ident, `"`) && len(ident) >= 2 {
+		return strings.ReplaceAll(ident[1:len(ident)-1], `""`, `"`)
+	}
+	return ident
+}
+
 // See https://docs.snowflake.com/en/sql-reference/data-types-datetime#timestamp
 // for the official description of the different types of timestamps.
 type timestampTypeMapping string

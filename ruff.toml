@@ -1,0 +1,38 @@
+# Shared ruff config for every Python project in the repo. Per-project
+# `[tool.ruff]` sections would shadow it, so don't add them.
+#
+# Only rules that catch real bugs are selected. Formatting, import order,
+# naming and annotation style are deliberately left out for now.
+
+# Every invocation (CI and agent skills) runs `pipx run ruff==0.16.9`; bump
+# them together.
+required-version = "==0.16.9"
+
+# The connector images run Python 3.12.
+target-version = "py312"
+
+[lint]
+select = [
+    "F",       # pyflakes: undefined names, redefinitions, unused variables
+    "E9",      # syntax errors
+    "B",       # bugbear: call-time defaults, loop closures, static-key comprehensions
+    "ASYNC",   # blocking or misused calls in async code
+    "RUF006",  # asyncio tasks created without keeping a reference
+    "DTZ",     # naive datetimes
+    "PLR0124", # comparing a value with itself
+]
+ignore = [
+    "F401", # unused imports
+    "F541", # f-strings without placeholders
+    "B904", # `raise` without `from` inside `except`; implicit chaining keeps the traceback
+    "B905", # `zip` without `strict`
+    "B006", # mutable defaults; flagged ones are never mutated
+    "B007", # unused loop variables
+    "B009", # `getattr` with a constant name
+    "B010", # `setattr` with a constant name
+    "B011", # `assert False`
+    "B017", # `pytest.raises(Exception)`
+    "B024", # abstract base classes without abstract methods
+    "B027", # empty methods in abstract base classes
+    "B028", # `warnings.warn` without `stacklevel`
+]

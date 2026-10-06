@@ -1,0 +1,104 @@
+{
+  "connector": "materialize-databricks",
+  "scenario": "uuidv7-recency-3tx.yaml",
+  "seed": 0,
+  "preview_exit_code": 0,
+  "apply_seconds": 7.335915008,
+  "wall_seconds": 885.017671936,
+  "rounds_observed": 4,
+  "scenario_transactions": 4,
+  "total_docs": 7864330,
+  "total_bytes": 32212295680,
+  "observed_docs": 7864330,
+  "observed_bytes": 32212295680,
+  "docs_per_sec": 8886.071147931505,
+  "mb_per_sec": 34.71121542160744,
+  "transactions": [
+    {
+      "index": 0,
+      "collection": "bench/wide_uuidv7",
+      "doc_count": 2621440,
+      "doc_size": 4096,
+      "bytes": 10737418240,
+      "fresh": {
+        "start": 0,
+        "count": 2621440,
+        "op": "c"
+      },
+      "overlaps": [],
+      "wall_seconds": 144.292740096,
+      "mb_per_sec": 70.96684138915917,
+      "docs_per_sec": 18167.511395624748
+    },
+    {
+      "index": 1,
+      "collection": "bench/wide_uuidv7",
+      "doc_count": 2621440,
+      "doc_size": 4096,
+      "bytes": 10737418240,
+      "fresh": {
+        "start": 2621440,
+        "count": 1960837,
+        "op": "c"
+      },
+      "overlaps": [
+        {
+          "op": "u",
+          "with": 0,
+          "count": 655360
+        },
+        {
+          "op": "u",
+          "with": 0,
+          "count": 5243
+        }
+      ],
+      "wall_seconds": 325.923098112,
+      "mb_per_sec": 31.41845441246123,
+      "docs_per_sec": 8043.124329590075
+    },
+    {
+      "index": 2,
+      "collection": "bench/wide_uuidv7",
+      "doc_count": 2621440,
+      "doc_size": 4096,
+      "bytes": 10737418240,
+      "fresh": {
+        "start": 4582277,
+        "count": 1960837,
+        "op": "c"
+      },
+      "overlaps": [
+        {
+          "op": "u",
+          "with": 1,
+          "count": 655360
+        },
+        {
+          "op": "u",
+          "with": 1,
+          "count": 5243
+        }
+      ],
+      "wall_seconds": 288.765864704,
+      "mb_per_sec": 35.461255126178195,
+      "docs_per_sec": 9078.081312301618
+    },
+    {
+      "index": 3,
+      "collection": "bench/wide_uuidv7",
+      "doc_count": 10,
+      "doc_size": 4096,
+      "bytes": 40960,
+      "fresh": {
+        "start": 6543114,
+        "count": 10,
+        "op": "c"
+      },
+      "overlaps": [],
+      "wall_seconds": 126.035969024,
+      "mb_per_sec": 0.0003099313656450061,
+      "docs_per_sec": 0.07934242960512156
+    }
+  ]
+}

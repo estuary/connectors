@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-09-30
+
+### Changed
+- Captures keep running when a Shopify store is frozen (HTTP 402), locked (423), or no
+  longer exists (404). Such a store is skipped with a warning and resumes from its last
+  persisted cursor once it is reachable again after a future connector restart.
+- A binding for a stream that no configured store can serve now opens idle with a warning
+  instead of failing validation and the capture.
+
+## 2026-09-29
+
+### Added
+- New `Max Concurrent Bulk Operations` setting under Advanced Config limits
+  how many bulk query operations the connector runs at once for each store
+  (1 to 5, default 5). Lower it to leave Shopify's bulk operation slots free
+  for other systems that submit bulk queries through the same app.
+
+### Changed
+- On startup, the connector now cancels only the bulk query operations it
+  submitted itself, which it marks with a `# Estuary Flow Managed Bulk Query`
+  comment. Bulk queries submitted by other systems through the same app are
+  left running.
+
 ## 2026-08-27
 
 ### Added
