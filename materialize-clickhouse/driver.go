@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	chproto "github.com/ClickHouse/ch-go/proto"
@@ -26,6 +27,7 @@ import (
 	"github.com/invopop/jsonschema"
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
+	"golang.org/x/sync/errgroup"
 )
 
 // connectorVersion is the connector's release tag, embedded so the client
@@ -163,8 +165,12 @@ func (c config) newClickhouseOptions() *clickhouse.Options {
 		Compression: &clickhouse.Compression{
 			Method: clickhouse.CompressionLZ4,
 		},
+		MaxOpenConns: maxOpenConns,
 	}
 }
+
+// maxOpenConns is the size of each connection pool the connector opens.
+const maxOpenConns = 10
 
 // tableConfig defines per-binding resource configuration.
 type tableConfig struct {
@@ -899,60 +905,25 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 		// ensure every binding's persistent temp tables. This always runs
 		// before the first Store (the runtime serializes Acknowledge ahead
 		// of the next transaction's store phase).
+		//
+		// Each binding has its own stage and target tables, so bindings are
+		// prepared concurrently: preparing one is several DDL round trips,
+		// and a serial pass over hundreds of bindings took tens of minutes
+		// on a slow service.
+		var drainedMu sync.Mutex
+		var group, groupCtx = errgroup.WithContext(ctx)
+		group.SetLimit(sessionStartConcurrency)
 		for _, b := range t.bindings {
-			if si, pending := t.state[b.target.StateKey]; pending {
-				if !shouldProcess(b.target.StateKey) {
-					// This binding's pending work was not requested, so its
-					// staged rows must stay put. ensureTempTables would
-					// discard them, so it is skipped as well; a session
-					// always processes every state key, so this only happens
-					// in the Apply RPC's narrowed drain, where no Store
-					// follows.
-					continue
-				}
-				drained = append(drained, b.target.StateKey)
-				// A store table whose partition key differs from the target's
-				// predates a partition-changing backfill: the backfill dropped
-				// and re-created the target, so the staged rows belong to a
-				// table generation that no longer exists and the backfill will
-				// re-send them. MOVE PARTITION into the new target can never
-				// succeed (code 36), so skip the move and let ensureTempTables
-				// re-create the store table.
-				if drifted, err := t.storePartitionKeyDrifted(ctx, b); err != nil {
-					return nil, fmt.Errorf("comparing store and target partition keys of %s: %w", b.target.Identifier, err)
-				} else if drifted {
-					log.WithField("target", b.target.Identifier).Warn(
-						"store table partition key differs from target; staged rows predate a partition-changing backfill and are discarded")
-					if err := t.ensureTempTables(ctx, b); err != nil {
-						return nil, fmt.Errorf("ensuring temp tables of %s: %w", b.target.Identifier, err)
-					}
-					continue
-				}
-				// A committed-but-unacknowledged transaction has rows staged
-				// in this binding's store table. Move them; never truncate or
-				// re-create a stage table holding pending rows.
-				if err := t.moveStorePartitionsToTarget(ctx, b, si, true); err != nil {
-					if !isUnknownTableErr(err) {
-						return nil, fmt.Errorf("recovering stage to target %s: %w", b.target.Identifier, err)
-					}
-					// The store table was dropped out-of-band, so there are no
-					// staged rows left to recover. Fall through to re-create
-					// the temp tables rather than crash-looping on the missing
-					// table; ReplacingMergeTree lets later transactions refresh
-					// the lost rows.
-					log.WithField("target", b.target.Identifier).Warn(
-						"store table missing during recovery; nothing to recover, re-creating temp tables")
-				}
-				// A successful recovery move leaves the store table empty, so
-				// falling through to ensureTempTables is safe and reconciles
-				// any target-schema drift that occurred while the commit was
-				// pending. Skipping it would fail the next MOVE PARTITION with
-				// code 122 ("Tables have different structure") -- a permanent
-				// recovery crash-loop (issue #4817).
-			}
-			if err := t.ensureTempTables(ctx, b); err != nil {
-				return nil, fmt.Errorf("ensuring temp tables of %s: %w", b.target.Identifier, err)
-			}
+			group.Go(func() error {
+				return t.prepareBinding(groupCtx, b, shouldProcess, func(stateKey string) {
+					drainedMu.Lock()
+					defer drainedMu.Unlock()
+					drained = append(drained, stateKey)
+				})
+			})
+		}
+		if err := group.Wait(); err != nil {
+			return nil, err
 		}
 		close(t.ensured)
 	case <-t.ensured: // ensured channel is closed
@@ -1001,6 +972,70 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	}
 
 	return &pf.ConnectorState{UpdatedJson: checkpointJSON, MergePatch: true}, nil
+}
+
+// sessionStartConcurrency bounds how many bindings are prepared at once when
+// a session starts. It stays under maxOpenConns so that no worker queues on
+// the pool.
+const sessionStartConcurrency = 8
+
+// prepareBinding recovers a binding's pending commit, when one is requested,
+// and ensures its persistent temp tables. drained is called with the
+// binding's state key once its pending commit is recovered.
+func (t *transactor) prepareBinding(ctx context.Context, b *binding, shouldProcess func(string) bool, drained func(string)) error {
+	if si, pending := t.state[b.target.StateKey]; pending {
+		if !shouldProcess(b.target.StateKey) {
+			// This binding's pending work was not requested, so its staged
+			// rows must stay put. ensureTempTables would discard them, so it
+			// is skipped as well; a session always processes every state
+			// key, so this only happens in the Apply RPC's narrowed drain,
+			// where no Store follows.
+			return nil
+		}
+		drained(b.target.StateKey)
+		// A store table whose partition key differs from the target's
+		// predates a partition-changing backfill: the backfill dropped and
+		// re-created the target, so the staged rows belong to a table
+		// generation that no longer exists and the backfill will re-send
+		// them. MOVE PARTITION into the new target can never succeed (code
+		// 36), so skip the move and let ensureTempTables re-create the store
+		// table.
+		if drifted, err := t.storePartitionKeyDrifted(ctx, b); err != nil {
+			return fmt.Errorf("comparing store and target partition keys of %s: %w", b.target.Identifier, err)
+		} else if drifted {
+			log.WithField("target", b.target.Identifier).Warn(
+				"store table partition key differs from target; staged rows predate a partition-changing backfill and are discarded")
+			if err := t.ensureTempTables(ctx, b); err != nil {
+				return fmt.Errorf("ensuring temp tables of %s: %w", b.target.Identifier, err)
+			}
+			return nil
+		}
+		// A committed-but-unacknowledged transaction has rows staged in this
+		// binding's store table. Move them; never truncate or re-create a
+		// stage table holding pending rows.
+		if err := t.moveStorePartitionsToTarget(ctx, b, si, true); err != nil {
+			if !isUnknownTableErr(err) {
+				return fmt.Errorf("recovering stage to target %s: %w", b.target.Identifier, err)
+			}
+			// The store table was dropped out-of-band, so there are no staged
+			// rows left to recover. Fall through to re-create the temp tables
+			// rather than crash-looping on the missing table;
+			// ReplacingMergeTree lets later transactions refresh the lost
+			// rows.
+			log.WithField("target", b.target.Identifier).Warn(
+				"store table missing during recovery; nothing to recover, re-creating temp tables")
+		}
+		// A successful recovery move leaves the store table empty, so falling
+		// through to ensureTempTables is safe and reconciles any
+		// target-schema drift that occurred while the commit was pending.
+		// Skipping it would fail the next MOVE PARTITION with code 122
+		// ("Tables have different structure") -- a permanent recovery
+		// crash-loop (issue #4817).
+	}
+	if err := t.ensureTempTables(ctx, b); err != nil {
+		return fmt.Errorf("ensuring temp tables of %s: %w", b.target.Identifier, err)
+	}
+	return nil
 }
 
 // isUnknownTableErr reports whether err (anywhere in its chain) is a ClickHouse
