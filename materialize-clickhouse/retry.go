@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	chproto "github.com/ClickHouse/ch-go/proto"
 	clickhouseproto "github.com/ClickHouse/clickhouse-go/v2/lib/proto"
 	log "github.com/sirupsen/logrus"
 )
@@ -68,16 +69,19 @@ func (p retryPolicy) retry(ctx context.Context, desc string, retryable func(erro
 	}
 }
 
-// isTransientErr reports whether err is a transient connection-level failure
-// of the kind seen when a ClickHouse Cloud replica is recycled mid-query:
-// connection reset, EOF on the native protocol, or an i/o timeout. Server
-// exceptions (e.g. code 241 OOM kills, DDL errors) are never transient --
-// they need the query itself to change, not a retry -- and neither is
-// cancellation of our own context.
+// isTransientErr reports whether err is a transient failure of the kind seen
+// when a ClickHouse Cloud replica is recycled mid-query: connection reset, EOF
+// on the native protocol, an i/o timeout, or a server exception raised because
+// the replica lost its Keeper session. Other server exceptions (e.g. code 241
+// OOM kills, DDL errors) are never transient -- they need the query itself to
+// change, not a retry -- and neither is cancellation of our own context.
 func isTransientErr(err error) bool {
 	var exc *clickhouseproto.Exception
 	if errors.As(err, &exc) {
-		return false
+		// KEEPER_EXCEPTION wraps the coordination errors (connection loss,
+		// session expired), which clear on their own once the replica
+		// reconnects, so the statement is worth retrying.
+		return chproto.Error(exc.Code) == chproto.ErrKeeperException
 	}
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		return false

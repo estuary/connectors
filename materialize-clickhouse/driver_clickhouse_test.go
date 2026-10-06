@@ -3,6 +3,7 @@ package connector
 import (
 	"context"
 	"fmt"
+	"io"
 	"sort"
 	"testing"
 	"time"
@@ -1884,5 +1885,70 @@ func TestAcknowledgeRecoveryMatrix(t *testing.T) {
 		require.EqualValues(t, 1, countTable(t, ctx, tr, tr.dialect.Identifier(storeTableName(b2.target, 0))))
 		require.Nil(t, tr.state[b1.target.StateKey])
 		require.NotNil(t, tr.state[b2.target.StateKey])
+	})
+}
+
+// droppingConn wraps a live connection and fails the first `drops` Exec and
+// Query calls with the EOF a recycled ClickHouse Cloud replica produces, then
+// passes everything through.
+type droppingConn struct {
+	chdriver.Conn
+	drops int
+}
+
+func (c *droppingConn) drop() error {
+	if c.drops <= 0 {
+		return nil
+	}
+	c.drops--
+	return fmt.Errorf("query processing: failed to read packet from 1.2.3.4:9440 (conn_id=1): read: %w", io.EOF)
+}
+
+func (c *droppingConn) Exec(ctx context.Context, query string, args ...any) error {
+	if err := c.drop(); err != nil {
+		return err
+	}
+	return c.Conn.Exec(ctx, query, args...)
+}
+
+func (c *droppingConn) Query(ctx context.Context, query string, args ...any) (chdriver.Rows, error) {
+	if err := c.drop(); err != nil {
+		return nil, err
+	}
+	return c.Conn.Query(ctx, query, args...)
+}
+
+// TestAcknowledgeRidesOutConnectionDrops covers the first Acknowledge of a
+// session, whose temp-table setup and recovery queries must retry a dropped
+// connection the same way Load and Store already do (issue #5403).
+func TestAcknowledgeRidesOutConnectionDrops(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	ensureDockerUp(t)
+	var ctx = t.Context()
+
+	t.Run("ensuring temp tables", func(t *testing.T) {
+		tr, b := newTestTransactor(t, ctx, "test_ack_drop_ensure")
+		_ = tr.store.conn.Exec(ctx, b.store.dropTableSQL)
+		tr.store.conn = &droppingConn{Conn: tr.store.conn, drops: 1}
+
+		_, err := tr.Acknowledge(ctx, nil, nil)
+		require.NoError(t, err)
+		require.EqualValues(t, 0, countTable(t, ctx, tr, tr.dialect.Identifier(storeTableName(b.target, 0))))
+	})
+
+	t.Run("recovering a pending commit", func(t *testing.T) {
+		tr, b := newTestTransactor(t, ctx, "test_ack_drop_recover")
+		require.NoError(t, tr.ensureTempTables(ctx, b))
+		stageTestRows(t, ctx, tr, b, []any{"k1", "v1", "c", testTime, `{"id":"k1"}`})
+		tr.store.conn = &droppingConn{Conn: tr.store.conn, drops: 1}
+
+		tr.recovery = true
+		tr.state[b.target.StateKey] = &stateItem{StoredRows: 1}
+		_, err := tr.Acknowledge(ctx, nil, nil)
+		require.NoError(t, err)
+		require.EqualValues(t, 1, countTable(t, ctx, tr, tr.dialect.Identifier("test_ack_drop_recover")))
+		require.Empty(t, tr.state)
 	})
 }

@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-10-06
+
+### Fixed
+- A dropped ClickHouse connection while the connector prepared its stage
+  tables at session start, read a stage table's partitions, or cleared the
+  load table between rounds failed the shard instead of being retried. Those
+  statements now use the same retry policy as loads and stores. Server errors
+  caused by a lost Keeper session (`KEEPER_EXCEPTION`, code 999) are retried
+  as well.
+
+### Changed
+- Session start prepares bindings concurrently (up to 8 at a time) instead of
+  one after another. A task with hundreds of bindings on a slow service spent
+  tens of minutes in this step before data moved again.
+
 ## 2026-09-04
 
 ### Changed
