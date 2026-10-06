@@ -183,3 +183,26 @@ func TestRetryPolicy(t *testing.T) {
 		}
 	})
 }
+
+// TestIsTransientErrKeeperLoss covers the server-side presentations of a lost
+// Keeper session, which resolve on their own once the replica reconnects and
+// so are worth a retry despite arriving as server exceptions.
+func TestIsTransientErrKeeperLoss(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		err  error
+	}{
+		{
+			name: "Keeper connection loss",
+			err:  fmt.Errorf("moving: %w", &clickhouseproto.Exception{Code: 999, Message: "Coordination::Exception: Connection loss"}),
+		},
+		{
+			name: "Keeper session expired",
+			err:  &clickhouseproto.Exception{Code: 999, Message: "Coordination::Exception: Session expired (ZSESSIONEXPIRED)"},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			require.True(t, isTransientErr(tt.err))
+		})
+	}
+}
