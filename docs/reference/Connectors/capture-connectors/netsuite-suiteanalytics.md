@@ -17,6 +17,12 @@ However, if you don't have SuiteAnalytics, see the [SuiteQL connector](./netsuit
 
 Estuary discovers all of the tables to which you grant access during [setup](#setup), including `Transactions`, `Reports`, `Lists`, and `Setup`.
 
+:::note Discovery time
+Discovery reads table and column metadata for every table your NetSuite role can access, not only the tables you capture. On large NetSuite accounts, this can take 20 minutes or more.
+
+Discovery runs when you create the capture, when you refresh its bindings, and periodically in the background if [auto-discovery](../../../concepts/captures.md#automatically-update-captures) is on. Wait for it to finish rather than reloading the page and starting again.
+:::
+
 ## Sync modes and data loading
 
 Each table binding uses one of three sync modes. The connector picks a mode automatically during discovery based on the cursor and key columns it finds for each table; you can override the choice in the binding configuration.
