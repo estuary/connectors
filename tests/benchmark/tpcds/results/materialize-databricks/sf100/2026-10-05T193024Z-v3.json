@@ -1,0 +1,223 @@
+{
+  "materialization": "estuary/bench-tpc-100/materialize-databricks",
+  "capture": "estuary/bench-tpc-100/source-tpc-ds",
+  "materialization_image": "ghcr.io/estuary/materialize-databricks:v3",
+  "capture_image": "ghcr.io/estuary/source-tpc-ds:v1",
+  "scale": "100",
+  "recorded_at": "2026-10-06T17:51:23.551254Z",
+  "complete": true,
+  "ok": true,
+  "materialize": {
+    "started_at": "2026-10-05T16:55:05.1720814Z",
+    "completed_at": "2026-10-05T19:30:24.7759961Z",
+    "seconds": 9319.6039147,
+    "transactions": 27,
+    "docs": 959037905,
+    "bytes": 463896797964,
+    "docs_per_sec": 102905.43608696612,
+    "mb_per_sec": 49.776449966107066
+  },
+  "capture_phase": {
+    "started_at": "2026-10-05T16:30:29.9851054Z",
+    "completed_at": "2026-10-05T19:21:00.8607268Z",
+    "seconds": 10230.8756214,
+    "transactions": 7670,
+    "docs": 959037905,
+    "bytes": 463896797964,
+    "docs_per_sec": 93739.57229955695,
+    "mb_per_sec": 45.34282451774348
+  },
+  "tables": {
+    "call_center": {
+      "expected": 30,
+      "materialized": 30,
+      "captured": 30,
+      "completed_at": "2026-10-05T16:55:07.1174945Z",
+      "seconds": 1.9454131000000001,
+      "ok": true
+    },
+    "catalog_page": {
+      "expected": 20400,
+      "materialized": 20400,
+      "captured": 20400,
+      "completed_at": "2026-10-05T16:55:07.1174945Z",
+      "seconds": 1.9454131000000001,
+      "ok": true
+    },
+    "catalog_returns": {
+      "expected": 14404374,
+      "materialized": 14404374,
+      "captured": 14404374,
+      "completed_at": "2026-10-05T18:42:25.7026703Z",
+      "seconds": 6440.5305889,
+      "ok": true
+    },
+    "catalog_sales": {
+      "expected": 143997065,
+      "materialized": 143997065,
+      "captured": 143997065,
+      "completed_at": "2026-10-05T18:42:25.7026703Z",
+      "seconds": 6440.5305889,
+      "ok": true
+    },
+    "customer": {
+      "expected": 2000000,
+      "materialized": 2000000,
+      "captured": 2000000,
+      "completed_at": "2026-10-05T16:55:57.393713Z",
+      "seconds": 52.2216316,
+      "ok": true
+    },
+    "customer_address": {
+      "expected": 1000000,
+      "materialized": 1000000,
+      "captured": 1000000,
+      "completed_at": "2026-10-05T16:55:57.393713Z",
+      "seconds": 52.2216316,
+      "ok": true
+    },
+    "customer_demographics": {
+      "expected": 1920800,
+      "materialized": 1920800,
+      "captured": 1920800,
+      "completed_at": "2026-10-05T16:55:57.393713Z",
+      "seconds": 52.2216316,
+      "ok": true
+    },
+    "date_dim": {
+      "expected": 73049,
+      "materialized": 73049,
+      "captured": 73049,
+      "completed_at": "2026-10-05T16:55:07.1174945Z",
+      "seconds": 1.9454131000000001,
+      "ok": true
+    },
+    "household_demographics": {
+      "expected": 7200,
+      "materialized": 7200,
+      "captured": 7200,
+      "completed_at": "2026-10-05T16:55:07.1174945Z",
+      "seconds": 1.9454131000000001,
+      "ok": true
+    },
+    "income_band": {
+      "expected": 20,
+      "materialized": 20,
+      "captured": 20,
+      "completed_at": "2026-10-05T16:55:07.1174945Z",
+      "seconds": 1.9454131000000001,
+      "ok": true
+    },
+    "inventory": {
+      "expected": 399330000,
+      "materialized": 399330000,
+      "captured": 399330000,
+      "completed_at": "2026-10-05T18:57:18.4817333Z",
+      "seconds": 7333.3096519,
+      "ok": true
+    },
+    "item": {
+      "expected": 204000,
+      "materialized": 204000,
+      "captured": 204000,
+      "completed_at": "2026-10-05T16:55:07.1174945Z",
+      "seconds": 1.9454131000000001,
+      "ok": true
+    },
+    "promotion": {
+      "expected": 1000,
+      "materialized": 1000,
+      "captured": 1000,
+      "completed_at": "2026-10-05T16:55:07.1174945Z",
+      "seconds": 1.9454131000000001,
+      "ok": true
+    },
+    "reason": {
+      "expected": 55,
+      "materialized": 55,
+      "captured": 55,
+      "completed_at": "2026-10-05T16:55:07.1174945Z",
+      "seconds": 1.9454131000000001,
+      "ok": true
+    },
+    "ship_mode": {
+      "expected": 20,
+      "materialized": 20,
+      "captured": 20,
+      "completed_at": "2026-10-05T16:55:05.1720814Z",
+      "ok": true
+    },
+    "store": {
+      "expected": 402,
+      "materialized": 402,
+      "captured": 402,
+      "completed_at": "2026-10-05T16:55:07.1174945Z",
+      "seconds": 1.9454131000000001,
+      "ok": true
+    },
+    "store_returns": {
+      "expected": 28795080,
+      "materialized": 28795080,
+      "captured": 28795080,
+      "completed_at": "2026-10-05T19:30:24.7759961Z",
+      "seconds": 9319.6039147,
+      "ok": true
+    },
+    "store_sales": {
+      "expected": 287997024,
+      "materialized": 287997024,
+      "captured": 287997024,
+      "completed_at": "2026-10-05T19:30:24.7759961Z",
+      "seconds": 9319.6039147,
+      "ok": true
+    },
+    "time_dim": {
+      "expected": 86400,
+      "materialized": 86400,
+      "captured": 86400,
+      "completed_at": "2026-10-05T16:55:07.1174945Z",
+      "seconds": 1.9454131000000001,
+      "ok": true
+    },
+    "warehouse": {
+      "expected": 15,
+      "materialized": 15,
+      "captured": 15,
+      "completed_at": "2026-10-05T16:55:07.1174945Z",
+      "seconds": 1.9454131000000001,
+      "ok": true
+    },
+    "web_page": {
+      "expected": 2040,
+      "materialized": 2040,
+      "captured": 2040,
+      "completed_at": "2026-10-05T16:55:07.1174945Z",
+      "seconds": 1.9454131000000001,
+      "ok": true
+    },
+    "web_returns": {
+      "expected": 7197670,
+      "materialized": 7197670,
+      "captured": 7197670,
+      "completed_at": "2026-10-05T17:58:51.1413438Z",
+      "seconds": 3825.9692624,
+      "ok": true
+    },
+    "web_sales": {
+      "expected": 72001237,
+      "materialized": 72001237,
+      "captured": 72001237,
+      "completed_at": "2026-10-05T17:58:51.1413438Z",
+      "seconds": 3825.9692624,
+      "ok": true
+    },
+    "web_site": {
+      "expected": 24,
+      "materialized": 24,
+      "captured": 24,
+      "completed_at": "2026-10-05T16:55:07.1174945Z",
+      "seconds": 1.9454131000000001,
+      "ok": true
+    }
+  }
+}

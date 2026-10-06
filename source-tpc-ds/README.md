@@ -100,6 +100,13 @@ DuckDB's shipped answer sets do not describe this connector's output. Use TPC's
 published qualification answers at scale 1, or compute reference answers by
 loading the captured data into any engine of your choice.
 
+## Recording a production load
+
+`go run ./tests/benchmark/tpcds -materialization <task>` checks that a
+materialization fed by this capture received exactly dsdgen's row count for
+every table and records how long the full load took, using only Flow's stats.
+See [tests/benchmark/tpcds/README.md](../tests/benchmark/tpcds/README.md).
+
 ## Running the reference queries
 
 1. Create the capture with the desired `scale` and materialize all 24
