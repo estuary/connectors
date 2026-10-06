@@ -311,12 +311,12 @@ To set exclusions for particular special column types, configure the resource's 
 
 If you find these exclusions too broad, you can add back individual filtered-out fields using the resource's **Additional Columns** Advanced Option.
 
+You can find out whether a specific column falls under one of these special types in NetSuite's column metadata under the `userdata` field.
+
 A binding whose queries return no rows and then fail with `Timed out too many times when fetching data from` usually selects a special column that NetSuite cannot serve.
 Turn on all four exclusion options for that binding, then add back only the columns you need under **Additional Columns**.
 
 Long-text (CLOB) values are captured up to 160,000 characters. On tables with many long-text columns, the limit is lower to keep the query under NetSuite's length limit, and the connector logs `CLOB columns will be truncated to fit the query length limit`. To capture longer values, exclude the columns you do not need.
-
-You can find out whether a specific column falls under one of these special types in NetSuite's column metadata under the `userdata` field.
 
 ## Setting a Schedule
 
