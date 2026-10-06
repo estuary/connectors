@@ -25,7 +25,7 @@ Each table binding uses one of three sync modes. The connector picks a mode auto
 
 Tables with a date-time column suitable for change tracking (configured via [`log_cursor`](#bindings)) are synced **incrementally**. Most base record tables — such as `Transaction`, `Account`, `Customer`, `Employee`, `Item`, `Subsidiary`, and `Vendor` — have a `lastmodifieddate` column that the connector discovers automatically. Some linking tables, including `TransactionLine`, `NextTransactionLineLink`, `PreviousTransactionLineLink`, `NextTransactionAccountingLineLink`, and `PreviousTransactionAccountingLineLink`, also use `lastmodifieddate` (or `linelastmodifieddate`) for incremental capture.
 
-During incremental sync, the connector queries only for rows modified since the last checkpoint. The polling frequency is controlled by the [`interval`](#bindings) setting (default: 1 hour). For fresher data, lower the interval to about 5 minutes (`PT5M`) on the bindings that need it. Going lower gains little, because the connector holds back the most recent 2 minutes of changes to allow for NetSuite's own delay in making them visible.
+During incremental sync, the connector queries only for rows modified since the last checkpoint. The polling frequency is controlled by the [`interval`](#bindings) setting (default: 1 hour). For fresher data, lower the interval to 5 minutes (`PT5M`) on the bindings that need it. Going lower gains little, because the connector holds back the most recent 2 minutes of changes to allow for NetSuite's own delay in making them visible.
 
 **How to tell if a table is incremental:** check the binding's `log_cursor` field. If it's set (for example, `lastmodifieddate`), the table is incremental.
 
