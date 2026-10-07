@@ -1,0 +1,10 @@
+captures:
+  acmeCo/source-okta:
+    endpoint:
+      local:
+        command:
+        - python
+        - -m
+        - source_okta
+        config: config.yaml
+    bindings: []
