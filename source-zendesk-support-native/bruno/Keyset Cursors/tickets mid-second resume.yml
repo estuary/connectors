@@ -1,0 +1,156 @@
+info:
+  name: tickets mid-second resume
+  type: http
+  seq: 5
+
+http:
+  method: GET
+  url: "{{base_url}}/tickets?sort=updated_at&page[size]={{seek_page_size}}&page[after]={{crafted_cursor}}"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // Build a keyset cursor from plain values instead of one Zendesk returned:
+        // base64(JSON {"o": <order>, "v": base64(type byte + int64 LE, ...)}), with
+        // type 'd' = epoch-seconds updated_at and 'i' = id. Not a credential, so a
+        // runtime var is fine.
+        const T = BigInt(bru.getEnvVar('seek_updated_at'));
+        const id = BigInt(bru.getEnvVar('seek_id'));
+        const order = bru.getEnvVar('seek_order');
+        const buf = Buffer.alloc(18);
+        buf.write('d', 0); buf.writeBigInt64LE(T, 1);
+        buf.write('i', 9); buf.writeBigInt64LE(id, 10);
+        const cursor = Buffer.from(JSON.stringify({ o: order, v: buf.toString('base64') })).toString('base64');
+        bru.setVar('crafted_cursor', cursor);
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - run 1: seek (1722008529, 0), page size 1 returns ticket 19 (projection)"
+    request:
+      url: "{{base_url}}/tickets?sort=updated_at&page[size]=1&page[after]=eyJvIjoidXBkYXRlZF9hdCxpZCIsInYiOiJaTkhEbzJZQUFBQUFhUUFBQUFBQUFBQUEifQ=="
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "699"
+        - name: "ratelimit-remaining"
+          value: "699"
+        - name: "ratelimit-reset"
+          value: "46"
+        - name: "zendesk-ratelimit-tickets-index"
+          value: "total=100000; remaining=99999; resets=46"
+      body:
+        type: json
+        data: |-
+          {
+            "tickets": [
+              {
+                "id": 19,
+                "updated_at": "2024-07-26T15:42:09Z",
+                "status": "open"
+              }
+            ],
+            "meta": {
+              "has_more": true,
+              "after_cursor": "eyJvIjoidXBkYXRlZF9hdCxpZCIsInYiOiJaTkhEbzJZQUFBQUFhWlNDMWRZNUdnQUEifQ==",
+              "before_cursor": "eyJvIjoidXBkYXRlZF9hdCxpZCIsInYiOiJaTkhEbzJZQUFBQUFhWlNDMWRZNUdnQUEifQ=="
+            }
+          }
+  - name: "200 - run 2: rebuilt (1722008529, 28835719774868) resumes at ticket 20 (projection)"
+    request:
+      url: "{{base_url}}/tickets?sort=updated_at&page[size]=100&page[after]=eyJvIjoidXBkYXRlZF9hdCxpZCIsInYiOiJaTkhEbzJZQUFBQUFhWlNDMWRZNUdnQUEifQ=="
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "698"
+        - name: "ratelimit-remaining"
+          value: "698"
+        - name: "ratelimit-reset"
+          value: "43"
+        - name: "zendesk-ratelimit-tickets-index"
+          value: "total=100000; remaining=99998; resets=43"
+      body:
+        type: json
+        data: |-
+          {
+            "tickets": [
+              {
+                "id": 20,
+                "updated_at": "2024-07-26T15:42:09Z",
+                "status": "open"
+              },
+              {
+                "id": 21,
+                "updated_at": "2024-07-26T15:42:09Z",
+                "status": "open"
+              },
+              {
+                "id": 22,
+                "updated_at": "2024-07-26T15:42:10Z",
+                "status": "open"
+              },
+              {
+                "id": 23,
+                "updated_at": "2024-07-26T15:42:10Z",
+                "status": "open"
+              },
+              {
+                "id": 24,
+                "updated_at": "2024-07-26T15:42:11Z",
+                "status": "open"
+              },
+              {
+                "id": 25,
+                "updated_at": "2024-07-26T15:42:11Z",
+                "status": "open"
+              }
+            ],
+            "tickets_total": 37,
+            "meta": {
+              "has_more": false,
+              "after_cursor": "eyJvIjoidXBkYXRlZF9hdCxpZCIsInYiOiJaR2RyeG1vQUFBQUFhUlJWc0hkck1RQUEifQ==",
+              "before_cursor": "eyJvIjoidXBkYXRlZF9hdCxpZCIsInYiOiJaTkhEbzJZQUFBQUFhWlNmNHRjNUdnQUEifQ=="
+            }
+          }
+
+docs: |-
+  **REFERENCE:** [List Tickets](https://developer.zendesk.com/api-reference/ticketing/tickets/tickets/#list-tickets)
+
+  **WHY:** Checks that a ticket cursor rebuilt from a returned cursor's decoded
+  `(updated_at, internal id)` resumes exactly in the middle of a second. Run 1:
+  `seek_id=0`, `seek_page_size=1` at a second holding several tickets; capture its
+  `after_cursor`. Run 2: `seek_id` = the internal id decoded from that cursor,
+  `seek_page_size=100`. Run 2 must start at the second ticket of that second. The
+  connector relies on this to resume an interrupted poll without duplicates.
+
+  **VERIFIED (2026-10-07):** second 2024-07-26T15:42:09Z holds tickets 19, 20, and 21. Run 1
+  returned ticket 19 with an `after_cursor` that decodes to
+  `(1722008529, 28835719774868)`. A cursor rebuilt from those decoded values is
+  byte-for-byte identical to the returned one, and resuming from it returns 20, 21,
+  then later seconds, without repeating 19. Resuming from the returned cursor directly
+  (`Keyset Cursors / tickets resume from returned cursor`) gave the same page.
+  Persisting the decoded `(updated_at, internal id)` resumes exactly mid-second.

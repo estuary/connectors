@@ -1,0 +1,28 @@
+info:
+  name: F1 - Restore deleted ticket
+  type: http
+  seq: 17
+
+http:
+  method: PUT
+  url: "{{base_url}}/deleted_tickets/{{restore_ticket_id}}/restore"
+  auth: inherit
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Restore Previously Deleted Ticket](https://developer.zendesk.com/api-reference/ticketing/tickets/tickets/#restore-previously-deleted-ticket)
+
+  SEEDING REQUEST: only the user runs this; never the assistant.
+
+  **WHY:** V12. Restores a soft-deleted ticket (`restore_ticket_id`, pinned to ticket 48,
+  deleted at 15:52:09 by `Seeding / A6 - Delete ticket`). Afterwards run
+  `Tickets / show probe ticket` with `probe_ticket_id=48`. If the restore bumped
+  `updated_at`, the `tickets` A8 sweep re-captures a restored ticket after its
+  deletion document was emitted; if not, the restored ticket stays deleted downstream.
+
+  **Outcome:** Ran 2026-10-07; ticket 48 restored, `updated_at` 20:38:30. V12 VERIFIED in `Tickets / show probe ticket`.

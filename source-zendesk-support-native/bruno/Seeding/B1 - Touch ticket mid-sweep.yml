@@ -1,0 +1,44 @@
+info:
+  name: B1 - Touch ticket mid-sweep
+  type: http
+  seq: 7
+
+http:
+  method: PUT
+  url: "{{base_url}}/tickets/{{sweep_touch_ticket_id}}"
+  body:
+    type: json
+    data: |-
+      {
+        "ticket": {
+          "tags": [
+            "bruno_probe_v3"
+          ]
+        }
+      }
+  auth: inherit
+
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Update Ticket](https://developer.zendesk.com/api-reference/ticketing/tickets/tickets/#update-ticket)
+
+  SEEDING REQUEST: only the user runs this; never the assistant.
+
+  **WHY:** V3. Run between `Tickets / descending sweep page 1` and
+  `Tickets / descending sweep page 2`. Sets `tags` on a ticket that page 1 has
+  not reached yet (ticket 41 has no tags, so nothing is overwritten), bumping its `updated_at` so it moves ahead of the sweep's
+  cursor. Page 2 then shows whether the keyset cursor skips or duplicates
+  records when one changes mid-sweep. `sweep_touch_ticket_id` is pinned in the environment to
+  ticket 41, which sits on a later page of the descending sweep.
+
+  Single-ticket `PUT /tickets/{id}` silently ignores `additional_tags` (200 OK,
+  ticket unchanged; observed 2026-10-07). That field exists only on the bulk
+  update request, so this request sets `tags` instead.
+
+  **Outcome:** Ran 2026-10-07 (second run, with `tags`); V3 VERIFIED in `Tickets / descending sweep page 1` and `Tickets / descending sweep page 2`.

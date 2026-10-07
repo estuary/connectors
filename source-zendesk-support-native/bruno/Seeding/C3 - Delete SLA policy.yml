@@ -1,0 +1,37 @@
+info:
+  name: C3 - Delete SLA policy
+  type: http
+  seq: 10
+
+http:
+  method: DELETE
+  url: "{{base_url}}/slas/policies/{{seed_sla_policy_id}}"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // seed_sla_policy_id normally arrives from `Seeding / C1 - Create 1-minute SLA policy`'s after-response capture. Fail
+        // loudly out of session rather than sending a malformed URL.
+        if (!bru.getVar('seed_sla_policy_id') && !bru.getEnvVar('seed_sla_policy_id')) {
+          throw new Error('seed_sla_policy_id not set: run `Seeding / C1 - Create 1-minute SLA policy` first in this session, or bru.setVar it');
+        }
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Delete SLA Policy](https://developer.zendesk.com/api-reference/ticketing/business-rules/sla_policies/#delete-sla-policy)
+
+  SEEDING REQUEST: only the user runs this; never the assistant.
+
+  **WHY:** Cleanup for V8. Removes the policy created by `Seeding / C1 - Create
+  1-minute SLA policy`, after the V8 reads are captured.
+
+  **Outcome:** Ran 2026-10-07; policy 54337621815700 deleted (204).
+  **Outcome:** Re-ran 2026-10-07; policy 54349623730068 deleted (204).
+  **Outcome:** Re-ran 2026-10-07; policy 54350009576980 deleted (204).

@@ -1,0 +1,37 @@
+info:
+  name: A6 - Delete ticket
+  type: http
+  seq: 6
+
+http:
+  method: DELETE
+  url: "{{base_url}}/tickets/{{seed_ticket_id}}"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // seed_ticket_id normally arrives from `Seeding / A5 - Create ticket to delete`'s after-response capture. Fail
+        // loudly out of session rather than sending a malformed URL.
+        if (!bru.getVar('seed_ticket_id') && !bru.getEnvVar('seed_ticket_id')) {
+          throw new Error('seed_ticket_id not set: run `Seeding / A5 - Create ticket to delete` first in this session, or bru.setVar it');
+        }
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Delete Ticket](https://developer.zendesk.com/api-reference/ticketing/tickets/tickets/#delete-ticket)
+
+  SEEDING REQUEST: only the user runs this; never the assistant.
+
+  **WHY:** A5. Soft-deletes the ticket created by `Seeding / A5 - Create ticket to
+  delete` (run A5 first in the same session). Afterwards re-run
+  `Incremental / tickets cursor`, `Tickets / start_time alone`, and
+  `Deleted / deleted_tickets`.
+
+  **Outcome:** Ran 2026-10-07; VERIFIED in `Incremental / tickets cursor`, `Tickets / start_time alone`, `Deleted / deleted_tickets`.

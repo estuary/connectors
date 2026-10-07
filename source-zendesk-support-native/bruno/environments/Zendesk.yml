@@ -1,0 +1,37 @@
+variables:
+  - name: base_url
+    value: https://subdomain.zendesk.com/api/v2
+  - name: config_path
+    value: ../config.yaml
+  - name: tickets_start_time
+    value: "1778249324"
+  - name: tickets_boundary_epoch
+    value: "1778249334"
+  - name: metric_ticket_id
+    value: "1"
+  - name: search_window_start
+    value: 2026-05-08T14:08:44Z
+  - name: search_window_end
+    value: 2026-05-08T14:08:54Z
+  - name: sweep_after_cursor
+    value: "eyJvIjoiLXVwZGF0ZWRfYXQsLWlkIiwidiI6IlpLeTRWbW9BQUFBQWFaUmNCVnF6TGdBQSJ9"
+  - name: sweep_touch_ticket_id
+    value: "41"
+  - name: probe_ticket_id
+    value: PIN_FROM_SEEDING_C2
+  - name: seek_sort
+    value: updated_at
+  - name: seek_order
+    value: updated_at,id
+  - name: seek_updated_at
+    value: "1778249334"
+  - name: seek_id
+    value: "0"
+  - name: returned_cursor
+    value: "eyJvIjoidXBkYXRlZF9hdCxpZCIsInYiOiJaTkpPdEdvQUFBQUFhUlFURFRyL01BQUEifQ=="
+  - name: bad_cursor
+    value: not-a-cursor
+  - name: seek_page_size
+    value: "1"
+  - name: restore_ticket_id
+    value: "48"

@@ -1,0 +1,65 @@
+info:
+  name: C1 - Create 1-minute SLA policy
+  type: http
+  seq: 8
+
+http:
+  method: POST
+  url: "{{base_url}}/slas/policies"
+  body:
+    type: json
+    data: |-
+      {
+        "sla_policy": {
+          "title": "Bruno probe V8",
+          "filter": {
+            "all": [
+              {
+                "field": "current_tags",
+                "operator": "includes",
+                "value": "bruno_probe_v8"
+              }
+            ],
+            "any": []
+          },
+          "policy_metrics": [
+            {
+              "priority": "normal",
+              "metric": "first_reply_time",
+              "target": 1,
+              "business_hours": false
+            }
+          ]
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // Chain: `Seeding / C3 - Delete SLA policy` consumes this id as {{seed_sla_policy_id}}.
+        // Runtime var only (a resource id, not a credential).
+        if (res.status >= 200 && res.status < 300 && res.body?.sla_policy?.id) {
+          bru.setVar('seed_sla_policy_id', res.body.sla_policy?.id);
+        }
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Create SLA Policy](https://developer.zendesk.com/api-reference/ticketing/business-rules/sla_policies/#create-sla-policy)
+
+  SEEDING REQUEST: only the user runs this; never the assistant.
+
+  **WHY:** V8. Creates an SLA policy with a 1-minute first-reply target that applies
+  only to tickets tagged `bruno_probe_v8`, so `Seeding / C2 - Create SLA ticket` can
+  breach it without any further update. Remove it afterwards with
+  `Seeding / C3 - Delete SLA policy`.
+
+  **Outcome:** Ran 2026-10-07 (policy 54337621815700); V8 VERIFIED in `Ticket Metric Events / per ticket`.
+  **Outcome:** Re-ran 2026-10-07 (policy 54349623730068) for V8a.
+  **Outcome:** Re-ran 2026-10-07 (policy 54350009576980) for V13.

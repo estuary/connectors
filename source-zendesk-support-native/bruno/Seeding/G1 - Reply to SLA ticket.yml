@@ -1,0 +1,49 @@
+info:
+  name: G1 - Reply to SLA ticket
+  type: http
+  seq: 18
+
+http:
+  method: PUT
+  url: "{{base_url}}/tickets/{{probe_ticket_id}}"
+  body:
+    type: json
+    data: |-
+      {
+        "ticket": {
+          "comment": {
+            "body": "Agent reply to fulfil the first-reply SLA before its breach.",
+            "public": true
+          }
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // probe_ticket_id normally arrives from `Seeding / C2 - Create SLA ticket`'s after-response capture. Fail
+        // loudly out of session rather than sending a malformed URL.
+        if (!bru.getVar('probe_ticket_id') && !bru.getEnvVar('probe_ticket_id')) {
+          throw new Error('probe_ticket_id not set: run `Seeding / C2 - Create SLA ticket` first in this session, or bru.setVar it');
+        }
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Update Ticket](https://developer.zendesk.com/api-reference/ticketing/tickets/tickets/#update-ticket)
+
+  SEEDING REQUEST: only the user runs this; never the assistant.
+
+  **WHY:** V13. Adds a public agent reply to the ticket created by
+  `Seeding / C2 - Create SLA ticket`, fulfilling its 1-minute first-reply SLA before
+  the pre-written `breach` event's time. Run it in the same `bru run` as C1 and C2.
+  After the breach time, re-run `Ticket Metric Events / per ticket` for that ticket to
+  see what happened to the pre-written breach event. Then remove the policy with
+  `Seeding / C3 - Delete SLA policy`.
+  **Outcome:** Ran 2026-10-07 on ticket 53 (policy 54350009576980). V13 VERIFIED in `Ticket Metric Events / per ticket`: fulfilled, no breach event. Events took 11 to 13 minutes to appear.
