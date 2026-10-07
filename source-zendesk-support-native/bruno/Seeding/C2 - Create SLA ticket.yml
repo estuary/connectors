@@ -1,0 +1,62 @@
+info:
+  name: C2 - Create SLA ticket
+  type: http
+  seq: 9
+
+http:
+  method: POST
+  url: "{{base_url}}/tickets"
+  body:
+    type: json
+    data: |-
+      {
+        "ticket": {
+          "subject": "Bruno probe V8 SLA breach",
+          "priority": "normal",
+          "tags": [
+            "bruno_probe_v8"
+          ],
+          "requester": {
+            "name": "Bruno probe V8 requester",
+            "email": "bruno-probe-v8-requester@example.com"
+          },
+          "comment": {
+            "body": "Created to verify whether SLA breach events update the ticket."
+          }
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // Chain: `Tickets / show probe ticket` consumes this id as {{probe_ticket_id}}.
+        // Runtime var only (a resource id, not a credential).
+        if (res.status >= 200 && res.status < 300 && res.body?.ticket?.id) {
+          bru.setVar('probe_ticket_id', res.body.ticket?.id);
+        }
+        if (res.body?.ticket?.id) bru.setVar('metric_ticket_id', res.body.ticket.id);
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Create Ticket](https://developer.zendesk.com/api-reference/ticketing/tickets/tickets/#create-ticket)
+
+  SEEDING REQUEST: only the user runs this; never the assistant.
+
+  **WHY:** V8. Creates a normal-priority ticket tagged `bruno_probe_v8` from a new
+  end-user requester, so the 1-minute first-reply SLA from
+  `Seeding / C1 - Create 1-minute SLA policy` breaches. Then wait at least 3 minutes
+  without touching the ticket and run `Tickets / show probe ticket` and
+  `Ticket Metric Events / per ticket` with `metric_ticket_id` set to this ticket. If a
+  `breach` event's `time` is later than the ticket's `updated_at`, per-ticket refetch
+  driven by ticket changes would miss it.
+
+  **Outcome:** Ran 2026-10-07 (ticket 49); V8 VERIFIED in `Ticket Metric Events / per ticket` and `Tickets / show probe ticket`.
+  **Outcome:** Re-ran 2026-10-07 (ticket 52); V8a VERIFIED in `Ticket Metric Events / per ticket`.
+  **Outcome:** Re-ran 2026-10-07 (ticket 53) for V13.

@@ -1,0 +1,223 @@
+info:
+  name: deleted_users sort values
+  type: http
+  seq: 6
+
+http:
+  method: GET
+  url: "{{base_url}}/deleted_users?sort={{probe_sort}}&page[size]=100"
+  params:
+    - name: "sort"
+      value: "{{probe_sort}}"
+      type: query
+    - name: "page[size]"
+      value: "100"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - sort=id"
+    request:
+      url: "{{base_url}}/deleted_users?sort=id&page[size]=100"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "697"
+        - name: "ratelimit-remaining"
+          value: "697"
+        - name: "ratelimit-reset"
+          value: "42"
+      body:
+        type: json
+        data: |-
+          {
+            "deleted_users": [
+              {
+                "id": 54337475674900,
+                "name": "Bruno probe V7 deleted user",
+                "created_at": "2026-10-07T15:52:04Z",
+                "updated_at": "2026-10-07T15:52:05Z",
+                "active": false
+              }
+            ],
+            "meta": {
+              "has_more": false,
+              "after_cursor": "eyJvIjoiaWQiLCJ2IjoiYVJTRDcyMXJNUUFBIn0=",
+              "before_cursor": "eyJvIjoiaWQiLCJ2IjoiYVJTRDcyMXJNUUFBIn0="
+            }
+          }
+  - name: "200 - sort=-id"
+    request:
+      url: "{{base_url}}/deleted_users?sort=-id&page[size]=100"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "696"
+        - name: "ratelimit-remaining"
+          value: "696"
+        - name: "ratelimit-reset"
+          value: "39"
+      body:
+        type: json
+        data: |-
+          {
+            "deleted_users": [
+              {
+                "id": 54337475674900,
+                "name": "Bruno probe V7 deleted user",
+                "created_at": "2026-10-07T15:52:04Z",
+                "updated_at": "2026-10-07T15:52:05Z",
+                "active": false
+              }
+            ],
+            "meta": {
+              "has_more": false,
+              "after_cursor": "eyJvIjoiLWlkIiwidiI6ImFSU0Q3MjFyTVFBQSJ9",
+              "before_cursor": "eyJvIjoiLWlkIiwidiI6ImFSU0Q3MjFyTVFBQSJ9"
+            }
+          }
+  - name: "400 - sort=-updated_at"
+    request:
+      url: "{{base_url}}/deleted_users?sort=-updated_at&page[size]=100"
+      method: GET
+    response:
+      status: 400
+      statusText: "Bad Request"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "692"
+        - name: "ratelimit-remaining"
+          value: "692"
+        - name: "ratelimit-reset"
+          value: "28"
+      body:
+        type: json
+        data: |-
+          {
+            "error": "InvalidPaginationParameter",
+            "description": "sort is not valid"
+          }
+  - name: "400 - sort=created_at"
+    request:
+      url: "{{base_url}}/deleted_users?sort=created_at&page[size]=100"
+      method: GET
+    response:
+      status: 400
+      statusText: "Bad Request"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "695"
+        - name: "ratelimit-remaining"
+          value: "695"
+        - name: "ratelimit-reset"
+          value: "36"
+      body:
+        type: json
+        data: |-
+          {
+            "error": "InvalidPaginationParameter",
+            "description": "sort is not valid"
+          }
+  - name: "400 - sort=deleted_at"
+    request:
+      url: "{{base_url}}/deleted_users?sort=deleted_at&page[size]=100"
+      method: GET
+    response:
+      status: 400
+      statusText: "Bad Request"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "694"
+        - name: "ratelimit-remaining"
+          value: "694"
+        - name: "ratelimit-reset"
+          value: "34"
+      body:
+        type: json
+        data: |-
+          {
+            "error": "InvalidPaginationParameter",
+            "description": "sort is not valid"
+          }
+  - name: "400 - sort=name"
+    request:
+      url: "{{base_url}}/deleted_users?sort=name&page[size]=100"
+      method: GET
+    response:
+      status: 400
+      statusText: "Bad Request"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "693"
+        - name: "ratelimit-remaining"
+          value: "693"
+        - name: "ratelimit-reset"
+          value: "31"
+      body:
+        type: json
+        data: |-
+          {
+            "error": "InvalidPaginationParameter",
+            "description": "sort is not valid"
+          }
+
+docs: |-
+  **REFERENCE:** [List Deleted Users](https://developer.zendesk.com/api-reference/ticketing/users/users/#list-deleted-users)
+
+  **WHY:** Finds which `sort` values `/deleted_users` accepts (it rejects `updated_at`),
+  and the order its cursor encodes for each. This decides whether user deletions can be
+  read incrementally by time.
+
+  **LIMITATION (VERIFIED 2026-10-07):** only `sort=id` and `sort=-id` are accepted. `updated_at`,
+  `-updated_at`, `created_at`, `deleted_at`, and `name` are rejected with
+  `400 InvalidPaginationParameter` ("sort is not valid"). User deletions can't be read
+  incrementally by time: each sweep reads the whole list and filters on `updated_at`
+  client-side.

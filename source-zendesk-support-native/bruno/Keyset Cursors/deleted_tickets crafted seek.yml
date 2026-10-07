@@ -1,0 +1,171 @@
+info:
+  name: deleted_tickets crafted seek
+  type: http
+  seq: 6
+
+http:
+  method: GET
+  url: "{{base_url}}/deleted_tickets?sort={{seek_sort}}&page[size]=100&page[after]={{crafted_cursor}}"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // Build a keyset cursor from plain values instead of one Zendesk returned:
+        // base64(JSON {"o": <order>, "v": base64(type byte + int64 LE, ...)}), with
+        // type 'd' = epoch-seconds updated_at and 'i' = id. Not a credential, so a
+        // runtime var is fine.
+        const T = BigInt(bru.getEnvVar('seek_updated_at'));
+        const id = BigInt(bru.getEnvVar('seek_id'));
+        const order = bru.getEnvVar('seek_order');
+        const buf = Buffer.alloc(18);
+        buf.write('d', 0); buf.writeBigInt64LE(T, 1);
+        buf.write('i', 9); buf.writeBigInt64LE(id, 10);
+        const cursor = Buffer.from(JSON.stringify({ o: order, v: buf.toString('base64') })).toString('base64');
+        bru.setVar('crafted_cursor', cursor);
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - seek (1791388329, 0) with only ticket 48 deleted (projection)"
+    request:
+      url: "{{base_url}}/deleted_tickets?sort=updated_at&page[size]=100&page[after]=eyJvIjoidXBkYXRlZF9hdCxpZCIsInYiOiJaS2xxeG1vQUFBQUFhUUFBQUFBQUFBQUEifQ=="
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "696"
+        - name: "ratelimit-remaining"
+          value: "696"
+        - name: "ratelimit-reset"
+          value: "30"
+        - name: "zendesk-ratelimit-deleted-tickets-index"
+          value: "total=10; remaining=6; resets=30"
+      body:
+        type: json
+        data: |-
+          {
+            "deleted_tickets": [
+              {
+                "id": 48,
+                "subject": "Bruno probe deleted ticket",
+                "deleted_at": "2026-10-07T15:52:09Z"
+              }
+            ],
+            "meta": {
+              "has_more": false,
+              "after_cursor": "eyJvIjoidXBkYXRlZF9hdCxpZCIsInYiOiJaS2xxeG1vQUFBQUFhWlI1VTI1ck1RQUEifQ==",
+              "before_cursor": "eyJvIjoidXBkYXRlZF9hdCxpZCIsInYiOiJaS2xxeG1vQUFBQUFhWlI1VTI1ck1RQUEifQ=="
+            }
+          }
+  - name: "200 - seek (1791388330, 0): empty"
+    request:
+      url: "{{base_url}}/deleted_tickets?sort=updated_at&page[size]=100&page[after]=eyJvIjoidXBkYXRlZF9hdCxpZCIsInYiOiJaS3BxeG1vQUFBQUFhUUFBQUFBQUFBQUEifQ=="
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "695"
+        - name: "ratelimit-remaining"
+          value: "695"
+        - name: "ratelimit-reset"
+          value: "27"
+        - name: "zendesk-ratelimit-deleted-tickets-index"
+          value: "total=10; remaining=5; resets=27"
+      body:
+        type: json
+        data: |-
+          {
+            "deleted_tickets": [],
+            "meta": {
+              "has_more": false,
+              "after_cursor": null,
+              "before_cursor": null
+            }
+          }
+  - name: "200 - after D1-D4: deletion order 48, B (51), A (50) (projection)"
+    request:
+      url: "{{base_url}}/deleted_tickets?sort=updated_at&page[size]=100&page[after]=eyJvIjoidXBkYXRlZF9hdCxpZCIsInYiOiJaS2xxeG1vQUFBQUFhUUFBQUFBQUFBQUEifQ=="
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "695"
+        - name: "ratelimit-remaining"
+          value: "695"
+        - name: "ratelimit-reset"
+          value: "23"
+        - name: "zendesk-ratelimit-deleted-tickets-index"
+          value: "total=10; remaining=9; resets=23"
+      body:
+        type: json
+        data: |-
+          {
+            "deleted_tickets": [
+              {
+                "id": 48,
+                "subject": "Bruno probe deleted ticket",
+                "deleted_at": "2026-10-07T15:52:09Z"
+              },
+              {
+                "id": 51,
+                "subject": "Bruno probe deletion order B",
+                "deleted_at": "2026-10-07T19:57:21Z"
+              },
+              {
+                "id": 50,
+                "subject": "Bruno probe deletion order A",
+                "deleted_at": "2026-10-07T19:57:24Z"
+              }
+            ],
+            "meta": {
+              "has_more": false,
+              "after_cursor": "eyJvIjoidXBkYXRlZF9hdCxpZCIsInYiOiJaQ1NreG1vQUFBQUFhWlRjSk85dE1RQUEifQ==",
+              "before_cursor": "eyJvIjoidXBkYXRlZF9hdCxpZCIsInYiOiJaS2xxeG1vQUFBQUFhWlI1VTI1ck1RQUEifQ=="
+            }
+          }
+
+docs: |-
+  **REFERENCE:** [List Deleted Tickets](https://developer.zendesk.com/api-reference/ticketing/tickets/tickets/#list-deleted-tickets)
+
+  **WHY:** Whether `/deleted_tickets` accepts client-built `(updated_at, id)` cursors
+  under `sort=updated_at` / `sort=deleted_at`. If so, deletions can be read with the
+  same ascending keyset sweep (A8) as `/tickets`, which the `tickets` deletion
+  subtask needs.
+
+  **VERIFIED (2026-10-07):** `/deleted_tickets` accepts client-built `(updated_at, id)` cursors
+  under `sort=updated_at` (and `sort=deleted_at`, which is identical). `(T, 0)` is
+  inclusive of second T. After `Seeding / D1`–`D4` deleted B three seconds before A,
+  results come back in deletion order (48, B, A), and the final cursor decodes to A's
+  exact `deleted_at`. A deleted ticket's `updated_at` is its deletion time, so the A8
+  ascending keyset sweep reads deletions incrementally. The tie-break id is internal,
+  as on `/tickets`.

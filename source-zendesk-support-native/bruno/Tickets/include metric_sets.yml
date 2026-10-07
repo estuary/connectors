@@ -1,0 +1,91 @@
+info:
+  name: include metric_sets
+  type: http
+  seq: 6
+
+http:
+  method: GET
+  url: "{{base_url}}/tickets?page[size]=2&include=metric_sets"
+  params:
+    - name: "page[size]"
+      value: "2"
+      type: query
+    - name: "include"
+      value: "metric_sets"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - metric_sets sideloaded (projection)"
+    request:
+      url: "{{base_url}}/tickets?page[size]=2&include=metric_sets"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "697"
+        - name: "ratelimit-remaining"
+          value: "697"
+        - name: "ratelimit-reset"
+          value: "58"
+        - name: "zendesk-ratelimit-tickets-index"
+          value: "total=100000; remaining=99998; resets=58"
+      body:
+        type: json
+        data: |-
+          {
+            "tickets": [
+              {
+                "id": 1,
+                "updated_at": "2026-05-08T14:08:44Z",
+                "status": "open"
+              },
+              {
+                "id": 2,
+                "updated_at": "2026-05-08T15:00:15Z",
+                "status": "open"
+              }
+            ],
+            "metric_sets": [
+              {
+                "ticket_id": 1,
+                "updated_at": "2024-08-01T14:45:47Z",
+                "solved_at": null
+              },
+              {
+                "ticket_id": 2,
+                "updated_at": "2024-07-26T15:43:34Z",
+                "solved_at": null
+              }
+            ],
+            "meta": {
+              "has_more": true,
+              "after_cursor": "eyJvIjoibmljZV9pZCIsInYiOiJhUUlBQUFBQUFBQUEifQ==",
+              "before_cursor": "eyJvIjoibmljZV9pZCIsInYiOiJhUUVBQUFBQUFBQUEifQ=="
+            }
+          }
+
+docs: |-
+  **REFERENCE:** [List Tickets](https://developer.zendesk.com/api-reference/ticketing/tickets/tickets/#list-tickets)
+
+  **WHY:** V4. Checks whether `/tickets` accepts the `metric_sets` sideload that the
+  `ticket_metrics` stream currently gets from the incremental ticket export.
+
+  **VERIFIED (2026-10-07):** `/tickets` accepts `include=metric_sets` and returns a top-level
+  `metric_sets` array (one per ticket) alongside `tickets`, with the full metric-set
+  fields (`reply_time_in_minutes`, `solved_at`, etc.). The current `ticket_metrics`
+  approach carries over to `/tickets`.

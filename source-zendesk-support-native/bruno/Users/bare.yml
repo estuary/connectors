@@ -1,0 +1,166 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/users?page[size]=100"
+  params:
+    - name: "page[size]"
+      value: "100"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - 31 users (projection)"
+    request:
+      url: "{{base_url}}/users?page[size]=100"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "695"
+        - name: "ratelimit-remaining"
+          value: "695"
+        - name: "ratelimit-reset"
+          value: "55"
+      body:
+        type: json
+        data: |-
+          {
+            "users": [
+              {
+                "id": 28835702984212,
+                "name": "Alex Bair",
+                "updated_at": "2026-06-04T04:15:52Z",
+                "active": true,
+                "email": "alexb@estuary.dev"
+              },
+              {
+                "id": 28835718905236,
+                "name": "Carlos Garcia",
+                "updated_at": "2024-07-26T15:41:59Z",
+                "active": true,
+                "email": "carlos.garcia@example.com"
+              },
+              {
+                "id": 28835719437332,
+                "name": "Luka Jensen",
+                "updated_at": "2024-07-26T15:42:05Z",
+                "active": true,
+                "email": "luka.jensen@example.com"
+              },
+              {
+                "id": 28835719514260,
+                "name": "Boonsri Saeli",
+                "updated_at": "2024-07-26T15:42:06Z",
+                "active": true,
+                "email": "boonsri.saeli@example.com"
+              },
+              {
+                "id": 28835719937428,
+                "name": "Blake Jackson",
+                "updated_at": "2024-07-26T15:42:11Z",
+                "active": true,
+                "email": "blake.jackson@example.com"
+              }
+            ],
+            "users_total": 31,
+            "meta": {
+              "has_more": false,
+              "after_cursor": "eyJvIjoiaWQiLCJ2IjoiYVpTMUpEbi9NQUFBIn0=",
+              "before_cursor": "eyJvIjoiaWQiLCJ2IjoiYVJSTzFkVTVHZ0FBIn0="
+            }
+          }
+  - name: "200 - after A1/A2, deleted user excluded (projection)"
+    request:
+      url: "{{base_url}}/users?page[size]=100"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "690"
+        - name: "ratelimit-remaining"
+          value: "690"
+        - name: "ratelimit-reset"
+          value: "36"
+      body:
+        type: json
+        data: |-
+          {
+            "users": [
+              {
+                "id": 28835702984212,
+                "name": "Alex Bair",
+                "updated_at": "2026-06-04T04:15:52Z",
+                "active": true,
+                "email": "alexb@estuary.dev"
+              },
+              {
+                "id": 28835718905236,
+                "name": "Carlos Garcia",
+                "updated_at": "2024-07-26T15:41:59Z",
+                "active": true,
+                "email": "carlos.garcia@example.com"
+              },
+              {
+                "id": 28835719437332,
+                "name": "Luka Jensen",
+                "updated_at": "2024-07-26T15:42:05Z",
+                "active": true,
+                "email": "luka.jensen@example.com"
+              },
+              {
+                "id": 28835719514260,
+                "name": "Boonsri Saeli",
+                "updated_at": "2024-07-26T15:42:06Z",
+                "active": true,
+                "email": "boonsri.saeli@example.com"
+              },
+              {
+                "id": 28835719937428,
+                "name": "Blake Jackson",
+                "updated_at": "2024-07-26T15:42:11Z",
+                "active": true,
+                "email": "blake.jackson@example.com"
+              }
+            ],
+            "users_total": 31,
+            "meta": {
+              "has_more": false,
+              "after_cursor": "eyJvIjoiaWQiLCJ2IjoiYVpTMUpEbi9NQUFBIn0=",
+              "before_cursor": "eyJvIjoiaWQiLCJ2IjoiYVJSTzFkVTVHZ0FBIn0="
+            }
+          }
+
+docs: |-
+  **REFERENCE:** [List Users](https://developer.zendesk.com/api-reference/ticketing/users/users/#list-users)
+
+  **WHY:** Baseline `/users` shape and population, compared with the incremental
+  user export (V7: does it include deleted users?).
+
+  **VERIFIED (2026-10-07):** default cursor is a keyset on `id`. A deleted user is excluded
+  (31 users before and after `Seeding / A2 - Delete user`; the export has 32).

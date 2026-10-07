@@ -1,0 +1,130 @@
+info:
+  name: descending sweep page 2
+  type: http
+  seq: 11
+
+http:
+  method: GET
+  url: "{{base_url}}/tickets?sort=-updated_at&page[size]=3&page[after]={{sweep_after_cursor}}"
+  auth: inherit
+
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - before B1 (projection)"
+    request:
+      url: "{{base_url}}/tickets?sort=-updated_at&page[size]=3&page[after]=eyJvIjoiLXVwZGF0ZWRfYXQsLWlkIiwidiI6IlpLeTRWbW9BQUFBQWFaUmNCVnF6TGdBQSJ9"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "698"
+        - name: "ratelimit-remaining"
+          value: "698"
+        - name: "ratelimit-reset"
+          value: "3"
+        - name: "zendesk-ratelimit-tickets-index"
+          value: "total=100000; remaining=99998; resets=3"
+      body:
+        type: json
+        data: |-
+          {
+            "tickets": [
+              {
+                "id": 44,
+                "updated_at": "2026-06-12T22:40:10Z",
+                "status": "open"
+              },
+              {
+                "id": 2,
+                "updated_at": "2026-05-08T15:00:15Z",
+                "status": "open"
+              },
+              {
+                "id": 3,
+                "updated_at": "2026-05-08T14:08:54Z",
+                "status": "open"
+              }
+            ],
+            "meta": {
+              "has_more": true,
+              "after_cursor": "eyJvIjoiLXVwZGF0ZWRfYXQsLWlkIiwidiI6IlpIYnUvV2tBQUFBQWFaVHZWOWc1R2dBQSJ9",
+              "before_cursor": "eyJvIjoiLXVwZGF0ZWRfYXQsLWlkIiwidiI6IlpNcUtMR29BQUFBQWFSU05DQSt5TFFBQSJ9"
+            }
+          }
+  - name: "200 - after B1, unchanged (projection)"
+    request:
+      url: "{{base_url}}/tickets?sort=-updated_at&page[size]=3&page[after]=eyJvIjoiLXVwZGF0ZWRfYXQsLWlkIiwidiI6IlpLeTRWbW9BQUFBQWFaUmNCVnF6TGdBQSJ9"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "697"
+        - name: "ratelimit-remaining"
+          value: "697"
+        - name: "ratelimit-reset"
+          value: "32"
+        - name: "zendesk-ratelimit-tickets-index"
+          value: "total=100000; remaining=99999; resets=32"
+      body:
+        type: json
+        data: |-
+          {
+            "tickets": [
+              {
+                "id": 44,
+                "updated_at": "2026-06-12T22:40:10Z",
+                "status": "open"
+              },
+              {
+                "id": 2,
+                "updated_at": "2026-05-08T15:00:15Z",
+                "status": "open"
+              },
+              {
+                "id": 3,
+                "updated_at": "2026-05-08T14:08:54Z",
+                "status": "open"
+              }
+            ],
+            "meta": {
+              "has_more": true,
+              "after_cursor": "eyJvIjoiLXVwZGF0ZWRfYXQsLWlkIiwidiI6IlpIYnUvV2tBQUFBQWFaVHZWOWc1R2dBQSJ9",
+              "before_cursor": "eyJvIjoiLXVwZGF0ZWRfYXQsLWlkIiwidiI6IlpNcUtMR29BQUFBQWFSU05DQSt5TFFBQSJ9"
+            }
+          }
+
+docs: |-
+  **REFERENCE:** [List Tickets](https://developer.zendesk.com/api-reference/ticketing/tickets/tickets/#list-tickets)
+
+  **WHY:** V3, second half. `sweep_after_cursor` is pinned in the environment from
+  a page-1 run (the cursor is a keyset value, not a session token); page 1's
+  after-response script overrides it for the session when re-run. Run after `Tickets / descending sweep page 1` and
+  `Seeding / B1 - Touch ticket mid-sweep`. The touched ticket should be absent here,
+  because it moved ahead of the cursor, and the page should continue exactly where page 1 ended.
+
+  **VERIFIED (2026-10-07):** identical before and after B1 updated ticket 41 (44, 2, 3). The
+  pinned keyset cursor resumes exactly where page 1 ended; a record changed elsewhere
+  in the list doesn't cause skips or duplicates. A record updated mid-sweep is missed by
+  the in-flight sweep and caught by the next one (V3).

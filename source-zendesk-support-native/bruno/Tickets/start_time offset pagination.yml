@@ -1,0 +1,120 @@
+info:
+  name: start_time offset pagination
+  type: http
+  seq: 9
+
+http:
+  method: GET
+  url: "{{base_url}}/tickets?start_time={{tickets_start_time}}&sort_by=updated_at&sort_order=asc&per_page=100"
+  params:
+    - name: "start_time"
+      value: "{{tickets_start_time}}"
+      type: query
+    - name: "sort_by"
+      value: "updated_at"
+      type: query
+    - name: "sort_order"
+      value: "asc"
+      type: query
+    - name: "per_page"
+      value: "100"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - start_time ignored under offset pagination (projection)"
+    request:
+      url: "{{base_url}}/tickets?start_time=1778249324&sort_by=updated_at&sort_order=asc&per_page=100"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "693"
+        - name: "ratelimit-remaining"
+          value: "693"
+        - name: "ratelimit-reset"
+          value: "21"
+        - name: "zendesk-ratelimit-tickets-index"
+          value: "total=100000; remaining=99993; resets=21"
+      body:
+        type: json
+        data: |-
+          {
+            "tickets": [
+              {
+                "id": 14,
+                "updated_at": "2024-07-26T15:42:06Z",
+                "status": "open"
+              },
+              {
+                "id": 15,
+                "updated_at": "2024-07-26T15:42:07Z",
+                "status": "open"
+              },
+              {
+                "id": 16,
+                "updated_at": "2024-07-26T15:42:07Z",
+                "status": "open"
+              },
+              {
+                "id": 18,
+                "updated_at": "2024-07-26T15:42:08Z",
+                "status": "open"
+              },
+              {
+                "id": 17,
+                "updated_at": "2024-07-26T15:42:08Z",
+                "status": "open"
+              },
+              {
+                "id": 19,
+                "updated_at": "2024-07-26T15:42:09Z",
+                "status": "open"
+              },
+              {
+                "id": 20,
+                "updated_at": "2024-07-26T15:42:09Z",
+                "status": "open"
+              },
+              {
+                "id": 21,
+                "updated_at": "2024-07-26T15:42:09Z",
+                "status": "open"
+              },
+              {
+                "id": 22,
+                "updated_at": "2024-07-26T15:42:10Z",
+                "status": "open"
+              },
+              {
+                "id": 23,
+                "updated_at": "2024-07-26T15:42:10Z",
+                "status": "open"
+              }
+            ],
+            "tickets_total": 42,
+            "count": 42
+          }
+
+docs: |-
+  **REFERENCE:** [List Tickets](https://developer.zendesk.com/api-reference/ticketing/tickets/tickets/#list-tickets)
+
+  **WHY:** V1 follow-up. Checks whether `start_time` is honored only under offset
+  pagination (`per_page`, `sort_by`), since it is ignored under cursor pagination.
+
+  **VERIFIED (2026-10-07):** `start_time` is ignored under offset pagination too: 42 tickets,
+  `count: 42`.
