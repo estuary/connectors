@@ -67,6 +67,7 @@ members = [
     "source-monday",
     "source-navan",
     "source-notion",
+    "source-okta",
     "source-outreach",
     "source-pendo",
     "source-posthog",
