@@ -126,6 +126,14 @@ func TestIntegration(t *testing.T) {
 		})
 	})
 
+	t.Run("acknowledge-after-field-add", func(t *testing.T) {
+		testutil.RunTestAllTasks(t, "testdata/apply.flow.yaml", func(t *testing.T, bundled []byte, taskName string, cfg config) {
+			tableName := fmt.Sprintf("ackfieldadd%s_flow_test_%d", uuid.NewString()[:8], time.Now().Unix())
+			res := makeResourceFn(tableName, false).WithDefaults(cfg)
+			sql.RunAcknowledgeAfterFieldAddTest(t, NewDriver().sqlDriver, cfg, res)
+		})
+	})
+
 	t.Run("migrate", func(t *testing.T) {
 		sql.RunMigrationTest(t, NewDriver().sqlDriver, "testdata/migrate.flow.yaml", makeResourceFn, nil)
 	})

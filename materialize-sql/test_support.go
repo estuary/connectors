@@ -72,6 +72,18 @@ func RunApplyDrainTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer
 	testutil.RunApplyDrainTest(t, driver, driver.NewMaterializer, cfg, res, seedPending, verifyDrained)
 }
 
+// RunAcknowledgeAfterFieldAddTest verifies that a transaction staged under one
+// specification is committed correctly by a session opened on a later
+// specification which selects an additional field.
+func RunAcknowledgeAfterFieldAddTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](
+	t *testing.T,
+	driver *Driver[EC, RC],
+	cfg EC,
+	res RC,
+) {
+	testutil.RunAcknowledgeAfterFieldAddTest(t, driver, driver.NewMaterializer, cfg, res)
+}
+
 // DrainSeedInsertQuery builds an INSERT statement adding a single row to the
 // applied base specification's resource, covering every selected field. It
 // serves as the staged work of a committed-but-unacknowledged transaction
