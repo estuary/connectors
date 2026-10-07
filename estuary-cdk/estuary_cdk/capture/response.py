@@ -11,6 +11,9 @@ class DiscoveredBinding(BaseModel, Generic[ResourceConfig]):
     documentSchema: dict
     key: list[str]
     disable: bool = False
+    # Path of the discovered resource, by which the control plane matches
+    # discovered and existing bindings (rather than by resource path pointers).
+    resourcePath: list[str] | None = None
 
 
 class Discovered(BaseModel, Generic[ResourceConfig]):

@@ -555,6 +555,7 @@ def discovered(
                 recommendedName=resource.name,
                 resourceConfig=resource.initial_config,
                 disable=resource.disable,
+                resourcePath=resource.initial_config.path(),
             )
         )
 
