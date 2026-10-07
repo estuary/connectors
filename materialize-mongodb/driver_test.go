@@ -1,12 +1,15 @@
 package connector
 
 import (
+	"context"
 	"os/exec"
 	"testing"
 
 	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate/testutil"
 	"github.com/stretchr/testify/require"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // TestIsIntegerKeyType guards the eligibility filter that decides which key
@@ -60,5 +63,50 @@ func TestIntegration(t *testing.T) {
 
 	t.Run("migrate", func(t *testing.T) {
 		boilerplate.RunMigrationTest(t, NewMaterializer, "testdata/migrate.flow.yaml", makeResourceFn, nil)
+	})
+
+	t.Run("truncate", func(t *testing.T) {
+		if boilerplate.RuntimeV1() {
+			t.Skip("backfill signals require runtime-next")
+		}
+		boilerplate.RunTestAllTasks(t, "testdata/truncate.flow.yaml", func(t *testing.T, _ []byte, taskName string, cfg config) {
+			var ctx = context.Background()
+			client, err := connect(ctx, cfg)
+			require.NoError(t, err)
+			defer client.Disconnect(ctx)
+			var db = client.Database(cfg.Database)
+
+			for _, name := range []string{"truncate_standard", "truncate_delta"} {
+				require.NoError(t, db.Collection(name).Drop(ctx))
+			}
+
+			boilerplate.RunFlowctl(t, "raw", "preview-next",
+				"--name", taskName,
+				"--source", "testdata/truncate.flow.yaml",
+				"--fixture", "testdata/truncate.fixture.json",
+				"--shards", "1",
+				"--timeout", "5m",
+			)
+
+			// The fixture stores ids 1-3, then re-stores only id 1 during a
+			// backfill. Only the standard-updates collection loses the
+			// documents published before the backfill.
+			for name, want := range map[string][]int64{
+				"truncate_standard": {1},
+				"truncate_delta":    {1, 1, 2, 3},
+			} {
+				cur, err := db.Collection(name).Find(ctx, bson.D{}, options.Find().SetSort(bson.D{{Key: "id", Value: 1}}))
+				require.NoError(t, err)
+				var docs []struct {
+					ID int64 `bson:"id"`
+				}
+				require.NoError(t, cur.All(ctx, &docs))
+				var ids []int64
+				for _, d := range docs {
+					ids = append(ids, d.ID)
+				}
+				require.Equal(t, want, ids, name)
+			}
+		})
 	})
 }
