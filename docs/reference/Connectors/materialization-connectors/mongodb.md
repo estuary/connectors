@@ -22,6 +22,14 @@ be present in the materialized MongoDB document as the field `_flow_id` to
 prevent conflicts with the required `_id` field.
 :::
 
+With standard updates, each materialized document also carries a
+`_flow_published_at` field holding the time the Estuary collection document was
+published. When a backfill of the source collection completes, the connector
+deletes the documents published before the backfill began, because the backfill
+re-sent every document the source still has. Documents stored by connector
+versions that predate this field have no such field, and they are kept.
+Delta-updates collections keep every document.
+
 ## Prerequisites
 
 You'll need:
