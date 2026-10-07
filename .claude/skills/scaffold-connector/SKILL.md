@@ -25,7 +25,7 @@ source-$1/
 ├── pyproject.toml
 ├── poetry.lock
 ├── VERSION
-├── config.yaml                 # plaintext placeholder (Phase 3)
+├── config.yaml                 # sops-encrypted placeholder (Phase 3)
 ├── test.flow.yaml              # Flow catalog for testing
 ├── acmeCo/                     # generated schemas — only if the connector has a capture test (regenerate-flow-discovery)
 ├── tests/
@@ -160,11 +160,11 @@ captures:
 
 `test_capture` is **opt-in**. It drives `flowctl raw preview-next`, the only command that needs generated target collections. If the connector won't have one, leave it out — and then `acmeCo/`, the `import:` line, and populated `bindings:` all stay absent, so the `bindings: []` shape above is the finished state, not a placeholder. `source-ashby` is the reference shape (rule `REVIEW-ACMECO-NEEDS-CAPTURE-TEST`).
 
-**`config.yaml`** — plaintext placeholder, enough for `EndpointConfig` to parse. Don't fabricate credentials: the placeholder is shaped to match the scheme, and real sops-encrypted values are the user's to supply (`configure-auth`, Guiding rules):
+**`config.yaml`** — a sops-encrypted placeholder in the file's **final shape**: every secret key carries the `_sops` suffix, and the file is encrypted the moment it is written, with the command in [CONTRIBUTING.md](../../../CONTRIBUTING.md#encrypting-test-credentials). Don't fabricate credentials: placeholder values only; the real ones are the user's to supply (`configure-auth`, Guiding rules).
 
 ```yaml
 credentials:
-  access_token: PLACEHOLDER_REPLACE_WITH_REAL_TOKEN
+  access_token_sops: PLACEHOLDER_REPLACE_WITH_REAL_TOKEN
 start_date: "2024-01-01T00:00:00Z"
 ```
 
@@ -216,4 +216,4 @@ scaffold-connector: source-$1
 - Auth scheme selection and `validate_credentials` implementation → `configure-auth`.
 - Any stream: document models, fetch functions, resource registration → `classify-stream-types` + `add-stream`.
 - Webhook-receiver connectors → `create-webhook-connector` (which calls this skill for the shared skeleton, then does webhook-specific setup).
-- Real credentials, sops encryption, and any live API call.
+- Real credentials and any live API call.
