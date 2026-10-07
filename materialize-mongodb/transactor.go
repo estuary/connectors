@@ -639,20 +639,16 @@ func setPublishedAt(doc bson.M) error {
 	if _, ok := doc[publishedAtField]; ok {
 		return fmt.Errorf("document has a field named %q which collides with the reserved name used to materialize its publication time", publishedAtField)
 	}
-	meta, ok := doc["_meta"].(map[string]interface{})
-	if !ok {
+	if meta, ok := doc["_meta"].(map[string]any); !ok {
 		return nil
-	}
-	raw, ok := meta["uuid"].(string)
-	if !ok {
+	} else if raw, ok := meta["uuid"].(string); !ok {
 		return nil
-	}
-	id, err := uuid.Parse(raw)
-	if err != nil {
+	} else if id, err := uuid.Parse(raw); err != nil {
 		return fmt.Errorf("parsing /_meta/uuid %q: %w", raw, err)
+	} else {
+		doc[publishedAtField] = primitive.NewDateTimeFromTime(message.GetClock(id).AsTime())
+		return nil
 	}
-	doc[publishedAtField] = primitive.NewDateTimeFromTime(message.GetClock(id).AsTime())
-	return nil
 }
 
 // parsePointerTokens splits an RFC6901 JSON pointer into its decoded reference
