@@ -10,7 +10,6 @@ import (
 	"regexp"
 	"slices"
 	"strings"
-	"text/template"
 	"time"
 
 	"cloud.google.com/go/bigquery"
@@ -38,6 +37,11 @@ type checkpointItem struct {
 	Bounds     []mergeBoundLiterals `json:",omitempty"`
 	SourceURIs []string             `json:",omitempty"`
 	JobPrefix  string               `json:",omitempty"`
+	// Fields are the selected fields of each staged row in column order, so
+	// the entry commits by the columns it was staged with even when the
+	// binding's selection has since changed. Nil Fields commits by the
+	// binding's current columns.
+	Fields []string `json:",omitempty"`
 
 	// round is the transaction round this session staged the entry in, for
 	// attributing its commit's row stats. Recovered and peer entries are
@@ -228,46 +232,31 @@ func (t *transactor) addBinding(target sql.Table, fieldSchemas map[string]*bigqu
 		return err
 	}
 
-	storeSchema, err := schemaForCols(target.Columns(), fieldSchemas)
-	if err != nil {
-		return err
-	}
-	storeSchema = append(storeSchema, &bigquery.FieldSchema{
-		Name: "_flow_delete",
-		Type: bigquery.BooleanFieldType,
-	})
-
 	b := &binding{
 		target:           target,
+		fieldSchemas:     fieldSchemas,
 		loadSchema:       loadSchema,
-		storeSchema:      storeSchema,
 		loadMergeBounds:  sql.NewMergeBoundsBuilder(target.Keys, dialect.Literal),
 		storeMergeBounds: sql.NewMergeBoundsBuilder(target.Keys, dialect.Literal),
+	}
+	if _, b.storeSchema, err = b.stagedTable(columnFields(target.Columns())); err != nil {
+		return err
 	}
 
 	if t.cfg.Advanced.NoFlowDocument {
 		b.nullFieldsToStrip = target.NullableFieldsToStrip()
 	}
 
-	for _, m := range []struct {
-		sql *string
-		tpl *template.Template
-	}{
-		{&b.tempTableName, t.templates.tempTableName},
-		{&b.storeInsertSQL, t.templates.storeInsert},
-	} {
-		var err error
-		if *m.sql, err = sql.RenderTableTemplate(target, m.tpl); err != nil {
-			return err
-		}
+	if b.tempTableName, err = sql.RenderTableTemplate(target, t.templates.tempTableName); err != nil {
+		return err
 	}
 
 	loadFields := make([]string, 0, len(loadSchema))
-	storeFields := make([]string, 0, len(storeSchema))
+	storeFields := make([]string, 0, len(b.storeSchema))
 	for _, field := range loadSchema {
 		loadFields = append(loadFields, field.Name)
 	}
-	for _, field := range storeSchema {
+	for _, field := range b.storeSchema {
 		storeFields = append(storeFields, field.Name)
 	}
 	t.loadFiles.AddBinding(target.Binding, loadFields)
@@ -308,6 +297,15 @@ func schemaForCols(cols []*sql.Column, fieldSchemas map[string]*bigquery.FieldSc
 	}
 
 	return s, nil
+}
+
+// columnFields lists the selected field of each column, in column order.
+func columnFields(cols []*sql.Column) []string {
+	out := make([]string, 0, len(cols))
+	for _, col := range cols {
+		out = append(out, col.Field)
+	}
+	return out
 }
 
 func (t *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSpec, _ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
@@ -523,6 +521,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			NeedsMerge: b.mustMerge,
 			SourceURIs: uris,
 			JobPrefix:  uuid.NewString(),
+			Fields:     columnFields(b.target.Columns()),
 			round:      it.Round,
 		}
 
@@ -663,19 +662,22 @@ func (t *transactor) acknowledgeApply(ctx context.Context, shouldProcess func(st
 
 			// Entries still using the deprecated Query field were already
 			// fully rendered when staged, so they run individually. The rest
-			// coalesce into a single query over their combined bounds and
-			// source files.
+			// coalesce into one query per staged field list over their
+			// combined bounds and source files.
 			// items[0] is this shard's own entry when it has one.
 			round := items[0].item.round
-			needsMerge := false
-			var coalesce []*checkpointItem
+			var groups [][]*checkpointItem
 			var sourceURIs []string
 			for _, e := range items {
 				sourceURIs = append(sourceURIs, e.item.SourceURIs...)
 				if e.item.Query == "" {
-					coalesce = append(coalesce, e.item)
-					if e.item.NeedsMerge {
-						needsMerge = true
+					idx := slices.IndexFunc(groups, func(g []*checkpointItem) bool {
+						return slices.Equal(g[0].Fields, e.item.Fields)
+					})
+					if idx == -1 {
+						groups = append(groups, []*checkpointItem{e.item})
+					} else {
+						groups[idx] = append(groups[idx], e.item)
 					}
 					continue
 				}
@@ -690,21 +692,29 @@ func (t *transactor) acknowledgeApply(ctx context.Context, shouldProcess func(st
 				}).Debug("acknowledge legacy query executed")
 			}
 
-			if len(coalesce) > 0 {
-				query := b.storeInsertSQL
-				if needsMerge {
-					var err error
-					bounds := combineBounds(b.target.Keys, coalesce)
-					query, err = renderQueryTemplate(b.target, t.templates.storeUpdate, bounds, t.objAndArrayAsJson)
-					if err != nil {
-						return fmt.Errorf("rendering merge query template: %w", err)
-					}
+			for _, coalesce := range groups {
+				table, schema, err := b.stagedTable(coalesce[0].Fields)
+				if err != nil {
+					return fmt.Errorf("resolving staged columns for %q: %w", b.target.Path, err)
 				}
+
+				needsMerge := slices.ContainsFunc(coalesce, func(item *checkpointItem) bool { return item.NeedsMerge })
+				var query string
+				if needsMerge {
+					bounds := combineBounds(table.Keys, coalesce)
+					query, err = renderQueryTemplate(table, t.templates.storeUpdate, bounds, t.objAndArrayAsJson)
+				} else {
+					query, err = sql.RenderTableTemplate(table, t.templates.storeInsert)
+				}
+				if err != nil {
+					return fmt.Errorf("rendering store query template: %w", err)
+				}
+
 				var coalescedURIs []string
 				for _, item := range coalesce {
 					coalescedURIs = append(coalescedURIs, item.SourceURIs...)
 				}
-				stat, err := t.client.queryIdempotent(groupCtx, b.storeSchema, query, coalesce[0].JobPrefix, coalescedURIs, b.tempTableName)
+				stat, err := t.client.queryIdempotent(groupCtx, schema, query, coalesce[0].JobPrefix, coalescedURIs, b.tempTableName)
 				if err != nil {
 					return fmt.Errorf("acknowledge query for %q: %w", b.target.Path, err)
 				}

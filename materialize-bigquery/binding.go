@@ -12,7 +12,8 @@ import (
 type binding struct {
 	target            sql.Table
 	nullFieldsToStrip []string
-	storeInsertSQL    string
+	// fieldSchemas are the destination table's columns by name.
+	fieldSchemas map[string]*bigquery.FieldSchema
 
 	loadSchema       bigquery.Schema
 	storeSchema      bigquery.Schema
@@ -64,4 +65,55 @@ func (bd *bindingDocument) Load(v []bigquery.Value, s bigquery.Schema) error {
 	}
 
 	return nil
+}
+
+// stagedTable returns the table and external-table schema for committing rows
+// staged with the given fields in column order. Nil fields denote rows staged
+// by the binding's current columns.
+func (b *binding) stagedTable(fields []string) (sql.Table, bigquery.Schema, error) {
+	if fields == nil {
+		return b.target, b.storeSchema, nil
+	}
+
+	current := make(map[string]*sql.Column, len(b.target.Columns()))
+	for _, col := range b.target.Columns() {
+		current[col.Field] = col
+	}
+
+	table := b.target
+	table.Keys = nil
+	table.Values = nil
+	table.Document = nil
+
+	for idx, field := range fields {
+		col, ok := current[field]
+		if !ok {
+			return sql.Table{}, nil, fmt.Errorf("staged field %q is not a column of the binding", field)
+		}
+		switch {
+		case idx < len(b.target.Keys):
+			if b.target.Keys[idx].Field != field {
+				return sql.Table{}, nil, fmt.Errorf("staged field %q at key position %d does not match key %q", field, idx, b.target.Keys[idx].Field)
+			}
+			table.Keys = append(table.Keys, *col)
+		case b.target.Document != nil && b.target.Document.Field == field:
+			table.Document = col
+		default:
+			table.Values = append(table.Values, *col)
+		}
+	}
+	if len(table.Keys) != len(b.target.Keys) {
+		return sql.Table{}, nil, fmt.Errorf("staged fields %v do not cover the binding's %d keys", fields, len(b.target.Keys))
+	}
+
+	schema, err := schemaForCols(table.Columns(), b.fieldSchemas)
+	if err != nil {
+		return sql.Table{}, nil, err
+	}
+	schema = append(schema, &bigquery.FieldSchema{
+		Name: "_flow_delete",
+		Type: bigquery.BooleanFieldType,
+	})
+
+	return table, schema, nil
 }
