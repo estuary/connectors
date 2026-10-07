@@ -1,0 +1,17 @@
+variables:
+  - name: base_url
+    value: https://api.estuary.dev
+  - name: graphql_url
+    value: https://api.estuary.dev/api/graphql
+  - name: config_path
+    value: ../config.yaml
+  - name: test_prefix
+    value: Jonathan_Wihl/
+  - name: test_prefix_nested
+    value: Artificial-Industries/
+  - name: nested_parent_prefix
+    value: Artificial-Industries/
+  - name: test_tenant
+    value: Jonathan_Wihl/
+  - name: readonly_tenant
+    value: demo/

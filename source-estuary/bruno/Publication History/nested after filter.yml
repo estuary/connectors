@@ -1,0 +1,94 @@
+info:
+  name: nested after filter
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: "{{graphql_url}}"
+  body:
+    type: json
+    data: |-
+      {
+        "query": "query PubHistoryNestedAfter($prefix: Prefix!, $after: String!) {\n  liveSpecs(by: { prefix: $prefix }, first: 100) {\n    pageInfo { hasNextPage endCursor }\n    edges { node {\n      catalogName\n      publicationHistory(after: $after, first: 25) {\n        pageInfo { hasNextPage endCursor }\n        edges { node { publicationId publishedAt } }\n      }\n    } }\n  }\n}",
+        "variables": {
+          "prefix": "{{test_prefix}}",
+          "after": "2026-04-01T00:00:00Z"
+        }
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 — after 2026-04-01Z: 1 of 55 refs non-empty (projection)"
+    request:
+      url: "{{graphql_url}}"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "liveSpecs": {
+                "pageInfo": {
+                  "hasNextPage": false,
+                  "endCursor": "Jonathan_Wihl/wikipedia/user-summary-limit"
+                },
+                "refCount": 55,
+                "refsWithHistory": [
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/motherduck/materialize-motherduck",
+                      "publicationHistory": {
+                        "pageInfo": {
+                          "hasNextPage": false,
+                          "endCursor": "2026-04-30T21:53:53.667377+00:00"
+                        },
+                        "edges": [
+                          {
+                            "node": {
+                              "publicationId": "1492cd3fa580028f",
+                              "publishedAt": "2026-04-20T22:35:53.416852+00:00"
+                            }
+                          },
+                          {
+                            "node": {
+                              "publicationId": "1492cdacec0001d6",
+                              "publishedAt": "2026-04-20T22:36:41.881198+00:00"
+                            }
+                          },
+                          {
+                            "node": {
+                              "publicationId": "14ac79e3a08003c6",
+                              "publishedAt": "2026-04-30T21:53:53.667377+00:00"
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+
+docs: |-
+  **REFERENCE:** [publicationHistory resolver](https://github.com/estuary/flow/blob/master/crates/control-plane-api/src/server/public/graphql/publication_history.rs)
+
+  **WHY:** This is the incremental sweep exactly as the connector will issue it:
+  one `liveSpecs` page with every ref's history filtered by the global cursor.
+  Most refs should return empty `edges` (no publications since the cursor), which
+  shows that the server-side filter makes unchanged specs nearly free to skip.
+
+  **VERIFIED (2026-10-07):** with `after: 2026-04-01T00:00:00Z` over all 55 refs, only `motherduck/materialize-motherduck` returned history (3 publications). The other 54 returned `edges: []`, `endCursor: null`. Latency was 0.6–0.8 s for 55 refs: every ref runs its own history SQL query (not DataLoader-batched).

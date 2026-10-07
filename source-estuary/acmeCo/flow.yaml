@@ -1,0 +1,64 @@
+collections:
+  acmeCo/alert_configs:
+    schema: alert_configs.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/alert_subscriptions:
+    schema: alert_subscriptions.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/alerts:
+    schema: alerts.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/catalog_stats_daily:
+    schema: catalog_stats_daily.schema.yaml
+    key:
+    - /catalogName
+    - /grain
+    - /timestamp
+  acmeCo/catalog_stats_hourly:
+    schema: catalog_stats_hourly.schema.yaml
+    key:
+    - /catalogName
+    - /grain
+    - /timestamp
+  acmeCo/catalog_stats_monthly:
+    schema: catalog_stats_monthly.schema.yaml
+    key:
+    - /catalogName
+    - /grain
+    - /timestamp
+  acmeCo/connectors:
+    schema: connectors.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/data_planes:
+    schema: data_planes.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/invoices:
+    schema: invoices.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/live_specs:
+    schema: live_specs.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/publication_history:
+    schema: publication_history.schema.yaml
+    key:
+    - /catalogName
+    - /publicationId
+  acmeCo/service_accounts:
+    schema: service_accounts.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/storage_mappings:
+    schema: storage_mappings.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/task_status:
+    schema: task_status.schema.yaml
+    key:
+    - /_meta/row_id

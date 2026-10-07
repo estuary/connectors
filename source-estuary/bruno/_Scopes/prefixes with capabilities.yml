@@ -1,0 +1,325 @@
+info:
+  name: prefixes with capabilities
+  type: graphql
+  seq: 1
+graphql:
+  method: POST
+  url: "{{base_url}}/api/graphql"
+  body:
+    query: |-
+      query Prefixes {
+        prefixes(by: { minCapability: read }) {
+          edges { node { prefix userCapability capabilities } }
+        }
+      }
+    variables: |-
+      {}
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true
+
+docs: |-
+  **REFERENCE:** https://github.com/estuary/flow/blob/master/crates/control-plane-api/src/server/public/graphql/prefixes.rs
+
+  **WHY:** The scope planner for every cluster-C stream. Each stream needs a
+  different capability (CatalogRead / ViewBilling / QueryServiceAccounts / admin).
+  If `capabilities` lists the fine-grained bits per prefix, the connector can
+  compute each stream's scopes up front and never send a query it isn't
+  authorized for (which would cost a 307 provisional-authz round trip and then
+  fail). Also shows whether nested prefixes come back unpruned.
+
+  **VERIFIED (2026-10-07):** 15 prefixes. Nested grants come back **unpruned** (`Artificial-Industries/`, `.../databricks/`, `.../postgres-shipments/` all listed). Each node carries `capabilities` (fine-grained bits): legacy `admin` prefixes hold `ViewBilling` and `QueryServiceAccounts`; `read` prefixes hold only `CatalogRead`, `JournalRead`, `ViewDataPlanePrivateNetworking`. The connector plans each stream's scopes from these bits.
+
+examples:
+  - name: 200 - 15 prefixes, nested unpruned, capability bits
+    request:
+      url: "{{base_url}}/api/graphql"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: "application/json"
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "prefixes": {
+                "edges": [
+                  {
+                    "node": {
+                      "prefix": "Artificial-Industries/",
+                      "userCapability": "admin",
+                      "capabilities": [
+                        "CatalogRead",
+                        "JournalRead",
+                        "JournalAppend",
+                        "SpecEdit",
+                        "CreateGrant",
+                        "DeleteGrant",
+                        "CreateInviteLink",
+                        "ViewDataPlanePrivateNetworking",
+                        "ModifyDataPlanePrivateNetworking",
+                        "ViewBilling",
+                        "EditBilling",
+                        "QueryServiceAccounts",
+                        "CreateServiceAccount",
+                        "CreateApiKey",
+                        "RevokeApiKey",
+                        "ViewSecret",
+                        "EditSecret",
+                        "DecryptSecret",
+                        "Delegate",
+                        "CreateSandbox"
+                      ]
+                    }
+                  },
+                  {
+                    "node": {
+                      "prefix": "Artificial-Industries/databricks/",
+                      "userCapability": "admin",
+                      "capabilities": [
+                        "CatalogRead",
+                        "JournalRead",
+                        "JournalAppend",
+                        "SpecEdit",
+                        "CreateGrant",
+                        "DeleteGrant",
+                        "CreateInviteLink",
+                        "ViewDataPlanePrivateNetworking",
+                        "ModifyDataPlanePrivateNetworking",
+                        "ViewBilling",
+                        "EditBilling",
+                        "QueryServiceAccounts",
+                        "CreateServiceAccount",
+                        "CreateApiKey",
+                        "RevokeApiKey",
+                        "ViewSecret",
+                        "EditSecret",
+                        "DecryptSecret",
+                        "Delegate",
+                        "CreateSandbox"
+                      ]
+                    }
+                  },
+                  {
+                    "node": {
+                      "prefix": "Artificial-Industries/postgres-shipments/",
+                      "userCapability": "admin",
+                      "capabilities": [
+                        "CatalogRead",
+                        "JournalRead",
+                        "JournalAppend",
+                        "SpecEdit",
+                        "CreateGrant",
+                        "DeleteGrant",
+                        "CreateInviteLink",
+                        "ViewDataPlanePrivateNetworking",
+                        "ModifyDataPlanePrivateNetworking",
+                        "ViewBilling",
+                        "EditBilling",
+                        "QueryServiceAccounts",
+                        "CreateServiceAccount",
+                        "CreateApiKey",
+                        "RevokeApiKey",
+                        "ViewSecret",
+                        "EditSecret",
+                        "DecryptSecret",
+                        "Delegate",
+                        "CreateSandbox"
+                      ]
+                    }
+                  },
+                  {
+                    "node": {
+                      "prefix": "Dani/",
+                      "userCapability": "read",
+                      "capabilities": [
+                        "CatalogRead",
+                        "JournalRead",
+                        "ViewDataPlanePrivateNetworking"
+                      ]
+                    }
+                  },
+                  {
+                    "node": {
+                      "prefix": "Dave/",
+                      "userCapability": "admin",
+                      "capabilities": [
+                        "CatalogRead",
+                        "JournalRead",
+                        "JournalAppend",
+                        "SpecEdit",
+                        "CreateGrant",
+                        "DeleteGrant",
+                        "CreateInviteLink",
+                        "ViewDataPlanePrivateNetworking",
+                        "ModifyDataPlanePrivateNetworking",
+                        "ViewBilling",
+                        "EditBilling",
+                        "QueryServiceAccounts",
+                        "CreateServiceAccount",
+                        "CreateApiKey",
+                        "RevokeApiKey",
+                        "ViewSecret",
+                        "EditSecret",
+                        "DecryptSecret",
+                        "Delegate",
+                        "CreateSandbox"
+                      ]
+                    }
+                  },
+                  {
+                    "node": {
+                      "prefix": "Jonathan_Wihl/",
+                      "userCapability": "admin",
+                      "capabilities": [
+                        "CatalogRead",
+                        "JournalRead",
+                        "JournalAppend",
+                        "SpecEdit",
+                        "CreateGrant",
+                        "DeleteGrant",
+                        "CreateInviteLink",
+                        "ViewDataPlanePrivateNetworking",
+                        "ModifyDataPlanePrivateNetworking",
+                        "ViewBilling",
+                        "EditBilling",
+                        "QueryServiceAccounts",
+                        "CreateServiceAccount",
+                        "CreateApiKey",
+                        "RevokeApiKey",
+                        "ViewSecret",
+                        "EditSecret",
+                        "DecryptSecret",
+                        "Delegate",
+                        "CreateSandbox"
+                      ]
+                    }
+                  },
+                  {
+                    "node": {
+                      "prefix": "dani-demo/",
+                      "userCapability": "admin",
+                      "capabilities": [
+                        "CatalogRead",
+                        "JournalRead",
+                        "JournalAppend",
+                        "SpecEdit",
+                        "CreateGrant",
+                        "DeleteGrant",
+                        "CreateInviteLink",
+                        "ViewDataPlanePrivateNetworking",
+                        "ModifyDataPlanePrivateNetworking",
+                        "ViewBilling",
+                        "EditBilling",
+                        "QueryServiceAccounts",
+                        "CreateServiceAccount",
+                        "CreateApiKey",
+                        "RevokeApiKey",
+                        "ViewSecret",
+                        "EditSecret",
+                        "DecryptSecret",
+                        "Delegate",
+                        "CreateSandbox"
+                      ]
+                    }
+                  },
+                  {
+                    "node": {
+                      "prefix": "demo/",
+                      "userCapability": "read",
+                      "capabilities": [
+                        "CatalogRead",
+                        "JournalRead",
+                        "ViewDataPlanePrivateNetworking"
+                      ]
+                    }
+                  },
+                  {
+                    "node": {
+                      "prefix": "estuary/public/",
+                      "userCapability": "read",
+                      "capabilities": [
+                        "CatalogRead",
+                        "JournalRead",
+                        "ViewDataPlanePrivateNetworking"
+                      ]
+                    }
+                  },
+                  {
+                    "node": {
+                      "prefix": "ops.us-central1.v1/",
+                      "userCapability": "read",
+                      "capabilities": [
+                        "CatalogRead",
+                        "JournalRead",
+                        "ViewDataPlanePrivateNetworking"
+                      ]
+                    }
+                  },
+                  {
+                    "node": {
+                      "prefix": "ops/dp/private/estuary/",
+                      "userCapability": "read",
+                      "capabilities": [
+                        "CatalogRead",
+                        "JournalRead",
+                        "ViewDataPlanePrivateNetworking"
+                      ]
+                    }
+                  },
+                  {
+                    "node": {
+                      "prefix": "ops/dp/private/solutions/",
+                      "userCapability": "read",
+                      "capabilities": [
+                        "CatalogRead",
+                        "JournalRead",
+                        "ViewDataPlanePrivateNetworking"
+                      ]
+                    }
+                  },
+                  {
+                    "node": {
+                      "prefix": "ops/dp/public/",
+                      "userCapability": "read",
+                      "capabilities": [
+                        "CatalogRead",
+                        "JournalRead",
+                        "ViewDataPlanePrivateNetworking"
+                      ]
+                    }
+                  },
+                  {
+                    "node": {
+                      "prefix": "ops/tasks/private/estuary/",
+                      "userCapability": "read",
+                      "capabilities": [
+                        "CatalogRead",
+                        "JournalRead",
+                        "ViewDataPlanePrivateNetworking"
+                      ]
+                    }
+                  },
+                  {
+                    "node": {
+                      "prefix": "ops/tasks/private/solutions/",
+                      "userCapability": "read",
+                      "capabilities": [
+                        "CatalogRead",
+                        "JournalRead",
+                        "ViewDataPlanePrivateNetworking"
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          }

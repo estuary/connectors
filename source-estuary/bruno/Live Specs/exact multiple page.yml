@@ -1,0 +1,79 @@
+info:
+  name: exact multiple page
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{graphql_url}}"
+  body:
+    type: json
+    data: |-
+      {
+        "query": "query LiveSpecsExact($prefix: Prefix!, $first: Int!) {\n  liveSpecs(by: { prefix: $prefix }, first: $first) {\n    pageInfo { hasNextPage endCursor }\n    edges { node { catalogName } }\n  }\n}",
+        "variables": {
+          "prefix": "{{test_prefix}}",
+          "first": "{{ls_total}}"
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // body `first` must be an Int; the env var templating yields a string.
+        const t = parseInt(bru.getVar('ls_total') ?? '', 10);
+        if (!t) throw new Error('run `Live Specs / page size 1000` first');
+        const body = req.getBody();
+        body.variables.first = t;
+        req.setBody(body);
+    - type: after-response
+      code: |-
+        const pi = res.getBody()?.data?.liveSpecs?.pageInfo;
+        if (pi?.endCursor) bru.setVar('ls_end_cursor', pi.endCursor);
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 — first 55 of 55: hasNextPage true (projection)"
+    request:
+      url: "{{graphql_url}}"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "liveSpecs": {
+                "pageInfo": {
+                  "hasNextPage": true,
+                  "endCursor": "Jonathan_Wihl/wikipedia/user-summary-limit"
+                },
+                "edgeCount": 55
+              }
+            }
+          }
+
+docs: |-
+  **REFERENCE:** [liveSpecs resolver](https://github.com/estuary/flow/blob/master/crates/control-plane-api/src/server/public/graphql/live_spec_refs.rs)
+
+  **WHY:** `hasNextPage = (rows == limit)`. When `first` equals the exact total
+  count, the server should still say `hasNextPage: true`, and
+  `Live Specs / trailing page` should return zero edges. The connector's loop
+  must therefore terminate on `hasNextPage == false` **or** an empty page, and
+  never treat an empty page as an error.
+
+  Run `Live Specs / page size 1000` first (it sets `ls_total`).
+
+  **LIMITATION (VERIFIED 2026-10-07):** `first: 55` on a 55-spec prefix returned all 55 edges **and** `hasNextPage: true`. `Live Specs / trailing page` is the empty follow-up.

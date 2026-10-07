@@ -1,0 +1,81 @@
+info:
+  name: page 2
+  type: graphql
+  seq: 2
+graphql:
+  method: POST
+  url: "{{base_url}}/api/graphql"
+  body:
+    query: |-
+      query Connectors($after: String!) {
+        connectors(first: 2, after: $after) {
+          pageInfo { hasNextPage endCursor }
+          edges { cursor node { id imageName } }
+        }
+      }
+    variables: |-
+      {
+        "after": "{{connectors_after}}"
+      }
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('connectors_after')) throw new Error('run `Connectors / page 1` first');
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true
+
+docs: |-
+  **REFERENCE:** https://github.com/estuary/flow/blob/master/crates/control-plane-api/src/server/public/graphql/connectors.rs
+
+  **WHY:** Continuation of `Connectors / page 1` (run it first in a fresh
+  session). Expect the next 2 ids, strictly greater, no overlap.
+
+  **VERIFIED (2026-10-07):** `after: <page-1 endCursor>` gives the next 2 ids, strictly greater with no overlap, `hasNextPage: true`. The forward Relay contract holds.
+
+examples:
+  - name: 200 - next 2 ascending ids
+    request:
+      url: "{{base_url}}/api/graphql"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: "application/json"
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "connectors": {
+                "pageInfo": {
+                  "hasNextPage": true,
+                  "endCursor": "05f363e5ab001c00"
+                },
+                "edges": [
+                  {
+                    "cursor": "05f363e5aa801400",
+                    "node": {
+                      "id": "05f363e5aa801400",
+                      "imageName": "ghcr.io/estuary/materialize-postgres"
+                    }
+                  },
+                  {
+                    "cursor": "05f363e5ab001c00",
+                    "node": {
+                      "id": "05f363e5ab001c00",
+                      "imageName": "ghcr.io/estuary/materialize-rockset"
+                    }
+                  }
+                ]
+              }
+            }
+          }

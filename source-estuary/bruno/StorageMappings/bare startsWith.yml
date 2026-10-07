@@ -1,0 +1,114 @@
+info:
+  name: bare startsWith
+  type: graphql
+  seq: 1
+graphql:
+  method: POST
+  url: "{{base_url}}/api/graphql"
+  body:
+    query: |-
+      query StorageMappings($prefix: String!) {
+        storageMappings(filter: { catalogPrefix: { startsWith: $prefix } }, first: 100) {
+          pageInfo { hasNextPage endCursor }
+          edges { cursor node {
+            catalogPrefix detail
+            dataPlanes { name }
+            fragmentStores { provider prefix bucket region storageAccountName containerName accountTenantId endpoint }
+          } }
+        }
+      }
+    variables: |-
+      {
+        "prefix": "{{test_prefix_nested}}"
+      }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true
+
+docs: |-
+  **REFERENCE:** https://github.com/estuary/flow/blob/master/crates/control-plane-api/src/server/public/graphql/storage_mappings.rs
+
+  **WHY:** The per-scope query. Uses the nested-grant tenant to show nested
+  mappings (`Artificial-Industries/` and `.../databricks/`) come back once each
+  under one `startsWith`. Selects data planes by `name` only (they are their own
+  stream) and skips deprecated `spec` and caller-relative `userCapability`.
+
+  **VERIFIED (2026-10-07):** One mapping under `Artificial-Industries/` (none at the nested `databricks/` / `postgres-shipments/` grants). `dataPlanes` are selected by `name` only. `fragmentStores` holds 3 GCS stores with nulls for non-GCS fields. Cursor = `catalogPrefix`. Not observed: multi-page; also, the source's `has_next = rows.len() == limit` can cause one trailing empty page (harmless).
+
+examples:
+  - name: 200 - one mapping, two data planes by name
+    request:
+      url: "{{base_url}}/api/graphql"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: "application/json"
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "storageMappings": {
+                "pageInfo": {
+                  "hasNextPage": false,
+                  "endCursor": "Artificial-Industries/"
+                },
+                "edges": [
+                  {
+                    "cursor": "Artificial-Industries/",
+                    "node": {
+                      "catalogPrefix": "Artificial-Industries/",
+                      "detail": "updated by user 3df2ea2c-3c66-4db0-8410-a405e6ed06ae via applied directive 12a3dade74892400",
+                      "dataPlanes": [
+                        {
+                          "name": "ops/dp/public/gcp-us-central1-c2"
+                        },
+                        {
+                          "name": "ops/dp/public/aws-eu-west-1-c1"
+                        }
+                      ],
+                      "fragmentStores": [
+                        {
+                          "provider": "GCS",
+                          "prefix": "artificial-industries/collection-data/",
+                          "bucket": "estuary-marketing-demos",
+                          "region": null,
+                          "storageAccountName": null,
+                          "containerName": null,
+                          "accountTenantId": null,
+                          "endpoint": null
+                        },
+                        {
+                          "provider": "GCS",
+                          "prefix": "collection-data/",
+                          "bucket": "estuary-trial",
+                          "region": null,
+                          "storageAccountName": null,
+                          "containerName": null,
+                          "accountTenantId": null,
+                          "endpoint": null
+                        },
+                        {
+                          "provider": "GCS",
+                          "prefix": "artificial-industries/collection-data/collection-data/",
+                          "bucket": "estuary-marketing-demos",
+                          "region": null,
+                          "storageAccountName": null,
+                          "containerName": null,
+                          "accountTenantId": null,
+                          "endpoint": null
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          }

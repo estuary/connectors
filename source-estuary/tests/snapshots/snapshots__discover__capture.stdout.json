@@ -1,0 +1,2117 @@
+[
+  {
+    "recommendedName": "catalog_stats_hourly",
+    "resourceConfig": {
+      "name": "catalog_stats_hourly",
+      "interval": "PT15M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "CaptureBindingStats": {
+          "additionalProperties": true,
+          "properties": {
+            "collection": {
+              "title": "Collection",
+              "type": "string"
+            },
+            "right": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/DocsAndBytes"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "out": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/DocsAndBytes"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "lastPublishedAt": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Lastpublishedat"
+            }
+          },
+          "required": [
+            "collection"
+          ],
+          "title": "CaptureBindingStats",
+          "type": "object"
+        },
+        "CatalogStatsSummary": {
+          "additionalProperties": true,
+          "properties": {
+            "readByMe": {
+              "$ref": "#/$defs/DocsAndBytes"
+            },
+            "readFromMe": {
+              "$ref": "#/$defs/DocsAndBytes"
+            },
+            "writtenByMe": {
+              "$ref": "#/$defs/DocsAndBytes"
+            },
+            "writtenToMe": {
+              "$ref": "#/$defs/DocsAndBytes"
+            },
+            "warnings": {
+              "title": "Warnings",
+              "type": "integer"
+            },
+            "errors": {
+              "title": "Errors",
+              "type": "integer"
+            },
+            "failures": {
+              "title": "Failures",
+              "type": "integer"
+            },
+            "usageSeconds": {
+              "title": "Usageseconds",
+              "type": "integer"
+            },
+            "txnCount": {
+              "title": "Txncount",
+              "type": "integer"
+            },
+            "lastPublishedAt": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Lastpublishedat"
+            }
+          },
+          "required": [
+            "readByMe",
+            "readFromMe",
+            "writtenByMe",
+            "writtenToMe",
+            "warnings",
+            "errors",
+            "failures",
+            "usageSeconds",
+            "txnCount"
+          ],
+          "title": "CatalogStatsSummary",
+          "type": "object"
+        },
+        "CatalogTaskStats": {
+          "additionalProperties": true,
+          "properties": {
+            "capture": {
+              "items": {
+                "$ref": "#/$defs/CaptureBindingStats"
+              },
+              "title": "Capture",
+              "type": "array"
+            },
+            "derive": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/DeriveStats"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "materialize": {
+              "items": {
+                "$ref": "#/$defs/MaterializeBindingStats"
+              },
+              "title": "Materialize",
+              "type": "array"
+            }
+          },
+          "required": [
+            "capture",
+            "materialize"
+          ],
+          "title": "CatalogTaskStats",
+          "type": "object"
+        },
+        "DeriveStats": {
+          "additionalProperties": true,
+          "properties": {
+            "transforms": {
+              "items": {
+                "$ref": "#/$defs/DeriveTransformStats"
+              },
+              "title": "Transforms",
+              "type": "array"
+            },
+            "published": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/DocsAndBytes"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "out": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/DocsAndBytes"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "lastPublishedAt": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Lastpublishedat"
+            }
+          },
+          "required": [
+            "transforms"
+          ],
+          "title": "DeriveStats",
+          "type": "object"
+        },
+        "DeriveTransformStats": {
+          "additionalProperties": true,
+          "properties": {
+            "transform": {
+              "title": "Transform",
+              "type": "string"
+            },
+            "source": {
+              "title": "Source",
+              "type": "string"
+            },
+            "input": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/DocsAndBytes"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "lastSourcePublishedAt": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Lastsourcepublishedat"
+            },
+            "bytesBehind": {
+              "title": "Bytesbehind",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "transform",
+            "source",
+            "bytesBehind"
+          ],
+          "title": "DeriveTransformStats",
+          "type": "object"
+        },
+        "DocsAndBytes": {
+          "additionalProperties": true,
+          "properties": {
+            "docsTotal": {
+              "title": "Docstotal",
+              "type": "integer"
+            },
+            "bytesTotal": {
+              "title": "Bytestotal",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "docsTotal",
+            "bytesTotal"
+          ],
+          "title": "DocsAndBytes",
+          "type": "object"
+        },
+        "MaterializeBindingStats": {
+          "additionalProperties": true,
+          "properties": {
+            "collection": {
+              "title": "Collection",
+              "type": "string"
+            },
+            "left": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/DocsAndBytes"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "right": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/DocsAndBytes"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "out": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/DocsAndBytes"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "lastSourcePublishedAt": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Lastsourcepublishedat"
+            },
+            "bytesBehind": {
+              "title": "Bytesbehind",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "collection",
+            "bytesBehind"
+          ],
+          "title": "MaterializeBindingStats",
+          "type": "object"
+        },
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "catalogName": {
+          "title": "Catalogname",
+          "type": "string"
+        },
+        "grain": {
+          "enum": [
+            "HOURLY",
+            "DAILY",
+            "MONTHLY"
+          ],
+          "title": "Grain",
+          "type": "string"
+        },
+        "timestamp": {
+          "format": "date-time",
+          "title": "Timestamp",
+          "type": "string"
+        },
+        "statsSummary": {
+          "$ref": "#/$defs/CatalogStatsSummary"
+        },
+        "taskStats": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CatalogTaskStats"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "catalogName",
+        "grain",
+        "timestamp",
+        "statsSummary"
+      ],
+      "title": "CatalogStats",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/catalogName",
+      "/grain",
+      "/timestamp"
+    ]
+  },
+  {
+    "recommendedName": "catalog_stats_daily",
+    "resourceConfig": {
+      "name": "catalog_stats_daily",
+      "interval": "PT1H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "CaptureBindingStats": {
+          "additionalProperties": true,
+          "properties": {
+            "collection": {
+              "title": "Collection",
+              "type": "string"
+            },
+            "right": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/DocsAndBytes"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "out": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/DocsAndBytes"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "lastPublishedAt": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Lastpublishedat"
+            }
+          },
+          "required": [
+            "collection"
+          ],
+          "title": "CaptureBindingStats",
+          "type": "object"
+        },
+        "CatalogStatsSummary": {
+          "additionalProperties": true,
+          "properties": {
+            "readByMe": {
+              "$ref": "#/$defs/DocsAndBytes"
+            },
+            "readFromMe": {
+              "$ref": "#/$defs/DocsAndBytes"
+            },
+            "writtenByMe": {
+              "$ref": "#/$defs/DocsAndBytes"
+            },
+            "writtenToMe": {
+              "$ref": "#/$defs/DocsAndBytes"
+            },
+            "warnings": {
+              "title": "Warnings",
+              "type": "integer"
+            },
+            "errors": {
+              "title": "Errors",
+              "type": "integer"
+            },
+            "failures": {
+              "title": "Failures",
+              "type": "integer"
+            },
+            "usageSeconds": {
+              "title": "Usageseconds",
+              "type": "integer"
+            },
+            "txnCount": {
+              "title": "Txncount",
+              "type": "integer"
+            },
+            "lastPublishedAt": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Lastpublishedat"
+            }
+          },
+          "required": [
+            "readByMe",
+            "readFromMe",
+            "writtenByMe",
+            "writtenToMe",
+            "warnings",
+            "errors",
+            "failures",
+            "usageSeconds",
+            "txnCount"
+          ],
+          "title": "CatalogStatsSummary",
+          "type": "object"
+        },
+        "CatalogTaskStats": {
+          "additionalProperties": true,
+          "properties": {
+            "capture": {
+              "items": {
+                "$ref": "#/$defs/CaptureBindingStats"
+              },
+              "title": "Capture",
+              "type": "array"
+            },
+            "derive": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/DeriveStats"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "materialize": {
+              "items": {
+                "$ref": "#/$defs/MaterializeBindingStats"
+              },
+              "title": "Materialize",
+              "type": "array"
+            }
+          },
+          "required": [
+            "capture",
+            "materialize"
+          ],
+          "title": "CatalogTaskStats",
+          "type": "object"
+        },
+        "DeriveStats": {
+          "additionalProperties": true,
+          "properties": {
+            "transforms": {
+              "items": {
+                "$ref": "#/$defs/DeriveTransformStats"
+              },
+              "title": "Transforms",
+              "type": "array"
+            },
+            "published": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/DocsAndBytes"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "out": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/DocsAndBytes"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "lastPublishedAt": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Lastpublishedat"
+            }
+          },
+          "required": [
+            "transforms"
+          ],
+          "title": "DeriveStats",
+          "type": "object"
+        },
+        "DeriveTransformStats": {
+          "additionalProperties": true,
+          "properties": {
+            "transform": {
+              "title": "Transform",
+              "type": "string"
+            },
+            "source": {
+              "title": "Source",
+              "type": "string"
+            },
+            "input": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/DocsAndBytes"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "lastSourcePublishedAt": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Lastsourcepublishedat"
+            },
+            "bytesBehind": {
+              "title": "Bytesbehind",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "transform",
+            "source",
+            "bytesBehind"
+          ],
+          "title": "DeriveTransformStats",
+          "type": "object"
+        },
+        "DocsAndBytes": {
+          "additionalProperties": true,
+          "properties": {
+            "docsTotal": {
+              "title": "Docstotal",
+              "type": "integer"
+            },
+            "bytesTotal": {
+              "title": "Bytestotal",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "docsTotal",
+            "bytesTotal"
+          ],
+          "title": "DocsAndBytes",
+          "type": "object"
+        },
+        "MaterializeBindingStats": {
+          "additionalProperties": true,
+          "properties": {
+            "collection": {
+              "title": "Collection",
+              "type": "string"
+            },
+            "left": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/DocsAndBytes"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "right": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/DocsAndBytes"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "out": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/DocsAndBytes"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "lastSourcePublishedAt": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Lastsourcepublishedat"
+            },
+            "bytesBehind": {
+              "title": "Bytesbehind",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "collection",
+            "bytesBehind"
+          ],
+          "title": "MaterializeBindingStats",
+          "type": "object"
+        },
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "catalogName": {
+          "title": "Catalogname",
+          "type": "string"
+        },
+        "grain": {
+          "enum": [
+            "HOURLY",
+            "DAILY",
+            "MONTHLY"
+          ],
+          "title": "Grain",
+          "type": "string"
+        },
+        "timestamp": {
+          "format": "date-time",
+          "title": "Timestamp",
+          "type": "string"
+        },
+        "statsSummary": {
+          "$ref": "#/$defs/CatalogStatsSummary"
+        },
+        "taskStats": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CatalogTaskStats"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "catalogName",
+        "grain",
+        "timestamp",
+        "statsSummary"
+      ],
+      "title": "CatalogStats",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/catalogName",
+      "/grain",
+      "/timestamp"
+    ]
+  },
+  {
+    "recommendedName": "catalog_stats_monthly",
+    "resourceConfig": {
+      "name": "catalog_stats_monthly",
+      "interval": "PT1H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "CaptureBindingStats": {
+          "additionalProperties": true,
+          "properties": {
+            "collection": {
+              "title": "Collection",
+              "type": "string"
+            },
+            "right": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/DocsAndBytes"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "out": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/DocsAndBytes"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "lastPublishedAt": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Lastpublishedat"
+            }
+          },
+          "required": [
+            "collection"
+          ],
+          "title": "CaptureBindingStats",
+          "type": "object"
+        },
+        "CatalogStatsSummary": {
+          "additionalProperties": true,
+          "properties": {
+            "readByMe": {
+              "$ref": "#/$defs/DocsAndBytes"
+            },
+            "readFromMe": {
+              "$ref": "#/$defs/DocsAndBytes"
+            },
+            "writtenByMe": {
+              "$ref": "#/$defs/DocsAndBytes"
+            },
+            "writtenToMe": {
+              "$ref": "#/$defs/DocsAndBytes"
+            },
+            "warnings": {
+              "title": "Warnings",
+              "type": "integer"
+            },
+            "errors": {
+              "title": "Errors",
+              "type": "integer"
+            },
+            "failures": {
+              "title": "Failures",
+              "type": "integer"
+            },
+            "usageSeconds": {
+              "title": "Usageseconds",
+              "type": "integer"
+            },
+            "txnCount": {
+              "title": "Txncount",
+              "type": "integer"
+            },
+            "lastPublishedAt": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Lastpublishedat"
+            }
+          },
+          "required": [
+            "readByMe",
+            "readFromMe",
+            "writtenByMe",
+            "writtenToMe",
+            "warnings",
+            "errors",
+            "failures",
+            "usageSeconds",
+            "txnCount"
+          ],
+          "title": "CatalogStatsSummary",
+          "type": "object"
+        },
+        "CatalogTaskStats": {
+          "additionalProperties": true,
+          "properties": {
+            "capture": {
+              "items": {
+                "$ref": "#/$defs/CaptureBindingStats"
+              },
+              "title": "Capture",
+              "type": "array"
+            },
+            "derive": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/DeriveStats"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "materialize": {
+              "items": {
+                "$ref": "#/$defs/MaterializeBindingStats"
+              },
+              "title": "Materialize",
+              "type": "array"
+            }
+          },
+          "required": [
+            "capture",
+            "materialize"
+          ],
+          "title": "CatalogTaskStats",
+          "type": "object"
+        },
+        "DeriveStats": {
+          "additionalProperties": true,
+          "properties": {
+            "transforms": {
+              "items": {
+                "$ref": "#/$defs/DeriveTransformStats"
+              },
+              "title": "Transforms",
+              "type": "array"
+            },
+            "published": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/DocsAndBytes"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "out": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/DocsAndBytes"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "lastPublishedAt": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Lastpublishedat"
+            }
+          },
+          "required": [
+            "transforms"
+          ],
+          "title": "DeriveStats",
+          "type": "object"
+        },
+        "DeriveTransformStats": {
+          "additionalProperties": true,
+          "properties": {
+            "transform": {
+              "title": "Transform",
+              "type": "string"
+            },
+            "source": {
+              "title": "Source",
+              "type": "string"
+            },
+            "input": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/DocsAndBytes"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "lastSourcePublishedAt": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Lastsourcepublishedat"
+            },
+            "bytesBehind": {
+              "title": "Bytesbehind",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "transform",
+            "source",
+            "bytesBehind"
+          ],
+          "title": "DeriveTransformStats",
+          "type": "object"
+        },
+        "DocsAndBytes": {
+          "additionalProperties": true,
+          "properties": {
+            "docsTotal": {
+              "title": "Docstotal",
+              "type": "integer"
+            },
+            "bytesTotal": {
+              "title": "Bytestotal",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "docsTotal",
+            "bytesTotal"
+          ],
+          "title": "DocsAndBytes",
+          "type": "object"
+        },
+        "MaterializeBindingStats": {
+          "additionalProperties": true,
+          "properties": {
+            "collection": {
+              "title": "Collection",
+              "type": "string"
+            },
+            "left": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/DocsAndBytes"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "right": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/DocsAndBytes"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "out": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/DocsAndBytes"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "lastSourcePublishedAt": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Lastsourcepublishedat"
+            },
+            "bytesBehind": {
+              "title": "Bytesbehind",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "collection",
+            "bytesBehind"
+          ],
+          "title": "MaterializeBindingStats",
+          "type": "object"
+        },
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "catalogName": {
+          "title": "Catalogname",
+          "type": "string"
+        },
+        "grain": {
+          "enum": [
+            "HOURLY",
+            "DAILY",
+            "MONTHLY"
+          ],
+          "title": "Grain",
+          "type": "string"
+        },
+        "timestamp": {
+          "format": "date-time",
+          "title": "Timestamp",
+          "type": "string"
+        },
+        "statsSummary": {
+          "$ref": "#/$defs/CatalogStatsSummary"
+        },
+        "taskStats": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CatalogTaskStats"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "catalogName",
+        "grain",
+        "timestamp",
+        "statsSummary"
+      ],
+      "title": "CatalogStats",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/catalogName",
+      "/grain",
+      "/timestamp"
+    ]
+  },
+  {
+    "recommendedName": "live_specs",
+    "resourceConfig": {
+      "name": "live_specs",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        }
+      },
+      "title": "BaseDocument",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "task_status",
+    "resourceConfig": {
+      "name": "task_status",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        }
+      },
+      "title": "BaseDocument",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "publication_history",
+    "resourceConfig": {
+      "name": "publication_history",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "catalogName": {
+          "title": "Catalogname",
+          "type": "string"
+        },
+        "publicationId": {
+          "title": "Publicationid",
+          "type": "string"
+        },
+        "publishedAt": {
+          "format": "date-time",
+          "title": "Publishedat",
+          "type": "string"
+        }
+      },
+      "required": [
+        "catalogName",
+        "publicationId",
+        "publishedAt"
+      ],
+      "title": "PublicationHistoryItem",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/catalogName",
+      "/publicationId"
+    ]
+  },
+  {
+    "recommendedName": "alerts",
+    "resourceConfig": {
+      "name": "alerts",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        }
+      },
+      "title": "BaseDocument",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "alert_configs",
+    "resourceConfig": {
+      "name": "alert_configs",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        }
+      },
+      "title": "BaseDocument",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "alert_subscriptions",
+    "resourceConfig": {
+      "name": "alert_subscriptions",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        }
+      },
+      "title": "BaseDocument",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "storage_mappings",
+    "resourceConfig": {
+      "name": "storage_mappings",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        }
+      },
+      "title": "BaseDocument",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "data_planes",
+    "resourceConfig": {
+      "name": "data_planes",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        }
+      },
+      "title": "BaseDocument",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "service_accounts",
+    "resourceConfig": {
+      "name": "service_accounts",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        }
+      },
+      "title": "BaseDocument",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "connectors",
+    "resourceConfig": {
+      "name": "connectors",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        }
+      },
+      "title": "BaseDocument",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "invoices",
+    "resourceConfig": {
+      "name": "invoices",
+      "interval": "PT1H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        }
+      },
+      "title": "BaseDocument",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  }
+]

@@ -1,0 +1,185 @@
+info:
+  name: full history
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{graphql_url}}"
+  body:
+    type: json
+    data: |-
+      {
+        "query": "query PubHistoryFull($name: Name!) {\n  liveSpecs(by: { names: [$name] }) {\n    edges { node {\n      catalogName\n      publicationHistory(first: 1000) {\n        pageInfo { hasNextPage endCursor }\n        edges { cursor node { publicationId publishedAt } }\n      }\n    } }\n  }\n}",
+        "variables": {
+          "name": "{{ph_spec}}"
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        const h = res.getBody()?.data?.liveSpecs?.edges?.[0]?.node?.publicationHistory?.edges ?? [];
+        if (h.length >= 2) { bru.setVar('ph_after', h[1].cursor); bru.setVar('ph_count', h.length); }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 — gpt-notion full history, 10 publications"
+    request:
+      url: "{{graphql_url}}"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "liveSpecs": {
+                "edges": [
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/gpt-notion",
+                      "publicationHistory": {
+                        "pageInfo": {
+                          "hasNextPage": false,
+                          "endCursor": "2025-03-27T00:50:03.537997+00:00"
+                        },
+                        "edges": [
+                          {
+                            "cursor": "2024-04-04T13:56:57.454633+00:00",
+                            "node": {
+                              "publicationId": "0d10fbbedc3f8c00",
+                              "publishedAt": "2024-04-04T13:56:57.454633+00:00"
+                            }
+                          },
+                          {
+                            "cursor": "2024-06-27T14:23:35.129414+00:00",
+                            "node": {
+                              "publicationId": "0de94a31eb8001cd",
+                              "publishedAt": "2024-06-27T14:23:35.129414+00:00"
+                            }
+                          },
+                          {
+                            "cursor": "2024-07-31T19:08:12.106771+00:00",
+                            "node": {
+                              "publicationId": "0e415851f28003d8",
+                              "publishedAt": "2024-07-31T19:08:12.106771+00:00"
+                            }
+                          },
+                          {
+                            "cursor": "2024-08-22T16:10:30.494634+00:00",
+                            "node": {
+                              "publicationId": "0e79b5e44079fc00",
+                              "publishedAt": "2024-08-22T16:10:30.494634+00:00"
+                            }
+                          },
+                          {
+                            "cursor": "2024-09-06T08:15:23.226595+00:00",
+                            "node": {
+                              "publicationId": "0e9f7c2947630800",
+                              "publishedAt": "2024-09-06T08:15:23.226595+00:00"
+                            }
+                          },
+                          {
+                            "cursor": "2024-09-06T10:20:26.509431+00:00",
+                            "node": {
+                              "publicationId": "0e9fb56c568b6c00",
+                              "publishedAt": "2024-09-06T10:20:26.509431+00:00"
+                            }
+                          },
+                          {
+                            "cursor": "2024-09-06T14:33:41.124214+00:00",
+                            "node": {
+                              "publicationId": "0ea02950a670a000",
+                              "publishedAt": "2024-09-06T14:33:41.124214+00:00"
+                            }
+                          },
+                          {
+                            "cursor": "2024-10-15T18:06:58.247852+00:00",
+                            "node": {
+                              "publicationId": "0f04f706ba8001d4",
+                              "publishedAt": "2024-10-15T18:06:58.247852+00:00"
+                            }
+                          },
+                          {
+                            "cursor": "2025-03-27T00:49:48.391360+00:00",
+                            "node": {
+                              "publicationId": "10a6d288358001ee",
+                              "publishedAt": "2025-03-27T00:49:48.391360+00:00"
+                            }
+                          },
+                          {
+                            "cursor": "2025-03-27T00:50:03.537997+00:00",
+                            "node": {
+                              "publicationId": "10a6d2a5a1800260",
+                              "publishedAt": "2025-03-27T00:50:03.537997+00:00"
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+  - name: "200 — PermissionDenied for unreadable name (whole request fails)"
+    request:
+      url: "{{graphql_url}}"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": null,
+            "errors": [
+              {
+                "message": "PermissionDenied: REDACTED is not authorized to access prefix or name '{{ph_spec}}' with required capability read",
+                "locations": [
+                  {
+                    "line": 2,
+                    "column": 3
+                  }
+                ],
+                "path": [
+                  "liveSpecs"
+                ]
+              }
+            ]
+          }
+
+docs: |-
+  **REFERENCE:** [publicationHistory resolver](https://github.com/estuary/flow/blob/master/crates/control-plane-api/src/server/public/graphql/publication_history.rs)
+
+  **WHY:** Full history for one spec, using the `names` form of `liveSpecs`. This
+  is the same shape the connector uses to drain a single spec whose nested
+  history page came back with `hasNextPage: true`. It shows that forward order is
+  oldest-first, that the edge `cursor` round-trips `publishedAt` at full
+  (microsecond) precision, and how `publicationId` orders relative to
+  `publishedAt`. Sets `ph_after` to the **second** item's `publishedAt` for
+  `Publication History / after boundary probe`.
+
+  Run `Publication History / nested bare` first (it sets `ph_spec`).
+
+  **VERIFIED (2026-10-07):** forward order is oldest-first. Edge `cursor` == `publishedAt`, with microseconds and `+00:00`. `publicationId` ascends in lockstep with `publishedAt` here, but it is not filterable. The last item's id equals `liveSpec.lastPubId`. With `first: 1000` over 10 items, `hasNextPage` is false (exact: this resolver fetches `limit + 1`, so no trailing empty page).
+
+
+  **LIMITATION (VERIFIED 2026-10-07):** a `names` entry (or `prefix`) that the key cannot read fails the **whole** request: HTTP 200, `data: null`, `errors[0].message` = `PermissionDenied: … is not authorized to access prefix or name '…' with required capability read`. The second example was captured when the chain var was unset. A configured prefix that loses its grant therefore raises `GraphQLError` for the whole sweep, never a silent partial.

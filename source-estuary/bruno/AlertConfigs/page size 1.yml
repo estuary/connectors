@@ -1,0 +1,69 @@
+info:
+  name: page size 1
+  type: graphql
+  seq: 3
+graphql:
+  method: POST
+  url: "{{base_url}}/api/graphql"
+  body:
+    query: |-
+      query AlertConfigs($prefix: String!) {
+        alertConfigs(filter: { catalogPrefixOrName: { startsWith: $prefix } }, first: 1) {
+          pageInfo { hasNextPage endCursor }
+          edges { cursor node { id catalogPrefixOrName } }
+        }
+      }
+    variables: |-
+      {
+        "prefix": "{{test_prefix_nested}}"
+      }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true
+
+docs: |-
+  **REFERENCE:** https://github.com/estuary/flow/blob/master/crates/control-plane-api/src/server/public/graphql/alert_configs.rs
+
+  **WHY:** Forward Relay contract with a tiny page: `hasNextPage` must be true
+  when more rows exist, and `endCursor` must equal the last edge's cursor
+  (here the `catalogPrefixOrName` itself).
+
+  **VERIFIED (2026-10-07):** `first: 1` with a single matching row gives `hasNextPage: false`, `endCursor` = the row's `catalogPrefixOrName`. A multi-page forward walk isn't observable here (only 1 row); the same async-graphql Relay pager is VERIFIED multi-page in `Connectors / page 2` and `Invoices / page size 1`.
+
+examples:
+  - name: 200 - first 1, single row, hasNextPage false
+    request:
+      url: "{{base_url}}/api/graphql"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: "application/json"
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "alertConfigs": {
+                "pageInfo": {
+                  "hasNextPage": false,
+                  "endCursor": "Artificial-Industries/"
+                },
+                "edges": [
+                  {
+                    "cursor": "Artificial-Industries/",
+                    "node": {
+                      "id": "15373da214d8a400",
+                      "catalogPrefixOrName": "Artificial-Industries/"
+                    }
+                  }
+                ]
+              }
+            }
+          }
