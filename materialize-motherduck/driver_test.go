@@ -87,6 +87,64 @@ func TestIntegration(t *testing.T) {
 	t.Run("fence", func(t *testing.T) {
 		runFenceSuite(t, motherduckVariant)
 	})
+
+	t.Run("truncate", func(t *testing.T) {
+		if testutil.RuntimeV1() {
+			t.Skip("backfill signals require runtime-next")
+		}
+		testutil.RunTestAllTasks(t, "testdata/truncate.flow.yaml", func(t *testing.T, _ []byte, taskName string, cfg config) {
+			t.Run(taskName, func(t *testing.T) {
+				var ctx = context.Background()
+				db, err := cfg.db(ctx)
+				require.NoError(t, err)
+				defer db.Close()
+
+				for _, table := range []string{"truncate_standard", "truncate_delta", "truncate_no_published_at"} {
+					_, err = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s.%s;", cfg.Schema, table))
+					require.NoError(t, err)
+				}
+				var checkpoints int
+				require.NoError(t, db.QueryRowContext(ctx,
+					"SELECT COUNT(*) FROM information_schema.tables WHERE table_catalog = ? AND table_schema = ? AND table_name = 'flow_checkpoints_v1'",
+					cfg.Database, cfg.Schema,
+				).Scan(&checkpoints))
+				if checkpoints > 0 {
+					_, err = db.ExecContext(ctx, fmt.Sprintf("DELETE FROM %s.flow_checkpoints_v1 WHERE materialization = ?;", cfg.Schema), taskName)
+					require.NoError(t, err)
+				}
+
+				testutil.RunFlowctl(t, "raw", "preview-next",
+					"--name", taskName,
+					"--source", "testdata/truncate.flow.yaml",
+					"--fixture", "testdata/truncate.fixture.json",
+					"--shards", "1",
+					"--timeout", "5m",
+					"--network", "flow-test",
+				)
+
+				// The fixture stores ids 1-3, then re-stores only id 1 during a
+				// backfill. Only the standard table with a flow_published_at
+				// column loses the rows published before the backfill.
+				for table, want := range map[string][]int64{
+					"truncate_standard":        {1},
+					"truncate_delta":           {1, 1, 2, 3},
+					"truncate_no_published_at": {1, 2, 3},
+				} {
+					var rows, err = db.QueryContext(ctx, fmt.Sprintf("SELECT id FROM %s.%s ORDER BY id;", cfg.Schema, table))
+					require.NoError(t, err)
+					var ids []int64
+					for rows.Next() {
+						var id int64
+						require.NoError(t, rows.Scan(&id))
+						ids = append(ids, id)
+					}
+					require.NoError(t, rows.Err())
+					require.NoError(t, rows.Close())
+					require.Equal(t, want, ids, table)
+				}
+			})
+		})
+	})
 }
 
 func makeTestResource(table string, delta bool) tableConfig {
