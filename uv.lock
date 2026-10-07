@@ -55,6 +55,7 @@ members = [
     "source-monday",
     "source-navan",
     "source-notion",
+    "source-okta",
     "source-outreach",
     "source-pendo",
     "source-posthog",
@@ -2474,6 +2475,21 @@ requires-dist = [
     { name = "estuary-cdk", extras = ["airbyte-shim"], editable = "estuary-cdk" },
     { name = "pydantic", specifier = ">=2,<3" },
     { name = "types-requests", specifier = ">=2.31,<3.0" },
+]
+
+[[package]]
+name = "source-okta"
+version = "0.1.0"
+source = { editable = "source-okta" }
+dependencies = [
+    { name = "estuary-cdk" },
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "estuary-cdk", editable = "estuary-cdk" },
+    { name = "pydantic", specifier = ">=2,<3" },
 ]
 
 [[package]]
