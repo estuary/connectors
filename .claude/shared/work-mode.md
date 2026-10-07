@@ -62,7 +62,7 @@ The credential stop is unavoidable — the user has to produce secrets you can't
 
 > **One thing only you can do.** I have built the skeleton of `source-<name>` and set up <scheme> authentication. To go further I need real credentials.
 >
-> 1. **Credentials.** Put these values in `source-<name>/config.yaml`: <fields>. Then encrypt the file: `<sops command>`. Reply when it is done.
+> 1. **Credentials.** Run `sops edit source-<name>/config.yaml`: it opens the decrypted file in your editor and re-encrypts on save. Replace the placeholder values of <fields>; keep the key names as they are. Reply when it is done.
 > 2. **Why it matters.** You may skip this: building from documentation alone is a supported mode. But with credentials I test every stream against the live API and the snapshot tests run on real data, which improves the result in several ways: the connector is built on what the API actually returns, not on what the documentation says it should. Without them the plans rest on documentation alone, nothing is verified, and your first production run is the first real test. Be aware that the API responses I read pass through Anthropic and are subject to its data-retention policy. Reply "no credentials" to continue without them.
 > 3. **Decisions so far**: streams <list>; authentication <scheme> (the provider also offers <other schemes>, if you hold those credentials instead); API budget <plan>; seeding <assistant / user / none, as you answered — who runs seeding requests>. Say so if you want any of them changed.
 >
