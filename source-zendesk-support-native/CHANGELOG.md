@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-08
+
+### Changed
+- `ticket_metric_events` now trails roughly 30 minutes behind the present. Previously, events recorded more than 5 minutes late could be missed.
+
 ## 2026-10-01
 
 ### Changed
