@@ -57,6 +57,10 @@ TIME_PARAMETER_DELAY = timedelta(seconds=61)
 # over records younger than INCREMENTAL_LAG, giving late arrivals time to appear
 # before the cursor moves past their timestamp.
 INCREMENTAL_LAG = timedelta(minutes=5)
+# Zendesk can record ticket metric events many minutes after the ticket change that
+# produced them, stamped with that change's time. ticket_metric_events trails further
+# behind the present so these late events surface before its cursor passes them.
+TICKET_METRIC_EVENTS_LAG = timedelta(minutes=30)
 
 DATETIME_STRING_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 INCREMENTAL_TIME_EXPORT_REQ_PER_MIN_LIMIT = 10
@@ -295,6 +299,7 @@ async def fetch_incremental_cursor_paginated_resources(
     filter_param: FilterParam,
     cursor_field: str,
     response_model: type[IncrementalCursorPaginatedResponse],
+    lag: timedelta,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[ZendeskResource | LogCursor, None]:
@@ -309,7 +314,7 @@ async def fetch_incremental_cursor_paginated_resources(
 
     last_seen_dt = log_cursor
     last_checkpointed = log_cursor
-    horizon = datetime.now(tz=UTC) - INCREMENTAL_LAG
+    horizon = datetime.now(tz=UTC) - lag
 
     if horizon <= log_cursor:
         return

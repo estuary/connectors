@@ -71,6 +71,7 @@ from .api import (
     url_base,
     _dt_to_s,
     INCREMENTAL_LAG,
+    TICKET_METRIC_EVENTS_LAG,
     TIME_PARAMETER_DELAY,
 )
 
@@ -557,6 +558,7 @@ def incremental_cursor_paginated_resources(
         filter_param: FilterParam,
         cursor_field: str,
         response_model: type[IncrementalCursorPaginatedResponse],
+        lag: timedelta,
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
         state: ResourceState,
@@ -576,6 +578,7 @@ def incremental_cursor_paginated_resources(
                 filter_param,
                 cursor_field,
                 response_model,
+                lag,
             ),
             fetch_page=functools.partial(
                 backfill_incremental_cursor_paginated_resources,
@@ -589,25 +592,29 @@ def incremental_cursor_paginated_resources(
             )
         )
 
-    cutoff = datetime.now(tz=UTC) - max(INCREMENTAL_LAG, TIME_PARAMETER_DELAY)
+    resources: list[common.Resource] = []
 
-    resources = [
+    for (name, path, filter_param, cursor_field, response_model) in INCREMENTAL_CURSOR_PAGINATED_RESOURCES:
+        lag = TICKET_METRIC_EVENTS_LAG if name == "ticket_metric_events" else INCREMENTAL_LAG
+
+        cutoff = datetime.now(tz=UTC) - max(lag, TIME_PARAMETER_DELAY)
+
+        resources.append(
             common.Resource(
-            name=name,
-            key=["/id"],
-            model=ZendeskResource,
-            open=functools.partial(open, path, filter_param, cursor_field, response_model),
-            initial_state=ResourceState(
-                inc=ResourceState.Incremental(cursor=cutoff),
-                backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None)
-            ),
-            initial_config=ResourceConfig(
-                name=name, interval=timedelta(minutes=5)
-            ),
-            schema_inference=True,
+                name=name,
+                key=["/id"],
+                model=ZendeskResource,
+                open=functools.partial(open, path, filter_param, cursor_field, response_model, lag),
+                initial_state=ResourceState(
+                    inc=ResourceState.Incremental(cursor=cutoff),
+                    backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None)
+                ),
+                initial_config=ResourceConfig(
+                    name=name, interval=timedelta(minutes=5)
+                ),
+                schema_inference=True,
+            )
         )
-        for (name, path, filter_param, cursor_field, response_model) in INCREMENTAL_CURSOR_PAGINATED_RESOURCES
-    ]
 
     return resources
 
