@@ -88,7 +88,9 @@ var recording struct {
 	// failFirst limits failWith to the first failFirst statements when
 	// non-zero; otherwise failWith fails every statement.
 	failFirst int
-	attempts  int
+	// failMatching limits failWith to statements containing it when set.
+	failMatching string
+	attempts     int
 }
 
 func (recordingDriver) Open(string) (driver.Conn, error) { return recordingConn{}, nil }
@@ -110,7 +112,8 @@ func (recordingConn) QueryContext(_ context.Context, query string, _ []driver.Na
 	recording.mu.Lock()
 	defer recording.mu.Unlock()
 	recording.attempts++
-	if recording.failWith != nil && (recording.failFirst == 0 || recording.attempts <= recording.failFirst) {
+	if recording.failWith != nil && (recording.failFirst == 0 || recording.attempts <= recording.failFirst) &&
+		(recording.failMatching == "" || strings.Contains(query, recording.failMatching)) {
 		return nil, recording.failWith
 	}
 	recording.executed = append(recording.executed, query)
@@ -134,7 +137,7 @@ func recordingDB(t *testing.T, failWith error) *stdsql.DB {
 	t.Helper()
 	registerRecordingDriver()
 
-	recording.executed, recording.failWith, recording.failFirst, recording.attempts = nil, failWith, 0, 0
+	recording.executed, recording.failWith, recording.failFirst, recording.failMatching, recording.attempts = nil, failWith, 0, "", 0
 	db, err := stdsql.Open("recording", "")
 	require.NoError(t, err)
 	t.Cleanup(func() { db.Close() })
@@ -361,7 +364,7 @@ func TestAcknowledge(t *testing.T) {
 
 		state, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
 		require.NoError(t, err)
-		require.Equal(t, []string{"Q1", "Q2"}, recording.executed)
+		require.ElementsMatch(t, []string{"Q1", "Q2"}, recording.executed)
 		require.True(t, state.MergePatch)
 		require.JSONEq(t, `{
 			"a_table.v1": {"00000000-ffffffff": null},
@@ -1034,4 +1037,54 @@ func TestDeleteDirectoryRecurses(t *testing.T) {
 	var deleted = d.files.(*fakeFiles).deleted
 	require.ElementsMatch(t, []string{"/t/part-0.parquet", "/t/_delta_log/0.json", "/t/_delta_log", "/t"}, deleted)
 	require.Equal(t, "/t", deleted[len(deleted)-1], "a directory is deleted after its contents")
+}
+
+// secondBinding adds a second renderable binding, b_table, to a rendering
+// transactor.
+func secondBinding(d *transactor) {
+	var target = renderableTable()
+	target.TableShape.Path = sql.TablePath{"schema", "b_table"}
+	target.Identifier = "`schema`.`b_table`"
+	target.StateKey = "b_table.v1"
+	d.bindings = append(d.bindings, &binding{target: target, rootStagingPath: d.bindings[0].rootStagingPath})
+}
+
+func TestAcknowledgeCommitsBindingsConcurrently(t *testing.T) {
+	t.Run("every binding's entries commit and clear", func(t *testing.T) {
+		var d = renderingTransactor(lowerRangeKey)
+		secondBinding(d)
+		d.cp.add("a_table.v1", lowerRangeKey, dirItem(true, []mergeBoundLiterals{bound("1", "10"), bound("'2024-01-01T00:00:00Z'", "'2024-01-02T00:00:00Z'")}, "txn-a"))
+		d.cp.add("b_table.v1", lowerRangeKey, dirItem(false, nil, "txn-b"))
+
+		state, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
+		require.NoError(t, err)
+
+		require.Len(t, recording.executed, 2)
+		var queries = strings.Join(recording.executed, "\n")
+		require.Contains(t, queries, "MERGE INTO `schema`.`a_table`")
+		require.Contains(t, queries, "COPY INTO `schema`.`b_table`")
+		require.JSONEq(t, `{
+			"a_table.v1": {"00000000-7fffffff": null},
+			"b_table.v1": {"00000000-7fffffff": null}
+		}`, string(state.UpdatedJson))
+		require.Empty(t, d.cp)
+	})
+
+	t.Run("a failed binding keeps its entries pending", func(t *testing.T) {
+		var d = renderingTransactor(lowerRangeKey)
+		secondBinding(d)
+		d.cp.add("a_table.v1", lowerRangeKey, dirItem(false, nil, "txn-a"))
+		d.cp.add("b_table.v1", lowerRangeKey, dirItem(false, nil, "txn-b"))
+
+		var db = recordingDB(t, fmt.Errorf("b_table is locked"))
+		recording.failMatching = "`b_table`"
+		_, err := d.acknowledgeApply(context.Background(), db, allKeys)
+		require.ErrorContains(t, err, "b_table is locked")
+
+		// The other binding may or may not have committed before the failure
+		// cancelled it; either way nothing is cleared, so recovery re-applies
+		// both.
+		require.NotNil(t, d.cp["a_table.v1"])
+		require.NotNil(t, d.cp["b_table.v1"])
+	})
 }
