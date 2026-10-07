@@ -547,6 +547,12 @@ type checkpointItem struct {
 	// NeedsMerge marks entries whose files must MERGE into the target table;
 	// otherwise a direct COPY INTO suffices.
 	NeedsMerge bool `json:",omitempty"`
+	// Fields are the selected fields of each staged row in column order, so
+	// the entry commits by the columns it was staged with even when the
+	// binding's selection has since changed. An entry without Fields was
+	// staged before this was recorded and commits by the binding's current
+	// columns.
+	Fields []string `json:",omitempty"`
 
 	// round is the transaction round this session staged the entry in, for
 	// attributing its commit's row stats. Recovered and peer entries are
@@ -841,6 +847,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			StagingTable: b.stagingTable,
 			Bounds:       boundsLiterals(b.storeMergeBounds.Build()),
 			NeedsMerge:   !b.target.DeltaUpdates && b.needsMerge,
+			Fields:       columnFields(b.target.Columns()),
 			round:        it.Round,
 		})
 		b.needsMerge, b.stagingTable = false, "" // reset for next round
@@ -877,6 +884,57 @@ func (d *transactor) copyIntoStagingTable(ctx context.Context, db *stdsql.DB, b 
 	}
 	b.stagingTable = name
 	return nil
+}
+
+// columnFields lists the selected field of each column, in column order.
+func columnFields(cols []*sql.Column) []string {
+	out := make([]string, 0, len(cols))
+	for _, col := range cols {
+		out = append(out, col.Field)
+	}
+	return out
+}
+
+// stagedTable returns the table and staged-file schema DDL for committing rows
+// staged with the given fields in column order. Nil fields denote rows staged
+// by the binding's current columns.
+func (b *binding) stagedTable(fields []string) (sql.Table, string, error) {
+	if fields == nil {
+		return b.target, b.storeSchema, nil
+	}
+
+	current := make(map[string]*sql.Column, len(b.target.Columns()))
+	for _, col := range b.target.Columns() {
+		current[col.Field] = col
+	}
+
+	table := b.target
+	table.Keys = nil
+	table.Values = nil
+	table.Document = nil
+
+	for idx, field := range fields {
+		col, ok := current[field]
+		if !ok {
+			return sql.Table{}, "", fmt.Errorf("staged field %q is not a column of the binding", field)
+		}
+		switch {
+		case idx < len(b.target.Keys):
+			if b.target.Keys[idx].Field != field {
+				return sql.Table{}, "", fmt.Errorf("staged field %q at key position %d does not match key %q", field, idx, b.target.Keys[idx].Field)
+			}
+			table.Keys = append(table.Keys, *col)
+		case b.target.Document != nil && b.target.Document.Field == field:
+			table.Document = col
+		default:
+			table.Values = append(table.Values, *col)
+		}
+	}
+	if len(table.Keys) != len(b.target.Keys) {
+		return sql.Table{}, "", fmt.Errorf("staged fields %v do not cover the binding's %d keys", fields, len(b.target.Keys))
+	}
+
+	return table, stagedSchemaDDL(table.Columns(), true), nil
 }
 
 func stagingIdentifier(b *binding, name string) string {
@@ -1074,13 +1132,27 @@ func (d *transactor) commitBindingCheckpointItems(ctx context.Context, db *stdsq
 		}
 	}
 
-	if len(coalesce) > 0 {
-		var needsMerge bool
-		for _, item := range coalesce {
-			needsMerge = needsMerge || item.NeedsMerge
+	// Entries coalesce per staged field list, since each list is its own
+	// staged row layout.
+	var groups [][]*checkpointItem
+	for _, item := range coalesce {
+		idx := slices.IndexFunc(groups, func(g []*checkpointItem) bool {
+			return slices.Equal(g[0].Fields, item.Fields)
+		})
+		if idx == -1 {
+			groups = append(groups, []*checkpointItem{item})
+		} else {
+			groups[idx] = append(groups[idx], item)
 		}
+	}
+	for _, group := range groups {
+		table, schema, err := b.stagedTable(group[0].Fields)
+		if err != nil {
+			return fmt.Errorf("resolving staged columns for %q: %w", b.target.Path, err)
+		}
+		needsMerge := slices.ContainsFunc(group, func(item *checkpointItem) bool { return item.NeedsMerge })
 
-		queries, err := d.renderCommitQueries(b, coalesce, combineBounds(b.target.Keys, coalesce), needsMerge)
+		queries, err := d.renderCommitQueries(b, table, schema, group, combineBounds(table.Keys, group), needsMerge)
 		if err != nil {
 			return err
 		}
@@ -1207,12 +1279,14 @@ func scanRowStats(rows *stdsql.Rows) m.RowStats {
 // renderCommitQueries renders the queries which commit the staged files of
 // checkpoint entries into the binding's target table: MERGE when any of the
 // staged rows update existing documents, and a direct COPY INTO otherwise.
+// table and schema describe the rows as staged, which may be fewer columns
+// than the binding now has.
 // Entries with a staging directory are read whole; the root-level files of
 // entries written before staging directories existed are read one by one,
 // chunked to bound the size of any single query.
 // TODO: remove the root-level file path in about January 2027, after every
 // task has started on this version and drained its pending checkpoint.
-func (d *transactor) renderCommitQueries(b *binding, items []*checkpointItem, bounds []sql.MergeBound, needsMerge bool) ([]string, error) {
+func (d *transactor) renderCommitQueries(b *binding, table sql.Table, schema string, items []*checkpointItem, bounds []sql.MergeBound, needsMerge bool) ([]string, error) {
 	var dirs, tables, rootFiles []string
 	for _, item := range items {
 		if item.StagingTable != "" && needsMerge {
@@ -1227,14 +1301,14 @@ func (d *transactor) renderCommitQueries(b *binding, items []*checkpointItem, bo
 	var queries []string
 	if !needsMerge {
 		for chunk := range slices.Chunk(rootFiles, queryBatchSize) {
-			if query, err := RenderTableWithFiles(b.target, chunk, b.rootStagingPath, d.templates.copyIntoDirect, bounds); err != nil {
+			if query, err := RenderTableWithFiles(table, chunk, b.rootStagingPath, d.templates.copyIntoDirect, bounds); err != nil {
 				return nil, fmt.Errorf("copyIntoDirect template: %w", err)
 			} else {
 				queries = append(queries, query)
 			}
 		}
 		for _, dir := range dirs {
-			if query, err := RenderTableWithFiles(b.target, nil, dir, d.templates.copyIntoDirect, bounds); err != nil {
+			if query, err := RenderTableWithFiles(table, nil, dir, d.templates.copyIntoDirect, bounds); err != nil {
 				return nil, fmt.Errorf("copyIntoDirect template: %w", err)
 			} else {
 				queries = append(queries, query)
@@ -1244,14 +1318,14 @@ func (d *transactor) renderCommitQueries(b *binding, items []*checkpointItem, bo
 	}
 
 	for chunk := range slices.Chunk(rootFiles, queryBatchSize) {
-		if query, err := RenderTableWithStaged(b.target, nil, pathsWithRoot(b.rootStagingPath, chunk), b.storeSchema, d.templates.mergeInto, bounds); err != nil {
+		if query, err := RenderTableWithStaged(table, nil, pathsWithRoot(b.rootStagingPath, chunk), schema, d.templates.mergeInto, bounds); err != nil {
 			return nil, fmt.Errorf("mergeInto template: %w", err)
 		} else {
 			queries = append(queries, query)
 		}
 	}
 	if len(dirs) > 0 || len(tables) > 0 {
-		if query, err := renderTemplate(d.templates.mergeInto, &tableWithFiles{Table: &b.target, Directories: dirs, Tables: tables, Schema: b.storeSchema, Bounds: bounds}); err != nil {
+		if query, err := renderTemplate(d.templates.mergeInto, &tableWithFiles{Table: &table, Directories: dirs, Tables: tables, Schema: schema, Bounds: bounds}); err != nil {
 			return nil, fmt.Errorf("mergeInto template: %w", err)
 		} else {
 			queries = append(queries, query)
