@@ -5,6 +5,10 @@
 - A transaction's tables are committed concurrently, up to five at a time,
   instead of one after another.
 
+### Fixed
+- Materializations no longer fail to commit a pending transaction after fields
+  are added to a binding's selection.
+
 ## 2026-10-01
 ### Changed
 - Updates to existing rows are copied into a Delta staging table once a

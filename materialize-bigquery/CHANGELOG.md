@@ -1,5 +1,11 @@
 # materialize-bigquery
 
+## 2026-10-07
+
+### Fixed
+- Materializations no longer fail to commit a pending transaction after fields
+  are added to a binding's selection.
+
 ## 2026-09-22
 
 ### Fixed
