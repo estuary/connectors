@@ -43,6 +43,9 @@ const volumeName = "flow_staging"
 // deleteConcurrency is how many Files API deletes a cleanup runs at once.
 const deleteConcurrency = 16
 
+// maxConcurrentCommits is how many bindings commit at once.
+const maxConcurrentCommits = 5
+
 const sweepAge = 24 * time.Hour
 
 type tableConfig struct {
@@ -967,6 +970,11 @@ func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB, should
 	// Everything else pending — entries of other state keys, and entries whose
 	// table no longer has a binding (it might be deleted already) — is left
 	// untouched, remaining pending in the persisted state.
+	//
+	// Bindings commit concurrently, since each operates on its own table.
+	var group, groupCtx = errgroup.WithContext(ctx)
+	group.SetLimit(maxConcurrentCommits)
+	var committed []string
 	for _, b := range d.bindings {
 		var sk = b.target.StateKey
 		if !shouldProcess(sk) {
@@ -989,10 +997,16 @@ func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB, should
 			continue
 		}
 
-		if err := d.commitBindingCheckpointItems(ctx, db, b, items); err != nil {
-			return nil, err
-		}
+		committed = append(committed, sk)
+		group.Go(func() error {
+			return d.commitBindingCheckpointItems(groupCtx, db, b, items)
+		})
+	}
+	if err := group.Wait(); err != nil {
+		return nil, err
+	}
 
+	for _, sk := range committed {
 		for rk := range d.cp[sk] {
 			clearAt(sk)[rk] = nil
 		}

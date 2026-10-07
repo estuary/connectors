@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-07
+### Changed
+- A transaction's tables are committed concurrently, up to five at a time,
+  instead of one after another.
+
 ## 2026-10-01
 ### Changed
 - Updates to existing rows are copied into a Delta staging table once a
