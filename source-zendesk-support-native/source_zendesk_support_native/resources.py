@@ -24,6 +24,7 @@ from .models import (
     ResourceConfig,
     ResourceState,
     SideConversation,
+    SideConversationEvent,
     TimestampedResource,
     ZendeskResource,
     EPOCH,
@@ -50,6 +51,7 @@ from .api import (
     backfill_satisfaction_ratings,
     backfill_talk_incremental_export_resources,
     backfill_side_conversations,
+    backfill_side_conversation_events,
     backfill_ticket_child_resources,
     backfill_ticket_metrics,
     fetch_audit_logs,
@@ -62,6 +64,7 @@ from .api import (
     fetch_post_comment_votes,
     fetch_satisfaction_ratings,
     fetch_side_conversations,
+    fetch_side_conversation_events,
     fetch_talk_incremental_export_resources,
     fetch_ticket_child_resources,
     fetch_ticket_metrics,
@@ -70,6 +73,7 @@ from .api import (
     snapshot_cursor_paginated_resources,
     url_base,
     _dt_to_s,
+    _s_to_dt,
     INCREMENTAL_LAG,
     TIME_PARAMETER_DELAY,
 )
@@ -100,6 +104,7 @@ TALK_STREAMS = [
 
 SIDE_CONVERSATION_STREAMS = [
     "side_conversations",
+    "side_conversation_events",
 ]
 
 
@@ -155,6 +160,25 @@ async def _is_side_conversations_enabled(
     body = await http.request(log, f"{url_base(config.subdomain)}/account/settings")
     settings = AccountSettings.model_validate_json(body)
     return settings.settings.side_conversations.show_in_context_panel
+
+
+# Only admins can use the side conversation events export.
+async def _can_export_side_conversation_events(
+        log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> bool:
+    try:
+        await http.request(
+            log,
+            f"{url_base(config.subdomain)}/tickets/side_conversations/events",
+            params={"start_time": _dt_to_s(datetime.now(tz=UTC))},
+        )
+    except HTTPError as err:
+        if err.code == 403:
+            return False
+        else:
+            raise err
+
+    return True
 
 
 async def validate_credentials(
@@ -903,6 +927,54 @@ def side_conversations(
     )
 
 
+def side_conversation_events(
+        log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> common.Resource:
+
+    def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings,
+    ):
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=functools.partial(
+                fetch_side_conversation_events,
+                http,
+                config.subdomain,
+            ),
+            fetch_page=functools.partial(
+                backfill_side_conversation_events,
+                http,
+                config.subdomain,
+                config.start_date,
+            ),
+        )
+
+    # Floored to a whole second, the export's start_time precision.
+    cutoff = _s_to_dt(_dt_to_s(datetime.now(tz=UTC) - INCREMENTAL_LAG))
+
+    return common.Resource(
+        name="side_conversation_events",
+        key=["/id"],
+        model=SideConversationEvent,
+        open=open,
+        initial_state=ResourceState(
+            inc=ResourceState.Incremental(cursor=cutoff),
+            backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None),
+        ),
+        initial_config=ResourceConfig(
+            name="side_conversation_events", interval=timedelta(minutes=5)
+        ),
+        schema_inference=True,
+    )
+
+
 def post_child_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
@@ -1006,6 +1078,7 @@ def _generate_resources(
         *incremental_cursor_export_resources(log, http, config),
         *ticket_child_resources(log, http, config),
         side_conversations(log, http, config),
+        side_conversation_events(log, http, config),
         *post_child_resources(log, http, config),
         post_comment_votes(log, http, config),
     ]
@@ -1032,6 +1105,8 @@ async def all_resources(
 
     if not await _is_side_conversations_enabled(log, http, config):
         excluded_streams.update(SIDE_CONVERSATION_STREAMS)
+    elif not await _can_export_side_conversation_events(log, http, config):
+        excluded_streams.add("side_conversation_events")
 
     if excluded_streams:
         resources = [r for r in resources if r.name not in excluded_streams]
