@@ -142,7 +142,7 @@ Copy the `authUrlTemplate`/`accessTokenBody` mustache shapes from the closest re
   - Google: add `google_spec=GOOGLE_SPEC`.
 - Implement `validate_credentials` to hit a **cheap, always-available, read-only** endpoint (e.g. `/me`, `/account`, a 1-item list) and raise `ValidationError` with an actionable message on `401`. Model it on `source-front`'s `validate_credentials` (probe + `HTTPError` → `ValidationError`). Pick the probe endpoint from the provider docs; note it in the Output so `bruno-probe-endpoint` can confirm it live.
 
-**`config.yaml`** — reshape the placeholder to the chosen scheme (e.g. `credentials: {credentials_title: "API Key", access_token: PLACEHOLDER}` or the OAuth/refresh-token fields), still with placeholder values.
+**`config.yaml`** — reshape the encrypted placeholder to the chosen scheme by editing it through `sops edit config.yaml` (decrypts into your editor, re-encrypts on save), still with placeholder values. Every secret key keeps the `_sops` suffix: `credentials: {credentials_title: "API Key", access_token_sops: PLACEHOLDER}`, or `client_secret_sops` / `refresh_token_sops` for OAuth. The file stays in its final shape so the user only replaces values.
 
 ## Phase 5 — Smoke test
 
@@ -154,7 +154,7 @@ Confirm the emitted `configSchema` shows the credential option(s) with the right
 
 ## Phase 6 — Hand off (`GATE-CREDENTIALS`)
 
-`config.yaml` still holds placeholders, and the credentials are the user's to provide. Hand back the two facts the gate needs: the fields for the chosen scheme, and the sops command (match a sibling connector's `sops`/KMS setup). Under `create-capture-connector` the orchestrator composes the stop; standalone, resolve it per the gate table in [`interaction-mode.md`](../../shared/interaction-mode.md).
+`config.yaml` still holds placeholders, and the credentials are the user's to provide. Hand back the two facts the gate needs: the fields for the chosen scheme, and the edit command, `sops edit source-$1/config.yaml`, which replaces the placeholder values in place and keeps the file encrypted. Under `create-capture-connector` the orchestrator composes the stop; standalone, resolve it per the gate table in [`interaction-mode.md`](../../shared/interaction-mode.md).
 
 ## Output
 
@@ -167,7 +167,7 @@ configure-auth: source-$1
 - validate_credentials probe endpoint: <path>  (PENDING — confirm via bruno-probe-endpoint)
 - spec smoke test: PASS/FAIL   (oauth2 block present: yes/no)
 - AUTH SEAM markers removed from: models.py, resources.py, config.yaml
-- BLOCKING HANDOFF: user must populate + sops-encrypt config.yaml before anything live runs (Phase 6).
+- BLOCKING HANDOFF: user must replace the placeholder values via `sops edit config.yaml` before anything live runs (Phase 6).
 - NEXT (after credentials are in): bruno-probe-endpoint to confirm the probe authenticates; then classify-stream-types / add-stream per stream.
 ```
 
