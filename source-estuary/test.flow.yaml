@@ -5,7 +5,7 @@ captures:
     endpoint:
       local:
         command:
-        - /Users/jonwihl/Desktop/EstuarySource/connectors/source-estuary/.venv/bin/python
+        - python
         - -m
         - source_estuary
         config: config.yaml
