@@ -419,11 +419,16 @@ fn responsible_for_partition(range: &Option<RangeSpec>, topic: &str, partition: 
     hash >= range.key_begin && hash <= range.key_end
 }
 
+// Reversing the partition number's bits gives both halves of every midpoint
+// split the same number of a topic's partitions, give or take one. The topic's
+// hash keeps different topics from favoring the same shards. A partition's key
+// depends only on its topic and number, so adding partitions never moves
+// existing ones.
 fn partition_key(topic: &str, partition: i32) -> u32 {
     let mut hasher = HighwayHasher::new(bytes_to_key(&HIGHWAY_HASH_KEY));
     hasher.append(topic.as_bytes());
-    hasher.append(&partition.to_le_bytes());
-    (hasher.finalize64() >> 32) as u32
+    let topic_hash = (hasher.finalize64() >> 32) as u32;
+    topic_hash ^ (partition as u32).reverse_bits()
 }
 
 async fn parse_datum(
@@ -1072,6 +1077,22 @@ mod tests {
             ));
         }
         insta::assert_snapshot!(out);
+    }
+
+    #[test]
+    fn partition_key_balance() {
+        for topic in ["orders", "events", "a", ""] {
+            for partitions in 1..=40 {
+                for count in [2, 4, 8, 16] {
+                    let per_shard = partitions_per_shard(topic, partitions, &equal_shards(count));
+                    let floor = partitions as usize / count;
+                    assert!(
+                        per_shard.iter().all(|&n| n == floor || n == floor + 1),
+                        "topic {topic:?}, {partitions} partitions, {count} shards: {per_shard:?}"
+                    );
+                }
+            }
+        }
     }
 
     // A key on the edge of a shard's range must belong to that shard. An
