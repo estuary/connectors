@@ -21,8 +21,8 @@ from ..models import (
 from .shared import (
     CURSOR_PAGINATION_PAGE_SIZE,
     url_base,
-    _s_to_dt,
-    _is_timestamp,
+    s_to_dt,
+    is_timestamp,
 )
 
 from .cursor_exports import (
@@ -110,8 +110,8 @@ async def fetch_ticket_child_resources(
 
     start_date: datetime | None = None
 
-    if _is_timestamp(cursor):
-        start_date = _s_to_dt(int(cursor))
+    if is_timestamp(cursor):
+        start_date = s_to_dt(int(cursor))
         cursor = None
 
     tickets_generator = _fetch_incremental_cursor_export_resources(http, subdomain, "tickets", start_date, cursor, log)
@@ -237,8 +237,8 @@ async def fetch_side_conversations(
 
     start_date: datetime | None = None
 
-    if _is_timestamp(cursor):
-        start_date = _s_to_dt(int(cursor))
+    if is_timestamp(cursor):
+        start_date = s_to_dt(int(cursor))
         cursor = None
 
     tickets_generator = _fetch_incremental_cursor_export_resources(
@@ -334,8 +334,8 @@ async def fetch_ticket_metrics(
 
     start_date: datetime | None = None
 
-    if _is_timestamp(cursor):
-        start_date = _s_to_dt(int(cursor))
+    if is_timestamp(cursor):
+        start_date = s_to_dt(int(cursor))
         cursor = None
 
     sideload_params = {

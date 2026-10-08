@@ -14,9 +14,9 @@ from ..models import (
 from .shared import (
     CURSOR_PAGINATION_PAGE_SIZE,
     url_base,
-    _dt_to_s,
-    _dt_to_str,
-    _str_to_dt,
+    dt_to_s,
+    dt_to_str,
+    str_to_dt,
 )
 
 # Zendesk can record ticket metric events many minutes after the ticket change that
@@ -31,9 +31,9 @@ def _convert_log_cursor_for_filter_param(
 ) -> str | int:
     match filter_param:
         case FilterParam.START_TIME:
-            return _dt_to_s(cursor)
+            return dt_to_s(cursor)
         case FilterParam.SINCE:
-            return _dt_to_str(cursor)
+            return dt_to_str(cursor)
         case _:
             raise RuntimeError(f"Unknown filter parameter type {filter}.")
 
@@ -73,14 +73,14 @@ async def fetch_incremental_cursor_paginated_resources(
         if (
             last_seen_dt > last_checkpointed
             and response.resources
-            and _str_to_dt(getattr(response.resources[0], cursor_field)) > last_seen_dt
+            and str_to_dt(getattr(response.resources[0], cursor_field)) > last_seen_dt
         ):
             yield last_seen_dt
             last_checkpointed = last_seen_dt
 
 
         for resource in response.resources:
-            resource_dt = _str_to_dt(getattr(resource, cursor_field))
+            resource_dt = str_to_dt(getattr(resource, cursor_field))
             # Skip records Zendesk may not have finished making visible.
             if resource_dt >= horizon:
                 continue
@@ -130,7 +130,7 @@ async def backfill_incremental_cursor_paginated_resources(
     )
 
     for resource in response.resources:
-        resource_dt = _str_to_dt(getattr(resource, cursor_field))
+        resource_dt = str_to_dt(getattr(resource, cursor_field))
         if resource_dt >= cutoff:
             return
 
