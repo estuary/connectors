@@ -5,6 +5,7 @@ import (
 	"embed"
 	"encoding/json"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -366,6 +367,83 @@ func TestRunApplyDrainsPendingState(t *testing.T) {
 	}
 }
 
+// TestRunApplyDrainsOnFieldSelectionChange verifies that Apply drains pending
+// state when a binding's field selection changes but its resource needs no
+// action, because every selected column already exists.
+func TestRunApplyDrainsOnFieldSelectionChange(t *testing.T) {
+	ctx := context.Background()
+
+	pendingState := json.RawMessage(`{"key_value":{"query":"MERGE INTO ..."}}`)
+	clearingPatch := &pf.ConnectorState{UpdatedJson: json.RawMessage(`{"key_value":null}`), MergePatch: true}
+
+	for _, tt := range []struct {
+		name        string
+		lastSpec    func(*pf.MaterializationSpec)
+		wantAckKeys []string
+		wantState   *pf.ConnectorState
+	}{
+		{
+			name: "re-selecting an existing column drains pending state",
+			lastSpec: func(s *pf.MaterializationSpec) {
+				s.Bindings[0].FieldSelection.Values = slices.DeleteFunc(s.Bindings[0].FieldSelection.Values, func(f string) bool {
+					return f == "optionalVal2"
+				})
+			},
+			wantAckKeys: []string{"key_value"},
+			wantState:   clearingPatch,
+		},
+		{
+			name: "reordering the selected values drains pending state",
+			lastSpec: func(s *pf.MaterializationSpec) {
+				vals := s.Bindings[0].FieldSelection.Values
+				require.Greater(t, len(vals), 1)
+				vals[0], vals[1] = vals[1], vals[0]
+			},
+			wantAckKeys: []string{"key_value"},
+			wantState:   clearingPatch,
+		},
+		{
+			name:        "an unchanged selection without actions does not drain",
+			lastSpec:    func(*pf.MaterializationSpec) {},
+			wantAckKeys: nil,
+			wantState:   nil,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			newSpec := loadMaterializerSpec(t, "base.flow.proto")
+			lastSpec := loadMaterializerSpec(t, "base.flow.proto")
+			tt.lastSpec(lastSpec)
+
+			req := &pm.Request_Apply{
+				Materialization:     newSpec,
+				Version:             "thisone",
+				LastMaterialization: lastSpec,
+				LastVersion:         "oldone",
+				StateJson:           pendingState,
+			}
+
+			// Every column of the new selection already exists, so the
+			// binding's update is empty and yields no action.
+			is := testInfoSchemaFromSpec(t, newSpec, func(in string) string { return in })
+			rec := &drainRecorder{ackPatch: clearingPatch, noopUpdates: true}
+
+			applied, err := RunApply(ctx, req, makeDrainTestMaterializerFn(rec, is))
+			require.NoError(t, err)
+
+			require.Equal(t, tt.wantAckKeys, rec.ackKeys)
+			require.Equal(t, tt.wantState, applied.State)
+			require.Equal(t, 0, rec.executedActions)
+
+			if tt.wantState != nil {
+				require.Contains(t, applied.ActionDescription, "committed previously staged transaction for state keys: key_value")
+				require.Same(t, lastSpec, rec.openedSpec)
+			} else {
+				require.Nil(t, rec.openedSpec)
+			}
+		})
+	}
+}
+
 type testCalls struct {
 	createResource   [][]string
 	updateResource   [][]string
@@ -632,6 +710,7 @@ type drainRecorder struct {
 	ackKeys         []string
 	ackPatch        *pf.ConnectorState // returned by Acknowledge
 	destroyed       bool
+	noopUpdates     bool // UpdateResource yields no action, as for an update with nothing to do
 }
 
 type drainTestMaterializer struct {
@@ -669,6 +748,9 @@ func (d *drainTestMaterializer) DeleteResource(ctx context.Context, path []strin
 }
 
 func (d *drainTestMaterializer) UpdateResource(ctx context.Context, path []string, existing ExistingResource, update BindingUpdate[testEndpointConfiger, testResourcer, testMappedTyper]) (string, ActionApplyFn, error) {
+	if d.rec.noopUpdates {
+		return "", nil, nil
+	}
 	return "", d.countingAction(), nil
 }
 
