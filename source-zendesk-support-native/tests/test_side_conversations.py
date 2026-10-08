@@ -7,11 +7,11 @@ from unittest.mock import patch, MagicMock
 import pytest
 
 from estuary_cdk.http import HTTPError
-from source_zendesk_support_native.api import (
+from source_zendesk_support_native.api.shared import _dt_to_s
+from source_zendesk_support_native.api.ticket_children import (
     _fetch_side_conversations,
     fetch_side_conversations,
     backfill_side_conversations,
-    _dt_to_s,
 )
 from source_zendesk_support_native.models import SideConversation, TimestampedResource
 from source_zendesk_support_native.resources import _is_side_conversations_enabled
@@ -135,7 +135,7 @@ class TestFetchSideConversationsIncremental:
         http.queue({"side_conversations": [_side_conv("sc-1", 101)], "next_page": None})
         http.queue({"side_conversations": [_side_conv("sc-2", 102)], "next_page": None})
 
-        with patch("source_zendesk_support_native.api._fetch_incremental_cursor_export_resources") as mock_export:
+        with patch("source_zendesk_support_native.api.ticket_children._fetch_incremental_cursor_export_resources") as mock_export:
             mock_export.return_value = _async_iter([_ticket(101), _ticket(102), next_page])
 
             results = [r async for r in fetch_side_conversations(http, "subdomain", log, cursor)]
@@ -155,7 +155,7 @@ class TestFetchSideConversationsIncremental:
         # Only ticket 102 should be fetched (101 is deleted)
         http.queue({"side_conversations": [_side_conv("sc-2", 102)], "next_page": None})
 
-        with patch("source_zendesk_support_native.api._fetch_incremental_cursor_export_resources") as mock_export:
+        with patch("source_zendesk_support_native.api.ticket_children._fetch_incremental_cursor_export_resources") as mock_export:
             mock_export.return_value = _async_iter([
                 _ticket(101, status="deleted"),
                 _ticket(102),
@@ -175,7 +175,7 @@ class TestFetchSideConversationsIncremental:
 
         http = MockHTTP()
 
-        with patch("source_zendesk_support_native.api._fetch_incremental_cursor_export_resources") as mock_export:
+        with patch("source_zendesk_support_native.api.ticket_children._fetch_incremental_cursor_export_resources") as mock_export:
             # No next_page cursor means generator completes without yielding
             mock_export.return_value = _async_iter([])
 
@@ -199,7 +199,7 @@ class TestBackfillSideConversations:
         http.queue({"side_conversations": [_side_conv("sc-1", 101)], "next_page": None})
         http.queue({"side_conversations": [_side_conv("sc-2", 102)], "next_page": None})
 
-        with patch("source_zendesk_support_native.api._fetch_incremental_cursor_export_resources") as mock_export:
+        with patch("source_zendesk_support_native.api.ticket_children._fetch_incremental_cursor_export_resources") as mock_export:
             mock_export.return_value = _async_iter([
                 _ticket(101, updated_at="2026-01-01T00:00:00Z"),
                 _ticket(102, updated_at="2026-02-01T00:00:00Z"),
@@ -225,7 +225,7 @@ class TestBackfillSideConversations:
         # Only ticket 101 (before cutoff) should be fetched
         http.queue({"side_conversations": [_side_conv("sc-1", 101)], "next_page": None})
 
-        with patch("source_zendesk_support_native.api._fetch_incremental_cursor_export_resources") as mock_export:
+        with patch("source_zendesk_support_native.api.ticket_children._fetch_incremental_cursor_export_resources") as mock_export:
             mock_export.return_value = _async_iter([
                 _ticket(101, updated_at="2026-01-01T00:00:00Z"),   # before cutoff
                 _ticket(102, updated_at="2026-02-01T00:00:00Z"),   # at/after cutoff — stop
@@ -248,7 +248,7 @@ class TestBackfillSideConversations:
         http = MockHTTP()
         http.queue({"side_conversations": [_side_conv("sc-2", 102)], "next_page": None})
 
-        with patch("source_zendesk_support_native.api._fetch_incremental_cursor_export_resources") as mock_export:
+        with patch("source_zendesk_support_native.api.ticket_children._fetch_incremental_cursor_export_resources") as mock_export:
             mock_export.return_value = _async_iter([
                 _ticket(101, status="deleted"),
                 _ticket(102),
@@ -274,7 +274,7 @@ class TestBackfillSideConversations:
         http.queue_error(500)
 
         results: list[SideConversation | str] = []
-        with patch("source_zendesk_support_native.api._fetch_incremental_cursor_export_resources") as mock_export:
+        with patch("source_zendesk_support_native.api.ticket_children._fetch_incremental_cursor_export_resources") as mock_export:
             mock_export.return_value = _async_iter([_ticket(101), _ticket(102), next_page])
 
             with pytest.raises(HTTPError):
