@@ -359,12 +359,16 @@ fn responsible_for_partition(range: &Option<RangeSpec>, topic: &str, partition: 
         Some(r) => r,
     };
 
+    let hash = partition_key(topic, partition);
+
+    hash >= range.key_begin && hash <= range.key_end
+}
+
+fn partition_key(topic: &str, partition: i32) -> u32 {
     let mut hasher = HighwayHasher::new(bytes_to_key(&HIGHWAY_HASH_KEY));
     hasher.append(topic.as_bytes());
     hasher.append(&partition.to_le_bytes());
-    let hash = (hasher.finalize64() >> 32) as u32;
-
-    hash >= range.key_begin && hash <= range.key_end
+    (hasher.finalize64() >> 32) as u32
 }
 
 async fn parse_datum(
@@ -943,5 +947,93 @@ mod tests {
         let mut out = FlushCountingWriter::default();
         write_checkpoint("t", 0, 0, &mut out).unwrap();
         assert_eq!(out.flushes, 1, "a checkpoint must flush");
+    }
+
+    fn full_range() -> RangeSpec {
+        RangeSpec {
+            key_begin: 0,
+            key_end: u32::MAX,
+            r_clock_begin: 0,
+            r_clock_end: u32::MAX,
+        }
+    }
+
+    // Flow splits a shard's key range at this midpoint (`map_shard_to_split`
+    // in Flow's activate crate). The tests must match it to model real splits.
+    fn split(range: &RangeSpec) -> (RangeSpec, RangeSpec) {
+        let pivot = (range.key_begin as u64 + range.key_end as u64).div_ceil(2) as u32;
+        (
+            RangeSpec {
+                key_end: pivot - 1,
+                ..*range
+            },
+            RangeSpec {
+                key_begin: pivot,
+                ..*range
+            },
+        )
+    }
+
+    fn equal_shards(count: usize) -> Vec<RangeSpec> {
+        let mut shards = vec![full_range()];
+        while shards.len() < count {
+            shards = shards
+                .iter()
+                .flat_map(|range| {
+                    let (lhs, rhs) = split(range);
+                    [lhs, rhs]
+                })
+                .collect();
+        }
+        shards
+    }
+
+    fn partitions_per_shard(topic: &str, partitions: i32, shards: &[RangeSpec]) -> Vec<usize> {
+        shards
+            .iter()
+            .map(|range| {
+                (0..partitions)
+                    .filter(|p| responsible_for_partition(&Some(*range), topic, *p))
+                    .count()
+            })
+            .collect()
+    }
+
+    // Changing a partition's key moves it to a different shard once a capture
+    // has been split, so the keys must never change by accident.
+    #[test]
+    fn partition_key_placement() {
+        let mut out = String::new();
+        for partition in 0..16 {
+            out.push_str(&format!(
+                "partition {partition:>2}: {:08x}\n",
+                partition_key("orders", partition)
+            ));
+        }
+        for count in [2, 4, 8] {
+            out.push_str(&format!(
+                "{count} shards: {:?}\n",
+                partitions_per_shard("orders", 16, &equal_shards(count))
+            ));
+        }
+        insta::assert_snapshot!(out);
+    }
+
+    // A key on the edge of a shard's range must belong to that shard. An
+    // exclusive bound would leave the partition with no owner, or give it two.
+    #[test]
+    fn key_range_bounds_are_inclusive() {
+        let key = partition_key("orders", 0);
+        let owns = |key_begin, key_end| {
+            let range = RangeSpec {
+                key_begin,
+                key_end,
+                ..full_range()
+            };
+            responsible_for_partition(&Some(range), "orders", 0)
+        };
+        assert!(owns(key, key));
+        assert!(!owns(0, key - 1));
+        assert!(!owns(key + 1, u32::MAX));
     }
 }
