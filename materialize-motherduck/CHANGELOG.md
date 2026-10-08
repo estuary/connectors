@@ -1,5 +1,13 @@
 # materialize-motherduck
 
+## 2026-10-08
+
+### Changed
+- The integration test suite now runs against a MotherDuck organization owned
+  service account instead of a personal account. Its `ci_testing` and
+  `ci_testing_ducklake` databases are shared read-only with every member of
+  the organization.
+
 ## 2026-10-05
 
 ### Added

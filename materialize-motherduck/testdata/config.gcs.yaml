@@ -1,6 +1,6 @@
 database: ci_testing
 schema: main
-token_sops: ENC[AES256_GCM,data:zJKezW9wWrmo5uZHt3BK/P5AWm6dIWnskg3KTh38q9v5O/w/LsVaSH+WVP+hT92zBF8wl83Q02reRcz3VUK1ma0bNkONkj9u2VPQb16TdlRp0f2lG1SOPcDP/1VhSpnoeRo9DFxsejg3+AwfMbkkTX2iCIZL59+yzFEX6PwRNsih1rtxR66MsjuPyFfspIKaxN1MXDpAUi1ESi1CvSB2N7bUtghLQ6n+87fIJ04FcVFwRUfuOPkdxC9ONNoJi/evha5cvfncZ8jOap8fwC1AjNY/5b13E5kEixmIAryWcnhydg5sgufFGsi6WMTMhMzb+4qkZGcuTd953KF3jGtf5qo6vcku8lYN8KUtTlTZb3WldILNO6Lu0/10s718BxR3n71qKGYmThFWwaeguFHbT79fS+/ffFeenx4ReoffAM+GS4DrWH5B/h7VmjqyHtvU3lOi,iv:u2LmumgY2AOqDd57vagcSbRPc13R6UfQyopX+kK/QHI=,tag:PHuliexX5UNKzcOCVvsuJg==,type:str]
+token_sops: ENC[AES256_GCM,data:XrdnEJZxMmU7655Ny/LguNvB06B2Sx0E6GdMLzKpEgQ8ARlXYwt9lLQNH6xAe+7ZTlKO+zZjqJco8qsfpRbqmOaOS+BAKXJSC9CmIJ3ZFn+8rnBsO4JQvvS7tIcw5NXjTTRL3EtawIPaEtVNHYUNsYdHP3XGIBhj3nN0hTKMYst2JCFS8VYTOJLOY+0nuKSUVWZlVaebDxZGaTd34hMzmlXTyjq8AxMJOKDUKPaTLmOVSchDlt8tGXYub6b8oiF+ykvoFh9zfmpJlpD/wi4WAbp1ElihXXEWpvbMbx6c1UCmpCJVijmYPSU7j6XksrUaKLM1XKQWotn8a30YTkcrdP2XpuU+J0MoXY6hwAeUIrE6QWLlhkAID4/5pi4Y9jTDx5ZuFFb6wir75jjg9fy9Bk0gFREYEgQQRrHE2Lzh6nQwOARtdsGOEbP56Zs2aqYFYOc9RYQSz/sfoq8u1eK7Qu6xSmHQJAHm1jv4tTqySU3E4CGxqfD7d9SFhA1b8tj7m90+CZaLLJ3e7gRn6PffuhZsLq7AhEJtrZ7bukJfq97UiqLcLDa//lJBd4BFbNspQTYpAvzM3ANx4mxlanMXn0iUzAxP3/sMidwAfjuW6w151RAUSFZQU2kJW3fzu8UQIZg6vhp17quRFYgFSAUXotYJUs/DKj0RjrdUWByDqvCdd8Z77Q0ypmtGR40SoFiKSNz0GfT9mQ==,iv:S0EqSX8YgfFLLUuTVVqmkq3mYYiEp2J9GdyEZqiOqyM=,tag:Jqmt1i4Zd9g+8ha7Bak1cw==,type:str]
 hardDelete: true
 stagingBucket:
     stagingBucketType: GCS
@@ -13,16 +13,11 @@ syncSchedule:
 advanced:
     feature_flags: allow_existing_tables_for_new_bindings
 sops:
-    kms: []
     gcp_kms:
         - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
           created_at: "2024-05-23T21:25:19Z"
           enc: CiQAdmEdwuYd5dgBmZKmE/v2/ebAF9rqZVtWs48HNDf1NOr11gQSSQCSobQjWx53iByTq/afJbpWDsWW4U67+LzfXRO15Ui1vpC2UaJKz58rMXUjoTy/umt1ftuZxKhaa9BzrLWfwLUvKCuBivYAwwA=
-    azure_kv: []
-    hc_vault: []
-    age: []
-    lastmodified: "2025-09-19T21:49:28Z"
-    mac: ENC[AES256_GCM,data:7wBUaoQFjXW6ew3FZ2/pVJoJfmAHYyNBnROwu+LifWCjjkYQIz72A1Ke6T0p5wSsEqJnpE7ete1Z0uPaEtG58/RA0ZiSOhCZ2hB8GTnHpqiGbqqw/bTIYEvqlqfbmEQgNwMv9r9xmE108PRMDYHTyLdkpITRRjb3wc8i5sX3jX8=,iv:0WZx34WCaKlkjZwe0sgKWV1kQ+qaN4noUgrJxRUUeWw=,tag:S3P/06KJWsMTg+4/f4khUw==,type:str]
-    pgp: []
+    lastmodified: "2026-10-08T16:30:18Z"
+    mac: ENC[AES256_GCM,data:+Frr2mLbIQ8Y61DV1tpmeSpSKzdD9WmdoTSSptBCjr/I78fZJo1BLOuule/820B2iDzTFk+lAqF2qmDRwrU+bTe/HZehfKXe1HmqNdYAoiBMOe0hgBD/Su5WUU5R9DgQnRTdW0Y5ZO+/+wvJn2UkoNTHKuSlf1AaLLAD9f2raZ0=,iv:zMEFBQkdUWwk4naTCnKnUt8eqzy1cq8m2gdvM8H/B7Y=,tag:ckHqUaYNy7Kp9Sq908SmVg==,type:str]
     encrypted_suffix: _sops
     version: 3.9.4
