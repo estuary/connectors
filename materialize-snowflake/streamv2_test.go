@@ -97,7 +97,7 @@ func TestStreamV2Manager(t *testing.T) {
 	// table, since a manager sweeps every channel that names its materialization.
 	var testMaterialization = "test/streamV2Materialization-" + testRunNonce
 
-	var tableName = "STREAMV2_TEST"
+	var tableName = "STREAMV2_TEST_" + testRunNonce
 	var cleanup = func() {
 		db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s;", tableName))
 	}
@@ -748,7 +748,7 @@ func TestStreamV2Manager(t *testing.T) {
 			// kept for its whole life too. Whether a drop takes that with it
 			// is measured rather than assumed, because it is what the fake sidecar
 			// and the sidecar's own tests model a drop as doing.
-			var notNullTable = "STREAMV2_TEST_DROP_NOT_NULL"
+			var notNullTable = "STREAMV2_TEST_DROP_NOT_NULL_" + testRunNonce
 			var rejecting = newManager(fullRange)
 			rejecting.addBinding(cfg.Database, cfg.Schema, notNullTable,
 				rejectingTable(t, notNullTable, "drop-notnull.v1"), nil)
@@ -919,7 +919,7 @@ func TestStreamV2Manager(t *testing.T) {
 		// table. Snowflake reports it only in the channel's row-error
 		// statistics, so the commit wait is where the transaction has to learn
 		// of it rather than acknowledging rows it did not deliver.
-		var notNullTable = "STREAMV2_TEST_NOT_NULL"
+		var notNullTable = "STREAMV2_TEST_NOT_NULL_" + testRunNonce
 		var notNullTarget = rejectingTable(t, notNullTable, "notnull.v1")
 
 		var m = newManager(fullRange)
@@ -985,15 +985,16 @@ func TestStreamV2Manager(t *testing.T) {
 		// what the connector sees is the commit wait which produces the
 		// checkpoint failing promptly with a classified error rather than
 		// hanging.
-		_, err = db.ExecContext(ctx, fmt.Sprintf("CREATE OR REPLACE VIEW STREAMV2_TEST_VIEW AS SELECT * FROM %s;", tableName))
+		var viewName = "STREAMV2_TEST_VIEW_" + testRunNonce
+		_, err = db.ExecContext(ctx, fmt.Sprintf("CREATE OR REPLACE VIEW %s AS SELECT * FROM %s;", viewName, tableName))
 		require.NoError(t, err)
-		defer db.ExecContext(ctx, "DROP VIEW IF EXISTS STREAMV2_TEST_VIEW;")
+		defer db.ExecContext(ctx, fmt.Sprintf("DROP VIEW IF EXISTS %s;", viewName))
 
 		var viewTarget = target("view.v1")
-		viewTarget.Identifier = "STREAMV2_TEST_VIEW"
+		viewTarget.Identifier = viewName
 
 		var m = newManager(fullRange)
-		m.addBinding(cfg.Database, cfg.Schema, "STREAMV2_TEST_VIEW", viewTarget, nil)
+		m.addBinding(cfg.Database, cfg.Schema, viewName, viewTarget, nil)
 
 		require.NoError(t, testWriteRow(ctx, m, 0, []any{"k", 1, json.RawMessage(`{}`)}))
 
@@ -1141,7 +1142,7 @@ func TestStreamV2Datatypes(t *testing.T) {
 		t.Run(tt.ddl, func(t *testing.T) {
 			var tbl = sql.Table{
 				TableShape: sql.TableShape{Binding: binding, DeltaUpdates: true},
-				Identifier: "STREAMV2_DATATYPES_" + tt.ddl,
+				Identifier: "STREAMV2_DATATYPES_" + tt.ddl + "_" + testRunNonce,
 				Keys:       []sql.Column{{Identifier: `KEY`, MappedType: sql.MappedType{DDL: "INTEGER"}}},
 				Values:     []sql.Column{{Identifier: `VAL`, MappedType: sql.MappedType{DDL: tt.ddl}}},
 				StateKey:   "datatypes." + tt.ddl,
