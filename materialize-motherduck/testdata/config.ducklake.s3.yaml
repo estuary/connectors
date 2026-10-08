@@ -1,6 +1,6 @@
 database: ci_testing_ducklake
 schema: main
-token_sops: ENC[AES256_GCM,data:2vxgVHL+KcAfLGUuPNF/iNYfXYbCzMTra2bo7hx97dKfd7sIR+pXKv6xVR8EjiNkaE6uOj1nFLKI2AK3WLOZUOB1dRP02L8T904wD0/v6DxVl6NhoJtNrxm80F017XRyCHdi3URraTruNWj1gsblGgNFKvKvnxtVZcHHUUDrLjKq973+fhp9laZuAnNbggLaxdA5SMRaYjAbTi5qGRgau0/w9SuONi8nya9cGR8Y0XsfTYDNKpdWYnePCWIuKiq+IxRH+Xdm80WyOoiAzRZ5VohfpOq3/WJBsIS6h3vCjKFW3tcYXVMvpwE2OrDQwULX55F268nevEd8FjwE1EUPd4yS8WFgmPfzXzIaX4kaZ4b0PHizxSa5cPsQdu6hoyxGdCfDOAf/3W03Qo38zgT9nVy8wu0rljcI4hEsPAGfYoxyguIc/X9WPn5gkAmv97vkZQzi,iv:Pg7vhg5cWRvPmi8nTQZ+8Yg8Y17INbtbnNJIP2w89+A=,tag:xX7mUwP6VwHYNVtod18chw==,type:str]
+token_sops: ENC[AES256_GCM,data:/fdyuZm75ydK/eGKilJksc0Q2cUm41faG1+y3QfkfTcaqWDcQW9g4q9XUDXCbZ1HTfA2SYpvhmwOqRWCTE0SY657dIpcY9yukiE6e9PiKIXChzio7xeijZKRW27KfFQHbxOwJDlM/XTnO2gn5H/GaSI6Xpp6hxqBKLxBUDCk4kWASF0bFC1lsXRQJzt/R/+HJvzKVdVqdKAiN3Za3vhn6o6NCLWGNXe22romY/DCLy+z9tRBCjs5X+1byAb67ehulH8zcVj3d4TamMQwhRUX61YPgHZtUWqb+dI47HsJWKjDq8vUmfNjK112HeWGdYNPchSJ06+YOS4zplW8SjFlg2QCUSWbI4nOnhYcVctY5LbRhXwYbL04WEk0+kBxv0RlTQ3ezV0YaAwkZm2mVKX4YPJckkOrvZ1ZiiEt8Zz+3ANn2d9qn8Er4nDSapybrsGPbFsJ7xD7G8I3I4mQACsJLTXbP4Cq7/GervOvX6MQRnyFbxKkv7CwShBIWUmK4QAHjOAzt34Yn4RJDcVl6PmMl5UXw9CzZVg7DgVkl8gc+0+SLAWl9+rYLpn+E+LEePuAGuVWS2Gof5W6ewyb1kFV/mPXjhDBYGTZOHTorTLHtoqX3Qvbdwh/Qcuf//2Bb51ZYfNCQ7+NK36qVyxeXdxgGp1cXrjQbMLCczktbZPASIpWj3vQ3BJ8bWgOBblEcSd6Kz+S0qMLww==,iv:+xYHPxxDv3qPwV0nGG8oDdpBhe0AH0Xd5qAT57HjWls=,tag:qExNMSCUoTsezzL06l+gbw==,type:str]
 hardDelete: true
 stagingBucket:
     stagingBucketType: S3
@@ -17,7 +17,7 @@ sops:
         - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
           created_at: "2026-08-10T17:38:09Z"
           enc: CiUAdmEdwge11kPZazoLgZdwTKfYn5gN+M3/iVD/H/u4IN1eaeBEEkkApbezqtgEOXWrwSzbWbwuqEsMzETdKiaO3YwkAt/Fq7Uro3ZB67Io4dtp+3MVHwSSgFIERQZYRUp8uiTIXuv7oH2OFDsmkx4C
-    lastmodified: "2026-08-10T17:38:10Z"
-    mac: ENC[AES256_GCM,data:z6y74MpU07STJHd+5BvJMr5W/9qssDxC8wwbwutTdCKRLx6DR3rWLUI1vZmbIgkySSLyPVHKdxPcqXOrwcJ5OSJl+n33NeQL8JXm1MyhhT5vi6Y9T/PJDVwE7OFebmLV3hXkJOP0NVFoI7NTKXTZxhokMDpt5dy/rAIIwjAru+g=,iv:Er3j5yiAA5lBiwhA1cGgxxA20PUhtEJaRvVgJLT2ffs=,tag:w1fekLuq4DFoB9/9XZCTdg==,type:str]
+    lastmodified: "2026-10-08T16:30:18Z"
+    mac: ENC[AES256_GCM,data:ztNHR8Ev5+W78ygmkkqL75sQdWcQis/m0mirz5pDL+vrnT9kyfUpJHHIPd5rEdPkYRh5QFH4CduEBBuIEE2B2Rvf1lX5Nt6p6uuUTMvuRi7V2HuE6q0yhkU6sO+fNNKC2+gcWDd1s6CI3IjBCLO+dZUNRdYcdCPtOhtdLBC35Gc=,iv:CnDPSn2iSBybKqmJrZ3OxsFoOxasN75f4jY0D52IC0Y=,tag:0taLcqIDqaEWdl6ysHzJnA==,type:str]
     encrypted_suffix: _sops
     version: 3.12.1
