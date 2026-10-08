@@ -114,8 +114,6 @@ jobs:
         uses: ./.github/actions/setup
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          gcp_project_id: ${{ secrets.GCP_PROJECT_ID }}
-          gcp_service_account_key: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
 
       - name: Install Python
         uses: actions/setup-python@v5

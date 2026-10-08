@@ -331,7 +331,6 @@ jobs:
         run: |
           ${{ matrix.connector }}/run_tests.sh
         env:
-          GCP_SERVICE_ACCOUNT_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
           # The estuary/flow repository contains a few large files in Git LFS. This can
           # present an issue with Go module checksums when using a commit-tagged version,
           # because a commit-tagged version will be fetched from VCS using `git archive`
