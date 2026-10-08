@@ -1,0 +1,24 @@
+info:
+  name: C6 - Delete Contact Bravo
+  type: http
+  seq: 25
+
+http:
+  method: DELETE
+  url: "{{base_url}}/contacts/{{seed_contact_b_id}}"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **ONLY THE USER RUNS THIS — never the assistant.** (API-NEVER-MUTATE)
+
+    **WHY:** Deletion visibility: after this, re-run `Contacts / bare`. Expect Bravo to disappear with no tombstone, i.e. deletions are invisible to an incremental capture. Needs `seed_contact_b_id` from C2.
+
+    Outcome: ran 2026-09-28 by the user; Bravo absent from every later list, no tombstone — VERIFIED in `Contacts / bare`.
+  type: text/markdown

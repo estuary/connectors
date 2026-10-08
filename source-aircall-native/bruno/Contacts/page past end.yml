@@ -1,0 +1,51 @@
+info:
+  name: page past end
+  type: http
+  seq: 10
+
+http:
+  method: GET
+  url: "{{base_url}}/contacts?per_page=50&page=999"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "400 - page 999 out of bound (10k cap)"
+    request:
+      url: "{{base_url}}/contacts?per_page=50&page=999"
+      method: GET
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "error": "Bad Request",
+            "data": null,
+            "message": "BAD_REQUEST",
+            "errors": "Your query is limited to 10k results and pagination is out of bound, please use timestamps or other filters.",
+            "troubleshoot": "BAD_REQUEST",
+            "success": false
+          }
+
+docs:
+  content: |-
+    **REFERENCE:** https://developers.aircall.io/api-references#list-all-contacts
+
+    **WHY:** 10k-cap enforcement mode.
+
+    **LIMITATION (VERIFIED 2026-09-28):** `page=999&per_page=50` → 400
+    `{"message":"BAD_REQUEST","errors":"Your query is limited to 10k results and
+    pagination is out of bound, please use timestamps or other filters."}` — even
+    with `total: 3`. Hard reject; the connector must never exceed page 200 at
+    `per_page=50`.
+  type: text/markdown

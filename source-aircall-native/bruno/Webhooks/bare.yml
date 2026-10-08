@@ -1,0 +1,79 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+http:
+  method: GET
+  url: '{{base_url}}/webhooks?per_page=50'
+  params:
+  - name: per_page
+    value: '50'
+    type: query
+  auth: inherit
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+docs:
+  content: |-
+    **REFERENCE:** https://developers.aircall.io/api-references#list-all-webhooks
+    **WHY:** the `webhooks` stream; decides the key (`webhook_id` UUID vs deprecated integer `id`) and confirms the `token` secret is present (redacted by the collection after-response script).
+
+    **LIMITATION (VERIFIED 2026-09-28):** the `meta` (empty **and** populated) is `{count,total,current_page,per_page}`, with **no** `next_page_link`/`previous_page_link` keys at all. The connector must treat an absent `next_page_link` as null (model it `str | None = None`).
+    (Initially empty, then seeded via `Seeding / B1 - Create Webhook`.)
+
+    **VERIFIED (2026-09-28):** items carry **both** `id` (int, deprecated 2024-04-15) and `webhook_id` (UUID; `direct_link` is built on it), plus `url`, `active`, `events`, `token`, `created_at`. `custom_name` wasn't echoed back even though B1 sent it. `token` (signing secret) **is returned on list** and is redacted here by the collection after-response script; the connector strips it at the model layer.
+    **LIMITATION (VERIFIED 2026-09-28):** the populated `meta` still has no `next_page_link`/`previous_page_link`, so this endpoint probably never sends them. The connector's completion signal is therefore `current_page * per_page >= meta.total` (present on every list), not the link.
+    **UNOBSERVABLE:** whether links appear with more than 50 webhooks (would need 51 seeds, over the ~10-request seeding cap). Moot under the total-based completion rule.
+  type: text/markdown
+examples:
+- name: 200 - empty list (meta lacks link keys)
+  request:
+    url: '{{base_url}}/webhooks?per_page=50'
+    method: GET
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"meta\": {\n    \"count\": 0,\n    \"total\": 0,\n    \"current_page\": 1,\n    \"\
+        per_page\": 50\n  },\n  \"webhooks\": []\n}"
+- name: 200 - populated after seeding (1 webhook, token redacted)
+  request:
+    url: '{{base_url}}/webhooks?per_page=50'
+    method: GET
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: |-
+        {
+          "meta": {
+            "count": 1,
+            "total": 1,
+            "current_page": 1,
+            "per_page": 50
+          },
+          "webhooks": [
+            {
+              "id": 44215352,
+              "direct_link": "https://api.aircall.io/v1/webhooks/7c97a580-72dc-47f0-b593-a82faadc27c2",
+              "url": "https://example.com/estuary-bruno-seed",
+              "active": true,
+              "events": [
+                "number.created"
+              ],
+              "token": "REDACTED",
+              "created_at": "2026-09-28T14:07:54.001Z",
+              "webhook_id": "7c97a580-72dc-47f0-b593-a82faadc27c2"
+            }
+          ]
+        }
