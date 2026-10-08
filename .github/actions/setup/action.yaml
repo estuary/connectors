@@ -5,12 +5,6 @@ inputs:
   github_token:
     description: GitHub token to use.
     required: true
-  gcp_project_id:
-    description: GCP Project for which to set up a service account.
-    required: true
-  gcp_service_account_key:
-    description: GCP Service account.
-    required: true
 
 outputs:
   tag_sha:
@@ -46,7 +40,9 @@ runs:
     - name: Authenticate with GCloud
       uses: google-github-actions/auth@v2
       with:
-        credentials_json: ${{ inputs.gcp_service_account_key }}
+        project_id: estuary-theatre
+        workload_identity_provider: projects/417581116910/locations/global/workloadIdentityPools/github/providers/connectors
+        service_account: storage-testing@estuary-theatre.iam.gserviceaccount.com
 
     - name: Set up GCloud SDK
       uses: google-github-actions/setup-gcloud@v2
