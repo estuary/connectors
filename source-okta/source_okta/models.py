@@ -1,17 +1,17 @@
-from datetime import datetime, timedelta, UTC
-from typing import Literal
+import re
+from datetime import UTC, datetime, timedelta
+from typing import ClassVar, Literal
 
-from pydantic import AwareDatetime, BaseModel, Field, field_validator
-
-from estuary_cdk.capture.common import (
-    BaseDocument,
-    ResourceConfig,
-    ResourceState,
-)
 from estuary_cdk.capture.common import (
     ConnectorState as GenericConnectorState,
 )
+from estuary_cdk.capture.common import (
+    ResourceConfig,
+    ResourceState,
+)
+from estuary_cdk.capture.document import BaseDocument
 from estuary_cdk.flow import AccessToken
+from pydantic import AwareDatetime, BaseModel, Field, field_validator
 
 
 class ApiToken(AccessToken):
@@ -90,4 +90,36 @@ class EndpointConfig(BaseModel):
 
 ConnectorState = GenericConnectorState[ResourceState]
 
-# Stream document models and resource registries are added by `add-stream`.
+
+class OktaApplication(BaseDocument, extra="allow"):
+    """One app integration, ACTIVE or INACTIVE; deleted apps are never listed."""
+
+    PATH: ClassVar[str] = "apps"
+    # Documented maximum; larger values are silently clamped to 200.
+    PAGE_SIZE: ClassVar[int] = 200
+
+    id: str
+
+
+class SystemLogEvent(BaseDocument, extra="allow"):
+    """One System Log event, the atomic audit fact Okta records.
+
+    Only the collection key and the backfill watermark are modelled; every
+    other field rides schema inference. Events are immutable once published.
+    """
+
+    PATH: ClassVar[str] = "logs"
+    SINCE_PARAM: ClassVar[str] = "since"
+    UNTIL_PARAM: ClassVar[str] = "until"
+    AFTER_PARAM: ClassVar[str] = "after"
+    # The `after` token is a position, `<persistence epoch-ms>_<n>`, never a
+    # session handle (`System Log / polling resume after`).
+    AFTER_TOKEN: ClassVar[re.Pattern[str]] = re.compile(r"\d+_\d+")
+    # Okta rejects anything above 1000 with a 400 (System Log / limit over max).
+    PAGE_SIZE: ClassVar[int] = 1000
+
+    uuid: str
+    published: AwareDatetime
+
+    def get_cursor(self) -> AwareDatetime:
+        return self.published
